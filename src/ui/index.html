@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CapIAu — Motor de Inteligência Cinematográfica</title>
+    <!-- Google Fonts: Inter e Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome para ícones premium -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Estilos Customizados -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- ── HEADER / TOP BAR ─────────────────────────────────────────── -->
+        <header class="header glassmorphism">
+            <div class="logo-area">
+                <i class="fa-solid fa-clapperboard logo-icon"></i>
+                <div class="logo-text">
+                    <h1>CapIAu</h1>
+                    <span>Making Of Editor</span>
+                </div>
+            </div>
+
+            <div class="project-area glassmorphism">
+                <i class="fa-solid fa-folder-tree project-icon"></i>
+                <select id="project-selector" title="Projeto Ativo">
+                    <!-- Projetos inseridos dinamicamente -->
+                </select>
+                <button id="btn-new-project" class="btn-icon" title="Novo Projeto">
+                    <i class="fa-solid fa-folder-plus"></i>
+                </button>
+                <button id="btn-delete-project" class="btn-icon btn-danger" title="Deletar Projeto">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
+            
+            <div class="search-area glassmorphism">
+
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="semantic-search-input" placeholder="Buscar falas ou B-rolls semanticamente (ex: escolha das lentes)...">
+                <select id="search-filter">
+                    <option value="">Todas as Mídias</option>
+                    <option value="interview">Entrevistas (ASR)</option>
+                    <option value="broll">Bastidores (B-roll)</option>
+                    <option value="photo">Fotos de Set</option>
+                </select>
+                <button id="btn-search" class="btn-primary">Buscar</button>
+            </div>
+            
+            <div class="actions-area">
+                <button id="btn-scan" class="btn-outline" title="Escanear pasta watch/">
+                    <i class="fa-solid fa-arrows-rotate"></i> Escanear watch/
+                </button>
+                <button id="btn-import-external" class="btn-outline" title="Importar HD ou pasta externa em modo Link">
+                    <i class="fa-solid fa-hard-drive"></i> Importar Pasta/HD
+                </button>
+                <button id="btn-open-proxies" class="btn-outline" title="Abrir pasta local de proxies no Explorer">
+                    <i class="fa-solid fa-folder-open"></i> Abrir Proxies
+                </button>
+                <button id="btn-retry-failed" class="btn-outline" style="color: var(--color-rose); border-color: rgba(244, 63, 94, 0.3);" title="Recomeçar todas as conversões de proxy falhas ou ausentes">
+                    <i class="fa-solid fa-arrows-rotate"></i> Recomeçar Falhas
+                </button>
+                <button id="btn-cluster" class="btn-secondary" title="Agrupar trechos em Temas Narrativos">
+                    <i class="fa-solid fa-brain"></i> Agrupar Temas
+                </button>
+            </div>
+
+        </header>
+
+        <!-- ── MAIN CONTENT WORKSPACE ───────────────────────────────────── -->
+        <div class="workspace">
+            <!-- ── LEFT SIDEBAR (COLLAPSIBLE - MEDIA LIBRARY) ─────────────── -->
+            <aside class="sidebar-left glassmorphism" id="sidebar-left">
+                <div class="sidebar-header">
+                    <h2>
+                        <i class="fa-solid fa-folder-open"></i> Biblioteca
+                        <button id="btn-reload-library" class="btn-icon" title="Recarregar Biblioteca" style="margin-left: 6px; font-size: 13px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                        </button>
+                        <button id="btn-add-media" class="btn-icon" title="Importar Pasta/HD Externo" style="margin-left: 6px; font-size: 13px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </h2>
+                    <button class="btn-toggle-sidebar" id="toggle-left" title="Recolher Painel">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                </div>
+                
+                <div class="media-tabs">
+                    <button class="tab-btn active" data-tab="tab-videos">Mídias</button>
+                    <button class="tab-btn" data-tab="tab-photos">Fotos Set</button>
+                    <button class="tab-btn" data-tab="tab-themes">Temas</button>
+                </div>
+                
+                <div class="sidebar-content scrollable">
+                    <!-- Tab: Vídeos -->
+                    <div class="tab-content active" id="tab-videos">
+                        <div class="media-list" id="video-list">
+                            <!-- Inserido dinamicamente via JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Tab: Fotos -->
+                    <div class="tab-content" id="tab-photos">
+                        <div class="media-grid" id="photo-list">
+                            <!-- Inserido dinamicamente via JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Tab: Temas -->
+                    <div class="tab-content" id="tab-themes">
+                        <div class="theme-list" id="theme-list">
+                            <!-- Inserido dinamicamente via JS -->
+                        </div>
+                    </div>
+                <div class="sidebar-footer status-container" id="system-status-bar" style="padding: 12px 16px; border-top: 1px solid var(--border-glass); display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text-secondary); background: rgba(0,0,0,0.15);">
+                    <i class="fa-solid fa-circle-check status-icon" id="system-status-icon" style="color: var(--color-emerald); font-size: 12px;"></i>
+                    <span id="system-status-text">Pronto.</span>
+                </div>
+            </aside>
+
+            
+            <!-- Botão flutuante para reabrir Sidebar Esquerda -->
+            <button class="btn-reopen-sidebar left" id="reopen-left" title="Abrir Biblioteca">
+                <i class="fa-solid fa-folder-open"></i>
+            </button>
+
+            <!-- ── CENTER AREA (ADVANCED PLAYER & TIMELINE) ────────────────── -->
+            <main class="center-stage">
+                <!-- Advanced Video Player Panel -->
+                <section class="player-panel glassmorphism">
+                    <div class="player-header">
+                        <div class="current-media-title" id="player-title">Nenhuma mídia selecionada</div>
+                        <div class="player-badges">
+                            <span class="badge" id="badge-type">-</span>
+                            <span class="badge" id="badge-resolution">-</span>
+                        </div>
+                    </div>
+                    
+                    <!-- HTML5 Player custom wrapper -->
+                    <div class="video-container" id="video-wrapper">
+                        <video id="main-video" src="" preload="auto"></video>
+                        
+                        <!-- Widescreen overlay indicators -->
+                        <div class="player-overlays">
+                            <div class="speed-indicator" id="speed-overlay">1.0x</div>
+                            <div class="jkl-indicator" id="jkl-overlay">K</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced Controls Bar -->
+                    <div class="player-controls">
+                        <!-- Playback buttons -->
+                        <div class="control-group">
+                            <button id="btn-prev-frame" class="btn-control" title="Frame Anterior"><i class="fa-solid fa-chevron-left"></i></button>
+                            <button id="btn-play" class="btn-control play-btn" title="Reproduzir/Pausar (Space / K)"><i class="fa-solid fa-play"></i></button>
+                            <button id="btn-next-frame" class="btn-control" title="Próximo Frame"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                        
+                        <!-- Timeline scrubber -->
+                        <div class="scrubber-container">
+                            <span class="time-code" id="current-time">00:00:00:00</span>
+                            <div class="scrubber-bar" id="scrubber-progress-bar">
+                                <div class="scrubber-fill" id="scrubber-progress-fill"></div>
+                                <div class="scrubber-handle" id="scrubber-progress-handle"></div>
+                                <div class="marker-in" id="marker-in-pos" style="display:none"></div>
+                                <div class="marker-out" id="marker-out-pos" style="display:none"></div>
+                            </div>
+                            <span class="time-code" id="duration-time">00:00:00:00</span>
+                        </div>
+                        
+                        <!-- Editing Markers (I/O) & Resolution/Speed Toggles -->
+                        <div class="control-group right-controls">
+                            <!-- Marcadores I/O -->
+                            <button id="btn-mark-in" class="btn-control btn-marker" title="Marcar Ponto de Entrada (I)">IN</button>
+                            <button id="btn-mark-out" class="btn-control btn-marker" title="Marcar Ponto de Saída (O)">OUT</button>
+                            <button id="btn-append-timeline" class="btn-primary btn-append" title="Inserir Segmento na Timeline (E)">
+                                <i class="fa-solid fa-plus"></i> Cortar & Inserir
+                            </button>
+                            
+                            <!-- Resolution toggle -->
+                            <div class="dropdown-wrapper">
+                                <i class="fa-solid fa-display"></i>
+                                <select id="select-resolution">
+                                    <option value="proxy_low">360p Proxy</option>
+                                    <option value="proxy_high" selected>720p Proxy</option>
+                                    <option value="original">Original</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Speed Control -->
+                            <div class="dropdown-wrapper">
+                                <i class="fa-solid fa-gauge-high"></i>
+                                <select id="select-speed">
+                                    <option value="0.25">0.25x</option>
+                                    <option value="0.5">0.5x</option>
+                                    <option value="1.0" selected>1.0x</option>
+                                    <option value="1.5">1.5x</option>
+                                    <option value="2.0">2.0x</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Maximize -->
+                            <button id="btn-maximize" class="btn-control" title="Tela Cheia"><i class="fa-solid fa-expand"></i></button>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Bottom Timeline & Storyboard sequence panel -->
+                <section class="timeline-panel glassmorphism" id="timeline-panel">
+                    <div class="panel-header">
+                        <h3><i class="fa-solid fa-list-check"></i> Linha do Tempo Editorial (Timeline)</h3>
+                        <div class="timeline-actions">
+                            <input type="text" id="timeline-name-input" value="Rascunho Making Of #1" placeholder="Nome da Timeline...">
+                            <button id="btn-save-timeline" class="btn-outline"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                            <div class="dropdown-wrapper">
+                                <i class="fa-solid fa-file-export"></i>
+                                <select id="select-export-format">
+                                    <option value="xml">Premiere / Resolve XML</option>
+                                    <option value="otio">OpenTimelineIO (.otio)</option>
+                                    <option value="edl">EDL (CMX 3600)</option>
+                                </select>
+                            </div>
+                            <button id="btn-export-timeline" class="btn-primary">Exportar</button>
+                            <button class="btn-toggle-sidebar" id="toggle-timeline" title="Recolher Linha do Tempo">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Multi-track interactive area -->
+                    <div class="timeline-track-area scrollable">
+                        <!-- Track V2: B-rolls sugeridos pela IA -->
+                        <div class="track-row">
+                            <div class="track-info">V2 (B-Roll IA)</div>
+                            <div class="track-content" id="track-broll">
+                                <!-- Elementos adicionados via JS -->
+                            </div>
+                        </div>
+                        
+                        <!-- Track V1: Depoimentos / Entrevistas selecionadas -->
+                        <div class="track-row">
+                            <div class="track-info">V1 (Falas ASR)</div>
+                            <div class="track-content" id="track-speech">
+                                <!-- Elementos adicionados via JS -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Botão flutuante para reabrir Timeline -->
+                <button class="btn-reopen-sidebar bottom" id="reopen-timeline" title="Abrir Linha do Tempo">
+                    <i class="fa-solid fa-list-check"></i> Linha do Tempo
+                </button>
+            </main>
+
+            <!-- ── RIGHT SIDEBAR (COLLAPSIBLE - TRANSCRIPTION / DIALOGUES) ──── -->
+            <aside class="sidebar-right glassmorphism" id="sidebar-right">
+                <div class="sidebar-header">
+                    <h2><i class="fa-solid fa-comment-dots"></i> Transcrição & Falas</h2>
+                    <button class="btn-toggle-sidebar" id="toggle-right" title="Recolher Painel">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+                
+                <div class="transcription-actions">
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <button id="btn-transcribe-now" class="btn-outline" style="flex: 1; font-size: 11px; padding: 8px 4px;" title="Transcrever apenas o vídeo carregado no player">
+                            <i class="fa-solid fa-microphone-lines"></i> Transcrever Atual
+                        </button>
+                        <button id="btn-transcribe-all" class="btn-secondary" style="flex: 1; font-size: 11px; padding: 8px 4px;" title="Transcrever em lote todos os vídeos do projeto que ainda não possuem transcrição">
+                            <i class="fa-solid fa-layer-group"></i> Transcrever Tudo
+                        </button>
+                    </div>
+                    <div class="media-tabs" id="right-tabs" style="margin: 4px 0 0 0; display: flex; width: 100%;">
+                        <button class="tab-btn active" id="btn-tab-transcript" data-right-tab="transcript" style="flex: 1;">Falas (ASR)</button>
+                        <button class="tab-btn" id="btn-tab-vision" data-right-tab="vision" style="flex: 1;">Visão IA</button>
+                        <button class="tab-btn" id="btn-tab-tasks" data-right-tab="tasks" style="flex: 1;"><i class="fa-solid fa-list-check"></i> Tarefas</button>
+                    </div>
+                </div>
+
+                
+                <div class="sidebar-content scrollable">
+                    <div class="transcript-feed" id="transcript-feed">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-microphone-slash"></i>
+                            <p>Selecione um depoimento na Biblioteca para carregar a transcrição correspondente.</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+            
+            <!-- Botão flutuante para reabrir Sidebar Direita -->
+            <button class="btn-reopen-sidebar right" id="reopen-right" title="Abrir Transcrição">
+                <i class="fa-solid fa-comment-dots"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Modal de Novo Projeto -->
+    <div id="project-modal" class="modal-overlay">
+        <div class="modal-content glassmorphism">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-folder-plus"></i> Criar Novo Projeto</h2>
+                <button class="btn-close-modal" id="btn-close-project-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="project-name">Nome do Projeto *</label>
+                    <input type="text" id="project-name" placeholder="Ex: Making Of - Filme X" required>
+                </div>
+                <div class="form-group">
+                    <label for="project-desc">Descrição</label>
+                    <textarea id="project-desc" rows="3" placeholder="Ex: Entrevistas e bastidores filmados na locação Y..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-project" class="btn-outline">Cancelar</button>
+                <button id="btn-submit-project" class="btn-primary">Criar e Abrir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Importação Externa -->
+    <div id="import-modal" class="modal-overlay">
+        <div class="modal-content glassmorphism">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-hard-drive"></i> Importar Pasta/HD Externo</h2>
+                <button class="btn-close-modal" id="btn-close-import-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="external-path-input">Caminho do Diretório ou Arquivo *</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="external-path-input" placeholder="Ex: D:/Material_Bruto/Bastidores" required style="flex: 1;">
+                        <button id="btn-browse-folder" class="btn-secondary" style="padding: 0 16px; font-size: 12px; height: 38px; display: flex; align-items: center; gap: 6px;" title="Procurar pasta pelo Explorer do Windows">
+                            <i class="fa-solid fa-folder-open"></i> Procurar...
+                        </button>
+                    </div>
+                    
+                    <!-- Drag & Drop container visual -->
+                    <div id="import-dropzone" class="import-dropzone" style="margin-top: 15px; border: 2px dashed rgba(138, 92, 246, 0.3); border-radius: 8px; padding: 20px; text-align: center; background: rgba(255, 255, 255, 0.02); transition: all 0.3s; cursor: pointer;">
+                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: 24px; color: var(--color-violet); margin-bottom: 8px;"></i>
+                        <p style="font-size: 12px; font-weight: 500; color: var(--text-secondary); margin: 0;">Arraste e solte uma PASTA ou arquivo aqui</p>
+                        <p style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 0;">(O navegador obterá o conteúdo e o preencherá automaticamente)</p>
+                    </div>
+
+                    <p style="font-size: 11px; color: var(--text-muted); margin-top: 10px; line-height: 1.4;">
+                        <b>Modo Link (In-Place):</b> Os arquivos originais permanecerão no seu HD externo e NÃO serão copiados localmente, poupando espaço. O CapIAu criará apenas os proxies rápidos de preview em seu computador local.
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-import" class="btn-outline">Cancelar</button>
+                <button id="btn-submit-import" class="btn-primary">Importar em Modo Link</button>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- Lógica da Aplicação -->
+    <script src="app.js"></script>
+</body>
+</html>
+

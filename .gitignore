@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+env/
+ENV/
+
+# Ambiente e Chaves de API
+.env
+
+# Diretórios de Dados Locais do CapIAu (Originals, Proxies, Qdrant, SQLite)
+data/
+data_test/
+data_test_ingest/
+
+# Pasta Watch (Manter a pasta, mas ignorar mídias dentro dela)
+watch/*
+!watch/.gitkeep
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
