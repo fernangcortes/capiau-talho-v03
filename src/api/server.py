@@ -102,6 +102,155 @@ def remove_project(project_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+class ProjectDriveLinkUpdate(BaseModel):
+    drive_link: str
+
+class ProjectExportOptions(BaseModel):
+    include_metadata: bool = True
+    include_proxies: bool = False
+    include_photos: bool = False
+    include_docs: bool = False
+
+@app.put("/api/project/{project_id}/drive-link")
+def update_drive_link(project_id: int, payload: ProjectDriveLinkUpdate):
+    """Atualiza o link do Google Drive associado a um projeto."""
+    from src.db.operations import update_project_drive_link
+    try:
+        update_project_drive_link(project_id, payload.drive_link)
+        return {"status": "success", "message": "Link do Drive atualizado."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/project/{project_id}/export")
+def export_project(project_id: int, options: ProjectExportOptions):
+    """Coleta e empacota metadados, proxies e fotos de um projeto em um arquivo ZIP."""
+    import zipfile
+    from src.db.operations import get_project_all_data
+    
+    data = get_project_all_data(project_id)
+    if not data or not data["project"]:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+        
+    project_name = data["project"]["name"].replace(" ", "_").lower()
+    
+    # Criar pasta de exports caso não exista
+    exports_dir = CONFIG.EXPORTS_DIR
+    exports_dir.mkdir(parents=True, exist_ok=True)
+    
+    zip_filename = f"caiau_export_{project_name}_{project_id}.zip"
+    zip_path = exports_dir / zip_filename
+    
+    try:
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # 1. Escrever o JSON de metadados
+            metadata_json = json.dumps(data, indent=2, ensure_ascii=False)
+            zip_file.writestr("metadata.json", metadata_json)
+            
+            # 2. Escrever proxies de vídeo se solicitado
+            if options.include_proxies:
+                for v in data.get("videos", []):
+                    proxy_file_name = f"proxy_vid_{v['id']}.mp4"
+                    proxy_path = CONFIG.PROXIES_DIR / proxy_file_name
+                    if proxy_path.exists():
+                        zip_file.write(proxy_path, f"proxies/{proxy_file_name}")
+                        
+            # 3. Escrever proxies de fotos se solicitado
+            if options.include_photos:
+                for p in data.get("photos", []):
+                    proxy_photo_name = f"photo_{p['id']}.webp"
+                    proxy_photo_path = CONFIG.PROXIES_DIR / "photos" / proxy_photo_name
+                    if proxy_photo_path.exists():
+                        zip_file.write(proxy_photo_path, f"proxies/photos/{proxy_photo_name}")
+                        
+            # 4. Escrever documentos de produção reais
+            if options.include_docs:
+                for doc in data.get("production_docs", []):
+                    if doc.get("filepath"):
+                        doc_path = Path(doc["filepath"])
+                        if doc_path.exists():
+                            zip_file.write(doc_path, f"docs/{doc_path.name}")
+                            
+        # Servir o arquivo para download
+        return FileResponse(
+            path=str(zip_path), 
+            filename=zip_filename, 
+            media_type="application/zip"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao exportar projeto: {str(e)}")
+
+@app.post("/api/project/import")
+async def import_project(file: UploadFile = File(...)):
+    """Recebe um arquivo ZIP exportado, descompacta os metadados/arquivos e reconstrói o banco e índices."""
+    import zipfile
+    import shutil
+    import tempfile
+    from src.db.operations import import_project_all_data
+    
+    # Criar diretório temporário para descompactação
+    temp_dir = tempfile.mkdtemp()
+    zip_path = os.path.join(temp_dir, "imported.zip")
+    
+    try:
+        # Salvar arquivo carregado localmente no diretório temporário
+        with open(zip_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # Extrair ZIP
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(temp_dir)
+            
+        # Ler metadata.json
+        metadata_path = os.path.join(temp_dir, "metadata.json")
+        if not os.path.exists(metadata_path):
+            raise HTTPException(status_code=400, detail="Arquivo ZIP inválido: metadata.json ausente.")
+            
+        with open(metadata_path, "r", encoding="utf-8") as f:
+            project_data = json.load(f)
+            
+        # Importar registros no SQLite e reconstruir índices semânticos no Qdrant
+        new_project_id = import_project_all_data(project_data)
+        
+        # Mapear e mover proxies físicos se existirem no ZIP
+        proxies_src_dir = os.path.join(temp_dir, "proxies")
+        if os.path.exists(proxies_src_dir):
+            CONFIG.PROXIES_DIR.mkdir(parents=True, exist_ok=True)
+            for proxy_file in os.listdir(proxies_src_dir):
+                src_file_path = os.path.join(proxies_src_dir, proxy_file)
+                if os.path.isfile(src_file_path):
+                    dest_file_path = CONFIG.PROXIES_DIR / proxy_file
+                    shutil.copy2(src_file_path, dest_file_path)
+                    
+            # Proxies de fotos
+            photos_src_dir = os.path.join(proxies_src_dir, "photos")
+            if os.path.exists(photos_src_dir):
+                photos_dest_dir = CONFIG.PROXIES_DIR / "photos"
+                photos_dest_dir.mkdir(parents=True, exist_ok=True)
+                for photo_file in os.listdir(photos_src_dir):
+                    src_photo_path = os.path.join(photos_src_dir, photo_file)
+                    if os.path.isfile(src_photo_path):
+                        dest_photo_path = photos_dest_dir / photo_file
+                        shutil.copy2(src_photo_path, dest_photo_path)
+                        
+        # Mover documentos físicos se existirem
+        docs_src_dir = os.path.join(temp_dir, "docs")
+        if os.path.exists(docs_src_dir):
+            CONFIG.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            for doc_file in os.listdir(docs_src_dir):
+                src_doc_path = os.path.join(docs_src_dir, doc_file)
+                if os.path.isfile(src_doc_path):
+                    dest_doc_path = CONFIG.CACHE_DIR / doc_file
+                    shutil.copy2(src_doc_path, dest_doc_path)
+                    
+        return {"status": "success", "project_id": new_project_id, "message": "Projeto importado com sucesso."}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Falha ao importar projeto: {str(e)}")
+    finally:
+        # Limpar diretório temporário
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
 @app.get("/api/videos")
 def list_videos(project_id: int = Query(1)):
     """Retorna a lista de vídeos cadastrados do projeto."""

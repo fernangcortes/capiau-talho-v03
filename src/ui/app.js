@@ -59,6 +59,7 @@ const MOCK_THEMES = [
 
 // ── VARIÁVEIS DE ESTADO DA APLICAÇÃO ──────────────────────────────────
 let currentProjectId = 1;
+let allProjects = [];
 let activeVideo = null;
 let activeTranscript = [];
 let activeTranscriptWords = [];
@@ -153,6 +154,7 @@ window.addEventListener("DOMContentLoaded", () => {
 function initApp() {
     console.log("CaIAu Talho iniciado.");
     setupProjectListeners();
+    setupProjectSyncListeners();
     loadProjects();
     updateTimelineUI();
 }
@@ -165,6 +167,7 @@ async function loadProjects() {
         const response = await fetch("/api/projects");
         if (response.ok) {
             const projects = await response.json();
+            allProjects = projects;
             if (projects.length > 0) {
                 selector.innerHTML = "";
                 projects.forEach(p => {
@@ -306,6 +309,231 @@ function setupProjectListeners() {
             alert("Backend offline. Deleção de projeto simulada.");
         }
     });
+}
+
+
+function setupProjectSyncListeners() {
+    const btnSync = document.getElementById("btn-sync-project");
+    const modal = document.getElementById("sync-modal");
+    const btnCloseHeader = document.getElementById("btn-close-sync-modal");
+    const btnCloseFooter = document.getElementById("btn-close-sync");
+    
+    const driveInput = document.getElementById("sync-drive-link");
+    const btnSaveLink = document.getElementById("btn-save-drive-link");
+    const lnkOpenDrive = document.getElementById("lnk-open-drive");
+    
+    const btnRunExport = document.getElementById("btn-run-export");
+    const exportStatus = document.getElementById("export-status");
+    
+    const importDropzone = document.getElementById("sync-import-dropzone");
+    const importFileInput = document.getElementById("sync-import-file-input");
+    const progressContainer = document.getElementById("sync-import-progress-container");
+    const progressFill = document.getElementById("sync-import-progress-fill");
+    const progressStatusText = document.getElementById("sync-import-status-text");
+    const progressPercentText = document.getElementById("sync-import-percent-text");
+
+    const updateDriveLinkUI = () => {
+        const proj = allProjects.find(p => p.id === currentProjectId);
+        if (proj && proj.drive_link) {
+            driveInput.value = proj.drive_link;
+            lnkOpenDrive.href = proj.drive_link;
+            lnkOpenDrive.style.pointerEvents = "auto";
+            lnkOpenDrive.style.opacity = "1";
+        } else {
+            driveInput.value = "";
+            lnkOpenDrive.href = "#";
+            lnkOpenDrive.style.pointerEvents = "none";
+            lnkOpenDrive.style.opacity = "0.5";
+        }
+    };
+
+    // Toggle Modal
+    if (btnSync) {
+        btnSync.addEventListener("click", () => {
+            updateDriveLinkUI();
+            modal.classList.add("active");
+        });
+    }
+
+    const closeModal = () => {
+        modal.classList.remove("active");
+        progressContainer.style.display = "none";
+        progressFill.style.width = "0%";
+    };
+    
+    if (btnCloseHeader) btnCloseHeader.addEventListener("click", closeModal);
+    if (btnCloseFooter) btnCloseFooter.addEventListener("click", closeModal);
+
+    // Salvar Link do Drive
+    if (btnSaveLink) {
+        btnSaveLink.addEventListener("click", async () => {
+            const link = driveInput.value.trim();
+            btnSaveLink.disabled = true;
+            btnSaveLink.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Salvando...`;
+            
+            try {
+                const response = await fetch(`/api/project/${currentProjectId}/drive-link`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ drive_link: link })
+                });
+                
+                if (response.ok) {
+                    const proj = allProjects.find(p => p.id === currentProjectId);
+                    if (proj) proj.drive_link = link;
+                    
+                    updateDriveLinkUI();
+                    alert("Link do Google Drive salvo com sucesso!");
+                } else {
+                    alert("Erro ao salvar link do Drive.");
+                }
+            } catch (e) {
+                alert("Erro ao salvar link. Backend offline?");
+            } finally {
+                btnSaveLink.disabled = false;
+                btnSaveLink.innerHTML = "Salvar Link";
+            }
+        });
+    }
+
+    // Executar Exportação
+    if (btnRunExport) {
+        btnRunExport.addEventListener("click", async () => {
+            btnRunExport.disabled = true;
+            exportStatus.style.display = "block";
+            
+            const includeProxies = document.getElementById("chk-export-proxies").checked;
+            const includePhotos = document.getElementById("chk-export-photos").checked;
+            const includeDocs = document.getElementById("chk-export-docs").checked;
+            
+            try {
+                const response = await fetch(`/api/project/${currentProjectId}/export`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        include_metadata: true,
+                        include_proxies: includeProxies,
+                        include_photos: includePhotos,
+                        include_docs: includeDocs
+                    })
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    
+                    const cd = response.headers.get("Content-Disposition");
+                    let filename = `caiau_export_project_${currentProjectId}.zip`;
+                    if (cd && cd.includes("filename=")) {
+                        filename = cd.split("filename=")[1].replace(/"/g, "");
+                    }
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const errText = await response.text();
+                    alert(`Erro ao exportar projeto: ${errText}`);
+                }
+            } catch (e) {
+                alert(`Erro ao conectar ao servidor para exportação: ${e.message}`);
+            } finally {
+                btnRunExport.disabled = false;
+                exportStatus.style.display = "none";
+            }
+        });
+    }
+
+    // Importação: Drag & Drop e Clique
+    if (importDropzone) {
+        importDropzone.addEventListener("click", () => {
+            importFileInput.click();
+        });
+
+        importFileInput.addEventListener("change", (e) => {
+            if (e.target.files.length > 0) {
+                handleImportFile(e.target.files[0]);
+            }
+        });
+
+        importDropzone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            importDropzone.classList.add("dragover");
+        });
+
+        importDropzone.addEventListener("dragleave", () => {
+            importDropzone.classList.remove("dragover");
+        });
+
+        importDropzone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            importDropzone.classList.remove("dragover");
+            if (e.dataTransfer.files.length > 0) {
+                handleImportFile(e.dataTransfer.files[0]);
+            }
+        });
+    }
+
+    const handleImportFile = (file) => {
+        if (!file.name.endsWith(".zip")) {
+            alert("Por favor, selecione apenas arquivos do tipo pacote .ZIP!");
+            return;
+        }
+        
+        progressContainer.style.display = "block";
+        progressFill.style.width = "0%";
+        progressPercentText.textContent = "0%";
+        progressStatusText.textContent = "Enviando arquivo...";
+        
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/project/import", true);
+        
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                progressFill.style.width = `${percent}%`;
+                progressPercentText.textContent = `${percent}%`;
+                if (percent === 100) {
+                    progressStatusText.textContent = "Descompactando e reindexando IA locais (CPU)...";
+                }
+            }
+        };
+        
+        xhr.onload = async () => {
+            if (xhr.status === 200) {
+                try {
+                    const res = JSON.parse(xhr.responseText);
+                    progressFill.style.width = "100%";
+                    progressPercentText.textContent = "100%";
+                    progressStatusText.textContent = "Projeto importado!";
+                    
+                    alert("Projeto importado com sucesso! O novo projeto foi carregado.");
+                    
+                    currentProjectId = res.project_id;
+                    closeModal();
+                    
+                    await loadProjects();
+                } catch (e) {
+                    alert(`Projeto importado, mas falha ao recarregar a interface: ${e.message}`);
+                }
+            } else {
+                alert(`Erro na importação do projeto: ${xhr.responseText || "Erro no servidor"}`);
+                progressContainer.style.display = "none";
+            }
+        };
+        
+        xhr.onerror = () => {
+            alert("Erro de conexão ao tentar importar o projeto.");
+            progressContainer.style.display = "none";
+        };
+        
+        const formData = new FormData();
+        formData.append("file", file);
+        xhr.send(formData);
+    };
 }
 
 

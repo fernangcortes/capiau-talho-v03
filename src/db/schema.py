@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS project (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     description TEXT,
+    drive_link TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -153,6 +154,15 @@ def init_db(db_path: Path = None):
         
         # Migração dinâmica de colunas para o banco de dados existente
         cursor = conn.cursor()
+        
+        # Migrações para tabela project
+        cursor.execute("PRAGMA table_info(project)")
+        project_cols = [row[1] for row in cursor.fetchall()]
+        if "drive_link" not in project_cols:
+            cursor.execute("ALTER TABLE project ADD COLUMN drive_link TEXT")
+            print("[MIGRATION] Coluna 'drive_link' adicionada à tabela project.")
+            
+        # Migrações para tabela video
         cursor.execute("PRAGMA table_info(video)")
         video_cols = [row[1] for row in cursor.fetchall()]
         

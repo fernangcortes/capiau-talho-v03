@@ -31,7 +31,9 @@ watch/*
 
 # Rascunhos e Testes Locais
 scratch/
+data_test_export/
 
 # Gráficos e Imagens da Documentação (Evita aumentar tamanho do repo)
 docs/graficos/
+
 

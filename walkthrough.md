@@ -177,8 +177,38 @@ Implementamos por completo a **Fase 5: Organização da Biblioteca**, resolvendo
    - **Controle Recursivo Avançado (`expandCollapseAllSubfolders`):** O clique executa uma expansão ou contração em cascata para a pasta selecionada e todas as suas subpastas descendentes de forma inteligente, sem afetar outras pastas de nível paralelo ou superior.
 
 3. **Integração com Auto-Polling de Background:**
-   - O fluxo de atualização da biblioteca foi unificado: novas detecções no watch/ ou processamentos de proxies em andamento atualizam as variáveis de estado globais (`allVideos` e `allPhotos`) e chamam `filterAndRenderLibrary()` / `filterAndRenderPhotos()`.
-   - Isso garante que a ordenação e filtros selecionados pelo usuário sejam mantidos de forma estável (sem redefinir as seleções do usuário) durante as atualizações automáticas em background.
+    - O fluxo de atualização da biblioteca foi unificado: novas detecções no watch/ ou processamentos de proxies em andamento atualizam as variáveis de estado globais (`allVideos` e `allPhotos`) e chamam `filterAndRenderLibrary()` / `filterAndRenderPhotos()`.
+    - Isso garante que a ordenação e filtros selecionados pelo usuário sejam mantidos de forma estável (sem redefinir as seleções do usuário) durante as atualizações automáticas em background.
 
 4. **Verificação de Fluxo:**
-   - Testado e validado com sucesso via subagente de navegação browser, demonstrando a correta integração de ponta a ponta e a reprodução automatizada no player a partir de links no chat.
+    - Testado e validado com sucesso via subagente de navegação browser, demonstrando a correta integração de ponta a ponta e a reprodução automatizada no player a partir de links no chat.
+
+---
+
+## ☁️ Fase 6: Exportação, Importação e Sincronização de Projetos (Novidades do MVP)
+
+Implementamos a funcionalidade completa de backup, restore e sincronização baseada em pacotes seletivos de arquivos `.zip` e links do Google Drive:
+
+1. **Associação de Links do Google Drive:**
+   - Adicionada a coluna `drive_link` na tabela de projetos do SQLite e criados os endpoints e a interface para persistência.
+   - O botão "Abrir no Navegador" no modal abre diretamente o link do Drive associado ao projeto para facilitar o upload/download de pacotes.
+
+2. **Empacotamento Seletivo (.ZIP):**
+   - Criado o endpoint `POST /api/project/{project_id}/export` para coletar metadados do banco (vídeos, fotos, transcript_words, faces, timelines, etc.) e empacotá-los em um arquivo compactado `.zip` junto com os arquivos de mídia selecionados (vídeo proxies, foto proxies e documentos).
+   - O Qdrant é consultado em tempo real para obter os frames do B-roll (`get_video_vision_frames`), de modo que as descrições de imagens já extraídas sejam incluídas no `metadata.json`, eliminando a necessidade de re-analisá-las com IA no computador de destino.
+
+3. **Importação e Re-Indexação Inteligente:**
+   - Criado o endpoint `POST /api/project/import` que recebe um pacote ZIP, descompacta os arquivos temporariamente, move os proxies e documentos para as pastas locais correspondentes e insere os registros no SQLite.
+   - **Mapeamento de IDs Relacionais:** Como chaves primárias são geradas dinamicamente no SQLite, o fluxo de importação re-mapeia todos os IDs nas tabelas relacionadas (`transcript`, `face`, `relation`, `timeline`, `transcript_theme`) para preservar a integridade estrutural e restaurar a timeline perfeitamente.
+   - **Resolução de Conflito de Unicidade:** Para evitar falhas de colisão de hashes únicos (`IntegrityError`), o sistema anexa o sufixo `_imp_{new_project_id}` às chaves SHA-256 duplicadas.
+   - **Re-Indexação Local:** O sistema reconstrói os vetores semânticos no Qdrant na máquina local a partir de descrições e transcrições importadas, garantindo que a busca semântica em CPU continue 100% funcional sem novas chamadas pagas de API.
+
+4. **Interface Premium Glassmorphic:**
+   - Adicionado botão de nuvem no cabeçalho para abrir o modal de sincronização.
+   - O modal contém as opções de exportação, o campo de link do Drive e uma zona de drag-and-drop para arrastar e importar arquivos ZIP.
+   - Uma barra de progresso em tempo real (utilizando `XMLHttpRequest`) atualiza o usuário sobre a velocidade do upload e as fases do processamento no servidor ("Enviando arquivo...", "Descompactando e reindexando IA locais (CPU)...").
+
+5. **Verificação de Fluxo e Testes:**
+   - **Teste Unitário:** Criado e executado com sucesso o teste `tests/test_project_export.py` validando toda a correspondência de chaves e resolução de conflitos de hash.
+   - **Visualização:** Validada via browser subagent a funcionalidade de gravação de links e renderização do modal.
+   - **Gravação de Demonstração:** Registrada com sucesso a gravação em formato WebP `save_link_success_1780522342772.webp` na pasta de artefatos.
