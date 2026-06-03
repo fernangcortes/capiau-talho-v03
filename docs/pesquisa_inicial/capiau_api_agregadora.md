@@ -1,22 +1,22 @@
-# CapIAu: APIs Agregadoras — O "Coração" da Estratégia Híbrida
+# CaIAu Talho: APIs Agregadoras — O "Coração" da Estratégia Híbrida
 
 **Data:** 02/06/2026  
 **Versão:** 2.1  
-**Escopo:** Análise aprofundada de APIs agregadoras (AI Gateways / LLM Routers) como camada central de orquestração entre o cluster GPU local, APIs pagas individuais, e o motor do CapIAu. Inclui comparativo completo dos principais players, arquitetura recomendada, custos, e estratégia de routing inteligente.
+**Escopo:** Análise aprofundada de APIs agregadoras (AI Gateways / LLM Routers) como camada central de orquestração entre o cluster GPU local, APIs pagas individuais, e o motor do CaIAu Talho. Inclui comparativo completo dos principais players, arquitetura recomendada, custos, e estratégia de routing inteligente.
 
 ---
 
 ## TL;DR — Por que uma API Agregadora muda tudo
 
-Uma **API agregadora** (também chamada de *AI Gateway* ou *LLM Router*) é uma camada de software que se posiciona **entre o CapIAu e todos os provedores de IA** — modelos locais no cluster, APIs de LLM, APIs de visão, APIs de transcrição, etc. Em vez de o CapIAu integrar diretamente com dezenas de provedores (OpenAI, Anthropic, Groq, DeepSeek, AWS, Azure, Google, etc.), ele se conecta **uma única vez** à agregadora, e ela cuida do resto. Isso reduz a complexidade de integração de **N conexões para 1**, habilita **routing inteligente** (enviar tarefas simples para modelos baratos, complexas para modelos caros), provê **fallback automático** (se um provedor cai, troca para outro instantaneamente), e oferece **observabilidade unificada** (custo, latência, uso — tudo em um dashboard). A escolha recomendada para o CapIAu é **LiteLLM (self-hosted)** para controle total e custo zero de gateway, com **Cloudflare AI Gateway** como backup managed se necessário.
+Uma **API agregadora** (também chamada de *AI Gateway* ou *LLM Router*) é uma camada de software que se posiciona **entre o CaIAu Talho e todos os provedores de IA** — modelos locais no cluster, APIs de LLM, APIs de visão, APIs de transcrição, etc. Em vez de o CaIAu Talho integrar diretamente com dezenas de provedores (OpenAI, Anthropic, Groq, DeepSeek, AWS, Azure, Google, etc.), ele se conecta **uma única vez** à agregadora, e ela cuida do resto. Isso reduz a complexidade de integração de **N conexões para 1**, habilita **routing inteligente** (enviar tarefas simples para modelos baratos, complexas para modelos caros), provê **fallback automático** (se um provedor cai, troca para outro instantaneamente), e oferece **observabilidade unificada** (custo, latência, uso — tudo em um dashboard). A escolha recomendada para o CaIAu Talho é **LiteLLM (self-hosted)** para controle total e custo zero de gateway, com **Cloudflare AI Gateway** como backup managed se necessário.
 
 ---
 
-## 1. O Que é uma API Agregadora e Por que o CapIAu Precisa de uma
+## 1. O Que é uma API Agregadora e Por que o CaIAu Talho Precisa de uma
 
 ### 1.1 O Problema: Integração Direta é um Pesadelo
 
-Sem uma agregadora, o CapIAu precisaria integrar diretamente com cada provedor:
+Sem uma agregadora, o CaIAu Talho precisaria integrar diretamente com cada provedor:
 
 | Provedor | Formato de API | SDK | Auth | Billing |
 |:---|:---|:---|:---|:---|
@@ -39,7 +39,7 @@ Sem uma agregadora, o CapIAu precisaria integrar diretamente com cada provedor:
 ```
 SEM AGREGADORA (integração direta — complexo):
 
-  CapIAu ──→ OpenAI
+  CaIAu Talho ──→ OpenAI
          ──→ Anthropic
          ──→ Groq
          ──→ DeepSeek
@@ -57,7 +57,7 @@ SEM AGREGADORA (integração direta — complexo):
 
 COM AGREGADORA (LiteLLM/OpenRouter — simples):
 
-  CapIAu ──→ API Agregadora ──→ OpenAI
+  CaIAu Talho ──→ API Agregadora ──→ OpenAI
                           ──→ Anthropic
                           ──→ Groq
                           ──→ DeepSeek
@@ -71,9 +71,9 @@ COM AGREGADORA (LiteLLM/OpenRouter — simples):
   Total: 1 integração para manter
 ```
 
-### 1.3 Benefícios Específicos para o CapIAu
+### 1.3 Benefícios Específicos para o CaIAu Talho
 
-| Benefício | Descrição | Impacto no CapIAu |
+| Benefício | Descrição | Impacto no CaIAu Talho |
 |:---|:---|:---|
 | **Routing Inteligente** | Classifica a complexidade da tarefa e envia para o modelo mais barato que resolve | **70% das tarefas vão para modelos de $0.10/1M tokens**, 20% para médios, 10% para frontier |
 | **Fallback Automático** | Se um provedor cai/falha, troca instantaneamente para outro | **Zero downtime** no pipeline de ingest/produção |
@@ -82,7 +82,7 @@ COM AGREGADORA (LiteLLM/OpenRouter — simples):
 | **Virtual Keys** | Cria chaves de API separadas por projeto/perfil/usuário | Isolamento de custos: Ficção, Doc, TV cada um com seu budget |
 | **Rate Limiting** | Controla RPM/TPM por chave, evitando estouro de quotas | Previne surpresas de billing |
 | **Budget Enforcement** | Define limites de gasto por projeto; quando atinge, bloqueia ou re-roteia | Controle de custo automático |
-| **Formato Unificado** | Todas as respostas vêm no formato OpenAI (independente do provedor) | Código do CapIAu não muda quando troca de modelo |
+| **Formato Unificado** | Todas as respostas vêm no formato OpenAI (independente do provedor) | Código do CaIAu Talho não muda quando troca de modelo |
 
 ---
 
@@ -104,9 +104,9 @@ COM AGREGADORA (LiteLLM/OpenRouter — simples):
 
 ### 2.2 Análise Detalhada por Agregadora
 
-#### **LiteLLM — A Escolha do CapIAu**
+#### **LiteLLM — A Escolha do CaIAu Talho**
 
-**LiteLLM** é um proxy server open-source (MIT license) que expõe uma única API OpenAI-compatible e roteia para 100+ provedores. É a escolha recomendada para o CapIAu por ser **self-hosted, gratuito, e extremamente flexível**.
+**LiteLLM** é um proxy server open-source (MIT license) que expõe uma única API OpenAI-compatible e roteia para 100+ provedores. É a escolha recomendada para o CaIAu Talho por ser **self-hosted, gratuito, e extremamente flexível**.
 
 | Aspecto | Detalhe |
 |:---|:---|
@@ -121,10 +121,10 @@ COM AGREGADORA (LiteLLM/OpenRouter — simples):
 | **Observability** | Dashboard admin UI, logging para Langfuse/MLflow/OpenTelemetry |
 | **Usuários em produção** | Netflix, Lemonade, Rocket Money |
 
-**Como funciona no CapIAu:**
+**Como funciona no CaIAu Talho:**
 
 ```python
-# O CapIAu faz UMA chamada — LiteLLM decide para onde enviar
+# O CaIAu Talho faz UMA chamada — LiteLLM decide para onde enviar
 import openai
 
 client = openai.OpenAI(
@@ -213,11 +213,11 @@ OpenRouter é o agregador mais conhecido, com **300+ modelos** e billing unifica
 | Billing unificado | Sem virtual keys |
 | API OpenAI-compatible | Sem caching nativo |
 
-**Veredito:** Bom para prototipagem rápida, mas **LiteLLM é superior para produção** do CapIAu por ser gratuito e self-hosted.
+**Veredito:** Bom para prototipagem rápida, mas **LiteLLM é superior para produção** do CaIAu Talho por ser gratuito e self-hosted.
 
 #### **Cloudflare AI Gateway — Opção Edge**
 
-Se o CapIAu já usa Cloudflare (CDN, DNS, Workers), o AI Gateway é uma extensão natural. Oferece **350+ modelos**, caching edge, rate limiting, e DLP (Data Loss Prevention). O **markup é de 5%** em unified billing.
+Se o CaIAu Talho já usa Cloudflare (CDN, DNS, Workers), o AI Gateway é uma extensão natural. Oferece **350+ modelos**, caching edge, rate limiting, e DLP (Data Loss Prevention). O **markup é de 5%** em unified billing.
 
 | Prós | Contras |
 |:---|:---|
@@ -250,14 +250,14 @@ Focado em compliance, governança, e observabilidade enterprise. Oferece audit l
 |:---|:---|
 | Enterprise-grade observability | $49/mês + usage (não é gratuito) |
 | Audit logs e compliance | Setup mais complexo |
-| RBAC e team management | Overkill para CapIAu no estágio atual |
+| RBAC e team management | Overkill para CaIAu Talho no estágio atual |
 | Guardrails avançados | |
 
-**Veredito:** Considerar apenas quando o CapIAu atingir **escala enterprise** com requisitos de compliance rigorosos.
+**Veredito:** Considerar apenas quando o CaIAu Talho atingir **escala enterprise** com requisitos de compliance rigorosos.
 
 ---
 
-## 3. Arquitetura do CapIAu com API Agregadora
+## 3. Arquitetura do CaIAu Talho com API Agregadora
 
 ### 3.1 Diagrama de Arquitetura Atualizada
 
@@ -275,7 +275,7 @@ Focado em compliance, governança, e observabilidade enterprise. Oferece audit l
 │         └─────────────────┼─────────────────┘                                            │
 │                           │                                                            │
 │                    ┌──────┴──────┐                                                      │
-│                    │  FastAPI    │  ← API REST do CapIAu (única integração)            │
+│                    │  FastAPI    │  ← API REST do CaIAu Talho (única integração)            │
 │                    └──────┬──────┘                                                      │
 └───────────────────────────┼─────────────────────────────────────────────────────────────┘
                             │
@@ -319,7 +319,7 @@ Focado em compliance, governança, e observabilidade enterprise. Oferece audit l
 ### 3.2 Fluxo de uma Requisição
 
 ```
-1. Editor no CapIAu clica "Analisar cena #12"
+1. Editor no CaIAu Talho clica "Analisar cena #12"
    │
 2. FastAPI recebe o request e envia para LiteLLM Proxy
    │   POST http://litellm:4000/v1/chat/completions
@@ -356,10 +356,10 @@ Focado em compliance, governança, e observabilidade enterprise. Oferece audit l
 
 ### 4.1 Classificador de Complexidade
 
-O CapIAu precisa de um classificador que decide qual "nível" de modelo usar para cada tarefa:
+O CaIAu Talho precisa de um classificador que decide qual "nível" de modelo usar para cada tarefa:
 
 ```python
-# Módulo de routing no CapIAu (camada antes de chamar LiteLLM)
+# Módulo de routing no CaIAu Talho (camada antes de chamar LiteLLM)
 class TaskRouter:
     def classify_complexity(self, task_type, content_length, context):
         """
@@ -402,7 +402,7 @@ class TaskRouter:
 
 ### 4.2 Distribuição de Tarefas por Nível
 
-| Nível | % das Tarefas | Modelos | Custo/1M tokens | Exemplos no CapIAu |
+| Nível | % das Tarefas | Modelos | Custo/1M tokens | Exemplos no CaIAu Talho |
 |:---|:---|:---|:---|:---|
 | **Simples** | ~70% | Groq Llama 3.1 8B, DeepSeek V3.2 | **$0.08-0.28** | Classificação, resumos curtos, extração de entidades, routing interno |
 | **Médio** | ~20% | Groq Llama 3.3 70B, DeepSeek V3.2 | **$0.28-0.79** | Análise de cena, alinhamento roteiro-transcrição, sugestão de B-roll, detecção de furos |
@@ -431,7 +431,7 @@ class TaskRouter:
 |:---|:---|:---|
 | **LiteLLM software** | **$0** | MIT license, open-source |
 | **Infraestrutura** | ~$20-50/mês | Docker container em um dos nós do cluster (2GB RAM, 2 vCPU) |
-| **PostgreSQL** | $0 (compartilhado) | Pode usar o mesmo SQLite/PostgreSQL do CapIAu |
+| **PostgreSQL** | $0 (compartilhado) | Pode usar o mesmo SQLite/PostgreSQL do CaIAu Talho |
 | **Redis (caching)** | $0 (compartilhado) | Pode usar o mesmo Redis do RQ/job queue |
 | **Markups sobre APIs** | **$0** | LiteLLM não adiciona markup — você paga o preço direto do provedor |
 | **TOTAL gateway** | **~$20-50/mês** | Apenas custo de infra mínimo |
@@ -456,7 +456,7 @@ A verdadeira economia da agregadora não é no preço dos tokens (LiteLLM não c
 
 ---
 
-## 6. Recomendação Final para o CapIAu
+## 6. Recomendação Final para o CaIAu Talho
 
 ### 6.1 Stack de APIs Agregadoras
 
@@ -475,7 +475,7 @@ A verdadeira economia da agregadora não é no preço dos tokens (LiteLLM não c
 | **Fase 0 (POC)** | 1 dia | Deploy LiteLLM em Docker no nó master, conectar Groq + DeepSeek |
 | **Fase 1** | 2 dias | Configurar routers (simple/medium/complex), virtual keys por perfil |
 | **Fase 2** | 1 dia | Integrar modelos locais do cluster (Qwen2.5 72B via vLLM) |
-| **Fase 3** | 2 dias | Implementar classificador de complexidade no CapIAu |
+| **Fase 3** | 2 dias | Implementar classificador de complexidade no CaIAu Talho |
 | **Fase 4** | 1 dia | Configurar Redis caching, budgets, rate limiting |
 | **Fase 5** | 1 dia | Dashboard de observabilidade, alertas de custo |
 | **Total** | **~1 semana** | Gateway completo em produção |
@@ -483,7 +483,7 @@ A verdadeira economia da agregadora não é no preço dos tokens (LiteLLM não c
 ### 6.3 Configuração YAML Final Recomendada
 
 ```yaml
-# litellm_config.yaml — Configuração completa para o CapIAu
+# litellm_config.yaml — Configuração completa para o CaIAu Talho
 
 model_list:
   # ═══════════════════════════════════════════════════════════════
@@ -642,4 +642,4 @@ caching:
 
 ---
 
-*Documento complementar ao plano expandido do CapIAu. Para o contexto completo (cluster GPU, APIs individuais, Asset Sourcing, cenários de custo), consulte `capiau_apis_cluster_expandido.md`.*
+*Documento complementar ao plano expandido do CaIAu Talho. Para o contexto completo (cluster GPU, APIs individuais, Asset Sourcing, cenários de custo), consulte `capiau_apis_cluster_expandido.md`.*

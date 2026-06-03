@@ -1,4 +1,4 @@
-# CapIAu: Plano Expandido — APIs Pagas + Cluster GPU + Pesquisa de Arquivos
+# CaIAu Talho: Plano Expandido — APIs Pagas + Cluster GPU + Pesquisa de Arquivos
 
 **Data:** 02/06/2026  
 **Versão:** 2.0  
@@ -8,19 +8,19 @@
 
 ## TL;DR — O que Muda com APIs + Cluster
 
-A adição de **APIs pagas** e um **cluster de 7 GPUs RTX 4000 Ada (112GB VRAM total)** transforma o CapIAu de um sistema "local-first" em uma **plataforma híbrida de alta performance**. As APIs cobrem lacunas onde modelos locais falham (transcrição streaming, visão de topo, LLM frontier) enquanto o cluster permite executar **múltiplos modelos simultaneamente** sem o gargalo de orquestração sequencial. A pesquisa de arquivos na internet (Europeana, Internet Archive, Wikimedia, Getty, APIs de notícias) adiciona uma **camada de inteligência de sourcing** crítica para documentário e jornalismo. O investimento total estimado é de **~$18.500 em hardware (CAPEX)** + **$1.200-18.000/mês em APIs (OPEX)**, dependendo do cenário de uso. A estratégia híbrida recomendada equilibra processamento local no cluster com APIs estratégicas, reduzindo OPEX em **60-70%** comparado ao uso exclusivo de APIs.
+A adição de **APIs pagas** e um **cluster de 7 GPUs RTX 4000 Ada (112GB VRAM total)** transforma o CaIAu Talho de um sistema "local-first" em uma **plataforma híbrida de alta performance**. As APIs cobrem lacunas onde modelos locais falham (transcrição streaming, visão de topo, LLM frontier) enquanto o cluster permite executar **múltiplos modelos simultaneamente** sem o gargalo de orquestração sequencial. A pesquisa de arquivos na internet (Europeana, Internet Archive, Wikimedia, Getty, APIs de notícias) adiciona uma **camada de inteligência de sourcing** crítica para documentário e jornalismo. O investimento total estimado é de **~$18.500 em hardware (CAPEX)** + **$1.200-18.000/mês em APIs (OPEX)**, dependendo do cenário de uso. A estratégia híbrida recomendada equilibra processamento local no cluster com APIs estratégicas, reduzindo OPEX em **60-70%** comparado ao uso exclusivo de APIs.
 
 ---
 
 ## 1. APIs Pagas: Matriz Completa Topo de Linha vs. Custo-Benefício
 
-A tabela abaixo mapeia todas as APIs relevantes ao CapIAu, organizadas por categoria técnica, com duas recomendações por categoria: **TOPO DE LINHA** (melhor qualidade/features) e **CUSTO-BENEFÍCIO** (melhor relação qualidade/preço).
+A tabela abaixo mapeia todas as APIs relevantes ao CaIAu Talho, organizadas por categoria técnica, com duas recomendações por categoria: **TOPO DE LINHA** (melhor qualidade/features) e **CUSTO-BENEFÍCIO** (melhor relação qualidade/preço).
 
 ### 1.1 APIs de Transcrição de Fala (ASR)
 
 ![Comparação APIs STT](api_stt_comparison.png)
 
-| API | Modelo | Preço/Hora | Diarização | Streaming | PT-BR | Classificação | Recomendação CapIAu |
+| API | Modelo | Preço/Hora | Diarização | Streaming | PT-BR | Classificação | Recomendação CaIAu Talho |
 |:---|:---|:---|:---|:---|:---|:---|:---|
 | **AssemblyAI Universal-2** | Proprietário | **$0.15** | Sim | **<300ms** | 99 idiomas | **TOPO DE LINHA** | Modo TV/Jornalismo — streaming com baixa latência, sentiment analysis built-in, PII redaction |
 | **ElevenLabs Scribe v2** | Proprietário | **$0.28** | 98% accuracy | Sim | 99 idiomas | **CUSTO-BENEFÍCIO** | Alternativa econômica com diarização inclusa (não cobrada separadamente) |
@@ -29,13 +29,13 @@ A tabela abaixo mapeia todas as APIs relevantes ao CapIAu, organizadas por categ
 | **AWS Transcribe** | Proprietário | **$1.44** | Sim | Sim | 100+ idiomas | Enterprise | Integração AWS, custom language models, medical transcription |
 | **Google Cloud STT** | Proprietário | **$0.36-1.44** | Sim | Sim | 125+ idiomas | Referência | Menor accuracy em benchmarks independentes |
 
-**Estratégia CapIAu:** Usar **ElevenLabs Scribe v2** como padrão ($0.28/hora) para ingest batch com diarização. Usar **AssemblyAI Universal-2** ($0.15/hora) no modo streaming para TV/jornalismo quando latência <300ms for crítica. **Whisper local** como fallback para volumes massivos (sem custo por hora).
+**Estratégia CaIAu Talho:** Usar **ElevenLabs Scribe v2** como padrão ($0.28/hora) para ingest batch com diarização. Usar **AssemblyAI Universal-2** ($0.15/hora) no modo streaming para TV/jornalismo quando latência <300ms for crítica. **Whisper local** como fallback para volumes massivos (sem custo por hora).
 
 ### 1.2 APIs de LLM (Language Models)
 
 ![Comparação APIs LLM](api_llm_comparison.png)
 
-| API | Modelo | Input/1M | Output/1M | Contexto | Speed | Classificação | Recomendação CapIAu |
+| API | Modelo | Input/1M | Output/1M | Contexto | Speed | Classificação | Recomendação CaIAu Talho |
 |:---|:---|:---|:---|:---|:---|:---|:---|
 | **Claude Opus 4.6** | Anthropic | $5.00 | **$25.00** | 200K | 30 tok/s | **TOPO DE LINHA** | Decisões editoriais complexas, análise narrativa profunda, reasoning de alto nível |
 | **GPT-5.4** | OpenAI | $2.50 | **$15.00** | 128K | 90 tok/s | **TOPO DE LINHA** | Visão multimodal, análise de documentos, code generation |
@@ -44,7 +44,7 @@ A tabela abaixo mapeia todas as APIs relevantes ao CapIAu, organizadas por categ
 | **Groq Llama 3.1 8B** | Groq | **$0.05** | **$0.08** | 8K | **840 tok/s** | Ultra barato | Classificação, routing, tarefas simples — praticamente de graça |
 | **GPT-4o mini** | OpenAI | $0.15 | $0.60 | 128K | 120 tok/s | Referência | Ecossistema maduro, mas DeepSeek V3.2 é melhor e mais barato |
 
-**Estratégia CapIAu — Routing Inteligente:**
+**Estratégia CaIAu Talho — Routing Inteligente:**
 
 | Tarefa | Modelo | Justificativa |
 |:---|:---|:---|
@@ -64,7 +64,7 @@ A tabela abaixo mapeia todas as APIs relevantes ao CapIAu, organizadas por categ
 | **GPT-4o Vision** | $2.50/1M tokens input | Descrição semântica rica, compreensão de contexto narrativo | Descrição editorial de cenas, análise de composição | **TOPO DE LINHA** |
 | **Claude Sonnet 4.6 Vision** | $3.00/1M tokens input | Análise visual detalhada, PDF parsing com imagens | Análise de storyboards, decupagem técnica | **TOPO DE LINHA** |
 
-**Estratégia CapIAu:** **AWS Rekognition** para processamento em lote de detecção de objetos, faces e OCR em todo o acervo (custo previsível, $0.10/min de vídeo). **GPT-4o Vision** para descrição semântica editorial de cenas-chave (onde a qualidade da descrição narrativa importa mais que o custo). **Azure Computer Vision** como camada gratuita para prototipagem (5K imagens/mês free).
+**Estratégia CaIAu Talho:** **AWS Rekognition** para processamento em lote de detecção de objetos, faces e OCR em todo o acervo (custo previsível, $0.10/min de vídeo). **GPT-4o Vision** para descrição semântica editorial de cenas-chave (onde a qualidade da descrição narrativa importa mais que o custo). **Azure Computer Vision** como camada gratuita para prototipagem (5K imagens/mês free).
 
 ### 1.4 APIs de Busca Semântica (Vector DB Cloud)
 
@@ -74,11 +74,11 @@ A tabela abaixo mapeia todas as APIs relevantes ao CapIAu, organizadas por categ
 | **Qdrant Cloud** | $0.014/hr por nó | Sim | 10M+ vetores | **CUSTO-BENEFÍCIO** |
 | **Weaviate Cloud** | ~$0.095/M dims/mês | **BM25 nativo** | Ilimitada com BQ | Referência (hybrid search) |
 
-**Estratégia CapIAu:** Manter **Qdrant self-hosted no cluster** (zero custo de licença, apenas eletricidade) para busca semântica principal. Usar **Pinecone Serverless** apenas como backup/DR ou para índices temporários de projetos específicos.
+**Estratégia CaIAu Talho:** Manter **Qdrant self-hosted no cluster** (zero custo de licença, apenas eletricidade) para busca semântica principal. Usar **Pinecone Serverless** apenas como backup/DR ou para índices temporários de projetos específicos.
 
 ### 1.5 APIs de Geração de Imagem e Vídeo (B-roll, Ilustrações)
 
-| API | Preço | Qualidade | Uso no CapIAu |
+| API | Preço | Qualidade | Uso no CaIAu Talho |
 |:---|:---|:---|:---|
 | **Kling AI 1.6** | **$0.05/segundo** | Boa | Geração de B-roll de transição/ambientação (documentário) |
 | **Runway Gen-4** | $0.10/segundo | **Excelente** | B-roll criativo de alta qualidade quando necessário |
@@ -87,7 +87,7 @@ A tabela abaixo mapeia todas as APIs relevantes ao CapIAu, organizadas por categ
 | **Flux 2 Pro (FAL.AI)** | **$0.05/imagem** | Excelente | Geração de imagens para storyboard, referências visuais |
 | **DALL-E 3** | $0.04-0.12/imagem | Muito boa | Integração nativa com GPT, text-in-image |
 
-**Estratégia CapIAu:** Não é core do CapIAu (que é um editor, não um gerador), mas pode ser usado para: (1) gerar imagens de referência para storyboard a partir de descrições do roteiro, (2) criar B-roll de transição quando material de arquivo é insuficiente, (3) gerar visualizações de "como seria" para apresentações de projeto. **Kling AI via FAL.AI** ($0.05/s) é o ponto de entrada mais econômico.
+**Estratégia CaIAu Talho:** Não é core do CaIAu Talho (que é um editor, não um gerador), mas pode ser usado para: (1) gerar imagens de referência para storyboard a partir de descrições do roteiro, (2) criar B-roll de transição quando material de arquivo é insuficiente, (3) gerar visualizações de "como seria" para apresentações de projeto. **Kling AI via FAL.AI** ($0.05/s) é o ponto de entrada mais econômico.
 
 ### 1.6 APIs de Busca Web e Notícias (Sourcing para Documentário/Jornalismo)
 
@@ -102,7 +102,7 @@ A tabela abaixo mapeia todas as APIs relevantes ao CapIAu, organizadas por categ
 | **Exa.ai** | **$0.005/query** | 1.000/mês | Neural search | Busca semântica — encontra conteúdo por significado, não keywords |
 | **Europeana APIs** | **Grátis** | Ilimitado | 60M+ itens de patrimônio cultural | Arquivos históricos, imagens, documentos culturais europeus |
 
-**Estratégia CapIAu:** **GDELT + Europeana** como base gratuita para pesquisa histórica e arquivos. **Tavily** ($0.008/query) para buscas contextuais orientadas a LLM (encontra e resume fontes relevantes). **Serper.dev** ($0.001/query) para buscas de volume em Google. **NewsAPI** para monitoramento de notícias em tempo real no perfil TV/Jornalismo.
+**Estratégia CaIAu Talho:** **GDELT + Europeana** como base gratuita para pesquisa histórica e arquivos. **Tavily** ($0.008/query) para buscas contextuais orientadas a LLM (encontra e resume fontes relevantes). **Serper.dev** ($0.001/query) para buscas de volume em Google. **NewsAPI** para monitoramento de notícias em tempo real no perfil TV/Jornalismo.
 
 ### 1.7 APIs de Arquivos Digitais e Mídia (Documentário)
 
@@ -119,13 +119,13 @@ A tabela abaixo mapeia todas as APIs relevantes ao CapIAu, organizadas por categ
 | **Library of Congress** | Histórico americano | API | **Grátis** | Diversos |
 | **Prelinger Archives** | Filmagens históricas (domínio público) | Download direto | **Grátis** | Domínio público |
 
-**Estratégia CapIAu:** Implementar um **"Asset Sourcing Engine"** que:
+**Estratégia CaIAu Talho:** Implementar um **"Asset Sourcing Engine"** que:
 1. Recebe uma query (tema, período, localização, tipo de mídia)
 2. Busca simultaneamente em: GDELT (contexto histórico), Europeana (patrimônio cultural), Internet Archive (mídia diversa), Wikimedia Commons (imagens livres), Flickr Commons (fotos históricas)
 3. Filtra por licenciamento compatível (CC-BY, domínio público, ou rights-managed se orçamento permitir)
 4. Baixa automaticamente os assets relevantes
 5. Extrai metadados (data, fonte, licença, descrição)
-6. Indexa no banco de dados do CapIAu como "material de arquivo potencial"
+6. Indexa no banco de dados do CaIAu Talho como "material de arquivo potencial"
 
 ---
 
@@ -399,7 +399,7 @@ Com base nos dados da ANEEL (2025) e projeções para 2026:
 
 ### 5.1 Arquitetura do Sourcing Engine
 
-O CapIAu pode incorporar um módulo de **"Asset Sourcing"** que pesquisa automaticamente imagens, vídeos e documentos históricos na internet para enriquecer projetos de documentário e jornalismo.
+O CaIAu Talho pode incorporar um módulo de **"Asset Sourcing"** que pesquisa automaticamente imagens, vídeos e documentos históricos na internet para enriquecer projetos de documentário e jornalismo.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -443,7 +443,7 @@ O CapIAu pode incorporar um módulo de **"Asset Sourcing"** que pesquisa automat
 │                                 │                                           │
 │                                 ▼                                           │
 │   ┌─────────────────────────────────────────────────────────────┐          │
-│   │              CAP INDEXER (integração CapIAu)                 │          │
+│   │              CAP INDEXER (integração CaIAu Talho)                 │          │
 │   │  • Baixa assets aprovados                                    │          │
 │   │  • Extrai metadados (data, fonte, licença, autor)            │          │
 │   │  • Gera descrição semântica (VLM local)                      │          │
@@ -474,7 +474,7 @@ O CapIAu pode incorporar um módulo de **"Asset Sourcing"** que pesquisa automat
 | **Rights-Managed (Getty)** | Uso específico por contrato | Duração, território, mídia definidos | Getty Images Editorial |
 | **Royalty-Free** | Uso ilimitado após compra | Não pode revender como stock | Shutterstock, Adobe Stock, iStock |
 
-**Sistema de gestão de licenças no CapIAu:** Cada asset importado do Sourcing Engine é armazenado com seu tipo de licença, requisitos de atribuição, data de expiração (se aplicável), e restrições de uso. O sistema alerta o editor se um asset com licença restrita for usado em um contexto não autorizado.
+**Sistema de gestão de licenças no CaIAu Talho:** Cada asset importado do Sourcing Engine é armazenado com seu tipo de licença, requisitos de atribuição, data de expiração (se aplicável), e restrições de uso. O sistema alerta o editor se um asset com licença restrita for usado em um contexto não autorizado.
 
 ---
 

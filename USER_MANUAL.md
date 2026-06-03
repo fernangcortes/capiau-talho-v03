@@ -1,12 +1,12 @@
-# Manual do Usuário — CapIAu Making Of Editor
+# Manual do Usuário — CaIAu Talho Making Of Editor
 
-Bem-vindo ao **CapIAu Making Of Editor**! Este guia prático descreve o passo a passo de como importar suas mídias, transcrever depoimentos, mapear imagens semanticamente e realizar a pré-edição do seu documentário de 20 horas de forma profissional.
+Bem-vindo ao **CaIAu Talho Making Of Editor**! Este guia prático descreve o passo a passo de como importar suas mídias, transcrever depoimentos, mapear imagens semanticamente e realizar a pré-edição do seu documentário de 20 horas de forma profissional.
 
 ---
 
 ## 📂 1. Estrutura de Pastas e Organização das Mídias
 
-Para processar seu material de forma limpa, o CapIAu utiliza a seguinte estrutura local criada no seu computador:
+Para processar seu material de forma limpa, o CaIAu Talho utiliza a seguinte estrutura local criada no seu computador:
 
 * **`watch/`:** A porta de entrada do sistema. Qualquer mídia (vídeo, áudio ou foto) colocada aqui será identificada para processamento.
 * **`data/originals/`:** Armazena as mídias originais copiadas de forma segura pelo sistema.

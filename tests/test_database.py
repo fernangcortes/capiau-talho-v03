@@ -1,4 +1,4 @@
-"""Teste unitário/integração para o Banco de Dados e Busca Semântica do CapIAu."""
+"""Teste unitário/integração para o Banco de Dados e Busca Semântica do CaIAu Talho."""
 import unittest
 import os
 import shutil

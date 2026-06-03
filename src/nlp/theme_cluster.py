@@ -75,7 +75,7 @@ def extract_makingof_themes(project_id: int = 1) -> dict:
     # Chamar o DeepSeek V3 (via OpenRouter) para processar o clustering
     api_key = CONFIG.OPENROUTER_API_KEY
     if not api_key or api_key == "your_openrouter_api_key_here":
-        print("  ❌ [NLP] Chave do OpenRouter não configurada. Abortando clustering.")
+        print("  [ERROR] [NLP] Chave do OpenRouter não configurada. Abortando clustering.")
         return {"themes": []}
         
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -138,7 +138,7 @@ Responda estritamente em Português e em formato JSON puro, sem marcações mark
                     
                     # Registrar Tema no banco
                     theme_id = add_theme(project_id, title, desc)
-                    print(f"  ✅ Tema catalogado: \"{title}\" (ID: {theme_id})")
+                    print(f"  [SUCCESS] Tema catalogado: \"{title}\" (ID: {theme_id})")
                     
                     # Mapear relações no grafo
                     for b_id in blocos:
@@ -168,11 +168,11 @@ Responda estritamente em Português e em formato JSON puro, sem marcações mark
                 print("  🎉 Agrupamento temático processado com sucesso!")
                 return result
             except Exception as db_err:
-                print(f"  ❌ Erro ao salvar relações de temas no banco: {db_err}")
+                print(f"  [ERROR] Erro ao salvar relações de temas no banco: {db_err}")
                 return {"themes": []}
         else:
-            print(f"  ❌ [NLP] Falha no OpenRouter (Status {response.status_code}): {response.text}")
+            print(f"  [ERROR] [NLP] Falha no OpenRouter (Status {response.status_code}): {response.text}")
             return {"themes": []}
     except Exception as e:
-        print(f"  ❌ [NLP] Erro crítico ao conectar à API do OpenRouter: {e}")
+        print(f"  [ERROR] [NLP] Erro crítico ao conectar à API do OpenRouter: {e}")
         return {"themes": []}

@@ -3,7 +3,7 @@ import os
 import sys
 import json
 from pathlib import Path
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -32,10 +32,12 @@ class EndpointFilter(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 # Inicializar bancos físicos no startup
+from src.db.operations import reset_stuck_tasks
 init_db()
+reset_stuck_tasks()
 
 app = FastAPI(
-    title="CapIAu — Motor de Inteligência Cinematográfica",
+    title="CaIAu Talho — Motor de Inteligência Cinematográfica",
     description="Backend de processamento inteligente híbrido para Making Of e Documentários.",
     version="1.0"
 )
@@ -118,17 +120,37 @@ def list_photos(project_id: int = Query(1)):
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM photo WHERE project_id = ? ORDER BY id DESC", (project_id,))
-        return [dict(r) for r in cursor.fetchall()]
+        rows = [dict(r) for r in cursor.fetchall()]
+        # Adicionar o caminho do proxy para cada foto se ele existir no disco
+        for row in rows:
+            photo_id = row['id']
+            proxy_relative_path = f"photos/proxy_photo_{photo_id}.webp"
+            proxy_full_path = CONFIG.PROXIES_DIR / proxy_relative_path
+            if proxy_full_path.exists():
+                row['proxy_path'] = f"/proxies/{proxy_relative_path}"
+            else:
+                row['proxy_path'] = None
+            
+            # Desserializar as tags do SQLite (salvas como string JSON)
+            if row.get('tags'):
+                try:
+                    row['tags'] = json.loads(row['tags'])
+                except Exception:
+                    row['tags'] = []
+            else:
+                row['tags'] = []
+        return rows
     finally:
         conn.close()
 
 
 @app.get("/api/video/{video_id}/transcript")
 def get_transcript(video_id: int):
-    """Retorna os blocos de falas de um depoimento específico."""
-    from src.db.operations import get_video_transcript
+    """Retorna os blocos de falas de um depoimento específico junto com as palavras individuais."""
+    from src.db.operations import get_video_transcript, get_video_transcript_words
     dialogues = get_video_transcript(video_id)
-    return {"video_id": video_id, "dialogues": dialogues}
+    words = get_video_transcript_words(video_id)
+    return {"video_id": video_id, "dialogues": dialogues, "words": words}
 
 @app.get("/api/video/{video_id}/vision")
 def get_video_vision(video_id: int, project_id: int = Query(1)):
@@ -207,10 +229,10 @@ def trigger_transcribe_all(project_id: int, background_tasks: BackgroundTasks):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, filepath, filename FROM video WHERE project_id = ? AND status != 'transcribed'", (project_id,))
+        cursor.execute("SELECT id, filepath, filename FROM video WHERE project_id = ? AND status != 'transcribed' AND video_type IN ('interview', 'broll')", (project_id,))
         rows = cursor.fetchall()
         if not rows:
-            return {"status": "success", "message": "Todos os vídeos já possuem transcrições.", "count": 0}
+            return {"status": "success", "message": "Todos os vídeos elegíveis já possuem transcrições.", "count": 0}
         videos_to_transcribe = [(r['id'], Path(r['filepath'])) for r in rows]
     finally:
         conn.close()
@@ -265,21 +287,172 @@ def trigger_vision_photo(photo_id: int, background_tasks: BackgroundTasks):
     background_tasks.add_task(analyze_set_photo, photo_id, filepath)
     return {"status": "success", "message": "Análise da foto de set iniciada."}
 
+ACTIVE_CLUSTERING = set()
+
 @app.post("/api/project/cluster-themes")
 def trigger_clustering(background_tasks: BackgroundTasks, project_id: int = Query(1)):
     """Processa o clustering temático de falas."""
-    background_tasks.add_task(extract_makingof_themes, project_id)
+    ACTIVE_CLUSTERING.add(project_id)
+    
+    def run_clustering():
+        try:
+            extract_makingof_themes(project_id)
+        finally:
+            ACTIVE_CLUSTERING.discard(project_id)
+            
+    background_tasks.add_task(run_clustering)
     return {"status": "success", "message": f"Processamento de temas iniciado para projeto {project_id}."}
 
 
 # ── Endpoints de Busca e Inteligência ────────────────────────
 
 @app.get("/api/search")
-def search_media(query: str = Query(..., min_length=2), project_id: int = Query(1), media_type: Optional[str] = None):
-    """Busca semântica no Qdrant local (file-based em CPU)."""
+def search_media(query: str = Query(..., min_length=1), project_id: int = Query(1), media_type: Optional[str] = None):
+    """Busca híbrida inteligente cruzando metadados relacionais do SQLite (falantes, rostos) e Qdrant."""
     search_engine = SemanticSearch.get_instance()
-    results = search_engine.search(project_id, query, media_type=media_type, limit=12)
-    return {"query": query, "results": results}
+    
+    # 1. Buscar rostos rotulados com este nome no SQLite
+    conn = get_connection()
+    face_results = []
+    speaker_results = []
+    try:
+        cursor = conn.cursor()
+        
+        # Buscar fotos com rosto rotulado
+        if not media_type or media_type == "photo":
+            cursor.execute("""
+                SELECT f.id as face_id, f.photo_id, p.filename, p.filepath, p.description, p.tags
+                FROM face f
+                JOIN photo p ON f.photo_id = p.id
+                WHERE f.project_id = ? AND f.name LIKE ?
+            """, (project_id, f"%{query}%"))
+            photo_rows = cursor.fetchall()
+            for pr in photo_rows:
+                face_results.append({
+                    "score": 1.0,
+                    "payload": {
+                        "media_type": "photo",
+                        "photo_id": pr["photo_id"],
+                        "filename": pr["filename"],
+                        "filepath": pr["filepath"],
+                        "text": f"Rosto de {query} identificado nesta foto de bastidores. Descrição: {pr['description'] or ''}",
+                        "tags": json.loads(pr["tags"]) if pr["tags"] else []
+                    }
+                })
+            
+        # Buscar vídeos com rosto rotulado
+        if not media_type or media_type in ["video", "broll"]:
+            cursor.execute("""
+                SELECT f.id as face_id, f.video_id, f.timestamp, v.filename, v.filepath, v.description, v.tags
+                FROM face f
+                JOIN video v ON f.video_id = v.id
+                WHERE f.project_id = ? AND f.name LIKE ?
+            """, (project_id, f"%{query}%"))
+            video_face_rows = cursor.fetchall()
+            for vr in video_face_rows:
+                face_results.append({
+                    "score": 1.0,
+                    "payload": {
+                        "media_type": "broll",
+                        "video_id": vr["video_id"],
+                        "filename": vr["filename"],
+                        "filepath": vr["filepath"],
+                        "start_time": max(0.0, vr["timestamp"] - 3.0),
+                        "end_time": vr["timestamp"] + 7.0,
+                        "text": f"Rosto de {query} identificado no timecode {vr['timestamp']}s nestes bastidores.",
+                        "tags": json.loads(vr["tags"]) if vr["tags"] else []
+                    }
+                })
+
+        # Buscar falas do falante (speaker_id) no SQLite
+        if not media_type or media_type in ["video", "interview"]:
+            cursor.execute("""
+                SELECT DISTINCT video_id, speaker_id, MIN(start_time) as min_start, MAX(end_time) as max_end
+                FROM transcript
+                WHERE video_id IN (SELECT id FROM video WHERE project_id = ?) AND speaker_id LIKE ?
+                GROUP BY video_id, speaker_id
+            """, (project_id, f"%{query}%"))
+            speaker_rows = cursor.fetchall()
+            for sr in speaker_rows:
+                cursor.execute("""
+                    SELECT word, start_time, end_time FROM transcript
+                    WHERE video_id = ? AND speaker_id = ?
+                    ORDER BY start_time LIMIT 25
+                """, (sr["video_id"], sr["speaker_id"]))
+                words = cursor.fetchall()
+                phrase = " ".join([w["word"] for w in words])
+                
+                speaker_results.append({
+                    "score": 0.95,
+                    "payload": {
+                        "media_type": "interview",
+                        "video_id": sr["video_id"],
+                        "speaker_id": sr["speaker_id"],
+                        "start_time": sr["min_start"],
+                        "end_time": sr["max_end"],
+                        "text": f"Depoimento de {sr['speaker_id']}: \"{phrase}...\""
+                    }
+                })
+    except Exception as db_err:
+        print(f"[SEARCH_ENHANCEMENT] Erro ao estender busca com SQLite: {db_err}")
+    finally:
+        conn.close()
+
+    # 2. Executar a busca semântica no Qdrant
+    results = []
+    try:
+        results = search_engine.search(project_id, query, media_type=media_type, limit=12)
+    except Exception as qdrant_err:
+        print(f"[SEARCH_QDRANT] Erro na busca Qdrant: {qdrant_err}")
+        
+    # 3. Mesclar resultados e remover duplicados por ID de mídia/tipo
+    seen_media = set()
+    final_results = []
+    
+    # Adicionar matches de rosto/falante primeiro (prioridade)
+    for r in face_results + speaker_results:
+        media_id = r["payload"].get("photo_id") or r["payload"].get("video_id") or r["payload"].get("doc_id")
+        key = (r["payload"]["media_type"], media_id)
+        if key not in seen_media:
+            seen_media.add(key)
+            final_results.append(r)
+            
+    # Adicionar resultados semânticos
+    for r in results:
+        r_dict = dict(r) if hasattr(r, 'dict') else r
+        payload = r_dict.get("payload", {})
+        media_id = payload.get("photo_id") or payload.get("video_id") or payload.get("doc_id")
+        key = (payload.get("media_type"), media_id)
+        if key not in seen_media:
+            seen_media.add(key)
+            final_results.append(r_dict)
+            
+    # Enriquecer os resultados de fotos com informações em tempo real do SQLite (como filename, filepath e proxy_path)
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        for r in final_results:
+            payload = r.get("payload", {})
+            if payload.get("media_type") == "photo":
+                photo_id = payload.get("photo_id")
+                if photo_id:
+                    cursor.execute("SELECT filename, filepath, status FROM photo WHERE id = ?", (photo_id,))
+                    photo_row = cursor.fetchone()
+                    if photo_row:
+                        payload["filename"] = photo_row["filename"]
+                        payload["filepath"] = photo_row["filepath"]
+                        payload["status"] = photo_row["status"]
+                        # Injetar o proxy path
+                        proxy_relative_path = f"photos/proxy_photo_{photo_id}.webp"
+                        proxy_full_path = CONFIG.PROXIES_DIR / proxy_relative_path
+                        if proxy_full_path.exists():
+                            payload["proxy_path"] = f"/proxies/{proxy_relative_path}"
+                        else:
+                            payload["proxy_path"] = None
+    finally:
+        conn.close()
+        
+    return {"query": query, "results": final_results[:12]}
 
 @app.get("/api/themes")
 def get_project_themes(project_id: int = Query(1)):
@@ -350,7 +523,11 @@ def export_timeline(timeline_id: int, export_format: str):
 def get_all_conversions():
     """Retorna o progresso atual e status de todas as conversões de proxy em andamento/recentes."""
     from src.ingest.watcher import CONVERSION_PROGRESS
-    return CONVERSION_PROGRESS
+    res = CONVERSION_PROGRESS.copy()
+    if ACTIVE_CLUSTERING:
+        for pid in ACTIVE_CLUSTERING:
+            res[f"cluster-{pid}"] = {"status": "running", "percent": 0, "type": "clustering"}
+    return res
 
 @app.post("/api/video/{video_id}/cancel-conversion")
 def api_cancel_conversion(video_id: int):
@@ -415,18 +592,24 @@ def api_retry_single_video(video_id: int):
 
 @app.post("/api/project/{project_id}/retry-failed")
 def api_retry_failed_project(project_id: int):
-    """Reinicia todas as conversões de proxy falhas ou que não possuam arquivo físico."""
+    """Reinicia todas as conversões de proxy falhas ou que não possuam arquivo físico (vídeos e fotos)."""
     conn = get_connection()
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT id, filepath, filename, duration FROM video WHERE project_id = ?", (project_id,))
-        rows = cursor.fetchall()
+        video_rows = cursor.fetchall()
+        
+        cursor.execute("SELECT id, filepath, filename, status FROM photo WHERE project_id = ?", (project_id,))
+        photo_rows = cursor.fetchall()
     finally:
         conn.close()
         
     count = 0
     from src.ingest.watcher import generate_proxy, update_video_status, ACTIVE_CONVERSIONS, PROXY_EXECUTOR
+    from src.db.operations import update_photo_status
+    from src.ingest.watcher import generate_photo_proxy
     
+    # 1. Reprocessar vídeos falhos
     def retry_single_video_task(video_id: int, filepath: Path, duration: float):
         import time
         try:
@@ -447,8 +630,8 @@ def api_retry_failed_project(project_id: int):
         except Exception as e:
             print(f"[RETRY] Erro ao reprocessar proxy ID {video_id}: {e}")
             update_video_status(video_id, 'error', error_message=str(e))
-
-    for r in rows:
+ 
+    for r in video_rows:
         video_id = r['id']
         filepath = Path(r['filepath'])
         duration = r['duration']
@@ -466,9 +649,44 @@ def api_retry_failed_project(project_id: int):
             finally:
                 conn.close()
                 
-            if status == 'error' or is_missing:
+            if status == 'error' or status == 'transcribing' or is_missing:
                 PROXY_EXECUTOR.submit(retry_single_video_task, video_id, filepath, duration)
                 count += 1
+                
+    # 2. Reprocessar fotos falhas
+    def retry_single_photo_task(photo_id: int, filepath: Path, proxy_path: Path):
+        try:
+            update_photo_status(photo_id, 'pending')
+            success = generate_photo_proxy(filepath, proxy_path)
+            if success:
+                update_photo_status(photo_id, 'ingested')
+                try:
+                    from src.vision.face_engine import process_photo_faces
+                    process_photo_faces(project_id, photo_id, proxy_path)
+                except Exception as fe:
+                    print(f"[RETRY_BATCH] Erro ao detectar rostos na foto: {fe}")
+            else:
+                update_photo_status(photo_id, 'error')
+        except Exception as e:
+            print(f"[RETRY] Erro ao reprocessar proxy de foto ID {photo_id}: {e}")
+            update_photo_status(photo_id, 'error')
+
+    for pr in photo_rows:
+        photo_id = pr['id']
+        filepath = Path(pr['filepath'])
+        status = pr['status']
+        proxy_path = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{photo_id}.webp"
+        is_missing = not proxy_path.exists() or proxy_path.stat().st_size == 0
+        
+        if status == 'error' or status == 'pending' or is_missing:
+            # Se já existir o arquivo proxy (corrompido), tenta remover
+            if proxy_path.exists():
+                try:
+                    proxy_path.unlink()
+                except Exception:
+                    pass
+            PROXY_EXECUTOR.submit(retry_single_photo_task, photo_id, filepath, proxy_path)
+            count += 1
                 
     return {"status": "success", "message": f"Reiniciadas {count} conversões em background.", "count": count}
 
@@ -500,6 +718,572 @@ def api_delete_video(video_id: int):
         raise HTTPException(status_code=500, detail=f"Erro ao remover vídeo do banco de dados: {str(e)}")
     finally:
         conn.close()
+
+@app.post("/api/photo/{photo_id}/retry")
+def api_retry_single_photo(photo_id: int):
+    """Reinicia a conversão de um único proxy de foto."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT filepath, filename, project_id FROM photo WHERE id = ?", (photo_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Foto não encontrada.")
+        filepath = Path(row['filepath'])
+        project_id = row['project_id']
+    finally:
+        conn.close()
+        
+    from src.ingest.watcher import generate_photo_proxy, update_photo_status, PROXY_EXECUTOR
+    proxy_path = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{photo_id}.webp"
+    
+    # Remover proxy corrompido se existir
+    if proxy_path.exists():
+        try:
+            proxy_path.unlink()
+        except Exception:
+            pass
+            
+    def retry_task(p_id, proj_id, orig_path, px_path):
+        try:
+            update_photo_status(p_id, 'pending')
+            success = generate_photo_proxy(orig_path, px_path)
+            if success:
+                update_photo_status(p_id, 'ingested')
+                try:
+                    from src.vision.face_engine import process_photo_faces
+                    process_photo_faces(proj_id, p_id, px_path)
+                except Exception as fe:
+                    print(f"[RETRY_SINGLE] Erro ao detectar rostos: {fe}")
+            else:
+                update_photo_status(p_id, 'error')
+        except Exception as e:
+            print(f"[RETRY_PHOTO] Erro ID {p_id}: {e}")
+            update_photo_status(p_id, 'error')
+            
+    PROXY_EXECUTOR.submit(retry_task, photo_id, project_id, filepath, proxy_path)
+    return {"status": "success", "message": f"Reiniciada conversão para foto ID {photo_id} em background."}
+
+@app.delete("/api/photo/{photo_id}")
+def api_delete_photo(photo_id: int):
+    """Remove a foto completamente do projeto e apaga o proxy correspondente."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM photo WHERE id = ?", (photo_id,))
+        conn.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao remover foto do banco: {str(e)}")
+    finally:
+        conn.close()
+        
+    # Deletar arquivo físico de proxy se existir
+    proxy_path = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{photo_id}.webp"
+    if proxy_path.exists():
+        try:
+            proxy_path.unlink()
+        except Exception:
+            pass
+            
+    return {"status": "success", "message": f"Foto ID {photo_id} removida com sucesso."}
+
+# ── Modelos Pydantic Adicionais ──────────────────────────────
+class SplitTranscriptPayload(BaseModel):
+    start_time: float
+    new_speaker_id: str
+
+# ── Endpoints de Documentos de Contexto e Visão em Lote ───────
+
+@app.post("/api/project/{project_id}/docs")
+async def upload_document(project_id: int, doc_type: str = "other", file: UploadFile = File(...)):
+    """Faz upload de um documento de roteiro ou contexto e indexa no Qdrant."""
+    filename = file.filename
+    file_bytes = await file.read()
+    
+    # 1. Decodificar / Extrair conteúdo com base no formato
+    content = ""
+    ext = Path(filename).suffix.lower()
+    
+    if ext in [".txt", ".fountain"]:
+        try:
+            content = file_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            content = file_bytes.decode("latin-1", errors="ignore")
+    elif ext == ".fdx":
+        try:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(file_bytes)
+            paragraphs = []
+            for p in root.findall(".//Paragraph"):
+                text_elems = p.findall(".//Text")
+                text = "".join([t.text for t in text_elems if t.text])
+                ptype = p.attrib.get("Type", "")
+                if text.strip():
+                    if ptype:
+                        paragraphs.append(f"{ptype.upper()}: {text.strip()}")
+                    else:
+                        paragraphs.append(text.strip())
+            content = "\n\n".join(paragraphs)
+            if not content.strip():
+                content = file_bytes.decode("utf-8", errors="ignore")
+        except Exception as e:
+            content = file_bytes.decode("utf-8", errors="ignore")
+    elif ext == ".pdf":
+        try:
+            import pypdf
+            from io import BytesIO
+            reader = pypdf.PdfReader(BytesIO(file_bytes))
+            pages_text = []
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    pages_text.append(text)
+            content = "\n\n".join(pages_text)
+            if not content.strip():
+                raise Exception("Nenhum texto pôde ser extraído do PDF.")
+        except ImportError:
+            raise HTTPException(
+                status_code=400, 
+                detail="Para processar arquivos PDF, instale a biblioteca 'pypdf' no servidor (pip install pypdf)."
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erro ao processar PDF: {str(e)}")
+    else:
+        raise HTTPException(status_code=400, detail="Formato de arquivo não suportado. Use .txt, .fountain, .fdx ou .pdf.")
+
+    if not content.strip():
+        raise HTTPException(status_code=400, detail="O arquivo está vazio ou não pôde ser decodificado.")
+        
+    # 2. Salvar no SQLite
+    from src.db.operations import add_production_doc
+    try:
+        doc_id = add_production_doc(
+            project_id=project_id,
+            filename=filename,
+            filepath=None,
+            content=content,
+            doc_type=doc_type
+        )
+        
+        # 3. Indexar no Qdrant
+        search_engine = SemanticSearch.get_instance()
+        search_engine.index_production_doc(project_id, doc_id, filename, content)
+        
+        return {"status": "success", "doc_id": doc_id, "filename": filename, "message": "Documento indexado com sucesso."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar documento: {str(e)}")
+
+@app.get("/api/project/{project_id}/docs")
+def list_documents(project_id: int):
+    """Lista todos os documentos de contexto importados no projeto."""
+    from src.db.operations import get_production_docs
+    return get_production_docs(project_id)
+
+@app.delete("/api/docs/{doc_id}")
+def remove_document(doc_id: int, project_id: int = Query(1)):
+    """Remove um documento de contexto do banco de dados e limpa os vetores no Qdrant."""
+    from src.db.operations import delete_production_doc
+    try:
+        # Remover do Qdrant primeiro
+        search_engine = SemanticSearch.get_instance()
+        search_engine.delete_production_doc_vectors(project_id, doc_id)
+        
+        # Remover do SQLite
+        delete_production_doc(doc_id)
+        return {"status": "success", "message": f"Documento ID {doc_id} removido."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao remover documento: {str(e)}")
+
+# ── Endpoints de Reconhecimento Facial (Fase 3) ──────────────────────────
+
+class LabelFacePayload(BaseModel):
+    name: str
+
+@app.post("/api/face/{face_id}/label")
+def label_face(face_id: int, payload: LabelFacePayload):
+    """Atribui um nome a um rosto detectado."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE face SET name = ? WHERE id = ?", (payload.name, face_id))
+        conn.commit()
+        return {"status": "success", "message": f"Rosto ID {face_id} rotulado como '{payload.name}'."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.get("/api/video/{video_id}/faces")
+def get_video_faces(video_id: int):
+    """Retorna todos os rostos detectados em um vídeo."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, bounding_box, timestamp FROM face WHERE video_id = ? ORDER BY timestamp", (video_id,))
+        rows = cursor.fetchall()
+        
+        result = []
+        for r in rows:
+            row_dict = dict(r)
+            if row_dict.get('bounding_box'):
+                try:
+                    row_dict['bounding_box'] = json.loads(row_dict['bounding_box'])
+                except Exception:
+                    pass
+            result.append(row_dict)
+        return result
+    finally:
+        conn.close()
+
+@app.get("/api/photo/{photo_id}/faces")
+def get_photo_faces(photo_id: int):
+    """Retorna todos os rostos detectados em uma foto."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, bounding_box FROM face WHERE photo_id = ?", (photo_id,))
+        rows = cursor.fetchall()
+        
+        result = []
+        for r in rows:
+            row_dict = dict(r)
+            if row_dict.get('bounding_box'):
+                try:
+                    row_dict['bounding_box'] = json.loads(row_dict['bounding_box'])
+                except Exception:
+                    pass
+            result.append(row_dict)
+        return result
+    finally:
+        conn.close()
+
+@app.get("/api/project/{project_id}/speakers")
+def get_project_speakers(project_id: int):
+    """Retorna a lista de nomes únicos de falantes diarizados do projeto."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT speaker_id 
+            FROM transcript 
+            WHERE video_id IN (SELECT id FROM video WHERE project_id = ?)
+            ORDER BY speaker_id
+        """, (project_id,))
+        speakers = [r['speaker_id'] for r in cursor.fetchall()]
+        
+        cursor.execute("""
+            SELECT DISTINCT name 
+            FROM face 
+            WHERE project_id = ? AND name IS NOT NULL
+            ORDER BY name
+        """, (project_id,))
+        faces = [r['name'] for r in cursor.fetchall()]
+        
+        all_names = sorted(list(set(speakers + faces)))
+        return all_names
+    finally:
+        conn.close()
+
+@app.post("/api/project/{project_id}/analyze-all-vision")
+def trigger_all_vision(project_id: int, background_tasks: BackgroundTasks):
+    """Dispara a decupagem visual de todas as mídias (B-rolls e fotos) pendentes em background."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        
+        # 1. Buscar B-rolls pendentes/ingested
+        cursor.execute("""
+            SELECT id, filepath, duration 
+            FROM video 
+            WHERE project_id = ? AND video_type = 'broll' AND status IN ('ingested', 'error')
+        """, (project_id,))
+        video_rows = cursor.fetchall()
+        
+        # 2. Buscar Fotos pendentes/ingested/error que não foram analisadas
+        cursor.execute("""
+            SELECT id, filepath 
+            FROM photo 
+            WHERE project_id = ? AND status IN ('ingested', 'pending', 'error')
+        """, (project_id,))
+        photo_rows = cursor.fetchall()
+    finally:
+        conn.close()
+        
+    def bg_analyze_all():
+        print(f"[VISION_BATCH] Iniciando lote de visão com {len(video_rows)} vídeos e {len(photo_rows)} fotos para projeto {project_id}")
+        
+        # Analisar vídeos B-Roll
+        for v in video_rows:
+            try:
+                analyze_broll_video(v['id'], Path(v['filepath']), v['duration'])
+            except Exception as e:
+                print(f"[VISION_BATCH] Erro no vídeo ID {v['id']}: {e}")
+                
+        # Analisar fotos de set (com detecção inteligente de sequências/bursts)
+        photos_with_time = []
+        for p in photo_rows:
+            path = Path(p['filepath'])
+            mtime = 0.0
+            try:
+                if path.exists():
+                    mtime = path.stat().st_mtime
+            except Exception:
+                pass
+            photos_with_time.append({
+                "id": p["id"],
+                "filepath": path,
+                "mtime": mtime,
+                "parent_dir": str(path.parent)
+            })
+            
+        # Ordenar por diretório pai e tempo de modificação
+        photos_with_time.sort(key=lambda x: (x["parent_dir"], x["mtime"]))
+        
+        last_analyzed_photo = None
+        
+        for p in photos_with_time:
+            photo_id = p["id"]
+            filepath = p["filepath"]
+            
+            # Detectar sequência temporal (intervalo menor que 5 segundos no mesmo diretório)
+            is_sequence = False
+            time_diff = 0.0
+            if last_analyzed_photo and last_analyzed_photo["parent_dir"] == p["parent_dir"]:
+                time_diff = abs(p["mtime"] - last_analyzed_photo["mtime"])
+                if time_diff < 5.0:
+                    is_sequence = True
+                    
+            if is_sequence:
+                print(f"  [VISION_BATCH] Foto ID {photo_id} ({filepath.name}) detectada em sequência com Foto ID {last_analyzed_photo['id']} (Diff: {time_diff:.1f}s). Reutilizando metadados.")
+                try:
+                    from src.db.operations import get_connection, update_photo_analysis, add_relation
+                    conn = get_connection()
+                    ref_desc = ""
+                    ref_tags_str = ""
+                    try:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT description, tags FROM photo WHERE id = ?", (last_analyzed_photo["id"],))
+                        row = cursor.fetchone()
+                        if row:
+                            ref_desc = row["description"] or ""
+                            ref_tags_str = row["tags"] or "[]"
+                    finally:
+                        conn.close()
+                        
+                    import json
+                    try:
+                        ref_tags = json.loads(ref_tags_str)
+                    except Exception:
+                        ref_tags = []
+                        
+                    desc = f"{ref_desc} (Foto em sequência)"
+                    
+                    # Salvar cópia no SQLite
+                    update_photo_analysis(photo_id, desc, ref_tags)
+                    
+                    # Indexar no Qdrant
+                    search_engine = SemanticSearch.get_instance()
+                    search_engine.index_photo_description(project_id, photo_id, desc, ref_tags)
+                    
+                    # Salvar relações de tags no grafo relacional
+                    for tag in ref_tags:
+                        add_relation(
+                            project_id=project_id,
+                            subject_type="photo",
+                            subject_id=str(photo_id),
+                            predicate="features_element",
+                            object_type="theme",
+                            object_id=tag,
+                            weight=1.0
+                        )
+                except Exception as seq_err:
+                    print(f"  [VISION_BATCH] Erro ao replicar metadados na foto sequencial ID {photo_id}: {seq_err}")
+            else:
+                try:
+                    analyze_set_photo(photo_id, filepath)
+                    # Armazenar esta como última analisada
+                    last_analyzed_photo = p
+                except Exception as e:
+                    print(f"[VISION_BATCH] Erro ao analisar foto ID {photo_id}: {e}")
+                
+    background_tasks.add_task(bg_analyze_all)
+    return {
+        "status": "success", 
+        "message": f"Análise visual em lote de {len(video_rows)} vídeos e {len(photo_rows)} fotos iniciada em background."
+    }
+
+@app.post("/api/video/{video_id}/split-transcript")
+def split_transcript(video_id: int, payload: SplitTranscriptPayload):
+    """Divide a transcrição a partir de uma palavra, atribuindo a ela e às subsequentes um novo falante."""
+    conn = get_connection()
+    try:
+        # 1. Encontrar o speaker atual da palavra neste timestamp
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT speaker_id 
+            FROM transcript 
+            WHERE video_id = ? AND start_time = ?
+        """, (video_id, payload.start_time))
+        word_row = cursor.fetchone()
+        if not word_row:
+            # Tentar achar a palavra mais próxima
+            cursor.execute("""
+                SELECT speaker_id, start_time 
+                FROM transcript 
+                WHERE video_id = ? AND start_time >= ? 
+                ORDER BY start_time ASC LIMIT 1
+            """, (video_id, payload.start_time))
+            word_row = cursor.fetchone()
+            
+        if not word_row:
+            raise HTTPException(status_code=404, detail="Nenhuma palavra encontrada neste timestamp.")
+            
+        current_speaker = word_row['speaker_id']
+        actual_start_time = word_row['start_time']
+        
+        # 2. Atualizar as palavras subsequentes do mesmo falante a partir daquele ponto
+        cursor.execute("""
+            UPDATE transcript 
+            SET speaker_id = ? 
+            WHERE video_id = ? AND start_time >= ? AND speaker_id = ?
+        """, (payload.new_speaker_id, video_id, actual_start_time, current_speaker))
+        conn.commit()
+        
+        # 3. Recarregar os diálogos no SQLite e re-indexar no Qdrant
+        from src.db.operations import get_video_transcript
+        dialogues = get_video_transcript(video_id)
+        if dialogues:
+            search_engine = SemanticSearch.get_instance()
+            cursor.execute("SELECT project_id FROM video WHERE id = ?", (video_id,))
+            proj_row = cursor.fetchone()
+            proj_id = proj_row['project_id'] if proj_row else 1
+            search_engine.index_transcript_chunks(proj_id, video_id, dialogues)
+            
+        return {"status": "success", "message": f"Transcrição dividida em {actual_start_time}s. Novo falante: {payload.new_speaker_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+class ChatPayload(BaseModel):
+    message: str
+    history: List[dict] = []
+
+@app.post("/api/project/{project_id}/chat")
+def chatbot_rag(project_id: int, payload: ChatPayload):
+    """Chatbot RAG que realiza busca híbrida no Qdrant/SQLite e responde usando DeepSeek."""
+    import requests
+    search_engine = SemanticSearch.get_instance()
+    
+    # 1. Pesquisa semântica no Qdrant
+    raw_results = []
+    try:
+        raw_results = search_engine.search(project_id, payload.message, limit=15)
+    except Exception as e:
+        print(f"[CHAT] Erro ao buscar no Qdrant: {e}")
+        
+    # Enriquecer resultados com nomes de arquivos do SQLite
+    conn = get_connection()
+    context_items = []
+    try:
+        cursor = conn.cursor()
+        for r in raw_results:
+            p = r.get("payload", {})
+            media_type = p.get("media_type")
+            text = p.get("text", "")
+            
+            if media_type in ["interview", "broll", "video"]:
+                vid = p.get("video_id")
+                cursor.execute("SELECT filename FROM video WHERE id = ?", (vid,))
+                row = cursor.fetchone()
+                fname = row["filename"] if row else "Video"
+                start = p.get("start_time", 0.0)
+                end = p.get("end_time", start + 10.0)
+                if media_type == "interview":
+                    speaker = p.get("speaker_id", "Desconhecido")
+                    context_items.append(f'- [Depoimento ID {vid} | Arquivo: {fname} | Falante: {speaker} | Tempo: {start:.1f}s - {end:.1f}s]: "{text}"')
+                else:
+                    context_items.append(f'- [B-Roll ID {vid} | Arquivo: {fname} | Tempo: {start:.1f}s]: "{text}"')
+            elif media_type == "photo":
+                phid = p.get("photo_id")
+                cursor.execute("SELECT filename FROM photo WHERE id = ?", (phid,))
+                row = cursor.fetchone()
+                fname = row["filename"] if row else "Foto"
+                context_items.append(f'- [Foto ID {phid} | Arquivo: {fname}]: "{text}"')
+            elif media_type == "doc":
+                docid = p.get("doc_id")
+                fname = p.get("filename", "Documento")
+                context_items.append(f'- [Documento ID {docid} | Arquivo: {fname}]: "{text}"')
+    finally:
+        conn.close()
+        
+    context_str = "\n".join(context_items)
+    
+    # 2. Construir instruções do sistema
+    system_prompt = f"""Você é o Assistente IA do CaIAu Talho, um co-editor e assistente de roteiro/produção de cinema inteligente.
+Você ajuda o usuário a montar seu filme a partir do material de bastidores (making of), fotos de set e documentos de produção.
+
+Ao responder às perguntas do usuário, use o contexto fornecido abaixo, que contém trechos de transcrição de depoimentos, descrições visuais de B-roll, descrições de fotos de set e documentos de produção.
+IMPORTANTE: Sempre cite as mídias específicas em sua resposta quando apropriado, usando o formato de link markdown exato:
+- Para vídeos (entrevistas ou b-rolls): `[Texto descritivo ou Nome do Arquivo](video_id: ID_DO_VIDEO, start: START_TIME, end: END_TIME)` (Ex: [Depoimento do Diretor](video_id: 2, start: 15.4, end: 28.0)). O player pulará para esse tempo.
+- Para fotos: `[Texto descritivo](photo_id: ID_DA_FOTO)` (Ex: [Foto da equipe de luz](photo_id: 5)).
+- Para documentos: `[Nome do Documento](doc_id: ID_DO_DOC)` (Ex: [Pauta de Entrevistas](doc_id: 1)).
+
+Seja profissional, criativo, dê sugestões de montagem e de narrativa. Escreva sempre em Português.
+
+CONTEXTO RELEVANTE DO PROJETO:
+{context_str if context_str else "Nenhum material indexado ou correspondente encontrado no banco vetorial."}
+"""
+
+    messages = [{"role": "system", "content": system_prompt}]
+    
+    # Adicionar histórico limitado
+    for h in payload.history[-8:]:
+        messages.append({
+            "role": h.get("role", "user"),
+            "content": h.get("content", "")
+        })
+        
+    messages.append({"role": "user", "content": payload.message})
+    
+    # 3. Chamar API do OpenRouter
+    api_key = CONFIG.OPENROUTER_API_KEY
+    if not api_key or api_key == "your_openrouter_api_key_here":
+        return {
+            "response": "Olá! Sou o assistente de edição do CaIAu Talho. Para que eu possa responder às suas dúvidas e pesquisar as mídias, configure a chave `OPENROUTER_API_KEY` no arquivo `.env` do seu servidor.",
+            "context_used": []
+        }
+        
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload_api = {
+        "model": CONFIG.TEXT_MODEL,
+        "messages": messages,
+        "temperature": 0.5
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload_api, timeout=30)
+        if response.status_code == 200:
+            res_json = response.json()
+            ai_text = res_json['choices'][0]['message']['content'].strip()
+            return {
+                "response": ai_text,
+                "context_used": context_items
+            }
+        else:
+            return {
+                "response": f"Erro ao contatar o motor de IA (Status {response.status_code}): {response.text}",
+                "context_used": []
+            }
+    except Exception as e:
+        return {
+            "response": f"Erro crítico na comunicação com o chatbot: {str(e)}",
+            "context_used": []
+        }
 
 @app.on_event("shutdown")
 def on_shutdown_cleanup():

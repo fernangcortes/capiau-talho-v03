@@ -54,6 +54,21 @@ class SemanticSearch:
         'dialogues' deve ser uma lista de dicionários contendo:
         {'speaker_id': str, 'start_time': float, 'end_time': float, 'text': str}
         """
+        # Obter o tipo real do vídeo (interview ou broll) no SQLite
+        from src.db.operations import get_connection
+        conn = get_connection()
+        video_type = "interview"
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT video_type FROM video WHERE id = ?", (video_id,))
+            row = cursor.fetchone()
+            if row:
+                video_type = row['video_type']
+        except Exception as e:
+            print(f"[QDRANT] Erro ao buscar tipo de vídeo no banco: {e}")
+        finally:
+            conn.close()
+
         points = []
         for idx, dial in enumerate(dialogues):
             text_to_embed = f"{dial['speaker_id']}: \"{dial['text']}\""
@@ -69,7 +84,7 @@ class SemanticSearch:
                 payload={
                     "project_id": project_id,
                     "video_id": video_id,
-                    "media_type": "interview",
+                    "media_type": video_type,
                     "speaker_id": dial['speaker_id'],
                     "start_time": dial['start_time'],
                     "end_time": dial['end_time'],
@@ -82,7 +97,7 @@ class SemanticSearch:
                 collection_name=self.collection_name,
                 points=points
             )
-            print(f"[QDRANT] {len(points)} falas indexadas para projeto {project_id}, vídeo {video_id}")
+            print(f"[QDRANT] {len(points)} falas indexadas ({video_type}) para projeto {project_id}, vídeo {video_id}")
 
     def index_broll_descriptions(self, project_id: int, video_id: int, descriptions: list):
         """Indexa as análises visuais de frames do B-Roll isolados por project_id.
@@ -215,4 +230,54 @@ class SemanticSearch:
         except Exception as e:
             print(f"[QDRANT] Erro ao recuperar frames do vídeo: {e}")
             return []
+
+    def index_production_doc(self, project_id: int, doc_id: int, filename: str, content: str):
+        """Indexa um documento de contexto fatiando-o em parágrafos no Qdrant local."""
+        paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
+        
+        points = []
+        for idx, text in enumerate(paragraphs):
+            if len(text) < 10:
+                continue
+                
+            text_to_embed = f"Documento '{filename}' | Parágrafo: {text}"
+            vector = self.encoder.encode(text_to_embed).tolist()
+            
+            point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"proj_{project_id}_doc_{doc_id}_para_{idx}"))
+            
+            points.append(PointStruct(
+                id=point_id,
+                vector=vector,
+                payload={
+                    "project_id": project_id,
+                    "doc_id": doc_id,
+                    "media_type": "doc",
+                    "filename": filename,
+                    "text": text
+                }
+            ))
+            
+        if points:
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points
+            )
+            print(f"[QDRANT] {len(points)} parágrafos indexados para o documento ID {doc_id} no projeto {project_id}")
+
+    def delete_production_doc_vectors(self, project_id: int, doc_id: int):
+        """Remove todos os vetores indexados de um documento de produção."""
+        try:
+            self.client.delete(
+                collection_name=self.collection_name,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                        FieldCondition(key="doc_id", match=MatchValue(value=doc_id)),
+                        FieldCondition(key="media_type", match=MatchValue(value="doc"))
+                    ]
+                )
+            )
+            print(f"[QDRANT] Vetores do documento ID {doc_id} removidos com sucesso.")
+        except Exception as e:
+            print(f"[QDRANT] Erro ao remover vetores do documento ID {doc_id}: {e}")
 

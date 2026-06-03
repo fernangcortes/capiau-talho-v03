@@ -37,7 +37,7 @@ const MOCK_TRANSCRIPT_1 = [
         speaker_id: "Diretor",
         start_time: 15.0,
         end_time: 25.0,
-        text: "Com 20 horas de gravação de entrevistas e B-rolls, o CapIAu nos ajuda a encontrar os melhores cortes instantaneamente."
+        text: "Com 20 horas de gravação de entrevistas e B-rolls, o CaIAu Talho nos ajuda a encontrar os melhores cortes instantaneamente."
     }
 ];
 
@@ -61,15 +61,29 @@ const MOCK_THEMES = [
 let currentProjectId = 1;
 let activeVideo = null;
 let activeTranscript = [];
+let activeTranscriptWords = [];
+let activeScissorsMode = false;
 let activeVisionFrames = [];
 let currentRightTab = "transcript";
 let activeTimelineCuts = [];
 let markerIn = null;
 let markerOut = null;
 let allVideos = [];
+let allPhotos = [];
 const openFoldersSet = new Set();
 let progressInterval = null;
 let activeConversions = {};
+let lastSearchResults = [];
+let lastSearchQuery = "";
+let currentPhotoList = [];
+let currentPhotoIndex = -1;
+let isPhotoZoomed = false;
+let lastPhotosSerialized = "";
+let isTasksGrouped = false;
+let wasClusteringRunning = false;
+let chatHistory = [];
+
+
 
 
 
@@ -137,7 +151,7 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 function initApp() {
-    console.log("CapIAu iniciado.");
+    console.log("CaIAu Talho iniciado.");
     setupProjectListeners();
     loadProjects();
     updateTimelineUI();
@@ -169,6 +183,7 @@ async function loadProjects() {
                 await loadVideos();
                 await loadPhotos();
                 await loadThemes();
+                await loadDocuments();
                 updateSystemStatus("Projetos carregados com sucesso.");
                 return;
             }
@@ -187,6 +202,7 @@ async function loadProjects() {
     await loadVideos();
     await loadPhotos();
     await loadThemes();
+    await loadDocuments();
     updateSystemStatus("Offline. Exibindo simulador (Mock).");
 }
 
@@ -226,6 +242,7 @@ function setupProjectListeners() {
         loadVideos();
         loadPhotos();
         loadThemes();
+        loadDocuments();
         updateTimelineUI();
     });
     
@@ -308,16 +325,15 @@ async function loadVideos() {
             if (currentRightTab === "tasks") {
                 renderRightPanelFeed(); // Atualiza a aba de tarefas em tempo real se ativa
             }
-            if (data.length > 0) {
-                renderVideos(data);
-                updateSystemStatus("Mídias atualizadas.");
-                return;
-            }
+            filterAndRenderLibrary();
+            updateSystemStatus("Mídias atualizadas.");
+            return;
         }
     } catch (e) {
         console.warn("Backend offline ou erro ao carregar vídeos. Carregando mock de segurança.");
     }
-    renderVideos(MOCK_VIDEOS);
+    allVideos = MOCK_VIDEOS;
+    filterAndRenderLibrary();
     updateSystemStatus("Pronto.");
 }
 
@@ -466,10 +482,21 @@ function renderTreeNode(node, container, depth = 0) {
         const chevron = node.isOpen ? "fa-chevron-down" : "fa-chevron-right";
         
         folderHeader.innerHTML = `
-            <i class="fa-solid ${chevron} chevron-icon" style="font-size:9px; margin-right:6px; color:var(--text-muted);"></i>
-            <i class="fa-solid ${icon} folder-icon" style="color:var(--color-violet); margin-right:8px;"></i>
-            <span class="folder-name">${node.name}</span>
+            <div style="display: flex; align-items: center; flex: 1; min-width: 0;">
+                <i class="fa-solid ${chevron} chevron-icon" style="font-size:9px; margin-right:6px; color:var(--text-muted);"></i>
+                <i class="fa-solid ${icon} folder-icon" style="color:var(--color-violet); margin-right:8px;"></i>
+                <span class="folder-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${node.name}</span>
+            </div>
+            <div class="folder-actions" style="display: flex; gap: 4px; margin-right: 6px;">
+                <button class="btn-folder-action" data-action="expand" title="Expandir todas as subpastas" style="background: none; border: none; padding: 2px 4px; color: var(--color-cyan); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fa-solid fa-angles-down"></i>
+                </button>
+                <button class="btn-folder-action" data-action="collapse" title="Recolher todas as subpastas" style="background: none; border: none; padding: 2px 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fa-solid fa-angles-up"></i>
+                </button>
+            </div>
         `;
+        folderHeader.dataset.folderPath = node.path;
         
         const folderChildren = document.createElement("div");
         folderChildren.className = "tree-folder-children";
@@ -479,6 +506,16 @@ function renderTreeNode(node, container, depth = 0) {
         
         folderHeader.addEventListener("click", (e) => {
             e.stopPropagation();
+            
+            // Verificar se clicou em um botão de ação de pasta
+            const actionBtn = e.target.closest(".btn-folder-action");
+            if (actionBtn) {
+                const action = actionBtn.dataset.action;
+                const path = folderHeader.dataset.folderPath;
+                expandCollapseAllSubfolders(path, action === "expand");
+                return;
+            }
+            
             node.isOpen = !node.isOpen;
             const newChevron = node.isOpen ? "fa-chevron-down" : "fa-chevron-right";
             const newIcon = node.isOpen ? "fa-folder-open" : "fa-folder";
@@ -499,11 +536,43 @@ function renderTreeNode(node, container, depth = 0) {
         folderDiv.appendChild(folderChildren);
         
         // Renderizar filhos recursivamente (pastas primeiro, depois arquivos)
+        const sortBy = document.getElementById("library-sort-by")?.value || "name_asc";
         const sortedKeys = Object.keys(node.children).sort((a, b) => {
             const nodeA = node.children[a];
             const nodeB = node.children[b];
             if (nodeA.type !== nodeB.type) {
                 return nodeA.type === "folder" ? -1 : 1;
+            }
+            if (nodeA.type === "folder") {
+                if (sortBy === "name_desc") {
+                    return b.localeCompare(a);
+                }
+                return a.localeCompare(b);
+            }
+            // Ambos são arquivos (vídeos)
+            const vA = nodeA.video;
+            const vB = nodeB.video;
+            if (sortBy === "name_asc") {
+                return (vA.filename || "").localeCompare(vB.filename || "");
+            } else if (sortBy === "name_desc") {
+                return (vB.filename || "").localeCompare(vA.filename || "");
+            } else if (sortBy === "type_interview") {
+                const typeA = vA.video_type === "interview" ? 0 : (vA.video_type === "broll" ? 1 : 2);
+                const typeB = vB.video_type === "interview" ? 0 : (vB.video_type === "broll" ? 1 : 2);
+                if (typeA !== typeB) return typeA - typeB;
+                return (vA.filename || "").localeCompare(vB.filename || "");
+            } else if (sortBy === "type_broll") {
+                const typeA = vA.video_type === "broll" ? 0 : (vA.video_type === "interview" ? 1 : 2);
+                const typeB = vB.video_type === "broll" ? 0 : (vB.video_type === "interview" ? 1 : 2);
+                if (typeA !== typeB) return typeA - typeB;
+                return (vA.filename || "").localeCompare(vB.filename || "");
+            } else if (sortBy === "duration_desc") {
+                const durA = vA.duration || 0;
+                const durB = vB.duration || 0;
+                if (durB !== durA) return durB - durA;
+                return (vA.filename || "").localeCompare(vB.filename || "");
+            } else if (sortBy === "date_desc") {
+                return (vB.id || 0) - (vA.id || 0);
             }
             return a.localeCompare(b);
         });
@@ -592,7 +661,8 @@ function renderVideos(videos) {
     }
     
     // Iniciar o polling em background de conversões se houver algum vídeo ativamente convertendo/processando
-    const hasActiveConversions = videos.some(v => v.status === "transcribing" || v.status === "processing" || v.status === "analyzing");
+    // Usa allVideos (não-filtrado) para garantir que o polling seja ativado mesmo com filtros ativos
+    const hasActiveConversions = allVideos.some(v => v.status === "transcribing" || v.status === "processing" || v.status === "analyzing");
     if (hasActiveConversions) {
         startProgressPolling();
     }
@@ -600,51 +670,214 @@ function renderVideos(videos) {
 
 async function loadPhotos() {
     updateSystemStatus("Carregando fotos de set...", true);
-    const listContainer = document.getElementById("photo-list");
-    listContainer.innerHTML = "";
     
     try {
         const response = await fetch(`/api/photos?project_id=${currentProjectId}`);
 
         if (response.ok) {
             const data = await response.json();
-            if (data.length > 0) {
-                renderPhotos(data);
-                updateSystemStatus("Fotos atualizadas.");
-                return;
+            allPhotos = data; // Armazena globalmente
+            filterAndRenderPhotos();
+            updateSystemStatus("Fotos atualizadas.");
+            
+            // Iniciar polling se houver alguma foto pendente
+            const hasPendingPhotos = data.some(p => p.status === "pending");
+            if (hasPendingPhotos) {
+                startProgressPolling();
             }
+            return;
         }
     } catch (e) {
         console.warn("Erro ao carregar fotos. Carregando mock.");
     }
-    renderPhotos(MOCK_PHOTOS);
+    allPhotos = MOCK_PHOTOS;
+    filterAndRenderPhotos();
     updateSystemStatus("Pronto.");
 }
 
 function renderPhotos(photos) {
+    currentPhotoList = photos; // Salva a lista global de fotos atualmente renderizadas para o carrossel
     const listContainer = document.getElementById("photo-list");
-    listContainer.innerHTML = "";
+    
+    // Serializar dados chave para verificar se algo relevante mudou (evitando recriar nós e dar flicker)
+    const serialized = JSON.stringify(photos.map(p => ({ id: p.id, status: p.status, proxy_path: p.proxy_path, filename: p.filename })));
+    if (lastPhotosSerialized === serialized && listContainer && listContainer.children.length > 0) {
+        return; // Sem alterações visuais e contêiner já preenchido, não recria o DOM
+    }
+    lastPhotosSerialized = serialized;
+    
+    if (listContainer) {
+        listContainer.innerHTML = "";
+    }
     
     photos.forEach(p => {
         const card = document.createElement("div");
         card.className = "photo-card";
         
-        // Tratar caminhos absolutos locais vs urls de mock
-        const src = p.filepath.startsWith('http') || p.filepath.startsWith('/') ? p.filepath : `/originals/${p.filename}`;
+        // Tratar caminhos absolutos locais vs urls de mock vs proxy path
+        const src = p.proxy_path || (p.filepath && (p.filepath.startsWith('http') || p.filepath.startsWith('/')) ? p.filepath : `/originals/${p.filename}`);
+        const isRaw = p.filename.toLowerCase().match(/\.(arw|cr2|nef|dng|pef|raf|orf|rw2|raw)$/);
+        
+        let imgHtml = "";
+        let clickEnabled = true;
+        
+        if (p.status === 'pending') {
+            imgHtml = `
+                <div class="photo-placeholder-loading">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Gerando Proxy...</span>
+                </div>
+            `;
+            if (isRaw) clickEnabled = false;
+        } else if (p.status === 'error') {
+            imgHtml = `
+                <div class="photo-placeholder-error">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>Falha no Proxy</span>
+                </div>
+            `;
+            if (isRaw) clickEnabled = false;
+        } else {
+            if (isRaw && !p.proxy_path) {
+                imgHtml = `
+                    <div class="photo-placeholder-loading">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <span>Processando RAW...</span>
+                    </div>
+                `;
+                clickEnabled = false;
+            } else {
+                imgHtml = `<img src="${src}" alt="${p.filename}" loading="lazy">`;
+            }
+        }
         
         card.innerHTML = `
-            <img src="${src}" alt="${p.filename}">
-            <p title="${p.description}">${p.description}</p>
+            ${imgHtml}
+            <p title="${p.description || p.filename}">${p.description || p.filename}</p>
         `;
         
-        card.addEventListener("click", () => {
-            // Ao clicar na foto, exibe a análise dela na busca ou player
-            alert(`Foto: ${p.filename}\nDescrição: ${p.description}\nTags: ${p.tags}`);
-        });
+        if (clickEnabled) {
+            card.addEventListener("click", () => {
+                openPhotoViewer(p);
+            });
+            card.style.cursor = "pointer";
+        } else {
+            card.style.cursor = "not-allowed";
+            card.title = "Aguarde o processamento do arquivo RAW para visualizar.";
+        }
         
         listContainer.appendChild(card);
     });
 }
+
+function filterAndRenderLibrary() {
+    const filterStatus = document.getElementById("library-filter-status")?.value || "all";
+    let filteredVideos = [...allVideos];
+    
+    // 1. Filtrar por status
+    if (filterStatus === "pending") {
+        filteredVideos = filteredVideos.filter(v => 
+            v.status === "pending" || 
+            v.status === "ingested" || 
+            v.status === "transcribing" || 
+            v.status === "processing" || 
+            v.status === "analyzing"
+        );
+    } else if (filterStatus === "processed") {
+        filteredVideos = filteredVideos.filter(v => 
+            v.status === "transcribed" || 
+            v.status === "analyzed"
+        );
+    } else if (filterStatus === "error") {
+        filteredVideos = filteredVideos.filter(v => v.status === "error");
+    }
+    
+    renderVideos(filteredVideos);
+}
+
+function filterAndRenderPhotos() {
+    const filterStatus = document.getElementById("library-filter-status")?.value || "all";
+    const sortBy = document.getElementById("library-sort-by")?.value || "name_asc";
+    
+    let filteredPhotos = [...allPhotos];
+    
+    // 1. Filtrar por status
+    if (filterStatus === "pending") {
+        filteredPhotos = filteredPhotos.filter(p => p.status === "pending" || p.status === "ingested");
+    } else if (filterStatus === "processed") {
+        filteredPhotos = filteredPhotos.filter(p => p.status === "analyzed" || (!p.status && p.proxy_path) || (p.status !== "pending" && p.status !== "error" && p.status !== "ingested"));
+    } else if (filterStatus === "error") {
+        filteredPhotos = filteredPhotos.filter(p => p.status === "error");
+    }
+    
+    // 2. Ordenar por metadados
+    filteredPhotos.sort((a, b) => {
+        if (sortBy === "name_asc") {
+            return (a.filename || "").localeCompare(b.filename || "");
+        } else if (sortBy === "name_desc") {
+            return (b.filename || "").localeCompare(a.filename || "");
+        } else if (sortBy === "date_desc") {
+            return (b.id || 0) - (a.id || 0);
+        } else {
+            return (a.filename || "").localeCompare(b.filename || "");
+        }
+    });
+    
+    renderPhotos(filteredPhotos);
+}
+
+window.expandCollapseAllSubfolders = function(folderPath, expand) {
+    const filepaths = allVideos.map(v => v.filepath.replace(/\\/g, "/"));
+    const commonBase = getCommonBasePath(filepaths);
+    
+    const folderPaths = new Set();
+    allVideos.forEach(v => {
+        const normalized = v.filepath.replace(/\\/g, "/");
+        const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
+        const parts = relative.split("/").filter(Boolean);
+        
+        let currentPath = "root";
+        for (let i = 0; i < parts.length - 1; i++) {
+            currentPath = currentPath + "/" + parts[i];
+            folderPaths.add(currentPath);
+        }
+    });
+
+    folderPaths.forEach(path => {
+        if (path === folderPath || path.startsWith(folderPath + "/")) {
+            if (expand) {
+                openFoldersSet.add(path);
+            } else {
+                openFoldersSet.delete(path);
+            }
+        }
+    });
+
+    filterAndRenderLibrary();
+};
+
+window.globalExpandCollapseAll = function(expand) {
+    const filepaths = allVideos.map(v => v.filepath.replace(/\\/g, "/"));
+    const commonBase = getCommonBasePath(filepaths);
+    
+    allVideos.forEach(v => {
+        const normalized = v.filepath.replace(/\\/g, "/");
+        const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
+        const parts = relative.split("/").filter(Boolean);
+        
+        let currentPath = "root";
+        for (let i = 0; i < parts.length - 1; i++) {
+            currentPath = currentPath + "/" + parts[i];
+            if (expand) {
+                openFoldersSet.add(currentPath);
+            } else {
+                openFoldersSet.delete(currentPath);
+            }
+        }
+    });
+
+    filterAndRenderLibrary();
+};
 
 async function loadThemes() {
     updateSystemStatus("Carregando temas narrativos...", true);
@@ -673,19 +906,167 @@ function renderThemes(themes) {
     const listContainer = document.getElementById("theme-list");
     listContainer.innerHTML = "";
     
+    if (themes.length === 0) {
+        listContainer.innerHTML = `
+            <div style="color:var(--text-muted); font-size:11px; padding:12px; text-align:center;">
+                Nenhum tema catalogado ainda. Clique em "Agrupar Temas" no cabeçalho para gerar o clustering por IA!
+            </div>
+        `;
+        return;
+    }
+    
     themes.forEach(t => {
         const card = document.createElement("div");
         card.className = "media-card";
         card.style.flexDirection = "column";
         card.style.alignItems = "flex-start";
-        card.style.gap = "4px";
+        card.style.gap = "6px";
+        card.style.padding = "12px";
         
         card.innerHTML = `
-            <h4 style="color: var(--color-cyan);"><i class="fa-solid fa-brain"></i> ${t.title}</h4>
-            <p style="font-size: 11px; color: var(--text-secondary);">${t.description}</p>
+            <h4 style="color: var(--color-cyan); margin: 0; font-size: 12px; font-weight: 600;"><i class="fa-solid fa-brain"></i> ${t.title}</h4>
+            <p style="font-size: 11px; color: var(--text-secondary); margin: 0; line-height: 1.4;">${t.description}</p>
+            <div style="display:flex; gap:6px; margin-top:6px; width: 100%;">
+                <button class="btn-primary btn-theme-search" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; border: none;" data-title="${t.title}">
+                    <i class="fa-solid fa-magnifying-glass"></i> Buscar Cortes
+                </button>
+                <button class="btn-secondary btn-theme-chat" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--text-primary); border: none;" data-title="${t.title}">
+                    <i class="fa-solid fa-comments"></i> Perguntar IA
+                </button>
+            </div>
         `;
+        
+        // Listeners
+        const searchBtn = card.querySelector(".btn-theme-search");
+        searchBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const title = searchBtn.getAttribute("data-title");
+            searchInput.value = title;
+            filterSelect.value = ""; // todas as mídias
+            runSemanticSearch();
+        });
+        
+        const chatBtn = card.querySelector(".btn-theme-chat");
+        chatBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const title = chatBtn.getAttribute("data-title");
+            
+            // Alternar para aba do chat
+            const btnTabChat = document.getElementById("btn-tab-chat");
+            if (btnTabChat) {
+                btnTabChat.click();
+            }
+            
+            // Preencher input do chat e disparar
+            setTimeout(() => {
+                const chatTextarea = document.getElementById("chat-input-textarea");
+                const chatSendBtn = document.getElementById("chat-send-btn");
+                if (chatTextarea && chatSendBtn) {
+                    chatTextarea.value = `Quais mídias e reflexões temos relacionadas ao tema '${title}'?`;
+                    chatSendBtn.click();
+                }
+            }, 100);
+        });
+        
         listContainer.appendChild(card);
     });
+}
+
+async function loadDocuments() {
+    const listContainer = document.getElementById("doc-list");
+    if (!listContainer) return;
+    listContainer.innerHTML = "<div class='loading' style='font-size:11px; color:var(--text-muted);'>Carregando documentos...</div>";
+    
+    try {
+        const response = await fetch(`/api/project/${currentProjectId}/docs`);
+        if (response.ok) {
+            const data = await response.json();
+            renderDocuments(data);
+        } else {
+            listContainer.innerHTML = "<div style='color:var(--text-muted); font-size:11px; padding:8px;'>Nenhum documento cadastrado.</div>";
+        }
+    } catch (e) {
+        listContainer.innerHTML = "<div style='color:var(--text-muted); font-size:11px; padding:8px;'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
+    }
+}
+
+function renderDocuments(docs) {
+    const listContainer = document.getElementById("doc-list");
+    if (!listContainer) return;
+    listContainer.innerHTML = "";
+    
+    if (docs.length === 0) {
+        listContainer.innerHTML = "<div style='color:var(--text-muted); font-size:11px; padding:8px;'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
+        return;
+    }
+    
+    docs.forEach(doc => {
+        const card = document.createElement("div");
+        card.className = "media-card";
+        card.style.display = "flex";
+        card.style.alignItems = "center";
+        card.style.justifyContent = "space-between";
+        card.style.padding = "8px 10px";
+        card.style.gap = "8px";
+        card.style.cursor = "default";
+        card.style.marginBottom = "6px";
+        
+        let docIcon = "fa-file-lines";
+        if (doc.doc_type === "script") docIcon = "fa-scroll";
+        else if (doc.doc_type === "outline") docIcon = "fa-list-ol";
+        else if (doc.doc_type === "notes") docIcon = "fa-clipboard";
+        
+        card.innerHTML = `
+            <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+                <i class="fa-solid ${docIcon}" style="color: var(--color-cyan); font-size: 14px;"></i>
+                <div style="display:flex; flex-direction:column; min-width:0; flex:1;">
+                    <span style="font-size:12px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-primary);" title="${doc.filename}">${doc.filename}</span>
+                    <span style="font-size:9px; color:var(--text-muted); text-transform:capitalize;">${doc.doc_type === 'script' ? 'Roteiro' : doc.doc_type}</span>
+                </div>
+            </div>
+            <button class="btn-card-action" style="color:var(--color-rose); background:transparent; border:none; cursor:pointer;" onclick="deleteDocument(${doc.id})" title="Deletar Documento"><i class="fa-solid fa-trash-can"></i></button>
+        `;
+        
+        listContainer.appendChild(card);
+    });
+}
+
+window.deleteDocument = async function(docId) {
+    if (!confirm("Tem certeza que deseja remover este documento? Seus dados indexados no Qdrant também serão excluídos!")) {
+        return;
+    }
+    updateSystemStatus("Removendo documento...", true);
+    try {
+        const response = await fetch(`/api/docs/${docId}?project_id=${currentProjectId}`, {
+            method: "DELETE"
+        });
+        if (response.ok) {
+            updateSystemStatus("Documento deletado.");
+            await loadDocuments();
+        } else {
+            alert("Erro ao deletar documento.");
+            updateSystemStatus("Falha ao deletar documento.");
+        }
+    } catch (e) {
+        updateSystemStatus("Erro de rede.");
+    }
+}
+
+function updateActionsRowVisibility() {
+    const asrActionsRow = document.getElementById("asr-actions-row");
+    const visionActionsRow = document.getElementById("vision-actions-row");
+    if (asrActionsRow && visionActionsRow) {
+        if (currentRightTab === "transcript") {
+            asrActionsRow.style.display = "flex";
+            visionActionsRow.style.display = "none";
+        } else if (currentRightTab === "vision") {
+            asrActionsRow.style.display = "none";
+            visionActionsRow.style.display = "flex";
+        } else {
+            asrActionsRow.style.display = "none";
+            visionActionsRow.style.display = "none";
+        }
+    }
 }
 
 // ── SELEÇÃO DE VÍDEO E PLAYER CONTROLLER ──────────────────────────────
@@ -733,20 +1114,40 @@ async function selectVideo(video) {
     if (markerInPos) markerInPos.style.display = "none";
     if (markerOutPos) markerOutPos.style.display = "none";
     
-    // Gerenciar visibilidade das abas da barra lateral direita
-    const rightTabs = document.getElementById("right-tabs");
+    // Gerenciar visibilidade das abas da barra lateral direita de forma dinâmica
     const btnTabTranscript = document.getElementById("btn-tab-transcript");
     const btnTabVision = document.getElementById("btn-tab-vision");
+    const btnTabTasks = document.getElementById("btn-tab-tasks");
+    const btnTabSearch = document.getElementById("btn-tab-search");
     
+    // Ocultar Visão IA se não for B-Roll
     if (video.video_type === "broll") {
-        rightTabs.style.display = "flex";
-        btnTabTranscript.classList.add("active");
-        btnTabVision.classList.remove("active");
-        currentRightTab = "transcript";
+        if (btnTabVision) btnTabVision.style.display = "block";
     } else {
-        rightTabs.style.display = "none";
-        currentRightTab = "transcript";
+        if (btnTabVision) btnTabVision.style.display = "none";
+        // Se a aba ativa era Visão IA mas o vídeo atual é depoimento, volta para Falas
+        if (currentRightTab === "vision") {
+            currentRightTab = "transcript";
+        }
     }
+    
+    // Atualizar as classes ativas de destaque nas abas
+    if (btnTabTranscript) btnTabTranscript.classList.remove("active");
+    if (btnTabVision) btnTabVision.classList.remove("active");
+    if (btnTabTasks) btnTabTasks.classList.remove("active");
+    if (btnTabSearch) btnTabSearch.classList.remove("active");
+    
+    if (currentRightTab === "transcript") {
+        if (btnTabTranscript) btnTabTranscript.classList.add("active");
+    } else if (currentRightTab === "vision") {
+        if (btnTabVision) btnTabVision.classList.add("active");
+    } else if (currentRightTab === "tasks") {
+        if (btnTabTasks) btnTabTasks.classList.add("active");
+    } else if (currentRightTab === "search") {
+        if (btnTabSearch) btnTabSearch.classList.add("active");
+    }
+    
+    updateActionsRowVisibility();
     
     // Carrega transcrições/descrições visuais
     await loadTranscript(video);
@@ -757,6 +1158,7 @@ async function loadTranscript(video) {
     feed.innerHTML = "<div class='loading'>Carregando dados...</div>";
     
     activeTranscript = [];
+    activeTranscriptWords = [];
     activeVisionFrames = [];
     
     // 1. Tentar sempre carregar falas/transcrições se existirem
@@ -766,6 +1168,7 @@ async function loadTranscript(video) {
             const data = await response.json();
             if (data.dialogues && data.dialogues.length > 0) {
                 activeTranscript = data.dialogues;
+                activeTranscriptWords = data.words || [];
             }
         }
     } catch (e) {
@@ -775,6 +1178,7 @@ async function loadTranscript(video) {
     // Fallback do Mock para entrevista de depoimento principal se estiver vazio/offline
     if (video.video_type === "interview" && activeTranscript.length === 0) {
         activeTranscript = MOCK_TRANSCRIPT_1;
+        activeTranscriptWords = [];
     }
     
     // 2. Se for B-roll, carregar descrições de frames reais do Qdrant
@@ -798,10 +1202,21 @@ async function loadTranscript(video) {
 
 function renderRightPanelFeed() {
     const feed = document.getElementById("transcript-feed");
-    feed.innerHTML = "";
     
     if (currentRightTab === "tasks") {
         renderTasksTab();
+        return;
+    }
+    
+    if (currentRightTab === "chat") {
+        renderChatTab();
+        return;
+    }
+    
+    feed.innerHTML = "";
+    
+    if (currentRightTab === "search") {
+        renderSearchResults(lastSearchResults, lastSearchQuery);
         return;
     }
     
@@ -858,37 +1273,82 @@ function renderRightPanelFeed() {
 async function renderTasksTab() {
     const feed = document.getElementById("transcript-feed");
     
-    // Buscar progresso atual das conversões FFmpeg
-    let conversions = {};
-    try {
-        const response = await fetch("/api/conversions");
-        if (response.ok) {
-            conversions = await response.json();
+    // Se o cabeçalho e o contêiner de lista não existem, renderiza a estrutura inicial
+    let listContainer = document.getElementById("tasks-list-container");
+    if (!listContainer) {
+        feed.innerHTML = `
+            <div class="transcription-actions" style="border:none; margin-bottom:12px; padding-bottom: 0;">
+                <h4 style="font-size:12px; color:var(--color-cyan); display:flex; align-items:center; justify-content:space-between; width:100%; margin:0;">
+                    <span><i class="fa-solid fa-list-check"></i> Fila de Tarefas</span>
+                    <div style="display:flex; align-items:center; gap:10px; margin-left:auto;">
+                        <label style="font-size:10px; color:var(--text-secondary); display:flex; align-items:center; gap:4px; cursor:pointer; font-weight:normal; margin:0; user-select:none;">
+                            <input type="checkbox" id="chk-tasks-grouped" ${isTasksGrouped ? 'checked' : ''} style="cursor:pointer; margin:0;"> Agrupar
+                        </label>
+                        <button class="btn-outline" onclick="loadVideos();" style="font-size:10px; padding:2px 8px; display:flex; align-items:center; gap:4px; height: 24px;">
+                            <i class="fa-solid fa-arrows-rotate"></i> Atualizar
+                        </button>
+                    </div>
+                </h4>
+            </div>
+            <div id="tasks-list-container" style="display:flex; flex-direction:column; gap:10px;"></div>
+        `;
+        listContainer = document.getElementById("tasks-list-container");
+        
+        // Registrar escuta do checkbox
+        const chk = document.getElementById("chk-tasks-grouped");
+        if (chk) {
+            chk.addEventListener("change", (e) => {
+                isTasksGrouped = e.target.checked;
+                renderTasksTab();
+            });
         }
-    } catch (e) {
-        console.warn("Erro ao buscar progresso das conversões.");
     }
     
-    feed.innerHTML = `
-        <div class="transcription-actions" style="border:none; margin-bottom:12px; padding-bottom: 0;">
-            <h4 style="font-size:12px; color:var(--color-cyan); display:flex; align-items:center; justify-content:space-between; width:100%; margin:0;">
-                <span><i class="fa-solid fa-list-check"></i> Fila de Tarefas</span>
-                <button class="btn-outline" onclick="loadVideos();" style="font-size:10px; padding:2px 8px; margin-left:auto; display:flex; align-items:center; gap:4px; height: 24px;">
-                    <i class="fa-solid fa-arrows-rotate"></i> Atualizar
-                </button>
-            </h4>
-        </div>
-    `;
+    const conversions = activeConversions || {};
     
-    const activeTasks = allVideos.filter(v => 
+    // Obter tarefas de vídeo
+    const videoTasks = allVideos.filter(v => 
         v.status === "transcribing" || 
         v.status === "processing" || 
         v.status === "analyzing" || 
         v.status === "error"
-    );
+    ).map(v => ({
+        id: `video-${v.id}`,
+        dbId: v.id,
+        type: "video",
+        filename: v.filename,
+        status: v.status,
+        errorMessage: v.error_message
+    }));
+    
+    // Obter tarefas de foto
+    let photoTasks = [];
+    let photos = [];
+    try {
+        const photoResponse = await fetch(`/api/photos?project_id=${currentProjectId}`);
+        if (photoResponse.ok) {
+            photos = await photoResponse.json();
+            photoTasks = photos.filter(p => 
+                p.status === "pending" || 
+                p.status === "error"
+            ).map(p => ({
+                id: `photo-${p.id}`,
+                dbId: p.id,
+                type: "photo",
+                filename: p.filename,
+                status: p.status,
+                errorMessage: p.status === 'error' ? "Arquivo de imagem corrompido ou formato RAW incompatível." : null
+            }));
+        }
+    } catch (e) {
+        console.warn("Erro ao buscar tarefas de fotos:", e);
+    }
+    
+    // Mesclar todas as tarefas
+    const activeTasks = [...videoTasks, ...photoTasks];
     
     if (activeTasks.length === 0) {
-        feed.innerHTML += `
+        listContainer.innerHTML = `
             <div class="empty-state" style="padding: 40px 20px;">
                 <i class="fa-solid fa-circle-check" style="color: var(--color-emerald); font-size: 32px; margin-bottom: 12px;"></i>
                 <p style="font-weight:600; color:var(--text-secondary);">Tudo em dia!</p>
@@ -900,61 +1360,229 @@ async function renderTasksTab() {
         return;
     }
     
-    activeTasks.forEach(v => {
-        const taskCard = document.createElement("div");
-        taskCard.className = "transcript-bubble";
-        taskCard.style.borderColor = v.status === "error" ? "rgba(244, 63, 94, 0.3)" : "var(--border-glass-glow)";
-        taskCard.style.background = v.status === "error" ? "rgba(244, 63, 94, 0.03)" : "rgba(255,255,255,0.02)";
-        taskCard.style.marginBottom = "10px";
-        taskCard.style.padding = "12px";
-        taskCard.style.cursor = "default";
+    // Se visualização agrupada estiver ativa, renderiza resumos consolidados
+    if (isTasksGrouped) {
+        const videoConvertingCount = Object.keys(conversions).length;
+        const videoTranscribingCount = allVideos.filter(v => v.status === "transcribing").length;
+        const videoAnalyzingCount = allVideos.filter(v => v.status === "analyzing").length;
+        const videoFailedCount = allVideos.filter(v => v.status === "error").length;
+        const photoPendingCount = photos.filter(p => p.status === "pending").length;
+        const photoFailedCount = photos.filter(p => p.status === "error").length;
+        
+        const groups = [
+            {
+                label: "Convertendo Proxies de Vídeo",
+                count: videoConvertingCount,
+                icon: "fa-spinner fa-spin",
+                color: "var(--color-cyan)",
+                desc: "FFmpeg processando mídias em background."
+            },
+            {
+                label: "Transcrevendo Depoimentos (ASR)",
+                count: videoTranscribingCount,
+                icon: "fa-spinner fa-spin",
+                color: "var(--color-cyan)",
+                desc: "AssemblyAI gerando transcrição palavra-a-palavra e diarização."
+            },
+            {
+                label: "Analisando Bastidores (Visão IA)",
+                count: videoAnalyzingCount,
+                icon: "fa-spinner fa-spin",
+                color: "var(--color-violet)",
+                desc: "Processamento multimodal de frames no OpenRouter."
+            },
+            {
+                label: "Gerando Proxies de Foto WebP",
+                count: photoPendingCount,
+                icon: "fa-spinner fa-spin",
+                color: "var(--color-cyan)",
+                desc: "Conversão Pillow/rawpy para formato WebP otimizado."
+            },
+            {
+                label: "Falhas em Vídeos",
+                count: videoFailedCount,
+                icon: "fa-triangle-exclamation",
+                color: "var(--color-rose)",
+                desc: "Erros no processamento ou transcrição de mídias."
+            },
+            {
+                label: "Falhas em Fotos",
+                count: photoFailedCount,
+                icon: "fa-triangle-exclamation",
+                color: "var(--color-rose)",
+                desc: "Erros ao ler arquivo ou gerar proxy WebP."
+            }
+        ];
+        
+        const activeGroups = groups.filter(g => g.count > 0);
+        
+        // Remover grupos que deixaram de ser ativos
+        const activeGroupIds = new Set(activeGroups.map(g => `task-group-${g.label.replace(/\s+/g, '-').toLowerCase()}`));
+        listContainer.querySelectorAll("[data-group-id]").forEach(card => {
+            const groupId = card.getAttribute("data-group-id");
+            if (!activeGroupIds.has(groupId)) {
+                card.remove();
+            }
+        });
+        
+        // Remover elementos de tarefas individuais no modo agrupado
+        listContainer.querySelectorAll("[data-task-id]").forEach(card => card.remove());
+        
+        activeGroups.forEach(g => {
+            const groupId = `task-group-${g.label.replace(/\s+/g, '-').toLowerCase()}`;
+            let groupCard = document.getElementById(groupId);
+            const isNew = !groupCard;
+            
+            if (isNew) {
+                groupCard = document.createElement("div");
+                groupCard.id = groupId;
+                groupCard.setAttribute("data-group-id", groupId);
+                groupCard.className = "transcript-bubble";
+                groupCard.style.marginBottom = "0px";
+                groupCard.style.padding = "12px";
+                groupCard.style.cursor = "default";
+            }
+            
+            groupCard.style.borderColor = g.color === "var(--color-rose)" ? "rgba(244, 63, 94, 0.3)" : "var(--border-glass-glow)";
+            groupCard.style.background = g.color === "var(--color-rose)" ? "rgba(244, 63, 94, 0.03)" : "rgba(255,255,255,0.02)";
+            
+            const innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-weight:600; font-size:11px; color:var(--text-secondary);">
+                        <i class="fa-solid ${g.icon}" style="margin-right: 6px; color: ${g.color};"></i> ${g.label}
+                    </span>
+                    <span class="badge" style="font-size:10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary);">
+                        ${g.count} ${g.count === 1 ? 'arquivo' : 'arquivos'}
+                    </span>
+                </div>
+                <p style="font-size:10px; color:var(--text-muted); margin:0; line-height:1.4;">
+                    ${g.desc}
+                </p>
+            `;
+            
+            if (groupCard.innerHTML !== innerHTML) {
+                groupCard.innerHTML = innerHTML;
+            }
+            
+            if (isNew) {
+                listContainer.appendChild(groupCard);
+            }
+        });
+        
+        return;
+    }
+    
+    // Se a visualização detalhada estiver ativa, precisamos garantir que o DOM anterior (agrupado) seja limpo
+    listContainer.querySelectorAll("[data-group-id]").forEach(card => card.remove());
+    const firstBubble = listContainer.querySelector(".transcript-bubble");
+    if (firstBubble && !firstBubble.hasAttribute("data-task-id")) {
+        listContainer.innerHTML = "";
+    }
+    
+    // Remover o empty-state do container se existirem tarefas ativas
+    const emptyState = listContainer.querySelector(".empty-state");
+    if (emptyState) {
+        listContainer.innerHTML = "";
+    }
+    
+    // Mapear IDs de tarefas ativas atuais
+    const activeTaskIds = new Set(activeTasks.map(t => t.id));
+    
+    // Remover do DOM as tarefas que não estão mais ativas
+    listContainer.querySelectorAll("[data-task-id]").forEach(card => {
+        const taskId = card.getAttribute("data-task-id");
+        if (!activeTaskIds.has(taskId)) {
+            card.remove();
+        }
+    });
+    
+    // Atualizar ou criar cada card de tarefa
+    activeTasks.forEach(t => {
+        let taskCard = document.getElementById(`task-card-${t.id}`);
+        const isNew = !taskCard;
+        
+        if (isNew) {
+            taskCard = document.createElement("div");
+            taskCard.id = `task-card-${t.id}`;
+            taskCard.setAttribute("data-task-id", t.id);
+            taskCard.className = "transcript-bubble";
+            taskCard.style.marginBottom = "0px";
+            taskCard.style.padding = "12px";
+            taskCard.style.cursor = "default";
+        }
+        
+        taskCard.style.borderColor = t.status === "error" ? "rgba(244, 63, 94, 0.3)" : "var(--border-glass-glow)";
+        taskCard.style.background = t.status === "error" ? "rgba(244, 63, 94, 0.03)" : "rgba(255,255,255,0.02)";
         
         let statusTitle = "";
         let statusIcon = "";
         let details = "";
         let actionBtn = "";
         
-        if (v.status === "transcribing" || v.status === "processing") {
-            const convData = conversions[v.id];
-            if (convData) {
-                const percent = convData.percent !== undefined ? convData.percent : 0;
-                statusTitle = `Convertendo (${percent}%)`;
-                statusIcon = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);"></i>`;
-                details = "FFmpeg convertendo vídeo para proxy de visualização leve.";
-                actionBtn = `<button class="btn-outline" style="color:var(--color-rose); font-size:10px; padding:4px 8px; border-color: rgba(244, 63, 94, 0.3);" onclick="cancelConversion(${v.id}); event.stopPropagation();">Cancelar</button>`;
-            } else {
-                statusTitle = "Transcrevendo (ASR)";
-                statusIcon = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);"></i>`;
-                details = "AssemblyAI analisando áudio e gerando falas na nuvem.";
-                actionBtn = ``;
+        if (t.type === "video") {
+            if (t.status === "transcribing" || t.status === "processing") {
+                const convData = conversions[t.dbId];
+                if (convData) {
+                    const percent = convData.percent !== undefined ? convData.percent : 0;
+                    statusTitle = `Convertendo (${percent}%)`;
+                    statusIcon = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);"></i>`;
+                    details = "FFmpeg convertendo vídeo para proxy de visualização leve.";
+                    actionBtn = `<button class="btn-outline" style="color:var(--color-rose); font-size:10px; padding:4px 8px; border-color: rgba(244, 63, 94, 0.3);" onclick="cancelConversion(${t.dbId}); event.stopPropagation();">Cancelar</button>`;
+                } else {
+                    statusTitle = "Transcrevendo (ASR)";
+                    statusIcon = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);"></i>`;
+                    details = "AssemblyAI analisando áudio e gerando falas na nuvem.";
+                    actionBtn = ``;
+                }
+            } else if (t.status === "analyzing") {
+                statusTitle = "Visão IA";
+                statusIcon = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-violet);"></i>`;
+                details = "Extraindo frames e descrevendo o conteúdo visual via IA.";
+                actionBtn = `<button class="btn-outline" style="color:var(--color-rose); font-size:10px; padding:4px 8px; border-color: rgba(244, 63, 94, 0.3);" onclick="cancelConversion(${t.dbId}); event.stopPropagation();">Cancelar</button>`;
+            } else if (t.status === "error") {
+                statusTitle = "Falha";
+                statusIcon = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);"></i>`;
+                details = t.errorMessage || "Erro desconhecido durante a conversão ou transcrição.";
+                actionBtn = `
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn-secondary" style="font-size:10px; padding:4px 8px; display:flex; align-items:center; gap:4px; height: 26px;" onclick="retrySingleVideo(${t.dbId}); event.stopPropagation();">
+                            <i class="fa-solid fa-arrows-rotate"></i> Tentar Novamente
+                        </button>
+                        <button class="btn-outline" style="color:var(--text-secondary); font-size:10px; padding:4px 8px; height: 26px;" onclick="deleteProxy(${t.dbId}); event.stopPropagation();">
+                            Remover
+                        </button>
+                    </div>
+                `;
             }
-        } else if (v.status === "analyzing") {
-            statusTitle = "Visão IA";
-            statusIcon = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-violet);"></i>`;
-            details = "Extraindo frames e descrevendo o conteúdo visual via IA.";
-            actionBtn = `<button class="btn-outline" style="color:var(--color-rose); font-size:10px; padding:4px 8px; border-color: rgba(244, 63, 94, 0.3);" onclick="cancelConversion(${v.id}); event.stopPropagation();">Cancelar</button>`;
-        } else if (v.status === "error") {
-            statusTitle = "Falha";
-            statusIcon = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);"></i>`;
-            details = v.error_message || "Erro desconhecido durante a conversão ou transcrição.";
-            actionBtn = `
-                <div style="display:flex; gap:6px;">
-                    <button class="btn-secondary" style="font-size:10px; padding:4px 8px; display:flex; align-items:center; gap:4px; height: 26px;" onclick="retrySingleVideo(${v.id}); event.stopPropagation();">
-                        <i class="fa-solid fa-arrows-rotate"></i> Tentar Novamente
-                    </button>
-                    <button class="btn-outline" style="color:var(--text-secondary); font-size:10px; padding:4px 8px; height: 26px;" onclick="deleteProxy(${v.id}); event.stopPropagation();">
-                        Remover
-                    </button>
-                </div>
-            `;
+        } else if (t.type === "photo") {
+            if (t.status === "pending") {
+                statusTitle = "Gerando Proxy";
+                statusIcon = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);"></i>`;
+                details = "Criando proxy WebP otimizado (1024px) para visualização rápida na web.";
+                actionBtn = ``;
+            } else if (t.status === "error") {
+                statusTitle = "Falha";
+                statusIcon = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);"></i>`;
+                details = t.errorMessage || "Arquivo de imagem corrompido ou formato RAW incompatível.";
+                actionBtn = `
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn-secondary" style="font-size:10px; padding:4px 8px; display:flex; align-items:center; gap:4px; height: 26px;" onclick="retrySinglePhoto(${t.dbId}); event.stopPropagation();">
+                            <i class="fa-solid fa-arrows-rotate"></i> Tentar Novamente
+                        </button>
+                        <button class="btn-outline" style="color:var(--text-secondary); font-size:10px; padding:4px 8px; height: 26px;" onclick="deletePhoto(${t.dbId}); event.stopPropagation();">
+                            Remover
+                        </button>
+                    </div>
+                `;
+            }
         }
         
-        taskCard.innerHTML = `
+        const innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;">
-                <span style="font-weight:600; font-size:11px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${v.filename}">
-                    ${v.filename}
+                <span style="font-weight:600; font-size:11px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${t.filename}">
+                    <i class="fa-solid ${t.type === 'photo' ? 'fa-image' : 'fa-film'}" style="margin-right: 4px; color: ${t.type === 'photo' ? '#f59e0b' : 'var(--color-violet)'};"></i> ${t.filename}
                 </span>
-                <span style="font-size:10px; font-weight:500; display:flex; align-items:center; gap:4px; color:${v.status === 'error' ? 'var(--color-rose)' : 'var(--color-cyan)'}; flex-shrink:0;">
+                <span style="font-size:10px; font-weight:500; display:flex; align-items:center; gap:4px; color:${t.status === 'error' ? 'var(--color-rose)' : 'var(--color-cyan)'}; flex-shrink:0;">
                     ${statusIcon} ${statusTitle}
                 </span>
             </div>
@@ -966,7 +1594,14 @@ async function renderTasksTab() {
             </div>
         `;
         
-        feed.appendChild(taskCard);
+        // Evita re-renderização se o conteúdo interno for idêntico, prevenindo flicker
+        if (taskCard.innerHTML !== innerHTML) {
+            taskCard.innerHTML = innerHTML;
+        }
+        
+        if (isNew) {
+            listContainer.appendChild(taskCard);
+        }
     });
 }
 
@@ -993,30 +1628,290 @@ window.retrySingleVideo = async function(videoId) {
     }
 };
 
+window.retrySinglePhoto = async function(photoId) {
+    showSpeedOverlay("Reprocessando...");
+    updateSystemStatus("Reiniciando tarefa...", true);
+    try {
+        const response = await fetch(`/api/photo/${photoId}/retry`, { method: "POST" });
+        if (response.ok) {
+            updateSystemStatus("Tarefa de foto reiniciada.");
+            startProgressPolling(); // Garantir que o polling está rodando para capturar a atualização
+            await loadPhotos();
+        } else {
+            const err = await response.json();
+            alert(err.detail || "Não foi possível reiniciar.");
+            updateSystemStatus("Falha ao reiniciar tarefa.");
+        }
+    } catch(e) {
+        updateSystemStatus("Erro de rede.");
+    }
+};
+
+window.deletePhoto = async function(photoId) {
+    if (!confirm("Tem certeza que deseja remover esta foto permanentemente do projeto? Isso apagará o arquivo de proxy local e removerá seu registro.")) {
+        return;
+    }
+    updateSystemStatus("Removendo foto...", true);
+    try {
+        const response = await fetch(`/api/photo/${photoId}`, { method: "DELETE" });
+        if (response.ok) {
+            updateSystemStatus("Foto removida com sucesso.");
+            await loadPhotos();
+        } else {
+            const err = await response.json();
+            alert(err.detail || "Não foi possível remover a foto.");
+            updateSystemStatus("Erro ao remover foto.");
+        }
+    } catch(e) {
+        updateSystemStatus("Erro de rede ao remover foto.");
+    }
+};
+
+function getMockWordsForDialogue(dialogue) {
+    const text = dialogue.text;
+    const words = text.split(/\s+/).filter(Boolean);
+    const start = dialogue.start_time;
+    const end = dialogue.end_time;
+    const duration = end - start;
+    const wordDuration = duration / Math.max(words.length, 1);
+    
+    return words.map((w, index) => ({
+        word: w,
+        start_time: start + index * wordDuration,
+        end_time: start + (index + 1) * wordDuration,
+        speaker_id: dialogue.speaker_id,
+        confidence: 1.0
+    }));
+}
+
+async function performTranscriptSplit(videoId, startTime, newSpeakerId) {
+    updateSystemStatus("Dividindo bloco de fala...", true);
+    try {
+        const response = await fetch(`/api/video/${videoId}/split-transcript`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                start_time: startTime,
+                new_speaker_id: newSpeakerId
+            })
+        });
+        if (response.ok) {
+            updateSystemStatus("Bloco de fala dividido com sucesso.");
+            await loadVideos();
+            if (activeVideo) {
+                await selectVideo(activeVideo);
+            }
+        } else {
+            const err = await response.json();
+            alert("Erro ao dividir: " + (err.detail || "Desconhecido"));
+            updateSystemStatus("Falha ao dividir.");
+        }
+    } catch (e) {
+        alert("Erro de rede ao dividir a transcrição.");
+        updateSystemStatus("Erro de rede.");
+    }
+}
+
+function createBubbleDOM(d, idx) {
+    const bubble = document.createElement("div");
+    bubble.className = "transcript-bubble";
+    bubble.setAttribute("data-dialogue-index", idx);
+    
+    // Find words belonging to this dialogue block
+    let bubbleWords = [];
+    if (activeTranscriptWords && activeTranscriptWords.length > 0) {
+        bubbleWords = activeTranscriptWords.filter(w => w.start_time >= d.start_time && w.start_time <= d.end_time);
+    }
+    
+    if (bubbleWords.length === 0) {
+        bubbleWords = getMockWordsForDialogue(d);
+    }
+    
+    const metaDiv = document.createElement("div");
+    metaDiv.className = "bubble-meta";
+    
+    const speakerSpan = document.createElement("span");
+    speakerSpan.className = "speaker-name";
+    speakerSpan.textContent = d.speaker_id;
+    
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "bubble-time";
+    timeSpan.textContent = formatTimecode(d.start_time);
+    
+    metaDiv.appendChild(speakerSpan);
+    metaDiv.appendChild(timeSpan);
+    
+    // Scissors button for splitting ASR transcript block
+    const splitBtn = document.createElement("button");
+    splitBtn.className = "btn-card-action split-btn";
+    splitBtn.innerHTML = '<i class="fa-solid fa-scissors"></i>';
+    splitBtn.title = "Dividir falas (Tesoura)";
+    splitBtn.style.marginLeft = "auto";
+    splitBtn.style.color = "var(--text-muted)";
+    splitBtn.style.cursor = "pointer";
+    splitBtn.style.background = "transparent";
+    splitBtn.style.border = "none";
+    
+    metaDiv.appendChild(splitBtn);
+    bubble.appendChild(metaDiv);
+    
+    const textDiv = document.createElement("div");
+    textDiv.className = "bubble-text";
+    
+    let selectedWordForSplit = null;
+    
+    bubbleWords.forEach((w, wIdx) => {
+        const span = document.createElement("span");
+        span.className = "word-span";
+        span.setAttribute("data-start", w.start_time);
+        span.setAttribute("data-end", w.end_time);
+        span.textContent = w.word;
+        
+        span.addEventListener("click", (e) => {
+            if (bubble.classList.contains("scissors-active")) {
+                e.stopPropagation();
+                bubble.querySelectorAll(".word-span.to-split").forEach(el => el.classList.remove("to-split"));
+                span.classList.add("to-split");
+                selectedWordForSplit = w;
+                splitBtn.style.color = "var(--color-rose)";
+            } else {
+                e.stopPropagation();
+                videoPlayer.currentTime = w.start_time;
+                playVideo();
+            }
+        });
+        
+        if (wIdx > 0) {
+            const nextWord = w.word;
+            if (![".", ",", "!", "?", ";", ":"].includes(nextWord)) {
+                textDiv.appendChild(document.createTextNode(" "));
+            }
+        }
+        textDiv.appendChild(span);
+    });
+    
+    bubble.appendChild(textDiv);
+    
+    // Toggle scissors split mode
+    splitBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!bubble.classList.contains("scissors-active")) {
+            // Cancel other active split bubbles first
+            document.querySelectorAll(".transcript-bubble.scissors-active").forEach(el => {
+                el.classList.remove("scissors-active");
+                const bBtn = el.querySelector(".split-btn");
+                if (bBtn) bBtn.style.color = "var(--text-muted)";
+            });
+            
+            bubble.classList.add("scissors-active");
+            splitBtn.style.color = "var(--color-cyan)";
+            updateSystemStatus("Clique em uma palavra do balão para selecionar o ponto de divisão.");
+        } else {
+            if (selectedWordForSplit) {
+                const newSpeaker = prompt("Digite o ID/Nome do novo falante:", d.speaker_id + "_2");
+                if (newSpeaker) {
+                    await performTranscriptSplit(activeVideo.id, selectedWordForSplit.start_time, newSpeaker);
+                }
+            } else {
+                alert("Selecione uma palavra clicando nela primeiro!");
+            }
+            bubble.classList.remove("scissors-active");
+            splitBtn.style.color = "var(--text-muted)";
+            bubble.querySelectorAll(".word-span.to-split").forEach(el => el.classList.remove("to-split"));
+        }
+    });
+    
+    bubble.addEventListener("click", () => {
+        videoPlayer.currentTime = d.start_time;
+        playVideo();
+    });
+    
+    return bubble;
+}
+
+function highlightAndScrollToDialogue(startTime) {
+    // Switch to transcript tab if not active
+    const btnTabTranscript = document.getElementById("btn-tab-transcript");
+    if (btnTabTranscript) btnTabTranscript.click();
+    
+    setTimeout(() => {
+        const bubbles = document.querySelectorAll(".transcript-bubble");
+        let targetBubble = null;
+        let minDiff = Infinity;
+        
+        bubbles.forEach(b => {
+            const idx = b.getAttribute("data-dialogue-index");
+            if (idx !== null) {
+                const d = activeTranscript[idx];
+                if (d) {
+                    const diff = Math.abs(d.start_time - startTime);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        targetBubble = b;
+                    }
+                }
+            }
+        });
+        
+        if (targetBubble) {
+            targetBubble.scrollIntoView({ behavior: "smooth", block: "center" });
+            targetBubble.classList.add("highlight-glow");
+            setTimeout(() => {
+                targetBubble.classList.remove("highlight-glow");
+            }, 3000);
+        }
+    }, 500);
+}
+
 function renderTranscript(dialogues) {
     const feed = document.getElementById("transcript-feed");
     feed.innerHTML = "";
     activeTranscript = dialogues;
     
+    const groups = [];
+    let currentGroup = [];
+    
     dialogues.forEach((d, idx) => {
-        const bubble = document.createElement("div");
-        bubble.className = "transcript-bubble";
-        
-        bubble.innerHTML = `
-            <div class="bubble-meta">
-                <span class="speaker-name">${d.speaker_id}</span>
-                <span class="bubble-time">${formatTimecode(d.start_time)}</span>
-            </div>
-            <div class="bubble-text">${d.text}</div>
-        `;
-        
-        // Ao clicar na bolha de diálogo, pula o vídeo para o tempo inicial dele
-        bubble.addEventListener("click", () => {
-            videoPlayer.currentTime = d.start_time;
-            playVideo();
-        });
-        
-        feed.appendChild(bubble);
+        if (idx === 0) {
+            currentGroup.push({ dialogue: d, originalIndex: idx });
+        } else {
+            const prev = dialogues[idx - 1];
+            if (d.start_time < prev.end_time) {
+                currentGroup.push({ dialogue: d, originalIndex: idx });
+            } else {
+                groups.push(currentGroup);
+                currentGroup = [{ dialogue: d, originalIndex: idx }];
+            }
+        }
+    });
+    if (currentGroup.length > 0) {
+        groups.push(currentGroup);
+    }
+    
+    groups.forEach(group => {
+        if (group.length === 1) {
+            const item = group[0];
+            const bubble = createBubbleDOM(item.dialogue, item.originalIndex);
+            feed.appendChild(bubble);
+        } else {
+            const overlapContainer = document.createElement("div");
+            overlapContainer.className = "overlap-row";
+            overlapContainer.style.display = "flex";
+            overlapContainer.style.flexDirection = "row";
+            overlapContainer.style.gap = "10px";
+            overlapContainer.style.width = "100%";
+            overlapContainer.style.marginBottom = "10px";
+            
+            group.forEach(item => {
+                const bubble = createBubbleDOM(item.dialogue, item.originalIndex);
+                bubble.style.flex = "1";
+                bubble.style.marginBottom = "0px";
+                bubble.classList.add("overlap-bubble");
+                overlapContainer.appendChild(bubble);
+            });
+            
+            feed.appendChild(overlapContainer);
+        }
     });
 }
 
@@ -1228,6 +2123,174 @@ window.removeTimelineBlock = function(idx) {
 
 // ── BUSCA SEMÂNTICA ──────────────────────────────────────────────────
 
+// Função para destacar os termos da busca com <mark>
+function highlightTerms(text, query) {
+    if (!query) return text;
+    const terms = query.toLowerCase().split(/\s+/).filter(t => t.trim().length > 2);
+    if (terms.length === 0) return text;
+    
+    let highlightedText = text;
+    terms.forEach(term => {
+        // Escapar caracteres especiais para o regex
+        const escapedTerm = term.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        // Regex case-insensitive que não pega dentro de tags HTML
+        const regex = new RegExp(`(${escapedTerm})(?![^<]*>)`, "gi");
+        highlightedText = highlightedText.replace(regex, `<mark class="search-highlight">$1</mark>`);
+    });
+    return highlightedText;
+}
+
+// Visualizador de foto premium com Carrossel e Zoom
+function openPhotoViewer(photoOrIndex) {
+    const modal = document.getElementById("photo-viewer-modal");
+    const imgEl = document.getElementById("photo-viewer-img");
+    const titleEl = document.getElementById("photo-viewer-title");
+    const descEl = document.getElementById("photo-viewer-desc");
+    const tagsEl = document.getElementById("photo-viewer-tags");
+    const counterEl = document.getElementById("photo-viewer-counter");
+    const loadingEl = document.getElementById("photo-viewer-loading");
+    
+    if (!modal) return;
+    
+    let photo;
+    if (typeof photoOrIndex === 'number') {
+        currentPhotoIndex = photoOrIndex;
+        photo = currentPhotoList[currentPhotoIndex];
+    } else {
+        photo = photoOrIndex;
+        // Tentar encontrar o índice na lista atual
+        currentPhotoIndex = currentPhotoList.findIndex(p => p.id === photo.id);
+        if (currentPhotoIndex === -1) {
+            // Se não encontrou (ex: clicado da busca), cria uma lista temporária de 1 item
+            currentPhotoList = [photo];
+            currentPhotoIndex = 0;
+        }
+    }
+    
+    if (!photo) return;
+    
+    titleEl.textContent = photo.filename;
+    descEl.textContent = photo.description || "Sem descrição disponível.";
+    
+    // Atualiza contador
+    if (counterEl) {
+        counterEl.textContent = `Foto ${currentPhotoIndex + 1} de ${currentPhotoList.length}`;
+    }
+    
+    // Resetar zoom
+    resetPhotoZoom();
+    
+    // Verificar status de processamento da foto
+    const isRaw = photo.filename.toLowerCase().match(/\.(arw|cr2|nef|dng|pef|raf|orf|rw2|raw)$/);
+    if (photo.status === 'pending' && isRaw) {
+        if (loadingEl) loadingEl.style.display = "flex";
+        imgEl.style.opacity = "0.3";
+        imgEl.src = "";
+    } else {
+        if (loadingEl) loadingEl.style.display = "none";
+        imgEl.style.opacity = "1";
+        const src = photo.proxy_path || (photo.filepath && (photo.filepath.startsWith('http') || photo.filepath.startsWith('/')) 
+            ? photo.filepath 
+            : `/originals/${photo.filename}`);
+        imgEl.src = src;
+    }
+    
+    tagsEl.innerHTML = "";
+    let tagsArray = [];
+    if (photo.tags) {
+        if (Array.isArray(photo.tags)) {
+            tagsArray = photo.tags;
+        } else if (typeof photo.tags === 'string') {
+            try {
+                const parsed = JSON.parse(photo.tags);
+                if (Array.isArray(parsed)) {
+                    tagsArray = parsed;
+                } else if (parsed) {
+                    tagsArray = [parsed];
+                }
+            } catch (e) {
+                tagsArray = photo.tags.split(',').map(t => t.trim()).filter(Boolean);
+            }
+        }
+    }
+    if (tagsArray.length > 0) {
+        tagsArray.forEach(t => {
+            const badge = document.createElement("span");
+            badge.className = "badge";
+            badge.textContent = `#${t}`;
+            tagsEl.appendChild(badge);
+        });
+    }
+    
+    modal.classList.add("active");
+    
+    // Desenhar caixas de rostos detectados
+    loadPhotoFaces(photo.id);
+    
+    // Foco no modal para capturar eventos de teclado
+    modal.focus();
+}
+
+function prevPhoto() {
+    if (currentPhotoList.length <= 1) return;
+    let newIndex = currentPhotoIndex - 1;
+    if (newIndex < 0) {
+        newIndex = currentPhotoList.length - 1; // Loop para o fim
+    }
+    openPhotoViewer(newIndex);
+}
+
+function nextPhoto() {
+    if (currentPhotoList.length <= 1) return;
+    let newIndex = currentPhotoIndex + 1;
+    if (newIndex >= currentPhotoList.length) {
+        newIndex = 0; // Loop para o início
+    }
+    openPhotoViewer(newIndex);
+}
+
+function togglePhotoZoom() {
+    const imgEl = document.getElementById("photo-viewer-img");
+    const btnZoom = document.getElementById("btn-zoom-photo");
+    if (!imgEl) return;
+    
+    if (isPhotoZoomed) {
+        resetPhotoZoom();
+    } else {
+        isPhotoZoomed = true;
+        imgEl.style.transform = "scale(1.8)";
+        imgEl.style.cursor = "zoom-out";
+        if (btnZoom) btnZoom.innerHTML = '<i class="fa-solid fa-magnifying-glass-minus"></i>';
+    }
+}
+
+function resetPhotoZoom() {
+    const imgEl = document.getElementById("photo-viewer-img");
+    const btnZoom = document.getElementById("btn-zoom-photo");
+    if (!imgEl) return;
+    
+    isPhotoZoomed = false;
+    imgEl.style.transform = "scale(1)";
+    imgEl.style.cursor = "zoom-in";
+    if (btnZoom) btnZoom.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus"></i>';
+}
+
+function activateSearchTab() {
+    const btnTabSearch = document.getElementById("btn-tab-search");
+    if (btnTabSearch) {
+        btnTabSearch.style.display = "block";
+        btnTabSearch.classList.add("active");
+    }
+    document.getElementById("btn-tab-transcript").classList.remove("active");
+    document.getElementById("btn-tab-vision").classList.remove("active");
+    const btnTabTasks = document.getElementById("btn-tab-tasks");
+    if (btnTabTasks) btnTabTasks.classList.remove("active");
+    const btnTabChat = document.getElementById("btn-tab-chat");
+    if (btnTabChat) btnTabChat.classList.remove("active");
+    
+    currentRightTab = "search";
+}
+
 async function runSemanticSearch() {
     const query = searchInput.value.trim();
     if (!query) return;
@@ -1244,6 +2307,14 @@ async function runSemanticSearch() {
         const response = await fetch(url);
         if (response.ok) {
             const data = await response.json();
+            
+            // Atualizar cache
+            lastSearchResults = data.results;
+            lastSearchQuery = query;
+            
+            // Ativar a aba de busca
+            activateSearchTab();
+            
             renderSearchResults(data.results, query);
             updateSystemStatus(`Busca concluída: ${data.results.length} resultados.`);
             return;
@@ -1265,18 +2336,57 @@ async function runSemanticSearch() {
                     end_time: 6.8,
                     text: "Olá, eu sou o diretor e escolhi usar lentes anamórficas para obter uma estética cinematográfica."
                 }
+            },
+            {
+                score: 0.765,
+                payload: {
+                    video_id: 2,
+                    media_type: "broll",
+                    start_time: 5.0,
+                    end_time: 15.0,
+                    text: "Operador de câmera focando a lente anamórfica durante o ensaio da cena de ação nos bastidores."
+                }
+            },
+            {
+                score: 0.620,
+                payload: {
+                    photo_id: 1,
+                    media_type: "photo",
+                    filename: "foto_set_1.jpg",
+                    filepath: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=300",
+                    text: "Diretor e ator ensaiando cena sob iluminação de tungstênio clássica.",
+                    tags: ["diretor", "luz"]
+                }
             }
         ];
+        
+        lastSearchResults = mockResults;
+        lastSearchQuery = query;
+        
+        activateSearchTab();
+        
         renderSearchResults(mockResults, query);
         updateSystemStatus("Busca concluída (Mock).");
     }, 600);
 }
 
 function renderSearchResults(results, query) {
+    // Captura as fotos dos resultados da busca para permitir navegar por elas no carrossel
+    currentPhotoList = results
+        .filter(r => r.payload.media_type === "photo")
+        .map(r => ({
+            id: r.payload.photo_id,
+            filename: r.payload.filename || `foto_set_${r.payload.photo_id}.jpg`,
+            filepath: r.payload.filepath,
+            proxy_path: r.payload.proxy_path,
+            description: r.payload.text,
+            tags: r.payload.tags || []
+        }));
+
     const feed = document.getElementById("transcript-feed");
     feed.innerHTML = `
         <div class="transcription-actions" style="border:none;">
-            <h4 style="font-size:12px; color:var(--color-cyan);">
+            <h4 style="font-size:12px; color:var(--color-cyan); display: flex; align-items: center; gap: 6px;">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> Resultados para: "${query}"
             </h4>
         </div>
@@ -1293,38 +2403,125 @@ function renderSearchResults(results, query) {
     }
     
     results.forEach(r => {
-        const bubble = document.createElement("div");
-        bubble.className = "transcript-bubble";
-        bubble.style.borderColor = "var(--border-glass-glow)";
-        bubble.style.background = "rgba(6, 182, 212, 0.03)";
+        const card = document.createElement("div");
+        const mediaType = r.payload.media_type || "interview";
+        card.className = `search-result-card type-${mediaType}`;
+        card.style.marginBottom = "10px";
         
-        const isPhoto = r.payload.media_type === "photo";
-        const title = isPhoto ? `Foto de Set` : r.payload.media_type === "interview" ? `${r.payload.speaker_id}` : `Bastidores B-Roll`;
-        const time = isPhoto ? "" : formatTimecode(r.payload.start_time);
+        const isPhoto = mediaType === "photo";
         
-        bubble.innerHTML = `
-            <div class="bubble-meta">
-                <span class="speaker-name" style="color:var(--color-cyan);"><i class="fa-solid fa-magnifying-glass"></i> ${title}</span>
-                <span class="bubble-time">${time} (Match: ${(r.score * 100).toFixed(0)}%)</span>
-            </div>
-            <div class="bubble-text">${r.payload.text}</div>
-        `;
+        // Define score badge class
+        const scorePercent = (r.score * 100).toFixed(0);
+        let scoreClass = "low";
+        if (r.score >= 0.8) {
+            scoreClass = "high";
+        } else if (r.score >= 0.5) {
+            scoreClass = "medium";
+        }
+        const scoreBadge = `<span class="match-badge ${scoreClass}"><i class="fa-solid fa-fire"></i> ${scorePercent}% Match</span>`;
         
-        if (!isPhoto) {
-            bubble.addEventListener("click", () => {
-                // Pular para o vídeo correto e segundo correto
-                const targetVid = MOCK_VIDEOS.find(v => v.id === r.payload.video_id);
+        // Match highlights
+        const highlightedText = highlightTerms(r.payload.text || "", query);
+        
+        if (isPhoto) {
+            const photoId = r.payload.photo_id;
+            const filename = r.payload.filename || `foto_set_${photoId}.jpg`;
+            const src = r.payload.proxy_path || (r.payload.filepath && (r.payload.filepath.startsWith('http') || r.payload.filepath.startsWith('/'))
+                ? r.payload.filepath
+                : `/originals/${filename}`);
+                
+            card.innerHTML = `
+                <div class="search-result-layout">
+                    <img class="search-result-thumb" src="${src}" alt="Thumb">
+                    <div class="search-result-content">
+                        <div class="bubble-meta" style="margin-bottom: 4px;">
+                            <span class="speaker-name" style="color:#f59e0b;"><i class="fa-solid fa-image"></i> Foto de Set</span>
+                            ${scoreBadge}
+                        </div>
+                        <div class="bubble-text">${highlightedText}</div>
+                        <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Arquivo: ${filename}</div>
+                    </div>
+                </div>
+            `;
+            
+            card.addEventListener("click", () => {
+                openPhotoViewer({
+                    id: photoId,
+                    filename: filename,
+                    filepath: r.payload.filepath,
+                    proxy_path: r.payload.proxy_path,
+                    description: r.payload.text,
+                    tags: r.payload.tags || []
+                });
+            });
+            
+        } else {
+            const isInterview = mediaType === "interview";
+            const icon = isInterview ? "fa-microphone" : "fa-video";
+            const color = isInterview ? "var(--color-cyan)" : "var(--color-violet)";
+            const title = isInterview ? (r.payload.speaker_id || "Entrevistado") : "Bastidores B-Roll";
+            const timecode = formatTimecode(r.payload.start_time || 0);
+            const vidId = r.payload.video_id;
+            
+            // Buscar nome do arquivo para exibir no rodapé do card
+            let videoFilename = "Vídeo";
+            const foundVid = allVideos.find(v => v.id === vidId) || MOCK_VIDEOS.find(v => v.id === vidId);
+            if (foundVid) {
+                videoFilename = foundVid.filename;
+            }
+            
+            card.innerHTML = `
+                <div class="bubble-meta" style="margin-bottom: 6px;">
+                    <span class="speaker-name" style="color:${color};"><i class="fa-solid ${icon}"></i> ${title}</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <button class="btn-play-result" style="background:transparent; border:none; color:var(--color-cyan); cursor:pointer; font-weight:600; font-size:11px; display:flex; align-items:center; gap:4px;" title="Tocar trecho">
+                            <i class="fa-solid fa-circle-play"></i> ${timecode}
+                        </button>
+                        ${scoreBadge}
+                    </div>
+                </div>
+                <div class="bubble-text">${highlightedText}</div>
+                <div style="font-size:10px; color:var(--text-muted); margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>Vídeo: ${videoFilename} (${(r.payload.end_time - r.payload.start_time).toFixed(1)}s)</span>
+                    <a href="#" class="view-context-link" style="color:var(--color-cyan); text-decoration:none; font-weight: 600; font-size:11px;"><i class="fa-solid fa-eye"></i> Ver no Contexto</a>
+                </div>
+            `;
+            
+            const btnPlayResult = card.querySelector(".btn-play-result");
+            if (btnPlayResult) {
+                btnPlayResult.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const targetVid = allVideos.find(v => v.id === vidId) || MOCK_VIDEOS.find(v => v.id === vidId);
+                    if (targetVid) {
+                        selectVideo(targetVid);
+                        setTimeout(() => {
+                            videoPlayer.currentTime = r.payload.start_time;
+                            playVideo();
+                        }, 350);
+                    }
+                });
+            }
+            
+            const handleContextClick = (e) => {
+                if (e) e.preventDefault();
+                const targetVid = allVideos.find(v => v.id === vidId) || MOCK_VIDEOS.find(v => v.id === vidId);
                 if (targetVid) {
                     selectVideo(targetVid);
-                    setTimeout(() => {
-                        videoPlayer.currentTime = r.payload.start_time;
-                        playVideo();
-                    }, 200);
+                    highlightAndScrollToDialogue(r.payload.start_time);
                 }
-            });
+            };
+            
+            card.addEventListener("click", handleContextClick);
+            const viewLink = card.querySelector(".view-context-link");
+            if (viewLink) {
+                viewLink.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    handleContextClick(e);
+                });
+            }
         }
         
-        feed.appendChild(bubble);
+        feed.appendChild(card);
     });
 }
 
@@ -1395,6 +2592,23 @@ function setupEventListeners() {
 
     // Play/Pause button
     btnPlay.addEventListener("click", togglePlay);
+
+    // Event listeners for sorting and filtering
+    const selectFilterStatus = document.getElementById("library-filter-status");
+    if (selectFilterStatus) {
+        selectFilterStatus.addEventListener("change", () => {
+            filterAndRenderLibrary();
+            filterAndRenderPhotos();
+        });
+    }
+    
+    const selectSortBy = document.getElementById("library-sort-by");
+    if (selectSortBy) {
+        selectSortBy.addEventListener("change", () => {
+            filterAndRenderLibrary();
+            filterAndRenderPhotos();
+        });
+    }
     
     // Keyboard Listeners (JKL & I/O Shortcuts)
     document.addEventListener("keydown", (e) => {
@@ -1402,6 +2616,28 @@ function setupEventListeners() {
         const activeTag = document.activeElement.tagName.toLowerCase();
         if (activeTag === "input" || activeTag === "textarea" || activeTag === "select") return;
 
+        // Se o visualizador de fotos estiver aberto, intercepta navegação
+        const photoModal = document.getElementById("photo-viewer-modal");
+        if (photoModal && photoModal.classList.contains("active")) {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                closePhotoModal();
+                return;
+            } else if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                prevPhoto();
+                return;
+            } else if (e.key === "ArrowRight") {
+                e.preventDefault();
+                nextPhoto();
+                return;
+            }
+            // Evitar interferência de comandos de vídeo se o modal de foto estiver aberto
+            if (e.key === " " || e.key === "k" || e.key === "K" || e.key === "j" || e.key === "J" || e.key === "l" || e.key === "L") {
+                e.preventDefault();
+                return;
+            }
+        }
         
         const key = e.key.toUpperCase();
         if (key === " ") {
@@ -1432,7 +2668,12 @@ function setupEventListeners() {
         } else if (key === "O") {
             setMarkOut();
         } else if (key === "E") {
-            appendToTimeline();
+            if (e.shiftKey || hasTextSelection()) {
+                e.preventDefault();
+                appendSelectedTextToTimeline();
+            } else {
+                appendToTimeline();
+            }
         }
     });
     
@@ -1490,16 +2731,21 @@ function setupEventListeners() {
         if (e.key === "Enter") runSemanticSearch();
     });
     
-    // Controle de abas do painel lateral direito (Falas vs Visão vs Tarefas)
+    // Controle de abas do painel lateral direito (Falas vs Visão vs Tarefas vs Chat vs Busca)
     const btnTabTranscript = document.getElementById("btn-tab-transcript");
     const btnTabVision = document.getElementById("btn-tab-vision");
     const btnTabTasks = document.getElementById("btn-tab-tasks");
+    const btnTabChat = document.getElementById("btn-tab-chat");
+    const btnTabSearch = document.getElementById("btn-tab-search");
     
     btnTabTranscript.addEventListener("click", () => {
         btnTabTranscript.classList.add("active");
         btnTabVision.classList.remove("active");
         if (btnTabTasks) btnTabTasks.classList.remove("active");
+        if (btnTabChat) btnTabChat.classList.remove("active");
+        if (btnTabSearch) btnTabSearch.classList.remove("active");
         currentRightTab = "transcript";
+        updateActionsRowVisibility();
         renderRightPanelFeed();
     });
     
@@ -1507,7 +2753,10 @@ function setupEventListeners() {
         btnTabVision.classList.add("active");
         btnTabTranscript.classList.remove("active");
         if (btnTabTasks) btnTabTasks.classList.remove("active");
+        if (btnTabChat) btnTabChat.classList.remove("active");
+        if (btnTabSearch) btnTabSearch.classList.remove("active");
         currentRightTab = "vision";
+        updateActionsRowVisibility();
         renderRightPanelFeed();
     });
 
@@ -1516,10 +2765,60 @@ function setupEventListeners() {
             btnTabTasks.classList.add("active");
             btnTabTranscript.classList.remove("active");
             btnTabVision.classList.remove("active");
+            if (btnTabChat) btnTabChat.classList.remove("active");
+            if (btnTabSearch) btnTabSearch.classList.remove("active");
             currentRightTab = "tasks";
+            updateActionsRowVisibility();
             renderRightPanelFeed();
         });
     }
+
+    if (btnTabChat) {
+        btnTabChat.addEventListener("click", () => {
+            btnTabChat.classList.add("active");
+            btnTabTranscript.classList.remove("active");
+            btnTabVision.classList.remove("active");
+            if (btnTabTasks) btnTabTasks.classList.remove("active");
+            if (btnTabSearch) btnTabSearch.classList.remove("active");
+            currentRightTab = "chat";
+            updateActionsRowVisibility();
+            renderRightPanelFeed();
+        });
+    }
+
+    if (btnTabSearch) {
+        btnTabSearch.addEventListener("click", () => {
+            btnTabSearch.classList.add("active");
+            btnTabTranscript.classList.remove("active");
+            btnTabVision.classList.remove("active");
+            if (btnTabTasks) btnTabTasks.classList.remove("active");
+            if (btnTabChat) btnTabChat.classList.remove("active");
+            currentRightTab = "search";
+            updateActionsRowVisibility();
+            renderRightPanelFeed();
+        });
+    }
+
+    // Configuração dos botões de controle do Visualizador de Fotos (Carrossel, Zoom, Closes)
+    const photoModal = document.getElementById("photo-viewer-modal");
+    const btnClosePhoto = document.getElementById("btn-close-photo-modal");
+    const btnClosePhotoViewer = document.getElementById("btn-close-photo-viewer");
+    const btnPrevPhoto = document.getElementById("btn-prev-photo");
+    const btnNextPhoto = document.getElementById("btn-next-photo");
+    const btnZoomPhoto = document.getElementById("btn-zoom-photo");
+    const imgPhotoViewer = document.getElementById("photo-viewer-img");
+    
+    const closePhotoModal = () => {
+        if (photoModal) photoModal.classList.remove("active");
+        resetPhotoZoom();
+    };
+    
+    if (btnClosePhoto) btnClosePhoto.addEventListener("click", closePhotoModal);
+    if (btnClosePhotoViewer) btnClosePhotoViewer.addEventListener("click", closePhotoModal);
+    if (btnPrevPhoto) btnPrevPhoto.addEventListener("click", prevPhoto);
+    if (btnNextPhoto) btnNextPhoto.addEventListener("click", nextPhoto);
+    if (btnZoomPhoto) btnZoomPhoto.addEventListener("click", togglePhotoZoom);
+    if (imgPhotoViewer) imgPhotoViewer.addEventListener("click", togglePhotoZoom);
 
     
     // Botões de Ação FastAPI
@@ -1686,8 +2985,8 @@ function setupEventListeners() {
 
             if (r.ok) {
                 alert("Análise inteligente de clustering temático em processamento via DeepSeek!");
-                updateSystemStatus("Clustering de temas concluído com sucesso.");
-                setTimeout(loadThemes, 4000);
+                updateSystemStatus("Clustering de temas em andamento...", true);
+                startProgressPolling();
             }
         } catch(e) {
             alert("Backend offline. Temas de making of gerados no mockup!");
@@ -1704,6 +3003,7 @@ function setupEventListeners() {
             if (r.ok) {
                 alert("Transcrição ASR do depoimento iniciada em background via AssemblyAI!");
                 updateSystemStatus("Transcrição ASR iniciada em background.");
+                startProgressPolling();
             }
         } catch(e) {
             alert("Vídeo de depoimento transcrito e diarizado no mockup!");
@@ -1720,6 +3020,7 @@ function setupEventListeners() {
                 const data = await r.json();
                 alert(data.message);
                 updateSystemStatus(`Lote de transcrição iniciado (${data.count} vídeos).`);
+                startProgressPolling();
             }
         } catch(e) {
             alert("Biblioteca inteira de depoimentos transcrita no mockup!");
@@ -1784,11 +3085,11 @@ function setupEventListeners() {
         }
         
         // Download de mock se API offline
-        const mockBlob = new Blob(["CapIAu Mock Timeline Export: Cuts=" + JSON.stringify(activeTimelineCuts)], { type: "text/plain" });
+        const mockBlob = new Blob(["CaIAu Talho Mock Timeline Export: Cuts=" + JSON.stringify(activeTimelineCuts)], { type: "text/plain" });
         const url = URL.createObjectURL(mockBlob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `capiau_export.${format}`;
+        a.download = `caiau_talho_export.${format}`;
         a.click();
     });
     
@@ -1805,6 +3106,118 @@ function setupEventListeners() {
             }
         });
     });
+
+    // ── GATILHOS DE DOCUMENTOS E ANÁLISE DE VISÃO (FASE 1) ──
+    const btnUploadDoc = document.getElementById("btn-upload-doc");
+    const docFileInput = document.getElementById("doc-file-input");
+    const docTypeSelector = document.getElementById("doc-type-selector");
+    
+    if (btnUploadDoc && docFileInput) {
+        btnUploadDoc.addEventListener("click", () => docFileInput.click());
+        docFileInput.addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const docType = docTypeSelector ? docTypeSelector.value : "other";
+            const formData = new FormData();
+            formData.append("file", file);
+            
+            updateSystemStatus(`Importando documento ${file.name}...`, true);
+            showSpeedOverlay("Importando...");
+            try {
+                const response = await fetch(`/api/project/${currentProjectId}/docs?doc_type=${docType}`, {
+                    method: "POST",
+                    body: formData
+                });
+                if (response.ok) {
+                    updateSystemStatus("Documento importado e indexado.");
+                    alert("Documento de roteiro/contexto importado e indexado no Qdrant com sucesso!");
+                    await loadDocuments();
+                } else {
+                    const err = await response.json();
+                    alert("Erro ao importar: " + (err.detail || "Desconhecido"));
+                    updateSystemStatus("Falha ao importar documento.");
+                }
+            } catch(e) {
+                alert("Erro de rede ao importar documento.");
+                updateSystemStatus("Erro de rede.");
+            }
+            docFileInput.value = "";
+        });
+    }
+
+    const btnAnalyzeVisionNow = document.getElementById("btn-analyze-vision-now");
+    if (btnAnalyzeVisionNow) {
+        btnAnalyzeVisionNow.addEventListener("click", async () => {
+            if (!activeVideo) return;
+            showSpeedOverlay("Analisando...");
+            updateSystemStatus(`Iniciando análise visual de: ${activeVideo.filename}...`, true);
+            try {
+                const response = await fetch(`/api/video/${activeVideo.id}/analyze-vision`, { method: "POST" });
+                if (response.ok) {
+                    alert("Decupagem visual por IA iniciada! O progresso será exibido na aba de Tarefas.");
+                    updateSystemStatus("Análise visual iniciada.");
+                    startProgressPolling();
+                } else {
+                    const err = await response.json();
+                    alert("Erro ao iniciar análise: " + (err.detail || "Desconhecido"));
+                    updateSystemStatus("Falha ao iniciar análise.");
+                }
+            } catch(e) {
+                alert("Erro de rede ao iniciar análise.");
+                updateSystemStatus("Erro de rede.");
+            }
+        });
+    }
+
+    const btnAnalyzeVisionAll = document.getElementById("btn-analyze-vision-all");
+    if (btnAnalyzeVisionAll) {
+        btnAnalyzeVisionAll.addEventListener("click", async () => {
+            showSpeedOverlay("Analisando Tudo...");
+            updateSystemStatus("Enfileirando análise visual em lote...", true);
+            try {
+                const response = await fetch(`/api/project/${currentProjectId}/analyze-all-vision`, { method: "POST" });
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(data.message);
+                    updateSystemStatus("Análise visual em lote enfileirada.");
+                    startProgressPolling();
+                } else {
+                    const err = await response.json();
+                    alert("Erro ao enfileirar lote: " + (err.detail || "Desconhecido"));
+                    updateSystemStatus("Falha ao enfileirar lote.");
+                }
+            } catch(e) {
+                alert("Erro de rede.");
+                updateSystemStatus("Erro de rede.");
+            }
+        });
+    }
+
+    const btnAnalyzePhotoVision = document.getElementById("btn-analyze-photo-vision");
+    if (btnAnalyzePhotoVision) {
+        btnAnalyzePhotoVision.addEventListener("click", async () => {
+            const photo = currentPhotoList[currentPhotoIndex];
+            if (!photo) return;
+            showSpeedOverlay("Analisando...");
+            updateSystemStatus(`Analisando foto: ${photo.filename}...`, true);
+            try {
+                const response = await fetch(`/api/photo/${photo.id}/analyze-vision`, { method: "POST" });
+                if (response.ok) {
+                    alert("Análise visual da foto de set iniciada em background!");
+                    updateSystemStatus("Análise da foto iniciada.");
+                    startProgressPolling();
+                } else {
+                    const err = await response.json();
+                    alert("Erro: " + (err.detail || "Desconhecido"));
+                    updateSystemStatus("Falha ao analisar foto.");
+                }
+            } catch(e) {
+                alert("Erro de rede.");
+                updateSystemStatus("Erro de rede.");
+            }
+        });
+    }
 }
 
 // ── FUNÇÕES DE COLLAPSE DE SIDEBARS ───────────────────────────────────
@@ -1875,46 +3288,100 @@ function startProgressPolling() {
                 renderRightPanelFeed();
             }
             
-            const response = await fetch("/api/conversions");
-            if (response.ok) {
-                const progressData = await response.json();
-                activeConversions = progressData; // Atualiza estado global
-                const activeIds = Object.keys(progressData);
-                
-                // Buscar atualizações de todos os vídeos para refletir mudanças de status (como ASR ou Visão completados)
+            let activeVideoIds = [];
+            let isClusteringRunning = false;
+            try {
+                const response = await fetch("/api/conversions");
+                if (response.ok) {
+                    const progressData = await response.json();
+                    activeConversions = progressData; // Atualiza estado global
+                    
+                    // Filtrar chaves que não sejam "cluster-..." para o processamento de vídeo normal
+                    activeVideoIds = Object.keys(progressData).filter(k => !k.startsWith("cluster-"));
+                    
+                    // Verificar se o clustering para o projeto atual está rodando
+                    isClusteringRunning = progressData[`cluster-${currentProjectId}`] !== undefined;
+                }
+            } catch (e) {
+                console.warn("Erro ao buscar conversões ativas:", e);
+            }
+            
+            // Controlar se o clustering terminou para recarregar temas narrativos
+            if (wasClusteringRunning && !isClusteringRunning) {
+                wasClusteringRunning = false;
+                updateSystemStatus("Organização de temas concluída.");
+                await loadThemes();
+            }
+            if (isClusteringRunning) {
+                wasClusteringRunning = true;
+                updateSystemStatus("Agrupando temas via DeepSeek...", true);
+            }
+            
+            // Buscar atualizações de todos os vídeos para refletir mudanças de status (como ASR ou Visão completados)
+            let videos = [];
+            try {
                 const resVideos = await fetch(`/api/videos?project_id=${currentProjectId}`);
                 if (resVideos.ok) {
-                    const videos = await resVideos.json();
-                    allVideos = videos;
+                    videos = await resVideos.json();
                     
-                    // Atualizar cada card de vídeo no DOM sem destruir a árvore
-                    videos.forEach(v => {
-                        updateVideoCardDOM(v);
-                    });
-                }
-                
-                // Se não há conversões ativas de proxy, e nenhuma outra mídia está transcrevendo/analisando, encerra o loop de polling
-                const hasActiveTasks = allVideos.some(v => v.status === "transcribing" || v.status === "processing" || v.status === "analyzing");
-                if (activeIds.length === 0 && !hasActiveTasks) {
-                    clearInterval(progressInterval);
-                    progressInterval = null;
-                    return;
-                }
-                
-                // Atualizar progresso de conversão textualmente se o card do proxy ativo for visível
-                activeIds.forEach(vidId => {
-                    const data = progressData[vidId];
-                    const card = document.querySelector(`.media-card[data-video-id="${vidId}"]`);
-                    if (card) {
-                        const progressEl = card.querySelector(".conversion-progress-text");
-                        if (progressEl && data.status === "running") {
-                            progressEl.innerHTML = `Convertendo ${data.percent}% <i class="fa-solid fa-spinner fa-spin" style="color:var(--color-cyan);"></i>`;
-                        }
+                    const oldStatusSerialized = JSON.stringify(allVideos.map(v => ({ id: v.id, status: v.status })));
+                    allVideos = videos;
+                    const newStatusSerialized = JSON.stringify(videos.map(v => ({ id: v.id, status: v.status })));
+                    
+                    if (oldStatusSerialized !== newStatusSerialized) {
+                        filterAndRenderLibrary();
+                    } else {
+                        videos.forEach(v => {
+                            updateVideoCardDOM(v);
+                        });
                     }
-                });
+                }
+            } catch (e) {
+                console.warn("Erro ao buscar vídeos:", e);
+            }
+            
+            // Buscar atualizações de todas as fotos para atualizar a biblioteca em tempo real
+            let photos = [];
+            try {
+                const resPhotos = await fetch(`/api/photos?project_id=${currentProjectId}`);
+                if (resPhotos.ok) {
+                    photos = await resPhotos.json();
+                    allPhotos = photos;
+                    
+                    // Se o visualizador de fotos estiver ativo, pode ter mudado status
+                    const tabPhotos = document.getElementById("tab-photos");
+                    if (tabPhotos && tabPhotos.classList.contains("active")) {
+                        filterAndRenderPhotos();
+                    }
+                }
+            } catch (e) {
+                console.warn("Erro ao buscar fotos:", e);
+            }
+            
+            // Atualizar progresso de conversão de vídeo textualmente se o card do proxy ativo for visível
+            activeVideoIds.forEach(vidId => {
+                const data = activeConversions[vidId];
+                const card = document.querySelector(`.media-card[data-video-id="${vidId}"]`);
+                if (card) {
+                    const progressEl = card.querySelector(".conversion-progress-text");
+                    if (progressEl && data && data.status === "running") {
+                        progressEl.innerHTML = `Convertendo ${data.percent}% <i class="fa-solid fa-spinner fa-spin" style="color:var(--color-cyan);"></i>`;
+                    }
+                }
+            });
+            
+            // Se não há conversões ativas de proxy de vídeo, nenhuma outra mídia está transcrevendo/analisando,
+            // nenhuma foto está com status "pending" e o clustering não está ativo, encerra o loop de polling
+            const hasActiveVideoTasks = videos.some(v => v.status === "transcribing" || v.status === "processing" || v.status === "analyzing");
+            const hasActivePhotoTasks = photos.some(p => p.status === "pending");
+            
+            if (activeVideoIds.length === 0 && !hasActiveVideoTasks && !hasActivePhotoTasks && !isClusteringRunning) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+                return;
             }
         } catch (e) {
-            console.warn("Erro ao buscar progresso.");
+            console.warn("Erro no ciclo de polling:", e);
         }
     }, 2000);
 }
@@ -1982,3 +3449,451 @@ window.deleteProxy = async function(videoId) {
         updateSystemStatus("Erro de rede ao remover vídeo.");
     }
 };
+
+function hasTextSelection() {
+    const selection = window.getSelection();
+    return selection && selection.toString().trim().length > 0;
+}
+
+function appendSelectedTextToTimeline() {
+    if (!activeVideo) {
+        alert("Selecione um vídeo primeiro!");
+        return;
+    }
+    
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+        alert("Nenhum texto selecionado!");
+        return;
+    }
+    
+    const wordSpans = document.querySelectorAll(".word-span");
+    const selectedSpans = [];
+    
+    wordSpans.forEach(span => {
+        if (selection.containsNode(span, true)) {
+            selectedSpans.push(span);
+        }
+    });
+    
+    if (selectedSpans.length === 0) {
+        alert("Selecione palavras inteiras da transcrição!");
+        return;
+    }
+    
+    selectedSpans.sort((a, b) => parseFloat(a.getAttribute("data-start")) - parseFloat(b.getAttribute("data-start")));
+    
+    const firstSpan = selectedSpans[0];
+    const lastSpan = selectedSpans[selectedSpans.length - 1];
+    
+    let start = parseFloat(firstSpan.getAttribute("data-start"));
+    let end = parseFloat(lastSpan.getAttribute("data-end"));
+    
+    const padding = 0.15;
+    start = Math.max(0, start - padding);
+    const duration = videoPlayer.duration || 999999;
+    end = Math.min(duration, end + padding);
+    
+    const cut = {
+        video_id: activeVideo.id,
+        filename: activeVideo.filename,
+        in: start,
+        out: end,
+        track: "V1"
+    };
+    
+    activeTimelineCuts.push(cut);
+    updateTimelineUI();
+    showSpeedOverlay("Texto Inserido!");
+    selection.removeAllRanges();
+}
+
+async function loadPhotoFaces(photoId) {
+    const container = document.getElementById("photo-viewer-overlay-container");
+    if (!container) return;
+    container.innerHTML = "";
+    
+    try {
+        const response = await fetch(`/api/photo/${photoId}/faces`);
+        if (response.ok) {
+            const faces = await response.json();
+            faces.forEach(face => {
+                const box = face.bounding_box;
+                if (!box || box.length !== 4) return;
+                
+                const [x, y, w, h] = box;
+                
+                const faceDiv = document.createElement("div");
+                faceDiv.className = "face-box";
+                faceDiv.style.left = `${x * 100}%`;
+                faceDiv.style.top = `${y * 100}%`;
+                faceDiv.style.width = `${w * 100}%`;
+                faceDiv.style.height = `${h * 100}%`;
+                
+                const label = face.name || "Quem é?";
+                faceDiv.title = label;
+                
+                const nameTag = document.createElement("span");
+                nameTag.className = "face-name-tag";
+                nameTag.textContent = label;
+                faceDiv.appendChild(nameTag);
+                
+                faceDiv.style.pointerEvents = "auto";
+                faceDiv.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    
+                    let speakers = [];
+                    try {
+                        const sResp = await fetch(`/api/project/${currentProjectId}/speakers`);
+                        if (sResp.ok) {
+                            speakers = await sResp.json();
+                        }
+                    } catch (err) {
+                        console.warn("Erro ao carregar speakers:", err);
+                    }
+                    
+                    let promptMsg = "Digite o nome desta pessoa:\n";
+                    if (speakers.length > 0) {
+                        promptMsg += "\nFalantes/Pessoas existentes:\n" + speakers.join(", ") + "\n";
+                    }
+                    
+                    const name = prompt(promptMsg, face.name || "");
+                    if (name !== null) {
+                        const trimmedName = name.trim();
+                        await labelFace(face.id, trimmedName);
+                        loadPhotoFaces(photoId);
+                    }
+                });
+                
+                container.appendChild(faceDiv);
+            });
+        }
+    } catch (e) {
+        console.warn("Erro ao buscar rostos da foto:", e);
+    }
+}
+
+async function labelFace(faceId, name) {
+    updateSystemStatus("Rotulando rosto...", true);
+    try {
+        const response = await fetch(`/api/face/${faceId}/label`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: name })
+        });
+        if (response.ok) {
+            updateSystemStatus("Rosto rotulado com sucesso.");
+        } else {
+            alert("Erro ao rotular rosto.");
+            updateSystemStatus("Falha ao rotular.");
+        }
+    } catch (e) {
+        updateSystemStatus("Erro de rede.");
+    }
+}
+
+// ── AUXILIARES DE RENDERIZAÇÃO E INTERAÇÃO DO CHATBOT ─────────────────
+function renderChatTab() {
+    const feed = document.getElementById("transcript-feed");
+    feed.innerHTML = "";
+    
+    const chatContainer = document.createElement("div");
+    chatContainer.className = "chat-tab-container";
+    
+    // Header/Ações
+    const titleArea = document.createElement("div");
+    titleArea.className = "transcription-actions";
+    titleArea.style.border = "none";
+    titleArea.style.marginBottom = "8px";
+    titleArea.style.paddingBottom = "0";
+    titleArea.innerHTML = `
+        <h4 style="font-size:12px; color:var(--color-cyan); display:flex; align-items:center; justify-content:space-between; width:100%; margin:0;">
+            <span><i class="fa-solid fa-comments"></i> Assistente Editorial IA</span>
+            <button class="btn-outline" id="btn-clear-chat" style="font-size:9px; padding:2px 8px; height:20px; display:flex; align-items:center; gap:4px;">
+                <i class="fa-solid fa-trash"></i> Limpar Chat
+            </button>
+        </h4>
+    `;
+    chatContainer.appendChild(titleArea);
+    
+    // Contêiner do Histórico de Mensagens
+    const chatHistoryEl = document.createElement("div");
+    chatHistoryEl.className = "chat-history";
+    chatHistoryEl.id = "chat-history-container";
+    
+    if (chatHistory.length === 0) {
+        const welcome = document.createElement("div");
+        welcome.className = "empty-state";
+        welcome.innerHTML = `
+            <i class="fa-solid fa-brain" style="color: var(--color-violet); font-size: 28px; margin-bottom: 10px; text-shadow: 0 0 10px rgba(138, 92, 246, 0.4);"></i>
+            <p style="font-weight: 600;">Como posso ajudar no seu documentário?</p>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; padding: 0 10px; text-align: center;">
+                Pesquise por falantes, momentos de ação de B-rolls ou trechos de roteiro. <br>
+                Pergunte coisas como: <span style="font-style: italic; font-weight: 500; color: var(--color-cyan);">"O que o diretor fala sobre lentes?"</span> ou <span style="font-style: italic; font-weight: 500; color: var(--color-cyan);">"Sugira clipes sobre iluminação"</span>.
+            </p>
+        `;
+        chatHistoryEl.appendChild(welcome);
+    } else {
+        chatHistory.forEach(msg => {
+            const bubble = document.createElement("div");
+            bubble.className = `chat-bubble ${msg.role}`;
+            
+            const meta = document.createElement("div");
+            meta.className = "bubble-meta";
+            meta.innerHTML = `<span>${msg.role === 'user' ? 'Você' : 'Assistente CaIAu Talho'}</span>`;
+            bubble.appendChild(meta);
+            
+            const textEl = document.createElement("div");
+            textEl.className = "chat-bubble-text";
+            textEl.innerHTML = parseChatResponseMarkdown(msg.content);
+            bubble.appendChild(textEl);
+            
+            // Exibir contexto RAG
+            if (msg.role === 'assistant' && msg.context_used && msg.context_used.length > 0) {
+                const ctxDetails = document.createElement("details");
+                ctxDetails.className = "chat-citation-context-list";
+                ctxDetails.innerHTML = `
+                    <summary style="cursor:pointer; font-weight:600; font-size:10px;">Contexto RAG Utilizado (${msg.context_used.length} trechos)</summary>
+                    <ul style="margin:4px 0 0 0; padding-left:14px; list-style-type:square; font-size:10px; display:flex; flex-direction:column; gap:4px;">
+                        ${msg.context_used.map(c => `<li>${c}</li>`).join('')}
+                    </ul>
+                `;
+                bubble.appendChild(ctxDetails);
+            }
+            
+            chatHistoryEl.appendChild(bubble);
+        });
+    }
+    chatContainer.appendChild(chatHistoryEl);
+    
+    // Área do Input
+    const inputContainer = document.createElement("div");
+    inputContainer.className = "chat-input-container";
+    
+    const inputEl = document.createElement("textarea");
+    inputEl.className = "chat-input-box";
+    inputEl.id = "chat-input-textarea";
+    inputEl.placeholder = "Escreva sua mensagem aqui...";
+    inputEl.rows = 1;
+    
+    const sendBtn = document.createElement("button");
+    sendBtn.className = "chat-send-button";
+    sendBtn.id = "chat-send-btn";
+    sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i>`;
+    
+    inputContainer.appendChild(inputEl);
+    inputContainer.appendChild(sendBtn);
+    chatContainer.appendChild(inputContainer);
+    
+    feed.appendChild(chatContainer);
+    
+    // Scroll para baixo
+    setTimeout(() => {
+        chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+    }, 50);
+    
+    // Listeners
+    const clearBtn = chatContainer.querySelector("#btn-clear-chat");
+    if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+            chatHistory = [];
+            renderChatTab();
+        });
+    }
+    
+    const sendMessage = async () => {
+        const text = inputEl.value.trim();
+        if (!text) return;
+        
+        inputEl.value = "";
+        sendBtn.disabled = true;
+        
+        chatHistory.push({ role: "user", content: text });
+        renderChatTab();
+        
+        const historyContainer = document.getElementById("chat-history-container");
+        const typingBubble = document.createElement("div");
+        typingBubble.className = "chat-bubble assistant typing";
+        typingBubble.innerHTML = `
+            <div class="bubble-meta"><span>Assistente CaIAu Talho</span></div>
+            <div class="chat-bubble-text"><i class="fa-solid fa-spinner fa-spin"></i> Pensando...</div>
+        `;
+        historyContainer.appendChild(typingBubble);
+        historyContainer.scrollTop = historyContainer.scrollHeight;
+        
+        try {
+            const historyPayload = chatHistory.slice(0, chatHistory.length - 1).map(h => ({
+                role: h.role,
+                content: h.content
+            }));
+            
+            const response = await fetch(`/api/project/${currentProjectId}/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: text,
+                    history: historyPayload
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                chatHistory.push({
+                    role: "assistant",
+                    content: data.response,
+                    context_used: data.context_used
+                });
+            } else {
+                const errText = await response.text();
+                chatHistory.push({
+                    role: "assistant",
+                    content: `Erro ao obter resposta do assistente: ${errText}`
+                });
+            }
+        } catch (err) {
+            chatHistory.push({
+                role: "assistant",
+                content: `Erro ao conectar ao servidor do CaIAu Talho: ${err.message}`
+            });
+        }
+        
+        renderChatTab();
+    };
+    
+    sendBtn.addEventListener("click", sendMessage);
+    inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+    
+    hookChatCitationClicks(chatHistoryEl);
+}
+
+function parseChatResponseMarkdown(text) {
+    if (!text) return "";
+    
+    // Escapar HTML para evitar XSS
+    let escaped = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+        
+    // Negrito e Itálico markdown simples
+    escaped = escaped
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+        
+    // Citações de vídeos: [Legenda](video_id: 2, start: 10.5, end: 15.0)
+    escaped = escaped.replace(/\[([^\]]+)\]\(video_id:\s*(\d+),\s*start:\s*([\d.]+),\s*end:\s*([\d.]+)\)/g, (match, label, videoId, start, end) => {
+        return `<a class="chat-citation video-citation" data-video-id="${videoId}" data-start="${start}" data-end="${end}"><i class="fa-solid fa-play"></i> ${label}</a>`;
+    });
+    
+    // Citações de fotos: [Legenda](photo_id: 4)
+    escaped = escaped.replace(/\[([^\]]+)\]\(photo_id:\s*(\d+)\)/g, (match, label, photoId) => {
+        return `<a class="chat-citation photo-citation" data-photo-id="${photoId}"><i class="fa-solid fa-image"></i> ${label}</a>`;
+    });
+    
+    // Citações de documentos: [Legenda](doc_id: 1)
+    escaped = escaped.replace(/\[([^\]]+)\]\(doc_id:\s*(\d+)\)/g, (match, label, docId) => {
+        return `<a class="chat-citation doc-citation" data-doc-id="${docId}"><i class="fa-solid fa-file-lines"></i> ${label}</a>`;
+    });
+    
+    // Formatar bullet points
+    escaped = escaped.replace(/^\s*-\s+(.+)$/gm, "<li>$1</li>");
+    escaped = escaped.replace(/(<li>.*<\/li>)/g, "<ul>$1</ul>");
+    escaped = escaped.replace(/<\/ul>\s*<ul>/g, ""); // Funde <ul> adjacentes
+    
+    // Quebras de linha
+    escaped = escaped.replace(/\n/g, "<br>");
+    
+    return escaped;
+}
+
+function hookChatCitationClicks(container) {
+    // Cliques em vídeos
+    container.querySelectorAll(".video-citation").forEach(link => {
+        link.addEventListener("click", (e) => {
+            e.preventDefault();
+            const videoId = parseInt(link.getAttribute("data-video-id"));
+            const startTime = parseFloat(link.getAttribute("data-start"));
+            const endTime = parseFloat(link.getAttribute("data-end"));
+            
+            const targetVid = allVideos.find(v => v.id === videoId) || MOCK_VIDEOS.find(v => v.id === videoId);
+            if (targetVid) {
+                selectVideo(targetVid);
+                setTimeout(() => {
+                    videoPlayer.currentTime = startTime;
+                    playVideo();
+                    highlightAndScrollToDialogue(startTime);
+                }, 350);
+            }
+        });
+    });
+    
+    // Cliques em fotos
+    container.querySelectorAll(".photo-citation").forEach(link => {
+        link.addEventListener("click", async (e) => {
+            e.preventDefault();
+            const photoId = parseInt(link.getAttribute("data-photo-id"));
+            
+            let targetPhoto = currentPhotoList.find(p => p.id === photoId);
+            if (!targetPhoto) {
+                try {
+                    const res = await fetch(`/api/photos?project_id=${currentProjectId}`);
+                    if (res.ok) {
+                        const photos = await res.json();
+                        targetPhoto = photos.find(p => p.id === photoId);
+                    }
+                } catch (err) {
+                    console.error("Erro ao buscar detalhes da foto:", err);
+                }
+            }
+            
+            if (targetPhoto) {
+                openPhotoViewer(targetPhoto);
+            } else {
+                alert(`Foto com ID ${photoId} não encontrada neste projeto.`);
+            }
+        });
+    });
+    
+    // Cliques em documentos
+    container.querySelectorAll(".doc-citation").forEach(link => {
+        link.addEventListener("click", async (e) => {
+            e.preventDefault();
+            const docId = parseInt(link.getAttribute("data-doc-id"));
+            
+            // Alternar para aba lateral de documentos
+            const btnTabDocs = document.querySelector('[data-tab="tab-docs"]');
+            if (btnTabDocs) {
+                btnTabDocs.click();
+            }
+            
+            const docElement = document.querySelector(`[data-doc-id="${docId}"]`);
+            if (docElement) {
+                docElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                docElement.style.border = '2px solid var(--color-cyan)';
+                docElement.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.4)';
+                setTimeout(() => {
+                    docElement.style.border = '';
+                    docElement.style.boxShadow = '';
+                }, 2000);
+            } else {
+                try {
+                    const res = await fetch(`/api/project/${currentProjectId}/docs`);
+                    if (res.ok) {
+                        const docs = await res.json();
+                        const doc = docs.find(d => d.id === docId);
+                        if (doc) {
+                            alert(`[Documento: ${doc.filename}]\n\nConteúdo:\n${doc.content.slice(0, 1000)}...`);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Erro ao carregar detalhes do documento:", err);
+                }
+            }
+        });
+    });
+}

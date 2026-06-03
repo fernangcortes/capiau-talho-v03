@@ -1,4 +1,4 @@
-"""Utilitários de operações e queries para o SQLite do CapIAu."""
+"""Utilitários de operações e queries para o SQLite do CaIAu Talho."""
 import sqlite3
 import json
 from pathlib import Path
@@ -47,7 +47,7 @@ def add_photo(project_id: int, filename: str, filepath: str, file_hash: str, des
             
         cursor.execute("""
             INSERT INTO photo (project_id, filename, filepath, hash, description, tags, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'ingested')
+            VALUES (?, ?, ?, ?, ?, ?, 'pending')
         """, (project_id, filename, filepath, file_hash, description, json.dumps(tags)))
         conn.commit()
         return cursor.lastrowid
@@ -62,6 +62,16 @@ def update_video_status(video_id: int, status: str, error_message: str = None):
         conn.commit()
     finally:
         conn.close()
+
+def update_photo_status(photo_id: int, status: str):
+    """Atualiza o status de processamento da foto."""
+    conn = get_connection()
+    try:
+        conn.execute("UPDATE photo SET status = ? WHERE id = ?", (status, photo_id))
+        conn.commit()
+    finally:
+        conn.close()
+
 
 def update_photo_analysis(photo_id: int, description: str, tags: list, status: str = "analyzed"):
     """Atualiza a descrição e as tags visuais da foto analisada."""
@@ -239,6 +249,85 @@ def delete_project(project_id: int):
     conn = get_connection()
     try:
         conn.execute("DELETE FROM project WHERE id = ?", (project_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_video_transcript_words(video_id: int):
+    """Retorna todas as palavras individuais da transcrição de um vídeo ordenadas por tempo."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, word, start_time, end_time, speaker_id, confidence 
+            FROM transcript 
+            WHERE video_id = ? 
+            ORDER BY start_time
+        """, (video_id,))
+        return [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+
+def reset_stuck_tasks():
+    """Reseta status temporários (transcribing, analyzing, pending) após reinicialização do servidor."""
+    conn = get_connection()
+    try:
+        # Resetar vídeos que estavam convertendo, transcrevendo ou analisando de volta para ingested
+        conn.execute("UPDATE video SET status = 'ingested' WHERE status IN ('transcribing', 'analyzing')")
+        # Marcar fotos que estavam pendentes como error (já que o processo foi abortado no restart)
+        conn.execute("UPDATE photo SET status = 'error' WHERE status = 'pending'")
+        conn.commit()
+        print("[DB] Status de tarefas interrompidas resetados com sucesso.")
+    except Exception as e:
+        print(f"[DB] Erro ao resetar status de tarefas interrompidas: {e}")
+    finally:
+        conn.close()
+
+def add_production_doc(project_id: int, filename: str, filepath: str, content: str, doc_type: str = "other") -> int:
+    """Adiciona um novo documento de contexto ao banco de dados."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO production_doc (project_id, filename, filepath, content, doc_type)
+            VALUES (?, ?, ?, ?, ?)
+        """, (project_id, filename, filepath, content, doc_type))
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+def get_production_docs(project_id: int) -> list:
+    """Retorna a lista de todos os documentos de contexto associados ao projeto."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, project_id, filename, filepath, content, doc_type, created_at FROM production_doc WHERE project_id = ? ORDER BY id DESC", (project_id,))
+        return [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+def delete_production_doc(doc_id: int):
+    """Deleta um documento pelo ID do banco de dados."""
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM production_doc WHERE id = ?", (doc_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+def update_video_metadata(video_id: int, description: str, summary: str, tags: list):
+    """Atualiza a descrição, sumário e tags editoriais do vídeo."""
+    conn = get_connection()
+    try:
+        conn.execute("""
+            UPDATE video 
+            SET description = ?, summary = ?, tags = ? 
+            WHERE id = ?
+        """, (description, summary, json.dumps(tags), video_id))
         conn.commit()
     finally:
         conn.close()

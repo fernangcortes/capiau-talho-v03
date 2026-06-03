@@ -28,3 +28,10 @@ watch/*
 *.njsproj
 *.sln
 *.swp
+
+# Rascunhos e Testes Locais
+scratch/
+
+# Gráficos e Imagens da Documentação (Evita aumentar tamanho do repo)
+docs/graficos/
+

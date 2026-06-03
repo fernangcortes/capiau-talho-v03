@@ -1,4 +1,4 @@
-"""Motor de Visão Multimodal do CapIAu para analisar frames de B-roll e Fotos de set via OpenRouter."""
+"""Motor de Visão Multimodal do CaIAu Talho para analisar frames de B-roll e Fotos de set via OpenRouter."""
 import os
 import sys
 import base64
@@ -37,7 +37,7 @@ def call_openrouter_vision(base64_image: str, extension: str = "jpeg") -> dict:
     """Envia uma imagem base64 para a API do OpenRouter usando o modelo mais custo-benefício (Gemini 2.5 Flash)."""
     api_key = CONFIG.OPENROUTER_API_KEY
     if not api_key or api_key == "your_openrouter_api_key_here":
-        print("[VISION] ❌ Chave do OpenRouter não configurada no .env")
+        print("[VISION] [ERROR] Chave do OpenRouter não configurada no .env")
         return {"descricao": "Análise indisponível", "tags": []}
 
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -99,83 +99,105 @@ def analyze_broll_video(video_id: int, filepath: Path, duration: float):
     """Varre um vídeo de B-Roll, extrai frames a cada X segundos e descreve-os via OpenRouter."""
     print(f"\n[VISION] Iniciando decupagem visual de B-Roll ID: {video_id} ({filepath.name})...")
     
-    # Obter project_id do SQLite
-    from src.db.operations import get_connection
-    conn = get_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT project_id FROM video WHERE id = ?", (video_id,))
-        row = cursor.fetchone()
-        project_id = row['project_id'] if row else 1
-    finally:
-        conn.close()
-        
-    # Criar diretório temporário no cache para frames extraídos
-    video_cache_dir = CONFIG.CACHE_DIR / f"vid_{video_id}"
-    video_cache_dir.mkdir(exist_ok=True)
-
+    from src.db.operations import get_connection, update_video_status
     
-    descriptions_indexed = []
-    interval = CONFIG.FRAME_INTERVAL # 10 segundos
-    
-    # Mapear timestamps
-    timestamps = []
-    t = 0.0
-    while t < duration:
-        timestamps.append(t)
-        t += interval
-        
-    for timestamp in timestamps:
-        frame_name = f"frame_{int(timestamp)}s.jpg"
-        frame_path = video_cache_dir / frame_name
-        
-        # 1. Extrair frame usando o FFmpeg local de forma ultrarrápida
-        success = extract_frame_ffmpeg(filepath, timestamp, frame_path)
-        if not success:
-            continue
-            
-        # 2. Codificar para base64
-        base64_img = encode_image_base64(frame_path)
-        
-        # 3. Chamar API de Visão do OpenRouter (Gemini 2.5 Flash)
-        analysis = call_openrouter_vision(base64_img, "jpg")
-        print(f"  Frame {timestamp}s: \"{analysis.get('descricao')}\" | Tags: {analysis.get('tags')}")
-        
-        descriptions_indexed.append({
-            "timestamp": timestamp,
-            "description": analysis.get("descricao", ""),
-            "tags": analysis.get("tags", [])
-        })
-        
-        # Registrar relações no grafo SQLite
-        for tag in analysis.get("tags", []):
-            add_relation(
-                project_id=project_id,
-                subject_type="video",
-                subject_id=str(video_id),
-                predicate="features_element",
-                object_type="theme",
-                object_id=tag,
-                weight=1.0
-            )
-            
-        # Deletar arquivo temporário para economizar espaço em disco
-        frame_path.unlink()
-        
-    # Indexar todas as descrições visuais no banco Qdrant local
-    if descriptions_indexed:
-        print(f"  [VISION] Indexando {len(descriptions_indexed)} frames visuais no Qdrant para projeto ID {project_id}...")
-        search_engine = SemanticSearch.get_instance()
-        search_engine.index_broll_descriptions(project_id, video_id, descriptions_indexed)
-
-        
-    # Limpar a pasta de cache do vídeo
     try:
-        video_cache_dir.rmdir()
-    except Exception:
-        pass
+        # Atualiza o status do vídeo para indicá-lo em processamento
+        update_video_status(video_id, 'analyzing')
         
-    print(f"  🎉 Análise visual do vídeo {video_id} concluída!")
+        # Obter project_id do SQLite
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT project_id FROM video WHERE id = ?", (video_id,))
+            row = cursor.fetchone()
+            project_id = row['project_id'] if row else 1
+        finally:
+            conn.close()
+            
+        # Criar diretório temporário no cache para frames extraídos
+        video_cache_dir = CONFIG.CACHE_DIR / f"vid_{video_id}"
+        video_cache_dir.mkdir(exist_ok=True)
+        
+        descriptions_indexed = []
+        interval = CONFIG.FRAME_INTERVAL # 10 segundos
+        
+        # Mapear timestamps
+        timestamps = []
+        t = 0.0
+        while t < duration:
+            timestamps.append(t)
+            t += interval
+            
+        for timestamp in timestamps:
+            frame_name = f"frame_{int(timestamp)}s.jpg"
+            frame_path = video_cache_dir / frame_name
+            
+            # 1. Extrair frame usando o FFmpeg local de forma ultrarrápida
+            success = extract_frame_ffmpeg(filepath, timestamp, frame_path)
+            if not success:
+                continue
+                
+            # Detectar rostos no frame de vídeo
+            try:
+                from src.vision.face_engine import process_video_frame_faces
+                process_video_frame_faces(project_id, video_id, timestamp, frame_path)
+            except Exception as fe:
+                print(f"[VISION] Erro ao detectar rostos no frame {timestamp}s: {fe}")
+                
+            # 2. Codificar para base64
+            base64_img = encode_image_base64(frame_path)
+            
+            # 3. Chamar API de Visão do OpenRouter (Gemini 2.5 Flash)
+            analysis = call_openrouter_vision(base64_img, "jpg")
+            print(f"  Frame {timestamp}s: \"{analysis.get('descricao')}\" | Tags: {analysis.get('tags')}")
+            
+            descriptions_indexed.append({
+                "timestamp": timestamp,
+                "description": analysis.get("descricao", ""),
+                "tags": analysis.get("tags", [])
+            })
+            
+            # Registrar relações no grafo SQLite
+            for tag in analysis.get("tags", []):
+                add_relation(
+                    project_id=project_id,
+                    subject_type="video",
+                    subject_id=str(video_id),
+                    predicate="features_element",
+                    object_type="theme",
+                    object_id=tag,
+                    weight=1.0
+                )
+                
+            # Deletar arquivo temporário para economizar espaço em disco
+            frame_path.unlink()
+            
+        # Indexar todas as descrições visuais no banco Qdrant local
+        if descriptions_indexed:
+            print(f"  [VISION] Indexando {len(descriptions_indexed)} frames visuais no Qdrant para projeto ID {project_id}...")
+            search_engine = SemanticSearch.get_instance()
+            search_engine.index_broll_descriptions(project_id, video_id, descriptions_indexed)
+            
+            # Gerar resumo editorial automático por IA
+            try:
+                from src.nlp.summary_engine import generate_video_summary
+                generate_video_summary(video_id, "broll", project_id, visual_descriptions=descriptions_indexed)
+            except Exception as sum_err:
+                print(f"  [VISION] Aviso: Erro na geração automática do resumo: {sum_err}")
+            
+        # Limpar a pasta de cache do vídeo
+        try:
+            video_cache_dir.rmdir()
+        except Exception:
+            pass
+            
+        print(f"  [SUCCESS] Análise visual do vídeo {video_id} concluída!")
+        update_video_status(video_id, 'analyzed')
+        
+    except Exception as e:
+        print(f"  [ERROR] [VISION_ERROR] Erro ao analisar B-Roll ID {video_id}: {e}")
+        update_video_status(video_id, 'error', error_message=str(e))
 
 def analyze_set_photo(photo_id: int, filepath: Path):
     """Analisa uma foto de set importada usando a API de Visão e registra os dados."""
@@ -193,9 +215,17 @@ def analyze_set_photo(photo_id: int, filepath: Path):
         conn.close()
         
     try:
-        base64_img = encode_image_base64(filepath)
-        ext = filepath.suffix.lower().replace('.', '')
-        
+        # Se houver proxy gerado (WebP leve de 1024px), usá-lo para economizar tokens e rede
+        proxy_path = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{photo_id}.webp"
+        if proxy_path.exists():
+            print(f"  [VISION] Usando proxy WebP otimizado para a análise: {proxy_path.name}")
+            base64_img = encode_image_base64(proxy_path)
+            ext = "webp"
+        else:
+            print(f"  [VISION] Proxy não encontrado. Usando arquivo original: {filepath.name}")
+            base64_img = encode_image_base64(filepath)
+            ext = filepath.suffix.lower().replace('.', '')
+            
         analysis = call_openrouter_vision(base64_img, ext)
         desc = analysis.get("descricao", "Foto de set analisada.")
         tags = analysis.get("tags", [])
@@ -222,5 +252,5 @@ def analyze_set_photo(photo_id: int, filepath: Path):
             )
             
     except Exception as e:
-        print(f"  ❌ Falha crítica ao processar a foto {filepath.name}: {e}")
+        print(f"  [ERROR] Falha crítica ao processar a foto {filepath.name}: {e}")
 

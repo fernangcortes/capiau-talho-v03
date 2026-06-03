@@ -9,14 +9,18 @@ import json
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from src.config import CONFIG
-from src.db.operations import add_video, add_photo, update_video_status
+from src.db.operations import get_connection, add_video, add_photo, update_video_status, update_photo_status
 
 # Limitar a no máximo 2 conversões FFmpeg simultâneas para poupar a CPU
 PROXY_EXECUTOR = ThreadPoolExecutor(max_workers=2)
 
 SUPPORTED_VIDEO = {'.mp4', '.mov', '.mxf', '.mts', '.mkv', '.avi'}
 SUPPORTED_AUDIO = {'.wav', '.mp3', '.m4a', '.bwf'}
-SUPPORTED_PHOTO = {'.jpg', '.jpeg', '.png', '.tiff'}
+SUPPORTED_PHOTO = {
+    '.jpg', '.jpeg', '.png', '.tiff',
+    '.arw', '.cr2', '.nef', '.dng', '.pef', '.raf', '.orf', '.rw2', '.raw'
+}
+
 
 def compute_hash(filepath: Path) -> str:
     """Calcula um hash SHA-256 parcial/completo de forma rápida para deduplicação."""
@@ -238,6 +242,52 @@ def generate_proxy(original_path: Path, proxy_path: Path, video_id: int, duratio
         CONVERSION_PROGRESS[video_id] = {"percent": 0.0, "status": "failed"}
         return False
 
+def generate_photo_proxy(original_path: Path, proxy_path: Path) -> bool:
+    """Gera um proxy leve (WebP) de alta qualidade redimensionado via Pillow/rawpy.
+    
+    A resolução máxima padrão é de 1024px na maior dimensão, economizando rede e otimizando a IA.
+    """
+    ext = original_path.suffix.lower()
+    raw_extensions = {'.arw', '.cr2', '.nef', '.dng', '.pef', '.raf', '.orf', '.rw2', '.raw'}
+    
+    try:
+        # Se for um arquivo RAW, usamos o rawpy para processá-lo
+        if ext in raw_extensions:
+            try:
+                import rawpy
+            except ImportError:
+                print(f"[INGEST] ❌ Erro: Biblioteca 'rawpy' não está instalada. Instale via 'pip install rawpy' para suportar formatos RAW.")
+                return False
+                
+            from PIL import Image
+            print(f"[INGEST] Processando foto RAW via rawpy: {original_path.name}")
+            with rawpy.imread(str(original_path)) as raw:
+                # O processamento padrão do rawpy gera um array RGB de alta qualidade
+                # use_camera_wb=True costuma dar o melhor balanço de branco
+                rgb = raw.postprocess(use_camera_wb=True)
+                img = Image.fromarray(rgb)
+        else:
+            from PIL import Image
+            print(f"[INGEST] Processando foto normal via Pillow: {original_path.name}")
+            img = Image.open(str(original_path))
+            
+        # Redimensionamento inteligente para visualização na web (limite máximo de 1024px na maior dimensão)
+        max_size = 1024
+        img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+        
+        # Garantir que a imagem está em modo RGB para salvar
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+            
+        # Salva como WebP de boa qualidade
+        proxy_path.parent.mkdir(parents=True, exist_ok=True)
+        img.save(str(proxy_path), 'WEBP', quality=85)
+        print(f"  [OK] Proxy de foto gerado com sucesso: {proxy_path.name}")
+        return True
+    except Exception as e:
+        print(f"  [ERRO] Falha ao gerar proxy para foto {original_path.name}: {e}")
+        return False
+
 def ingest_file(filepath: Path, project_id: int = 1, copy_original: bool = True) -> bool:
     """Ingere um único arquivo de mídia, catalogando no SQLite e gerando proxies."""
     ext = filepath.suffix.lower()
@@ -322,7 +372,6 @@ def ingest_file(filepath: Path, project_id: int = 1, copy_original: bool = True)
             photo_dest = filepath
             print(f"  -> Processando foto em modo Link (sem cópia): {photo_dest}")
 
-            
         photo_id = add_photo(
             project_id=project_id,
             filename=filepath.name,
@@ -331,7 +380,43 @@ def ingest_file(filepath: Path, project_id: int = 1, copy_original: bool = True)
             description="Foto de set importada.",
             tags=[]
         )
-        print(f"  [OK] Foto ID: {photo_id} registrada no SQLite.")
+        
+        # Gerar proxy de foto WebP em background
+        proxy_path = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{photo_id}.webp"
+        if not proxy_path.exists():
+            update_photo_status(photo_id, 'pending')
+            
+            def bg_photo_task(p_id, proj_id, orig_path, px_path):
+                try:
+                    success = generate_photo_proxy(orig_path, px_path)
+                    if success:
+                        update_photo_status(p_id, 'ingested')
+                        try:
+                            from src.vision.face_engine import process_photo_faces
+                            process_photo_faces(proj_id, p_id, px_path)
+                        except Exception as fe:
+                            print(f"[BG_PHOTO_PROXY] Erro na deteção de rostos: {fe}")
+                    else:
+                        update_photo_status(p_id, 'error')
+                except Exception as e:
+                    print(f"[BG_PHOTO_PROXY] Erro no ID {p_id}: {e}")
+                    update_photo_status(p_id, 'error')
+            
+            PROXY_EXECUTOR.submit(bg_photo_task, photo_id, project_id, photo_dest, proxy_path)
+        else:
+            # Se o proxy já existe mas o status ainda está pendente por algum motivo, marca como ingested
+            conn = get_connection()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT status FROM photo WHERE id = ?", (photo_id,))
+                row = cursor.fetchone()
+                current_status = row['status'] if row else 'pending'
+            finally:
+                conn.close()
+            if current_status == 'pending':
+                update_photo_status(photo_id, 'ingested')
+                
+        print(f"  [OK] Foto ID: {photo_id} catalogada e adicionada à fila de proxies.")
         return True
         
     return False

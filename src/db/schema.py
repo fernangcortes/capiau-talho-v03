@@ -1,4 +1,4 @@
-"""Schema de Banco de Dados SQLite para o CapIAu Making Of MVP."""
+"""Schema de Banco de Dados SQLite para o CaIAu Talho Making Of MVP."""
 import sqlite3
 from pathlib import Path
 from src.config import CONFIG
@@ -28,6 +28,11 @@ CREATE TABLE IF NOT EXISTS video (
     codec TEXT,
     bitrate INTEGER,
     
+    -- Metadados editoriais / de IA
+    description TEXT,
+    summary TEXT,
+    tags TEXT, -- JSON array de tags gerais
+    
     -- Status no pipeline
     status TEXT CHECK(status IN ('pending', 'ingested', 'transcribing', 'transcribed', 'analyzing', 'analyzed', 'error')) DEFAULT 'pending',
     error_message TEXT,
@@ -45,6 +50,30 @@ CREATE TABLE IF NOT EXISTS photo (
     description TEXT,
     tags TEXT, -- JSON array de tags visuais
     status TEXT CHECK(status IN ('pending', 'ingested', 'analyzed', 'error')) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Documentos de Contexto de Produção (Roteiros, Pautas, Fountain, FDX, etc.)
+CREATE TABLE IF NOT EXISTS production_doc (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    filepath TEXT,
+    content TEXT NOT NULL,
+    doc_type TEXT CHECK(doc_type IN ('script', 'outline', 'notes', 'other')) DEFAULT 'other',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Rostos Identificados (Face Recognition)
+CREATE TABLE IF NOT EXISTS face (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    name TEXT, -- Nome da pessoa (ex: "Diretor Carlos"), NULL se não rotulado
+    bounding_box TEXT, -- JSON com coordenadas [x, y, w, h] relativas
+    photo_id INTEGER REFERENCES photo(id) ON DELETE CASCADE,
+    video_id INTEGER REFERENCES video(id) ON DELETE CASCADE,
+    timestamp REAL, -- Timestamp do frame para vídeos, NULL para fotos
+    embedding TEXT, -- JSON array do vetor de embedding facial (ex: 128 floats)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -111,7 +140,7 @@ CREATE INDEX IF NOT EXISTS idx_relation_object ON relation(project_id, object_ty
 """
 
 def init_db(db_path: Path = None):
-    """Inicializa o banco de dados SQLite com as tabelas do schema."""
+    """Inicializa o banco de dados SQLite com as tabelas do schema e realiza migrações dinâmicas."""
     if db_path is None:
         db_path = CONFIG.DB_PATH
         
@@ -122,8 +151,24 @@ def init_db(db_path: Path = None):
         conn.executescript(SCHEMA_SQL)
         conn.commit()
         
-        # Inserir projeto padrão se a tabela estiver vazia
+        # Migração dinâmica de colunas para o banco de dados existente
         cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(video)")
+        video_cols = [row[1] for row in cursor.fetchall()]
+        
+        if "description" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN description TEXT")
+            print("[MIGRATION] Coluna 'description' adicionada à tabela video.")
+        if "summary" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN summary TEXT")
+            print("[MIGRATION] Coluna 'summary' adicionada à tabela video.")
+        if "tags" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN tags TEXT")
+            print("[MIGRATION] Coluna 'tags' adicionada à tabela video.")
+            
+        conn.commit()
+        
+        # Inserir projeto padrão se a tabela estiver vazia
         cursor.execute("SELECT COUNT(*) FROM project")
         if cursor.fetchone()[0] == 0:
             cursor.execute("INSERT INTO project (name, description) VALUES (?, ?)", 

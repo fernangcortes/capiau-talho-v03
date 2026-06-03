@@ -1,4 +1,4 @@
-"""Configurações centralizadas do CapIAu MVP."""
+"""Configurações centralizadas do CaIAu Talho MVP."""
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -42,11 +42,13 @@ class Config:
             self.WATCH_FOLDER,
             self.ORIGINALS_DIR,
             self.PROXIES_DIR,
+            self.PROXIES_DIR / "photos",
             self.CACHE_DIR,
             self.EXPORTS_DIR,
             self.QDRANT_DB_PATH.parent,
             self.DB_PATH.parent
         ]:
             directory.mkdir(parents=True, exist_ok=True)
+
             
 CONFIG = Config()

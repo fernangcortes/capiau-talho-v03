@@ -1,7 +1,7 @@
-# CapIAu MVP: APIs de Baixo Custo + Free Tier Generoso
+# CaIAu Talho MVP: APIs de Baixo Custo + Free Tier Generoso
 
 **Data:** 02/06/2026  
-**Escopo:** Guia passo a passo para implementar o MVP do CapIAu usando APIs pagas de **baixíssimo custo** e **free tiers generosos**. Foco em ficção cinematográfica. Zero instalação de modelos locais pesados — tudo via API. Orçamento alvo: **$0-12 para 20h de análise de vídeo** (ou $0 se usar apenas free tiers).  
+**Escopo:** Guia passo a passo para implementar o MVP do CaIAu Talho usando APIs pagas de **baixíssimo custo** e **free tiers generosos**. Foco em ficção cinematográfica. Zero instalação de modelos locais pesados — tudo via API. Orçamento alvo: **$0-12 para 20h de análise de vídeo** (ou $0 se usar apenas free tiers).  
 **Tempo estimado:** 2-3 horas de setup + 20h de vídeo analisadas em ~4-6 horas (processamento paralelo via APIs).
 
 ---
@@ -156,7 +156,7 @@ OPENAI_API_KEY=sk-sua-chave-aqui
 QDRANT_URL=https://sua-url.cloud.qdrant.io
 QDRANT_API_KEY=sua-chave-qdrant
 
-# ── Configuração CapIAu ────────────────────────────────────
+# ── Configuração CaIAu Talho ────────────────────────────────────
 capiau_DB=./data/capiau.db
 capiau_WATCH=./watch
 capiau_EXPORTS=./exports
@@ -179,7 +179,7 @@ set -a && source .env && set +a
 LiteLLM é um **proxy server open-source** que unifica todas as APIs em um único endpoint OpenAI-compatible. Você configura uma vez e depois troca de provedor alterando apenas uma linha no YAML.
 
 **Benefícios para o MVP:**
-- **1 integração** no código do CapIAu (em vez de 5+)
+- **1 integração** no código do CaIAu Talho (em vez de 5+)
 - **Fallback automático**: DeepSeek cai → Groq assume → Together AI → OpenAI
 - **Virtual keys** com budgets por "projeto" (Ficção: $5, Doc: $10)
 - **Caching** Redis (reduz chamadas repetidas em 30-50%)
@@ -782,7 +782,7 @@ services:
       - redis-data:/data
     restart: unless-stopped
 
-  # App CapIAu (FastAPI)
+  # App CaIAu Talho (FastAPI)
   capiau:
     build:
       context: .
