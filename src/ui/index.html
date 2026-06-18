@@ -276,7 +276,13 @@
                 </section>
                 
                 <!-- Botão flutuante para reabrir Timeline -->
-                <button class="btn-reopen-sidebar bottom" id="reopen-timeline" data-tooltip="Abrir Linha do Te            <aside class="sidebar-right glassmorphism" id="sidebar-right">
+                <button class="btn-reopen-sidebar bottom" id="reopen-timeline" data-tooltip="Abrir Linha do Tempo">
+                    <i data-lucide="list-todo"></i>
+                </button>
+            </main>
+
+            <!-- ── RIGHT SIDEBAR (COLLAPSIBLE - TRANSCRIPTION / DIALOGUES) ──── -->
+            <aside class="sidebar-right glassmorphism" id="sidebar-right">
                 <div class="sidebar-header">
                     <h2><i data-lucide="message-square"></i> Transcrição & Falas</h2>
                     <button class="btn-toggle-sidebar" id="toggle-right" data-tooltip="Recolher Painel">
@@ -328,7 +334,7 @@
                     </div>
 
                     <!-- Tab: Chat IA -->
-                    <div id="chat-container" style="display: none; height: 100%; display: flex; flex-direction: column;">
+                    <div id="chat-container" style="display: none; height: 100%; flex-direction: column;">
                         <div class="chat-tab-container" style="display: flex; flex-direction: column; height: 100%;">
                             <h4 style="font-size:12px; color:var(--color-cyan); display:flex; align-items:center; justify-content:space-between; width:100%; margin:0; padding: 10px 15px 5px 15px;">
                                 <span><i data-lucide="message-square"></i> Assistente Editorial IA</span>

@@ -427,6 +427,9 @@ window.addEventListener("DOMContentLoaded", () => {
         updateActionsRowVisibility(tab);
     });
 
+    // Sincronizar estado inicial da aba da direita
+    STATE.emit("rightTabChanged", STATE.currentRightTab);
+
     // Ocultar ou mostrar botão de visão baseado no tipo do vídeo ativo
     STATE.on("activeVideoChanged", (video) => {
         const btnTabVision = document.getElementById("btn-tab-vision");
