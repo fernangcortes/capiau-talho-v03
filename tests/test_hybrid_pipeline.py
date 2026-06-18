@@ -15,8 +15,10 @@ from src.ingest.watcher import ingest_file, generate_photo_proxy
 class TestIngestPipeline(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Pasta de testes dedicada
+        # Pasta de testes dedicada - limpa se já existir para evitar banco sujo
         cls.test_dir = Path(__file__).resolve().parent.parent / "data_test_ingest"
+        if cls.test_dir.exists():
+            shutil.rmtree(cls.test_dir, ignore_errors=True)
         cls.test_dir.mkdir(exist_ok=True)
         
         cls.original_db = CONFIG.DB_PATH
@@ -43,7 +45,7 @@ class TestIngestPipeline(unittest.TestCase):
         # Limpar arquivos de teste
         shutil.rmtree(cls.test_dir, ignore_errors=True)
 
-    @patch('src.ingest.watcher.generate_proxy', return_value=True)
+    @patch('src.services.ingest.generate_video_proxy', return_value=True)
     def test_video_ingest(self, mock_proxy):
         print("\n[TEST] 1. Criando arquivo de vídeo simulado...")
         dummy_file = self.test_dir / "depoimento_ator.mp4"

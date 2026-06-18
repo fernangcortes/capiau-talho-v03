@@ -4,12 +4,11 @@ import json
 from pathlib import Path
 import opentimelineio as otio
 from src.config import CONFIG
-from src.db.operations import get_connection
+from src.db.connection import get_db
 
 def generate_otio_timeline(timeline_id: int) -> otio.schema.Timeline:
     """Carrega os cortes salvos na tabela 'timeline' e monta uma timeline do OpenTimelineIO."""
-    conn = get_connection()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT name, sequence_json FROM timeline WHERE id = ?", (timeline_id,))
         row = cursor.fetchone()
@@ -72,8 +71,6 @@ def generate_otio_timeline(timeline_id: int) -> otio.schema.Timeline:
             track.append(clip)
             
         return otio_timeline
-    finally:
-        conn.close()
 
 def export_timeline_file(timeline_id: int, output_format: str = "otio") -> Path:
     """Exporta a timeline selecionada para o formato especificado (.otio, .xml ou .edl).

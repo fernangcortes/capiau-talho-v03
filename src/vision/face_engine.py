@@ -2,7 +2,7 @@
 import cv2
 import json
 from pathlib import Path
-from src.db.operations import get_connection
+from src.db.connection import get_db
 
 def detect_faces_in_image(image_path: Path) -> list:
     """Detecta rostos usando Haar Cascades em uma imagem local (Pillow proxy ou original).
@@ -50,15 +50,14 @@ def detect_faces_in_image(image_path: Path) -> list:
         print(f"[FACE_ENGINE] Erro na detecção de rostos para {image_path.name}: {e}")
         return []
 
-def process_photo_faces(project_id: int, photo_id: int, image_path: Path):
+def process_photo_faces(project_id: int, photo_id: int, image_path: Path) -> None:
     """Detecta rostos na foto de set e registra na tabela face do SQLite com name = NULL."""
     try:
         faces = detect_faces_in_image(image_path)
         if not faces:
             return
             
-        conn = get_connection()
-        try:
+        with get_db() as conn:
             cursor = conn.cursor()
             # Limpar detecções antigas da foto para evitar duplicações
             cursor.execute("DELETE FROM face WHERE photo_id = ?", (photo_id,))
@@ -71,20 +70,17 @@ def process_photo_faces(project_id: int, photo_id: int, image_path: Path):
                 """, (project_id, bounding_box_json, photo_id))
             conn.commit()
             print(f"[FACE_ENGINE] {len(faces)} rostos detectados e registrados para foto ID {photo_id}")
-        finally:
-            conn.close()
     except Exception as e:
         print(f"[FACE_ENGINE] Erro ao salvar rostos de foto ID {photo_id}: {e}")
 
-def process_video_frame_faces(project_id: int, video_id: int, timestamp: float, image_path: Path):
+def process_video_frame_faces(project_id: int, video_id: int, timestamp: float, image_path: Path) -> None:
     """Detecta rostos em um frame de B-roll extraído e registra na tabela face com name = NULL."""
     try:
         faces = detect_faces_in_image(image_path)
         if not faces:
             return
             
-        conn = get_connection()
-        try:
+        with get_db() as conn:
             cursor = conn.cursor()
             # Opcional: remover se houver uma detecção idêntica de timestamp
             cursor.execute("DELETE FROM face WHERE video_id = ? AND timestamp = ?", (video_id, timestamp))
@@ -97,7 +93,5 @@ def process_video_frame_faces(project_id: int, video_id: int, timestamp: float, 
                 """, (project_id, bounding_box_json, video_id, timestamp))
             conn.commit()
             print(f"[FACE_ENGINE] {len(faces)} rostos detectados no frame {timestamp}s do vídeo ID {video_id}")
-        finally:
-            conn.close()
     except Exception as e:
         print(f"[FACE_ENGINE] Erro ao salvar rostos de frame do vídeo ID {video_id}: {e}")

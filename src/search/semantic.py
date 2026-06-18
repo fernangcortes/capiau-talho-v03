@@ -48,27 +48,12 @@ class SemanticSearch:
         except Exception as e:
             print(f"[QDRANT] Erro ao inicializar a coleção: {e}")
 
-    def index_transcript_chunks(self, project_id: int, video_id: int, dialogues: list):
+    def index_transcript_chunks(self, project_id: int, video_id: int, dialogues: list, video_type: str = "interview") -> None:
         """Indexa os parágrafos de transcrição de depoimentos isolados por project_id.
         
         'dialogues' deve ser uma lista de dicionários contendo:
         {'speaker_id': str, 'start_time': float, 'end_time': float, 'text': str}
         """
-        # Obter o tipo real do vídeo (interview ou broll) no SQLite
-        from src.db.operations import get_connection
-        conn = get_connection()
-        video_type = "interview"
-        try:
-            cursor = conn.cursor()
-            cursor.execute("SELECT video_type FROM video WHERE id = ?", (video_id,))
-            row = cursor.fetchone()
-            if row:
-                video_type = row['video_type']
-        except Exception as e:
-            print(f"[QDRANT] Erro ao buscar tipo de vídeo no banco: {e}")
-        finally:
-            conn.close()
-
         points = []
         for idx, dial in enumerate(dialogues):
             text_to_embed = f"{dial['speaker_id']}: \"{dial['text']}\""

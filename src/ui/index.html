@@ -7,7 +7,7 @@
     <!-- Google Fonts: Inter e Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Customizados -->
@@ -15,81 +15,45 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- ── HEADER / TOP BAR ─────────────────────────────────────────── -->
-        <header class="header glassmorphism">
-            <div class="logo-area">
-                <i class="fa-solid fa-clapperboard logo-icon"></i>
-                <div class="logo-text">
-                    <h1>CaIAu Talho</h1>
-                    <span>Making Of Editor</span>
-                </div>
-            </div>
-
-            <div class="project-area glassmorphism">
-                <i class="fa-solid fa-folder-tree project-icon"></i>
-                <select id="project-selector" title="Projeto Ativo">
-                    <!-- Projetos inseridos dinamicamente -->
-                </select>
-                <button id="btn-new-project" class="btn-icon" title="Novo Projeto">
-                    <i class="fa-solid fa-folder-plus"></i>
-                </button>
-                <button id="btn-sync-project" class="btn-icon" title="Sincronizar e Exportar/Importar Projeto" style="color: var(--color-cyan);">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                </button>
-                <button id="btn-delete-project" class="btn-icon btn-danger" title="Deletar Projeto">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
-            </div>
-            
-            <div class="search-area glassmorphism">
-
-                <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                <input type="text" id="semantic-search-input" placeholder="Buscar falas ou B-rolls semanticamente (ex: escolha das lentes)...">
-                <select id="search-filter">
-                    <option value="">Todas as Mídias</option>
-                    <option value="interview">Entrevistas (ASR)</option>
-                    <option value="broll">Bastidores (B-roll)</option>
-                    <option value="photo">Fotos de Set</option>
-                </select>
-                <button id="btn-search" class="btn-primary">Buscar</button>
-            </div>
-            
-            <div class="actions-area">
-                <button id="btn-scan" class="btn-outline" title="Escanear pasta watch/">
-                    <i class="fa-solid fa-arrows-rotate"></i> Escanear watch/
-                </button>
-                <button id="btn-import-external" class="btn-outline" title="Importar HD ou pasta externa em modo Link">
-                    <i class="fa-solid fa-hard-drive"></i> Importar Pasta/HD
-                </button>
-                <button id="btn-open-proxies" class="btn-outline" title="Abrir pasta local de proxies no Explorer">
-                    <i class="fa-solid fa-folder-open"></i> Abrir Proxies
-                </button>
-                <button id="btn-retry-failed" class="btn-outline" style="color: var(--color-rose); border-color: rgba(244, 63, 94, 0.3);" title="Recomeçar todas as conversões de proxy falhas ou ausentes">
-                    <i class="fa-solid fa-arrows-rotate"></i> Recomeçar Falhas
-                </button>
-                <button id="btn-cluster" class="btn-secondary" title="Agrupar trechos em Temas Narrativos">
-                    <i class="fa-solid fa-brain"></i> Agrupar Temas
-                </button>
-            </div>
-
-        </header>
-
         <!-- ── MAIN CONTENT WORKSPACE ───────────────────────────────────── -->
         <div class="workspace">
             <!-- ── LEFT SIDEBAR (COLLAPSIBLE - MEDIA LIBRARY) ─────────────── -->
             <aside class="sidebar-left glassmorphism" id="sidebar-left">
+                <!-- Seção de Projetos no topo da lateral esquerda -->
+                <div class="project-sidebar-area">
+                    <div class="project-title-row">
+                        <span id="current-project-name" class="project-name-display" data-tooltip="Nome do Projeto (Clique para alternar)">Carregando...</span>
+                        <div class="project-action-buttons">
+                            <button id="btn-new-project" class="btn-icon" data-tooltip="Criar Novo Projeto"><i data-lucide="folder-plus"></i></button>
+                            <button id="btn-sync-project" class="btn-icon" data-tooltip="Sincronizar e Backup (.ZIP)" style="color: var(--color-cyan) !important;"><i data-lucide="cloud-upload"></i></button>
+                            <button id="btn-delete-project" class="btn-icon btn-danger" data-tooltip="Deletar Projeto Ativo" style="color: var(--color-rose) !important;"><i data-lucide="trash-2"></i></button>
+                        </div>
+                    </div>
+                    <!-- Dropdown oculto ativado por clique no nome do projeto -->
+                    <select id="project-selector" style="display: none;"></select>
+                </div>
+
+                <!-- Busca Semântica na lateral esquerda -->
+                <div class="search-sidebar-area">
+                    <div class="search-input-wrapper">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input type="text" id="semantic-search-input" placeholder="Buscar falas ou bastidores..." data-tooltip="Busca semântica por IA em depoimentos, B-rolls e fotos">
+                        <select id="search-filter" data-tooltip="Filtrar por tipo de mídia">
+                            <option value="">Todas</option>
+                            <option value="interview">Falas</option>
+                            <option value="broll">Bastidores</option>
+                            <option value="photo">Fotos</option>
+                        </select>
+                        <button id="btn-search" class="btn-icon" data-tooltip="Buscar"><i data-lucide="arrow-right"></i></button>
+                    </div>
+                </div>
+
                 <div class="sidebar-header">
                     <h2>
-                        <i class="fa-solid fa-folder-open"></i> Biblioteca
-                        <button id="btn-reload-library" class="btn-icon" title="Recarregar Biblioteca" style="margin-left: 6px; font-size: 13px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
-                            <i class="fa-solid fa-arrows-rotate"></i>
-                        </button>
-                        <button id="btn-add-media" class="btn-icon" title="Importar Pasta/HD Externo" style="margin-left: 6px; font-size: 13px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
-                            <i class="fa-solid fa-plus"></i>
-                        </button>
+                        <i data-lucide="folder-open" style="width: 14px; height: 14px; color: var(--color-violet);"></i> Biblioteca
                     </h2>
-                    <button class="btn-toggle-sidebar" id="toggle-left" title="Recolher Painel">
-                        <i class="fa-solid fa-chevron-left"></i>
+                    <button class="btn-toggle-sidebar" id="toggle-left" data-tooltip="Recolher Painel">
+                        <i data-lucide="chevron-left"></i>
                     </button>
                 </div>
                 
@@ -100,11 +64,11 @@
                     <button class="tab-btn" data-tab="tab-docs">Documentos</button>
                 </div>
                 
-                <div class="library-toolbar" id="library-filter-bar" style="padding: 8px 12px; border-bottom: 1px solid var(--border-glass); display: flex; gap: 8px; background: rgba(0,0,0,0.15);">
+                <div class="library-toolbar" id="library-filter-bar">
                     <!-- Filtro por status de análise -->
-                    <div class="dropdown-wrapper" style="height: 26px; padding: 0 6px; flex: 1; display: flex; align-items: center;">
-                        <i class="fa-solid fa-filter" style="font-size: 10px; color: var(--color-cyan);"></i>
-                        <select id="library-filter-status" style="background: transparent; border: none; outline: none; color: var(--text-secondary); font-size: 10px; font-weight: 600; cursor: pointer; width: 100%;">
+                    <div class="dropdown-wrapper">
+                        <i data-lucide="filter"></i>
+                        <select id="library-filter-status">
                             <option value="all">Filtros: Todos</option>
                             <option value="pending">Não Analisados</option>
                             <option value="processed">Analisados (IA)</option>
@@ -113,9 +77,9 @@
                     </div>
                     
                     <!-- Ordenar por metadados -->
-                    <div class="dropdown-wrapper" style="height: 26px; padding: 0 6px; flex: 1; display: flex; align-items: center;">
-                        <i class="fa-solid fa-arrow-down-a-z" style="font-size: 10px; color: var(--color-cyan);"></i>
-                        <select id="library-sort-by" style="background: transparent; border: none; outline: none; color: var(--text-secondary); font-size: 10px; font-weight: 600; cursor: pointer; width: 100%;">
+                    <div class="dropdown-wrapper">
+                        <i data-lucide="arrow-down-narrow-wide"></i>
+                        <select id="library-sort-by">
                             <option value="name_asc">Nome (A-Z)</option>
                             <option value="name_desc">Nome (Z-A)</option>
                             <option value="type_interview">Entrevistas 1º</option>
@@ -124,9 +88,12 @@
                             <option value="date_desc">Adição Recente</option>
                         </select>
                     </div>
-                    <!-- Botões globais expandir/recolher tudo -->
-                    <button id="btn-expand-all" title="Expandir todas as pastas" onclick="globalExpandCollapseAll(true)" style="background: none; border: 1px solid rgba(6,182,212,0.25); border-radius: 4px; padding: 3px 7px; color: var(--color-cyan); cursor: pointer; font-size: 10px; transition: all 0.2s; flex-shrink: 0;"><i class="fa-solid fa-angles-down"></i></button>
-                    <button id="btn-collapse-all" title="Recolher todas as pastas" onclick="globalExpandCollapseAll(false)" style="background: none; border: 1px solid rgba(100,100,120,0.25); border-radius: 4px; padding: 3px 7px; color: var(--text-muted); cursor: pointer; font-size: 10px; transition: all 0.2s; flex-shrink: 0;"><i class="fa-solid fa-angles-up"></i></button>
+                    <!-- Ações da Biblioteca -->
+                    <button id="btn-scan" class="btn-icon" data-tooltip="Escanear pasta watch/"><i data-lucide="rotate-cw"></i></button>
+                    <button id="btn-import-external" class="btn-icon" data-tooltip="Importar Pasta/HD Externo"><i data-lucide="hard-drive"></i></button>
+                    <button id="btn-reload-library" class="btn-icon" data-tooltip="Recarregar Biblioteca"><i data-lucide="database"></i></button>
+                    <button id="btn-expand-all" class="btn-icon" data-tooltip="Expandir todas as pastas" onclick="globalExpandCollapseAll(true)"><i data-lucide="chevrons-down"></i></button>
+                    <button id="btn-collapse-all" class="btn-icon" data-tooltip="Recolher todas as pastas" onclick="globalExpandCollapseAll(false)"><i data-lucide="chevrons-up"></i></button>
                 </div>
                 
                 <div class="sidebar-content scrollable">
@@ -146,6 +113,10 @@
                     
                     <!-- Tab: Temas -->
                     <div class="tab-content" id="tab-themes">
+                        <div style="padding: 4px 6px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); margin-bottom: 8px;">
+                            <span style="font-size: 10px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Temas Narrativos</span>
+                            <button id="btn-cluster" class="btn-icon" data-tooltip="Agrupar trechos em Temas Narrativos (IA)"><i data-lucide="brain"></i></button>
+                        </div>
                         <div class="theme-list" id="theme-list">
                             <!-- Inserido dinamicamente via JS -->
                         </div>
@@ -153,14 +124,14 @@
 
                     <!-- Tab: Documentos -->
                     <div class="tab-content" id="tab-docs">
-                        <div class="document-section" style="padding: 12px; display:flex; flex-direction:column; gap:10px;">
+                        <div class="document-section" style="padding: 6px; display:flex; flex-direction:column; gap:10px;">
                             <div style="display:flex; flex-direction:column; gap:8px;">
                                 <input type="file" id="doc-file-input" style="display:none;" accept=".txt,.fountain,.fdx,.pdf">
-                                <button id="btn-upload-doc" class="btn-primary" style="font-size:11px; padding:8px 12px; display:flex; align-items:center; justify-content:center; gap:6px;">
-                                    <i class="fa-solid fa-file-upload"></i> Importar Roteiro / Contexto
+                                <button id="btn-upload-doc" class="btn-primary" style="font-size:11px; padding:8px 12px; display:flex; align-items:center; justify-content:center; gap:6px;" data-tooltip="Importar arquivo de texto ou PDF para contextualizar a IA">
+                                    <i data-lucide="upload"></i> Importar Roteiro / Contexto
                                 </button>
                                 <div class="dropdown-wrapper" style="height: 32px; padding: 0 10px; display: flex; align-items: center;">
-                                    <i class="fa-solid fa-tags" style="color: var(--color-cyan); font-size: 11px;"></i>
+                                    <i data-lucide="tags" style="color: var(--color-cyan); width:12px; height:12px; margin-right:6px;"></i>
                                     <select id="doc-type-selector" style="background: transparent; border: none; outline: none; color: var(--text-secondary); font-size: 11px; font-weight: 600; cursor: pointer; flex: 1; padding: 4px 0;">
                                         <option value="script">Roteiro (Screenplay)</option>
                                         <option value="outline">Pauta / Argumento</option>
@@ -175,16 +146,12 @@
                         </div>
                     </div>
                 </div>
-                <div class="sidebar-footer status-container" id="system-status-bar" style="padding: 12px 16px; border-top: 1px solid var(--border-glass); display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text-secondary); background: rgba(0,0,0,0.15);">
-                    <i class="fa-solid fa-circle-check status-icon" id="system-status-icon" style="color: var(--color-emerald); font-size: 12px;"></i>
-                    <span id="system-status-text">Pronto.</span>
-                </div>
             </aside>
 
             
             <!-- Botão flutuante para reabrir Sidebar Esquerda -->
-            <button class="btn-reopen-sidebar left" id="reopen-left" title="Abrir Biblioteca">
-                <i class="fa-solid fa-folder-open"></i>
+            <button class="btn-reopen-sidebar left" id="reopen-left" data-tooltip="Abrir Biblioteca">
+                <i data-lucide="folder-open"></i>
             </button>
 
             <!-- ── CENTER AREA (ADVANCED PLAYER & TIMELINE) ────────────────── -->
@@ -214,9 +181,9 @@
                     <div class="player-controls">
                         <!-- Playback buttons -->
                         <div class="control-group">
-                            <button id="btn-prev-frame" class="btn-control" title="Frame Anterior"><i class="fa-solid fa-chevron-left"></i></button>
-                            <button id="btn-play" class="btn-control play-btn" title="Reproduzir/Pausar (Space / K)"><i class="fa-solid fa-play"></i></button>
-                            <button id="btn-next-frame" class="btn-control" title="Próximo Frame"><i class="fa-solid fa-chevron-right"></i></button>
+                            <button id="btn-prev-frame" class="btn-control" data-tooltip="Frame Anterior"><i data-lucide="chevron-left"></i></button>
+                            <button id="btn-play" class="btn-control play-btn" data-tooltip="Reproduzir/Pausar (Space / K)"><i data-lucide="play"></i></button>
+                            <button id="btn-next-frame" class="btn-control" data-tooltip="Próximo Frame"><i data-lucide="chevron-right"></i></button>
                         </div>
                         
                         <!-- Timeline scrubber -->
@@ -234,15 +201,13 @@
                         <!-- Editing Markers (I/O) & Resolution/Speed Toggles -->
                         <div class="control-group right-controls">
                             <!-- Marcadores I/O -->
-                            <button id="btn-mark-in" class="btn-control btn-marker" title="Marcar Ponto de Entrada (I)">IN</button>
-                            <button id="btn-mark-out" class="btn-control btn-marker" title="Marcar Ponto de Saída (O)">OUT</button>
-                            <button id="btn-append-timeline" class="btn-primary btn-append" title="Inserir Segmento na Timeline (E)">
-                                <i class="fa-solid fa-plus"></i> Cortar & Inserir
-                            </button>
+                            <button id="btn-mark-in" class="btn-control btn-marker" data-tooltip="Marcar Entrada (I)"><i data-lucide="chevron-right"></i></button>
+                            <button id="btn-mark-out" class="btn-control btn-marker" data-tooltip="Marcar Saída (O)"><i data-lucide="chevron-left"></i></button>
+                            <button id="btn-append-timeline" class="btn-primary btn-append" data-tooltip="Cortar & Inserir na Timeline (E)"><i data-lucide="plus"></i></button>
                             
                             <!-- Resolution toggle -->
-                            <div class="dropdown-wrapper">
-                                <i class="fa-solid fa-display"></i>
+                            <div class="dropdown-wrapper" data-tooltip="Qualidade de Visualização">
+                                <i data-lucide="monitor"></i>
                                 <select id="select-resolution">
                                     <option value="proxy_low">360p Proxy</option>
                                     <option value="proxy_high" selected>720p Proxy</option>
@@ -251,8 +216,8 @@
                             </div>
                             
                             <!-- Speed Control -->
-                            <div class="dropdown-wrapper">
-                                <i class="fa-solid fa-gauge-high"></i>
+                            <div class="dropdown-wrapper" data-tooltip="Velocidade de Reprodução">
+                                <i data-lucide="gauge"></i>
                                 <select id="select-speed">
                                     <option value="0.25">0.25x</option>
                                     <option value="0.5">0.5x</option>
@@ -263,7 +228,7 @@
                             </div>
                             
                             <!-- Maximize -->
-                            <button id="btn-maximize" class="btn-control" title="Tela Cheia"><i class="fa-solid fa-expand"></i></button>
+                            <button id="btn-maximize" class="btn-control" data-tooltip="Tela Cheia"><i data-lucide="maximize"></i></button>
                         </div>
                     </div>
                 </section>
@@ -271,21 +236,21 @@
                 <!-- Bottom Timeline & Storyboard sequence panel -->
                 <section class="timeline-panel glassmorphism" id="timeline-panel">
                     <div class="panel-header">
-                        <h3><i class="fa-solid fa-list-check"></i> Linha do Tempo Editorial (Timeline)</h3>
+                        <h3><i data-lucide="list-todo"></i> Linha do Tempo Editorial (Timeline)</h3>
                         <div class="timeline-actions">
                             <input type="text" id="timeline-name-input" value="Rascunho Making Of #1" placeholder="Nome da Timeline...">
-                            <button id="btn-save-timeline" class="btn-outline"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
-                            <div class="dropdown-wrapper">
-                                <i class="fa-solid fa-file-export"></i>
+                            <button id="btn-save-timeline" class="btn-outline" data-tooltip="Salvar Timeline"><i data-lucide="save"></i></button>
+                            <div class="dropdown-wrapper" data-tooltip="Formato de Exportação">
+                                <i data-lucide="file-output"></i>
                                 <select id="select-export-format">
                                     <option value="xml">Premiere / Resolve XML</option>
                                     <option value="otio">OpenTimelineIO (.otio)</option>
                                     <option value="edl">EDL (CMX 3600)</option>
                                 </select>
                             </div>
-                            <button id="btn-export-timeline" class="btn-primary">Exportar</button>
-                            <button class="btn-toggle-sidebar" id="toggle-timeline" title="Recolher Linha do Tempo">
-                                <i class="fa-solid fa-chevron-down"></i>
+                            <button id="btn-export-timeline" class="btn-primary" data-tooltip="Exportar Linha do Tempo"><i data-lucide="download"></i></button>
+                            <button class="btn-toggle-sidebar" id="toggle-timeline" data-tooltip="Recolher Linha do Tempo">
+                                <i data-lucide="chevron-down"></i>
                             </button>
                         </div>
                     </div>
@@ -311,60 +276,89 @@
                 </section>
                 
                 <!-- Botão flutuante para reabrir Timeline -->
-                <button class="btn-reopen-sidebar bottom" id="reopen-timeline" title="Abrir Linha do Tempo">
-                    <i class="fa-solid fa-list-check"></i> Linha do Tempo
-                </button>
-            </main>
-
-            <!-- ── RIGHT SIDEBAR (COLLAPSIBLE - TRANSCRIPTION / DIALOGUES) ──── -->
-            <aside class="sidebar-right glassmorphism" id="sidebar-right">
+                <button class="btn-reopen-sidebar bottom" id="reopen-timeline" data-tooltip="Abrir Linha do Te            <aside class="sidebar-right glassmorphism" id="sidebar-right">
                 <div class="sidebar-header">
-                    <h2><i class="fa-solid fa-comment-dots"></i> Transcrição & Falas</h2>
-                    <button class="btn-toggle-sidebar" id="toggle-right" title="Recolher Painel">
-                        <i class="fa-solid fa-chevron-right"></i>
+                    <h2><i data-lucide="message-square"></i> Transcrição & Falas</h2>
+                    <button class="btn-toggle-sidebar" id="toggle-right" data-tooltip="Recolher Painel">
+                        <i data-lucide="chevron-right"></i>
                     </button>
                 </div>
                 
                 <div class="transcription-actions">
                     <div id="asr-actions-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
-                        <button id="btn-transcribe-now" class="btn-outline" style="flex: 1; font-size: 11px; padding: 8px 4px;" title="Transcrever apenas o vídeo carregado no player">
-                            <i class="fa-solid fa-microphone-lines"></i> Transcrever Atual
-                        </button>
-                        <button id="btn-transcribe-all" class="btn-secondary" style="flex: 1; font-size: 11px; padding: 8px 4px;" title="Transcrever em lote todos os vídeos do projeto que ainda não possuem transcrição">
-                            <i class="fa-solid fa-layer-group"></i> Transcrever Tudo
-                        </button>
+                        <button id="btn-transcribe-now" class="btn-outline" data-tooltip="Transcrever Vídeo no Player"><i data-lucide="mic"></i></button>
+                        <button id="btn-transcribe-all" class="btn-secondary" data-tooltip="Transcrever Todos os Vídeos"><i data-lucide="layers"></i></button>
                     </div>
                     <div id="vision-actions-row" style="display: none; gap: 8px; margin-bottom: 8px;">
-                        <button id="btn-analyze-vision-now" class="btn-outline" style="flex: 1; font-size: 11px; padding: 8px 4px;" title="Analisar frames do B-Roll atual via VLM">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Analisar Visão
-                        </button>
-                        <button id="btn-analyze-vision-all" class="btn-secondary" style="flex: 1; font-size: 11px; padding: 8px 4px;" title="Analisar em lote todos os B-rolls e fotos pendentes do projeto">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Analisar Tudo (Visão)
-                        </button>
+                        <button id="btn-analyze-vision-now" class="btn-outline" data-tooltip="Analisar Visão do Vídeo no Player"><i data-lucide="sparkles"></i></button>
+                        <button id="btn-analyze-vision-all" class="btn-secondary" data-tooltip="Analisar Todos (Visão)"><i data-lucide="sparkles"></i></button>
                     </div>
                     <div class="media-tabs" id="right-tabs" style="margin: 4px 0 0 0; display: flex; width: 100%;">
-                        <button class="tab-btn active" id="btn-tab-transcript" data-right-tab="transcript" style="flex: 1;">Falas (ASR)</button>
-                        <button class="tab-btn" id="btn-tab-vision" data-right-tab="vision" style="flex: 1;">Visão IA</button>
-                        <button class="tab-btn" id="btn-tab-tasks" data-right-tab="tasks" style="flex: 1;"><i class="fa-solid fa-list-check"></i> Tarefas</button>
-                        <button class="tab-btn" id="btn-tab-chat" data-right-tab="chat" style="flex: 1;"><i class="fa-solid fa-comments"></i> Chat IA</button>
-                        <button class="tab-btn" id="btn-tab-search" data-right-tab="search" style="flex: 1; display: none;"><i class="fa-solid fa-magnifying-glass"></i> Busca</button>
+                        <button class="tab-btn active" id="btn-tab-transcript" data-right-tab="transcript" style="flex: 1;">Falas</button>
+                        <button class="tab-btn" id="btn-tab-vision" data-right-tab="vision" style="flex: 1;">Visão</button>
+                        <button class="tab-btn" id="btn-tab-tasks" data-right-tab="tasks" style="flex: 1;"><i data-lucide="list-todo"></i></button>
+                        <button class="tab-btn" id="btn-tab-chat" data-right-tab="chat" style="flex: 1;"><i data-lucide="message-square"></i></button>
+                        <button class="tab-btn" id="btn-tab-search" data-right-tab="search" style="flex: 1; display: none;"><i data-lucide="search"></i></button>
                     </div>
                 </div>
 
-                
                 <div class="sidebar-content scrollable">
-                    <div class="transcript-feed" id="transcript-feed">
+                    <!-- Tab: Transcrição / Falas (ASR) -->
+                    <div class="transcript-feed active" id="transcript-container">
                         <div class="empty-state">
-                            <i class="fa-solid fa-microphone-slash"></i>
+                            <i data-lucide="mic-off"></i>
                             <p>Selecione um depoimento na Biblioteca para carregar a transcrição correspondente.</p>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Visão IA -->
+                    <div class="transcript-feed" id="vision-container" style="display: none;">
+                        <div class="empty-state">
+                            <i data-lucide="eye-off"></i>
+                            <p>Selecione um B-roll para visualizar a descrição de visão.</p>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Tarefas -->
+                    <div class="transcript-feed" id="tasks-container" style="display: none;">
+                        <div class="empty-state">
+                            <i data-lucide="list-todo"></i>
+                            <p>Nenhuma tarefa em execução.</p>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Chat IA -->
+                    <div id="chat-container" style="display: none; height: 100%; display: flex; flex-direction: column;">
+                        <div class="chat-tab-container" style="display: flex; flex-direction: column; height: 100%;">
+                            <h4 style="font-size:12px; color:var(--color-cyan); display:flex; align-items:center; justify-content:space-between; width:100%; margin:0; padding: 10px 15px 5px 15px;">
+                                <span><i data-lucide="message-square"></i> Assistente Editorial IA</span>
+                                <button class="btn-outline" id="btn-clear-chat" data-tooltip="Limpar Histórico do Chat">
+                                    <i data-lucide="trash-2"></i>
+                                </button>
+                            </h4>
+                            <div class="chat-history" id="chat-messages" style="flex: 1; overflow-y: auto; padding: 10px 15px;">
+                                <!-- Histórico de mensagens do chat -->
+                            </div>
+                            <div class="chat-input-area" style="display: flex; gap: 8px; padding: 10px 15px; border-top: 1px solid var(--border-glass);">
+                                <input type="text" id="chat-input" placeholder="Pergunte ao CaIAu..." style="flex: 1; height: 36px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 4px; padding: 0 10px; color: var(--text-primary); outline: none;">
+                                <button id="btn-send-chat" class="btn-primary" data-tooltip="Enviar Mensagem"><i data-lucide="send"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Busca (Resultados) -->
+                    <div class="transcript-feed" id="search-container" style="display: none;">
+                        <div class="empty-state">
+                            <i data-lucide="search"></i>
+                            <p>Resultados da busca aparecerão aqui.</p>
                         </div>
                     </div>
                 </div>
             </aside>
             
             <!-- Botão flutuante para reabrir Sidebar Direita -->
-            <button class="btn-reopen-sidebar right" id="reopen-right" title="Abrir Transcrição">
-                <i class="fa-solid fa-comment-dots"></i>
+            <button class="btn-reopen-sidebar right" id="reopen-right" data-tooltip="Abrir Transcrição">
+                <i data-lucide="message-square"></i>
             </button>
         </div>
     </div>
@@ -373,7 +367,7 @@
     <div id="project-modal" class="modal-overlay">
         <div class="modal-content glassmorphism">
             <div class="modal-header">
-                <h2><i class="fa-solid fa-folder-plus"></i> Criar Novo Projeto</h2>
+                <h2><i data-lucide="folder-plus"></i> Criar Novo Projeto</h2>
                 <button class="btn-close-modal" id="btn-close-project-modal">&times;</button>
             </div>
             <div class="modal-body">
@@ -397,7 +391,7 @@
     <div id="import-modal" class="modal-overlay">
         <div class="modal-content glassmorphism">
             <div class="modal-header">
-                <h2><i class="fa-solid fa-hard-drive"></i> Importar Pasta/HD Externo</h2>
+                <h2><i data-lucide="hard-drive"></i> Importar Pasta/HD Externo</h2>
                 <button class="btn-close-modal" id="btn-close-import-modal">&times;</button>
             </div>
             <div class="modal-body">
@@ -405,16 +399,13 @@
                     <label for="external-path-input">Caminho do Diretório ou Arquivo *</label>
                     <div style="display: flex; gap: 8px;">
                         <input type="text" id="external-path-input" placeholder="Ex: D:/Material_Bruto/Bastidores" required style="flex: 1;">
-                        <button id="btn-browse-folder" class="btn-secondary" style="padding: 0 16px; font-size: 12px; height: 38px; display: flex; align-items: center; gap: 6px;" title="Procurar pasta pelo Explorer do Windows">
-                            <i class="fa-solid fa-folder-open"></i> Procurar...
-                        </button>
+                        <button id="btn-browse-folder" class="btn-secondary" data-tooltip="Procurar pasta pelo Explorer"><i data-lucide="folder-open"></i></button>
                     </div>
                     
                     <!-- Drag & Drop container visual -->
-                    <div id="import-dropzone" class="import-dropzone" style="margin-top: 15px; border: 2px dashed rgba(138, 92, 246, 0.3); border-radius: 8px; padding: 20px; text-align: center; background: rgba(255, 255, 255, 0.02); transition: all 0.3s; cursor: pointer;">
-                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: 24px; color: var(--color-violet); margin-bottom: 8px;"></i>
+                    <div id="import-dropzone" class="import-dropzone" style="margin-top: 15px; border: 2px dashed rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; text-align: center; background: rgba(255, 255, 255, 0.02); transition: all 0.3s; cursor: pointer;">
+                        <i data-lucide="upload-cloud" style="width: 24px; height: 24px; color: var(--text-secondary); margin-bottom: 8px; display: inline-block;"></i>
                         <p style="font-size: 12px; font-weight: 500; color: var(--text-secondary); margin: 0;">Arraste e solte uma PASTA ou arquivo aqui</p>
-                        <p style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 0;">(O navegador obterá o conteúdo e o preencherá automaticamente)</p>
                     </div>
 
                     <p style="font-size: 11px; color: var(--text-muted); margin-top: 10px; line-height: 1.4;">
@@ -433,7 +424,7 @@
     <div id="sync-modal" class="modal-overlay">
         <div class="modal-content glassmorphism" style="max-width: 600px; width: 90%;">
             <div class="modal-header">
-                <h2><i class="fa-solid fa-cloud-arrow-up"></i> Sincronização & Backup do Projeto</h2>
+                <h2><i data-lucide="cloud"></i> Sincronização & Backup do Projeto</h2>
                 <button class="btn-close-modal" id="btn-close-sync-modal">&times;</button>
             </div>
             <div class="modal-body" style="display: flex; flex-direction: column; gap: 20px; padding: 15px 0;">
@@ -454,7 +445,7 @@
                     </div>
                     <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
                         <a id="lnk-open-drive" href="#" target="_blank" class="btn-outline" style="text-decoration: none; font-size: 11px; padding: 5px 10px; height: auto; display: inline-flex; align-items: center; gap: 6px; pointer-events: none; opacity: 0.5;">
-                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir no Navegador
+                            <i data-lucide="external-link"></i> Abrir no Navegador
                         </a>
                     </div>
                 </div>
@@ -462,7 +453,7 @@
                 <!-- 2. Seção Exportação -->
                 <div class="sync-section" style="border: 1px solid var(--border-glass); border-radius: 8px; padding: 15px; background: rgba(0,0,0,0.15);">
                     <h3 style="font-size: 13px; font-weight: 600; color: var(--color-cyan); margin-top: 0; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                        <i class="fa-solid fa-file-export"></i> Exportar Projeto (.ZIP)
+                        <i data-lucide="download"></i> Exportar Projeto (.ZIP)
                     </h3>
                     <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">
                         Selecione quais dados e arquivos de preview de proxies deseja compactar para transferir para outro computador.
@@ -488,24 +479,24 @@
                     </div>
 
                     <button id="btn-run-export" class="btn-primary" style="width: 100%; height: 38px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; font-weight: 600;">
-                        <i class="fa-solid fa-file-zipper"></i> Gerar Pacote de Exportação e Baixar
+                        <i data-lucide="archive"></i> Gerar Pacote de Exportação e Baixar
                     </button>
                     <div id="export-status" style="font-size: 10px; color: var(--text-muted); margin-top: 6px; text-align: center; display: none;">
-                        <i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);"></i> Compactando arquivos de projeto... Aguarde.
+                        <span class="animate-pulse" style="color: var(--color-cyan);">Compactando arquivos de projeto... Aguarde.</span>
                     </div>
                 </div>
 
                 <!-- 3. Seção Importação -->
                 <div class="sync-section" style="border: 1px solid var(--border-glass); border-radius: 8px; padding: 15px; background: rgba(0,0,0,0.15);">
                     <h3 style="font-size: 13px; font-weight: 600; color: var(--color-cyan); margin-top: 0; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                        <i class="fa-solid fa-file-import"></i> Importar Projeto (.ZIP)
+                        <i data-lucide="upload"></i> Importar Projeto (.ZIP)
                     </h3>
                     <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4;">
                         Selecione ou arraste um pacote ZIP exportado de outro computador para restaurar dados, mídias e reconstruir índices de IA.
                     </p>
                     
                     <div id="sync-import-dropzone" style="border: 2px dashed rgba(6, 182, 212, 0.3); border-radius: 6px; padding: 25px 15px; text-align: center; background: rgba(255,255,255,0.01); cursor: pointer; transition: all 0.2s;">
-                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: 26px; color: var(--color-cyan); margin-bottom: 8px;"></i>
+                        <i data-lucide="upload-cloud" style="width: 26px; height: 26px; color: var(--color-cyan); margin-bottom: 8px; display: inline-block;"></i>
                         <p style="font-size: 11px; font-weight: 500; color: var(--text-secondary); margin: 0;">Arraste o arquivo ZIP ou clique para selecionar</p>
                         <input type="file" id="sync-import-file-input" accept=".zip" style="display: none;">
                     </div>
@@ -534,18 +525,18 @@
         <div class="modal-content glassmorphism" style="max-width: 950px; width: 90%; text-align: center; padding: 20px; transition: all 0.3s ease;">
             <div class="modal-header" style="padding-bottom: 10px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <i class="fa-solid fa-image" style="color: var(--color-cyan); text-shadow: 0 0 10px rgba(6, 182, 212, 0.4);"></i>
+                    <i data-lucide="image" style="color: var(--color-cyan);"></i>
                     <h2 id="photo-viewer-title" style="font-size: 16px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw;">Foto de Set</h2>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <button id="btn-zoom-photo" class="btn-control" style="width: 32px; height: 32px; font-size: 12px;" title="Zoom (Expandir)"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                    <button id="btn-zoom-photo" class="btn-control" style="width: 32px; height: 32px; font-size: 12px;" data-tooltip="Alternar Zoom da Foto"><i data-lucide="zoom-in"></i></button>
                     <button class="btn-close-modal" id="btn-close-photo-modal" style="font-size: 20px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;">&times;</button>
                 </div>
             </div>
             <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 10px;">
                 <!-- Carrossel de Fotos -->
                 <div class="photo-viewer-container" style="display: flex; align-items: center; width: 100%; position: relative; gap: 15px;">
-                    <button id="btn-prev-photo" class="btn-control" style="width: 44px; height: 44px; border-radius: 50%; font-size: 16px; flex-shrink: 0;" title="Foto Anterior (Seta Esquerda)"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button id="btn-prev-photo" class="btn-control" style="width: 44px; height: 44px; border-radius: 50%; font-size: 16px; flex-shrink: 0;" data-tooltip="Foto Anterior"><i data-lucide="chevron-left"></i></button>
                     
                     <div style="flex: 1; position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden; border-radius: 8px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.4); box-shadow: 0 8px 32px rgba(0,0,0,0.6);">
                         <div style="position: relative; display: inline-block; max-width: 100%;">
@@ -555,13 +546,12 @@
                         
                         <!-- Spinner de processamento/carregamento interno -->
                         <div id="photo-viewer-loading" class="photo-placeholder-loading" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; background: rgba(10, 8, 14, 0.85); flex-direction: column; justify-content: center; align-items: center;">
-                            <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: var(--color-cyan); margin-bottom: 10px;"></i>
+                            <span class="animate-spin" style="font-size: 24px; color: var(--color-cyan); margin-bottom: 10px;">↻</span>
                             <span style="font-size: 12px; font-weight: 500; color: var(--text-primary);">Gerando Proxy de Imagem...</span>
-                            <span style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">Aguarde o processamento em background</span>
                         </div>
                     </div>
                     
-                    <button id="btn-next-photo" class="btn-control" style="width: 44px; height: 44px; border-radius: 50%; font-size: 16px; flex-shrink: 0;" title="Próxima Foto (Seta Direita)"><i class="fa-solid fa-chevron-right"></i></button>
+                    <button id="btn-next-photo" class="btn-control" style="width: 44px; height: 44px; border-radius: 50%; font-size: 16px; flex-shrink: 0;" data-tooltip="Próxima Foto"><i data-lucide="chevron-right"></i></button>
                 </div>
                 
                 <p id="photo-viewer-desc" style="font-size: 12px; line-height: 1.6; color: var(--text-secondary); margin: 5px 0 0 0; text-align: center; align-self: stretch; padding: 0 20px; word-break: break-word;"></p>
@@ -569,15 +559,38 @@
             </div>
             <div class="modal-footer" style="justify-content: center; padding-top: 10px; border-top: 1px solid var(--border-glass); gap: 10px;">
                 <span id="photo-viewer-counter" style="font-size: 11px; color: var(--text-muted); margin-right: 15px;">Foto 0 de 0</span>
-                <button id="btn-analyze-photo-vision" class="btn-primary" style="height: 30px; font-size: 12px; padding: 0 15px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Analisar com IA</button>
-                <button id="btn-close-photo-viewer" class="btn-secondary" style="min-width: 100px; height: 30px; font-size: 12px; padding: 0 15px;">Fechar</button>
+                <button id="btn-analyze-photo-vision" class="btn-primary" data-tooltip="Analisar Foto com IA"><i data-lucide="sparkles"></i></button>
+                <button id="btn-close-photo-viewer" class="btn-secondary" data-tooltip="Fechar Visualizador"><i data-lucide="x"></i></button>
             </div>
         </div>
     </div>
 
-    
+    <!-- Rodapé Global -->
+    <footer class="app-footer">
+        <div class="footer-tooltip-container">
+            <span id="footer-tooltip-text">Sistema pronto.</span>
+        </div>
+        <div class="footer-actions">
+            <button id="btn-global-settings" class="btn-icon" data-tooltip="Configurações Globais"><i data-lucide="settings"></i></button>
+            <div id="settings-popover" class="settings-popover" style="display: none;">
+                <div class="settings-title">Configurações</div>
+                <div class="settings-option">
+                    <input type="checkbox" id="chk-toggle-tooltips" checked>
+                    <label for="chk-toggle-tooltips">Mostrar Tooltips no Rodapé</label>
+                </div>
+                <div class="settings-divider"></div>
+                <div class="settings-actions">
+                    <button id="btn-open-proxies" class="btn-outline btn-sm" data-tooltip="Abrir Pasta de Proxies"><i data-lucide="folder"></i> Abrir Proxies</button>
+                    <button id="btn-retry-failed" class="btn-outline btn-sm" data-tooltip="Recomeçar análises falhas"><i data-lucide="refresh-cw"></i> Recomeçar Falhas</button>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Lógica da Aplicação -->
-    <script src="app.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
 
