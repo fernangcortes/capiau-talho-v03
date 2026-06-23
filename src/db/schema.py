@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS face (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
     name TEXT, -- Nome da pessoa (ex: "Diretor Carlos"), NULL se não rotulado
+    cluster_id INTEGER, -- ID do grupo similar (DBSCAN), NULL se ruído ou não clusterizado
     bounding_box TEXT, -- JSON com coordenadas [x, y, w, h] relativas
     photo_id INTEGER REFERENCES photo(id) ON DELETE CASCADE,
     video_id INTEGER REFERENCES video(id) ON DELETE CASCADE,
@@ -161,6 +162,14 @@ def init_db(db_path: Path = None):
         if "drive_link" not in project_cols:
             cursor.execute("ALTER TABLE project ADD COLUMN drive_link TEXT")
             print("[MIGRATION] Coluna 'drive_link' adicionada à tabela project.")
+            
+        # Migrações para tabela face
+        cursor.execute("PRAGMA table_info(face)")
+        face_cols = [row[1] for row in cursor.fetchall()]
+        if "cluster_id" not in face_cols:
+            cursor.execute("ALTER TABLE face ADD COLUMN cluster_id INTEGER")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_face_project_cluster ON face(project_id, cluster_id)")
+            print("[MIGRATION] Coluna 'cluster_id' e índice adicionados à tabela face.")
             
         # Migrações para tabela video
         cursor.execute("PRAGMA table_info(video)")

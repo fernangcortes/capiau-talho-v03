@@ -432,3 +432,36 @@ Concluímos com sucesso a transição do frontend para uma arquitetura modular m
 4. **Homologação:**
    - Todos os 7 testes automatizados de backend (`python -m unittest discover tests/`) foram executados e passaram com sucesso (`OK`).
    - O funcionamento do layout foi verificado visualmente e por console através de automação no navegador, confirmando a ausência de erros de Javascript e um carregamento visual perfeito.
+
+---
+
+## 👥 Fase 8: Reconhecimento Facial Local e Galeria de Rostos (Fase 1 - Junho 2026)
+
+Implementamos e validamos o motor de reconhecimento facial e clustering 100% local otimizado para CPU, além de criar a interface de agrupamento, desambiguação e nomeação em lote:
+
+1. **Setup de Modelos ONNX e Banco de Dados:**
+   - Implementado o download automático dos modelos do OpenCV Zoo: **YuNet** para detecção de rostos com landmarks fiduciais e alinhamento facial (~3.7MB) e **SFace** para geração de embeddings faciais de 128 dimensões (~33MB).
+   - Atualizado o banco SQLite para suportar agrupamentos de rostos (`cluster_id` e índice `idx_face_project_cluster`).
+   - Processados retroativamente e gerados embeddings para **956 rostos** a partir de fotos de set e frames de vídeo do projeto (resolvendo a falta de embeddings para os registros preexistentes).
+
+2. **Detecção Inteligente de Multidões e Qualidade (Heurísticas):**
+   - Integrada a análise de nitidez baseada na variância do operador Laplaciano para detectar desfoque.
+   - Heurística de Multidões: se uma cena tiver mais de 8 rostos, rostos pequenos (< 40px) e desfocados (figuração) são ignorados automaticamente para evitar poluir os clusters. Caso contrário, rostos menores/desfocados de personagens em segundo plano são catalogados.
+
+3. **Clustering DBSCAN Puramente Local (NumPy):**
+   - Implementado o algoritmo DBSCAN em NumPy com matriz de similaridade de cosseno (produto interno de vetores normalizados L2). Agrupa rostos semelhantes sob o nome temporário `Pessoa Desconhecida (Grupo X)` de forma instantânea na CPU.
+
+4. **Interface e Lógica de Desambiguação e Fusão na UI:**
+   - **Galeria de Rostos:** Nova aba "Rostos" na barra lateral esquerda listando os clusters criados com crop facial dinâmico, número de aparições e campo de input com autocompleção de nomes de speakers do projeto.
+   - **Prevenção de Conflitos e Desambiguação Manual Unitária:** Se um usuário renomear um grupo de rostos com um nome já existente em outro grupo, o backend acusa conflito e abre a janela translúcida de desambiguação manual na UI.
+   - Permite que o editor escolha entre:
+     - **Fusão Total:** Mescla todos os rostos de ambos os clusters sob o mesmo nome no SQLite.
+     - **Confirmar Selecionados:** Reatribui individualmente (desambiguação unitária) apenas as caixas faciais que forem selecionadas pelo usuário para o grupo de destino correto, separando os restantes.
+
+5. **Eliminação de Lock Contention no SQLite:**
+   - Corrigido o bug silencioso de database locking movendo as submissões de tarefas de processamento de fotos e a execução da detecção facial de dentro de blocos de conexão ativos para fora da transação de inserção inicial, garantindo concorrência perfeita em threads em background.
+
+6. **Homologação:**
+   - Criados testes automatizados robustos em `tests/test_face_recognition.py` cobrindo o DBSCAN matricial, agrupamento de rostos no banco, detecção de conflitos, merge de clusters e reatribuição manual de faces.
+   - O conjunto total de 9 testes passa com sucesso (`OK` em 8.480s).
+

@@ -116,6 +116,140 @@ export class PanelsManager {
         }
     }
 
+    createBubbleDOM(d, idx, dialogues) {
+        const bubble = document.createElement("div");
+        bubble.className = "transcript-bubble";
+        bubble.setAttribute("data-dialogue-index", idx);
+        
+        // Determina as palavras do bloco
+        let bubbleWords = [];
+        if (STATE.activeTranscriptWords && STATE.activeTranscriptWords.length > 0) {
+            bubbleWords = STATE.activeTranscriptWords.filter(w => w.start_time >= d.start_time && w.start_time <= d.end_time);
+        }
+        
+        if (bubbleWords.length === 0) {
+            const words = d.text.split(" ");
+            const duration = d.end_time - d.start_time;
+            const wordDur = duration / Math.max(1, words.length);
+            bubbleWords = words.map((w, i) => ({
+                word: w,
+                start_time: d.start_time + i * wordDur,
+                end_time: d.start_time + (i + 1) * wordDur
+            }));
+        }
+        
+        const metaDiv = document.createElement("div");
+        metaDiv.className = "bubble-meta";
+        
+        const speakerSpan = document.createElement("span");
+        speakerSpan.className = "speaker-name";
+        speakerSpan.textContent = d.speaker_id;
+        
+        const timeSpan = document.createElement("span");
+        timeSpan.className = "bubble-time";
+        timeSpan.textContent = formatTimecode(d.start_time);
+        
+        metaDiv.appendChild(speakerSpan);
+        metaDiv.appendChild(timeSpan);
+        
+        // Botão de tesoura individual para divisão de bloco
+        const splitBtn = document.createElement("button");
+        splitBtn.className = "btn-card-action split-btn";
+        splitBtn.innerHTML = '<i class="fa-solid fa-scissors"></i>';
+        splitBtn.title = "Dividir falas (Tesoura)";
+        splitBtn.style.marginLeft = "auto";
+        splitBtn.style.color = "var(--text-muted)";
+        splitBtn.style.cursor = "pointer";
+        splitBtn.style.background = "transparent";
+        splitBtn.style.border = "none";
+        
+        metaDiv.appendChild(splitBtn);
+        bubble.appendChild(metaDiv);
+        
+        const textDiv = document.createElement("div");
+        textDiv.className = "bubble-text";
+        
+        let selectedWordForSplit = null;
+        
+        bubbleWords.forEach((w, wIdx) => {
+            const span = document.createElement("span");
+            span.className = "word-span";
+            span.setAttribute("data-start", w.start_time);
+            span.setAttribute("data-end", w.end_time);
+            span.textContent = w.word;
+            
+            span.addEventListener("click", (e) => {
+                if (bubble.classList.contains("scissors-active")) {
+                    e.stopPropagation();
+                    bubble.querySelectorAll(".word-span.to-split").forEach(el => el.classList.remove("to-split"));
+                    span.classList.add("to-split");
+                    selectedWordForSplit = w;
+                    splitBtn.style.color = "var(--color-rose)";
+                } else {
+                    e.stopPropagation();
+                    const player = document.getElementById("main-video");
+                    if (player) {
+                        player.currentTime = w.start_time;
+                        player.play();
+                    }
+                }
+            });
+            
+            if (wIdx > 0) {
+                const nextWord = w.word;
+                if (![".", ",", "!", "?", ";", ":"].includes(nextWord)) {
+                    textDiv.appendChild(document.createTextNode(" "));
+                }
+            }
+            textDiv.appendChild(span);
+        });
+        
+        bubble.appendChild(textDiv);
+        
+        // Lógica de toggle/execução do modo tesoura
+        splitBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            if (!bubble.classList.contains("scissors-active")) {
+                document.querySelectorAll(".transcript-bubble.scissors-active").forEach(el => {
+                    el.classList.remove("scissors-active");
+                    const bBtn = el.querySelector(".split-btn");
+                    if (bBtn) bBtn.style.color = "var(--text-muted)";
+                });
+                
+                bubble.classList.add("scissors-active");
+                splitBtn.style.color = "var(--color-cyan)";
+                STATE.emit("statusChanged", { text: "Clique em uma palavra do balão para selecionar o ponto de divisão.", active: true });
+            } else {
+                if (selectedWordForSplit) {
+                    const newSpeaker = prompt("Digite o ID/Nome do novo falante:", d.speaker_id + "_2");
+                    if (newSpeaker) {
+                        try {
+                            await CapIAuAPI.splitTranscript(STATE.activeVideo.id, selectedWordForSplit.start_time, newSpeaker);
+                            this.onVideoChanged(STATE.activeVideo);
+                        } catch (err) {
+                            alert(`Falha ao dividir transcrição: ${err.message}`);
+                        }
+                    }
+                } else {
+                    alert("Selecione uma palavra clicando nela primeiro!");
+                }
+                bubble.classList.remove("scissors-active");
+                splitBtn.style.color = "var(--text-muted)";
+                bubble.querySelectorAll(".word-span.to-split").forEach(el => el.classList.remove("to-split"));
+            }
+        });
+        
+        bubble.addEventListener("click", () => {
+            const player = document.getElementById("main-video");
+            if (player) {
+                player.currentTime = d.start_time;
+                player.play();
+            }
+        });
+        
+        return bubble;
+    }
+
     renderTranscript(dialogues) {
         if (!this.transcriptContainer) return;
         this.transcriptContainer.innerHTML = "";
@@ -125,47 +259,50 @@ export class PanelsManager {
             return;
         }
 
-        // Renderiza blocos de falas (diálogos)
-        dialogues.forEach(block => {
-            const blockEl = document.createElement("div");
-            blockEl.className = "transcript-block";
-            blockEl.setAttribute("data-dialogue-index", dialogues.indexOf(block));
-            
-            const speakerHeader = document.createElement("div");
-            speakerHeader.className = "transcript-speaker";
-            speakerHeader.textContent = block.speaker_id;
-            blockEl.appendChild(speakerHeader);
-            
-            const textBody = document.createElement("div");
-            textBody.className = "transcript-text";
-            
-            // Fatiamos o texto por palavras para mapeamento preciso de clique
-            const words = block.text.split(" ");
-            words.forEach((w, wIdx) => {
-                const wordSpan = document.createElement("span");
-                wordSpan.className = "transcript-word";
-                wordSpan.textContent = w + " ";
+        const groups = [];
+        let currentGroup = [];
+        
+        dialogues.forEach((d, idx) => {
+            if (idx === 0) {
+                currentGroup.push({ dialogue: d, originalIndex: idx });
+            } else {
+                const prev = dialogues[idx - 1];
+                if (d.start_time < prev.end_time) {
+                    currentGroup.push({ dialogue: d, originalIndex: idx });
+                } else {
+                    groups.push(currentGroup);
+                    currentGroup = [{ dialogue: d, originalIndex: idx }];
+                }
+            }
+        });
+        if (currentGroup.length > 0) {
+            groups.push(currentGroup);
+        }
+        
+        groups.forEach(group => {
+            if (group.length === 1) {
+                const item = group[0];
+                const bubble = this.createBubbleDOM(item.dialogue, item.originalIndex, dialogues);
+                this.transcriptContainer.appendChild(bubble);
+            } else {
+                const overlapContainer = document.createElement("div");
+                overlapContainer.className = "overlap-row";
+                overlapContainer.style.display = "flex";
+                overlapContainer.style.flexDirection = "row";
+                overlapContainer.style.gap = "10px";
+                overlapContainer.style.width = "100%";
+                overlapContainer.style.marginBottom = "10px";
                 
-                // Associa o timecode aproximado da palavra a partir do bloco
-                const approxTime = block.start_time + ((block.end_time - block.start_time) * (wIdx / words.length));
-                
-                wordSpan.addEventListener("click", () => {
-                    if (STATE.activeScissorsMode) {
-                        this.splitTranscript(approxTime);
-                    } else {
-                        // Navega player para o timecode da palavra
-                        const player = document.getElementById("main-video");
-                        if (player) {
-                            player.currentTime = approxTime;
-                            player.play();
-                        }
-                    }
+                group.forEach(item => {
+                    const bubble = this.createBubbleDOM(item.dialogue, item.originalIndex, dialogues);
+                    bubble.style.flex = "1";
+                    bubble.style.marginBottom = "0px";
+                    bubble.classList.add("overlap-bubble");
+                    overlapContainer.appendChild(bubble);
                 });
-                textBody.appendChild(wordSpan);
-            });
-            
-            blockEl.appendChild(textBody);
-            this.transcriptContainer.appendChild(blockEl);
+                
+                this.transcriptContainer.appendChild(overlapContainer);
+            }
         });
     }
 
@@ -305,7 +442,6 @@ export class PanelsManager {
                 
                 this.themesContainer.appendChild(card);
             });
-            if (window.initLucide) window.initLucide();
         } catch (e) {
             this.themesContainer.innerHTML = `<div class="empty-state-text">Erro ao carregar temas.</div>`;
         }
@@ -373,7 +509,6 @@ export class PanelsManager {
                 this.trackBroll.appendChild(block);
             }
         });
-        if (window.initLucide) window.initLucide();
     }
 
     async saveActiveTimeline() {
@@ -463,7 +598,7 @@ export class PanelsManager {
                 </div>
                 <div class="task-actions">
                     <span class="task-percent">${t.percent}%</span>
-                    ${(!isFinished && !isFailed) ? `<button class="btn-action btn-cancel-task" data-id="${key}">Cancelar</button>` : ''}
+                    ${(!isFinished && !isFailed && !isNaN(Number(key))) ? `<button class="btn-action btn-cancel-task" data-id="${key}">Cancelar</button>` : ''}
                 </div>
             `;
             
@@ -478,6 +613,5 @@ export class PanelsManager {
             
             this.tasksContainer.appendChild(item);
         });
-        if (window.initLucide) window.initLucide();
     }
 }

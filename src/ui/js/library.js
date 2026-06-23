@@ -1,6 +1,7 @@
 // Gerenciador visual da Biblioteca de Mídias, árvore de pastas e lightbox de fotos.
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
+import { FaceManager } from "./faces.js";
 
 // Armazena o estado das pastas expandidas/recolhidas
 const openFoldersSet = new Set();
@@ -107,11 +108,11 @@ function renderTreeNode(node, container, depth = 0) {
                 <span class="folder-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${node.name}</span>
             </div>
             <div class="folder-actions" style="display: flex; gap: 4px; margin-right: 6px;">
-                <button class="btn-folder-action" data-action="expand" data-tooltip="Expandir todas as subpastas">
-                    <i data-lucide="chevrons-down"></i>
+                <button class="btn-folder-action" data-action="expand" title="Expandir todas as subpastas" style="background: none; border: none; padding: 2px 4px; color: var(--color-cyan); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fa-solid fa-angles-down"></i>
                 </button>
-                <button class="btn-folder-action" data-action="collapse" data-tooltip="Recolher todas as subpastas">
-                    <i data-lucide="chevrons-up"></i>
+                <button class="btn-folder-action" data-action="collapse" title="Recolher todas as subpastas" style="background: none; border: none; padding: 2px 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fa-solid fa-angles-up"></i>
                 </button>
             </div>
         `;
@@ -217,26 +218,26 @@ function renderTreeNode(node, container, depth = 0) {
         
         if (v.status === "transcribing" || v.status === "processing") {
             if (isConverting) {
-                statusGlow = `<span class="conversion-progress-text" style="font-size: 9px; color: var(--color-cyan); margin-left: 4px;">Convertendo... <i data-lucide="loader-2" class="animate-spin" style="width: 10px; height: 10px;"></i></span>`;
-                actionBtn = `<button class="btn-card-action" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Conversão"><i data-lucide="square"></i></button>`;
+                statusGlow = `<span class="conversion-progress-text" style="font-size: 9px; color: var(--color-cyan); margin-left: 4px;">Convertendo... <i class="fa-solid fa-spinner fa-spin"></i></span>`;
+                actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" title="Cancelar Conversão"><i class="fa-solid fa-circle-stop"></i></button>`;
             } else {
-                statusGlow = `<span class="conversion-progress-text" style="font-size: 9px; color: var(--color-cyan); margin-left: 4px;">Transcrevendo... <i data-lucide="loader-2" class="animate-spin" style="width: 10px; height: 10px;"></i></span>`;
+                statusGlow = `<span class="conversion-progress-text" style="font-size: 9px; color: var(--color-cyan); margin-left: 4px;">Transcrevendo... <i class="fa-solid fa-spinner fa-spin"></i></span>`;
                 actionBtn = ``;
             }
         } else if (v.status === "analyzing") {
-            statusGlow = `<span class="conversion-progress-text" style="font-size: 9px; color: var(--color-violet); margin-left: 4px;">Analisando... <i data-lucide="loader-2" class="animate-spin" style="width: 10px; height: 10px;"></i></span>`;
-            actionBtn = `<button class="btn-card-action" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Análise"><i data-lucide="square"></i></button>`;
+            statusGlow = `<span class="conversion-progress-text" style="font-size: 9px; color: var(--color-violet); margin-left: 4px;">Analisando... <i class="fa-solid fa-spinner fa-spin"></i></span>`;
+            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" title="Cancelar Análise"><i class="fa-solid fa-circle-stop"></i></button>`;
         } else if (v.status === "transcribed") {
             statusBadge = `<span class="badge" style="font-size: 7px; padding: 0px 3px; color: var(--color-cyan); border-color: rgba(6, 182, 212, 0.3); margin-left: 4px;">ASR</span>`;
-            actionBtn = `<button class="btn-card-action btn-hover-only" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i data-lucide="trash-2"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can"></i></button>`;
         } else if (v.status === "analyzed") {
             statusBadge = `<span class="badge" style="font-size: 7px; padding: 0px 3px; color: var(--color-violet); border-color: rgba(138, 92, 246, 0.3); margin-left: 4px;">VISÃO</span>`;
-            actionBtn = `<button class="btn-card-action btn-hover-only" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i data-lucide="trash-2"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can"></i></button>`;
         } else if (v.status === "ingested") {
-            actionBtn = `<button class="btn-card-action btn-hover-only" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i data-lucide="trash-2"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can"></i></button>`;
         } else if (v.status === "error") {
-            statusGlow = `<i data-lucide="alert-triangle" style="color: var(--color-rose); width: 10px; height: 10px; margin-left: 4px;" data-tooltip="Erro no processamento!"></i>`;
-            actionBtn = `<button class="btn-card-action" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Limpar Vídeo/Proxy"><i data-lucide="trash-2"></i></button>`;
+            statusGlow = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose); font-size: 10px; margin-left: 4px;" title="Erro no processamento!"></i>`;
+            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--text-secondary); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Limpar Vídeo/Proxy"><i class="fa-solid fa-trash-can"></i></button>`;
         }
         
         card.innerHTML = `
@@ -351,11 +352,6 @@ export class LibraryManager {
         this.docsListEl = document.getElementById("doc-list");
         this.btnScan = document.getElementById("btn-scan");
         this.btnTranscribeAll = document.getElementById("btn-transcribe-all");
-        this.btnImportExternal = document.getElementById("btn-import-external");
-        this.btnAddMedia = document.getElementById("btn-add-media");
-        this.btnOpenProxies = document.getElementById("btn-open-proxies");
-        this.btnRetryFailed = document.getElementById("btn-retry-failed");
-        this.btnReloadLibrary = document.getElementById("btn-reload-library");
         
         // Lightbox
         this.lightbox = document.getElementById("photo-viewer-modal");
@@ -367,6 +363,8 @@ export class LibraryManager {
         this.btnPrevPhoto = document.getElementById("btn-prev-photo");
         this.btnNextPhoto = document.getElementById("btn-next-photo");
         this.btnZoomPhoto = document.getElementById("btn-zoom-photo");
+        this.lightboxCounter = document.getElementById("photo-viewer-counter");
+        this.btnAnalyzePhoto = document.getElementById("btn-analyze-photo-vision");
         this.isPhotoZoomed = false;
 
         this.init();
@@ -388,11 +386,6 @@ export class LibraryManager {
 
         if (this.btnScan) this.btnScan.addEventListener("click", () => this.triggerScan());
         if (this.btnTranscribeAll) this.btnTranscribeAll.addEventListener("click", () => this.triggerTranscribeAll());
-        if (this.btnImportExternal) this.btnImportExternal.addEventListener("click", () => this.triggerImportExternal());
-        if (this.btnAddMedia) this.btnAddMedia.addEventListener("click", () => this.triggerImportExternal());
-        if (this.btnOpenProxies) this.btnOpenProxies.addEventListener("click", () => this.triggerOpenProxies());
-        if (this.btnRetryFailed) this.btnRetryFailed.addEventListener("click", () => this.triggerRetryFailed());
-        if (this.btnReloadLibrary) this.btnReloadLibrary.addEventListener("click", () => this.reloadData());
 
         // Document uploading
         const btnUploadDoc = document.getElementById("btn-upload-doc");
@@ -447,27 +440,8 @@ export class LibraryManager {
         if (this.lightboxImg) {
             this.lightboxImg.addEventListener("click", () => this.toggleZoom());
         }
-
-        const btnAnalyzePhotoVision = document.getElementById("btn-analyze-photo-vision");
-        if (btnAnalyzePhotoVision) {
-            btnAnalyzePhotoVision.addEventListener("click", async () => {
-                const list = STATE.currentPhotoList;
-                const idx = STATE.currentPhotoIndex;
-                if (!list || idx === -1 || idx >= list.length) return;
-                const photo = list[idx];
-                if (!photo) return;
-                
-                STATE.emit("statusChanged", { text: `Analisando foto: ${photo.filename}...`, active: true });
-                try {
-                    await CapIAuAPI.analyzePhotoVision(photo.id);
-                    alert("Análise visual da foto de set iniciada em background!");
-                    this.reloadData();
-                } catch (err) {
-                    console.error(err);
-                    alert("Erro ao disparar análise visual: " + err);
-                    STATE.emit("statusChanged", { text: `Erro ao analisar foto ${photo.filename}.`, active: false });
-                }
-            });
+        if (this.btnAnalyzePhoto) {
+            this.btnAnalyzePhoto.addEventListener("click", () => this.analyzeCurrentPhoto());
         }
 
         document.addEventListener("keydown", (e) => {
@@ -535,12 +509,11 @@ export class LibraryManager {
                         <span style="font-size:9px; color:var(--text-muted); text-transform:capitalize;">${doc.doc_type === 'script' ? 'Roteiro' : doc.doc_type}</span>
                     </div>
                 </div>
-                <button class="btn-card-action" onclick="window.deleteDocument(${doc.id})" data-tooltip="Deletar Documento"><i data-lucide="trash-2"></i></button>
+                <button class="btn-card-action" style="color:var(--color-rose); background:transparent; border:none; cursor:pointer;" onclick="window.deleteDocument(${doc.id})" title="Deletar Documento"><i class="fa-solid fa-trash-can"></i></button>
             `;
             
             this.docsListEl.appendChild(card);
         });
-        if (window.initLucide) window.initLucide();
     }
 
     renderVideos(videos) {
@@ -560,7 +533,6 @@ export class LibraryManager {
         } else {
             renderTreeNode(tree, this.videoListEl, 0);
         }
-        if (window.initLucide) window.initLucide();
     }
 
     renderPhotos(photos) {
@@ -631,58 +603,16 @@ export class LibraryManager {
             
             this.photoListEl.appendChild(card);
         });
-        if (window.initLucide) window.initLucide();
     }
 
     async triggerScan() {
-        STATE.emit("statusChanged", { text: "Varrendo pasta watch/ para catalogar...", active: true });
-        try {
-            await CapIAuAPI.request(`/api/ingest/scan?project_id=${STATE.currentProjectId}`, { method: "POST" });
-            alert("Varredura iniciada! Coloque arquivos em 'watch/' para catalogação automática.");
-            STATE.emit("statusChanged", { text: "Varredura watch/ concluída.", active: false });
+        await CapIAuAPI.request(`/api/project/open-proxies-folder`, { method: "POST" });
+        // Escaneamento
+        const response = await CapIAuAPI.request("/api/ingest/select-folder", { method: "POST" });
+        if (response.status === "success" && response.path) {
+            await CapIAuAPI.triggerExternalIngest(response.path, STATE.currentProjectId);
+            alert("Ingestão in-place iniciada em background.");
             this.reloadData();
-        } catch(err) {
-            console.error(err);
-            alert("Erro ao disparar varredura: " + err);
-            STATE.emit("statusChanged", { text: "Erro na varredura watch/.", active: false });
-        }
-    }
-
-    async triggerImportExternal() {
-        try {
-            const response = await CapIAuAPI.selectFolder();
-            if (response.status === "success" && response.path) {
-                STATE.emit("statusChanged", { text: "Iniciando Ingestão Externa...", active: true });
-                await CapIAuAPI.triggerExternalIngest(response.path, STATE.currentProjectId);
-                alert("Ingestão in-place iniciada em background.");
-                this.reloadData();
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Erro ao importar pasta externa: " + err);
-        }
-    }
-
-    async triggerOpenProxies() {
-        try {
-            await CapIAuAPI.openProxiesFolder();
-            STATE.emit("statusChanged", { text: "Pasta de proxies aberta.", active: false });
-        } catch (err) {
-            console.error(err);
-            alert("Erro ao abrir pasta de proxies: " + err);
-        }
-    }
-
-    async triggerRetryFailed() {
-        try {
-            STATE.emit("statusChanged", { text: "Iniciando reprocessamento de falhas...", active: true });
-            const response = await CapIAuAPI.retryFailedConversions(STATE.currentProjectId);
-            alert(`Reiniciando conversão de ${response.count || 0} proxies falhos ou ausentes em background!`);
-            STATE.emit("statusChanged", { text: `Reiniciadas ${response.count || 0} conversões falhas.`, active: false });
-            this.reloadData();
-        } catch (err) {
-            console.error(err);
-            alert("Erro ao reprocessar falhas: " + err);
         }
     }
 
@@ -700,6 +630,12 @@ export class LibraryManager {
         this.lightboxImg.src = photo.proxy_path ? photo.proxy_path : photo.filepath;
         this.lightboxTitle.textContent = photo.filename;
         this.lightboxDesc.textContent = photo.description || "Sem descrição gerada por IA.";
+        
+        if (this.lightboxCounter) {
+            const list = STATE.currentPhotoList || [];
+            const idx = STATE.currentPhotoIndex;
+            this.lightboxCounter.textContent = `Foto ${idx + 1} de ${list.length}`;
+        }
         
         // Render Tags
         this.lightboxTags.innerHTML = "";
@@ -719,6 +655,22 @@ export class LibraryManager {
     closeLightbox() {
         if (this.lightbox) this.lightbox.style.display = "none";
         this.resetZoom();
+    }
+
+    async analyzeCurrentPhoto() {
+        const list = STATE.currentPhotoList;
+        const currentIdx = STATE.currentPhotoIndex;
+        if (!list || currentIdx === -1) return;
+        const photo = list[currentIdx];
+        if (!photo) return;
+        
+        try {
+            await CapIAuAPI.analyzePhotoVision(photo.id);
+            alert("Análise visual da foto de set iniciada em background!");
+            STATE.emit("statusChanged", { text: `Análise da foto ${photo.filename} iniciada.`, active: true });
+        } catch (err) {
+            alert("Erro ao iniciar análise: " + err.message);
+        }
     }
 
     navigatePhoto(direction) {
@@ -800,8 +752,10 @@ export class LibraryManager {
                     const name = prompt(promptMsg, face.name || "");
                     if (name !== null) {
                         const trimmedName = name.trim();
-                        await CapIAuAPI.labelFace(face.id, trimmedName);
-                        this.loadLightboxFaces(photoId);
+                        const res = await CapIAuAPI.labelFace(face.id, trimmedName);
+                        await FaceManager.handleLabelResponse(res, face.id, () => {
+                            this.loadLightboxFaces(photoId);
+                        });
                     }
                 });
                 

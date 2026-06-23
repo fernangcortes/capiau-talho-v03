@@ -24,14 +24,30 @@ def get_transcript(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn
     return {"video_id": video_id, "dialogues": dialogues, "words": words}
 
 @router.get("/api/video/{video_id}/vision")
-def get_video_vision(video_id: int, project_id: int = Query(1)):
-    """Retorna descrições de frames de B-roll armazenadas no Qdrant."""
+def get_video_vision(video_id: int, project_id: int = Query(1), conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Retorna descrições de frames de B-roll armazenadas no Qdrant enriquecidas com rostos rotulados."""
     try:
         search_engine = SemanticSearch.get_instance()
         frames = search_engine.get_video_vision_frames(project_id, video_id)
+        
+        # Enriquecer com os nomes de rostos conhecidos
+        cursor = conn.cursor()
+        for frame in frames:
+            ts = frame["timestamp"]
+            cursor.execute("""
+                SELECT DISTINCT name FROM face 
+                WHERE video_id = ? AND ABS(timestamp - ?) < 0.1 AND name IS NOT NULL
+            """, (video_id, ts))
+            names = [r["name"] for r in cursor.fetchall()]
+            if names:
+                from src.services.rag import enrich_description
+                frame["description"] = enrich_description(frame["description"], names)
+                
         return {"video_id": video_id, "frames": frames}
-    except Exception:
+    except Exception as e:
+        print(f"[NarrativeAPI] Erro ao buscar vision frames: {e}")
         return {"video_id": video_id, "frames": []}
+
 
 @router.post("/api/project/cluster-themes")
 def trigger_clustering(background_tasks: BackgroundTasks, project_id: int = Query(1)):

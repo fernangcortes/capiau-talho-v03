@@ -27,6 +27,7 @@ from src.nlp.json_parser import extract_json_from_markdown
 from src.media.ffmpeg import extract_audio_mono, extract_frame, has_audio_stream
 from src.search.semantic import SemanticSearch
 from src.vision.face_engine import process_video_frame_faces, process_photo_faces
+from src.core.tasks import TASK_MANAGER
 
 class PipelineService:
     @staticmethod
@@ -138,6 +139,7 @@ class PipelineService:
 
         with get_db() as conn:
             MediaRepository.update_video_status(conn, video_id, 'transcribing')
+        TASK_MANAGER.update_progress(str(video_id), 0.0, "running", task_type="transcription")
 
         # Verifica stream de áudio física
         if not has_audio_stream(video_path):
@@ -194,12 +196,14 @@ class PipelineService:
                 
             with get_db() as conn:
                 MediaRepository.update_video_status(conn, video_id, 'transcribed')
+            TASK_MANAGER.update_progress(str(video_id), 100.0, "finished", task_type="transcription")
             return True
         except Exception as e:
             err_msg = str(e)
             print(f"[ASR] Erro inesperado no pipeline ASR: {err_msg}")
             with get_db() as conn:
                 MediaRepository.update_video_status(conn, video_id, 'error', error_message=err_msg)
+            TASK_MANAGER.update_progress(str(video_id), 0.0, "failed", task_type="transcription")
             return False
         finally:
             if temp_audio_path.exists():
@@ -260,6 +264,7 @@ class PipelineService:
                 return False
             project_id = video['project_id']
             MediaRepository.update_video_status(conn, video_id, 'analyzing')
+        TASK_MANAGER.update_progress(str(video_id), 0.0, "running", task_type="vision")
             
         video_cache_dir = CONFIG.CACHE_DIR / f"vid_{video_id}"
         video_cache_dir.mkdir(exist_ok=True)
@@ -274,7 +279,10 @@ class PipelineService:
             t += interval
             
         try:
-            for timestamp in timestamps:
+            total_stamps = len(timestamps)
+            for idx, timestamp in enumerate(timestamps):
+                percent = (idx / total_stamps) * 100.0
+                TASK_MANAGER.update_progress(str(video_id), percent, "running", task_type="vision")
                 frame_path = video_cache_dir / f"frame_{int(timestamp)}s.jpg"
                 if not extract_frame(filepath, timestamp, frame_path):
                     continue
@@ -321,12 +329,14 @@ class PipelineService:
                     
             with get_db() as conn:
                 MediaRepository.update_video_status(conn, video_id, 'analyzed')
+            TASK_MANAGER.update_progress(str(video_id), 100.0, "finished", task_type="vision")
             return True
         except Exception as e:
             err_msg = str(e)
             print(f"[Vision] Falha multimodal no vídeo {video_id}: {err_msg}")
             with get_db() as conn:
                 MediaRepository.update_video_status(conn, video_id, 'error', error_message=err_msg)
+            TASK_MANAGER.update_progress(str(video_id), 0.0, "failed", task_type="vision")
             return False
         finally:
             # Limpa pasta temporária
@@ -349,6 +359,7 @@ class PipelineService:
                 return False
             project_id = photo['project_id']
             MediaRepository.update_photo_status(conn, photo_id, 'pending')
+        TASK_MANAGER.update_progress(f"photo-{photo_id}", 0.0, "running", task_type="vision")
             
         try:
             proxy_path = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{photo_id}.webp"
@@ -374,11 +385,13 @@ class PipelineService:
                     
             search_engine = SemanticSearch.get_instance()
             search_engine.index_photo_description(project_id, photo_id, desc, tags)
+            TASK_MANAGER.update_progress(f"photo-{photo_id}", 100.0, "finished", task_type="vision")
             return True
         except Exception as e:
             print(f"[Vision] Erro ao analisar foto {photo_id}: {e}")
             with get_db() as conn:
                 MediaRepository.update_photo_status(conn, photo_id, 'error')
+            TASK_MANAGER.update_progress(f"photo-{photo_id}", 0.0, "failed", task_type="vision")
             return False
 
     @staticmethod

@@ -97,18 +97,14 @@ export class VideoPlayer {
         }
 
         let videoSrc = video.filepath;
-        if (!videoSrc.startsWith('http') && !videoSrc.startsWith('/')) {
-            videoSrc = `/proxies/proxy_vid_${video.id}.mp4`;
+        const isRemote = videoSrc.startsWith("http") || videoSrc.startsWith("/proxies/") || videoSrc.startsWith("/");
+        
+        if (video.proxy_path) {
+            videoSrc = video.proxy_path;
+        } else if (!isRemote) {
+            // Se não tem proxy e não é remoto, tenta originals
+            videoSrc = `/originals/${video.filename}`;
         }
-
-        this.video.onerror = () => {
-            console.warn("Falha ao carregar arquivo de vídeo proxy local. Carregando mock de segurança.");
-            const fallbackSrc = video.id % 2 === 1 ? "https://www.w3schools.com/html/mov_bbb.mp4" : "https://www.w3schools.com/html/movie.mp4";
-            this.video.onerror = null; // Evita recursão infinita
-            this.video.src = fallbackSrc;
-            this.video.load();
-        };
-
         this.video.src = videoSrc;
         this.video.load();
         

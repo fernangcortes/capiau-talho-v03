@@ -69,8 +69,13 @@ class IngestService:
             target_path = filepath
             
         # Inserção no banco SQLite
+        media_id = None
+        media_type = None
+        duration = None
+        
         with get_db() as conn:
             if ext in SUPPORTED_VIDEO or ext in SUPPORTED_AUDIO:
+                media_type = "video"
                 # Determina tipo de vídeo inicial com base na nomenclatura da pasta/arquivo
                 filepath_lower = str(filepath).lower()
                 if any(k in filepath_lower for k in ["interview", "depoimento", "entrevista"]):
@@ -82,6 +87,7 @@ class IngestService:
                 
                 # Extrai metadados técnicos
                 meta = get_media_metadata(target_path)
+                duration = meta['duration']
                 media_id = MediaRepository.add_video(
                     conn,
                     project_id=project_id,
@@ -95,15 +101,8 @@ class IngestService:
                     codec=meta['codec'],
                     bitrate=meta['bitrate']
                 )
-                
-                # Agenda geração de proxy de vídeo em background
-                TASK_MANAGER.executor.submit(
-                    IngestService._generate_video_proxy_task,
-                    media_id,
-                    target_path,
-                    meta['duration']
-                )
             else:
+                media_type = "photo"
                 # Inserção de foto
                 media_id = MediaRepository.add_photo(
                     conn,
@@ -113,14 +112,23 @@ class IngestService:
                     file_hash=file_hash
                 )
                 
-                # Agenda geração de proxy e detecção de rostos da foto
-                TASK_MANAGER.executor.submit(
-                    IngestService._generate_photo_proxy_task,
-                    project_id,
-                    media_id,
-                    target_path
-                )
+        # Agenda as tarefas em background APÓS fechar a conexão do banco para evitar database is locked
+        if media_type == "video":
+            TASK_MANAGER.executor.submit(
+                IngestService._generate_video_proxy_task,
+                media_id,
+                target_path,
+                duration
+            )
+        elif media_type == "photo":
+            TASK_MANAGER.executor.submit(
+                IngestService._generate_photo_proxy_task,
+                project_id,
+                media_id,
+                target_path
+            )
         return True
+
 
     @staticmethod
     def ingest_external_path(path_obj: Path, project_id: int) -> Dict[str, Any]:
@@ -218,15 +226,17 @@ class IngestService:
             with get_db() as conn:
                 if success:
                     MediaRepository.update_photo_status(conn, photo_id, 'ingested')
-                    
-                    # Roda detecção facial no proxy gerado
-                    try:
-                        process_photo_faces(project_id, photo_id, proxy_path)
-                    except Exception as fe:
-                        print(f"[IngestService] Erro na detecção de rostos da foto {photo_id}: {fe}")
                 else:
                     MediaRepository.update_photo_status(conn, photo_id, 'error')
+                    
+            if success:
+                # Roda detecção facial no proxy gerado (fora da transação de status)
+                try:
+                    process_photo_faces(project_id, photo_id, proxy_path)
+                except Exception as fe:
+                    print(f"[IngestService] Erro na detecção de rostos da foto {photo_id}: {fe}")
         except Exception as e:
             print(f"[IngestService] Falha crítica no processamento da foto {photo_id}: {e}")
             with get_db() as conn:
                 MediaRepository.update_photo_status(conn, photo_id, 'error')
+

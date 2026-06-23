@@ -216,6 +216,40 @@ class SemanticSearch:
             print(f"[QDRANT] Erro ao recuperar frames do vídeo: {e}")
             return []
 
+    def get_video_vision_frame_description(self, project_id: int, video_id: int, timestamp: float) -> str:
+        """Recupera a descrição de um único frame de B-Roll indexado no Qdrant."""
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+        try:
+            response = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                        FieldCondition(key="video_id", match=MatchValue(value=video_id)),
+                        FieldCondition(key="media_type", match=MatchValue(value="broll"))
+                    ]
+                ),
+                limit=1000,
+                with_payload=True
+            )
+            points = response[0]
+            if not points:
+                return ""
+                
+            best_desc = ""
+            min_diff = 999.0
+            for p in points:
+                p_ts = p.payload.get("start_time", 0.0)
+                diff = abs(p_ts - timestamp)
+                if diff < min_diff and diff < 1.0: # 1s tolerance
+                    min_diff = diff
+                    best_desc = p.payload.get("text", "")
+            return best_desc
+        except Exception as e:
+            print(f"[QDRANT] Erro ao recuperar frame description: {e}")
+            return ""
+
+
     def index_production_doc(self, project_id: int, doc_id: int, filename: str, content: str):
         """Indexa um documento de contexto fatiando-o em parágrafos no Qdrant local."""
         paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]

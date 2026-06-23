@@ -67,9 +67,11 @@ export class ChatManager {
 
     showTypingIndicator() {
         const typingEl = document.createElement("div");
-        typingEl.className = "chat-message assistant typing-indicator";
+        typingEl.className = "chat-bubble assistant typing-indicator";
+        typingEl.style.alignSelf = "flex-start";
         typingEl.innerHTML = `
-            <div class="message-bubble">
+            <div class="bubble-meta"><span>Assistente CaIAu Talho</span></div>
+            <div class="chat-bubble-text" style="display: flex; gap: 4px; padding: 4px 0; align-items: center; height: 12px;">
                 <span class="dot"></span>
                 <span class="dot"></span>
                 <span class="dot"></span>
@@ -92,34 +94,36 @@ export class ChatManager {
         
         if (history.length === 0) {
             this.chatMessages.innerHTML = `
-                <div class="chat-welcome-state">
-                    <h3>Assistente IA de Montagem</h3>
-                    <p>Pesquise o material e construa roteiros textuais. Experimente perguntar:</p>
-                    <ul>
-                        <li>"Onde o diretor fala sobre lentes anamórficas?"</li>
-                        <li>"Encontre fotos de bastidores com claquetes."</li>
-                        <li>"Quais os temas mais debatidos nos depoimentos?"</li>
-                    </ul>
+                <div class="empty-state" style="padding: 40px 20px;">
+                    <i class="fa-solid fa-brain" style="color: var(--color-violet); font-size: 28px; margin-bottom: 10px; text-shadow: 0 0 10px rgba(138, 92, 246, 0.4);"></i>
+                    <p style="font-weight: 600;">Como posso ajudar no seu documentário?</p>
+                    <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; padding: 0 10px; text-align: center;">
+                        Pesquise por falantes, momentos de ação de B-rolls ou trechos de roteiro. <br>
+                        Pergunte coisas como: <span style="font-style: italic; font-weight: 500; color: var(--color-cyan);">"O que o diretor fala sobre lentes?"</span> ou <span style="font-style: italic; font-weight: 500; color: var(--color-cyan);">"Sugira clipes sobre iluminação"</span>.
+                    </p>
                 </div>
             `;
             return;
         }
 
         history.forEach(m => {
-            const msgEl = document.createElement("div");
-            msgEl.className = `chat-message ${m.role}`;
+            const bubble = document.createElement("div");
+            bubble.className = `chat-bubble ${m.role}`;
             
-            // Renderiza bolha de texto formatando links especiais
-            const formattedContent = this.formatMarkdownLinks(m.content);
+            const meta = document.createElement("div");
+            meta.className = "bubble-meta";
+            meta.innerHTML = `<span>${m.role === 'user' ? 'Você' : 'Assistente CaIAu Talho'}</span>`;
+            bubble.appendChild(meta);
             
-            msgEl.innerHTML = `
-                <div class="message-bubble">${formattedContent}</div>
-            `;
-            this.chatMessages.appendChild(msgEl);
+            const textEl = document.createElement("div");
+            textEl.className = "chat-bubble-text";
+            textEl.innerHTML = this.formatMarkdownLinks(m.content);
+            bubble.appendChild(textEl);
+            
+            this.chatMessages.appendChild(bubble);
         });
 
         this.scrollToBottom();
-        if (window.initLucide) window.initLucide();
     }
 
     formatMarkdownLinks(content) {
@@ -185,12 +189,8 @@ export class ChatManager {
                 const btnTabPhotos = document.querySelector('[data-tab="tab-photos"]');
                 if (btnTabPhotos) btnTabPhotos.click();
                 
-                // Emite evento ou chama lightbox (biblioteca escutará)
-                const libraryEl = document.getElementById("photo-list");
-                if (libraryEl) {
-                    const thumb = Array.from(libraryEl.querySelectorAll(".photo-item"))
-                                       .find(el => el.querySelector(".item-name").title === photo.filename);
-                    if (thumb) thumb.click();
+                if (window.libraryManager) {
+                    window.libraryManager.openLightbox(photo);
                 }
             } else {
                 alert(`Foto com ID ${id} não encontrada.`);

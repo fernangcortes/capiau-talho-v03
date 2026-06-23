@@ -5,6 +5,7 @@ import { LibraryManager } from "./library.js";
 import { PanelsManager } from "./panels.js";
 import { ChatManager } from "./chat.js";
 import { ProjectsManager } from "./projects.js";
+import { FaceManager } from "./faces.js";
 
 // Função para destacar os termos da busca com <mark>
 function highlightTerms(text, query) {
@@ -26,7 +27,7 @@ function highlightAndScrollToDialogue(startTime) {
     if (btnTabTranscript) btnTabTranscript.click();
     
     setTimeout(() => {
-        const blocks = document.querySelectorAll(".transcript-block");
+        const blocks = document.querySelectorAll(".transcript-bubble");
         let targetBlock = null;
         let minDiff = Infinity;
         
@@ -129,11 +130,8 @@ function renderSearchResults(results, query) {
                     // Open Lightbox
                     const btnTabPhotos = document.querySelector('[data-tab="tab-photos"]');
                     if (btnTabPhotos) btnTabPhotos.click();
-                    const photoListEl = document.getElementById("photo-list");
-                    if (photoListEl) {
-                        const thumb = Array.from(photoListEl.querySelectorAll(".photo-item"))
-                                           .find(el => el.querySelector(".item-name").title === filename);
-                        if (thumb) thumb.click();
+                    if (window.libraryManager) {
+                        window.libraryManager.openLightbox(photo);
                     }
                 }
             });
@@ -251,70 +249,14 @@ function updateActionsRowVisibility(tab) {
 window.addEventListener("DOMContentLoaded", () => {
     console.log("CaIAu Talho: Inicializando os módulos...");
 
-    // Global tooltips helper
-    window.setupButtonTooltips = function(root = document) {
-        const buttons = root.querySelectorAll("button, [data-tooltip], .tab-btn");
-        buttons.forEach(btn => {
-            if (btn.dataset.hasTooltipListener) return;
-            btn.dataset.hasTooltipListener = "true";
-            
-            btn.addEventListener("mouseenter", () => {
-                const chkToggle = document.getElementById("chk-toggle-tooltips");
-                if (chkToggle && !chkToggle.checked) return;
-                
-                const tooltipText = btn.getAttribute("data-tooltip") || btn.title || "";
-                const footerTooltip = document.getElementById("footer-tooltip-text");
-                if (footerTooltip && tooltipText) {
-                    footerTooltip.textContent = tooltipText;
-                    footerTooltip.classList.add("active");
-                }
-            });
-            
-            btn.addEventListener("mouseleave", () => {
-                const footerTooltip = document.getElementById("footer-tooltip-text");
-                if (footerTooltip) {
-                    footerTooltip.textContent = "Sistema pronto.";
-                    footerTooltip.classList.remove("active");
-                }
-            });
-        });
-    };
-
-    // Global Lucide helper
-    window.initLucide = function() {
-        if (window.lucide) {
-            window.lucide.createIcons();
-            window.setupButtonTooltips();
-        }
-    };
-
-    // Configurações Globais Popover Toggle
-    const btnSettings = document.getElementById("btn-global-settings");
-    const settingsPopover = document.getElementById("settings-popover");
-    
-    if (btnSettings && settingsPopover) {
-        btnSettings.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const isVisible = settingsPopover.style.display === "block";
-            settingsPopover.style.display = isVisible ? "none" : "block";
-        });
-        
-        document.addEventListener("click", (e) => {
-            if (!settingsPopover.contains(e.target) && e.target !== btnSettings) {
-                settingsPopover.style.display = "none";
-            }
-        });
-    }
-
-    // Call initially
-    window.initLucide();
-
     // Instanciando os gerenciadores
     const player = new VideoPlayer();
     const library = new LibraryManager();
+    window.libraryManager = library;
     const panels = new PanelsManager();
     const chat = new ChatManager();
     const projects = new ProjectsManager();
+    FaceManager.init();
 
     // ── CONFIGURAÇÃO DE SIDEBARS RETRÁTEIS ──
     const sidebarLeft = document.getElementById("sidebar-left");
@@ -426,9 +368,6 @@ window.addEventListener("DOMContentLoaded", () => {
         // Atualizar headers das ações
         updateActionsRowVisibility(tab);
     });
-
-    // Sincronizar estado inicial da aba da direita
-    STATE.emit("rightTabChanged", STATE.currentRightTab);
 
     // Ocultar ou mostrar botão de visão baseado no tipo do vídeo ativo
     STATE.on("activeVideoChanged", (video) => {

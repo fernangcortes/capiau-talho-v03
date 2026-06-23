@@ -198,4 +198,39 @@ export class CapIAuAPI {
             body: JSON.stringify({ message, history })
         });
     }
+
+    static fetchFaceClusters(projectId) {
+        return this.request(`/api/project/${projectId}/face-clusters`);
+    }
+
+    static clusterFaces(projectId, eps = 0.38, minSamples = 3) {
+        return this.request(`/api/project/${projectId}/faces/cluster?eps=${eps}&min_samples=${minSamples}`, {
+            method: "POST"
+        });
+    }
+
+    static mergeClusters(projectId, srcClusterId, destClusterId, name) {
+        return this.request(`/api/project/${projectId}/faces/merge`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ src_cluster_id: srcClusterId, dest_cluster_id: destClusterId, name })
+        });
+    }
+
+    static reassignFaces(projectId, faceIds, targetClusterId, targetName) {
+        return this.request(`/api/project/${projectId}/faces/reassign`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ face_ids: faceIds, target_cluster_id: targetClusterId, target_name: targetName })
+        });
+    }
+
+    static fetchClusterFaces(projectId, clusterId) {
+        return this.request(`/api/project/${projectId}/face-clusters/${clusterId}/faces`);
+    }
+
+    static fetchUnlabeledFaces(projectId) {
+        return this.request(`/api/project/${projectId}/unlabeled-faces`);
+    }
 }
+

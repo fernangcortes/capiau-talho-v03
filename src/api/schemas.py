@@ -41,3 +41,14 @@ class SplitTranscriptPayload(BaseModel):
 class ChatPayload(BaseModel):
     message: str
     history: List[Dict[str, str]] = []
+
+class MergeClustersPayload(BaseModel):
+    src_cluster_id: int
+    dest_cluster_id: int
+    name: str
+
+class ReassignFacesPayload(BaseModel):
+    face_ids: List[int]
+    target_cluster_id: int
+    target_name: str
+
