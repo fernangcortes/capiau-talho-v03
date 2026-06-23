@@ -89,7 +89,7 @@ export class FaceManager {
                 card.className = "face-cluster-card";
                 card.dataset.clusterId = cluster.cluster_id;
 
-                const thumbUrl = `/api/face/${cluster.rep_face_id}/thumbnail`;
+                const thumbUrl = `/api/faces/face/${cluster.rep_face_id}/thumbnail`;
                 const occurrencesText = cluster.occurrences === 1 ? "1 aparição" : `${cluster.occurrences} aparições`;
 
                 // If name is the placeholder (e.g. Pessoa Desconhecida...), show empty input value or placeholder
@@ -209,7 +209,7 @@ export class FaceManager {
                 item.className = "disambiguation-item selected"; // selected by default
                 item.dataset.faceId = face.id;
 
-                const thumbUrl = `/api/face/${face.id}/thumbnail`;
+                const thumbUrl = `/api/faces/face/${face.id}/thumbnail`;
                 
                 // Meta description context (video filename or photo name + timestamp)
                 let metaText = "";
@@ -316,6 +316,31 @@ export class FaceManager {
         modal.style.display = "flex";
         grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">Carregando rostos do projeto...</p></div>';
         
+        // Oculta a barra de ações em massa inicialmente
+        const bulkBar = document.getElementById("fullscreen-bulk-actions-bar");
+        if (bulkBar) bulkBar.style.display = "none";
+        
+        if (!this.bulkEventsBound) {
+            this.bulkEventsBound = true;
+            const btnBulkApply = document.getElementById("btn-bulk-apply");
+            if (btnBulkApply) {
+                btnBulkApply.addEventListener("click", () => this.applyBulkLabel());
+            }
+            const btnBulkReject = document.getElementById("btn-bulk-reject");
+            if (btnBulkReject) {
+                btnBulkReject.addEventListener("click", () => this.applyBulkReject());
+            }
+            // Suporte para Enter no campo bulk
+            const bulkInput = document.getElementById("bulk-face-input");
+            if (bulkInput) {
+                bulkInput.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") {
+                        this.applyBulkLabel();
+                    }
+                });
+            }
+        }
+        
         try {
             const projectId = STATE.currentProjectId;
             const faces = await CapIAuAPI.fetchUnlabeledFaces(projectId);
@@ -346,8 +371,9 @@ export class FaceManager {
             const card = document.createElement("div");
             card.className = "fullscreen-face-card";
             card.dataset.faceId = face.id;
+            card.dataset.clusterId = face.cluster_id;
 
-            const thumbUrl = `/api/face/${face.id}/thumbnail`;
+            const thumbUrl = `/api/faces/face/${face.id}/thumbnail`;
             
             let metaText = "Desconhecido";
             if (face.photo_id !== null) {
@@ -361,18 +387,57 @@ export class FaceManager {
             const inputPlaceholder = isPlaceholder ? face.name : "Quem é esta pessoa?";
 
             card.innerHTML = `
+                <div class="fullscreen-face-select-badge">
+                    <i class="fa-solid fa-check" style="color: #000; font-size: 10px; display: none;"></i>
+                </div>
                 <div class="fullscreen-face-thumb-container">
                     <img class="fullscreen-face-thumb" src="${thumbUrl}" alt="Rosto" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22><rect width=%22120%22 height=%22120%22 fill=%22%23222%22/><text x=%2250%%22 y=%2250%%22 font-size=%2224%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23666%22>?</text></svg>'">
                 </div>
                 <div class="fullscreen-face-meta" title="${metaText}">${metaText}</div>
-                <div class="fullscreen-face-input-wrapper">
-                    <input class="fullscreen-face-input" type="text" list="speakers-datalist" value="${inputValue}" placeholder="${inputPlaceholder}">
+                <div class="fullscreen-face-input-wrapper" style="display:flex; gap:6px; margin-top:5px; width:100%;">
+                    <input class="fullscreen-face-input" type="text" list="speakers-datalist" value="${inputValue}" placeholder="${inputPlaceholder}" style="flex:1;">
+                    <button class="btn-reject-face" title="Não relevante / Não é rosto" style="background:rgba(239, 68, 68, 0.15); border:1px solid rgba(239, 68, 68, 0.4); color:#ef4444; border-radius:6px; width:34px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
+                        <i class="fa-solid fa-ban"></i>
+                    </button>
                 </div>
             `;
 
             const inputEl = card.querySelector(".fullscreen-face-input");
+            const btnReject = card.querySelector(".btn-reject-face");
             
             let isChanging = false;
+
+            btnReject.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                if (isChanging) return;
+                
+                const objectName = prompt("Esta detecção não é um rosto. Se for um objeto relevante (ex: Abajur, Cadeira, Microfone), digite o nome do objeto. Caso contrário, deixe em branco para marcar apenas como Não Relevante:\n(Clique em Cancelar para desistir)");
+                if (objectName === null) return;
+                
+                isChanging = true;
+                try {
+                    const res = await CapIAuAPI.rejectFace(face.id, objectName.trim());
+                    if (res && res.status === "success") {
+                        card.classList.add("fade-out");
+                        setTimeout(() => {
+                            card.remove();
+                            if (grid.children.length === 0) {
+                                this.renderFullscreenFaces([]);
+                            }
+                        }, 300);
+                        this.loadFaceClusters();
+                        if (STATE.activeVideo) {
+                            STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Erro ao rejeitar rosto:", err);
+                    alert("Erro ao descartar detecção.");
+                } finally {
+                    isChanging = false;
+                }
+            });
+
             const saveName = async () => {
                 if (isChanging) return;
                 const newName = inputEl.value.trim();
@@ -433,8 +498,273 @@ export class FaceManager {
             });
             inputEl.addEventListener("blur", saveName);
 
+            // Toggle seleção ao clicar no card (fora do input e do botão de banir)
+            card.addEventListener("click", (e) => {
+                if (e.target.closest(".fullscreen-face-input-wrapper")) return;
+
+                card.classList.toggle("selected");
+                const selectBadge = card.querySelector(".fullscreen-face-select-badge");
+                const checkIcon = selectBadge.querySelector("i");
+                if (card.classList.contains("selected")) {
+                    selectBadge.style.background = "var(--color-cyan)";
+                    selectBadge.style.borderColor = "var(--color-cyan)";
+                    checkIcon.style.display = "block";
+                    card.style.outline = "2px solid var(--color-cyan)";
+                } else {
+                    selectBadge.style.background = "rgba(0,0,0,0.6)";
+                    selectBadge.style.borderColor = "rgba(255,255,255,0.3)";
+                    checkIcon.style.display = "none";
+                    card.style.outline = "none";
+                }
+
+                this.updateBulkActionsBar();
+            });
+
+            // Hover para exibir contexto (imagem cheia ou clip de vídeo)
+            let hoverTimeout;
+            card.addEventListener("mouseenter", () => {
+                hoverTimeout = setTimeout(() => {
+                    FaceManager.showContextPreview(face, card);
+                }, 400); // pequeno delay para não incomodar ao passar o mouse rápido
+            });
+            card.addEventListener("mouseleave", () => {
+                clearTimeout(hoverTimeout);
+                FaceManager.hideContextPreview();
+            });
+
             grid.appendChild(card);
         });
+    }
+
+    static updateBulkActionsBar() {
+        const selectedCards = document.querySelectorAll(".fullscreen-face-card.selected");
+        const count = selectedCards.length;
+        const bar = document.getElementById("fullscreen-bulk-actions-bar");
+        const countEl = document.getElementById("bulk-select-count");
+        
+        if (!bar || !countEl) return;
+
+        if (count > 0) {
+            bar.style.display = "flex";
+            countEl.textContent = `${count} ${count === 1 ? 'item selecionado' : 'itens selecionados'}`;
+        } else {
+            bar.style.display = "none";
+        }
+    }
+
+    static async applyBulkLabel() {
+        const newName = document.getElementById("bulk-face-input").value.trim();
+        if (!newName) {
+            alert("Por favor, digite o nome da pessoa/objeto.");
+            return;
+        }
+
+        const selectedCards = Array.from(document.querySelectorAll(".fullscreen-face-card.selected"));
+        if (selectedCards.length === 0) return;
+
+        const btnApply = document.getElementById("btn-bulk-apply");
+        btnApply.disabled = true;
+        btnApply.textContent = "Aplicando...";
+
+        const projectId = STATE.currentProjectId;
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const card of selectedCards) {
+            const faceId = parseInt(card.dataset.faceId);
+            const clusterId = parseInt(card.dataset.clusterId);
+            try {
+                const res = await CapIAuAPI.labelFace(faceId, newName);
+                if (res && res.status === "conflict") {
+                    // Se houver conflito, faz a mesclagem automática do cluster de origem com o destino
+                    const srcCluster = res.current_cluster_id;
+                    const destCluster = res.existing_cluster_id;
+                    if (srcCluster !== null && destCluster !== null && srcCluster !== destCluster) {
+                        await CapIAuAPI.mergeClusters(projectId, srcCluster, destCluster, newName);
+                    }
+                }
+                successCount++;
+                card.classList.add("fade-out");
+                setTimeout(() => card.remove(), 300);
+            } catch (err) {
+                console.error("Erro ao aplicar nome no rosto:", faceId, err);
+                errorCount++;
+            }
+        }
+
+        btnApply.disabled = false;
+        btnApply.textContent = "Aplicar";
+        document.getElementById("bulk-face-input").value = "";
+
+        // Oculta a barra de ações em massa
+        document.getElementById("fullscreen-bulk-actions-bar").style.display = "none";
+
+        // Se sobrar nenhum card, exibe o empty state
+        setTimeout(() => {
+            const grid = document.getElementById("fullscreen-faces-grid");
+            if (grid && grid.children.length === 0) {
+                this.renderFullscreenFaces([]);
+            }
+        }, 350);
+
+        // Recarregar os clusters no fundo para manter em sincronia
+        this.loadFaceClusters();
+        
+        // Dispara evento global para que o player e visão também atualizem se estiverem exibindo este vídeo
+        if (STATE.activeVideo) {
+            STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+        }
+    }
+
+    static async applyBulkReject() {
+        const selectedCards = Array.from(document.querySelectorAll(".fullscreen-face-card.selected"));
+        if (selectedCards.length === 0) return;
+
+        const objectName = prompt(`As ${selectedCards.length} detecções selecionadas não são rostos. Se forem o mesmo objeto relevante (ex: Abajur, Cadeira, Microfone), digite o nome do objeto. Caso contrário, deixe em branco para marcar todas como Não Relevante:\n(Clique em Cancelar para desistir)`);
+        if (objectName === null) return;
+
+        const btnReject = document.getElementById("btn-bulk-reject");
+        btnReject.disabled = true;
+        btnReject.textContent = "Descartando...";
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const card of selectedCards) {
+            const faceId = parseInt(card.dataset.faceId);
+            try {
+                const res = await CapIAuAPI.rejectFace(faceId, objectName.trim());
+                if (res && res.status === "success") {
+                    successCount++;
+                    card.classList.add("fade-out");
+                    setTimeout(() => card.remove(), 300);
+                }
+            } catch (err) {
+                console.error("Erro ao rejeitar rosto em lote:", faceId, err);
+                errorCount++;
+            }
+        }
+
+        btnReject.disabled = false;
+        btnReject.textContent = "Descartar";
+
+        // Oculta a barra de ações em massa
+        document.getElementById("fullscreen-bulk-actions-bar").style.display = "none";
+
+        // Se sobrar nenhum card, exibe o empty state
+        setTimeout(() => {
+            const grid = document.getElementById("fullscreen-faces-grid");
+            if (grid && grid.children.length === 0) {
+                this.renderFullscreenFaces([]);
+            }
+        }, 350);
+
+        this.loadFaceClusters();
+        
+        if (STATE.activeVideo) {
+            STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+        }
+    }
+
+    static showContextPreview(face, card) {
+        let popover = document.getElementById("fullscreen-face-context-popover");
+        if (!popover) {
+            popover = document.createElement("div");
+            popover.id = "fullscreen-face-context-popover";
+            popover.style.position = "fixed";
+            popover.style.zIndex = "10010";
+            popover.style.background = "rgba(10, 8, 14, 0.95)";
+            popover.style.border = "1px solid rgba(6, 182, 212, 0.5)";
+            popover.style.borderRadius = "12px";
+            popover.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
+            popover.style.padding = "10px";
+            popover.style.width = "320px";
+            popover.style.display = "flex";
+            popover.style.flexDirection = "column";
+            popover.style.gap = "8px";
+            popover.style.pointerEvents = "none"; // Evita interferir no mouseleave
+            document.body.appendChild(popover);
+        }
+
+        const cardRect = card.getBoundingClientRect();
+        let left = cardRect.right + 15;
+        if (left + 340 > window.innerWidth) {
+            left = cardRect.left - 340; 
+        }
+        let top = cardRect.top + (cardRect.height - 240) / 2;
+        if (top < 10) top = 10;
+        if (top + 240 > window.innerHeight) top = window.innerHeight - 250;
+
+        popover.style.left = `${left}px`;
+        popover.style.top = `${top}px`;
+        popover.style.display = "flex";
+
+        popover.innerHTML = `
+            <div style="font-size:10px; color:var(--text-secondary); text-transform:uppercase; font-weight:600; display:flex; align-items:center; gap:5px;">
+                <i class="fa-solid fa-eye" style="color:var(--color-cyan);"></i> Visualização do Contexto
+            </div>
+            <div id="popover-media-container" style="width:100%; height:180px; border-radius:6px; overflow:hidden; background:#000; position:relative; display:flex; align-items:center; justify-content:center;">
+                <div class="loading-state-text" style="font-size:11px;">Carregando mídia...</div>
+            </div>
+            <div style="font-size:10px; color:var(--text-muted); text-align:center; font-style:italic;">
+                ${face.photo_id ? 'Foto original completa' : `Vídeo no frame ${face.timestamp}s`}
+            </div>
+        `;
+
+        const mediaContainer = popover.querySelector("#popover-media-container");
+
+        if (face.photo_id) {
+            let src = face.photo_proxy_path || face.photo_filepath;
+            if (!src || (!src.startsWith("http") && !src.startsWith("/"))) {
+                src = `/originals/${face.photo_filename}`;
+            }
+            mediaContainer.innerHTML = `
+                <img src="${src}" style="width:100%; height:100%; object-fit:contain;">
+            `;
+        } else if (face.video_id) {
+            let src = face.video_filepath;
+            if (face.video_proxy_path) {
+                src = face.video_proxy_path;
+            } else {
+                const isRemote = src && (src.startsWith("http") || src.startsWith("/proxies/") || src.startsWith("/"));
+                if (!isRemote) {
+                    src = `/originals/${face.video_filename}`;
+                }
+            }
+            
+            const videoEl = document.createElement("video");
+            videoEl.src = src;
+            videoEl.style.width = "100%";
+            videoEl.style.height = "100%";
+            videoEl.style.objectFit = "contain";
+            videoEl.muted = true;
+            videoEl.playsInline = true;
+            
+            const ts = parseFloat(face.timestamp) || 0.0;
+            const startTime = Math.max(0.0, ts - 2.0);
+            
+            videoEl.addEventListener("loadedmetadata", () => {
+                videoEl.currentTime = startTime;
+                videoEl.play().catch(e => console.warn("Erro ao reproduzir preview:", e));
+            });
+
+            videoEl.addEventListener("timeupdate", () => {
+                if (videoEl.currentTime >= ts + 3.0) {
+                    videoEl.currentTime = startTime;
+                }
+            });
+
+            mediaContainer.innerHTML = "";
+            mediaContainer.appendChild(videoEl);
+        }
+    }
+
+    static hideContextPreview() {
+        const popover = document.getElementById("fullscreen-face-context-popover");
+        if (popover) {
+            popover.style.display = "none";
+            popover.innerHTML = "";
+        }
     }
 
     static closeFullscreenDisambiguation() {
@@ -443,4 +773,3 @@ export class FaceManager {
         this.loadFaceClusters();
     }
 }
-

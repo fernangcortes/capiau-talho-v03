@@ -25,23 +25,57 @@ def get_transcript(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn
 
 @router.get("/api/video/{video_id}/vision")
 def get_video_vision(video_id: int, project_id: int = Query(1), conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Retorna descrições de frames de B-roll armazenadas no Qdrant enriquecidas com rostos rotulados."""
+    """Retorna descrições de frames de B-roll enriquecidas com rostos/objetos do banco de dados (tolerância 5.0s)."""
     try:
         search_engine = SemanticSearch.get_instance()
         frames = search_engine.get_video_vision_frames(project_id, video_id)
-        
-        # Enriquecer com os nomes de rostos conhecidos
+        if not frames:
+            return {"video_id": video_id, "frames": []}
+            
+        # Buscar todas as faces/objetos rotulados neste vídeo de uma só vez
         cursor = conn.cursor()
-        for frame in frames:
-            ts = frame["timestamp"]
-            cursor.execute("""
-                SELECT DISTINCT name FROM face 
-                WHERE video_id = ? AND ABS(timestamp - ?) < 0.1 AND name IS NOT NULL
-            """, (video_id, ts))
-            names = [r["name"] for r in cursor.fetchall()]
-            if names:
-                from src.services.rag import enrich_description
-                frame["description"] = enrich_description(frame["description"], names)
+        cursor.execute("""
+            SELECT DISTINCT name, timestamp, crop_path FROM face 
+            WHERE video_id = ? AND name IS NOT NULL AND name != '' AND name != 'Não Relevante' AND name != 'Não é Rosto'
+        """, (video_id,))
+        faces = cursor.fetchall()
+        
+        # Associar cada face/objeto ao frame de B-Roll mais próximo (limite de 5.0 segundos)
+        frame_names = {i: [] for i in range(len(frames))}
+        frame_replacements = {i: {} for i in range(len(frames))}
+        for face in faces:
+            face_name = face[0]
+            face_ts = face[1]
+            face_crop = face[2]
+            
+            # Encontrar o frame mais próximo
+            best_idx = -1
+            min_diff = 5.0  # Limite máximo de 5 segundos de tolerância
+            for idx, frame in enumerate(frames):
+                diff = abs(frame["timestamp"] - face_ts)
+                if diff < min_diff:
+                    min_diff = diff
+                    best_idx = idx
+            
+            if best_idx != -1:
+                if face_crop and face_crop.startswith("text:"):
+                    target_text = face_crop[5:]
+                    frame_replacements[best_idx][target_text] = face_name
+                else:
+                    if face_name not in frame_names[best_idx]:
+                        frame_names[best_idx].append(face_name)
+                    
+        # Enriquecer as descrições dos frames
+        from src.services.rag import enrich_description
+        for idx in range(len(frames)):
+            names = frame_names[idx]
+            replacements = frame_replacements[idx]
+            if names or replacements:
+                frames[idx]["description"] = enrich_description(
+                    frames[idx]["description"], 
+                    names, 
+                    text_replacements=replacements
+                )
                 
         return {"video_id": video_id, "frames": frames}
     except Exception as e:

@@ -1480,22 +1480,23 @@ mark.search-highlight {
 
 .overlap-bubble {
     border-style: dashed !important;
-    border-color: rgba(138, 92, 246, 0.4) !important;
+    border-color: rgba(138, 92, 246, 0.8) !important;
+    background: rgba(138, 92, 246, 0.15) !important;
 }
 
 /* Face bounding boxes overlays */
 .face-box {
     position: absolute;
-    border: 2px solid rgba(6, 182, 212, 0.6);
-    background: rgba(6, 182, 212, 0.05);
+    border: 2px solid transparent;
+    background: transparent;
     border-radius: 4px;
     cursor: pointer;
-    box-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+    box-shadow: none;
     transition: all 0.2s ease;
 }
 
 .face-box:hover {
-    border-color: var(--color-cyan);
+    border: 2px solid var(--color-cyan);
     background: rgba(6, 182, 212, 0.2);
     box-shadow: 0 0 15px var(--color-cyan);
 }
@@ -1515,9 +1516,12 @@ mark.search-highlight {
     white-space: nowrap;
     pointer-events: none;
     box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
 .face-box:hover .face-name-tag {
+    opacity: 1;
     background: var(--color-cyan);
     color: #000;
     border-color: #fff;
@@ -1954,5 +1958,49 @@ mark.search-highlight {
     opacity: 0;
     transform: scale(0.8) translateY(20px);
     pointer-events: none;
+}
+
+/* Card selecionado em tela cheia */
+.fullscreen-face-card {
+    position: relative; /* Para posicionamento do badge */
+}
+
+.fullscreen-face-card.selected {
+    border-color: var(--color-cyan) !important;
+    background: rgba(6, 182, 212, 0.08) !important;
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.3) !important;
+}
+
+/* Badge de seleção */
+.fullscreen-face-select-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.2s ease;
+    opacity: 0; /* Oculto por padrão, aparece ao passar o mouse ou se selecionado */
+}
+
+.fullscreen-face-card:hover .fullscreen-face-select-badge,
+.fullscreen-face-card.selected .fullscreen-face-select-badge {
+    opacity: 1;
+}
+
+.fullscreen-face-card.selected .fullscreen-face-select-badge {
+    background: var(--color-cyan) !important;
+    border-color: var(--color-cyan) !important;
+}
+
+.fullscreen-face-card.selected .fullscreen-face-select-badge i {
+    display: block !important;
 }
 

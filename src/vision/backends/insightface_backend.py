@@ -33,12 +33,20 @@ class InsightFaceBackend(FaceBackend):
         self._available = None
 
     def _get_app(self):
-        """Lazy loading do InsightFace app."""
+        """Lazy loading do InsightFace app com fallback para CPU."""
         if self._app is None:
             try:
                 from insightface.app import FaceAnalysis
                 self._app = FaceAnalysis(name="buffalo_l")
-                self._app.prepare(ctx_id=self.ctx_id, det_size=self.det_size)
+                try:
+                    self._app.prepare(ctx_id=self.ctx_id, det_size=self.det_size)
+                except Exception as pe:
+                    if self.ctx_id == 0:
+                        print(f"[INSIGHTFACE_BACKEND] Falha ao iniciar na GPU (ctx_id=0): {pe}. Tentando CPU...")
+                        self.ctx_id = -1
+                        self._app.prepare(ctx_id=-1, det_size=self.det_size)
+                    else:
+                        raise pe
             except ImportError:
                 print("[INSIGHTFACE_BACKEND] insightface nao instalado.")
                 print("[INSIGHTFACE_BACKEND] Instale: pip install insightface onnxruntime-gpu")

@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS face (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
     cluster_id INTEGER, -- ID do grupo similar (DBSCAN), NULL se ruido ou nao clusterizado
+    name TEXT, -- Nome da pessoa (cache de exibicao), NULL se nao rotulado
     bounding_box TEXT, -- JSON com coordenadas [x, y, w, h] relativas
     photo_id INTEGER REFERENCES photo(id) ON DELETE CASCADE,
     video_id INTEGER REFERENCES video(id) ON DELETE CASCADE,

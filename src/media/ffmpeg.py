@@ -97,8 +97,8 @@ def extract_audio_mono(video_path: Path, output_path: Path) -> bool:
         return False
 
 def extract_frame(video_path: Path, timestamp: float, output_path: Path) -> bool:
-    """Extrai um único frame JPEG de alta qualidade a partir de um timestamp."""
-    cmd = [
+    """Extrai um único frame JPEG de alta qualidade a partir de um timestamp com fallback de busca lenta para MTS."""
+    cmd_fast = [
         'ffmpeg', '-y',
         '-ss', str(timestamp),
         '-i', str(video_path),
@@ -106,17 +106,32 @@ def extract_frame(video_path: Path, timestamp: float, output_path: Path) -> bool
         '-q:v', '2',
         str(output_path)
     ]
+    startupinfo = None
+    if os.name == 'nt':
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        
     try:
-        startupinfo = None
-        if os.name == 'nt':
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, check=True)
-        return output_path.exists()
-    except Exception as e:
-        print(f"[FFmpeg] Falha ao extrair frame a {timestamp}s do vídeo {video_path.name}: {e}")
-        return False
+        subprocess.run(cmd_fast, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, check=True)
+        if output_path.exists():
+            return True
+    except Exception:
+        # Fallback de busca lenta (-ss depois do -i) para arquivos .MTS com index corrompido
+        cmd_slow = [
+            'ffmpeg', '-y',
+            '-i', str(video_path),
+            '-ss', str(timestamp),
+            '-vframes', '1',
+            '-q:v', '2',
+            str(output_path)
+        ]
+        try:
+            subprocess.run(cmd_slow, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, check=True)
+            return output_path.exists()
+        except Exception as e:
+            print(f"[FFmpeg] Falha critica ao extrair frame a {timestamp}s do video {video_path.name} (busca rapida e lenta falharam): {e}")
+            return False
+    return False
 
 def generate_video_proxy(
     original_path: Path,

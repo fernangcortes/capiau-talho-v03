@@ -62,9 +62,10 @@ class AWSBackend(FaceBackend):
     def is_available(self) -> bool:
         if self._available is None:
             try:
-                self._get_client().describe_collections(MaxResults=1)
+                self._get_client().list_collections(MaxResults=1)
                 self._available = True
-            except Exception:
+            except Exception as e:
+                print(f"[AWS_BACKEND] Teste de conexão falhou (list_collections): {e}")
                 self._available = False
         return self._available
 

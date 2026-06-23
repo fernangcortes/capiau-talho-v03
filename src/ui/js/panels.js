@@ -1,7 +1,7 @@
 // Gerenciador de Painéis: Transcrição, Timelines, Temas e Fila de Tarefas.
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
-import { formatTimecode } from "./player.js";
+import { formatTimecode, showAnnotationModal } from "./player.js";
 
 export class PanelsManager {
     constructor() {
@@ -30,6 +30,11 @@ export class PanelsManager {
         STATE.on("timelineCutsUpdated", (cuts) => this.renderTimeline(cuts));
         STATE.on("scissorsModeChanged", (active) => this.toggleScissorsUI(active));
         STATE.on("projectChanged", () => this.loadThemes());
+        STATE.on("videoFacesUpdated", (videoId) => {
+            if (STATE.activeVideo && STATE.activeVideo.id === videoId) {
+                this.renderVision(STATE.activeVisionFrames);
+            }
+        });
         
         
         if (this.btnCluster) this.btnCluster.addEventListener("click", () => this.runClustering());
@@ -53,12 +58,22 @@ export class PanelsManager {
         const btnAnalyzeVisionAll = document.getElementById("btn-analyze-vision-all");
         if (btnAnalyzeVisionAll) {
             btnAnalyzeVisionAll.addEventListener("click", async () => {
-                if (confirm("Disparar análise visual multimodal de IA para todos os B-rolls e fotos não analisados do projeto ativo?")) {
+                const force = confirm("Deseja FORÇAR a reanálise de TODAS as mídias do projeto (incluindo as já analisadas) para aplicar a nova configuração?\n\nClique em 'OK' para reanalisar tudo de novo, ou 'Cancelar' para analisar apenas as novas/pendentes.");
+                if (force) {
                     try {
-                        await CapIAuAPI.analyzeAllVision(STATE.currentProjectId);
-                        alert("Análise visual em lote disparada.");
+                        await CapIAuAPI.analyzeAllVision(STATE.currentProjectId, true);
+                        alert("Reanálise completa em lote de IA disparada! Acompanhe o progresso na aba de tarefas.");
                     } catch (err) {
-                        alert("Erro ao disparar análise em lote: " + err.message);
+                        alert("Erro ao disparar reanálise: " + err.message);
+                    }
+                } else {
+                    if (confirm("Disparar análise apenas para as novas mídias pendentes?")) {
+                        try {
+                            await CapIAuAPI.analyzeAllVision(STATE.currentProjectId, false);
+                            alert("Análise de mídias pendentes disparada! Acompanhe o progresso na aba de tarefas.");
+                        } catch (err) {
+                            alert("Erro ao disparar análise: " + err.message);
+                        }
                     }
                 }
             });
@@ -306,7 +321,7 @@ export class PanelsManager {
         });
     }
 
-    renderVision(frames) {
+    async renderVision(frames) {
         if (!this.visionContainer) return;
         this.visionContainer.innerHTML = "";
 
@@ -315,22 +330,97 @@ export class PanelsManager {
             return;
         }
 
+        // 1. Criar container de tags de marcações no topo
+        const tagsHeader = document.createElement("div");
+        tagsHeader.className = "vision-tags-header";
+        tagsHeader.style.display = "flex";
+        tagsHeader.style.flexDirection = "column";
+        tagsHeader.style.gap = "6px";
+        tagsHeader.style.marginBottom = "15px";
+        tagsHeader.style.padding = "10px";
+        tagsHeader.style.borderRadius = "8px";
+        tagsHeader.style.border = "1px solid var(--border-glass)";
+        tagsHeader.style.background = "rgba(0, 0, 0, 0.2)";
+        tagsHeader.innerHTML = `
+            <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; display:flex; align-items:center; gap:6px;">
+                <i class="fa-solid fa-tags" style="color:var(--color-cyan);"></i> Pessoas/Objetos Marcados:
+            </div>
+            <div class="vision-tags-list" style="display:flex; flex-wrap:wrap; gap:6px;">
+                <span style="font-size:11px; color:var(--text-secondary); font-style:italic;">Carregando marcações...</span>
+            </div>
+        `;
+        this.visionContainer.appendChild(tagsHeader);
+        
+        const tagsListEl = tagsHeader.querySelector(".vision-tags-list");
+
+        // 2. Criar container da lista de descrição dos frames
+        const framesListContainer = document.createElement("div");
+        framesListContainer.className = "vision-frames-list";
+        framesListContainer.style.display = "flex";
+        framesListContainer.style.flexDirection = "column";
+        framesListContainer.style.gap = "10px";
+        this.visionContainer.appendChild(framesListContainer);
+
         frames.forEach(f => {
             const row = document.createElement("div");
             row.className = "vision-frame-row";
             row.innerHTML = `
                 <div class="vision-timecode">${formatTimecode(f.timestamp)}</div>
-                <div class="vision-description">${f.description}</div>
+                <div class="vision-description" style="user-select: text; cursor: text;">${f.description}</div>
             `;
-            row.addEventListener("click", () => {
+            
+            const descDiv = row.querySelector(".vision-description");
+            descDiv.addEventListener("mouseup", (e) => {
+                const selection = window.getSelection();
+                const selectedText = selection.toString().trim();
+                if (selectedText.length > 1) {
+                    e.stopPropagation();
+                    this.showFloatingLinkButton(e.clientX, e.clientY, selectedText, f.timestamp, STATE.activeVideo.id);
+                }
+            });
+
+            row.addEventListener("click", (e) => {
+                const selection = window.getSelection();
+                if (selection && selection.toString().trim().length > 0) {
+                    // Ignora o clique se o usuário estiver apenas selecionando texto
+                    return;
+                }
                 const player = document.getElementById("main-video");
                 if (player) {
                     player.currentTime = f.timestamp;
                     player.play();
                 }
             });
-            this.visionContainer.appendChild(row);
+            framesListContainer.appendChild(row);
         });
+
+        // 3. Carregar marcações/tags
+        if (STATE.activeVideo) {
+            try {
+                const faces = await CapIAuAPI.fetchVideoFaces(STATE.activeVideo.id);
+                const uniqueNames = [...new Set(faces.map(face => face.name).filter(n => n))];
+                tagsListEl.innerHTML = "";
+                if (uniqueNames.length === 0) {
+                    tagsListEl.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); font-style:italic;">Nenhuma pessoa ou objeto marcado neste vídeo.</span>`;
+                } else {
+                    uniqueNames.forEach(name => {
+                        const tag = document.createElement("span");
+                        tag.textContent = name;
+                        tag.className = "badge";
+                        tag.style.fontSize = "10px";
+                        tag.style.padding = "3px 8px";
+                        tag.style.borderRadius = "12px";
+                        tag.style.background = "rgba(6, 182, 212, 0.15)";
+                        tag.style.border = "1px solid rgba(6, 182, 212, 0.4)";
+                        tag.style.color = "var(--color-cyan)";
+                        tagsListEl.appendChild(tag);
+                    });
+                }
+            } catch (err) {
+                console.error("Erro ao carregar faces do vídeo para tags da visão:", err);
+                tagsListEl.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); font-style:italic;">Erro ao carregar marcações.</span>`;
+            }
+        }
     }
 
     toggleScissorsUI(active) {
@@ -604,14 +694,149 @@ export class PanelsManager {
             
             const cancelBtn = item.querySelector(".btn-cancel-task");
             if (cancelBtn) {
-                cancelBtn.addEventListener("click", async () => {
+                cancelBtn.addEventListener("click", async (e) => {
+                    e.stopPropagation();
                     if (confirm("Cancelar codificação de proxy desta mídia?")) {
                         await CapIAuAPI.cancelConversion(Number(key));
                     }
                 });
             }
             
+            if (isFinished) {
+                item.style.cursor = "pointer";
+                item.title = "Clique para abrir esta mídia";
+                
+                // Efeito hover simples
+                item.addEventListener("mouseenter", () => {
+                    item.style.background = "rgba(255, 255, 255, 0.05)";
+                    item.style.transform = "translateY(-1px)";
+                });
+                item.addEventListener("mouseleave", () => {
+                    item.style.background = "";
+                    item.style.transform = "";
+                });
+                
+                item.addEventListener("click", () => {
+                    if (key.startsWith("photo-")) {
+                        const photoId = Number(key.split("photo-")[1]);
+                        const photo = STATE.allPhotos.find(p => p.id === photoId);
+                        if (photo) {
+                            // Muda para a aba de fotos
+                            const tabBtn = document.querySelector(`.tab-btn[data-tab="tab-photos"]`);
+                            if (tabBtn) tabBtn.click();
+                            
+                            // Abre a lightbox da foto
+                            if (window.libraryManager) {
+                                STATE.currentPhotoList = STATE.allPhotos;
+                                STATE.currentPhotoIndex = STATE.allPhotos.indexOf(photo);
+                                window.libraryManager.openLightbox(photo);
+                            }
+                        } else {
+                            alert("Foto correspondente não encontrada na biblioteca local.");
+                        }
+                    } else {
+                        const videoId = Number(key);
+                        if (!isNaN(videoId)) {
+                            const video = STATE.allVideos.find(v => v.id === videoId);
+                            if (video) {
+                                // Muda para a aba de mídias/vídeos
+                                const tabBtn = document.querySelector(`.tab-btn[data-tab="tab-videos"]`);
+                                if (tabBtn) tabBtn.click();
+                                
+                                // Foca no vídeo e carrega no player
+                                STATE.activeVideo = video;
+                                
+                                // Muda para a aba direita correspondente (Transcrição para entrevistas, Visão para B-rolls)
+                                if (video.video_type === "interview") {
+                                    STATE.currentRightTab = "transcript";
+                                } else {
+                                    STATE.currentRightTab = "vision";
+                                }
+                            } else {
+                                alert("Vídeo correspondente não encontrado na biblioteca local.");
+                            }
+                        }
+                    }
+                });
+            }
+            
             this.tasksContainer.appendChild(item);
         });
+    }
+
+    showFloatingLinkButton(x, y, selectedText, timestamp, videoId) {
+        const oldBtn = document.getElementById("floating-link-btn");
+        if (oldBtn) oldBtn.remove();
+
+        const btn = document.createElement("button");
+        btn.id = "floating-link-btn";
+        btn.innerHTML = `<i class="fa-solid fa-link"></i> Vincular a Pessoa/Objeto`;
+        btn.style.position = "fixed";
+        btn.style.left = `${x}px`;
+        btn.style.top = `${y - 40}px`;
+        btn.style.zIndex = "1000";
+        btn.style.background = "var(--color-cyan)";
+        btn.style.color = "#000";
+        btn.style.border = "none";
+        btn.style.padding = "6px 12px";
+        btn.style.borderRadius = "20px";
+        btn.style.fontSize = "11px";
+        btn.style.fontWeight = "600";
+        btn.style.cursor = "pointer";
+        btn.style.boxShadow = "0 4px 10px rgba(0,0,0,0.5)";
+        
+        btn.style.pointerEvents = "auto";
+        btn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            btn.remove();
+            this.promptLinkText(selectedText, timestamp, videoId);
+        });
+
+        document.body.appendChild(btn);
+
+        const removeBtn = () => {
+            btn.remove();
+            document.removeEventListener("mousedown", removeBtn);
+        };
+        setTimeout(() => {
+            document.addEventListener("mousedown", removeBtn);
+        }, 100);
+    }
+
+    async promptLinkText(selectedText, timestamp, videoId) {
+        let speakers = [];
+        try {
+            speakers = await CapIAuAPI.fetchProjectSpeakers(STATE.currentProjectId);
+        } catch (err) {
+            console.warn("Erro ao buscar pessoas/falantes existentes:", err);
+        }
+
+        const name = await showAnnotationModal(speakers, "");
+        if (name) {
+            const trimmedName = name.trim();
+            if (trimmedName) {
+                try {
+                    const payload = {
+                        project_id: STATE.currentProjectId,
+                        video_id: videoId,
+                        timestamp: timestamp,
+                        bounding_box: [0, 0, 0, 0],
+                        name: trimmedName,
+                        text_to_replace: selectedText
+                    };
+                    
+                    const res = await CapIAuAPI.addManualFace(payload);
+                    if (res && res.status === "success") {
+                        const visionData = await CapIAuAPI.fetchVideoVision(videoId, STATE.currentProjectId);
+                        STATE.activeVisionFrames = visionData.frames || [];
+                        
+                        STATE.emit("videoFacesUpdated", videoId);
+                    }
+                } catch (err) {
+                    console.error("Erro ao vincular texto:", err);
+                    alert("Erro ao vincular texto.");
+                }
+            }
+        }
     }
 }

@@ -11,8 +11,8 @@ from src.db.operations import add_relation, update_photo_analysis
 from src.search.semantic import SemanticSearch
 
 def extract_frame_ffmpeg(video_path: Path, timestamp: float, output_path: Path) -> bool:
-    """Extrai um único frame de alta qualidade de um timestamp usando o FFmpeg (muito leve, sem OpenCV)."""
-    cmd = [
+    """Extrai um único frame de alta qualidade de um timestamp usando o FFmpeg (muito leve, com fallback de busca lenta)."""
+    cmd_fast = [
         'ffmpeg', '-y',
         '-ss', str(timestamp),     # Posiciona no segundo exato de forma rápida
         '-i', str(video_path),
@@ -22,11 +22,26 @@ def extract_frame_ffmpeg(video_path: Path, timestamp: float, output_path: Path) 
     ]
     try:
         # Silencia a saída do FFmpeg
-        subprocess.run(cmd, capture_output=True, check=True)
-        return output_path.exists()
-    except Exception as e:
-        print(f"[VISION] Falha ao extrair frame a {timestamp}s: {e}")
-        return False
+        subprocess.run(cmd_fast, capture_output=True, check=True)
+        if output_path.exists():
+            return True
+    except Exception:
+        # Fallback de busca lenta (-ss depois do -i) para arquivos .MTS com index corrompido
+        cmd_slow = [
+            'ffmpeg', '-y',
+            '-i', str(video_path),
+            '-ss', str(timestamp),
+            '-vframes', '1',
+            '-q:v', '2',
+            str(output_path)
+        ]
+        try:
+            subprocess.run(cmd_slow, capture_output=True, check=True)
+            return output_path.exists()
+        except Exception as e:
+            print(f"[VISION] Falha critica ao extrair frame a {timestamp}s (busca rapida e lenta falharam): {e}")
+            return False
+    return False
 
 def encode_image_base64(image_path: Path) -> str:
     """Codifica um arquivo de imagem local para base64 para envio na API."""

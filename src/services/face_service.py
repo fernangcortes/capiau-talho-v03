@@ -555,6 +555,17 @@ class FaceService:
             
             crop_path = self.crops_dir / filename
             cv2.imwrite(str(crop_path), crop)
+            
+            # S3 Upload in background
+            try:
+                from src.services.s3_service import S3Service
+                s3_service = S3Service.get_instance()
+                if s3_service.enabled:
+                    from src.core.tasks import TASK_MANAGER
+                    TASK_MANAGER.executor.submit(s3_service.upload_file, crop_path, f"crops/{filename}")
+            except Exception as s3_err:
+                print(f"[FACE_SERVICE] Erro ao disparar upload do crop para S3: {s3_err}")
+                
             return crop_path
             
         except Exception as e:

@@ -226,3 +226,32 @@ def remove_document(doc_id: int, project_id: int = Query(1), conn: sqlite3.Conne
         return {"status": "success", "message": f"Documento ID {doc_id} removido."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/project/backup-db")
+def backup_database():
+    """Faz backup manual do arquivo de banco de dados SQLite para o S3."""
+    from src.services.s3_service import S3Service
+    s3_service = S3Service.get_instance()
+    if not s3_service.enabled:
+        raise HTTPException(status_code=400, detail="Serviço S3 não está ativo ou configurado no .env.")
+    
+    db_path = CONFIG.DB_PATH
+    if not db_path.exists():
+        raise HTTPException(status_code=404, detail="Banco de dados local não encontrado.")
+    
+    # Executar upload
+    s3_key = "backups/capiau_backup.db"
+    success = s3_service.upload_file(db_path, s3_key)
+    if success:
+        return {"status": "success", "message": "Backup do banco de dados concluído com sucesso para o S3.", "key": s3_key}
+    else:
+        raise HTTPException(status_code=500, detail="Falha ao fazer upload do backup para o S3. Verifique as travas de limite.")
+
+@router.get("/api/project/{project_id}/speakers")
+def get_project_speakers(project_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Retorna lista consolidada de falantes e rostos rotulados do projeto."""
+    from src.db.repositories.media import MediaRepository
+    try:
+        return MediaRepository.get_project_speakers_and_labeled_faces(conn, project_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

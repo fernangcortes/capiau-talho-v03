@@ -32,6 +32,17 @@ class SyncService:
             photos = query_all("SELECT * FROM photo WHERE project_id = ?", (project_id,))
             docs = query_all("SELECT * FROM production_doc WHERE project_id = ?", (project_id,))
             faces = query_all("SELECT * FROM face WHERE project_id = ?", (project_id,))
+            people = query_all("SELECT * FROM person WHERE project_id = ?", (project_id,))
+            
+            face_recognitions = []
+            if faces:
+                face_ids = [f['id'] for f in faces]
+                placeholders = ",".join("?" for _ in face_ids)
+                face_recognitions = query_all(f"""
+                    SELECT * FROM face_recognition 
+                    WHERE face_id IN ({placeholders})
+                """, tuple(face_ids))
+
             themes = query_all("SELECT * FROM theme WHERE project_id = ?", (project_id,))
             timelines = query_all("SELECT * FROM timeline WHERE project_id = ?", (project_id,))
             relations = query_all("SELECT * FROM relation WHERE project_id = ?", (project_id,))
@@ -68,6 +79,8 @@ class SyncService:
                 "photos": photos,
                 "production_docs": docs,
                 "faces": faces,
+                "people": people,
+                "face_recognitions": face_recognitions,
                 "themes": themes,
                 "timelines": timelines,
                 "relations": relations,
@@ -234,21 +247,56 @@ class SyncService:
                     r["predicate"], r["object_type"], obj_id, r.get("weight", 1.0)
                 )
                 
-            # 8. Rostos
+            # 8. Pessoas (Identificadas)
+            person_id_map = {}
+            for person in data.get("people", []):
+                old_person_id = person["id"]
+                cursor.execute("""
+                    INSERT INTO person (project_id, name, aliases, bio, profile_image_path, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (new_project_id, person.get("name"), person.get("aliases"), 
+                      person.get("bio"), person.get("profile_image_path"), person.get("metadata")))
+                person_id_map[old_person_id] = cursor.lastrowid
+
+            # 8.1. Rostos
+            face_id_map = {}
             for face in data.get("faces", []):
+                old_face_id = face["id"]
                 face_vid = face.get("video_id")
                 face_photo = face.get("photo_id")
                 
                 new_vid_id = video_id_map.get(face_vid) if face_vid else None
                 new_photo_id = photo_id_map.get(face_photo) if face_photo else None
                 
-                MediaRepository.add_face(
-                    conn, new_project_id, face.get("name"),
-                    json.loads(face.get("bounding_box", "[]")),
-                    photo_id=new_photo_id, video_id=new_vid_id,
-                    timestamp=face.get("timestamp"),
-                    embedding=json.loads(face.get("embedding")) if face.get("embedding") else None
-                )
+                cursor.execute("""
+                    INSERT INTO face (project_id, cluster_id, name, bounding_box, photo_id, video_id, 
+                                    timestamp, quality_score, blur_score, face_size_px, crop_path)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (new_project_id, face.get("cluster_id"), face.get("name"), face.get("bounding_box"),
+                      new_photo_id, new_vid_id, face.get("timestamp"), face.get("quality_score"),
+                      face.get("blur_score"), face.get("face_size_px"), face.get("crop_path")))
+                
+                new_face_id = cursor.lastrowid
+                face_id_map[old_face_id] = new_face_id
+                
+            # 8.2. Reconhecimentos Faciais
+            for rec in data.get("face_recognitions", []):
+                old_face_id = rec["face_id"]
+                old_person_id = rec.get("person_id")
+                
+                new_face_id = face_id_map.get(old_face_id)
+                new_person_id = person_id_map.get(old_person_id) if old_person_id else None
+                
+                if new_face_id:
+                    cursor.execute("""
+                        INSERT INTO face_recognition 
+                        (face_id, tier, model, model_version, person_id, embedding, similarity, 
+                         confidence, status, recognized_by, recognized_at, raw_response, cost_usd, processing_time_ms)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (new_face_id, rec.get("tier"), rec.get("model"), rec.get("model_version"),
+                          new_person_id, rec.get("embedding"), rec.get("similarity"), rec.get("confidence"),
+                          rec.get("status"), rec.get("recognized_by"), rec.get("recognized_at"),
+                          rec.get("raw_response"), rec.get("cost_usd", 0.0), rec.get("processing_time_ms")))
                 
             # 9. Transcrições palavra-a-palavra
             for tr in data.get("transcripts", []):

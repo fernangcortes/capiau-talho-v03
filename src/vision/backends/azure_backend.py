@@ -53,17 +53,42 @@ class AzureBackend(FaceBackend):
     def is_free(self) -> bool:
         return True  # Dentro do free tier
 
+    def _throttle(self):
+        """Aplica throttling para respeitar o limite de 20 chamadas por minuto do Azure Free Tier."""
+        now = time.time()
+        if not hasattr(self, "_call_times"):
+            self._call_times = []
+        
+        # Filtra chamadas feitas nos últimos 60 segundos
+        self._call_times = [t for t in self._call_times if now - t < 60.0]
+        
+        # Se atingiu o limite de 20, aguarda o tempo necessário para liberar a chamada mais antiga
+        if len(self._call_times) >= 20:
+            sleep_time = 60.0 - (now - self._call_times[0])
+            if sleep_time > 0:
+                print(f"[AZURE_BACKEND] Throttling ativo: limite de 20 chamadas/min atingido. Aguardando {sleep_time:.2f}s...")
+                time.sleep(sleep_time)
+                now = time.time()
+                self._call_times = [t for t in self._call_times if now - t < 60.0]
+                
+        self._call_times.append(now)
+
     def _test_connection(self) -> bool:
-        """Testa conexao com a API Azure."""
+        """Testa conexao com a API Azure e loga detalhes de erro se falhar."""
         try:
             headers = {"Ocp-Apim-Subscription-Key": self.key}
-            r = requests.get(f"{self.endpoint}/face/v1.0/detect", headers=headers, timeout=5)
-            return r.status_code in [200, 400]  # 400 = OK sem imagem
-        except Exception:
+            r = requests.post(f"{self.endpoint}/face/v1.0/detect", headers=headers, timeout=5)
+            if r.status_code not in [200, 400]:
+                print(f"[AZURE_BACKEND] Conexão falhou (Status HTTP {r.status_code}): {r.text}")
+                return False
+            return True
+        except Exception as e:
+            print(f"[AZURE_BACKEND] Exceção no teste de conexão: {e}")
             return False
 
     def _call_detect(self, image_path: Path) -> List[dict]:
-        """Chama Azure Face Detect API."""
+        """Chama Azure Face Detect API com throttling."""
+        self._throttle()
         headers = {
             "Ocp-Apim-Subscription-Key": self.key,
             "Content-Type": "application/octet-stream"
@@ -175,8 +200,8 @@ class AzureBackend(FaceBackend):
             )
 
     def add_face_to_collection(self, face_id: str, person_id: str, collection_id: str = "capiau_default") -> bool:
-        """Adiciona um faceId a uma Face Collection (LargePersonGroup).
-        Permite reconhecimento 1:N posterior."""
+        """Adiciona um faceId a uma Face Collection (LargePersonGroup) com throttling."""
+        self._throttle()
         try:
             headers = {"Ocp-Apim-Subscription-Key": self.key, "Content-Type": "application/json"}
             
@@ -201,7 +226,8 @@ class AzureBackend(FaceBackend):
             return False
 
     def search_face_in_collection(self, face_id: str, collection_id: str = "capiau_default") -> Optional[str]:
-        """Busca um faceId em uma Face Collection. Retorna personId se encontrado."""
+        """Busca um faceId em uma Face Collection com throttling. Retorna personId se encontrado."""
+        self._throttle()
         try:
             headers = {"Ocp-Apim-Subscription-Key": self.key, "Content-Type": "application/json"}
             

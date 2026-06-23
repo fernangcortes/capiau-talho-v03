@@ -403,4 +403,70 @@ window.addEventListener("DOMContentLoaded", () => {
     projects.loadProjectsList().then(() => {
         console.log("Projetos iniciais carregados e configurados.");
     });
+
+    // -- AWS S3 Status and Backup Integration --
+    const s3Indicator = document.getElementById("s3-status-indicator");
+    
+    async function updateS3Status() {
+        if (!s3Indicator) return;
+        try {
+            const status = await CapIAuAPI.fetchS3Status();
+            if (status.enabled) {
+                if (status.cost_limit_reached) {
+                    s3Indicator.style.color = "var(--color-rose)";
+                    s3Indicator.title = `S3 Bloqueado: Limite Financeiro Atingido (${status.total_size_gb.toFixed(2)} GB / 150 GB)`;
+                    s3Indicator.className = "btn-icon warning";
+                } else {
+                    s3Indicator.style.color = "var(--color-emerald)"; // Green
+                    s3Indicator.title = `S3 Ativo (${status.total_size_gb.toFixed(2)} GB / 150 GB) - Clique para backup do banco de dados`;
+                    s3Indicator.className = "btn-icon online";
+                }
+            } else {
+                s3Indicator.style.color = "var(--text-muted)";
+                s3Indicator.title = "S3 Inativo ou Desconfigurado no .env";
+                s3Indicator.className = "btn-icon offline";
+            }
+        } catch (err) {
+            console.error("Falha ao obter status S3:", err);
+            s3Indicator.style.color = "var(--text-muted)";
+            s3Indicator.title = "S3 Indisponível (Erro de Conexão)";
+            s3Indicator.className = "btn-icon offline";
+        }
+    }
+
+    if (s3Indicator) {
+        s3Indicator.addEventListener("click", async () => {
+            let status;
+            try {
+                status = await CapIAuAPI.fetchS3Status();
+            } catch (err) {
+                alert("Falha de conexão com o servidor backend.");
+                return;
+            }
+            if (!status.enabled) {
+                alert("O serviço S3 não está ativo ou não foi configurado no seu arquivo .env.");
+                return;
+            }
+            if (status.cost_limit_reached) {
+                alert(`Backup cancelado por segurança de custos! O limite de 150 GB foi atingido no bucket S3 (${status.total_size_gb.toFixed(2)} GB).`);
+                return;
+            }
+            if (confirm("Deseja realizar o backup manual do banco de dados relacional (capiau.db) para o Amazon S3?")) {
+                s3Indicator.style.color = "var(--color-cyan)";
+                s3Indicator.title = "Realizando backup do banco de dados...";
+                try {
+                    const res = await CapIAuAPI.backupDatabase();
+                    alert(res.message || "Backup realizado com sucesso!");
+                } catch (err) {
+                    alert(`Falha ao realizar backup: ${err.message || err}`);
+                } finally {
+                    updateS3Status();
+                }
+            }
+        });
+    }
+
+    // Inicializa status S3 e atualiza a cada 60 segundos
+    updateS3Status();
+    setInterval(updateS3Status, 60000);
 });

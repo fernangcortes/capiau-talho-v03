@@ -49,7 +49,7 @@ class FacePipeline:
         self._init_backends()
 
     def _init_backends(self):
-        """Inicializa todos os backends disponiveis."""
+        """Inicializa todos os backends, mesmo os indisponíveis (para fins de status)."""
         backends = [
             LocalBackend(),      # Tier 0
             AzureBackend(),      # Tier 1
@@ -58,11 +58,11 @@ class FacePipeline:
         ]
         
         for backend in backends:
+            self._backends[backend.tier] = backend
             if backend.is_available:
-                self._backends[backend.tier] = backend
-                print(f"[FACE_PIPELINE] Backend disponivel: {backend}")
+                print(f"[FACE_PIPELINE] Backend disponível: {backend.name} (Tier {backend.tier})")
             else:
-                print(f"[FACE_PIPELINE] Backend indisponivel: {backend.name} (verifique credenciais/configuracao)")
+                print(f"[FACE_PIPELINE] Backend indisponível: {backend.name} (Tier {backend.tier})")
 
     @property
     def available_backends(self) -> List[FaceBackend]:
@@ -110,8 +110,8 @@ class FacePipeline:
                 break
             
             backend = self._backends.get(tier)
-            if backend is None:
-                print(f"[FACE_PIPELINE] Tier {tier} indisponivel, pulando...")
+            if backend is None or not backend.is_available:
+                print(f"[FACE_PIPELINE] Tier {tier} ({backend.name if backend else 'desconhecido'}) indisponível, pulando...")
                 continue
             
             print(f"[FACE_PIPELINE] Executando Tier {tier}: {backend.name} para {image_path.name}")
@@ -174,7 +174,7 @@ class FacePipeline:
         if current_confidence >= confidence_threshold:
             return None
         
-        if 1 not in self._backends:
+        if 1 not in self._backends or not self._backends[1].is_available:
             print("[FACE_PIPELINE] Azure Face API indisponivel para refinamento")
             return None
         
@@ -186,8 +186,8 @@ class FacePipeline:
         """Executa Tier 3 (InsightFace GPU) para maxima precisao.
         Usado para arquivos especificos selecionados pelo usuario.
         """
-        if 3 not in self._backends:
-            print("[FACE_PIPELINE] InsightFace indisponivel (GPU necessaria)")
+        if 3 not in self._backends or not self._backends[3].is_available:
+            print("[FACE_PIPELINE] InsightFace indisponivel (GPU/pacotes necessarios)")
             return None
         
         print(f"[FACE_PIPELINE] Processamento de precisao (Tier 3) para {image_path.name}")

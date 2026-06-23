@@ -9,31 +9,98 @@ from src.db.repositories.media import MediaRepository
 from src.search.semantic import SemanticSearch
 from src.nlp.prompt_templates import get_chatbot_system_prompt
 
-def enrich_description(text: str, names: List[str]) -> str:
-    """Enriquece descrições visuais substituindo termos genéricos pelos nomes dos rostos rotulados."""
-    if not names or not text:
+def enrich_description(text: str, names: List[str], text_replacements: Optional[Dict[str, str]] = None) -> str:
+    """Enriquece descrições visuais substituindo termos genéricos (incluindo plurais e objetos) pelos nomes rotulados."""
+    if not text:
         return text
+        
+    import re
+    
+    modified_text = text
+    
+    # 0. Substituição direta de trechos de texto vinculados manualmente
+    if text_replacements:
+        for target, replacement in text_replacements.items():
+            if target:
+                pattern = re.compile(re.escape(target), re.IGNORECASE)
+                modified_text = pattern.sub(replacement, modified_text)
+                
+    if not names:
+        return modified_text
         
     clean_names = []
     for n in names:
-        if n not in clean_names:
+        if n and n not in clean_names:
             clean_names.append(n)
             
-    modified_text = text
-    generic_terms = [
-        "um homem", "uma mulher", "uma pessoa", "o homem", "a mulher", "o diretor", "a diretora",
-        "o ator", "a atriz", "um rapaz", "uma moça", "um operador", "o operador", "um fotógrafo",
-        "o fotógrafo", "um entrevistado", "o entrevistado", "um técnico", "o técnico", "o editor",
-        "um editor", "a editora", "a repórter", "o repórter", "uma figura", "a pessoa", "o sujeito",
-        "o indivíduo", "o personagem", "um personagem"
-    ]
+    if not clean_names:
+        return modified_text
     
-    for name in clean_names:
+    # 1. Substituição de termos plurais se houver múltiplos nomes
+    num_names = len(clean_names)
+    if num_names >= 2:
+        names_joined = ", ".join(clean_names[:-1]) + " e " + clean_names[-1]
+        plural_terms = [
+            r"\b[dD]uas mulheres\b", r"\b[dD]ois homens\b", r"\b[dD]uas pessoas\b", 
+            r"\b[dD]ois rapazes\b", r"\b[dD]uas moças\b", r"\b[tT]rês mulheres\b", 
+            r"\b[tT]rês homens\b", r"\b[tT]rês pessoas\b", r"\b[vV]árias pessoas\b", 
+            r"\b[aA]lgumas pessoas\b", r"\b[pP]essoas\b", r"\b[mM]ulheres\b", r"\b[hH]omens\b"
+        ]
+        for term in plural_terms:
+            match = re.search(term, modified_text)
+            if match:
+                start, end = match.span()
+                modified_text = modified_text[:start] + names_joined + modified_text[end:]
+                return modified_text
+
+    # 2. Casamento de substantivos específicos (ex: objetos como 'abajur' ou 'câmera')
+    articles = ["de um", "de uma", "um", "uma", "o", "a", "este", "esta", "esse", "essa", "do", "da"]
+    sorted_names = sorted(clean_names, key=len, reverse=True)
+    
+    for name in sorted_names:
+        # Extrai palavras significativas do nome
+        name_words = [w.lower() for w in re.split(r'\W+', name) if len(w) > 2]
+        matched = False
+        for word in name_words:
+            if word in ["de", "da", "do", "com", "para", "em", "um", "uma"]:
+                continue
+            # Busca pela palavra com limites de palavra
+            pattern = re.compile(rf'\b{word}\b', re.IGNORECASE)
+            match = pattern.search(modified_text)
+            if match:
+                start, end = match.span()
+                # Verifica se há artigo precedente
+                preceding_text = modified_text[:start].rstrip()
+                found_article_len = 0
+                for art in sorted(articles, key=len, reverse=True):
+                    if preceding_text.lower().endswith(" " + art) or preceding_text.lower() == art:
+                        found_article_len = len(art)
+                        break
+                
+                if found_article_len > 0:
+                    article_start = len(preceding_text) - found_article_len
+                    modified_text = modified_text[:article_start] + name + modified_text[end:]
+                else:
+                    modified_text = modified_text[:start] + name + modified_text[end:]
+                matched = True
+                break
+        if matched:
+            continue
+
+        # 3. Fallback: Termos genéricos de pessoas (singular)
+        generic_terms = [
+            "um homem", "uma mulher", "uma pessoa", "o homem", "a mulher", "o diretor", "a diretora",
+            "o ator", "a atriz", "um rapaz", "uma moça", "um operador", "o operador", "um fotógrafo",
+            "o fotógrafo", "um entrevistado", "o entrevistado", "um técnico", "o técnico", "o editor",
+            "um editor", "a editora", "a repórter", "o repórter", "uma figura", "a pessoa", "o sujeito",
+            "o indivíduo", "o personagem", "um personagem"
+        ]
+        
+        text_lower = modified_text.lower()
         best_match_idx = -1
         best_match_term = None
         best_match_len = 0
         
-        text_lower = modified_text.lower()
         for term in generic_terms:
             idx = text_lower.find(term)
             if idx != -1:
@@ -71,12 +138,12 @@ class RAGService:
                     SELECT f.id as face_id, f.photo_id, p.filename, p.filepath, p.description, p.tags
                     FROM face f
                     JOIN photo p ON f.photo_id = p.id
-                    WHERE f.project_id = ? AND f.name LIKE ?
+                    WHERE f.project_id = ? AND f.name LIKE ? AND f.name != 'Não Relevante' AND f.name != 'Não é Rosto'
                 """, (project_id, f"%{query}%"))
                 photo_rows = cursor.fetchall()
                 for pr in photo_rows:
                     # Obter todos os rostos rotulados nesta foto
-                    cursor.execute("SELECT DISTINCT name FROM face WHERE photo_id = ? AND name IS NOT NULL", (pr["photo_id"],))
+                    cursor.execute("SELECT DISTINCT name FROM face WHERE photo_id = ? AND name IS NOT NULL AND name != 'Não Relevante' AND name != 'Não é Rosto'", (pr["photo_id"],))
                     names = [r["name"] for r in cursor.fetchall()]
                     
                     raw_desc = pr["description"] or "Foto de bastidores."
@@ -99,7 +166,7 @@ class RAGService:
                     SELECT f.id as face_id, f.video_id, f.timestamp, v.filename, v.filepath, v.description, v.tags
                     FROM face f
                     JOIN video v ON f.video_id = v.id
-                    WHERE f.project_id = ? AND f.name LIKE ?
+                    WHERE f.project_id = ? AND f.name LIKE ? AND f.name != 'Não Relevante' AND f.name != 'Não é Rosto'
                 """, (project_id, f"%{query}%"))
                 video_face_rows = cursor.fetchall()
                 for vr in video_face_rows:
@@ -114,14 +181,24 @@ class RAGService:
                     if not frame_desc:
                         frame_desc = vr["description"] or "Frame de bastidores."
                         
-                    # Obter os rostos rotulados no mesmo frame
+                    # Obter os rostos rotulados no mesmo frame com 5s de tolerância
                     cursor.execute("""
-                        SELECT DISTINCT name FROM face 
-                        WHERE video_id = ? AND ABS(timestamp - ?) < 0.1 AND name IS NOT NULL
+                        SELECT DISTINCT name, crop_path FROM face 
+                        WHERE video_id = ? AND ABS(timestamp - ?) <= 5.0 AND name IS NOT NULL AND name != '' AND name != 'Não Relevante' AND name != 'Não é Rosto'
                     """, (vr["video_id"], vr["timestamp"]))
-                    names = [r["name"] for r in cursor.fetchall()]
+                    face_rows = cursor.fetchall()
+                    names = []
+                    replacements = {}
+                    for f_row in face_rows:
+                        face_name = f_row["name"]
+                        face_crop = f_row["crop_path"]
+                        if face_crop and face_crop.startswith("text:"):
+                            replacements[face_crop[5:]] = face_name
+                        else:
+                            if face_name not in names:
+                                names.append(face_name)
                     
-                    enriched_desc = enrich_description(frame_desc, names)
+                    enriched_desc = enrich_description(frame_desc, names, text_replacements=replacements)
                     
                     face_results.append({
                         "score": 1.0,
@@ -215,7 +292,7 @@ class RAGService:
                             payload["tags"] = json.loads(photo_row["tags"]) if photo_row["tags"] else []
                             
                             # Enriquece com rostos conhecidos
-                            cursor.execute("SELECT DISTINCT name FROM face WHERE photo_id = ? AND name IS NOT NULL", (photo_id,))
+                            cursor.execute("SELECT DISTINCT name FROM face WHERE photo_id = ? AND name IS NOT NULL AND name != 'Não Relevante' AND name != 'Não é Rosto'", (photo_id,))
                             names = [f_row["name"] for f_row in cursor.fetchall()]
                             raw_desc = photo_row["description"] or payload.get("text") or "Foto de bastidores."
                             payload["text"] = enrich_description(raw_desc, names)
@@ -229,11 +306,22 @@ class RAGService:
                     video_id = payload.get("video_id")
                     timestamp = payload.get("start_time")
                     if video_id and timestamp is not None:
-                        # Enriquece com rostos conhecidos no frame
-                        cursor.execute("SELECT DISTINCT name FROM face WHERE video_id = ? AND ABS(timestamp - ?) < 0.1 AND name IS NOT NULL", (video_id, timestamp))
-                        names = [f_row["name"] for f_row in cursor.fetchall()]
+                        # Enriquece com rostos conhecidos no frame com 5s de tolerância
+                        cursor.execute("SELECT DISTINCT name, crop_path FROM face WHERE video_id = ? AND ABS(timestamp - ?) <= 5.0 AND name IS NOT NULL AND name != '' AND name != 'Não Relevante' AND name != 'Não é Rosto'", (video_id, timestamp))
+                        face_rows = cursor.fetchall()
+                        names = []
+                        replacements = {}
+                        for f_row in face_rows:
+                            face_name = f_row[0]
+                            face_crop = f_row[1]
+                            if face_crop and face_crop.startswith("text:"):
+                                replacements[face_crop[5:]] = face_name
+                            else:
+                                if face_name not in names:
+                                    names.append(face_name)
+                        
                         raw_desc = payload.get("text", "")
-                        payload["text"] = enrich_description(raw_desc, names)
+                        payload["text"] = enrich_description(raw_desc, names, text_replacements=replacements)
 
 
         return final_results[:limit]

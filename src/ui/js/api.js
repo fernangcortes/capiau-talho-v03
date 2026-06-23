@@ -74,19 +74,35 @@ export class CapIAuAPI {
     }
 
     static labelFace(faceId, name) {
-        return this.request(`/api/face/${faceId}/label`, {
+        return this.request(`/api/faces/face/${faceId}/label`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name })
         });
     }
 
+    static rejectFace(faceId, name = "") {
+        return this.request(`/api/faces/face/${faceId}/reject`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name })
+        });
+    }
+
+    static addManualFace(payload) {
+        return this.request("/api/faces/face", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+    }
+
     static fetchVideoFaces(videoId) {
-        return this.request(`/api/video/${videoId}/faces`);
+        return this.request(`/api/faces/video/${videoId}/faces`);
     }
 
     static fetchPhotoFaces(photoId) {
-        return this.request(`/api/photo/${photoId}/faces`);
+        return this.request(`/api/faces/photo/${photoId}/faces`);
     }
 
     static fetchProjectSpeakers(projectId) {
@@ -122,8 +138,8 @@ export class CapIAuAPI {
         return this.request(`/api/photo/${photoId}/analyze-vision`, { method: "POST" });
     }
 
-    static analyzeAllVision(projectId) {
-        return this.request(`/api/project/${projectId}/analyze-all-vision`, { method: "POST" });
+    static analyzeAllVision(projectId, force = false) {
+        return this.request(`/api/project/${projectId}/analyze-all-vision?force=${force}`, { method: "POST" });
     }
 
     static fetchConversions() {
@@ -200,17 +216,17 @@ export class CapIAuAPI {
     }
 
     static fetchFaceClusters(projectId) {
-        return this.request(`/api/project/${projectId}/face-clusters`);
+        return this.request(`/api/faces/project/${projectId}/face-clusters`);
     }
 
     static clusterFaces(projectId, eps = 0.38, minSamples = 3) {
-        return this.request(`/api/project/${projectId}/faces/cluster?eps=${eps}&min_samples=${minSamples}`, {
+        return this.request(`/api/faces/project/${projectId}/faces/cluster?eps=${eps}&min_samples=${minSamples}`, {
             method: "POST"
         });
     }
 
     static mergeClusters(projectId, srcClusterId, destClusterId, name) {
-        return this.request(`/api/project/${projectId}/faces/merge`, {
+        return this.request(`/api/faces/project/${projectId}/faces/merge`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ src_cluster_id: srcClusterId, dest_cluster_id: destClusterId, name })
@@ -218,7 +234,7 @@ export class CapIAuAPI {
     }
 
     static reassignFaces(projectId, faceIds, targetClusterId, targetName) {
-        return this.request(`/api/project/${projectId}/faces/reassign`, {
+        return this.request(`/api/faces/project/${projectId}/faces/reassign`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ face_ids: faceIds, target_cluster_id: targetClusterId, target_name: targetName })
@@ -226,11 +242,19 @@ export class CapIAuAPI {
     }
 
     static fetchClusterFaces(projectId, clusterId) {
-        return this.request(`/api/project/${projectId}/face-clusters/${clusterId}/faces`);
+        return this.request(`/api/faces/project/${projectId}/face-clusters/${clusterId}/faces`);
     }
 
     static fetchUnlabeledFaces(projectId) {
-        return this.request(`/api/project/${projectId}/unlabeled-faces`);
+        return this.request(`/api/faces/project/${projectId}/unlabeled-faces`);
+    }
+
+    static fetchS3Status() {
+        return this.request("/api/faces/pipeline/s3/status");
+    }
+
+    static backupDatabase() {
+        return this.request("/api/project/backup-db", { method: "POST" });
     }
 }
 

@@ -18,6 +18,7 @@ from src.db.repositories.media import MediaRepository
 from src.core.tasks import TASK_MANAGER
 from src.services.ingest import IngestService
 from src.services.pipeline import PipelineService
+from src.search.semantic import SemanticSearch
 
 router = APIRouter(tags=["Media & Ingestion"])
 
@@ -31,7 +32,17 @@ def list_videos(project_id: int = Query(1), conn: sqlite3.Connection = Depends(g
         if (CONFIG.PROXIES_DIR / proxy_rel).exists():
             v['proxy_path'] = f"/proxies/{proxy_rel}"
         else:
-            v['proxy_path'] = None
+            from src.services.s3_service import S3Service
+            s3_service = S3Service.get_instance()
+            if s3_service.enabled:
+                s3_key = f"proxies/{proxy_rel}"
+                presigned_url = s3_service.generate_presigned_url(s3_key)
+                if presigned_url:
+                    v['proxy_path'] = presigned_url
+                else:
+                    v['proxy_path'] = None
+            else:
+                v['proxy_path'] = None
     return videos
 
 @router.get("/api/photos")
@@ -143,14 +154,26 @@ def trigger_vision_photo(photo_id: int, background_tasks: BackgroundTasks, conn:
     return {"status": "success", "message": "Análise visual da foto de set iniciada."}
 
 @router.post("/api/project/{project_id}/analyze-all-vision")
-def trigger_all_vision(project_id: int, background_tasks: BackgroundTasks, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Analisa de forma assíncrona todas as mídias pendentes de visão, aplicando detecção facial e burst-sequencing de fotos."""
+def trigger_all_vision(
+    project_id: int,
+    force: bool = Query(False, description="Forçar reanálise de mídias já analisadas"),
+    background_tasks: BackgroundTasks = None,
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Analisa de forma assíncrona todas as mídias pendentes ou todas (se force=True) de visão, aplicando detecção facial e burst-sequencing de fotos."""
     cursor = conn.cursor()
-    cursor.execute("SELECT id, filepath, duration FROM video WHERE project_id = ? AND video_type = 'broll' AND status IN ('ingested', 'error')", (project_id,))
-    video_rows = cursor.fetchall()
-    
-    cursor.execute("SELECT id, filepath FROM photo WHERE project_id = ? AND status IN ('ingested', 'pending', 'error')", (project_id,))
-    photo_rows = cursor.fetchall()
+    if force:
+        cursor.execute("SELECT id, filepath, duration FROM video WHERE project_id = ? AND video_type = 'broll'", (project_id,))
+        video_rows = cursor.fetchall()
+        
+        cursor.execute("SELECT id, filepath FROM photo WHERE project_id = ?", (project_id,))
+        photo_rows = cursor.fetchall()
+    else:
+        cursor.execute("SELECT id, filepath, duration FROM video WHERE project_id = ? AND video_type = 'broll' AND status IN ('ingested', 'analyzing', 'error')", (project_id,))
+        video_rows = cursor.fetchall()
+        
+        cursor.execute("SELECT id, filepath FROM photo WHERE project_id = ? AND status IN ('ingested', 'pending', 'error')", (project_id,))
+        photo_rows = cursor.fetchall()
     
     def bg_vision_all():
         # 1. Processa B-rolls
@@ -345,249 +368,4 @@ def delete_photo(photo_id: int, conn: sqlite3.Connection = Depends(get_db_conn))
     MediaRepository.delete_photo(conn, photo_id)
     conn.commit()
     return {"status": "success", "message": f"Foto ID {photo_id} removida."}
-
-@router.post("/api/face/{face_id}/label")
-def label_face(face_id: int, payload: LabelFacePayload, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Rotula um rosto específico. Propaga em lote para o cluster, com detecção de conflitos."""
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT project_id, cluster_id, name FROM face WHERE id = ?", (face_id,))
-        row = cursor.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Face não encontrada.")
-            
-        project_id = row["project_id"]
-        current_cluster_id = row["cluster_id"]
-        new_name = payload.name.strip()
-        
-        if not new_name:
-            # Limpar nome se vazio
-            cursor.execute("UPDATE face SET name = NULL WHERE id = ?", (face_id,))
-            conn.commit()
-            return {"status": "success", "message": "Rótulo removido."}
-            
-        # Se a face faz parte de um cluster, verificar se o novo nome já pertence a OUTRO cluster
-        if current_cluster_id is not None and current_cluster_id >= 0:
-            cursor.execute("""
-                SELECT DISTINCT cluster_id FROM face 
-                WHERE project_id = ? AND name = ? AND cluster_id != ? AND cluster_id >= 0
-            """, (project_id, new_name, current_cluster_id))
-            conflict_row = cursor.fetchone()
-            
-            if conflict_row:
-                other_cluster_id = conflict_row["cluster_id"]
-                return {
-                    "status": "conflict",
-                    "message": f"O nome '{new_name}' já está associado a outro grupo de rostos (Grupo {other_cluster_id + 1}).",
-                    "current_cluster_id": current_cluster_id,
-                    "existing_cluster_id": other_cluster_id,
-                    "target_name": new_name
-                }
-                
-            # Sem conflitos: atualizar todas as faces do mesmo cluster
-            cursor.execute("""
-                UPDATE face SET name = ? WHERE project_id = ? AND cluster_id = ?
-            """, (new_name, project_id, current_cluster_id))
-            conn.commit()
-            return {
-                "status": "success", 
-                "message": f"Todas as faces do Grupo {current_cluster_id + 1} foram rotuladas como '{new_name}'."
-            }
-        else:
-            # Rosto isolado/ruído: atualizar apenas este rosto individualmente
-            cursor.execute("UPDATE face SET name = ? WHERE id = ?", (new_name, face_id))
-            conn.commit()
-            return {"status": "success", "message": f"Rosto ID {face_id} rotulado individualmente como '{new_name}'."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/api/video/{video_id}/faces")
-def get_video_faces(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Retorna todos os rostos identificados nos frames do vídeo."""
-    faces = MediaRepository.get_video_faces(conn, video_id)
-    for f in faces:
-        try:
-            f['bounding_box'] = json.loads(f['bounding_box']) if f.get('bounding_box') else []
-        except Exception:
-            pass
-    return faces
-
-@router.get("/api/photo/{photo_id}/faces")
-def get_photo_faces(photo_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Retorna todos os rostos detectados em uma foto bastidores."""
-    faces = MediaRepository.get_photo_faces(conn, photo_id)
-    for f in faces:
-        try:
-            f['bounding_box'] = json.loads(f['bounding_box']) if f.get('bounding_box') else []
-        except Exception:
-            pass
-    return faces
-
-@router.get("/api/project/{project_id}/speakers")
-def get_project_speakers(project_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Agrega e ordena uma lista consolidada de falantes diarizados e rostos rotulados."""
-    return MediaRepository.get_project_speakers_and_labeled_faces(conn, project_id)
-
-@router.get("/api/project/{project_id}/face-clusters")
-def list_project_face_clusters(project_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Lista todos os grupos de rostos agrupados no projeto."""
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT 
-                cluster_id,
-                name,
-                MIN(id) as rep_face_id,
-                COUNT(*) as occurrences
-            FROM face
-            WHERE project_id = ? AND cluster_id IS NOT NULL AND cluster_id >= 0
-            GROUP BY cluster_id, name
-            ORDER BY occurrences DESC
-        """, (project_id,))
-        rows = cursor.fetchall()
-        return [dict(r) for r in rows]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/api/project/{project_id}/unlabeled-faces")
-def list_unlabeled_faces(project_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Retorna rostos que não foram rotulados (ou possuem placeholders genéricos) para desambiguação rápida."""
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, bounding_box, photo_id, video_id, timestamp, name, cluster_id
-            FROM face
-            WHERE project_id = ? AND (name IS NULL OR name LIKE 'Pessoa Desconhecida%')
-            ORDER BY cluster_id DESC, id DESC
-            LIMIT 100
-        """, (project_id,))
-        rows = cursor.fetchall()
-        return [dict(r) for r in rows]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/api/project/{project_id}/face-clusters/{cluster_id}/faces")
-
-def list_cluster_faces(project_id: int, cluster_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Retorna todas as faces individuais pertencentes a um cluster específico."""
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, bounding_box, photo_id, video_id, timestamp, name 
-            FROM face 
-            WHERE project_id = ? AND cluster_id = ?
-        """, (project_id, cluster_id))
-        rows = cursor.fetchall()
-        return [dict(r) for r in rows]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/api/project/{project_id}/faces/cluster")
-def cluster_project_faces(project_id: int, eps: float = 0.38, min_samples: int = 3):
-    """Dispara o agrupamento DBSCAN local de rostos no projeto."""
-    from src.vision.face_engine import cluster_faces_dbscan
-    return cluster_faces_dbscan(project_id, eps, min_samples)
-
-@router.post("/api/project/{project_id}/faces/merge")
-def merge_project_clusters(project_id: int, payload: MergeClustersPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Mescla duas classes de clusters de faces (Resolução de conflito: fusão total)."""
-    try:
-        from src.vision.face_engine import merge_clusters
-        merge_clusters(project_id, payload.src_cluster_id, payload.dest_cluster_id, payload.name)
-        return {"status": "success", "message": f"Clusters mesclados com sucesso sob o nome '{payload.name}'."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/api/project/{project_id}/faces/reassign")
-def reassign_project_faces(project_id: int, payload: ReassignFacesPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Reatribui faces de forma unitária (Resolução de conflito: desambiguação manual)."""
-    try:
-        from src.vision.face_engine import reassign_faces
-        reassign_faces(project_id, payload.face_ids, payload.target_cluster_id, payload.target_name)
-        return {"status": "success", "message": f"{len(payload.face_ids)} faces reatribuídas com sucesso."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/api/face/{face_id}/thumbnail")
-def get_face_thumbnail(face_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Corta dinamicamente e retorna o thumbnail JPEG da face."""
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT f.bounding_box, f.photo_id, f.video_id, f.timestamp, 
-                   p.filepath as photo_path, v.filepath as video_path
-            FROM face f
-            LEFT JOIN photo p ON f.photo_id = p.id
-            LEFT JOIN video v ON f.video_id = v.id
-            WHERE f.id = ?
-        """, (face_id,))
-        row = cursor.fetchone()
-        
-        if not row or not row["bounding_box"]:
-            raise HTTPException(status_code=404, detail="Face ou bounding box não encontrada.")
-            
-        bbox = json.loads(row["bounding_box"])
-        rx, ry, rw, rh = bbox
-        
-        img_path = None
-        temp_frame_path = None
-        
-        if row["photo_id"] is not None:
-            img_path = Path(row["photo_path"])
-            if not img_path.exists():
-                img_path = Path("c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP") / img_path
-        elif row["video_id"] is not None:
-            video_path = Path(row["video_path"])
-            if not video_path.exists():
-                video_path = Path("c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP") / video_path
-                
-            if video_path.exists():
-                from src.vision.multimodal_engine import extract_frame_ffmpeg
-                temp_dir = CONFIG.CACHE_DIR / "temp_crops"
-                temp_dir.mkdir(exist_ok=True, parents=True)
-                temp_frame_path = temp_dir / f"crop_vid_{row['video_id']}_ts_{int(row['timestamp'])}s.jpg"
-                
-                success = extract_frame_ffmpeg(video_path, row["timestamp"], temp_frame_path)
-                if success and temp_frame_path.exists():
-                    img_path = temp_frame_path
-                    
-        if not img_path or not img_path.exists():
-            raise HTTPException(status_code=404, detail="Arquivo de mídia de origem não encontrado.")
-            
-        img = cv2.imread(str(img_path))
-        if img is None:
-            raise HTTPException(status_code=500, detail="Erro ao carregar imagem.")
-            
-        height, width = img.shape[:2]
-        
-        # Adiciona margem de 15% para contexto visual do rosto
-        margin = 0.15
-        x = int((rx - margin * rw) * width)
-        y = int((ry - margin * rh) * height)
-        w = int((rw + 2 * margin * rw) * width)
-        h = int((rh + 2 * margin * rh) * height)
-        
-        x1, y1 = max(0, x), max(0, y)
-        x2, y2 = min(width, x + w), min(height, y + h)
-        
-        crop_img = img[y1:y2, x1:x2]
-        if crop_img.size == 0:
-            crop_img = img
-            
-        crop_img = cv2.resize(crop_img, (96, 96))
-        
-        retval, buf = cv2.imencode(".jpg", crop_img)
-        if not retval:
-            raise HTTPException(status_code=500, detail="Erro ao codificar thumbnail.")
-            
-        if temp_frame_path and temp_frame_path.exists():
-            try:
-                temp_frame_path.unlink()
-            except Exception:
-                pass
-                
-        from fastapi.responses import Response
-        return Response(content=buf.tobytes(), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 

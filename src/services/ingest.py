@@ -195,6 +195,19 @@ class IngestService:
                 if success:
                     MediaRepository.update_video_status(conn, video_id, 'ingested')
                     TASK_MANAGER.update_progress(str(video_id), 100.0, "finished")
+                    
+                    # S3 Upload in background
+                    try:
+                        from src.services.s3_service import S3Service
+                        s3_service = S3Service.get_instance()
+                        if s3_service.enabled:
+                            TASK_MANAGER.executor.submit(
+                                s3_service.upload_file,
+                                proxy_path,
+                                f"proxies/proxy_vid_{video_id}.mp4"
+                            )
+                    except Exception as s3_err:
+                        print(f"[IngestService] Erro ao disparar upload do proxy de video para S3: {s3_err}")
                 else:
                     # Verifica se foi cancelado de forma manual
                     current_prog = TASK_MANAGER.get_progress().get(str(video_id), {})

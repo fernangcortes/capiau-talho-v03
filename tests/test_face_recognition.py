@@ -114,9 +114,14 @@ class TestFaceRecognitionAndClustering(unittest.TestCase):
                 norm = np.linalg.norm(emb)
                 emb = (np.array(emb) / norm).tolist()
                 cursor.execute("""
-                    INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp, embedding)
-                    VALUES (?, ?, ?, ?, NULL, NULL, ?)
-                """, (project_id, None, json.dumps([0.1, 0.1, 0.2, 0.2]), 10 + i, json.dumps(emb)))
+                    INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp)
+                    VALUES (?, ?, ?, ?, NULL, NULL)
+                """, (project_id, None, json.dumps([0.1, 0.1, 0.2, 0.2]), 10 + i))
+                face_id = cursor.lastrowid
+                cursor.execute("""
+                    INSERT INTO face_recognition (face_id, tier, model, model_version, embedding, confidence, status)
+                    VALUES (?, 0, 'yunet_sface', 'v1.0', ?, 0.8, 'auto')
+                """, (face_id, json.dumps(emb)))
                 
             # 3 faces próximas ao padrão João
             for i in range(3):
@@ -125,20 +130,30 @@ class TestFaceRecognitionAndClustering(unittest.TestCase):
                 norm = np.linalg.norm(emb)
                 emb = (np.array(emb) / norm).tolist()
                 cursor.execute("""
-                    INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp, embedding)
-                    VALUES (?, ?, ?, ?, NULL, NULL, ?)
-                """, (project_id, None, json.dumps([0.4, 0.4, 0.2, 0.2]), 20 + i, json.dumps(emb)))
+                    INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp)
+                    VALUES (?, ?, ?, ?, NULL, NULL)
+                """, (project_id, None, json.dumps([0.4, 0.4, 0.2, 0.2]), 20 + i))
+                face_id = cursor.lastrowid
+                cursor.execute("""
+                    INSERT INTO face_recognition (face_id, tier, model, model_version, embedding, confidence, status)
+                    VALUES (?, 0, 'yunet_sface', 'v1.0', ?, 0.8, 'auto')
+                """, (face_id, json.dumps(emb)))
                 
             # 1 face ruído
             cursor.execute("""
-                INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp, embedding)
-                VALUES (?, ?, ?, ?, NULL, NULL, ?)
-            """, (project_id, None, json.dumps([0.8, 0.8, 0.1, 0.1]), 99, json.dumps(emb_noise)))
+                INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp)
+                VALUES (?, ?, ?, ?, NULL, NULL)
+            """, (project_id, None, json.dumps([0.8, 0.8, 0.1, 0.1]), 99))
+            face_id = cursor.lastrowid
+            cursor.execute("""
+                INSERT INTO face_recognition (face_id, tier, model, model_version, embedding, confidence, status)
+                VALUES (?, 0, 'yunet_sface', 'v1.0', ?, 0.8, 'auto')
+            """, (face_id, json.dumps(emb_noise)))
             
             conn.commit()
 
         # 1. Trigger Clustering
-        response = self.client.post(f"/api/project/{project_id}/faces/cluster?eps=0.38&min_samples=3")
+        response = self.client.post(f"/api/faces/project/{project_id}/faces/cluster?eps=0.38&min_samples=3")
         self.assertEqual(response.status_code, 200)
         c_res = response.json()
         self.assertEqual(c_res["total_faces"], 7)
@@ -147,7 +162,7 @@ class TestFaceRecognitionAndClustering(unittest.TestCase):
         self.assertEqual(c_res["noise_faces"], 1)
 
         # 2. List Clusters
-        response = self.client.get(f"/api/project/{project_id}/face-clusters")
+        response = self.client.get(f"/api/faces/project/{project_id}/face-clusters")
         self.assertEqual(response.status_code, 200)
         clusters = response.json()
         self.assertEqual(len(clusters), 2)
@@ -157,7 +172,7 @@ class TestFaceRecognitionAndClustering(unittest.TestCase):
         cluster_b = clusters[1]
         
         # 3. Label Cluster A as "Maria"
-        response = self.client.post(f"/api/face/{cluster_a['rep_face_id']}/label", json={"name": "Maria"})
+        response = self.client.post(f"/api/faces/face/{cluster_a['rep_face_id']}/label", json={"name": "Maria"})
         self.assertEqual(response.status_code, 200)
         self.assertIn("Maria", response.json()["message"])
         
@@ -168,7 +183,7 @@ class TestFaceRecognitionAndClustering(unittest.TestCase):
             self.assertEqual(cursor.fetchone()["count"], 3)
 
         # 4. Label Cluster B as "Maria" -> Deverá acusar CONFLITO
-        response = self.client.post(f"/api/face/{cluster_b['rep_face_id']}/label", json={"name": "Maria"})
+        response = self.client.post(f"/api/faces/face/{cluster_b['rep_face_id']}/label", json={"name": "Maria"})
         self.assertEqual(response.status_code, 200)
         label_res = response.json()
         self.assertEqual(label_res["status"], "conflict")
@@ -177,7 +192,7 @@ class TestFaceRecognitionAndClustering(unittest.TestCase):
         self.assertEqual(label_res["existing_cluster_id"], cluster_a["cluster_id"])
 
         # 5. Resolver conflito por Fusão Total (Merge)
-        response = self.client.post(f"/api/project/{project_id}/faces/merge", json={
+        response = self.client.post(f"/api/faces/project/{project_id}/faces/merge", json={
             "src_cluster_id": cluster_b["cluster_id"],
             "dest_cluster_id": cluster_a["cluster_id"],
             "name": "Maria"
@@ -195,16 +210,20 @@ class TestFaceRecognitionAndClustering(unittest.TestCase):
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp, embedding)
-                VALUES (?, ?, ?, 30, NULL, NULL, ?)
-            """, (project_id, "Maria", json.dumps([0.1, 0.1, 0.2, 0.2]), json.dumps(emb_maria)))
+                INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp)
+                VALUES (?, ?, ?, 30, NULL, NULL)
+            """, (project_id, "Maria", json.dumps([0.1, 0.1, 0.2, 0.2])))
             new_face_id = cursor.lastrowid
+            cursor.execute("""
+                INSERT INTO face_recognition (face_id, tier, model, model_version, embedding, confidence, status)
+                VALUES (?, 0, 'yunet_sface', 'v1.0', ?, 0.8, 'auto')
+            """, (new_face_id, json.dumps(emb_maria)))
             # Atribuir manualmente a um novo cluster_id = 9
             cursor.execute("UPDATE face SET cluster_id = 9 WHERE id = ?", (new_face_id,))
             conn.commit()
 
         # Reatribuir individualmente (Desambiguação Manual Unitária)
-        response = self.client.post(f"/api/project/{project_id}/faces/reassign", json={
+        response = self.client.post(f"/api/faces/project/{project_id}/faces/reassign", json={
             "face_ids": [new_face_id],
             "target_cluster_id": cluster_a["cluster_id"],
             "target_name": "Maria Real"
@@ -220,7 +239,7 @@ class TestFaceRecognitionAndClustering(unittest.TestCase):
             self.assertEqual(row["cluster_id"], cluster_a["cluster_id"])
 
         # Testar desambiguação fullscreen: listar rostos não rotulados
-        response = self.client.get(f"/api/project/{project_id}/unlabeled-faces")
+        response = self.client.get(f"/api/faces/project/{project_id}/unlabeled-faces")
         self.assertEqual(response.status_code, 200)
         unlabeled_list = response.json()
         self.assertTrue(len(unlabeled_list) > 0)
@@ -238,6 +257,27 @@ class TestFaceRecognitionAndClustering(unittest.TestCase):
         self.assertTrue(len(search_res) > 0)
         first_text = search_res[0]["payload"]["text"]
         self.assertIn("Maria Real de casaco deitado na grama.", first_text)
+
+        # 7. Testar rejeição com especificação de objeto
+        response = self.client.post(f"/api/faces/face/{new_face_id}/reject", json={"name": "Luminária"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "success")
+
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM face WHERE id = ?", (new_face_id,))
+            self.assertEqual(cursor.fetchone()["name"], "Luminária")
+            cursor.execute("SELECT status FROM face_recognition WHERE face_id = ? ORDER BY recognized_at DESC LIMIT 1", (new_face_id,))
+            self.assertEqual(cursor.fetchone()["status"], "rejected")
+
+        # 8. Testar rejeição sem payload (fallback para 'Não Relevante')
+        response = self.client.post(f"/api/faces/face/{new_face_id}/reject")
+        self.assertEqual(response.status_code, 200)
+
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM face WHERE id = ?", (new_face_id,))
+            self.assertEqual(cursor.fetchone()["name"], "Não Relevante")
 
 
 if __name__ == "__main__":

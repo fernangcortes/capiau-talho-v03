@@ -133,15 +133,23 @@ class MediaRepository:
         timestamp: Optional[float] = None,
         embedding: Optional[List[float]] = None
     ) -> int:
-        """Insere um registro de detecção facial."""
+        """Insere um registro de detecção facial e seu embedding associado na tabela de reconhecimentos."""
         cursor = conn.cursor()
         bbox_str = json.dumps(bounding_box)
-        emb_str = json.dumps(embedding) if embedding else None
         cursor.execute("""
-            INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp, embedding)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (project_id, name, bbox_str, photo_id, video_id, timestamp, emb_str))
-        return cursor.lastrowid
+            INSERT INTO face (project_id, name, bounding_box, photo_id, video_id, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (project_id, name, bbox_str, photo_id, video_id, timestamp))
+        face_id = cursor.lastrowid
+        
+        if embedding:
+            emb_str = json.dumps(embedding)
+            cursor.execute("""
+                INSERT INTO face_recognition (face_id, tier, model, model_version, embedding, confidence, status)
+                VALUES (?, 0, 'yunet_sface', 'v1.0', ?, 0.8, 'auto')
+            """, (face_id, emb_str))
+            
+        return face_id
 
     @staticmethod
     def delete_faces_by_source(conn: sqlite3.Connection, photo_id: Optional[int] = None, video_id: Optional[int] = None, timestamp: Optional[float] = None) -> None:
