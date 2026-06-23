@@ -78,3 +78,32 @@ Para editar em velocidade profissional de ilha de corte, use os atalhos de tecla
 3. Clique em **`Salvar`** para gravar a timeline no SQLite local.
 4. Escolha o formato de saída no seletor (ex: **`Premiere / Resolve XML`** para importar direto no Premiere/Resolve/FCP, ou **`OpenTimelineIO (.otio)`**).
 5. Clique em **`Exportar`**. O arquivo será gerado instantaneamente no disco e o download iniciará no seu navegador!
+
+---
+
+## 👁️ 5. Mapeamento de Rostos, Objetos e Desambiguação Rápida
+
+O CaIAu Talho conta com uma interface completa de decupagem visual para gerenciar as marcações de pessoas e elementos do set de filmagem.
+
+### A. Exibição e Desenho Livre (Drag-and-Draw) no Player
+* **Visualização Inteligente:** As caixas delimitadoras de rostos e objetos (`face-box`) ficam ocultas por padrão no player para não poluir a visualização. Elas aparecem instantaneamente ao passar o mouse perto do rosto ou objeto quando o player estiver **pausado**.
+* **Desenhar novas caixas:** Se quiser cadastrar um objeto do cenário (ex: `Abajur`, `Microfone de Lapela`) ou uma pessoa não detectada automaticamente:
+  1. Pause o vídeo no frame desejado.
+  2. Clique com o botão esquerdo e arraste o mouse sobre o objeto para desenhar um retângulo pontilhado roxo.
+  3. Ao soltar, uma janela de prompt surgirá. Digite o nome do objeto ou pessoa (ou escolha um nome sugerido na lista) e confirme.
+  4. O retângulo se fixará na tela e atualizará automaticamente as tags na aba **Visão IA**.
+
+### B. Desambiguação Rápida em Tela Cheia
+Na aba **Grupos de Rostos**, clique em **`Desambiguação Rápida`** para abrir o gerenciador em tela cheia. Aqui, você verá todas as detecções ainda sem nome ou não validadas do seu projeto:
+
+* **Preview de Contexto Instantâneo (Hover):** Algumas miniaturas podem estar desfocadas ou muito aproximadas. Para ver o contexto original completo, basta **deixar o mouse posicionado em cima do card**. O sistema carregará instantaneamente um popover flutuante com a foto original completa ou um trecho de vídeo de 5 segundos rodando em loop ao redor daquele frame. Os previews utilizam arquivos proxies locais otimizados para garantir rapidez.
+* **Marcar como Objeto ou Rejeitar (Não Relevante):** 
+  * Clique no ícone de banir (vermelho) no canto do card.
+  * Um prompt perguntará se o elemento é um objeto relevante do cenário. 
+  * Se for (ex: `Câmera`), digite o nome do objeto. Ele será catalogado e integrado nas buscas semânticas da biblioteca, sem poluir o agrupamento de rostos de pessoas.
+  * Se for apenas ruído visual, deixe em branco e confirme. O elemento será rotulado como `Não Relevante` e ignorado pelas descrições do RAG.
+* **Seleção em Massa (Bulk Actions):** 
+  * Você pode clicar em múltiplos cards para selecioná-los.
+  * Uma barra inferior de ações surgirá. 
+  * Digite um nome e clique em **Aplicar** para nomear todos ao mesmo tempo. Caso haja um conflito de grupos (se o nome já pertencer a outro grupo), o sistema mesclará automaticamente os grupos em background.
+  * Clique em **Descartar** para rejeitar todas as marcações selecionadas de uma vez, com a opção de catalogá-las conjuntamente como um mesmo objeto (ex: `Cadeira`).

@@ -68,6 +68,51 @@ graph TD
   * **DeepSeek V3:** Agrupa as falas de todas as entrevistas em temas de documentário (clustering narrativo).
   * **Gemini 2.5 Flash / Gemini 3.1 Flash Lite:** Analisa fotos de set e frames de B-roll a cada 10 segundos para gerar metadados visuais semânticos de bastidores.
 
+### 4. Pipeline de Visão Inteligente e Reconhecimento Facial
+O CaIAu Talho implementa um fluxo de reconhecimento facial em cascata dividida em **4 Tiers** de processamento e precisão:
+* **Tier 0 (Local CPU):** Deteção leve com **YuNet** e extração de embeddings com **SFace** rodando localmente na CPU.
+* **Tier 1 (Nuvem Azure):** Integração com **Azure Face API** (com limite ativo de 20 chamadas/min e teste de conexão via `POST` robusto no plano gratuito) para extração fina de atributos e contornos de alta precisão.
+* **Tier 2 (Nuvem AWS):** Reconhecimento de rostos de celebridades e busca de coleções no **AWS Rekognition**.
+* **Tier 3 (Local GPU/CPU Avançado):** Suporte nativo ao **InsightFace** (ArcFace + RetinaFace). Se detectado que o módulo `insightface` está em falta, o backend expõe um endpoint para a instalação programática (`POST /api/faces/pipeline/install-insightface`) com um clique diretamente pela interface.
+
+#### Motor de Enriquecimento de RAG e Busca Semântica
+As descrições brutas dos frames de B-roll e fotos geradas pelas IAs de visão são associadas às marcações de rostos e objetos em uma janela de tolerância de **5.0 segundos**:
+* **Substituição de Plurais:** Quando dois ou mais nomes de pessoas são identificados no mesmo frame, termos genéricos no texto (ex: `Duas mulheres`, `Pessoas`) são automaticamente substituídos pela junção de seus nomes reais (ex: `Fernanda e Aline`).
+* **Resolução de Substantivos de Objetos:** Ao marcar um objeto (ex: `Abajur de Mesa`), o sistema localiza o substantivo correspondente na descrição original (ex: `um abajur`, `a luz`) e substitui o termo pelo nome preciso do objeto anotado.
+* **Busca Semântica:** Mapeamentos manuais criados com a anotação Drag-and-Draw inserem representações textuais na base SQLite, garantindo que buscas por objetos ou pessoas encontrem o frame exato na biblioteca.
+
+---
+
+## 🔌 Detalhamento das APIs de Visão e Faces
+
+Abaixo estão listadas as rotas do backend FastAPI que gerenciam o fluxo de detecções e desambiguação:
+
+### 1. Rotulação e Resolução de Conflitos
+* **`POST /api/faces/face/{face_id}/label`**
+  * **Payload:** `{"name": "Nome da Pessoa/Objeto"}`
+  * **Funcionamento:** Atribui um nome à detecção. Se a detecção pertencer a um cluster/grupo, aplica o nome a todas as faces do mesmo grupo.
+  * **Resolução de Conflitos:** Se o nome fornecido já estiver associado a outro cluster, a API retorna um status `conflict` com os IDs dos clusters conflitantes, permitindo que o frontend inicie uma modal de desambiguação para fusão manual (`merge`) ou reatribuição (`reassign`).
+
+### 2. Fusão de Grupos e Reatribuição de Rostos
+* **`POST /api/faces/project/{project_id}/faces/merge`**
+  * **Payload:** `{"src_cluster_id": int, "dest_cluster_id": int, "name": "Nome Confirmado"}`
+  * **Funcionamento:** Une por completo o cluster de origem ao de destino.
+* **`POST /api/faces/project/{project_id}/faces/reassign`**
+  * **Payload:** `{"face_ids": List[int], "target_cluster_id": int, "target_name": "Nome"}`
+  * **Funcionamento:** Transfere individualmente apenas as detecções selecionadas de um grupo para o grupo correto.
+
+### 3. Rejeição e Catalogação de Objetos
+* **`POST /api/faces/face/{face_id}/reject`**
+  * **Payload (Opcional):** `{"name": "Nome do Objeto"}`
+  * **Funcionamento:** Descarta uma detecção de rosto errônea.
+    * Se nenhum nome for fornecido (ou deixado em branco), a detecção é rotulada como `"Não Relevante"` e seu status é atualizado para `rejected`, fazendo com que seja totalmente ignorada nos algoritmos de clustering e de enriquecimento RAG.
+    * Se um nome de objeto for fornecido (ex: `Abajur`), a detecção é arquivada como `rejected` (para não poluir o clustering de pessoas), mas o nome do objeto é persistido no banco de dados para indexação na busca semântica e enriquecimento textual de B-rolls.
+
+### 4. Desenho de Caixas Manuais (Drag-and-Draw)
+* **`POST /api/faces/face`**
+  * **Payload:** `{"project_id": int, "video_id": Optional[int], "photo_id": Optional[int], "timestamp": Optional[float], "bounding_box": [x, y, w, h], "name": "Nome"}`
+  * **Funcionamento:** Permite criar uma nova marcação retangular nas coordenadas normalizadas `[0.0 a 1.0]` do vídeo/foto, indexando elementos personalizados do set.
+
 ---
 
 ## 📂 Estrutura Modular do Código
