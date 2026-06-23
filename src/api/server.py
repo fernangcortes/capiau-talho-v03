@@ -10,13 +10,13 @@ from src.core.tasks import TASK_MANAGER
 from src.db.schema import init_db
 from src.db.connection import get_db
 from src.db.repositories.media import MediaRepository
-from src.api.routes import projects, media, narrative
+from src.api.routes import projects, media, narrative, faces
 
 # Silencia polling logs repetitivos do uvicorn no terminal
 class EndpointFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
-        return "/api/conversions" not in msg and "/api/videos" not in msg
+        return "/api/conversions" not in msg and "/api/videos" not in msg and "/api/faces" not in msg
 
 logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
@@ -30,8 +30,8 @@ with get_db() as conn:
 
 app = FastAPI(
     title="CapIAu Talho — Motor de Inteligência Cinematográfica",
-    description="Backend modularizado com FastAPI, SQLite, Qdrant e FFmpeg em CPU.",
-    version="3.0"
+    description="Backend modularizado com FastAPI, SQLite, Qdrant, FFmpeg em CPU e Reconhecimento Facial em Cascata.",
+    version="3.1"
 )
 
 app.add_middleware(
@@ -46,14 +46,15 @@ app.add_middleware(
 app.include_router(projects.router)
 app.include_router(media.router)
 app.include_router(narrative.router)
+app.include_router(faces.router)
 
 @app.on_event("shutdown")
 def on_shutdown_cleanup() -> None:
-    """Callback disparado no desligamento do servidor para matar processos órfãos."""
-    print("[Shutdown] Limpando processos FFmpeg em execução...")
+    """Callback disparado no desligamento do servidor para matar processos orfaos."""
+    print("[Shutdown] Limpando processos FFmpeg em execucao...")
     TASK_MANAGER.cleanup()
 
-# Montagem de endpoints para arquivos estáticos locais (player/visualização)
+# Montagem de endpoints para arquivos estáticos locais (player/visualizacao)
 app.mount("/proxies", StaticFiles(directory=str(CONFIG.PROXIES_DIR)), name="proxies")
 app.mount("/originals", StaticFiles(directory=str(CONFIG.ORIGINALS_DIR)), name="originals")
 
