@@ -1,4 +1,4 @@
-"""Motor de Detecção e Reconhecimento Facial (YuNet + SFace) do CaIAu Talho."""
+"""Motor de Detecção e Reconhecimento Facial (YuNet + SFace) do CapIAu-Talho."""
 import cv2
 import json
 import numpy as np

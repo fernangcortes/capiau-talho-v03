@@ -1,4 +1,4 @@
-# Lista de Tarefas (CaIAu Talho MVP - Making Of & Documentário)
+# Lista de Tarefas (CapIAu-Talho MVP - Making Of & Documentário)
 
 - [x] **Task 1: Setup do Ambiente Híbrido e Infraestrutura**
   - [x] Criar estrutura de pastas do projeto no workspace
@@ -58,7 +58,7 @@
   - [x] Rodar suite de testes e validar a estabilidade geral da aplicação
 
 - [x] **Fase 1: Ingestão de Fotos & Proxies RAW/JPG**
-# Lista de Tarefas (CaIAu Talho MVP - Making Of & Documentário)
+# Lista de Tarefas (CapIAu-Talho MVP - Making Of & Documentário)
 
 - [x] **Task 1: Setup do Ambiente Híbrido e Infraestrutura**
   - [x] Criar estrutura de pastas do projeto no workspace

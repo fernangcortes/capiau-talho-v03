@@ -1,4 +1,4 @@
-"""Configurações centralizadas do CaIAu Talho MVP."""
+"""Configurações centralizadas do CapIAu-Talho MVP."""
 import os
 from pathlib import Path
 from dotenv import load_dotenv

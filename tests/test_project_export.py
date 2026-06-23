@@ -1,4 +1,4 @@
-"""Teste unitário para a funcionalidade de Exportação e Importação de Projetos (CaIAu Talho)."""
+"""Teste unitário para a funcionalidade de Exportação e Importação de Projetos (CapIAu-Talho)."""
 import unittest
 import os
 import shutil

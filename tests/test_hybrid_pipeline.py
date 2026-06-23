@@ -1,4 +1,4 @@
-"""Teste de integração para o pipeline de Ingestão e Proxying do CaIAu Talho."""
+"""Teste de integração para o pipeline de Ingestão e Proxying do CapIAu-Talho."""
 import unittest
 import os
 import shutil

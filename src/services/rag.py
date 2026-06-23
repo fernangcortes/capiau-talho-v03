@@ -376,7 +376,7 @@ class RAGService:
         api_key = CONFIG.OPENROUTER_API_KEY
         if not api_key or api_key == "your_openrouter_api_key_here":
             return {
-                "response": "Olá! Sou o assistente de edição do CaIAu Talho. Configure a chave `OPENROUTER_API_KEY` no arquivo `.env` para conversar.",
+                "response": "Olá! Sou o assistente de edição do CapIAu-Talho. Configure a chave `OPENROUTER_API_KEY` no arquivo `.env` para conversar.",
                 "context_used": []
             }
             

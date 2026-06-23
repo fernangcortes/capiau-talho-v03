@@ -1,6 +1,6 @@
-# Plano de Implementação — CaIAu Talho MVP (Making Of & Documentário)
+# Plano de Implementação — CapIAu-Talho MVP (Making Of & Documentário)
 
-Este documento apresenta o plano detalhado de implementação para o MVP funcional do **CaIAu Talho**, customizado para o fluxo de **Documentários e Making Of**, adaptado para o seu processador Intel i7 (32GB RAM, sem GPU dedicada) e atualizado com as especificações avançadas de player, interface responsiva 16:9 e orçamento detalhado de APIs via OpenRouter.
+Este documento apresenta o plano detalhado de implementação para o MVP funcional do **CapIAu-Talho**, customizado para o fluxo de **Documentários e Making Of**, adaptado para o seu processador Intel i7 (32GB RAM, sem GPU dedicada) e atualizado com as especificações avançadas de player, interface responsiva 16:9 e orçamento detalhado de APIs via OpenRouter.
 
 ---
 
@@ -72,7 +72,7 @@ Garantimos que o processamento completo de suas **20 horas de material** ficará
 
 Abaixo está o mockup atualizado em **proporção widescreen 16:9**, refletindo o layout de edição cinematográfica com menus retráteis e player de vídeo profissional:
 
-![CaIAu Talho Widescreen 16:9 Mockup](file:///C:/Users/FGC/.gemini/antigravity/brain/1aaf0404-dccd-4965-8c26-ad520cf12616/ui_widescreen_mockup_1780409470298.png)
+![CapIAu-Talho Widescreen 16:9 Mockup](file:///C:/Users/FGC/.gemini/antigravity/brain/1aaf0404-dccd-4965-8c26-ad520cf12616/ui_widescreen_mockup_1780409470298.png)
 
 ### 4.1 Layout Dinâmico e Menus Retráteis:
 * **Menu Lateral Esquerdo (Retrátil):** Biblioteca de Mídias organizada com abas para Entrevistas, B-roll de bastidores e Fotos de set. Pode ser recolhida em um menu minimalista de ícones para dar mais espaço ao player.

@@ -1,4 +1,4 @@
-"""Teste de API para os endpoints de fotos de set do CaIAu Talho."""
+"""Teste de API para os endpoints de fotos de set do CapIAu-Talho."""
 import unittest
 from pathlib import Path
 from fastapi.testclient import TestClient

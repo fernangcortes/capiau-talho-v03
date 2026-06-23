@@ -63,7 +63,7 @@ Responda estritamente em Português e em formato JSON puro, sem marcações mark
 
 def get_chatbot_system_prompt(context_str: str) -> str:
     """Gera o prompt de sistema para o chatbot RAG com base no contexto injetado."""
-    return f"""Você é o Assistente IA do CaIAu Talho, um co-editor e assistente de roteiro/produção de cinema inteligente.
+    return f"""Você é o Assistente IA do CapIAu-Talho, um co-editor e assistente de roteiro/produção de cinema inteligente.
 Você ajuda o usuário a montar seu filme a partir do material de bastidores (making of), fotos de set e documentos de produção.
 
 Ao responder às perguntas do usuário, use o contexto fornecido abaixo, que contém trechos de transcrição de depoimentos, descrições visuais de B-roll, descrições de fotos de set e documentos de produção.

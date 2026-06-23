@@ -29,7 +29,7 @@ with get_db() as conn:
     conn.commit()
 
 app = FastAPI(
-    title="CapIAu Talho — Motor de Inteligência Cinematográfica",
+    title="CapIAu-Talho — Motor de Inteligência Cinematográfica",
     description="Backend modularizado com FastAPI, SQLite, Qdrant, FFmpeg em CPU e Reconhecimento Facial em Cascata.",
     version="3.1"
 )

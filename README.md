@@ -1,14 +1,14 @@
-# 🎬 CaIAu Talho — Motor de Inteligência e Decupagem Cinematográfica
+# 🎬 CapIAu-Talho — Motor de Inteligência e Decupagem Cinematográfica
 
-O **CaIAu Talho** é uma solução de inteligência artificial e pré-edição (decupagem) projetada especificamente para fluxos de **Making Of e Documentários**. O sistema foi projetado sob um **Modelo Híbrido Otimizado** para rodar com eficiência em CPUs locais (como processadores Intel i7 com 32GB de RAM), eliminando a dependência de GPUs Nvidia dedicadas locais através do uso de buscas locais rápidas em CPU combinadas com APIs na nuvem de baixíssimo custo.
+O **CapIAu-Talho** é uma solução de inteligência artificial e pré-edição (decupagem) projetada especificamente para fluxos de **Making Of e Documentários**. O sistema foi projetado sob um **Modelo Híbrido Otimizado** para rodar com eficiência em CPUs locais (como processadores Intel i7 com 32GB de RAM), eliminando a dependência de GPUs Nvidia dedicadas locais através do uso de buscas locais rápidas em CPU combinadas com APIs na nuvem de baixíssimo custo.
 
-Com o CaIAu Talho, você pode processar mais de 20 horas de material bruto (entrevistas, B-rolls de bastidores, fotos de set), transcrever falas automaticamente com identificação de personagens (diarização), fazer pesquisas semânticas rápidas na biblioteca (ex: *"diretor escolhendo lentes"*) e exportar o rascunho de timeline diretamente para Premiere Pro ou DaVinci Resolve via XML e OpenTimelineIO.
+Com o CapIAu-Talho, você pode processar mais de 20 horas de material bruto (entrevistas, B-rolls de bastidores, fotos de set), transcrever falas automaticamente com identificação de personagens (diarização), fazer pesquisas semânticas rápidas na biblioteca (ex: *"diretor escolhendo lentes"*) e exportar o rascunho de timeline diretamente para Premiere Pro ou DaVinci Resolve via XML e OpenTimelineIO.
 
 ---
 
 ## 🛠️ Arquitetura Técnica do Sistema
 
-A arquitetura do CaIAu Talho é baseada em três pilares: **Ingestão In-Place (HD Externo)**, **Banco de Dados Híbrido Local** e **Processamento de IA Híbrido**:
+A arquitetura do CapIAu-Talho é baseada em três pilares: **Ingestão In-Place (HD Externo)**, **Banco de Dados Híbrido Local** e **Processamento de IA Híbrido**:
 
 ```mermaid
 graph TD
@@ -60,7 +60,7 @@ graph TD
 
 ### 2. Camada de Processamento de Mídia
 * **FFmpeg / FFprobe:** Extrai metadados técnicos (duração, codec, resolução, taxa de quadros) na importação e converte vídeos pesados H.264/ProRes em proxies leves 720p/360p H.264 AAC com monitoramento em tempo real do progresso (0-100%).
-* **Extração Monofônica Local:** Antes de transcrever na nuvem, o CaIAu Talho extrai o áudio em MP3 mono de 16kHz localmente. Isso reduz o tamanho do arquivo a ser enviado à nuvem em mais de 99%, evitando falhas de rede e permitindo carregar o áudio de entrevistas de 30 minutos em menos de 10 segundos.
+* **Extração Monofônica Local:** Antes de transcrever na nuvem, o CapIAu-Talho extrai o áudio em MP3 mono de 16kHz localmente. Isso reduz o tamanho do arquivo a ser enviado à nuvem em mais de 99%, evitando falhas de rede e permitindo carregar o áudio de entrevistas de 30 minutos em menos de 10 segundos.
 
 ### 3. Camada de Inteligência Artificial (Nuvem Econômica)
 * **AssemblyAI (Universal-2 API):** Transcreve depoimentos na língua portuguesa com pontuação e diarização automática de personagens (quem falou o quê e em qual tempo exato).
@@ -69,7 +69,7 @@ graph TD
   * **Gemini 2.5 Flash / Gemini 3.1 Flash Lite:** Analisa fotos de set e frames de B-roll a cada 10 segundos para gerar metadados visuais semânticos de bastidores.
 
 ### 4. Pipeline de Visão Inteligente e Reconhecimento Facial
-O CaIAu Talho implementa um fluxo de reconhecimento facial em cascata dividida em **4 Tiers** de processamento e precisão:
+O CapIAu-Talho implementa um fluxo de reconhecimento facial em cascata dividida em **4 Tiers** de processamento e precisão:
 * **Tier 0 (Local CPU):** Deteção leve com **YuNet** e extração de embeddings com **SFace** rodando localmente na CPU.
 * **Tier 1 (Nuvem Azure):** Integração com **Azure Face API** (com limite ativo de 20 chamadas/min e teste de conexão via `POST` robusto no plano gratuito) para extração fina de atributos e contornos de alta precisão.
 * **Tier 2 (Nuvem AWS):** Reconhecimento de rostos de celebridades e busca de coleções no **AWS Rekognition**.
@@ -212,7 +212,7 @@ Como a pasta local ainda não está rastreada por controle de versão, siga as e
 Adicione os arquivos respeitando as regras do `.gitignore` (que ignoram as mídias pesadas e bancos locais para não exceder limites de tamanho de arquivo do GitHub):
 ```bash
 git add .
-git commit -m "feat: setup do MVP CaIAu Talho funcional com proxies in-place, ASR, busca semântica em CPU e correções de usabilidade"
+git commit -m "feat: setup do MVP CapIAu-Talho funcional com proxies in-place, ASR, busca semântica em CPU e correções de usabilidade"
 ```
 
 ### Passo 3: Criar repositório remoto no GitHub e fazer o Push
@@ -261,7 +261,7 @@ Hospedar o backend FastAPI na Vercel requer configurar um arquivo `vercel.json` 
 > 3. **Bancos Embutidos:** SQLite e Qdrant Local File-Based gravam dados em arquivos locais. Em plataformas como a Vercel ou Heroku, o sistema de arquivos é **efêmero** (tudo é apagado a cada novo deploy ou reinício de servidor).
 >
 > **Estratégia Recomendada para Produção Remota:**
-> Se desejar acessar o CaIAu Talho de outros computadores em nuvem, configure:
+> Se desejar acessar o CapIAu-Talho de outros computadores em nuvem, configure:
 > * **Banco de Dados Remoto:** SQLite no Render/Railway com volume persistente (Disk), ou migrar para PostgreSQL na nuvem + Qdrant Cloud (Instância de nuvem gratuita).
 > * **Geração de Proxies no Cliente/Servidor Dedicado:** Um servidor com Docker dedicado que possua FFmpeg instalado em uma máquina com GPU (ex: AWS EC2 ou Railway com volume) para computar os proxies.
 
@@ -269,7 +269,7 @@ Hospedar o backend FastAPI na Vercel requer configurar um arquivo `vercel.json` 
 
 ## 🔮 Roadmap: Futuras Fases do Projeto
 
-Após a validação bem-sucedida do MVP com proxies e buscas, as próximas etapas de desenvolvimento do CaIAu Talho contemplam:
+Após a validação bem-sucedida do MVP com proxies e buscas, as próximas etapas de desenvolvimento do CapIAu-Talho contemplam:
 
 1. **Edição Baseada em Texto (Text-Based Video Editing):**
    * Permitir que o editor monte a timeline apenas selecionando linhas de texto da transcrição. O sistema cortará o vídeo automaticamente nos marcadores de tempo das palavras selecionadas.

@@ -1,14 +1,14 @@
-# CaIAu Talho: Pesquisa de Arquitetura — Motor de Edição Automática com Inteligência Cinematográfica
+# CapIAu-Talho: Pesquisa de Arquitetura — Motor de Edição Automática com Inteligência Cinematográfica
 
 **Data:** 02/06/2026  
 **Versão:** 1.0  
-**Escopo:** Planejamento e arquitetura do sistema CaIAu Talho — análise de 27 questões técnicas divididas em 7 categorias, com classificação por dificuldade, matriz comparativa de tecnologias, diagrama de arquitetura proposto, schema de dados, papers acadêmicos, gaps identificados, roadmap e recomendação de stack final.
+**Escopo:** Planejamento e arquitetura do sistema CapIAu-Talho — análise de 27 questões técnicas divididas em 7 categorias, com classificação por dificuldade, matriz comparativa de tecnologias, diagrama de arquitetura proposto, schema de dados, papers acadêmicos, gaps identificados, roadmap e recomendação de stack final.
 
 ---
 
 ## TL;DR — Resumo Executivo
 
-O CaIAu Talho é viável tecnicamente com **stack open source predominantemente maduro**, mas exige **desenvolvimento customizado significativo** nos módulos de decisão editorial inteligente. Das 27 perguntas pesquisadas, **13 têm soluções bem estabelecidas** (fáceis de integrar) e **14 exigem pesquisa, engenharia ou adaptação não-trivial**. Os maiores desafios estão em: (1) **match-on-action e detecção de continuidade** em vídeo, (2) **fuzzy matching entre transcrição e roteiro** considerando improvisos, (3) **edição por duração fixa sem perda semântica** no perfil TV, (4) **busca semântica em tempo real em acervos de 500+ horas**, e (5) **sincronização áudio-vídeo sem timecode** para documentário. A arquitetura recomendada é **motor compartilhado plugin-based + três interfaces de perfil**, usando **SQLite para metadados estruturados, Qdrant para busca semântica, e uma camada de grafo em SQLite** para relacionamentos. O hardware mínimo (**RTX 4060 8GB**) suporta modelos de 7-9B parâmetros em quantização Q4, suficiente para LLM local, mas exige **orquestração cuidadosa** quando múltiplos modelos (LLM + VLM + ASR) competem por VRAM.
+O CapIAu-Talho é viável tecnicamente com **stack open source predominantemente maduro**, mas exige **desenvolvimento customizado significativo** nos módulos de decisão editorial inteligente. Das 27 perguntas pesquisadas, **13 têm soluções bem estabelecidas** (fáceis de integrar) e **14 exigem pesquisa, engenharia ou adaptação não-trivial**. Os maiores desafios estão em: (1) **match-on-action e detecção de continuidade** em vídeo, (2) **fuzzy matching entre transcrição e roteiro** considerando improvisos, (3) **edição por duração fixa sem perda semântica** no perfil TV, (4) **busca semântica em tempo real em acervos de 500+ horas**, e (5) **sincronização áudio-vídeo sem timecode** para documentário. A arquitetura recomendada é **motor compartilhado plugin-based + três interfaces de perfil**, usando **SQLite para metadados estruturados, Qdrant para busca semântica, e uma camada de grafo em SQLite** para relacionamentos. O hardware mínimo (**RTX 4060 8GB**) suporta modelos de 7-9B parâmetros em quantização Q4, suficiente para LLM local, mas exige **orquestração cuidadosa** quando múltiplos modelos (LLM + VLM + ASR) competem por VRAM.
 
 ---
 
@@ -86,7 +86,7 @@ A análise abaixo separa cada pergunta em duas categorias: **FÁCIL** (solução
 | # | Pergunta | Classificação | Justificativa |
 |:---|:---|:---|:---|
 | G25 | Garantir que metadados de rosto/emotion não violem LGPD/GDPR? | **COMPLICADO** | Biometria é **dado sensível** sob LGPD. Documentário e jornalismo com não-atores exigem **consentimento explícito** ou anonimização. Não existe solução técnica pronta que combine reconhecimento facial com gerenciamento de consentimento. Requer: hash de faces para pseudo-anonimização, controle de acesso aos embeddings, e RIAD/LIA documentada. |
-| G26 | Quais modelos de IA são open source para uso comercial sem restrições? | **FÁCIL** | **Apache 2.0:** Qwen, Mistral, Falcon, OLMo. **MIT:** DeepSeek, Phi. **Llama License:** permite comercial até 700M MAU. Requer atenção a: Llama (restrição de uso para treinar outros LLMs), Gemma (usage policy), Qwen-72B (limite de 100M usuários). Para o CaIAu Talho, **Qwen2.5-7B (Apache 2.0) + Mistral-Nemo-12B (Apache 2.0)** são escolhas seguras. |
+| G26 | Quais modelos de IA são open source para uso comercial sem restrições? | **FÁCIL** | **Apache 2.0:** Qwen, Mistral, Falcon, OLMo. **MIT:** DeepSeek, Phi. **Llama License:** permite comercial até 700M MAU. Requer atenção a: Llama (restrição de uso para treinar outros LLMs), Gemma (usage policy), Qwen-72B (limite de 100M usuários). Para o CapIAu-Talho, **Qwen2.5-7B (Apache 2.0) + Mistral-Nemo-12B (Apache 2.0)** são escolhas seguras. |
 | G27 | Containerizar pipeline de vídeo com GPU para execução multi-usuário? | **FÁCIL** | **NVIDIA Container Toolkit** + Docker é padrão de indústria. Vários repositórios de referência (decode-video-pytorch, nvidia-accelerated-pytorch-ffmpeg). O desafio é orquestração de múltiplos jobs concorrentes na mesma GPU, não a containerização em si. |
 
 ---
@@ -105,7 +105,7 @@ A análise abaixo separa cada pergunta em duas categorias: **FÁCIL** (solução
 | **AssemblyAI** | Proprietário | **Excelente** | Sim | **<200ms** | Comercial | Não | N/A |
 | **distil-whisper-ptbr** | distil-large-v3 | **Excelente** (WER 8.2%) | Não | Limitado | MIT | Sim | ~3GB |
 
-**Recomendação CaIAu Talho:** **WhisperX** para ingest batch (transcrição + diarização + timestamps palavra-a-palavra). **faster-whisper** com chunked streaming para modo TV (teleprompter ao vivo), com fallback para AssemblyAI se latência <1s for crítica.
+**Recomendação CapIAu-Talho:** **WhisperX** para ingest batch (transcrição + diarização + timestamps palavra-a-palavra). **faster-whisper** com chunked streaming para modo TV (teleprompter ao vivo), com fallback para AssemblyAI se latência <1s for crítica.
 
 ### 2.2 Visão Computacional (Análise de Vídeo)
 
@@ -120,7 +120,7 @@ A análise abaixo separa cada pergunta em duas categorias: **FÁCIL** (solução
 | **DeepFace** | Reconhecimento facial/emotion | Varies | N/A | MIT | Sim | ~2GB | Facilidade de uso, múltiplos backends |
 | **InsightFace** | Reconhecimento facial | Alta | N/A | MIT | Sim | ~2GB | Mais preciso que DeepFace |
 
-**Recomendação CaIAu Talho:** **YOLOv8** para detecção de objetos/ações, **Qwen2-VL-2B** para descrição semântica (cabe em 8GB VRAM), **InsightFace** para reconhecimento facial, **DeepFace** para análise de emoção.
+**Recomendação CapIAu-Talho:** **YOLOv8** para detecção de objetos/ações, **Qwen2-VL-2B** para descrição semântica (cabe em 8GB VRAM), **InsightFace** para reconhecimento facial, **DeepFace** para análise de emoção.
 
 ### 2.3 Banco de Dados e Busca Semântica
 
@@ -133,7 +133,7 @@ A análise abaixo separa cada pergunta em duas categorias: **FÁCIL** (solução
 | **pgvector** | PostgreSQL ext. | Via PostgreSQL | <50M | Moderada | N/A | PostgreSQL | Útil se já usar PostgreSQL |
 | **SQLite** | Relacional | N/A | Ilimitado (disco) | <1ms | N/A | Domínio público | Perfeito para metadados estruturados |
 
-**Recomendação CaIAu Talho:** **SQLite** para metadados estruturados (takes, cenas, personagens, timecodes), **Qdrant** para busca semântica (embeddings de transcrições, descrições visuais, diálogos).
+**Recomendação CapIAu-Talho:** **SQLite** para metadados estruturados (takes, cenas, personagens, timecodes), **Qdrant** para busca semântica (embeddings de transcrições, descrições visuais, diálogos).
 
 ### 2.4 Modelos de Linguagem (LLM Local)
 
@@ -146,7 +146,7 @@ A análise abaixo separa cada pergunta em duas categorias: **FÁCIL** (solução
 | **Phi-4 (14B)** | 14B | MIT | ~8GB (spill) | ~2 t/s | Sim | Bom | Não recomendado para 8GB |
 | **Qwen3.5 (9B)** | 9B | Apache 2.0 | ~5GB | **~55 t/s** | Sim | Excelente | Se VRAM permitir (16GB+) |
 
-**Recomendação CaIAu Talho:** **Qwen2.5-7B-Instruct (Q4_K_M)** como LLM principal — Apache 2.0 (sem restrições comerciais), excelente em PT-BR, cabe confortavelmente em 8GB VRAM com ~9 tokens/s. **Llama 3.2-3B** como fallback rápido para tarefas simples.
+**Recomendação CapIAu-Talho:** **Qwen2.5-7B-Instruct (Q4_K_M)** como LLM principal — Apache 2.0 (sem restrições comerciais), excelente em PT-BR, cabe confortavelmente em 8GB VRAM com ~9 tokens/s. **Llama 3.2-3B** como fallback rápido para tarefas simples.
 
 ### 2.5 Parsing de Documentação de Produção
 
@@ -162,7 +162,7 @@ A análise abaixo separa cada pergunta em duas categorias: **FÁCIL** (solução
 
 ### 2.6 Formatos de Intercâmbio Editorial
 
-| Formato | Suporte NLE | Complexidade | Metadados | Recomendação CaIAu Talho |
+| Formato | Suporte NLE | Complexidade | Metadados | Recomendação CapIAu-Talho |
 |:---|:---|:---|:---|:---|
 | **OTIO** | Resolve (nativo), Avid, Premiere (beta), Blender, Nuke | Média | Extensível | **Formato nativo interno** — prioridade máxima |
 | **XML (FCP/Premiere)** | Premiere, FCP, Resolve | Média | Bom | Saída para Premiere/Resolve |
@@ -651,9 +651,9 @@ Fase 4:                                       [  Integração  ]
 |:---|:---|:---|:---|
 | **Linguagem** | Python 3.10+ | — | Ecossistema dominante em ML/CV; todas as libs principais são Python-first |
 | **API/Backend** | FastAPI | Flask | Performance, async nativo, documentação OpenAPI automática, tipagem |
-| **Banco estruturado** | SQLite | PostgreSQL | Zero config, serverless, suficiente para escala do CaIAu Talho; migração para PostgreSQL é trivial se necessário |
+| **Banco estruturado** | SQLite | PostgreSQL | Zero config, serverless, suficiente para escala do CapIAu-Talho; migração para PostgreSQL é trivial se necessário |
 | **Busca semântica** | Qdrant (Docker) | Weaviate | Melhor performance self-hosted, menor footprint, filtering nativo, Apache 2.0 |
-| **Grafo de relações** | SQLite (triplas) | Neo4j | Para a escala do CaIAu Talho, triplas em SQLite são suficientes; evita infra adicional |
+| **Grafo de relações** | SQLite (triplas) | Neo4j | Para a escala do CapIAu-Talho, triplas em SQLite são suficientes; evita infra adicional |
 | **Message Queue** | Redis + RQ | Celery + RabbitMQ | Simplicidade para jobs em background; RQ é Python-native e suficiente |
 | **Transcrição** | WhisperX | faster-whisper | WhisperX = transcrição + diarização + timestamps palavra; one-stop shop |
 | **VLM (descrição)** | Qwen2-VL-2B | Qwen2.5-VL-3B | 2B cabe em RTX 4060 com VRAM sobrando; Apache 2.0; excelente multimodal |

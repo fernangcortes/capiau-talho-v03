@@ -1,10 +1,10 @@
-# Walkthrough da Implementação — CaIAu Talho Making Of MVP
+# Walkthrough da Implementação — CapIAu-Talho Making Of MVP
 
 Este documento resume as implementações realizadas, os testes efetuados e instrui sobre como executar a aplicação de forma rápida e local.
 
 ---
 
-## 🛠️ O Que FO MVP funcional do **CaIAu Talho** foi totalmente desenvolvido e testado no seu computador! A arquitetura foi adaptada de forma ideal para o seu processador **Intel i7-10700** e **32 GB de RAM** sem depender de GPU dedicada, operando em um **Modelo Híbrido Otimizado**:
+## 🛠️ O Que FO MVP funcional do **CapIAu-Talho** foi totalmente desenvolvido e testado no seu computador! A arquitetura foi adaptada de forma ideal para o seu processador **Intel i7-10700** e **32 GB de RAM** sem depender de GPU dedicada, operando em um **Modelo Híbrido Otimizado**:
 
 ### 1. Ambiente Híbrido e Modelos Customizáveis (Novidades de 2026)
 * [x] Criado `requirements.txt` com todas as dependências unificadas e instaladas com sucesso (FastAPI, Qdrant-client, Sentence-transformers, AssemblyAI, OpenTimelineIO, etc.).
@@ -21,7 +21,7 @@ Este documento resume as implementações realizadas, os testes efetuados e inst
 
 ### 3. Pipeline de Ingestão, FFmpeg e In-Place Ingestion (HD Externo)
 * [x] Criado `src/ingest/watcher.py` para monitoramento automático de arquivos na pasta `watch/`.
-* [x] **Ingestão In-Place (Modo Link para HD Externo):** Adicionado suporte a parâmetro `copy_original=False` no fluxo de ingestão. Mídias gigantes localizadas em HDs externos ou SSDs podem ser analisadas e vinculadas **sem serem copiadas localmente** (poupando espaço em disco). O CaIAu Talho armazena no SQLite o caminho absoluto real do HD externo e gera apenas o leve proxy de preview localmente, garantindo o link correto na exportação XML/EDL.
+* [x] **Ingestão In-Place (Modo Link para HD Externo):** Adicionado suporte a parâmetro `copy_original=False` no fluxo de ingestão. Mídias gigantes localizadas em HDs externos ou SSDs podem ser analisadas e vinculadas **sem serem copiadas localmente** (poupando espaço em disco). O CapIAu-Talho armazena no SQLite o caminho absoluto real do HD externo e gera apenas o leve proxy de preview localmente, garantindo o link correto na exportação XML/EDL.
 * [x] **Importador Recursivo de Pastas:** Criada a lógica `ingest_external_path` mapeada no novo endpoint `/api/ingest/external` para varrer recursivamente qualquer caminho absoluto de disco externo e catalogar mídias em modo in-place.
 * [x] Implementado deduplicação automática via SHA-256 e extração de metadados técnicos ricos por **FFprobe**.
 * [x] Desenvolvido proxying nativo por **FFmpeg** gerando proxies rápidos H.264 em 720p/360p com áudio AAC para visualização imediata na Web, com tratamento de exceções robusto e sem travar a CPU.
@@ -43,9 +43,9 @@ Este documento resume as implementações realizadas, os testes efetuados e inst
   - **Marcação de Pontos I/O (In / Out)** via teclas `I` e `O`, permitindo fatiar e enviar trechos à timeline instantaneamente (tecla `E`).
   - **Barra de Status do Sistema em Tempo Real:** Uma barra translúcida premium no rodapé do painel esquerdo que fornece referência contínua e visual das ações em execução no background (como varredura de pastas, importações recursivas, IA decodificando falas com AssemblyAI ou temas com DeepSeek), mudando dinamicamente entre spinners de carregamento ativos e checks verdes de finalização bem-sucedida.
   - **Status de Pipeline nos Cards de Mídia:** Badges e spinners embutidos nos cards de vídeo que mostram o status individual de processamento (spinners animados para mídias em fase de `transcrevendo` ou `analisando`, selos premium **[ASR]** e **[VISÃO]** para tarefas concluídas e marcações em vermelho para erros de FFmpeg).
-  - **Painel Ativo de Conversões e Progresso Real (0-100%):** O CaIAu Talho agora lê dinamicamente a saída do `stdout` do FFmpeg (`-progress pipe:1`) e calcula o progresso real em porcentagem comparando com a duração obtida pelo FFprobe. Os cards de mídia exibem dinamicamente `Convertendo XX%` com spinners em tempo real.
+  - **Painel Ativo de Conversões e Progresso Real (0-100%):** O CapIAu-Talho agora lê dinamicamente a saída do `stdout` do FFmpeg (`-progress pipe:1`) e calcula o progresso real em porcentagem comparando com a duração obtida pelo FFprobe. Os cards de mídia exibem dinamicamente `Convertendo XX%` com spinners em tempo real.
   - **Ações de Controle Total (Cancelar/Deletar):** Cards de mídia ganham botões flutuantes: um botão de parada (`fa-circle-stop`) em mídias ativas para matar a tarefa e limpar arquivos parciais, e um ícone de lixeira hover (`fa-trash-can`) para proxies concluídos, permitindo deletar fisicamente o proxy do HD e liberar espaço na máquina local.
-  - **Visualização em Árvore/Explorer (Premium VSCode-Style):** Para evitar poluição visual ao importar centenas de arquivos, a biblioteca do CaIAu Talho agora detecta a estrutura física de subpastas do HD ou diretório importado e as agrupa em uma **Árvore de Diretórios interativa**. As pastas e subpastas iniciam **recolhidas por padrão**, permitindo que você as explore expandindo/fechando conforme desejar, exatamente como em um gerenciador de arquivos nativo.
+  - **Visualização em Árvore/Explorer (Premium VSCode-Style):** Para evitar poluição visual ao importar centenas de arquivos, a biblioteca do CapIAu-Talho agora detecta a estrutura física de subpastas do HD ou diretório importado e as agrupa em uma **Árvore de Diretórios interativa**. As pastas e subpastas iniciam **recolhidas por padrão**, permitindo que você as explore expandindo/fechando conforme desejar, exatamente como em um gerenciador de arquivos nativo.
   - **Prevenção Máxima de Processos Órfãos (Ganchos de Shutdown):** Adicionado manipulador de encerramento do FastAPI (`@app.on_event("shutdown")`) e limpezas via atexit. Quando o servidor é encerrado ou o terminal fechado, todos os processos de conversão `ffmpeg.exe` ativos são terminados fisicamente no Windows (`taskkill /F /T`) eliminando por completo o risco de processos órfãos invisíveis consumindo CPU no background.
   - **Atualização Dinâmica Instantânea (Auto-Polling):** Ingestões recursivas iniciam um polling inteligente que atualiza a biblioteca dinamicamente a cada 2 segundos, fazendo com que novos arquivos catalogados apareçam de forma imediata na tela do usuário.
   - **Salvamento de Projetos em Tempo Real:** Gravação atômica instantânea de todos os metadados diretamente no banco de dados local SQLite (`capiau.db`), garantindo que projetos sejam salvos automaticamente após qualquer ação sem risco de perda de dados.
@@ -132,7 +132,7 @@ Desenvolvemos e refinamos por completo o pipeline de ingestão e visualização 
 
 ## 📝 Atualizações Recentes (03/06/2026)
 
-Implementamos a **Fase 4: Chatbot RAG Integrado & Sumários de Contexto** completando o ciclo inteligente do CaIAu Talho:
+Implementamos a **Fase 4: Chatbot RAG Integrado & Sumários de Contexto** completando o ciclo inteligente do CapIAu-Talho:
 
 1. **Pipeline de Sumarização por IA (DeepSeek V3):**
    - Criado [summary_engine.py](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/src/nlp/summary_engine.py) que se comunica com o OpenRouter (modelo `deepseek/deepseek-chat`) para analisar as transcrições das Entrevistas e a sequência temporal das descrições do B-roll.
@@ -216,7 +216,7 @@ Implementamos a funcionalidade completa de backup, restore e sincronização bas
 
 ### 3. Pipeline de Ingestão, FFmpeg e In-Place Ingestion (HD Externo)
 * [x] Criado `src/ingest/watcher.py` para monitoramento automático de arquivos na pasta `watch/`.
-* [x] **Ingestão In-Place (Modo Link para HD Externo):** Adicionado suporte a parâmetro `copy_original=False` no fluxo de ingestão. Mídias gigantes localizadas em HDs externos ou SSDs podem ser analisadas e vinculadas **sem serem copiadas localmente** (poupando espaço em disco). O CaIAu Talho armazena no SQLite o caminho absoluto real do HD externo e gera apenas o leve proxy de preview localmente, garantindo o link correto na exportação XML/EDL.
+* [x] **Ingestão In-Place (Modo Link para HD Externo):** Adicionado suporte a parâmetro `copy_original=False` no fluxo de ingestão. Mídias gigantes localizadas em HDs externos ou SSDs podem ser analisadas e vinculadas **sem serem copiadas localmente** (poupando espaço em disco). O CapIAu-Talho armazena no SQLite o caminho absoluto real do HD externo e gera apenas o leve proxy de preview localmente, garantindo o link correto na exportação XML/EDL.
 * [x] **Importador Recursivo de Pastas:** Criada a lógica `ingest_external_path` mapeada no novo endpoint `/api/ingest/external` para varrer recursivamente qualquer caminho absoluto de disco externo e catalogar mídias em modo in-place.
 * [x] Implementado deduplicação automática via SHA-256 e extração de metadados técnicos ricos por **FFprobe**.
 * [x] Desenvolvido proxying nativo por **FFmpeg** gerando proxies rápidos H.264 em 720p/360p com áudio AAC para visualização imediata na Web, com tratamento de exceções robusto e sem travar a CPU.
@@ -238,9 +238,9 @@ Implementamos a funcionalidade completa de backup, restore e sincronização bas
   - **Marcação de Pontos I/O (In / Out)** via teclas `I` e `O`, permitindo fatiar e enviar trechos à timeline instantaneamente (tecla `E`).
   - **Barra de Status do Sistema em Tempo Real:** Uma barra translúcida premium no rodapé do painel esquerdo que fornece referência contínua e visual das ações em execução no background (como varredura de pastas, importações recursivas, IA decodificando falas com AssemblyAI ou temas com DeepSeek), mudando dinamicamente entre spinners de carregamento ativos e checks verdes de finalização bem-sucedida.
   - **Status de Pipeline nos Cards de Mídia:** Badges e spinners embutidos nos cards de vídeo que show o status individual de processamento (spinners animados para mídias em fase de `transcrevendo` ou `analisando`, selos premium **[ASR]** e **[VISÃO]** para tarefas concluídas e marcações em vermelho para erros de FFmpeg).
-  - **Painel Ativo de Conversões e Progresso Real (0-100%):** O CaIAu Talho agora lê dinamicamente a saída do `stdout` do FFmpeg (`-progress pipe:1`) e calcula o progresso real em porcentagem comparando com a duração obtida pelo FFprobe. Os cards de mídia exibem dinamicamente `Convertendo XX%` com spinners em tempo real.
+  - **Painel Ativo de Conversões e Progresso Real (0-100%):** O CapIAu-Talho agora lê dinamicamente a saída do `stdout` do FFmpeg (`-progress pipe:1`) e calcula o progresso real em porcentagem comparando com a duração obtida pelo FFprobe. Os cards de mídia exibem dinamicamente `Convertendo XX%` com spinners em tempo real.
   - **Ações de Controle Total (Cancelar/Deletar):** Cards de mídia ganham botões flutuantes: um botão de parada (`fa-circle-stop`) em mídias ativas para matar a tarefa e limpar arquivos parciais, e um ícone de lixeira hover (`fa-trash-can`) para proxies concluídos, permitindo deletar fisicamente o proxy do HD e liberar espaço na máquina local.
-  - **Visualização em Árvore/Explorer (Premium VSCode-Style):** Para evitar poluição visual ao importar centenas de arquivos, a biblioteca do CaIAu Talho agora detecta a estrutura física de subpastas do HD ou diretório importado e as agrupa em uma **Árvore de Diretórios interativa**. As pastas e subpastas iniciam **recolhidas por padrão**, permitindo que você as explore expandindo/fechando conforme desejar, exatamente como em um gerenciador de arquivos nativo.
+  - **Visualização em Árvore/Explorer (Premium VSCode-Style):** Para evitar poluição visual ao importar centenas de arquivos, a biblioteca do CapIAu-Talho agora detecta a estrutura física de subpastas do HD ou diretório importado e as agrupa em uma **Árvore de Diretórios interativa**. As pastas e subpastas iniciam **recolhidas por padrão**, permitindo que você as explore expandindo/fechando conforme desejar, exatamente como em um gerenciador de arquivos nativo.
   - **Prevenção Máxima de Processos Órfãos (Ganchos de Shutdown):** Adicionado manipulador de encerramento do FastAPI (`@app.on_event("shutdown")`) e limpezas via atexit. Quando o servidor é encerrado ou o terminal fechado, todos os processos de conversão `ffmpeg.exe` ativos são terminados fisicamente no Windows (`taskkill /F /T`) eliminando por completo o risco de processos órfãos invisíveis consumindo CPU no background.
   - **Atualização Dinâmica Instantânea (Auto-Polling):** Ingestões recursivas iniciam um polling inteligente que atualiza a biblioteca dinamicamente a cada 2 segundos, fazendo com que novos arquivos catalogados apareçam de forma imediata na tela do usuário.
   - **Salvamento de Projetos em Tempo Real:** Gravação atômica instantânea de todos os metadados diretamente no banco de dados local SQLite (`capiau.db`), garantindo que projetos sejam salvos automaticamente após qualquer ação sem risco de perda de dados.
@@ -327,7 +327,7 @@ Desenvolvemos e refinamos por completo o pipeline de ingestão e visualização 
 
 ## 📝 Atualizações Recentes (03/06/2026)
 
-Implementamos a **Fase 4: Chatbot RAG Integrado & Sumários de Contexto** completando o ciclo inteligente do CaIAu Talho:
+Implementamos a **Fase 4: Chatbot RAG Integrado & Sumários de Contexto** completando o ciclo inteligente do CapIAu-Talho:
 
 1. **Pipeline de Sumarização por IA (DeepSeek V3):**
    - Criado [summary_engine.py](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/src/nlp/summary_engine.py) que se comunica com o OpenRouter (modelo `deepseek/deepseek-chat`) para analisar as transcrições das Entrevistas e a sequência temporal das descrições do B-roll.

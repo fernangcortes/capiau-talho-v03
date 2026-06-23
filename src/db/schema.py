@@ -1,4 +1,4 @@
-"""Schema de Banco de Dados SQLite para o CaIAu Talho Making Of MVP."""
+"""Schema de Banco de Dados SQLite para o CapIAu-Talho Making Of MVP."""
 import sqlite3
 from pathlib import Path
 from src.config import CONFIG

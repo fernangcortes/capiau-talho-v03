@@ -1,4 +1,4 @@
-"""Motor de Visão Multimodal do CaIAu Talho para analisar frames de B-roll e Fotos de set via OpenRouter."""
+"""Motor de Visão Multimodal do CapIAu-Talho para analisar frames de B-roll e Fotos de set via OpenRouter."""
 import os
 import sys
 import base64

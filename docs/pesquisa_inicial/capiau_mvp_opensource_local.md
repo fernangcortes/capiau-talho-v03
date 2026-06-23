@@ -1,7 +1,7 @@
-# CaIAu Talho MVP: Implementação Open Source 100% Local
+# CapIAu-Talho MVP: Implementação Open Source 100% Local
 
 **Data:** 02/06/2026  
-**Escopo:** Guia passo a passo para implementar o MVP do CaIAu Talho usando exclusivamente software open source, rodando 100% local em uma única máquina (RTX 3060/4060 8GB ou CPU). Zero custo de APIs. Foco em ficção cinematográfica como primeiro perfil.  
+**Escopo:** Guia passo a passo para implementar o MVP do CapIAu-Talho usando exclusivamente software open source, rodando 100% local em uma única máquina (RTX 3060/4060 8GB ou CPU). Zero custo de APIs. Foco em ficção cinematográfica como primeiro perfil.  
 **Tempo estimado:** 4-6 horas de setup + 20h de análise de vídeo processadas em ~2-3 dias.
 
 ---
@@ -72,14 +72,14 @@ docker run --rm --gpus all nvidia/cuda:12.0-base-ubuntu22.04 nvidia-smi
 ### 2.2 Criar Estrutura do Projeto (5 min)
 
 ```bash
-# Diretório base do CaIAu Talho
+# Diretório base do CapIAu-Talho
 mkdir -p ~/capiau/{data,models,src,config,logs,watch}
 mkdir -p ~/capiau/data/{originals,proxies,cache,exports}
 mkdir -p ~/capiau/src/{ingest,transcription,vision,audio,db,export,api,ui}
 
 # Variáveis de ambiente
 cat > ~/capiau/.env << 'EOF'
-# CaIAu Talho Environment
+# CapIAu-Talho Environment
 capiau_HOME=/home/$USER/capiau
 capiau_DB_PATH=/home/$USER/capiau/data/capiau.db
 capiau_WATCH_FOLDER=/home/$USER/capiau/watch
@@ -128,7 +128,7 @@ ollama pull llama3.2:3b
 ollama list
 ```
 
-| Modelo | Tamanho | VRAM (Q4) | Tokens/s (RTX 4060) | Uso no CaIAu Talho |
+| Modelo | Tamanho | VRAM (Q4) | Tokens/s (RTX 4060) | Uso no CapIAu-Talho |
 |:---|:---|:---|:---|:---|
 | qwen2.5:7b | 4.7 GB | ~4.7 GB | ~9 t/s | Decisões editoriais, resumos, análise |
 | llava:7b | 4.7 GB | ~4.7 GB | ~8 t/s | Descrição semântica de frames |
@@ -284,7 +284,7 @@ python3 -c "import opentimelineio as otio; print('OTIO versão:', otio.__version
 ### 3.2 Arquivo: `src/config.py`
 
 ```python
-"""Configurações centralizadas do CaIAu Talho MVP."""
+"""Configurações centralizadas do CapIAu-Talho MVP."""
 import os
 from pathlib import Path
 from dataclasses import dataclass

@@ -247,7 +247,7 @@ function updateActionsRowVisibility(tab) {
 
 // Inicialização da Aplicação
 window.addEventListener("DOMContentLoaded", () => {
-    console.log("CaIAu Talho: Inicializando os módulos...");
+    console.log("CapIAu-Talho: Inicializando os módulos...");
 
     // Instanciando os gerenciadores
     const player = new VideoPlayer();

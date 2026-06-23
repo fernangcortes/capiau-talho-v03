@@ -1,12 +1,12 @@
-# Manual do Usuário — CaIAu Talho Making Of Editor
+# Manual do Usuário — CapIAu-Talho Making Of Editor
 
-Bem-vindo ao **CaIAu Talho Making Of Editor**! Este guia prático descreve o passo a passo de como importar suas mídias, transcrever depoimentos, mapear imagens semanticamente e realizar a pré-edição do seu documentário de 20 horas de forma profissional.
+Bem-vindo ao **CapIAu-Talho Making Of Editor**! Este guia prático descreve o passo a passo de como importar suas mídias, transcrever depoimentos, mapear imagens semanticamente e realizar a pré-edição do seu documentário de 20 horas de forma profissional.
 
 ---
 
 ## 📂 1. Estrutura de Pastas e Organização das Mídias
 
-Para processar seu material de forma limpa, o CaIAu Talho utiliza a seguinte estrutura local criada no seu computador:
+Para processar seu material de forma limpa, o CapIAu-Talho utiliza a seguinte estrutura local criada no seu computador:
 
 * **`watch/`:** A porta de entrada do sistema. Qualquer mídia (vídeo, áudio ou foto) colocada aqui será identificada para processamento.
 * **`data/originals/`:** Armazena as mídias originais copiadas de forma segura pelo sistema.
@@ -83,7 +83,7 @@ Para editar em velocidade profissional de ilha de corte, use os atalhos de tecla
 
 ## 👁️ 5. Mapeamento de Rostos, Objetos e Desambiguação Rápida
 
-O CaIAu Talho conta com uma interface completa de decupagem visual para gerenciar as marcações de pessoas e elementos do set de filmagem.
+O CapIAu-Talho conta com uma interface completa de decupagem visual para gerenciar as marcações de pessoas e elementos do set de filmagem.
 
 ### A. Exibição e Desenho Livre (Drag-and-Draw) no Player
 * **Visualização Inteligente:** As caixas delimitadoras de rostos e objetos (`face-box`) ficam ocultas por padrão no player para não poluir a visualização. Elas aparecem instantaneamente ao passar o mouse perto do rosto ou objeto quando o player estiver **pausado**.

@@ -1,4 +1,4 @@
-"""Motor ASR (reconhecimento de fala) do CaIAu Talho integrado com AssemblyAI."""
+"""Motor ASR (reconhecimento de fala) do CapIAu-Talho integrado com AssemblyAI."""
 import os
 import sys
 import wave

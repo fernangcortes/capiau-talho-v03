@@ -70,7 +70,7 @@ export class ChatManager {
         typingEl.className = "chat-bubble assistant typing-indicator";
         typingEl.style.alignSelf = "flex-start";
         typingEl.innerHTML = `
-            <div class="bubble-meta"><span>Assistente CaIAu Talho</span></div>
+            <div class="bubble-meta"><span>Assistente CapIAu-Talho</span></div>
             <div class="chat-bubble-text" style="display: flex; gap: 4px; padding: 4px 0; align-items: center; height: 12px;">
                 <span class="dot"></span>
                 <span class="dot"></span>
@@ -112,7 +112,7 @@ export class ChatManager {
             
             const meta = document.createElement("div");
             meta.className = "bubble-meta";
-            meta.innerHTML = `<span>${m.role === 'user' ? 'Você' : 'Assistente CaIAu Talho'}</span>`;
+            meta.innerHTML = `<span>${m.role === 'user' ? 'Você' : 'Assistente CapIAu-Talho'}</span>`;
             bubble.appendChild(meta);
             
             const textEl = document.createElement("div");
