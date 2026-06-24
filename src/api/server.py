@@ -62,3 +62,4 @@ app.mount("/originals", StaticFiles(directory=str(CONFIG.ORIGINALS_DIR)), name="
 frontend_dir = CONFIG.BASE_DIR / "src/ui"
 frontend_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="ui")
+# Auto-reload trigger comment v2

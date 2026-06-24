@@ -45,9 +45,15 @@ Para ajudar a IA a identificar seus clipes de forma inteligente na ingestão:
 2. O DeepSeek V3 lerá as transcrições das entrevistas e proporá de 5 a 10 temas estruturados sobre o making of (ex: *Lentes Anamórficas, Fotografia, Roteiro*).
 3. Esses temas aparecerão na aba **Temas** na barra lateral esquerda, facilitando a navegação temática.
 
-### Passo E: Busca Semântica Híbrida
+### Passo E: Busca Semântica Híbrida e Controles de Playlist
 No campo de busca no topo, pesquise por conceitos (ex: *"diretor falando sobre iluminação"* ou *"câmeras no set"*). 
-O Qdrant embutido na sua CPU fará uma busca vetorial instantânea e retornará falas de entrevistas, frames de B-roll ou fotos de set correspondentes no painel direito. Clicar no resultado abre o vídeo correspondente no tempo exato!
+O Qdrant embutido na sua CPU fará uma busca vetorial instantânea e retornará falas de entrevistas, frames de B-roll ou fotos de set correspondentes no painel direito. Clicar no resultado abre a mídia correspondente.
+
+* **Agrupamento & Ocorrências Secundárias:** Os resultados são desduplicados por arquivo de mídia. Trechos e falas secundárias adicionais do mesmo vídeo são agrupados em uma seção sanfonada abaixo do card principal. Clique em *"Ver mais ocorrências (X)"* para expandir os sub-cards correspondentes.
+* **Pre-visualização Rápida (Hover Previews):** Posicione o cursor do mouse sobre qualquer card ou sub-card de resultado da busca. Após 400ms, um popover lateral surgirá mostrando um preview em loop mudo de 5 segundos do trecho exato (para vídeos) ou a imagem da foto.
+* **Playlist de Busca e Autoplay Sequencial:** Uma barra de controle de playlist com botões de Retroceder (`⏮`), Autoplay (`Play / Parar`) e Avançar (`⏭`) é injetada no topo do feed de resultados.
+  * Ao clicar em um card ou sub-card, ele é selecionado e destacado com uma borda brilhante e a playlist é ativada.
+  * Ative o **Autoplay** clicando no botão correspondente. Os vídeos tocarão nos timestamps corretos e pularão automaticamente para o próximo resultado ao término do trecho ou arquivo. As fotos abrirão automaticamente no visualizador de fotos (Lightbox) por 4 segundos e avançarão para a próxima mídia da lista sem interrupção.
 
 ---
 

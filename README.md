@@ -79,7 +79,9 @@ O CapIAu-Talho implementa um fluxo de reconhecimento facial em cascata dividida 
 As descrições brutas dos frames de B-roll e fotos geradas pelas IAs de visão são associadas às marcações de rostos e objetos em uma janela de tolerância de **5.0 segundos**:
 * **Substituição de Plurais:** Quando dois ou mais nomes de pessoas são identificados no mesmo frame, termos genéricos no texto (ex: `Duas mulheres`, `Pessoas`) são automaticamente substituídos pela junção de seus nomes reais (ex: `Fernanda e Aline`).
 * **Resolução de Substantivos de Objetos:** Ao marcar um objeto (ex: `Abajur de Mesa`), o sistema localiza o substantivo correspondente na descrição original (ex: `um abajur`, `a luz`) e substitui o termo pelo nome preciso do objeto anotado.
-* **Busca Semântica:** Mapeamentos manuais criados com a anotação Drag-and-Draw inserem representações textuais na base SQLite, garantindo que buscas por objetos ou pessoas encontrem o frame exato na biblioteca.
+* **Busca Semântica Híbrida Desduplicada:** Mapeamentos manuais criados com a anotação Drag-and-Draw inserem representações textuais na base SQLite, garantindo que buscas por objetos ou pessoas encontrem o frame exato na biblioteca. Cada mídia única (vídeo ou foto) é retornada apenas uma vez no feed principal, agrupando trechos secundários em menus retráteis (*other_occurrences*).
+* **Playlist de Busca e Autoplay Sequencial:** Barra de controles (`⏮`, `Autoplay`, `⏭`) no painel de busca que permite reproduzir os resultados consecutivamente. O sistema calcula a duração do trecho e pula para o próximo item do feed. Fotos de set abrem na lightbox por 4 segundos e avançam de forma sequencial.
+* **Pre-visualização Flutuante (Hover Previews):** Passar o mouse sobre cards ou sub-cards de resultados de busca abre um popover lateral inteligente com um loop de vídeo mudo (5s) ou imagem contextualmente focada no trecho correspondente.
 
 ---
 

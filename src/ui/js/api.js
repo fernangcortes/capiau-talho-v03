@@ -179,12 +179,20 @@ export class CapIAuAPI {
         return this.request(`/api/themes?project_id=${projectId}`);
     }
 
-    static search(query, projectId, mediaType = "") {
-        let url = `/api/search?query=${encodeURIComponent(query)}&project_id=${projectId}`;
+    static search(query, projectId, mediaType = "", limit = 30, offset = 0) {
+        let url = `/api/search?query=${encodeURIComponent(query)}&project_id=${projectId}&limit=${limit}&offset=${offset}`;
         if (mediaType) {
             url += `&media_type=${mediaType}`;
         }
         return this.request(url);
+    }
+
+    static categorizeSearchResults(query, results) {
+        return this.request("/api/search/categorize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query, results })
+        });
     }
 
     static saveTimeline(projectId, name, description, cuts) {

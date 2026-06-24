@@ -124,7 +124,7 @@ def enrich_description(text: str, names: List[str], text_replacements: Optional[
 class RAGService:
 
     @staticmethod
-    def search_hybrid(project_id: int, query: str, media_type: Optional[str] = None, limit: int = 12) -> List[Dict[str, Any]]:
+    def search_hybrid(project_id: int, query: str, media_type: Optional[str] = None, limit: int = 30, offset: int = 0) -> List[Dict[str, Any]]:
         """Realiza busca híbrida: cruzando rostos/falantes no SQLite e vetores no Qdrant."""
         face_results = []
         speaker_results = []
@@ -248,31 +248,52 @@ class RAGService:
         results = []
         try:
             search_engine = SemanticSearch.get_instance()
-            results = search_engine.search(project_id, query, media_type=media_type, limit=limit)
+            qdrant_limit = max(200, offset * 5 + limit * 10)
+            results = search_engine.search(project_id, query, media_type=media_type, limit=qdrant_limit)
         except Exception as qdrant_err:
             print(f"[RAGSearch] Erro ao pesquisar no Qdrant: {qdrant_err}")
 
-        # 4. Mescla resultados removendo duplicatas
-        seen_media = set()
-        final_results = []
+        # 4. Mescla resultados agrupando ocorrências por mídia
+        media_groups = {} # key -> list of results
+        all_candidates = face_results + speaker_results + results
         
-        # Adiciona resultados prioritários (SQLite rostos/falantes)
-        for r in face_results + speaker_results:
-            payload = r["payload"]
-            media_id = payload.get("photo_id") or payload.get("video_id")
-            key = (payload["media_type"], media_id)
-            if key not in seen_media:
-                seen_media.add(key)
-                final_results.append(r)
-                
-        # Adiciona resultados semânticos
-        for r in results:
+        for r in all_candidates:
             payload = r.get("payload", {})
-            media_id = payload.get("photo_id") or payload.get("video_id") or payload.get("doc_id")
-            key = (payload.get("media_type"), media_id)
-            if key not in seen_media:
-                seen_media.add(key)
-                final_results.append(r)
+            m_type = payload.get("media_type", "unknown")
+            if m_type == "video":
+                payload["media_type"] = "interview"
+                m_type = "interview"
+                
+            media_id = payload.get("photo_id") or payload.get("video_id") or payload.get("doc_id") or 0
+            group_key = (m_type, media_id)
+            
+            if group_key not in media_groups:
+                media_groups[group_key] = []
+                
+            # Evitar exatamente o mesmo timestamp (com 1 decimal de tolerância)
+            start_time = payload.get("start_time", 0.0)
+            if not any(round(existing["payload"].get("start_time", 0.0), 1) == round(start_time, 1) for existing in media_groups[group_key]):
+                media_groups[group_key].append(r)
+                
+        # Selecionar o melhor resultado de cada mídia e agrupar os outros
+        final_results = []
+        for group_key, items in media_groups.items():
+            items.sort(key=lambda x: x.get("score", 0.0), reverse=True)
+            
+            main_item = items[0]
+            other_occurrences = []
+            for item_idx, item in enumerate(items[1:]):
+                payload_sub = item.get("payload", {})
+                other_occurrences.append({
+                    "id": f"{group_key[0]}_{group_key[1]}_{payload_sub.get('start_time', 0.0)}_sub_{item_idx}",
+                    "score": item.get("score", 0.0),
+                    "start_time": payload_sub.get("start_time", 0.0),
+                    "end_time": payload_sub.get("end_time", 0.0),
+                    "text": payload_sub.get("text", "")
+                })
+            
+            main_item["other_occurrences"] = other_occurrences
+            final_results.append(main_item)
 
         # 5. Enriquecimento de metadados estáticos e caminhos de proxy no SQLite
         with get_db() as conn:
@@ -324,7 +345,78 @@ class RAGService:
                         payload["text"] = enrich_description(raw_desc, names, text_replacements=replacements)
 
 
-        return final_results[:limit]
+        # 6. Atribui IDs estáveis para referência no frontend e categorização
+        for idx, r in enumerate(final_results):
+            payload = r.get("payload", {})
+            m_type = payload.get("media_type", "unknown")
+            if m_type == "video":
+                payload["media_type"] = "interview"
+                m_type = "interview"
+            media_id = payload.get("photo_id") or payload.get("video_id") or payload.get("doc_id") or 0
+            start_time = payload.get("start_time", 0.0)
+            r["id"] = f"{m_type}_{media_id}_{start_time}_{idx}"
+
+        return final_results[offset : offset + limit]
+
+    @staticmethod
+    def categorize_results_with_llm(query: str, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Usa LLM para agrupar semanticamente resultados de busca em categorias de desambiguação."""
+        api_key = CONFIG.OPENROUTER_API_KEY
+        if not api_key or api_key == "your_openrouter_api_key_here":
+            return {"categories": []}
+
+        # Preparar texto dos itens para o prompt do LLM
+        items_desc = []
+        for idx, item in enumerate(items):
+            item_id = item.get("id", f"item_{idx}")
+            media_type = item.get("media_type", "unknown")
+            text = item.get("text", "")
+            items_desc.append(f"- ID: {item_id} | Tipo: {media_type} | Texto: {text}")
+
+        items_str = "\n".join(items_desc)
+
+        system_prompt = (
+            "Você é um assistente de edição de vídeo e documentários. Sua tarefa é analisar uma lista de resultados de busca "
+            "e agrupá-los em categorias temáticas ou de desambiguação baseadas no termo pesquisado.\n"
+            "Retorne APENAS um objeto JSON no seguinte formato (sem formatação markdown ou explicações extra):\n"
+            "{\n"
+            "  \"categories\": [\n"
+            "    {\n"
+            "      \"name\": \"Nome Curto e Claro da Categoria (máx 3 palavras)\",\n"
+            "      \"result_ids\": [\"id1\", \"id2\"]\n"
+            "    }\n"
+            "  ]\n"
+            "}"
+        )
+
+        user_content = f"Termo buscado: '{query}'\n\nResultados encontrados:\n{items_str}"
+
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": CONFIG.TEXT_MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            "temperature": 0.3,
+            "response_format": {"type": "json_object"}
+        }
+
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=20)
+            if response.status_code == 200:
+                res_json = response.json()
+                ai_text = res_json['choices'][0]['message']['content'].strip()
+                # Tentar decodificar o JSON retornado
+                return json.loads(ai_text)
+            return {"categories": []}
+        except Exception as e:
+            print(f"[RAGSearch] Erro ao categorizar com LLM: {e}")
+            return {"categories": []}
 
     @staticmethod
     def chat(project_id: int, message: str, history: List[Dict[str, str]]) -> Dict[str, Any]:

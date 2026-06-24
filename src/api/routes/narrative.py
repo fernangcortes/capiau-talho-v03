@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.responses import FileResponse
 
 from src.api.dependencies import get_db_conn
-from src.api.schemas import TimelineCreate, SplitTranscriptPayload, ChatPayload
+from src.api.schemas import TimelineCreate, SplitTranscriptPayload, ChatPayload, SearchCategorizePayload
 from src.db.repositories.projects import ProjectRepository
 from src.db.repositories.narrative import NarrativeRepository
 from src.services.pipeline import PipelineService
@@ -105,10 +105,22 @@ def get_project_themes(project_id: int = Query(1), conn: sqlite3.Connection = De
     return {"themes": themes}
 
 @router.get("/api/search")
-def search_media(query: str = Query(..., min_length=1), project_id: int = Query(1), media_type: Optional[str] = None):
+def search_media(
+    query: str = Query(..., min_length=1),
+    project_id: int = Query(1),
+    media_type: Optional[str] = None,
+    limit: int = Query(30),
+    offset: int = Query(0)
+):
     """Busca híbrida inteligente cruzando metadados relacionais e Qdrant vetorial."""
-    results = RAGService.search_hybrid(project_id, query, media_type=media_type)
+    results = RAGService.search_hybrid(project_id, query, media_type=media_type, limit=limit, offset=offset)
     return {"query": query, "results": results}
+
+@router.post("/api/search/categorize")
+def categorize_search(payload: SearchCategorizePayload):
+    """Agrupa os resultados da busca em categorias semânticas via LLM."""
+    results_dicts = [{"id": r.id, "media_type": r.media_type, "text": r.text} for r in payload.results]
+    return RAGService.categorize_results_with_llm(payload.query, results_dicts)
 
 @router.post("/api/timeline")
 def save_timeline(timeline: TimelineCreate, conn: sqlite3.Connection = Depends(get_db_conn)):

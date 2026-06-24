@@ -52,3 +52,12 @@ class ReassignFacesPayload(BaseModel):
     target_cluster_id: int
     target_name: str
 
+class SearchResultItem(BaseModel):
+    id: str
+    media_type: str
+    text: str
+
+class SearchCategorizePayload(BaseModel):
+    query: str
+    results: List[SearchResultItem]
+

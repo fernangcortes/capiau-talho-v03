@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, MatchAny
 from sentence_transformers import SentenceTransformer
 from src.config import CONFIG
 import uuid
@@ -158,12 +158,20 @@ class SemanticSearch:
         
         # Filtro adicional opcional por tipo de mídia
         if media_type:
-            conditions.append(
-                FieldCondition(
-                    key="media_type",
-                    match=MatchValue(value=media_type)
+            if media_type == "interview":
+                conditions.append(
+                    FieldCondition(
+                        key="media_type",
+                        match=MatchAny(any=["interview", "video"])
+                    )
                 )
-            )
+            else:
+                conditions.append(
+                    FieldCondition(
+                        key="media_type",
+                        match=MatchValue(value=media_type)
+                    )
+                )
             
         query_filter = Filter(must=conditions)
             
