@@ -579,6 +579,13 @@ button {
     background: #000;
 }
 
+/* Fullscreen adjustments */
+#video-wrapper:fullscreen video,
+#video-wrapper:fullscreen img {
+    max-height: 100% !important;
+}
+
+
 .player-overlays {
     position: absolute;
     top: 20px;

@@ -40,6 +40,7 @@ export class VideoPlayer {
         this.btnAppend = document.getElementById("btn-append-timeline");
         this.markerInPos = document.getElementById("marker-in-pos");
         this.markerOutPos = document.getElementById("marker-out-pos");
+        this.btnMaximize = document.getElementById("btn-maximize");
 
         this.speedsForward = [1.0, 1.5, 2.0, 4.0, 8.0];
         this.speedsReverse = [-1.0, -2.0, -4.0, -8.0];
@@ -106,6 +107,14 @@ export class VideoPlayer {
         if (this.btnMarkIn) this.btnMarkIn.addEventListener("click", () => this.markIn());
         if (this.btnMarkOut) this.btnMarkOut.addEventListener("click", () => this.markOut());
         if (this.btnAppend) this.btnAppend.addEventListener("click", () => this.appendToTimeline());
+
+        if (this.btnMaximize) {
+            this.btnMaximize.addEventListener("click", () => this.toggleFullscreen());
+        }
+        document.addEventListener("fullscreenchange", () => this.onFullscreenChange());
+        document.addEventListener("webkitfullscreenchange", () => this.onFullscreenChange());
+        document.addEventListener("mozfullscreenchange", () => this.onFullscreenChange());
+        document.addEventListener("MSFullscreenChange", () => this.onFullscreenChange());
 
         // Atalhos de teclado globais
         document.addEventListener("keydown", (e) => this.handleKeyboard(e));
@@ -423,6 +432,50 @@ export class VideoPlayer {
             // Próximo frame
             this.seek(this.video.currentTime + 0.04);
         }
+    }
+
+    toggleFullscreen() {
+        const container = document.getElementById("video-wrapper");
+        if (!container) return;
+
+        if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+            if (container.requestFullscreen) {
+                container.requestFullscreen();
+            } else if (container.webkitRequestFullscreen) {
+                container.webkitRequestFullscreen();
+            } else if (container.mozRequestFullScreen) {
+                container.mozRequestFullScreen();
+            } else if (container.msRequestFullscreen) {
+                container.msRequestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+    }
+
+    onFullscreenChange() {
+        const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        if (this.btnMaximize) {
+            if (isFullscreen) {
+                this.btnMaximize.innerHTML = `<i class="fa-solid fa-compress"></i>`;
+                this.btnMaximize.title = "Sair da Tela Cheia";
+            } else {
+                this.btnMaximize.innerHTML = `<i class="fa-solid fa-expand"></i>`;
+                this.btnMaximize.title = "Tela Cheia";
+            }
+        }
+        // Recalcula o overlay com delay curto para dar tempo de renderização do layout
+        setTimeout(() => {
+            this.updateOverlaySize();
+        }, 100);
     }
 
     createOverlayContainer() {
