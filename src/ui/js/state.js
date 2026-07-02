@@ -35,6 +35,7 @@ class AppState extends EventEmitter {
         this._activeTimelineCuts = [];
         this._markerIn = null;
         this._markerOut = null;
+        this._projectFps = 24;
         
         this._allVideos = [];
         this._allPhotos = [];
@@ -123,10 +124,53 @@ class AppState extends EventEmitter {
         this.emit("rightTabChanged", val);
     }
 
+    get projectFps() { return this._projectFps; }
+    set projectFps(val) {
+        this._projectFps = Number(val) || 24;
+        this.emit("projectFpsChanged", this._projectFps);
+    }
+
     get activeTimelineCuts() { return this._activeTimelineCuts; }
     set activeTimelineCuts(val) {
-        this._activeTimelineCuts = val;
-        this.emit("timelineCutsUpdated", val);
+        const fps = this._projectFps || 24;
+        let currentV1Frame = 0;
+        let currentV2Frame = 0;
+        
+        this._activeTimelineCuts = (val || []).map((cut, index) => {
+            const video = this._allVideos.find(v => v.id === cut.video_id);
+            const videoFps = video && video.fps ? video.fps : fps;
+            
+            const inFrame = cut.inFrame !== undefined ? cut.inFrame : Math.round(cut.in * videoFps);
+            const outFrame = cut.outFrame !== undefined ? cut.outFrame : Math.round(cut.out * videoFps);
+            const duration = outFrame - inFrame;
+            
+            const track = cut.track || "V1";
+            let timelineStartFrame = cut.timelineStartFrame;
+            
+            if (track === "V1") {
+                timelineStartFrame = currentV1Frame;
+                currentV1Frame += duration;
+            } else {
+                if (timelineStartFrame === undefined) {
+                    timelineStartFrame = currentV2Frame;
+                    currentV2Frame += duration;
+                } else {
+                    currentV2Frame = timelineStartFrame + duration;
+                }
+            }
+            
+            return {
+                id: cut.id || `cut_${index}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                video_id: cut.video_id,
+                inFrame: Math.round(inFrame),
+                outFrame: Math.round(outFrame),
+                in: cut.in !== undefined ? cut.in : inFrame / videoFps,
+                out: cut.out !== undefined ? cut.out : outFrame / videoFps,
+                track: track,
+                timelineStartFrame: Math.round(timelineStartFrame)
+            };
+        });
+        this.emit("timelineCutsUpdated", this._activeTimelineCuts);
     }
 
     get markerIn() { return this._markerIn; }
@@ -179,3 +223,4 @@ class AppState extends EventEmitter {
 }
 
 export const STATE = new AppState();
+window.STATE = STATE;
