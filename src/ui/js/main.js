@@ -1070,17 +1070,27 @@ window.addEventListener("DOMContentLoaded", () => {
     FaceManager.init();
 
     // -- Open Photos in Player Configuration --
-    const chkLibrary = document.getElementById("chk-library-photos-in-player");
-    if (chkLibrary) {
-        chkLibrary.checked = STATE.openPhotosInPlayer;
-        chkLibrary.addEventListener("change", (e) => {
-            STATE.openPhotosInPlayer = e.target.checked;
+    const btnLibrary = document.getElementById("btn-library-photos-in-player");
+    function updatePhotoPlayerBtnStyle(btn, active) {
+        if (!btn) return;
+        if (active) {
+            btn.style.color = "var(--color-cyan)";
+            btn.style.borderColor = "rgba(6,182,212,0.4)";
+        } else {
+            btn.style.color = "var(--text-muted)";
+            btn.style.borderColor = "rgba(100,100,120,0.25)";
+        }
+    }
+    if (btnLibrary) {
+        btnLibrary.addEventListener("click", () => {
+            STATE.openPhotosInPlayer = !STATE.openPhotosInPlayer;
         });
+        updatePhotoPlayerBtnStyle(btnLibrary, STATE.openPhotosInPlayer);
     }
 
     STATE.on("openPhotosInPlayerChanged", (openInPlayer) => {
-        const chkL = document.getElementById("chk-library-photos-in-player");
-        if (chkL) chkL.checked = openInPlayer;
+        const btnL = document.getElementById("btn-library-photos-in-player");
+        updatePhotoPlayerBtnStyle(btnL, openInPlayer);
         
         const chkS = document.getElementById("chk-search-photos-in-player");
         if (chkS) chkS.checked = openInPlayer;
