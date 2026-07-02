@@ -21,6 +21,8 @@ export class VideoPlayer {
     constructor() {
         this.video = document.getElementById("main-video");
         this.btnPlay = document.getElementById("btn-play");
+        this.btnPrevFrame = document.getElementById("btn-prev-frame");
+        this.btnNextFrame = document.getElementById("btn-next-frame");
         this.currentTimeEl = document.getElementById("current-time");
         this.durationTimeEl = document.getElementById("duration-time");
         this.scrubberFill = document.getElementById("scrubber-progress-fill");
@@ -91,6 +93,16 @@ export class VideoPlayer {
 
         // Eventos DOM
         if (this.btnPlay) this.btnPlay.addEventListener("click", () => this.togglePlay());
+        if (this.btnPrevFrame) {
+            this.btnPrevFrame.addEventListener("click", () => {
+                this.seek(this.video.currentTime - 0.04);
+            });
+        }
+        if (this.btnNextFrame) {
+            this.btnNextFrame.addEventListener("click", () => {
+                this.seek(this.video.currentTime + 0.04);
+            });
+        }
         if (this.scrubberBar) {
             this.scrubberBar.addEventListener("click", (e) => this.seekScrubber(e));
             this.scrubberBar.addEventListener("mousedown", (e) => this.startScrubberDrag(e));
