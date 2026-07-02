@@ -592,9 +592,13 @@ export class LibraryManager {
             if (clickEnabled) {
                 card.style.cursor = "pointer";
                 card.addEventListener("click", () => {
-                    STATE.currentPhotoList = photos;
-                    STATE.currentPhotoIndex = photos.indexOf(p);
-                    this.openLightbox(p);
+                    if (STATE.openPhotosInPlayer) {
+                        STATE.activePhoto = p;
+                    } else {
+                        STATE.currentPhotoList = photos;
+                        STATE.currentPhotoIndex = photos.indexOf(p);
+                        this.openLightbox(p);
+                    }
                 });
             } else {
                 card.style.cursor = "not-allowed";

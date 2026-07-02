@@ -56,6 +56,7 @@ export class VideoPlayer {
     init() {
         // Observa mudanças do vídeo ativo
         STATE.on("activeVideoChanged", (video) => this.loadVideo(video));
+        STATE.on("activePhotoChanged", (photo) => this.loadPhoto(photo));
         STATE.on("markerInChanged", (val) => this.updateMarkersUI());
         STATE.on("markerOutChanged", (val) => this.updateMarkersUI());
         STATE.on("videoFacesUpdated", (videoId) => {
@@ -112,16 +113,21 @@ export class VideoPlayer {
 
     loadVideo(video) {
         if (!video) {
-            this.video.src = "";
-            this.titleEl.textContent = "Nenhuma mídia selecionada";
-            this.badgeType.className = "badge badge-hidden";
-            this.badgeResolution.className = "badge badge-hidden";
-            STATE.markerIn = null;
-            STATE.markerOut = null;
-            this.videoFaces = [];
-            this.clearFacesOverlay();
+            if (!STATE.activePhoto) {
+                this.hidePhoto();
+                this.video.src = "";
+                this.titleEl.textContent = "Nenhuma mídia selecionada";
+                this.badgeType.className = "badge badge-hidden";
+                this.badgeResolution.className = "badge badge-hidden";
+                STATE.markerIn = null;
+                STATE.markerOut = null;
+                this.videoFaces = [];
+                this.clearFacesOverlay();
+            }
             return;
         }
+
+        this.hidePhoto();
 
         let videoSrc = video.filepath;
         const isRemote = videoSrc.startsWith("http") || videoSrc.startsWith("/proxies/") || videoSrc.startsWith("/");
@@ -159,6 +165,65 @@ export class VideoPlayer {
                 console.error("Erro ao carregar faces do vídeo:", err);
                 this.videoFaces = [];
             });
+    }
+
+    loadPhoto(photo) {
+        if (!photo) {
+            if (!STATE.activeVideo) {
+                this.hidePhoto();
+            }
+            return;
+        }
+        
+        if (this.video) {
+            this.video.pause();
+            this.video.style.display = "none";
+        }
+        
+        let imgEl = document.getElementById("player-photo");
+        if (!imgEl) {
+            imgEl = document.createElement("img");
+            imgEl.id = "player-photo";
+            const videoWrapper = document.getElementById("video-wrapper");
+            if (videoWrapper) {
+                videoWrapper.appendChild(imgEl);
+            }
+        }
+        
+        const src = photo.proxy_path || (photo.filepath && (photo.filepath.startsWith('http') || photo.filepath.startsWith('/')) ? photo.filepath : `/originals/${photo.filename}`);
+        imgEl.src = src;
+        imgEl.style.display = "block";
+        
+        if (this.titleEl) this.titleEl.textContent = photo.filename;
+        if (this.badgeType) {
+            this.badgeType.textContent = "FOTO DE SET";
+            this.badgeType.className = "badge badge-photo";
+        }
+        if (this.badgeResolution) {
+            this.badgeResolution.textContent = photo.resolution || "Proxy";
+            this.badgeResolution.className = "badge badge-gray";
+        }
+        
+        STATE.markerIn = null;
+        STATE.markerOut = null;
+        if (this.currentTimeEl) this.currentTimeEl.textContent = "00:00:00:00";
+        if (this.durationTimeEl) this.durationTimeEl.textContent = "00:00:00:00";
+        if (this.scrubberFill) this.scrubberFill.style.width = "0%";
+        if (this.scrubberHandle) this.scrubberHandle.style.left = "0%";
+        
+        this.videoFaces = [];
+        this.clearFacesOverlay();
+    }
+    
+    hidePhoto() {
+        const imgEl = document.getElementById("player-photo");
+        if (imgEl) {
+            imgEl.style.display = "none";
+            imgEl.src = "";
+        }
+        if (this.video) {
+            this.video.style.display = "block";
+        }
     }
 
     onTimeUpdate() {

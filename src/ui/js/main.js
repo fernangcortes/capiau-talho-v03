@@ -252,17 +252,21 @@ function playSearchPlaylistItem(index) {
     }
     
     if (item.media_type === "photo") {
-        const playerEl = document.getElementById("main-video");
-        if (playerEl) playerEl.pause();
-        
         const photo = STATE.allPhotos.find(p => p.id === item.photo_id);
         if (photo) {
-            STATE.currentPhotoList = STATE.allPhotos;
-            STATE.currentPhotoIndex = STATE.allPhotos.indexOf(photo);
-            const btnTabPhotos = document.querySelector('[data-tab="tab-photos"]');
-            if (btnTabPhotos) btnTabPhotos.click();
-            if (window.libraryManager) {
-                window.libraryManager.openLightbox(photo);
+            if (SEARCH_STATE.autoplaySeq || STATE.openPhotosInPlayer) {
+                if (window.libraryManager && window.libraryManager.lightbox) {
+                    window.libraryManager.closeLightbox();
+                }
+                STATE.activePhoto = photo;
+            } else {
+                STATE.currentPhotoList = STATE.allPhotos;
+                STATE.currentPhotoIndex = STATE.allPhotos.indexOf(photo);
+                const btnTabPhotos = document.querySelector('[data-tab="tab-photos"]');
+                if (btnTabPhotos) btnTabPhotos.click();
+                if (window.libraryManager) {
+                    window.libraryManager.openLightbox(photo);
+                }
             }
         }
         
@@ -820,12 +824,15 @@ function applyFiltersAndRenderCards() {
     
     // Atualizar UI dos controles de playlist
     const controlsDiv = searchContainer.querySelector(".search-playlist-controls");
+    const optionsDiv = searchContainer.querySelector(".search-playlist-options");
     if (controlsDiv) {
         if (SEARCH_STATE.playlistItems.length > 0) {
             controlsDiv.style.display = "flex";
+            if (optionsDiv) optionsDiv.style.display = "flex";
             updatePlaylistUI();
         } else {
             controlsDiv.style.display = "none";
+            if (optionsDiv) optionsDiv.style.display = "none";
         }
     }
 }
@@ -897,6 +904,13 @@ function renderSearchResults(query) {
                 Nenhum selecionado
             </div>
         </div>
+        
+        <div class="search-playlist-options" style="display: none; align-items: center; margin: -5px 15px 10px 15px; padding: 0 6px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                <input type="checkbox" id="chk-search-photos-in-player" style="cursor: pointer; width: 12px; height: 12px; accent-color: var(--color-cyan);">
+                <span>Abrir fotos no player de vídeo</span>
+            </label>
+        </div>
 
         <div class="context-filters-container">
             <!-- Pílulas contextuais e IA injetadas dinamicamente -->
@@ -927,6 +941,14 @@ function renderSearchResults(query) {
                 if (playerEl) playerEl.pause();
                 updatePlaylistUI();
             }
+        });
+    }
+
+    const chkSearch = searchContainer.querySelector("#chk-search-photos-in-player");
+    if (chkSearch) {
+        chkSearch.checked = STATE.openPhotosInPlayer;
+        chkSearch.addEventListener("change", (e) => {
+            STATE.openPhotosInPlayer = e.target.checked;
         });
     }
 
@@ -1046,6 +1068,23 @@ window.addEventListener("DOMContentLoaded", () => {
     const chat = new ChatManager();
     const projects = new ProjectsManager();
     FaceManager.init();
+
+    // -- Open Photos in Player Configuration --
+    const chkLibrary = document.getElementById("chk-library-photos-in-player");
+    if (chkLibrary) {
+        chkLibrary.checked = STATE.openPhotosInPlayer;
+        chkLibrary.addEventListener("change", (e) => {
+            STATE.openPhotosInPlayer = e.target.checked;
+        });
+    }
+
+    STATE.on("openPhotosInPlayerChanged", (openInPlayer) => {
+        const chkL = document.getElementById("chk-library-photos-in-player");
+        if (chkL) chkL.checked = openInPlayer;
+        
+        const chkS = document.getElementById("chk-search-photos-in-player");
+        if (chkS) chkS.checked = openInPlayer;
+    });
 
     // ── CONFIGURAÇÃO DE SIDEBARS RETRÁTEIS ──
     const sidebarLeft = document.getElementById("sidebar-left");

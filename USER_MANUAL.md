@@ -53,7 +53,8 @@ O Qdrant embutido na sua CPU fará uma busca vetorial instantânea e retornará 
 * **Pre-visualização Rápida (Hover Previews):** Posicione o cursor do mouse sobre qualquer card ou sub-card de resultado da busca. Após 400ms, um popover lateral surgirá mostrando um preview em loop mudo de 5 segundos do trecho exato (para vídeos) ou a imagem da foto.
 * **Playlist de Busca e Autoplay Sequencial:** Uma barra de controle de playlist com botões de Retroceder (`⏮`), Autoplay (`Play / Parar`) e Avançar (`⏭`) é injetada no topo do feed de resultados.
   * Ao clicar em um card ou sub-card, ele é selecionado e destacado com uma borda brilhante e a playlist é ativada.
-  * Ative o **Autoplay** clicando no botão correspondente. Os vídeos tocarão nos timestamps corretos e pularão automaticamente para o próximo resultado ao término do trecho ou arquivo. As fotos abrirão automaticamente no visualizador de fotos (Lightbox) por 4 segundos e avançarão para a próxima mídia da lista sem interrupção.
+  * Ative o **Autoplay** clicando no botão correspondente. Os vídeos tocarão nos timestamps corretos e pularão automaticamente para o próximo resultado. No modo Autoplay, as fotos são exibidas diretamente dentro da área do player de vídeo por 4 segundos antes de avançar, sem abrir popups ou modais.
+  * **Opção de Exibição de Fotos no Player:** Caso queira que o clique manual em fotos abra diretamente no player de vídeo em vez do Lightbox tradicional, marque a opção "Abrir fotos no player de vídeo" (disponível na aba de fotos da biblioteca à esquerda e na barra de opções de busca à direita). Ambas as caixas de seleção permanecem sincronizadas.
 
 ---
 

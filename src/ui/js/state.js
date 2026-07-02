@@ -25,6 +25,8 @@ class AppState extends EventEmitter {
         this._currentProjectId = 1;
         this._allProjects = [];
         this._activeVideo = null;
+        this._activePhoto = null;
+        this._openPhotosInPlayer = false;
         this._activeTranscript = [];
         this._activeTranscriptWords = [];
         this._activeScissorsMode = false;
@@ -63,8 +65,32 @@ class AppState extends EventEmitter {
 
     get activeVideo() { return this._activeVideo; }
     set activeVideo(val) {
+        if (val) {
+            this._activePhoto = null;
+        }
         this._activeVideo = val;
         this.emit("activeVideoChanged", val);
+        if (val) {
+            this.emit("activePhotoChanged", null);
+        }
+    }
+
+    get activePhoto() { return this._activePhoto; }
+    set activePhoto(val) {
+        if (val) {
+            this._activeVideo = null;
+        }
+        this._activePhoto = val;
+        this.emit("activePhotoChanged", val);
+        if (val) {
+            this.emit("activeVideoChanged", null);
+        }
+    }
+
+    get openPhotosInPlayer() { return this._openPhotosInPlayer; }
+    set openPhotosInPlayer(val) {
+        this._openPhotosInPlayer = !!val;
+        this.emit("openPhotosInPlayerChanged", this._openPhotosInPlayer);
     }
 
     get activeTranscript() { return this._activeTranscript; }

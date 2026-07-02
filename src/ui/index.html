@@ -141,8 +141,13 @@
                         </div>
                     </div>
                     
-                    <!-- Tab: Fotos -->
                     <div class="tab-content" id="tab-photos">
+                        <div style="padding: 8px 12px; display: flex; align-items: center; border-bottom: 1px solid var(--border-glass); background: rgba(255,255,255,0.01); margin-bottom: 8px;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-secondary); cursor: pointer; user-select: none; width: 100%;">
+                                <input type="checkbox" id="chk-library-photos-in-player" style="cursor: pointer; width: 12px; height: 12px; accent-color: var(--color-cyan);">
+                                <span>Abrir fotos no player de vídeo</span>
+                            </label>
+                        </div>
                         <div class="media-grid" id="photo-list">
                             <!-- Inserido dinamicamente via JS -->
                         </div>
@@ -224,6 +229,7 @@
                     <!-- HTML5 Player custom wrapper -->
                     <div class="video-container" id="video-wrapper">
                         <video id="main-video" src="" preload="auto"></video>
+                        <img id="player-photo" style="display:none;" src="">
                         
                         <!-- Widescreen overlay indicators -->
                         <div class="player-overlays">
