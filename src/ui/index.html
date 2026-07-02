@@ -41,6 +41,16 @@
                 </button>
             </div>
             
+            <!-- Seletor de Workspace -->
+            <div class="project-area glassmorphism" style="background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.3);">
+                <i class="fa-solid fa-table-columns" style="color: #c084fc;"></i>
+                <select id="select-workspace" title="Configuração de Workspace" style="color: #c084fc; max-width: 140px; background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; cursor: pointer;">
+                    <option value="default">Workspace: Padrão</option>
+                    <option value="decupagem">Workspace: Decupagem</option>
+                    <option value="multitela">Workspace: Multi-Tela</option>
+                </select>
+            </div>
+            
             <div class="search-area glassmorphism">
 
                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
@@ -91,9 +101,12 @@
                             <i class="fa-solid fa-cloud"></i>
                         </span>
                     </h2>
-                    <button class="btn-toggle-sidebar" id="toggle-left" title="Recolher Painel">
-                        <i class="fa-solid fa-chevron-left"></i>
-                    </button>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button id="btn-popout-library" class="btn-icon" title="Destacar Biblioteca" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
+                        <button class="btn-toggle-sidebar" id="toggle-left" title="Recolher Painel">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="media-tabs">
@@ -211,85 +224,114 @@
 
             <!-- ── CENTER AREA (ADVANCED PLAYER & TIMELINE) ────────────────── -->
             <main class="center-stage">
-                <!-- Advanced Video Player Panel -->
-                <section class="player-panel glassmorphism">
-                    <div class="player-header">
-                        <div class="current-media-title" id="player-title">Nenhuma mídia selecionada</div>
-                        <div class="player-badges">
-                            <span class="badge" id="badge-type">-</span>
-                            <span class="badge" id="badge-resolution">-</span>
-                        </div>
-                    </div>
-                    
-                    <!-- HTML5 Player custom wrapper -->
-                    <div class="video-container" id="video-wrapper">
-                        <video id="main-video" src="" preload="auto"></video>
-                        <img id="player-photo" style="display:none;" src="">
-                        
-                        <!-- Widescreen overlay indicators -->
-                        <div class="player-overlays">
-                            <div class="speed-indicator" id="speed-overlay">1.0x</div>
-                            <div class="jkl-indicator" id="jkl-overlay">K</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Advanced Controls Bar -->
-                    <div class="player-controls">
-                        <!-- Playback buttons -->
-                        <div class="control-group">
-                            <button id="btn-prev-frame" class="btn-control" title="Frame Anterior"><i class="fa-solid fa-chevron-left"></i></button>
-                            <button id="btn-play" class="btn-control play-btn" title="Reproduzir/Pausar (Space / K)"><i class="fa-solid fa-play"></i></button>
-                            <button id="btn-next-frame" class="btn-control" title="Próximo Frame"><i class="fa-solid fa-chevron-right"></i></button>
+                <!-- Contêiner de Monitores Duplos (Source & Program) -->
+                <div class="monitors-container" style="display: flex; gap: 15px; width: 100%; flex: 1; min-height: 300px; box-sizing: border-box;">
+                    <!-- Monitor de Origem (Source - Esquerda) -->
+                    <section class="player-panel glassmorphism" id="source-player-panel" style="flex: 1; display: flex; flex-direction: column; position: relative;">
+                        <div class="player-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-glass);">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 11px; font-weight: 800; color: var(--color-cyan); background: rgba(6, 182, 212, 0.1); padding: 2px 6px; border-radius: 4px;">SOURCE</span>
+                                <div class="current-media-title" id="source-player-title" style="font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width: 180px;">Nenhum clipe carregado</div>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button id="btn-popout-source" class="btn-control" title="Destacar Player" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-up-right-from-square"></i></button>
+                                <button id="btn-expand-source" class="btn-control" title="Maximizar" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-expand"></i></button>
+                            </div>
                         </div>
                         
-                        <!-- Timeline scrubber -->
-                        <div class="scrubber-container">
-                            <span class="time-code" id="current-time">00:00:00:00</span>
-                            <div class="scrubber-bar" id="scrubber-progress-bar">
-                                <div class="scrubber-fill" id="scrubber-progress-fill"></div>
-                                <div class="scrubber-handle" id="scrubber-progress-handle"></div>
-                                <div class="marker-in" id="marker-in-pos" style="display:none"></div>
-                                <div class="marker-out" id="marker-out-pos" style="display:none"></div>
-                            </div>
-                            <span class="time-code" id="duration-time">00:00:00:00</span>
+                        <div class="video-container" id="source-video-wrapper" style="flex: 1; background: #000; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                            <video id="source-video" src="" preload="auto" style="position: absolute; width: 100%; height: 100%; object-fit: contain; display: block;"></video>
+                            <img id="source-player-photo" style="display:none; width: 100%; height: 100%; object-fit: contain; position: absolute;" src="">
                         </div>
                         
-                        <!-- Editing Markers (I/O) & Resolution/Speed Toggles -->
-                        <div class="control-group right-controls">
-                            <!-- Marcadores I/O -->
-                            <button id="btn-mark-in" class="btn-control btn-marker" title="Marcar Ponto de Entrada (I)">IN</button>
-                            <button id="btn-mark-out" class="btn-control btn-marker" title="Marcar Ponto de Saída (O)">OUT</button>
-                            <button id="btn-append-timeline" class="btn-primary btn-append" title="Inserir Segmento na Timeline (E)">
-                                <i class="fa-solid fa-plus"></i> Cortar & Inserir
-                            </button>
-                            
-                            <!-- Resolution toggle -->
-                            <div class="dropdown-wrapper">
-                                <i class="fa-solid fa-display"></i>
-                                <select id="select-resolution">
-                                    <option value="proxy_low">360p Proxy</option>
-                                    <option value="proxy_high" selected>720p Proxy</option>
-                                    <option value="original">Original</option>
-                                </select>
+                        <!-- Controles Source -->
+                        <div class="player-controls" style="padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-glass); background: rgba(0,0,0,0.2);">
+                            <!-- Scrubber -->
+                            <div class="scrubber-container" style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                                <span class="time-code" id="source-current-time" style="font-size: 10px; font-family: monospace; color: var(--text-secondary);">00:00:00:00</span>
+                                <div class="scrubber-bar" id="source-scrubber-progress-bar" style="flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; position: relative; cursor: pointer;">
+                                    <div class="scrubber-fill" id="source-scrubber-progress-fill" style="height: 100%; width: 0%; background: var(--color-cyan); border-radius: 3px;"></div>
+                                    <div class="scrubber-handle" id="source-scrubber-progress-handle" style="width: 10px; height: 10px; border-radius: 50%; background: #fff; position: absolute; top: -2px; left: 0%; transform: translateX(-50%); pointer-events: none;"></div>
+                                    <div class="marker-in" id="source-marker-in-pos" style="display:none; position: absolute; width: 4px; height: 100%; background: #22c55e; top: 0;"></div>
+                                    <div class="marker-out" id="source-marker-out-pos" style="display:none; position: absolute; width: 4px; height: 100%; background: #ef4444; top: 0;"></div>
+                                </div>
+                                <span class="time-code" id="source-duration-time" style="font-size: 10px; font-family: monospace; color: var(--text-secondary);">00:00:00:00</span>
                             </div>
                             
-                            <!-- Speed Control -->
-                            <div class="dropdown-wrapper">
-                                <i class="fa-solid fa-gauge-high"></i>
-                                <select id="select-speed">
-                                    <option value="0.25">0.25x</option>
-                                    <option value="0.5">0.5x</option>
-                                    <option value="1.0" selected>1.0x</option>
-                                    <option value="1.5">1.5x</option>
-                                    <option value="2.0">2.0x</option>
-                                </select>
+                            <!-- Botoes -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <div style="display: flex; gap: 6px;">
+                                    <button id="btn-source-prev-frame" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Frame Anterior"><i class="fa-solid fa-chevron-left"></i></button>
+                                    <button id="btn-source-play" class="btn-control play-btn" style="padding: 4px 12px; font-size: 11px;" title="Play/Pause"><i class="fa-solid fa-play"></i></button>
+                                    <button id="btn-source-next-frame" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Próximo Frame"><i class="fa-solid fa-chevron-right"></i></button>
+                                </div>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <button id="btn-mark-in" class="btn-control btn-marker" style="padding: 4px 8px; font-size: 10px; font-weight: bold;" title="Ponto In (I)">IN</button>
+                                    <button id="btn-mark-out" class="btn-control btn-marker" style="padding: 4px 8px; font-size: 10px; font-weight: bold;" title="Ponto Out (O)">OUT</button>
+                                    <button id="btn-append-timeline" class="btn-primary btn-append" style="padding: 4px 12px; font-size: 11px; height: 26px; display: flex; align-items: center; gap: 4px;" title="Inserir Segmento na Timeline (E)">
+                                        <i class="fa-solid fa-plus"></i> Inserir
+                                    </button>
+                                </div>
                             </div>
-                            
-                            <!-- Maximize -->
-                            <button id="btn-maximize" class="btn-control" title="Tela Cheia"><i class="fa-solid fa-expand"></i></button>
                         </div>
-                    </div>
-                </section>
+                    </section>
+
+                    <!-- Monitor de Programa (Program - Direita) -->
+                    <section class="player-panel glassmorphism" id="program-player-panel" style="flex: 1; display: flex; flex-direction: column; position: relative;">
+                        <div class="player-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-glass);">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 11px; font-weight: 800; color: #a855f7; background: rgba(168, 85, 247, 0.1); padding: 2px 6px; border-radius: 4px;">PROGRAM</span>
+                                <div class="current-media-title" id="program-player-title" style="font-size: 12px; font-weight: 600; color: #fff;">Timeline Ativa</div>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button id="btn-popout-program" class="btn-control" title="Destacar Player" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-up-right-from-square"></i></button>
+                                <button id="btn-expand-program" class="btn-control" title="Maximizar" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-expand"></i></button>
+                            </div>
+                        </div>
+                        
+                        <div class="video-container" id="program-video-wrapper" style="flex: 1; background: #000; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                            <!-- Pool A/B de Vídeos para reprodução sequencial sem lag -->
+                            <video id="program-video-a" src="" preload="auto" style="position: absolute; width: 100%; height: 100%; object-fit: contain; display: block;"></video>
+                            <video id="program-video-b" src="" preload="auto" style="position: absolute; width: 100%; height: 100%; object-fit: contain; display: none;"></video>
+                            
+                            <!-- Elemento de visualização de foto se houver na timeline -->
+                            <img id="program-player-photo" style="display:none; width: 100%; height: 100%; object-fit: contain; position: absolute;" src="">
+                        </div>
+                        
+                        <!-- Controles Program -->
+                        <div class="player-controls" style="padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-glass); background: rgba(0,0,0,0.2);">
+                            <!-- Scrubber -->
+                            <div class="scrubber-container" style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                                <span class="time-code" id="program-current-time" style="font-size: 10px; font-family: monospace; color: var(--text-secondary);">00:00:00:00</span>
+                                <div class="scrubber-bar" id="program-scrubber-progress-bar" style="flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; position: relative; cursor: pointer;">
+                                    <div class="scrubber-fill" id="program-scrubber-progress-fill" style="height: 100%; width: 0%; background: #a855f7; border-radius: 3px;"></div>
+                                    <div class="scrubber-handle" id="program-scrubber-progress-handle" style="width: 10px; height: 10px; border-radius: 50%; background: #fff; position: absolute; top: -2px; left: 0%; transform: translateX(-50%); pointer-events: none;"></div>
+                                </div>
+                                <span class="time-code" id="program-duration-time" style="font-size: 10px; font-family: monospace; color: var(--text-secondary);">00:00:00:00</span>
+                            </div>
+                            
+                            <!-- Botoes -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <div style="display: flex; gap: 6px;">
+                                    <button id="btn-program-prev-frame" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Frame Anterior"><i class="fa-solid fa-chevron-left"></i></button>
+                                    <button id="btn-program-play" class="btn-control play-btn" style="padding: 4px 12px; font-size: 11px;" title="Play/Pause"><i class="fa-solid fa-play"></i></button>
+                                    <button id="btn-program-next-frame" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Próximo Frame"><i class="fa-solid fa-chevron-right"></i></button>
+                                </div>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <!-- Volume / Resolution selector -->
+                                    <div class="dropdown-wrapper">
+                                        <i class="fa-solid fa-display"></i>
+                                        <select id="program-select-resolution" style="font-size: 10px; height: 22px; padding: 0 4px;">
+                                            <option value="proxy_low">360p Proxy</option>
+                                            <option value="proxy_high" selected>720p Proxy</option>
+                                            <option value="original">Original</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
                 
                 <!-- Bottom Timeline & Storyboard sequence panel -->
                 <section class="timeline-panel glassmorphism" id="timeline-panel">
@@ -298,6 +340,17 @@
                         <div class="timeline-actions">
                             <input type="text" id="timeline-name-input" value="Rascunho Making Of #1" placeholder="Nome da Timeline...">
                             <button id="btn-save-timeline" class="btn-outline"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                            <!-- Dropdown de IA Persona -->
+                            <div class="dropdown-wrapper" style="background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.3);">
+                                <i class="fa-solid fa-robot" style="color: #c084fc;"></i>
+                                <select id="select-ai-persona" style="color: #c084fc;">
+                                    <option value="none">IA Persona...</option>
+                                    <option value="montadora">IA Montadora</option>
+                                    <option value="diretora">IA Diretora</option>
+                                    <option value="sound_designer">IA Sound Designer</option>
+                                    <option value="colorista">IA Colorista & FX</option>
+                                </select>
+                            </div>
                             <div class="dropdown-wrapper">
                                 <i class="fa-solid fa-file-export"></i>
                                 <select id="select-export-format">
@@ -307,6 +360,8 @@
                                 </select>
                             </div>
                             <button id="btn-export-timeline" class="btn-primary">Exportar</button>
+                            <button id="btn-timeline-help" class="btn-outline" title="Atalhos e Ajuda" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0;"><i class="fa-solid fa-keyboard"></i></button>
+                            <button id="btn-popout-timeline" class="btn-outline" title="Destacar Timeline" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0;"><i class="fa-solid fa-up-right-from-square"></i></button>
                             <button class="btn-toggle-sidebar" id="toggle-timeline" title="Recolher Linha do Tempo">
                                 <i class="fa-solid fa-chevron-down"></i>
                             </button>
@@ -314,20 +369,29 @@
                     </div>
                     
                     <!-- Multi-track interactive area -->
-                    <div class="timeline-track-area scrollable">
-                        <!-- Track V2: B-rolls sugeridos pela IA -->
-                        <div class="track-row">
-                            <div class="track-info">V2 (B-Roll IA)</div>
-                            <div class="track-content" id="track-broll">
-                                <!-- Elementos adicionados via JS -->
+                    <div class="timeline-track-area">
+                        <div class="timeline-canvas-wrapper" style="position: relative; width: 100%; height: 200px; display: flex; flex-direction: row; border-radius: 8px; border: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.3); overflow: hidden;">
+                            <!-- Sidebar fixo de trilhas -->
+                            <div class="timeline-headers-sidebar" style="width: 100px; display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.4); border-right: 1px solid var(--border-glass); z-index: 10; flex-shrink: 0; box-sizing: border-box;">
+                                <div class="timeline-header-ruler" style="height: 30px; border-bottom: 1px solid var(--border-glass); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: var(--color-cyan); font-family: monospace; letter-spacing: 0.5px;">TIMECODE</div>
+                                <div class="timeline-header-track" style="height: 85px; border-bottom: 1px solid var(--border-glass); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding: 5px 10px; font-size: 10px; font-weight: 700; color: var(--text-secondary); font-family: var(--font-heading); gap: 6px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                        <span>V2 B-Roll</span>
+                                        <button class="btn-track-mute" id="btn-mute-v2" title="Mutar Trilha" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 10px;"><i class="fa-solid fa-volume-high"></i></button>
+                                    </div>
+                                    <input type="range" class="slider-track-volume" id="volume-v2" min="0" max="1" step="0.1" value="1" style="width: 100%; height: 3px; accent-color: #a855f7; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">
+                                </div>
+                                <div class="timeline-header-track" style="height: 85px; display: flex; flex-direction: column; justify-content: center; padding: 5px 10px; font-size: 10px; font-weight: 700; color: var(--text-secondary); font-family: var(--font-heading); gap: 6px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                        <span>V1 Falas</span>
+                                        <button class="btn-track-mute" id="btn-mute-v1" title="Mutar Trilha" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 10px;"><i class="fa-solid fa-volume-high"></i></button>
+                                    </div>
+                                    <input type="range" class="slider-track-volume" id="volume-v1" min="0" max="1" step="0.1" value="1" style="width: 100%; height: 3px; accent-color: var(--color-cyan); cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">
+                                </div>
                             </div>
-                        </div>
-                        
-                        <!-- Track V1: Depoimentos / Entrevistas selecionadas -->
-                        <div class="track-row">
-                            <div class="track-info">V1 (Falas ASR)</div>
-                            <div class="track-content" id="track-speech">
-                                <!-- Elementos adicionados via JS -->
+                            <!-- Canvas da timeline -->
+                            <div class="timeline-canvas-container" style="flex: 1; position: relative; overflow: hidden; height: 100%;">
+                                <canvas id="timeline-canvas" style="display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
                             </div>
                         </div>
                     </div>
@@ -343,9 +407,12 @@
             <aside class="sidebar-right glassmorphism" id="sidebar-right">
                 <div class="sidebar-header">
                     <h2><i class="fa-solid fa-comment-dots"></i> Transcrição & Falas</h2>
-                    <button class="btn-toggle-sidebar" id="toggle-right" title="Recolher Painel">
-                        <i class="fa-solid fa-chevron-right"></i>
-                    </button>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button id="btn-popout-right" class="btn-icon" title="Destacar Painel Lateral" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
+                        <button class="btn-toggle-sidebar" id="toggle-right" title="Recolher Painel">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="transcription-actions">
@@ -703,6 +770,62 @@
             <div style="flex: 1; overflow-y: auto; padding: 25px 0;">
                 <div id="fullscreen-faces-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 24px; width: 100%;">
                     <!-- Preenchido dinamicamente com cards grandes de rostos -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card flutuante de preview na timeline -->
+    <div id="timeline-preview-card">
+        <video autoplay muted loop playsinline></video>
+        <div class="preview-info">00:00:00:00</div>
+    </div>
+
+    <!-- Modal de Ajuda de Atalhos e Manual -->
+    <div id="modal-timeline-help" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 11000; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
+        <div class="glassmorphism" style="width: 550px; max-height: 80%; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border-glass); border-radius: 12px; padding: 25px; display: flex; flex-direction: column; gap: 15px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.8); overflow-y: auto; box-sizing: border-box;">
+            <h3 style="color: var(--color-cyan); margin: 0; font-family: var(--font-heading); display: flex; align-items: center; gap: 10px; font-size: 16px;">
+                <i class="fa-solid fa-keyboard"></i> Guia Rápido & Atalhos de Teclado
+            </h3>
+            <button id="btn-close-help" style="position: absolute; top: 15px; right: 15px; border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 16px;"><i class="fa-solid fa-xmark"></i></button>
+            
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.6; display: flex; flex-direction: column; gap: 12px;">
+                <p style="margin: 0;">O <strong>CapIAu-Talho</strong> é otimizado para navegação ultra-rápida via teclado. Aqui está o resumo de como operar a Timeline Canvas:</p>
+                
+                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">1. Controle de Reprodução (Monitores)</h4>
+                <div style="display: grid; grid-template-columns: 120px 1fr; gap: 6px;">
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Espaço</kbd></div>
+                    <div>Play / Pause no player ativo</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">I</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">O</kbd></div>
+                    <div>Define ponto IN / OUT no Monitor de Origem</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">E</kbd></div>
+                    <div>Insere trecho cortado na Timeline</div>
+                </div>
+
+                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">2. Comportamento das Trilhas (V1 vs V2)</h4>
+                <p style="margin: 0;"><strong>V1 (Falas):</strong> É magnética. Os cortes ficam grudados. Arrastar clipes reordena a sequência de falas; puxar as bordas (trim) ajusta a fala e puxa todo o resto junto.</p>
+                <p style="margin: 0;"><strong>V2 (B-Roll):</strong> É livre. Você pode arrastar os clipes para qualquer ponto no tempo e ajustar a duração sem alterar a fala principal.</p>
+
+                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">3. Atalhos na Timeline Canvas</h4>
+                <div style="display: grid; grid-template-columns: 120px 1fr; gap: 6px;">
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Setas</kbd></div>
+                    <div>Focar e navegar entre clipes / trilhas</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Shift + Seta</kbd></div>
+                    <div>Empurrar (nudge) clipe focado em 1 frame</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">[</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">]</kbd></div>
+                    <div>Trim do início / fim do clipe focado</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl + Roda Mouse</kbd></div>
+                    <div>Zoom horizontal na agulha</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Botão Meio Drag</kbd></div>
+                    <div>Pan/Scroll horizontal pela timeline</div>
+                </div>
+
+                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">4. Faixas Fantasmas de IA (Ghost Tracks)</h4>
+                <div style="display: grid; grid-template-columns: 120px 1fr; gap: 6px;">
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Enter</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Y</kbd></div>
+                    <div>Aceitar sugestão de IA e torná-la real</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Del</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">N</kbd></div>
+                    <div>Rejeitar e apagar sugestão / clipe ativo</div>
                 </div>
             </div>
         </div>

@@ -2,6 +2,9 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { formatTimecode, showAnnotationModal } from "./player.js";
+import { CapiauTimelineRenderer } from "./timelineRenderer.js";
+import { CapiauTimelineInteraction } from "./timelineInteraction.js";
+import { TIMELINE_STATE } from "./timelineState.js";
 
 export class PanelsManager {
     constructor() {
@@ -9,9 +12,14 @@ export class PanelsManager {
         this.visionContainer = document.getElementById("vision-container");
         this.themesContainer = document.getElementById("theme-list");
         this.tasksContainer = document.getElementById("tasks-container");
-        this.timelineCutsContainer = document.getElementById("timeline-cuts-list");
-        this.trackSpeech = document.getElementById("track-speech");
-        this.trackBroll = document.getElementById("track-broll");
+        
+        // Inicializa o novo renderizador Canvas e interações
+        this.timelineRenderer = new CapiauTimelineRenderer();
+        this.timelineInteraction = new CapiauTimelineInteraction(this.timelineRenderer);
+        
+        // Expõe no window para sincronização com pop-outs (WorkspaceManager)
+        window.timelineRenderer = this.timelineRenderer;
+        window.timelineInteraction = this.timelineInteraction;
         
         this.btnCluster = document.getElementById("btn-cluster");
         this.btnSaveTimeline = document.getElementById("btn-save-timeline");
@@ -86,6 +94,77 @@ export class PanelsManager {
         if (this.btnScissors) {
             this.btnScissors.addEventListener("click", () => {
                 STATE.activeScissorsMode = !STATE.activeScissorsMode;
+            });
+        }
+
+        const selectAiPersona = document.getElementById("select-ai-persona");
+        if (selectAiPersona) {
+            selectAiPersona.addEventListener("change", () => this.onAiPersonaSelect());
+        }
+
+        // Sliders de Volume das Trilhas
+        const volV1 = document.getElementById("volume-v1");
+        if (volV1) {
+            volV1.addEventListener("input", (e) => {
+                TIMELINE_STATE.trackVolumes.V1 = parseFloat(e.target.value);
+                STATE.emit("timelineCutsUpdated");
+            });
+        }
+        
+        const volV2 = document.getElementById("volume-v2");
+        if (volV2) {
+            volV2.addEventListener("input", (e) => {
+                TIMELINE_STATE.trackVolumes.V2 = parseFloat(e.target.value);
+                STATE.emit("timelineCutsUpdated");
+            });
+        }
+
+        // Botões de Mute das Trilhas
+        const btnMuteV1 = document.getElementById("btn-mute-v1");
+        if (btnMuteV1) {
+            btnMuteV1.addEventListener("click", () => {
+                TIMELINE_STATE.trackMuted.V1 = !TIMELINE_STATE.trackMuted.V1;
+                btnMuteV1.innerHTML = TIMELINE_STATE.trackMuted.V1 
+                    ? `<i class="fa-solid fa-volume-xmark" style="color: var(--color-rose);"></i>` 
+                    : `<i class="fa-solid fa-volume-high"></i>`;
+                STATE.emit("timelineCutsUpdated");
+            });
+        }
+
+        const btnMuteV2 = document.getElementById("btn-mute-v2");
+        if (btnMuteV2) {
+            btnMuteV2.addEventListener("click", () => {
+                TIMELINE_STATE.trackMuted.V2 = !TIMELINE_STATE.trackMuted.V2;
+                btnMuteV2.innerHTML = TIMELINE_STATE.trackMuted.V2 
+                    ? `<i class="fa-solid fa-volume-xmark" style="color: var(--color-rose);"></i>` 
+                    : `<i class="fa-solid fa-volume-high"></i>`;
+                STATE.emit("timelineCutsUpdated");
+            });
+        }
+
+        // Modal de Ajuda / Atalhos de Teclado
+        const btnHelp = document.getElementById("btn-timeline-help");
+        const btnCloseHelp = document.getElementById("btn-close-help");
+        const modalHelp = document.getElementById("modal-timeline-help");
+
+        if (btnHelp && modalHelp) {
+            btnHelp.addEventListener("click", () => {
+                modalHelp.style.display = "flex";
+            });
+        }
+
+        if (btnCloseHelp && modalHelp) {
+            btnCloseHelp.addEventListener("click", () => {
+                modalHelp.style.display = "none";
+            });
+        }
+
+        // Foco do teclado para o player Program ao clicar em qualquer parte do painel da timeline
+        const timelinePanel = document.getElementById("timeline-panel");
+        if (timelinePanel) {
+            timelinePanel.addEventListener("click", () => {
+                window.activeFocusedPlayer = "program";
+                console.log("[Player] Foco do teclado definido para PROGRAM (via timeline-panel)");
             });
         }
 
@@ -202,7 +281,7 @@ export class PanelsManager {
                     splitBtn.style.color = "var(--color-rose)";
                 } else {
                     e.stopPropagation();
-                    const player = document.getElementById("main-video");
+                    const player = document.getElementById("source-video");
                     if (player) {
                         player.currentTime = w.start_time;
                         player.play();
@@ -255,7 +334,7 @@ export class PanelsManager {
         });
         
         bubble.addEventListener("click", () => {
-            const player = document.getElementById("main-video");
+            const player = document.getElementById("source-video");
             if (player) {
                 player.currentTime = d.start_time;
                 player.play();
@@ -385,7 +464,7 @@ export class PanelsManager {
                     // Ignora o clique se o usuário estiver apenas selecionando texto
                     return;
                 }
-                const player = document.getElementById("main-video");
+                const player = document.getElementById("source-video");
                 if (player) {
                     player.currentTime = f.timestamp;
                     player.play();
@@ -538,67 +617,9 @@ export class PanelsManager {
     }
 
     renderTimeline(cuts) {
-        if (!this.timelineCutsContainer) return;
-        this.timelineCutsContainer.innerHTML = "";
-        
-        // Limpa trilhas visuais
-        this.trackSpeech.innerHTML = "";
-        this.trackBroll.innerHTML = "";
-
-        if (cuts.length === 0) {
-            this.timelineCutsContainer.innerHTML = `<div class="empty-state-text">Timeline vazia. Marque pontos In/Out e clique em "Adicionar à Timeline (E)".</div>`;
-            return;
+        if (this.timelineRenderer) {
+            this.timelineRenderer.requestRedraw();
         }
-
-        cuts.forEach((cut, index) => {
-            const video = STATE.allVideos.find(v => v.id === cut.video_id);
-            const name = video ? video.filename : `Vídeo ${cut.video_id}`;
-            const dur = cut.out - cut.in;
-            
-            // Item na lista de cortes
-            const cutItem = document.createElement("div");
-            cutItem.className = "timeline-cut-item";
-            cutItem.innerHTML = `
-                <div class="cut-info">
-                    <span class="cut-index">#${index+1}</span>
-                    <span class="cut-name" title="${name}">${name}</span>
-                    <span class="cut-time">[${formatTimecode(cut.in)} -> ${formatTimecode(cut.out)}] (${dur.toFixed(1)}s)</span>
-                </div>
-                <button class="btn-action btn-delete-cut">Excluir</button>
-            `;
-            
-            cutItem.querySelector(".btn-delete-cut").addEventListener("click", () => {
-                const updated = [...STATE.activeTimelineCuts];
-                updated.splice(index, 1);
-                STATE.activeTimelineCuts = updated;
-            });
-            
-            this.timelineCutsContainer.appendChild(cutItem);
-
-            // Bloco visual na trilha (V1 para depoimentos, V2 para b-rolls)
-            const block = document.createElement("div");
-            block.className = `timeline-visual-block track-${cut.track}`;
-            block.style.flexGrow = Math.max(1, Math.floor(dur));
-            block.textContent = `#${index+1} (${dur.toFixed(0)}s)`;
-            block.title = `${name}\nIn: ${formatTimecode(cut.in)}\nOut: ${formatTimecode(cut.out)}`;
-            
-            block.addEventListener("click", () => {
-                // Seleciona e carrega o vídeo correspondente no player
-                if (video) {
-                    STATE.activeVideo = video;
-                    const player = document.getElementById("main-video");
-                    if (player) {
-                        player.currentTime = cut.in;
-                    }
-                }
-            });
-
-            if (cut.track === "V1") {
-                this.trackSpeech.appendChild(block);
-            } else {
-                this.trackBroll.appendChild(block);
-            }
-        });
     }
 
     async saveActiveTimeline() {
@@ -837,6 +858,122 @@ export class PanelsManager {
                     alert("Erro ao vincular texto.");
                 }
             }
+        }
+    }
+
+    async onAiPersonaSelect() {
+        const selector = document.getElementById("select-ai-persona");
+        if (!selector) return;
+        
+        const persona = selector.value;
+        if (persona === "none") return;
+        
+        // Reseta o seletor para permitir cliques subsequentes
+        selector.value = "none";
+        
+        const capsPersona = persona.toUpperCase().replace("_", " ");
+        console.log(`[AI PERSONA] Invoking analysis for persona: ${capsPersona}`);
+        
+        // Simulação de Progresso
+        const timelinePanel = document.getElementById("timeline-panel");
+        const headerTitle = timelinePanel ? timelinePanel.querySelector(".panel-header h3") : null;
+        let originalTitleHTML = "";
+        
+        if (headerTitle) {
+            originalTitleHTML = headerTitle.innerHTML;
+            headerTitle.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-cyan);"></i> IA ${capsPersona} analisando o corte...`;
+        }
+        
+        // Aguarda 1.8 segundos para dar feedback realista
+        await new Promise(resolve => setTimeout(resolve, 1800));
+        
+        if (headerTitle) {
+            headerTitle.innerHTML = originalTitleHTML;
+        }
+
+        // Se a timeline estiver vazia, avisa o usuário que é preciso ter ao menos 1 corte
+        const cuts = STATE.activeTimelineCuts;
+        if (cuts.length === 0) {
+            alert(`A IA ${capsPersona} precisa de ao menos um clipe na timeline para poder sugerir edições baseadas no contexto!`);
+            return;
+        }
+
+        // Importa dinamicamente para interagir com o estado da timeline
+        const { TIMELINE_STATE } = await import("./timelineState.js");
+
+        let suggestions = [];
+        
+        if (persona === "montadora") {
+            // IA Montadora sugere cortar uma redundância no primeiro clipe
+            const targetClip = cuts[0];
+            const durFrames = targetClip.outFrame - targetClip.inFrame;
+            
+            if (durFrames > 48) {
+                suggestions.push({
+                    video_id: targetClip.video_id,
+                    inFrame: targetClip.inFrame + Math.round(durFrames * 0.6),
+                    outFrame: targetClip.outFrame,
+                    timelineStartFrame: targetClip.timelineStartFrame + Math.round(durFrames * 0.6),
+                    track: targetClip.track,
+                    action: "DELETE",
+                    targetClipId: targetClip.id,
+                    reason: "IA Montadora: Sugere remover trecho prolixo / silêncio no final do clipe"
+                });
+            }
+        } 
+        else if (persona === "diretora") {
+            // IA Diretora sugere inserir um clipe de entrevista complementar
+            const otherVideo = STATE.allVideos.find(v => v.video_type === "interview" && !cuts.some(c => c.video_id === v.id));
+            const videoId = otherVideo ? otherVideo.id : (cuts[0] ? cuts[0].video_id : 1);
+            
+            const lastCut = cuts[cuts.length - 1];
+            const startFrame = lastCut ? lastCut.timelineStartFrame + (lastCut.outFrame - lastCut.inFrame) : 0;
+            
+            suggestions.push({
+                video_id: videoId,
+                inFrame: 0,
+                outFrame: 120, // 5 segundos
+                timelineStartFrame: startFrame,
+                track: "V1",
+                action: "INSERT",
+                reason: "IA Diretora: Inserir depoimento complementar para estruturar a narrativa"
+            });
+        } 
+        else if (persona === "sound_designer") {
+            // Sugere trilha de fundo na V2 (B-roll track)
+            const soundVideo = STATE.allVideos.find(v => v.video_type === "broll") || { id: 2 };
+            const targetClip = cuts[0];
+            
+            suggestions.push({
+                video_id: soundVideo.id,
+                inFrame: 0,
+                outFrame: 240, // 10 segundos
+                timelineStartFrame: targetClip ? targetClip.timelineStartFrame : 0,
+                track: "V2",
+                action: "INSERT",
+                reason: "IA Sound Designer: Adicionar trilha de atmosfera/SFX para reforçar o drama"
+            });
+        } 
+        else if (persona === "colorista") {
+            // Sugere cobrir com B-roll 1 segundo após o início do primeiro corte
+            const brollVideo = STATE.allVideos.find(v => v.video_type === "broll") || { id: 2 };
+            const targetClip = cuts[0];
+            
+            suggestions.push({
+                video_id: brollVideo.id,
+                inFrame: 48,
+                outFrame: 144, // 4 segundos
+                timelineStartFrame: targetClip ? targetClip.timelineStartFrame + 24 : 0,
+                track: "V2",
+                action: "INSERT",
+                reason: "IA Colorista: Sugestão de cobertura de B-roll para encobrir a transição de Jump Cut"
+            });
+        }
+
+        if (suggestions.length > 0) {
+            TIMELINE_STATE.setGhostSuggestions(suggestions);
+        } else {
+            alert(`A IA ${capsPersona} analisou o corte e concluiu que a estrutura atual está excelente. Nenhuma edição sugerida!`);
         }
     }
 }

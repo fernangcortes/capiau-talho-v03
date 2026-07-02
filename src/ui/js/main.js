@@ -2,10 +2,11 @@ import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { VideoPlayer, formatTimecode } from "./player.js";
 import { LibraryManager } from "./library.js";
-import { PanelsManager } from "./panels.js";
+import { PanelsManager } from "./panels.js?v=2";
 import { ChatManager } from "./chat.js";
 import { ProjectsManager } from "./projects.js";
 import { FaceManager } from "./faces.js";
+import { WorkspaceManager } from "./workspaceManager.js";
 
 // Função para destacar os termos da busca com <mark>
 function highlightTerms(text, query) {
@@ -284,7 +285,7 @@ function playSearchPlaylistItem(index) {
         if (targetVid) {
             STATE.activeVideo = targetVid;
             setTimeout(() => {
-                const playerEl = document.getElementById("main-video");
+                const playerEl = document.getElementById("source-video");
                 if (playerEl) {
                     playerEl.currentTime = item.start_time || 0;
                     playerEl.play().catch(err => console.warn("Autoplay block:", err));
@@ -937,7 +938,7 @@ function renderSearchResults(query) {
                 playSearchPlaylistItem(targetIdx);
             } else {
                 if (SEARCH_STATE.photoTimer) clearTimeout(SEARCH_STATE.photoTimer);
-                const playerEl = document.getElementById("main-video");
+                const playerEl = document.getElementById("source-video");
                 if (playerEl) playerEl.pause();
                 updatePlaylistUI();
             }
@@ -1061,7 +1062,10 @@ window.addEventListener("DOMContentLoaded", () => {
     console.log("CapIAu-Talho: Inicializando os módulos...");
 
     // Instanciando os gerenciadores
+    const workspace = new WorkspaceManager();
+    window.workspaceManager = workspace;
     const player = new VideoPlayer();
+    window.player = player;
     const library = new LibraryManager();
     window.libraryManager = library;
     const panels = new PanelsManager();
@@ -1319,7 +1323,7 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     // -- Autoplay event listeners on main-video --
-    const mainVideoEl = document.getElementById("main-video");
+    const mainVideoEl = document.getElementById("source-video");
     if (mainVideoEl) {
         mainVideoEl.addEventListener("timeupdate", () => {
             if (!SEARCH_STATE.autoplaySeq) return;
