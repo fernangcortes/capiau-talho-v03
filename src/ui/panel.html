@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>CapIAu-Talho - Painel Destacado</title>
+    <!-- CSS e FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 15px;
+            background: #0b0f19;
+            color: #f8fafc;
+            overflow: auto;
+            height: 100vh;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+        #panel-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Estilos específicos para painéis destacados */
+        #panel-container > section {
+            height: 100% !important;
+            flex: 1 !important;
+            border: none !important;
+            border-radius: 0 !important;
+        }
+        #panel-container .timeline-track-area {
+            flex: 1 !important;
+            height: calc(100% - 60px) !important;
+        }
+        #panel-container .timeline-canvas-wrapper {
+            height: 100% !important;
+            flex: 1 !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="panel-container">
+        <!-- O conteúdo será injetado dinamicamente -->
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: var(--color-cyan);"></i>
+            <p style="margin-top: 15px; font-size: 13px; color: var(--text-secondary);">Sincronizando painel com o editor...</p>
+        </div>
+    </div>
+    
+    <script type="module">
+        // Captura o tipo de painel pela URL
+        const params = new URLSearchParams(window.location.search);
+        const panelName = params.get("panel") || "none";
+        
+        // Define o título da página
+        document.title = `Talho - Painel: ${panelName.toUpperCase().replace("-panel", "")}`;
+        
+        // Abre canal de comunicação
+        const channel = new BroadcastChannel("capiau-workspace-sync");
+        
+        // Acessa a janela pai (main editor)
+        const opener = window.opener;
+        if (!opener) {
+            document.getElementById("panel-container").innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--color-rose);">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 32px;"></i>
+                    <p style="margin-top: 15px; font-size: 14px;">Erro: Esta janela deve ser aberta a partir do editor principal.</p>
+                </div>
+            `;
+        } else {
+            // Envia sinal de inicialização para a janela principal
+            channel.postMessage({
+                type: "POPOUT_READY",
+                panel: panelName
+            });
+            
+
+            
+            // Avisa a janela principal quando esta janela for fechada
+            window.addEventListener("beforeunload", () => {
+                channel.postMessage({
+                    type: "POPOUT_CLOSED",
+                    panel: panelName
+                });
+            });
+        }
+    </script>
+</body>
+</html>
