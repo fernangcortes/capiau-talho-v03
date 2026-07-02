@@ -1,7 +1,12 @@
-// Gerenciador do Player de Vídeo, atalhos de teclado JKL e marcação de pontos In/Out.
+// Gerenciador do Player de Vídeo Duplo (Source/Program), atalhos JKL e workspaces multi-monitores.
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { FaceManager } from "./faces.js";
+import { TIMELINE_STATE } from "./timelineState.js";
+import { getActiveElement } from "./workspaceManager.js";
+
+// Foco global do teclado para players: "source" ou "program"
+window.activeFocusedPlayer = "source";
 
 export function formatTimecode(secs) {
     if (isNaN(secs) || secs === null) return "00:00:00:00";
@@ -17,33 +22,13 @@ export function formatTimecode(secs) {
     ].join(':');
 }
 
-export class VideoPlayer {
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 1. SOURCE PLAYER - MONITOR DE ORIGEM (ESQUERDA)
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export class SourcePlayer {
     constructor() {
-        this.video = document.getElementById("main-video");
-        this.btnPlay = document.getElementById("btn-play");
-        this.btnPrevFrame = document.getElementById("btn-prev-frame");
-        this.btnNextFrame = document.getElementById("btn-next-frame");
-        this.currentTimeEl = document.getElementById("current-time");
-        this.durationTimeEl = document.getElementById("duration-time");
-        this.scrubberFill = document.getElementById("scrubber-progress-fill");
-        this.scrubberHandle = document.getElementById("scrubber-progress-handle");
-        this.scrubberBar = document.getElementById("scrubber-progress-bar");
-        this.titleEl = document.getElementById("player-title");
-        this.badgeType = document.getElementById("badge-type");
-        this.badgeResolution = document.getElementById("badge-resolution");
-        
-        this.selectSpeed = document.getElementById("select-speed");
-        this.selectResolution = document.getElementById("select-resolution");
-        this.speedOverlay = document.getElementById("speed-overlay");
-        this.jklOverlay = document.getElementById("jkl-overlay");
-        
-        this.btnMarkIn = document.getElementById("btn-mark-in");
-        this.btnMarkOut = document.getElementById("btn-mark-out");
-        this.btnAppend = document.getElementById("btn-append-timeline");
-        this.markerInPos = document.getElementById("marker-in-pos");
-        this.markerOutPos = document.getElementById("marker-out-pos");
-        this.btnMaximize = document.getElementById("btn-maximize");
-
         this.speedsForward = [1.0, 1.5, 2.0, 4.0, 8.0];
         this.speedsReverse = [-1.0, -2.0, -4.0, -8.0];
         this.jklState = 'K';
@@ -52,22 +37,35 @@ export class VideoPlayer {
         
         this.videoFaces = [];
         this.overlayContainer = null;
-
+        
         this.init();
     }
 
+    // Atalho para resolver o elemento do DOM de forma dinâmica (suporta pop-out)
+    el(id) {
+        return getActiveElement(id);
+    }
+
     init() {
-        // Observa mudanças do vídeo ativo
-        STATE.on("activeVideoChanged", (video) => this.loadVideo(video));
-        STATE.on("activePhotoChanged", (photo) => this.loadPhoto(photo));
-        STATE.on("markerInChanged", (val) => this.updateMarkersUI());
-        STATE.on("markerOutChanged", (val) => this.updateMarkersUI());
+        // Observa mudanças globais na biblioteca
+        STATE.on("activeVideoChanged", (video) => {
+            window.activeFocusedPlayer = "source";
+            this.loadVideo(video);
+        });
+        STATE.on("activePhotoChanged", (photo) => {
+            window.activeFocusedPlayer = "source";
+            this.loadPhoto(photo);
+        });
+        STATE.on("markerInChanged", () => this.updateMarkersUI());
+        STATE.on("markerOutChanged", () => this.updateMarkersUI());
+
         STATE.on("videoFacesUpdated", (videoId) => {
             if (STATE.activeVideo && STATE.activeVideo.id === videoId) {
                 CapIAuAPI.fetchVideoFaces(videoId)
                     .then(faces => {
                         this.videoFaces = faces || [];
-                        if (this.video.paused) {
+                        const video = this.el("source-video");
+                        if (video && video.paused) {
                             this.updateFacesOverlay();
                         }
                     })
@@ -75,71 +73,82 @@ export class VideoPlayer {
             }
         });
 
-        // Eventos nativos do elemento video
-        if (this.video) {
-            this.video.addEventListener("timeupdate", () => this.onTimeUpdate());
-            this.video.addEventListener("loadedmetadata", () => this.onLoadedMetadata());
-            this.video.addEventListener("play", () => this.onPlayStateChange(true));
-            this.video.addEventListener("pause", () => this.onPlayStateChange(false));
-            this.video.addEventListener("seeked", () => {
-                if (this.video.paused) this.updateFacesOverlay();
+        // Eventos do Elemento de Vídeo
+        const video = this.el("source-video");
+        if (video) {
+            video.addEventListener("timeupdate", () => this.onTimeUpdate());
+            video.addEventListener("loadedmetadata", () => this.onLoadedMetadata());
+            video.addEventListener("play", () => this.onPlayStateChange(true));
+            video.addEventListener("pause", () => this.onPlayStateChange(false));
+            video.addEventListener("seeked", () => {
+                const vid = this.el("source-video");
+                if (vid && vid.paused) this.updateFacesOverlay();
             });
 
             this.resizeObserver = new ResizeObserver(() => {
-                if (this.video.paused) this.updateOverlaySize();
+                const vid = this.el("source-video");
+                if (vid && vid.paused) this.updateOverlaySize();
             });
-            this.resizeObserver.observe(this.video);
+            this.resizeObserver.observe(video);
         }
 
-        // Eventos DOM
-        if (this.btnPlay) this.btnPlay.addEventListener("click", () => this.togglePlay());
-        if (this.btnPrevFrame) {
-            this.btnPrevFrame.addEventListener("click", () => {
-                this.seek(this.video.currentTime - 0.04);
+        // Botoes de Controle
+        const btnPlay = this.el("btn-source-play");
+        if (btnPlay) btnPlay.addEventListener("click", () => this.togglePlay());
+
+        const btnPrev = this.el("btn-source-prev-frame");
+        if (btnPrev) {
+            btnPrev.addEventListener("click", () => {
+                const vid = this.el("source-video");
+                if (vid) this.seek(vid.currentTime - 0.04);
             });
         }
-        if (this.btnNextFrame) {
-            this.btnNextFrame.addEventListener("click", () => {
-                this.seek(this.video.currentTime + 0.04);
+
+        const btnNext = this.el("btn-source-next-frame");
+        if (btnNext) {
+            btnNext.addEventListener("click", () => {
+                const vid = this.el("source-video");
+                if (vid) this.seek(vid.currentTime + 0.04);
             });
         }
-        if (this.scrubberBar) {
-            this.scrubberBar.addEventListener("click", (e) => this.seekScrubber(e));
-            this.scrubberBar.addEventListener("mousedown", (e) => this.startScrubberDrag(e));
-        }
-        
-        if (this.selectSpeed) {
-            this.selectSpeed.addEventListener("change", (e) => {
-                const spd = parseFloat(e.target.value);
-                this.setSpeed(spd);
-            });
+
+        const scrubber = this.el("source-scrubber-progress-bar");
+        if (scrubber) {
+            scrubber.addEventListener("click", (e) => this.seekScrubber(e));
+            scrubber.addEventListener("mousedown", (e) => this.startScrubberDrag(e));
         }
 
         // Marcadores
-        if (this.btnMarkIn) this.btnMarkIn.addEventListener("click", () => this.markIn());
-        if (this.btnMarkOut) this.btnMarkOut.addEventListener("click", () => this.markOut());
-        if (this.btnAppend) this.btnAppend.addEventListener("click", () => this.appendToTimeline());
+        const btnIn = this.el("btn-mark-in");
+        if (btnIn) btnIn.addEventListener("click", () => this.markIn());
 
-        if (this.btnMaximize) {
-            this.btnMaximize.addEventListener("click", () => this.toggleFullscreen());
+        const btnOut = this.el("btn-mark-out");
+        if (btnOut) btnOut.addEventListener("click", () => this.markOut());
+
+        const btnAppend = this.el("btn-append-timeline");
+        if (btnAppend) btnAppend.addEventListener("click", () => this.appendToTimeline());
+
+        // Vincula foco visual
+        const panel = document.getElementById("source-player-panel");
+        if (panel) {
+            panel.addEventListener("click", () => {
+                window.activeFocusedPlayer = "source";
+                console.log("[Player] Foco do teclado definido para SOURCE");
+            });
         }
-        document.addEventListener("fullscreenchange", () => this.onFullscreenChange());
-        document.addEventListener("webkitfullscreenchange", () => this.onFullscreenChange());
-        document.addEventListener("mozfullscreenchange", () => this.onFullscreenChange());
-        document.addEventListener("MSFullscreenChange", () => this.onFullscreenChange());
-
-        // Atalhos de teclado globais
-        document.addEventListener("keydown", (e) => this.handleKeyboard(e));
     }
 
     loadVideo(video) {
+        const vid = this.el("source-video");
+        if (!vid) return;
+
         if (!video) {
             if (!STATE.activePhoto) {
                 this.hidePhoto();
-                this.video.src = "";
-                this.titleEl.textContent = "Nenhuma mídia selecionada";
-                this.badgeType.className = "badge badge-hidden";
-                this.badgeResolution.className = "badge badge-hidden";
+                vid.src = "";
+                vid.removeAttribute("data-loaded-src");
+                const title = this.el("source-player-title");
+                if (title) title.textContent = "Nenhum clipe carregado";
                 STATE.markerIn = null;
                 STATE.markerOut = null;
                 this.videoFaces = [];
@@ -150,23 +159,25 @@ export class VideoPlayer {
 
         this.hidePhoto();
 
-        let videoSrc = video.filepath;
+        let videoSrc = video.filepath || "";
+        videoSrc = videoSrc.replace(/\\/g, "/");
         const isRemote = videoSrc.startsWith("http") || videoSrc.startsWith("/proxies/") || videoSrc.startsWith("/");
         
         if (video.proxy_path) {
-            videoSrc = video.proxy_path;
+            videoSrc = video.proxy_path.replace(/\\/g, "/");
         } else if (!isRemote) {
-            // Se não tem proxy e não é remoto, tenta originals
             videoSrc = `/originals/${video.filename}`;
         }
-        this.video.src = videoSrc;
-        this.video.load();
         
-        this.titleEl.textContent = video.filename;
-        this.badgeType.textContent = video.video_type === "interview" ? "DEPOIMENTO" : "B-ROLL";
-        this.badgeType.className = `badge badge-${video.video_type}`;
-        this.badgeResolution.textContent = video.resolution || "1080p";
-        this.badgeResolution.className = "badge badge-gray";
+        vid.style.zIndex = "1";
+        if (vid.dataset.loadedSrc !== videoSrc) {
+            vid.src = videoSrc;
+            vid.dataset.loadedSrc = videoSrc;
+            vid.load();
+        }
+        
+        const title = this.el("source-player-title");
+        if (title) title.textContent = video.filename;
 
         STATE.markerIn = null;
         STATE.markerOut = null;
@@ -175,15 +186,17 @@ export class VideoPlayer {
 
         this.videoFaces = [];
         this.clearFacesOverlay();
+
         CapIAuAPI.fetchVideoFaces(video.id)
             .then(faces => {
                 this.videoFaces = faces || [];
-                if (this.video.paused) {
+                const innerVid = this.el("source-video");
+                if (innerVid && innerVid.paused) {
                     this.updateFacesOverlay();
                 }
             })
             .catch(err => {
-                console.error("Erro ao carregar faces do vídeo:", err);
+                console.error("Erro ao carregar faces:", err);
                 this.videoFaces = [];
             });
     }
@@ -195,112 +208,123 @@ export class VideoPlayer {
             }
             return;
         }
-        
-        if (this.video) {
-            this.video.pause();
-            this.video.style.display = "none";
+        const vid = this.el("source-video");
+        if (vid) {
+            vid.pause();
+            vid.style.display = "none";
         }
         
-        let imgEl = document.getElementById("player-photo");
-        if (!imgEl) {
-            imgEl = document.createElement("img");
-            imgEl.id = "player-photo";
-            const videoWrapper = document.getElementById("video-wrapper");
-            if (videoWrapper) {
-                videoWrapper.appendChild(imgEl);
-            }
-        }
+        const imgEl = this.el("source-player-photo");
+        if (!imgEl) return;
         
         const src = photo.proxy_path || (photo.filepath && (photo.filepath.startsWith('http') || photo.filepath.startsWith('/')) ? photo.filepath : `/originals/${photo.filename}`);
         imgEl.src = src;
         imgEl.style.display = "block";
         
-        if (this.titleEl) this.titleEl.textContent = photo.filename;
-        if (this.badgeType) {
-            this.badgeType.textContent = "FOTO DE SET";
-            this.badgeType.className = "badge badge-photo";
-        }
-        if (this.badgeResolution) {
-            this.badgeResolution.textContent = photo.resolution || "Proxy";
-            this.badgeResolution.className = "badge badge-gray";
-        }
+        const title = this.el("source-player-title");
+        if (title) title.textContent = photo.filename;
         
         STATE.markerIn = null;
         STATE.markerOut = null;
-        if (this.currentTimeEl) this.currentTimeEl.textContent = "00:00:00:00";
-        if (this.durationTimeEl) this.durationTimeEl.textContent = "00:00:00:00";
-        if (this.scrubberFill) this.scrubberFill.style.width = "0%";
-        if (this.scrubberHandle) this.scrubberHandle.style.left = "0%";
+        
+        const curTime = this.el("source-current-time");
+        if (curTime) curTime.textContent = "00:00:00:00";
+        
+        const durTime = this.el("source-duration-time");
+        if (durTime) durTime.textContent = "00:00:00:00";
+
+        const fill = this.el("source-scrubber-progress-fill");
+        if (fill) fill.style.width = "0%";
+
+        const handle = this.el("source-scrubber-progress-handle");
+        if (handle) handle.style.left = "0%";
         
         this.videoFaces = [];
         this.clearFacesOverlay();
     }
-    
+
     hidePhoto() {
-        const imgEl = document.getElementById("player-photo");
+        const imgEl = this.el("source-player-photo");
         if (imgEl) {
             imgEl.style.display = "none";
             imgEl.src = "";
         }
-        if (this.video) {
-            this.video.style.display = "block";
+        const vid = this.el("source-video");
+        if (vid) {
+            vid.style.display = "block";
         }
     }
 
     onTimeUpdate() {
-        if (!this.video) return;
-        const cur = this.video.currentTime;
-        const dur = this.video.duration || 0;
-        this.currentTimeEl.textContent = formatTimecode(cur);
+        const vid = this.el("source-video");
+        if (!vid) return;
+
+        const cur = vid.currentTime;
+        const dur = vid.duration || 0;
+
+        const curTime = this.el("source-current-time");
+        if (curTime) curTime.textContent = formatTimecode(cur);
         
         if (dur > 0) {
             const pct = (cur / dur) * 100;
-            this.scrubberFill.style.width = `${pct}%`;
-            this.scrubberHandle.style.left = `${pct}%`;
+            const fill = this.el("source-scrubber-progress-fill");
+            if (fill) fill.style.width = `${pct}%`;
+            const handle = this.el("source-scrubber-progress-handle");
+            if (handle) handle.style.left = `${pct}%`;
         }
 
-        if (this.video.paused) {
+        if (vid.paused) {
             this.updateFacesOverlay();
         }
     }
 
     onLoadedMetadata() {
-        if (!this.video) return;
-        this.durationTimeEl.textContent = formatTimecode(this.video.duration);
+        const vid = this.el("source-video");
+        if (!vid) return;
+        const durTime = this.el("source-duration-time");
+        if (durTime) durTime.textContent = formatTimecode(vid.duration);
         this.onTimeUpdate();
     }
 
     onPlayStateChange(isPlaying) {
-        this.btnPlay.innerHTML = isPlaying 
-            ? `<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`
-            : `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
-        
+        const btnPlay = this.el("btn-source-play");
+        if (btnPlay) {
+            btnPlay.innerHTML = isPlaying 
+                ? `<i class="fa-solid fa-pause"></i>`
+                : `<i class="fa-solid fa-play"></i>`;
+        }
         this.updateFacesOverlay();
     }
 
     togglePlay() {
-        if (!this.video || !this.video.src) return;
+        const vid = this.el("source-video");
+        if (!vid || !vid.src) return;
+        
         this.stopReverse();
-        if (this.video.paused) {
-            this.video.play();
+        if (vid.paused) {
+            vid.play();
             this.jklState = 'L';
             this.jklIndex = 0;
         } else {
-            this.video.pause();
+            vid.pause();
             this.jklState = 'K';
         }
     }
 
     seek(seconds) {
-        if (!this.video) return;
-        this.video.currentTime = Math.max(0, Math.min(seconds, this.video.duration || 0));
+        const vid = this.el("source-video");
+        if (!vid) return;
+        vid.currentTime = Math.max(0, Math.min(seconds, vid.duration || 0));
     }
 
     seekScrubber(e) {
-        if (!this.video || !this.video.duration) return;
-        const rect = this.scrubberBar.getBoundingClientRect();
+        const vid = this.el("source-video");
+        const bar = this.el("source-scrubber-progress-bar");
+        if (!vid || !vid.duration || !bar) return;
+        
+        const rect = bar.getBoundingClientRect();
         const pct = (e.clientX - rect.left) / rect.width;
-        this.seek(pct * this.video.duration);
+        this.seek(pct * vid.duration);
     }
 
     startScrubberDrag(e) {
@@ -314,34 +338,29 @@ export class VideoPlayer {
     }
 
     setSpeed(speed) {
-        if (!this.video) return;
+        const vid = this.el("source-video");
+        if (!vid) return;
         this.stopReverse();
+        
         STATE.playbackSpeed = speed;
-        this.video.playbackRate = Math.abs(speed);
-        
-        if (this.selectSpeed) this.selectSpeed.value = speed;
-        
-        if (speed !== 1.0) {
-            this.showOverlay(this.speedOverlay, `${speed}x`);
-        }
+        vid.playbackRate = Math.abs(speed);
     }
 
     startReverse(rate) {
         this.stopReverse();
-        if (!this.video) return;
-        this.video.pause();
-        this.video.playbackRate = 0; // Pausa o player nativo para não conflitar
-        
-        const step = 0.04 * Math.abs(rate); // 40ms por frame aproximado
+        const vid = this.el("source-video");
+        if (!vid) return;
+
+        vid.pause();
+        const step = 0.04 * Math.abs(rate);
         this.reverseInterval = setInterval(() => {
-            if (this.video.currentTime <= 0) {
+            if (vid.currentTime <= 0) {
                 this.stopReverse();
                 this.jklState = 'K';
             } else {
-                this.video.currentTime -= step;
+                vid.currentTime -= step;
             }
         }, 40);
-        this.showOverlay(this.jklOverlay, `<< RETROCESSO ${Math.abs(rate)}x`);
     }
 
     stopReverse() {
@@ -352,27 +371,53 @@ export class VideoPlayer {
     }
 
     markIn() {
-        if (!this.video || !this.video.src) return;
-        STATE.markerIn = this.video.currentTime;
+        const vid = this.el("source-video");
+        if (!vid || !vid.src) return;
+        STATE.markerIn = vid.currentTime;
     }
 
     markOut() {
-        if (!this.video || !this.video.src) return;
-        STATE.markerOut = this.video.currentTime;
+        const vid = this.el("source-video");
+        if (!vid || !vid.src) return;
+        STATE.markerOut = vid.currentTime;
     }
 
     updateMarkersUI() {
-        this.markerInPos.textContent = STATE.markerIn !== null ? formatTimecode(STATE.markerIn) : "--:--:--:--";
-        this.markerOutPos.textContent = STATE.markerOut !== null ? formatTimecode(STATE.markerOut) : "--:--:--:--";
+        const markerInBar = this.el("source-marker-in-pos");
+        const markerOutBar = this.el("source-marker-out-pos");
+        const vid = this.el("source-video");
+
+        if (vid && vid.duration > 0) {
+            if (STATE.markerIn !== null) {
+                const pctIn = (STATE.markerIn / vid.duration) * 100;
+                if (markerInBar) {
+                    markerInBar.style.left = `${pctIn}%`;
+                    markerInBar.style.display = "block";
+                }
+            } else if (markerInBar) {
+                markerInBar.style.display = "none";
+            }
+
+            if (STATE.markerOut !== null) {
+                const pctOut = (STATE.markerOut / vid.duration) * 100;
+                if (markerOutBar) {
+                    markerOutBar.style.left = `${pctOut}%`;
+                    markerOutBar.style.display = "block";
+                }
+            } else if (markerOutBar) {
+                markerOutBar.style.display = "none";
+            }
+        }
     }
 
     appendToTimeline() {
         if (!STATE.activeVideo) return;
+        const vid = this.el("source-video");
         const inTime = STATE.markerIn !== null ? STATE.markerIn : 0.0;
-        const outTime = STATE.markerOut !== null ? STATE.markerOut : (this.video.duration || 0.0);
+        const outTime = STATE.markerOut !== null ? STATE.markerOut : (vid ? vid.duration : 0.0);
         
         if (inTime >= outTime) {
-            alert("Ponto de entrada (In) deve ser menor que o ponto de saída (Out).");
+            alert("Ponto In deve ser menor que o ponto Out.");
             return;
         }
 
@@ -383,159 +428,58 @@ export class VideoPlayer {
             track: STATE.activeVideo.video_type === "interview" ? "V1" : "V2"
         };
 
-        const updatedCuts = [...STATE.activeTimelineCuts, newCut];
-        STATE.activeTimelineCuts = updatedCuts;
+        STATE.activeTimelineCuts = [...STATE.activeTimelineCuts, newCut];
         
-        // Limpa marcadores
         STATE.markerIn = null;
         STATE.markerOut = null;
     }
 
-    showOverlay(el, text) {
-        if (!el) return;
-        el.textContent = text;
-        el.style.opacity = "1";
-        setTimeout(() => {
-            el.style.opacity = "0";
-        }, 1200);
-    }
-
-    handleKeyboard(e) {
-        // Evita disparar atalhos ao escrever no Chat ou nos campos de Busca
-        const activeTag = document.activeElement.tagName.toLowerCase();
-        if (activeTag === "input" || activeTag === "textarea") return;
-
-        const code = e.code;
-        if (code === "Space" || code === "KeyK") {
-            e.preventDefault();
-            this.togglePlay();
-        } else if (code === "KeyL") {
-            // L: Avançar / Acelerar
-            if (this.jklState === 'L') {
-                this.jklIndex = Math.min(this.jklIndex + 1, this.speedsForward.length - 1);
-            } else {
-                this.jklState = 'L';
-                this.jklIndex = 0;
-            }
-            const speed = this.speedsForward[this.jklIndex];
-            this.setSpeed(speed);
-            this.video.play();
-            this.showOverlay(this.jklOverlay, `>> AVANÇO ${speed}x`);
-        } else if (code === "KeyJ") {
-            // J: Retroceder / Acelerar reverso
-            if (this.jklState === 'J') {
-                this.jklIndex = Math.min(this.jklIndex + 1, this.speedsReverse.length - 1);
-            } else {
-                this.jklState = 'J';
-                this.jklIndex = 0;
-            }
-            const revSpeed = this.speedsReverse[this.jklIndex];
-            this.startReverse(revSpeed);
-        } else if (code === "KeyI") {
-            this.markIn();
-        } else if (code === "KeyO") {
-            this.markOut();
-        } else if (code === "KeyE") {
-            this.appendToTimeline();
-        } else if (code === "ArrowLeft") {
-            // Frame anterior (1 frame = ~40ms em 24fps)
-            this.seek(this.video.currentTime - 0.04);
-        } else if (code === "ArrowRight") {
-            // Próximo frame
-            this.seek(this.video.currentTime + 0.04);
-        }
-    }
-
-    toggleFullscreen() {
-        const container = document.getElementById("video-wrapper");
-        if (!container) return;
-
-        if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
-            if (container.requestFullscreen) {
-                container.requestFullscreen();
-            } else if (container.webkitRequestFullscreen) {
-                container.webkitRequestFullscreen();
-            } else if (container.mozRequestFullScreen) {
-                container.mozRequestFullScreen();
-            } else if (container.msRequestFullscreen) {
-                container.msRequestFullscreen();
-            }
-        } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            } else if (document.mozCancelFullScreen) {
-                document.mozCancelFullScreen();
-            } else if (document.msExitFullscreen) {
-                document.msExitFullscreen();
-            }
-        }
-    }
-
-    onFullscreenChange() {
-        const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
-        if (this.btnMaximize) {
-            if (isFullscreen) {
-                this.btnMaximize.innerHTML = `<i class="fa-solid fa-compress"></i>`;
-                this.btnMaximize.title = "Sair da Tela Cheia";
-            } else {
-                this.btnMaximize.innerHTML = `<i class="fa-solid fa-expand"></i>`;
-                this.btnMaximize.title = "Tela Cheia";
-            }
-        }
-        // Recalcula o overlay com delay curto para dar tempo de renderização do layout
-        setTimeout(() => {
-            this.updateOverlaySize();
-        }, 100);
-    }
-
     createOverlayContainer() {
         if (this.overlayContainer) return;
-        
+        const wrapper = this.el("source-video-wrapper");
+        const vid = this.el("source-video");
+        if (!wrapper || !vid) return;
+
         this.overlayContainer = document.createElement("div");
-        this.overlayContainer.id = "video-face-overlay-container";
+        this.overlayContainer.id = "source-video-face-overlay-container";
         this.overlayContainer.style.position = "absolute";
-        this.overlayContainer.style.zIndex = "8";
+        this.overlayContainer.style.zIndex = "2";
         this.overlayContainer.style.pointerEvents = "auto";
         this.overlayContainer.style.boxSizing = "border-box";
         this.overlayContainer.style.overflow = "hidden";
         
-        // Eventos de drag-and-draw para marcar manualmente novas áreas
         this.overlayContainer.addEventListener("mousedown", (e) => this.onMouseDown(e));
-        
-        this.video.parentElement.appendChild(this.overlayContainer);
+        wrapper.appendChild(this.overlayContainer);
     }
 
     updateOverlaySize() {
-        if (!this.video || !this.video.videoWidth || !this.video.videoHeight || !this.overlayContainer) return;
+        const vid = this.el("source-video");
+        if (!vid || !vid.videoWidth || !this.overlayContainer) return;
 
-        const videoWidth = this.video.videoWidth;
-        const videoHeight = this.video.videoHeight;
-        const elementWidth = this.video.clientWidth;
-        const elementHeight = this.video.clientHeight;
+        const wWidth = vid.videoWidth;
+        const wHeight = vid.videoHeight;
+        const eWidth = vid.clientWidth;
+        const eHeight = vid.clientHeight;
 
-        const videoRatio = videoWidth / videoHeight;
-        const elementRatio = elementWidth / elementHeight;
+        const videoRatio = wWidth / wHeight;
+        const elementRatio = eWidth / eHeight;
 
         let actualWidth, actualHeight, contentLeft, contentTop;
 
         if (elementRatio > videoRatio) {
-            // Letterbox nas laterais esquerda/direita
-            actualHeight = elementHeight;
+            actualHeight = eHeight;
             actualWidth = actualHeight * videoRatio;
-            contentLeft = (elementWidth - actualWidth) / 2;
+            contentLeft = (eWidth - actualWidth) / 2;
             contentTop = 0;
         } else {
-            // Letterbox acima/abaixo
-            actualWidth = elementWidth;
+            actualWidth = eWidth;
             actualHeight = actualWidth / videoRatio;
             contentLeft = 0;
-            contentTop = (elementHeight - actualHeight) / 2;
+            contentTop = (eHeight - actualHeight) / 2;
         }
 
-        const videoRect = this.video.getBoundingClientRect();
-        const containerRect = this.video.parentElement.getBoundingClientRect();
+        const videoRect = vid.getBoundingClientRect();
+        const containerRect = vid.parentElement.getBoundingClientRect();
 
         const overlayLeft = videoRect.left - containerRect.left + contentLeft;
         const overlayTop = videoRect.top - containerRect.top + contentTop;
@@ -547,43 +491,44 @@ export class VideoPlayer {
     }
 
     updateFacesOverlay() {
-        if (!this.video || !this.video.src) {
+        const vid = this.el("source-video");
+        if (!vid || !vid.src) {
             this.clearFacesOverlay();
             return;
         }
 
-        if (this.video.paused) {
+        if (vid.paused) {
             if (!this.overlayContainer) {
                 this.createOverlayContainer();
             }
-            this.overlayContainer.style.display = "block";
-            this.updateOverlaySize();
+            if (this.overlayContainer) {
+                this.overlayContainer.style.display = "block";
+                this.updateOverlaySize();
 
-            const currentTime = this.video.currentTime;
-            const tolerance = 5.0; // tolerância de 5 segundos
+                const currentTime = vid.currentTime;
+                const tolerance = 5.0;
 
-            if (!this.videoFaces || this.videoFaces.length === 0) {
-                this.renderFaces([]);
-                return;
-            }
-
-            // Encontra o timestamp mais próximo
-            let bestTimestamp = null;
-            let minDiff = Infinity;
-            for (const face of this.videoFaces) {
-                const diff = Math.abs(face.timestamp - currentTime);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    bestTimestamp = face.timestamp;
+                if (!this.videoFaces || this.videoFaces.length === 0) {
+                    this.renderFaces([]);
+                    return;
                 }
-            }
 
-            if (bestTimestamp !== null && minDiff <= tolerance) {
-                // Filtra todas as detecções que possuem esse mesmo timestamp aproximado (dentro de 0.1s)
-                const frameFaces = this.videoFaces.filter(face => Math.abs(face.timestamp - bestTimestamp) < 0.1);
-                this.renderFaces(frameFaces);
-            } else {
-                this.renderFaces([]);
+                let bestTimestamp = null;
+                let minDiff = Infinity;
+                for (const face of this.videoFaces) {
+                    const diff = Math.abs(face.timestamp - currentTime);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        bestTimestamp = face.timestamp;
+                    }
+                }
+
+                if (bestTimestamp !== null && minDiff <= tolerance) {
+                    const frameFaces = this.videoFaces.filter(face => Math.abs(face.timestamp - bestTimestamp) < 0.1);
+                    this.renderFaces(frameFaces);
+                } else {
+                    this.renderFaces([]);
+                }
             }
         } else {
             this.clearFacesOverlay();
@@ -593,7 +538,6 @@ export class VideoPlayer {
     renderFaces(frameFaces) {
         if (!this.overlayContainer) return;
         
-        // Remove as caixas de rostos antigas
         const oldBoxes = this.overlayContainer.querySelectorAll(".face-box");
         oldBoxes.forEach(box => box.remove());
 
@@ -602,7 +546,6 @@ export class VideoPlayer {
             if (!box || box.length !== 4) return;
 
             const [x, y, w, h] = box;
-
             const faceDiv = document.createElement("div");
             faceDiv.className = "face-box";
             faceDiv.style.left = `${x * 100}%`;
@@ -621,12 +564,11 @@ export class VideoPlayer {
             faceDiv.style.pointerEvents = "auto";
             faceDiv.addEventListener("click", async (e) => {
                 e.stopPropagation();
-
                 let speakers = [];
                 try {
                     speakers = await CapIAuAPI.fetchProjectSpeakers(STATE.currentProjectId);
                 } catch (err) {
-                    console.warn("Erro ao carregar pessoas/objetos existentes:", err);
+                    console.warn("Erro ao carregar speakers:", err);
                 }
 
                 const name = await showAnnotationModal(speakers, face.name || "");
@@ -635,17 +577,10 @@ export class VideoPlayer {
                     const res = await CapIAuAPI.labelFace(face.id, trimmedName);
                     
                     await FaceManager.handleLabelResponse(res, face.id, async () => {
-                        // Recarrega as faces e atualiza
-                        const faces = await CapIAuAPI.fetchVideoFaces(STATE.activeVideo.id);
-                        this.videoFaces = faces || [];
-                        this.updateFacesOverlay();
-                        
-                        // Atualiza dinamicamente o texto do painel Visão IA
-                        try {
-                            const visionData = await CapIAuAPI.fetchVideoVision(STATE.activeVideo.id, STATE.currentProjectId);
-                            STATE.activeVisionFrames = visionData.frames || [];
-                        } catch (err2) {
-                            console.warn("Erro ao atualizar Visão IA:", err2);
+                        if (STATE.activeVideo) {
+                            const faces = await CapIAuAPI.fetchVideoFaces(STATE.activeVideo.id);
+                            this.videoFaces = faces || [];
+                            this.updateFacesOverlay();
                         }
                     });
                 }
@@ -664,7 +599,6 @@ export class VideoPlayer {
     }
 
     onMouseDown(e) {
-        // Se clicou em uma caixa já existente, não faz nada
         if (e.target.closest(".face-box")) return;
 
         e.preventDefault();
@@ -728,10 +662,8 @@ export class VideoPlayer {
         this.drawingBox.remove();
         this.drawingBox = null;
 
-        // Limiar de segurança para cliques acidentais
         if (finalWidth < 15 || finalHeight < 15) return;
 
-        // Normalização das coordenadas
         const x = finalLeft / rect.width;
         const y = finalTop / rect.height;
         const w = finalWidth / rect.width;
@@ -741,49 +673,384 @@ export class VideoPlayer {
         try {
             speakers = await CapIAuAPI.fetchProjectSpeakers(STATE.currentProjectId);
         } catch (err) {
-            console.warn("Erro ao buscar pessoas/falantes existentes:", err);
+            console.warn("Erro ao buscar speakers:", err);
         }
 
         const name = await showAnnotationModal(speakers, "");
-        if (name) {
+        if (name && STATE.activeVideo) {
             const trimmedName = name.trim();
             if (trimmedName) {
                 try {
+                    const vid = this.el("source-video");
                     const payload = {
                         project_id: STATE.currentProjectId,
                         video_id: STATE.activeVideo.id,
-                        timestamp: this.video.currentTime,
+                        timestamp: vid ? vid.currentTime : 0,
                         bounding_box: [x, y, w, h],
                         name: trimmedName
                     };
 
                     const res = await CapIAuAPI.addManualFace(payload);
                     if (res && res.status === "success") {
-                        // Recarrega as faces
                         const faces = await CapIAuAPI.fetchVideoFaces(STATE.activeVideo.id);
                         this.videoFaces = faces || [];
                         this.updateFacesOverlay();
-
-                        // Atualiza dinamicamente o texto do painel Visão IA
-                        try {
-                            const visionData = await CapIAuAPI.fetchVideoVision(STATE.activeVideo.id, STATE.currentProjectId);
-                            STATE.activeVisionFrames = visionData.frames || [];
-                        } catch (err2) {
-                            console.warn("Erro ao recarregar Visão IA:", err2);
-                        }
                     }
                 } catch (err) {
-                    console.error("Erro ao salvar marcação manual:", err);
-                    alert("Erro ao salvar marcação manual.");
+                    console.error("Erro ao salvar:", err);
                 }
             }
         }
     }
 }
 
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 2. PROGRAM PLAYER - MONITOR DE PROGRAMA / TIMELINE (DIREITA)
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export class ProgramPlayer {
+    constructor() {
+        this.isPlaying = false;
+        this.playRequest = null;
+        this.init();
+    }
+
+    el(id) {
+        return getActiveElement(id);
+    }
+
+    init() {
+        // Redesenha e sincroniza o player sempre que a timeline muda
+        STATE.on("timelineCutsUpdated", () => this.syncVideoToPlayhead());
+        
+        // Escuta mudanças manuais da agulha (scrubbing)
+        STATE.on("timelinePlayheadChanged", () => this.syncVideoToPlayhead());
+
+        // Botão Play Program
+        const btnPlay = this.el("btn-program-play");
+        if (btnPlay) btnPlay.addEventListener("click", () => this.togglePlay());
+
+        // Navegação de frames
+        const btnPrev = this.el("btn-program-prev-frame");
+        if (btnPrev) {
+            btnPrev.addEventListener("click", () => {
+                TIMELINE_STATE.setPlayheadFrame(Math.max(0, TIMELINE_STATE.playheadFrame - 1));
+            });
+        }
+
+        const btnNext = this.el("btn-program-next-frame");
+        if (btnNext) {
+            btnNext.addEventListener("click", () => {
+                const maxDur = this.getDurationFrames();
+                TIMELINE_STATE.setPlayheadFrame(Math.min(maxDur, TIMELINE_STATE.playheadFrame + 1));
+            });
+        }
+
+        // Scrubber
+        const scrubber = this.el("program-scrubber-progress-bar");
+        if (scrubber) {
+            scrubber.addEventListener("click", (e) => this.seekScrubber(e));
+            scrubber.addEventListener("mousedown", (e) => this.startScrubberDrag(e));
+        }
+
+        // Foco visual do teclado
+        const panel = document.getElementById("program-player-panel");
+        if (panel) {
+            panel.addEventListener("click", () => {
+                window.activeFocusedPlayer = "program";
+                console.log("[Player] Foco do teclado definido para PROGRAM");
+            });
+        }
+    }
+
+    getDurationFrames() {
+        const cuts = STATE.activeTimelineCuts;
+        let maxFrame = 0;
+        cuts.forEach(cut => {
+            const end = cut.timelineStartFrame + (cut.outFrame - cut.inFrame);
+            if (end > maxFrame) maxFrame = end;
+        });
+        return maxFrame;
+    }
+
+    togglePlay() {
+        if (this.isPlaying) {
+            this.pause();
+        } else {
+            this.play();
+        }
+    }
+
+    play() {
+        if (this.isPlaying) return;
+        this.isPlaying = true;
+
+        const btnPlay = this.el("btn-program-play");
+        if (btnPlay) btnPlay.innerHTML = `<i class="fa-solid fa-pause"></i>`;
+
+        let lastTime = performance.now();
+        const step = () => {
+            if (!this.isPlaying) return;
+            const now = performance.now();
+            const elapsedSecs = (now - lastTime) / 1000;
+            lastTime = now;
+
+            const maxDur = this.getDurationFrames();
+            if (TIMELINE_STATE.playheadFrame >= maxDur && maxDur > 0) {
+                this.pause();
+                TIMELINE_STATE.setPlayheadFrame(0);
+                return;
+            }
+
+            const elapsedFrames = elapsedSecs * 24; // assume 24 FPS
+            TIMELINE_STATE.setPlayheadFrame(TIMELINE_STATE.playheadFrame + elapsedFrames);
+
+            this.playRequest = requestAnimationFrame(step);
+        };
+        this.playRequest = requestAnimationFrame(step);
+    }
+
+    pause() {
+        this.isPlaying = false;
+        if (this.playRequest) {
+            cancelAnimationFrame(this.playRequest);
+            this.playRequest = null;
+        }
+
+        const btnPlay = this.el("btn-program-play");
+        if (btnPlay) btnPlay.innerHTML = `<i class="fa-solid fa-play"></i>`;
+
+        const videoA = this.el("program-video-a");
+        const videoB = this.el("program-video-b");
+        if (videoA) videoA.pause();
+        if (videoB) videoB.pause();
+    }
+
+    syncVideoToPlayhead() {
+        const currentFrame = TIMELINE_STATE.playheadFrame;
+        const durationFrames = this.getDurationFrames();
+
+        // Atualiza tempos de scrubber
+        const curTimeEl = this.el("program-current-time");
+        if (curTimeEl) curTimeEl.textContent = formatTimecode(currentFrame / 24);
+
+        const durTimeEl = this.el("program-duration-time");
+        if (durTimeEl) durTimeEl.textContent = formatTimecode(durationFrames / 24);
+
+        const fill = this.el("program-scrubber-progress-fill");
+        const handle = this.el("program-scrubber-progress-handle");
+
+        if (durationFrames > 0) {
+            const pct = (currentFrame / durationFrames) * 100;
+            if (fill) fill.style.width = `${pct}%`;
+            if (handle) handle.style.left = `${pct}%`;
+        } else {
+            if (fill) fill.style.width = "0%";
+            if (handle) handle.style.left = "0%";
+        }
+
+        const cuts = STATE.activeTimelineCuts;
+
+        // ────────── TRILHA V1: Falas / Entrevistas ──────────
+        const videoA = this.el("program-video-a");
+        if (videoA) {
+            const cutV1 = cuts.find(c => c.track === "V1" && currentFrame >= c.timelineStartFrame && currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame)));
+            if (cutV1) {
+                const videoData = STATE.allVideos.find(v => v.id === cutV1.video_id);
+                if (videoData) {
+                    const rawSrc = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
+                    const videoSrc = rawSrc.replace(/\\/g, "/");
+                    if (videoA.dataset.loadedSrc !== videoSrc) {
+                        videoA.src = videoSrc;
+                        videoA.dataset.loadedSrc = videoSrc;
+                        videoA.load();
+                    }
+
+                    // Calcula o tempo correspondente no arquivo
+                    const offsetFrames = currentFrame - cutV1.timelineStartFrame;
+                    const targetSeconds = cutV1.in + (offsetFrames / 24);
+
+                    if (Math.abs(videoA.currentTime - targetSeconds) > 0.1) {
+                        videoA.currentTime = targetSeconds;
+                    }
+
+                    // Controla áudio e play status
+                    videoA.volume = TIMELINE_STATE.trackMuted.V1 ? 0 : TIMELINE_STATE.trackVolumes.V1;
+                    if (this.isPlaying && videoA.paused) {
+                        videoA.play().catch(() => {});
+                    } else if (!this.isPlaying && !videoA.paused) {
+                        videoA.pause();
+                    }
+                    videoA.style.display = "block";
+                }
+            } else {
+                videoA.pause();
+                videoA.style.display = "none";
+            }
+        }
+
+        // ────────── TRILHA V2: B-Roll (Sobreposição) ──────────
+        const videoB = this.el("program-video-b");
+        if (videoB) {
+            const cutV2 = cuts.find(c => c.track === "V2" && currentFrame >= c.timelineStartFrame && currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame)));
+            if (cutV2) {
+                const videoData = STATE.allVideos.find(v => v.id === cutV2.video_id);
+                if (videoData) {
+                    const rawSrc = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
+                    const videoSrc = rawSrc.replace(/\\/g, "/");
+                    if (videoB.dataset.loadedSrc !== videoSrc) {
+                        videoB.src = videoSrc;
+                        videoB.dataset.loadedSrc = videoSrc;
+                        videoB.load();
+                    }
+
+                    const offsetFrames = currentFrame - cutV2.timelineStartFrame;
+                    const targetSeconds = cutV2.in + (offsetFrames / 24);
+
+                    if (Math.abs(videoB.currentTime - targetSeconds) > 0.1) {
+                        videoB.currentTime = targetSeconds;
+                    }
+
+                    videoB.volume = TIMELINE_STATE.trackMuted.V2 ? 0 : TIMELINE_STATE.trackVolumes.V2;
+                    if (this.isPlaying && videoB.paused) {
+                        videoB.play().catch(() => {});
+                    } else if (!this.isPlaying && !videoB.paused) {
+                        videoB.pause();
+                    }
+                    // Exibe a cobertura visual B-roll por cima de tudo
+                    videoB.style.display = "block";
+                    videoB.style.zIndex = "10";
+                }
+            } else {
+                videoB.pause();
+                videoB.style.display = "none";
+            }
+        }
+    }
+
+    seekScrubber(e) {
+        const bar = this.el("program-scrubber-progress-bar");
+        if (!bar) return;
+        const rect = bar.getBoundingClientRect();
+        const pct = (e.clientX - rect.left) / rect.width;
+        const durFrames = this.getDurationFrames();
+        TIMELINE_STATE.setPlayheadFrame(Math.round(pct * durFrames));
+    }
+
+    startScrubberDrag(e) {
+        const onMouseMove = (moveEvent) => this.seekScrubber(moveEvent);
+        const onMouseUp = () => {
+            document.removeEventListener("mousemove", onMouseMove);
+            document.removeEventListener("mouseup", onMouseUp);
+        };
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+    }
+}
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 3. WRAPPER COMPATÍVEL - VIDEO PLAYER (EXPOSTO PARA MAIN.JS)
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export class VideoPlayer {
+    constructor() {
+        this.sourcePlayer = new SourcePlayer();
+        this.programPlayer = new ProgramPlayer();
+
+        // Escuta atalhos globais de teclado redirecionando para o player focado
+        document.addEventListener("keydown", (e) => this.handleGlobalKeyboard(e));
+    }
+
+    // Atalhos de teclado compartilhados
+    handleGlobalKeyboard(e) {
+        const activeTag = document.activeElement.tagName.toLowerCase();
+        if (activeTag === "input" || activeTag === "textarea") return;
+
+        const code = e.code;
+        const activePlayer = window.activeFocusedPlayer === "source" ? this.sourcePlayer : this.programPlayer;
+
+        if (code === "Space" || code === "KeyK") {
+            e.preventDefault();
+            activePlayer.togglePlay();
+        } 
+        else if (code === "KeyL") {
+            e.preventDefault();
+            if (window.activeFocusedPlayer === "source") {
+                if (this.sourcePlayer.jklState === 'L') {
+                    this.sourcePlayer.jklIndex = Math.min(this.sourcePlayer.jklIndex + 1, this.sourcePlayer.speedsForward.length - 1);
+                } else {
+                    this.sourcePlayer.jklState = 'L';
+                    this.sourcePlayer.jklIndex = 0;
+                }
+                const speed = this.sourcePlayer.speedsForward[this.sourcePlayer.jklIndex];
+                this.sourcePlayer.setSpeed(speed);
+                const vid = this.sourcePlayer.el("source-video");
+                if (vid) vid.play();
+            } else {
+                this.programPlayer.play();
+            }
+        } 
+        else if (code === "KeyJ") {
+            e.preventDefault();
+            if (window.activeFocusedPlayer === "source") {
+                if (this.sourcePlayer.jklState === 'J') {
+                    this.sourcePlayer.jklIndex = Math.min(this.sourcePlayer.jklIndex + 1, this.sourcePlayer.speedsReverse.length - 1);
+                } else {
+                    this.sourcePlayer.jklState = 'J';
+                    this.sourcePlayer.jklIndex = 0;
+                }
+                const speed = this.sourcePlayer.speedsReverse[this.sourcePlayer.jklIndex];
+                this.sourcePlayer.startReverse(speed);
+            } else {
+                // Apenas pausa a reprodução da timeline se tentar voltar atrás (simplificado)
+                this.programPlayer.pause();
+                TIMELINE_STATE.setPlayheadFrame(Math.max(0, TIMELINE_STATE.playheadFrame - 24));
+            }
+        } 
+        else if (code === "KeyI") {
+            this.sourcePlayer.markIn();
+        } 
+        else if (code === "KeyO") {
+            this.sourcePlayer.markOut();
+        } 
+        else if (code === "KeyE") {
+            this.sourcePlayer.appendToTimeline();
+        } 
+        else if (code === "ArrowLeft") {
+            e.preventDefault();
+            if (window.activeFocusedPlayer === "source") {
+                const vid = this.sourcePlayer.el("source-video");
+                if (vid) this.sourcePlayer.seek(vid.currentTime - 0.04);
+            } else {
+                TIMELINE_STATE.setPlayheadFrame(Math.max(0, TIMELINE_STATE.playheadFrame - 1));
+            }
+        } 
+        else if (code === "ArrowRight") {
+            e.preventDefault();
+            if (window.activeFocusedPlayer === "source") {
+                const vid = this.sourcePlayer.el("source-video");
+                if (vid) this.sourcePlayer.seek(vid.currentTime + 0.04);
+            } else {
+                const maxDur = this.programPlayer.getDurationFrames();
+                TIMELINE_STATE.setPlayheadFrame(Math.min(maxDur, TIMELINE_STATE.playheadFrame + 1));
+            }
+        }
+    }
+
+    // Métodos delegados para manter compatibilidade com a Biblioteca/ASR
+    loadVideo(video) {
+        this.sourcePlayer.loadVideo(video);
+    }
+
+    loadPhoto(photo) {
+        this.sourcePlayer.loadPhoto(photo);
+    }
+}
+
 export function showAnnotationModal(speakers, initialValue = "") {
     return new Promise((resolve) => {
-        // Remove existing modal if any
         const oldModal = document.getElementById("annotation-modal");
         if (oldModal) oldModal.remove();
 
@@ -795,7 +1062,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         const content = document.createElement("div");
         content.className = "modal-content glassmorphism";
         content.style.maxWidth = "400px";
-        content.style.width = "90%";
+        content.style.width = "95%";
         content.style.padding = "20px";
         content.style.display = "flex";
         content.style.flexDirection = "column";
@@ -895,7 +1162,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         const footer = document.createElement("div");
         footer.className = "modal-footer";
         footer.style.display = "flex";
-        footer.style.justify = "flex-end";
+        footer.style.justifyContent = "flex-end";
         footer.style.gap = "10px";
 
         const btnCancel = document.createElement("button");

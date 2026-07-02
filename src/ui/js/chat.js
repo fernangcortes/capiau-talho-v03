@@ -169,7 +169,7 @@ export class ChatManager {
                 
                 // Aguarda um pequeno instante para o carregamento do source do vídeo no player
                 setTimeout(() => {
-                    const player = document.getElementById("main-video");
+                    const player = document.getElementById("source-video");
                     if (player) {
                         player.currentTime = start;
                         player.play();
