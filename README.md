@@ -83,6 +83,13 @@ As descrições brutas dos frames de B-roll e fotos geradas pelas IAs de visão 
 * **Playlist de Busca e Autoplay Sequencial:** Barra de controles (`⏮`, `Autoplay`, `⏭`) no painel de busca que permite reproduzir os resultados consecutivamente. O sistema calcula a duração do trecho e pula para o próximo item do feed. Fotos de set são exibidas no próprio player de vídeo por 4 segundos e avançam sequencialmente (com opção de ver fotos no player também no clique manual nas abas de busca e biblioteca).
 * **Pre-visualização Flutuante (Hover Previews):** Passar o mouse sobre cards ou sub-cards de resultados de busca abre um popover lateral inteligente com um loop de vídeo mudo (5s) ou imagem contextualmente focada no trecho correspondente.
 
+### 5. Motor de Edição Não-Linear (NLE) e Layout Flexível
+* **Visualizadores Duplos Independentes:** Divisão do monitor central em **Source Player** (esquerda, dedicado a JKL de alta velocidade, marcação de pontos In/Out com `I`/`O` e inserções rápidas com `E`) e **Program Player** (direita, dedicado a reproduzir a sequência da timeline ativa). O Program Player gerencia automaticamente um pool A/B de elementos de vídeo para mesclar clipes sem lags de buffer de rede.
+* **Timeline em Canvas 2D:** Linha do tempo de alto desempenho desenhada reativamente usando Canvas 2D, com suporte a redimensionamento dinâmico sem efeito de zoom distorcido. Permite arrastar blocos horizontalmente para ajuste de tempo e verticalmente para transpor clipes entre a trilha sequencial V1 (Falas) e a trilha de cobertura V2 (B-Roll) com atração magnética.
+* **Workspaces Dinâmicos e Destaque Multi-Monitor:** Sistema modular que destaca qualquer painel principal (Biblioteca, Transcrição, Timeline, Players e Chat) em novas janelas do navegador. Utiliza transferência de nós DOM nativos (`document.adoptNode()`) de forma que os elementos físicos são movidos de documento. Isso preserva todos os ouvintes de eventos em JavaScript (event listeners) e estados locais de inputs sem necessidade de comunicações de mensagens assíncronas.
+* **Encaminhamento de Atalhos de Teclado:** Teclas de atalho acionadas em qualquer janela pop-out aberta (como a barra de espaço para dar Play/Pause no player Program) são automaticamente delegadas e executadas no player principal na janela central.
+
+
 ---
 
 ## 🔌 Detalhamento das APIs de Visão e Faces
