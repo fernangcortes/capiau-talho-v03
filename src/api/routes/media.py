@@ -95,6 +95,13 @@ def trigger_external_ingest(payload: ExternalPathIngest, background_tasks: Backg
     background_tasks.add_task(bg_task)
     return {"status": "success", "message": f"Ingestão externa iniciada para projeto {payload.project_id}."}
 
+@router.post("/api/project/{project_id}/scan-watch")
+def trigger_scan_watch(project_id: int, background_tasks: BackgroundTasks):
+    """Escaneia a pasta watch/ em background e registra os novos arquivos."""
+    from src.ingest.watcher import scan_watch_folder
+    background_tasks.add_task(scan_watch_folder, project_id)
+    return {"status": "success", "message": "Varredura da pasta watch/ iniciada."}
+
 @router.post("/api/video/{video_id}/transcribe")
 def trigger_transcribe(video_id: int, background_tasks: BackgroundTasks, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Inicia a transcrição ASR AssemblyAI e indexação semântica em background."""

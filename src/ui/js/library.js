@@ -351,6 +351,9 @@ export class LibraryManager {
         this.photoListEl = document.getElementById("photo-list");
         this.docsListEl = document.getElementById("doc-list");
         this.btnScan = document.getElementById("btn-scan");
+        this.btnImportExternal = document.getElementById("btn-import-external");
+        this.btnOpenProxies = document.getElementById("btn-open-proxies");
+        this.btnRetryFailed = document.getElementById("btn-retry-failed");
         this.btnTranscribeAll = document.getElementById("btn-transcribe-all");
         
         // Lightbox
@@ -384,7 +387,10 @@ export class LibraryManager {
             });
         });
 
-        if (this.btnScan) this.btnScan.addEventListener("click", () => this.triggerScan());
+        if (this.btnScan) this.btnScan.addEventListener("click", () => this.runWatchScan());
+        if (this.btnImportExternal) this.btnImportExternal.addEventListener("click", () => this.runImportExternal());
+        if (this.btnOpenProxies) this.btnOpenProxies.addEventListener("click", () => this.runOpenProxies());
+        if (this.btnRetryFailed) this.btnRetryFailed.addEventListener("click", () => this.runRetryFailed());
         if (this.btnTranscribeAll) this.btnTranscribeAll.addEventListener("click", () => this.triggerTranscribeAll());
 
         // Document uploading
@@ -609,14 +615,51 @@ export class LibraryManager {
         });
     }
 
-    async triggerScan() {
-        await CapIAuAPI.request(`/api/project/open-proxies-folder`, { method: "POST" });
-        // Escaneamento
-        const response = await CapIAuAPI.request("/api/ingest/select-folder", { method: "POST" });
-        if (response.status === "success" && response.path) {
-            await CapIAuAPI.triggerExternalIngest(response.path, STATE.currentProjectId);
-            alert("Ingestão in-place iniciada em background.");
+    async runWatchScan() {
+        try {
+            await CapIAuAPI.request(`/api/project/${STATE.currentProjectId}/scan-watch`, { method: "POST" });
+            alert("Varredura da pasta watch/ iniciada em background.");
             this.reloadData();
+        } catch (err) {
+            alert("Erro ao iniciar varredura: " + err.message);
+        }
+    }
+
+    async runImportExternal() {
+        try {
+            const response = await CapIAuAPI.request("/api/ingest/select-folder", { method: "POST" });
+            if (response.status === "success" && response.path) {
+                const triggerRes = await CapIAuAPI.request("/api/ingest/external", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        path: response.path,
+                        project_id: STATE.currentProjectId
+                    }),
+                    headers: { "Content-Type": "application/json" }
+                });
+                alert("Ingestão in-place iniciada em background.");
+                this.reloadData();
+            }
+        } catch (err) {
+            alert("Erro ao importar pasta: " + err.message);
+        }
+    }
+
+    async runOpenProxies() {
+        try {
+            await CapIAuAPI.request("/api/project/open-proxies-folder", { method: "POST" });
+        } catch (err) {
+            alert("Erro ao abrir pasta de proxies: " + err.message);
+        }
+    }
+
+    async runRetryFailed() {
+        try {
+            await CapIAuAPI.request(`/api/project/${STATE.currentProjectId}/retry-failed`, { method: "POST" });
+            alert("Reprocessamento de proxies e transcrições falhas reiniciado em background.");
+            this.reloadData();
+        } catch (err) {
+            alert("Erro ao reiniciar falhas: " + err.message);
         }
     }
 

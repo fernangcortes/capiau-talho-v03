@@ -21,7 +21,6 @@
                 <i class="fa-solid fa-clapperboard logo-icon"></i>
                 <div class="logo-text">
                     <h1>CapIAu-Talho</h1>
-                    <span>Making Of Editor</span>
                 </div>
             </div>
 
@@ -30,13 +29,13 @@
                 <select id="project-selector" title="Projeto Ativo">
                     <!-- Projetos inseridos dinamicamente -->
                 </select>
-                <button id="btn-new-project" class="btn-icon" title="Novo Projeto">
+                <button id="btn-new-project" class="btn-icon" data-tooltip="Criar um novo projeto no banco de dados local.">
                     <i class="fa-solid fa-folder-plus"></i>
                 </button>
-                <button id="btn-sync-project" class="btn-icon" title="Sincronizar e Exportar/Importar Projeto" style="color: var(--color-cyan);">
+                <button id="btn-sync-project" class="btn-icon" data-tooltip="Sincronizar e exportar ou importar dados de backup do projeto." style="color: var(--color-cyan);">
                     <i class="fa-solid fa-cloud-arrow-up"></i>
                 </button>
-                <button id="btn-delete-project" class="btn-icon btn-danger" title="Deletar Projeto">
+                <button id="btn-delete-project" class="btn-icon btn-danger" data-tooltip="Remover permanentemente o projeto ativo e seus metadados.">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
             </div>
@@ -52,7 +51,6 @@
             </div>
             
             <div class="search-area glassmorphism">
-
                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
                 <input type="text" id="semantic-search-input" placeholder="Buscar falas ou B-rolls semanticamente (ex: escolha das lentes)...">
                 <select id="search-filter">
@@ -61,28 +59,37 @@
                     <option value="broll">Bastidores (B-roll)</option>
                     <option value="photo">Fotos de Set</option>
                 </select>
-                <button id="btn-search" class="btn-primary">Buscar</button>
+                <button id="btn-search" class="btn-primary" data-tooltip="Executar pesquisa semântica por inteligência artificial nos arquivos do projeto.">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
             </div>
             
             <div class="actions-area">
-                <button id="btn-scan" class="btn-outline" title="Escanear pasta watch/">
-                    <i class="fa-solid fa-arrows-rotate"></i> Escanear watch/
+                <button id="btn-scan" class="btn-outline" data-tooltip="Escanear a pasta watch/ para identificar e importar novos arquivos de mídia locais.">
+                    <i class="fa-solid fa-arrows-rotate"></i>
                 </button>
-                <button id="btn-import-external" class="btn-outline" title="Importar HD ou pasta externa em modo Link">
-                    <i class="fa-solid fa-hard-drive"></i> Importar Pasta/HD
+                <button id="btn-import-external" class="btn-outline" data-tooltip="Importar mídias de um HD externo ou pasta em modo Link (sem cópia física, gerando apenas proxies).">
+                    <i class="fa-solid fa-hard-drive"></i>
                 </button>
-                <button id="btn-open-proxies" class="btn-outline" title="Abrir pasta local de proxies no Explorer">
-                    <i class="fa-solid fa-folder-open"></i> Abrir Proxies
+                <button id="btn-open-proxies" class="btn-outline" data-tooltip="Abrir pasta física local onde são salvos os arquivos de proxy.">
+                    <i class="fa-solid fa-folder-open"></i>
                 </button>
-                <button id="btn-retry-failed" class="btn-outline" style="color: var(--color-rose); border-color: rgba(244, 63, 94, 0.3);" title="Recomeçar todas as conversões de proxy falhas ou ausentes">
-                    <i class="fa-solid fa-arrows-rotate"></i> Recomeçar Falhas
+                <button id="btn-retry-failed" class="btn-outline" style="color: var(--color-rose); border-color: rgba(244, 63, 94, 0.3);" data-tooltip="Tentar gerar novamente todos os proxies ou transcrições que falharam ou estão ausentes.">
+                    <i class="fa-solid fa-arrows-rotate"></i>
                 </button>
-                <button id="btn-cluster" class="btn-secondary" title="Agrupar trechos em Temas Narrativos">
-                    <i class="fa-solid fa-brain"></i> Agrupar Temas
+                <button id="btn-cluster" class="btn-secondary" data-tooltip="Executar inteligência artificial para agrupar e organizar trechos e transcrições em blocos temáticos.">
+                    <i class="fa-solid fa-brain"></i>
+                </button>
+                <button id="btn-collapse-header" class="btn-outline" data-tooltip="Ocultar cabeçalho para expandir o espaço vertical de trabalho e edição.">
+                    <i class="fa-solid fa-chevron-up"></i>
                 </button>
             </div>
-
         </header>
+
+        <!-- Botão flutuante para restaurar o cabeçalho quando recolhido -->
+        <div id="header-restore-trigger" class="header-restore-btn" data-tooltip="Expandir cabeçalho" style="display: none;">
+            <i class="fa-solid fa-chevron-down"></i>
+        </div>
 
         <!-- ── MAIN CONTENT WORKSPACE ───────────────────────────────────── -->
         <div class="workspace">

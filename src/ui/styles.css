@@ -84,55 +84,54 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 70px;
-    padding: 0 24px;
-    margin: 10px 10px 0 10px;
-    border-radius: 12px;
+    height: 46px;
+    padding: 0 16px;
+    margin: 8px 8px 0 8px;
+    border-radius: 8px;
     z-index: 100;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), margin 0.3s ease, height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
 }
 
 .logo-area {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
 }
 
 .logo-icon {
-    font-size: 24px;
+    font-size: 16px;
     color: var(--color-violet);
-    text-shadow: 0 0 15px rgba(138, 92, 246, 0.6);
+    text-shadow: 0 0 10px rgba(138, 92, 246, 0.6);
 }
 
 .logo-text h1 {
     font-family: var(--font-heading);
-    font-size: 20px;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.3px;
     background: linear-gradient(135deg, #fff 30%, var(--color-violet));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
 .logo-text span {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: var(--text-muted);
+    display: none;
 }
 
 .search-area {
     display: flex;
     align-items: center;
-    width: 45%;
-    height: 42px;
-    padding: 0 12px;
-    border-radius: 20px;
+    width: 35%;
+    height: 30px;
+    padding: 0 8px;
+    border-radius: 6px;
     background: rgba(0, 0, 0, 0.3);
+    gap: 6px;
 }
 
 .search-icon {
     color: var(--text-muted);
-    margin-right: 10px;
+    font-size: 11px;
 }
 
 .search-area input {
@@ -141,24 +140,144 @@ body {
     border: none;
     outline: none;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: 11px;
 }
 
 .search-area select {
     background: var(--bg-base);
     border: 1px solid var(--border-glass);
     color: var(--text-secondary);
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
     outline: none;
-    margin-right: 10px;
+    margin-right: 0;
     cursor: pointer;
+    max-width: 120px;
+}
+
+#btn-search.btn-primary {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    box-shadow: none;
+    font-size: 11px;
 }
 
 .actions-area {
     display: flex;
-    gap: 12px;
+    gap: 6px;
+    align-items: center;
+}
+
+.actions-area button {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+/* ── CUSTOM PREMIUM TOOLTIPS ────────────────────────────────────────── */
+[data-tooltip] {
+    position: relative;
+}
+
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translate(-50%, 100%) scale(0.9);
+    background: rgba(15, 11, 28, 0.96);
+    border: 1px solid rgba(138, 92, 246, 0.35);
+    color: #f3f1f5;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: normal;
+    width: max-content;
+    max-width: 250px;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    line-height: 1.4;
+    text-align: left;
+}
+
+[data-tooltip]:hover::after {
+    opacity: 1;
+    transform: translate(-50%, 100%) scale(1);
+}
+
+.actions-area [data-tooltip]::after {
+    left: auto;
+    right: 0;
+    transform: translate(0, 100%) scale(0.9);
+}
+
+.actions-area [data-tooltip]:hover::after {
+    transform: translate(0, 100%) scale(1);
+}
+
+/* ── RETRACTABLE HEADER CLASSES ──────────────────────────────────────── */
+.header-collapsed .header {
+    transform: translateY(-120%);
+    height: 0;
+    margin: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.header-restore-btn {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 14px;
+    background: rgba(138, 92, 246, 0.15);
+    border: 1px solid rgba(138, 92, 246, 0.3);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: background 0.2s, height 0.2s;
+}
+
+.header-restore-btn i {
+    font-size: 8px;
+    color: var(--color-violet);
+    transition: transform 0.2s;
+}
+
+.header-restore-btn:hover {
+    background: var(--color-violet);
+    height: 18px;
+}
+
+.header-restore-btn:hover i {
+    color: #fff;
+    transform: scale(1.2);
 }
 
 /* ── BUTTONS ───────────────────────────────────────────────────────── */
@@ -213,10 +332,15 @@ button {
 .workspace {
     display: flex;
     flex: 1;
-    height: calc(100vh - 85px);
+    height: calc(100vh - 66px);
     padding: 10px;
     gap: 10px;
     position: relative;
+    transition: height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.header-collapsed .workspace {
+    height: calc(100vh - 20px);
 }
 
 /* ── RETRACTABLE SIDEBARS ────────────────────────────────────────────── */
@@ -1142,11 +1266,11 @@ button {
 .project-area {
     display: flex;
     align-items: center;
-    border-radius: 20px;
+    border-radius: 6px;
     background: rgba(0, 0, 0, 0.35);
-    height: 42px;
-    padding: 0 14px;
-    gap: 8px;
+    height: 30px;
+    padding: 0 8px;
+    gap: 6px;
     border: 1px solid var(--border-glass);
     transition: var(--transition-smooth);
 }
@@ -1156,7 +1280,7 @@ button {
 
 .project-icon {
     color: var(--color-violet);
-    font-size: 14px;
+    font-size: 11px;
 }
 
 #project-selector {
@@ -1164,12 +1288,12 @@ button {
     border: none;
     outline: none;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 600;
     font-family: var(--font-heading);
     cursor: pointer;
-    max-width: 160px;
-    padding-right: 6px;
+    max-width: 130px;
+    padding-right: 4px;
 }
 #project-selector option {
     background: var(--bg-base);
@@ -1179,13 +1303,13 @@ button {
 .btn-icon {
     background: transparent;
     color: var(--text-muted);
-    font-size: 13px;
-    width: 26px;
-    height: 26px;
+    font-size: 11px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    border-radius: 4px;
     transition: var(--transition-smooth);
     border: none;
     cursor: pointer;

@@ -1147,6 +1147,23 @@ window.addEventListener("DOMContentLoaded", () => {
     if (reopenRight) reopenRight.addEventListener("click", () => expandSidebar("right"));
     if (reopenTimeline) reopenTimeline.addEventListener("click", () => expandSidebar("timeline"));
 
+    // ── CONFIGURAÇÃO DO CABEÇALHO RETRÁTIL ──
+    const appContainer = document.querySelector(".app-container");
+    const btnCollapseHeader = document.getElementById("btn-collapse-header");
+    const headerRestoreTrigger = document.getElementById("header-restore-trigger");
+
+    if (btnCollapseHeader && headerRestoreTrigger && appContainer) {
+        btnCollapseHeader.addEventListener("click", () => {
+            appContainer.classList.add("header-collapsed");
+            headerRestoreTrigger.style.display = "flex";
+        });
+
+        headerRestoreTrigger.addEventListener("click", () => {
+            appContainer.classList.remove("header-collapsed");
+            headerRestoreTrigger.style.display = "none";
+        });
+    }
+
     // ── TABS NATIVAS DA ESQUERDA (BIBLIOTECA) ──
     document.querySelectorAll(".sidebar-left .tab-btn").forEach(btn => {
         btn.addEventListener("click", () => {
