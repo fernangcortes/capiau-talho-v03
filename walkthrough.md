@@ -465,3 +465,48 @@ Implementamos e validamos o motor de reconhecimento facial e clustering 100% loc
    - Criados testes automatizados robustos em `tests/test_face_recognition.py` cobrindo o DBSCAN matricial, agrupamento de rostos no banco, detecção de conflitos, merge de clusters e reatribuição manual de faces.
    - O conjunto total de 9 testes passa com sucesso (`OK` em 8.480s).
 
+---
+
+## 🖥️ Fase 9: Visualizadores Duplos Independentes (Source & Program)
+
+Desenvolvemos a estrutura de monitoramento duplo no painel central, idêntica à de suites de edição profissionais (como Premiere e DaVinci Resolve):
+
+1. **Source Player (Monitor de Origem - Esquerda):**
+   - Dedicado a inspecionar mídias brutas da Biblioteca (vídeos e fotos de set).
+   - Suporte nativo a atalhos de teclado **JKL** com velocidades múltiplas (1.5x, 2x, 4x, 8x) e retrocesso (J reverso) via loops de animação temporal.
+   - Marcação rápida de pontos de entrada (`I`) e saída (`O`) e botão de inserção (`E` ou botão dedicado) para recortar o segmento de áudio/vídeo e enviá-lo instantaneamente para a trilha ativa da Timeline.
+   - Renderização dinâmica do overlay de detecção de rostos (YuNet/SFace) em tempo real, dimensionando-se de forma responsiva às mudanças de tamanho do monitor.
+
+2. **Program Player (Monitor de Programa - Direita):**
+   - Dedicado à reprodução reativa e sequencial dos clipes montados na timeline ativa.
+   - Gerenciamento inteligente de buffering A/B de elementos de vídeo para alternar de forma suave entre diferentes clipes e arquivos de proxies, eliminando travamentos de transição na CPU.
+
+---
+
+## 🎨 Fase 10: Timeline Multi-Trilha Reativa em Canvas 2D
+
+Para garantir desempenho extremo na renderização de timelines complexas na CPU local, implementamos a linha do tempo desenhada diretamente em um Canvas HTML5:
+
+1. **Desenho em Canvas 2D de Alta Performance:**
+   - Todo o desenho de réguas, timecodes, trilhas (`V1` para falas e depoimentos, `V2` para cobertura/B-Roll) e blocos de clipes é gerenciado por renderização direta em Canvas, com suporte nativo a High-DPI (Pixel Ratio) para displays retina.
+   - Representação visual de ondas de áudio (waveforms) renderizadas dinamicamente sobre os blocos baseados no banco de dados.
+
+2. **Interatividade e Atração Magnética:**
+   - Lógica de arrastar e soltar (drag-and-drop) de alta performance: movimentação livre de blocos horizontalmente para ajuste de ponto na linha do tempo, e verticalmente para alterar trilhas.
+   - Implementação de **snapping/atração magnética** para alinhar clipes perfeitamente com os limites de clipes adjacentes ou com a agulha de reprodução (playhead), evitando espaços vazios involuntários na edição de falas.
+
+---
+
+## 🎛️ Fase 11: Workspaces Dinâmicos e Destaque Multi-Monitor
+
+Visando a produtividade do editor em múltiplos monitores, implementamos um motor flexível de pop-outs de painéis em novas janelas do navegador:
+
+1. **Destaque Modular de Elementos (Pop-outs):**
+   - O editor pode abrir qualquer painel (Biblioteca, Transcrição, Timeline, Players ou Chat) em uma nova janela independente do navegador clicando no ícone de destaque.
+   - Utilização de **`document.adoptNode()`** para mover os elementos físicos do DOM de forma nativa. Isso preserva intactos todos os event listeners em JavaScript e o estado reativo local sem a necessidade de re-inicializações ou comunicação assíncrona lenta.
+
+2. **Sincronização Bidirecional e Encaminhamento de Atalhos:**
+   - Comunicação via **`BroadcastChannel`** e escuta de eventos globais para coordenar mudanças de estado entre a janela principal e as janelas secundárias abertas.
+   - Encaminhamento automático de comandos de teclado de qualquer pop-out ativo (como pressionar barra de espaço para dar play no monitor de origem) para o player centralizado na tela mãe, gerando um controle unificado do setup.
+
+
