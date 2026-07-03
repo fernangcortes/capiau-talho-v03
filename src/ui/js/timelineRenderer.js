@@ -45,10 +45,13 @@ export class CapiauTimelineRenderer {
     setCanvas(canvas) {
         if (!canvas) return;
         
-        // Remove listener de resize da janela antiga
+        // Remove listener de resize e para de observar
         if (this.canvas) {
             const oldWin = this.canvas.ownerDocument.defaultView || window;
             oldWin.removeEventListener("resize", this.boundResize);
+            if (this.resizeObserver) {
+                this.resizeObserver.unobserve(this.canvas.parentNode);
+            }
         }
         
         this.canvas = canvas;
@@ -57,6 +60,10 @@ export class CapiauTimelineRenderer {
         // Adiciona o listener na nova janela do canvas
         const newWin = canvas.ownerDocument.defaultView || window;
         newWin.addEventListener("resize", this.boundResize);
+        
+        if (this.resizeObserver) {
+            this.resizeObserver.observe(this.canvas.parentNode);
+        }
         
         this.resize();
         this.requestRedraw();
@@ -73,6 +80,15 @@ export class CapiauTimelineRenderer {
         
         const win = this.canvas ? (this.canvas.ownerDocument.defaultView || window) : window;
         win.addEventListener("resize", this.boundResize);
+
+        // ResizeObserver para detectar mudanças de tamanho do contêiner da timeline (como redimensionar/recolher painéis laterais)
+        this.resizeObserver = new ResizeObserver(() => {
+            this.resize();
+            this.requestRedraw();
+        });
+        if (this.canvas && this.canvas.parentNode) {
+            this.resizeObserver.observe(this.canvas.parentNode);
+        }
 
         // Ouvintes de evento do estado para redesenho reativo
         STATE.on("timelineCutsUpdated", () => this.requestRedraw());
