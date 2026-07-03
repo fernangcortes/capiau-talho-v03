@@ -267,7 +267,7 @@ class TestFaceRecognitionAndClustering(unittest.TestCase):
             cursor = conn.cursor()
             cursor.execute("SELECT name FROM face WHERE id = ?", (new_face_id,))
             self.assertEqual(cursor.fetchone()["name"], "Luminária")
-            cursor.execute("SELECT status FROM face_recognition WHERE face_id = ? ORDER BY recognized_at DESC LIMIT 1", (new_face_id,))
+            cursor.execute("SELECT status FROM face_recognition WHERE face_id = ? ORDER BY recognized_at DESC, id DESC LIMIT 1", (new_face_id,))
             self.assertEqual(cursor.fetchone()["status"], "rejected")
 
         # 8. Testar rejeição sem payload (fallback para 'Não Relevante')

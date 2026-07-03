@@ -1,14 +1,27 @@
 # 🎬 CapIAu-Talho — Motor de Inteligência e Decupagem Cinematográfica
 
-O **CapIAu-Talho** é uma solução de inteligência artificial e pré-edição (decupagem) projetada especificamente para fluxos de **Making Of e Documentários**. O sistema foi projetado sob um **Modelo Híbrido Otimizado** para rodar com eficiência em CPUs locais (como processadores Intel i7 com 32GB de RAM), eliminando a dependência de GPUs Nvidia dedicadas locais através do uso de buscas locais rápidas em CPU combinadas com APIs na nuvem de baixíssimo custo.
+O **CapIAu-Talho** é uma solução inteligente de decupagem e pré-edição projetada sob medida para fluxos de **Making Of e Documentários**. O sistema opera em um **Modelo Híbrido Otimizado** desenhado especificamente para rodar com alta performance em CPUs locais (como processadores Intel i7 com 32GB de RAM), sem depender de GPUs dedicadas locais. 
 
-Com o CapIAu-Talho, você pode processar mais de 20 horas de material bruto (entrevistas, B-rolls de bastidores, fotos de set), transcrever falas automaticamente com identificação de personagens (diarização), fazer pesquisas semânticas rápidas na biblioteca (ex: *"diretor escolhendo lentes"*) e exportar o rascunho de timeline diretamente para Premiere Pro ou DaVinci Resolve via XML e OpenTimelineIO.
+A inteligência é distribuída: buscas vetoriais e reconhecimento facial ocorrem 100% localmente no seu hardware, enquanto tarefas pesadas de linguagem e transcrição utilizam APIs em nuvem de baixíssimo custo de forma otimizada.
 
 ---
 
-## 🛠️ Arquitetura Técnica do Sistema
+## 🚀 Recursos Principais (Features)
 
-A arquitetura do CapIAu-Talho é baseada em três pilares: **Ingestão In-Place (HD Externo)**, **Banco de Dados Híbrido Local** e **Processamento de IA Híbrido**:
+* **📁 Ingestão In-Place (HD Externo):** Varredura recursiva e catalogação de mídias gigantes localizadas em HDs externos ou SSDs sem precisar copiá-las localmente.
+* **⚡ Geração de Proxies Inteligente:** Conversão automática de vídeos pesados em proxies leves de 720p/360p via FFmpeg, com controle de progresso real (0-100%) e prevenção de processos órfãos.
+* **🎙️ Transcrição pt-BR & Diarização (ASR):** Transcrição palavra-a-palavra de entrevistas via AssemblyAI com identificação automática de personagens (quem falou o quê).
+* **🔍 Busca Semântica Híbrida local:** Pesquise na biblioteca usando linguagem natural (ex: *"diretor falando sobre a escolha de lentes"*) e encontre o trecho exato instantaneamente via Qdrant local rodando em CPU.
+* **👤 Reconhecimento Facial CPU Local:** Motor 100% local usando modelos YuNet e SFace (ONNX) para detectar, agrupar (DBSCAN), desambiguar e nomear personagens em fotos e vídeos.
+* **💬 Chatbot RAG Integrado:** Tire dúvidas sobre o material bruto do documentário. As respostas da IA incluem citações clicáveis que abrem o vídeo correspondente no player e movem a agulha para o frame exato.
+* **🖥️ Visualizadores Duplos (NLE):** Setup profissional de edição contendo monitor de origem (*Source Player*) com controles **JKL** de alta velocidade, marcadores de entrada e saída (**I/O**) e monitor de visualização da timeline (*Program Player*).
+* **🎨 Timeline Multi-trilha Canvas 2D:** Linha do tempo de alto desempenho renderizada em Canvas, suportando trilhas de falas (`V1`), cobertura B-roll (`V2`), snapping magnético e zoom.
+* **🎛️ Workspaces Multi-monitores:** Destaque qualquer painel principal (Biblioteca, Transcrição, Timeline, Players ou Chat) em janelas separadas do navegador mantendo atalhos e estados sincronizados via BroadcastChannel.
+* **☁️ Sincronização e Backup ZIP:** Sincronize projetos inteiros (incluindo metadados, proxies e descrições faciais já computadas) via pacotes ZIP e links diretos do Google Drive.
+
+---
+
+## 📊 Arquitetura Técnica do Sistema
 
 ```mermaid
 graph TD
@@ -26,15 +39,14 @@ graph TD
 
     subgraph APIs_Nuvem["☁️ APIs na Nuvem (Econômicas)"]
         AssemblyAI["AssemblyAI (ASR / Diarização pt-BR)"]
-        OpenRouterText["OpenRouter (DeepSeek V3 — Clustering)"]
-        OpenRouterVision["OpenRouter (Gemini 2.5 Flash — Descrição de Frames)"]
+        OpenRouter["OpenRouter (DeepSeek V3 / Gemini Flash)"]
     end
 
     subgraph Frontend["💻 Frontend Web (Glassmorphism UI)"]
-        Player["Player 16:9 (JKL Shortcuts / Marcadores I-O)"]
+        Player["Players Duplos (JKL Shortcuts / Marcadores I-O)"]
         Biblioteca["Biblioteca em Árvore (In-Place)"]
-        Timeline["Timeline Multi-Trilha (Cortes)"]
-        FilaTarefas["Tarefas (Progresso FFmpeg/ASR)"]
+        Timeline["Timeline Canvas 2D (Cortes)"]
+        Chat["Chatbot RAG & Busca"]
     end
 
     Originals --> Watcher
@@ -45,246 +57,78 @@ graph TD
     AssemblyAI -->|Diarização + Timestamps| SQLite
     AssemblyAI -->|Indexar texto| SentenceTransformers
     SentenceTransformers -->|Embeddings| Qdrant
-    SQLite -->|Diálogos| OpenRouterText
-    OpenRouterText -->|Temas Narrativos| SQLite
-    FFmpeg -->|Frames de Bastidores| OpenRouterVision
-    OpenRouterVision -->|Descrições Visuais| Qdrant
+    SQLite -->|Diálogos| OpenRouter
+    OpenRouter -->|Temas & Chat RAG| SQLite
+    FFmpeg -->|Frames de Bastidores| OpenRouter
+    OpenRouter -->|Descrições Visuais| Qdrant
     Qdrant -->|Busca Semântica < 5ms| Biblioteca
     Timeline -->|Exportar XML/OTIO| HD_Externo
 ```
 
-### 1. Camada de Dados e Busca Vetorial (Local em CPU)
-* **SQLite (`capiau.db`):** Banco de dados relacional que gerencia metadados técnicos de mídias, timelines, relações e a tabela de falas palabra-a-palavra. Conta com deleção em cascata (`PRAGMA foreign_keys = ON`) para o isolamento completo de múltiplos projetos.
-* **Qdrant Local (File-Based):** Banco vetorial embutido que opera localmente em CPU (sem necessidade de Docker) para armazenar os embeddings e realizar buscas semânticas instantâneas em milissegundos.
-* **Sentence-Transformers (`all-MiniLM-L6-v2`):** Modelo local e offline de ~120MB encarregado de gerar os embeddings vetoriais na CPU.
-
-### 2. Camada de Processamento de Mídia
-* **FFmpeg / FFprobe:** Extrai metadados técnicos (duração, codec, resolução, taxa de quadros) na importação e converte vídeos pesados H.264/ProRes em proxies leves 720p/360p H.264 AAC com monitoramento em tempo real do progresso (0-100%).
-* **Extração Monofônica Local:** Antes de transcrever na nuvem, o CapIAu-Talho extrai o áudio em MP3 mono de 16kHz localmente. Isso reduz o tamanho do arquivo a ser enviado à nuvem em mais de 99%, evitando falhas de rede e permitindo carregar o áudio de entrevistas de 30 minutos em menos de 10 segundos.
-
-### 3. Camada de Inteligência Artificial (Nuvem Econômica)
-* **AssemblyAI (Universal-2 API):** Transcreve depoimentos na língua portuguesa com pontuação e diarização automática de personagens (quem falou o quê e em qual tempo exato).
-* **OpenRouter (DeepSeek V3 & Gemini 2.5/3.1 Flash):**
-  * **DeepSeek V3:** Agrupa as falas de todas as entrevistas em temas de documentário (clustering narrativo).
-  * **Gemini 2.5 Flash / Gemini 3.1 Flash Lite:** Analisa fotos de set e frames de B-roll a cada 10 segundos para gerar metadados visuais semânticos de bastidores.
-
-### 4. Pipeline de Visão Inteligente e Reconhecimento Facial
-O CapIAu-Talho implementa um fluxo de reconhecimento facial em cascata dividida em **4 Tiers** de processamento e precisão:
-* **Tier 0 (Local CPU):** Deteção leve com **YuNet** e extração de embeddings com **SFace** rodando localmente na CPU.
-* **Tier 1 (Nuvem Azure):** Integração com **Azure Face API** (com limite ativo de 20 chamadas/min e teste de conexão via `POST` robusto no plano gratuito) para extração fina de atributos e contornos de alta precisão.
-* **Tier 2 (Nuvem AWS):** Reconhecimento de rostos de celebridades e busca de coleções no **AWS Rekognition**.
-* **Tier 3 (Local GPU/CPU Avançado):** Suporte nativo ao **InsightFace** (ArcFace + RetinaFace). Se detectado que o módulo `insightface` está em falta, o backend expõe um endpoint para a instalação programática (`POST /api/faces/pipeline/install-insightface`) com um clique diretamente pela interface.
-
-#### Motor de Enriquecimento de RAG e Busca Semântica
-As descrições brutas dos frames de B-roll e fotos geradas pelas IAs de visão são associadas às marcações de rostos e objetos em uma janela de tolerância de **5.0 segundos**:
-* **Substituição de Plurais:** Quando dois ou mais nomes de pessoas são identificados no mesmo frame, termos genéricos no texto (ex: `Duas mulheres`, `Pessoas`) são automaticamente substituídos pela junção de seus nomes reais (ex: `Fernanda e Aline`).
-* **Resolução de Substantivos de Objetos:** Ao marcar um objeto (ex: `Abajur de Mesa`), o sistema localiza o substantivo correspondente na descrição original (ex: `um abajur`, `a luz`) e substitui o termo pelo nome preciso do objeto anotado.
-* **Busca Semântica Híbrida Desduplicada:** Mapeamentos manuais criados com a anotação Drag-and-Draw inserem representações textuais na base SQLite, garantindo que buscas por objetos ou pessoas encontrem o frame exato na biblioteca. Cada mídia única (vídeo ou foto) é retornada apenas uma vez no feed principal, agrupando trechos secundários em menus retráteis (*other_occurrences*).
-* **Playlist de Busca e Autoplay Sequencial:** Barra de controles (`⏮`, `Autoplay`, `⏭`) no painel de busca que permite reproduzir os resultados consecutivamente. O sistema calcula a duração do trecho e pula para o próximo item do feed. Fotos de set são exibidas no próprio player de vídeo por 4 segundos e avançam sequencialmente (com opção de ver fotos no player também no clique manual nas abas de busca e biblioteca).
-* **Pre-visualização Flutuante (Hover Previews):** Passar o mouse sobre cards ou sub-cards de resultados de busca abre um popover lateral inteligente com um loop de vídeo mudo (5s) ou imagem contextualmente focada no trecho correspondente.
-
-### 5. Motor de Edição Não-Linear (NLE) e Layout Flexível
-* **Visualizadores Duplos Independentes:** Divisão do monitor central em **Source Player** (esquerda, dedicado a JKL de alta velocidade, marcação de pontos In/Out com `I`/`O` e inserções rápidas com `E`) e **Program Player** (direita, dedicado a reproduzir a sequência da timeline ativa). O Program Player gerencia automaticamente um pool A/B de elementos de vídeo para mesclar clipes sem lags de buffer de rede.
-* **Timeline em Canvas 2D:** Linha do tempo de alto desempenho desenhada reativamente usando Canvas 2D, com suporte a redimensionamento dinâmico sem efeito de zoom distorcido. Permite arrastar blocos horizontalmente para ajuste de tempo e verticalmente para transpor clipes entre a trilha sequencial V1 (Falas) e a trilha de cobertura V2 (B-Roll) com atração magnética.
-* **Workspaces Dinâmicos e Destaque Multi-Monitor:** Sistema modular que destaca qualquer painel principal (Biblioteca, Transcrição, Timeline, Players e Chat) em novas janelas do navegador. Utiliza transferência de nós DOM nativos (`document.adoptNode()`) de forma que os elementos físicos são movidos de documento. Isso preserva todos os ouvintes de eventos em JavaScript (event listeners) e estados locais de inputs sem necessidade de comunicações de mensagens assíncronas.
-* **Encaminhamento de Atalhos de Teclado:** Teclas de atalho acionadas em qualquer janela pop-out aberta (como a barra de espaço para dar Play/Pause no player Program) são automaticamente delegadas e executadas no player principal na janela central.
-
-
 ---
 
-## 🔌 Detalhamento das APIs de Visão e Faces
+## ⚙️ Pré-requisitos & Execução Local
 
-Abaixo estão listadas as rotas do backend FastAPI que gerenciam o fluxo de detecções e desambiguação:
-
-### 1. Rotulação e Resolução de Conflitos
-* **`POST /api/faces/face/{face_id}/label`**
-  * **Payload:** `{"name": "Nome da Pessoa/Objeto"}`
-  * **Funcionamento:** Atribui um nome à detecção. Se a detecção pertencer a um cluster/grupo, aplica o nome a todas as faces do mesmo grupo.
-  * **Resolução de Conflitos:** Se o nome fornecido já estiver associado a outro cluster, a API retorna um status `conflict` com os IDs dos clusters conflitantes, permitindo que o frontend inicie uma modal de desambiguação para fusão manual (`merge`) ou reatribuição (`reassign`).
-
-### 2. Fusão de Grupos e Reatribuição de Rostos
-* **`POST /api/faces/project/{project_id}/faces/merge`**
-  * **Payload:** `{"src_cluster_id": int, "dest_cluster_id": int, "name": "Nome Confirmado"}`
-  * **Funcionamento:** Une por completo o cluster de origem ao de destino.
-* **`POST /api/faces/project/{project_id}/faces/reassign`**
-  * **Payload:** `{"face_ids": List[int], "target_cluster_id": int, "target_name": "Nome"}`
-  * **Funcionamento:** Transfere individualmente apenas as detecções selecionadas de um grupo para o grupo correto.
-
-### 3. Rejeição e Catalogação de Objetos
-* **`POST /api/faces/face/{face_id}/reject`**
-  * **Payload (Opcional):** `{"name": "Nome do Objeto"}`
-  * **Funcionamento:** Descarta uma detecção de rosto errônea.
-    * Se nenhum nome for fornecido (ou deixado em branco), a detecção é rotulada como `"Não Relevante"` e seu status é atualizado para `rejected`, fazendo com que seja totalmente ignorada nos algoritmos de clustering e de enriquecimento RAG.
-    * Se um nome de objeto for fornecido (ex: `Abajur`), a detecção é arquivada como `rejected` (para não poluir o clustering de pessoas), mas o nome do objeto é persistido no banco de dados para indexação na busca semântica e enriquecimento textual de B-rolls.
-
-### 4. Desenho de Caixas Manuais (Drag-and-Draw)
-* **`POST /api/faces/face`**
-  * **Payload:** `{"project_id": int, "video_id": Optional[int], "photo_id": Optional[int], "timestamp": Optional[float], "bounding_box": [x, y, w, h], "name": "Nome"}`
-  * **Funcionamento:** Permite criar uma nova marcação retangular nas coordenadas normalizadas `[0.0 a 1.0]` do vídeo/foto, indexando elementos personalizados do set.
-
----
-
-## 📂 Estrutura Modular do Código
-
-O projeto está organizado seguindo práticas de modularidade para facilitar expansões futuras:
-
-```
-├── data/                       # Arquivos gerados localmente (ignorado no Git)
-│   ├── cache/                  # Áudios MP3 temporários para upload ASR
-│   ├── originals/              # Mídias copiadas fisicamente (se copy_original=True)
-│   ├── proxies/                # Vídeos proxies leves MP4 gerados pelo FFmpeg
-│   ├── capiau.db               # Banco de dados relacional SQLite
-│   └── qdrant.db/              # Base vetorial local do Qdrant
-├── scratch/                    # Scripts rápidos e ferramentas de teste de conexão
-│   └── test_connections.py     # Script utilitário de diagnóstico das APIs
-├── src/                        # Código-fonte principal da aplicação
-│   ├── api/
-│   │   └── server.py           # Rotas FastAPI e silenciador de log de polling
-│   ├── db/
-│   │   ├── schema.py           # Definição e inicialização do SQLite
-│   │   └── operations.py       # Operações CRUD do banco de dados e isolamento
-│   ├── export/
-│   │   └── otio_export.py      # Conversor de Timeline para XML (Resolve/Premiere)
-│   ├── ingest/
-│   │   └── watcher.py          # Watcher de arquivos, FFprobe e gerador de proxies
-│   ├── nlp/
-│   │   └── theme_cluster.py    # Clustering inteligente de falas via DeepSeek V3
-│   ├── search/
-│   │   └── semantic.py         # Busca vetorial local via Qdrant e MiniLM
-│   ├── transcription/
-│   │   └── asr_engine.py       # Extração de MP3 e integração com AssemblyAI
-│   ├── ui/                     # Interface Web Premium (Glassmorphism)
-│   │   ├── index.html          # HTML5 semântico com abas e player widescreen
-│   │   ├── app.js              # Atalhos JKL, I/O, in-place updates e persistência
-│   │   └── styles.css          # Estilo translúcido premium responsivo
-│   ├── vision/
-│   │   └── multimodal_engine.py# Análise visual de fotos e frames via Gemini
-│   └── config.py               # Configurações globais e inicialização de pastas
-├── tests/                      # Conjunto de testes de integração e unitários
-│   ├── test_database.py        # Validação do SQLite e busca semântica em CPU
-│   └── test_hybrid_pipeline.py # Validação de ingestão e fluxo de proxies
-├── .env                        # Variáveis de ambiente e API Keys (não comitar!)
-├── .gitignore                  # Regras de exclusão do Git
-├── requirements.txt            # Dependências unificadas do Python
-└── USER_MANUAL.md              # Manual de utilização para o usuário final
-```
-
----
-
-## ⚡ Instalação e Execução Local
-
-### Pré-requisitos:
+### Pré-requisitos
 1. **Python 3.10+** instalado.
-2. **FFmpeg** instalado na máquina e adicionado ao PATH do Windows. (Verifique abrindo o console e digitando `ffmpeg -version`).
+2. **FFmpeg** instalado na máquina e configurado no PATH do sistema. (Teste digitando `ffmpeg -version` no terminal).
 
-### Configuração:
-1. **Instalar dependências:**
+### Instalação Rápida
+1. Instale as dependências requeridas:
    ```bash
    pip install -r requirements.txt
    ```
-2. **Configurar as APIs no arquivo `.env`:**
-   Crie ou edite o arquivo `.env` na raiz do projeto com as chaves corretas:
+2. Crie ou configure o arquivo [.env](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/.env) na raiz do projeto contendo suas chaves:
    ```env
    OPENROUTER_API_KEY=sua_chave_do_openrouter
    ASSEMBLYAI_API_KEY=sua_chave_da_assemblyai
-   
-   # Opcional: Modelos OpenRouter (Gemini 2.5 Flash / DeepSeek V3)
+
+   # Configurações de Modelos (Padrão Econômico)
    TEXT_MODEL=deepseek/deepseek-chat
    VISION_MODEL=google/gemini-2.5-flash
    ```
 
-### Executar a aplicação:
-1. Inicie o servidor FastAPI:
-   ```bash
-   python -m uvicorn src.api.server:app --reload
-   ```
-2. Acesse a URL no navegador:
-   👉 **[http://localhost:8000/](http://localhost:8000/)**
-
----
-
-## 🐙 Gerenciamento com Git e GitHub
-
-Como a pasta local ainda não está rastreada por controle de versão, siga as etapas abaixo no terminal do seu computador para inicializar e publicar o repositório no seu GitHub.
-
-### Passo 1: Inicializar o repositório local
-1. Abra o prompt de comando no diretório do projeto:
-   ```powershell
-   cd c:\Users\FGC\Desktop\Capiau-Talho-Kimi_MVP
-   ```
-2. Inicialize o repositório Git:
-   ```bash
-   git init
-   ```
-
-### Passo 2: Commitar as bases de código modulares
-Adicione os arquivos respeitando as regras do `.gitignore` (que ignoram as mídias pesadas e bancos locais para não exceder limites de tamanho de arquivo do GitHub):
+### Executando a Aplicação
+Inicie o servidor de desenvolvimento:
 ```bash
-git add .
-git commit -m "feat: setup do MVP CapIAu-Talho funcional com proxies in-place, ASR, busca semântica em CPU e correções de usabilidade"
+python -m uvicorn src.api.server:app --reload
 ```
-
-### Passo 3: Criar repositório remoto no GitHub e fazer o Push
-1. Acesse o seu [GitHub](https://github.com/) e crie um novo repositório vazio (ex: `Capiau-Talho-Kimi_MVP`). **Não** adicione README, licença ou gitignore automáticos na interface do site.
-2. Copie o endereço HTTPS ou SSH do repositório gerado e rode os comandos abaixo no seu computador:
-   ```bash
-   # Renomear branch padrão para main
-   git branch -M main
-   
-   # Conectar o repositório local com o GitHub remoto
-   git remote add origin https://github.com/SEU_USUARIO/Capiau-Talho-Kimi_MVP.git
-   
-   # Fazer o envio definitivo do código
-   git push -u origin main
-   ```
+Abra no seu navegador de preferência:
+👉 **[http://localhost:8000/](http://localhost:8000/)**
 
 ---
 
-## ☁️ Instruções de Deploy (Vercel & Produção)
+## 📁 Estrutura de Pastas Simplificada
 
-### Cenário 1: Hospedar o Frontend na Vercel (Recomendado para Interface)
-O frontend estático está localizado em `src/ui/`. A Vercel é excelente para servir páginas estáticas de forma gratuita e rápida.
-
-1. Instale a Vercel CLI ou conecte seu repositório do GitHub diretamente no site da [Vercel](https://vercel.com).
-2. Configure a raiz do projeto de deploy direcionado para `src/ui` (ou configure as configurações padrão para servir arquivos HTML estáticos).
-3. **Desvantagem local:** O player Web local precisa acessar as rotas de API `/api/...` que rodam na sua máquina (FastAPI).
-
-### Cenário 2: Servidor Completo (FastAPI + Frontend)
-Hospedar o backend FastAPI na Vercel requer configurar um arquivo `vercel.json` na raiz do repositório para mapear requisições do servidor FastAPI como Serverless Functions.
-
-#### Exemplo de `vercel.json`:
-```json
-{
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/src/api/server.py" },
-    { "source": "/(.*)", "destination": "/src/ui/$1" }
-  ]
-}
-```
-
-> [!CAUTION]
-> **Aviso de Limitações de Cloud (Vercel/Render):**
-> Hospedar a aplicação 100% na nuvem (como na Vercel) para um MVP de vídeo possui **3 restrições técnicas graves**:
-> 1. **Execução do FFmpeg:** Servidores serverless como o Vercel não possuem binários do `ffmpeg` pré-instalados para gerar proxies locais, e as funções expiram em no máximo 10-60 segundos (causando timeout em processamento de vídeo).
-> 2. **Espaço em Disco:** HDs Externos e mídias de 20 horas não podem ser acessados pela Vercel em nuvem (ingestão in-place só funciona localmente na rede física do usuário).
-> 3. **Bancos Embutidos:** SQLite e Qdrant Local File-Based gravam dados em arquivos locais. Em plataformas como a Vercel ou Heroku, o sistema de arquivos é **efêmero** (tudo é apagado a cada novo deploy ou reinício de servidor).
->
-> **Estratégia Recomendada para Produção Remota:**
-> Se desejar acessar o CapIAu-Talho de outros computadores em nuvem, configure:
-> * **Banco de Dados Remoto:** SQLite no Render/Railway com volume persistente (Disk), ou migrar para PostgreSQL na nuvem + Qdrant Cloud (Instância de nuvem gratuita).
-> * **Geração de Proxies no Cliente/Servidor Dedicado:** Um servidor com Docker dedicado que possua FFmpeg instalado em uma máquina com GPU (ex: AWS EC2 ou Railway com volume) para computar os proxies.
+* `/data` - Bancos de dados (`capiau.db`, `qdrant.db`) e caches locais gerados em execução (ignorado no Git).
+* `/docs` - Documentações de arquitetura, manuais e guias de integração.
+* `/src` - Código fonte principal da aplicação.
+  * `/src/api` - Rotas FastAPI e controladores HTTP.
+  * `/src/db` - Schemas e persistência SQLite.
+  * `/src/ingest` - Watcher de mídias e gerador de proxies com FFmpeg.
+  * `/src/search` - Sistema de indexação e buscas no Qdrant local.
+  * `/src/ui` - Painel de controle Web e módulos Javascript (`/ui/js`).
+* `/tests` - Suite de testes automatizados unitários e de integração.
 
 ---
 
-## 🔮 Roadmap: Futuras Fases do Projeto
+## 🐳 Notas sobre Deploy e Nuvem
 
-Após a validação bem-sucedida do MVP com proxies e buscas, as próximas etapas de desenvolvimento do CapIAu-Talho contemplam:
+O CapIAu-Talho foi desenhado especificamente como uma ferramenta **desktop híbrida de uso local**. Devido ao tamanho das mídias originais de vídeo (que permanecem em discos externos) e à necessidade de dependências do sistema como o FFmpeg para proxying, **não recomendamos** o deploy em servidores serverless efêmeros (como Vercel ou Netlify).
 
-1. **Edição Baseada em Texto (Text-Based Video Editing):**
-   * Permitir que o editor monte a timeline apenas selecionando linhas de texto da transcrição. O sistema cortará o vídeo automaticamente nos marcadores de tempo das palavras selecionadas.
-2. **Integração Nativa DaVinci Resolve / Premiere (FCPXML/OTIO completo):**
-   * Aprimorar o exportador para gerar metadados de marcadores coloridos de falas diretamente nos clipes na timeline de edição profissional.
-3. **Subtítulo Inteligente Integrado:**
-   * Geração e gravação física (*burn-in*) ou exportação de arquivos de legenda SRT/VTT a partir dos blocos da diarização gerados pela AssemblyAI.
-4. **Painel de Controle de Custos:**
-   * Gráficos em tempo real do uso do OpenRouter para monitorar o gasto exato em centavos de cada clipe ou frame analisado.
+Se for necessário compartilhar a aplicação em rede ou nuvem privada:
+1. Monte a aplicação em un container **Docker** contendo os binários do FFmpeg.
+2. Utilize volumes persistentes vinculados para manter os arquivos de banco de dados SQLite (`.db`) e o diretório de dados Qdrant.
+
+---
+
+## 📚 Documentações Complementares
+
+Para aprofundar-se em guias de uso específicos e na operação fina do CapIAu-Talho, consulte os seguintes arquivos na pasta `/docs`:
+
+* 📖 **[Manual do Usuário (USER_MANUAL.md)](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/USER_MANUAL.md):** Manual completo de operação das funcionalidades na tela.
+* 🎬 **[Integração e Workflow com Kdenlive (docs/kdenlive_workflow.md)](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/docs/kdenlive_workflow.md):** O fluxo de edição offline/online com o Kdenlive e os planos de automação do formato nativo `.kdenlive` (MLT).
+* 🎹 **[Cheat Sheet de Atalhos de Teclado (docs/shortcuts.md)](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/docs/shortcuts.md):** Lista rápida de atalhos e mapeamento de botões no player e timeline.
+* 💰 **[Guia de Custos & Segurança de APIs (docs/costs_and_security.md)](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/docs/costs_and_security.md):** Melhores práticas para economizar chaves e tokens ao usar AssemblyAI e OpenRouter.
+* 🔌 **[Referência de Endpoints de API (docs/api_endpoints.md)](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/docs/api_endpoints.md):** Lista de endpoints e payloads JSON de controle de faces e visão.
+* 🚀 **[Walkthrough de Desenvolvimento (walkthrough.md)](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/walkthrough.md):** O progresso técnico detalhado das 11 fases concluídas de implementação do MVP.
