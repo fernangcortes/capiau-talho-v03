@@ -346,11 +346,11 @@
                         <h3><i class="fa-solid fa-list-check"></i> Linha do Tempo Editorial (Timeline)</h3>
                         <div class="timeline-actions">
                             <input type="text" id="timeline-name-input" value="Rascunho Making Of #1" placeholder="Nome da Timeline...">
-                            <button id="btn-save-timeline" class="btn-outline"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                            <button id="btn-save-timeline" class="btn-outline" data-tooltip="Salvar a linha do tempo atual no banco de dados local."><i class="fa-solid fa-floppy-disk"></i></button>
                             <!-- Dropdown de IA Persona -->
-                            <div class="dropdown-wrapper" style="background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.3);">
+                            <div class="dropdown-wrapper" style="background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.3);" data-tooltip="Selecione um assistente de IA especialista (Montador, Diretor, etc.) para contextualizar as ações e sugestões na timeline.">
                                 <i class="fa-solid fa-robot" style="color: #c084fc;"></i>
-                                <select id="select-ai-persona" style="color: #c084fc;">
+                                <select id="select-ai-persona" style="color: #c084fc; background: transparent; border: none; outline: none; cursor: pointer;">
                                     <option value="none">IA Persona...</option>
                                     <option value="montadora">IA Montadora</option>
                                     <option value="diretora">IA Diretora</option>
@@ -358,18 +358,18 @@
                                     <option value="colorista">IA Colorista & FX</option>
                                 </select>
                             </div>
-                            <div class="dropdown-wrapper">
+                            <div class="dropdown-wrapper" data-tooltip="Escolha o formato de saída para exportação (XML do Premiere/Resolve, OpenTimelineIO ou EDL clássico).">
                                 <i class="fa-solid fa-file-export"></i>
-                                <select id="select-export-format">
+                                <select id="select-export-format" style="background: transparent; border: none; outline: none; cursor: pointer;">
                                     <option value="xml">Premiere / Resolve XML</option>
                                     <option value="otio">OpenTimelineIO (.otio)</option>
                                     <option value="edl">EDL (CMX 3600)</option>
                                 </select>
                             </div>
-                            <button id="btn-export-timeline" class="btn-primary">Exportar</button>
-                            <button id="btn-timeline-help" class="btn-outline" title="Atalhos e Ajuda" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0;"><i class="fa-solid fa-keyboard"></i></button>
-                            <button id="btn-popout-timeline" class="btn-outline" title="Destacar Timeline" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0;"><i class="fa-solid fa-up-right-from-square"></i></button>
-                            <button class="btn-toggle-sidebar" id="toggle-timeline" title="Recolher Linha do Tempo">
+                            <button id="btn-export-timeline" class="btn-primary" data-tooltip="Exportar sequência de cortes da timeline para o formato selecionado."><i class="fa-solid fa-file-export"></i></button>
+                            <button id="btn-timeline-help" class="btn-outline" data-tooltip="Guia rápido e cheat sheet de atalhos de teclado da Timeline Canvas."><i class="fa-solid fa-keyboard"></i></button>
+                            <button id="btn-popout-timeline" class="btn-outline" data-tooltip="Destacar a linha do tempo e colocá-la em uma janela flutuante independente."><i class="fa-solid fa-up-right-from-square"></i></button>
+                            <button class="btn-toggle-sidebar" id="toggle-timeline" data-tooltip="Recolher e ocultar a linha do tempo.">
                                 <i class="fa-solid fa-chevron-down"></i>
                             </button>
                         </div>
@@ -405,9 +405,9 @@
                 </section>
                 
                 <!-- Botão flutuante para reabrir Timeline -->
-                <button class="btn-reopen-sidebar bottom" id="reopen-timeline" title="Abrir Linha do Tempo">
-                    <i class="fa-solid fa-list-check"></i> Linha do Tempo
-                </button>
+                <div id="reopen-timeline" class="timeline-restore-btn" data-tooltip="Expandir Linha do Tempo">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </div>
             </main>
 
             <!-- ── RIGHT SIDEBAR (COLLAPSIBLE - TRANSCRIPTION / DIALOGUES) ──── -->

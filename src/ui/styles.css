@@ -897,7 +897,7 @@ button {
     display: flex;
     flex-direction: column;
     height: 290px;
-    border-radius: 12px;
+    border-radius: 8px;
     transition: var(--transition-smooth);
     overflow: hidden;
 }
@@ -915,34 +915,104 @@ button {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 20px;
+    padding: 6px 12px;
     border-bottom: 1px solid var(--border-glass);
 }
 
 .panel-header h3 {
     font-family: var(--font-heading);
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .timeline-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
 }
 
 .timeline-actions input {
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid var(--border-glass);
     color: var(--text-primary);
-    padding: 6px 12px;
+    padding: 0 8px;
+    height: 30px;
+    border-radius: 6px;
+    font-size: 11px;
+    outline: none;
+    width: 140px;
+}
+
+.timeline-actions button {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 6px;
     font-size: 12px;
-    outline: none;
-    width: 200px;
+}
+
+.timeline-actions .dropdown-wrapper {
+    height: 30px;
+    padding: 0 8px;
+    border-radius: 6px;
+    gap: 4px;
+}
+
+.timeline-actions .dropdown-wrapper select {
+    font-size: 11px;
+    padding: 2px 0;
+    max-width: 120px;
+}
+
+/* ── TIMELINE RESTORE TRIGGER BUTTON ─────────────────────────────────── */
+.timeline-restore-btn {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 14px;
+    background: rgba(138, 92, 246, 0.15);
+    border: 1px solid rgba(138, 92, 246, 0.3);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: background 0.2s, height 0.2s, opacity 0.2s;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.timeline-restore-btn i {
+    font-size: 8px;
+    color: var(--color-violet);
+    transition: transform 0.2s;
+}
+
+.timeline-restore-btn:hover {
+    background: var(--color-violet);
+    height: 18px;
+}
+
+.timeline-restore-btn:hover i {
+    color: #fff;
+    transform: scale(1.2);
+}
+
+.timeline-restore-btn.visible {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .timeline-track-area {
