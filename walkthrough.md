@@ -509,4 +509,33 @@ Visando a produtividade do editor em múltiplos monitores, implementamos um moto
    - Comunicação via **`BroadcastChannel`** e escuta de eventos globais para coordenar mudanças de estado entre a janela principal e as janelas secundárias abertas.
    - Encaminhamento automático de comandos de teclado de qualquer pop-out ativo (como pressionar barra de espaço para dar play no monitor de origem) para o player centralizado na tela mãe, gerando um controle unificado do setup.
 
+---
+
+## 🎨 Fase 12: Minimalismo no Cabeçalho, Timeline Compacta e Restauradores Laterais (03/07/2026)
+
+Implementamos uma grande re-estilização e otimização ergonômica para maximizar a área útil de tela e refinar a interação com painéis colapsáveis:
+
+1. **Cabeçalho Widescreen Ultra-Compacto e Ações Rápidas:**
+   - Reduzida a altura do cabeçalho de `70px` para `46px` e os containers internos de `42px` para `30px`.
+   - Simplificação do logotipo: remoção do subtítulo `"Making Of Editor"` e redução do nome `"CapIAu-Talho"`.
+   - Botões da barra de ações limpos de texto, adotando exclusivamente line-icons e tooltips explicativos customizados em CSS (`data-tooltip`) com estética de vidro desfocado (`backdrop-filter`).
+   - Adicionada a rota `POST /api/project/{project_id}/scan-watch` no backend e vinculada a ações assíncronas de varredura.
+
+2. **Cabeçalho Retrátil com Gatilho Minimalista:**
+   - Criação da transição para a classe `.header-collapsed` que desliza o cabeçalho para cima com curva suave, redimensionando a área de trabalho (`.workspace`) para ocupar toda a altura da tela.
+   - Posicionamento de um gatilho de restauração ultra-discreto no topo central (`#header-restore-trigger`) contendo uma setinha muito pequena.
+
+3. **Timeline Minimalista sem Título e Botões Compactos:**
+   - Remoção do texto redundante `"Linha do Tempo Editorial (Timeline)"` do painel superior, restando apenas o ícone.
+   - Conversão dos botões de Salvar e Exportar da timeline em line-icons compactos com tooltips.
+   - Substituição do antigo botão flutuante de restauração de timeline por uma setinha flutuante ultra-pequena (`.timeline-restore-btn`) centralizada na base inferior da tela.
+
+4. **Abas Restauradoras Laterais com Setas Chevron:**
+   - Os antigos botões redondos de abrir sidebars foram redesenhados como abas indicadoras minimalistas (`14px` x `32px`) coladas no centro-esquerdo e centro-direito da tela, mostrando apenas pequenas setas chevrons (`fa-chevron-right` e `fa-chevron-left`).
+   - Efeito de hover interativo suave que expande a largura da aba de `14px` para `18px`, mantendo o alinhamento vertical absoluto centralizado sem saltos ou tremores.
+
+5. **Correção de Escala Dinâmica via ResizeObserver:**
+   - Integração da API nativa `ResizeObserver` para monitorar a largura e altura física do contêiner pai da timeline. 
+   - Ao expandir ou fechar as barras laterais, a timeline recalcula a sua dimensão lógica instantaneamente e redesenha a régua e clipes (exibindo mais ou menos tempo na tela), eliminando por completo o borramento por estiramento visual e resolvendo o erro de deslocamento/offset nos cliques do playhead (agulha).
+
 
