@@ -1,6 +1,6 @@
 # Manual do Usuário — CapIAu-Talho Making Of Editor
 
-Bem-vindo ao **CapIAu-Talho Making Of Editor**! Este guia prático descreve o passo a passo de como importar suas mídias, transcrever depoimentos, mapear imagens semanticamente e realizar a pré-edição do seu documentário de 20 horas de forma profissional.
+Bem-vindo ao **CapIAu-Talho Making Of Editor**! Este guia prático descreve o passo a passo de como importar suas mídias, transcrever depoimentos, mapear imagens semanticamente, interagir com o agente de edição e realizar a pré-edição do seu documentário de forma profissional.
 
 ---
 
@@ -58,37 +58,20 @@ O Qdrant embutido na sua CPU fará uma busca vetorial instantânea e retornará 
 
 ---
 
-## ⌨️ 3. Atalhos do Player Profissional (Teclado)
+## 🤖 3. Assistente Conversacional de Edição (Chat-Agente) & Ghost Clips
 
-Para editar em velocidade profissional de ilha de corte, use os atalhos de teclado idênticos ao Premiere/Resolve (certifique-se de que a caixa de pesquisa do topo não esteja selecionada):
+O painel de Chat agora funciona como um **Agente Editor Ativo** que pode realizar modificações físicas na sua timeline a partir de ordens textuais simples (ex: *"insira o clipe 2 na pista V1"*, *"aplique um fade de 1s no primeiro clipe"*, *"cubra o depoimento do diretor com B-rolls do set"*).
 
-### Atalhos de Reprodução JKL:
-* **Tecla `K` / `Espaço`:** Pausar ou Reproduzir o vídeo.
-* **Tecla `L`:** Avança o vídeo. Aperte **L** repetidamente para acelerar a reprodução (**1.5x, 2x, 4x, 8x**).
-* **Tecla `J`:** Retrocede o vídeo de forma reversa rápida. Aperte **J** repetidamente para acelerar o retrocesso (**-1x, -2x, -4x, -8x**).
-
-### Atalhos de Corte (In/Out):
-* **Tecla `I`:** Marca o ponto de **IN** (tempo inicial do corte). Um marcador azul aparecerá na barra de progresso.
-* **Tecla `O`:** Marca o ponto de **OUT** (tempo final do corte). Um marcador vermelho aparecerá na barra de progresso.
-* **Tecla `E` (ou botão "Cortar & Inserir"):** Recorta o trecho selecionado (entre os pontos IN e OUT) e o insere de forma automática na trilha correspondente na timeline inferior!
-
-### Controles de Tela e Resolução:
-* **Seletor de Resolução:** Altere no player para **360p Proxy** se notar lentidão no carregamento, ou **720p Proxy** para melhor visualização.
-* **Menus Retráteis:** Clique nos botões de setas nos cantos de cada painel para fechar as barras laterais esquerda e direita. O player de vídeo central se expandirá de forma responsiva na tela de acordo com o espaço liberado. Para reabrir, clique nos botões circulares flutuantes correspondentes!
+* **Modo Direto vs. Modo Rascunho (Ghost Clips):**
+  * Edições pontuais e não-destrutivas (como inserir ou ajustar um único clipe) são aplicadas **diretamente na timeline** (e podem ser desfeitas com `Ctrl+Z`).
+  * Edições em massa ou destrutivas (como substituições amplas ou rough cuts automáticos) são exibidas na timeline como **clipes fantasmas (ghost clips)** hachurados em verde (para inserções/substituições) ou vermelho (para remoções).
+* **Ações sobre Ghost Clips:**
+  * Para **aceitar** uma sugestão e torná-la definitiva: selecione o clipe fantasma na timeline e pressione **`Enter`** (ou a tecla **`Y`**, ou clique no botão `✓` do popup correspondente).
+  * Para **rejeitar** e descartar a sugestão: selecione o clipe fantasma e pressione **`Delete`** (ou **`Backspace`**, ou clique no botão `✗` do popup correspondente).
 
 ---
 
-## 🎬 4. Salvando e Exportando sua Timeline
-
-1. À medida que insere clipes na timeline (Trilha V1 para falas/entrevistas e V2 para B-rolls), eles aparecerão no painel inferior.
-2. Dê um nome para a sua sequência no campo de texto (ex: *Rascunho Sequência 1*).
-3. Clique em **`Salvar`** para gravar a timeline no SQLite local.
-4. Escolha o formato de saída no seletor (ex: **`Premiere / Resolve XML`** para importar direto no Premiere/Resolve/FCP, ou **`OpenTimelineIO (.otio)`**).
-5. Clique em **`Exportar`**. O arquivo será gerado instantaneamente no disco e o download iniciará no seu navegador!
-
----
-
-## 👁️ 5. Mapeamento de Rostos, Objetos e Desambiguação Rápida
+## 👥 4. Mapeamento de Rostos, Objetos e Desambiguação Rápida
 
 O CapIAu-Talho conta com uma interface completa de decupagem visual para gerenciar as marcações de pessoas e elementos do set de filmagem.
 
@@ -103,14 +86,45 @@ O CapIAu-Talho conta com uma interface completa de decupagem visual para gerenci
 ### B. Desambiguação Rápida em Tela Cheia
 Na aba **Grupos de Rostos**, clique em **`Desambiguação Rápida`** para abrir o gerenciador em tela cheia. Aqui, você verá todas as detecções ainda sem nome ou não validadas do seu projeto:
 
-* **Preview de Contexto Instantâneo (Hover):** Algumas miniaturas podem estar desfocadas ou muito aproximadas. Para ver o contexto original completo, basta **deixar o mouse posicionado em cima do card**. O sistema carregará instantaneamente um popover flutuante com a foto original completa ou um trecho de vídeo de 5 segundos rodando em loop ao redor daquele frame. Os previews utilizam arquivos proxies locais otimizados para garantir rapidez.
+* **Preview de Contexto Instantâneo (Hover):** Algumas miniaturas podem estar desfocadas ou muito aproximadas. Para ver o contexto original completo, basta **deixar o mouse posicionado em cima do card**. O sistema carregará instantaneamente um popover flutuante com a foto original completa ou um trecho de vídeo de 5 segundos rodando em loop ao redor daquele frame.
 * **Marcar como Objeto ou Rejeitar (Não Relevante):** 
   * Clique no ícone de banir (vermelho) no canto do card.
-  * Um prompt perguntará se o elemento é um objeto relevante do cenário. 
-  * Se for (ex: `Câmera`), digite o nome do objeto. Ele será catalogado e integrado nas buscas semânticas da biblioteca, sem poluir o agrupamento de rostos de pessoas.
-  * Se for apenas ruído visual, deixe em branco e confirme. O elemento será rotulado como `Não Relevante` e ignorado pelas descrições do RAG.
+  * Um prompt perguntará se o elemento é um objeto relevante do cenário. Se for (ex: `Câmera`), digite o nome do objeto. Se for apenas ruído visual, deixe em branco e confirme. O elemento será rotulado como `Não Relevante` e ignorado pelas descrições do RAG.
 * **Seleção em Massa (Bulk Actions):** 
-  * Você pode clicar em múltiplos cards para selecioná-los.
-  * Uma barra inferior de ações surgirá. 
-  * Digite um nome e clique em **Aplicar** para nomear todos ao mesmo tempo. Caso haja um conflito de grupos (se o nome já pertencer a outro grupo), o sistema mesclará automaticamente os grupos em background.
-  * Clique em **Descartar** para rejeitar todas as marcações selecionadas de uma vez, com a opção de catalogá-las conjuntamente como um mesmo objeto (ex: `Cadeira`).
+  * Selecione múltiplos cards clicando neles.
+  * Na barra de ações inferior, digite um nome e clique em **Aplicar** para nomear todos ao mesmo tempo. Se o nome já pertencer a outro grupo, o sistema mesclará os grupos em background.
+  * Clique em **Descartar** para rejeitar todas as marcações selecionadas de uma vez.
+
+---
+
+## 🎛️ 5. Pistas de Áudio Reais e J/L-Cuts Nativos
+
+O CapIAu-Talho suporta trilhas de áudio independentes (`A1`, `A2`...) vinculadas aos clipes de vídeo (`V1`, `V2`...).
+
+* **Vínculo de Clipes (Link A/V):** Por padrão, os clipes de vídeo e seus respectivos áudios são importados de forma acoplada (`link_id`). Ao arrastar o vídeo na timeline, o áudio correspondente o acompanha de forma sincronizada.
+* **Edição de J-Cuts e L-Cuts (Trims Independentes):**
+  * Para desvincular o par de áudio e vídeo e fazer edições independentes (por exemplo, estender o áudio de uma fala sobre a cena do B-roll seguinte, ou fazer o áudio do B-roll entrar 1s antes do corte do vídeo), selecione o clipe e pressione a tecla **`U`** (Desvincular).
+  * Após desvincular, você pode mover ou ajustar as bordas (*trim*) de cada faixa de forma independente na timeline.
+  * O player do programa interpretará a sobreposição, reproduzindo o vídeo de uma faixa e o áudio da outra simultaneamente em tempo real.
+
+---
+
+## 🔄 6. Carrossel de Alternativas da IA (Atalho `A`)
+
+Sempre que a IA propuser e inserir um vídeo na timeline, ela indexará trechos alternativos parecidos do acervo. Isso permite que você substitua clipes de forma extremamente dinâmica:
+
+1. **Selecionar e Abrir:** Clique em qualquer clipe gerado pela IA (identificado com borda diferenciada) na timeline para selecioná-lo e pressione a tecla **`A`** no teclado.
+2. **Modal com Vídeo Previews:** Um modal com fundo desfocado surgirá no centro da tela, exibindo um card para cada clipe alternativo. Cada card mostra o vídeo correspondente rodando automaticamente em loop silencioso de 5 segundos daquele trecho exato da recomendação.
+3. **Mecanismo de Substituição (Swap):** Abaixo da justificativa de uso do clipe, você encontrará dois ícones de linha para substituição:
+   * **`↔` Slot Fixo:** Substitui a mídia atual pelo candidato selecionado, ajustando os pontos de entrada e saída para caber exatamente na mesma duração da timeline.
+   * **`↠` Ripple:** Substitui o clipe aplicando a duração ideal recomendada do candidato e empurra (ou puxa) automaticamente todos os clipes subsequentes da mesma trilha.
+4. **Desfazer:** Todas as trocas são salvas no histórico local e podem ser revertidas com `Ctrl+Z`.
+
+---
+
+## 🎬 7. Salvando e Exportando sua Timeline
+
+1. À medida que edita, dê um nome para a sua sequência no campo de texto (ex: *Montagem Inicial*).
+2. Clique em **`Salvar`** para gravar a timeline no SQLite.
+3. Escolha o formato de saída no seletor (XML para Premiere/Resolve/FCP, OpenTimelineIO `.otio` ou EDL).
+4. Clique em **`Exportar`**. O download iniciará no seu navegador e o arquivo estará pronto para ser importado no seu editor NLE profissional.

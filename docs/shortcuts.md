@@ -31,6 +31,24 @@ Os atalhos abaixo controlam o player de origem (*Source*) ou o player de timelin
 
 ---
 
+## 🔄 Edição e Controle de Alternativas (IA) & Histórico
+
+Os comandos abaixo ficam disponíveis ao interagir com a linha do tempo ou com clipes propostos pelo agente de IA.
+
+| Tecla | Ação | Descrição |
+| :---: | :--- | :--- |
+| **`A`** | **Abrir/Fechar Alternativas** | Abre o modal de alternativas da IA para o clipe de IA selecionado, ou o fecha caso esteja aberto. |
+| **`Esc (Escape)`** | **Fechar Alternativas** | Fecha o modal de alternativas da IA caso esteja aberto. |
+| **`Delete` / `Backspace`** | **Deletar Clipe / Rejeitar Ghost** | Apaga o clipe selecionado na timeline (e seu par de áudio vinculado). Se for um clipe fantasma (*ghost clip*), rejeita a sugestão. |
+| **`Enter` / `Y`** | **Aceitar Sugestão da IA** | Aceita e consolida o clipe fantasma (*ghost clip*) selecionado na timeline. |
+| **`U`** | **Desvincular Par A/V** | Desvincula o clipe de vídeo selecionado de seu respectivo par de áudio para trims independentes (J/L-cuts). |
+| **`Setas (← / →)`** | **Deslocar Clipe (Nudge)** | Desloca o clipe selecionado exatamente 1 frame para a esquerda ou direita na timeline. |
+| **`[` / `]`** | **Ajustar Bordas (Nudge Trim)** | Ajusta a borda esquerda para trás (`[`) ou a borda direita para a frente (`]`) em 1 frame. |
+| **`Ctrl + Z`** | **Desfazer** | Desfaz o último passo de edição na timeline. |
+| **`Ctrl + Y` ou `Ctrl+Shift+Z`** | **Refazer** | Refaz o passo de edição desfeito. |
+
+---
+
 ## 📸 Navegação no Visualizador de Fotos (Lightbox)
 
 Quando o modal visualizador de fotos de set estiver aberto, os seguintes atalhos estarão ativos:
@@ -44,5 +62,6 @@ Quando o modal visualizador de fotos de set estiver aberto, os seguintes atalhos
 ---
 
 ## 🛡️ Prevenção Automática de Conflitos de Digitação
+
 * O sistema detecta de forma inteligente se o cursor do usuário está focado em qualquer elemento de formulário (campos de busca, inputs do chatbot, caixas de diálogo para nomear rostos, ou seletores de projetos).
 * **Os atalhos de controle de vídeo e timeline são temporariamente suspensos** nesse estado para permitir uma digitação fluida de textos e evitar que comandos acidentais ativem os players.
