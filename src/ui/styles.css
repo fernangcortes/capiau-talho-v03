@@ -2001,6 +2001,16 @@ mark.search-highlight {
 }
 
 /* Estilos da Galeria de Rostos */
+.face-clusters-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.wide-layout .face-clusters-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
 .face-cluster-card {
     display: flex;
     align-items: center;

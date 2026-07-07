@@ -50,6 +50,29 @@ export class FaceManager {
             btnGroupBulkReject.addEventListener("click", () => this.rejectSelectedFaces(this.activeGroupCluster));
         }
 
+        // --- Reassign Modal Bindings ---
+        const btnCloseReassign = document.getElementById("btn-close-reassign");
+        if (btnCloseReassign) {
+            btnCloseReassign.addEventListener("click", () => this.closeReassignModal());
+        }
+        const btnReassignCancel = document.getElementById("btn-reassign-cancel");
+        if (btnReassignCancel) {
+            btnReassignCancel.addEventListener("click", () => this.closeReassignModal());
+        }
+        const selectReassign = document.getElementById("reassign-name-select");
+        const inputReassign = document.getElementById("reassign-name-input");
+        if (selectReassign && inputReassign) {
+            selectReassign.addEventListener("change", () => {
+                if (selectReassign.value) {
+                    inputReassign.value = selectReassign.value;
+                }
+            });
+        }
+        const btnReassignConfirm = document.getElementById("btn-reassign-confirm");
+        if (btnReassignConfirm) {
+            btnReassignConfirm.addEventListener("click", () => this.confirmReassignFaces());
+        }
+
         // Listen for project change to load face clusters
         STATE.on("projectChanged", () => {
             this.loadFaceClusters();
@@ -828,7 +851,7 @@ export class FaceManager {
         this.activeGroupCluster = cluster;
         
         try {
-            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id);
+            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id, cluster.name || "");
             this.renderGroupManagerFaces(faces, cluster);
         } catch (e) {
             console.error("Erro ao carregar faces do grupo:", e);
@@ -840,6 +863,7 @@ export class FaceManager {
         const modal = document.getElementById("face-group-manager-modal");
         if (modal) modal.style.display = "none";
         this.activeGroupCluster = null;
+        this.closeReassignModal();
     }
 
     static renderGroupManagerFaces(faces, cluster) {
@@ -919,6 +943,8 @@ export class FaceManager {
             }
         } else {
             bar.style.display = "none";
+            const panel = document.getElementById("group-manager-reassign-panel");
+            if (panel) panel.style.display = "none";
         }
     }
 
@@ -928,7 +954,7 @@ export class FaceManager {
         if (!confirm(msg)) return;
         
         try {
-            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id);
+            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id, cluster.name || "");
             const faceIds = faces.map(f => f.id);
             
             if (faceIds.length === 0) {
@@ -961,7 +987,7 @@ export class FaceManager {
             await CapIAuAPI.dissociateFaces(STATE.currentProjectId, faceIds);
             
             // Recarregar os rostos no modal
-            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id);
+            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id, cluster.name || "");
             this.renderGroupManagerFaces(faces, cluster);
             this.updateGroupManagerBulkBar();
             
@@ -991,33 +1017,84 @@ export class FaceManager {
         const selected = document.querySelectorAll(".group-manager-face-card.selected");
         const faceIds = Array.from(selected).map(card => parseInt(card.dataset.faceId));
         if (faceIds.length === 0) return;
-        
-        const newName = prompt("Digite o nome da pessoa/objeto para o qual deseja reatribuir os rostos selecionados:");
-        if (newName === null) return;
-        const trimmed = newName.trim();
-        if (!trimmed) {
+
+        this.reassignCluster = cluster;
+        this.reassignFaceIds = faceIds;
+
+        const panel = document.getElementById("group-manager-reassign-panel");
+        const selectEl = document.getElementById("reassign-name-select");
+        const inputEl = document.getElementById("reassign-name-input");
+
+        if (!panel) return;
+
+        // Fetch existing speakers to populate the select dropdown
+        try {
+            const speakers = await CapIAuAPI.fetchProjectSpeakers(STATE.currentProjectId).catch(() => []);
+            const cleanSpeakers = Array.from(new Set(speakers))
+                .filter(s => s && !s.startsWith("Pessoa Desconhecida") && !s.startsWith("SPEAKER_"))
+                .sort();
+
+            selectEl.innerHTML = '<option value="" style="background: #111; color: var(--text-secondary);">Selecione existente...</option>';
+            cleanSpeakers.forEach(sp => {
+                const opt = document.createElement("option");
+                opt.value = sp;
+                opt.textContent = sp;
+                opt.style.background = "#111";
+                opt.style.color = "var(--text-primary)";
+                selectEl.appendChild(opt);
+            });
+        } catch (e) {
+            console.error("Erro ao carregar speakers para reatribuição:", e);
+        }
+
+        inputEl.value = "";
+        panel.style.display = "flex";
+    }
+
+    static closeReassignModal() {
+        const panel = document.getElementById("group-manager-reassign-panel");
+        if (panel) panel.style.display = "none";
+        const selectEl = document.getElementById("reassign-name-select");
+        const inputEl = document.getElementById("reassign-name-input");
+        if (selectEl) selectEl.value = "";
+        if (inputEl) inputEl.value = "";
+        this.reassignCluster = null;
+        this.reassignFaceIds = null;
+    }
+
+    static async confirmReassignFaces() {
+        const cluster = this.reassignCluster;
+        const faceIds = this.reassignFaceIds;
+        if (!cluster || !faceIds || faceIds.length === 0) return;
+
+        const inputEl = document.getElementById("reassign-name-input");
+        if (!inputEl) return;
+        const newName = inputEl.value.trim();
+        if (!newName) {
             alert("Nome inválido.");
             return;
         }
-        
+
         try {
-            await CapIAuAPI.reassignFaces(STATE.currentProjectId, faceIds, -1, trimmed);
-            
+            await CapIAuAPI.reassignFaces(STATE.currentProjectId, faceIds, -1, newName);
+
+            this.closeReassignModal();
+
             // Recarregar os rostos no modal
-            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id);
+            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id, cluster.name || "");
             this.renderGroupManagerFaces(faces, cluster);
             this.updateGroupManagerBulkBar();
-            
+
             // Recarregar a barra lateral de grupos
             await this.loadFaceClusters();
-            
+
             const countVal = document.getElementById("group-manager-count-val");
             if (countVal) countVal.textContent = faces.length;
-            
+
             if (faces.length === 0) {
                 this.closeGroupManagerModal();
             }
-            
+
             if (STATE.activeVideo) {
                 STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
             }
@@ -1043,7 +1120,7 @@ export class FaceManager {
             }
             
             // Recarregar os rostos no modal
-            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id);
+            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id, cluster.name || "");
             this.renderGroupManagerFaces(faces, cluster);
             this.updateGroupManagerBulkBar();
             

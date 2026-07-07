@@ -281,8 +281,12 @@ export class CapIAuAPI {
         });
     }
 
-    static fetchClusterFaces(projectId, clusterId) {
-        return this.request(`/api/faces/project/${projectId}/face-clusters/${clusterId}/faces`);
+    static fetchClusterFaces(projectId, clusterId, name = null) {
+        let url = `/api/faces/project/${projectId}/face-clusters/${clusterId}/faces`;
+        if (name !== null && name !== undefined) {
+            url += `?name=${encodeURIComponent(name)}`;
+        }
+        return this.request(url);
     }
 
     static fetchUnlabeledFaces(projectId) {

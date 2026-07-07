@@ -743,21 +743,45 @@ async def list_unlabeled_faces(project_id: int):
 
 
 @router.get("/project/{project_id}/face-clusters/{cluster_id}/faces")
-async def list_cluster_faces(project_id: int, cluster_id: int):
+async def list_cluster_faces(project_id: int, cluster_id: int, name: Optional[str] = None):
     """Retorna todas as faces individuais de um cluster com paths de midias para preview."""
     try:
         with get_db() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT f.id, f.bounding_box, f.photo_id, f.video_id, f.timestamp, f.name, f.cluster_id,
-                       p.filename as photo_filename, p.filepath as photo_filepath,
-                       v.filename as video_filename, v.filepath as video_filepath
-                FROM face f
-                LEFT JOIN photo p ON f.photo_id = p.id
-                LEFT JOIN video v ON f.video_id = v.id
-                WHERE f.project_id = ? AND f.cluster_id = ?
-                ORDER BY f.id DESC
-            """, (project_id, cluster_id))
+            if name is not None:
+                if name == "":
+                    cursor.execute("""
+                        SELECT f.id, f.bounding_box, f.photo_id, f.video_id, f.timestamp, f.name, f.cluster_id,
+                               p.filename as photo_filename, p.filepath as photo_filepath,
+                               v.filename as video_filename, v.filepath as video_filepath
+                        FROM face f
+                        LEFT JOIN photo p ON f.photo_id = p.id
+                        LEFT JOIN video v ON f.video_id = v.id
+                        WHERE f.project_id = ? AND f.cluster_id = ? AND f.name IS NULL
+                        ORDER BY f.id DESC
+                    """, (project_id, cluster_id))
+                else:
+                    cursor.execute("""
+                        SELECT f.id, f.bounding_box, f.photo_id, f.video_id, f.timestamp, f.name, f.cluster_id,
+                               p.filename as photo_filename, p.filepath as photo_filepath,
+                               v.filename as video_filename, v.filepath as video_filepath
+                        FROM face f
+                        LEFT JOIN photo p ON f.photo_id = p.id
+                        LEFT JOIN video v ON f.video_id = v.id
+                        WHERE f.project_id = ? AND f.cluster_id = ? AND f.name = ?
+                        ORDER BY f.id DESC
+                    """, (project_id, cluster_id, name))
+            else:
+                cursor.execute("""
+                    SELECT f.id, f.bounding_box, f.photo_id, f.video_id, f.timestamp, f.name, f.cluster_id,
+                           p.filename as photo_filename, p.filepath as photo_filepath,
+                           v.filename as video_filename, v.filepath as video_filepath
+                    FROM face f
+                    LEFT JOIN photo p ON f.photo_id = p.id
+                    LEFT JOIN video v ON f.video_id = v.id
+                    WHERE f.project_id = ? AND f.cluster_id = ?
+                    ORDER BY f.id DESC
+                """, (project_id, cluster_id))
             rows = cursor.fetchall()
             
             res = []

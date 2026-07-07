@@ -166,3 +166,13 @@
   - [x] Desenvolver controle recursivo de expansão/recolhimento das subpastas por nó (`expandCollapseAllSubfolders`) com botões dedicados de ação no hover.
   - [x] Criar botões globais na barra de ferramentas da biblioteca (`globalExpandCollapseAll`) para expandir/recolher todas as subpastas simultaneamente.
   - [x] Integrar a ordenação e filtros no fluxo de renderização com suporte a fotos e polling dinâmico de conversões.
+
+- [x] **Task 9: Restruturação da Aba Rostos (Faces)**
+  - [x] Implementar classe `.face-clusters-grid` em CSS no `styles.css`
+  - [x] Remover estilo flex inline de `#face-clusters-list` em `index.html` e usar a nova classe
+  - [x] Adicionar modal `#face-reassign-modal` em `index.html`
+  - [x] Atualizar endpoint `list_cluster_faces` no backend em `faces.py` para suportar filtro de nome opcional (incluindo `f.name IS NULL` para `""`)
+  - [x] Atualizar função `fetchClusterFaces` na classe `CapIAuAPI` em `api.js` para enviar o nome como parâmetro query string
+  - [x] Atualizar métodos UI (`openGroupManagerModal`, `dissolveGroup`, `dissociateSelectedFaces`, `reassignSelectedFaces`, `rejectSelectedFaces`) em `faces.js` para passar `cluster.name || ""` ao buscar os rostos
+  - [x] Mapear eventos e lógica do modal de reatribuição (`face-reassign-modal`) em `faces.js`
+  - [x] Testar e validar visualmente todas as melhorias e correções

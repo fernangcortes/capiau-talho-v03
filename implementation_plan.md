@@ -234,3 +234,56 @@ Adicionaremos funções CRUD específicas para projetos:
 5. Fazer uma busca semântica em um projeto e verificar que mídias do outro projeto não são retornadas.
 6. Clicar em deletar projeto e atestar que a remoção em cascata limpou os registros no SQLite.
 
+---
+
+## 8. Restruturação da Aba Rostos (Faces)
+
+A reestruturação da aba de rostos visa melhorar a usabilidade na desambiguação rápida e no gerenciamento de clusters de rostos, resolvendo bugs de visualização e interatividade.
+
+### 8.1 Requisitos e Alterações Propostas
+
+#### 1. Exibição Responsiva em Grid da Lista de Grupos
+- **Problema:** Ao maximizar a barra lateral esquerda (ou ao destacá-la em janela flutuante ampla), os cards de grupos de rostos (que usavam layout flex vertical) se esticavam horizontalmente por toda a largura, sem aproveitar o espaço para exibir mais resultados lado a lado.
+- **Solução:**
+  - Remover o estilo inline `display:flex; flex-direction:column;` do elemento `#face-clusters-list` em [index.html](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/src/ui/index.html) e associá-lo a uma nova classe CSS `.face-clusters-grid`.
+  - Em [styles.css](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/src/ui/styles.css), configurar a classe `.face-clusters-grid` para usar `display: grid; grid-template-columns: 1fr; gap: 10px;`.
+  - Sob o modificador `.wide-layout` (quando o container possuir largura >= 550px), alterar as colunas para `grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));`. Isso fará com que novos cards apareçam lado a lado de acordo com o redimensionamento.
+
+#### 2. Correção Visual do Desaparecimento dos Cards no Gerenciador de Grupos
+- **Problema:** Ao selecionar rostos e clicar em "Desassociar Selecionados", "Reatribuir Nome" ou "Descartar", o banco atualizava os registros (com logs válidos no CMD), mas os cards continuavam renderizados no modal de gerenciamento.
+- **Causa:** O endpoint `GET /api/faces/project/{project_id}/face-clusters/{cluster_id}/faces` retornava *todas* as faces de um determinado `cluster_id` de forma incondicional. Ao dissociar ou reatribuir, a face mantinha seu `cluster_id` original (embora seu nome de exibição mudasse), fazendo com que o modal recarregasse a face modificada de forma indesejada.
+- **Solução:**
+  - **Backend:** Em [faces.py](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/src/api/routes/faces.py), alterar a rota `/project/{project_id}/face-clusters/{cluster_id}/faces` para aceitar um parâmetro opcional query `name: Optional[str] = None`.
+    - Se `name` for enviado (por exemplo, "João"), filtrar a query SQL para buscar apenas faces que tenham `f.name = ?`.
+    - Se `name` for vazio/string em branco (`""`), buscar faces com `f.name IS NULL`.
+    - Se `name` for `None` (não fornecido), manter o comportamento anterior e retornar todas as faces do cluster.
+  - **API JS:** Em [api.js](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/src/ui/js/api.js), estender `fetchClusterFaces(projectId, clusterId, name = null)` para incluir o parâmetro de nome como query string na URL caso ele esteja preenchido.
+  - **JavaScript UI:** Em [faces.js](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/src/ui/js/faces.js), em todas as chamadas a `fetchClusterFaces` no modal de gerenciar rostos (recarregar após desassociar, reatribuir, descartar ou na abertura inicial), passar `cluster.name || ""` como parâmetro de filtro. Dessa forma, as faces cujo nome foi alterado sumirão imediatamente do grid do modal.
+
+#### 3. Modal de Escolha para "Reatribuir Nome" com Nomes Existentes
+- **Problema:** O botão "Reatribuir Nome" usava um simples comando browser `prompt()`, o que impossibilitava a seleção de pessoas já cadastradas na biblioteca.
+- **Solução:**
+  - **HTML:** Adicionar o modal `#face-reassign-modal` em [index.html](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/src/ui/index.html) logo abaixo do modal de desambiguação. O modal conterá:
+    - Um campo `<select id="reassign-name-select">` para escolher pessoas existentes.
+    - Um campo `<input type="text" id="reassign-name-input">` para digitar um novo nome.
+    - Botões de Confirmar e Cancelar.
+  - **JavaScript UI:** Em [faces.js](file:///c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP/src/ui/js/faces.js):
+    - No `init()`, vincular os eventos dos botões do novo modal, além de um listener de sincronização (quando selecionar um nome no dropdown, preencher o input de texto automaticamente).
+    - Modificar `reassignSelectedFaces(cluster)` para abrir o novo modal `#face-reassign-modal`.
+    - Buscar a lista de falantes cadastrados do projeto usando `CapIAuAPI.fetchProjectSpeakers()`, limpar placeholders (ex: "Pessoa Desconhecida", "SPEAKER_"), ordenar alfabeticamente e popular o select.
+    - Implementar a função `confirmReassignFaces()` para enviar a chamada de reassociação com o nome selecionado, fechando o modal e recarregando os dados necessários.
+
+### 8.2 Verificação Manual dos Novos Recursos
+1. **Aba Rostos (Grid):**
+   - Entrar na aba "Rostos" no painel esquerdo.
+   - Expandir a biblioteca (ou destacá-la usando o popout). Certificar-se de que a lista de grupos se reorganize como um grid com múltiplos cards por linha quando o espaço for suficiente.
+2. **Reatribuição com Seleção de Nomes:**
+   - Clicar em um card de grupo (ex: "Grupo 1").
+   - Selecionar alguns rostos marcando a checkbox/badge.
+   - Clicar em "Reatribuir Nome". Confirmar que um modal estilizado é aberto com a listagem de pessoas existentes.
+   - Escolher um nome existente ou digitar um novo, e confirmar. Verificar se os rostos desaparecem do modal ativo de gerenciamento.
+3. **Desassociar e Descartar:**
+   - Selecionar rostos no gerenciador de grupo e clicar em "Desassociar Selecionados" ou "Descartar".
+   - Confirmar as ações. Garantir que os rostos sumam instantaneamente da tela do gerenciador de grupo.
+
+
