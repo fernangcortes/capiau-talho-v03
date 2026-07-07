@@ -376,3 +376,67 @@ def delete_photo(photo_id: int, conn: sqlite3.Connection = Depends(get_db_conn))
     conn.commit()
     return {"status": "success", "message": f"Foto ID {photo_id} removida."}
 
+
+@router.get("/api/video/{video_id}/thumbnail")
+def get_video_thumbnail(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Retorna o thumbnail do vídeo. Se não existir, gera a partir de 10% da duração."""
+    from fastapi.responses import FileResponse
+    from src.media.ffmpeg import extract_frame
+    
+    thumb_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
+    if thumb_path.exists() and thumb_path.stat().st_size > 0:
+        return FileResponse(thumb_path)
+        
+    # Se não existe, busca metadados do vídeo para gerar
+    video = MediaRepository.get_video(conn, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
+        
+    video_path = Path(video['filepath'])
+    if not video_path.exists():
+        # Tenta com o proxy de vídeo se o original não existir
+        proxy_rel = f"proxy_vid_{video_id}.mp4"
+        proxy_path = CONFIG.PROXIES_DIR / proxy_rel
+        if proxy_path.exists():
+            video_path = proxy_path
+        else:
+            raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado: {video_path}")
+        
+    duration = video.get('duration') or 0.0
+    # Gera a 10% do tempo (ou a 1.0s de fallback)
+    target_time = max(1.0, duration * 0.1)
+    
+    success = extract_frame(video_path, target_time, thumb_path)
+    if success and thumb_path.exists():
+        return FileResponse(thumb_path)
+        
+    raise HTTPException(status_code=500, detail="Não foi possível gerar a miniatura do vídeo.")
+
+
+@router.post("/api/video/{video_id}/thumbnail")
+def set_video_thumbnail(video_id: int, timestamp: float = Query(...), conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Extrai e define uma miniatura específica no timestamp fornecido."""
+    from src.media.ffmpeg import extract_frame
+    
+    video = MediaRepository.get_video(conn, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
+        
+    video_path = Path(video['filepath'])
+    if not video_path.exists():
+        # Tenta com o proxy de vídeo se o original não existir
+        proxy_rel = f"proxy_vid_{video_id}.mp4"
+        proxy_path = CONFIG.PROXIES_DIR / proxy_rel
+        if proxy_path.exists():
+            video_path = proxy_path
+        else:
+            raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado: {video_path}")
+        
+    thumb_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
+    success = extract_frame(video_path, timestamp, thumb_path)
+    if success and thumb_path.exists():
+        return {"status": "success", "message": "Miniatura atualizada com sucesso."}
+        
+    raise HTTPException(status_code=500, detail="Falha ao extrair frame no timestamp fornecido.")
+
+

@@ -40,6 +40,7 @@ class Config:
     CACHE_DIR = BASE_DIR / os.getenv("capiau_CACHE", "data/cache")
     EXPORTS_DIR = BASE_DIR / os.getenv("capiau_EXPORTS", "data/exports")
     QDRANT_DB_PATH = BASE_DIR / os.getenv("capiau_QDRANT_DB", "data/qdrant.db")
+    THUMBNAILS_DIR = PROXIES_DIR / "thumbnails"
     
     # ── Configurações de Ingestão e Proxy ──────────────────────
     PROXY_RESOLUTION = "1280x720" # HD 720p para preview suave
@@ -58,6 +59,7 @@ class Config:
             self.ORIGINALS_DIR,
             self.PROXIES_DIR,
             self.PROXIES_DIR / "photos",
+            self.THUMBNAILS_DIR,
             self.CACHE_DIR,
             self.EXPORTS_DIR,
             self.QDRANT_DB_PATH.parent,

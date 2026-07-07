@@ -539,3 +539,30 @@ Implementamos uma grande re-estilização e otimização ergonômica para maximi
    - Ao expandir ou fechar as barras laterais, a timeline recalcula a sua dimensão lógica instantaneamente e redesenha a régua e clipes (exibindo mais ou menos tempo na tela), eliminando por completo o borramento por estiramento visual e resolvendo o erro de deslocamento/offset nos cliques do playhead (agulha).
 
 
+
+---
+
+## 🎛️ Fase 13: Otimização da Biblioteca de Clipes & Modal de Decupagem com Player Interno (07/07/2026)
+
+Implementamos uma grande re-estilização e otimização ergonômica para a biblioteca de mídias e introduzimos uma suíte de decupagem integrada:
+
+1. **Visualização Conformada em Linha Única:**
+   - Redesenho completo dos cards de arquivo (`.media-card.tree-file-item`) para exibir todos os metadados em uma única linha flex de 28px de altura.
+   - Miniaturas reais de clipes formatadas em proporção 16x9 com cantos levemente arredondados.
+   - Opções de controle de visibilidade (Miniaturas, Duração, Tags e Status) através de um popover flutuante reativo persistido via `localStorage`.
+
+2. **Remoção de Limitações de Comprimento e Modo Grade (Grid) Adaptável:**
+   - Remoção de corte estático de caracteres no JS, permitindo que títulos se expandam de acordo com o tamanho horizontal da janela, otimizando o espaço quando o painel é maximizado.
+   - Zoom dinâmico via slider range que ajusta a largura da miniatura de `40px` até `240px` (valor padrão ajustado para `80px`).
+   - Modo Grade que distribui os clipes em várias colunas automáticas de acordo com a largura da tela.
+
+3. **Limpeza Inteligente de Títulos de IA ("Tema Cru"):**
+   - Criação da função `cleanTitle` para remover qualificadores comuns gerados por IA ("Sequência útil de...", "Clipe valioso mostrando...", etc.), extraindo o assunto de forma direta e mantendo a descrição completa na tooltip de hover.
+
+4. **Modal de Decupagem Integrado com Player de Vídeo e Recortes (IO+E):**
+   - Substituição do preview de thumbnail estático por um **Video Player interno** (`<video id="interview-modal-video">`) para reprodução instantânea com áudio ativado por padrão.
+   - Layout horizontal (`flex-direction: row !important`) dividindo o modal em duas colunas (player à esquerda e ferramentas na direita), aproveitando 100% do espaço de tela disponível.
+   - Interatividade de seek direcionado: cliques no índice de capítulos, temas narrativos ou palavras da transcrição diarizada sincronizam o tempo do vídeo local instantaneamente.
+   - Suporte nativo e sem interferências de cliques nos botões de controle nativos (play, volume, seekbar) com z-index configurado.
+   - Painel de marcação local (pontos IN, OUT e Enviar para Timeline) com atalhos de teclado locais (`I`, `O`, `E`) e pausando os atalhos globais de fundo.
+   - Atualização física de miniatura via botão de câmera que gera um novo frame no cache do servidor a partir do tempo atual do player.

@@ -6,6 +6,115 @@ import { FaceManager } from "./faces.js";
 // Armazena o estado das pastas expandidas/recolhidas
 const openFoldersSet = new Set();
 
+// Preferências de exibição de títulos de clipes
+if (!window.titleDisplayPreferences) {
+    try {
+        window.titleDisplayPreferences = JSON.parse(localStorage.getItem("titleDisplayPreferences") || "{}");
+    } catch(e) {
+        window.titleDisplayPreferences = {};
+    }
+}
+
+export function cleanTitle(text) {
+    if (!text) return "";
+    let clean = text.trim();
+    
+    // Lista de prefixos/introduções comuns gerados por IA para remover
+    const prefixos = [
+        // Adjetivos ou qualificadores complexos iniciais
+        /^(valiosa|valioso|útil|importante|versátil|interessante|dinâmica|dinâmico|visualmente\s+rica|visualmente\s+rico|intimista\s+e\s+tranquila|intimista\s+e\s+tranquilo|rica\s+e\s+diversificada|rico\s+e\s+diversificado|excelente|ótima|ótimo)\s*(para\s+mostrar|para\s+documentários|para|que\s+capture|que\s+destaca|que\s+mostra|que)?\s*/i,
+        // Nomes de tipo de clipe e conectivos
+        /^(sequência|clipe|material|trecho|registro|vídeo|cena|aéreos|detalhes|registro|imagens|take|plano|gravação)\s*(que\s+destacam|que\s+mostram|de\s+bastidores|útil|valioso|importante|interessante|para|mostrando|de|com|do|da|em)?\s*/i,
+        // Verbos de ação no infinitivo/gerúndio no início
+        /^(mostrar|exibir|capturar|apresentar|destacar|revelar|retratar|registrar|focar\s+em|focar|trazer|capturando|mostrando|registrando|focando|apresentando|destacando|revelando|retratando)\s+(a|o|os|as|um|uma)?\s*/i,
+        // Conectivos iniciais de "A.", "O.", "A", "O", "Uma", "Um"
+        /^(a\.|o\.|um\.|uma\.|a\s+|o\s+|um\s+|uma\s+)/i
+    ];
+    
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const regex of prefixos) {
+            const newClean = clean.replace(regex, "").trim();
+            if (newClean !== clean) {
+                clean = newClean;
+                changed = true;
+            }
+        }
+    }
+    
+    // Remove pontuações/vírgulas órfãs no início
+    clean = clean.replace(/^[\s,\.\-]+/, "").trim();
+    
+    // Capitaliza primeira letra
+    if (clean) {
+        clean = clean.charAt(0).toUpperCase() + clean.slice(1);
+    }
+    
+    return clean;
+}
+
+export function getFriendlyTitle(v) {
+    // Se o usuário optou por forçar nome do arquivo real para este clipe
+    const forceRealFilename = window.titleDisplayPreferences && window.titleDisplayPreferences[v.id] === "filename";
+    if (forceRealFilename) return v.filename;
+
+    if (v.video_type === "interview") {
+        let name = "";
+        if (v.description && v.description.includes("Entrevista com")) {
+            const match = v.description.match(/Entrevista com\s+([^,\-\n]+)/i);
+            if (match) name = match[1].trim();
+        }
+        if (!name && v.summary) {
+            const match = v.summary.match(/Entrevistado:\s*([^,\-\n\.]+)/i);
+            if (match) name = match[1].trim();
+        }
+        if (!name && v.tags) {
+            try {
+                const parsed = typeof v.tags === "string" ? JSON.parse(v.tags) : v.tags;
+                const speakerTag = parsed.find(t => t.startsWith("Speaker:") || t.startsWith("Person:"));
+                if (speakerTag) name = speakerTag.split(":")[1].trim();
+            } catch(e) {}
+        }
+        if (!name) name = "Entrevista";
+
+        let speech = "";
+        if (v.summary) {
+            speech = v.summary.replace(/Resumo:|Entrevista:/i, "").trim();
+        } else if (v.description) {
+            speech = v.description.trim();
+        }
+        
+        speech = cleanTitle(speech);
+        
+        if (speech) {
+            return `${name} - "${speech}"`;
+        }
+        return `${name} (${v.filename})`;
+    } else if (v.video_type === "broll") {
+        let desc = v.summary || v.description;
+        desc = cleanTitle(desc);
+        if (desc) {
+            return desc;
+        }
+        return `Bastidores - ${v.filename}`;
+    }
+    return v.filename;
+}
+
+function hasMatchingChildren(node, query) {
+    if (!query) return true;
+    if (node.type === "file") {
+        const friendlyTitle = getFriendlyTitle(node.video).toLowerCase();
+        const filename = node.video.filename.toLowerCase();
+        return friendlyTitle.includes(query) || filename.includes(query);
+    }
+    if (node.type === "folder") {
+        return Object.values(node.children).some(child => hasMatchingChildren(child, query));
+    }
+    return false;
+}
+
 function getCommonBasePath(paths) {
     if (paths.length === 0) return "";
     if (paths.length === 1) {
@@ -91,6 +200,10 @@ function formatTimecode(sec) {
 
 function renderTreeNode(node, container, depth = 0) {
     if (node.type === "folder") {
+        const query = document.getElementById("library-search-input")?.value.toLowerCase().trim() || "";
+        if (query && !hasMatchingChildren(node, query)) {
+            return;
+        }
         const folderDiv = document.createElement("div");
         folderDiv.className = "tree-folder-container";
         
@@ -201,14 +314,31 @@ function renderTreeNode(node, container, depth = 0) {
         container.appendChild(folderDiv);
     } else if (node.type === "file") {
         const v = node.video;
+        
+        // Verifica se corresponde ao filtro de busca
+        const searchInput = document.getElementById("library-search-input");
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        
+        const friendlyTitle = getFriendlyTitle(v);
+        const forceRealFilename = window.titleDisplayPreferences && window.titleDisplayPreferences[v.id] === "filename";
+        const currentTitle = forceRealFilename ? v.filename : friendlyTitle;
+        
+        if (query) {
+            const matchesFriendly = friendlyTitle.toLowerCase().includes(query);
+            const matchesFilename = v.filename.toLowerCase().includes(query);
+            if (!matchesFriendly && !matchesFilename) {
+                return; // Oculta se não corresponder
+            }
+        }
+        
         const card = document.createElement("div");
         card.className = "media-card tree-file-item";
         card.setAttribute("data-video-id", v.id);
-        card.style.paddingLeft = `${depth * 10 + 10}px`;
+        card.style.paddingLeft = `${depth * 10 + 6}px`;
         if (STATE.activeVideo && STATE.activeVideo.id === v.id) card.classList.add("active");
         
         const badgeClass = v.video_type === "interview" ? "tag-interview" : "tag-broll";
-        const badgeLabel = v.video_type === "interview" ? "Fala ASR" : "Bastidores";
+        const badgeLabel = v.video_type === "interview" ? "Fala" : "Bastidores";
         
         let statusGlow = "";
         let statusBadge = "";
@@ -218,40 +348,57 @@ function renderTreeNode(node, container, depth = 0) {
         
         if (v.status === "transcribing" || v.status === "processing") {
             if (isConverting) {
-                statusGlow = `<span class="conversion-progress-text" style="font-size: 9px; color: var(--color-cyan); margin-left: 4px;">Convertendo... <i class="fa-solid fa-spinner fa-spin"></i></span>`;
-                actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" title="Cancelar Conversão"><i class="fa-solid fa-circle-stop"></i></button>`;
+                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" title="Convertendo..."></i>`;
+                actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" title="Cancelar Conversão"><i class="fa-solid fa-circle-stop" style="font-size:10px;"></i></button>`;
             } else {
-                statusGlow = `<span class="conversion-progress-text" style="font-size: 9px; color: var(--color-cyan); margin-left: 4px;">Transcrevendo... <i class="fa-solid fa-spinner fa-spin"></i></span>`;
-                actionBtn = ``;
+                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" title="Transcrevendo..."></i>`;
             }
         } else if (v.status === "analyzing") {
-            statusGlow = `<span class="conversion-progress-text" style="font-size: 9px; color: var(--color-violet); margin-left: 4px;">Analisando... <i class="fa-solid fa-spinner fa-spin"></i></span>`;
-            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" title="Cancelar Análise"><i class="fa-solid fa-circle-stop"></i></button>`;
+            statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-violet);" title="Analisando..."></i>`;
+            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" title="Cancelar Análise"><i class="fa-solid fa-circle-stop" style="font-size:10px;"></i></button>`;
         } else if (v.status === "transcribed") {
-            statusBadge = `<span class="badge" style="font-size: 7px; padding: 0px 3px; color: var(--color-cyan); border-color: rgba(6, 182, 212, 0.3); margin-left: 4px;">ASR</span>`;
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can"></i></button>`;
+            statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: rgba(6, 182, 212, 0.3);">ASR</span>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         } else if (v.status === "analyzed") {
-            statusBadge = `<span class="badge" style="font-size: 7px; padding: 0px 3px; color: var(--color-violet); border-color: rgba(138, 92, 246, 0.3); margin-left: 4px;">VISÃO</span>`;
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can"></i></button>`;
+            statusBadge = `<span class="badge" style="color: var(--color-violet); border-color: rgba(138, 92, 246, 0.3);">VISÃO</span>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         } else if (v.status === "ingested") {
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         } else if (v.status === "error") {
-            statusGlow = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose); font-size: 10px; margin-left: 4px;" title="Erro no processamento!"></i>`;
-            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--text-secondary); margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Limpar Vídeo/Proxy"><i class="fa-solid fa-trash-can"></i></button>`;
+            statusGlow = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);" title="Erro no processamento!"></i>`;
+            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Limpar Vídeo/Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         }
         
+        // Thumbnail (Real ou Ícone)
+        const showRealThumb = !document.body.classList.contains("hide-thumbnails") && document.getElementById("chk-show-thumbnails")?.checked !== false;
+        let thumbContent = `<i class="fa-solid ${v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film'}"></i>`;
+        if (showRealThumb && v.status !== "pending" && v.status !== "error") {
+            thumbContent = `<img src="/api/video/${v.id}/thumbnail" alt="Thumb" onerror="this.style.display='none'">`;
+        }
+        
+        // Toggle title display icon
+        const toggleTitleIcon = forceRealFilename ? "fa-file-signature" : "fa-font";
+        const toggleTitleTitle = forceRealFilename ? "Mostrar Título Contextual" : "Mostrar Nome do Arquivo Real";
+        const toggleBtnHtml = `<button class="btn-toggle-filename" title="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
+
+        // Tooltip completa
+        const tooltip = `Título: ${friendlyTitle}\nArquivo: ${v.filename}\nTipo: ${v.video_type === 'interview' ? 'Entrevista' : 'Bastidores'}\nDescrição: ${v.description || v.summary || 'Sem decupagem'}`;
+
         card.innerHTML = `
-            <div class="media-thumbnail" style="width:30px; height:22px; font-size:10px; flex-shrink:0;">
-                <i class="fa-solid ${v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film'}"></i>
+            <div class="media-thumbnail">
+                ${thumbContent}
             </div>
-            <div class="media-info" style="display:flex; flex-direction:column; gap:1px; flex:1; min-width:0;">
-                <h4 style="display:flex; align-items:center; width:100%; justify-content:space-between; margin:0; font-size:12px;">
-                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${v.filename}">${v.filename}</span>
-                    ${actionBtn}
+            <div class="media-info">
+                <h4 title="${tooltip}">
+                    ${toggleBtnHtml}
+                    <span class="clip-title-text" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${currentTitle}</span>
                 </h4>
-                <div style="display:flex; justify-content:space-between; align-items:center; width:100%; font-size:10px;">
-                    <span>${v.duration ? formatTimecode(v.duration) : "00:00:00"} ${statusGlow}${statusBadge}</span>
-                    <span class="badge-tag ${badgeClass}" style="margin:0; float:none; font-size:8px; padding:1px 3px;">${badgeLabel}</span>
+                <div class="media-meta-row">
+                    <span class="media-duration">${v.duration ? formatTimecode(v.duration).substring(3, 11) : "00:00:00"}</span>
+                    ${statusGlow}
+                    ${statusBadge}
+                    <span class="badge-tag ${badgeClass}">${badgeLabel}</span>
+                    ${actionBtn}
                 </div>
             </div>
         `;
@@ -259,6 +406,20 @@ function renderTreeNode(node, container, depth = 0) {
         card.addEventListener("click", () => {
             STATE.activeVideo = v;
         });
+        
+        // Listener para alternar título
+        const toggleBtn = card.querySelector(".btn-toggle-filename");
+        if (toggleBtn) {
+            toggleBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const wasReal = window.titleDisplayPreferences[v.id] === "filename";
+                window.titleDisplayPreferences[v.id] = wasReal ? "friendly" : "filename";
+                localStorage.setItem("titleDisplayPreferences", JSON.stringify(window.titleDisplayPreferences));
+                // Recarrega biblioteca inteira para re-renderizar
+                STATE.emit("videosUpdated", STATE.allVideos);
+            });
+        }
+        
         container.appendChild(card);
     }
 }
@@ -457,6 +618,224 @@ export class LibraryManager {
                 if (e.key === "Escape") this.closeLightbox();
             }
         });
+
+        // Configurações de exibição de mídias (Dropdown)
+        const btnDisplaySettings = document.getElementById("btn-library-display-settings");
+        const settingsDropdown = document.getElementById("library-display-settings-dropdown");
+        
+        if (btnDisplaySettings && settingsDropdown) {
+            btnDisplaySettings.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const isHidden = settingsDropdown.style.display === "none";
+                settingsDropdown.style.display = isHidden ? "flex" : "none";
+            });
+            
+            document.addEventListener("click", (e) => {
+                if (settingsDropdown.style.display === "flex" && !settingsDropdown.contains(e.target) && e.target !== btnDisplaySettings) {
+                    settingsDropdown.style.display = "none";
+                }
+            });
+        }
+        
+        // Checkboxes de exibição
+        const chkThumbnails = document.getElementById("chk-show-thumbnails");
+        const chkDuration = document.getElementById("chk-show-duration");
+        const chkTags = document.getElementById("chk-show-tags");
+        const chkStatus = document.getElementById("chk-show-status");
+        
+        const videoList = this.videoListEl || document.getElementById("video-list");
+        
+        function applyDisplayClasses() {
+            if (!videoList) return;
+            videoList.classList.toggle("hide-thumbnails", chkThumbnails ? !chkThumbnails.checked : false);
+            videoList.classList.toggle("hide-duration", chkDuration ? !chkDuration.checked : false);
+            videoList.classList.toggle("hide-tags", chkTags ? !chkTags.checked : false);
+            videoList.classList.toggle("hide-status", chkStatus ? !chkStatus.checked : false);
+        }
+        
+        const checkboxes = [chkThumbnails, chkDuration, chkTags, chkStatus];
+        checkboxes.forEach(chk => {
+            if (chk) {
+                // Carregar estado salvo
+                const savedVal = localStorage.getItem(`lib-pref-${chk.id}`);
+                if (savedVal !== null) {
+                    chk.checked = savedVal === "true";
+                }
+                
+                chk.addEventListener("change", () => {
+                    localStorage.setItem(`lib-pref-${chk.id}`, chk.checked);
+                    applyDisplayClasses();
+                    // Re-renderiza para carregar imagens se Miniaturas foi ativado
+                    STATE.emit("videosUpdated", STATE.allVideos);
+                });
+            }
+        });
+        
+        applyDisplayClasses();
+
+        // Modo de Visualização (Lista vs Grade)
+        const btnViewModeList = document.getElementById("btn-view-mode-list");
+        const btnViewModeGrid = document.getElementById("btn-view-mode-grid");
+        
+        function setViewMode(mode) {
+            if (!videoList) return;
+            if (mode === "grid") {
+                videoList.classList.add("view-mode-grid");
+                if (btnViewModeGrid) btnViewModeGrid.classList.add("active");
+                if (btnViewModeList) btnViewModeList.classList.remove("active");
+            } else {
+                videoList.classList.remove("view-mode-grid");
+                if (btnViewModeList) btnViewModeList.classList.add("active");
+                if (btnViewModeGrid) btnViewModeGrid.classList.remove("active");
+            }
+            localStorage.setItem("lib-pref-view-mode", mode);
+        }
+        
+        if (btnViewModeList) {
+            btnViewModeList.addEventListener("click", () => setViewMode("list"));
+        }
+        if (btnViewModeGrid) {
+            btnViewModeGrid.addEventListener("click", () => setViewMode("grid"));
+        }
+        
+        // Zoom Slider
+        const zoomSlider = document.getElementById("library-zoom-slider");
+        const zoomLabel = document.getElementById("library-zoom-label");
+        
+        function setZoomValue(val) {
+            if (!videoList) return;
+            videoList.style.setProperty("--thumb-width", `${val}px`);
+            videoList.style.setProperty("--thumb-height", `${Math.round(val * 9 / 16)}px`);
+            if (zoomLabel) zoomLabel.textContent = `${val}px`;
+            if (zoomSlider) zoomSlider.value = val;
+            localStorage.setItem("lib-pref-zoom", val);
+        }
+        
+        if (zoomSlider) {
+            zoomSlider.addEventListener("input", (e) => {
+                setZoomValue(parseInt(e.target.value));
+            });
+        }
+        
+        // Carrega preferências salvas
+        const savedViewMode = localStorage.getItem("lib-pref-view-mode") || "list";
+        setViewMode(savedViewMode);
+        
+        const savedZoom = localStorage.getItem("lib-pref-zoom") || "80";
+        setZoomValue(parseInt(savedZoom));
+
+        // Busca de mídias (Filtro em tempo real)
+        const searchInput = document.getElementById("library-search-input");
+        if (searchInput) {
+            searchInput.addEventListener("input", () => {
+                STATE.emit("videosUpdated", STATE.allVideos);
+            });
+        }
+
+        // Atalho 'a' ou 'A' para abrir o Modal de Entrevista
+        document.addEventListener("keydown", (e) => {
+            const activeTag = document.activeElement.tagName;
+            if (activeTag === "INPUT" || activeTag === "TEXTAREA" || document.activeElement.isContentEditable) {
+                return; // Ignora se o usuário estiver em um input
+            }
+            
+            if (e.key.toLowerCase() === 'a') {
+                if (STATE.activeVideo) {
+                    e.preventDefault();
+                    this.openInterviewModal(STATE.activeVideo);
+                }
+            }
+        });
+
+        // Eventos do Modal de Entrevista
+        const btnCloseInterview = document.getElementById("btn-close-interview-modal");
+        const interviewModal = document.getElementById("interview-modal");
+        
+        const closeInterviewModal = () => {
+            if (interviewModal) {
+                interviewModal.style.display = "none";
+            }
+            const modalVideo = document.getElementById("interview-modal-video");
+            if (modalVideo) {
+                modalVideo.pause();
+                modalVideo.src = "";
+            }
+        };
+
+        if (btnCloseInterview && interviewModal) {
+            btnCloseInterview.addEventListener("click", closeInterviewModal);
+            interviewModal.addEventListener("click", (e) => {
+                if (e.target === interviewModal) {
+                    closeInterviewModal();
+                }
+            });
+        }
+
+        // Controles de Ponto In/Out/Append e Miniatura no Modal de Entrevista
+        const btnModalMarkIn = document.getElementById("btn-interview-modal-mark-in");
+        const btnModalMarkOut = document.getElementById("btn-interview-modal-mark-out");
+        const btnModalSetThumb = document.getElementById("btn-interview-modal-set-thumb");
+        const btnModalAppend = document.getElementById("btn-interview-modal-append");
+
+        if (btnModalMarkIn) {
+            btnModalMarkIn.addEventListener("click", () => this.markModalIn());
+        }
+        if (btnModalMarkOut) {
+            btnModalMarkOut.addEventListener("click", () => this.markModalOut());
+        }
+        if (btnModalSetThumb) {
+            btnModalSetThumb.addEventListener("click", () => {
+                if (STATE.activeVideo) this.setModalThumbnail(STATE.activeVideo);
+            });
+        }
+        if (btnModalAppend) {
+            btnModalAppend.addEventListener("click", () => {
+                if (STATE.activeVideo) this.appendModalToTimeline(STATE.activeVideo);
+            });
+        }
+
+        // Atalhos de teclado locais do Modal de Entrevista (I, O, E)
+        document.addEventListener("keydown", (e) => {
+            if (!interviewModal || interviewModal.style.display !== "flex") return;
+            
+            const activeTag = document.activeElement.tagName.toLowerCase();
+            if (activeTag === "input" || activeTag === "textarea" || document.activeElement.isContentEditable) {
+                return; // Ignora se o usuário estiver digitando
+            }
+            
+            const key = e.key.toLowerCase();
+            if (key === 'i') {
+                e.preventDefault();
+                this.markModalIn();
+            } else if (key === 'o') {
+                e.preventDefault();
+                this.markModalOut();
+            } else if (key === 'e') {
+                e.preventDefault();
+                if (STATE.activeVideo) this.appendModalToTimeline(STATE.activeVideo);
+            }
+        });
+
+        // Abas do Modal de Entrevista
+        const tabHeader = document.getElementById("interview-tabs-header");
+        if (tabHeader) {
+            tabHeader.querySelectorAll(".tab-btn").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const tabId = btn.dataset.interviewTab;
+                    this.switchInterviewTab(tabId);
+                });
+            });
+        }
+
+        // Copiar Notas
+        const btnCopyNotes = document.getElementById("btn-interview-copy-notes");
+        if (btnCopyNotes) {
+            btnCopyNotes.addEventListener("click", () => {
+                if (STATE.activeVideo) {
+                    this.copyInterviewNotes(STATE.activeVideo);
+                }
+            });
+        }
     }
 
     async reloadData() {
@@ -814,4 +1193,412 @@ export class LibraryManager {
             console.error("Erro ao carregar rostos do lightbox:", e);
         }
     }
+
+    seekModalVideo(time) {
+        const modalVideo = document.getElementById("interview-modal-video");
+        if (modalVideo) {
+            modalVideo.currentTime = time;
+            modalVideo.play().catch(err => {
+                console.warn("Play programmatic blocked:", err);
+            });
+        }
+    }
+
+    async openInterviewModal(video) {
+        const modal = document.getElementById("interview-modal");
+        if (!modal) return;
+        
+        modal.style.display = "flex";
+        
+        const titleEl = document.getElementById("interview-modal-title");
+        const fileInfoEl = document.getElementById("interview-modal-file-info");
+        const durInfoEl = document.getElementById("interview-modal-dur-info");
+        const summaryEl = document.getElementById("interview-modal-summary");
+        
+        const friendlyTitle = getFriendlyTitle(video);
+        if (titleEl) titleEl.textContent = friendlyTitle;
+        if (fileInfoEl) fileInfoEl.textContent = `Arquivo: ${video.filename}`;
+        if (durInfoEl) durInfoEl.textContent = `Duração: ${video.duration ? formatTimecode(video.duration) : "00:00:00:00"}`;
+        
+        if (summaryEl) {
+            summaryEl.textContent = video.summary || video.description || "Nenhum metadado de IA gerado para este clipe.";
+        }
+        
+        // Carrega o Vídeo no Player do Modal
+        const modalVideo = document.getElementById("interview-modal-video");
+        if (modalVideo) {
+            let videoSrc = video.filepath || "";
+            videoSrc = videoSrc.replace(/\\/g, "/");
+            const isRemote = videoSrc.startsWith("http") || videoSrc.startsWith("/proxies/") || videoSrc.startsWith("/");
+            
+            if (video.proxy_path) {
+                videoSrc = video.proxy_path.replace(/\\/g, "/");
+            } else if (!isRemote) {
+                videoSrc = `/originals/${video.filename}`;
+            }
+            
+            console.log("Loading video in modal: filename =", video.filename, "proxy_path =", video.proxy_path, "resolved src =", videoSrc);
+            
+            modalVideo.src = videoSrc;
+            modalVideo.muted = false;
+            modalVideo.volume = 1.0;
+            modalVideo.load();
+        }
+        
+        // Inicializa Marcadores do Modal
+        this.modalMarkerIn = null;
+        this.modalMarkerOut = null;
+        this.updateModalMarkersUI();
+        
+        this.interviewDialogueList = [];
+        this.switchInterviewTab("tab-interview-index");
+        
+        const chaptersList = document.getElementById("interview-chapters-list");
+        const themesList = document.getElementById("interview-themes-list");
+        const wordsList = document.getElementById("interview-transcript-words");
+        if (chaptersList) chaptersList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando índice...</div>`;
+        if (themesList) themesList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando temas...</div>`;
+        if (wordsList) wordsList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando transcrição...</div>`;
+        
+        try {
+            const data = await CapIAuAPI.fetchTranscript(video.id);
+            const dialogues = data.dialogues || [];
+            this.interviewDialogueList = dialogues;
+            
+            if (chaptersList) {
+                chaptersList.innerHTML = "";
+                if (dialogues.length === 0) {
+                    chaptersList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Sem transcrição disponível para gerar índice.</div>`;
+                } else {
+                    let currentSpeaker = null;
+                    let lastChapterTime = -100;
+                    dialogues.forEach(d => {
+                        const timeDiff = d.start_time - lastChapterTime;
+                        if (d.speaker_id !== currentSpeaker || timeDiff > 40) {
+                            currentSpeaker = d.speaker_id;
+                            lastChapterTime = d.start_time;
+                            
+                            const item = document.createElement("div");
+                            item.className = "timeline-chapter-item";
+                            
+                            const timecode = formatTimecode(d.start_time).substring(3, 11);
+                            item.innerHTML = `
+                                <span class="timeline-chapter-time" data-time="${d.start_time}">${timecode}</span>
+                                <div style="font-weight: 700; font-size: 11px; color: var(--color-cyan); margin-bottom: 2px;">${d.speaker_id}</div>
+                                <div class="timeline-chapter-text">"${d.text.substring(0, 100)}${d.text.length > 100 ? '...' : ''}"</div>
+                            `;
+                            
+                            item.querySelector(".timeline-chapter-time").addEventListener("click", () => {
+                                this.seekModalVideo(d.start_time);
+                            });
+                            
+                            chaptersList.appendChild(item);
+                        }
+                    });
+                }
+            }
+            
+            this.renderInterviewTranscript(dialogues, data.words || []);
+            
+        } catch(err) {
+            console.warn("Sem transcrição para este vídeo:", err);
+            if (chaptersList) chaptersList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Material não transcrito ou B-roll de bastidores.</div>`;
+            if (wordsList) wordsList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Mídia de B-roll sem áudio transcrito.</div>`;
+            
+            if (video.video_type === "broll" || video.status === "analyzed") {
+                if (chaptersList) chaptersList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando frames de visão...</div>`;
+                try {
+                    const data = await CapIAuAPI.fetchVideoVision(video.id, STATE.currentProjectId);
+                    const frames = data.frames || [];
+                    if (chaptersList) {
+                        chaptersList.innerHTML = "";
+                        if (frames.length === 0) {
+                            chaptersList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Nenhuma descrição visual disponível.</div>`;
+                        } else {
+                            frames.forEach(f => {
+                                const item = document.createElement("div");
+                                item.className = "timeline-chapter-item";
+                                const timecode = formatTimecode(f.timestamp).substring(3, 11);
+                                item.innerHTML = `
+                                    <span class="timeline-chapter-time" data-time="${f.timestamp}">${timecode}</span>
+                                    <div class="timeline-chapter-text">${f.description || "Descrição de cena"}</div>
+                                `;
+                                item.querySelector(".timeline-chapter-time").addEventListener("click", () => {
+                                    this.seekModalVideo(f.timestamp);
+                                });
+                                chaptersList.appendChild(item);
+                            });
+                        }
+                    }
+                } catch(e) {
+                    if (chaptersList) chaptersList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Sem frames de visão processados.</div>`;
+                }
+            }
+        }
+        
+        try {
+            const themesData = await CapIAuAPI.fetchThemes(STATE.currentProjectId);
+            const themes = themesData.themes || [];
+            if (themesList) {
+                themesList.innerHTML = "";
+                let hasThemes = false;
+                
+                for (const theme of themes) {
+                    const segsData = await CapIAuAPI.fetchThemeSegments(theme.id);
+                    const segments = segsData.segments || [];
+                    const matchingSegs = segments.filter(s => s.video_id === video.id);
+                    
+                    if (matchingSegs.length > 0) {
+                        hasThemes = true;
+                        
+                        const card = document.createElement("div");
+                        card.className = "interview-theme-card";
+                        
+                        let segsHtml = "";
+                        matchingSegs.forEach(s => {
+                            const timecode = formatTimecode(s.start_time || 0).substring(3, 11);
+                            segsHtml += `
+                                <div style="margin-top: 8px; padding-left: 8px; border-left: 2px solid var(--color-cyan); font-size: 11px;">
+                                    <span class="timeline-chapter-time" style="padding: 1px 4px; font-size: 9px;" data-time="${s.start_time}">${timecode}</span>
+                                    <span style="color: var(--text-secondary);">"${s.text_excerpt || ''}"</span>
+                                </div>
+                            `;
+                        });
+                        
+                        card.innerHTML = `
+                            <div class="interview-theme-title">${theme.title}</div>
+                            <div class="interview-theme-desc">${theme.description || ''}</div>
+                            ${segsHtml}
+                        `;
+                        
+                        card.querySelectorAll(".timeline-chapter-time").forEach(btn => {
+                            btn.addEventListener("click", () => {
+                                const time = parseFloat(btn.dataset.time);
+                                this.seekModalVideo(time);
+                            });
+                        });
+                        
+                        themesList.appendChild(card);
+                    }
+                }
+                
+                if (!hasThemes) {
+                    themesList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Nenhum tema narrativo mapeado para este clipe.</div>`;
+                }
+            }
+        } catch(err) {
+            console.warn("Erro ao carregar temas:", err);
+            if (themesList) themesList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Erro ao processar temas narrativos.</div>`;
+        }
+    }
+
+    renderInterviewTranscript(dialogues, words) {
+        const container = document.getElementById("interview-transcript-words");
+        if (!container) return;
+        
+        container.innerHTML = "";
+        if (dialogues.length === 0) {
+            container.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Sem transcrição disponível.</div>`;
+            return;
+        }
+        
+        dialogues.forEach((d, idx) => {
+            const block = document.createElement("div");
+            block.className = "interview-speech-block";
+            
+            const timecode = formatTimecode(d.start_time).substring(3, 11);
+            
+            let blockWords = [];
+            if (words && words.length > 0) {
+                blockWords = words.filter(w => w.start_time >= d.start_time && w.start_time <= d.end_time);
+            }
+            
+            let speechContent = "";
+            if (blockWords.length > 0) {
+                speechContent = blockWords.map(w => {
+                    return `<span class="interview-speech-word" data-start="${w.start_time}">${w.word}</span>`;
+                }).join(" ");
+            } else {
+                speechContent = d.text.split(" ").map(w => {
+                    return `<span class="interview-speech-word" data-start="${d.start_time}">${w}</span>`;
+                }).join(" ");
+            }
+            
+            block.innerHTML = `
+                <div class="interview-speech-header">
+                    <span style="color: var(--color-cyan); font-weight: 700;">${d.speaker_id}</span>
+                    <span class="timeline-chapter-time" style="padding: 1px 4px; font-size: 9px;" data-time="${d.start_time}">${timecode}</span>
+                </div>
+                <div class="interview-speech-text">${speechContent}</div>
+            `;
+            
+            block.querySelectorAll(".interview-speech-word, .timeline-chapter-time").forEach(el => {
+                el.addEventListener("click", () => {
+                    const time = parseFloat(el.dataset.start || el.dataset.time);
+                    this.seekModalVideo(time);
+                });
+            });
+            
+            container.appendChild(block);
+        });
+
+        // Configuração de busca no transcrito
+        const transcriptSearch = document.getElementById("interview-transcript-search");
+        const searchCount = document.getElementById("interview-search-count");
+        if (transcriptSearch) {
+            // Remove listeners antigos re-criando o elemento ou limpando o input
+            transcriptSearch.value = "";
+            if (searchCount) searchCount.textContent = "";
+            
+            // Clone do input para limpar event listeners anteriores
+            const newSearch = transcriptSearch.cloneNode(true);
+            transcriptSearch.parentNode.replaceChild(newSearch, transcriptSearch);
+            
+            newSearch.addEventListener("input", () => {
+                const query = newSearch.value.toLowerCase().trim();
+                const blocks = container.querySelectorAll(".interview-speech-block");
+                let matchesCount = 0;
+                
+                blocks.forEach(b => {
+                    const text = b.querySelector(".interview-speech-text").textContent.toLowerCase();
+                    const match = !query || text.includes(query);
+                    b.style.display = match ? "flex" : "none";
+                    if (match && query) {
+                        matchesCount++;
+                    }
+                });
+                
+                const newSearchCount = document.getElementById("interview-search-count");
+                if (newSearchCount) {
+                    newSearchCount.textContent = query ? `${matchesCount} encontrados` : "";
+                }
+            });
+        }
+    }
+
+    switchInterviewTab(tabId) {
+        const header = document.getElementById("interview-tabs-header");
+        if (header) {
+            header.querySelectorAll(".tab-btn").forEach(btn => {
+                if (btn.dataset.interviewTab === tabId) {
+                    btn.classList.add("active");
+                } else {
+                    btn.classList.remove("active");
+                }
+            });
+        }
+        
+        const modal = document.getElementById("interview-modal");
+        if (modal) {
+            modal.querySelectorAll(".interview-tab-content").forEach(content => {
+                if (content.id === tabId) {
+                    content.style.display = "flex";
+                } else {
+                    content.style.display = "none";
+                }
+            });
+        }
+    }
+
+    copyInterviewNotes(video) {
+        if (!video) return;
+        
+        let markdown = `# Notas de Decupagem: ${video.filename}\n\n`;
+        markdown += `**Título**: ${getFriendlyTitle(video)}\n`;
+        markdown += `**Duração**: ${video.duration ? formatTimecode(video.duration) : "00:00:00"}\n\n`;
+        
+        markdown += `## Resumo Executivo\n`;
+        markdown += `${video.summary || video.description || "Nenhum resumo disponível."}\n\n`;
+        
+        if (this.interviewDialogueList && this.interviewDialogueList.length > 0) {
+            markdown += `## Índice de Tempos e Falas\n`;
+            let currentSpeaker = null;
+            let lastChapterTime = -100;
+            this.interviewDialogueList.forEach(d => {
+                const timeDiff = d.start_time - lastChapterTime;
+                if (d.speaker_id !== currentSpeaker || timeDiff > 40) {
+                    currentSpeaker = d.speaker_id;
+                    lastChapterTime = d.start_time;
+                    const tc = formatTimecode(d.start_time).substring(3, 11);
+                    markdown += `* **[${tc}]** *${d.speaker_id}*: "${d.text}"\n`;
+                }
+            });
+        }
+        
+        navigator.clipboard.writeText(markdown)
+            .then(() => alert("Notas de decupagem copiadas em Markdown para a área de transferência!"))
+            .catch(err => alert("Erro ao copiar notas: " + err));
+    }
+
+    markModalIn() {
+        const modalVideo = document.getElementById("interview-modal-video");
+        if (!modalVideo) return;
+        this.modalMarkerIn = modalVideo.currentTime;
+        this.updateModalMarkersUI();
+    }
+
+    markModalOut() {
+        const modalVideo = document.getElementById("interview-modal-video");
+        if (!modalVideo) return;
+        this.modalMarkerOut = modalVideo.currentTime;
+        this.updateModalMarkersUI();
+    }
+
+    updateModalMarkersUI() {
+        const lblIn = document.getElementById("lbl-interview-modal-in");
+        const lblOut = document.getElementById("lbl-interview-modal-out");
+        if (lblIn) {
+            lblIn.textContent = this.modalMarkerIn !== null ? formatTimecode(this.modalMarkerIn).substring(3, 11) : "00:00:00";
+        }
+        if (lblOut) {
+            lblOut.textContent = this.modalMarkerOut !== null ? formatTimecode(this.modalMarkerOut).substring(3, 11) : "00:00:00";
+        }
+    }
+
+    appendModalToTimeline(video) {
+        if (!video) return;
+        const modalVideo = document.getElementById("interview-modal-video");
+        const inTime = this.modalMarkerIn !== null ? this.modalMarkerIn : 0.0;
+        const outTime = this.modalMarkerOut !== null ? this.modalMarkerOut : (modalVideo ? modalVideo.duration : 0.0);
+        
+        if (inTime >= outTime) {
+            alert("Ponto In deve ser menor que o ponto Out.");
+            return;
+        }
+        
+        if (window.TIMELINE_STATE) {
+            window.TIMELINE_STATE.addCut(video.id, inTime, outTime, null);
+            alert("Sub-clipe adicionado à timeline!");
+        } else {
+            console.error("TIMELINE_STATE não encontrado.");
+        }
+        
+        this.modalMarkerIn = null;
+        this.modalMarkerOut = null;
+        this.updateModalMarkersUI();
+    }
+
+    async setModalThumbnail(video) {
+        if (!video) return;
+        const modalVideo = document.getElementById("interview-modal-video");
+        if (!modalVideo) return;
+        
+        const timestamp = modalVideo.currentTime;
+        try {
+            const response = await fetch(`/api/video/${video.id}/thumbnail?timestamp=${timestamp}`, {
+                method: "POST"
+            });
+            if (response.ok) {
+                alert("Miniatura física atualizada com o frame atual do modal!");
+                // Força a atualização da lista na biblioteca
+                STATE.emit("videosUpdated", STATE.allVideos);
+            } else {
+                const err = await response.json();
+                alert("Erro ao definir miniatura: " + (err.detail || "Desconhecido"));
+            }
+        } catch (e) {
+            alert("Erro de rede ao salvar miniatura.");
+        }
+    }
 }
+

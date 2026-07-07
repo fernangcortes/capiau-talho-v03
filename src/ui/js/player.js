@@ -112,6 +112,35 @@ export class SourcePlayer {
             });
         }
 
+        const btnSetThumb = this.el("btn-source-set-thumbnail");
+        if (btnSetThumb) {
+            btnSetThumb.addEventListener("click", async () => {
+                if (!STATE.activeVideo) {
+                    alert("Nenhum vídeo ativo para definir miniatura.");
+                    return;
+                }
+                const vid = this.el("source-video");
+                if (!vid) return;
+                
+                const currentSeconds = vid.currentTime;
+                try {
+                    const response = await fetch(`/api/video/${STATE.activeVideo.id}/thumbnail?timestamp=${currentSeconds}`, {
+                        method: "POST"
+                    });
+                    if (response.ok) {
+                        alert("Miniatura atualizada com o frame atual!");
+                        // Força a atualização da lista na biblioteca
+                        STATE.emit("videosUpdated", STATE.allVideos);
+                    } else {
+                        const err = await response.json();
+                        alert("Erro ao definir miniatura: " + (err.detail || "Desconhecido"));
+                    }
+                } catch (e) {
+                    alert("Erro de rede ao salvar miniatura.");
+                }
+            });
+        }
+
         const scrubber = this.el("source-scrubber-progress-bar");
         if (scrubber) {
             scrubber.addEventListener("click", (e) => this.seekScrubber(e));
@@ -1108,6 +1137,12 @@ export class VideoPlayer {
     handleGlobalKeyboard(e) {
         const activeTag = document.activeElement.tagName.toLowerCase();
         if (activeTag === "input" || activeTag === "textarea") return;
+
+        // Se o modal de entrevista estiver aberto, ignora atalhos do player principal
+        const interviewModal = document.getElementById("interview-modal");
+        if (interviewModal && interviewModal.style.display === "flex") {
+            return;
+        }
 
         const code = e.code;
         const activePlayer = window.activeFocusedPlayer === "source" ? this.sourcePlayer : this.programPlayer;
