@@ -328,6 +328,33 @@ export class CapiauTimelineInteraction {
         const selectedId = TIMELINE_STATE.selectedClipId;
         const cuts = [...STATE.activeTimelineCuts];
 
+        // Toggle do popup de alternativas com a tecla 'A'
+        if (e.key.toLowerCase() === "a" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const popup = this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup");
+            if (popup && popup.style.display === "flex") {
+                this.hideAlternativesPopup();
+                e.preventDefault();
+                return;
+            } else if (selectedId) {
+                const clip = cuts.find(c => c.id === selectedId);
+                if (clip && clip.origin === "ai" && clip.alternatives && clip.alternatives.length > 0) {
+                    this.showAlternativesPopup(clip);
+                    e.preventDefault();
+                    return;
+                }
+            }
+        }
+
+        // Fechar popup de alternativas com a tecla 'Escape'
+        if (e.key === "Escape") {
+            const popup = this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup");
+            if (popup && popup.style.display === "flex") {
+                this.hideAlternativesPopup();
+                e.preventDefault();
+                return;
+            }
+        }
+
         // Undo / Redo globais da timeline
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
             e.preventDefault();
@@ -718,25 +745,15 @@ export class CapiauTimelineInteraction {
             doc.body.appendChild(previewCard);
         }
 
-        // Se estiver arrastando ou fazendo scrub, ou fora das trilhas, esconde
+        // Se estiver arrastando ou fazendo scrub, ou fora das trilhas, esconde o preview normal
         if (this.dragState || !track) {
             previewCard.style.display = "none";
-            this.hideAlternativesPopup();
             return;
         }
 
         const hit = this.findClipAt(frame, track);
         if (hit && hit.type === "clip") {
             const clip = hit.data;
-
-            // Se for clipe gerado pela IA e contiver alternativas, abre o carrossel em vez do preview normal
-            if (clip.origin === "ai" && clip.alternatives && clip.alternatives.length > 0) {
-                previewCard.style.display = "none";
-                this.showAlternativesPopup(clientX, clientY, clip);
-                return;
-            }
-
-            this.hideAlternativesPopup();
 
             const video = STATE.allVideos.find(v => v.id === clip.video_id);
             if (video) {
@@ -765,7 +782,6 @@ export class CapiauTimelineInteraction {
 
         // Se não houver clipe sob o cursor, esconde
         previewCard.style.display = "none";
-        this.hideAlternativesPopup();
     }
 
     /**
@@ -784,27 +800,53 @@ export class CapiauTimelineInteraction {
     }
 
     /**
-     * Exibe o carrossel popup de mídias alternativas.
+     * Exibe o carrossel popup de mídias alternativas como modal com backdrop desfocado.
      */
-    showAlternativesPopup(clientX, clientY, clip) {
+    showAlternativesPopup(clip) {
         const doc = this.canvas.ownerDocument;
+        
+        // Criar backdrop se não existir
+        let backdrop = doc.querySelector("#timeline-alternatives-backdrop");
+        if (!backdrop) {
+            backdrop = doc.createElement("div");
+            backdrop.id = "timeline-alternatives-backdrop";
+            backdrop.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.7);
+                backdrop-filter: blur(5px);
+                z-index: 9999;
+                display: none;
+            `;
+            backdrop.addEventListener("click", () => this.hideAlternativesPopup());
+            doc.body.appendChild(backdrop);
+        }
+
+        // Criar popup se não existir
         let popup = doc.querySelector("#timeline-alternatives-popup");
         if (!popup) {
             popup = doc.createElement("div");
             popup.id = "timeline-alternatives-popup";
             popup.style.cssText = `
                 position: fixed;
-                background: rgba(15, 23, 42, 0.95);
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(15, 23, 42, 0.98);
                 border: 1px solid var(--color-cyan);
-                border-radius: 8px;
-                padding: 12px;
-                display: flex;
+                border-radius: 12px;
+                padding: 20px;
+                display: none;
                 flex-direction: column;
-                gap: 10px;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+                gap: 15px;
+                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
                 z-index: 10000;
                 font-family: sans-serif;
-                width: 320px;
+                width: 720px;
+                max-width: 90vw;
                 backdrop-filter: blur(10px);
                 color: #fff;
             `;
@@ -812,46 +854,74 @@ export class CapiauTimelineInteraction {
         }
 
         if (popup.dataset.clipId === clip.id && popup.style.display === "flex") {
-            return; // Evita reconstruir enquanto o mouse continua sobre o mesmo clipe
+            return;
         }
         popup.dataset.clipId = clip.id;
 
         // Renderiza lista de alternativas
         let altsHtml = "";
-        // Filtramos para não mostrar o vídeo ativo na lista de alternativas dele mesmo
         const activeAlts = (clip.alternatives || []).filter(alt => alt.video_id !== clip.video_id);
         
         activeAlts.forEach((alt, idx) => {
             const video = STATE.allVideos.find(v => v.id === alt.video_id);
-            const filename = video ? video.filename : `Vídeo ID ${alt.video_id}`;
+            if (!video) return;
+            const videoSrc = video.proxy_path || video.filepath || `/originals/${video.filename}`;
+            const targetSrc = `${videoSrc}#t=${alt.in_s.toFixed(1)},${alt.out_s.toFixed(1)}`;
+            
             altsHtml += `
-                <div class="alt-card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
-                    <div style="font-size: 11px; font-weight: bold; color: #f1f5f9; display:flex; justify-content:space-between;">
-                        <span>Candidato #${idx + 1}</span>
-                        <span style="font-size:9px; color:#c084fc;">ID ${alt.video_id}</span>
+                <div class="alt-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="position: relative; border-radius: 6px; overflow: hidden; background: #000; aspect-ratio: 16/9;">
+                        <video src="${targetSrc}" autoplay loop muted playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                        <div style="position: absolute; top: 8px; left: 8px; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px; color: #fff;">
+                            Candidato #${idx + 1}
+                        </div>
                     </div>
-                    <div style="font-size: 10px; color: var(--text-primary); text-overflow: ellipsis; white-space: nowrap; overflow: hidden; font-family: monospace;">${filename}</div>
-                    <div style="font-size: 10px; color: #94a3b8; line-height: 1.3;">"${alt.reason || 'Sem justificativa.'}"</div>
-                    <div style="font-size: 10px; color: var(--text-secondary);">Duração Ideal: ${alt.ideal_duration_s ? alt.ideal_duration_s.toFixed(1) + 's' : 'N/A'}</div>
-                    <div style="display: flex; gap: 6px; margin-top: 4px;">
-                        <button class="btn-alt-swap-fixed" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" style="flex: 1; height: 22px; font-size: 9px; font-weight: bold; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff; cursor: pointer; outline: none;">Slot Fixo</button>
-                        <button class="btn-alt-swap-ripple" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" style="flex: 1; height: 22px; font-size: 9px; font-weight: bold; background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3); border-radius: 4px; color: var(--color-cyan); cursor: pointer; outline: none;">Ripple</button>
+                    <div style="font-size: 12px; color: #e2e8f0; line-height: 1.4; flex-grow: 1; min-height: 36px;">
+                        "${alt.reason || 'Sem justificativa.'}"
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+                        <span>Duração Ideal: ${alt.ideal_duration_s ? alt.ideal_duration_s.toFixed(1) + 's' : 'N/A'}</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-alt-swap-fixed btn-icon" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" title="Slot Fixo (substitui mantendo a duração atual)" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; cursor: pointer; outline: none; transition: all 0.2s;">
+                                <i class="fa-solid fa-arrows-left-right"></i>
+                            </button>
+                            <button class="btn-alt-swap-ripple btn-icon" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" title="Ripple (aplica duração ideal e empurra os seguintes)" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 15px; background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3); border-radius: 6px; color: var(--color-cyan); cursor: pointer; outline: none; transition: all 0.2s;">
+                                <i class="fa-solid fa-angles-right"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
         });
 
         popup.innerHTML = `
-            <div style="font-size: 11px; color: var(--color-cyan); font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
-                <span><i class="fa-solid fa-wand-magic-sparkles"></i> OPÇÕES ALTERNATIVAS DA IA</span>
-                <span style="font-size: 9px; color: var(--text-secondary); cursor: pointer;" class="btn-close-alts"><i class="fa-solid fa-xmark"></i></span>
+            <style>
+                .btn-alt-swap-fixed:hover {
+                    background: rgba(255,255,255,0.15) !important;
+                    border-color: rgba(255,255,255,0.3) !important;
+                }
+                .btn-alt-swap-ripple:hover {
+                    background: rgba(6,182,212,0.25) !important;
+                    border-color: rgba(6,182,212,0.6) !important;
+                }
+                .btn-close-alts:hover {
+                    color: #fff !important;
+                }
+            </style>
+            <div style="font-size: 14px; color: var(--color-cyan); font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+                <span><i class="fa-solid fa-wand-magic-sparkles"></i> Opções Alternativas da IA</span>
+                <span style="font-size: 11px; color: var(--text-secondary); cursor: pointer; padding: 4px;" class="btn-close-alts"><i class="fa-solid fa-xmark"></i></span>
             </div>
-            <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
-                ${altsHtml || '<div style="font-size: 10px; color: var(--text-secondary); text-align: center; padding: 10px 0;">Nenhum clipe alternativo configurado no acervo.</div>'}
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: -5px;">
+                Atalho: pressione <kbd style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px; font-family: monospace;">A</kbd> para fechar ou clique fora.
+            </div>
+            <div style="max-height: 400px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; padding-right: 4px; margin-top: 10px;">
+                ${altsHtml || '<div style="grid-column: 1/-1; font-size: 12px; color: var(--text-secondary); text-align: center; padding: 20px 0;">Nenhum clipe alternativo configurado no acervo.</div>'}
             </div>
         `;
 
-        this._placeFixedPopup(popup, clientX, clientY);
+        backdrop.style.display = "block";
+        popup.style.display = "flex";
 
         // Listeners dos botões
         popup.querySelector(".btn-close-alts").onclick = () => this.hideAlternativesPopup();
@@ -881,9 +951,19 @@ export class CapiauTimelineInteraction {
      * Oculta o popup flutuante de alternativas.
      */
     hideAlternativesPopup() {
-        const popup = this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup");
+        const doc = this.canvas.ownerDocument;
+        const popup = doc.querySelector("#timeline-alternatives-popup");
+        const backdrop = doc.querySelector("#timeline-alternatives-backdrop");
         if (popup) {
             popup.style.display = "none";
+            // Limpar sources e pausar para economizar recursos
+            popup.querySelectorAll("video").forEach(v => {
+                v.pause();
+                v.src = "";
+            });
+        }
+        if (backdrop) {
+            backdrop.style.display = "none";
         }
     }
 }
