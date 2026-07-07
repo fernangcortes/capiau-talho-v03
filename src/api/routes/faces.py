@@ -14,6 +14,8 @@ from fastapi.responses import FileResponse, RedirectResponse
 
 from src.config import CONFIG
 from src.db.connection import get_db
+from src.db.repositories.entities import EntityRepository
+from src.nlp.enrichment_engine import enrich_after_face_labeling, enrich_photo, enrich_video_frames, enrich_in_background
 from src.services.face_service import get_face_service, FaceService
 from src.vision.face_pipeline import get_pipeline, FacePipeline
 
@@ -73,6 +75,9 @@ class ReassignFacesRequest(BaseModel):
     target_cluster_id: int
     target_name: str
 
+class DissociateFacesRequest(BaseModel):
+    face_ids: List[int]
+
 class ConfirmIdentityRequest(BaseModel):
     face_id: int
     person_id: int
@@ -104,6 +109,125 @@ class ManualFaceCreate(BaseModel):
     bounding_box: List[float]
     name: str
     text_to_replace: Optional[str] = None
+    entity_type: Optional[str] = None  # 'person' | 'object' | 'location' (heurística se ausente)
+
+
+# ── Helpers ──
+
+def _register_person_entity_mentions(project_id: int, name: str, face_ids: List[int]) -> None:
+    """Registra a pessoa na camada de entidades + uma menção por face rotulada."""
+    try:
+        with get_db() as conn:
+            entity_id = EntityRepository.upsert_entity(conn, project_id, name, "person")
+            cursor = conn.cursor()
+            qmarks = ",".join("?" * len(face_ids))
+            cursor.execute(f"SELECT photo_id, video_id, timestamp FROM face WHERE id IN ({qmarks})", face_ids)
+            for r in cursor.fetchall():
+                EntityRepository.add_mention(
+                    conn, entity_id, project_id,
+                    photo_id=r["photo_id"], video_id=r["video_id"], timestamp=r["timestamp"],
+                    source="face_recognition", status="confirmed"
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"[Entities] Falha ao registrar menções da pessoa '{name}': {e}")
+
+
+def _recover_photo_faces_task(project_id: int) -> None:
+    """Recuperação completa de rostos em fotos (para acervos ingeridos antes da detecção):
+
+    1. Detecta rostos localmente (YuNet/SFace) em todas as fotos SEM detecção prévia.
+    2. Re-clusteriza o projeto inteiro — fotos herdam os nomes já rotulados nos vídeos.
+    3. Registra as menções na camada de entidades.
+    4. Re-enriquece as descrições do projeto (nomes entram no texto + reindexação).
+
+    NÃO refaz nenhuma análise de visão paga — só detecção local + reescrita barata.
+    """
+    from src.core.tasks import TASK_MANAGER
+    from src.vision.face_engine import process_photo_faces
+    from src.nlp.enrichment_engine import enrich_project
+
+    task_key = f"recover-faces-{project_id}"
+    try:
+        TASK_MANAGER.update_progress(task_key, 0.0, "running", task_type="faces")
+
+        # 1. Fotos sem nenhuma face detectada
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT p.id, p.filepath FROM photo p
+                WHERE p.project_id = ? AND p.status != 'error'
+                  AND NOT EXISTS (SELECT 1 FROM face f WHERE f.photo_id = p.id)
+                ORDER BY p.id
+            """, (project_id,))
+            pending = [(r["id"], r["filepath"]) for r in cursor.fetchall()]
+
+        total = len(pending)
+        print(f"[RECOVER] {total} fotos sem detecção facial. Iniciando varredura local...")
+
+        detected_photos = 0
+        for idx, (photo_id, filepath) in enumerate(pending):
+            if idx % 10 == 0:
+                TASK_MANAGER.update_progress(task_key, (idx / max(total, 1)) * 70.0, "running", task_type="faces")
+            proxy = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{photo_id}.webp"
+            target = proxy if proxy.exists() else Path(filepath)
+            if not target.exists():
+                continue
+            try:
+                process_photo_faces(project_id, photo_id, target)
+                detected_photos += 1
+            except Exception as fe:
+                print(f"[RECOVER] Falha na foto {photo_id}: {fe}")
+
+        # 2. Re-clustering global (nomes reais propagam para as novas faces)
+        TASK_MANAGER.update_progress(task_key, 75.0, "running", task_type="faces")
+        service = get_face_service()
+        cluster_result = service.cluster_project_faces(project_id)
+        print(f"[RECOVER] Clustering: {cluster_result}")
+
+        # 3. Menções de entidades para as faces nomeadas (fotos e vídeos)
+        TASK_MANAGER.update_progress(task_key, 85.0, "running", task_type="faces")
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, name, photo_id, video_id, timestamp FROM face
+                WHERE project_id = ? AND name IS NOT NULL AND name != ''
+                  AND name NOT LIKE 'Pessoa Desconhecida%'
+                  AND name NOT IN ('Não Relevante', 'Não é Rosto')
+            """, (project_id,))
+            named = cursor.fetchall()
+            for r in named:
+                entity_id = EntityRepository.upsert_entity(conn, project_id, r["name"], "person")
+                EntityRepository.add_mention(
+                    conn, entity_id, project_id,
+                    photo_id=r["photo_id"], video_id=r["video_id"], timestamp=r["timestamp"],
+                    source="face_recognition", status="confirmed"
+                )
+            conn.commit()
+
+        # 4. Reescrita das descrições com os nomes + reindexação semântica
+        TASK_MANAGER.update_progress(task_key, 90.0, "running", task_type="faces")
+        enrich_result = enrich_project(project_id)
+
+        TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="faces")
+        print(f"[RECOVER] Concluído: {detected_photos} fotos varridas, "
+              f"{len(named)} faces nomeadas, enriquecimento: {enrich_result}")
+    except Exception as e:
+        print(f"[RECOVER] Erro crítico na recuperação de rostos: {e}")
+        TASK_MANAGER.update_progress(task_key, 0.0, "failed", task_type="faces")
+
+
+@router.post("/project/{project_id}/recover-photo-faces")
+async def recover_photo_faces(project_id: int):
+    """Dispara em background: detecção facial nas fotos sem detecção + re-clustering
+    (herança de nomes) + menções de entidades + enriquecimento das descrições."""
+    import threading
+    threading.Thread(target=_recover_photo_faces_task, args=(project_id,), daemon=True).start()
+    return {
+        "status": "success",
+        "message": "Recuperação de rostos iniciada em background. Acompanhe na aba Tarefas. "
+                   "Ao final, as descrições de fotos e vídeos serão reescritas com os nomes."
+    }
 
 
 # ── Rotas ──
@@ -205,29 +329,55 @@ async def add_manual_face(payload: ManualFaceCreate):
             VALUES (?, 4, 'manual', 'v1.0', ?, 1.0, 'confirmed', 'user')
         """, (face_id, person_id))
         
-        # Se for um objeto/tag (não apenas pessoa), também podemos adicionar um relacionamento de narrativa
+        # ── Camada de Entidades: registra a entidade canônica + menção confirmada ──
+        # Heurística de tipo: com trecho de texto vinculado ou bounding box vazia = objeto;
+        # caso contrário (rosto desenhado/pessoa), pessoa.
+        entity_type = payload.entity_type
+        if entity_type not in ("person", "object", "location", "other"):
+            is_boxless = not payload.bounding_box or all(v == 0 for v in payload.bounding_box)
+            entity_type = "object" if (payload.text_to_replace or is_boxless) else "person"
+
+        try:
+            entity_id = EntityRepository.upsert_entity(conn, payload.project_id, payload.name, entity_type)
+            EntityRepository.add_mention(
+                conn, entity_id, payload.project_id,
+                photo_id=payload.photo_id, video_id=payload.video_id,
+                timestamp=payload.timestamp,
+                source="text_link" if payload.text_to_replace else "human_audit",
+                status="confirmed",
+                text_to_replace=payload.text_to_replace
+            )
+        except Exception as ent_err:
+            print(f"[Entities] Falha ao registrar entidade manual: {ent_err}")
+
+        # Grafo relacional + indexação semântica da anotação para busca
         if payload.video_id:
             cursor.execute("""
                 INSERT INTO relation (project_id, subject_type, subject_id, predicate, object_type, object_id, weight)
                 VALUES (?, 'video', ?, 'features_element', 'theme', ?, 1.0)
             """, (payload.project_id, str(payload.video_id), payload.name))
-            
-            # Também indexa o novo tema/objeto no Qdrant para busca semântica
+
             try:
                 from src.search.semantic import SemanticSearch
                 search_engine = SemanticSearch.get_instance()
-                search_engine.index_video_dialogue(
+                search_engine.index_annotation(
                     project_id=payload.project_id,
                     video_id=payload.video_id,
-                    speaker_id="object_tag",
-                    start_time=payload.timestamp,
-                    end_time=payload.timestamp + 2.0,
-                    text=f"[Elemento/Objeto detectado: {payload.name}]"
+                    start_time=payload.timestamp or 0.0,
+                    end_time=(payload.timestamp or 0.0) + 2.0,
+                    text=f"Elemento/Objeto marcado pelo usuário: {payload.name}"
                 )
             except Exception as qdrant_err:
                 print(f"[Qdrant] Falha ao indexar objeto manual no Qdrant: {qdrant_err}")
-                
+
         conn.commit()
+
+    # Reescreve e reindexa as descrições afetadas em background (LLM + Qdrant)
+    if payload.photo_id:
+        enrich_in_background(enrich_photo, payload.project_id, payload.photo_id)
+    elif payload.video_id and payload.timestamp is not None:
+        enrich_in_background(enrich_video_frames, payload.project_id, payload.video_id, [payload.timestamp])
+
     return {"status": "success", "face_id": face_id, "person_id": person_id}
 
 
@@ -424,9 +574,16 @@ async def merge_project_clusters(project_id: int, request: MergeClustersRequest)
     service.merge_clusters(project_id, request.src_cluster_id, request.dest_cluster_id, request.name)
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("UPDATE face SET name = ? WHERE project_id = ? AND cluster_id = ?", 
+        cursor.execute("UPDATE face SET name = ? WHERE project_id = ? AND cluster_id = ?",
                        (request.name, project_id, request.dest_cluster_id))
+        cursor.execute("SELECT id FROM face WHERE project_id = ? AND cluster_id = ?", (project_id, request.dest_cluster_id))
+        merged_face_ids = [r["id"] for r in cursor.fetchall()]
         conn.commit()
+
+    if merged_face_ids:
+        _register_person_entity_mentions(project_id, request.name, merged_face_ids)
+    enrich_in_background(enrich_after_face_labeling, project_id, cluster_id=request.dest_cluster_id)
+
     return {"status": "success", "message": f"Cluster {request.src_cluster_id} mesclado com {request.dest_cluster_id}"}
 
 
@@ -434,9 +591,57 @@ async def merge_project_clusters(project_id: int, request: MergeClustersRequest)
 async def reassign_project_faces(project_id: int, request: ReassignFacesRequest):
     """Reatribui faces de forma unitaria (desambiguacao manual)."""
     service = get_face_service()
+    
+    target_cluster_id = request.target_cluster_id
+    target_name = request.target_name.strip()
+    
+    # Se target_cluster_id nao for informado ou for negativo/invalido, tenta descobrir ou criar novo
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Se tem nome, verificar se ja existe um cluster_id associado a esse nome
+        if target_name:
+            cursor.execute("""
+                SELECT DISTINCT cluster_id FROM face 
+                WHERE project_id = ? AND name = ? AND cluster_id IS NOT NULL AND cluster_id >= 0
+                LIMIT 1
+            """, (project_id, target_name))
+            row = cursor.fetchone()
+            if row:
+                target_cluster_id = row["cluster_id"]
+            elif target_cluster_id is None or target_cluster_id < 0:
+                # Gerar um novo cluster_id unico para o projeto
+                cursor.execute("SELECT MAX(cluster_id) as max_cid FROM face WHERE project_id = ? AND cluster_id IS NOT NULL", (project_id,))
+                max_row = cursor.fetchone()
+                max_cid = max_row["max_cid"] if max_row and max_row["max_cid"] is not None else -1
+                target_cluster_id = max_cid + 1
+
+    # Encontrar ou criar a pessoa no banco
+    if target_name:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM person WHERE project_id = ? AND name = ?", (project_id, target_name))
+            row = cursor.fetchone()
+            if row:
+                person_id = row["id"]
+            else:
+                cursor.execute("INSERT INTO person (project_id, name) VALUES (?, ?)", (project_id, target_name))
+                person_id = cursor.lastrowid
+                conn.commit()
+    else:
+        person_id = None
+        
     for fid in request.face_ids:
-        service.reassign_face(fid, request.target_cluster_id, request.target_name)
-    return {"status": "success", "message": f"{len(request.face_ids)} faces reatribuídas com sucesso."}
+        # Reatribuir a face para o cluster e nome corretos
+        service.reassign_face(fid, target_cluster_id, target_name)
+        if person_id is not None:
+            service.confirm_face_identity(fid, person_id)
+            
+    if target_name:
+        _register_person_entity_mentions(project_id, target_name, request.face_ids)
+    enrich_in_background(enrich_after_face_labeling, project_id, face_ids=request.face_ids)
+
+    return {"status": "success", "message": f"{len(request.face_ids)} faces reatribuídas com sucesso.", "target_cluster_id": target_cluster_id}
 
 
 @router.post("/confirm-identity")
@@ -539,17 +744,118 @@ async def list_unlabeled_faces(project_id: int):
 
 @router.get("/project/{project_id}/face-clusters/{cluster_id}/faces")
 async def list_cluster_faces(project_id: int, cluster_id: int):
-    """Retorna todas as faces individuais de um cluster."""
+    """Retorna todas as faces individuais de um cluster com paths de midias para preview."""
     try:
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, bounding_box, photo_id, video_id, timestamp, name 
-                FROM face 
-                WHERE project_id = ? AND cluster_id = ?
+                SELECT f.id, f.bounding_box, f.photo_id, f.video_id, f.timestamp, f.name, f.cluster_id,
+                       p.filename as photo_filename, p.filepath as photo_filepath,
+                       v.filename as video_filename, v.filepath as video_filepath
+                FROM face f
+                LEFT JOIN photo p ON f.photo_id = p.id
+                LEFT JOIN video v ON f.video_id = v.id
+                WHERE f.project_id = ? AND f.cluster_id = ?
+                ORDER BY f.id DESC
             """, (project_id, cluster_id))
             rows = cursor.fetchall()
-            return [dict(r) for r in rows]
+            
+            res = []
+            for r in rows:
+                row_dict = dict(r)
+                if row_dict["video_id"] is not None:
+                    proxy_rel = f"proxy_vid_{row_dict['video_id']}.mp4"
+                    if (CONFIG.PROXIES_DIR / proxy_rel).exists():
+                        row_dict["video_proxy_path"] = f"/proxies/{proxy_rel}"
+                    else:
+                        from src.services.s3_service import S3Service
+                        s3_service = S3Service.get_instance()
+                        if s3_service.enabled:
+                            s3_key = f"proxies/{proxy_rel}"
+                            presigned_url = s3_service.generate_presigned_url(s3_key)
+                            row_dict["video_proxy_path"] = presigned_url
+                        else:
+                            row_dict["video_proxy_path"] = None
+                else:
+                    row_dict["video_proxy_path"] = None
+                
+                if row_dict["photo_id"] is not None:
+                    proxy_rel = f"photos/proxy_photo_{row_dict['photo_id']}.webp"
+                    if (CONFIG.PROXIES_DIR / proxy_rel).exists():
+                        row_dict["photo_proxy_path"] = f"/proxies/{proxy_rel}"
+                    else:
+                        row_dict["photo_proxy_path"] = None
+                else:
+                    row_dict["photo_proxy_path"] = None
+                    
+                res.append(row_dict)
+            return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/project/{project_id}/faces/dissociate")
+async def dissociate_project_faces(project_id: int, request: DissociateFacesRequest):
+    """Remove a identificação de um conjunto de faces, voltando a serem desconhecidas."""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            
+            for fid in request.face_ids:
+                # 1. Recuperar info da face
+                cursor.execute("SELECT name, photo_id, video_id, timestamp, cluster_id FROM face WHERE id = ?", (fid,))
+                face_row = cursor.fetchone()
+                if not face_row:
+                    continue
+                
+                old_name = face_row["name"]
+                cluster_id = face_row["cluster_id"]
+                
+                # 2. Desconfirmar/supersede reconhecimento manual do usuário
+                cursor.execute("UPDATE face_recognition SET status = 'superseded' WHERE face_id = ?", (fid,))
+                
+                # 3. Atualizar nome na face para o placeholder padrão se tiver cluster_id, senão NULL
+                if cluster_id is not None and cluster_id >= 0:
+                    placeholder_name = f"Pessoa Desconhecida (Grupo {cluster_id + 1})"
+                else:
+                    placeholder_name = None
+                
+                cursor.execute("UPDATE face SET name = ? WHERE id = ?", (placeholder_name, fid))
+                
+                # 4. Limpar entidade correspondente nas menções se não houver mais faces dessa pessoa na mídia
+                if old_name:
+                    cursor.execute("SELECT id FROM person WHERE project_id = ? AND name = ?", (project_id, old_name))
+                    person_row = cursor.fetchone()
+                    if person_row:
+                        person_id = person_row["id"]
+                        photo_id = face_row["photo_id"]
+                        video_id = face_row["video_id"]
+                        timestamp = face_row["timestamp"]
+                        
+                        if photo_id is not None:
+                            cursor.execute("SELECT id FROM face WHERE photo_id = ? AND name = ? AND id != ?", (photo_id, old_name, fid))
+                        else:
+                            cursor.execute("SELECT id FROM face WHERE video_id = ? AND ABS(timestamp - ?) <= 0.1 AND name = ? AND id != ?", (video_id, timestamp, old_name, fid))
+                            
+                        other_face = cursor.fetchone()
+                        if not other_face:
+                            if photo_id is not None:
+                                cursor.execute("""
+                                    DELETE FROM entity_mention 
+                                    WHERE entity_id = ? AND project_id = ? AND photo_id = ?
+                                """, (person_id, project_id, photo_id))
+                            else:
+                                cursor.execute("""
+                                    DELETE FROM entity_mention 
+                                    WHERE entity_id = ? AND project_id = ? AND video_id = ? AND ABS(timestamp - ?) <= 0.1
+                                """, (person_id, project_id, video_id, timestamp))
+            
+            conn.commit()
+            
+        # Re-enriquecer em background
+        enrich_in_background(enrich_after_face_labeling, project_id, face_ids=request.face_ids)
+        
+        return {"status": "success", "message": f"{len(request.face_ids)} faces desassociadas com sucesso."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -615,16 +921,19 @@ async def label_face(face_id: int, payload: LabelFaceRequest):
             cursor = conn.cursor()
             cursor.execute("SELECT id FROM face WHERE project_id = ? AND cluster_id = ?", (project_id, current_cluster_id))
             face_ids = [r["id"] for r in cursor.fetchall()]
-        
+
         for fid in face_ids:
             service.confirm_face_identity(fid, person_id)
-        
+
         # Atualizar cache de nomes na tabela face
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE face SET name = ? WHERE project_id = ? AND cluster_id = ?", (new_name, project_id, current_cluster_id))
             conn.commit()
-            
+
+        _register_person_entity_mentions(project_id, new_name, face_ids)
+        enrich_in_background(enrich_after_face_labeling, project_id, cluster_id=current_cluster_id)
+
         return {"status": "success", "message": f"Todas as faces do Grupo {current_cluster_id + 1} foram rotuladas como '{new_name}'."}
     else:
         service.confirm_face_identity(face_id, person_id)
@@ -632,6 +941,10 @@ async def label_face(face_id: int, payload: LabelFaceRequest):
             cursor = conn.cursor()
             cursor.execute("UPDATE face SET name = ? WHERE id = ?", (new_name, face_id))
             conn.commit()
+
+        _register_person_entity_mentions(project_id, new_name, [face_id])
+        enrich_in_background(enrich_after_face_labeling, project_id, face_ids=[face_id])
+
         return {"status": "success", "message": f"Rosto ID {face_id} rotulado individualmente como '{new_name}'."}
 
 
@@ -661,9 +974,15 @@ async def get_face_thumbnail(face_id: int):
         temp_frame_path = None
         
         if row["photo_id"] is not None:
-            img_path = Path(row["photo_path"])
-            if not img_path.exists():
-                img_path = Path("c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP") / img_path
+            # Prefere carregar o proxy webp leve para evitar decodificar RAW pesados (.CR2, etc.) no OpenCV
+            proxy_rel = f"photos/proxy_photo_{row['photo_id']}.webp"
+            proxy_path = CONFIG.PROXIES_DIR / proxy_rel
+            if proxy_path.exists():
+                img_path = proxy_path
+            else:
+                img_path = Path(row["photo_path"])
+                if not img_path.exists():
+                    img_path = Path("c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP") / img_path
         elif row["video_id"] is not None:
             video_path = Path(row["video_path"])
             if not video_path.exists():
@@ -688,7 +1007,7 @@ async def get_face_thumbnail(face_id: int):
             if crop_row and crop_row["crop_path"]:
                 crop_p = Path(crop_row["crop_path"])
                 if crop_p.exists():
-                    return FileResponse(str(crop_p))
+                    return FileResponse(str(crop_p), media_type="image/jpeg")
                 else:
                     # Se nao existe localmente, mas S3 esta ativo, redirecionar para a URL assinada
                     from src.services.s3_service import S3Service
@@ -700,7 +1019,23 @@ async def get_face_thumbnail(face_id: int):
                             return RedirectResponse(presigned_url)
             raise HTTPException(status_code=404, detail="Midia fisica para crop nao encontrada.")
         
-        img = cv2.imread(str(img_path))
+        img = None
+        if img_path and img_path.exists():
+            ext = img_path.suffix.lower()
+            raw_extensions = {'.arw', '.cr2', '.nef', '.dng', '.pef', '.raf', '.orf', '.rw2', '.raw'}
+            if ext in raw_extensions:
+                try:
+                    import rawpy
+                    with rawpy.imread(str(img_path)) as raw:
+                        rgb = raw.postprocess(half_size=True, use_camera_wb=True)
+                        img = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                except Exception as raw_err:
+                    print(f"[Faces API] Erro ao ler RAW {img_path.name} via rawpy: {raw_err}")
+                    img = None
+            
+            if img is None:
+                img = cv2.imread(str(img_path))
+                
         if img is None:
             raise HTTPException(status_code=500, detail="Erro ao ler imagem original.")
             
@@ -720,7 +1055,7 @@ async def get_face_thumbnail(face_id: int):
         out_crop_path = temp_dir / f"face_thumb_{face_id}.jpg"
         cv2.imwrite(str(out_crop_path), crop)
         
-        return FileResponse(str(out_crop_path))
+        return FileResponse(str(out_crop_path), media_type="image/jpeg")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -798,6 +1133,23 @@ async def reject_face(face_id: int, payload: Optional[RejectFaceRequest] = None)
         
         # Limpar o nome e salvar o nome do objeto (ou 'Não Relevante')
         cursor.execute("UPDATE face SET name = ? WHERE id = ?", (target_name, face_id))
+        cursor.execute("SELECT project_id, photo_id, video_id, timestamp FROM face WHERE id = ?", (face_id,))
+        face_row = cursor.fetchone()
         conn.commit()
-        
+
+    # Se o usuário identificou um OBJETO (não apenas descartou), registra como entidade
+    if target_name != "Não Relevante" and face_row:
+        try:
+            with get_db() as conn:
+                entity_id = EntityRepository.upsert_entity(conn, face_row["project_id"], target_name, "object")
+                EntityRepository.add_mention(
+                    conn, entity_id, face_row["project_id"],
+                    photo_id=face_row["photo_id"], video_id=face_row["video_id"],
+                    timestamp=face_row["timestamp"], source="human_audit", status="confirmed"
+                )
+                conn.commit()
+            enrich_in_background(enrich_after_face_labeling, face_row["project_id"], face_ids=[face_id])
+        except Exception as e:
+            print(f"[Entities] Falha ao registrar objeto rejeitado: {e}")
+
     return {"status": "success", "message": f"Face rejeitada com sucesso (rotulada como '{target_name}')."}
