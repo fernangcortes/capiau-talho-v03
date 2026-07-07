@@ -43,7 +43,9 @@ Os comandos abaixo ficam disponíveis ao interagir com a linha do tempo ou com c
 | **`Enter` / `Y`** | **Aceitar Sugestão da IA** | Aceita e consolida o clipe fantasma (*ghost clip*) selecionado na timeline. |
 | **`U`** | **Desvincular Par A/V** | Desvincula o clipe de vídeo selecionado de seu respectivo par de áudio para trims independentes (J/L-cuts). |
 | **`Setas (← / →)`** | **Deslocar Clipe (Nudge)** | Desloca o clipe selecionado exatamente 1 frame para a esquerda ou direita na timeline. |
-| **`[` / `]`** | **Ajustar Bordas (Nudge Trim)** | Ajusta a borda esquerda para trás (`[`) ou a borda direita para a frente (`]`) em 1 frame. |
+| **`Alt + Setas (← / →)`** | **Ajustar Entrada (Trim In)** | Ajusta a borda esquerda (In-point) do clipe selecionado em 1 frame para trás (←) ou para a frente (→). (Alternativa layout-independent). |
+| **`Shift + Setas (← / →)`** | **Ajustar Saída (Trim Out)** | Ajusta a borda direita (Out-point) do clipe selecionado em 1 frame para trás (←) ou para a frente (→). (Alternativa layout-independent). |
+| **`[` / `]`** | **Ajustar Bordas (Nudge Trim)** | Atalho clássico de uma tecla: ajusta a borda esquerda para trás (`[`) ou a borda direita para a frente (`]`) em 1 frame. |
 | **`Ctrl + Z`** | **Desfazer** | Desfaz o último passo de edição na timeline. |
 | **`Ctrl + Y` ou `Ctrl+Shift+Z`** | **Refazer** | Refaz o passo de edição desfeito. |
 

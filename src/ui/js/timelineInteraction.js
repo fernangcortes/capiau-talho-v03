@@ -422,11 +422,27 @@ export class CapiauTimelineInteraction {
             }
         }
         else if (e.key === "ArrowLeft") {
-            this.nudgeSelection(selectedId, -1); // 1 frame para trás
+            if (selectedId) {
+                if (e.altKey) {
+                    this.nudgeTrim(selectedId, "left", -1);
+                } else if (e.shiftKey) {
+                    this.nudgeTrim(selectedId, "right", -1);
+                } else {
+                    this.nudgeSelection(selectedId, -1); // 1 frame para trás
+                }
+            }
             e.preventDefault();
         }
         else if (e.key === "ArrowRight") {
-            this.nudgeSelection(selectedId, 1);  // 1 frame para frente
+            if (selectedId) {
+                if (e.altKey) {
+                    this.nudgeTrim(selectedId, "left", 1);
+                } else if (e.shiftKey) {
+                    this.nudgeTrim(selectedId, "right", 1);
+                } else {
+                    this.nudgeSelection(selectedId, 1); // 1 frame para frente
+                }
+            }
             e.preventDefault();
         }
         else if (e.key === "[") {
