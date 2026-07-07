@@ -76,18 +76,22 @@ export function timecodeToFrames(tc, fps = 24) {
 // --- MODELO DE PISTAS ---
 
 // Alturas por tipo de pista (px no canvas)
-export const TRACK_HEIGHTS = { ai: 44, video: 72, audio: 56 };
+export const TRACK_HEIGHTS = { ai: 44, video: 72, audio: 48 };
 
 /**
  * Pistas padrão (ordem do array = ordem visual de cima para baixo).
  * "AI" é a pista de sugestões: somente leitura, recebe os ghost clips.
  * "V1" é magnética (ripple) por padrão; "V2" é livre.
+ * "A1"/"A2" são pistas de áudio reais: recebem o áudio vinculado (link_id)
+ * dos clipes de vídeo, com trims independentes (L-cuts / J-cuts).
  */
 function defaultTracks() {
     return [
         { id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, magnetic: false },
         { id: "V2", name: "B-Roll", kind: "video", volume: 1.0, muted: false, locked: false, magnetic: false },
-        { id: "V1", name: "Falas", kind: "video", volume: 1.0, muted: false, locked: false, magnetic: true }
+        { id: "V1", name: "Falas", kind: "video", volume: 1.0, muted: false, locked: false, magnetic: true },
+        { id: "A1", name: "Áudio Falas", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false },
+        { id: "A2", name: "Áudio B-Roll", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false }
     ];
 }
 
@@ -122,8 +126,37 @@ export class CapiauTimelineState {
         return this.tracks.filter(t => t.kind === "video");
     }
 
+    /** Pistas de áudio em ordem visual (de cima para baixo). */
+    getAudioTracks() {
+        return this.tracks.filter(t => t.kind === "audio");
+    }
+
     getAiTrack() {
         return this.tracks.find(t => t.kind === "ai") || null;
+    }
+
+    /** Tipo (kind) da pista pelo id, com fallback "video" para pistas desconhecidas. */
+    trackKindOf(trackId) {
+        const t = this.getTrack(trackId);
+        return t ? (t.kind || "video") : "video";
+    }
+
+    /**
+     * Pista de áudio pareada de uma pista de vídeo (para onde vai o áudio vinculado):
+     * V1→A1 por sufixo numérico; senão por índice (base→topo); senão a primeira de áudio.
+     */
+    pairedAudioTrackId(videoTrackId) {
+        const audioTracks = this.getAudioTracks();
+        if (!audioTracks.length) return null;
+        const num = String(videoTrackId).replace(/\D/g, "");
+        if (num) {
+            const direct = audioTracks.find(t => t.id === `A${num}`);
+            if (direct) return direct.id;
+        }
+        const videoTracks = this.getVideoTracks();
+        const idxFromBottom = [...videoTracks].reverse().findIndex(t => t.id === videoTrackId);
+        if (idxFromBottom >= 0 && idxFromBottom < audioTracks.length) return audioTracks[idxFromBottom].id;
+        return audioTracks[0].id;
     }
 
     trackHeight(track) {
@@ -170,44 +203,82 @@ export class CapiauTimelineState {
             locked: false,
             magnetic: false
         };
-        // Insere abaixo da pista de IA (índice 1) para ficar no topo das pistas de vídeo
-        const aiIdx = this.tracks.findIndex(t => t.kind === "ai");
-        this.tracks.splice(aiIdx >= 0 ? aiIdx + 1 : 0, 0, track);
-        STATE.emit("timelineTracksChanged", this.tracks);
+        TIMELINE_HISTORY.record(() => {
+            // Insere abaixo da pista de IA (índice 1) para ficar no topo das pistas de vídeo
+            const aiIdx = this.tracks.findIndex(t => t.kind === "ai");
+            this.tracks.splice(aiIdx >= 0 ? aiIdx + 1 : 0, 0, track);
+            STATE.emit("timelineTracksChanged", this.tracks);
+        });
         return track;
     }
 
-    /** Remove uma pista (os clipes dela são movidos para a pista de vídeo mais próxima). */
+    /** Adiciona uma nova pista de áudio (sempre na base da timeline). */
+    addAudioTrack(name = null) {
+        let n = 1;
+        while (this.tracks.some(t => t.id === `A${n}`)) n++;
+        const track = {
+            id: `A${n}`,
+            name: name || `Áudio ${n}`,
+            kind: "audio",
+            volume: 1.0,
+            muted: false,
+            locked: false,
+            magnetic: false
+        };
+        TIMELINE_HISTORY.record(() => {
+            this.tracks.push(track);
+            STATE.emit("timelineTracksChanged", this.tracks);
+        });
+        return track;
+    }
+
+    /** Remove uma pista (os clipes dela vão para a pista mais próxima do mesmo tipo). */
     removeTrack(trackId) {
         const idx = this.tracks.findIndex(t => t.id === trackId);
         if (idx === -1) return false;
         const track = this.tracks[idx];
         if (track.kind === "ai") return false; // pista de IA é permanente
-        if (this.getVideoTracks().length <= 1) return false; // sempre resta 1 pista de vídeo
+        if (track.kind === "video" && this.getVideoTracks().length <= 1) return false; // sempre resta 1 pista de vídeo
 
-        this.tracks.splice(idx, 1);
-        const fallback = this.getVideoTracks()[this.getVideoTracks().length - 1];
+        TIMELINE_HISTORY.record(() => {
+            this.tracks.splice(idx, 1);
+            const sameKind = this.tracks.filter(t => t.kind === track.kind);
+            const fallback = sameKind.length ? sameKind[sameKind.length - 1] : null;
 
-        // Move os clipes órfãos
-        const cuts = [...STATE.activeTimelineCuts];
-        let moved = false;
-        cuts.forEach(c => {
-            if (c.track === trackId) {
-                c.track = fallback.id;
-                moved = true;
+            let cuts = [...STATE.activeTimelineCuts];
+            let changed = false;
+            if (fallback) {
+                // Move os clipes órfãos para outra pista do mesmo tipo
+                cuts.forEach(c => {
+                    if (c.track === trackId) {
+                        c.track = fallback.id;
+                        changed = true;
+                    }
+                });
+            } else {
+                // Última pista de áudio removida: clipes dela saem e os pares ficam desvinculados
+                const removedLinks = new Set(cuts.filter(c => c.track === trackId && c.link_id).map(c => c.link_id));
+                const before = cuts.length;
+                cuts = cuts.filter(c => c.track !== trackId);
+                changed = cuts.length !== before;
+                cuts.forEach(c => {
+                    if (c.link_id && removedLinks.has(c.link_id)) c.link_id = null;
+                });
             }
+            STATE.emit("timelineTracksChanged", this.tracks);
+            if (changed) STATE.activeTimelineCuts = cuts;
+            else STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
         });
-        STATE.emit("timelineTracksChanged", this.tracks);
-        if (moved) STATE.activeTimelineCuts = cuts;
-        else STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
         return true;
     }
 
     renameTrack(trackId, newName) {
         const track = this.getTrack(trackId);
         if (!track || !newName) return;
-        track.name = newName.trim();
-        STATE.emit("timelineTracksChanged", this.tracks);
+        TIMELINE_HISTORY.record(() => {
+            track.name = newName.trim();
+            STATE.emit("timelineTracksChanged", this.tracks);
+        });
     }
 
     setTrackVolume(trackId, volume) {
@@ -234,11 +305,13 @@ export class CapiauTimelineState {
 
     toggleTrackMagnetic(trackId) {
         const track = this.getTrack(trackId);
-        if (!track || track.kind === "ai") return;
-        track.magnetic = !track.magnetic;
-        STATE.emit("timelineTracksChanged", this.tracks);
-        // Reaplica o layout (o setter recalcula posições das pistas magnéticas)
-        STATE.activeTimelineCuts = [...STATE.activeTimelineCuts];
+        if (!track || track.kind !== "video") return; // ripple magnético só em pistas de vídeo
+        TIMELINE_HISTORY.record(() => {
+            track.magnetic = !track.magnetic;
+            STATE.emit("timelineTracksChanged", this.tracks);
+            // Reaplica o layout (o setter recalcula posições das pistas magnéticas)
+            STATE.activeTimelineCuts = [...STATE.activeTimelineCuts];
+        });
     }
 
     /** Serializa as pistas para persistência/API. */
@@ -316,6 +389,7 @@ export class CapiauTimelineState {
             const outFrame = cut.outFrame !== undefined ? cut.outFrame : secondsToFrames(cut.out, fps);
 
             return {
+                ...cut,
                 id: cut.id || `cut_${index}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
                 video_id: cut.video_id,
                 inFrame: Math.round(inFrame),
@@ -323,7 +397,8 @@ export class CapiauTimelineState {
                 in: cut.in !== undefined ? cut.in : framesToSeconds(inFrame, fps),
                 out: cut.out !== undefined ? cut.out : framesToSeconds(outFrame, fps),
                 track: cut.track || "V1",
-                timelineStartFrame: cut.timelineStartFrame
+                timelineStartFrame: cut.timelineStartFrame,
+                link_id: cut.link_id || null
             };
         });
     }
@@ -356,23 +431,73 @@ export class CapiauTimelineState {
 
         const inFrame = secondsToFrames(inSec, this.fps);
         const outFrame = secondsToFrames(outSec, this.fps);
+        const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        // Par A/V: o áudio nasce vinculado (link_id) na pista de áudio pareada
+        const audioTrackId = this.pairedAudioTrackId(track);
+        const linkId = audioTrackId ? `link_${stamp}` : null;
 
         const newCut = {
-            id: `cut_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            id: `cut_${stamp}`,
             video_id: videoId,
             inFrame: inFrame,
             outFrame: outFrame,
             in: inSec,
             out: outSec,
-            track: track
+            track: track,
+            link_id: linkId
         };
 
-        const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
-        currentCuts.push(newCut);
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
+            currentCuts.push(newCut);
+            if (audioTrackId) {
+                currentCuts.push({
+                    id: `cut_${stamp}_a`,
+                    video_id: videoId,
+                    inFrame: inFrame,
+                    outFrame: outFrame,
+                    in: inSec,
+                    out: outSec,
+                    track: audioTrackId,
+                    link_id: linkId
+                });
+            }
 
-        // Atualiza o estado global reativo
-        STATE.activeTimelineCuts = currentCuts;
+            // Atualiza o estado global reativo
+            STATE.activeTimelineCuts = currentCuts;
+        });
         return newCut;
+    }
+
+    /**
+     * Migração A/V: garante que existam pistas de áudio e cria clipes de áudio
+     * vinculados para clipes de vídeo sem par (timelines antigas v1/v2 sem áudio).
+     */
+    migrateCutsToAV(cuts) {
+        if (!this.getAudioTracks().length) {
+            this.tracks.push(
+                { id: "A1", name: "Áudio Falas", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false },
+                { id: "A2", name: "Áudio B-Roll", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false }
+            );
+            STATE.emit("timelineTracksChanged", this.tracks);
+        }
+
+        const result = [...cuts];
+        cuts.forEach((cut, idx) => {
+            if (this.trackKindOf(cut.track) !== "video" || cut.link_id) return;
+            const audioTrackId = this.pairedAudioTrackId(cut.track);
+            if (!audioTrackId) return;
+            const linkId = `link_migr_${idx}_${Date.now()}`;
+            cut.link_id = linkId;
+            result.push({
+                ...cut,
+                id: `${cut.id || `cut_migr_${idx}`}_a`,
+                track: audioTrackId,
+                link_id: linkId
+            });
+        });
+        return result;
     }
 
     // ── SUGESTÕES DE IA (GHOST CLIPS) ───────────────────────────────────
@@ -396,14 +521,23 @@ export class CapiauTimelineState {
                 outFrame: Math.round(outFrame),
                 in: s.in !== undefined ? s.in : framesToSeconds(inFrame, fps),
                 out: s.out !== undefined ? s.out : framesToSeconds(outFrame, fps),
-                timelineStartFrame: s.timelineStartFrame !== undefined
+                // O backend envia timelineStartFrame: null + posição em segundos
+                // (timeline_start ou timeline_start_s) — null NÃO pode virar frame 0
+                timelineStartFrame: (s.timelineStartFrame !== undefined && s.timelineStartFrame !== null)
                     ? Math.round(s.timelineStartFrame)
-                    : secondsToFrames(s.timeline_start_s || 0, this.fps),
+                    : secondsToFrames(
+                        (s.timeline_start_s !== undefined && s.timeline_start_s !== null)
+                            ? s.timeline_start_s
+                            : (s.timeline_start || 0),
+                        fps
+                    ),
                 track: this.getTrack(s.track) ? s.track : fallbackTrack, // pista de DESTINO ao aceitar
                 action: s.action || "INSERT", // "INSERT", "DELETE", "REPLACE"
                 reason: s.reason || "Recomendação semântica da IA",
                 persona: s.persona || null,
-                targetClipId: s.targetClipId || s.target_clip_id || null // Para exclusões ou substituições
+                targetClipId: s.targetClipId || s.target_clip_id || null, // Para exclusões ou substituições
+                origin: s.origin || "ai",
+                alternatives: s.alternatives || []
             };
         });
         STATE.emit("timelineGhostUpdated", this.ghostTrack);
@@ -417,49 +551,89 @@ export class CapiauTimelineState {
         if (index === -1) return;
 
         const suggestion = this.ghostTrack[index];
-        const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
 
-        if (suggestion.action === "INSERT") {
-            // Insere o clipe na trilha de destino, na posição sugerida
-            currentCuts.push({
-                id: `cut_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                video_id: suggestion.video_id,
-                inFrame: suggestion.inFrame,
-                outFrame: suggestion.outFrame,
-                in: suggestion.in,
-                out: suggestion.out,
-                track: suggestion.track,
-                timelineStartFrame: suggestion.timelineStartFrame
-            });
-        } else if (suggestion.action === "DELETE" && suggestion.targetClipId) {
-            // Remove o clipe alvo
-            const targetIdx = currentCuts.findIndex(c => c.id === suggestion.targetClipId);
-            if (targetIdx !== -1) {
-                currentCuts.splice(targetIdx, 1);
-            }
-        } else if (suggestion.action === "REPLACE" && suggestion.targetClipId) {
-            // Substitui o clipe alvo
-            const targetIdx = currentCuts.findIndex(c => c.id === suggestion.targetClipId);
-            if (targetIdx !== -1) {
-                currentCuts[targetIdx] = {
-                    id: `cut_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
+            const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+            // Monta o par vídeo + áudio vinculado da sugestão
+            const buildPair = (timelineStartFrame) => {
+                const audioTrackId = this.pairedAudioTrackId(suggestion.track);
+                const linkId = audioTrackId ? `link_${stamp}` : null;
+                const base = {
                     video_id: suggestion.video_id,
                     inFrame: suggestion.inFrame,
                     outFrame: suggestion.outFrame,
                     in: suggestion.in,
                     out: suggestion.out,
-                    track: suggestion.track,
-                    timelineStartFrame: currentCuts[targetIdx].timelineStartFrame
+                    link_id: linkId,
+                    origin: suggestion.origin || "ai",
+                    alternatives: suggestion.alternatives || []
                 };
+                const pair = [{ ...base, id: `cut_${stamp}`, track: suggestion.track, timelineStartFrame }];
+                if (audioTrackId) {
+                    pair.push({ ...base, id: `cut_${stamp}_a`, track: audioTrackId, timelineStartFrame });
+                }
+                return pair;
+            };
+
+            // Remove um clipe e o par vinculado a ele (mantendo a ordem dos demais)
+            const removeWithPartner = (clipId) => {
+                const target = currentCuts.find(c => c.id === clipId);
+                if (!target) return;
+                const removeIds = new Set([target.id]);
+                if (target.link_id) {
+                    currentCuts.forEach(c => { if (c.link_id === target.link_id) removeIds.add(c.id); });
+                }
+                for (let i = currentCuts.length - 1; i >= 0; i--) {
+                    if (removeIds.has(currentCuts[i].id)) currentCuts.splice(i, 1);
+                }
+            };
+
+            // REPLACE sem alvo válido degrada para INSERT na posição do ghost —
+            // aceitar uma sugestão nunca pode ser um no-op silencioso
+            let action = suggestion.action;
+            if (action === "REPLACE" &&
+                (!suggestion.targetClipId || !currentCuts.some(c => c.id === suggestion.targetClipId))) {
+                console.warn(`[Timeline] REPLACE sem clipe alvo (${suggestion.targetClipId}); inserindo na posição sugerida.`);
+                action = "INSERT";
             }
-        }
 
-        // Remove da lista de sugestões
-        this.ghostTrack.splice(index, 1);
+            if (action === "INSERT") {
+                currentCuts.push(...buildPair(suggestion.timelineStartFrame));
+            } else if (action === "DELETE" && suggestion.targetClipId) {
+                removeWithPartner(suggestion.targetClipId);
+            } else if (action === "REPLACE" && suggestion.targetClipId) {
+                // Substitui no mesmo índice (preserva a ordem do ripple na pista magnética)
+                const targetIdx = currentCuts.findIndex(c => c.id === suggestion.targetClipId);
+                if (targetIdx !== -1) {
+                    const old = currentCuts[targetIdx];
+                    const pair = buildPair(old.timelineStartFrame);
+                    currentCuts[targetIdx] = pair[0];
+                    if (old.link_id) {
+                        for (let i = currentCuts.length - 1; i >= 0; i--) {
+                            const c = currentCuts[i];
+                            if (c.link_id === old.link_id && c.id !== pair[0].id) currentCuts.splice(i, 1);
+                        }
+                    }
+                    if (pair[1]) currentCuts.push(pair[1]);
+                }
+            }
 
-        // Emite eventos
-        STATE.activeTimelineCuts = currentCuts;
-        STATE.emit("timelineGhostUpdated", this.ghostTrack);
+            // Remove da lista de sugestões
+            this.ghostTrack.splice(index, 1);
+
+            // Ordena os cortes por início na timeline para que a inserção na pista magnética respeite a ordem cronológica
+            currentCuts.sort((a, b) => {
+                const startA = a.timelineStartFrame !== undefined ? a.timelineStartFrame : (a.timeline_start || 0) * this.fps;
+                const startB = b.timelineStartFrame !== undefined ? b.timelineStartFrame : (b.timeline_start || 0) * this.fps;
+                return startA - startB;
+            });
+
+            // Emite eventos
+            STATE.activeTimelineCuts = currentCuts;
+            STATE.emit("timelineGhostUpdated", this.ghostTrack);
+        });
     }
 
     /**
@@ -469,10 +643,194 @@ export class CapiauTimelineState {
         const index = this.ghostTrack.findIndex(g => g.id === ghostId);
         if (index === -1) return;
 
-        this.ghostTrack.splice(index, 1);
-        STATE.emit("timelineGhostUpdated", this.ghostTrack);
+        TIMELINE_HISTORY.record(() => {
+            this.ghostTrack.splice(index, 1);
+            STATE.emit("timelineGhostUpdated", this.ghostTrack);
+        });
+    }
+
+    /**
+     * Substitui a mídia de um clipe na timeline por uma candidata do carrossel de alternativas.
+     */
+    replaceClipWithAlternative(clipId, alternativeVideoId, newIn, newOut, useIdealDuration) {
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
+            const targetIdx = currentCuts.findIndex(c => c.id === clipId);
+            if (targetIdx === -1) return;
+
+            const targetVideoClip = currentCuts[targetIdx];
+            const oldDuration = targetVideoClip.out - targetVideoClip.in;
+
+            // Determinar nova duração do slot
+            let newDuration = oldDuration;
+            if (useIdealDuration) {
+                newDuration = newOut - newIn;
+            } else {
+                newOut = newIn + oldDuration;
+            }
+            const delta = newDuration - oldDuration;
+
+            // Encontrar parceiro de áudio
+            const audioPartner = targetVideoClip.link_id
+                ? currentCuts.find(c => c.link_id === targetVideoClip.link_id && c.id !== targetVideoClip.id)
+                : null;
+
+            // A mídia atual vira alternativa (a troca é reversível pelo carrossel)
+            const alts = targetVideoClip.alternatives || [];
+            if (!alts.some(a => a.video_id === targetVideoClip.video_id)) {
+                alts.push({
+                    video_id: targetVideoClip.video_id,
+                    in_s: targetVideoClip.in,
+                    out_s: targetVideoClip.out,
+                    ideal_duration_s: oldDuration,
+                    reason: "Escolha anterior neste slot"
+                });
+            }
+            targetVideoClip.alternatives = alts;
+
+            // Atualizar o vídeo original
+            targetVideoClip.video_id = alternativeVideoId;
+            targetVideoClip.in = newIn;
+            targetVideoClip.out = newOut;
+            targetVideoClip.inFrame = Math.round(newIn * this.fps);
+            targetVideoClip.outFrame = Math.round(newOut * this.fps);
+
+            // Atualizar o áudio parceiro
+            if (audioPartner) {
+                audioPartner.video_id = alternativeVideoId;
+                audioPartner.in = newIn;
+                audioPartner.out = newOut;
+                audioPartner.inFrame = Math.round(newIn * this.fps);
+                audioPartner.outFrame = Math.round(newOut * this.fps);
+            }
+
+            // Se for alteração de duração com ripple, empurra clipes seguintes da mesma trilha
+            // (posições sempre derivadas de timelineStartFrame — timeline_start em segundos
+            // pode estar obsoleto/ausente em clipes movidos manualmente)
+            if (delta !== 0) {
+                const trackId = targetVideoClip.track;
+                const isMagnetic = this.getTrack(trackId)?.magnetic || false;
+
+                if (!isMagnetic) {
+                    const deltaFrames = Math.round(delta * this.fps);
+                    const targetEndFrame = (targetVideoClip.timelineStartFrame || 0) + Math.round(oldDuration * this.fps);
+                    currentCuts.forEach(c => {
+                        if (c.track === trackId && c.id !== targetVideoClip.id &&
+                            (c.timelineStartFrame || 0) >= targetEndFrame - 1) {
+                            c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) + deltaFrames);
+                            c.timeline_start = c.timelineStartFrame / this.fps;
+                        }
+                    });
+                }
+            }
+
+            // Ordena os cortes por início na timeline para que a inserção na pista magnética respeite a ordem cronológica
+            currentCuts.sort((a, b) => {
+                const startA = a.timelineStartFrame !== undefined ? a.timelineStartFrame : (a.timeline_start || 0) * this.fps;
+                const startB = b.timelineStartFrame !== undefined ? b.timelineStartFrame : (b.timeline_start || 0) * this.fps;
+                return startA - startB;
+            });
+
+            // Atualiza os cortes
+            STATE.activeTimelineCuts = currentCuts;
+        });
     }
 }
 
 export const TIMELINE_STATE = new CapiauTimelineState();
 window.TIMELINE_STATE = TIMELINE_STATE;
+
+// --- HISTÓRICO DE UNDO/REDO (snapshots de clipes, pistas e sugestões) ---
+
+class TimelineHistory {
+    constructor() {
+        this.undoStack = [];
+        this.redoStack = [];
+        this.pending = null; // snapshot pré-transação (para drags contínuos)
+        this.limit = 100;
+    }
+
+    _capture() {
+        return JSON.parse(JSON.stringify({
+            cuts: STATE.activeTimelineCuts,
+            tracks: TIMELINE_STATE.tracks,
+            ghosts: TIMELINE_STATE.ghostTrack
+        }));
+    }
+
+    /** Abre uma transação (ex: mousedown de um drag/trim). Idempotente. */
+    begin() {
+        if (!this.pending) this.pending = this._capture();
+    }
+
+    /** Fecha a transação: empilha o estado anterior somente se algo mudou. */
+    commit() {
+        if (!this.pending) return;
+        const before = this.pending;
+        this.pending = null;
+        if (JSON.stringify(before) === JSON.stringify(this._capture())) return;
+        this.undoStack.push(before);
+        if (this.undoStack.length > this.limit) this.undoStack.shift();
+        this.redoStack = [];
+        this._notify();
+    }
+
+    /** Envolve uma operação pontual numa transação própria (ou adere à transação aberta). */
+    record(fn) {
+        if (this.pending) {
+            fn();
+            return;
+        }
+        this.begin();
+        try {
+            fn();
+        } finally {
+            this.commit();
+        }
+    }
+
+    _restore(snap) {
+        TIMELINE_STATE.selectedClipId = null;
+        TIMELINE_STATE.selectedGhostClipId = null;
+        TIMELINE_STATE.setTracks(snap.tracks);
+        STATE.activeTimelineCuts = snap.cuts || [];
+        TIMELINE_STATE.ghostTrack = snap.ghosts || [];
+        STATE.emit("timelineGhostUpdated", TIMELINE_STATE.ghostTrack);
+        this._notify();
+    }
+
+    undo() {
+        if (!this.undoStack.length) return false;
+        const current = this._capture();
+        const snap = this.undoStack.pop();
+        this.redoStack.push(current);
+        this._restore(snap);
+        return true;
+    }
+
+    redo() {
+        if (!this.redoStack.length) return false;
+        const current = this._capture();
+        const snap = this.redoStack.pop();
+        this.undoStack.push(current);
+        this._restore(snap);
+        return true;
+    }
+
+    clear() {
+        this.undoStack = [];
+        this.redoStack = [];
+        this.pending = null;
+        this._notify();
+    }
+
+    _notify() {
+        STATE.emit("timelineHistoryChanged", {
+            canUndo: this.undoStack.length > 0,
+            canRedo: this.redoStack.length > 0
+        });
+    }
+}
+
+export const TIMELINE_HISTORY = new TimelineHistory();
+window.TIMELINE_HISTORY = TIMELINE_HISTORY;

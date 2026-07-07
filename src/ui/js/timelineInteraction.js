@@ -1,6 +1,6 @@
 // Controlador de Interatividade, Cliques e Atalhos da Timeline (CapIAu-Talho)
 import { STATE } from "./state.js";
-import { TIMELINE_STATE, secondsToFrames, framesToSeconds } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds } from "./timelineState.js";
 
 export class CapiauTimelineInteraction {
     constructor(renderer) {
@@ -172,6 +172,9 @@ export class CapiauTimelineInteraction {
                     TIMELINE_STATE.selectedClipId = clip.id;
                     TIMELINE_STATE.selectedTrack = track;
 
+                    // Abre a transação de histórico: o drag/trim vira 1 passo de undo
+                    TIMELINE_HISTORY.begin();
+
                     const trimEdge = this.checkTrimZone(x, clip);
 
                     if (trimEdge === "left") {
@@ -250,10 +253,11 @@ export class CapiauTimelineInteraction {
             const deltaFrames = Math.round(dx / TIMELINE_STATE.zoom);
             const targetStart = Math.max(0, this.dragStartClipFrame + deltaFrames);
 
-            // Trilha de destino: qualquer pista de vídeo não travada sob o mouse
+            // Trilha de destino: qualquer pista não travada sob o mouse
+            // (moveClip garante que o tipo da pista combina com o do clipe)
             let targetTrack = null;
             const trackObj = track ? TIMELINE_STATE.getTrack(track) : null;
-            if (trackObj && trackObj.kind === "video" && !trackObj.locked) {
+            if (trackObj && trackObj.kind !== "ai" && !trackObj.locked) {
                 targetTrack = track;
             }
             this.moveClip(this.draggedClipId, targetStart, targetTrack);
@@ -273,6 +277,8 @@ export class CapiauTimelineInteraction {
     }
 
     onMouseUp() {
+        // Fecha a transação do drag/trim (no-op se nada mudou)
+        TIMELINE_HISTORY.commit();
         this.dragState = null;
         this.draggedClipId = null;
         if (this.canvas) this.canvas.style.cursor = "default";
@@ -322,13 +328,41 @@ export class CapiauTimelineInteraction {
         const selectedId = TIMELINE_STATE.selectedClipId;
         const cuts = [...STATE.activeTimelineCuts];
 
+        // Undo / Redo globais da timeline
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+            e.preventDefault();
+            if (e.shiftKey) TIMELINE_HISTORY.redo();
+            else TIMELINE_HISTORY.undo();
+            return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+            e.preventDefault();
+            TIMELINE_HISTORY.redo();
+            return;
+        }
+
         if (e.key === "Delete" || e.key === "Backspace") {
             if (selectedId) {
                 const idx = cuts.findIndex(c => c.id === selectedId);
                 if (idx !== -1) {
-                    cuts.splice(idx, 1);
-                    STATE.activeTimelineCuts = cuts;
-                    TIMELINE_STATE.selectedClipId = null;
+                    TIMELINE_HISTORY.record(() => {
+                        const clip = cuts[idx];
+                        const linkId = clip.link_id;
+                        if (e.altKey || !linkId) {
+                            // Alt+Delete: apaga só o selecionado e desvincula o par
+                            cuts.splice(idx, 1);
+                            if (linkId) {
+                                cuts.forEach(c => { if (c.link_id === linkId) c.link_id = null; });
+                            }
+                        } else {
+                            // Delete: apaga o clipe e o par A/V vinculado
+                            for (let i = cuts.length - 1; i >= 0; i--) {
+                                if (cuts[i].link_id === linkId) cuts.splice(i, 1);
+                            }
+                        }
+                        STATE.activeTimelineCuts = cuts;
+                        TIMELINE_STATE.selectedClipId = null;
+                    });
                     e.preventDefault();
                 }
             } else if (TIMELINE_STATE.selectedGhostClipId) {
@@ -336,6 +370,20 @@ export class CapiauTimelineInteraction {
                 TIMELINE_STATE.rejectGhostSuggestion(TIMELINE_STATE.selectedGhostClipId);
                 TIMELINE_STATE.selectedGhostClipId = null;
                 e.preventDefault();
+            }
+        }
+        else if (e.key.toLowerCase() === "u" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            // U: desvincula o par A/V do clipe selecionado
+            if (selectedId) {
+                const clip = cuts.find(c => c.id === selectedId);
+                if (clip && clip.link_id) {
+                    TIMELINE_HISTORY.record(() => {
+                        const linkId = clip.link_id;
+                        cuts.forEach(c => { if (c.link_id === linkId) c.link_id = null; });
+                        STATE.activeTimelineCuts = cuts;
+                    });
+                    e.preventDefault();
+                }
             }
         }
         else if (e.key === "Enter" || e.key.toLowerCase() === "y") {
@@ -417,14 +465,42 @@ export class CapiauTimelineInteraction {
         const clip = cuts.find(c => c.id === clipId);
         if (!clip) return;
 
-        // Trilha final do clipe (a atual, ou a nova sob o mouse)
-        const finalTrackId = (targetTrack && targetTrack !== clip.track) ? targetTrack : clip.track;
-        const finalTrack = TIMELINE_STATE.getTrack(finalTrackId);
-        if (finalTrack && (finalTrack.locked || finalTrack.kind !== "video")) return;
+        const clipKind = TIMELINE_STATE.trackKindOf(clip.track);
 
+        // Trilha final do clipe: precisa ser do mesmo tipo (vídeo↔vídeo, áudio↔áudio) e estar livre
+        let finalTrackId = clip.track;
         if (targetTrack && targetTrack !== clip.track) {
-            console.log(`[Timeline] Transpondo clipe ${clipId} de ${clip.track} para ${targetTrack}`);
-            clip.track = targetTrack;
+            const t = TIMELINE_STATE.getTrack(targetTrack);
+            if (t && !t.locked && (t.kind || "video") === clipKind) {
+                console.log(`[Timeline] Transpondo clipe ${clipId} de ${clip.track} para ${targetTrack}`);
+                finalTrackId = targetTrack;
+            }
+        }
+        const finalTrack = TIMELINE_STATE.getTrack(finalTrackId);
+        if (finalTrack && finalTrack.locked) return;
+        if (finalTrackId !== clip.track) clip.track = finalTrackId;
+
+        if (clipKind === "audio") {
+            if (clip.link_id) {
+                // Áudio vinculado: o par se move junto — o delta horizontal é aplicado
+                // ao vídeo par e a passada de sincronia A/V reancora o áudio.
+                const partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id &&
+                    TIMELINE_STATE.trackKindOf(c.track) === "video");
+                if (partner) {
+                    const partnerTrack = TIMELINE_STATE.getTrack(partner.track);
+                    if (partnerTrack && !partnerTrack.magnetic && !partnerTrack.locked) {
+                        const delta = targetStartFrame - clip.timelineStartFrame;
+                        partner.timelineStartFrame = Math.max(0, partner.timelineStartFrame + delta);
+                    }
+                    // Em pista magnética o vídeo é rippleado: o áudio fica ancorado
+                    STATE.activeTimelineCuts = cuts;
+                    return;
+                }
+            }
+            // Áudio destacado: posicionamento livre
+            clip.timelineStartFrame = Math.max(0, targetStartFrame);
+            STATE.activeTimelineCuts = cuts;
+            return;
         }
 
         const isMagnetic = finalTrack ? !!finalTrack.magnetic : (finalTrackId === "V1");
@@ -485,21 +561,24 @@ export class CapiauTimelineInteraction {
         const trackObj = TIMELINE_STATE.getTrack(clip.track);
         if (trackObj && trackObj.locked) return;
 
-        if (trackObj ? trackObj.magnetic : clip.track === "V1") {
-            // Pista magnética: reordena na sequência (move posições na array)
-            const idx = cuts.findIndex(c => c.id === clipId);
-            const targetIdx = idx + deltaFrames;
-            if (targetIdx >= 0 && targetIdx < cuts.length) {
-                // Swap
-                cuts[idx] = cuts[targetIdx];
-                cuts[targetIdx] = clip;
-                STATE.activeTimelineCuts = cuts;
+        const kind = trackObj ? (trackObj.kind || "video") : "video";
+
+        TIMELINE_HISTORY.record(() => {
+            if (kind === "video" && (trackObj ? trackObj.magnetic : clip.track === "V1")) {
+                // Pista magnética: reordena na sequência (move posições na array)
+                const idx = cuts.findIndex(c => c.id === clipId);
+                const targetIdx = idx + deltaFrames;
+                if (targetIdx >= 0 && targetIdx < cuts.length) {
+                    // Swap
+                    cuts[idx] = cuts[targetIdx];
+                    cuts[targetIdx] = clip;
+                    STATE.activeTimelineCuts = cuts;
+                }
+            } else {
+                // Pistas livres (e áudio vinculado/destacado): desloca no tempo via moveClip
+                this.moveClip(clipId, Math.max(0, clip.timelineStartFrame + deltaFrames), null);
             }
-        } else {
-            // Pista livre desloca de fato no tempo
-            clip.timelineStartFrame = Math.max(0, clip.timelineStartFrame + deltaFrames);
-            STATE.activeTimelineCuts = cuts;
-        }
+        });
     }
 
     nudgeTrim(clipId, edge, deltaFrames) {
@@ -509,27 +588,53 @@ export class CapiauTimelineInteraction {
 
         const fps = TIMELINE_STATE.fps; // frames sempre em fps da timeline
 
-        if (edge === "left") {
-            clip.inFrame = Math.max(0, clip.inFrame + deltaFrames);
-            clip.in = clip.inFrame / fps;
-            const trackObj = TIMELINE_STATE.getTrack(clip.track);
-            if (!trackObj || !trackObj.magnetic) {
-                clip.timelineStartFrame = Math.max(0, clip.timelineStartFrame + deltaFrames);
+        TIMELINE_HISTORY.record(() => {
+            if (edge === "left") {
+                clip.inFrame = Math.max(0, clip.inFrame + deltaFrames);
+                clip.in = clip.inFrame / fps;
+                const trackObj = TIMELINE_STATE.getTrack(clip.track);
+                if (!trackObj || !trackObj.magnetic) {
+                    clip.timelineStartFrame = Math.max(0, clip.timelineStartFrame + deltaFrames);
+                }
+            } else {
+                clip.outFrame = Math.max(clip.inFrame + 12, clip.outFrame + deltaFrames);
+                clip.out = clip.outFrame / fps;
             }
-        } else {
-            clip.outFrame = Math.max(clip.inFrame + 12, clip.outFrame + deltaFrames);
-            clip.out = clip.outFrame / fps;
-        }
-        STATE.activeTimelineCuts = cuts;
+            STATE.activeTimelineCuts = cuts;
+        });
     }
 
     // --- POPUPS E INTERACTION IA CONTEXTUAL ---
 
+    /**
+     * Posiciona um popup `position: fixed` próximo ao cursor, sem sair da viewport.
+     * Os popups vivem no <body> da janela do canvas: dentro do container da timeline
+     * (overflow: hidden) eles eram cortados ao abrir acima das pistas superiores.
+     */
+    _placeFixedPopup(popup, clientX, clientY, offsetX = 12) {
+        const win = this.canvas.ownerDocument.defaultView || window;
+        popup.style.visibility = "hidden";
+        popup.style.display = "flex";
+        const w = popup.offsetWidth || 300;
+        const h = popup.offsetHeight || 150;
+
+        let left = clientX + offsetX;
+        if (left + w > win.innerWidth - 8) left = Math.max(8, clientX - w - offsetX);
+
+        let top = clientY - h - 12; // preferência: acima do cursor
+        if (top < 8) top = Math.min(clientY + 16, win.innerHeight - h - 8);
+        top = Math.max(8, Math.min(top, win.innerHeight - h - 8));
+
+        popup.style.left = `${left}px`;
+        popup.style.top = `${top}px`;
+        popup.style.visibility = "visible";
+    }
+
     showGhostActionsPopup(clientX, clientY, ghost) {
-        // Criar ou reusar pop-up de aprovação contextual
-        let popup = document.getElementById("ghost-action-popup");
+        const doc = this.canvas.ownerDocument;
+        let popup = doc.querySelector("#ghost-action-popup");
         if (!popup) {
-            popup = document.createElement("div");
+            popup = doc.createElement("div");
             popup.id = "ghost-action-popup";
             popup.style.cssText = `
                 position: fixed;
@@ -541,12 +646,12 @@ export class CapiauTimelineInteraction {
                 flex-direction: column;
                 gap: 8px;
                 box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-                z-index: 9999;
+                z-index: 10001;
                 font-family: sans-serif;
                 min-width: 220px;
                 backdrop-filter: blur(8px);
             `;
-            document.body.appendChild(popup);
+            doc.body.appendChild(popup);
         }
 
         popup.innerHTML = `
@@ -554,17 +659,15 @@ export class CapiauTimelineInteraction {
             <div style="font-size: 12px; color: #fff; line-height: 1.4; margin-bottom: 6px;">"${ghost.reason}"</div>
             <div style="display: flex; gap: 8px;">
                 <button id="btn-popup-accept" class="btn-primary" style="flex: 1; height: 26px; font-size: 11px; font-weight: bold; padding: 0 10px; display: flex; align-items: center; justify-content: center; gap: 4px; border-radius: 4px;">
-                    <i class="fa-solid fa-check"></i> Aceitar (Y)
+                     <i class="fa-solid fa-check"></i> Aceitar (Y)
                 </button>
                 <button id="btn-popup-reject" class="btn-secondary" style="flex: 1; height: 26px; font-size: 11px; font-weight: bold; padding: 0 10px; display: flex; align-items: center; justify-content: center; gap: 4px; border-radius: 4px; border-color: rgba(239, 68, 68, 0.3); color: #ef4444; background: rgba(239, 68, 68, 0.08);">
-                    <i class="fa-solid fa-xmark"></i> Rejeitar (N)
+                     <i class="fa-solid fa-xmark"></i> Rejeitar (N)
                 </button>
             </div>
         `;
 
-        popup.style.left = `${clientX}px`;
-        popup.style.top = `${clientY - 110}px`;
-        popup.style.display = "flex";
+        this._placeFixedPopup(popup, clientX, clientY);
 
         // Listeners dos botões
         popup.querySelector("#btn-popup-accept").onclick = () => {
@@ -580,40 +683,71 @@ export class CapiauTimelineInteraction {
         const closeHandler = (event) => {
             if (!popup.contains(event.target) && event.target.id !== this.canvas.id) {
                 popup.style.display = "none";
-                document.removeEventListener("mousedown", closeHandler);
+                this.canvas.ownerDocument.removeEventListener("mousedown", closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener("mousedown", closeHandler), 10);
+        setTimeout(() => this.canvas.ownerDocument.addEventListener("mousedown", closeHandler), 10);
     }
 
     /**
      * Atualiza a exibição do popup flutuante de preview com o vídeo proxy correspondente.
      */
     updateHoverPreview(clientX, clientY, frame, track) {
-        const previewCard = document.getElementById("timeline-preview-card");
-        if (!previewCard) return;
+        const doc = this.canvas.ownerDocument;
+        // Reutiliza o card estático do index.html; em popouts, cria um no body da janela
+        let previewCard = doc.querySelector("#timeline-preview-card");
+        if (!previewCard) {
+            previewCard = doc.createElement("div");
+            previewCard.id = "timeline-preview-card";
+            previewCard.style.cssText = `
+                position: fixed;
+                width: 200px;
+                height: 145px;
+                background: rgba(15, 23, 42, 0.95);
+                border: 1px solid var(--border-glass);
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+                z-index: 10000;
+                display: none;
+                flex-direction: column;
+                pointer-events: none;
+                backdrop-filter: blur(8px);
+            `;
+            previewCard.innerHTML = `<video autoplay muted loop playsinline style="width: 100%; height: 112px; object-fit: cover; background: #000;"></video><div class="preview-info" style="flex: 1; font-size: 10px; color: var(--text-secondary); padding: 6px 8px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-family: monospace;">00:00:00:00</div>`;
+            doc.body.appendChild(previewCard);
+        }
 
         // Se estiver arrastando ou fazendo scrub, ou fora das trilhas, esconde
         if (this.dragState || !track) {
             previewCard.style.display = "none";
+            this.hideAlternativesPopup();
             return;
         }
 
         const hit = this.findClipAt(frame, track);
-        if (hit) {
+        if (hit && hit.type === "clip") {
             const clip = hit.data;
+
+            // Se for clipe gerado pela IA e contiver alternativas, abre o carrossel em vez do preview normal
+            if (clip.origin === "ai" && clip.alternatives && clip.alternatives.length > 0) {
+                previewCard.style.display = "none";
+                this.showAlternativesPopup(clientX, clientY, clip);
+                return;
+            }
+
+            this.hideAlternativesPopup();
+
             const video = STATE.allVideos.find(v => v.id === clip.video_id);
             if (video) {
                 const videoSrc = video.proxy_path || video.filepath || `/originals/${video.filename}`;
                 const videoEl = previewCard.querySelector("video");
                 const infoEl = previewCard.querySelector(".preview-info");
                 
-                // Formata o fragmento de tempo em segundos (in, out) para tocar a região precisa
                 const inSeconds = clip.in;
                 const outSeconds = clip.out;
                 const targetSrc = `${videoSrc}#t=${inSeconds.toFixed(1)},${outSeconds.toFixed(1)}`;
                 
-                // Evita recarregar a mesma URL repetidamente se já estiver tocando
                 const fullTargetSrc = window.location.origin + targetSrc;
                 if (videoEl.src !== fullTargetSrc && !videoEl.src.endsWith(targetSrc)) {
                     videoEl.src = targetSrc;
@@ -621,27 +755,24 @@ export class CapiauTimelineInteraction {
                     videoEl.play().catch(() => {});
                 }
 
-                // Exibe o nome do vídeo e duração do trecho
                 const duration = outSeconds - inSeconds;
                 infoEl.textContent = `${video.filename} (${duration.toFixed(1)}s)`;
 
-                // Posiciona o card acima e ligeiramente à direita do cursor do mouse
-                previewCard.style.left = `${clientX + 15}px`;
-                previewCard.style.top = `${clientY - 160}px`;
-                previewCard.style.display = "flex";
+                this._placeFixedPopup(previewCard, clientX, clientY, 15);
                 return;
             }
         }
 
         // Se não houver clipe sob o cursor, esconde
         previewCard.style.display = "none";
+        this.hideAlternativesPopup();
     }
 
     /**
      * Esconde o card de preview.
      */
     hideHoverPreview() {
-        const previewCard = document.getElementById("timeline-preview-card");
+        const previewCard = this.canvas.ownerDocument.querySelector("#timeline-preview-card");
         if (previewCard) {
             previewCard.style.display = "none";
             const videoEl = previewCard.querySelector("video");
@@ -649,6 +780,110 @@ export class CapiauTimelineInteraction {
                 videoEl.pause();
                 videoEl.src = "";
             }
+        }
+    }
+
+    /**
+     * Exibe o carrossel popup de mídias alternativas.
+     */
+    showAlternativesPopup(clientX, clientY, clip) {
+        const doc = this.canvas.ownerDocument;
+        let popup = doc.querySelector("#timeline-alternatives-popup");
+        if (!popup) {
+            popup = doc.createElement("div");
+            popup.id = "timeline-alternatives-popup";
+            popup.style.cssText = `
+                position: fixed;
+                background: rgba(15, 23, 42, 0.95);
+                border: 1px solid var(--color-cyan);
+                border-radius: 8px;
+                padding: 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+                z-index: 10000;
+                font-family: sans-serif;
+                width: 320px;
+                backdrop-filter: blur(10px);
+                color: #fff;
+            `;
+            doc.body.appendChild(popup);
+        }
+
+        if (popup.dataset.clipId === clip.id && popup.style.display === "flex") {
+            return; // Evita reconstruir enquanto o mouse continua sobre o mesmo clipe
+        }
+        popup.dataset.clipId = clip.id;
+
+        // Renderiza lista de alternativas
+        let altsHtml = "";
+        // Filtramos para não mostrar o vídeo ativo na lista de alternativas dele mesmo
+        const activeAlts = (clip.alternatives || []).filter(alt => alt.video_id !== clip.video_id);
+        
+        activeAlts.forEach((alt, idx) => {
+            const video = STATE.allVideos.find(v => v.id === alt.video_id);
+            const filename = video ? video.filename : `Vídeo ID ${alt.video_id}`;
+            altsHtml += `
+                <div class="alt-card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+                    <div style="font-size: 11px; font-weight: bold; color: #f1f5f9; display:flex; justify-content:space-between;">
+                        <span>Candidato #${idx + 1}</span>
+                        <span style="font-size:9px; color:#c084fc;">ID ${alt.video_id}</span>
+                    </div>
+                    <div style="font-size: 10px; color: var(--text-primary); text-overflow: ellipsis; white-space: nowrap; overflow: hidden; font-family: monospace;">${filename}</div>
+                    <div style="font-size: 10px; color: #94a3b8; line-height: 1.3;">"${alt.reason || 'Sem justificativa.'}"</div>
+                    <div style="font-size: 10px; color: var(--text-secondary);">Duração Ideal: ${alt.ideal_duration_s ? alt.ideal_duration_s.toFixed(1) + 's' : 'N/A'}</div>
+                    <div style="display: flex; gap: 6px; margin-top: 4px;">
+                        <button class="btn-alt-swap-fixed" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" style="flex: 1; height: 22px; font-size: 9px; font-weight: bold; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff; cursor: pointer; outline: none;">Slot Fixo</button>
+                        <button class="btn-alt-swap-ripple" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" style="flex: 1; height: 22px; font-size: 9px; font-weight: bold; background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3); border-radius: 4px; color: var(--color-cyan); cursor: pointer; outline: none;">Ripple</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        popup.innerHTML = `
+            <div style="font-size: 11px; color: var(--color-cyan); font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
+                <span><i class="fa-solid fa-wand-magic-sparkles"></i> OPÇÕES ALTERNATIVAS DA IA</span>
+                <span style="font-size: 9px; color: var(--text-secondary); cursor: pointer;" class="btn-close-alts"><i class="fa-solid fa-xmark"></i></span>
+            </div>
+            <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+                ${altsHtml || '<div style="font-size: 10px; color: var(--text-secondary); text-align: center; padding: 10px 0;">Nenhum clipe alternativo configurado no acervo.</div>'}
+            </div>
+        `;
+
+        this._placeFixedPopup(popup, clientX, clientY);
+
+        // Listeners dos botões
+        popup.querySelector(".btn-close-alts").onclick = () => this.hideAlternativesPopup();
+
+        popup.querySelectorAll(".btn-alt-swap-fixed").forEach(btn => {
+            btn.onclick = () => {
+                const vid = parseInt(btn.dataset.videoId);
+                const inS = parseFloat(btn.dataset.in);
+                const outS = parseFloat(btn.dataset.out);
+                TIMELINE_STATE.replaceClipWithAlternative(clip.id, vid, inS, outS, false);
+                this.hideAlternativesPopup();
+            };
+        });
+
+        popup.querySelectorAll(".btn-alt-swap-ripple").forEach(btn => {
+            btn.onclick = () => {
+                const vid = parseInt(btn.dataset.videoId);
+                const inS = parseFloat(btn.dataset.in);
+                const outS = parseFloat(btn.dataset.out);
+                TIMELINE_STATE.replaceClipWithAlternative(clip.id, vid, inS, outS, true);
+                this.hideAlternativesPopup();
+            };
+        });
+    }
+
+    /**
+     * Oculta o popup flutuante de alternativas.
+     */
+    hideAlternativesPopup() {
+        const popup = this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup");
+        if (popup) {
+            popup.style.display = "none";
         }
     }
 }

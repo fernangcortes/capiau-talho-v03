@@ -820,6 +820,11 @@ export class ProgramPlayer {
         const videoB = this.el("program-video-b");
         if (videoA) videoA.pause();
         if (videoB) videoB.pause();
+
+        // Pausa também as pistas de áudio dedicadas
+        if (this.audioPool) {
+            Object.values(this.audioPool).forEach(el => el.pause());
+        }
     }
 
     syncVideoToPlayhead() {
@@ -938,8 +943,8 @@ export class ProgramPlayer {
                 if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
             }
 
-            // Controla áudio (volume/mute por pista) e play status
-            el.volume = (track && track.muted) ? 0 : (track ? track.volume : 1.0);
+            // Pistas de vídeo são só imagem: o áudio vem das pistas de áudio dedicadas
+            el.muted = true;
             if (this.isPlaying && el.paused) {
                 el.play().catch(() => {});
             } else if (!this.isPlaying && !el.paused) {
@@ -968,6 +973,101 @@ export class ProgramPlayer {
 
         applyCutToElement(baseEl, baseCut, baseTrack, 1);
         applyCutToElement(overlayEl, overlayCut, overlayTrack, 10);
+
+        // ────────── ÁUDIO MULTIPISTA ──────────
+        // Cada pista de áudio tem seu próprio elemento <audio> tocando o clipe sob o playhead
+        this.syncAudioTracks(cuts, currentFrame);
+    }
+
+    /** Elemento <audio> dedicado de uma pista (criado sob demanda, fora do DOM visível). */
+    getAudioElement(trackId) {
+        if (!this.audioPool) this.audioPool = {};
+        if (!this.audioPool[trackId]) {
+            const el = document.createElement("audio");
+            el.preload = "auto";
+            el.dataset.trackId = trackId;
+            document.body.appendChild(el);
+            this.audioPool[trackId] = el;
+        }
+        return this.audioPool[trackId];
+    }
+
+    syncAudioTracks(cuts, currentFrame) {
+        const audioTracks = TIMELINE_STATE.tracks.filter(t => t.kind === "audio");
+        const seen = new Set();
+
+        audioTracks.forEach(track => {
+            seen.add(track.id);
+            const el = this.getAudioElement(track.id);
+            const cut = cuts.find(c =>
+                c.track === track.id &&
+                currentFrame >= c.timelineStartFrame &&
+                currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame))
+            );
+
+            if (!cut) {
+                if (!el.paused) el.pause();
+                el.dataset.activeClipId = "";
+                return;
+            }
+
+            const videoData = STATE.allVideos.find(v => v.id === cut.video_id);
+            if (!videoData) {
+                if (!el.paused) el.pause();
+                return;
+            }
+
+            const rawSrc = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
+            const audioSrc = rawSrc.replace(/\\/g, "/");
+            const srcChanged = el.dataset.loadedSrc !== audioSrc;
+            if (srcChanged) {
+                el.src = audioSrc;
+                el.dataset.loadedSrc = audioSrc;
+                el.load();
+            }
+
+            const offsetFrames = currentFrame - cut.timelineStartFrame;
+            const targetSeconds = cut.in + (offsetFrames / 24);
+            const clipChanged = el.dataset.activeClipId !== String(cut.id);
+            if (clipChanged) el.dataset.activeClipId = String(cut.id);
+
+            const drift = el.currentTime - targetSeconds;
+
+            // Deriva no áudio: nudge de rate suave (3% não altera o pitch de forma audível)
+            // e seek duro apenas em descontinuidade real — seeks frequentes geram clicks.
+            if (srcChanged || clipChanged || Math.abs(drift) > 0.5) {
+                el.currentTime = Math.max(0, targetSeconds);
+                el.playbackRate = 1.0;
+            } else if (this.isPlaying) {
+                if (drift > 0.06) el.playbackRate = 0.97;
+                else if (drift < -0.06) el.playbackRate = 1.03;
+                else if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
+            } else {
+                if (Math.abs(drift) > 0.06) el.currentTime = Math.max(0, targetSeconds);
+                if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
+            }
+
+            const vol = track.volume !== undefined ? track.volume : 1.0;
+            el.volume = track.muted ? 0 : Math.max(0, Math.min(1, vol));
+            if (this.isPlaying && el.paused) {
+                el.play().catch(() => {});
+            } else if (!this.isPlaying && !el.paused) {
+                el.pause();
+            }
+        });
+
+        // Pistas de áudio removidas: descarta os elementos órfãos
+        if (this.audioPool) {
+            Object.keys(this.audioPool).forEach(tid => {
+                if (!seen.has(tid)) {
+                    const el = this.audioPool[tid];
+                    el.pause();
+                    el.src = "";
+                    el.remove();
+                    delete this.audioPool[tid];
+                }
+            });
+        }
     }
 
     seekScrubber(e) {

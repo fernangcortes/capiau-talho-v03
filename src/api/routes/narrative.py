@@ -189,7 +189,11 @@ def save_timeline(timeline: TimelineCreate, conn: sqlite3.Connection = Depends(g
                 "in": c.in_time,
                 "out": c.out_time,
                 "track": c.track,
-                "timeline_start": c.timeline_start
+                "timeline_start": c.timeline_start,
+                "link_id": c.link_id,
+                "effects": c.effects or [],
+                "alternatives": c.alternatives or [],
+                "origin": c.origin or "user"
             }
             for c in timeline.cuts
         ]
@@ -271,6 +275,32 @@ def split_transcript(video_id: int, payload: SplitTranscriptPayload, conn: sqlit
 
 @router.post("/api/project/{project_id}/chat")
 def chatbot_rag(project_id: int, payload: ChatPayload):
-    """Interface chatbot RAG com busca híbrida de contexto no Qdrant e SQLite."""
+    """Interface chatbot RAG (legado) ou Agente de Edição ativo (se timeline for enviada)."""
+    if payload.clips is not None:
+        from src.services.chat_agent import ChatAgentService
+        # Converte TimelineAISuggestClip em dict para o serviço
+        clips_dicts = [c.dict() for c in payload.clips]
+        tracks_dicts = [t.dict() for t in payload.tracks] if payload.tracks else []
+        res = ChatAgentService.chat_with_agent(
+            project_id=project_id,
+            message=payload.message,
+            history=payload.history,
+            clips=clips_dicts,
+            tracks=tracks_dicts,
+            fps=payload.fps,
+            agent_model=payload.agent_model,
+            custom_api_key=payload.custom_api_key
+        )
+        return res
+    
     res = RAGService.chat(project_id, payload.message, payload.history)
     return res
+
+@router.get("/api/agent/models")
+def get_agent_models():
+    """Retorna os modelos de agente de edição configurados e o padrão do sistema (Fase 1)."""
+    from src.config import CONFIG
+    return {
+        "models": CONFIG.AGENT_MODELS,
+        "default": CONFIG.AGENT_MODEL
+    }

@@ -2,7 +2,7 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { getActiveElement, getActiveQuerySelector, SplitterHelper } from "./workspaceManager.js";
-import { TIMELINE_STATE } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY } from "./timelineState.js";
 import { formatTimecode } from "./player.js";
 
 export class ChatManager {
@@ -49,6 +49,9 @@ export class ChatManager {
 
         // Listener de histórico de chat
         STATE.on("chatHistoryUpdated", (history) => this.renderHistory(history));
+
+        // Inicializa as configurações do agente de edição (Fase 1)
+        this.loadAgentSettings();
 
         // Inicializa o gerenciamento do layout responsivo e splitter
         this.initLayoutToggle();
@@ -127,6 +130,52 @@ export class ChatManager {
         }
     }
 
+    async loadAgentSettings() {
+        const modelSelect = document.getElementById("agent-model-select");
+        const apiKeyInput = document.getElementById("agent-api-key-input");
+        if (!modelSelect || !apiKeyInput) return;
+
+        // Recupera valores do LocalStorage
+        const savedModel = localStorage.getItem("capiau_agent_model");
+        const savedKey = localStorage.getItem("capiau_agent_api_key");
+
+        if (savedKey) {
+            apiKeyInput.value = savedKey;
+        }
+
+        // Salvar chave no LocalStorage quando alterada
+        apiKeyInput.addEventListener("input", () => {
+            localStorage.setItem("capiau_agent_api_key", apiKeyInput.value);
+        });
+
+        try {
+            const data = await CapIAuAPI.fetchAgentModels();
+            modelSelect.innerHTML = "";
+            
+            data.models.forEach(model => {
+                const opt = document.createElement("option");
+                opt.value = model;
+                opt.textContent = model;
+                modelSelect.appendChild(opt);
+            });
+
+            // Restaura o modelo anterior ou define o padrão
+            if (savedModel && data.models.includes(savedModel)) {
+                modelSelect.value = savedModel;
+            } else if (data.default) {
+                modelSelect.value = data.default;
+                localStorage.setItem("capiau_agent_model", data.default);
+            }
+
+            modelSelect.addEventListener("change", () => {
+                localStorage.setItem("capiau_agent_model", modelSelect.value);
+            });
+        } catch (err) {
+            console.error("Falha ao carregar modelos do agente:", err);
+            modelSelect.innerHTML = `<option value="deepseek/deepseek-v4-flash">deepseek/deepseek-v4-flash (Erro)</option>`;
+        }
+    }
+
     async sendMessage() {
         const input = this.chatInput;
         if (!input) return;
@@ -144,15 +193,57 @@ export class ChatManager {
         this.showTypingIndicator();
 
         try {
-            const response = await CapIAuAPI.chat(STATE.currentProjectId, msg, STATE.chatHistory);
+            // Captura o estado atual da timeline para enviar ao agente
+            const clips = STATE.activeTimelineCuts || [];
+            const tracks = TIMELINE_STATE ? TIMELINE_STATE.tracks : [];
+            const fps = STATE.projectFps || 24.0;
+
+            const modelSelect = document.getElementById("agent-model-select");
+            const agentModel = modelSelect ? modelSelect.value : null;
+
+            const apiKeyInput = document.getElementById("agent-api-key-input");
+            const customApiKey = apiKeyInput ? apiKeyInput.value.trim() : null;
+
+            const response = await CapIAuAPI.chat(
+                STATE.currentProjectId, 
+                msg, 
+                STATE.chatHistory, 
+                clips, 
+                tracks, 
+                fps, 
+                agentModel, 
+                customApiKey
+            );
             this.hideTypingIndicator();
             
             // Adiciona resposta da IA ao histórico
             const aiMsg = { role: "assistant", content: response.response };
             STATE.chatHistory = [...STATE.chatHistory, aiMsg];
+
+            // Trata as sugestões fantasma da IA (Preview)
+            if (TIMELINE_STATE) {
+                if (response.suggestions && response.suggestions.length > 0) {
+                    TIMELINE_STATE.setGhostSuggestions(response.suggestions);
+                } else if (response.final_cuts && response.operations && response.operations.length > 0) {
+                    // Limpa sugestões antigas antes de aplicar cortes diretos
+                    TIMELINE_STATE.setGhostSuggestions([]);
+                    // Ordena cronologicamente: a pista magnética layouta pela ordem do array,
+                    // e a cópia-sombra devolve os clipes em ordem de inserção
+                    const orderedCuts = [...response.final_cuts].sort(
+                        (a, b) => (a.timeline_start || 0) - (b.timeline_start || 0)
+                    );
+                    // Grava modificações diretas na timeline com suporte a Undo/Redo
+                    TIMELINE_HISTORY.record(() => {
+                        STATE.activeTimelineCuts = orderedCuts;
+                    });
+                } else {
+                    // Sem operações ou sugestões novas, limpa a ghost track
+                    TIMELINE_STATE.setGhostSuggestions([]);
+                }
+            }
         } catch (e) {
             this.hideTypingIndicator();
-            const errMsg = { role: "assistant", content: `Erro ao processar mensagem RAG: ${e.message}` };
+            const errMsg = { role: "assistant", content: `Erro ao processar mensagem do agente: ${e.message}` };
             STATE.chatHistory = [...STATE.chatHistory, errMsg];
         }
     }

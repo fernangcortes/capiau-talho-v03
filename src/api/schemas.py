@@ -26,6 +26,10 @@ class CutItem(BaseModel):
     track: str = "V1"
     timeline_start: Optional[float] = None  # posição absoluta na timeline (segundos, formato v2)
     id: Optional[str] = None                # id estável do clipe no frontend
+    link_id: Optional[str] = None           # vínculo A/V: par vídeo+áudio compartilham o mesmo link_id
+    effects: Optional[List[Dict[str, Any]]] = None       # efeitos MLT aplicados (fade, volume, speed...)
+    alternatives: Optional[List[Dict[str, Any]]] = None  # candidatos do carrossel de alternativas da IA
+    origin: Optional[str] = None                          # "user" | "ai"
 
 class TrackItem(BaseModel):
     id: str
@@ -52,6 +56,10 @@ class TimelineAISuggestClip(BaseModel):
     out_s: float
     timeline_start_s: float = 0.0
     track: str = "V1"
+    link_id: Optional[str] = None
+    origin: Optional[str] = "user"
+    alternatives: Optional[List[Dict[str, Any]]] = None
+    effects: Optional[List[Dict[str, Any]]] = None  # preserva efeitos ao passar pelo agente
 
 class TimelineAISuggestPayload(BaseModel):
     project_id: int = 1
@@ -71,6 +79,12 @@ class SplitTranscriptPayload(BaseModel):
 class ChatPayload(BaseModel):
     message: str
     history: List[Dict[str, str]] = []
+    # Fase 1: Snapshot da timeline para o agente de edição
+    clips: Optional[List[TimelineAISuggestClip]] = None
+    tracks: Optional[List[TrackItem]] = None
+    fps: float = 24.0
+    agent_model: Optional[str] = None
+    custom_api_key: Optional[str] = None  # Permite ao usuário passar sua própria chave OpenRouter via UI
 
 class MergeClustersPayload(BaseModel):
     src_cluster_id: int

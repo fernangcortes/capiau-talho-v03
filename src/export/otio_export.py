@@ -31,6 +31,7 @@ def generate_otio_timeline(timeline_id: int) -> otio.schema.Timeline:
         otio_timeline = otio.schema.Timeline(name=timeline_name)
         track_map = {}
         track_names = {t.get("id"): (t.get("name") or t.get("id")) for t in tracks_meta}
+        track_kinds = {t.get("id"): (t.get("kind") or "video") for t in tracks_meta}
         # Pistas de IA (sugestões não aceitas) não são exportadas
         ai_track_ids = {t.get("id") for t in tracks_meta if t.get("kind") == "ai"}
 
@@ -48,7 +49,8 @@ def generate_otio_timeline(timeline_id: int) -> otio.schema.Timeline:
 
         for track_id in sorted_track_ids:
             track_label = f"{track_id} {track_names.get(track_id, '')}".strip()
-            track = otio.schema.Track(name=track_label, kind=otio.schema.TrackKind.Video)
+            otio_kind = otio.schema.TrackKind.Audio if track_kinds.get(track_id) == "audio" else otio.schema.TrackKind.Video
+            track = otio.schema.Track(name=track_label, kind=otio_kind)
             otio_timeline.tracks.append(track)
             track_map[track_id] = track
 
@@ -111,11 +113,12 @@ def export_timeline_file(timeline_id: int, output_format: str = "otio") -> Path:
     """
     otio_timeline = generate_otio_timeline(timeline_id)
 
-    # EDL (CMX 3600) suporta apenas UMA trilha de vídeo: achata as pistas
+    # EDL (CMX 3600) suporta apenas UMA trilha de vídeo: achata as pistas de VÍDEO
     # (clipe da pista mais alta prevalece, como na visualização do programa)
     if output_format == "edl" and len(otio_timeline.tracks) > 1:
         try:
-            flat_track = otio.algorithms.flatten_stack(otio_timeline.tracks)
+            video_tracks = [t for t in otio_timeline.tracks if t.kind == otio.schema.TrackKind.Video]
+            flat_track = otio.algorithms.flatten_stack(video_tracks)
             flat_timeline = otio.schema.Timeline(name=otio_timeline.name)
             flat_timeline.tracks.append(flat_track)
             otio_timeline = flat_timeline
@@ -133,6 +136,6 @@ def export_timeline_file(timeline_id: int, output_format: str = "otio") -> Path:
     # Exporta para disco usando a API do OpenTimelineIO
     print(f"[EXPORT] Exportando timeline {timeline_id} para {output_path.name}...")
     otio.adapters.write_to_file(otio_timeline, str(output_path), adapter_name=adapter_name)
-    print("  ✅ Timeline salva com sucesso!")
+    print("  [OK] Timeline salva com sucesso!")
     
     return output_path

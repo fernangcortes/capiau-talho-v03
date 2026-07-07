@@ -18,6 +18,14 @@ const AI_TRACK_STYLE = {
     border: "rgba(34, 197, 94, 0.6)"
 };
 
+// Pistas de áudio (verde-esmeralda, como nos NLEs)
+const AUDIO_TRACK_STYLE = {
+    bg: "rgba(16, 185, 129, 0.07)",
+    clipBg: "rgba(16, 185, 129, 0.18)",
+    border: "rgba(16, 185, 129, 0.6)",
+    wave: "rgba(110, 231, 183, 0.55)"
+};
+
 export class CapiauTimelineRenderer {
     constructor() {
         this.canvas = document.getElementById("timeline-canvas");
@@ -87,6 +95,7 @@ export class CapiauTimelineRenderer {
     /** Estilo visual de uma pista de vídeo pelo índice entre as pistas de vídeo. */
     getTrackStyle(track) {
         if (track.kind === "ai") return AI_TRACK_STYLE;
+        if (track.kind === "audio") return AUDIO_TRACK_STYLE;
         const videoTracks = TIMELINE_STATE.getVideoTracks();
         const idx = videoTracks.findIndex(t => t.id === track.id);
         return TRACK_PALETTE[((idx % TRACK_PALETTE.length) + TRACK_PALETTE.length) % TRACK_PALETTE.length];
@@ -343,6 +352,10 @@ export class CapiauTimelineRenderer {
         lanes.forEach(l => { laneMap[l.track.id] = l; });
         const fallbackLane = lanes.find(l => l.track.kind === "video");
 
+        // Par A/V do clipe selecionado (recebe destaque tracejado)
+        const selectedCut = cuts.find(c => c.id === TIMELINE_STATE.selectedClipId);
+        const selectedLink = selectedCut ? selectedCut.link_id : null;
+
         cuts.forEach((cut) => {
             const lane = laneMap[cut.track] || fallbackLane;
             if (!lane) return;
@@ -356,6 +369,7 @@ export class CapiauTimelineRenderer {
             if (startX + width < 0 || startX > this.width) return;
 
             const style = this.getTrackStyle(lane.track);
+            const laneKind = lane.track.kind || "video";
 
             // Espaçamento interno vertical do clipe
             const clipY = lane.top + 6;
@@ -366,19 +380,23 @@ export class CapiauTimelineRenderer {
             ctx.fillRect(startX, clipY, width, clipHeight);
 
             const isSelected = TIMELINE_STATE.selectedClipId === cut.id;
-            ctx.strokeStyle = isSelected ? this.colors.selection : style.border;
+            const isPartner = !isSelected && selectedLink && cut.link_id === selectedLink;
+            ctx.strokeStyle = (isSelected || isPartner) ? this.colors.selection : style.border;
             ctx.lineWidth = isSelected ? 2 : 1.5;
+            if (isPartner) ctx.setLineDash([4, 3]); // par A/V do selecionado: tracejado
             ctx.strokeRect(startX, clipY, width, clipHeight);
+            if (isPartner) ctx.setLineDash([]);
 
-            // Waveform para clipes de entrevista (fala)
+            // Waveform nos clipes das pistas de áudio
             const video = STATE.allVideos.find(v => v.id === cut.video_id);
-            if (video && video.video_type === "interview") {
+            if (laneKind === "audio") {
                 this.drawWaveform(cut, startX, clipY, width, clipHeight, style.wave);
             }
 
             // Desenhar texto descritivo do clipe (Nome do arquivo)
             const name = video ? video.filename : `Vídeo ${cut.video_id}`;
-            const label = `# ${name} [${framesToTimecode(cut.inFrame, TIMELINE_STATE.fps).substring(6)} -> ${framesToTimecode(cut.outFrame, TIMELINE_STATE.fps).substring(6)}]`;
+            const prefix = laneKind === "audio" ? (cut.link_id ? "♪⇅" : "♪") : "#";
+            const label = `${prefix} ${name} [${framesToTimecode(cut.inFrame, TIMELINE_STATE.fps).substring(6)} -> ${framesToTimecode(cut.outFrame, TIMELINE_STATE.fps).substring(6)}]`;
 
             ctx.save();
             ctx.beginPath();

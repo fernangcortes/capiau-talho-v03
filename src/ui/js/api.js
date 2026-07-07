@@ -239,12 +239,40 @@ export class CapIAuAPI {
         });
     }
 
-    static chat(projectId, message, history) {
+    static chat(projectId, message, history, clips = null, tracks = null, fps = 24.0, agentModel = null, customApiKey = null) {
+        const bodyData = { message, history };
+        if (clips !== null) {
+            const safeFps = Number(fps) || 24.0;
+            bodyData.clips = clips.map(c => ({
+                id: c.id,
+                video_id: Number(c.video_id),
+                in_s: Number(c.in),
+                out_s: Number(c.out),
+                // Clipes do frontend guardam a posição em frames (timelineStartFrame);
+                // timeline_start (segundos) só existe em payloads vindos do backend
+                timeline_start_s: (c.timelineStartFrame !== undefined && c.timelineStartFrame !== null)
+                    ? c.timelineStartFrame / safeFps
+                    : (Number(c.timeline_start) || 0),
+                track: c.track || "V1",
+                link_id: c.link_id || null,
+                origin: c.origin || "user",
+                alternatives: c.alternatives || [],
+                effects: c.effects || []
+            }));
+            bodyData.tracks = tracks || [];
+            bodyData.fps = Number(fps) || 24.0;
+            if (agentModel) bodyData.agent_model = agentModel;
+            if (customApiKey) bodyData.custom_api_key = customApiKey;
+        }
         return this.request(`/api/project/${projectId}/chat`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message, history })
+            body: JSON.stringify(bodyData)
         });
+    }
+
+    static fetchAgentModels() {
+        return this.request("/api/agent/models");
     }
 
     static fetchFaceClusters(projectId) {

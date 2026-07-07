@@ -349,6 +349,8 @@
                             <input type="text" id="timeline-name-input" value="Rascunho Making Of #1" placeholder="Nome da Timeline...">
                             <button id="btn-save-timeline" class="btn-outline" data-tooltip="Salvar a linha do tempo atual no banco de dados local."><i class="fa-solid fa-floppy-disk"></i></button>
                             <button id="btn-load-timeline" class="btn-outline" data-tooltip="Carregar uma timeline salva (com pistas e posições)."><i class="fa-solid fa-folder-open"></i></button>
+                            <button id="btn-undo-timeline" class="btn-outline" data-tooltip="Desfazer última edição da timeline (Ctrl+Z)." style="opacity: 0.4;"><i class="fa-solid fa-rotate-left"></i></button>
+                            <button id="btn-redo-timeline" class="btn-outline" data-tooltip="Refazer edição desfeita (Ctrl+Shift+Z ou Ctrl+Y)." style="opacity: 0.4;"><i class="fa-solid fa-rotate-right"></i></button>
                             <!-- Dropdown de IA Persona -->
                             <div class="dropdown-wrapper" style="background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.3);" data-tooltip="Selecione um assistente de IA especialista (Montador, Diretor, etc.). A IA analisa o corte ATUAL da timeline (falas, cobertura e lacunas) e propõe edições na pista de IA.">
                                 <i class="fa-solid fa-robot" style="color: #c084fc;"></i>
@@ -385,7 +387,10 @@
                             <div class="timeline-headers-sidebar" style="width: 118px; display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.4); border-right: 1px solid var(--border-glass); z-index: 10; flex-shrink: 0; box-sizing: border-box; overflow: hidden;">
                                 <div class="timeline-header-ruler" style="height: 30px; flex-shrink: 0; border-bottom: 1px solid var(--border-glass); display: flex; align-items: center; justify-content: space-between; padding: 0 6px; font-size: 9px; font-weight: 700; color: var(--color-cyan); font-family: monospace; letter-spacing: 0.5px; box-sizing: border-box;">
                                     <span>TIMECODE</span>
-                                    <button id="btn-add-track" title="Adicionar nova pista de vídeo" style="border: 1px solid rgba(6,182,212,0.3); background: rgba(6,182,212,0.08); color: var(--color-cyan); cursor: pointer; border-radius: 4px; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; padding: 0;"><i class="fa-solid fa-plus"></i></button>
+                                    <div style="display: flex; gap: 4px;">
+                                        <button id="btn-add-track" title="Adicionar nova pista de vídeo" style="border: 1px solid rgba(6,182,212,0.3); background: rgba(6,182,212,0.08); color: var(--color-cyan); cursor: pointer; border-radius: 4px; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; padding: 0;"><i class="fa-solid fa-plus"></i></button>
+                                        <button id="btn-add-audio-track" title="Adicionar nova pista de áudio" style="border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.08); color: #10b981; cursor: pointer; border-radius: 4px; width: 18px; height: 18px; font-size: 9px; display: flex; align-items: center; justify-content: center; padding: 0;"><i class="fa-solid fa-music"></i></button>
+                                    </div>
                                 </div>
                                 <div id="timeline-track-headers" style="position: relative; flex: 1; overflow: hidden;">
                                     <!-- Cabeçalhos de pistas inseridos dinamicamente -->
@@ -483,6 +488,19 @@
                                 </button>
                             </div>
                         </h4>
+                        <!-- Controles de Configuração do Agente (Modelo e Chave) -->
+                        <div id="agent-controls" style="display: flex; flex-direction: column; gap: 6px; padding: 8px 15px; border-bottom: 1px solid var(--border-glass); background: rgba(0,0,0,0.1); flex-shrink: 0;">
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <label style="font-size: 10px; color: var(--text-secondary); width: 60px; font-weight: bold;">Modelo IA:</label>
+                                <select id="agent-model-select" style="flex: 1; height: 24px; font-size: 11px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-primary); padding: 0 4px; outline: none; cursor: pointer;">
+                                    <!-- Preenchido via API -->
+                                </select>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <label style="font-size: 10px; color: var(--text-secondary); width: 60px; font-weight: bold;">Chave API:</label>
+                                <input type="password" id="agent-api-key-input" placeholder="OpenRouter API Key (deixe vazio para usar a do .env)..." style="flex: 1; height: 24px; font-size: 11px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-primary); padding: 0 6px; outline: none;">
+                            </div>
+                        </div>
                         <div class="chat-main-layout" style="display: flex; flex: 1; overflow: hidden; position: relative; width: 100%;">
                             <!-- Esquerda: Feed de Conversa -->
                             <div class="chat-conversation-pane" style="display: flex; flex-direction: column; flex: 1; height: 100%; min-width: 250px;">
@@ -923,6 +941,21 @@
                     <div>Aceitar sugestão de IA e torná-la real</div>
                     <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Del</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">N</kbd></div>
                     <div>Rejeitar e apagar sugestão / clipe ativo</div>
+                </div>
+
+                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">5. Histórico e Áudio Vinculado (A/V)</h4>
+                <p style="margin: 0;">Todo clipe de vídeo entra com o <strong>áudio vinculado</strong> numa pista de áudio (A1/A2, verde). O par se move junto, mas os <strong>trims são independentes</strong>: estique a borda do clipe de áudio para criar <strong>J-cuts</strong> (áudio entra antes da imagem) e <strong>L-cuts</strong> (áudio continua após o corte).</p>
+                <div style="display: grid; grid-template-columns: 120px 1fr; gap: 6px;">
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl + Z</kbd></div>
+                    <div>Desfazer edição da timeline</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl + Shift + Z</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl + Y</kbd></div>
+                    <div>Refazer edição desfeita</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">U</kbd></div>
+                    <div>Desvincular o par A/V do clipe selecionado</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Del</kbd></div>
+                    <div>Apagar o clipe selecionado + par vinculado</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Alt + Del</kbd></div>
+                    <div>Apagar só o clipe selecionado (desvincula o par)</div>
                 </div>
             </div>
         </div>

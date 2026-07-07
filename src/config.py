@@ -18,6 +18,18 @@ class Config:
     TEXT_MODEL = os.getenv("TEXT_MODEL", "deepseek/deepseek-chat")
     VISION_MODEL = os.getenv("VISION_MODEL", "google/gemini-2.5-flash")
     
+    # ── Configurações do Agente de Edição (Fase 1 - Julho 2026) ──
+    AGENT_MODEL = os.getenv("AGENT_MODEL", "deepseek/deepseek-v4-flash")
+    AGENT_MODELS = [
+        "deepseek/deepseek-v4-flash",
+        "deepseek/deepseek-v4-pro",
+        "google/gemini-3.5-flash",
+        "google/gemini-3.5-pro",
+        "anthropic/claude-5-sonnet",
+        "anthropic/claude-5-fable",
+        "openai/gpt-4o-mini"
+    ]
+    
     # ── Paths locais ───────────────────────────────────────────
     BASE_DIR = Path(__file__).resolve().parent.parent
     

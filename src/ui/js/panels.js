@@ -4,7 +4,7 @@ import { CapIAuAPI } from "./api.js";
 import { formatTimecode, showAnnotationModal } from "./player.js";
 import { CapiauTimelineRenderer } from "./timelineRenderer.js";
 import { CapiauTimelineInteraction } from "./timelineInteraction.js";
-import { TIMELINE_STATE, secondsToFrames } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames } from "./timelineState.js";
 import { getActiveElement, getActiveQuerySelector } from "./workspaceManager.js";
 
 export class PanelsManager {
@@ -129,6 +129,28 @@ export class PanelsManager {
                 }
             });
         }
+
+        const btnAddAudioTrack = document.getElementById("btn-add-audio-track");
+        if (btnAddAudioTrack) {
+            btnAddAudioTrack.addEventListener("click", () => {
+                const name = prompt("Nome da nova pista de áudio:", "Áudio Extra");
+                if (name !== null) {
+                    TIMELINE_STATE.addAudioTrack(name.trim() || null);
+                }
+            });
+        }
+
+        // ── Undo / Redo da timeline ──
+        const btnUndo = document.getElementById("btn-undo-timeline");
+        const btnRedo = document.getElementById("btn-redo-timeline");
+        if (btnUndo) btnUndo.addEventListener("click", () => TIMELINE_HISTORY.undo());
+        if (btnRedo) btnRedo.addEventListener("click", () => TIMELINE_HISTORY.redo());
+        STATE.on("timelineHistoryChanged", ({ canUndo, canRedo }) => {
+            const u = getActiveElement("btn-undo-timeline");
+            const r = getActiveElement("btn-redo-timeline");
+            if (u) u.style.opacity = canUndo ? "1" : "0.4";
+            if (r) r.style.opacity = canRedo ? "1" : "0.4";
+        });
 
         STATE.on("timelineTracksChanged", () => this.renderTrackHeaders());
         STATE.on("timelineVScrollChanged", () => this.syncTrackHeadersScroll());
@@ -704,7 +726,11 @@ export class PanelsManager {
                 in_time: c.in,
                 out_time: c.out,
                 track: c.track,
-                timeline_start: (c.timelineStartFrame || 0) / fps
+                timeline_start: (c.timelineStartFrame || 0) / fps,
+                link_id: c.link_id || null,
+                effects: c.effects || [],
+                alternatives: c.alternatives || [],
+                origin: c.origin || "user"
             }));
             const tracks = TIMELINE_STATE.serializeTracks();
             await CapIAuAPI.saveTimeline(STATE.currentProjectId, name, "Corte criado no editor", cuts, tracks, fps);
@@ -977,7 +1003,8 @@ export class PanelsManager {
                 persona: persona,
                 fps: fps,
                 brief: "",
-                clips: cuts.map(c => ({
+                // Só clipes de vídeo: o áudio vinculado é derivado e pollui o contexto do LLM
+                clips: cuts.filter(c => TIMELINE_STATE.trackKindOf(c.track) === "video").map(c => ({
                     id: String(c.id),
                     video_id: c.video_id,
                     in_s: c.in,
@@ -1057,6 +1084,7 @@ export class PanelsManager {
                     this.runAiTimelineAnalysis(persona);
                 });
             } else {
+                const isAudio = track.kind === "audio";
                 const muteIcon = track.muted
                     ? `<i class="fa-solid fa-volume-xmark" style="color: var(--color-rose);"></i>`
                     : `<i class="fa-solid fa-volume-high"></i>`;
@@ -1065,30 +1093,41 @@ export class PanelsManager {
                     : `<i class="fa-solid fa-lock-open"></i>`;
                 const magnetColor = track.magnetic ? "var(--color-cyan)" : "var(--text-muted)";
 
+                // Vídeo é só imagem (magnet, sem volume); áudio tem volume/mute (sem magnet)
+                const kindIcon = isAudio
+                    ? `<i class="fa-solid fa-music" style="font-size: 8px; color: var(--color-emerald, #10b981);"></i> `
+                    : "";
+                const magnetBtn = isAudio ? "" : `<button class="btn-track-magnet" title="${track.magnetic ? 'Pista magnética (ripple): clipes ficam grudados em sequência' : 'Pista livre: posicionamento manual'}" style="border: none; background: none; color: ${magnetColor}; cursor: pointer; padding: 0; font-size: 9px;"><i class="fa-solid fa-magnet"></i></button>`;
+                const muteBtn = isAudio ? `<button class="btn-track-mute" title="Mutar Trilha" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 10px;">${muteIcon}</button>` : "";
+                const volumeSlider = isAudio ? `<input type="range" class="slider-track-volume" min="0" max="1" step="0.1" value="${track.volume}" style="width: 100%; height: 3px; accent-color: var(--color-cyan); cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">` : "";
+
                 row.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px;">
-                        <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">${track.id} ${track.name}</span>
+                        <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">${kindIcon}${track.id} ${track.name}</span>
                         <div style="display: flex; gap: 4px; flex-shrink: 0;">
-                            <button class="btn-track-magnet" title="${track.magnetic ? 'Pista magnética (ripple): clipes ficam grudados em sequência' : 'Pista livre: posicionamento manual'}" style="border: none; background: none; color: ${magnetColor}; cursor: pointer; padding: 0; font-size: 9px;"><i class="fa-solid fa-magnet"></i></button>
+                            ${magnetBtn}
                             <button class="btn-track-lock" title="Travar/Destravar pista" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 9px;">${lockIcon}</button>
-                            <button class="btn-track-mute" title="Mutar Trilha" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 10px;">${muteIcon}</button>
-                            <button class="btn-track-remove" title="Remover pista (clipes vão para outra pista)" style="border: none; background: none; color: var(--text-muted); cursor: pointer; padding: 0; font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
+                            ${muteBtn}
+                            <button class="btn-track-remove" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="border: none; background: none; color: var(--text-muted); cursor: pointer; padding: 0; font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     </div>
-                    <input type="range" class="slider-track-volume" min="0" max="1" step="0.1" value="${track.volume}" style="width: 100%; height: 3px; accent-color: var(--color-cyan); cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">
+                    ${volumeSlider}
                 `;
 
-                row.querySelector(".btn-track-mute").addEventListener("click", () => TIMELINE_STATE.toggleTrackMute(track.id));
+                const muteEl = row.querySelector(".btn-track-mute");
+                if (muteEl) muteEl.addEventListener("click", () => TIMELINE_STATE.toggleTrackMute(track.id));
                 row.querySelector(".btn-track-lock").addEventListener("click", () => TIMELINE_STATE.toggleTrackLock(track.id));
-                row.querySelector(".btn-track-magnet").addEventListener("click", () => TIMELINE_STATE.toggleTrackMagnetic(track.id));
+                const magnetEl = row.querySelector(".btn-track-magnet");
+                if (magnetEl) magnetEl.addEventListener("click", () => TIMELINE_STATE.toggleTrackMagnetic(track.id));
                 row.querySelector(".btn-track-remove").addEventListener("click", () => {
-                    if (confirm(`Remover a pista "${track.id} ${track.name}"? Os clipes dela serão movidos para outra pista de vídeo.`)) {
+                    if (confirm(`Remover a pista "${track.id} ${track.name}"? Os clipes dela serão movidos para outra pista do mesmo tipo.`)) {
                         if (!TIMELINE_STATE.removeTrack(track.id)) {
                             alert("Não é possível remover: a timeline precisa de ao menos uma pista de vídeo.");
                         }
                     }
                 });
-                row.querySelector(".slider-track-volume").addEventListener("input", (e) => {
+                const volumeEl = row.querySelector(".slider-track-volume");
+                if (volumeEl) volumeEl.addEventListener("input", (e) => {
                     TIMELINE_STATE.setTrackVolume(track.id, parseFloat(e.target.value));
                 });
                 row.querySelector(".track-name-label").addEventListener("dblclick", () => {
@@ -1134,23 +1173,31 @@ export class PanelsManager {
             const detail = await CapIAuAPI.fetchTimelineDetail(timelineId);
             const sequence = detail.sequence || {};
 
-            // Restaura as pistas e os clipes com posições absolutas
-            TIMELINE_STATE.setTracks(sequence.tracks || []);
-            if (sequence.fps) TIMELINE_STATE.setFps(sequence.fps);
+            // O carregamento é 1 passo de undo: Ctrl+Z restaura a timeline anterior
+            TIMELINE_HISTORY.record(() => {
+                // Restaura as pistas e os clipes com posições absolutas
+                TIMELINE_STATE.setTracks(sequence.tracks || []);
+                if (sequence.fps) TIMELINE_STATE.setFps(sequence.fps);
 
-            const fps = TIMELINE_STATE.fps || 24;
-            const cuts = (sequence.clips || []).map((c, idx) => ({
-                id: c.id || `cut_loaded_${idx}_${Date.now()}`,
-                video_id: c.video_id,
-                in: c.in,
-                out: c.out,
-                track: c.track || "V1",
-                timelineStartFrame: c.timeline_start !== undefined && c.timeline_start !== null
-                    ? secondsToFrames(c.timeline_start, fps)
-                    : undefined
-            }));
+                const fps = TIMELINE_STATE.fps || 24;
+                const cuts = (sequence.clips || []).map((c, idx) => ({
+                    id: c.id || `cut_loaded_${idx}_${Date.now()}`,
+                    video_id: c.video_id,
+                    in: c.in,
+                    out: c.out,
+                    track: c.track || "V1",
+                    link_id: c.link_id || null,
+                    effects: c.effects || [],
+                    alternatives: c.alternatives || [],
+                    origin: c.origin || "user",
+                    timelineStartFrame: c.timeline_start !== undefined && c.timeline_start !== null
+                        ? secondsToFrames(c.timeline_start, fps)
+                        : undefined
+                }));
 
-            STATE.activeTimelineCuts = cuts;
+                // Timelines antigas (sem pistas de áudio): cria pares A/V vinculados
+                STATE.activeTimelineCuts = TIMELINE_STATE.migrateCutsToAV(cuts);
+            });
 
             const nameInput = getActiveElement("timeline-name-input");
             if (nameInput) nameInput.value = detail.name || `Timeline ${timelineId}`;

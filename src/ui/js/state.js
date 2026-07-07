@@ -145,6 +145,13 @@ class AppState extends EventEmitter {
             }
             return trackId === "V1"; // fallback: comportamento legado
         };
+        const kindOf = (trackId) => {
+            if (timelineState) {
+                const t = timelineState.getTrack(trackId);
+                if (t) return t.kind || "video";
+            }
+            return "video";
+        };
 
         const trackCursors = {}; // posição corrente por pista (para layout sequencial/append)
 
@@ -158,6 +165,12 @@ class AppState extends EventEmitter {
 
             const track = cut.track || "V1";
             let timelineStartFrame = cut.timelineStartFrame;
+
+            // Compat: payloads do backend/agente posicionam em segundos (timeline_start)
+            if ((timelineStartFrame === undefined || timelineStartFrame === null) &&
+                cut.timeline_start !== undefined && cut.timeline_start !== null) {
+                timelineStartFrame = Math.round(cut.timeline_start * timelineFps);
+            }
 
             if (trackCursors[track] === undefined) trackCursors[track] = 0;
 
@@ -174,6 +187,7 @@ class AppState extends EventEmitter {
             }
 
             return {
+                ...cut,
                 id: cut.id || `cut_${index}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
                 video_id: cut.video_id,
                 inFrame: Math.round(inFrame),
@@ -181,9 +195,36 @@ class AppState extends EventEmitter {
                 in: cut.in !== undefined ? cut.in : inFrame / timelineFps,
                 out: cut.out !== undefined ? cut.out : outFrame / timelineFps,
                 track: track,
-                timelineStartFrame: Math.round(timelineStartFrame)
+                timelineStartFrame: Math.round(timelineStartFrame),
+                // Mantém a chave em segundos sincronizada (evita valor obsoleto após drags)
+                timeline_start: Math.round(timelineStartFrame) / timelineFps,
+                link_id: cut.link_id || null
             };
         });
+
+        // ── Sincronia A/V: áudio vinculado é ancorado ao clipe de vídeo par ──
+        // Invariante: (timelineStartFrame - inFrame) do áudio == o do vídeo.
+        // Trims independentes do áudio produzem J/L-cuts sem perder o sync, e o
+        // ripple da pista magnética arrasta o áudio junto do vídeo.
+        const videoByLink = {};
+        this._activeTimelineCuts.forEach(c => {
+            if (c.link_id && kindOf(c.track) === "video") videoByLink[c.link_id] = c;
+        });
+        this._activeTimelineCuts.forEach(c => {
+            if (!c.link_id || kindOf(c.track) !== "audio") return;
+            const v = videoByLink[c.link_id];
+            if (!v) return;
+            let start = v.timelineStartFrame - v.inFrame + c.inFrame;
+            if (start < 0) {
+                // Não existe timeline antes do 0: encurta a extensão do áudio
+                c.inFrame -= start;
+                c.in = c.inFrame / timelineFps;
+                start = 0;
+            }
+            c.timelineStartFrame = start;
+            c.timeline_start = start / timelineFps;
+        });
+
         this.emit("timelineCutsUpdated", this._activeTimelineCuts);
     }
 
