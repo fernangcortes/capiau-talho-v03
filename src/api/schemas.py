@@ -24,12 +24,42 @@ class CutItem(BaseModel):
     in_time: float  # mapeado de 'in' por ser palavra reservada
     out_time: float # mapeado de 'out'
     track: str = "V1"
+    timeline_start: Optional[float] = None  # posição absoluta na timeline (segundos, formato v2)
+    id: Optional[str] = None                # id estável do clipe no frontend
+
+class TrackItem(BaseModel):
+    id: str
+    name: str = ""
+    kind: str = "video"  # 'video' | 'audio' | 'ai'
+    order: int = 0
+    volume: float = 1.0
+    muted: bool = False
+    locked: bool = False
+    magnetic: bool = False
 
 class TimelineCreate(BaseModel):
     name: str
     description: str = ""
     cuts: List[CutItem]
     project_id: int = 1
+    tracks: Optional[List[TrackItem]] = None  # formato v2 multipista
+    fps: float = 24.0
+
+class TimelineAISuggestClip(BaseModel):
+    id: str
+    video_id: int
+    in_s: float
+    out_s: float
+    timeline_start_s: float = 0.0
+    track: str = "V1"
+
+class TimelineAISuggestPayload(BaseModel):
+    project_id: int = 1
+    persona: str = "diretora"
+    fps: float = 24.0
+    brief: str = ""
+    clips: List[TimelineAISuggestClip]
+    tracks: List[TrackItem] = []
 
 class LabelFacePayload(BaseModel):
     name: str

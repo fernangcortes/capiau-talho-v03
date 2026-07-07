@@ -94,21 +94,29 @@ class SemanticSearch:
         for idx, desc in enumerate(descriptions):
             text_to_embed = f"B-Roll frame {desc['timestamp']}s: {desc['description']}. Elementos: {', '.join(desc['tags'])}"
             vector = self.encoder.encode(text_to_embed).tolist()
-            
+
             point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"proj_{project_id}_vid_{video_id}_broll_{idx}"))
-            
+
+            payload = {
+                "project_id": project_id,
+                "video_id": video_id,
+                "media_type": "broll",
+                "start_time": desc['timestamp'],
+                "end_time": desc['timestamp'] + CONFIG.FRAME_INTERVAL,
+                "text": desc['description'],
+                "raw_text": desc['description'],
+                "tags": desc['tags']
+            }
+            # Saída estruturada da visão (pessoas/objetos citados) para busca e auditoria
+            if desc.get('people'):
+                payload["people"] = desc['people']
+            if desc.get('objects'):
+                payload["objects"] = desc['objects']
+
             points.append(PointStruct(
                 id=point_id,
                 vector=vector,
-                payload={
-                    "project_id": project_id,
-                    "video_id": video_id,
-                    "media_type": "broll",
-                    "start_time": desc['timestamp'],
-                    "end_time": desc['timestamp'] + CONFIG.FRAME_INTERVAL,
-                    "text": desc['description'],
-                    "tags": desc['tags']
-                }
+                payload=payload
             ))
             
         if points:
@@ -135,6 +143,7 @@ class SemanticSearch:
                     "photo_id": photo_id,
                     "media_type": "photo",
                     "text": description,
+                    "raw_text": description,
                     "tags": tags
                 }
             )]
@@ -257,6 +266,158 @@ class SemanticSearch:
             print(f"[QDRANT] Erro ao recuperar frame description: {e}")
             return ""
 
+
+    def get_video_vision_points(self, project_id: int, video_id: int):
+        """Recupera os pontos brutos (com IDs) das descrições de frames do B-Roll para reindexação."""
+        query_filter = Filter(
+            must=[
+                FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                FieldCondition(key="video_id", match=MatchValue(value=video_id)),
+                FieldCondition(key="media_type", match=MatchValue(value="broll"))
+            ]
+        )
+        try:
+            response = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=query_filter,
+                limit=2000,
+                with_payload=True
+            )
+            return response[0]
+        except Exception as e:
+            print(f"[QDRANT] Erro ao recuperar pontos do vídeo {video_id}: {e}")
+            return []
+
+    def _build_embed_text(self, payload: dict) -> str:
+        """Reconstrói o texto de embedding canônico de um ponto a partir do payload.
+
+        Mantém o MESMO formato usado na indexação original de cada tipo de mídia,
+        garantindo que reindexações produzam vetores comparáveis.
+        """
+        media_type = payload.get("media_type", "")
+        text = payload.get("text", "") or ""
+        tags = payload.get("tags") or []
+
+        if media_type in ("interview", "video"):
+            speaker = payload.get("speaker_id", "")
+            return f"{speaker}: \"{text}\"" if speaker else text
+        if media_type == "broll":
+            ts = payload.get("start_time", 0.0)
+            return f"B-Roll frame {ts}s: {text}. Elementos: {', '.join(tags)}"
+        if media_type == "photo":
+            return f"Foto de set: {text}. Tags: {', '.join(tags)}"
+        if media_type == "doc":
+            return f"Documento '{payload.get('filename', '')}' | Parágrafo: {text}"
+        return text
+
+    def update_point_text(self, point_id, payload: dict, enriched_text: str):
+        """Reescreve o texto de um ponto existente (mantendo o ID) e re-embeda o vetor.
+
+        Usado pelo motor de enriquecimento: a busca semântica passa a enxergar os
+        nomes reais de pessoas/objetos em vez dos termos genéricos originais.
+        """
+        new_payload = dict(payload)
+        # Preserva o texto original da visão apenas na primeira reescrita
+        if "raw_text" not in new_payload or not new_payload.get("raw_text"):
+            new_payload["raw_text"] = new_payload.get("text", "")
+        new_payload["text"] = enriched_text
+
+        vector = self.encoder.encode(self._build_embed_text(new_payload)).tolist()
+        self.client.upsert(
+            collection_name=self.collection_name,
+            points=[PointStruct(id=point_id, vector=vector, payload=new_payload)]
+        )
+
+    def reindex_all(self) -> int:
+        """Re-embeda TODOS os pontos da coleção com o modelo de embeddings atual.
+
+        Necessário após trocar CONFIG.embedding_model (ex: migração para o modelo
+        multilíngue). Mantém IDs e payloads; só os vetores são recalculados.
+        Progresso visível na aba Tarefas (TASK_MANAGER).
+        """
+        from src.core.tasks import TASK_MANAGER
+        task_key = "reindex-embeddings"
+        TASK_MANAGER.update_progress(task_key, 0.0, "running", task_type="index")
+
+        try:
+            total = self.client.count(self.collection_name).count
+        except Exception:
+            total = 0
+
+        print(f"[QDRANT] Reindexação total iniciada: {total} pontos com o modelo '{CONFIG.embedding_model}'...")
+
+        done = 0
+        offset = None
+        try:
+            while True:
+                points, offset = self.client.scroll(
+                    collection_name=self.collection_name,
+                    limit=256,
+                    offset=offset,
+                    with_payload=True
+                )
+                if not points:
+                    break
+
+                texts = [self._build_embed_text(p.payload or {}) for p in points]
+                vectors = self.encoder.encode(texts, show_progress_bar=False)
+
+                self.client.upsert(
+                    collection_name=self.collection_name,
+                    points=[
+                        PointStruct(id=p.id, vector=v.tolist(), payload=p.payload or {})
+                        for p, v in zip(points, vectors)
+                    ]
+                )
+                done += len(points)
+                percent = min(99.0, (done / max(total, 1)) * 100.0)
+                TASK_MANAGER.update_progress(task_key, percent, "running", task_type="index")
+
+                if offset is None:
+                    break
+
+            TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="index")
+            print(f"[QDRANT] Reindexação concluída: {done} pontos re-embedados.")
+            return done
+        except Exception as e:
+            print(f"[QDRANT] Erro na reindexação: {e}")
+            TASK_MANAGER.update_progress(task_key, 0.0, "failed", task_type="index")
+            return done
+
+    def get_photo_point(self, project_id: int, photo_id: int):
+        """Recupera o ponto indexado de uma foto (ou None)."""
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"proj_{project_id}_photo_{photo_id}"))
+        try:
+            points = self.client.retrieve(
+                collection_name=self.collection_name,
+                ids=[point_id],
+                with_payload=True
+            )
+            return points[0] if points else None
+        except Exception as e:
+            print(f"[QDRANT] Erro ao recuperar ponto da foto {photo_id}: {e}")
+            return None
+
+    def index_annotation(self, project_id: int, video_id: int, start_time: float, end_time: float, text: str):
+        """Indexa uma anotação manual (objeto/elemento marcado pelo usuário) como ponto pesquisável."""
+        vector = self.encoder.encode(text).tolist()
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"proj_{project_id}_vid_{video_id}_annot_{start_time}"))
+        self.client.upsert(
+            collection_name=self.collection_name,
+            points=[PointStruct(
+                id=point_id,
+                vector=vector,
+                payload={
+                    "project_id": project_id,
+                    "video_id": video_id,
+                    "media_type": "broll",
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "text": text,
+                    "tags": []
+                }
+            )]
+        )
 
     def index_production_doc(self, project_id: int, doc_id: int, filename: str, content: str):
         """Indexa um documento de contexto fatiando-o em parágrafos no Qdrant local."""

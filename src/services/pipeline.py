@@ -19,10 +19,12 @@ from src.db.repositories.narrative import NarrativeRepository
 from src.core.exceptions import PipelineError
 from src.nlp.prompt_templates import (
     VISION_PROMPT,
+    get_vision_prompt,
     get_interview_summary_prompt,
     get_broll_summary_prompt,
     get_theme_clustering_prompt
 )
+from src.db.repositories.entities import EntityRepository
 from src.nlp.json_parser import extract_json_from_markdown
 from src.media.ffmpeg import extract_audio_mono, extract_frame, has_audio_stream
 from src.search.semantic import SemanticSearch
@@ -193,7 +195,14 @@ class PipelineService:
                 PipelineService.generate_video_summary(video_id, "interview", project_id)
             except Exception as sum_err:
                 print(f"[ASR] Aviso: Falha na geração do resumo: {sum_err}")
-                
+
+            # Atribuição incremental aos temas existentes (sem re-clusterizar tudo)
+            try:
+                from src.nlp.theme_engine import assign_media_to_themes
+                assign_media_to_themes(project_id, video_id=video_id)
+            except Exception as theme_err:
+                print(f"[ASR] Aviso: Falha na atribuição incremental de temas: {theme_err}")
+
             with get_db() as conn:
                 MediaRepository.update_video_status(conn, video_id, 'transcribed')
             TASK_MANAGER.update_progress(str(video_id), 100.0, "finished", task_type="transcription")
@@ -213,26 +222,30 @@ class PipelineService:
                     pass
 
     @staticmethod
-    def call_openrouter_vision(base64_image: str, extension: str = "jpeg") -> Dict[str, Any]:
-        """Chama a API do OpenRouter Vision para analisar frames ou fotos."""
+    def call_openrouter_vision(base64_image: str, extension: str = "jpeg", prompt: Optional[str] = None) -> Dict[str, Any]:
+        """Chama a API do OpenRouter Vision para analisar frames ou fotos.
+
+        'prompt' permite injetar o prompt estruturado com entidades conhecidas do projeto
+        (get_vision_prompt); sem ele, usa o prompt legado simples.
+        """
         api_key = CONFIG.OPENROUTER_API_KEY
         if not api_key or api_key == "your_openrouter_api_key_here":
             return {"descricao": "Análise indisponível", "tags": []}
-            
+
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
         mime_type = "image/jpeg" if extension in ["jpeg", "jpg"] else f"image/{extension}"
-        
+
         payload = {
             "model": CONFIG.VISION_MODEL,
             "messages": [
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": VISION_PROMPT},
+                        {"type": "text", "text": prompt or VISION_PROMPT},
                         {
                             "type": "image_url",
                             "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}
@@ -254,6 +267,45 @@ class PipelineService:
         except Exception as e:
             print(f"[Vision] Erro ao chamar OpenRouter: {e}")
             return {"descricao": "Análise indisponível por erro de requisição", "tags": []}
+
+    @staticmethod
+    def _register_auto_mentions(
+        conn,
+        project_id: int,
+        known_entities: List[Dict[str, str]],
+        analysis: Dict[str, Any],
+        video_id: Optional[int] = None,
+        photo_id: Optional[int] = None,
+        timestamp: Optional[float] = None
+    ) -> None:
+        """Cria menções automáticas (status='auto') quando a visão cita entidades já catalogadas.
+
+        Só vincula matches exatos (case-insensitive) com o registro de entidades — nunca
+        cria entidades novas a partir de palpites do modelo de visão.
+        """
+        try:
+            known_map = {e["name"].strip().lower(): e for e in (known_entities or [])}
+            if not known_map:
+                return
+
+            cited = [str(p) for p in (analysis.get("pessoas") or [])] + \
+                    [str(o) for o in (analysis.get("objetos") or [])]
+
+            for raw_name in cited:
+                key = raw_name.strip().lower()
+                match = known_map.get(key)
+                if not match:
+                    continue
+                entity_id = EntityRepository.upsert_entity(
+                    conn, project_id, match["name"], match.get("entity_type", "other")
+                )
+                EntityRepository.add_mention(
+                    conn, entity_id, project_id,
+                    photo_id=photo_id, video_id=video_id, timestamp=timestamp,
+                    source="vision_auto", status="auto"
+                )
+        except Exception as e:
+            print(f"[Vision] Falha ao registrar menções automáticas: {e}")
 
     @staticmethod
     def analyze_video_vision(video_id: int, filepath: Path, duration: float) -> bool:
@@ -278,6 +330,14 @@ class PipelineService:
             timestamps.append(t)
             t += interval
             
+        # Entidades já catalogadas no projeto — o modelo de visão nomeia direto na análise
+        known_entities = []
+        try:
+            with get_db() as conn:
+                known_entities = EntityRepository.get_known_names(conn, project_id)
+        except Exception as ent_err:
+            print(f"[Vision] Falha ao carregar entidades conhecidas: {ent_err}")
+
         try:
             total_stamps = len(timestamps)
             for idx, timestamp in enumerate(timestamps):
@@ -286,47 +346,83 @@ class PipelineService:
                 frame_path = video_cache_dir / f"frame_{int(timestamp)}s.jpg"
                 if not extract_frame(filepath, timestamp, frame_path):
                     continue
-                    
+
                 # Roda reconhecimento facial do frame
                 try:
                     process_video_frame_faces(project_id, video_id, timestamp, frame_path)
                 except Exception as fe:
                     print(f"[Vision] Falha facial no frame {timestamp}s: {fe}")
-                    
+
+                # Pessoas confirmadas por rosto neste frame (rotulagens anteriores propagadas por cluster)
+                detected_people = []
+                try:
+                    with get_db() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            SELECT DISTINCT name FROM face
+                            WHERE video_id = ? AND ABS(timestamp - ?) <= 5.0
+                              AND name IS NOT NULL AND name != ''
+                              AND name NOT IN ('Não Relevante', 'Não é Rosto')
+                        """, (video_id, timestamp))
+                        detected_people = [r["name"] for r in cursor.fetchall()]
+                except Exception:
+                    pass
+
                 # Base64 encoding
                 import base64
                 with open(frame_path, "rb") as img_file:
                     base64_img = base64.b64encode(img_file.read()).decode('utf-8')
-                    
-                analysis = PipelineService.call_openrouter_vision(base64_img, "jpg")
+
+                vision_prompt = get_vision_prompt(known_entities, detected_people)
+                analysis = PipelineService.call_openrouter_vision(base64_img, "jpg", prompt=vision_prompt)
                 descriptions_indexed.append({
                     "timestamp": timestamp,
                     "description": analysis.get("descricao", ""),
-                    "tags": analysis.get("tags", [])
+                    "tags": analysis.get("tags", []),
+                    "people": analysis.get("pessoas", []) or [],
+                    "objects": analysis.get("objetos", []) or []
                 })
-                
-                # Registra no grafo relacional
+
+                # Registra no grafo relacional + menções automáticas de entidades reconhecidas
                 with get_db() as conn:
                     for tag in analysis.get("tags", []):
                         NarrativeRepository.add_relation(
                             conn, project_id, "video", str(video_id),
                             "features_element", "theme", tag
                         )
-                
+                    PipelineService._register_auto_mentions(
+                        conn, project_id, known_entities, analysis,
+                        video_id=video_id, timestamp=timestamp
+                    )
+
                 try:
                     frame_path.unlink()
                 except Exception:
                     pass
-                    
+
             if descriptions_indexed:
                 search_engine = SemanticSearch.get_instance()
                 search_engine.index_broll_descriptions(project_id, video_id, descriptions_indexed)
-                
+
                 try:
                     PipelineService.generate_video_summary(video_id, "broll", project_id, descriptions_indexed)
                 except Exception as sum_err:
                     print(f"[Vision] Falha ao resumir B-roll: {sum_err}")
-                    
+
+                # Enriquecimento pós-análise: aplica nomes confirmados anteriormente
+                try:
+                    from src.nlp.enrichment_engine import enrich_video_frames
+                    enrich_video_frames(project_id, video_id)
+                except Exception as enrich_err:
+                    print(f"[Vision] Falha no enriquecimento pós-análise: {enrich_err}")
+
+                # Atribuição incremental de temas existentes ao novo material
+                try:
+                    from src.nlp.theme_engine import assign_media_to_themes
+                    assign_media_to_themes(project_id, video_id=video_id)
+                except Exception as theme_err:
+                    print(f"[Vision] Falha na atribuição incremental de temas: {theme_err}")
+
             with get_db() as conn:
                 MediaRepository.update_video_status(conn, video_id, 'analyzed')
             TASK_MANAGER.update_progress(str(video_id), 100.0, "finished", task_type="vision")
@@ -365,26 +461,61 @@ class PipelineService:
             proxy_path = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{photo_id}.webp"
             target_path = proxy_path if proxy_path.exists() else filepath
             ext = target_path.suffix.lower().replace('.', '')
-            
+
             import base64
             with open(target_path, "rb") as img_file:
                 base64_img = base64.b64encode(img_file.read()).decode('utf-8')
-                
-            analysis = PipelineService.call_openrouter_vision(base64_img, ext)
+
+            known_entities = []
+            detected_people = []
+            with get_db() as conn:
+                try:
+                    known_entities = EntityRepository.get_known_names(conn, project_id)
+                except Exception:
+                    pass
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT DISTINCT name FROM face
+                    WHERE photo_id = ? AND name IS NOT NULL AND name != ''
+                      AND name NOT IN ('Não Relevante', 'Não é Rosto')
+                """, (photo_id,))
+                detected_people = [r["name"] for r in cursor.fetchall()]
+
+            vision_prompt = get_vision_prompt(known_entities, detected_people)
+            analysis = PipelineService.call_openrouter_vision(base64_img, ext, prompt=vision_prompt)
             desc = analysis.get("descricao", "Foto de set analisada.")
             tags = analysis.get("tags", [])
-            
+
             with get_db() as conn:
                 MediaRepository.update_photo_analysis(conn, photo_id, desc, tags)
-                
+                # Preserva o texto bruto da visão como fonte para reescritas futuras
+                conn.execute("UPDATE photo SET raw_description = ? WHERE id = ?", (desc, photo_id))
+
                 for tag in tags:
                     NarrativeRepository.add_relation(
                         conn, project_id, "photo", str(photo_id),
                         "features_element", "theme", tag
                     )
-                    
+                PipelineService._register_auto_mentions(
+                    conn, project_id, known_entities, analysis, photo_id=photo_id
+                )
+
             search_engine = SemanticSearch.get_instance()
             search_engine.index_photo_description(project_id, photo_id, desc, tags)
+
+            # Enriquecimento imediato se já houver entidades confirmadas nesta foto
+            try:
+                from src.nlp.enrichment_engine import enrich_photo
+                enrich_photo(project_id, photo_id)
+            except Exception as enrich_err:
+                print(f"[Vision] Falha no enriquecimento da foto {photo_id}: {enrich_err}")
+
+            try:
+                from src.nlp.theme_engine import assign_media_to_themes
+                assign_media_to_themes(project_id, photo_id=photo_id)
+            except Exception as theme_err:
+                print(f"[Vision] Falha na atribuição de temas da foto {photo_id}: {theme_err}")
+
             TASK_MANAGER.update_progress(f"photo-{photo_id}", 100.0, "finished", task_type="vision")
             return True
         except Exception as e:
@@ -396,7 +527,20 @@ class PipelineService:
 
     @staticmethod
     def run_project_theme_clustering(project_id: int) -> Dict[str, Any]:
-        """Agrupa blocos falados em temas lógicos usando o DeepSeek Chat do OpenRouter."""
+        """Agrupamento temático híbrido: embeddings locais + nomeação por LLM (v2).
+
+        Cai para o clustering legado (LLM único com texto truncado) apenas se o v2 falhar.
+        """
+        try:
+            from src.nlp.theme_engine import run_theme_clustering_v2
+            return run_theme_clustering_v2(project_id)
+        except Exception as e:
+            print(f"[Clustering] Falha no clustering v2 ({e}), usando fallback legado...")
+            return PipelineService._run_legacy_theme_clustering(project_id)
+
+    @staticmethod
+    def _run_legacy_theme_clustering(project_id: int) -> Dict[str, Any]:
+        """Clustering legado: uma única chamada de LLM com a transcrição truncada em 30k chars."""
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("""

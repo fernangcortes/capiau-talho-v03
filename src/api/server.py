@@ -1,5 +1,11 @@
 """Servidor REST FastAPI unificado e simplificado para o ecossistema CapIAu-Talho."""
 import logging
+import mimetypes
+
+# Corrigir mapeamento do registro do Windows que polui tipos MIME de imagem
+mimetypes.add_type('image/jpeg', '.jpg')
+mimetypes.add_type('image/jpeg', '.jpeg')
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -10,7 +16,7 @@ from src.core.tasks import TASK_MANAGER
 from src.db.schema import init_db
 from src.db.connection import get_db
 from src.db.repositories.media import MediaRepository
-from src.api.routes import projects, media, narrative, faces
+from src.api.routes import projects, media, narrative, faces, entities
 
 # Silencia polling logs repetitivos do uvicorn no terminal
 class EndpointFilter(logging.Filter):
@@ -55,6 +61,7 @@ app.include_router(projects.router)
 app.include_router(media.router)
 app.include_router(narrative.router)
 app.include_router(faces.router)
+app.include_router(entities.router)
 
 @app.on_event("shutdown")
 def on_shutdown_cleanup() -> None:
@@ -70,4 +77,4 @@ app.mount("/originals", StaticFiles(directory=str(CONFIG.ORIGINALS_DIR)), name="
 frontend_dir = CONFIG.BASE_DIR / "src/ui"
 frontend_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="ui")
-# Auto-reload trigger comment v2
+# Auto-reload trigger comment v3 (adaptadores OTIO fcp_xml + cmx_3600 instalados)
