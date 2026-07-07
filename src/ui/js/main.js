@@ -6,7 +6,7 @@ import { PanelsManager } from "./panels.js?v=2";
 import { ChatManager } from "./chat.js";
 import { ProjectsManager } from "./projects.js";
 import { FaceManager } from "./faces.js";
-import { WorkspaceManager } from "./workspaceManager.js";
+import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
 
 // Função para destacar os termos da busca com <mark>
 function highlightTerms(text, query) {
@@ -493,7 +493,7 @@ async function runAiCategorization() {
 }
 
 function applyFiltersAndRenderCards() {
-    const searchContainer = document.getElementById("search-container");
+    const searchContainer = getActiveElement("search-container");
     if (!searchContainer) return;
     
     const resultsList = searchContainer.querySelector(".search-results-list");
@@ -872,7 +872,7 @@ async function loadMoreResults() {
 }
 
 function renderSearchResults(query) {
-    const searchContainer = document.getElementById("search-container");
+    const searchContainer = getActiveElement("search-container");
     if (!searchContainer) return;
 
     searchContainer.innerHTML = `
@@ -1013,7 +1013,7 @@ async function runSemanticSearch() {
     if (!query) return;
     
     const filter = filterSelect ? filterSelect.value : "";
-    const searchContainer = document.getElementById("search-container");
+    const searchContainer = getActiveElement("search-container");
     if (searchContainer) {
         searchContainer.innerHTML = "<div class='loading' style='padding: 15px;'>Buscando conceitos na biblioteca...</div>";
     }
@@ -1050,8 +1050,8 @@ async function runSemanticSearch() {
 window.runSemanticSearch = runSemanticSearch;
 
 function updateActionsRowVisibility(tab) {
-    const asrRow = document.getElementById("asr-actions-row");
-    const visionRow = document.getElementById("vision-actions-row");
+    const asrRow = getActiveElement("asr-actions-row");
+    const visionRow = getActiveElement("vision-actions-row");
     
     if (asrRow) asrRow.style.display = (tab === "transcript") ? "flex" : "none";
     if (visionRow) visionRow.style.display = (tab === "vision") ? "flex" : "none";
@@ -1167,11 +1167,12 @@ window.addEventListener("DOMContentLoaded", () => {
     // ── TABS NATIVAS DA ESQUERDA (BIBLIOTECA) ──
     document.querySelectorAll(".sidebar-left .tab-btn").forEach(btn => {
         btn.addEventListener("click", () => {
-            document.querySelectorAll(".sidebar-left .tab-btn").forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".sidebar-left .tab-content").forEach(c => c.classList.remove("active"));
+            const doc = btn.ownerDocument;
+            doc.querySelectorAll(".sidebar-left .tab-btn").forEach(b => b.classList.remove("active"));
+            doc.querySelectorAll(".sidebar-left .tab-content").forEach(c => c.classList.remove("active"));
             
             btn.classList.add("active");
-            const targetContent = document.getElementById(btn.dataset.tab);
+            const targetContent = doc.getElementById(btn.dataset.tab);
             if (targetContent) {
                 targetContent.classList.add("active");
             }

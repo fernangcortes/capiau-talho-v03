@@ -133,39 +133,53 @@ class AppState extends EventEmitter {
     get activeTimelineCuts() { return this._activeTimelineCuts; }
     set activeTimelineCuts(val) {
         const fps = this._projectFps || 24;
-        let currentV1Frame = 0;
-        let currentV2Frame = 0;
-        
+
+        // Configuração dinâmica de pistas (via global para evitar ciclo de import).
+        // Pistas "magnéticas" (ripple) recalculam posições sequencialmente;
+        // as demais preservam o posicionamento livre do usuário.
+        const timelineState = window.TIMELINE_STATE || null;
+        const isMagnetic = (trackId) => {
+            if (timelineState) {
+                const t = timelineState.getTrack(trackId);
+                if (t) return !!t.magnetic;
+            }
+            return trackId === "V1"; // fallback: comportamento legado
+        };
+
+        const trackCursors = {}; // posição corrente por pista (para layout sequencial/append)
+
+        // Frames SEMPRE em fps da timeline (nunca do vídeo fonte) — ver conformCuts
+        const timelineFps = (timelineState && timelineState.fps) ? timelineState.fps : fps;
+
         this._activeTimelineCuts = (val || []).map((cut, index) => {
-            const video = this._allVideos.find(v => v.id === cut.video_id);
-            const videoFps = video && video.fps ? video.fps : fps;
-            
-            const inFrame = cut.inFrame !== undefined ? cut.inFrame : Math.round(cut.in * videoFps);
-            const outFrame = cut.outFrame !== undefined ? cut.outFrame : Math.round(cut.out * videoFps);
+            const inFrame = cut.inFrame !== undefined ? cut.inFrame : Math.round(cut.in * timelineFps);
+            const outFrame = cut.outFrame !== undefined ? cut.outFrame : Math.round(cut.out * timelineFps);
             const duration = outFrame - inFrame;
-            
+
             const track = cut.track || "V1";
             let timelineStartFrame = cut.timelineStartFrame;
-            
-            if (track === "V1") {
-                timelineStartFrame = currentV1Frame;
-                currentV1Frame += duration;
+
+            if (trackCursors[track] === undefined) trackCursors[track] = 0;
+
+            if (isMagnetic(track)) {
+                // Layout sequencial: cada clipe gruda no anterior da mesma pista
+                timelineStartFrame = trackCursors[track];
+                trackCursors[track] += duration;
             } else {
-                if (timelineStartFrame === undefined) {
-                    timelineStartFrame = currentV2Frame;
-                    currentV2Frame += duration;
-                } else {
-                    currentV2Frame = timelineStartFrame + duration;
+                if (timelineStartFrame === undefined || timelineStartFrame === null) {
+                    // Sem posição definida: entra após o último clipe da pista
+                    timelineStartFrame = trackCursors[track];
                 }
+                trackCursors[track] = Math.max(trackCursors[track], timelineStartFrame + duration);
             }
-            
+
             return {
                 id: cut.id || `cut_${index}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
                 video_id: cut.video_id,
                 inFrame: Math.round(inFrame),
                 outFrame: Math.round(outFrame),
-                in: cut.in !== undefined ? cut.in : inFrame / videoFps,
-                out: cut.out !== undefined ? cut.out : outFrame / videoFps,
+                in: cut.in !== undefined ? cut.in : inFrame / timelineFps,
+                out: cut.out !== undefined ? cut.out : outFrame / timelineFps,
                 track: track,
                 timelineStartFrame: Math.round(timelineStartFrame)
             };

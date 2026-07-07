@@ -17,6 +17,20 @@ export function getActiveElement(id) {
     return document.getElementById(id);
 }
 
+/**
+ * Procura um elemento usando querySelector varrendo a janela principal e qualquer janela popout aberta.
+ */
+export function getActiveQuerySelector(selector) {
+    for (const name in window.popoutWindows) {
+        const win = window.popoutWindows[name];
+        if (win && !win.closed) {
+            const el = win.document.querySelector(selector);
+            if (el) return el;
+        }
+    }
+    return document.querySelector(selector);
+}
+
 export class WorkspaceManager {
     constructor() {
         this.channel = new BroadcastChannel("capiau-workspace-sync");
@@ -81,6 +95,9 @@ export class WorkspaceManager {
                 this.applyWorkspace(ws);
             });
         }
+
+        this.initMaximizeButtons();
+        this.initSidebarObservers();
     }
 
     applyWorkspace(ws) {
@@ -212,6 +229,19 @@ export class WorkspaceManager {
         const parent = this.originalParents[panelId];
         
         if (localPanel && parent) {
+            // Pausa e descarrega qualquer player de vídeo dentro do painel para evitar áudio fantasma
+            try {
+                const videos = localPanel.querySelectorAll("video");
+                videos.forEach(v => {
+                    v.pause();
+                    v.src = "";
+                    v.removeAttribute("src");
+                    v.load();
+                });
+            } catch (err) {
+                console.warn("[WorkspaceManager] Erro ao descarregar vídeos no restorePanel:", err);
+            }
+
             const sibling = this.originalNextSiblings[panelId];
             document.adoptNode(localPanel);
             if (sibling && sibling.parentNode === parent) {
@@ -259,5 +289,135 @@ export class WorkspaceManager {
             window.timelineRenderer.setCanvas(localCanvas);
             window.timelineInteraction.setCanvas(localCanvas);
         }
+    }
+
+    initMaximizeButtons() {
+        const btnMaxLib = document.getElementById("btn-maximize-library");
+        const sidebarLeft = document.getElementById("sidebar-left");
+        if (btnMaxLib && sidebarLeft) {
+            btnMaxLib.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const isMax = sidebarLeft.classList.toggle("sidebar-maximized");
+                btnMaxLib.innerHTML = isMax 
+                    ? `<i class="fa-solid fa-compress"></i>` 
+                    : `<i class="fa-solid fa-expand"></i>`;
+                btnMaxLib.title = isMax ? "Restaurar Biblioteca" : "Maximizar Biblioteca";
+                
+                // Força atualização da timeline ou outros elementos no resize do editor
+                window.dispatchEvent(new Event("resize"));
+            });
+        }
+
+        const btnMaxRight = document.getElementById("btn-maximize-right");
+        const sidebarRight = document.getElementById("sidebar-right");
+        if (btnMaxRight && sidebarRight) {
+            btnMaxRight.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const isMax = sidebarRight.classList.toggle("sidebar-maximized");
+                btnMaxRight.innerHTML = isMax 
+                    ? `<i class="fa-solid fa-compress"></i>` 
+                    : `<i class="fa-solid fa-expand"></i>`;
+                btnMaxRight.title = isMax ? "Restaurar Painel" : "Maximizar Painel";
+                
+                window.dispatchEvent(new Event("resize"));
+            });
+        }
+    }
+
+    initSidebarObservers() {
+        const sidebars = [document.getElementById("sidebar-left"), document.getElementById("sidebar-right")];
+        const observer = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                const el = entry.target;
+                if (!el) continue;
+                const width = entry.contentRect.width;
+                if (width >= 550) {
+                    el.classList.add("wide-layout");
+                    el.classList.remove("narrow-layout");
+                } else {
+                    el.classList.add("narrow-layout");
+                    el.classList.remove("wide-layout");
+                }
+            }
+        });
+        sidebars.forEach(s => {
+            if (s) observer.observe(s);
+        });
+    }
+}
+
+/**
+ * Utilitário para gerenciar divisores de tela arrastáveis em duas colunas.
+ */
+export class SplitterHelper {
+    static initSplitter(container, leftSelector, rightSelector, options = {}) {
+        const minPct = options.minPct || 25;
+        const maxPct = options.maxPct || 75;
+        const defaultPct = options.defaultPct || 50;
+
+        const leftEl = container.querySelector(leftSelector);
+        const rightEl = container.querySelector(rightSelector);
+        if (!leftEl || !rightEl) return;
+
+        // Remove divisor existente
+        const existing = container.querySelector(".panel-splitter");
+        if (existing) existing.remove();
+
+        // Cria o elemento divisor
+        const splitter = container.ownerDocument.createElement("div");
+        splitter.className = "panel-splitter";
+
+        // Insere o divisor entre as duas colunas
+        leftEl.after(splitter);
+
+        // Define proporções padrão
+        leftEl.style.flex = `0 0 ${defaultPct}%`;
+        rightEl.style.flex = `1 1 0%`;
+
+        let isDragging = false;
+
+        splitter.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            isDragging = true;
+            splitter.classList.add("active");
+
+            // Adiciona overlay na tela para evitar interrupções de arraste
+            const overlay = container.ownerDocument.createElement("div");
+            overlay.className = "splitter-drag-overlay";
+            overlay.style.position = "fixed";
+            overlay.style.top = "0";
+            overlay.style.left = "0";
+            overlay.style.width = "100vw";
+            overlay.style.height = "100vh";
+            overlay.style.zIndex = "9999";
+            overlay.style.cursor = "col-resize";
+            container.ownerDocument.body.appendChild(overlay);
+
+            const handleMouseMove = (moveEvent) => {
+                if (!isDragging) return;
+                const containerRect = container.getBoundingClientRect();
+                const offsetX = moveEvent.clientX - containerRect.left;
+                let pct = (offsetX / containerRect.width) * 100;
+
+                if (pct < minPct) pct = minPct;
+                if (pct > maxPct) pct = maxPct;
+
+                leftEl.style.flex = `0 0 ${pct}%`;
+                
+                // Força disparo de evento resize no container para recalcular elementos internos como Canvas
+                container.dispatchEvent(new Event("resize"));
+            };
+
+            const handleMouseUp = () => {
+                isDragging = false;
+                splitter.classList.remove("active");
+                overlay.remove();
+                container.ownerDocument.removeEventListener("mousemove", handleMouseMove);
+                container.ownerDocument.removeEventListener("mouseup", handleMouseUp);
+            };
+
+            container.ownerDocument.addEventListener("mousemove", handleMouseMove);
+            container.ownerDocument.addEventListener("mouseup", handleMouseUp);
+        });
     }
 }

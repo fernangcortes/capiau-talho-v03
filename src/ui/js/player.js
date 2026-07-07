@@ -421,15 +421,10 @@ export class SourcePlayer {
             return;
         }
 
-        const newCut = {
-            video_id: STATE.activeVideo.id,
-            in: inTime,
-            out: outTime,
-            track: STATE.activeVideo.video_type === "interview" ? "V1" : "V2"
-        };
+        // Usa o TIMELINE_STATE para rotear o clipe à pista correta
+        // (entrevistas → pista magnética de falas; b-rolls → pista livre)
+        TIMELINE_STATE.addCut(STATE.activeVideo.id, inTime, outTime, null);
 
-        STATE.activeTimelineCuts = [...STATE.activeTimelineCuts, newCut];
-        
         STATE.markerIn = null;
         STATE.markerOut = null;
     }
@@ -852,81 +847,127 @@ export class ProgramPlayer {
 
         const cuts = STATE.activeTimelineCuts;
 
-        // ────────── TRILHA V1: Falas / Entrevistas ──────────
+        // ────────── COMPOSIÇÃO MULTIPISTA ──────────
+        // Base (videoA) = clipe da pista de vídeo MAIS BAIXA no playhead (geralmente falas).
+        // Sobreposição (videoB) = clipe da pista de vídeo MAIS ALTA acima da base (cobertura b-roll).
+        const videoTracks = TIMELINE_STATE.getVideoTracks(); // ordem visual: topo → base
+        const clipAtPlayhead = (trackId) => cuts.find(c =>
+            c.track === trackId &&
+            currentFrame >= c.timelineStartFrame &&
+            currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame))
+        );
+
+        let baseCut = null, baseTrack = null;
+        for (let i = videoTracks.length - 1; i >= 0; i--) { // de baixo para cima
+            const hit = clipAtPlayhead(videoTracks[i].id);
+            if (hit) {
+                baseCut = hit;
+                baseTrack = videoTracks[i];
+                break;
+            }
+        }
+
+        let overlayCut = null, overlayTrack = null;
+        for (let i = 0; i < videoTracks.length; i++) { // de cima para baixo
+            const hit = clipAtPlayhead(videoTracks[i].id);
+            if (hit && (!baseCut || hit.id !== baseCut.id)) {
+                overlayCut = hit;
+                overlayTrack = videoTracks[i];
+                break;
+            }
+        }
+
+        const applyCutToElement = (el, cut, track, zIndex) => {
+            if (!el) return;
+            if (!cut) {
+                if (!el.paused) el.pause();
+                if (el.style.display !== "none") el.style.display = "none";
+                el.dataset.activeClipId = "";
+                return;
+            }
+            const videoData = STATE.allVideos.find(v => v.id === cut.video_id);
+            if (!videoData) {
+                if (!el.paused) el.pause();
+                el.style.display = "none";
+                el.dataset.activeClipId = "";
+                return;
+            }
+            const rawSrc = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
+            const videoSrc = rawSrc.replace(/\\/g, "/");
+            const srcChanged = el.dataset.loadedSrc !== videoSrc;
+            if (srcChanged) {
+                el.src = videoSrc;
+                el.dataset.loadedSrc = videoSrc;
+                el.load();
+            }
+
+            // Calcula o tempo correspondente no arquivo
+            const offsetFrames = currentFrame - cut.timelineStartFrame;
+            const targetSeconds = cut.in + (offsetFrames / 24);
+
+            const clipChanged = el.dataset.activeClipId !== String(cut.id);
+            if (clipChanged) el.dataset.activeClipId = String(cut.id);
+
+            const drift = el.currentTime - targetSeconds;
+
+            // SINCRONIA SEM SEEK-LOOP:
+            // Seek "duro" num vídeo em reprodução trava o decoder (~100-300ms), o que
+            // aumenta a deriva e dispara o próximo seek — loop infinito de pisca-trava,
+            // garantido com 2 vídeos sobrepostos decodificando juntos.
+            // Em reprodução, corrigimos a deriva suavemente via playbackRate (como NLEs);
+            // seek duro só em descontinuidade real (troca de clipe, scrub, deriva > 1s).
+            if (srcChanged || clipChanged) {
+                el.currentTime = targetSeconds;
+                el.playbackRate = 1.0;
+            } else if (this.isPlaying) {
+                if (Math.abs(drift) > 1.0) {
+                    el.currentTime = targetSeconds;
+                    el.playbackRate = 1.0;
+                } else if (drift > 0.08) {
+                    el.playbackRate = 0.92; // vídeo adiantado: segura levemente
+                } else if (drift < -0.08) {
+                    el.playbackRate = 1.08; // vídeo atrasado: acelera levemente
+                } else if (el.playbackRate !== 1.0) {
+                    el.playbackRate = 1.0;
+                }
+            } else {
+                // Pausado (scrub manual): seek preciso é o comportamento esperado
+                if (Math.abs(drift) > 0.06) {
+                    el.currentTime = targetSeconds;
+                }
+                if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
+            }
+
+            // Controla áudio (volume/mute por pista) e play status
+            el.volume = (track && track.muted) ? 0 : (track ? track.volume : 1.0);
+            if (this.isPlaying && el.paused) {
+                el.play().catch(() => {});
+            } else if (!this.isPlaying && !el.paused) {
+                el.pause();
+            }
+            if (el.style.display !== "block") el.style.display = "block";
+            el.style.zIndex = String(zIndex);
+        };
+
         const videoA = this.el("program-video-a");
-        if (videoA) {
-            const cutV1 = cuts.find(c => c.track === "V1" && currentFrame >= c.timelineStartFrame && currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame)));
-            if (cutV1) {
-                const videoData = STATE.allVideos.find(v => v.id === cutV1.video_id);
-                if (videoData) {
-                    const rawSrc = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
-                    const videoSrc = rawSrc.replace(/\\/g, "/");
-                    if (videoA.dataset.loadedSrc !== videoSrc) {
-                        videoA.src = videoSrc;
-                        videoA.dataset.loadedSrc = videoSrc;
-                        videoA.load();
-                    }
-
-                    // Calcula o tempo correspondente no arquivo
-                    const offsetFrames = currentFrame - cutV1.timelineStartFrame;
-                    const targetSeconds = cutV1.in + (offsetFrames / 24);
-
-                    if (Math.abs(videoA.currentTime - targetSeconds) > 0.1) {
-                        videoA.currentTime = targetSeconds;
-                    }
-
-                    // Controla áudio e play status
-                    videoA.volume = TIMELINE_STATE.trackMuted.V1 ? 0 : TIMELINE_STATE.trackVolumes.V1;
-                    if (this.isPlaying && videoA.paused) {
-                        videoA.play().catch(() => {});
-                    } else if (!this.isPlaying && !videoA.paused) {
-                        videoA.pause();
-                    }
-                    videoA.style.display = "block";
-                }
-            } else {
-                videoA.pause();
-                videoA.style.display = "none";
-            }
-        }
-
-        // ────────── TRILHA V2: B-Roll (Sobreposição) ──────────
         const videoB = this.el("program-video-b");
-        if (videoB) {
-            const cutV2 = cuts.find(c => c.track === "V2" && currentFrame >= c.timelineStartFrame && currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame)));
-            if (cutV2) {
-                const videoData = STATE.allVideos.find(v => v.id === cutV2.video_id);
-                if (videoData) {
-                    const rawSrc = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
-                    const videoSrc = rawSrc.replace(/\\/g, "/");
-                    if (videoB.dataset.loadedSrc !== videoSrc) {
-                        videoB.src = videoSrc;
-                        videoB.dataset.loadedSrc = videoSrc;
-                        videoB.load();
-                    }
 
-                    const offsetFrames = currentFrame - cutV2.timelineStartFrame;
-                    const targetSeconds = cutV2.in + (offsetFrames / 24);
-
-                    if (Math.abs(videoB.currentTime - targetSeconds) > 0.1) {
-                        videoB.currentTime = targetSeconds;
-                    }
-
-                    videoB.volume = TIMELINE_STATE.trackMuted.V2 ? 0 : TIMELINE_STATE.trackVolumes.V2;
-                    if (this.isPlaying && videoB.paused) {
-                        videoB.play().catch(() => {});
-                    } else if (!this.isPlaying && !videoB.paused) {
-                        videoB.pause();
-                    }
-                    // Exibe a cobertura visual B-roll por cima de tudo
-                    videoB.style.display = "block";
-                    videoB.style.zIndex = "10";
-                }
-            } else {
-                videoB.pause();
-                videoB.style.display = "none";
-            }
+        // ESTABILIDADE DE PAPÉIS: se um clipe já está tocando num elemento, mantém nele.
+        // Sem isso, quando o clipe de baixo termina, o de cima "migraria" do elemento B
+        // para o A (recarga de src no meio da reprodução = flash preto).
+        let baseEl = videoA, overlayEl = videoB;
+        if (baseCut && !overlayCut && videoB && videoB.dataset.activeClipId === String(baseCut.id)) {
+            baseEl = videoB;
+            overlayEl = videoA;
+        } else if (baseCut && overlayCut && videoA && videoB &&
+                   videoA.dataset.activeClipId === String(overlayCut.id) &&
+                   videoB.dataset.activeClipId === String(baseCut.id)) {
+            baseEl = videoB;
+            overlayEl = videoA;
         }
+
+        applyCutToElement(baseEl, baseCut, baseTrack, 1);
+        applyCutToElement(overlayEl, overlayCut, overlayTrack, 10);
     }
 
     seekScrubber(e) {

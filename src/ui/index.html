@@ -109,6 +109,7 @@
                         </span>
                     </h2>
                     <div style="display: flex; gap: 8px; align-items: center;">
+                        <button id="btn-maximize-library" class="btn-icon" title="Maximizar Biblioteca" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-expand"></i></button>
                         <button id="btn-popout-library" class="btn-icon" title="Destacar Biblioteca" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
                         <button class="btn-toggle-sidebar" id="toggle-left" title="Recolher Painel">
                             <i class="fa-solid fa-chevron-left"></i>
@@ -347,8 +348,9 @@
                         <div class="timeline-actions">
                             <input type="text" id="timeline-name-input" value="Rascunho Making Of #1" placeholder="Nome da Timeline...">
                             <button id="btn-save-timeline" class="btn-outline" data-tooltip="Salvar a linha do tempo atual no banco de dados local."><i class="fa-solid fa-floppy-disk"></i></button>
+                            <button id="btn-load-timeline" class="btn-outline" data-tooltip="Carregar uma timeline salva (com pistas e posições)."><i class="fa-solid fa-folder-open"></i></button>
                             <!-- Dropdown de IA Persona -->
-                            <div class="dropdown-wrapper" style="background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.3);" data-tooltip="Selecione um assistente de IA especialista (Montador, Diretor, etc.) para contextualizar as ações e sugestões na timeline.">
+                            <div class="dropdown-wrapper" style="background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.3);" data-tooltip="Selecione um assistente de IA especialista (Montador, Diretor, etc.). A IA analisa o corte ATUAL da timeline (falas, cobertura e lacunas) e propõe edições na pista de IA.">
                                 <i class="fa-solid fa-robot" style="color: #c084fc;"></i>
                                 <select id="select-ai-persona" style="color: #c084fc; background: transparent; border: none; outline: none; cursor: pointer;">
                                     <option value="none">IA Persona...</option>
@@ -358,6 +360,7 @@
                                     <option value="colorista">IA Colorista & FX</option>
                                 </select>
                             </div>
+                            <button id="btn-ai-suggest" class="btn-outline" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.35);" data-tooltip="✨ Analisar o corte atual com IA: envia o contexto da timeline (transcrições dos trechos, descrições visuais e lacunas de cobertura) e recebe sugestões na pista de IA."><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                             <div class="dropdown-wrapper" data-tooltip="Escolha o formato de saída para exportação (XML do Premiere/Resolve, OpenTimelineIO ou EDL clássico).">
                                 <i class="fa-solid fa-file-export"></i>
                                 <select id="select-export-format" style="background: transparent; border: none; outline: none; cursor: pointer;">
@@ -377,23 +380,15 @@
                     
                     <!-- Multi-track interactive area -->
                     <div class="timeline-track-area">
-                        <div class="timeline-canvas-wrapper" style="position: relative; width: 100%; height: 200px; display: flex; flex-direction: row; border-radius: 8px; border: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.3); overflow: hidden;">
-                            <!-- Sidebar fixo de trilhas -->
-                            <div class="timeline-headers-sidebar" style="width: 100px; display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.4); border-right: 1px solid var(--border-glass); z-index: 10; flex-shrink: 0; box-sizing: border-box;">
-                                <div class="timeline-header-ruler" style="height: 30px; border-bottom: 1px solid var(--border-glass); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: var(--color-cyan); font-family: monospace; letter-spacing: 0.5px;">TIMECODE</div>
-                                <div class="timeline-header-track" style="height: 85px; border-bottom: 1px solid var(--border-glass); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding: 5px 10px; font-size: 10px; font-weight: 700; color: var(--text-secondary); font-family: var(--font-heading); gap: 6px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                        <span>V2 B-Roll</span>
-                                        <button class="btn-track-mute" id="btn-mute-v2" title="Mutar Trilha" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 10px;"><i class="fa-solid fa-volume-high"></i></button>
-                                    </div>
-                                    <input type="range" class="slider-track-volume" id="volume-v2" min="0" max="1" step="0.1" value="1" style="width: 100%; height: 3px; accent-color: #a855f7; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">
+                        <div class="timeline-canvas-wrapper" style="position: relative; width: 100%; flex: 1; min-height: 170px; display: flex; flex-direction: row; border-radius: 8px; border: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.3); overflow: hidden;">
+                            <!-- Sidebar de trilhas (gerada dinamicamente pelo panels.js) -->
+                            <div class="timeline-headers-sidebar" style="width: 118px; display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.4); border-right: 1px solid var(--border-glass); z-index: 10; flex-shrink: 0; box-sizing: border-box; overflow: hidden;">
+                                <div class="timeline-header-ruler" style="height: 30px; flex-shrink: 0; border-bottom: 1px solid var(--border-glass); display: flex; align-items: center; justify-content: space-between; padding: 0 6px; font-size: 9px; font-weight: 700; color: var(--color-cyan); font-family: monospace; letter-spacing: 0.5px; box-sizing: border-box;">
+                                    <span>TIMECODE</span>
+                                    <button id="btn-add-track" title="Adicionar nova pista de vídeo" style="border: 1px solid rgba(6,182,212,0.3); background: rgba(6,182,212,0.08); color: var(--color-cyan); cursor: pointer; border-radius: 4px; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; padding: 0;"><i class="fa-solid fa-plus"></i></button>
                                 </div>
-                                <div class="timeline-header-track" style="height: 85px; display: flex; flex-direction: column; justify-content: center; padding: 5px 10px; font-size: 10px; font-weight: 700; color: var(--text-secondary); font-family: var(--font-heading); gap: 6px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                        <span>V1 Falas</span>
-                                        <button class="btn-track-mute" id="btn-mute-v1" title="Mutar Trilha" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 10px;"><i class="fa-solid fa-volume-high"></i></button>
-                                    </div>
-                                    <input type="range" class="slider-track-volume" id="volume-v1" min="0" max="1" step="0.1" value="1" style="width: 100%; height: 3px; accent-color: var(--color-cyan); cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">
+                                <div id="timeline-track-headers" style="position: relative; flex: 1; overflow: hidden;">
+                                    <!-- Cabeçalhos de pistas inseridos dinamicamente -->
                                 </div>
                             </div>
                             <!-- Canvas da timeline -->
@@ -415,6 +410,7 @@
                 <div class="sidebar-header">
                     <h2><i class="fa-solid fa-comment-dots"></i> Transcrição & Falas</h2>
                     <div style="display: flex; gap: 8px; align-items: center;">
+                        <button id="btn-maximize-right" class="btn-icon" title="Maximizar Painel" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-expand"></i></button>
                         <button id="btn-popout-right" class="btn-icon" title="Destacar Painel Lateral" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
                         <button class="btn-toggle-sidebar" id="toggle-right" title="Recolher Painel">
                             <i class="fa-solid fa-chevron-right"></i>
@@ -476,23 +472,49 @@
 
                     <!-- Tab: Chat IA -->
                     <div id="chat-container" style="display: none; height: 100%; display: flex; flex-direction: column;">
-                        <div class="chat-tab-container" style="display: flex; flex-direction: column; height: 100%;">
-                            <h4 style="font-size:12px; color:var(--color-cyan); display:flex; align-items:center; justify-content:space-between; width:100%; margin:0; padding: 10px 15px 5px 15px;">
-                                <span><i class="fa-solid fa-comments"></i> Assistente Editorial IA</span>
+                        <h4 style="font-size:12px; color:var(--color-cyan); display:flex; align-items:center; justify-content:space-between; width:100%; margin:0; padding: 10px 15px 5px 15px; flex-shrink: 0;">
+                            <span><i class="fa-solid fa-comments"></i> Assistente Editorial IA</span>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button class="btn-outline" id="btn-chat-layout" style="font-size:9px; padding:2px 8px; height:20px; display:none; align-items:center; gap:4px;" title="Alternar Layout">
+                                    <i class="fa-solid fa-columns"></i> <span>Split</span>
+                                </button>
                                 <button class="btn-outline" id="btn-clear-chat" style="font-size:9px; padding:2px 8px; height:20px; display:flex; align-items:center; gap:4px;">
                                     <i class="fa-solid fa-trash"></i> Limpar Chat
                                 </button>
-                            </h4>
-                            <div class="chat-history" id="chat-messages" style="flex: 1; overflow-y: auto; padding: 10px 15px;">
-                                <!-- Histórico de mensagens do chat -->
                             </div>
-                            <div class="chat-input-area" style="display: flex; gap: 8px; padding: 10px 15px; border-top: 1px solid var(--border-glass);">
-                                <input type="text" id="chat-input" placeholder="Pergunte ao CapIAu..." style="flex: 1; height: 36px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 4px; padding: 0 10px; color: var(--text-primary); outline: none;">
-                                <button id="btn-send-chat" class="btn-primary" style="height: 36px; padding: 0 15px;"><i class="fa-solid fa-paper-plane"></i></button>
+                        </h4>
+                        <div class="chat-main-layout" style="display: flex; flex: 1; overflow: hidden; position: relative; width: 100%;">
+                            <!-- Esquerda: Feed de Conversa -->
+                            <div class="chat-conversation-pane" style="display: flex; flex-direction: column; flex: 1; height: 100%; min-width: 250px;">
+                                <div class="chat-history" id="chat-messages" style="flex: 1; overflow-y: auto; padding: 10px 15px;">
+                                    <!-- Histórico de mensagens do chat -->
+                                </div>
+                                <div class="chat-input-area" style="display: flex; gap: 8px; padding: 10px 15px; border-top: 1px solid var(--border-glass); flex-shrink: 0;">
+                                    <input type="text" id="chat-input" placeholder="Pergunte ao CapIAu..." style="flex: 1; height: 36px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 4px; padding: 0 10px; color: var(--text-primary); outline: none;">
+                                    <button id="btn-send-chat" class="btn-primary" style="height: 36px; padding: 0 15px;"><i class="fa-solid fa-paper-plane"></i></button>
+                                </div>
+                            </div>
+                            
+                            <!-- Direita: Board de Mídias Vinculadas -->
+                            <div class="chat-media-pane" id="chat-media-board" style="display: none; flex-direction: column; height: 100%; border-left: 1px solid var(--border-glass); min-width: 250px; background: rgba(0,0,0,0.15);">
+                                <div class="chat-media-player-container" style="padding: 10px 15px 5px 15px; border-bottom: 1px solid var(--border-glass); background: #000; display: flex; flex-direction: column; gap: 6px;">
+                                    <div style="font-size: 10px; color: var(--color-cyan); font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                                        <span>PREVIEW LOCAL</span>
+                                        <span id="chat-mini-player-title" style="color: var(--text-secondary); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Nenhum clipe carregado</span>
+                                    </div>
+                                    <div style="width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 6px; overflow: hidden; position: relative;">
+                                        <video id="chat-mini-video" src="" controls style="width: 100%; height: 100%; object-fit: contain;"></video>
+                                    </div>
+                                </div>
+                                <div class="chat-media-cards-container" style="flex: 1; overflow-y: auto; padding: 10px 15px;">
+                                    <div style="font-size: 10px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">Mídias Vinculadas</div>
+                                    <div class="chat-media-grid" id="chat-media-grid" style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+                                        <div class="empty-state-text" style="font-style: italic; color: var(--text-muted); font-size: 11px;">Nenhuma mídia citada no chat ainda.</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-
                     <!-- Tab: Busca (Resultados) -->
                     <div class="transcript-feed" id="search-container" style="display: none;">
                         <div class="empty-state">
@@ -741,6 +763,58 @@
         </div>
     </div>
 
+    <!-- Modal de Gerenciamento de Grupo de Rostos -->
+    <div id="face-group-manager-modal" class="modal-overlay" style="display: none; z-index: 2000; background: rgba(10, 8, 14, 0.95); backdrop-filter: blur(20px);">
+        <div class="modal-content glassmorphism" style="width: 80%; max-width: 900px; height: 85vh; display: flex; flex-direction: column; padding: 25px; box-sizing: border-box; gap: 15px; border: 1px solid rgba(6, 182, 212, 0.3);">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <i class="fa-solid fa-users-gear" style="color: var(--color-cyan); font-size: 20px;"></i>
+                    <div>
+                        <h3 id="group-manager-title" style="margin: 0; font-size: 18px; font-weight: 700; font-family: 'Outfit', sans-serif;">Gerenciar Grupo de Rostos</h3>
+                        <span id="group-manager-subtitle" style="font-size: 12px; color: var(--text-muted);">Visualize e altere as desambiguações deste grupo</span>
+                    </div>
+                </div>
+                <button id="btn-close-group-manager" class="btn-secondary" style="height: 32px; width: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border-glass);">
+                    <div style="font-size: 13px; color: var(--text-secondary);">
+                        Total de aparições cadastradas neste grupo: <strong id="group-manager-count-val" style="color: var(--color-cyan);">0</strong>
+                    </div>
+                    <button id="btn-group-dissolve-all" class="btn-secondary" style="border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); height: 32px; font-size: 11px; padding: 0 12px; font-weight: 600; cursor: pointer; border-radius: 6px;">
+                        <i class="fa-solid fa-arrows-spin"></i> Dissolver Grupo (Tornar Todos Desconhecidos)
+                    </button>
+                </div>
+                
+                <!-- Barra de Ações Rápidas para Selecionados (oculta por padrão) -->
+                <div id="group-manager-bulk-bar" style="display: none; align-items: center; justify-content: space-between; background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); padding: 10px 16px; border-radius: 8px; animation: fadeIn 0.2s ease;">
+                    <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #fff;">
+                        <i class="fa-solid fa-square-check" style="color: var(--color-cyan);"></i>
+                        <span id="group-manager-bulk-count">0 itens selecionados</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="btn-group-bulk-dissociate" class="btn-secondary" style="height: 28px; font-size: 11px; padding: 0 10px; cursor: pointer;">
+                            <i class="fa-solid fa-arrow-rotate-left"></i> Desassociar Selecionados
+                        </button>
+                        <button id="btn-group-bulk-reassign" class="btn-primary" style="height: 28px; font-size: 11px; padding: 0 10px; cursor: pointer;">
+                            <i class="fa-solid fa-user-pen"></i> Reatribuir Nome
+                        </button>
+                        <button id="btn-group-bulk-reject" class="btn-secondary" style="border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); height: 28px; font-size: 11px; padding: 0 10px; cursor: pointer;">
+                            <i class="fa-solid fa-ban"></i> Descartar
+                        </button>
+                    </div>
+                </div>
+
+                <div id="group-manager-faces-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; padding: 4px;">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     
     <!-- Sessão Fullscreen de Desambiguação Estilo Google Fotos -->
     <div id="fullscreen-faces-disambiguation" class="modal-overlay" style="display: none; z-index: 2000; background: rgba(10, 8, 14, 0.95); backdrop-filter: blur(20px);">
@@ -809,9 +883,9 @@
                     <div>Insere trecho cortado na Timeline</div>
                 </div>
 
-                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">2. Comportamento das Trilhas (V1 vs V2)</h4>
-                <p style="margin: 0;"><strong>V1 (Falas):</strong> É magnética. Os cortes ficam grudados. Arrastar clipes reordena a sequência de falas; puxar as bordas (trim) ajusta a fala e puxa todo o resto junto.</p>
-                <p style="margin: 0;"><strong>V2 (B-Roll):</strong> É livre. Você pode arrastar os clipes para qualquer ponto no tempo e ajustar a duração sem alterar a fala principal.</p>
+                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">2. Pistas Dinâmicas (Multipista)</h4>
+                <p style="margin: 0;">Crie quantas pistas quiser pelo botão <strong>+</strong> no topo da sidebar de trilhas. Cada pista tem <strong>volume, mute, trava (cadeado)</strong> e o modo <strong>ímã <i class="fa-solid fa-magnet" style="font-size: 9px;"></i></strong>: pistas magnéticas (como a V1 Falas) mantêm os clipes grudados em sequência; pistas livres (como a V2 B-Roll) permitem posicionar em qualquer ponto do tempo. Clique duplo no nome renomeia; roda do mouse rola verticalmente quando há muitas pistas.</p>
+                <p style="margin: 0;"><strong>Pista de IA (verde):</strong> recebe as sugestões da análise ✨. Clique numa sugestão para aceitar (vai para a pista de destino) ou rejeitar.</p>
 
                 <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">3. Atalhos na Timeline Canvas</h4>
                 <div style="display: grid; grid-template-columns: 120px 1fr; gap: 6px;">

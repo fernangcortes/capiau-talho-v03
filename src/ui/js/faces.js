@@ -24,10 +24,37 @@ export class FaceManager {
             btnCloseDisambiguation.addEventListener("click", () => this.closeDisambiguationModal());
         }
 
+        // --- Group Manager Modal Bindings ---
+        const btnCloseGroupManager = document.getElementById("btn-close-group-manager");
+        if (btnCloseGroupManager) {
+            btnCloseGroupManager.addEventListener("click", () => this.closeGroupManagerModal());
+        }
+
+        const btnGroupDissolveAll = document.getElementById("btn-group-dissolve-all");
+        if (btnGroupDissolveAll) {
+            btnGroupDissolveAll.addEventListener("click", () => this.dissolveGroup(this.activeGroupCluster));
+        }
+
+        const btnGroupBulkDissociate = document.getElementById("btn-group-bulk-dissociate");
+        if (btnGroupBulkDissociate) {
+            btnGroupBulkDissociate.addEventListener("click", () => this.dissociateSelectedFaces(this.activeGroupCluster));
+        }
+
+        const btnGroupBulkReassign = document.getElementById("btn-group-bulk-reassign");
+        if (btnGroupBulkReassign) {
+            btnGroupBulkReassign.addEventListener("click", () => this.reassignSelectedFaces(this.activeGroupCluster));
+        }
+
+        const btnGroupBulkReject = document.getElementById("btn-group-bulk-reject");
+        if (btnGroupBulkReject) {
+            btnGroupBulkReject.addEventListener("click", () => this.rejectSelectedFaces(this.activeGroupCluster));
+        }
+
         // Listen for project change to load face clusters
         STATE.on("projectChanged", () => {
             this.loadFaceClusters();
             this.closeFullscreenDisambiguation();
+            this.closeGroupManagerModal();
         });
         
         // Initial load
@@ -152,6 +179,12 @@ export class FaceManager {
                     }
                 });
                 inputEl.addEventListener("blur", saveName);
+
+                // Click card (outside input) to manage/edit group
+                card.addEventListener("click", (e) => {
+                    if (e.target.closest(".face-cluster-input")) return;
+                    this.openGroupManagerModal(cluster);
+                });
 
                 container.appendChild(card);
             });
@@ -771,5 +804,266 @@ export class FaceManager {
         const modal = document.getElementById("fullscreen-faces-disambiguation");
         if (modal) modal.style.display = "none";
         this.loadFaceClusters();
+    }
+
+    // --- GERENCIADOR DE GRUPO DE ROSTOS ---
+    static async openGroupManagerModal(cluster) {
+        const modal = document.getElementById("face-group-manager-modal");
+        const grid = document.getElementById("group-manager-faces-grid");
+        const title = document.getElementById("group-manager-title");
+        const countVal = document.getElementById("group-manager-count-val");
+        const bulkBar = document.getElementById("group-manager-bulk-bar");
+        
+        if (!modal || !grid) return;
+        
+        modal.style.display = "flex";
+        if (bulkBar) bulkBar.style.display = "none";
+        
+        const clusterNameDisplay = (cluster.name && !cluster.name.startsWith("Pessoa Desconhecida")) ? cluster.name : `Grupo ${cluster.cluster_id + 1}`;
+        if (title) title.textContent = `Gerenciar Rostos: ${clusterNameDisplay}`;
+        if (countVal) countVal.textContent = cluster.occurrences;
+        
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">Carregando rostos do grupo...</p></div>';
+        
+        this.activeGroupCluster = cluster;
+        
+        try {
+            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id);
+            this.renderGroupManagerFaces(faces, cluster);
+        } catch (e) {
+            console.error("Erro ao carregar faces do grupo:", e);
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--color-red);">Erro ao carregar faces do grupo.</div>';
+        }
+    }
+
+    static closeGroupManagerModal() {
+        const modal = document.getElementById("face-group-manager-modal");
+        if (modal) modal.style.display = "none";
+        this.activeGroupCluster = null;
+    }
+
+    static renderGroupManagerFaces(faces, cluster) {
+        const grid = document.getElementById("group-manager-faces-grid");
+        if (!grid) return;
+        
+        grid.innerHTML = "";
+        
+        if (!faces || faces.length === 0) {
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">Nenhum rosto neste grupo.</div>';
+            return;
+        }
+        
+        faces.forEach(face => {
+            const card = document.createElement("div");
+            card.className = "group-manager-face-card";
+            card.dataset.faceId = face.id;
+            
+            const thumbUrl = `/api/faces/face/${face.id}/thumbnail`;
+            
+            let metaText = "Desconhecido";
+            if (face.photo_id !== null) {
+                metaText = `Foto ID ${face.photo_id}`;
+            } else if (face.video_id !== null) {
+                metaText = `Frame ${face.timestamp}s`;
+            }
+            
+            card.innerHTML = `
+                <div class="group-manager-face-select-badge">
+                    <i class="fa-solid fa-check" style="display: none;"></i>
+                </div>
+                <div class="group-manager-face-thumb-container">
+                    <img class="group-manager-face-thumb" src="${thumbUrl}" alt="Rosto" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22><rect width=%2280%22 height=%2280%22 fill=%22%23222%22/><text x=%2250%%22 y=%2250%%22 font-size=%2216%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23666%22>?</text></svg>'">
+                </div>
+                <div class="group-manager-face-meta" title="${metaText}">${metaText}</div>
+            `;
+            
+            card.addEventListener("click", () => {
+                card.classList.toggle("selected");
+                const badge = card.querySelector(".group-manager-face-select-badge");
+                const icon = badge.querySelector("i");
+                if (card.classList.contains("selected")) {
+                    icon.style.display = "block";
+                } else {
+                    icon.style.display = "none";
+                }
+                this.updateGroupManagerBulkBar();
+            });
+            
+            let hoverTimeout;
+            card.addEventListener("mouseenter", () => {
+                hoverTimeout = setTimeout(() => {
+                    FaceManager.showContextPreview(face, card);
+                }, 400);
+            });
+            card.addEventListener("mouseleave", () => {
+                clearTimeout(hoverTimeout);
+                FaceManager.hideContextPreview();
+            });
+            
+            grid.appendChild(card);
+        });
+    }
+
+    static updateGroupManagerBulkBar() {
+        const selected = document.querySelectorAll(".group-manager-face-card.selected");
+        const count = selected.length;
+        const bar = document.getElementById("group-manager-bulk-bar");
+        const countText = document.getElementById("group-manager-bulk-count");
+        
+        if (!bar) return;
+        
+        if (count > 0) {
+            bar.style.display = "flex";
+            if (countText) {
+                countText.textContent = `${count} ${count === 1 ? 'item selecionado' : 'itens selecionados'}`;
+            }
+        } else {
+            bar.style.display = "none";
+        }
+    }
+
+    static async dissolveGroup(cluster) {
+        if (!cluster) return;
+        const msg = `Deseja realmente dissolver o grupo "${(cluster.name && !cluster.name.startsWith('Pessoa Desconhecida')) ? cluster.name : 'Grupo ' + (cluster.cluster_id + 1)}"? Todas as ${cluster.occurrences} aparições voltarão a ser consideradas "Pessoas Desconhecidas" na tela de desambiguação rápida.`;
+        if (!confirm(msg)) return;
+        
+        try {
+            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id);
+            const faceIds = faces.map(f => f.id);
+            
+            if (faceIds.length === 0) {
+                alert("Nenhum rosto encontrado neste grupo.");
+                return;
+            }
+            
+            await CapIAuAPI.dissociateFaces(STATE.currentProjectId, faceIds);
+            this.closeGroupManagerModal();
+            await this.loadFaceClusters();
+            if (STATE.activeVideo) {
+                STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+            }
+            alert("Grupo dissolvido com sucesso!");
+        } catch (e) {
+            console.error("Erro ao dissolver grupo:", e);
+            alert("Erro ao dissolver o grupo de rostos.");
+        }
+    }
+
+    static async dissociateSelectedFaces(cluster) {
+        if (!cluster) return;
+        const selected = document.querySelectorAll(".group-manager-face-card.selected");
+        const faceIds = Array.from(selected).map(card => parseInt(card.dataset.faceId));
+        if (faceIds.length === 0) return;
+        
+        if (!confirm(`Deseja desassociar as ${faceIds.length} faces selecionadas do nome atual? Elas voltarão para a desambiguação rápida.`)) return;
+        
+        try {
+            await CapIAuAPI.dissociateFaces(STATE.currentProjectId, faceIds);
+            
+            // Recarregar os rostos no modal
+            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id);
+            this.renderGroupManagerFaces(faces, cluster);
+            this.updateGroupManagerBulkBar();
+            
+            // Recarregar a barra lateral de grupos
+            await this.loadFaceClusters();
+            
+            // Atualizar contagem no modal
+            const countVal = document.getElementById("group-manager-count-val");
+            if (countVal) countVal.textContent = faces.length;
+            
+            if (faces.length === 0) {
+                this.closeGroupManagerModal();
+            }
+            
+            if (STATE.activeVideo) {
+                STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+            }
+            alert("Rostos desassociados com sucesso!");
+        } catch (e) {
+            console.error("Erro ao desassociar faces:", e);
+            alert("Erro ao desassociar faces selecionadas.");
+        }
+    }
+
+    static async reassignSelectedFaces(cluster) {
+        if (!cluster) return;
+        const selected = document.querySelectorAll(".group-manager-face-card.selected");
+        const faceIds = Array.from(selected).map(card => parseInt(card.dataset.faceId));
+        if (faceIds.length === 0) return;
+        
+        const newName = prompt("Digite o nome da pessoa/objeto para o qual deseja reatribuir os rostos selecionados:");
+        if (newName === null) return;
+        const trimmed = newName.trim();
+        if (!trimmed) {
+            alert("Nome inválido.");
+            return;
+        }
+        
+        try {
+            await CapIAuAPI.reassignFaces(STATE.currentProjectId, faceIds, -1, trimmed);
+            
+            // Recarregar os rostos no modal
+            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id);
+            this.renderGroupManagerFaces(faces, cluster);
+            this.updateGroupManagerBulkBar();
+            
+            // Recarregar a barra lateral de grupos
+            await this.loadFaceClusters();
+            
+            const countVal = document.getElementById("group-manager-count-val");
+            if (countVal) countVal.textContent = faces.length;
+            
+            if (faces.length === 0) {
+                this.closeGroupManagerModal();
+            }
+            
+            if (STATE.activeVideo) {
+                STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+            }
+            alert("Rostos reatribuídos com sucesso!");
+        } catch (e) {
+            console.error("Erro ao reatribuir faces:", e);
+            alert("Erro ao reatribuir faces selecionadas.");
+        }
+    }
+
+    static async rejectSelectedFaces(cluster) {
+        if (!cluster) return;
+        const selected = document.querySelectorAll(".group-manager-face-card.selected");
+        const faceIds = Array.from(selected).map(card => parseInt(card.dataset.faceId));
+        if (faceIds.length === 0) return;
+        
+        const objectName = prompt(`As ${faceIds.length} detecções selecionadas não são rostos. Se forem o mesmo objeto relevante (ex: Abajur, Cadeira, Microfone), digite o nome do objeto. Caso contrário, deixe em branco para marcar todas como Não Relevante:\n(Clique em Cancelar para desistir)`);
+        if (objectName === null) return;
+        
+        try {
+            for (const fid of faceIds) {
+                await CapIAuAPI.rejectFace(fid, objectName.trim());
+            }
+            
+            // Recarregar os rostos no modal
+            const faces = await CapIAuAPI.fetchClusterFaces(STATE.currentProjectId, cluster.cluster_id);
+            this.renderGroupManagerFaces(faces, cluster);
+            this.updateGroupManagerBulkBar();
+            
+            // Recarregar a barra lateral de grupos
+            await this.loadFaceClusters();
+            
+            const countVal = document.getElementById("group-manager-count-val");
+            if (countVal) countVal.textContent = faces.length;
+            
+            if (faces.length === 0) {
+                this.closeGroupManagerModal();
+            }
+            
+            if (STATE.activeVideo) {
+                STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+            }
+            alert("Faces descartadas com sucesso!");
+        } catch (e) {
+            console.error("Erro ao rejeitar faces:", e);
+            alert("Erro ao descartar faces selecionadas.");
+        }
     }
 }

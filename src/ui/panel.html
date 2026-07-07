@@ -24,8 +24,10 @@
             flex-direction: column;
         }
         /* Estilos específicos para painéis destacados */
-        #panel-container > section {
+        #panel-container > section, #panel-container > aside {
             height: 100% !important;
+            width: 100% !important;
+            max-width: 100% !important;
             flex: 1 !important;
             border: none !important;
             border-radius: 0 !important;
@@ -76,8 +78,29 @@
                 panel: panelName
             });
             
-
-            
+            // Monitora redimensionamento do painel para aplicar classes de layout amplo/estreito
+            const container = document.getElementById("panel-container");
+            const observer = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    const width = entry.contentRect.width;
+                    if (width >= 550) {
+                        container.classList.add("wide-layout");
+                        container.classList.remove("narrow-layout");
+                        if (container.firstElementChild) {
+                            container.firstElementChild.classList.add("wide-layout");
+                            container.firstElementChild.classList.remove("narrow-layout");
+                        }
+                    } else {
+                        container.classList.add("narrow-layout");
+                        container.classList.remove("wide-layout");
+                        if (container.firstElementChild) {
+                            container.firstElementChild.classList.add("narrow-layout");
+                            container.firstElementChild.classList.remove("wide-layout");
+                        }
+                    }
+                }
+            });
+            observer.observe(container);
             // Avisa a janela principal quando esta janela for fechada
             window.addEventListener("beforeunload", () => {
                 channel.postMessage({

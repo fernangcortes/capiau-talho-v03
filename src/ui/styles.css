@@ -611,7 +611,7 @@ button {
 /* Grid de Fotos */
 .media-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     gap: 8px;
 }
 
@@ -622,6 +622,10 @@ button {
     cursor: pointer;
     transition: var(--transition-smooth);
     background: rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 130px;
 }
 .photo-card:hover {
     border-color: var(--color-cyan);
@@ -629,8 +633,10 @@ button {
 }
 .photo-card img {
     width: 100%;
-    height: 90px;
-    object-fit: cover;
+    height: 100px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.4);
+    display: block;
 }
 .photo-card p {
     padding: 6px;
@@ -638,12 +644,13 @@ button {
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
+    margin: 0;
 }
 
 /* Placeholders para fotos em processamento ou erro */
 .photo-placeholder-loading, .photo-placeholder-error {
     width: 100%;
-    height: 90px;
+    height: 100px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2436,4 +2443,253 @@ mark.search-highlight {
     background: #fff;
     cursor: pointer;
 }
+
+/* ── DIVISORES ARRASTÁVEIS (SPLITTERS) ── */
+.panel-splitter {
+    width: 6px;
+    cursor: col-resize;
+    background: rgba(255, 255, 255, 0.05);
+    transition: background 0.2s, box-shadow 0.2s;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.03);
+    border-right: 1px solid rgba(255, 255, 255, 0.03);
+}
+.panel-splitter:hover, .panel-splitter.active {
+    background: var(--color-cyan) !important;
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
+}
+
+/* ── SIDEBARS MAXIMIZADOS (MAIN WINDOW) ── */
+.sidebar-left.sidebar-maximized, .sidebar-right.sidebar-maximized {
+    position: absolute;
+    top: 10px;
+    bottom: 10px;
+    width: calc(100% - 20px) !important;
+    height: calc(100% - 20px) !important;
+    z-index: 1000;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    background: #0b0f19;
+    border: 1px solid var(--border-glass) !important;
+    border-radius: 12px !important;
+}
+.sidebar-left.sidebar-maximized {
+    left: 10px;
+}
+.sidebar-right.sidebar-maximized {
+    right: 10px;
+}
+
+/* ── CHAT IA WIDESCREEN LAYOUTS ── */
+#chat-container.wide-layout #btn-chat-layout {
+    display: inline-flex !important;
+}
+
+/* Modo Split (Lado a Lado) */
+#chat-container.wide-layout.chat-split-mode #chat-media-board {
+    display: flex !important;
+}
+
+/* Modo Foco Centralizado */
+#chat-container.wide-layout.chat-focus-mode .chat-conversation-pane {
+    max-width: 700px;
+    margin: 0 auto;
+}
+#chat-container.wide-layout.chat-focus-mode #chat-media-board {
+    display: none !important;
+}
+
+/* Cards de Mídia no Chat IA (Design consistente com Falas) */
+.chat-media-card {
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 10px 12px;
+    gap: 6px;
+    transition: var(--transition-smooth);
+    margin-top: 8px;
+    box-sizing: border-box;
+}
+.chat-media-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+.chat-media-card .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 700;
+}
+.chat-media-card .card-title {
+    color: var(--color-cyan);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.chat-media-card .card-timecode {
+    color: var(--text-secondary);
+    font-family: monospace;
+    font-size: 10px;
+}
+.chat-media-card .card-quote {
+    font-size: 11px;
+    color: var(--text-primary);
+    line-height: 1.4;
+    user-select: text;
+    border-left: 2px solid rgba(255, 255, 255, 0.08);
+    padding-left: 8px;
+    margin: 2px 0;
+}
+.chat-media-card .card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+.chat-media-card .card-actions button {
+    font-size: 10px;
+    padding: 4px 10px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid var(--border-glass);
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    outline: none;
+}
+.chat-media-card .card-actions button:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+.chat-media-card .card-actions button.btn-play-card {
+    border-color: rgba(6, 182, 212, 0.3);
+    color: var(--color-cyan);
+}
+.chat-media-card .card-actions button.btn-play-card:hover {
+    background: rgba(6, 182, 212, 0.1);
+    border-color: var(--color-cyan);
+}
+.chat-media-card .card-actions button.btn-insert-card {
+    border-color: rgba(168, 85, 247, 0.3);
+    color: var(--color-violet);
+}
+.chat-media-card .card-actions button.btn-insert-card:hover {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: var(--color-violet);
+}
+
+/* ── CHAT INLINE PILL BUTTON LINKS ── */
+.chat-media-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(6, 182, 212, 0.08);
+    border: 1px solid rgba(6, 182, 212, 0.25);
+    color: var(--color-cyan) !important;
+    text-decoration: none !important;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    transition: all 0.2s;
+    margin: 0 2px;
+}
+.chat-media-link:hover {
+    background: rgba(6, 182, 212, 0.15) !important;
+    border-color: var(--color-cyan) !important;
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.3) !important;
+}
+
+/* ── GERENCIADOR DE GRUPO DE ROSTOS MODAL ── */
+.group-manager-face-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 12px;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    box-sizing: border-box;
+}
+
+.group-manager-face-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(6, 182, 212, 0.4);
+    transform: translateY(-2px);
+}
+
+.group-manager-face-card.selected {
+    border-color: var(--color-cyan) !important;
+    background: rgba(6, 182, 212, 0.06) !important;
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.2) !important;
+}
+
+.group-manager-face-thumb-container {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid rgba(6, 182, 212, 0.4);
+    background: #14101d;
+    transition: all 0.2s ease;
+}
+
+.group-manager-face-card:hover .group-manager-face-thumb-container {
+    border-color: var(--color-cyan);
+}
+
+.group-manager-face-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.group-manager-face-meta {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-align: center;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.group-manager-face-select-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.group-manager-face-card.selected .group-manager-face-select-badge {
+    background: var(--color-cyan);
+    border-color: var(--color-cyan);
+}
+
+.group-manager-face-select-badge i {
+    color: #000;
+    font-size: 9px;
+}
+
 
