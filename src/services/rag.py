@@ -27,12 +27,19 @@ def enrich_description(text: str, names: List[str], text_replacements: Optional[
                 
     if not names:
         return modified_text
-        
+
     clean_names = []
     for n in names:
         if n and n not in clean_names:
             clean_names.append(n)
-            
+
+    # Idempotência: nomes que já constam no texto (ex: descrição persistida já
+    # enriquecida pelo enrichment_engine) não devem ser inseridos novamente
+    clean_names = [
+        n for n in clean_names
+        if not re.search(rf'\b{re.escape(n)}\b', modified_text, re.IGNORECASE)
+    ]
+
     if not clean_names:
         return modified_text
     

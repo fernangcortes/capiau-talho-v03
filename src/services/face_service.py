@@ -220,13 +220,22 @@ class FaceService:
             for cluster_id, f_ids in clusters_map.items():
                 # Verificar se ja existe nome no cluster
                 cluster_name = self._get_cluster_suggested_name(conn, cluster_id, f_ids)
-                
+
                 placeholders = ",".join("?" for _ in f_ids)
                 cursor.execute(f"""
-                    UPDATE face 
+                    UPDATE face
                     SET cluster_id = ?, name = COALESCE(name, ?)
                     WHERE id IN ({placeholders})
                 """, [cluster_id, cluster_name] + f_ids)
+
+                # Se o cluster tem um nome REAL, promove membros que ainda
+                # carregam placeholder ('Pessoa Desconhecida...') para o nome real
+                if not cluster_name.startswith("Pessoa Desconhecida"):
+                    cursor.execute(f"""
+                        UPDATE face
+                        SET name = ?
+                        WHERE id IN ({placeholders}) AND name LIKE 'Pessoa Desconhecida%'
+                    """, [cluster_name] + f_ids)
             
             # Ruído: cluster_id = -1
             noise_ids = [face_ids[i] for i, l in enumerate(labels) if l == -1]
@@ -461,7 +470,12 @@ class FaceService:
             return dict(row) if row else None
 
     def _get_faces_with_embeddings(self, project_id: int) -> List[Dict[str, Any]]:
-        """Retorna faces com seus embeddings autoritativos para clustering."""
+        """Retorna faces com seus embeddings autoritativos para clustering.
+
+        Prioriza embeddings versionados (face_recognition); faz FALLBACK para a
+        coluna legada face.embedding — onde o pipeline local (YuNet/SFace) grava.
+        Sem o fallback, projetos com dados legados clusterizavam 0 faces.
+        """
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -472,7 +486,7 @@ class FaceService:
                 AND fr.status NOT IN ('rejected', 'superseded')
                 ORDER BY fr.tier DESC, fr.recognized_at DESC
             """, (project_id,))
-            
+
             # Pegar o embedding mais recente de cada face
             seen = set()
             results = []
@@ -480,21 +494,46 @@ class FaceService:
                 if row["face_id"] not in seen:
                     seen.add(row["face_id"])
                     results.append(dict(row))
-            
+
+            # Fallback legado: faces com embedding direto na tabela face
+            try:
+                cursor.execute("""
+                    SELECT id as face_id, embedding
+                    FROM face
+                    WHERE project_id = ? AND embedding IS NOT NULL
+                """, (project_id,))
+                for row in cursor.fetchall():
+                    if row["face_id"] not in seen:
+                        seen.add(row["face_id"])
+                        results.append(dict(row))
+            except Exception:
+                pass  # coluna legada pode não existir em bancos novos
+
             return results
 
     def _get_cluster_suggested_name(self, conn, cluster_id: int, face_ids: List[int]) -> str:
-        """Sugere nome para cluster baseado em nomes existentes."""
+        """Sugere nome para cluster baseado em nomes existentes.
+
+        Prefere nomes REAIS dados pelo usuário; placeholders ('Pessoa Desconhecida...')
+        e descartes só são usados se não houver alternativa.
+        """
         cursor = conn.cursor()
         placeholders = ",".join("?" for _ in face_ids)
         cursor.execute(f"""
-            SELECT DISTINCT name FROM face 
-            WHERE id IN ({placeholders}) AND name IS NOT NULL
+            SELECT name, COUNT(*) as cnt FROM face
+            WHERE id IN ({placeholders}) AND name IS NOT NULL AND name != ''
+            GROUP BY name ORDER BY cnt DESC
         """, face_ids)
-        
-        names = [r["name"] for r in cursor.fetchall()]
-        if names:
-            return names[0]  # Primeiro nome encontrado
+
+        real_names = []
+        for r in cursor.fetchall():
+            n = r["name"]
+            if n.startswith("Pessoa Desconhecida") or n in ("Não Relevante", "Não é Rosto"):
+                continue
+            real_names.append(n)
+
+        if real_names:
+            return real_names[0]  # nome real mais frequente no cluster
         return f"Pessoa Desconhecida (Grupo {cluster_id + 1})"
 
     def _clear_auto_detections(self, photo_id: Optional[int] = None, video_id: Optional[int] = None, timestamp: Optional[float] = None) -> None:

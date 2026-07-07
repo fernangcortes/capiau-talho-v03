@@ -64,38 +64,53 @@ export class CapiauTimelineInteraction {
     }
 
     /**
-     * Mapeia coordenadas x/y relativas ao canvas para frame e track.
+     * Mapeia coordenadas x/y relativas ao canvas para frame e track (dinâmico multipista).
      */
     getCoordinates(clientX, clientY) {
         const rect = this.canvas.getBoundingClientRect();
         const x = clientX - rect.left;
         const y = clientY - rect.top;
-        
+
         const frame = Math.round(TIMELINE_STATE.scrollLeftFrame + (x / TIMELINE_STATE.zoom));
-        
-        let track = null;
-        if (y >= this.renderer.rulerHeight && y < this.renderer.rulerHeight + this.renderer.trackHeight) {
-            track = "V2";
-        } else if (y >= this.renderer.rulerHeight + this.renderer.trackHeight && y < this.renderer.rulerHeight + 2 * this.renderer.trackHeight) {
-            track = "V1";
-        }
-        
-        return { x, y, frame, track };
+
+        const trackObj = this.renderer.getTrackAtY(y);
+        const track = trackObj ? trackObj.id : null;
+
+        return { x, y, frame, track, trackObj };
     }
 
     /**
      * Encontra qual clipe (comum ou ghost) está sob o mouse.
      */
-    findClipAt(frame, track) {
+    findClipAt(frame, track, y = null) {
         if (!track) return null;
-        
+
+        const trackObj = TIMELINE_STATE.getTrack(track);
         const cuts = STATE.activeTimelineCuts;
+
+        // Pista de IA: hit-test somente nos ghost clips (INSERT/REPLACE)
+        if (trackObj && trackObj.kind === "ai") {
+            const ghost = TIMELINE_STATE.ghostTrack.find(g =>
+                g.action !== "DELETE" &&
+                frame >= g.timelineStartFrame &&
+                frame <= g.timelineStartFrame + Math.max(g.outFrame - g.inFrame, Math.round(20 / TIMELINE_STATE.zoom))
+            );
+            if (ghost) return { type: "ghost", data: ghost };
+            return null;
+        }
+
+        // Ghosts de DELETE são desenhados sobre o clipe alvo na pista original
+        const deleteGhost = TIMELINE_STATE.ghostTrack.find(g => {
+            if (g.action !== "DELETE" || !g.targetClipId) return false;
+            const target = cuts.find(c => c.id === g.targetClipId);
+            return target && target.track === track &&
+                frame >= g.timelineStartFrame &&
+                frame <= g.timelineStartFrame + (g.outFrame - g.inFrame);
+        });
+        if (deleteGhost) return { type: "ghost", data: deleteGhost };
+
         const clip = cuts.find(c => c.track === track && frame >= c.timelineStartFrame && frame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
         if (clip) return { type: "clip", data: clip };
-        
-        const ghosts = TIMELINE_STATE.ghostTrack;
-        const ghost = ghosts.find(g => g.track === track && frame >= g.timelineStartFrame && frame <= g.timelineStartFrame + (g.outFrame - g.inFrame));
-        if (ghost) return { type: "ghost", data: ghost };
 
         return null;
     }
@@ -138,18 +153,27 @@ export class CapiauTimelineInteraction {
             return;
         }
 
-        // 3. Clique nas trilhas V1/V2
+        // 3. Clique nas trilhas
         if (track) {
-            const hit = this.findClipAt(frame, track);
-            
+            const hit = this.findClipAt(frame, track, y);
+
             if (hit) {
                 if (hit.type === "clip") {
                     const clip = hit.data;
+                    const clipTrack = TIMELINE_STATE.getTrack(clip.track);
+                    if (clipTrack && clipTrack.locked) {
+                        // Pista travada: apenas seleciona, sem permitir arrastes
+                        TIMELINE_STATE.selectedClipId = clip.id;
+                        TIMELINE_STATE.selectedTrack = track;
+                        this.syncPlayerToClip(clip);
+                        this.renderer.requestRedraw();
+                        return;
+                    }
                     TIMELINE_STATE.selectedClipId = clip.id;
                     TIMELINE_STATE.selectedTrack = track;
-                    
+
                     const trimEdge = this.checkTrimZone(x, clip);
-                    
+
                     if (trimEdge === "left") {
                         this.dragState = "trim-left";
                         this.draggedClipId = clip.id;
@@ -225,9 +249,13 @@ export class CapiauTimelineInteraction {
             const dx = e.clientX - this.dragStartMouseX;
             const deltaFrames = Math.round(dx / TIMELINE_STATE.zoom);
             const targetStart = Math.max(0, this.dragStartClipFrame + deltaFrames);
-            
-            // Determina a trilha de destino baseada na coordenada vertical do mouse
-            const targetTrack = track === "V1" || track === "V2" ? track : null;
+
+            // Trilha de destino: qualquer pista de vídeo não travada sob o mouse
+            let targetTrack = null;
+            const trackObj = track ? TIMELINE_STATE.getTrack(track) : null;
+            if (trackObj && trackObj.kind === "video" && !trackObj.locked) {
+                targetTrack = track;
+            }
             this.moveClip(this.draggedClipId, targetStart, targetTrack);
         }
         else if (this.dragState === "trim-left" && this.draggedClipId) {
@@ -252,26 +280,36 @@ export class CapiauTimelineInteraction {
 
     onWheel(e) {
         e.preventDefault();
-        
+
         if (e.ctrlKey) {
             // Zoom horizontal centralizado no mouse
             const rect = this.canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
-            
+
             const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
-            
+
             const oldZoom = TIMELINE_STATE.zoom;
             const newZoom = Math.max(0.01, Math.min(5.0, oldZoom * zoomFactor));
-            
+
             const mouseFrame = TIMELINE_STATE.scrollLeftFrame + (mouseX / oldZoom);
             const newScrollLeft = mouseFrame - (mouseX / newZoom);
-            
+
             TIMELINE_STATE.setZoom(newZoom);
             TIMELINE_STATE.setScrollLeftFrame(newScrollLeft);
-        } else {
-            // Scroll horizontal por roda do mouse
-            const deltaFrames = e.deltaX / TIMELINE_STATE.zoom;
+        } else if (e.shiftKey) {
+            // Shift + roda = scroll horizontal
+            const deltaFrames = (e.deltaY || e.deltaX) / TIMELINE_STATE.zoom;
             TIMELINE_STATE.setScrollLeftFrame(TIMELINE_STATE.scrollLeftFrame + deltaFrames);
+        } else {
+            // Roda simples: scroll vertical das pistas quando excedem a área visível
+            const viewportH = (this.renderer.height || 200) - this.renderer.rulerHeight;
+            const overflow = TIMELINE_STATE.totalTracksHeight() > viewportH;
+            if (overflow && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                TIMELINE_STATE.setScrollTop(TIMELINE_STATE.scrollTop + e.deltaY * 0.5, viewportH);
+            } else {
+                const deltaFrames = (e.deltaX || e.deltaY) / TIMELINE_STATE.zoom;
+                TIMELINE_STATE.setScrollLeftFrame(TIMELINE_STATE.scrollLeftFrame + deltaFrames);
+            }
         }
     }
 
@@ -343,80 +381,59 @@ export class CapiauTimelineInteraction {
         }
     }
 
+    /**
+     * Insere um clipe magneticamente na sequência da pista alvo (ordenado pelo centro do drop).
+     */
+    _insertMagnetic(cuts, clip, trackId, targetStartFrame) {
+        const duration = clip.outFrame - clip.inFrame;
+        const targetCenter = targetStartFrame + duration / 2;
+
+        const idx = cuts.findIndex(c => c.id === clip.id);
+        if (idx !== -1) cuts.splice(idx, 1);
+
+        const trackCuts = cuts.filter(c => c.track === trackId);
+        const otherCuts = cuts.filter(c => c.track !== trackId);
+
+        let inserted = false;
+        let currentOffset = 0;
+        for (let i = 0; i < trackCuts.length; i++) {
+            const c = trackCuts[i];
+            const cDur = c.outFrame - c.inFrame;
+            if (targetCenter < currentOffset + cDur / 2) {
+                trackCuts.splice(i, 0, clip);
+                inserted = true;
+                break;
+            }
+            currentOffset += cDur;
+        }
+        if (!inserted) {
+            trackCuts.push(clip);
+        }
+        STATE.activeTimelineCuts = [...trackCuts, ...otherCuts];
+    }
+
     moveClip(clipId, targetStartFrame, targetTrack) {
         const cuts = [...STATE.activeTimelineCuts];
         const clip = cuts.find(c => c.id === clipId);
         if (!clip) return;
-        
-        const duration = clip.outFrame - clip.inFrame;
 
-        // Se mudou de trilha (V1 <-> V2)
+        // Trilha final do clipe (a atual, ou a nova sob o mouse)
+        const finalTrackId = (targetTrack && targetTrack !== clip.track) ? targetTrack : clip.track;
+        const finalTrack = TIMELINE_STATE.getTrack(finalTrackId);
+        if (finalTrack && (finalTrack.locked || finalTrack.kind !== "video")) return;
+
         if (targetTrack && targetTrack !== clip.track) {
             console.log(`[Timeline] Transpondo clipe ${clipId} de ${clip.track} para ${targetTrack}`);
             clip.track = targetTrack;
-            
-            if (targetTrack === "V1") {
-                // Ao entrar em V1, insere de forma magnética na sequência
-                const idx = cuts.findIndex(c => c.id === clipId);
-                cuts.splice(idx, 1);
-                
-                const targetCenter = targetStartFrame + duration / 2;
-                let inserted = false;
-                let currentOffset = 0;
-                
-                const v1Cuts = cuts.filter(c => c.track === "V1");
-                const otherCuts = cuts.filter(c => c.track !== "V1");
-                
-                for (let i = 0; i < v1Cuts.length; i++) {
-                    const c = v1Cuts[i];
-                    const cDur = c.outFrame - c.inFrame;
-                    if (targetCenter < currentOffset + cDur / 2) {
-                        v1Cuts.splice(i, 0, clip);
-                        inserted = true;
-                        break;
-                    }
-                    currentOffset += cDur;
-                }
-                if (!inserted) {
-                    v1Cuts.push(clip);
-                }
-                
-                STATE.activeTimelineCuts = [...v1Cuts, ...otherCuts];
-                return;
-            } else {
-                // Ao entrar em V2, torna-se livre
-                clip.timelineStartFrame = targetStartFrame;
-                STATE.activeTimelineCuts = cuts;
-                return;
-            }
         }
 
-        // Se permaneceu na mesma trilha
-        if (clip.track === "V1") {
-            const targetCenter = targetStartFrame + duration / 2;
-            const idx = cuts.findIndex(c => c.id === clipId);
-            cuts.splice(idx, 1);
-            
-            let inserted = false;
-            let currentOffset = 0;
-            const v1Cuts = cuts.filter(c => c.track === "V1");
-            const otherCuts = cuts.filter(c => c.track !== "V1");
-            
-            for (let i = 0; i < v1Cuts.length; i++) {
-                const c = v1Cuts[i];
-                const cDur = c.outFrame - c.inFrame;
-                if (targetCenter < currentOffset + cDur / 2) {
-                    v1Cuts.splice(i, 0, clip);
-                    inserted = true;
-                    break;
-                }
-                currentOffset += cDur;
-            }
-            if (!inserted) {
-                v1Cuts.push(clip);
-            }
-            STATE.activeTimelineCuts = [...v1Cuts, ...otherCuts];
+        const isMagnetic = finalTrack ? !!finalTrack.magnetic : (finalTrackId === "V1");
+
+        if (isMagnetic) {
+            // Pista magnética: reordena a sequência (ripple)
+            this._insertMagnetic(cuts, clip, finalTrackId, targetStartFrame);
         } else {
+            // Pista livre: posicionamento absoluto
             clip.timelineStartFrame = targetStartFrame;
             STATE.activeTimelineCuts = cuts;
         }
@@ -429,14 +446,14 @@ export class CapiauTimelineInteraction {
 
         const maxStart = clip.outFrame - 12; // Mínimo de 12 frames de duração
         const targetIn = Math.min(maxStart, Math.max(0, this.dragStartInFrame + deltaFrames));
-        
+
         clip.inFrame = targetIn;
-        const video = STATE.allVideos.find(v => v.id === clip.video_id);
-        const fps = video && video.fps ? video.fps : TIMELINE_STATE.fps;
+        const fps = TIMELINE_STATE.fps; // frames sempre em fps da timeline
         clip.in = targetIn / fps;
 
-        if (clip.track === "V2") {
-            // Desloca o início na timeline proporcionalmente
+        const trackObj = TIMELINE_STATE.getTrack(clip.track);
+        if (!trackObj || !trackObj.magnetic) {
+            // Pista livre: desloca o início na timeline proporcionalmente
             const targetStart = Math.max(0, this.dragStartClipFrame + deltaFrames);
             clip.timelineStartFrame = targetStart;
         }
@@ -453,8 +470,7 @@ export class CapiauTimelineInteraction {
         const targetOut = Math.max(minOut, this.dragStartOutFrame + deltaFrames);
 
         clip.outFrame = targetOut;
-        const video = STATE.allVideos.find(v => v.id === clip.video_id);
-        const fps = video && video.fps ? video.fps : TIMELINE_STATE.fps;
+        const fps = TIMELINE_STATE.fps; // frames sempre em fps da timeline
         clip.out = targetOut / fps;
 
         STATE.activeTimelineCuts = cuts;
@@ -466,8 +482,11 @@ export class CapiauTimelineInteraction {
         const clip = cuts.find(c => c.id === clipId);
         if (!clip) return;
 
-        if (clip.track === "V1") {
-            // Reordena na timeline sequencial (move posições na array)
+        const trackObj = TIMELINE_STATE.getTrack(clip.track);
+        if (trackObj && trackObj.locked) return;
+
+        if (trackObj ? trackObj.magnetic : clip.track === "V1") {
+            // Pista magnética: reordena na sequência (move posições na array)
             const idx = cuts.findIndex(c => c.id === clipId);
             const targetIdx = idx + deltaFrames;
             if (targetIdx >= 0 && targetIdx < cuts.length) {
@@ -477,7 +496,7 @@ export class CapiauTimelineInteraction {
                 STATE.activeTimelineCuts = cuts;
             }
         } else {
-            // V2 desloca de fato no tempo
+            // Pista livre desloca de fato no tempo
             clip.timelineStartFrame = Math.max(0, clip.timelineStartFrame + deltaFrames);
             STATE.activeTimelineCuts = cuts;
         }
@@ -488,13 +507,13 @@ export class CapiauTimelineInteraction {
         const clip = cuts.find(c => c.id === clipId);
         if (!clip) return;
 
-        const video = STATE.allVideos.find(v => v.id === clip.video_id);
-        const fps = video && video.fps ? video.fps : TIMELINE_STATE.fps;
+        const fps = TIMELINE_STATE.fps; // frames sempre em fps da timeline
 
         if (edge === "left") {
             clip.inFrame = Math.max(0, clip.inFrame + deltaFrames);
             clip.in = clip.inFrame / fps;
-            if (clip.track === "V2") {
+            const trackObj = TIMELINE_STATE.getTrack(clip.track);
+            if (!trackObj || !trackObj.magnetic) {
                 clip.timelineStartFrame = Math.max(0, clip.timelineStartFrame + deltaFrames);
             }
         } else {

@@ -494,6 +494,7 @@ export class LibraryManager {
         docs.forEach(doc => {
             const card = document.createElement("div");
             card.className = "media-card";
+            card.setAttribute("data-doc-id", doc.id);
             card.style.display = "flex";
             card.style.alignItems = "center";
             card.style.justifyContent = "space-between";
@@ -553,6 +554,7 @@ export class LibraryManager {
         photos.forEach(p => {
             const card = document.createElement("div");
             card.className = "photo-card";
+            card.setAttribute("data-photo-id", p.id);
             
             const src = p.proxy_path || (p.filepath && (p.filepath.startsWith('http') || p.filepath.startsWith('/')) ? p.filepath : `/originals/${p.filename}`);
             const isRaw = p.filename.toLowerCase().match(/\.(arw|cr2|nef|dng|pef|raf|orf|rw2|raw)$/);

@@ -195,16 +195,40 @@ export class CapIAuAPI {
         });
     }
 
-    static saveTimeline(projectId, name, description, cuts) {
+    static saveTimeline(projectId, name, description, cuts, tracks = null, fps = 24) {
         return this.request("/api/timeline", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ project_id: projectId, name, description, cuts })
+            body: JSON.stringify({ project_id: projectId, name, description, cuts, tracks, fps })
         });
     }
 
     static fetchTimelines(projectId) {
         return this.request(`/api/timeline?project_id=${projectId}`);
+    }
+
+    static fetchTimelineDetail(timelineId) {
+        return this.request(`/api/timeline/${timelineId}`);
+    }
+
+    static aiSuggestTimeline(payload) {
+        return this.request("/api/timeline/ai-suggest", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+    }
+
+    static fetchThemeSegments(themeId) {
+        return this.request(`/api/theme/${themeId}/segments`);
+    }
+
+    static fetchEntities(projectId) {
+        return this.request(`/api/entities/project/${projectId}`);
+    }
+
+    static enrichProject(projectId) {
+        return this.request(`/api/entities/project/${projectId}/enrich`, { method: "POST" });
     }
 
     static splitTranscript(videoId, startTime, newSpeakerId) {
@@ -249,8 +273,20 @@ export class CapIAuAPI {
         });
     }
 
-    static fetchClusterFaces(projectId, clusterId) {
-        return this.request(`/api/faces/project/${projectId}/face-clusters/${clusterId}/faces`);
+    static dissociateFaces(projectId, faceIds) {
+        return this.request(`/api/faces/project/${projectId}/faces/dissociate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ face_ids: faceIds })
+        });
+    }
+
+    static fetchClusterFaces(projectId, clusterId, name = null) {
+        let url = `/api/faces/project/${projectId}/face-clusters/${clusterId}/faces`;
+        if (name !== null && name !== undefined) {
+            url += `?name=${encodeURIComponent(name)}`;
+        }
+        return this.request(url);
     }
 
     static fetchUnlabeledFaces(projectId) {

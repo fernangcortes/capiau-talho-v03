@@ -6,11 +6,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.responses import FileResponse
 
 from src.api.dependencies import get_db_conn
-from src.api.schemas import TimelineCreate, SplitTranscriptPayload, ChatPayload, SearchCategorizePayload
+from src.api.schemas import (
+    TimelineCreate,
+    TimelineAISuggestPayload,
+    SplitTranscriptPayload,
+    ChatPayload,
+    SearchCategorizePayload
+)
 from src.db.repositories.projects import ProjectRepository
 from src.db.repositories.narrative import NarrativeRepository
+from src.db.repositories.media import MediaRepository
 from src.services.pipeline import PipelineService
 from src.services.rag import RAGService
+from src.services.timeline_ai import TimelineAIService
 from src.search.semantic import SemanticSearch
 from src.export.otio_export import export_timeline_file
 
@@ -100,9 +108,32 @@ def trigger_clustering(background_tasks: BackgroundTasks, project_id: int = Quer
 
 @router.get("/api/themes")
 def get_project_themes(project_id: int = Query(1), conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Retorna os temas e tópicos catalogados no SQLite."""
+    """Retorna os temas catalogados com contagem de segmentos (trechos com timecode)."""
     themes = NarrativeRepository.get_themes(conn, project_id)
+    cursor = conn.cursor()
+    for t in themes:
+        cursor.execute("SELECT COUNT(*) as cnt FROM theme_segment WHERE theme_id = ?", (t["id"],))
+        row = cursor.fetchone()
+        t["segments_count"] = row["cnt"] if row else 0
     return {"themes": themes}
+
+@router.get("/api/theme/{theme_id}/segments")
+def get_theme_segments(theme_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Retorna os trechos exatos (mídia + intervalo de tempo) vinculados a um tema."""
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT s.id, s.video_id, s.photo_id, s.start_time, s.end_time, s.speaker_id,
+               s.text_excerpt, s.relevance,
+               v.filename as video_filename, v.video_type,
+               p.filename as photo_filename
+        FROM theme_segment s
+        LEFT JOIN video v ON s.video_id = v.id
+        LEFT JOIN photo p ON s.photo_id = p.id
+        WHERE s.theme_id = ?
+        ORDER BY s.relevance DESC, s.video_id, s.start_time
+    """, (theme_id,))
+    segments = [dict(r) for r in cursor.fetchall()]
+    return {"theme_id": theme_id, "segments": segments}
 
 @router.get("/api/search")
 def search_media(
@@ -122,15 +153,51 @@ def categorize_search(payload: SearchCategorizePayload):
     results_dicts = [{"id": r.id, "media_type": r.media_type, "text": r.text} for r in payload.results]
     return RAGService.categorize_results_with_llm(payload.query, results_dicts)
 
+@router.post("/api/search/reindex")
+def reindex_embeddings(conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Re-embeda todo o acervo com o modelo de embeddings atual (após troca de modelo).
+
+    Também invalida os centroides de temas (modelo antigo), que serão recomputados
+    na próxima rodada de clustering. Progresso na aba Tarefas.
+    """
+    # Centroides de temas foram gerados com o modelo antigo — invalidar
+    conn.execute("UPDATE theme SET embedding = NULL")
+    conn.commit()
+
+    import threading
+
+    def _run():
+        try:
+            SemanticSearch.get_instance().reindex_all()
+        except Exception as e:
+            print(f"[Reindex] Erro crítico: {e}")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {
+        "status": "success",
+        "message": "Reindexação total iniciada em background (modelo: veja EMBEDDING_MODEL). Acompanhe na aba Tarefas."
+    }
+
 @router.post("/api/timeline")
 def save_timeline(timeline: TimelineCreate, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Salva um novo rascunho de timeline."""
+    """Salva um novo rascunho de timeline (formato v2 multipista)."""
     try:
         cuts_dict = [
-            {"video_id": c.video_id, "in": c.in_time, "out": c.out_time, "track": c.track}
+            {
+                "id": c.id,
+                "video_id": c.video_id,
+                "in": c.in_time,
+                "out": c.out_time,
+                "track": c.track,
+                "timeline_start": c.timeline_start
+            }
             for c in timeline.cuts
         ]
-        timeline_id = ProjectRepository.save_timeline(conn, timeline.project_id, timeline.name, timeline.description, cuts_dict)
+        tracks_dict = [t.dict() for t in timeline.tracks] if timeline.tracks else None
+        timeline_id = ProjectRepository.save_timeline(
+            conn, timeline.project_id, timeline.name, timeline.description,
+            cuts_dict, tracks=tracks_dict, fps=timeline.fps
+        )
         conn.commit()
         return {"status": "success", "timeline_id": timeline_id}
     except Exception as e:
@@ -140,6 +207,30 @@ def save_timeline(timeline: TimelineCreate, conn: sqlite3.Connection = Depends(g
 def list_timelines(project_id: int = Query(1), conn: sqlite3.Connection = Depends(get_db_conn)):
     """Retorna todas as timelines cadastradas do projeto."""
     return ProjectRepository.list_timelines(conn, project_id)
+
+@router.get("/api/timeline/{timeline_id}")
+def get_timeline_detail(timeline_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Carrega uma timeline salva (normalizada para o formato v2 com trilhas e posições)."""
+    result = ProjectRepository.get_timeline(conn, timeline_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Timeline não encontrada.")
+    return result
+
+@router.post("/api/timeline/ai-suggest")
+def timeline_ai_suggest(payload: TimelineAISuggestPayload):
+    """Analisa o corte ATUAL da timeline (transcrições dos trechos, descrições visuais,
+    lacunas de cobertura) e retorna sugestões estruturadas de edição para a pista de IA."""
+    clips = [c.dict() for c in payload.clips]
+    tracks = [t.dict() for t in payload.tracks]
+    result = TimelineAIService.suggest(
+        project_id=payload.project_id,
+        persona=payload.persona,
+        clips=clips,
+        tracks=tracks,
+        fps=payload.fps,
+        brief=payload.brief
+    )
+    return result
 
 @router.get("/api/timeline/{timeline_id}/export/{export_format}")
 def export_timeline(timeline_id: int, export_format: str):

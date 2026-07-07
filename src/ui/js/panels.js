@@ -4,7 +4,8 @@ import { CapIAuAPI } from "./api.js";
 import { formatTimecode, showAnnotationModal } from "./player.js";
 import { CapiauTimelineRenderer } from "./timelineRenderer.js";
 import { CapiauTimelineInteraction } from "./timelineInteraction.js";
-import { TIMELINE_STATE } from "./timelineState.js";
+import { TIMELINE_STATE, secondsToFrames } from "./timelineState.js";
+import { getActiveElement, getActiveQuerySelector } from "./workspaceManager.js";
 
 export class PanelsManager {
     constructor() {
@@ -102,45 +103,36 @@ export class PanelsManager {
             selectAiPersona.addEventListener("change", () => this.onAiPersonaSelect());
         }
 
-        // Sliders de Volume das Trilhas
-        const volV1 = document.getElementById("volume-v1");
-        if (volV1) {
-            volV1.addEventListener("input", (e) => {
-                TIMELINE_STATE.trackVolumes.V1 = parseFloat(e.target.value);
-                STATE.emit("timelineCutsUpdated");
-            });
-        }
-        
-        const volV2 = document.getElementById("volume-v2");
-        if (volV2) {
-            volV2.addEventListener("input", (e) => {
-                TIMELINE_STATE.trackVolumes.V2 = parseFloat(e.target.value);
-                STATE.emit("timelineCutsUpdated");
+        // Botão ✨ Sugerir: análise de IA com o contexto atual da timeline
+        const btnAiSuggest = document.getElementById("btn-ai-suggest");
+        if (btnAiSuggest) {
+            btnAiSuggest.addEventListener("click", () => {
+                const selector = getActiveElement("select-ai-persona");
+                const persona = selector && selector.value !== "none" ? selector.value : "diretora";
+                this.runAiTimelineAnalysis(persona);
             });
         }
 
-        // Botões de Mute das Trilhas
-        const btnMuteV1 = document.getElementById("btn-mute-v1");
-        if (btnMuteV1) {
-            btnMuteV1.addEventListener("click", () => {
-                TIMELINE_STATE.trackMuted.V1 = !TIMELINE_STATE.trackMuted.V1;
-                btnMuteV1.innerHTML = TIMELINE_STATE.trackMuted.V1 
-                    ? `<i class="fa-solid fa-volume-xmark" style="color: var(--color-rose);"></i>` 
-                    : `<i class="fa-solid fa-volume-high"></i>`;
-                STATE.emit("timelineCutsUpdated");
+        // Botão de carregar timeline salva
+        const btnLoadTimeline = document.getElementById("btn-load-timeline");
+        if (btnLoadTimeline) {
+            btnLoadTimeline.addEventListener("click", () => this.loadTimelinePrompt());
+        }
+
+        // ── Cabeçalhos dinâmicos das pistas ──
+        const btnAddTrack = document.getElementById("btn-add-track");
+        if (btnAddTrack) {
+            btnAddTrack.addEventListener("click", () => {
+                const name = prompt("Nome da nova pista de vídeo:", "Nova Pista");
+                if (name !== null) {
+                    TIMELINE_STATE.addVideoTrack(name.trim() || null);
+                }
             });
         }
 
-        const btnMuteV2 = document.getElementById("btn-mute-v2");
-        if (btnMuteV2) {
-            btnMuteV2.addEventListener("click", () => {
-                TIMELINE_STATE.trackMuted.V2 = !TIMELINE_STATE.trackMuted.V2;
-                btnMuteV2.innerHTML = TIMELINE_STATE.trackMuted.V2 
-                    ? `<i class="fa-solid fa-volume-xmark" style="color: var(--color-rose);"></i>` 
-                    : `<i class="fa-solid fa-volume-high"></i>`;
-                STATE.emit("timelineCutsUpdated");
-            });
-        }
+        STATE.on("timelineTracksChanged", () => this.renderTrackHeaders());
+        STATE.on("timelineVScrollChanged", () => this.syncTrackHeadersScroll());
+        this.renderTrackHeaders();
 
         // Modal de Ajuda / Atalhos de Teclado
         const btnHelp = document.getElementById("btn-timeline-help");
@@ -442,10 +434,16 @@ export class PanelsManager {
 
         frames.forEach(f => {
             const row = document.createElement("div");
-            row.className = "vision-frame-row";
+            row.className = "transcript-bubble vision-bubble";
+            row.style.marginBottom = "0px";
+            row.style.cursor = "pointer";
             row.innerHTML = `
-                <div class="vision-timecode">${formatTimecode(f.timestamp)}</div>
-                <div class="vision-description" style="user-select: text; cursor: text;">${f.description}</div>
+                <div class="bubble-meta" style="margin-bottom: 6px; display: flex; align-items: center; width: 100%;">
+                    <span class="speaker-name" style="color: var(--color-cyan); font-weight:700;"><i class="fa-solid fa-eye" style="font-size: 9px; margin-right: 4px;"></i> VISÃO IA</span>
+                    <span class="bubble-time" style="font-family: monospace; font-size:10px; color: var(--text-secondary); margin-left: auto;">${formatTimecode(f.timestamp)}</span>
+                    <button class="btn-card-action btn-play-vision" style="margin-left: 10px; color: var(--text-muted); background: transparent; border:none; cursor:pointer;" title="Assistir"><i class="fa-solid fa-play"></i></button>
+                </div>
+                <div class="bubble-text vision-description" style="user-select: text; cursor: text; font-size: 12px; line-height: 1.5; color: var(--text-primary);">${f.description}</div>
             `;
             
             const descDiv = row.querySelector(".vision-description");
@@ -559,11 +557,18 @@ export class PanelsManager {
                 card.style.alignItems = "flex-start";
                 card.style.gap = "6px";
                 card.style.padding = "12px";
-                
+
+                const segmentsBadge = t.segments_count
+                    ? `<span style="font-size: 9px; color: var(--color-emerald); background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 1px 7px; font-weight: 600;">${t.segments_count} trechos</span>`
+                    : "";
+
                 card.innerHTML = `
-                    <h4 style="color: var(--color-cyan); margin: 0; font-size: 12px; font-weight: 600; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-brain"></i> ${t.title}</h4>
+                    <h4 style="color: var(--color-cyan); margin: 0; font-size: 12px; font-weight: 600; display:flex; align-items:center; gap:6px; width: 100%;"><i class="fa-solid fa-brain"></i> <span style="flex:1;">${t.title}</span> ${segmentsBadge}</h4>
                     <p style="font-size: 11px; color: var(--text-secondary); margin: 0; line-height: 1.4; text-align: left;">${t.description}</p>
-                    <div style="display:flex; gap:6px; margin-top:6px; width: 100%;">
+                    <div style="display:flex; gap:6px; margin-top:6px; width: 100%; flex-wrap: wrap;">
+                        ${t.segments_count ? `<button class="btn-secondary btn-theme-segments" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--color-emerald); border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.06);" data-theme-id="${t.id}">
+                            <i class="fa-solid fa-clock"></i> Ver Trechos
+                        </button>` : ""}
                         <button class="btn-primary btn-theme-search" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; border: none;" data-title="${t.title}">
                             <i class="fa-solid fa-magnifying-glass"></i> Buscar Cortes
                         </button>
@@ -571,8 +576,69 @@ export class PanelsManager {
                             <i class="fa-solid fa-comments"></i> Perguntar IA
                         </button>
                     </div>
+                    <div class="theme-segments-list" style="display: none; width: 100%; margin-top: 6px; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto;"></div>
                 `;
-                
+
+                // Listener: expandir/recolher trechos do tema (com seek na mídia)
+                const segmentsBtn = card.querySelector(".btn-theme-segments");
+                if (segmentsBtn) {
+                    segmentsBtn.addEventListener("click", async (e) => {
+                        e.stopPropagation();
+                        const listEl = card.querySelector(".theme-segments-list");
+                        if (listEl.style.display !== "none") {
+                            listEl.style.display = "none";
+                            return;
+                        }
+                        listEl.style.display = "flex";
+                        listEl.innerHTML = `<span style="font-size: 10px; color: var(--text-muted);">Carregando trechos...</span>`;
+                        try {
+                            const data = await CapIAuAPI.fetchThemeSegments(t.id);
+                            const segments = data.segments || [];
+                            listEl.innerHTML = "";
+                            if (segments.length === 0) {
+                                listEl.innerHTML = `<span style="font-size: 10px; color: var(--text-muted);">Nenhum trecho registrado. Rode o agrupamento temático novamente.</span>`;
+                                return;
+                            }
+                            segments.forEach(seg => {
+                                const item = document.createElement("div");
+                                item.style.cssText = "display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 5px; cursor: pointer; transition: background 0.15s;";
+                                const isPhoto = seg.photo_id !== null && seg.photo_id !== undefined;
+                                const mediaLabel = isPhoto
+                                    ? `<i class="fa-solid fa-image"></i> ${seg.photo_filename || 'Foto ' + seg.photo_id}`
+                                    : `<i class="fa-solid fa-film"></i> ${seg.video_filename || 'Vídeo ' + seg.video_id} · ${formatTimecode(seg.start_time || 0).substring(3)}${seg.speaker_id ? ' · ' + seg.speaker_id : ''}`;
+                                item.innerHTML = `
+                                    <span style="font-size: 9px; font-weight: 700; color: var(--color-cyan);">${mediaLabel}</span>
+                                    <span style="font-size: 10px; color: var(--text-secondary); line-height: 1.35;">${(seg.text_excerpt || '').substring(0, 140)}${(seg.text_excerpt || '').length > 140 ? '…' : ''}</span>
+                                `;
+                                item.addEventListener("mouseenter", () => item.style.background = "rgba(6,182,212,0.08)");
+                                item.addEventListener("mouseleave", () => item.style.background = "rgba(255,255,255,0.03)");
+                                item.addEventListener("click", () => {
+                                    if (isPhoto) {
+                                        const photo = STATE.allPhotos.find(p => p.id === seg.photo_id);
+                                        if (photo && window.libraryManager) {
+                                            STATE.currentPhotoList = STATE.allPhotos;
+                                            STATE.currentPhotoIndex = STATE.allPhotos.indexOf(photo);
+                                            window.libraryManager.openLightbox(photo);
+                                        }
+                                    } else {
+                                        const video = STATE.allVideos.find(v => v.id === seg.video_id);
+                                        if (video) {
+                                            STATE.activeVideo = video;
+                                            setTimeout(() => {
+                                                const player = getActiveElement("source-video");
+                                                if (player) player.currentTime = seg.start_time || 0;
+                                            }, 350);
+                                        }
+                                    }
+                                });
+                                listEl.appendChild(item);
+                            });
+                        } catch (err) {
+                            listEl.innerHTML = `<span style="font-size: 10px; color: var(--color-rose);">Erro ao carregar trechos.</span>`;
+                        }
+                    });
+                }
+
                 // Listeners
                 const searchBtn = card.querySelector(".btn-theme-search");
                 searchBtn.addEventListener("click", (e) => {
@@ -629,16 +695,20 @@ export class PanelsManager {
         }
         const name = prompt("Digite um nome para esta versão da timeline:", "Versão 1 - Rascunho");
         if (!name) return;
-        
+
         try {
+            const fps = TIMELINE_STATE.fps || 24;
             const cuts = STATE.activeTimelineCuts.map(c => ({
+                id: String(c.id),
                 video_id: c.video_id,
                 in_time: c.in,
                 out_time: c.out,
-                track: c.track
+                track: c.track,
+                timeline_start: (c.timelineStartFrame || 0) / fps
             }));
-            await CapIAuAPI.saveTimeline(STATE.currentProjectId, name, "Corte criado no editor", cuts);
-            alert("Timeline salva com sucesso no banco SQLite.");
+            const tracks = TIMELINE_STATE.serializeTracks();
+            await CapIAuAPI.saveTimeline(STATE.currentProjectId, name, "Corte criado no editor", cuts, tracks, fps);
+            alert("Timeline salva com sucesso (formato multipista v2).");
         } catch (e) {
             alert("Erro ao salvar timeline.");
         }
@@ -743,7 +813,7 @@ export class PanelsManager {
                         const photo = STATE.allPhotos.find(p => p.id === photoId);
                         if (photo) {
                             // Muda para a aba de fotos
-                            const tabBtn = document.querySelector(`.tab-btn[data-tab="tab-photos"]`);
+                            const tabBtn = getActiveQuerySelector(`.tab-btn[data-tab="tab-photos"]`);
                             if (tabBtn) tabBtn.click();
                             
                             // Abre a lightbox da foto
@@ -761,7 +831,7 @@ export class PanelsManager {
                             const video = STATE.allVideos.find(v => v.id === videoId);
                             if (video) {
                                 // Muda para a aba de mídias/vídeos
-                                const tabBtn = document.querySelector(`.tab-btn[data-tab="tab-videos"]`);
+                                const tabBtn = getActiveQuerySelector(`.tab-btn[data-tab="tab-videos"]`);
                                 if (tabBtn) tabBtn.click();
                                 
                                 // Foca no vídeo e carrega no player
@@ -864,116 +934,231 @@ export class PanelsManager {
     async onAiPersonaSelect() {
         const selector = document.getElementById("select-ai-persona");
         if (!selector) return;
-        
+
         const persona = selector.value;
         if (persona === "none") return;
-        
+
         // Reseta o seletor para permitir cliques subsequentes
         selector.value = "none";
-        
-        const capsPersona = persona.toUpperCase().replace("_", " ");
-        console.log(`[AI PERSONA] Invoking analysis for persona: ${capsPersona}`);
-        
-        // Simulação de Progresso
-        const timelinePanel = document.getElementById("timeline-panel");
-        const headerTitle = timelinePanel ? timelinePanel.querySelector(".panel-header h3") : null;
-        let originalTitleHTML = "";
-        
-        if (headerTitle) {
-            originalTitleHTML = headerTitle.innerHTML;
-            headerTitle.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-cyan);"></i> IA ${capsPersona} analisando o corte...`;
-        }
-        
-        // Aguarda 1.8 segundos para dar feedback realista
-        await new Promise(resolve => setTimeout(resolve, 1800));
-        
-        if (headerTitle) {
-            headerTitle.innerHTML = originalTitleHTML;
-        }
+        this.runAiTimelineAnalysis(persona);
+    }
 
-        // Se a timeline estiver vazia, avisa o usuário que é preciso ter ao menos 1 corte
+    /**
+     * Análise REAL de IA da timeline: envia o contexto atual (clipes, trilhas,
+     * transcrições dos trechos e lacunas — montado no backend) e recebe sugestões
+     * estruturadas que viram ghost clips na pista de IA.
+     */
+    async runAiTimelineAnalysis(persona) {
         const cuts = STATE.activeTimelineCuts;
         if (cuts.length === 0) {
-            alert(`A IA ${capsPersona} precisa de ao menos um clipe na timeline para poder sugerir edições baseadas no contexto!`);
+            alert("A IA precisa de ao menos um clipe na timeline para analisar o contexto do corte!");
+            return;
+        }
+        if (TIMELINE_STATE.aiAnalysisRunning) {
+            alert("Já existe uma análise de IA em andamento. Aguarde a conclusão.");
             return;
         }
 
-        // Importa dinamicamente para interagir com o estado da timeline
-        const { TIMELINE_STATE } = await import("./timelineState.js");
+        const capsPersona = persona.toUpperCase().replace("_", " ");
+        const timelinePanel = getActiveElement("timeline-panel");
+        const headerTitle = timelinePanel ? timelinePanel.querySelector(".panel-header h3") : null;
+        const originalTitleHTML = headerTitle ? headerTitle.innerHTML : "";
 
-        let suggestions = [];
-        
-        if (persona === "montadora") {
-            // IA Montadora sugere cortar uma redundância no primeiro clipe
-            const targetClip = cuts[0];
-            const durFrames = targetClip.outFrame - targetClip.inFrame;
-            
-            if (durFrames > 48) {
-                suggestions.push({
-                    video_id: targetClip.video_id,
-                    inFrame: targetClip.inFrame + Math.round(durFrames * 0.6),
-                    outFrame: targetClip.outFrame,
-                    timelineStartFrame: targetClip.timelineStartFrame + Math.round(durFrames * 0.6),
-                    track: targetClip.track,
-                    action: "DELETE",
-                    targetClipId: targetClip.id,
-                    reason: "IA Montadora: Sugere remover trecho prolixo / silêncio no final do clipe"
+        if (headerTitle) {
+            headerTitle.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-cyan);"></i> IA ${capsPersona} analisando o corte real...`;
+        }
+        TIMELINE_STATE.aiAnalysisRunning = true;
+        this.timelineRenderer.requestRedraw();
+
+        try {
+            const fps = TIMELINE_STATE.fps || 24;
+            const payload = {
+                project_id: STATE.currentProjectId,
+                persona: persona,
+                fps: fps,
+                brief: "",
+                clips: cuts.map(c => ({
+                    id: String(c.id),
+                    video_id: c.video_id,
+                    in_s: c.in,
+                    out_s: c.out,
+                    timeline_start_s: (c.timelineStartFrame || 0) / fps,
+                    track: c.track
+                })),
+                tracks: TIMELINE_STATE.serializeTracks()
+            };
+
+            const res = await CapIAuAPI.aiSuggestTimeline(payload);
+
+            if (res.error) {
+                alert(`IA ${capsPersona}: ${res.error}`);
+                return;
+            }
+
+            const suggestions = (res.suggestions || []).map(s => ({
+                video_id: s.video_id,
+                in: s.in,
+                out: s.out,
+                timelineStartFrame: secondsToFrames(s.timeline_start_s || 0, fps),
+                track: s.track,
+                action: s.action,
+                reason: s.reason,
+                persona: s.persona,
+                targetClipId: s.target_clip_id
+            }));
+
+            if (suggestions.length > 0) {
+                TIMELINE_STATE.setGhostSuggestions(suggestions);
+            } else {
+                alert(`A IA ${capsPersona} analisou o corte e não propôs mudanças estruturais. Tente outra persona ou adicione mais material analisado à biblioteca.`);
+            }
+        } catch (err) {
+            console.error("[AI TIMELINE] Falha na análise:", err);
+            alert(`Erro ao consultar a IA ${capsPersona}: ${err.message}`);
+        } finally {
+            TIMELINE_STATE.aiAnalysisRunning = false;
+            if (headerTitle) headerTitle.innerHTML = originalTitleHTML;
+            this.timelineRenderer.requestRedraw();
+        }
+    }
+
+    /**
+     * Renderiza os cabeçalhos das pistas (nome, volume, mute, lock, remover)
+     * na sidebar da timeline, espelhando TIMELINE_STATE.tracks.
+     */
+    renderTrackHeaders() {
+        const container = getActiveElement("timeline-track-headers");
+        if (!container) return;
+        const doc = container.ownerDocument;
+        container.innerHTML = "";
+
+        const inner = doc.createElement("div");
+        inner.id = "timeline-track-headers-inner";
+        inner.style.cssText = "position: absolute; top: 0; left: 0; width: 100%; will-change: transform;";
+        inner.style.transform = `translateY(${-TIMELINE_STATE.scrollTop}px)`;
+
+        TIMELINE_STATE.tracks.forEach(track => {
+            const h = TIMELINE_STATE.trackHeight(track);
+            const row = doc.createElement("div");
+            row.className = "timeline-header-track";
+            row.dataset.trackId = track.id;
+            row.style.cssText = `height: ${h}px; border-bottom: 1px solid var(--border-glass); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding: 4px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); font-family: var(--font-heading); gap: 4px; overflow: hidden;`;
+
+            if (track.kind === "ai") {
+                row.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: 9px;"></i> ${track.name}</span>
+                        <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                    </div>
+                `;
+                row.querySelector(".btn-track-ai-run").addEventListener("click", () => {
+                    const selector = getActiveElement("select-ai-persona");
+                    const persona = selector && selector.value !== "none" ? selector.value : "diretora";
+                    this.runAiTimelineAnalysis(persona);
+                });
+            } else {
+                const muteIcon = track.muted
+                    ? `<i class="fa-solid fa-volume-xmark" style="color: var(--color-rose);"></i>`
+                    : `<i class="fa-solid fa-volume-high"></i>`;
+                const lockIcon = track.locked
+                    ? `<i class="fa-solid fa-lock" style="color: var(--color-rose);"></i>`
+                    : `<i class="fa-solid fa-lock-open"></i>`;
+                const magnetColor = track.magnetic ? "var(--color-cyan)" : "var(--text-muted)";
+
+                row.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px;">
+                        <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">${track.id} ${track.name}</span>
+                        <div style="display: flex; gap: 4px; flex-shrink: 0;">
+                            <button class="btn-track-magnet" title="${track.magnetic ? 'Pista magnética (ripple): clipes ficam grudados em sequência' : 'Pista livre: posicionamento manual'}" style="border: none; background: none; color: ${magnetColor}; cursor: pointer; padding: 0; font-size: 9px;"><i class="fa-solid fa-magnet"></i></button>
+                            <button class="btn-track-lock" title="Travar/Destravar pista" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 9px;">${lockIcon}</button>
+                            <button class="btn-track-mute" title="Mutar Trilha" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 10px;">${muteIcon}</button>
+                            <button class="btn-track-remove" title="Remover pista (clipes vão para outra pista)" style="border: none; background: none; color: var(--text-muted); cursor: pointer; padding: 0; font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                    <input type="range" class="slider-track-volume" min="0" max="1" step="0.1" value="${track.volume}" style="width: 100%; height: 3px; accent-color: var(--color-cyan); cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">
+                `;
+
+                row.querySelector(".btn-track-mute").addEventListener("click", () => TIMELINE_STATE.toggleTrackMute(track.id));
+                row.querySelector(".btn-track-lock").addEventListener("click", () => TIMELINE_STATE.toggleTrackLock(track.id));
+                row.querySelector(".btn-track-magnet").addEventListener("click", () => TIMELINE_STATE.toggleTrackMagnetic(track.id));
+                row.querySelector(".btn-track-remove").addEventListener("click", () => {
+                    if (confirm(`Remover a pista "${track.id} ${track.name}"? Os clipes dela serão movidos para outra pista de vídeo.`)) {
+                        if (!TIMELINE_STATE.removeTrack(track.id)) {
+                            alert("Não é possível remover: a timeline precisa de ao menos uma pista de vídeo.");
+                        }
+                    }
+                });
+                row.querySelector(".slider-track-volume").addEventListener("input", (e) => {
+                    TIMELINE_STATE.setTrackVolume(track.id, parseFloat(e.target.value));
+                });
+                row.querySelector(".track-name-label").addEventListener("dblclick", () => {
+                    const newName = prompt("Novo nome da pista:", track.name);
+                    if (newName !== null && newName.trim()) {
+                        TIMELINE_STATE.renameTrack(track.id, newName);
+                    }
                 });
             }
-        } 
-        else if (persona === "diretora") {
-            // IA Diretora sugere inserir um clipe de entrevista complementar
-            const otherVideo = STATE.allVideos.find(v => v.video_type === "interview" && !cuts.some(c => c.video_id === v.id));
-            const videoId = otherVideo ? otherVideo.id : (cuts[0] ? cuts[0].video_id : 1);
-            
-            const lastCut = cuts[cuts.length - 1];
-            const startFrame = lastCut ? lastCut.timelineStartFrame + (lastCut.outFrame - lastCut.inFrame) : 0;
-            
-            suggestions.push({
-                video_id: videoId,
-                inFrame: 0,
-                outFrame: 120, // 5 segundos
-                timelineStartFrame: startFrame,
-                track: "V1",
-                action: "INSERT",
-                reason: "IA Diretora: Inserir depoimento complementar para estruturar a narrativa"
-            });
-        } 
-        else if (persona === "sound_designer") {
-            // Sugere trilha de fundo na V2 (B-roll track)
-            const soundVideo = STATE.allVideos.find(v => v.video_type === "broll") || { id: 2 };
-            const targetClip = cuts[0];
-            
-            suggestions.push({
-                video_id: soundVideo.id,
-                inFrame: 0,
-                outFrame: 240, // 10 segundos
-                timelineStartFrame: targetClip ? targetClip.timelineStartFrame : 0,
-                track: "V2",
-                action: "INSERT",
-                reason: "IA Sound Designer: Adicionar trilha de atmosfera/SFX para reforçar o drama"
-            });
-        } 
-        else if (persona === "colorista") {
-            // Sugere cobrir com B-roll 1 segundo após o início do primeiro corte
-            const brollVideo = STATE.allVideos.find(v => v.video_type === "broll") || { id: 2 };
-            const targetClip = cuts[0];
-            
-            suggestions.push({
-                video_id: brollVideo.id,
-                inFrame: 48,
-                outFrame: 144, // 4 segundos
-                timelineStartFrame: targetClip ? targetClip.timelineStartFrame + 24 : 0,
-                track: "V2",
-                action: "INSERT",
-                reason: "IA Colorista: Sugestão de cobertura de B-roll para encobrir a transição de Jump Cut"
-            });
-        }
 
-        if (suggestions.length > 0) {
-            TIMELINE_STATE.setGhostSuggestions(suggestions);
-        } else {
-            alert(`A IA ${capsPersona} analisou o corte e concluiu que a estrutura atual está excelente. Nenhuma edição sugerida!`);
+            inner.appendChild(row);
+        });
+
+        container.appendChild(inner);
+    }
+
+    /** Sincroniza o scroll vertical dos cabeçalhos com o canvas. */
+    syncTrackHeadersScroll() {
+        const container = getActiveElement("timeline-track-headers");
+        if (!container) return;
+        const inner = container.querySelector("#timeline-track-headers-inner");
+        if (inner) {
+            inner.style.transform = `translateY(${-TIMELINE_STATE.scrollTop}px)`;
+        }
+    }
+
+    /** Lista as timelines salvas e carrega a escolhida (com pistas e posições). */
+    async loadTimelinePrompt() {
+        try {
+            const timelines = await CapIAuAPI.fetchTimelines(STATE.currentProjectId);
+            if (!timelines || timelines.length === 0) {
+                alert("Nenhuma timeline salva neste projeto ainda.");
+                return;
+            }
+
+            const options = timelines.slice(0, 15).map(t => `${t.id}: ${t.name}`).join("\n");
+            const answer = prompt(`Digite o ID da timeline para carregar:\n\n${options}`, String(timelines[0].id));
+            if (!answer) return;
+
+            const timelineId = parseInt(answer.trim(), 10);
+            if (isNaN(timelineId)) return;
+
+            const detail = await CapIAuAPI.fetchTimelineDetail(timelineId);
+            const sequence = detail.sequence || {};
+
+            // Restaura as pistas e os clipes com posições absolutas
+            TIMELINE_STATE.setTracks(sequence.tracks || []);
+            if (sequence.fps) TIMELINE_STATE.setFps(sequence.fps);
+
+            const fps = TIMELINE_STATE.fps || 24;
+            const cuts = (sequence.clips || []).map((c, idx) => ({
+                id: c.id || `cut_loaded_${idx}_${Date.now()}`,
+                video_id: c.video_id,
+                in: c.in,
+                out: c.out,
+                track: c.track || "V1",
+                timelineStartFrame: c.timeline_start !== undefined && c.timeline_start !== null
+                    ? secondsToFrames(c.timeline_start, fps)
+                    : undefined
+            }));
+
+            STATE.activeTimelineCuts = cuts;
+
+            const nameInput = getActiveElement("timeline-name-input");
+            if (nameInput) nameInput.value = detail.name || `Timeline ${timelineId}`;
+
+            console.log(`[Timeline] Timeline ${timelineId} carregada: ${cuts.length} clipes, ${TIMELINE_STATE.tracks.length} pistas.`);
+        } catch (e) {
+            console.error("Erro ao carregar timeline:", e);
+            alert("Erro ao carregar timeline: " + e.message);
         }
     }
 }

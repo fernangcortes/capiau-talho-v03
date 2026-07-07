@@ -170,6 +170,49 @@ CREATE TABLE IF NOT EXISTS timeline (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Entidades Nomeadas (Pessoas, Objetos/Equipamentos, Locacoes)
+-- Registro canonico usado para enriquecer descricoes de visao e busca
+CREATE TABLE IF NOT EXISTS entity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    entity_type TEXT CHECK(entity_type IN ('person','object','location','other')) DEFAULT 'other',
+    name TEXT NOT NULL,
+    aliases TEXT, -- JSON array de apelidos/sinonimos
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(project_id, name)
+);
+
+-- Mencoes de Entidades em midias (fotos, frames de video)
+-- Cada mencao registra ONDE e COMO a entidade foi vista/identificada
+CREATE TABLE IF NOT EXISTS entity_mention (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_id INTEGER NOT NULL REFERENCES entity(id) ON DELETE CASCADE,
+    project_id INTEGER NOT NULL,
+    photo_id INTEGER REFERENCES photo(id) ON DELETE CASCADE,
+    video_id INTEGER REFERENCES video(id) ON DELETE CASCADE,
+    timestamp REAL, -- timestamp do frame para videos, NULL para fotos
+    source TEXT CHECK(source IN ('vision_auto','face_recognition','human_audit','text_link')) DEFAULT 'human_audit',
+    status TEXT CHECK(status IN ('auto','confirmed','rejected')) DEFAULT 'confirmed',
+    text_to_replace TEXT, -- trecho literal da descricao a substituir pelo nome (opcional)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Segmentos Tematicos: liga um tema a um TRECHO exato de midia (nao ao video inteiro)
+CREATE TABLE IF NOT EXISTS theme_segment (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    theme_id INTEGER NOT NULL REFERENCES theme(id) ON DELETE CASCADE,
+    project_id INTEGER NOT NULL,
+    video_id INTEGER REFERENCES video(id) ON DELETE CASCADE,
+    photo_id INTEGER REFERENCES photo(id) ON DELETE CASCADE,
+    start_time REAL, -- inicio do trecho em segundos (NULL para fotos)
+    end_time REAL,
+    speaker_id TEXT,
+    text_excerpt TEXT, -- amostra do texto do segmento para exibicao
+    relevance REAL DEFAULT 1.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Grafo Relacional (Triplas RDF-like para matches, continuidades e tags)
 CREATE TABLE IF NOT EXISTS relation (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -200,6 +243,12 @@ CREATE INDEX IF NOT EXISTS idx_transcript_video ON transcript(video_id);
 CREATE INDEX IF NOT EXISTS idx_transcript_time ON transcript(start_time, end_time);
 CREATE INDEX IF NOT EXISTS idx_relation_subject ON relation(project_id, subject_type, subject_id);
 CREATE INDEX IF NOT EXISTS idx_relation_object ON relation(project_id, object_type, object_id);
+CREATE INDEX IF NOT EXISTS idx_entity_project ON entity(project_id);
+CREATE INDEX IF NOT EXISTS idx_mention_entity ON entity_mention(entity_id);
+CREATE INDEX IF NOT EXISTS idx_mention_video ON entity_mention(video_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_mention_photo ON entity_mention(photo_id);
+CREATE INDEX IF NOT EXISTS idx_theme_segment_theme ON theme_segment(theme_id);
+CREATE INDEX IF NOT EXISTS idx_theme_segment_video ON theme_segment(video_id);
 """
 
 def init_db(db_path: Path = None):
@@ -266,7 +315,24 @@ def init_db(db_path: Path = None):
         if "tags" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN tags TEXT")
             print("[MIGRATION] Coluna 'tags' adicionada a tabela video.")
-            
+
+        # Migracoes para tabela photo (descricao original preservada antes do enriquecimento)
+        cursor.execute("PRAGMA table_info(photo)")
+        photo_cols = [row[1] for row in cursor.fetchall()]
+        if "raw_description" not in photo_cols:
+            cursor.execute("ALTER TABLE photo ADD COLUMN raw_description TEXT")
+            print("[MIGRATION] Coluna 'raw_description' adicionada a tabela photo.")
+
+        # Migracoes para tabela theme (centroide de embedding e temas fixados pelo usuario)
+        cursor.execute("PRAGMA table_info(theme)")
+        theme_cols = [row[1] for row in cursor.fetchall()]
+        if "embedding" not in theme_cols:
+            cursor.execute("ALTER TABLE theme ADD COLUMN embedding TEXT")
+            print("[MIGRATION] Coluna 'embedding' adicionada a tabela theme.")
+        if "pinned" not in theme_cols:
+            cursor.execute("ALTER TABLE theme ADD COLUMN pinned INTEGER DEFAULT 0")
+            print("[MIGRATION] Coluna 'pinned' adicionada a tabela theme.")
+
         conn.commit()
         
         # Inserir projeto padrao se a tabela estiver vazia
