@@ -421,6 +421,13 @@ export class CapiauTimelineInteraction {
                 e.preventDefault();
             }
         }
+        else if (e.key.toLowerCase() === "z" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            // Z: divide o clipe selecionado no playhead
+            if (selectedId) {
+                TIMELINE_STATE.splitClip(selectedId, TIMELINE_STATE.playheadFrame);
+                e.preventDefault();
+            }
+        }
         else if (e.key === "ArrowLeft") {
             if (selectedId) {
                 if (e.altKey) {

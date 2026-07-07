@@ -42,6 +42,7 @@ Os comandos abaixo ficam disponíveis ao interagir com a linha do tempo ou com c
 | **`Delete` / `Backspace`** | **Deletar Clipe / Rejeitar Ghost** | Apaga o clipe selecionado na timeline (e seu par de áudio vinculado). Se for um clipe fantasma (*ghost clip*), rejeita a sugestão. |
 | **`Enter` / `Y`** | **Aceitar Sugestão da IA** | Aceita e consolida o clipe fantasma (*ghost clip*) selecionado na timeline. |
 | **`U`** | **Desvincular Par A/V** | Desvincula o clipe de vídeo selecionado de seu respectivo par de áudio para trims independentes (J/L-cuts). |
+| **`Z`** | **Dividir Clipe (Split)** | Divide o clipe selecionado na timeline ao meio, exatamente na posição atual da agulha (playhead). Se estiver vinculado (A/V), divide ambos. |
 | **`Setas (← / →)`** | **Deslocar Clipe (Nudge)** | Desloca o clipe selecionado exatamente 1 frame para a esquerda ou direita na timeline. |
 | **`Alt + Setas (← / →)`** | **Ajustar Entrada (Trim In)** | Ajusta a borda esquerda (In-point) do clipe selecionado em 1 frame para trás (←) ou para a frente (→). (Alternativa layout-independent). |
 | **`Shift + Setas (← / →)`** | **Ajustar Saída (Trim Out)** | Ajusta a borda direita (Out-point) do clipe selecionado em 1 frame para trás (←) ou para a frente (→). (Alternativa layout-independent). |

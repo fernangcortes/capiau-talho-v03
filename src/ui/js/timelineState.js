@@ -735,6 +735,65 @@ export class CapiauTimelineState {
             STATE.activeTimelineCuts = currentCuts;
         });
     }
+
+    /**
+     * Divide um clipe em dois no frame especificado (playhead).
+     */
+    splitClip(clipId, splitFrame) {
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = [...STATE.activeTimelineCuts];
+            const targetIdx = currentCuts.findIndex(c => c.id === clipId);
+            if (targetIdx === -1) return;
+
+            const clip = currentCuts[targetIdx];
+            const fps = this.fps;
+
+            // Verifica se o frame intersecta o clipe
+            const startFrame = clip.timelineStartFrame || 0;
+            const durationFrames = clip.outFrame - clip.inFrame;
+            const endFrame = startFrame + durationFrames;
+
+            if (splitFrame <= startFrame || splitFrame >= endFrame) {
+                return; // Fora do clipe
+            }
+
+            // Descobrir se há clipe parceiro vinculado
+            const partner = clip.link_id 
+                ? currentCuts.find(c => c.link_id === clip.link_id && c.id !== clip.id)
+                : null;
+
+            const newLinkPartner = clip.link_id ? `link_${Date.now()}_${Math.floor(Math.random()*900+100)}` : null;
+
+            const doSplit = (c, linkId) => {
+                const cStart = c.timelineStartFrame || 0;
+                const offsetFrames = splitFrame - cStart;
+                
+                // Criar o segundo clipe (parte direita)
+                const secondClip = {
+                    ...c,
+                    id: `cut_${Date.now()}_${Math.floor(Math.random()*900+100)}_${c.id.endsWith("_a") ? "a" : "v"}`,
+                    timelineStartFrame: splitFrame,
+                    timeline_start: splitFrame / fps,
+                    inFrame: c.inFrame + offsetFrames,
+                    in: (c.inFrame + offsetFrames) / fps,
+                    link_id: linkId
+                };
+
+                // Modificar o primeiro clipe (parte esquerda)
+                c.outFrame = c.inFrame + offsetFrames;
+                c.out = c.outFrame / fps;
+
+                currentCuts.push(secondClip);
+            };
+
+            doSplit(clip, newLinkPartner);
+            if (partner) {
+                doSplit(partner, newLinkPartner);
+            }
+
+            STATE.activeTimelineCuts = currentCuts;
+        });
+    }
 }
 
 export const TIMELINE_STATE = new CapiauTimelineState();

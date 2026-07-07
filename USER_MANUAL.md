@@ -106,6 +106,9 @@ O CapIAu-Talho suporta trilhas de áudio independentes (`A1`, `A2`...) vinculada
   * Para desvincular o par de áudio e vídeo e fazer edições independentes (por exemplo, estender o áudio de uma fala sobre a cena do B-roll seguinte, ou fazer o áudio do B-roll entrar 1s antes do corte do vídeo), selecione o clipe e pressione a tecla **`U`** (Desvincular).
   * Após desvincular, você pode mover ou ajustar as bordas (*trim*) de cada faixa de forma independente na timeline.
   * O player do programa interpretará a sobreposição, reproduzindo o vídeo de uma faixa e o áudio da outra simultaneamente em tempo real.
+* **Dividir Clipe (Split - Tecla `Z`):**
+  * Selecione qualquer clipe na timeline e pressione a tecla **`Z`** para cortá-lo ao meio exatamente na posição da agulha (playhead).
+  * Se o clipe de vídeo possuir um clipe de áudio vinculado (`link_id`), o corte é aplicado a ambos os clipes de forma sincronizada, mantendo as metades resultantes vinculadas individualmente.
 
 ---
 
