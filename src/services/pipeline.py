@@ -284,6 +284,14 @@ class PipelineService:
         cria entidades novas a partir de palpites do modelo de visão.
         """
         try:
+            cursor = conn.cursor()
+            
+            # Limpa menções anteriores do tipo 'vision_auto' para esta mídia específica
+            if photo_id is not None:
+                cursor.execute("DELETE FROM entity_mention WHERE photo_id = ? AND source = 'vision_auto'", (photo_id,))
+            elif video_id is not None and timestamp is not None:
+                cursor.execute("DELETE FROM entity_mention WHERE video_id = ? AND ABS(timestamp - ?) <= 0.1 AND source = 'vision_auto'", (video_id, timestamp))
+
             known_map = {e["name"].strip().lower(): e for e in (known_entities or [])}
             if not known_map:
                 return
@@ -353,20 +361,25 @@ class PipelineService:
                 except Exception as fe:
                     print(f"[Vision] Falha facial no frame {timestamp}s: {fe}")
 
-                # Pessoas confirmadas por rosto neste frame (rotulagens anteriores propagadas por cluster)
+                # Pessoas confirmadas por rosto neste frame
                 detected_people = []
                 try:
                     with get_db() as conn:
                         cursor = conn.cursor()
                         cursor.execute("""
-                            SELECT DISTINCT name FROM face
-                            WHERE video_id = ? AND ABS(timestamp - ?) <= 5.0
+                            SELECT name, bounding_box FROM face
+                            WHERE video_id = ? AND ABS(timestamp - ?) <= 0.5
                               AND name IS NOT NULL AND name != ''
                               AND name NOT IN ('Não Relevante', 'Não é Rosto')
                         """, (video_id, timestamp))
-                        detected_people = [r["name"] for r in cursor.fetchall()]
-                except Exception:
-                    pass
+                        for r in cursor.fetchall():
+                            try:
+                                bbox = json.loads(r["bounding_box"]) if r["bounding_box"] else None
+                            except Exception:
+                                bbox = None
+                            detected_people.append({"name": r["name"], "bbox": bbox})
+                except Exception as e:
+                    print(f"[Vision] Falha ao recuperar faces para o vídeo: {e}")
 
                 # Base64 encoding
                 import base64
@@ -475,11 +488,16 @@ class PipelineService:
                     pass
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT DISTINCT name FROM face
+                    SELECT name, bounding_box FROM face
                     WHERE photo_id = ? AND name IS NOT NULL AND name != ''
                       AND name NOT IN ('Não Relevante', 'Não é Rosto')
                 """, (photo_id,))
-                detected_people = [r["name"] for r in cursor.fetchall()]
+                for r in cursor.fetchall():
+                    try:
+                        bbox = json.loads(r["bounding_box"]) if r["bounding_box"] else None
+                    except Exception:
+                        bbox = None
+                    detected_people.append({"name": r["name"], "bbox": bbox})
 
             vision_prompt = get_vision_prompt(known_entities, detected_people)
             analysis = PipelineService.call_openrouter_vision(base64_img, ext, prompt=vision_prompt)

@@ -1092,12 +1092,27 @@ export class LibraryManager {
         const photo = list[currentIdx];
         if (!photo) return;
         
+        if (!this.btnAnalyzePhoto) return;
+        const originalHTML = this.btnAnalyzePhoto.innerHTML;
+        
         try {
-            await CapIAuAPI.analyzePhotoVision(photo.id);
-            alert("Análise visual da foto de set iniciada em background!");
-            STATE.emit("statusChanged", { text: `Análise da foto ${photo.filename} iniciada.`, active: true });
+            this.btnAnalyzePhoto.disabled = true;
+            this.btnAnalyzePhoto.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analisando...';
+            
+            const res = await CapIAuAPI.analyzePhotoVision(photo.id);
+            if (res && res.status === "success" && res.photo) {
+                list[currentIdx] = res.photo;
+                this.openLightbox(res.photo);
+                STATE.emit("photosUpdated", list);
+                STATE.emit("statusChanged", { text: `Foto ${photo.filename} analisada com sucesso!`, active: false });
+            } else {
+                alert("Erro ao processar análise da foto.");
+            }
         } catch (err) {
             alert("Erro ao iniciar análise: " + err.message);
+        } finally {
+            this.btnAnalyzePhoto.disabled = false;
+            this.btnAnalyzePhoto.innerHTML = originalHTML;
         }
     }
 

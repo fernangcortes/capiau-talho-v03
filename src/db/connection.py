@@ -11,8 +11,9 @@ def get_db(db_path: Optional[Path] = None) -> Generator[sqlite3.Connection, None
     if db_path is None:
         db_path = CONFIG.DB_PATH
     
-    conn = sqlite3.connect(db_path, check_same_thread=False)
+    conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30.0)
     conn.execute("PRAGMA foreign_keys = ON")  # Garante deleção em cascata física
+    conn.execute("PRAGMA journal_mode = WAL")  # Habilita Write-Ahead Logging para concorrência
     conn.row_factory = sqlite3.Row            # Permite indexar colunas por nome
     try:
         yield conn

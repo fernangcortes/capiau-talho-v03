@@ -114,6 +114,58 @@ class ManualFaceCreate(BaseModel):
 
 # ── Helpers ──
 
+def _clear_old_name_mentions(conn: sqlite3.Connection, project_id: int, face_ids: List[int], new_name: Optional[str]) -> None:
+    """Remove as menções das entidades antigas de rostos que mudaram de nome,
+    se não restar nenhum outro rosto com o mesmo nome na respectiva foto/frame de vídeo.
+    """
+    if not face_ids or not project_id:
+        return
+    cursor = conn.cursor()
+    # 1. Obter informações de cada face antes de atualizar
+    qmarks = ",".join("?" * len(face_ids))
+    cursor.execute(f"SELECT id, name, photo_id, video_id, timestamp FROM face WHERE id IN ({qmarks})", face_ids)
+    face_rows = [dict(r) for r in cursor.fetchall()]
+    
+    for r in face_rows:
+        fid = r["id"]
+        old_name = r["name"]
+        
+        # Se não tinha nome antigo, ou se o nome antigo é igual ao novo nome (normalizado), não faz nada
+        if not old_name or (new_name and old_name.strip().lower() == new_name.strip().lower()):
+            continue
+            
+        # Obter o id da entidade correspondente ao nome antigo na tabela entity
+        cursor.execute("SELECT id FROM entity WHERE project_id = ? AND name = ? COLLATE NOCASE", (project_id, old_name))
+        ent_row = cursor.fetchone()
+        if not ent_row:
+            continue
+            
+        entity_id = ent_row["id"]
+        photo_id = r["photo_id"]
+        video_id = r["video_id"]
+        timestamp = r["timestamp"]
+        
+        # Verificar se restou alguma OUTRA face na mesma foto/frame com esse mesmo nome antigo
+        if photo_id is not None:
+            cursor.execute("SELECT id FROM face WHERE photo_id = ? AND name = ? AND id != ?", (photo_id, old_name, fid))
+        else:
+            cursor.execute("SELECT id FROM face WHERE video_id = ? AND ABS(timestamp - ?) <= 0.1 AND name = ? AND id != ?", (video_id, timestamp, old_name, fid))
+            
+        other_face = cursor.fetchone()
+        if not other_face:
+            # Deleta a menção da entidade antiga pois não há mais rostos com ela nessa mídia/frame
+            if photo_id is not None:
+                cursor.execute("""
+                    DELETE FROM entity_mention 
+                    WHERE entity_id = ? AND project_id = ? AND photo_id = ?
+                """, (entity_id, project_id, photo_id))
+            else:
+                cursor.execute("""
+                    DELETE FROM entity_mention 
+                    WHERE entity_id = ? AND project_id = ? AND video_id = ? AND ABS(timestamp - ?) <= 0.1
+                """, (entity_id, project_id, video_id, timestamp))
+
+
 def _register_person_entity_mentions(project_id: int, name: str, face_ids: List[int]) -> None:
     """Registra a pessoa na camada de entidades + uma menção por face rotulada."""
     try:
@@ -571,6 +623,15 @@ async def get_project_people(project_id: int):
 async def merge_project_clusters(project_id: int, request: MergeClustersRequest):
     """Mescla dois clusters em um unico."""
     service = get_face_service()
+    
+    # Limpar menções antigas das faces do cluster de origem antes de mesclar/renomear
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM face WHERE project_id = ? AND cluster_id = ?", (project_id, request.src_cluster_id))
+        src_face_ids = [r["id"] for r in cursor.fetchall()]
+        _clear_old_name_mentions(conn, project_id, src_face_ids, request.name)
+        conn.commit()
+
     service.merge_clusters(project_id, request.src_cluster_id, request.dest_cluster_id, request.name)
     with get_db() as conn:
         cursor = conn.cursor()
@@ -598,6 +659,9 @@ async def reassign_project_faces(project_id: int, request: ReassignFacesRequest)
     # Se target_cluster_id nao for informado ou for negativo/invalido, tenta descobrir ou criar novo
     with get_db() as conn:
         cursor = conn.cursor()
+        
+        # Limpar menções antigas das faces antes de aplicar novo nome/reassociar
+        _clear_old_name_mentions(conn, project_id, request.face_ids, target_name)
         
         # Se tem nome, verificar se ja existe um cluster_id associado a esse nome
         if target_name:
@@ -702,9 +766,9 @@ async def list_unlabeled_faces(project_id: int):
                 FROM face f
                 LEFT JOIN photo p ON f.photo_id = p.id
                 LEFT JOIN video v ON f.video_id = v.id
-                WHERE f.project_id = ? AND (f.name IS NULL OR f.name LIKE 'Pessoa Desconhecida%')
+                WHERE f.project_id = ? AND (f.name IS NULL OR TRIM(f.name) = '' OR f.name LIKE 'Pessoa Desconhecida%')
                 ORDER BY f.cluster_id DESC, f.id DESC
-                LIMIT 100
+                LIMIT 1000
             """, (project_id,))
             rows = cursor.fetchall()
             
@@ -825,6 +889,9 @@ async def dissociate_project_faces(project_id: int, request: DissociateFacesRequ
         with get_db() as conn:
             cursor = conn.cursor()
             
+            # Limpar as menções antigas antes de desassociar
+            _clear_old_name_mentions(conn, project_id, request.face_ids, None)
+            
             for fid in request.face_ids:
                 # 1. Recuperar info da face
                 cursor.execute("SELECT name, photo_id, video_id, timestamp, cluster_id FROM face WHERE id = ?", (fid,))
@@ -832,7 +899,6 @@ async def dissociate_project_faces(project_id: int, request: DissociateFacesRequ
                 if not face_row:
                     continue
                 
-                old_name = face_row["name"]
                 cluster_id = face_row["cluster_id"]
                 
                 # 2. Desconfirmar/supersede reconhecimento manual do usuário
@@ -845,34 +911,6 @@ async def dissociate_project_faces(project_id: int, request: DissociateFacesRequ
                     placeholder_name = None
                 
                 cursor.execute("UPDATE face SET name = ? WHERE id = ?", (placeholder_name, fid))
-                
-                # 4. Limpar entidade correspondente nas menções se não houver mais faces dessa pessoa na mídia
-                if old_name:
-                    cursor.execute("SELECT id FROM person WHERE project_id = ? AND name = ?", (project_id, old_name))
-                    person_row = cursor.fetchone()
-                    if person_row:
-                        person_id = person_row["id"]
-                        photo_id = face_row["photo_id"]
-                        video_id = face_row["video_id"]
-                        timestamp = face_row["timestamp"]
-                        
-                        if photo_id is not None:
-                            cursor.execute("SELECT id FROM face WHERE photo_id = ? AND name = ? AND id != ?", (photo_id, old_name, fid))
-                        else:
-                            cursor.execute("SELECT id FROM face WHERE video_id = ? AND ABS(timestamp - ?) <= 0.1 AND name = ? AND id != ?", (video_id, timestamp, old_name, fid))
-                            
-                        other_face = cursor.fetchone()
-                        if not other_face:
-                            if photo_id is not None:
-                                cursor.execute("""
-                                    DELETE FROM entity_mention 
-                                    WHERE entity_id = ? AND project_id = ? AND photo_id = ?
-                                """, (person_id, project_id, photo_id))
-                            else:
-                                cursor.execute("""
-                                    DELETE FROM entity_mention 
-                                    WHERE entity_id = ? AND project_id = ? AND video_id = ? AND ABS(timestamp - ?) <= 0.1
-                                """, (person_id, project_id, video_id, timestamp))
             
             conn.commit()
             
@@ -945,6 +983,10 @@ async def label_face(face_id: int, payload: LabelFaceRequest):
             cursor = conn.cursor()
             cursor.execute("SELECT id FROM face WHERE project_id = ? AND cluster_id = ?", (project_id, current_cluster_id))
             face_ids = [r["id"] for r in cursor.fetchall()]
+            
+            # Limpar menções antigas das faces do grupo que mudarão de nome
+            _clear_old_name_mentions(conn, project_id, face_ids, new_name)
+            conn.commit()
 
         for fid in face_ids:
             service.confirm_face_identity(fid, person_id)
@@ -960,6 +1002,11 @@ async def label_face(face_id: int, payload: LabelFaceRequest):
 
         return {"status": "success", "message": f"Todas as faces do Grupo {current_cluster_id + 1} foram rotuladas como '{new_name}'."}
     else:
+        with get_db() as conn:
+            # Limpar menção antiga da face individual
+            _clear_old_name_mentions(conn, project_id, [face_id], new_name)
+            conn.commit()
+
         service.confirm_face_identity(face_id, person_id)
         with get_db() as conn:
             cursor = conn.cursor()
@@ -1142,9 +1189,15 @@ async def reject_face(face_id: int, payload: Optional[RejectFaceRequest] = None)
 
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM face WHERE id = ?", (face_id,))
-        if not cursor.fetchone():
+        cursor.execute("SELECT id, project_id FROM face WHERE id = ?", (face_id,))
+        face_row_init = cursor.fetchone()
+        if not face_row_init:
             raise HTTPException(status_code=404, detail="Face nao encontrada")
+        
+        project_id = face_row_init["project_id"]
+        
+        # Limpar menções antigas da face
+        _clear_old_name_mentions(conn, project_id, [face_id], target_name)
         
         # Marcar reconhecimentos anteriores como 'superseded'
         cursor.execute("UPDATE face_recognition SET status = 'superseded' WHERE face_id = ?", (face_id,))

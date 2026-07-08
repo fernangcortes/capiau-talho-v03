@@ -11,18 +11,29 @@ def get_vision_prompt(known_entities: list = None, detected_people: list = None)
     """Gera o prompt de visão estruturado, injetando entidades conhecidas do projeto.
 
     known_entities: lista de dicts {name, entity_type} já catalogados no projeto.
-    detected_people: nomes de pessoas reconhecidas facialmente NESTE frame específico.
+    detected_people: lista de dicts {"name": name, "bbox": [x, y, w, h]} de pessoas confirmadas por rosto neste frame.
     """
     context_block = ""
     if known_entities:
-        people = [e["name"] for e in known_entities if e.get("entity_type") == "person"]
+        # Não injetamos a lista geral de todas as pessoas do projeto para evitar que a IA de visão alucine nomes.
+        # As pessoas são identificadas de forma confiável pelo reconhecimento facial/reassociação.
         objects = [e["name"] for e in known_entities if e.get("entity_type") in ("object", "location", "other")]
-        if people:
-            context_block += f"\nPESSOAS CONHECIDAS NESTE PROJETO: {', '.join(people[:40])}."
         if objects:
             context_block += f"\nOBJETOS/EQUIPAMENTOS/LOCAIS CONHECIDOS: {', '.join(objects[:40])}."
+    
     if detected_people:
-        context_block += f"\nRECONHECIMENTO FACIAL CONFIRMOU NESTE FRAME: {', '.join(detected_people)}. Use esses nomes na descrição em vez de termos genéricos como 'um homem' ou 'uma pessoa'."
+        lines = []
+        for p in detected_people:
+            name = p["name"]
+            bbox = p["bbox"]
+            if bbox:
+                # O formato é [x_min, y_min, largura, altura] em coordenadas normalizadas [0.0, 1.0]
+                lines.append(f"- '{name}': rosto localizado em [x_min={bbox[0]:.4f}, y_min={bbox[1]:.4f}, largura={bbox[2]:.4f}, altura={bbox[3]:.4f}]")
+            else:
+                lines.append(f"- '{name}': presente na cena")
+        
+        context_block += "\nRECONHECIMENTO FACIAL E LOCALIZAÇÃO DE ROSTOS CONFIRMADOS NESTA IMAGEM:\n" + "\n".join(lines)
+        context_block += "\nIMPORTANTE: Use os nomes próprios acima para descrever a pessoa localizada em cada coordenada correspondente. Por exemplo, se a face de 'Fernando' está localizada em x_min=0.23, e a pessoa com essa face está segurando um objeto, descreva Fernando segurando o objeto. Isso evita confundir as ações de cada pessoa na cena."
 
     if context_block:
         context_block = (

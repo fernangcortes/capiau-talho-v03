@@ -92,7 +92,8 @@ def enrich_video_frames(project_id: int, video_id: int, only_timestamps: Optiona
     if not points:
         return 0
 
-    updated = 0
+    # 1. Coleta todas as informações necessárias do SQLite de forma rápida
+    tasks = []
     with get_db() as conn:
         for point in points:
             payload = point.payload or {}
@@ -116,19 +117,38 @@ def enrich_video_frames(project_id: int, video_id: int, only_timestamps: Optiona
             if payload.get("enrich_key") == key:
                 continue  # já enriquecido com este mesmo conjunto de entidades
 
-            enriched = _rewrite_with_fallback(raw_text, entities, replacements)
-            if not enriched or enriched == payload.get("text"):
-                continue
+            tasks.append({
+                "point": point,
+                "payload": payload,
+                "raw_text": raw_text,
+                "entities": entities,
+                "replacements": replacements,
+                "key": key
+            })
 
-            new_payload = dict(payload)
-            new_payload["enrich_key"] = key
-            new_payload["entity_names"] = [e["name"] for e in entities]
-            try:
-                search_engine.update_point_text(point.id, new_payload, enriched)
-                updated += 1
-                print(f"[ENRICH] Vídeo {video_id} @ {ts:.0f}s: \"{enriched[:80]}\"")
-            except Exception as e:
-                print(f"[ENRICH] Falha ao reindexar frame {ts}s do vídeo {video_id}: {e}")
+    # 2. Executa as chamadas HTTP (OpenRouter) e indexação (Qdrant) fora de transações do SQLite
+    updated = 0
+    for task in tasks:
+        raw_text = task["raw_text"]
+        entities = task["entities"]
+        replacements = task["replacements"]
+        point = task["point"]
+        payload = task["payload"]
+        key = task["key"]
+
+        enriched = _rewrite_with_fallback(raw_text, entities, replacements)
+        if not enriched or enriched == payload.get("text"):
+            continue
+
+        new_payload = dict(payload)
+        new_payload["enrich_key"] = key
+        new_payload["entity_names"] = [e["name"] for e in entities]
+        try:
+            search_engine.update_point_text(point.id, new_payload, enriched)
+            updated += 1
+            print(f"[ENRICH] Vídeo {video_id} @ {payload.get('start_time', 0.0):.0f}s: \"{enriched[:80]}\"")
+        except Exception as e:
+            print(f"[ENRICH] Falha ao reindexar frame {payload.get('start_time', 0.0)}s do vídeo {video_id}: {e}")
 
     return updated
 
@@ -137,6 +157,7 @@ def enrich_photo(project_id: int, photo_id: int) -> bool:
     """Enriquece a descrição de uma foto de set, persiste no SQLite e reindexa no Qdrant."""
     from src.search.semantic import SemanticSearch
 
+    # 1. Ler dados do banco de forma rápida e fechar a conexão
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT description, raw_description, tags FROM photo WHERE id = ?", (photo_id,))
@@ -153,19 +174,24 @@ def enrich_photo(project_id: int, photo_id: int) -> bool:
         replacements = data["replacements"]
         if not entities and not replacements:
             return False
+        
+        tags_raw = row["tags"]
 
-        enriched = _rewrite_with_fallback(raw, entities, replacements)
-        if not enriched:
-            return False
+    # 2. Executar reescrita LLM (chamada HTTP) fora da transação do banco
+    enriched = _rewrite_with_fallback(raw, entities, replacements)
+    if not enriched:
+        return False
 
-        # Persiste: descrição oficial = enriquecida; original preservada em raw_description
+    # 3. Persiste no SQLite em uma nova transação curta
+    with get_db() as conn:
+        cursor = conn.cursor()
         cursor.execute(
             "UPDATE photo SET description = ?, raw_description = ? WHERE id = ?",
             (enriched, raw, photo_id)
         )
         conn.commit()
 
-    # Reindexa no Qdrant mantendo o mesmo ID de ponto
+    # 4. Reindexa no Qdrant mantendo o mesmo ID de ponto
     try:
         search_engine = SemanticSearch.get_instance()
         point = search_engine.get_photo_point(project_id, photo_id)
@@ -178,7 +204,7 @@ def enrich_photo(project_id: int, photo_id: int) -> bool:
         else:
             tags = []
             try:
-                tags = json.loads(row["tags"]) if row["tags"] else []
+                tags = json.loads(tags_raw) if tags_raw else []
             except Exception:
                 pass
             search_engine.index_photo_description(project_id, photo_id, enriched, tags)

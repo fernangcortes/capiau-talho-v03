@@ -131,6 +131,10 @@
 
 - [x] **Fase 1 Expansão: Schema DB, Documentos de Contexto e Visão VLM**
   - [x] Atualizar o SQLite schema em `schema.py` com as novas tabelas (`production_doc`, `face`) e colunas de vídeo (`description`, `summary`, `tags`).
+  - [x] [x] **1. Backend (FastAPI & FFmpeg)**
+  - [x] Garantir diretório `data/proxies/thumbnails` in `src/config.py`
+  - [x] Implementar rota `GET /api/video/{video_id}/thumbnail` para extração e retorno da miniatura padrão (10% do tempo)
+  - [x] Implementar rota `POST /api/video/{video_id}/thumbnail` para extração da miniatura em timestamp específico (atualização) de metadados em `operations.py`.
   - [x] Implementar migrações dinâmicas seguras no startup (`init_db`) para adicionar novas colunas sem perda de dados.
   - [x] Implementar operações de banco para documentos e atualização de metadados em `operations.py`.
   - [x] Desenvolver parser de documentos Fountain, FDX, TXT e PDF no backend em `server.py` e indexação vetorial no Qdrant em `semantic.py`.

@@ -335,6 +335,41 @@ def init_db(db_path: Path = None):
 
         conn.commit()
         
+        # Limpeza automática de menções órfãs/stale de rostos que foram renomeados/mesclados no passado
+        try:
+            cursor.execute("""
+                DELETE FROM entity_mention
+                WHERE source IN ('face_recognition', 'human_audit')
+                  AND (
+                    -- Para fotos: não existe nenhuma face na mesma foto com o mesmo nome da entidade
+                    (photo_id IS NOT NULL AND NOT EXISTS (
+                        SELECT 1 FROM face f
+                        JOIN entity e ON e.id = entity_mention.entity_id
+                        WHERE f.photo_id = entity_mention.photo_id
+                          AND f.name IS NOT NULL
+                          AND f.name != ''
+                          AND f.name = e.name COLLATE NOCASE
+                    ))
+                    OR
+                    -- Para vídeos: não existe nenhuma face no mesmo vídeo e timestamp aproximado com o mesmo nome da entidade
+                    (video_id IS NOT NULL AND NOT EXISTS (
+                        SELECT 1 FROM face f
+                        JOIN entity e ON e.id = entity_mention.entity_id
+                        WHERE f.video_id = entity_mention.video_id
+                          AND ABS(f.timestamp - entity_mention.timestamp) <= 0.1
+                          AND f.name IS NOT NULL
+                          AND f.name != ''
+                          AND f.name = e.name COLLATE NOCASE
+                    ))
+                  )
+            """)
+            deleted_rows = cursor.rowcount
+            if deleted_rows > 0:
+                print(f"[MIGRATION] Limpeza do banco concluída: {deleted_rows} menções órfãs/stale de rostos foram removidas.")
+                conn.commit()
+        except Exception as cleanup_err:
+            print(f"[MIGRATION] Falha ao executar limpeza automática de menções: {cleanup_err}")
+        
         # Inserir projeto padrao se a tabela estiver vazia
         cursor.execute("SELECT COUNT(*) FROM project")
         if cursor.fetchone()[0] == 0:

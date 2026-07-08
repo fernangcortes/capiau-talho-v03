@@ -150,15 +150,32 @@ def trigger_vision_video(video_id: int, background_tasks: BackgroundTasks, conn:
     return {"status": "success", "message": "Decupagem visual do B-roll iniciada."}
 
 @router.post("/api/photo/{photo_id}/analyze-vision")
-def trigger_vision_photo(photo_id: int, background_tasks: BackgroundTasks, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Inicia a análise visual e tags por IA da foto bastidores."""
+def trigger_vision_photo(photo_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Inicia a análise visual e tags por IA da foto bastidores de forma síncrona."""
     photo = MediaRepository.get_photo(conn, photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Foto não encontrada.")
     filepath = Path(photo['filepath'])
     
-    background_tasks.add_task(PipelineService.analyze_photo_vision, photo_id, filepath)
-    return {"status": "success", "message": "Análise visual da foto de set iniciada."}
+    success = PipelineService.analyze_photo_vision(photo_id, filepath)
+    if not success:
+        raise HTTPException(status_code=500, detail="Erro durante a análise de visão da foto.")
+        
+    # Recarrega a foto pós-análise
+    updated = MediaRepository.get_photo(conn, photo_id)
+    if updated:
+        proxy_rel = f"photos/proxy_photo_{updated['id']}.webp"
+        if (CONFIG.PROXIES_DIR / proxy_rel).exists():
+            updated['proxy_path'] = f"/proxies/{proxy_rel}"
+        else:
+            updated['proxy_path'] = None
+            
+        try:
+            updated['tags'] = json.loads(updated['tags']) if updated.get('tags') else []
+        except Exception:
+            updated['tags'] = []
+            
+    return {"status": "success", "photo": updated}
 
 @router.post("/api/project/{project_id}/analyze-all-vision")
 def trigger_all_vision(
