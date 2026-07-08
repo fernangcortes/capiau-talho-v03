@@ -194,6 +194,97 @@ class FaceService:
         Usa os embeddings autoritativos (get_authoritative_recognition) para
         cada face, garantindo que o melhor reconhecimento prevaleca.
         """
+        # Cancelar qualquer tarefa de enriquecimento ativa para o projeto
+        from src.core.tasks import TASK_MANAGER
+        task_key = f"enrich-project-{project_id}"
+        TASK_MANAGER.cancelled_tasks.add(task_key)
+
+        # --- Autocura: Restaurar consistência de faces manualmente confirmadas ou rejeitadas ---
+        with get_db() as conn:
+            cursor = conn.cursor()
+            
+            # 1. Recuperar confirmações manuais no projeto, ordenadas para pegar a mais recente primeiro
+            cursor.execute("""
+                SELECT fr.face_id, fr.person_id, p.name as person_name, fr.id as rec_id
+                FROM face_recognition fr
+                JOIN person p ON fr.person_id = p.id
+                JOIN face f ON fr.face_id = f.id
+                WHERE f.project_id = ? AND fr.status = 'confirmed'
+                ORDER BY fr.face_id, fr.recognized_at DESC, fr.id DESC
+            """, (project_id,))
+            
+            rows = cursor.fetchall()
+            seen_faces = set()
+            for row in rows:
+                fid = row["face_id"]
+                rec_id = row["rec_id"]
+                p_name = row["person_name"]
+                
+                if fid in seen_faces:
+                    # Este é um duplicado mais antigo! Vamos desativá-lo para limpar o banco
+                    cursor.execute("UPDATE face_recognition SET status = 'superseded' WHERE id = ?", (rec_id,))
+                    continue
+                seen_faces.add(fid)
+                
+                # Achar o cluster_id desse nome no projeto
+                cursor.execute("""
+                    SELECT DISTINCT cluster_id FROM face
+                    WHERE project_id = ? AND name = ? AND cluster_id IS NOT NULL AND cluster_id >= 0
+                    LIMIT 1
+                """, (project_id, p_name))
+                c_row = cursor.fetchone()
+                
+                if c_row:
+                    actual_cluster_id = c_row["cluster_id"]
+                else:
+                    # Se não existir, gera um novo
+                    cursor.execute("SELECT MAX(cluster_id) as max_cid FROM face WHERE project_id = ? AND cluster_id IS NOT NULL", (project_id,))
+                    max_row = cursor.fetchone()
+                    max_cid = max_row["max_cid"] if max_row and max_row["max_cid"] is not None else -1
+                    actual_cluster_id = max_cid + 1
+                
+                # Restaurar no banco
+                cursor.execute("""
+                    UPDATE face
+                    SET name = ?, cluster_id = ?
+                    WHERE id = ?
+                """, (p_name, actual_cluster_id, fid))
+                
+            # 2. Recuperar rejeições manuais no projeto para restaurar cluster_id = -1
+            cursor.execute("""
+                SELECT fr.face_id, fr.id as rec_id
+                FROM face_recognition fr
+                JOIN face f ON fr.face_id = f.id
+                WHERE f.project_id = ? AND fr.status = 'rejected'
+                ORDER BY fr.face_id, fr.recognized_at DESC, fr.id DESC
+            """, (project_id,))
+            
+            rejected_rows = cursor.fetchall()
+            seen_rejected = set()
+            for row in rejected_rows:
+                fid = row["face_id"]
+                rec_id = row["rec_id"]
+                
+                if fid in seen_rejected or fid in seen_faces:
+                    # Registro duplicado ou anulado por uma confirmação posterior
+                    cursor.execute("UPDATE face_recognition SET status = 'superseded' WHERE id = ?", (rec_id,))
+                    continue
+                seen_rejected.add(fid)
+                
+                cursor.execute("SELECT name FROM face WHERE id = ?", (fid,))
+                f_row = cursor.fetchone()
+                current_name = f_row["name"] if f_row else None
+                if not current_name or current_name.startswith("Pessoa Desconhecida") or current_name == "":
+                    current_name = "Não Relevante"
+                
+                cursor.execute("""
+                    UPDATE face
+                    SET name = ?, cluster_id = -1
+                    WHERE id = ?
+                """, (current_name, fid))
+                
+            conn.commit()
+
         faces_data = self._get_faces_with_embeddings(project_id)
         
         if not faces_data:
@@ -221,27 +312,54 @@ class FaceService:
                 # Verificar se ja existe nome no cluster
                 cluster_name = self._get_cluster_suggested_name(conn, cluster_id, f_ids)
 
-                placeholders = ",".join("?" for _ in f_ids)
-                cursor.execute(f"""
-                    UPDATE face
-                    SET cluster_id = ?, name = COALESCE(name, ?)
-                    WHERE id IN ({placeholders})
-                """, [cluster_id, cluster_name] + f_ids)
+                # Se o cluster tem um nome real, tenta achar o cluster_id existente para esse nome no projeto
+                actual_cluster_id = cluster_id
+                if not cluster_name.startswith("Pessoa Desconhecida") and cluster_name not in ("Não Relevante", "Não é Rosto"):
+                    cursor.execute("""
+                        SELECT DISTINCT cluster_id FROM face
+                        WHERE project_id = ? AND name = ? AND cluster_id IS NOT NULL AND cluster_id >= 0
+                        LIMIT 1
+                    """, (project_id, cluster_name))
+                    row = cursor.fetchone()
+                    if row:
+                        actual_cluster_id = row["cluster_id"]
 
-                # Se o cluster tem um nome REAL, promove membros que ainda
-                # carregam placeholder ('Pessoa Desconhecida...') para o nome real
-                if not cluster_name.startswith("Pessoa Desconhecida"):
-                    cursor.execute(f"""
-                        UPDATE face
-                        SET name = ?
-                        WHERE id IN ({placeholders}) AND name LIKE 'Pessoa Desconhecida%'
-                    """, [cluster_name] + f_ids)
+                # Atualizar cada face individualmente, pulando as que têm confirmação manual
+                for f_id in f_ids:
+                    # Verificar se tem confirmação manual ativa
+                    cursor.execute("""
+                        SELECT 1 FROM face_recognition
+                        WHERE face_id = ? AND status = 'confirmed'
+                        LIMIT 1
+                    """, (f_id,))
+                    is_confirmed = cursor.fetchone() is not None
+                    
+                    if not is_confirmed:
+                        cursor.execute("""
+                            UPDATE face
+                            SET cluster_id = ?, name = COALESCE(name, ?)
+                            WHERE id = ?
+                        """, (actual_cluster_id, cluster_name, f_id))
+                        
+                        if not cluster_name.startswith("Pessoa Desconhecida") and cluster_name not in ("Não Relevante", "Não é Rosto"):
+                            cursor.execute("""
+                                UPDATE face
+                                SET name = ?
+                                WHERE id = ? AND name LIKE 'Pessoa Desconhecida%'
+                            """, (cluster_name, f_id))
             
             # Ruído: cluster_id = -1
             noise_ids = [face_ids[i] for i, l in enumerate(labels) if l == -1]
-            if noise_ids:
-                placeholders = ",".join("?" for _ in noise_ids)
-                cursor.execute(f"UPDATE face SET cluster_id = -1 WHERE id IN ({placeholders})", noise_ids)
+            for f_id in noise_ids:
+                # Verificar se tem confirmação manual ativa antes de marcar como ruído
+                cursor.execute("""
+                    SELECT 1 FROM face_recognition
+                    WHERE face_id = ? AND status = 'confirmed'
+                    LIMIT 1
+                """, (f_id,))
+                is_confirmed = cursor.fetchone() is not None
+                if not is_confirmed:
+                    cursor.execute("UPDATE face SET cluster_id = -1 WHERE id = ?", (f_id,))
             
             conn.commit()
         
@@ -270,7 +388,7 @@ class FaceService:
             cursor.execute("""
                 UPDATE face_recognition 
                 SET status = 'superseded'
-                WHERE face_id = ? AND status = 'auto'
+                WHERE face_id = ? AND status != 'superseded'
             """, (face_id,))
             
             # Inserir reconhecimento manual confirmado
@@ -484,6 +602,10 @@ class FaceService:
                 JOIN face_recognition fr ON f.id = fr.face_id
                 WHERE f.project_id = ? AND fr.embedding IS NOT NULL
                 AND fr.status NOT IN ('rejected', 'superseded')
+                AND NOT EXISTS (
+                    SELECT 1 FROM face_recognition fr2 
+                    WHERE fr2.face_id = f.id AND fr2.status IN ('confirmed', 'rejected')
+                )
                 ORDER BY fr.tier DESC, fr.recognized_at DESC
             """, (project_id,))
 
@@ -501,6 +623,10 @@ class FaceService:
                     SELECT id as face_id, embedding
                     FROM face
                     WHERE project_id = ? AND embedding IS NOT NULL
+                    AND NOT EXISTS (
+                        SELECT 1 FROM face_recognition fr2 
+                        WHERE fr2.face_id = face.id AND fr2.status IN ('confirmed', 'rejected')
+                    )
                 """, (project_id,))
                 for row in cursor.fetchall():
                     if row["face_id"] not in seen:

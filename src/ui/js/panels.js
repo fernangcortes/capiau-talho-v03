@@ -795,9 +795,16 @@ export class PanelsManager {
             const isFinished = t.status === "finished";
             const isFailed = t.status === "failed";
             
+            let taskTitle = `Mídia ID: ${key} (${t.type || 'proxy'})`;
+            if (t.type === 'enrich') {
+                taskTitle = `Sincronização de Descrições (Projeto)`;
+            } else if (key.startsWith('recover-faces-')) {
+                taskTitle = `Recuperação de Rostos (Projeto)`;
+            }
+            
             item.innerHTML = `
                 <div class="task-info">
-                    <span class="task-title">Mídia ID: ${key} (${t.type || 'proxy'})</span>
+                    <span class="task-title">${taskTitle}</span>
                     <span class="task-status status-${t.status}">${t.status.toUpperCase()}</span>
                 </div>
                 <div class="progress-bar-container">

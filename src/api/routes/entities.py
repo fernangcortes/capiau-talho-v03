@@ -87,20 +87,20 @@ def delete_entity(entity_id: int):
 @router.post("/project/{project_id}/enrich")
 def trigger_project_enrichment(
     project_id: int,
-    background_tasks: BackgroundTasks,
     video_id: Optional[int] = Query(None, description="Restringe o enriquecimento a um único vídeo"),
     photo_id: Optional[int] = Query(None, description="Restringe o enriquecimento a uma única foto")
 ):
     """Dispara o re-enriquecimento das descrições: reescreve com os nomes confirmados
     (LLM) e reindexa os embeddings no Qdrant. Sem parâmetros = projeto inteiro."""
+    from src.core.tasks import TASK_MANAGER
     if video_id is not None:
-        background_tasks.add_task(enrich_video_frames, project_id, video_id)
+        TASK_MANAGER.executor.submit(enrich_video_frames, project_id, video_id)
         scope = f"vídeo {video_id}"
     elif photo_id is not None:
-        background_tasks.add_task(enrich_photo, project_id, photo_id)
+        TASK_MANAGER.executor.submit(enrich_photo, project_id, photo_id)
         scope = f"foto {photo_id}"
     else:
-        background_tasks.add_task(enrich_project, project_id)
+        TASK_MANAGER.executor.submit(enrich_project, project_id)
         scope = "projeto inteiro"
     return {
         "status": "success",

@@ -257,22 +257,50 @@ def enrich_after_face_labeling(project_id: int, face_ids: Optional[List[int]] = 
 
 def enrich_project(project_id: int) -> Dict[str, int]:
     """Re-enriquecimento completo do projeto (todas as fotos e vídeos com entidades)."""
+    from src.core.tasks import TASK_MANAGER
+    task_key = f"enrich-project-{project_id}"
+    TASK_MANAGER.update_progress(task_key, 0.0, "running", task_type="enrich")
+
     photos_done = 0
     frames_done = 0
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM photo WHERE project_id = ?", (project_id,))
-        photo_ids = [r["id"] for r in cursor.fetchall()]
-        cursor.execute("SELECT id FROM video WHERE project_id = ?", (project_id,))
-        video_ids = [r["id"] for r in cursor.fetchall()]
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM photo WHERE project_id = ?", (project_id,))
+            photo_ids = [r["id"] for r in cursor.fetchall()]
+            cursor.execute("SELECT id FROM video WHERE project_id = ?", (project_id,))
+            video_ids = [r["id"] for r in cursor.fetchall()]
 
-    for pid in photo_ids:
-        if enrich_photo(project_id, pid):
-            photos_done += 1
-    for vid in video_ids:
-        frames_done += enrich_video_frames(project_id, vid)
+        total_items = len(photo_ids) + len(video_ids)
+        processed = 0
 
-    print(f"[ENRICH] Projeto {project_id}: {photos_done} fotos e {frames_done} frames enriquecidos.")
+        for pid in photo_ids:
+            if task_key in getattr(TASK_MANAGER, "cancelled_tasks", set()):
+                print(f"[ENRICH] Cancelamento detectado para a tarefa {task_key}.")
+                TASK_MANAGER.update_progress(task_key, percent if 'percent' in locals() else 0.0, "failed", task_type="enrich")
+                return {"photos": photos_done, "frames": frames_done}
+            if enrich_photo(project_id, pid):
+                photos_done += 1
+            processed += 1
+            percent = round((processed / max(total_items, 1)) * 100.0, 1)
+            TASK_MANAGER.update_progress(task_key, percent, "running", task_type="enrich")
+
+        for vid in video_ids:
+            if task_key in getattr(TASK_MANAGER, "cancelled_tasks", set()):
+                print(f"[ENRICH] Cancelamento detectado para a tarefa {task_key}.")
+                TASK_MANAGER.update_progress(task_key, percent if 'percent' in locals() else 0.0, "failed", task_type="enrich")
+                return {"photos": photos_done, "frames": frames_done}
+            frames_done += enrich_video_frames(project_id, vid)
+            processed += 1
+            percent = round((processed / max(total_items, 1)) * 100.0, 1)
+            TASK_MANAGER.update_progress(task_key, percent, "running", task_type="enrich")
+
+        TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="enrich")
+        print(f"[ENRICH] Projeto {project_id}: {photos_done} fotos e {frames_done} frames enriquecidos.")
+    except Exception as e:
+        print(f"[ENRICH] Erro no enriquecimento do projeto {project_id}: {e}")
+        TASK_MANAGER.update_progress(task_key, 0.0, "failed", task_type="enrich")
+
     return {"photos": photos_done, "frames": frames_done}
 
 

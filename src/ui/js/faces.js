@@ -8,6 +8,54 @@ export class FaceManager {
             btnCluster.addEventListener("click", () => this.triggerClustering());
         }
 
+        // Setup clustering settings toggle
+        const toggle = document.getElementById("clustering-settings-toggle");
+        const panel = document.getElementById("clustering-settings-panel");
+        if (toggle && panel) {
+            toggle.addEventListener("click", () => {
+                const isOpen = panel.style.display === "flex";
+                panel.style.display = isOpen ? "none" : "flex";
+                const icon = toggle.querySelector(".toggle-icon");
+                if (icon) {
+                    icon.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+                }
+            });
+        }
+
+        // Setup slider value listener
+        const epsInput = document.getElementById("input-clustering-eps");
+        const epsVal = document.getElementById("val-clustering-eps");
+        if (epsInput && epsVal) {
+            epsInput.addEventListener("input", () => {
+                epsVal.textContent = epsInput.value;
+            });
+        }
+
+        const btnSyncEnrich = document.getElementById("btn-sync-enrich");
+        if (btnSyncEnrich) {
+            btnSyncEnrich.addEventListener("click", () => this.triggerManualEnrichment());
+        }
+
+        // Keyboard fast typing search
+        document.addEventListener("keydown", (e) => {
+            const modal = document.getElementById("fullscreen-faces-disambiguation");
+            if (!modal || modal.style.display === "none") return;
+            
+            // Ignore if typing in an input/textarea
+            if (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA") return;
+            
+            const selected = document.querySelectorAll(".fullscreen-face-card.selected");
+            if (selected.length > 0 && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                const bulkInput = document.getElementById("bulk-face-input");
+                if (bulkInput) {
+                    bulkInput.focus();
+                    bulkInput.value = e.key;
+                    e.preventDefault(); // prevent double insertion of key
+                    bulkInput.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+        });
+
         const btnFullscreen = document.getElementById("btn-fullscreen-faces");
         if (btnFullscreen) {
             btnFullscreen.addEventListener("click", () => this.openFullscreenDisambiguation());
@@ -89,12 +137,18 @@ export class FaceManager {
         const btnCluster = document.getElementById("btn-cluster-faces");
         if (!btnCluster) return;
 
+        const epsInput = document.getElementById("input-clustering-eps");
+        const minSamplesInput = document.getElementById("input-clustering-min-samples");
+
+        const eps = epsInput ? parseFloat(epsInput.value) : 0.38;
+        const minSamples = minSamplesInput ? parseInt(minSamplesInput.value) : 3;
+
         const originalText = btnCluster.innerHTML;
         btnCluster.disabled = true;
         btnCluster.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Agrupando...';
 
         try {
-            const res = await CapIAuAPI.clusterFaces(STATE.currentProjectId);
+            const res = await CapIAuAPI.clusterFaces(STATE.currentProjectId, eps, minSamples);
             console.log("[FaceManager] Clustering result:", res);
             alert(`Clustering concluído com sucesso!\nFaces total: ${res.total_faces}\nAgrupadas: ${res.clustered_faces}\nNovos grupos: ${res.clusters_created}\nRuídos: ${res.noise_faces}`);
             await this.loadFaceClusters();
@@ -104,6 +158,33 @@ export class FaceManager {
         } finally {
             btnCluster.disabled = false;
             btnCluster.innerHTML = originalText;
+        }
+    }
+
+    static async triggerManualEnrichment() {
+        const btnSync = document.getElementById("btn-sync-enrich");
+        if (!btnSync) return;
+
+        const projectId = STATE.currentProjectId;
+        if (!projectId) {
+            alert("Selecione um projeto ativo primeiro.");
+            return;
+        }
+
+        const originalText = btnSync.innerHTML;
+        btnSync.disabled = true;
+        btnSync.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando...';
+
+        try {
+            const res = await CapIAuAPI.enrichProject(projectId);
+            console.log("[FaceManager] Manual enrichment triggered:", res);
+            alert("Sincronização iniciada com sucesso! Você pode acompanhar o progresso das descrições na aba 'Tarefas'.");
+        } catch (e) {
+            console.error("[FaceManager] Error triggering manual enrichment:", e);
+            alert("Erro ao disparar a sincronização.");
+        } finally {
+            btnSync.disabled = false;
+            btnSync.innerHTML = originalText;
         }
     }
 
@@ -410,8 +491,33 @@ export class FaceManager {
     static renderFullscreenFaces(faces) {
         const grid = document.getElementById("fullscreen-faces-grid");
         if (!grid) return;
-        
-        if (!faces || faces.length === 0) {
+
+        // Remove old load-more container if present
+        const oldLoadMore = document.getElementById("fullscreen-load-more-container");
+        if (oldLoadMore) oldLoadMore.remove();
+
+        this.unlabeledFaces = faces || [];
+        this.currentPage = 0;
+        this.pageSize = 60;
+        this.lastClickedFaceId = null; // Track for Shift+Click selection
+
+        grid.innerHTML = "";
+        this.renderNextPage();
+    }
+
+    static renderNextPage() {
+        const grid = document.getElementById("fullscreen-faces-grid");
+        if (!grid) return;
+
+        // Remove old load-more button if it exists
+        const oldLoadMore = document.getElementById("fullscreen-load-more-container");
+        if (oldLoadMore) oldLoadMore.remove();
+
+        const startIdx = this.currentPage * this.pageSize;
+        const endIdx = startIdx + this.pageSize;
+        const pageFaces = this.unlabeledFaces.slice(startIdx, endIdx);
+
+        if (pageFaces.length === 0 && this.currentPage === 0) {
             grid.innerHTML = `
                 <div style="grid-column: 1/-1; text-align: center; padding: 60px; color: var(--text-muted);">
                     <i class="fa-solid fa-circle-check fa-4x" style="color: var(--color-emerald); margin-bottom: 20px;"></i>
@@ -422,8 +528,7 @@ export class FaceManager {
             return;
         }
 
-        grid.innerHTML = "";
-        faces.forEach(face => {
+        pageFaces.forEach(face => {
             const card = document.createElement("div");
             card.className = "fullscreen-face-card";
             card.dataset.faceId = face.id;
@@ -477,8 +582,12 @@ export class FaceManager {
                         card.classList.add("fade-out");
                         setTimeout(() => {
                             card.remove();
-                            if (grid.children.length === 0) {
-                                this.renderFullscreenFaces([]);
+                            if (grid.querySelectorAll(".fullscreen-face-card").length === 0) {
+                                if (this.currentPage * this.pageSize < this.unlabeledFaces.length) {
+                                    this.renderNextPage();
+                                } else {
+                                    this.renderFullscreenFaces([]);
+                                }
                             }
                         }, 300);
                         this.loadFaceClusters();
@@ -519,12 +628,15 @@ export class FaceManager {
                             const modal = document.getElementById("face-disambiguation-modal");
                             if (modal && modal.style.display === "none") {
                                 clearInterval(checkClose);
-                                // If successfully resolved, let's remove card from fullscreen view
                                 card.classList.add("fade-out");
                                 setTimeout(() => {
                                     card.remove();
-                                    if (grid.children.length === 0) {
-                                        this.renderFullscreenFaces([]);
+                                    if (grid.querySelectorAll(".fullscreen-face-card").length === 0) {
+                                        if (this.currentPage * this.pageSize < this.unlabeledFaces.length) {
+                                            this.renderNextPage();
+                                        } else {
+                                            this.renderFullscreenFaces([]);
+                                        }
                                     }
                                 }, 300);
                             }
@@ -534,8 +646,12 @@ export class FaceManager {
                         card.classList.add("fade-out");
                         setTimeout(() => {
                             card.remove();
-                            if (grid.children.length === 0) {
-                                this.renderFullscreenFaces([]);
+                            if (grid.querySelectorAll(".fullscreen-face-card").length === 0) {
+                                if (this.currentPage * this.pageSize < this.unlabeledFaces.length) {
+                                    this.renderNextPage();
+                                } else {
+                                    this.renderFullscreenFaces([]);
+                                }
                             }
                         }, 300);
                     }
@@ -558,30 +674,67 @@ export class FaceManager {
             card.addEventListener("click", (e) => {
                 if (e.target.closest(".fullscreen-face-input-wrapper")) return;
 
-                card.classList.toggle("selected");
-                const selectBadge = card.querySelector(".fullscreen-face-select-badge");
-                const checkIcon = selectBadge.querySelector("i");
-                if (card.classList.contains("selected")) {
-                    selectBadge.style.background = "var(--color-cyan)";
-                    selectBadge.style.borderColor = "var(--color-cyan)";
-                    checkIcon.style.display = "block";
-                    card.style.outline = "2px solid var(--color-cyan)";
+                const cards = Array.from(grid.querySelectorAll(".fullscreen-face-card"));
+                const currentIdx = cards.indexOf(card);
+                
+                if (e.shiftKey && this.lastClickedFaceId !== null) {
+                    const lastCard = cards.find(c => c.dataset.faceId == this.lastClickedFaceId);
+                    const lastIdx = cards.indexOf(lastCard);
+                    if (lastIdx !== -1 && currentIdx !== -1) {
+                        const start = Math.min(lastIdx, currentIdx);
+                        const end = Math.max(lastIdx, currentIdx);
+                        const targetState = !card.classList.contains("selected");
+                        
+                        for (let i = start; i <= end; i++) {
+                            const c = cards[i];
+                            c.classList.toggle("selected", targetState);
+                            const badge = c.querySelector(".fullscreen-face-select-badge");
+                            const icon = badge.querySelector("i");
+                            if (targetState) {
+                                badge.style.background = "var(--color-cyan)";
+                                badge.style.borderColor = "var(--color-cyan)";
+                                icon.style.display = "block";
+                                c.style.outline = "2px solid var(--color-cyan)";
+                            } else {
+                                badge.style.background = "rgba(0,0,0,0.6)";
+                                badge.style.borderColor = "rgba(255,255,255,0.3)";
+                                icon.style.display = "none";
+                                c.style.outline = "none";
+                            }
+                        }
+                    }
                 } else {
-                    selectBadge.style.background = "rgba(0,0,0,0.6)";
-                    selectBadge.style.borderColor = "rgba(255,255,255,0.3)";
-                    checkIcon.style.display = "none";
-                    card.style.outline = "none";
+                    card.classList.toggle("selected");
+                    const selectBadge = card.querySelector(".fullscreen-face-select-badge");
+                    const checkIcon = selectBadge.querySelector("i");
+                    if (card.classList.contains("selected")) {
+                        selectBadge.style.background = "var(--color-cyan)";
+                        selectBadge.style.borderColor = "var(--color-cyan)";
+                        checkIcon.style.display = "block";
+                        card.style.outline = "2px solid var(--color-cyan)";
+                    } else {
+                        selectBadge.style.background = "rgba(0,0,0,0.6)";
+                        selectBadge.style.borderColor = "rgba(255,255,255,0.3)";
+                        checkIcon.style.display = "none";
+                        card.style.outline = "none";
+                    }
                 }
 
+                this.lastClickedFaceId = face.id;
                 this.updateBulkActionsBar();
             });
 
             // Hover para exibir contexto (imagem cheia ou clip de vídeo)
             let hoverTimeout;
             card.addEventListener("mouseenter", () => {
+                const selectEl = document.getElementById("select-hover-delay");
+                const hoverDelay = selectEl ? parseInt(selectEl.value) : 2000;
+                
+                if (hoverDelay >= 999999) return; // Desativado
+                
                 hoverTimeout = setTimeout(() => {
                     FaceManager.showContextPreview(face, card);
-                }, 400); // pequeno delay para não incomodar ao passar o mouse rápido
+                }, hoverDelay);
             });
             card.addEventListener("mouseleave", () => {
                 clearTimeout(hoverTimeout);
@@ -590,6 +743,25 @@ export class FaceManager {
 
             grid.appendChild(card);
         });
+
+        this.currentPage++;
+
+        // Add the "Load More" button if there are more faces
+        if (endIdx < this.unlabeledFaces.length) {
+            const container = document.createElement("div");
+            container.id = "fullscreen-load-more-container";
+            container.style.cssText = "grid-column: 1/-1; display: flex; justify-content: center; padding: 20px 0; margin-top: 10px;";
+            
+            const btn = document.createElement("button");
+            btn.className = "btn-secondary";
+            btn.style.cssText = "padding: 10px 24px; font-size: 13px; font-weight: 600; cursor: pointer; border-color: rgba(6, 182, 212, 0.3); color: var(--color-cyan);";
+            btn.innerHTML = `<i class="fa-solid fa-angles-down"></i> Carregar Mais Rostos (${this.unlabeledFaces.length - endIdx} restantes)`;
+            
+            btn.addEventListener("click", () => this.renderNextPage());
+            container.appendChild(btn);
+            
+            grid.appendChild(container);
+        }
     }
 
     static updateBulkActionsBar() {
@@ -842,6 +1014,8 @@ export class FaceManager {
         modal.style.display = "flex";
         if (bulkBar) bulkBar.style.display = "none";
         
+        this.lastClickedGroupFaceId = null; // Reset for Shift+Click selection
+        
         const clusterNameDisplay = (cluster.name && !cluster.name.startsWith("Pessoa Desconhecida")) ? cluster.name : `Grupo ${cluster.cluster_id + 1}`;
         if (title) title.textContent = `Gerenciar Rostos: ${clusterNameDisplay}`;
         if (countVal) countVal.textContent = cluster.occurrences;
@@ -901,15 +1075,42 @@ export class FaceManager {
                 <div class="group-manager-face-meta" title="${metaText}">${metaText}</div>
             `;
             
-            card.addEventListener("click", () => {
-                card.classList.toggle("selected");
-                const badge = card.querySelector(".group-manager-face-select-badge");
-                const icon = badge.querySelector("i");
-                if (card.classList.contains("selected")) {
-                    icon.style.display = "block";
+            card.addEventListener("click", (e) => {
+                const cards = Array.from(grid.querySelectorAll(".group-manager-face-card"));
+                const currentIdx = cards.indexOf(card);
+                
+                if (e.shiftKey && this.lastClickedGroupFaceId !== null) {
+                    const lastCard = cards.find(c => c.dataset.faceId == this.lastClickedGroupFaceId);
+                    const lastIdx = cards.indexOf(lastCard);
+                    if (lastIdx !== -1 && currentIdx !== -1) {
+                        const start = Math.min(lastIdx, currentIdx);
+                        const end = Math.max(lastIdx, currentIdx);
+                        const targetState = !card.classList.contains("selected");
+                        
+                        for (let i = start; i <= end; i++) {
+                            const c = cards[i];
+                            c.classList.toggle("selected", targetState);
+                            const badge = c.querySelector(".group-manager-face-select-badge");
+                            const icon = badge.querySelector("i");
+                            if (targetState) {
+                                icon.style.display = "block";
+                            } else {
+                                icon.style.display = "none";
+                            }
+                        }
+                    }
                 } else {
-                    icon.style.display = "none";
+                    card.classList.toggle("selected");
+                    const badge = card.querySelector(".group-manager-face-select-badge");
+                    const icon = badge.querySelector("i");
+                    if (card.classList.contains("selected")) {
+                        icon.style.display = "block";
+                    } else {
+                        icon.style.display = "none";
+                    }
                 }
+                
+                this.lastClickedGroupFaceId = face.id;
                 this.updateGroupManagerBulkBar();
             });
             

@@ -425,10 +425,11 @@ async def add_manual_face(payload: ManualFaceCreate):
         conn.commit()
 
     # Reescreve e reindexa as descrições afetadas em background (LLM + Qdrant)
-    if payload.photo_id:
-        enrich_in_background(enrich_photo, payload.project_id, payload.photo_id)
-    elif payload.video_id and payload.timestamp is not None:
-        enrich_in_background(enrich_video_frames, payload.project_id, payload.video_id, [payload.timestamp])
+    # if payload.photo_id:
+    #     enrich_in_background(enrich_photo, payload.project_id, payload.photo_id)
+    # elif payload.video_id and payload.timestamp is not None:
+    #     enrich_in_background(enrich_video_frames, payload.project_id, payload.video_id, [payload.timestamp])
+    pass
 
     return {"status": "success", "face_id": face_id, "person_id": person_id}
 
@@ -643,7 +644,8 @@ async def merge_project_clusters(project_id: int, request: MergeClustersRequest)
 
     if merged_face_ids:
         _register_person_entity_mentions(project_id, request.name, merged_face_ids)
-    enrich_in_background(enrich_after_face_labeling, project_id, cluster_id=request.dest_cluster_id)
+    # enrich_in_background(enrich_after_face_labeling, project_id, cluster_id=request.dest_cluster_id)
+    pass
 
     return {"status": "success", "message": f"Cluster {request.src_cluster_id} mesclado com {request.dest_cluster_id}"}
 
@@ -703,7 +705,8 @@ async def reassign_project_faces(project_id: int, request: ReassignFacesRequest)
             
     if target_name:
         _register_person_entity_mentions(project_id, target_name, request.face_ids)
-    enrich_in_background(enrich_after_face_labeling, project_id, face_ids=request.face_ids)
+    # enrich_in_background(enrich_after_face_labeling, project_id, face_ids=request.face_ids)
+    pass
 
     return {"status": "success", "message": f"{len(request.face_ids)} faces reatribuídas com sucesso.", "target_cluster_id": target_cluster_id}
 
@@ -915,7 +918,8 @@ async def dissociate_project_faces(project_id: int, request: DissociateFacesRequ
             conn.commit()
             
         # Re-enriquecer em background
-        enrich_in_background(enrich_after_face_labeling, project_id, face_ids=request.face_ids)
+        # enrich_in_background(enrich_after_face_labeling, project_id, face_ids=request.face_ids)
+        pass
         
         return {"status": "success", "message": f"{len(request.face_ids)} faces desassociadas com sucesso."}
     except Exception as e:
@@ -998,7 +1002,7 @@ async def label_face(face_id: int, payload: LabelFaceRequest):
             conn.commit()
 
         _register_person_entity_mentions(project_id, new_name, face_ids)
-        enrich_in_background(enrich_after_face_labeling, project_id, cluster_id=current_cluster_id)
+        # enrich_in_background(enrich_after_face_labeling, project_id, cluster_id=current_cluster_id)
 
         return {"status": "success", "message": f"Todas as faces do Grupo {current_cluster_id + 1} foram rotuladas como '{new_name}'."}
     else:
@@ -1014,19 +1018,20 @@ async def label_face(face_id: int, payload: LabelFaceRequest):
             conn.commit()
 
         _register_person_entity_mentions(project_id, new_name, [face_id])
-        enrich_in_background(enrich_after_face_labeling, project_id, face_ids=[face_id])
+        # enrich_in_background(enrich_after_face_labeling, project_id, face_ids=[face_id])
 
         return {"status": "success", "message": f"Rosto ID {face_id} rotulado individualmente como '{new_name}'."}
 
 
 @router.get("/face/{face_id}/thumbnail")
 async def get_face_thumbnail(face_id: int):
-    """Corta dinamicamente e retorna o thumbnail JPEG da face."""
+    """Retorna o thumbnail da face, priorizando cache/crop_path para máxima velocidade."""
     try:
+        # 1. Tentar ler os dados da face, incluindo o crop_path pré-salvo
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT f.bounding_box, f.photo_id, f.video_id, f.timestamp, 
+                SELECT f.bounding_box, f.photo_id, f.video_id, f.timestamp, f.crop_path,
                        p.filepath as photo_path, v.filepath as video_path
                 FROM face f
                 LEFT JOIN photo p ON f.photo_id = p.id
@@ -1035,17 +1040,50 @@ async def get_face_thumbnail(face_id: int):
             """, (face_id,))
             row = cursor.fetchone()
         
-        if not row or not row["bounding_box"]:
-            raise HTTPException(status_code=404, detail="Face ou bounding box nao encontrada.")
+        if not row:
+            raise HTTPException(status_code=404, detail="Face não encontrada.")
+
+        # Cache headers padrão de 7 dias para thumbnails
+        cache_headers = {"Cache-Control": "public, max-age=604800, immutable"}
+
+        # 2. Prioridade Máxima: se já existe crop_path gravado no DB e o arquivo existe
+        if row["crop_path"]:
+            crop_p = Path(row["crop_path"])
+            if not crop_p.exists():
+                # Tenta resolver relativo à pasta de trabalho
+                crop_p = Path("c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP") / crop_p
             
+            if crop_p.exists():
+                return FileResponse(str(crop_p), media_type="image/jpeg", headers=cache_headers)
+            else:
+                # Tenta buscar no S3 se ativado
+                from src.services.s3_service import S3Service
+                s3_service = S3Service.get_instance()
+                if s3_service.enabled:
+                    s3_key = f"crops/{crop_p.name}"
+                    presigned_url = s3_service.generate_presigned_url(s3_key)
+                    if presigned_url:
+                        from fastapi.responses import RedirectResponse
+                        return RedirectResponse(presigned_url)
+
+        # 3. Segunda Prioridade: verificar se já existe crop dinâmico em temp_crops
+        temp_dir = CONFIG.CACHE_DIR / "temp_crops"
+        temp_dir.mkdir(exist_ok=True, parents=True)
+        out_crop_path = temp_dir / f"face_thumb_{face_id}.jpg"
+        if out_crop_path.exists():
+            return FileResponse(str(out_crop_path), media_type="image/jpeg", headers=cache_headers)
+
+        # 4. Fallback: extração e corte dinâmicos (lento, apenas se não tiver crop em disco)
+        if not row["bounding_box"]:
+            raise HTTPException(status_code=404, detail="Bounding box não encontrada para corte dinâmico.")
+
         bbox = json.loads(row["bounding_box"])
         rx, ry, rw, rh = bbox
-        
+
         img_path = None
         temp_frame_path = None
-        
+
         if row["photo_id"] is not None:
-            # Prefere carregar o proxy webp leve para evitar decodificar RAW pesados (.CR2, etc.) no OpenCV
             proxy_rel = f"photos/proxy_photo_{row['photo_id']}.webp"
             proxy_path = CONFIG.PROXIES_DIR / proxy_rel
             if proxy_path.exists():
@@ -1061,55 +1099,37 @@ async def get_face_thumbnail(face_id: int):
                 
             if video_path.exists():
                 from src.vision.multimodal_engine import extract_frame_ffmpeg
-                temp_dir = CONFIG.CACHE_DIR / "temp_crops"
-                temp_dir.mkdir(exist_ok=True, parents=True)
                 temp_frame_path = temp_dir / f"crop_vid_{row['video_id']}_ts_{int(row['timestamp'])}s.jpg"
                 
-                success = extract_frame_ffmpeg(video_path, row["timestamp"], temp_frame_path)
-                if success and temp_frame_path.exists():
-                    img_path = temp_frame_path
-        
-        # Fallback para crop_path salvo localmente no ingest
-        if not img_path or not img_path.exists():
-            with get_db() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT crop_path FROM face WHERE id = ?", (face_id,))
-                crop_row = cursor.fetchone()
-            if crop_row and crop_row["crop_path"]:
-                crop_p = Path(crop_row["crop_path"])
-                if crop_p.exists():
-                    return FileResponse(str(crop_p), media_type="image/jpeg")
-                else:
-                    # Se nao existe localmente, mas S3 esta ativo, redirecionar para a URL assinada
-                    from src.services.s3_service import S3Service
-                    s3_service = S3Service.get_instance()
-                    if s3_service.enabled:
-                        s3_key = f"crops/{crop_p.name}"
-                        presigned_url = s3_service.generate_presigned_url(s3_key)
-                        if presigned_url:
-                            return RedirectResponse(presigned_url)
-            raise HTTPException(status_code=404, detail="Midia fisica para crop nao encontrada.")
-        
-        img = None
-        if img_path and img_path.exists():
-            ext = img_path.suffix.lower()
-            raw_extensions = {'.arw', '.cr2', '.nef', '.dng', '.pef', '.raf', '.orf', '.rw2', '.raw'}
-            if ext in raw_extensions:
-                try:
-                    import rawpy
-                    with rawpy.imread(str(img_path)) as raw:
-                        rgb = raw.postprocess(half_size=True, use_camera_wb=True)
-                        img = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-                except Exception as raw_err:
-                    print(f"[Faces API] Erro ao ler RAW {img_path.name} via rawpy: {raw_err}")
-                    img = None
-            
-            if img is None:
-                img = cv2.imread(str(img_path))
+                # Só extrai se o frame base temporário não existir
+                if not temp_frame_path.exists():
+                    extract_frame_ffmpeg(video_path, row["timestamp"], temp_frame_path)
                 
+                if temp_frame_path.exists():
+                    img_path = temp_frame_path
+
+        if not img_path or not img_path.exists():
+            raise HTTPException(status_code=404, detail="Mídia física original não encontrada para corte dinâmico.")
+
+        img = None
+        ext = img_path.suffix.lower()
+        raw_extensions = {'.arw', '.cr2', '.nef', '.dng', '.pef', '.raf', '.orf', '.rw2', '.raw'}
+        if ext in raw_extensions:
+            try:
+                import rawpy
+                with rawpy.imread(str(img_path)) as raw:
+                    rgb = raw.postprocess(half_size=True, use_camera_wb=True)
+                    img = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+            except Exception as raw_err:
+                print(f"[Faces API] Erro ao ler RAW {img_path.name} via rawpy: {raw_err}")
+                img = None
+        
         if img is None:
-            raise HTTPException(status_code=500, detail="Erro ao ler imagem original.")
+            img = cv2.imread(str(img_path))
             
+        if img is None:
+            raise HTTPException(status_code=500, detail="Erro ao ler imagem original para corte dinâmico.")
+
         h, w = img.shape[:2]
         x, y, bw, bh = int(rx * w), int(ry * h), int(rw * w), int(rh * h)
         
@@ -1119,14 +1139,11 @@ async def get_face_thumbnail(face_id: int):
         
         crop = img[y1:y2, x1:x2]
         if crop.size == 0:
-            raise HTTPException(status_code=500, detail="Crop invalido.")
+            raise HTTPException(status_code=500, detail="Crop dinâmico inválido.")
             
-        temp_dir = CONFIG.CACHE_DIR / "temp_crops"
-        temp_dir.mkdir(exist_ok=True, parents=True)
-        out_crop_path = temp_dir / f"face_thumb_{face_id}.jpg"
         cv2.imwrite(str(out_crop_path), crop)
-        
-        return FileResponse(str(out_crop_path), media_type="image/jpeg")
+        return FileResponse(str(out_crop_path), media_type="image/jpeg", headers=cache_headers)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1225,7 +1242,7 @@ async def reject_face(face_id: int, payload: Optional[RejectFaceRequest] = None)
                     timestamp=face_row["timestamp"], source="human_audit", status="confirmed"
                 )
                 conn.commit()
-            enrich_in_background(enrich_after_face_labeling, face_row["project_id"], face_ids=[face_id])
+            # enrich_in_background(enrich_after_face_labeling, face_row["project_id"], face_ids=[face_id])
         except Exception as e:
             print(f"[Entities] Falha ao registrar objeto rejeitado: {e}")
 

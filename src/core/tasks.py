@@ -24,6 +24,7 @@ class TaskManager:
         self.active_processes: Dict[int, subprocess.Popen] = {}
         self.progress: Dict[str, Dict[str, Any]] = {}
         self.active_clustering: set = set()
+        self.cancelled_tasks: set = set()
         self._initialized = True
 
     def register_process(self, video_id: int, process: subprocess.Popen) -> None:

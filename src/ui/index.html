@@ -259,6 +259,38 @@
                                 </button>
                             </div>
 
+                            <!-- Painel de Configurações do Agrupamento -->
+                            <div id="clustering-settings-toggle" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-secondary); padding: 6px 8px; border-radius: 4px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); user-select: none;">
+                                <span><i class="fa-solid fa-sliders" style="margin-right: 4px; color: var(--color-purple);"></i> Ajustes de Agrupamento</span>
+                                <i class="fa-solid fa-chevron-down toggle-icon" style="transition: transform 0.2s;"></i>
+                            </div>
+                            <div id="clustering-settings-panel" style="display: none; flex-direction: column; gap: 8px; padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); font-size: 11px;">
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="color: var(--text-secondary);">Tolerância (Epsilon):</span>
+                                        <span id="val-clustering-eps" style="font-weight: bold; color: var(--color-purple);">0.38</span>
+                                    </div>
+                                    <input type="range" id="input-clustering-eps" min="0.20" max="0.60" step="0.01" value="0.38" style="width: 100%; accent-color: var(--color-purple); cursor: pointer;">
+                                    <span style="font-size: 9px; color: var(--text-muted); line-height: 1.2;">Menor = mais rígido (menos fotos/grupo). Maior = mais tolerante (pode agrupar variações, mas com risco de misturar pessoas).</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                    <span style="color: var(--text-secondary);">Mínimo de fotos por grupo:</span>
+                                    <input type="number" id="input-clustering-min-samples" min="1" max="10" value="3" style="width: 50px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: white; padding: 2px 4px; text-align: center; font-size: 11px;">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                    <span style="color: var(--text-secondary);">Delay do Preview:</span>
+                                    <select id="select-hover-delay" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: white; padding: 2px 4px; font-size: 11px;">
+                                        <option value="500">0.5s</option>
+                                        <option value="1000">1.0s</option>
+                                        <option value="2000" selected>2.0s</option>
+                                        <option value="999999">Desativado</option>
+                                    </select>
+                                </div>
+                                <button id="btn-sync-enrich" class="btn-primary" style="font-size:11px; padding:6px 10px; margin-top:6px; display:flex; align-items:center; justify-content:center; gap:6px; height: 28px; width: 100%; background: linear-gradient(135deg, #06b6d4, #0891b2);">
+                                    <i class="fa-solid fa-arrows-rotate"></i> Sincronizar Nomes nas Descrições
+                                </button>
+                            </div>
+
                             <div id="face-clusters-list" style="display:flex; flex-direction:column; gap:10px; margin-top:8px; max-height: 70vh; overflow-y: auto; padding-right: 4px;">
                                 <!-- Inserido dinamicamente via JS -->
                             </div>
