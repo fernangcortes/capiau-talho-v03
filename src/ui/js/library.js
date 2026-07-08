@@ -334,7 +334,7 @@ function renderTreeNode(node, container, depth = 0) {
         const card = document.createElement("div");
         card.className = "media-card tree-file-item";
         card.setAttribute("data-video-id", v.id);
-        card.style.paddingLeft = `${depth * 10 + 6}px`;
+        card.style.paddingLeft = "6px";
         if (STATE.activeVideo && STATE.activeVideo.id === v.id) card.classList.add("active");
         
         const badgeClass = v.video_type === "interview" ? "tag-interview" : "tag-broll";
@@ -391,7 +391,7 @@ function renderTreeNode(node, container, depth = 0) {
             <div class="media-info">
                 <h4 title="${tooltip}">
                     ${toggleBtnHtml}
-                    <span class="clip-title-text" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${currentTitle}</span>
+                    <span class="clip-title-text">${currentTitle}</span>
                 </h4>
                 <div class="media-meta-row">
                     <span class="media-duration">${v.duration ? formatTimecode(v.duration).substring(3, 11) : "00:00:00"}</span>

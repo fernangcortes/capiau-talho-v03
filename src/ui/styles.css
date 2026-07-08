@@ -662,10 +662,10 @@ button {
 
 .media-card.tree-file-item .media-info {
     display: flex;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: space-between;
-    gap: 6px;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: center;
+    gap: 4px;
     flex: 1;
     min-width: 0;
     height: 100%;
@@ -676,14 +676,24 @@ button {
     font-size: 11px;
     font-weight: 500;
     color: var(--text-primary);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    flex: 1;
+    width: 100%;
     min-width: 0;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 4px;
+}
+
+.media-card.tree-file-item .media-info h4 .clip-title-text {
+    white-space: normal !important;
+    word-break: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    max-height: calc(var(--thumb-height) - 16px);
+    line-height: 1.25;
+    flex: 1;
+    min-width: 0;
 }
 
 .media-card.tree-file-item .media-info .media-meta-row {
@@ -691,6 +701,7 @@ button {
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
+    width: 100%;
 }
 
 .media-card.tree-file-item .media-info .media-duration {
@@ -728,6 +739,12 @@ button {
     grid-template-columns: repeat(auto-fill, minmax(calc(var(--thumb-width) + 30px), 1fr)) !important;
     gap: 10px !important;
     padding: 6px 0 10px 0 !important;
+    align-items: start !important; /* Evita que os cards estiquem na vertical de forma desigual */
+}
+
+/* Ocupação inteira das subpastas na grade */
+#video-list.view-mode-grid .tree-folder-container {
+    grid-column: 1 / -1;
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item {
@@ -740,6 +757,20 @@ button {
     border: 1px solid rgba(255, 255, 255, 0.05) !important;
     border-radius: 6px !important;
     gap: 6px !important;
+    position: relative;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.25s ease, 
+                border-color 0.25s ease, 
+                background-color 0.25s ease;
+    z-index: 1;
+}
+
+#video-list.view-mode-grid .media-card.tree-file-item:hover {
+    transform: scale(1.04, 1.08) translateY(-2px); /* Aumento sutil horizontal/vertical, levemente maior verticalmente */
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.6);
+    border-color: rgba(6, 182, 212, 0.4) !important;
+    background: rgba(15, 23, 42, 0.95) !important;
+    z-index: 10;
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item .media-thumbnail {
@@ -761,10 +792,77 @@ button {
     font-size: 10px !important;
 }
 
+#video-list.view-mode-grid .media-card.tree-file-item .media-info h4 .clip-title-text {
+    white-space: normal !important;
+    word-break: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    max-height: 28px;
+    transition: max-height 0.25s ease;
+}
+
+#video-list.view-mode-grid .media-card.tree-file-item:hover .media-info h4 .clip-title-text {
+    -webkit-line-clamp: 4;
+    max-height: 56px;
+}
+
 #video-list.view-mode-grid .media-card.tree-file-item .media-info .media-meta-row {
     width: 100% !important;
     justify-content: space-between !important;
     font-size: 9px !important;
+}
+
+/* Posicionamento flutuante do botão de deletar/cancelar na miniatura apenas no modo grade */
+#video-list.view-mode-grid .media-card.tree-file-item .btn-card-action {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(15, 23, 42, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: var(--color-rose) !important;
+    border-radius: 4px;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
+    font-size: 11px;
+    z-index: 5;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    transition: background-color 0.2s, color 0.2s, transform 0.1s;
+}
+
+#video-list.view-mode-grid .media-card.tree-file-item .btn-card-action.btn-hover-only {
+    display: none;
+}
+
+#video-list.view-mode-grid .media-card.tree-file-item:hover .btn-card-action.btn-hover-only {
+    display: flex;
+}
+
+#video-list.view-mode-grid .media-card.tree-file-item .btn-card-action:hover {
+    background: var(--color-rose) !important;
+    color: #fff !important;
+    transform: scale(1.1);
+}
+
+/* Responsividade de colunas no modo maximizado (Grade) */
+.sidebar-left.sidebar-maximized #video-list.view-mode-grid .tree-folder-children {
+    grid-template-columns: repeat(auto-fill, minmax(max(calc(var(--thumb-width) + 40px), 200px), 1fr)) !important;
+}
+
+/* Quando a biblioteca está maximizada no modo LISTA (exibir em colunas responsivas) */
+.sidebar-left.sidebar-maximized #video-list:not(.view-mode-grid) .tree-folder-children {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)) !important;
+    gap: 8px 16px !important;
+}
+
+.sidebar-left.sidebar-maximized #video-list:not(.view-mode-grid) .tree-folder-container {
+    grid-column: 1 / -1;
 }
 
 #btn-view-mode-list, #btn-view-mode-grid {
@@ -802,14 +900,14 @@ button {
     font-size: 9px;
     padding: 2px;
     border-radius: 2px;
-    opacity: 0;
+    display: none !important; /* Escondido por padrão para não empurrar o texto à direita */
     transition: all 0.2s;
-    display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 
 .media-card.tree-file-item:hover .btn-toggle-filename {
+    display: inline-flex !important;
     opacity: 0.7;
 }
 
@@ -1933,6 +2031,14 @@ button {
     gap: 4px;
     margin-top: 4px;
     margin-bottom: 4px;
+}
+
+/* Fundo sutil apenas no modo lista para organizar visualmente pastas aninhadas */
+#video-list:not(.view-mode-grid) .tree-folder-children {
+    background: rgba(255, 255, 255, 0.015);
+    border-radius: 4px;
+    padding-top: 2px;
+    padding-bottom: 2px;
 }
 
 .tree-file-item {
