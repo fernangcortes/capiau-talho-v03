@@ -566,3 +566,30 @@ Implementamos uma grande re-estilização e otimização ergonômica para a bibl
    - Suporte nativo e sem interferências de cliques nos botões de controle nativos (play, volume, seekbar) com z-index configurado.
    - Painel de marcação local (pontos IN, OUT e Enviar para Timeline) com atalhos de teclado locais (`I`, `O`, `E`) e pausando os atalhos globais de fundo.
    - Atualização física de miniatura via botão de câmera que gera um novo frame no cache do servidor a partir do tempo atual do player.
+
+
+---
+
+## 📸 Fase 14: Suporte a Fotos Still na Timeline, Visualizador Ken Burns, Workspace de Montagem e Posicionamento de Zoom/Visualização (09/07/2026)
+
+Implementamos a funcionalidade completa de suporte a fotos (stills) na timeline e no player, nova workspace para montagem facilitada e otimização de posicionamento de controles na biblioteca:
+
+1. **Fotos Stills na Timeline e Exportação (OTIO):**
+   - Suporte nativo ao tipo de mídia `"photo"` nas rotas de narrativa, modelos Pydantic e persistência SQLite.
+   - Adicionada duração padrão para stills (`Config.PHOTO_DEFAULT_DURATION = 5.0`).
+   - Exportador OpenTimelineIO (`otio_export.py`) atualizado para empacotar fotos stills como referências de mídia externas com durações corretas e metadados preservados (incluindo parâmetros Ken Burns).
+   - Desenvolvidos testes unitários robustos em `tests/test_f0_otio_export.py` validando o empacotamento e exportação de stills.
+
+2. **Drag-and-Drop e Inserção de Fotos no Frontend:**
+   - Adicionado atributo `draggable` para vídeos e fotos na biblioteca, permitindo arrastar arquivos da barra lateral diretamente para as pistas de vídeo da timeline.
+   - Desenvolvido botão flutuante "+" no hover dos cards de fotos e botão na lightbox para adicionar stills com durações configuráveis.
+
+3. **Composição e Efeitos Visuais (Ken Burns, Fades & Fit) no Player:**
+   - O Program Player (`player.js`) agora compõe stills de fotos utilizando duas camadas `<img>` com sincronização contínua com a agulha de reprodução.
+   - Aplicação dinâmica de enquadramento (Fit/Fill), movimentos suaves de zoom/pan (Ken Burns) e transições por opacidade (dissolve crossfades) com base nos efeitos configurados para o clipe.
+   - Desenvolvido o **Inspetor de Foto** (painel flutuante de ajustes) na timeline para alternar entre modos Fit/Fill, presets Ken Burns e tempos de crossfade.
+
+4. **Workspace "Montagem" e Ajuste Ergonômico de Zoom/Exibição:**
+   - Novo preset de workspace chamado "Montagem" (`workspaceManager.js`): maximiza a biblioteca no topo e ancora a timeline horizontalmente na base da tela, permitindo gerenciar grandes volumes de mídia com monitores flutuantes de Source/Program (com toggle ocultável `#btn-montagem-monitors`).
+   - Posicionamento melhorado dos controles de **Visualização** (modo Lista/Cards) e **Zoom** (ícone de lupa, range slider e rótulo de pixels), movidos do dropdown de opções de exibição para o lado esquerdo da terceira linha da barra de ferramentas da biblioteca.
+   - Removidos os boxes de contorno, bordas e fundos de todos os botões da terceira linha (Visualização, Zoom, Expandir, Recolher, Fotos no Player), tornando-os ícones limpos (*line-icons*) com efeitos suaves de hover.

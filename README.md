@@ -31,6 +31,8 @@ Ao contrário das ferramentas tradicionais que tratam a IA de forma isolada, o C
 * **🔄 Modal de Alternativas da IA:** Todo clipe inserido pela IA carrega candidatos semânticos sugeridos. Ao selecionar um clipe na timeline e pressionar **`A`**, um modal centralizado exibe vídeos tocando em loop silencioso de cada alternativa com a justificativa da IA. Troque os clipes com um clique usando as ferramentas visuais **Slot Fixo** (mantém duração) ou **Ripple** (desloca a timeline para encaixar a duração ideal).
 * **🖥️ Janelas Destacáveis (Workspaces Multi-monitores):** Destaque a Biblioteca, Timeline, Players ou Chatbot em janelas independentes. Elas mantêm sincronia de playhead, seleções e comandos em tempo real usando `BroadcastChannel`.
 * **📂 Visualização em Árvore Inteligente:** Navegue por acervos gigantes organizados dinamicamente em pastas e subpastas hierárquicas colapsadas no estilo Explorer de arquivos, eliminando a poluição visual na biblioteca.
+* **📸 Suporte a Fotos Still & Efeitos Ken Burns:** Permite inserir fotos do set (incluindo RAW) como stills na timeline com arrastar-e-soltar. Possibilita animar movimentos suaves (Ken Burns), ajustar enquadramento (Fit/Fill) e fades por meio do Inspetor de Foto e compose no Program Player.
+* **🎛️ Workspace "Montagem":** Novo preset que maximiza a biblioteca no topo e estende a timeline horizontalmente na base da tela, otimizando o fluxo de decupagem com monitores flutuantes de Source e Program.
 
 ---
 

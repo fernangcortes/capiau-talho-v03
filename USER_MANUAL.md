@@ -131,3 +131,21 @@ Sempre que a IA propuser e inserir um vídeo na timeline, ela indexará trechos 
 2. Clique em **`Salvar`** para gravar a timeline no SQLite.
 3. Escolha o formato de saída no seletor (XML para Premiere/Resolve/FCP, OpenTimelineIO `.otio` ou EDL).
 4. Clique em **`Exportar`**. O download iniciará no seu navegador e o arquivo estará pronto para ser importado no seu editor NLE profissional.
+
+
+---
+
+## 🎛️ 8. Layout e Organização Avançada
+
+### Workspace "Montagem" (Timeline Ancorada)
+* Para produções complexas, você pode ativar o preset **Montagem** no topo da tela. 
+* Este modo maximiza a biblioteca na parte superior e ancora a linha do tempo (timeline) horizontalmente cobrindo toda a base inferior da tela. Os monitores flutuantes (Source/Program) podem ser exibidos ou ocultados rapidamente clicando no botão flutuante de TV (`#btn-montagem-monitors`).
+
+### Reposicionamento dos Controles de Zoom e Modo de Exibição
+* Os botões de **Modo de Visualização** (Lista ou Cards) e o controle deslizante de **Zoom** das miniaturas foram movidos para a linha inferior da barra de ferramentas da biblioteca (Linha 3).
+* Todos os controles dessa linha (Zoom, Visualização, Expandir Tudo, Recolher Tudo e Abrir Fotos no Player) foram otimizados como ícones simples (*line-icons*) livres de contornos e boxes, minimizando a poluição visual na biblioteca.
+
+### Inserção Rápida e Arrastar-e-Soltar (Drag-and-Drop)
+* Você pode adicionar mídias à timeline de duas formas:
+  1. **Arrastar-e-Soltar:** Clique e segure qualquer vídeo ou foto na barra lateral e arraste-o diretamente para a trilha desejada na timeline.
+  2. **Inserção Rápida:** Passe o mouse sobre qualquer miniatura de foto para revelar um botão flutuante "+". O clique adicionará a imagem como still (duração padrão de 5s) na timeline no ponto da agulha.
