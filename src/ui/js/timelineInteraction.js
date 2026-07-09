@@ -26,6 +26,8 @@ export class CapiauTimelineInteraction {
         this.boundWheel = (e) => this.onWheel(e);
         this.boundMouseLeave = () => this.hideHoverPreview();
         this.boundKeyDown = (e) => this.onKeyDown(e);
+        this.boundDragOver = (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; };
+        this.boundDrop = (e) => this.onDrop(e);
 
         this.init();
     }
@@ -40,7 +42,11 @@ export class CapiauTimelineInteraction {
         win.addEventListener("mouseup", this.boundMouseUp);
         this.canvas.addEventListener("wheel", this.boundWheel);
         this.canvas.addEventListener("mouseleave", this.boundMouseLeave);
-        
+
+        // Arrastar-e-soltar de mídias da biblioteca para a timeline
+        this.canvas.addEventListener("dragover", this.boundDragOver);
+        this.canvas.addEventListener("drop", this.boundDrop);
+
         // Keyboard Listener global
         win.addEventListener("keydown", this.boundKeyDown);
     }
@@ -53,6 +59,8 @@ export class CapiauTimelineInteraction {
         win.removeEventListener("mouseup", this.boundMouseUp);
         this.canvas.removeEventListener("wheel", this.boundWheel);
         this.canvas.removeEventListener("mouseleave", this.boundMouseLeave);
+        this.canvas.removeEventListener("dragover", this.boundDragOver);
+        this.canvas.removeEventListener("drop", this.boundDrop);
         win.removeEventListener("keydown", this.boundKeyDown);
     }
 
@@ -166,6 +174,7 @@ export class CapiauTimelineInteraction {
                         TIMELINE_STATE.selectedClipId = clip.id;
                         TIMELINE_STATE.selectedTrack = track;
                         this.syncPlayerToClip(clip);
+                        this.refreshPhotoInspector();
                         this.renderer.requestRedraw();
                         return;
                     }
@@ -214,6 +223,7 @@ export class CapiauTimelineInteraction {
                 TIMELINE_STATE.selectedClipId = null;
                 TIMELINE_STATE.selectedGhostClipId = null;
             }
+            this.refreshPhotoInspector();
             this.renderer.requestRedraw();
         }
     }
@@ -282,6 +292,159 @@ export class CapiauTimelineInteraction {
         this.dragState = null;
         this.draggedClipId = null;
         if (this.canvas) this.canvas.style.cursor = "default";
+    }
+
+    /**
+     * Soltura de mídia da biblioteca na timeline (foto ou vídeo).
+     * A posição/pista vêm da coordenada do drop; pista de destino precisa ser de vídeo.
+     */
+    onDrop(e) {
+        e.preventDefault();
+        let payload = null;
+        try {
+            const raw = e.dataTransfer.getData("application/x-capiau-media");
+            if (raw) payload = JSON.parse(raw);
+        } catch (_) { payload = null; }
+        if (!payload || payload.id === undefined || payload.id === null) return;
+
+        const { frame, track } = this.getCoordinates(e.clientX, e.clientY);
+        const trackObj = track ? TIMELINE_STATE.getTrack(track) : null;
+        const targetTrack = (trackObj && trackObj.kind === "video" && !trackObj.locked) ? track : null;
+        const dropFrame = Math.max(0, frame);
+
+        if (payload.type === "photo") {
+            TIMELINE_STATE.addPhotoCut(payload.id, { track: targetTrack, timelineStartFrame: dropFrame });
+        } else {
+            const video = STATE.allVideos.find(v => v.id === payload.id);
+            const dur = (video && video.duration) ? video.duration : 5.0;
+            TIMELINE_STATE.addCut(payload.id, 0, dur, targetTrack, dropFrame);
+        }
+    }
+
+    // ── INSPETOR DE CLIPE DE FOTO (enquadramento / Ken Burns / fades) ──
+
+    /** Mostra o inspetor se o clipe selecionado for foto; senão oculta. */
+    refreshPhotoInspector() {
+        const clip = STATE.activeTimelineCuts.find(c => c.id === TIMELINE_STATE.selectedClipId);
+        if (clip && clip.type === "photo") this.showPhotoInspector(clip);
+        else this.hidePhotoInspector();
+    }
+
+    hidePhotoInspector() {
+        const panel = this.canvas.ownerDocument.querySelector("#timeline-photo-inspector");
+        if (panel) panel.style.display = "none";
+    }
+
+    /** Aplica uma mutação nos effects do clipe de foto (com undo) e re-renderiza o painel. */
+    _mutatePhotoEffects(clipId, fn) {
+        TIMELINE_HISTORY.record(() => {
+            const cuts = [...STATE.activeTimelineCuts];
+            const clip = cuts.find(c => c.id === clipId);
+            if (!clip || clip.type !== "photo") return;
+            clip.effects = clip.effects ? clip.effects.map(e => ({ ...e })) : [];
+            fn(clip);
+            STATE.activeTimelineCuts = cuts; // dispara recomposição do Program + redraw
+        });
+        const clip = STATE.activeTimelineCuts.find(c => c.id === clipId);
+        if (clip) this.showPhotoInspector(clip);
+    }
+
+    setPhotoFit(clipId, mode) {
+        this._mutatePhotoEffects(clipId, (clip) => {
+            clip.effects = clip.effects.filter(e => e.type !== "fit");
+            clip.effects.push({ type: "fit", mode });
+        });
+    }
+
+    setPhotoKenBurns(clipId, preset) {
+        const presets = {
+            none: null,
+            zoomIn: { from: { scale: 1, x: 0, y: 0 }, to: { scale: 1.25, x: 0, y: 0 } },
+            zoomOut: { from: { scale: 1.25, x: 0, y: 0 }, to: { scale: 1, x: 0, y: 0 } },
+            panRight: { from: { scale: 1.18, x: 6, y: 0 }, to: { scale: 1.18, x: -6, y: 0 } },
+            panLeft: { from: { scale: 1.18, x: -6, y: 0 }, to: { scale: 1.18, x: 6, y: 0 } }
+        };
+        this._mutatePhotoEffects(clipId, (clip) => {
+            clip.effects = clip.effects.filter(e => e.type !== "ken_burns");
+            const cfg = presets[preset];
+            if (cfg) clip.effects.push({ type: "ken_burns", preset, easing: "easeInOut", ...cfg });
+        });
+    }
+
+    setPhotoFade(clipId, side, dur) {
+        this._mutatePhotoEffects(clipId, (clip) => {
+            clip.effects = clip.effects.filter(e => !(e.type === "crossfade" && e.side === side));
+            if (dur > 0) clip.effects.push({ type: "crossfade", side, duration_s: dur });
+        });
+    }
+
+    /** Painel flutuante de ajustes do clipe de foto selecionado. */
+    showPhotoInspector(clip) {
+        const doc = this.canvas.ownerDocument;
+        const win = doc.defaultView || window;
+        let panel = doc.querySelector("#timeline-photo-inspector");
+        if (!panel) {
+            panel = doc.createElement("div");
+            panel.id = "timeline-photo-inspector";
+            panel.style.cssText = `position: fixed; z-index: 10002; background: rgba(15,23,42,0.97); border: 1px solid var(--color-cyan); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.6); font-family: sans-serif; width: 300px; backdrop-filter: blur(8px); color: #fff;`;
+            doc.body.appendChild(panel);
+        }
+        panel.dataset.clipId = clip.id;
+
+        const eff = clip.effects || [];
+        const fit = eff.find(e => e.type === "fit");
+        const fitMode = fit ? fit.mode : "fill";
+        const kb = eff.find(e => e.type === "ken_burns");
+        const kbPreset = kb ? (kb.preset || "custom") : "none";
+        const fadeIn = eff.find(e => e.type === "crossfade" && e.side === "in");
+        const fadeOut = eff.find(e => e.type === "crossfade" && e.side === "out");
+
+        const btn = (label, active, act) => `<button data-act="${act}" style="flex:1; min-width:56px; padding:4px 6px; font-size:10px; border-radius:5px; cursor:pointer; border:1px solid ${active ? 'var(--color-cyan)' : 'rgba(255,255,255,0.15)'}; background:${active ? 'rgba(6,182,212,0.25)' : 'rgba(255,255,255,0.05)'}; color:#fff;">${label}</button>`;
+
+        panel.innerHTML = `
+            <div style="font-size:11px; font-weight:bold; color:var(--color-cyan); display:flex; justify-content:space-between; align-items:center;">
+                <span><i class="fa-solid fa-image"></i> Foto — Ajustes</span>
+                <span id="photo-insp-close" style="cursor:pointer; color:var(--text-secondary);"><i class="fa-solid fa-xmark"></i></span>
+            </div>
+            <div style="font-size:10px; color:var(--text-secondary);">Enquadramento</div>
+            <div style="display:flex; gap:6px;">${btn("Preencher (fill)", fitMode === "fill", "fit:fill")}${btn("Ajustar (fit)", fitMode === "fit", "fit:fit")}</div>
+            <div style="font-size:10px; color:var(--text-secondary);">Movimento (Ken Burns)</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                ${btn("Nenhum", kbPreset === "none", "kb:none")}
+                ${btn("Zoom In", kbPreset === "zoomIn", "kb:zoomIn")}
+                ${btn("Zoom Out", kbPreset === "zoomOut", "kb:zoomOut")}
+                ${btn("Pan →", kbPreset === "panRight", "kb:panRight")}
+                ${btn("Pan ←", kbPreset === "panLeft", "kb:panLeft")}
+            </div>
+            <div style="font-size:10px; color:var(--text-secondary);">Transições (dissolve, s)</div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <span style="font-size:10px;">In</span>
+                <input id="photo-insp-fadein" type="number" min="0" step="0.1" value="${fadeIn ? fadeIn.duration_s : 0}" style="width:56px; height:24px; font-size:11px; text-align:center; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:5px; color:#fff;">
+                <span style="font-size:10px;">Out</span>
+                <input id="photo-insp-fadeout" type="number" min="0" step="0.1" value="${fadeOut ? fadeOut.duration_s : 0}" style="width:56px; height:24px; font-size:11px; text-align:center; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:5px; color:#fff;">
+            </div>
+        `;
+
+        // Posiciona acima (à direita) do canvas da timeline
+        const rect = this.canvas.getBoundingClientRect();
+        let top = rect.top - 232;
+        if (top < 8) top = Math.min(rect.top + 8, win.innerHeight - 244);
+        panel.style.top = `${Math.max(8, top)}px`;
+        panel.style.left = `${Math.max(8, Math.min(rect.right - 312, win.innerWidth - 312))}px`;
+        panel.style.display = "flex";
+
+        panel.querySelector("#photo-insp-close").onclick = () => this.hidePhotoInspector();
+        panel.querySelectorAll("button[data-act]").forEach(b => {
+            b.onclick = () => {
+                const [kind, val] = b.dataset.act.split(":");
+                if (kind === "fit") this.setPhotoFit(clip.id, val);
+                else if (kind === "kb") this.setPhotoKenBurns(clip.id, val);
+            };
+        });
+        const fi = panel.querySelector("#photo-insp-fadein");
+        const fo = panel.querySelector("#photo-insp-fadeout");
+        fi.onchange = () => this.setPhotoFade(clip.id, "in", parseFloat(fi.value) || 0);
+        fo.onchange = () => this.setPhotoFade(clip.id, "out", parseFloat(fo.value) || 0);
     }
 
     onWheel(e) {
@@ -390,6 +553,7 @@ export class CapiauTimelineInteraction {
                         STATE.activeTimelineCuts = cuts;
                         TIMELINE_STATE.selectedClipId = null;
                     });
+                    this.hidePhotoInspector();
                     e.preventDefault();
                 }
             } else if (TIMELINE_STATE.selectedGhostClipId) {
@@ -469,6 +633,11 @@ export class CapiauTimelineInteraction {
     }
 
     syncPlayerToClip(clip) {
+        if (clip && clip.type === "photo") {
+            const photo = STATE.allPhotos.find(p => p.id === clip.photo_id);
+            if (photo) STATE.activePhoto = photo;
+            return;
+        }
         const video = STATE.allVideos.find(v => v.id === clip.video_id);
         if (video) {
             STATE.activeVideo = video;
@@ -764,7 +933,7 @@ export class CapiauTimelineInteraction {
                 pointer-events: none;
                 backdrop-filter: blur(8px);
             `;
-            previewCard.innerHTML = `<video autoplay muted loop playsinline style="width: 100%; height: 112px; object-fit: cover; background: #000;"></video><div class="preview-info" style="flex: 1; font-size: 10px; color: var(--text-secondary); padding: 6px 8px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-family: monospace;">00:00:00:00</div>`;
+            previewCard.innerHTML = `<video autoplay muted loop playsinline style="width: 100%; height: 112px; object-fit: cover; background: #000;"></video><img class="preview-img" style="width: 100%; height: 112px; object-fit: cover; background: #000; display: none;"><div class="preview-info" style="flex: 1; font-size: 10px; color: var(--text-secondary); padding: 6px 8px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-family: monospace;">00:00:00:00</div>`;
             doc.body.appendChild(previewCard);
         }
 
@@ -778,8 +947,32 @@ export class CapiauTimelineInteraction {
         if (hit && hit.type === "clip") {
             const clip = hit.data;
 
+            // Preview de FOTO (still): mostra a imagem no card, oculta o vídeo
+            if (clip.type === "photo") {
+                const photo = STATE.allPhotos.find(p => p.id === clip.photo_id);
+                if (photo) {
+                    const imgEl = previewCard.querySelector(".preview-img");
+                    const videoEl = previewCard.querySelector("video");
+                    const infoEl = previewCard.querySelector(".preview-info");
+                    if (videoEl) { videoEl.pause(); videoEl.style.display = "none"; }
+                    const src = (photo.proxy_path || photo.filepath || `/originals/${photo.filename}`).replace(/\\/g, "/");
+                    if (imgEl) {
+                        if (imgEl.src.indexOf(src) === -1) imgEl.src = src;
+                        imgEl.style.display = "block";
+                    }
+                    const durS = clip.out - clip.in;
+                    infoEl.textContent = `${photo.filename} (${durS.toFixed(1)}s)`;
+                    this._placeFixedPopup(previewCard, clientX, clientY, 15);
+                    return;
+                }
+            }
+
             const video = STATE.allVideos.find(v => v.id === clip.video_id);
             if (video) {
+                const imgEl = previewCard.querySelector(".preview-img");
+                if (imgEl) imgEl.style.display = "none";
+                const vEl = previewCard.querySelector("video");
+                if (vEl) vEl.style.display = "block";
                 const videoSrc = video.proxy_path || video.filepath || `/originals/${video.filename}`;
                 const videoEl = previewCard.querySelector("video");
                 const infoEl = previewCard.querySelector(".preview-info");
