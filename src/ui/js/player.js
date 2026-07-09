@@ -440,6 +440,11 @@ export class SourcePlayer {
     }
 
     appendToTimeline() {
+        // Foto ativa (still): insere com a duração padrão (ajustável depois no trim)
+        if (!STATE.activeVideo && STATE.activePhoto) {
+            TIMELINE_STATE.addPhotoCut(STATE.activePhoto.id, {});
+            return;
+        }
         if (!STATE.activeVideo) return;
         const vid = this.el("source-video");
         const inTime = STATE.markerIn !== null ? STATE.markerIn : 0.0;
@@ -747,9 +752,12 @@ export class ProgramPlayer {
     init() {
         // Redesenha e sincroniza o player sempre que a timeline muda
         STATE.on("timelineCutsUpdated", () => this.syncVideoToPlayhead());
-        
+
         // Escuta mudanças manuais da agulha (scrubbing)
         STATE.on("timelinePlayheadChanged", () => this.syncVideoToPlayhead());
+
+        // Fotos podem carregar depois da timeline: recompõe quando a lista chega
+        STATE.on("photosUpdated", () => this.syncVideoToPlayhead());
 
         // Botão Play Program
         const btnPlay = this.el("btn-program-play");
@@ -1000,12 +1008,97 @@ export class ProgramPlayer {
             overlayEl = videoA;
         }
 
+        // Clipes de foto (still) não vão para elementos <video> (video_id null ⇒ applyCutToElement
+        // apenas oculta o <video>); a imagem é composta nas camadas <img> dedicadas.
         applyCutToElement(baseEl, baseCut, baseTrack, 1);
         applyCutToElement(overlayEl, overlayCut, overlayTrack, 10);
+
+        // ────────── CAMADAS DE FOTO (STILL) ──────────
+        // imgA = slot base (z-index 2, acima do vídeo base); imgB = slot overlay (z-index 11).
+        const imgA = this.el("program-player-photo");
+        const imgB = this.el("program-player-photo-b");
+        this.applyPhotoSlot(imgA, (baseCut && baseCut.type === "photo") ? baseCut : null, currentFrame, 2);
+        this.applyPhotoSlot(imgB, (overlayCut && overlayCut.type === "photo") ? overlayCut : null, currentFrame, 11);
 
         // ────────── ÁUDIO MULTIPISTA ──────────
         // Cada pista de áudio tem seu próprio elemento <audio> tocando o clipe sob o playhead
         this.syncAudioTracks(cuts, currentFrame);
+    }
+
+    /**
+     * Compõe uma camada de foto (still) num elemento <img>.
+     * cut null ⇒ oculta a camada. Aplica enquadramento/movimento via applyPhotoEffects.
+     */
+    applyPhotoSlot(imgEl, cut, currentFrame, zIndex) {
+        if (!imgEl) return;
+        if (!cut) {
+            if (imgEl.style.display !== "none") imgEl.style.display = "none";
+            imgEl.dataset.activeClipId = "";
+            return;
+        }
+        const photo = STATE.allPhotos.find(p => p.id === cut.photo_id);
+        if (!photo) {
+            if (imgEl.style.display !== "none") imgEl.style.display = "none";
+            imgEl.dataset.activeClipId = "";
+            return;
+        }
+        const rawSrc = photo.proxy_path || photo.filepath || `/originals/${photo.filename}`;
+        const src = String(rawSrc).replace(/\\/g, "/");
+        if (imgEl.dataset.loadedSrc !== src) {
+            imgEl.src = src;
+            imgEl.dataset.loadedSrc = src;
+        }
+        imgEl.dataset.activeClipId = String(cut.id);
+        imgEl.style.zIndex = String(zIndex);
+        if (imgEl.style.display !== "block") imgEl.style.display = "block";
+        this.applyPhotoEffects(imgEl, cut, currentFrame);
+    }
+
+    /**
+     * Aplica enquadramento (fit/fill), crop/movimento (Ken Burns) e fades (dissolve)
+     * à foto, derivando o progresso do clipe a partir do frame atual do playhead.
+     */
+    applyPhotoEffects(imgEl, cut, currentFrame) {
+        const effects = cut.effects || [];
+        const fps = TIMELINE_STATE.fps || 24;
+        const durFrames = Math.max(1, cut.outFrame - cut.inFrame);
+        const p = Math.min(1, Math.max(0, (currentFrame - cut.timelineStartFrame) / durFrames));
+
+        // Enquadramento
+        const fit = effects.find(e => e.type === "fit");
+        imgEl.style.objectFit = (fit && fit.mode === "fit") ? "contain" : "cover";
+        imgEl.style.transformOrigin = "center center";
+
+        // Movimento (Ken Burns) ou crop estático
+        const kb = effects.find(e => e.type === "ken_burns");
+        const tf = effects.find(e => e.type === "transform");
+        let scale = 1, tx = 0, ty = 0;
+        if (kb) {
+            const ease = kb.easing === "easeInOut"
+                ? (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2)
+                : p;
+            const from = kb.from || {}, to = kb.to || {};
+            const fs = from.scale ?? 1, ts = to.scale ?? 1;
+            const fx = from.x ?? 0, txx = to.x ?? 0;
+            const fy = from.y ?? 0, tyy = to.y ?? 0;
+            scale = fs + (ts - fs) * ease;
+            tx = fx + (txx - fx) * ease;
+            ty = fy + (tyy - fy) * ease;
+        } else if (tf) {
+            scale = tf.scale ?? 1; tx = tf.x ?? 0; ty = tf.y ?? 0;
+        }
+        imgEl.style.transform = `translate(${tx}%, ${ty}%) scale(${scale})`;
+
+        // Fades (dissolve) de entrada/saída por opacidade
+        let opacity = 1;
+        const tIn = (currentFrame - cut.timelineStartFrame) / fps;                       // s desde o início
+        const tOut = (cut.timelineStartFrame + durFrames - currentFrame) / fps;          // s até o fim
+        effects.filter(e => e.type === "crossfade").forEach(cf => {
+            const d = Math.max(0.05, cf.duration_s || 0.5);
+            if (cf.side === "in" && tIn < d) opacity = Math.min(opacity, Math.max(0, tIn / d));
+            if (cf.side === "out" && tOut < d) opacity = Math.min(opacity, Math.max(0, tOut / d));
+        });
+        imgEl.style.opacity = String(opacity);
     }
 
     /** Elemento <audio> dedicado de uma pista (criado sob demanda, fora do DOM visível). */
