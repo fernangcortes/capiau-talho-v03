@@ -363,6 +363,18 @@ button {
     pointer-events: none;
 }
 
+/* Suporte para ocultar sidebars maximizados quando recolhidos */
+.sidebar-left.sidebar-maximized.collapsed, .sidebar-right.sidebar-maximized.collapsed {
+    display: none !important;
+}
+
+/* Ocultar abas e filtros/toolbar da biblioteca */
+.sidebar-left.filters-collapsed .media-tabs,
+.sidebar-left.filters-collapsed #library-filter-bar {
+    display: none !important;
+}
+
+
 .sidebar-header {
     display: flex;
     align-items: center;

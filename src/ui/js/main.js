@@ -1147,6 +1147,26 @@ window.addEventListener("DOMContentLoaded", () => {
     if (reopenRight) reopenRight.addEventListener("click", () => expandSidebar("right"));
     if (reopenTimeline) reopenTimeline.addEventListener("click", () => expandSidebar("timeline"));
 
+    // Alternar filtros/abas da biblioteca de mídias (hide/show)
+    const btnToggleFilters = document.getElementById("btn-toggle-library-filters");
+    if (btnToggleFilters && sidebarLeft) {
+        btnToggleFilters.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const isHidden = sidebarLeft.classList.toggle("filters-collapsed");
+            const icon = btnToggleFilters.querySelector("i");
+            if (icon) {
+                if (isHidden) {
+                    icon.className = "fa-solid fa-eye-slash";
+                    btnToggleFilters.title = "Mostrar Filtros/Abas";
+                } else {
+                    icon.className = "fa-solid fa-eye";
+                    btnToggleFilters.title = "Ocultar Filtros/Abas";
+                }
+            }
+            window.dispatchEvent(new Event("resize"));
+        });
+    }
+
     // ── CONFIGURAÇÃO DO CABEÇALHO RETRÁTIL ──
     const appContainer = document.querySelector(".app-container");
     const btnCollapseHeader = document.getElementById("btn-collapse-header");
