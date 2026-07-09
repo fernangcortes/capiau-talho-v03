@@ -57,3 +57,64 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
     * **Vertical:** A tooltip se projeta acima do elemento por padrão. Caso passe do topo da janela (Y < 8px), ela se inverte automaticamente para baixo.
     * **Horizontal:** Caso atinja os cantos laterais esquerdo ou direito do navegador, o script limita seu valor horizontal em pixels para mantê-la visível na tela.
   * **Injeção Dinâmica:** O `MutationObserver` em `main.js` intercepta qualquer injeção HTML dinâmica e converte automaticamente tags `title` em atributos `data-tooltip`, integrando-as no motor global.
+
+---
+
+## 6. Linhas Restauradoras para Painéis Retráteis (Restore Lines)
+* **Objetivo:** Oferecer um mecanismo de reabertura não-invasivo, fino e integrado ao layout flex para qualquer painel, sidebar, aba ou janela que possua funcionalidade de show/hide (retração). A linha deve ser sempre visível e acessível sem sobrepor o conteúdo principal.
+* **Padrão Visual:**
+  * Quando um painel retrátil é colapsado (largura ou altura vai para `0px`), uma **linha finíssima de 4px** aparece exatamente no local onde o painel ficava, inserida diretamente no fluxo flexbox (nunca com `position: absolute`).
+  * A linha usa cores temáticas translúcidas de acordo com o grupo funcional do painel:
+    * **Violeta/Roxo** (`rgba(139, 92, 246, ...)`) — para barras de ferramentas e toolbars.
+    * **Ciano** (`rgba(6, 182, 212, ...)`) — para cabeçalhos de pistas, headers e abas de navegação.
+    * **Rose** (`rgba(244, 63, 94, ...)`) — para painéis de configuração ou elementos destrutivos.
+    * **Emerald** (`rgba(16, 185, 129, ...)`) — para painéis de mídia ou saída.
+  * A linha possui `data-tooltip` explicando sua função (ex: "Expandir Barra de Ferramentas").
+
+* **Regra Crítica — Largura Fixa (Anti-Flicker):**
+  * A largura da linha **NUNCA deve mudar no hover**. Alterar a largura de um elemento no fluxo flex causa layout shifts que disparam `ResizeObserver` em canvas e redimensionam painéis adjacentes, gerando um efeito de "piscar" (flicker) visível ao usuário.
+  * No hover, apenas propriedades **visuais** devem mudar: `background` (mais opaco) e `box-shadow` (glow). A propriedade `width` deve ser omitida da `transition`.
+
+* **CSS de Referência:**
+  ```css
+  .restore-line {
+      width: 4px;
+      height: 100%;
+      background: rgba(COR_TEMATICA, 0.15);
+      border-right: 1px solid rgba(COR_TEMATICA, 0.3);
+      cursor: pointer;
+      z-index: 100;
+      transition: background 0.2s, box-shadow 0.2s;  /* SEM width */
+      flex-shrink: 0;
+  }
+  .restore-line:hover {
+      background: rgba(COR_TEMATICA, 0.85);
+      box-shadow: 0 0 10px rgba(COR_TEMATICA, 0.6);
+  }
+  ```
+
+* **HTML de Referência:**
+  ```html
+  <!-- Inserir DENTRO do contêiner flex, na posição exata onde o painel ficava -->
+  <div id="reopen-NOME" class="NOME-restore-line" data-tooltip="Expandir NOME_DO_PAINEL" style="display: none;"></div>
+  ```
+
+* **JavaScript de Referência:**
+  ```javascript
+  // Ao colapsar o painel:
+  painel.classList.add("collapsed");
+  linhaRestauradora.style.display = "block";
+  window.dispatchEvent(new Event("resize"));
+
+  // Ao clicar na linha para restaurar:
+  linhaRestauradora.addEventListener("click", () => {
+      painel.classList.remove("collapsed");
+      linhaRestauradora.style.display = "none";
+      window.dispatchEvent(new Event("resize"));
+  });
+  ```
+
+* **Posicionamento no DOM:**
+  * A linha restauradora deve ser um **irmão direto** no mesmo contêiner flex do painel colapsado, posicionada logo após o painel no fluxo do DOM.
+  * **Nunca usar `position: absolute`** — isso causa sobreposições, problemas de z-index e inacessibilidade quando múltiplos painéis estão colapsados simultaneamente.
+  * O painel colapsado deve usar `width: 0px !important; opacity: 0; pointer-events: none;` com transição suave.

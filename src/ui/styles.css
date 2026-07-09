@@ -1659,8 +1659,8 @@ button {
 .timeline-track-area {
     display: flex;
     flex-direction: column;
-    padding: 16px;
-    gap: 12px;
+    padding: 0;
+    gap: 0;
     background: rgba(0, 0, 0, 0.2);
     flex: 1;
 }
@@ -3664,5 +3664,326 @@ select option, .nle-select option {
     border: none !important;
     box-shadow: none !important;
 }
+
+/* ── TIMELINE VERTICAL TOOLBAR ────────────────────────────────────── */
+.timeline-actions-sidebar {
+    width: 36px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    justify-content: center;
+    background: rgba(10, 10, 12, 0.65);
+    border-right: 1px solid var(--border-glass);
+    z-index: 20;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 3px;
+    gap: 2px;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease, opacity 0.3s ease, border-right 0.3s ease;
+}
+
+/* Scrollbar sutil para caso o container overflow */
+.timeline-actions-sidebar::-webkit-scrollbar {
+    width: 3px;
+}
+.timeline-actions-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+}
+
+.timeline-actions-sidebar.cols-1 {
+    width: 36px !important;
+}
+.timeline-actions-sidebar.cols-2 {
+    width: 68px !important;
+}
+
+.timeline-actions-sidebar.collapsed {
+    width: 0px !important;
+    padding: 3px 0 !important;
+    opacity: 0;
+    pointer-events: none;
+    border-right: none !important;
+}
+
+/* Header toolbar layout for close/cycle buttons */
+.toolbar-header {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    flex-shrink: 0;
+}
+.timeline-actions-sidebar.cols-1 .toolbar-header {
+    flex-direction: column;
+}
+
+/* Divider inside toolbar acts as row-break */
+.toolbar-divider {
+    width: 100%;
+    height: 1px;
+    background: var(--border-glass);
+    margin: 2px 0;
+    flex-shrink: 0;
+}
+
+/* Oculta os divisores e espacadores em modo cols-2 para permitir empacotamento denso */
+.timeline-actions-sidebar.cols-2 .toolbar-divider,
+.timeline-actions-sidebar.cols-2 .toolbar-spacer {
+    display: none !important;
+}
+
+/* Sections inside toolbar wrap buttons horizontally based on available width */
+.toolbar-section {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+/* Buttons in toolbar */
+.btn-toolbar-action {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 11px;
+    transition: transform var(--transition-fast), color var(--transition-fast), text-shadow var(--transition-fast);
+}
+
+.btn-toolbar-action:hover {
+    transform: scale(1.1);
+    color: #fff;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+/* Save / Undo / Redo / etc active transitions */
+#btn-save-timeline:hover {
+    color: var(--color-cyan);
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+#btn-load-timeline:hover {
+    color: #eab308;
+    text-shadow: 0 0 8px #eab308;
+}
+#btn-rename-timeline:hover {
+    color: var(--color-cyan);
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+#btn-undo-timeline:hover:not([style*="opacity: 0.4"]) {
+    color: var(--color-violet);
+    text-shadow: 0 0 8px var(--color-violet);
+}
+#btn-redo-timeline:hover:not([style*="opacity: 0.4"]) {
+    color: var(--color-violet);
+    text-shadow: 0 0 8px var(--color-violet);
+}
+#btn-ai-suggest:hover {
+    color: #22c55e !important;
+    text-shadow: 0 0 8px #22c55e;
+}
+#btn-export-timeline:hover {
+    color: var(--color-cyan);
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+#btn-timeline-help:hover {
+    color: var(--text-primary);
+}
+#btn-popout-timeline:hover {
+    color: var(--color-cyan);
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+#toggle-timeline:hover {
+    color: var(--color-rose);
+    text-shadow: 0 0 8px var(--color-rose);
+}
+
+/* Invisible Select Overlay inside toolbar button */
+.select-wrapper-btn {
+    position: relative;
+}
+.toolbar-invisible-select {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+.toolbar-invisible-select option {
+    background-color: #121218 !important;
+    color: #e2e8f0 !important;
+}
+
+/* Toolbar toggle button at top */
+.btn-toolbar-toggle {
+    width: 28px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+.timeline-actions-sidebar.cols-1 .btn-toolbar-toggle {
+    width: 100%;
+}
+.btn-toolbar-toggle:hover {
+    color: var(--color-cyan);
+}
+
+/* ── TRACK HEADERS RETRACION ───────────────────────────────────────── */
+.timeline-headers-sidebar {
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, border-right 0.3s ease;
+}
+.timeline-headers-sidebar.collapsed {
+    width: 0px !important;
+    opacity: 0;
+    pointer-events: none;
+    border-right: none !important;
+}
+
+/* Restaura a barra de ferramentas (linha finíssima que brilha no hover, sem alterar largura para evitar flicker do canvas) */
+.toolbar-restore-line {
+    width: 4px;
+    height: 100%;
+    background: rgba(139, 92, 246, 0.15);
+    border-right: 1px solid rgba(139, 92, 246, 0.3);
+    cursor: pointer;
+    z-index: 100;
+    transition: background 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+}
+.toolbar-restore-line:hover {
+    background: rgba(139, 92, 246, 0.85);
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
+}
+
+/* Restaura os cabeçalhos de pistas (linha finíssima que brilha no hover, sem alterar largura para evitar flicker do canvas) */
+.headers-restore-line {
+    width: 4px;
+    height: 100%;
+    background: rgba(6, 182, 212, 0.15);
+    border-right: 1px solid rgba(6, 182, 212, 0.3);
+    cursor: pointer;
+    z-index: 100;
+    transition: background 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+}
+.headers-restore-line:hover {
+    background: rgba(6, 182, 212, 0.85);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
+}
+
+/* Botão de colapso de pistas no ruler */
+#btn-toggle-headers {
+    transition: transform 0.2s;
+}
+#btn-toggle-headers:hover {
+    transform: scale(1.2);
+}
+
+/* ── BOTÕES DE PISTA FLAT E GLOWS (NLE DESIGN SYSTEM) ────────────────── */
+.btn-track-action {
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--transition-fast), color var(--transition-fast), text-shadow var(--transition-fast);
+}
+
+.btn-track-action:hover {
+    transform: scale(1.1);
+}
+
+.btn-track-magnet {
+    transition: color 0.2s, text-shadow 0.2s, transform 0.2s;
+}
+.btn-track-magnet:hover {
+    transform: scale(1.15);
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+
+.btn-track-lock {
+    transition: color 0.2s, text-shadow 0.2s, transform 0.2s;
+}
+.btn-track-lock:hover {
+    transform: scale(1.15);
+    color: var(--color-rose) !important;
+    text-shadow: 0 0 8px var(--color-rose);
+}
+
+.btn-track-mute {
+    transition: color 0.2s, text-shadow 0.2s, transform 0.2s;
+}
+.btn-track-mute:hover {
+    transform: scale(1.15);
+    color: var(--color-emerald, #10b981) !important;
+    text-shadow: 0 0 8px var(--color-emerald, #10b981);
+}
+
+.btn-track-remove {
+    transition: color 0.2s, text-shadow 0.2s, transform 0.2s;
+}
+.btn-track-remove:hover {
+    transform: scale(1.2);
+    color: var(--color-rose) !important;
+    text-shadow: 0 0 8px var(--color-rose);
+}
+
+.btn-track-ai-run {
+    transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.btn-track-ai-run:hover {
+    transform: scale(1.05);
+    background: rgba(34, 197, 94, 0.18) !important;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.35);
+}
+
+/* ── NOTIFICAÇÃO FLUTUANTE DE STATUS DE IA ───────────────────────── */
+.panel-header {
+    display: none;
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    z-index: 50;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 6px 10px;
+    pointer-events: none;
+}
+.panel-header:has(.fa-spin) {
+    display: flex !important;
+}
+
 
 

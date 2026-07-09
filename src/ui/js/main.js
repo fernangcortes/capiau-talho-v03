@@ -1227,6 +1227,80 @@ window.addEventListener("DOMContentLoaded", () => {
     if (reopenRight) reopenRight.addEventListener("click", () => expandSidebar("right"));
     if (reopenTimeline) reopenTimeline.addEventListener("click", () => expandSidebar("timeline"));
 
+    // ── CONFIGURAÇÃO DE RETRAÇÃO DO NOVO TOOLBAR E CABEÇALHOS DA TIMELINE ──
+    const timelineActionsSidebar = document.getElementById("timeline-actions-sidebar");
+    const timelineHeadersSidebar = document.getElementById("timeline-headers-sidebar");
+    const btnToggleToolbar = document.getElementById("btn-toggle-toolbar");
+    const btnToggleHeaders = document.getElementById("btn-toggle-headers");
+    const reopenToolbar = document.getElementById("reopen-toolbar");
+    const reopenHeaders = document.getElementById("reopen-headers");
+    const btnCycleColumns = document.getElementById("btn-cycle-columns");
+
+    if (btnToggleToolbar && timelineActionsSidebar && reopenToolbar) {
+        btnToggleToolbar.addEventListener("click", () => {
+            timelineActionsSidebar.classList.add("collapsed");
+            reopenToolbar.style.display = "block";
+            window.dispatchEvent(new Event("resize"));
+        });
+    }
+
+    if (reopenToolbar && timelineActionsSidebar) {
+        reopenToolbar.addEventListener("click", () => {
+            timelineActionsSidebar.classList.remove("collapsed");
+            reopenToolbar.style.display = "none";
+            window.dispatchEvent(new Event("resize"));
+        });
+    }
+
+    if (btnToggleHeaders && timelineHeadersSidebar && reopenHeaders) {
+        btnToggleHeaders.addEventListener("click", () => {
+            timelineHeadersSidebar.classList.add("collapsed");
+            reopenHeaders.style.display = "block";
+            window.dispatchEvent(new Event("resize"));
+        });
+    }
+
+    if (reopenHeaders && timelineHeadersSidebar) {
+        reopenHeaders.addEventListener("click", () => {
+            timelineHeadersSidebar.classList.remove("collapsed");
+            reopenHeaders.style.display = "none";
+            window.dispatchEvent(new Event("resize"));
+        });
+    }
+
+    // Alternar colunas do toolbar vertical (1 ou 2 colunas de botões)
+    if (btnCycleColumns && timelineActionsSidebar) {
+        btnCycleColumns.addEventListener("click", () => {
+            if (timelineActionsSidebar.classList.contains("cols-1")) {
+                timelineActionsSidebar.classList.remove("cols-1");
+                timelineActionsSidebar.classList.add("cols-2");
+            } else {
+                timelineActionsSidebar.classList.remove("cols-2");
+                timelineActionsSidebar.classList.add("cols-1");
+            }
+            window.dispatchEvent(new Event("resize"));
+        });
+    }
+
+    // ── GATILHO E SINCRONIZAÇÃO DE RENOMEAR TIMELINE ──
+    const btnRenameTimeline = document.getElementById("btn-rename-timeline");
+    const timelineNameInput = document.getElementById("timeline-name-input");
+    if (btnRenameTimeline && timelineNameInput) {
+        btnRenameTimeline.addEventListener("click", () => {
+            const currentName = timelineNameInput.value || "Versão sem nome";
+            const newName = prompt("Renomear a timeline atual:", currentName);
+            if (newName !== null && newName.trim() !== "") {
+                timelineNameInput.value = newName.trim();
+                btnRenameTimeline.setAttribute("data-tooltip", `Renomear Timeline (Atual: ${newName.trim()})`);
+                timelineNameInput.dispatchEvent(new Event("change"));
+            }
+        });
+        
+        if (timelineNameInput.value) {
+            btnRenameTimeline.setAttribute("data-tooltip", `Renomear Timeline (Atual: ${timelineNameInput.value})`);
+        }
+    }
+
     // Alternar filtros/abas da biblioteca de mídias (hide/show)
     const btnToggleFilters = document.getElementById("btn-toggle-library-filters");
     if (btnToggleFilters && sidebarLeft) {

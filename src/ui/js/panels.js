@@ -1110,8 +1110,8 @@ export class PanelsManager {
                 const kindIcon = isAudio
                     ? `<i class="fa-solid fa-music" style="font-size: 8px; color: var(--color-emerald, #10b981);"></i> `
                     : "";
-                const magnetBtn = isAudio ? "" : `<button class="btn-track-magnet" title="${track.magnetic ? 'Pista magnética (ripple): clipes ficam grudados em sequência' : 'Pista livre: posicionamento manual'}" style="border: none; background: none; color: ${magnetColor}; cursor: pointer; padding: 0; font-size: 9px;"><i class="fa-solid fa-magnet"></i></button>`;
-                const muteBtn = isAudio ? `<button class="btn-track-mute" title="Mutar Trilha" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 10px;">${muteIcon}</button>` : "";
+                const magnetBtn = isAudio ? "" : `<button class="btn-track-magnet btn-track-action" title="${track.magnetic ? 'Pista magnética (ripple): clipes ficam grudados em sequência' : 'Pista livre: posicionamento manual'}" style="color: ${magnetColor}; font-size: 9px;"><i class="fa-solid fa-magnet"></i></button>`;
+                const muteBtn = isAudio ? `<button class="btn-track-mute btn-track-action" title="Mutar Trilha" style="color: var(--text-secondary); font-size: 10px;">${muteIcon}</button>` : "";
                 const volumeSlider = isAudio ? `<input type="range" class="slider-track-volume" min="0" max="1" step="0.1" value="${track.volume}" style="width: 100%; height: 3px; accent-color: var(--color-cyan); cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">` : "";
 
                 row.innerHTML = `
@@ -1119,9 +1119,9 @@ export class PanelsManager {
                         <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">${kindIcon}${track.id} ${track.name}</span>
                         <div style="display: flex; gap: 4px; flex-shrink: 0;">
                             ${magnetBtn}
-                            <button class="btn-track-lock" title="Travar/Destravar pista" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 9px;">${lockIcon}</button>
+                            <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
                             ${muteBtn}
-                            <button class="btn-track-remove" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="border: none; background: none; color: var(--text-muted); cursor: pointer; padding: 0; font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
+                            <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     </div>
                     ${volumeSlider}
@@ -1215,7 +1215,14 @@ export class PanelsManager {
             });
 
             const nameInput = getActiveElement("timeline-name-input");
-            if (nameInput) nameInput.value = detail.name || `Timeline ${timelineId}`;
+            if (nameInput) {
+                const newName = detail.name || `Timeline ${timelineId}`;
+                nameInput.value = newName;
+                const btnRename = getActiveElement("btn-rename-timeline");
+                if (btnRename) {
+                    btnRename.setAttribute("data-tooltip", `Renomear Timeline (Atual: ${newName})`);
+                }
+            }
 
             console.log(`[Timeline] Timeline ${timelineId} carregada: ${cuts.length} clipes, ${TIMELINE_STATE.tracks.length} pistas.`);
         } catch (e) {
