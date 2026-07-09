@@ -406,7 +406,14 @@ function renderTreeNode(node, container, depth = 0) {
         card.addEventListener("click", () => {
             STATE.activeVideo = v;
         });
-        
+
+        // Arrastar-e-soltar do vídeo para a timeline
+        card.draggable = true;
+        card.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({ type: "video", id: v.id }));
+            e.dataTransfer.effectAllowed = "copy";
+        });
+
         // Listener para alternar título
         const toggleBtn = card.querySelector(".btn-toggle-filename");
         if (toggleBtn) {
@@ -609,6 +616,17 @@ export class LibraryManager {
         }
         if (this.btnAnalyzePhoto) {
             this.btnAnalyzePhoto.addEventListener("click", () => this.analyzeCurrentPhoto());
+        }
+
+        const btnAddPhotoTimeline = document.getElementById("btn-add-photo-timeline");
+        if (btnAddPhotoTimeline) {
+            btnAddPhotoTimeline.addEventListener("click", () => {
+                const photo = this.currentLightboxPhoto || (STATE.currentPhotoList || [])[STATE.currentPhotoIndex];
+                if (!photo || !window.TIMELINE_STATE) return;
+                const durInput = document.getElementById("photo-viewer-duration");
+                const durationSec = durInput ? parseFloat(durInput.value) : undefined;
+                window.TIMELINE_STATE.addPhotoCut(photo.id, { durationSec });
+            });
         }
 
         document.addEventListener("keydown", (e) => {
@@ -973,11 +991,32 @@ export class LibraryManager {
             
             card.innerHTML = `
                 ${imgHtml}
+                <button class="btn-photo-add-timeline" title="Adicionar à timeline (still)" style="position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:5px; border:none; background:rgba(6,182,212,0.9); color:#00141a; font-size:11px; cursor:pointer; z-index:3; display:none; align-items:center; justify-content:center;"><i class="fa-solid fa-plus"></i></button>
                 <p title="${p.description || p.filename}">${p.description || p.filename}</p>
             `;
-            
+
             if (clickEnabled) {
                 card.style.cursor = "pointer";
+                card.style.position = "relative";
+
+                // Arrastar-e-soltar da foto para a timeline
+                card.draggable = true;
+                card.addEventListener("dragstart", (e) => {
+                    e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({ type: "photo", id: p.id }));
+                    e.dataTransfer.effectAllowed = "copy";
+                });
+
+                // Botão "+" flutuante (aparece no hover) para adicionar à timeline
+                const addBtn = card.querySelector(".btn-photo-add-timeline");
+                if (addBtn) {
+                    card.addEventListener("mouseenter", () => { addBtn.style.display = "flex"; });
+                    card.addEventListener("mouseleave", () => { addBtn.style.display = "none"; });
+                    addBtn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        if (window.TIMELINE_STATE) window.TIMELINE_STATE.addPhotoCut(p.id, {});
+                    });
+                }
+
                 card.addEventListener("click", () => {
                     if (STATE.openPhotosInPlayer) {
                         STATE.activePhoto = p;
@@ -1054,6 +1093,7 @@ export class LibraryManager {
     // Lightbox / Visualizador de Fotos
     openLightbox(photo) {
         if (!this.lightbox) return;
+        this.currentLightboxPhoto = photo;
         this.lightbox.style.display = "flex";
         this.lightboxImg.src = photo.proxy_path ? photo.proxy_path : photo.filepath;
         this.lightboxTitle.textContent = photo.filename;
