@@ -239,6 +239,25 @@ export class CapIAuAPI {
         });
     }
 
+    static renameSpeaker(videoId, oldSpeakerId, newSpeakerId, globalRename = false, startTime = null, endTime = null) {
+        return this.request(`/api/video/${videoId}/rename-speaker`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                old_speaker_id: oldSpeakerId,
+                new_speaker_id: newSpeakerId,
+                global_rename: globalRename,
+                start_time: startTime,
+                end_time: endTime
+            })
+        });
+    }
+
+    static fetchDiarizationClues(videoId, silenceThreshold = 1.2, enableSilence = true, enableQuestions = true, enableFaces = true) {
+        return this.request(`/api/video/${videoId}/diarization-clues?silence_threshold=${silenceThreshold}&enable_silence=${enableSilence}&enable_questions=${enableQuestions}&enable_faces=${enableFaces}`);
+    }
+
+
     static chat(projectId, message, history, clips = null, tracks = null, fps = 24.0, agentModel = null, customApiKey = null) {
         const bodyData = { message, history };
         if (clips !== null) {

@@ -32,8 +32,8 @@ Ao contrário das ferramentas tradicionais que tratam a IA de forma isolada, o C
 * **🖥️ Janelas Destacáveis (Workspaces Multi-monitores):** Destaque a Biblioteca, Timeline, Players ou Chatbot em janelas independentes. Elas mantêm sincronia de playhead, seleções e comandos em tempo real usando `BroadcastChannel`.
 * **📂 Visualização em Árvore Inteligente:** Navegue por acervos gigantes organizados dinamicamente em pastas e subpastas hierárquicas colapsadas no estilo Explorer de arquivos, eliminando a poluição visual na biblioteca.
 * **📸 Suporte a Fotos Still & Efeitos Ken Burns:** Permite inserir fotos do set (incluindo RAW) como stills na timeline com arrastar-e-soltar. Possibilita animar movimentos suaves (Ken Burns), ajustar enquadramento (Fit/Fill) e fades por meio do Inspetor de Foto e compose no Program Player.
-* **🎛️ Workspace "Montagem":** Novo preset que maximiza a biblioteca no topo e estende a timeline horizontalmente na base da tela, otimizando o fluxo de decupagem com monitores flutuantes de Source e Program.
-
+* **🎛️ Layout Estúdio & Controle Flexível (Workspaces):** Preset de interface robusto para decupagem que reposiciona a biblioteca (maximizada) e empilha os players de Source/Program em formato limpo (*controles apenas no hover*). Permite expandir a transcrição como terceira coluna retrátil. Além disso, gerencie a altura vertical das pistas de vídeo e áudio via slider global ou arraste individual pela borda.
+* **🎤 Assistente de Diarização Inteligente:** Fluxo completo para corrigir falantes na transcrição. Inclui uma gaveta de pistas globais (silêncios longos, perguntas e discrepâncias faciais) e um inspetor de balão avançado. O inspetor exibe uma *Waveform Interativa* de fala, permitindo dividir depoimentos com dois cliques precisos, e oferece desambiguação facial instantânea baseada em quem está na tela no milissegundo correspondente.
 ---
 
 ## 📊 Arquitetura Técnica do Sistema

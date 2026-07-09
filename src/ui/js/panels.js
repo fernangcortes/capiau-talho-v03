@@ -190,13 +190,17 @@ export class PanelsManager {
             });
         }
 
+        // Inicializa gaveta do assistente e propriedades do inspetor
+        this.initSpeechAssistant();
+
         // Inicia pooling de progresso de tarefas a cada 2.5 segundos
         this.startTasksProgressLoop();
     }
 
     async onVideoChanged(video) {
+        const scrollFeed = document.getElementById("transcript-feed-scroll") || this.transcriptContainer;
         if (!video) {
-            this.transcriptContainer.innerHTML = `<div class="empty-state-text">Nenhum depoimento selecionado.</div>`;
+            scrollFeed.innerHTML = `<div class="empty-state-text">Nenhum depoimento selecionado.</div>`;
             this.visionContainer.innerHTML = `<div class="empty-state-text">Nenhum B-roll selecionado.</div>`;
             return;
         }
@@ -206,16 +210,16 @@ export class PanelsManager {
 
         // Se for depoimento, carrega transcrição
         if (video.video_type === "interview" || video.status === "transcribed") {
-            this.transcriptContainer.innerHTML = `<div class="loading-state-text">Carregando transcrição...</div>`;
+            scrollFeed.innerHTML = `<div class="loading-state-text">Carregando transcrição...</div>`;
             try {
                 const data = await CapIAuAPI.fetchTranscript(video.id);
                 STATE.activeTranscript = data.dialogues || [];
                 STATE.activeTranscriptWords = data.words || [];
             } catch (e) {
-                this.transcriptContainer.innerHTML = `<div class="empty-state-text">Erro ao obter transcrição. Certifique-se de iniciar o ASR.</div>`;
+                scrollFeed.innerHTML = `<div class="empty-state-text">Erro ao obter transcrição. Certifique-se de iniciar o ASR.</div>`;
             }
         } else {
-            this.transcriptContainer.innerHTML = `<div class="empty-state-text">Mídia classificada como B-Roll. Use a aba "Visão IA" ao lado.</div>`;
+            scrollFeed.innerHTML = `<div class="empty-state-text">Mídia classificada como B-Roll. Use a aba "Visão IA" ao lado.</div>`;
         }
 
         // Se for B-roll, carrega frames
@@ -260,6 +264,13 @@ export class PanelsManager {
         const speakerSpan = document.createElement("span");
         speakerSpan.className = "speaker-name";
         speakerSpan.textContent = d.speaker_id;
+        speakerSpan.style.cursor = "pointer";
+        speakerSpan.title = "Clique para Inspecionar / Renomear Falante";
+        
+        speakerSpan.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.openBubbleInspector(d, bubble);
+        });
         
         const timeSpan = document.createElement("span");
         timeSpan.className = "bubble-time";
@@ -268,17 +279,34 @@ export class PanelsManager {
         metaDiv.appendChild(speakerSpan);
         metaDiv.appendChild(timeSpan);
         
+        // Botão de inspeção/detalhes
+        const inspectBtn = document.createElement("button");
+        inspectBtn.className = "btn-card-action inspect-btn";
+        inspectBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
+        inspectBtn.title = "Ajustar / Inspecionar Falas";
+        inspectBtn.style.marginLeft = "auto";
+        inspectBtn.style.color = "var(--text-muted)";
+        inspectBtn.style.cursor = "pointer";
+        inspectBtn.style.background = "transparent";
+        inspectBtn.style.border = "none";
+        
+        inspectBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.openBubbleInspector(d, bubble);
+        });
+        
         // Botão de tesoura individual para divisão de bloco
         const splitBtn = document.createElement("button");
         splitBtn.className = "btn-card-action split-btn";
         splitBtn.innerHTML = '<i class="fa-solid fa-scissors"></i>';
         splitBtn.title = "Dividir falas (Tesoura)";
-        splitBtn.style.marginLeft = "auto";
+        splitBtn.style.marginLeft = "10px";
         splitBtn.style.color = "var(--text-muted)";
         splitBtn.style.cursor = "pointer";
         splitBtn.style.background = "transparent";
         splitBtn.style.border = "none";
         
+        metaDiv.appendChild(inspectBtn);
         metaDiv.appendChild(splitBtn);
         bubble.appendChild(metaDiv);
         
@@ -309,6 +337,12 @@ export class PanelsManager {
                         player.play();
                     }
                 }
+            });
+            
+            span.addEventListener("contextmenu", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.showCustomContextMenu(e.clientX, e.clientY, w, d, bubble);
             });
             
             if (wIdx > 0) {
@@ -363,15 +397,25 @@ export class PanelsManager {
             }
         });
         
+        bubble.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            if (STATE.activeVideo) {
+                TIMELINE_STATE.addCut(STATE.activeVideo.id, d.start_time, d.end_time, null);
+                STATE.emit("statusChanged", { text: `Trecho de ${d.speaker_id} adicionado à timeline (${formatTimecode(d.start_time)} - ${formatTimecode(d.end_time)}).`, active: true });
+            }
+        });
+        
         return bubble;
     }
 
     renderTranscript(dialogues) {
-        if (!this.transcriptContainer) return;
-        this.transcriptContainer.innerHTML = "";
+        this.activeDialogues = dialogues;
+        const scrollFeed = document.getElementById("transcript-feed-scroll");
+        if (!scrollFeed) return;
+        scrollFeed.innerHTML = "";
         
         if (dialogues.length === 0) {
-            this.transcriptContainer.innerHTML = `<div class="empty-state-text">Transcrição pendente ou vazia. Clique em "Transcrever" na biblioteca.</div>`;
+            scrollFeed.innerHTML = `<div class="empty-state-text">Transcrição pendente ou vazia. Clique em "Transcrever" na biblioteca.</div>`;
             return;
         }
 
@@ -399,7 +443,7 @@ export class PanelsManager {
             if (group.length === 1) {
                 const item = group[0];
                 const bubble = this.createBubbleDOM(item.dialogue, item.originalIndex, dialogues);
-                this.transcriptContainer.appendChild(bubble);
+                scrollFeed.appendChild(bubble);
             } else {
                 const overlapContainer = document.createElement("div");
                 overlapContainer.className = "overlap-row";
@@ -417,10 +461,682 @@ export class PanelsManager {
                     overlapContainer.appendChild(bubble);
                 });
                 
-                this.transcriptContainer.appendChild(overlapContainer);
+                scrollFeed.appendChild(overlapContainer);
+            }
+        });
+        
+        // Sempre fecha o inspetor quando carrega novo vídeo
+        this.closeBubbleInspector();
+        
+        // Busca pistas globais em background se a gaveta não estiver colapsada
+        if (this.assistantDrawer && !this.assistantDrawer.classList.contains("collapsed")) {
+            this.loadDiarizationClues();
+        }
+    }
+
+    /* ── MÉTODOS DO ASSISTENTE DE FALAS E INSPETOR DE DIARIZAÇÃO ── */
+    initSpeechAssistant() {
+        this.assistantDrawer = document.getElementById("speech-assistant-drawer");
+        this.btnToggleDrawer = document.getElementById("btn-toggle-assistant-drawer");
+        
+        if (this.assistantDrawer && this.btnToggleDrawer) {
+            this.drawerContent = this.assistantDrawer.querySelector(".drawer-content");
+            this.toggleIcon = this.assistantDrawer.querySelector(".toggle-icon");
+            this.btnUpdateClues = document.getElementById("btn-update-clues");
+            this.inspectorPanel = document.getElementById("bubble-inspector-panel");
+            
+            this.btnToggleDrawer.addEventListener("click", () => this.toggleAssistantDrawer());
+            
+            if (this.btnUpdateClues) {
+                this.btnUpdateClues.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    this.loadDiarizationClues();
+                });
+            }
+            
+            // Ouvintes de alteração automática nas configurações de pista
+            const chkSilence = document.getElementById("chk-enable-silence");
+            const chkQuestions = document.getElementById("chk-enable-questions");
+            const chkFaces = document.getElementById("chk-enable-faces");
+            const numThreshold = document.getElementById("num-silence-threshold");
+            
+            if (chkSilence) chkSilence.addEventListener("change", () => this.loadDiarizationClues());
+            if (chkQuestions) chkQuestions.addEventListener("change", () => this.loadDiarizationClues());
+            if (chkFaces) chkFaces.addEventListener("change", () => this.loadDiarizationClues());
+            if (numThreshold) numThreshold.addEventListener("change", () => this.loadDiarizationClues());
+        }
+    }
+
+    toggleAssistantDrawer() {
+        if (!this.assistantDrawer) return;
+        const isCollapsed = this.assistantDrawer.classList.contains("collapsed");
+        if (isCollapsed) {
+            this.assistantDrawer.classList.remove("collapsed");
+            this.drawerContent.style.maxHeight = "300px";
+            this.toggleIcon.style.transform = "rotate(180deg)";
+            this.loadDiarizationClues();
+        } else {
+            this.assistantDrawer.classList.add("collapsed");
+            this.drawerContent.style.maxHeight = "0px";
+            this.toggleIcon.style.transform = "rotate(0deg)";
+        }
+    }
+
+    async loadDiarizationClues() {
+        if (!STATE.activeVideo) return;
+        const silenceThreshold = parseFloat(document.getElementById("num-silence-threshold").value) || 1.2;
+        const enableSilence = document.getElementById("chk-enable-silence").checked;
+        const enableQuestions = document.getElementById("chk-enable-questions").checked;
+        const enableFaces = document.getElementById("chk-enable-faces").checked;
+        
+        const cluesList = document.getElementById("assistant-clues-list");
+        if (!cluesList) return;
+        cluesList.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: 10px; text-align: center; padding: 10px 0;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando pistas...</div>`;
+        
+        try {
+            const clues = await CapIAuAPI.fetchDiarizationClues(
+                STATE.activeVideo.id,
+                silenceThreshold,
+                enableSilence,
+                enableQuestions,
+                enableFaces
+            );
+            
+            cluesList.innerHTML = "";
+            if (clues.length === 0) {
+                cluesList.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: 10px; text-align: center; padding: 10px 0;">Nenhuma pista detectada com as configurações atuais.</div>`;
+                return;
+            }
+            
+            clues.forEach(clue => {
+                const card = document.createElement("div");
+                card.className = "clue-card";
+                
+                let badgeClass = "";
+                let badgeLabel = "";
+                
+                if (clue.type === "silence") {
+                    badgeClass = "silence";
+                    badgeLabel = `Pausa: ${clue.duration}s`;
+                } else if (clue.type === "question") {
+                    badgeClass = "question";
+                    badgeLabel = "Pergunta";
+                } else if (clue.type === "face") {
+                    badgeClass = "face";
+                    badgeLabel = `Rosto: ${clue.face_name}`;
+                }
+                
+                card.innerHTML = `
+                    <div class="clue-meta" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <span class="clue-badge ${badgeClass}">${badgeLabel}</span>
+                        <span style="color:var(--text-muted); font-size:9px;">${formatTimecode(clue.timestamp)}</span>
+                    </div>
+                    <div class="clue-context" style="font-style:italic; color:var(--text-muted); font-size:10px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">"${clue.context}"</div>
+                    <div class="clue-actions" style="display:flex; gap:6px; margin-top:6px;">
+                        <button class="btn-flat-action cyan btn-listen-clue" style="font-size:9px; padding:2px 4px; background:rgba(6, 182, 212, 0.1) !important; border-radius:3px;"><i class="fa-solid fa-play"></i> Ouvir</button>
+                        <button class="btn-flat-action rose btn-inspect-clue" style="font-size:9px; padding:2px 4px; background:rgba(244, 63, 94, 0.1) !important; border-radius:3px;"><i class="fa-solid fa-magnifying-glass"></i> Ajustar</button>
+                    </div>
+                `;
+                
+                card.querySelector(".btn-listen-clue").addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const player = document.getElementById("source-video");
+                    if (player) {
+                        player.currentTime = Math.max(0, clue.timestamp - 2);
+                        player.play();
+                    }
+                });
+                
+                card.querySelector(".btn-inspect-clue").addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    this.inspectBubbleByTime(clue.timestamp);
+                });
+                
+                cluesList.appendChild(card);
+            });
+        } catch (err) {
+            cluesList.innerHTML = `<div style="color: var(--color-rose); font-size: 10px; text-align: center; padding: 10px 0;">Erro: ${err.message}</div>`;
+        }
+    }
+
+    inspectBubbleByTime(timestamp) {
+        const bubbles = document.querySelectorAll(".transcript-bubble");
+        let targetBubble = null;
+        let targetDialogue = null;
+        
+        bubbles.forEach(bubble => {
+            const index = parseInt(bubble.getAttribute("data-dialogue-index"));
+            const dial = this.activeDialogues[index];
+            if (dial && dial.start_time <= timestamp && dial.end_time >= timestamp) {
+                targetBubble = bubble;
+                targetDialogue = dial;
+            }
+        });
+        
+        if (!targetBubble && bubbles.length > 0) {
+            let minDist = Infinity;
+            bubbles.forEach(bubble => {
+                const index = parseInt(bubble.getAttribute("data-dialogue-index"));
+                const dial = this.activeDialogues[index];
+                if (dial) {
+                    const dist = Math.min(Math.abs(dial.start_time - timestamp), Math.abs(dial.end_time - timestamp));
+                    if (dist < minDist) {
+                        minDist = dist;
+                        targetBubble = bubble;
+                        targetDialogue = dial;
+                    }
+                }
+            });
+        }
+        
+        if (targetBubble && targetDialogue) {
+            targetBubble.scrollIntoView({ behavior: "smooth", block: "center" });
+            targetBubble.classList.add("highlight-glow");
+            setTimeout(() => targetBubble.classList.remove("highlight-glow"), 3000);
+            this.openBubbleInspector(targetDialogue, targetBubble);
+        }
+    }
+
+    async openBubbleInspector(d, bubble) {
+        if (!this.inspectorPanel) return;
+        
+        // Expand right sidebar to 700px
+        const sidebar = document.getElementById("sidebar-right");
+        if (sidebar) {
+            sidebar.style.width = "700px";
+            window.dispatchEvent(new Event("resize"));
+        }
+        
+        this.inspectorPanel.style.display = "flex";
+        this.inspectorPanel.innerHTML = "";
+        
+        // Renderiza cabeçalho do inspetor
+        const header = document.createElement("div");
+        header.className = "inspector-header";
+        header.innerHTML = `
+            <span><i class="fa-solid fa-magnifying-glass-chart"></i> Inspetor de Falas</span>
+            <button id="btn-close-inspector" class="btn-flat-action" title="Fechar Inspetor" style="color:var(--text-secondary); font-size:14px; background:none; border:none; cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+        `;
+        header.querySelector("#btn-close-inspector").addEventListener("click", () => this.closeBubbleInspector());
+        this.inspectorPanel.appendChild(header);
+        
+        const body = document.createElement("div");
+        body.className = "inspector-body";
+        
+        // Seção 1: Texto selecionado
+        const secText = document.createElement("div");
+        secText.innerHTML = `
+            <div class="inspector-section-title"><i class="fa-solid fa-quote-left" style="color:var(--color-cyan);"></i> Trecho Selecionado</div>
+            <div style="font-size:11px; color:#fff; line-height:1.4; padding:8px; background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:6px; font-style:italic;">
+                "${d.text}"
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:10px; color:var(--text-muted);">
+                <span>Início: ${formatTimecode(d.start_time)}</span>
+                <span>Fim: ${formatTimecode(d.end_time)}</span>
+            </div>
+        `;
+        body.appendChild(secText);
+        
+        // Seção 2: Waveform Canvas
+        const secWave = document.createElement("div");
+        secWave.innerHTML = `
+            <div class="inspector-section-title"><i class="fa-solid fa-chart-simple" style="color:var(--color-rose);"></i> Waveform de Fala & Silêncio</div>
+            <div class="waveform-container">
+                <canvas id="inspector-waveform" class="waveform-canvas"></canvas>
+            </div>
+            <div style="font-size:9px; color:var(--text-muted); margin-top:4px; text-align:center;">
+                Clique para navegar. Tracejado rosa indica pausa/corte sugerido.
+            </div>
+        `;
+        body.appendChild(secWave);
+        
+        // Seção 3: Atribuição de Falante
+        const secSpeaker = document.createElement("div");
+        secSpeaker.innerHTML = `
+            <div class="inspector-section-title"><i class="fa-solid fa-user-pen" style="color:var(--color-violet);"></i> Identificação do Falante</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; gap:6px;">
+                    <select id="sel-inspector-speaker" class="nle-select" style="flex:1; padding:6px; border-radius:6px; border:1px solid var(--border-glass); background:rgba(0,0,0,0.3); color:#fff; font-size:11px;">
+                        <!-- Carregado via autocomplete -->
+                    </select>
+                </div>
+                <label style="font-size:10px; color:var(--text-secondary); display:flex; align-items:center; gap:4px; cursor:pointer;">
+                    <input type="checkbox" id="chk-global-rename"> Aplicar a TODOS os blocos de "${d.speaker_id}" neste vídeo
+                </label>
+                <div style="display:flex; gap:6px; margin-top:4px;">
+                    <button id="btn-save-speaker-name" class="btn-flat-action cyan" style="font-weight:600; padding:6px 12px; background:rgba(6, 182, 212, 0.15) !important; border-radius:4px;"><i class="fa-solid fa-floppy-disk"></i> Salvar Rótulo</button>
+                </div>
+            </div>
+        `;
+        body.appendChild(secSpeaker);
+        
+        // Seção 4: Pausas Internas
+        const secLocalSilences = document.createElement("div");
+        secLocalSilences.innerHTML = `
+            <div class="inspector-section-title"><i class="fa-solid fa-scissors" style="color:var(--color-rose);"></i> Sugestões de Divisão Internas</div>
+            <div id="inspector-local-silences-list" style="display:flex; flex-direction:column; gap:6px; font-size:10px;">
+                <!-- Carregado via JS -->
+            </div>
+        `;
+        body.appendChild(secLocalSilences);
+        
+        // Seção 5: Rostos Detectados
+        const secFaces = document.createElement("div");
+        secFaces.innerHTML = `
+            <div class="inspector-section-title"><i class="fa-solid fa-face-smile" style="color:var(--color-cyan);"></i> Rostos na Tela (Coincidências)</div>
+            <div id="inspector-faces-grid" class="faces-grid">
+                <div style="font-style:italic; color:var(--text-muted); font-size:9px; text-align:center; grid-column: 1 / -1;">Buscando rostos coincidentes no banco de dados...</div>
+            </div>
+        `;
+        body.appendChild(secFaces);
+        
+        this.inspectorPanel.appendChild(body);
+        
+        // Carrega autocomplete de falantes
+        const speakers = await CapIAuAPI.fetchProjectSpeakers(STATE.currentProjectId).catch(() => []);
+        const selectSpk = body.querySelector("#sel-inspector-speaker");
+        selectSpk.innerHTML = "";
+        
+        const uniqueSpeakers = Array.from(new Set([d.speaker_id, ...speakers]));
+        uniqueSpeakers.forEach(s => {
+            const opt = document.createElement("option");
+            opt.value = s;
+            opt.textContent = s;
+            opt.style.backgroundColor = "#121218";
+            opt.style.color = "#e2e8f0";
+            if (s === d.speaker_id) opt.selected = true;
+            selectSpk.appendChild(opt);
+        });
+        
+        const optNew = document.createElement("option");
+        optNew.value = "_new_";
+        optNew.textContent = "+ Novo Falante...";
+        optNew.style.backgroundColor = "#121218";
+        optNew.style.color = "var(--color-cyan)";
+        selectSpk.appendChild(optNew);
+        
+        selectSpk.addEventListener("change", (e) => {
+            if (e.target.value === "_new_") {
+                const name = prompt("Digite o nome do novo falante:");
+                if (name && name.trim()) {
+                    const cleanName = name.trim();
+                    const newOpt = document.createElement("option");
+                    newOpt.value = cleanName;
+                    newOpt.textContent = cleanName;
+                    newOpt.selected = true;
+                    selectSpk.insertBefore(newOpt, optNew);
+                } else {
+                    selectSpk.value = d.speaker_id;
+                }
+            }
+        });
+        
+        body.querySelector("#btn-save-speaker-name").addEventListener("click", async () => {
+            const newSpeaker = selectSpk.value;
+            if (newSpeaker === "_new_" || !newSpeaker) return;
+            const globalRename = body.querySelector("#chk-global-rename").checked;
+            
+            try {
+                await CapIAuAPI.renameSpeaker(
+                    STATE.activeVideo.id,
+                    d.speaker_id,
+                    newSpeaker,
+                    globalRename,
+                    d.start_time,
+                    d.end_time
+                );
+                this.onVideoChanged(STATE.activeVideo);
+                this.closeBubbleInspector();
+                STATE.emit("statusChanged", { text: `Falante renomeado para "${newSpeaker}" com sucesso!`, active: true });
+            } catch (err) {
+                alert(`Erro ao renomear: ${err.message}`);
+            }
+        });
+        
+        this.renderInspectorWaveform(d);
+        this.renderLocalSilences(d);
+        this.renderLocalFaces(d);
+    }
+
+    closeBubbleInspector() {
+        if (this.inspectorPanel) {
+            this.inspectorPanel.style.display = "none";
+        }
+        const sidebar = document.getElementById("sidebar-right");
+        if (sidebar) {
+            sidebar.style.width = ""; // Restaura largura original da sidebar
+            window.dispatchEvent(new Event("resize"));
+        }
+    }
+
+    renderInspectorWaveform(d) {
+        const canvas = document.getElementById("inspector-waveform");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * window.devicePixelRatio;
+        canvas.height = rect.height * window.devicePixelRatio;
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        
+        const width = rect.width;
+        const height = rect.height;
+        const centerY = height / 2;
+        
+        ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+        ctx.fillRect(0, 0, width, height);
+        
+        let bubbleWords = [];
+        if (STATE.activeTranscriptWords && STATE.activeTranscriptWords.length > 0) {
+            bubbleWords = STATE.activeTranscriptWords.filter(w => w.start_time >= d.start_time && w.start_time <= d.end_time);
+        }
+        
+        const duration = d.end_time - d.start_time;
+        if (duration <= 0) return;
+        
+        const timeToX = (t) => ((t - d.start_time) / duration) * width;
+        const xToTime = (x) => d.start_time + (x / width) * duration;
+        
+        ctx.strokeStyle = "rgba(6, 182, 212, 0.6)";
+        ctx.lineWidth = 1.5;
+        
+        if (bubbleWords.length > 0) {
+            bubbleWords.forEach(w => {
+                const xStart = timeToX(w.start_time);
+                const xEnd = timeToX(w.end_time);
+                const wWidth = Math.max(1, xEnd - xStart);
+                
+                ctx.beginPath();
+                const points = Math.max(5, Math.floor(wWidth / 2));
+                for (let i = 0; i <= points; i++) {
+                    const px = xStart + (i / points) * wWidth;
+                    const amp = Math.sin((i / points) * Math.PI) * (centerY - 8) * (0.6 + Math.random() * 0.4);
+                    ctx.moveTo(px, centerY - amp);
+                    ctx.lineTo(px, centerY + amp);
+                }
+                ctx.stroke();
+            });
+            
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+            ctx.lineWidth = 1.0;
+            ctx.beginPath();
+            for (let i = 0; i < bubbleWords.length - 1; i++) {
+                const xEndPrev = timeToX(bubbleWords[i].end_time);
+                const xStartNext = timeToX(bubbleWords[i+1].start_time);
+                if (xStartNext > xEndPrev) {
+                    ctx.moveTo(xEndPrev, centerY);
+                    ctx.lineTo(xStartNext, centerY);
+                }
+            }
+            ctx.stroke();
+        } else {
+            ctx.beginPath();
+            for (let x = 0; x < width; x++) {
+                const amp = Math.sin((x / width) * Math.PI * 15) * (centerY - 10) * Math.random();
+                ctx.moveTo(x, centerY - amp);
+                ctx.lineTo(x, centerY + amp);
+            }
+            ctx.stroke();
+        }
+        
+        const silenceThreshold = parseFloat(document.getElementById("num-silence-threshold").value) || 1.2;
+        for (let i = 0; i < bubbleWords.length - 1; i++) {
+            const gap = bubbleWords[i+1].start_time - bubbleWords[i].end_time;
+            if (gap >= silenceThreshold) {
+                const cutTime = (bubbleWords[i].end_time + bubbleWords[i+1].start_time) / 2;
+                const cx = timeToX(cutTime);
+                ctx.strokeStyle = "var(--color-rose)";
+                ctx.lineWidth = 1.0;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(cx, 0);
+                ctx.lineTo(cx, height);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+        
+        canvas.addEventListener("click", (e) => {
+            const clickX = e.offsetX;
+            const targetTime = xToTime(clickX);
+            const player = document.getElementById("source-video");
+            if (player) {
+                player.currentTime = targetTime;
+                player.play();
+            }
+        });
+        
+        canvas.addEventListener("dblclick", async (e) => {
+            const clickX = e.offsetX;
+            const targetTime = xToTime(clickX);
+            const formattedTime = formatTimecode(targetTime);
+            
+            const newSpeaker = prompt(`Deseja dividir a fala em ${formattedTime}? Digite o nome do novo falante:`, d.speaker_id + "_2");
+            if (newSpeaker && newSpeaker.trim()) {
+                try {
+                    await CapIAuAPI.splitTranscript(STATE.activeVideo.id, targetTime, newSpeaker.trim());
+                    this.onVideoChanged(STATE.activeVideo);
+                    this.closeBubbleInspector();
+                } catch (err) {
+                    alert(`Falha ao dividir fala: ${err.message}`);
+                }
             }
         });
     }
+
+    renderLocalSilences(d) {
+        const listDiv = document.getElementById("inspector-local-silences-list");
+        if (!listDiv) return;
+        listDiv.innerHTML = "";
+        
+        let bubbleWords = [];
+        if (STATE.activeTranscriptWords && STATE.activeTranscriptWords.length > 0) {
+            bubbleWords = STATE.activeTranscriptWords.filter(w => w.start_time >= d.start_time && w.start_time <= d.end_time);
+        }
+        
+        const silenceThreshold = parseFloat(document.getElementById("num-silence-threshold").value) || 1.2;
+        const localSilences = [];
+        
+        for (let i = 0; i < bubbleWords.length - 1; i++) {
+            const gap = bubbleWords[i+1].start_time - bubbleWords[i].end_time;
+            if (gap >= silenceThreshold) {
+                const cutTime = (bubbleWords[i].end_time + bubbleWords[i+1].start_time) / 2;
+                localSilences.push({
+                    timestamp: cutTime,
+                    duration: gap,
+                    wordBefore: bubbleWords[i].word,
+                    wordAfter: bubbleWords[i+1].word
+                });
+            }
+        }
+        
+        if (localSilences.length === 0) {
+            listDiv.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: 9px; text-align: center; padding: 5px 0;">Nenhuma pausa longa dentro deste balão.</div>`;
+            return;
+        }
+        
+        localSilences.forEach(s => {
+            const row = document.createElement("div");
+            row.style.display = "flex";
+            row.style.alignItems = "center";
+            row.style.justifyContent = "space-between";
+            row.style.padding = "6px";
+            row.style.background = "rgba(255,255,255,0.02)";
+            row.style.border = "1px solid var(--border-glass)";
+            row.style.borderRadius = "4px";
+            row.style.marginBottom = "4px";
+            
+            row.innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                    <span style="font-weight:600; color:var(--color-rose);"><i class="fa-solid fa-volume-xmark"></i> Pausa de ${s.duration.toFixed(1)}s</span>
+                    <span style="color:var(--text-muted); font-size:9px;">Entre "${s.wordBefore}" e "${s.wordAfter}" às ${formatTimecode(s.timestamp)}</span>
+                </div>
+                <div style="display:flex; gap:4px;">
+                    <button class="btn-flat-action cyan btn-listen-silence" title="Ouvir" style="background:none; border:none; cursor:pointer;"><i class="fa-solid fa-play"></i></button>
+                    <button class="btn-flat-action rose btn-split-silence" title="Dividir aqui" style="font-size:9px; padding:2px 4px; background:rgba(244, 63, 94, 0.1) !important; border-radius:3px; cursor:pointer;"><i class="fa-solid fa-scissors"></i> Dividir</button>
+                </div>
+            `;
+            
+            row.querySelector(".btn-listen-silence").addEventListener("click", (e) => {
+                e.stopPropagation();
+                const player = document.getElementById("source-video");
+                if (player) {
+                    player.currentTime = Math.max(0, s.timestamp - 2);
+                    player.play();
+                }
+            });
+            
+            row.querySelector(".btn-split-silence").addEventListener("click", async (e) => {
+                e.stopPropagation();
+                const newSpeaker = prompt(`Dividir fala às ${formatTimecode(s.timestamp)}? Digite o nome do novo falante:`, d.speaker_id + "_2");
+                if (newSpeaker && newSpeaker.trim()) {
+                    try {
+                        await CapIAuAPI.splitTranscript(STATE.activeVideo.id, s.timestamp, newSpeaker.trim());
+                        this.onVideoChanged(STATE.activeVideo);
+                        this.closeBubbleInspector();
+                    } catch (err) {
+                        alert(`Falha ao dividir fala: ${err.message}`);
+                    }
+                }
+            });
+            
+            listDiv.appendChild(row);
+        });
+    }
+
+    async renderLocalFaces(d) {
+        const grid = document.getElementById("inspector-faces-grid");
+        if (!grid) return;
+        
+        try {
+            const allFaces = await CapIAuAPI.fetchVideoFaces(STATE.activeVideo.id).catch(() => []);
+            const localFaces = allFaces.filter(f => f.timestamp >= d.start_time - 0.5 && f.timestamp <= d.end_time + 0.5);
+            
+            grid.innerHTML = "";
+            if (localFaces.length === 0) {
+                grid.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: 9px; text-align: center; grid-column: 1 / -1; padding: 5px 0;">Nenhum rosto detectado neste trecho do vídeo.</div>`;
+                return;
+            }
+            
+            const uniqueFacesMap = new Map();
+            localFaces.forEach(f => {
+                const label = f.name || `Rosto #${f.id}`;
+                if (!uniqueFacesMap.has(label)) {
+                    uniqueFacesMap.set(label, f);
+                }
+            });
+            
+            uniqueFacesMap.forEach((face, label) => {
+                const card = document.createElement("div");
+                card.className = "face-thumb-card";
+                card.setAttribute("title", `Rosto detectado em ${formatTimecode(face.timestamp)}`);
+                
+                card.innerHTML = `
+                    <img src="/api/face/${face.id}/thumbnail" alt="${label}" onerror="this.src='https://placehold.co/45x45/181824/ffffff?text=?'">
+                    <span style="font-size:9px; text-overflow:ellipsis; overflow:hidden; width:100%; white-space:nowrap;">${label}</span>
+                    <button class="btn-flat-action cyan" style="font-size: 9px; padding: 2px 4px; margin-top:2px; background:rgba(6, 182, 212, 0.1) !important; border-radius:3px; cursor:pointer;" title="Usar este nome"><i class="fa-solid fa-check"></i> Atribuir</button>
+                `;
+                
+                const actionBtn = card.querySelector("button");
+                const assignAction = async (e) => {
+                    e.stopPropagation();
+                    if (!face.name) {
+                        const name = prompt("Este rosto ainda não está rotulado. Digite o nome da pessoa:");
+                        if (name && name.trim()) {
+                            try {
+                                await CapIAuAPI.labelFace(face.id, name.trim());
+                                face.name = name.trim();
+                            } catch (err) {
+                                alert(`Falha ao rotular rosto: ${err.message}`);
+                                return;
+                            }
+                        } else {
+                            return;
+                        }
+                    }
+                    
+                    const selectSpk = document.getElementById("sel-inspector-speaker");
+                    if (selectSpk) {
+                        let optExists = false;
+                        for (let i = 0; i < selectSpk.options.length; i++) {
+                            if (selectSpk.options[i].value === face.name) {
+                                optExists = true;
+                                selectSpk.selectedIndex = i;
+                                break;
+                            }
+                        }
+                        if (!optExists) {
+                            const newOpt = document.createElement("option");
+                            newOpt.value = face.name;
+                            newOpt.textContent = face.name;
+                            newOpt.selected = true;
+                            selectSpk.insertBefore(newOpt, selectSpk.firstChild);
+                        }
+                        
+                        const btnSave = document.getElementById("btn-save-speaker-name");
+                        if (btnSave) btnSave.click();
+                    }
+                };
+                
+                card.addEventListener("click", assignAction);
+                grid.appendChild(card);
+            });
+        } catch (err) {
+            grid.innerHTML = `<div style="color: var(--color-rose); font-size: 9px; text-align: center; grid-column: 1 / -1;">Erro ao carregar rostos: ${err.message}</div>`;
+        }
+    }
+
+    showCustomContextMenu(clientX, clientY, word, dialogue, bubble) {
+        const oldMenu = document.getElementById("custom-speech-context-menu");
+        if (oldMenu) oldMenu.remove();
+        
+        const menu = document.createElement("div");
+        menu.id = "custom-speech-context-menu";
+        menu.className = "custom-context-menu";
+        menu.style.left = `${clientX}px`;
+        menu.style.top = `${clientY}px`;
+        
+        menu.innerHTML = `
+            <div class="menu-item" id="ctx-play"><i class="fa-solid fa-play"></i> Reproduzir daqui</div>
+            <div class="menu-item" id="ctx-split" style="color:var(--color-rose);"><i class="fa-solid fa-scissors"></i> Dividir fala aqui</div>
+            <div class="menu-item" id="ctx-inspect"><i class="fa-solid fa-magnifying-glass"></i> Inspecionar diálogo</div>
+        `;
+        
+        document.body.appendChild(menu);
+        
+        const closeMenu = () => {
+            menu.remove();
+            document.removeEventListener("click", closeMenu);
+        };
+        setTimeout(() => document.addEventListener("click", closeMenu), 50);
+        
+        menu.querySelector("#ctx-play").addEventListener("click", () => {
+            const player = document.getElementById("source-video");
+            if (player) {
+                player.currentTime = word.start_time;
+                player.play();
+            }
+        });
+        
+        menu.querySelector("#ctx-split").addEventListener("click", async () => {
+            const formattedTime = formatTimecode(word.start_time);
+            const newSpeaker = prompt(`Dividir fala às ${formattedTime}? Digite o nome do novo falante:`, dialogue.speaker_id + "_2");
+            if (newSpeaker && newSpeaker.trim()) {
+                try {
+                    await CapIAuAPI.splitTranscript(STATE.activeVideo.id, word.start_time, newSpeaker.trim());
+                    this.onVideoChanged(STATE.activeVideo);
+                    this.closeBubbleInspector();
+                } catch (err) {
+                    alert(`Falha ao dividir fala: ${err.message}`);
+                }
+            }
+        });
+        
+        menu.querySelector("#ctx-inspect").addEventListener("click", () => {
+            this.openBubbleInspector(dialogue, bubble);
+        });
+    }
+
 
     async renderVision(frames) {
         if (!this.visionContainer) return;

@@ -109,3 +109,12 @@ class SearchCategorizePayload(BaseModel):
     query: str
     results: List[SearchResultItem]
 
+
+class RenameSpeakerPayload(BaseModel):
+    old_speaker_id: str
+    new_speaker_id: str
+    global_rename: bool = False
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+
+

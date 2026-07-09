@@ -170,3 +170,31 @@ class NarrativeRepository:
             INSERT OR IGNORE INTO transcript_theme (transcript_id, theme_id, relevance)
             VALUES (?, ?, ?)
         """, (transcript_id, theme_id, relevance))
+
+    @staticmethod
+    def rename_speaker(
+        conn: sqlite3.Connection,
+        video_id: int,
+        old_speaker_id: str,
+        new_speaker_id: str,
+        global_rename: bool = False,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None
+    ) -> None:
+        """Atualiza o nome do falante na tabela transcript para o trecho indicado ou globalmente."""
+        cursor = conn.cursor()
+        if global_rename:
+            cursor.execute("""
+                UPDATE transcript 
+                SET speaker_id = ? 
+                WHERE video_id = ? AND speaker_id = ?
+            """, (new_speaker_id, video_id, old_speaker_id))
+        else:
+            if start_time is None or end_time is None:
+                raise ValueError("start_time e end_time são necessários para renomeação local.")
+            cursor.execute("""
+                UPDATE transcript 
+                SET speaker_id = ? 
+                WHERE video_id = ? AND speaker_id = ? AND start_time >= ? AND end_time <= ?
+            """, (new_speaker_id, video_id, old_speaker_id, start_time - 0.05, end_time + 0.05))
+

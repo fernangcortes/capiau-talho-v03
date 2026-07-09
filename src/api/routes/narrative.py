@@ -11,7 +11,8 @@ from src.api.schemas import (
     TimelineAISuggestPayload,
     SplitTranscriptPayload,
     ChatPayload,
-    SearchCategorizePayload
+    SearchCategorizePayload,
+    RenameSpeakerPayload
 )
 from src.db.repositories.projects import ProjectRepository
 from src.db.repositories.narrative import NarrativeRepository
@@ -274,6 +275,120 @@ def split_transcript(video_id: int, payload: SplitTranscriptPayload, conn: sqlit
         return {"status": "success", "message": f"Transcrição dividida em {actual_time}s. Novo falante: {payload.new_speaker_id}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/video/{video_id}/rename-speaker")
+def rename_speaker(video_id: int, payload: RenameSpeakerPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Renomeia um falante local ou globalmente e atualiza o índice semântico."""
+    try:
+        NarrativeRepository.rename_speaker(
+            conn,
+            video_id=video_id,
+            old_speaker_id=payload.old_speaker_id,
+            new_speaker_id=payload.new_speaker_id,
+            global_rename=payload.global_rename,
+            start_time=payload.start_time,
+            end_time=payload.end_time
+        )
+        conn.commit()
+        
+        # Re-indexa o diálogo no Qdrant
+        dialogues = NarrativeRepository.get_transcript_dialogues(conn, video_id)
+        if dialogues:
+            video = MediaRepository.get_video(conn, video_id)
+            proj_id = video['project_id'] if video else 1
+            v_type = video['video_type'] if video else 'interview'
+            
+            search_engine = SemanticSearch.get_instance()
+            search_engine.index_transcript_chunks(proj_id, video_id, dialogues, v_type)
+            
+        return {"status": "success", "message": "Falante renomeado com sucesso."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/api/video/{video_id}/diarization-clues")
+def get_diarization_clues(
+    video_id: int,
+    silence_threshold: float = Query(1.2),
+    enable_silence: bool = Query(True),
+    enable_questions: bool = Query(True),
+    enable_faces: bool = Query(True),
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Calcula e retorna pistas de diarização baseadas em silêncios, perguntas e rostos."""
+    try:
+        clues = []
+        words = NarrativeRepository.get_transcript_words(conn, video_id)
+        if not words:
+            return []
+            
+        dialogues = NarrativeRepository.get_transcript_dialogues(conn, video_id)
+        
+        # Helper para encontrar o texto ao redor de um timestamp
+        def get_context_text(words_list, index, num_words=5):
+            start_idx = max(0, index - num_words)
+            end_idx = min(len(words_list), index + num_words + 1)
+            return " ".join([words_list[i]['word'] for i in range(start_idx, end_idx)])
+
+        # 1. Pistas de Silêncio
+        if enable_silence and silence_threshold > 0:
+            for i in range(len(words) - 1):
+                w1 = words[i]
+                w2 = words[i+1]
+                if w1['speaker_id'] == w2['speaker_id']:
+                    gap = w2['start_time'] - w1['end_time']
+                    if gap >= silence_threshold:
+                        clues.append({
+                            "type": "silence",
+                            "timestamp": round((w1['end_time'] + w2['start_time']) / 2, 2),
+                            "duration": round(gap, 2),
+                            "context": get_context_text(words, i, 4),
+                            "speaker_id": w1['speaker_id']
+                        })
+
+        # 2. Pistas de Pergunta
+        if enable_questions:
+            for i in range(len(words) - 1):
+                w1 = words[i]
+                w2 = words[i+1]
+                if "?" in w1['word'] and w1['speaker_id'] == w2['speaker_id']:
+                    clues.append({
+                        "type": "question",
+                        "timestamp": round(w1['end_time'], 2),
+                        "context": get_context_text(words, i, 4),
+                        "speaker_id": w1['speaker_id']
+                    })
+
+        # 3. Pistas de Rostos
+        if enable_faces:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, name, timestamp 
+                FROM face 
+                WHERE video_id = ? AND name IS NOT NULL AND name != ""
+                ORDER BY timestamp
+            """, (video_id,))
+            faces = [dict(r) for r in cursor.fetchall()]
+            
+            for f in faces:
+                f_time = f['timestamp']
+                for dial in dialogues:
+                    if dial['start_time'] <= f_time <= dial['end_time']:
+                        if dial['speaker_id'] != f['name']:
+                            clues.append({
+                                "type": "face",
+                                "timestamp": round(f_time, 2),
+                                "face_id": f['id'],
+                                "face_name": f['name'],
+                                "speaker_id": dial['speaker_id'],
+                                "context": dial['text']
+                            })
+                            break
+                            
+        clues = sorted(clues, key=lambda x: x['timestamp'])
+        return clues
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/api/project/{project_id}/chat")
 def chatbot_rag(project_id: int, payload: ChatPayload):

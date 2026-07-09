@@ -32,8 +32,12 @@ Para ajudar a IA a identificar seus clipes de forma inteligente na ingestão:
 1. Na aba **Mídias**, clique em uma entrevista carregada (ela começará a tocar no player).
 2. No menu lateral direito, clique no botão **`Transcrever Vídeo Atual`**.
 3. A API AssemblyAI fará o processamento na nuvem em segundos (usando seu Free Tier).
-4. O diálogo completo aparecerá no painel direito, dividido por falantes (ex: *Falante A, Falante B*) com timestamps atômicos.
+4. O diálogo completo aparecerá no painel direito, dividido por falantes (ex: *Speaker A, Speaker B*) com timestamps atômicos.
 5. **Dica de ouro:** Clique em qualquer palavra ou frase do texto e o player de vídeo pulará exatamente para aquele segundo da fala!
+6. **Assistente de Diarização:** A transcrição agora conta com um assistente robusto para corrigir falantes. Na lateral direita superior da transcrição, você verá a "Gaveta de Pistas" que aponta possíveis erros da inteligência artificial (como falas muito longas com silêncio no meio, ou um rosto diferente falando).
+7. **Inspetor de Balão (Waveform):** Clique com o botão direito sobre o nome de qualquer falante em um balão de transcrição. Uma gaveta lateral se abrirá exibindo o **Inspetor de Fala**, com uma *waveform interativa*. Com ela você pode:
+   * **Dividir falas:** Dê um clique duplo em qualquer ponto da onda de áudio (waveform) para dividir a fala naquele exato milissegundo. O player navegará direto para o trecho.
+   * **Atribuição Rápida de Rosto:** O inspetor detecta quem está aparecendo no vídeo naquele trecho e já sugere o nome da pessoa em um menu suspenso para você corrigir o falante com 1 clique.
 
 ### Passo C: Decupagem Visual de B-Rolls e Fotos
 1. No backend real, os vídeos de B-roll sofrem decupagem a cada 10s extraindo frames-chave e enviando para o Gemini 2.5 Flash no OpenRouter.
@@ -132,14 +136,16 @@ Sempre que a IA propuser e inserir um vídeo na timeline, ela indexará trechos 
 3. Escolha o formato de saída no seletor (XML para Premiere/Resolve/FCP, OpenTimelineIO `.otio` ou EDL).
 4. Clique em **`Exportar`**. O download iniciará no seu navegador e o arquivo estará pronto para ser importado no seu editor NLE profissional.
 
-
 ---
 
 ## 🎛️ 8. Layout e Organização Avançada
 
-### Workspace "Montagem" (Timeline Ancorada)
-* Para produções complexas, você pode ativar o preset **Montagem** no topo da tela. 
-* Este modo maximiza a biblioteca na parte superior e ancora a linha do tempo (timeline) horizontalmente cobrindo toda a base inferior da tela. Os monitores flutuantes (Source/Program) podem ser exibidos ou ocultados rapidamente clicando no botão flutuante de TV (`#btn-montagem-monitors`).
+### Workspace "Estúdio" (Layout Flexível de Alta Densidade)
+* Para decupagens robustas, ative o botão **Estúdio** no topo da tela.
+* Este modo reorganiza completamente a interface. A biblioteca ganha espaço predominante. Os dois monitores (Source e Program) são empilhados na segunda coluna em formato ultralimpo, onde seus controles de player só aparecem no *hover* do mouse (`position:absolute`), e a transcrição fica disponível como uma terceira coluna colapsável. A linha do tempo expande em 100% da largura inferior.
+* **Altura das Pistas:** Tanto no layout Padrão quanto no Estúdio, você pode ajustar a altura das trilhas da timeline de duas formas:
+  1. Usando o slider vertical global na barra de ferramentas superior.
+  2. Clicando e arrastando a borda inferior do cabeçalho de uma trilha individual à esquerda (para redimensionamentos independentes que são salvos na sessão local).
 
 ### Reposicionamento dos Controles de Zoom e Modo de Exibição
 * Os botões de **Modo de Visualização** (Lista ou Cards) e o controle deslizante de **Zoom** das miniaturas foram movidos para a linha inferior da barra de ferramentas da biblioteca (Linha 3).
