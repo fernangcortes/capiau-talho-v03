@@ -49,11 +49,25 @@ app.add_middleware(
 )
 
 @app.middleware("http")
-async def add_no_cache_headers(request, call_next):
+async def add_cache_headers(request, call_next):
     response = await call_next(request)
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
+    path = request.url.path
+    # Mídia pesada (thumbnails de rostos, proxies, originais) PODE e DEVE ser cacheada pelo
+    # navegador. Sem isso, cada reabertura de "Gerenciar Rostos" re-baixava centenas de
+    # thumbnails e re-transmitia proxies do zero, saturando o servidor de worker único.
+    is_media = (
+        path.startswith("/proxies")
+        or path.startswith("/originals")
+        or path.endswith("/thumbnail")
+    )
+    if is_media:
+        # Respeita o Cache-Control que a própria rota já definiu; caso contrário aplica um padrão.
+        response.headers.setdefault("Cache-Control", "public, max-age=604800")
+    else:
+        # HTML/JS/JSON continuam sem cache para refletir mudanças imediatamente.
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     return response
 
 # Acoplamento de rotas modulares

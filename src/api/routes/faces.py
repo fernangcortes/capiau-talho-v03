@@ -6,6 +6,7 @@ e consulta de faces com resolucao de conflitos por precedencia.
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 import json
+import sqlite3
 import cv2
 import numpy as np
 from pydantic import BaseModel
@@ -270,7 +271,7 @@ def _recover_photo_faces_task(project_id: int) -> None:
 
 
 @router.post("/project/{project_id}/recover-photo-faces")
-async def recover_photo_faces(project_id: int):
+def recover_photo_faces(project_id: int):
     """Dispara em background: detecção facial nas fotos sem detecção + re-clustering
     (herança de nomes) + menções de entidades + enriquecimento das descrições."""
     import threading
@@ -285,7 +286,7 @@ async def recover_photo_faces(project_id: int):
 # ── Rotas ──
 
 @router.get("/pipeline/status", response_model=PipelineStatusResponse)
-async def get_pipeline_status():
+def get_pipeline_status():
     """Retorna status dos backends disponiveis no pipeline."""
     pipeline = get_pipeline()
     
@@ -307,7 +308,7 @@ async def get_pipeline_status():
 
 
 @router.get("/pipeline/s3/status", response_model=S3StatusResponse)
-async def get_s3_status():
+def get_s3_status():
     """Retorna o status da integracao S3, tamanho do bucket e travas de seguranca."""
     from src.services.s3_service import S3Service
     s3_service = S3Service.get_instance()
@@ -332,7 +333,7 @@ async def get_s3_status():
 
 
 @router.post("/pipeline/install-insightface")
-async def install_insightface(gpu: bool = Query(False, description="Instalar versão com suporte a GPU (onnxruntime-gpu)")):
+def install_insightface(gpu: bool = Query(False, description="Instalar versão com suporte a GPU (onnxruntime-gpu)")):
     """Instala o InsightFace e dependências de runtime (onnxruntime) no Python local."""
     import subprocess
     import sys
@@ -352,7 +353,7 @@ async def install_insightface(gpu: bool = Query(False, description="Instalar ver
 
 
 @router.post("/face")
-async def add_manual_face(payload: ManualFaceCreate):
+def add_manual_face(payload: ManualFaceCreate):
     """Insere manualmente uma face ou objeto desenhado pelo usuario no frame/foto."""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -435,7 +436,7 @@ async def add_manual_face(payload: ManualFaceCreate):
 
 
 @router.post("/photo/{photo_id}/detect", response_model=dict)
-async def detect_faces_photo(
+def detect_faces_photo(
     photo_id: int,
     project_id: int = Query(..., description="ID do projeto"),
     image_path: str = Query(..., description="Caminho absoluto da imagem")
@@ -459,7 +460,7 @@ async def detect_faces_photo(
 
 
 @router.post("/video/{video_id}/frame/detect", response_model=dict)
-async def detect_faces_video_frame(
+def detect_faces_video_frame(
     video_id: int,
     project_id: int = Query(..., description="ID do projeto"),
     timestamp: float = Query(..., description="Timestamp do frame em segundos"),
@@ -484,7 +485,7 @@ async def detect_faces_video_frame(
 
 
 @router.post("/face/{face_id}/refine", response_model=dict)
-async def refine_face(
+def refine_face(
     face_id: int,
     image_path: str = Query(..., description="Caminho da imagem para reprocessar"),
     max_tier: int = Query(2, description="Tier maximo para refinamento (1-2)")
@@ -516,7 +517,7 @@ async def refine_face(
 
 
 @router.post("/face/{face_id}/precise", response_model=dict)
-async def process_face_precise(
+def process_face_precise(
     face_id: int,
     image_path: str = Query(..., description="Caminho da imagem para processamento de precisao")
 ):
@@ -547,7 +548,7 @@ async def process_face_precise(
 
 
 @router.get("/project/{project_id}/faces", response_model=List[dict])
-async def get_project_faces(
+def get_project_faces(
     project_id: int,
     media_type: Optional[str] = Query(None, description="Filtrar por 'video' ou 'photo'"),
     media_id: Optional[int] = Query(None, description="ID da midia especifica")
@@ -559,7 +560,7 @@ async def get_project_faces(
 
 
 @router.get("/face/{face_id}", response_model=dict)
-async def get_face_detail(face_id: int):
+def get_face_detail(face_id: int):
     """Retorna detalhes completos de uma face com todos os reconhecimentos."""
     service = get_face_service()
     face = service.get_face_detail(face_id)
@@ -571,7 +572,7 @@ async def get_face_detail(face_id: int):
 
 
 @router.post("/project/{project_id}/faces/cluster", response_model=ClusterResult)
-async def cluster_faces(
+def cluster_faces(
     project_id: int,
     eps: float = Query(0.38, description="Distancia maxima DBSCAN"),
     min_samples: int = Query(3, description="Minimo de amostras por cluster")
@@ -588,7 +589,7 @@ async def cluster_faces(
 
 
 @router.post("/project/{project_id}/people", response_model=PersonResponse)
-async def create_person(project_id: int, request: PersonCreateRequest):
+def create_person(project_id: int, request: PersonCreateRequest):
     """Cria uma nova pessoa no projeto."""
     service = get_face_service()
     person_id = service.create_person(
@@ -607,7 +608,7 @@ async def create_person(project_id: int, request: PersonCreateRequest):
 
 
 @router.get("/project/{project_id}/people", response_model=List[PersonResponse])
-async def get_project_people(project_id: int):
+def get_project_people(project_id: int):
     """Retorna todas as pessoas identificadas no projeto."""
     service = get_face_service()
     people = service.get_project_people(project_id)
@@ -621,7 +622,7 @@ async def get_project_people(project_id: int):
 
 
 @router.post("/project/{project_id}/faces/merge")
-async def merge_project_clusters(project_id: int, request: MergeClustersRequest):
+def merge_project_clusters(project_id: int, request: MergeClustersRequest):
     """Mescla dois clusters em um unico."""
     service = get_face_service()
     
@@ -651,7 +652,7 @@ async def merge_project_clusters(project_id: int, request: MergeClustersRequest)
 
 
 @router.post("/project/{project_id}/faces/reassign")
-async def reassign_project_faces(project_id: int, request: ReassignFacesRequest):
+def reassign_project_faces(project_id: int, request: ReassignFacesRequest):
     """Reatribui faces de forma unitaria (desambiguacao manual)."""
     service = get_face_service()
     
@@ -712,7 +713,7 @@ async def reassign_project_faces(project_id: int, request: ReassignFacesRequest)
 
 
 @router.post("/confirm-identity")
-async def confirm_identity(request: ConfirmIdentityRequest):
+def confirm_identity(request: ConfirmIdentityRequest):
     """Operador confirma manualmente a identidade de uma face (Tier 4)."""
     service = get_face_service()
     success = service.confirm_face_identity(
@@ -734,7 +735,7 @@ async def confirm_identity(request: ConfirmIdentityRequest):
 # ── NOVAS ROTAS PORTADAS DE MEDIA.PY ──
 
 @router.get("/project/{project_id}/face-clusters")
-async def list_project_face_clusters(project_id: int):
+def list_project_face_clusters(project_id: int):
     """Lista todos os grupos de rostos agrupados no projeto."""
     try:
         with get_db() as conn:
@@ -757,7 +758,7 @@ async def list_project_face_clusters(project_id: int):
 
 
 @router.get("/project/{project_id}/unlabeled-faces")
-async def list_unlabeled_faces(project_id: int):
+def list_unlabeled_faces(project_id: int):
     """Retorna rostos nao rotulados (ou placeholders) para desambiguacao rapida."""
     try:
         with get_db() as conn:
@@ -810,7 +811,7 @@ async def list_unlabeled_faces(project_id: int):
 
 
 @router.get("/project/{project_id}/face-clusters/{cluster_id}/faces")
-async def list_cluster_faces(project_id: int, cluster_id: int, name: Optional[str] = None):
+def list_cluster_faces(project_id: int, cluster_id: int, name: Optional[str] = None):
     """Retorna todas as faces individuais de um cluster com paths de midias para preview."""
     try:
         with get_db() as conn:
@@ -886,7 +887,7 @@ async def list_cluster_faces(project_id: int, cluster_id: int, name: Optional[st
 
 
 @router.post("/project/{project_id}/faces/dissociate")
-async def dissociate_project_faces(project_id: int, request: DissociateFacesRequest):
+def dissociate_project_faces(project_id: int, request: DissociateFacesRequest):
     """Remove a identificação de um conjunto de faces, voltando a serem desconhecidas."""
     try:
         with get_db() as conn:
@@ -927,7 +928,7 @@ async def dissociate_project_faces(project_id: int, request: DissociateFacesRequ
 
 
 @router.post("/face/{face_id}/label")
-async def label_face(face_id: int, payload: LabelFaceRequest):
+def label_face(face_id: int, payload: LabelFaceRequest):
     """Rotula uma face ou cluster de faces inteiro, gerenciando conflitos."""
     service = get_face_service()
     face = service._get_face(face_id)
@@ -1024,7 +1025,7 @@ async def label_face(face_id: int, payload: LabelFaceRequest):
 
 
 @router.get("/face/{face_id}/thumbnail")
-async def get_face_thumbnail(face_id: int):
+def get_face_thumbnail(face_id: int):
     """Retorna o thumbnail da face, priorizando cache/crop_path para máxima velocidade."""
     try:
         # 1. Tentar ler os dados da face, incluindo o crop_path pré-salvo
@@ -1149,7 +1150,7 @@ async def get_face_thumbnail(face_id: int):
 
 
 @router.get("/video/{video_id}/faces", response_model=List[dict])
-async def get_video_faces_compat(video_id: int):
+def get_video_faces_compat(video_id: int):
     """Retorna rostos do video com compatibilidade."""
     service = get_face_service()
     # Buscar projeto associado ao video
@@ -1176,7 +1177,7 @@ async def get_video_faces_compat(video_id: int):
 
 
 @router.get("/photo/{photo_id}/faces", response_model=List[dict])
-async def get_photo_faces_compat(photo_id: int):
+def get_photo_faces_compat(photo_id: int):
     """Retorna rostos da foto com compatibilidade."""
     service = get_face_service()
     with get_db() as conn:
@@ -1196,7 +1197,7 @@ async def get_photo_faces_compat(photo_id: int):
 
 
 @router.post("/face/{face_id}/reject")
-async def reject_face(face_id: int, payload: Optional[RejectFaceRequest] = None):
+def reject_face(face_id: int, payload: Optional[RejectFaceRequest] = None):
     """Marca uma face como rejeitada/nao relevante (nao e rosto) e opcionalmente especifica o objeto."""
     target_name = "Não Relevante"
     if payload and payload.name:
