@@ -122,15 +122,18 @@ MATERIAL DISPONÍVEL NA BIBLIOTECA (candidatos para inserção):
 {brief_block}
 TAREFA: Proponha de 1 a 5 edições concretas na timeline. Para cada sugestão:
 - "action": "INSERT" (inserir novo clipe), "DELETE" (remover trecho de um clipe existente) ou "REPLACE" (substituir um clipe existente).
-- "video_id": ID do vídeo fonte (obrigatório para INSERT/REPLACE; use APENAS IDs listados acima).
-- "source_in_s" / "source_out_s": trecho do arquivo fonte em segundos (dentro da duração do vídeo).
+- "type": "video" (padrão) ou "photo" (foto still de set/bastidores).
+- Para type "video": "video_id" (ID do vídeo fonte, use APENAS IDs listados) + "source_in_s"/"source_out_s" (trecho do arquivo, dentro da duração).
+- Para type "photo": "photo_id" (ID da foto listada) + opcionalmente "duration_s" (duração do still na timeline; padrão 5s). NÃO use source_in_s/out_s em fotos.
 - "timeline_start_s": onde o clipe entra na timeline, em segundos.
 - "track": id da trilha de destino (use os ids de trilha listados no estado da timeline).
 - "target_clip_id": id do clipe alvo (obrigatório para DELETE/REPLACE; use os ids listados).
-- "reason": justificativa editorial curta e específica (cite o conteúdo, ex: "cobre a fala sobre a escolha da lente com imagem da câmera").
+- "reason": justificativa editorial curta e específica (cite o conteúdo, ex: "cobre a fala sobre a escolha da lente com foto de bastidores da câmera").
+
+Fotos still funcionam muito bem para cobrir falas quando não há b-roll em vídeo adequado.
 
 Responda estritamente em JSON puro (sem markdown):
-{{"suggestions": [{{"action": "INSERT", "video_id": 3, "source_in_s": 12.0, "source_out_s": 18.5, "timeline_start_s": 42.0, "track": "V2", "target_clip_id": null, "reason": "..."}}]}}"""
+{{"suggestions": [{{"action": "INSERT", "type": "video", "video_id": 3, "source_in_s": 12.0, "source_out_s": 18.5, "timeline_start_s": 42.0, "track": "V2", "target_clip_id": null, "reason": "..."}}, {{"action": "INSERT", "type": "photo", "photo_id": 7, "duration_s": 5.0, "timeline_start_s": 60.0, "track": "V2", "target_clip_id": null, "reason": "..."}}]}}"""
 
 def get_theme_naming_prompt(clusters_block: str, existing_themes: list = None) -> str:
     """Gera o prompt para nomear clusters de conteúdo já agrupados por embeddings."""

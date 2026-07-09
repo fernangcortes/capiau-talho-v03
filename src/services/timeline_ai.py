@@ -15,6 +15,7 @@ from src.nlp.prompt_templates import get_timeline_suggestion_prompt, TIMELINE_PE
 from src.nlp.json_parser import extract_json_from_markdown
 
 MAX_CANDIDATE_VIDEOS = 25
+MAX_CANDIDATE_PHOTOS = 15
 MAX_FRAMES_PER_CLIP = 8
 
 
@@ -74,13 +75,29 @@ class TimelineAIService:
             coverage_spans = [] # trechos com b-roll por cima
 
             for clip in sorted_clips:
-                vid = clip.get("video_id")
                 in_s = float(clip.get("in_s", 0.0))
                 out_s = float(clip.get("out_s", 0.0))
                 tl_start = float(clip.get("timeline_start_s", 0.0))
                 tl_end = tl_start + (out_s - in_s)
                 track_id = clip.get("track", "V1")
 
+                # Foto still: já é cobertura visual (não tem fala)
+                if clip.get("type") == "photo":
+                    pid = clip.get("photo_id")
+                    cursor.execute("SELECT filename, description FROM photo WHERE id = ?", (pid,))
+                    prow = cursor.fetchone()
+                    fname = prow["filename"] if prow else f"Foto {pid}"
+                    lines.append(
+                        f"- [Clipe id={clip.get('id', '?')} | trilha {track_id} ({track_names.get(track_id, '')}) | "
+                        f"timeline {tl_start:.1f}s → {tl_end:.1f}s | fonte: foto {pid} \"{fname}\" (still)]"
+                    )
+                    if prow and prow["description"]:
+                        lines.append(f"  VISUAL: {prow['description'][:220]}")
+                    coverage_spans.append((tl_start, tl_end))
+                    lines.append("")
+                    continue
+
+                vid = clip.get("video_id")
                 cursor.execute("SELECT filename, video_type, duration FROM video WHERE id = ?", (vid,))
                 vrow = cursor.fetchone()
                 fname = vrow["filename"] if vrow else f"Vídeo {vid}"
@@ -142,6 +159,15 @@ class TimelineAIService:
                 LIMIT ?
             """, (project_id, MAX_CANDIDATE_VIDEOS * 2))
             rows = cursor.fetchall()
+            # Fotos still de set/bastidores analisadas (candidatas a cobrir falas)
+            cursor.execute("""
+                SELECT id, filename, description, tags
+                FROM photo
+                WHERE project_id = ? AND status = 'analyzed'
+                ORDER BY id
+                LIMIT ?
+            """, (project_id, MAX_CANDIDATE_PHOTOS))
+            photo_rows = cursor.fetchall()
 
         count = 0
         for r in rows:
@@ -161,6 +187,19 @@ class TimelineAIService:
                 f"{desc[:220]}" + (f" Tags: {tags}." if tags else "")
             )
             count += 1
+
+        for r in photo_rows:
+            desc = r["description"] or ""
+            tags = ""
+            try:
+                tag_list = json.loads(r["tags"]) if r["tags"] else []
+                tags = ", ".join(tag_list[:6])
+            except Exception:
+                pass
+            lines.append(
+                f"- [Foto id={r['id']} | \"{r['filename']}\" | still de set/bastidores]: "
+                f"{desc[:220]}" + (f" Tags: {tags}." if tags else "")
+            )
 
         return "\n".join(lines) if lines else "(nenhuma mídia analisada disponível)"
 
@@ -219,6 +258,8 @@ class TimelineAIService:
             cursor = conn.cursor()
             cursor.execute("SELECT id, duration FROM video WHERE project_id = ?", (project_id,))
             durations = {r["id"]: (r["duration"] or 0.0) for r in cursor.fetchall()}
+            cursor.execute("SELECT id FROM photo WHERE project_id = ? AND status = 'analyzed'", (project_id,))
+            photo_ids = {r["id"] for r in cursor.fetchall()}
 
         validated = []
         for s in raw_suggestions:
@@ -231,6 +272,37 @@ class TimelineAIService:
                 if action in ("DELETE", "REPLACE"):
                     if not target_clip_id or str(target_clip_id) not in clip_ids:
                         continue
+
+                ctype = str(s.get("type", "video")).lower()
+
+                track = s.get("track")
+                if track not in valid_track_ids:
+                    track = video_track_ids[-1] if video_track_ids else "V2"
+
+                base = {
+                    "action": action,
+                    "track": track,
+                    "timeline_start_s": round(float(s.get("timeline_start_s", 0.0) or 0.0), 2),
+                    "target_clip_id": target_clip_id,
+                    "reason": str(s.get("reason", "Sugestão da IA"))[:300],
+                    "persona": persona,
+                }
+
+                if ctype == "photo":
+                    # Foto still: valida o id e sintetiza a duração (in=0, out=duração)
+                    photo_id = s.get("photo_id")
+                    if action in ("INSERT", "REPLACE") and photo_id not in photo_ids:
+                        continue
+                    dur = max(0.5, min(float(s.get("duration_s", 5.0) or 5.0), 30.0))
+                    validated.append({
+                        **base,
+                        "type": "photo",
+                        "photo_id": photo_id,
+                        "video_id": None,
+                        "in": 0.0,
+                        "out": round(dur, 2),
+                    })
+                    continue
 
                 video_id = s.get("video_id")
                 in_s = float(s.get("source_in_s", 0.0) or 0.0)
@@ -246,20 +318,13 @@ class TimelineAIService:
                     if out_s - in_s < 0.5:
                         out_s = in_s + min(5.0, dur - in_s if dur > 0 else 5.0)
 
-                track = s.get("track")
-                if track not in valid_track_ids:
-                    track = video_track_ids[-1] if video_track_ids else "V2"
-
                 validated.append({
-                    "action": action,
+                    **base,
+                    "type": "video",
                     "video_id": video_id,
+                    "photo_id": None,
                     "in": round(in_s, 2),
                     "out": round(out_s, 2),
-                    "timeline_start_s": round(float(s.get("timeline_start_s", 0.0) or 0.0), 2),
-                    "track": track,
-                    "target_clip_id": target_clip_id,
-                    "reason": str(s.get("reason", "Sugestão da IA"))[:300],
-                    "persona": persona
                 })
             except Exception:
                 continue
