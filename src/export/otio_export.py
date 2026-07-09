@@ -58,18 +58,29 @@ def generate_otio_timeline(timeline_id: int) -> otio.schema.Timeline:
             playhead_s = 0.0
 
             for cut in track_clips:
-                video_id = cut['video_id']
-                in_s = float(cut['in'])
-                out_s = float(cut['out'])
+                in_s = float(cut.get('in', 0.0))
+                out_s = float(cut.get('out', 0.0))
                 start_s = float(cut.get('timeline_start', playhead_s) or playhead_s)
+                is_photo = cut.get('type') == 'photo'
 
-                cursor.execute("SELECT filename, filepath, fps FROM video WHERE id = ?", (video_id,))
-                v_row = cursor.fetchone()
-                if not v_row:
-                    continue
-
-                filepath = v_row['filepath']
-                fps = float(v_row['fps']) if v_row['fps'] else timeline_fps
+                if is_photo:
+                    # Foto still: referencia o arquivo original; fps = fps da timeline
+                    cursor.execute("SELECT filename, filepath FROM photo WHERE id = ?", (cut.get('photo_id'),))
+                    p_row = cursor.fetchone()
+                    if not p_row:
+                        continue
+                    filepath = p_row['filepath']
+                    fps = timeline_fps
+                    clip_name = p_row['filename']
+                else:
+                    video_id = cut.get('video_id')
+                    cursor.execute("SELECT filename, filepath, fps FROM video WHERE id = ?", (video_id,))
+                    v_row = cursor.fetchone()
+                    if not v_row:
+                        continue
+                    filepath = v_row['filepath']
+                    fps = float(v_row['fps']) if v_row['fps'] else timeline_fps
+                    clip_name = v_row['filename']
 
                 # Gap para posicionar o clipe no ponto correto da timeline
                 if start_s > playhead_s + (1.0 / timeline_fps):
@@ -82,27 +93,52 @@ def generate_otio_timeline(timeline_id: int) -> otio.schema.Timeline:
                     ))
                     playhead_s = start_s
 
-                media_ref = otio.schema.ExternalReference(
-                    target_url=Path(filepath).as_uri(),
-                    available_range=otio.opentime.TimeRange(
-                        start_time=otio.opentime.RationalTime(0, fps),
-                        duration=otio.opentime.RationalTime(int(out_s * fps), fps)
+                if is_photo:
+                    # Still congelado: source do 0 à duração do clipe na timeline.
+                    dur_frames = max(1, int((out_s - in_s) * fps))
+                    media_ref = otio.schema.ExternalReference(
+                        target_url=Path(filepath).as_uri(),
+                        available_range=otio.opentime.TimeRange(
+                            start_time=otio.opentime.RationalTime(0, fps),
+                            duration=otio.opentime.RationalTime(dur_frames, fps)
+                        )
                     )
-                )
+                    clip_range = otio.opentime.TimeRange(
+                        start_time=otio.opentime.RationalTime(0, fps),
+                        duration=otio.opentime.RationalTime(dur_frames, fps)
+                    )
+                    clip = otio.schema.Clip(
+                        name=clip_name,
+                        media_reference=media_ref,
+                        source_range=clip_range
+                    )
+                    # Enquadramento/Ken Burns preservados como metadados (best-effort;
+                    # FCPXML/EDL não renderizam o movimento, mas mantêm posição+duração).
+                    clip.metadata["capiau"] = {"still": True, "effects": cut.get('effects') or []}
+                    track.append(clip)
+                    playhead_s += (out_s - in_s)
+                else:
+                    media_ref = otio.schema.ExternalReference(
+                        target_url=Path(filepath).as_uri(),
+                        available_range=otio.opentime.TimeRange(
+                            start_time=otio.opentime.RationalTime(0, fps),
+                            duration=otio.opentime.RationalTime(int(out_s * fps), fps)
+                        )
+                    )
 
-                clip_range = otio.opentime.TimeRange(
-                    start_time=otio.opentime.RationalTime(int(in_s * fps), fps),
-                    duration=otio.opentime.RationalTime(int((out_s - in_s) * fps), fps)
-                )
+                    clip_range = otio.opentime.TimeRange(
+                        start_time=otio.opentime.RationalTime(int(in_s * fps), fps),
+                        duration=otio.opentime.RationalTime(int((out_s - in_s) * fps), fps)
+                    )
 
-                clip = otio.schema.Clip(
-                    name=v_row['filename'],
-                    media_reference=media_ref,
-                    source_range=clip_range
-                )
+                    clip = otio.schema.Clip(
+                        name=clip_name,
+                        media_reference=media_ref,
+                        source_range=clip_range
+                    )
 
-                track.append(clip)
-                playhead_s += (out_s - in_s)
+                    track.append(clip)
+                    playhead_s += (out_s - in_s)
 
         return otio_timeline
 

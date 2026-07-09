@@ -145,5 +145,58 @@ class TestF0OTIOTimelineExport(unittest.TestCase):
         
         print("\n[OK] Teste de exportacao OTIO/XML/EDL com audio multipista passou com sucesso!")
 
+    def test_otio_photo_still_export(self):
+        # 1. Projeto + uma foto (still) analisada
+        proj_id = add_project("Teste OTIO Foto", "Export de still", "")
+        photo_path = str((self.test_dir / "originals" / "foto_set.jpg").resolve())
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO photo (project_id, filename, filepath, hash, description, tags, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, 'analyzed')",
+                (proj_id, "foto_set.jpg", photo_path, "hash_foto_still_1", "Foto de bastidores", "[]")
+            )
+            photo_id = cur.lastrowid
+
+        tracks = [
+            {"id": "AI", "name": "IA", "kind": "ai"},
+            {"id": "V2", "name": "B-Roll", "kind": "video"},
+            {"id": "V1", "name": "Falas", "kind": "video"},
+        ]
+        # Um clipe de foto still de 5s na V2 (in=0, out=5), com Ken Burns em effects
+        cuts = [
+            {"id": "cut_photo", "type": "photo", "photo_id": photo_id, "video_id": None,
+             "in": 0.0, "out": 5.0, "track": "V2", "timeline_start": 0.0, "link_id": None,
+             "effects": [{"type": "fit", "mode": "fill"},
+                         {"type": "ken_burns", "preset": "zoomIn",
+                          "from": {"scale": 1, "x": 0, "y": 0}, "to": {"scale": 1.25, "x": 0, "y": 0}}]},
+        ]
+        with get_db() as conn:
+            timeline_id = ProjectRepository.save_timeline(
+                conn=conn, project_id=proj_id, name="TL Foto", description="still",
+                cuts=cuts, tracks=tracks, fps=24.0
+            )
+
+        otio_timeline = generate_otio_timeline(timeline_id)
+        # Só a V2 tem clipe (V1/AI vazias ou não exportadas)
+        v2 = next(t for t in otio_timeline.tracks if t.name.startswith("V2"))
+        clips = [c for c in v2 if isinstance(c, otio.schema.Clip)]
+        self.assertEqual(len(clips), 1)
+        clip = clips[0]
+        self.assertEqual(clip.name, "foto_set.jpg")
+        # Duração do still = 5s
+        self.assertAlmostEqual(clip.source_range.duration.to_seconds(), 5.0, places=3)
+        # Referencia o arquivo da foto
+        self.assertTrue(str(clip.media_reference.target_url).endswith("foto_set.jpg"))
+        # Metadados capiau preservam still + effects (Ken Burns)
+        self.assertTrue(clip.metadata.get("capiau", {}).get("still"))
+        self.assertTrue(any(e.get("type") == "ken_burns" for e in clip.metadata["capiau"]["effects"]))
+
+        # Export para arquivo não deve lançar exceção
+        otio_path = export_timeline_file(timeline_id, "otio")
+        self.assertTrue(otio_path.exists())
+
+        print("\n[OK] Teste de exportacao de FOTO still (OTIO) passou com sucesso!")
+
 if __name__ == "__main__":
     unittest.main()
