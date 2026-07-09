@@ -96,6 +96,60 @@ export class WorkspaceManager {
             });
         }
 
+        // Inicializa os divisores de tela ajustáveis (Splitters) do layout principal
+        const workspaceContainer = document.querySelector(".workspace");
+        if (workspaceContainer) {
+            // 1. Sidebar Esquerda <-> Center Stage (Horizontal, ajusta largura em pixels da Sidebar)
+            SplitterHelper.initSplitter(workspaceContainer, "#sidebar-left", ".center-stage", {
+                direction: "horizontal",
+                resizeTarget: "left",
+                unit: "px",
+                minVal: 200,
+                maxVal: 600,
+                defaultVal: 350,
+                className: "splitter-sidebar-left"
+            });
+
+            // 2. Center Stage <-> Sidebar Direita (Horizontal, ajusta largura em pixels da Sidebar)
+            SplitterHelper.initSplitter(workspaceContainer, ".center-stage", "#sidebar-right", {
+                direction: "horizontal",
+                resizeTarget: "right",
+                unit: "px",
+                minVal: 250,
+                maxVal: 600,
+                defaultVal: 350,
+                className: "splitter-sidebar-right"
+            });
+        }
+
+        const centerStage = document.querySelector(".center-stage");
+        if (centerStage) {
+            // 3. Monitors Container <-> Timeline Panel (Vertical, ajusta altura em pixels da Timeline)
+            SplitterHelper.initSplitter(centerStage, ".monitors-container", "#timeline-panel", {
+                direction: "vertical",
+                resizeTarget: "right",
+                unit: "px",
+                minVal: 150,
+                maxVal: 600,
+                defaultVal: 290,
+                className: "splitter-timeline"
+            });
+        }
+
+        const monitorsContainer = document.querySelector(".monitors-container");
+        if (monitorsContainer) {
+            // 4. Source Player <-> Program Player (Horizontal, ajusta proporcionalmente em %)
+            SplitterHelper.initSplitter(monitorsContainer, "#source-player-panel", "#program-player-panel", {
+                direction: "horizontal",
+                resizeTarget: "left",
+                unit: "%",
+                minVal: 20,
+                maxVal: 80,
+                defaultVal: 50,
+                className: "splitter-players"
+            });
+        }
+
         this.initMaximizeButtons();
         this.initSidebarObservers();
     }
@@ -381,12 +435,26 @@ export class WorkspaceManager {
                 const el = entry.target;
                 if (!el) continue;
                 const width = entry.contentRect.width;
+                
+                // Manter compatibilidade com classes legadas
                 if (width >= 550) {
                     el.classList.add("wide-layout");
                     el.classList.remove("narrow-layout");
                 } else {
                     el.classList.add("narrow-layout");
                     el.classList.remove("wide-layout");
+                }
+
+                // Layout adaptativo de 3 níveis
+                if (width >= 320) {
+                    el.classList.add("sidebar-normal");
+                    el.classList.remove("sidebar-compact", "sidebar-minimal");
+                } else if (width >= 240) {
+                    el.classList.add("sidebar-compact");
+                    el.classList.remove("sidebar-normal", "sidebar-minimal");
+                } else {
+                    el.classList.add("sidebar-minimal");
+                    el.classList.remove("sidebar-normal", "sidebar-compact");
                 }
             }
         });
@@ -401,28 +469,47 @@ export class WorkspaceManager {
  */
 export class SplitterHelper {
     static initSplitter(container, leftSelector, rightSelector, options = {}) {
-        const minPct = options.minPct || 25;
-        const maxPct = options.maxPct || 75;
-        const defaultPct = options.defaultPct || 50;
+        const direction = options.direction || "horizontal"; // "horizontal" or "vertical"
+        const resizeTarget = options.resizeTarget || "left"; // "left" (first) or "right" (second)
+        const unit = options.unit || "%"; // "%" or "px"
+        const minVal = options.minVal || (unit === "%" ? (options.minPct || 20) : 150);
+        const maxVal = options.maxVal || (unit === "%" ? (options.maxPct || 80) : 800);
+        const defaultVal = options.defaultVal || (unit === "%" ? (options.defaultPct || 50) : 350);
+        const className = options.className || "";
 
         const leftEl = container.querySelector(leftSelector);
         const rightEl = container.querySelector(rightSelector);
         if (!leftEl || !rightEl) return;
 
-        // Remove divisor existente
-        const existing = container.querySelector(".panel-splitter");
+        // Remove divisor com a mesma classe se já existir
+        const existingClass = className ? `.${className.split(" ")[0]}` : ".panel-splitter";
+        const existing = container.querySelector(existingClass);
         if (existing) existing.remove();
 
         // Cria o elemento divisor
         const splitter = container.ownerDocument.createElement("div");
-        splitter.className = "panel-splitter";
+        splitter.className = direction === "horizontal" ? "panel-splitter" : "panel-splitter-v";
+        if (className) {
+            splitter.classList.add(...className.split(" "));
+        }
 
-        // Insere o divisor entre as duas colunas
+        // Insere o divisor entre as duas colunas/linhas
         leftEl.after(splitter);
 
-        // Define proporções padrão
-        leftEl.style.flex = `0 0 ${defaultPct}%`;
-        rightEl.style.flex = `1 1 0%`;
+        // Define tamanho inicial baseado na unidade e no alvo
+        if (unit === "px") {
+            const targetEl = resizeTarget === "left" ? leftEl : rightEl;
+            targetEl.style.flex = `0 0 ${defaultVal}px`;
+            if (direction === "horizontal") {
+                targetEl.style.width = `${defaultVal}px`;
+            } else {
+                targetEl.style.height = `${defaultVal}px`;
+            }
+        } else {
+            // Percentual
+            leftEl.style.flex = `0 0 ${defaultVal}%`;
+            rightEl.style.flex = `1 1 0%`;
+        }
 
         let isDragging = false;
 
@@ -430,6 +517,9 @@ export class SplitterHelper {
             e.preventDefault();
             isDragging = true;
             splitter.classList.add("active");
+
+            // Adiciona classe de resizing ao body para desativar transições e seleções de texto temporariamente
+            container.ownerDocument.body.classList.add("layout-resizing");
 
             // Adiciona overlay na tela para evitar interrupções de arraste
             const overlay = container.ownerDocument.createElement("div");
@@ -440,30 +530,75 @@ export class SplitterHelper {
             overlay.style.width = "100vw";
             overlay.style.height = "100vh";
             overlay.style.zIndex = "9999";
-            overlay.style.cursor = "col-resize";
+            overlay.style.cursor = direction === "horizontal" ? "col-resize" : "row-resize";
             container.ownerDocument.body.appendChild(overlay);
 
             const handleMouseMove = (moveEvent) => {
                 if (!isDragging) return;
                 const containerRect = container.getBoundingClientRect();
-                const offsetX = moveEvent.clientX - containerRect.left;
-                let pct = (offsetX / containerRect.width) * 100;
 
-                if (pct < minPct) pct = minPct;
-                if (pct > maxPct) pct = maxPct;
+                if (unit === "px") {
+                    let val;
+                    if (direction === "horizontal") {
+                        if (resizeTarget === "left") {
+                            val = moveEvent.clientX - containerRect.left;
+                        } else {
+                            val = containerRect.right - moveEvent.clientX;
+                        }
+                        if (val < minVal) val = minVal;
+                        if (val > maxVal) val = maxVal;
+                        
+                        const targetEl = resizeTarget === "left" ? leftEl : rightEl;
+                        targetEl.style.width = `${val}px`;
+                        targetEl.style.flex = `0 0 ${val}px`;
+                    } else {
+                        // vertical px
+                        if (resizeTarget === "left") {
+                            val = moveEvent.clientY - containerRect.top;
+                        } else {
+                            val = containerRect.bottom - moveEvent.clientY;
+                        }
+                        if (val < minVal) val = minVal;
+                        if (val > maxVal) val = maxVal;
 
-                leftEl.style.flex = `0 0 ${pct}%`;
+                        const targetEl = resizeTarget === "left" ? leftEl : rightEl;
+                        targetEl.style.height = `${val}px`;
+                        targetEl.style.flex = `0 0 ${val}px`;
+                    }
+                } else {
+                    // percentual
+                    if (direction === "horizontal") {
+                        const offsetX = moveEvent.clientX - containerRect.left;
+                        let pct = (offsetX / containerRect.width) * 100;
+                        if (pct < minVal) pct = minVal;
+                        if (pct > maxVal) pct = maxVal;
+
+                        leftEl.style.flex = `0 0 ${pct}%`;
+                    } else {
+                        const offsetY = moveEvent.clientY - containerRect.top;
+                        let pct = (offsetY / containerRect.height) * 100;
+                        if (pct < minVal) pct = minVal;
+                        if (pct > maxVal) pct = maxVal;
+
+                        leftEl.style.flex = `0 0 ${pct}%`;
+                    }
+                }
                 
-                // Força disparo de evento resize no container para recalcular elementos internos como Canvas
+                // Força disparo de evento resize no window e container
                 container.dispatchEvent(new Event("resize"));
+                window.dispatchEvent(new Event("resize"));
             };
 
             const handleMouseUp = () => {
                 isDragging = false;
                 splitter.classList.remove("active");
+                container.ownerDocument.body.classList.remove("layout-resizing");
                 overlay.remove();
                 container.ownerDocument.removeEventListener("mousemove", handleMouseMove);
                 container.ownerDocument.removeEventListener("mouseup", handleMouseUp);
+                
+                // Dispara resize final para garantir sincronia
+                window.dispatchEvent(new Event("resize"));
             };
 
             container.ownerDocument.addEventListener("mousemove", handleMouseMove);
