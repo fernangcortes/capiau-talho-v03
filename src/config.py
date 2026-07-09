@@ -47,6 +47,8 @@ class Config:
     PROXY_CRF = 23
     PROXY_PRESET = "fast"
     FRAME_INTERVAL = 10  # Extrair frame a cada 10 segundos para visão multimodal
+    # Duração padrão (segundos) de uma foto (still) ao ser inserida na timeline.
+    PHOTO_DEFAULT_DURATION = 5.0
     # Modelo de embeddings local (384 dims). O multilíngue entende Português de verdade;
     # o antigo all-MiniLM-L6-v2 é focado em inglês e ranqueava mal buscas em PT.
     # Após trocar de modelo, rode POST /api/search/reindex para re-embedar o acervo.

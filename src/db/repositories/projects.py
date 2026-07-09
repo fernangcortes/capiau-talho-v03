@@ -128,7 +128,9 @@ class ProjectRepository:
             out_s = float(cut.get("out", 0.0))
             start = track_cursor.get(track, 0.0)
             clips.append({
+                "type": cut.get("type", "video"),
                 "video_id": cut.get("video_id"),
+                "photo_id": cut.get("photo_id"),
                 "in": in_s,
                 "out": out_s,
                 "track": track,

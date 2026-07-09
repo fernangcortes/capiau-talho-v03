@@ -185,7 +185,9 @@ def save_timeline(timeline: TimelineCreate, conn: sqlite3.Connection = Depends(g
         cuts_dict = [
             {
                 "id": c.id,
+                "type": c.type or "video",
                 "video_id": c.video_id,
+                "photo_id": c.photo_id,
                 "in": c.in_time,
                 "out": c.out_time,
                 "track": c.track,

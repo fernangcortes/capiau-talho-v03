@@ -20,7 +20,9 @@ class ExternalPathIngest(BaseModel):
     project_id: int = 1
 
 class CutItem(BaseModel):
-    video_id: int
+    video_id: Optional[int] = None          # obrigatório para type='video'; None para fotos
+    type: str = "video"                     # 'video' | 'photo' (discriminador de mídia)
+    photo_id: Optional[int] = None          # preenchido quando type='photo' (still)
     in_time: float  # mapeado de 'in' por ser palavra reservada
     out_time: float # mapeado de 'out'
     track: str = "V1"
@@ -51,7 +53,9 @@ class TimelineCreate(BaseModel):
 
 class TimelineAISuggestClip(BaseModel):
     id: str
-    video_id: int
+    video_id: Optional[int] = None
+    type: str = "video"                     # 'video' | 'photo'
+    photo_id: Optional[int] = None
     in_s: float
     out_s: float
     timeline_start_s: float = 0.0

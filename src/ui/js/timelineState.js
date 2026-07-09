@@ -78,6 +78,9 @@ export function timecodeToFrames(tc, fps = 24) {
 // Alturas por tipo de pista (px no canvas)
 export const TRACK_HEIGHTS = { ai: 44, video: 72, audio: 48 };
 
+// Duração padrão (segundos) de uma foto (still) ao ser inserida na timeline.
+export const PHOTO_DEFAULT_DURATION = 5;
+
 /**
  * Pistas padrão (ordem do array = ordem visual de cima para baixo).
  * "AI" é a pista de sugestões: somente leitura, recebe os ghost clips.
@@ -406,7 +409,7 @@ export class CapiauTimelineState {
     /**
      * Adiciona um novo corte à timeline de forma compatível e reativa.
      */
-    addCut(videoId, inSec, outSec, track = null) {
+    addCut(videoId, inSec, outSec, track = null, timelineStartFrame = null) {
         const video = STATE.allVideos.find(v => v.id === videoId);
 
         // Pista inexistente/travada vira roteamento automático
@@ -439,6 +442,7 @@ export class CapiauTimelineState {
 
         const newCut = {
             id: `cut_${stamp}`,
+            type: "video",
             video_id: videoId,
             inFrame: inFrame,
             outFrame: outFrame,
@@ -447,6 +451,12 @@ export class CapiauTimelineState {
             track: track,
             link_id: linkId
         };
+        // Posição explícita (ex: drop) só vale em pista livre; a magnética faz ripple.
+        const targetTrackObj = this.getTrack(track);
+        if (timelineStartFrame !== null && timelineStartFrame !== undefined &&
+            targetTrackObj && !targetTrackObj.magnetic) {
+            newCut.timelineStartFrame = Math.max(0, Math.round(timelineStartFrame));
+        }
 
         TIMELINE_HISTORY.record(() => {
             const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
@@ -454,6 +464,7 @@ export class CapiauTimelineState {
             if (audioTrackId) {
                 currentCuts.push({
                     id: `cut_${stamp}_a`,
+                    type: "video",
                     video_id: videoId,
                     inFrame: inFrame,
                     outFrame: outFrame,
@@ -465,6 +476,55 @@ export class CapiauTimelineState {
             }
 
             // Atualiza o estado global reativo
+            STATE.activeTimelineCuts = currentCuts;
+        });
+        return newCut;
+    }
+
+    /**
+     * Adiciona uma FOTO (still) como clipe na timeline.
+     * Fotos não têm faixa de áudio (link_id sempre null) e usam uma duração padrão
+     * (ajustável depois pelo trim). Enquadramento default = "fill" (editável por clipe).
+     */
+    addPhotoCut(photoId, { durationSec = PHOTO_DEFAULT_DURATION, track = null, timelineStartFrame = null } = {}) {
+        // Roteamento: fotos vão para uma pista de vídeo LIVRE (como B-roll); fallback = magnética/última
+        if (track) {
+            const t = this.getTrack(track);
+            if (!t || t.kind !== "video") track = null;
+        }
+        if (!track) {
+            const videoTracks = this.getVideoTracks();
+            const freeTracks = videoTracks.filter(t => !t.magnetic && !t.locked);
+            const free = freeTracks.length ? freeTracks[freeTracks.length - 1] : null;
+            track = (free || videoTracks.find(t => t.magnetic) || videoTracks[videoTracks.length - 1] || { id: "V1" }).id;
+        }
+
+        const dur = Math.max(0.1, Number(durationSec) || PHOTO_DEFAULT_DURATION);
+        const outFrame = secondsToFrames(dur, this.fps);
+        const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        const newCut = {
+            id: `cut_${stamp}`,
+            type: "photo",
+            photo_id: photoId,
+            video_id: null,
+            inFrame: 0,
+            outFrame: outFrame,
+            in: 0,
+            out: dur,
+            track: track,
+            link_id: null,
+            effects: [{ type: "fit", mode: "fill" }]
+        };
+        const targetTrackObj = this.getTrack(track);
+        if (timelineStartFrame !== null && timelineStartFrame !== undefined &&
+            targetTrackObj && !targetTrackObj.magnetic) {
+            newCut.timelineStartFrame = Math.max(0, Math.round(timelineStartFrame));
+        }
+
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
+            currentCuts.push(newCut);
             STATE.activeTimelineCuts = currentCuts;
         });
         return newCut;
@@ -485,7 +545,8 @@ export class CapiauTimelineState {
 
         const result = [...cuts];
         cuts.forEach((cut, idx) => {
-            if (this.trackKindOf(cut.track) !== "video" || cut.link_id) return;
+            // Fotos (stills) não têm áudio: nunca ganham par A/V
+            if (this.trackKindOf(cut.track) !== "video" || cut.link_id || cut.type === "photo") return;
             const audioTrackId = this.pairedAudioTrackId(cut.track);
             if (!audioTrackId) return;
             const linkId = `link_migr_${idx}_${Date.now()}`;
@@ -516,7 +577,9 @@ export class CapiauTimelineState {
 
             return {
                 id: s.id || `ghost_${index}_${Date.now()}`,
-                video_id: s.video_id,
+                type: s.type || "video",
+                video_id: s.video_id ?? null,
+                photo_id: s.photo_id ?? null,
                 inFrame: Math.round(inFrame),
                 outFrame: Math.round(outFrame),
                 in: s.in !== undefined ? s.in : framesToSeconds(inFrame, fps),
@@ -556,11 +619,29 @@ export class CapiauTimelineState {
             const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
             const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-            // Monta o par vídeo + áudio vinculado da sugestão
+            // Monta o(s) clipe(s) da sugestão: foto = still único (sem áudio); vídeo = par A/V
             const buildPair = (timelineStartFrame) => {
+                if (suggestion.type === "photo") {
+                    return [{
+                        id: `cut_${stamp}`,
+                        type: "photo",
+                        photo_id: suggestion.photo_id,
+                        video_id: null,
+                        inFrame: suggestion.inFrame,
+                        outFrame: suggestion.outFrame,
+                        in: suggestion.in,
+                        out: suggestion.out,
+                        track: suggestion.track,
+                        link_id: null,
+                        origin: suggestion.origin || "ai",
+                        effects: [{ type: "fit", mode: "fill" }],
+                        timelineStartFrame
+                    }];
+                }
                 const audioTrackId = this.pairedAudioTrackId(suggestion.track);
                 const linkId = audioTrackId ? `link_${stamp}` : null;
                 const base = {
+                    type: "video",
                     video_id: suggestion.video_id,
                     inFrame: suggestion.inFrame,
                     outFrame: suggestion.outFrame,
