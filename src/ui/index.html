@@ -46,7 +46,7 @@
                 <select id="select-workspace" title="Configuração de Workspace" style="color: #c084fc; max-width: 140px; background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; cursor: pointer;">
                     <option value="default">Workspace: Padrão</option>
                     <option value="decupagem">Workspace: Decupagem</option>
-                    <option value="montagem">Workspace: Montagem</option>
+                    <option value="montagem">Workspace: Estúdio</option>
                     <option value="multitela">Workspace: Multi-Tela</option>
                 </select>
             </div>
@@ -111,7 +111,7 @@
                     </h2>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <button id="btn-toggle-library-filters" class="btn-icon" title="Ocultar Filtros/Abas" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-eye"></i></button>
-                        <button id="btn-maximize-library" class="btn-icon" title="Maximizar Biblioteca" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-expand"></i></button>
+                        <button id="btn-maximize-library" class="btn-icon" title="Layout Estúdio (biblioteca + players + timeline)" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-expand"></i></button>
                         <button id="btn-popout-library" class="btn-icon" title="Destacar Biblioteca" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
                         <button class="btn-toggle-sidebar" id="toggle-left" title="Recolher Painel">
                             <i class="fa-solid fa-chevron-left"></i>
@@ -447,7 +447,14 @@
                                 </div>
                                 
                                 <div class="toolbar-divider"></div>
-                                
+
+                                <!-- Altura vertical das pistas: slider global (arraste a borda de cada pista p/ ajuste individual) -->
+                                <div class="track-height-control" data-tooltip="Altura das pistas (global) — arraste a borda de cada pista para ajuste individual">
+                                    <input type="range" id="track-height-slider" class="track-height-slider" min="50" max="170" step="5" value="100">
+                                </div>
+
+                                <div class="toolbar-divider"></div>
+
                                 <!-- Nome/Renomear Timeline -->
                                 <button id="btn-rename-timeline" class="btn-toolbar-action" data-tooltip="Renomear Timeline (Clique para editar)"><i class="fa-solid fa-pen-to-square"></i></button>
                                 <input type="text" id="timeline-name-input" value="Rascunho Making Of #1" style="display: none;">
@@ -580,12 +587,42 @@
                 </div>
 
                 
-                <div class="sidebar-content scrollable">
+                <div class="sidebar-content scrollable" style="overflow: hidden;">
                     <!-- Tab: Transcrição / Falas (ASR) -->
-                    <div class="transcript-feed active" id="transcript-container">
-                        <div class="empty-state">
-                            <i class="fa-solid fa-microphone-slash"></i>
-                            <p>Selecione um depoimento na Biblioteca para carregar a transcrição correspondente.</p>
+                    <div class="transcript-feed active" id="transcript-container" style="display: flex; flex-direction: row; width: 100%; height: 100%; overflow: hidden; padding: 0;">
+                        <!-- Coluna 1: Lista e Pistas -->
+                        <div id="transcript-list-col" style="flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; min-width: 250px;">
+                            <!-- Gaveta de Pistas Globais (Assistente de Falas) -->
+                            <div id="speech-assistant-drawer" class="speech-assistant-drawer collapsed">
+                                <div class="drawer-header" id="btn-toggle-assistant-drawer" style="cursor: pointer; padding: 8px 12px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 600; color: var(--color-cyan);">
+                                    <span><i class="fa-solid fa-wand-magic-sparkles"></i> Assistente de Falas & Pistas</span>
+                                    <i class="fa-solid fa-chevron-down toggle-icon" style="transition: transform 0.2s;"></i>
+                                </div>
+                                <div class="drawer-content" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: rgba(0,0,0,0.15); display: flex; flex-direction: column; border-bottom: 1px solid var(--border-glass);">
+                                    <div class="assistant-config" style="padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 8px; font-size: 10px; border-bottom: 1px dashed var(--border-glass); align-items: center; color: var(--text-secondary);">
+                                        <label style="display: flex; align-items: center; gap: 3px; cursor: pointer;"><input type="checkbox" id="chk-enable-silence" checked> Silêncios (Limiar: <input type="number" id="num-silence-threshold" value="1.2" step="0.1" style="width: 45px; background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); color:#fff; padding: 1px 3px; border-radius: 4px; font-size:10px; outline:none; text-align:center;">s)</label>
+                                        <label style="display: flex; align-items: center; gap: 3px; cursor: pointer;"><input type="checkbox" id="chk-enable-questions" checked> Perguntas (?)</label>
+                                        <label style="display: flex; align-items: center; gap: 3px; cursor: pointer;"><input type="checkbox" id="chk-enable-faces" checked> Rostos</label>
+                                        <button id="btn-update-clues" class="btn-card-action" style="font-size:10px; color:var(--color-cyan); background:none; border:none; padding: 2px; cursor:pointer; margin-left:auto;" title="Atualizar Pistas"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                    </div>
+                                    <div id="assistant-clues-list" class="clues-list scrollable" style="max-height: 180px; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px;">
+                                        <!-- Carregado via JS -->
+                                        <div style="font-style: italic; color: var(--text-muted); font-size: 10px; text-align: center; padding: 10px 0;">Selecione um depoimento para buscar pistas.</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Feed de Balões de Transcrição -->
+                            <div id="transcript-feed-scroll" class="scrollable" style="flex: 1; overflow-y: auto; padding: 15px; min-height: 0;">
+                                <div class="empty-state">
+                                    <i class="fa-solid fa-microphone-slash"></i>
+                                    <p>Selecione um depoimento na Biblioteca para carregar a transcrição correspondente.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Coluna 2: Inspetor do Balão (Oculto por padrão, largura fixa de 350px) -->
+                        <div id="bubble-inspector-panel" class="bubble-inspector-panel" style="display: none; width: 350px; border-left: 1px solid var(--border-glass); background: rgba(10, 8, 14, 0.45); flex-direction: column; height: 100%; overflow: hidden; flex-shrink: 0; min-height: 0;">
+                            <!-- Inserido dinamicamente via panels.js -->
                         </div>
                     </div>
 

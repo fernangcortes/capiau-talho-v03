@@ -3127,12 +3127,6 @@ mark.search-highlight {
 .center-stage:has(#timeline-panel.collapsed) .splitter-timeline { display: none !important; }
 .monitors-container:has(.player-panel.maximized) .splitter-players { display: none !important; }
 
-/* Desativa os splitters no modo montagem para evitar conflitos de posicionamento fixo */
-body.montagem .panel-splitter,
-body.montagem .panel-splitter-v {
-    display: none !important;
-}
-
 /* Prevenção de travamentos e transições lentas durante o arraste */
 body.layout-resizing * {
     transition: none !important;
@@ -3170,76 +3164,87 @@ body.layout-resizing * {
     right: 10px;
 }
 
-/* ── MODO MONTAGEM (biblioteca no topo + timeline ancorada na base) ── */
-/* Painel de transcrição some para dar espaço à montagem */
-body.montagem .sidebar-right { display: none !important; }
+/* ── LAYOUT ESTÚDIO (biblioteca grande | players empilhados | transcrição + timeline full-width) ──
+   Reflui em flex real (sem position:fixed). O reparent é feito em workspaceManager.applyStudio(). */
 
-/* Biblioteca maximizada ocupa só o topo, cedendo ~44vh da base à timeline.
-   (Sobrescreve o height !important da regra base de .sidebar-maximized.) */
-body.montagem .sidebar-left.sidebar-maximized {
-    top: 10px !important;
-    bottom: auto !important;
-    height: calc(56vh - 30px) !important;
+/* Workspace passa a empilhar: [linha superior] sobre [timeline full-width] */
+body.studio .workspace {
+    flex-direction: column;
 }
 
-/* Timeline ancorada em largura total na base da tela */
-body.montagem #timeline-panel {
-    position: fixed !important;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-    height: 44vh;
-    z-index: 1001;
-    margin: 0;
-    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55);
+/* Linha superior agrupa as 3 colunas e ocupa o espaço acima da timeline */
+body.studio .studio-top {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    position: relative;
 }
-/* No modo montagem a timeline nunca fica recolhida */
-body.montagem #timeline-panel.collapsed { display: flex !important; }
-body.montagem #reopen-timeline { display: none !important; }
 
-/* Mini-monitores flutuantes (Source + Program), liga/desliga.
-   Usa !important para vencer os estilos inline (width:100%, flex:1, min-height:300px). */
-body.montagem .monitors-container {
-    position: fixed !important;
-    top: 84px !important;
-    right: 24px !important;
-    left: auto !important;
-    width: 480px !important;
-    height: 172px !important;
+/* Center-stage vira a coluna do meio contendo apenas os players */
+body.studio .studio-top > .center-stage {
+    min-width: 0;
+    height: 100%;
+}
+
+/* Players empilhados (Source em cima, Program embaixo).
+   !important vence o inline min-height:300px / width:100% / flex:1. */
+body.studio .monitors-container {
+    flex-direction: column !important;
+    width: 100% !important;
+    height: 100% !important;
     min-height: 0 !important;
-    flex: 0 0 auto !important;
-    z-index: 1002;
-    gap: 8px !important;
+    flex: 1 1 auto !important;
 }
-body.montagem.montagem-monitors-hidden .monitors-container { display: none !important; }
 
-/* Botão flutuante para alternar os mini-monitores */
-#btn-montagem-monitors {
-    position: fixed;
-    top: 46px;
-    right: 24px;
-    z-index: 1003;
-    width: 30px;
-    height: 30px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    border: 1px solid var(--border-glass);
-    background: rgba(15, 23, 42, 0.92);
-    color: var(--color-cyan);
-    cursor: pointer;
-    font-size: 13px;
+/* Seamless: colunas encostadas, sem cantos nem bordas (a regra base usa `.workspace >`,
+   que não alcança as sidebars quando reparenteadas dentro de .studio-top). */
+body.studio .studio-top > .sidebar-left,
+body.studio .studio-top > .sidebar-right {
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
 }
-body.montagem.montagem-monitors-hidden #btn-montagem-monitors { color: var(--text-muted); }
 
-/* Modais detalhados (entrevista/foto) não cobrem a timeline ancorada */
-body.montagem #interview-modal,
-body.montagem #photo-viewer-modal {
-    height: calc(56vh - 24px) !important;
-    bottom: auto !important;
-    top: 0 !important;
+/* ── Players limpos: só vídeo; cabeçalho e controles surgem no hover ── */
+body.studio .player-panel {
+    position: relative;
 }
+body.studio .player-header,
+body.studio .player-controls {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    border: none !important;
+}
+body.studio .player-header {
+    top: 0;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent);
+}
+body.studio .player-controls {
+    bottom: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+}
+body.studio .player-panel:hover .player-header,
+body.studio .player-panel:hover .player-controls {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Vídeo/foto preenchem o painel (remove o cap 52vh do layout padrão) */
+body.studio .video-container video,
+body.studio .video-container img {
+    max-height: none;
+}
+
+/* Ocultar divisores do studio quando o painel adjacente está colapsado */
+body.studio .studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib { display: none !important; }
+body.studio .studio-top:has(#sidebar-right.collapsed) .splitter-studio-right { display: none !important; }
+body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline { display: none !important; }
 
 /* ── CHAT IA WIDESCREEN LAYOUTS ── */
 #chat-container.wide-layout #btn-chat-layout {
@@ -3738,6 +3743,41 @@ select option, .nle-select option {
     display: none !important;
 }
 
+/* ── Slider global de altura das pistas (vertical, na toolbar) ── */
+.track-height-control {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 5px 0;
+}
+.track-height-slider {
+    writing-mode: vertical-lr;
+    direction: rtl; /* topo = mais alto */
+    width: 16px;
+    height: 58px;
+    margin: 0;
+    background: transparent;
+    accent-color: var(--color-cyan);
+    cursor: ns-resize;
+}
+
+/* ── Alça de redimensionamento de altura por pista (borda inferior do cabeçalho) ── */
+.track-resize-handle {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 6px;
+    cursor: row-resize;
+    z-index: 6;
+    background: transparent;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+.track-resize-handle:hover {
+    background: rgba(6, 182, 212, 0.55);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
+}
+
 /* Sections inside toolbar wrap buttons horizontally based on available width */
 .toolbar-section {
     display: flex;
@@ -3984,6 +4024,231 @@ select option, .nle-select option {
 .panel-header:has(.fa-spin) {
     display: flex !important;
 }
+
+/* ── ASSISTENTE DE FALAS E INSPETOR DE DIARIZAÇÃO ─────────────────── */
+.speech-assistant-drawer {
+    border-bottom: 1px solid var(--border-glass);
+}
+.speech-assistant-drawer.collapsed .toggle-icon {
+    transform: rotate(0deg);
+}
+.speech-assistant-drawer:not(.collapsed) .toggle-icon {
+    transform: rotate(180deg);
+}
+
+.clue-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-glass);
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: border-color 0.2s, background 0.2s;
+}
+.clue-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(6, 182, 212, 0.3);
+}
+.clue-card .clue-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+}
+.clue-card .clue-context {
+    font-style: italic;
+    color: var(--text-muted);
+    line-height: 1.3;
+}
+.clue-card .clue-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.clue-badge {
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.clue-badge.silence {
+    background: rgba(244, 63, 94, 0.12);
+    color: var(--color-rose);
+    border: 1px solid rgba(244, 63, 94, 0.22);
+}
+.clue-badge.question {
+    background: rgba(168, 85, 247, 0.12);
+    color: var(--color-violet);
+    border: 1px solid rgba(168, 85, 247, 0.22);
+}
+.clue-badge.face {
+    background: rgba(6, 182, 212, 0.12);
+    color: var(--color-cyan);
+    border: 1px solid rgba(6, 182, 212, 0.22);
+}
+
+/* Inspetor Lateral (Coluna 2) */
+.bubble-inspector-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.inspector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-glass);
+    font-family: var(--font-heading);
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.2);
+}
+.inspector-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.inspector-section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.waveform-container {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-glass);
+    border-radius: 6px;
+    padding: 6px;
+    position: relative;
+}
+.waveform-canvas {
+    width: 100%;
+    height: 50px;
+    display: block;
+    cursor: pointer;
+}
+
+.faces-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+    gap: 6px;
+}
+.face-thumb-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-glass);
+    border-radius: 6px;
+    padding: 6px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+}
+.face-thumb-card:hover {
+    transform: scale(1.05);
+    border-color: var(--color-cyan);
+}
+.face-thumb-card img {
+    width: 45px;
+    height: 45px;
+    border-radius: 4px;
+    object-fit: cover;
+    background: #000;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.face-thumb-card span {
+    font-size: 9px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+/* Botões Flat do Inspetor */
+.btn-flat-action {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-secondary);
+    padding: 4px 6px;
+    font-size: 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: color 0.2s, transform 0.2s, text-shadow 0.2s;
+}
+.btn-flat-action:hover {
+    color: #fff;
+    transform: scale(1.08);
+}
+.btn-flat-action.cyan:hover {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+.btn-flat-action.rose:hover {
+    color: var(--color-rose) !important;
+    text-shadow: 0 0 8px var(--color-rose);
+}
+.btn-flat-action.violet:hover {
+    color: var(--color-violet) !important;
+    text-shadow: 0 0 8px var(--color-violet);
+}
+
+/* Menu de Contexto Customizado */
+.custom-context-menu {
+    position: fixed;
+    z-index: 10000;
+    background: rgba(18, 18, 24, 0.95);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--border-glass);
+    border-radius: 6px;
+    padding: 4px 0;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 10px rgba(139, 92, 246, 0.15);
+    width: 200px;
+    font-family: var(--font-body);
+}
+.custom-context-menu .menu-item {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.15s, color 0.15s;
+}
+.custom-context-menu .menu-item:hover {
+    background: rgba(139, 92, 246, 0.2);
+    color: #fff;
+    text-shadow: 0 0 5px rgba(139, 92, 246, 0.4);
+}
+
+/* Destaque para palavra selecionada para dividir */
+.word-span.to-split {
+    background: rgba(244, 63, 94, 0.5) !important;
+    color: #fff !important;
+    box-shadow: 0 0 8px rgba(244, 63, 94, 0.8) !important;
+    border-radius: 2px;
+}
+
 
 
 

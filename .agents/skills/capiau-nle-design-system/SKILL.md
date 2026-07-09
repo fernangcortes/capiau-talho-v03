@@ -118,3 +118,25 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
   * A linha restauradora deve ser um **irmão direto** no mesmo contêiner flex do painel colapsado, posicionada logo após o painel no fluxo do DOM.
   * **Nunca usar `position: absolute`** — isso causa sobreposições, problemas de z-index e inacessibilidade quando múltiplos painéis estão colapsados simultaneamente.
   * O painel colapsado deve usar `width: 0px !important; opacity: 0; pointer-events: none;` com transição suave.
+
+---
+
+## 7. Players Limpos com Controles em Hover
+
+* **Objetivo:** Sempre que um player de vídeo (`.player-panel`) for construído ou reaproveitado em um layout novo, ele deve
+  priorizar a exibição do vídeo — cabeçalho e barra de controles não devem competir visualmente com a imagem quando o
+  usuário não está interagindo com aquele player específico.
+* **Diretrizes:**
+  * O contêiner do player (`.player-panel`) precisa de `position: relative;` para servir de referência aos overlays.
+  * `.player-header` e `.player-controls` tornam-se overlays absolutos (`position: absolute; left: 0; right: 0;`), um
+    ancorado no topo (`top: 0`) e outro na base (`bottom: 0`), com `z-index` acima do vídeo.
+  * Estado padrão: `opacity: 0; pointer-events: none;` — o vídeo ocupa 100% do painel sem faixas nem botões visíveis.
+  * No hover do painel (`.player-panel:hover .player-header`, `.player-panel:hover .player-controls`):
+    `opacity: 1; pointer-events: auto;`, com `transition: opacity 0.2s ease;` (sem transição de layout/altura, só opacidade).
+  * Usar gradiente sutil por trás dos controles para garantir legibilidade sobre qualquer imagem, nunca um fundo opaco
+    sólido: `linear-gradient(to bottom, rgba(0,0,0,.55), transparent)` no header e
+    `linear-gradient(to top, rgba(0,0,0,.6), transparent)` nos controles.
+  * Remover o cap de altura do vídeo (`max-height`) nesses contextos — o vídeo deve preencher todo o painel, já que não
+    há mais cabeçalho/controles ocupando espaço fixo no fluxo.
+* **Referência de implementação:** ver o layout "Estúdio" (`body.studio .player-panel/.player-header/.player-controls`
+  em `styles.css`), que reaproveita esse padrão para os monitores Source/Program empilhados.

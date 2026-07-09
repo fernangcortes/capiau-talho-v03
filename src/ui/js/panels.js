@@ -140,6 +140,14 @@ export class PanelsManager {
             });
         }
 
+        // ── Altura vertical das pistas: slider global (0.5×–1.7×) ──
+        const trackHeightSlider = document.getElementById("track-height-slider");
+        if (trackHeightSlider) {
+            trackHeightSlider.addEventListener("input", (e) => {
+                TIMELINE_STATE.setTrackHeightScale(parseInt(e.target.value, 10) / 100);
+            });
+        }
+
         // ── Undo / Redo da timeline ──
         const btnUndo = document.getElementById("btn-undo-timeline");
         const btnRedo = document.getElementById("btn-redo-timeline");
@@ -1150,6 +1158,36 @@ export class PanelsManager {
                     }
                 });
             }
+
+            // Alça de redimensionamento da altura individual desta pista (borda inferior).
+            row.style.position = "relative";
+            const resizeHandle = doc.createElement("div");
+            resizeHandle.className = "track-resize-handle";
+            resizeHandle.dataset.tooltip = "Arraste para ajustar a altura desta pista";
+            resizeHandle.addEventListener("mousedown", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const startY = e.clientY;
+                const startH = TIMELINE_STATE.trackHeight(track);
+                doc.body.classList.add("layout-resizing");
+                // Durante o arraste: muta heightPx e redesenha o canvas, SEM re-renderizar
+                // os cabeçalhos (evita recriar a alça no meio do gesto). Commit no mouseup.
+                const onMove = (ev) => {
+                    const nh = Math.min(240, Math.max(22, startH + (ev.clientY - startY)));
+                    track.heightPx = nh;
+                    row.style.height = `${nh}px`;
+                    if (this.timelineRenderer) this.timelineRenderer.requestRedraw();
+                };
+                const onUp = () => {
+                    doc.body.classList.remove("layout-resizing");
+                    doc.removeEventListener("mousemove", onMove);
+                    doc.removeEventListener("mouseup", onUp);
+                    STATE.emit("timelineTracksChanged", TIMELINE_STATE.tracks);
+                };
+                doc.addEventListener("mousemove", onMove);
+                doc.addEventListener("mouseup", onUp);
+            });
+            row.appendChild(resizeHandle);
 
             inner.appendChild(row);
         });

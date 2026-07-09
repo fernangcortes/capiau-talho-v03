@@ -112,6 +112,7 @@ export class CapiauTimelineState {
         this.selectedTrack = "V1"; // Track focada ativa
 
         this.tracks = defaultTracks(); // Lista dinâmica de pistas (ordem visual)
+        this.trackHeightScale = 1.0; // Fator de escala vertical das pistas (compacto ↔ alto)
 
         this.ghostTrack = []; // Lista de sugestões da IA (Ghost Clips)
         this.selectedGhostClipId = null; // ID da sugestão de IA ativa
@@ -163,7 +164,32 @@ export class CapiauTimelineState {
     }
 
     trackHeight(track) {
-        return TRACK_HEIGHTS[track.kind] || TRACK_HEIGHTS.video;
+        // Override por pista (arraste individual) tem prioridade sobre a escala global.
+        if (track.heightPx != null && isFinite(track.heightPx)) {
+            return Math.min(240, Math.max(22, Math.round(track.heightPx)));
+        }
+        const base = TRACK_HEIGHTS[track.kind] || TRACK_HEIGHTS.video;
+        // Aplica a escala vertical global, com piso para manter as pistas clicáveis/legíveis.
+        return Math.max(22, Math.round(base * (this.trackHeightScale || 1)));
+    }
+
+    /**
+     * Escala vertical GLOBAL das pistas (slider). Afeta apenas pistas sem override.
+     * Clampeia entre 0.5 (compacto) e 1.7 (alto) e re-renderiza pistas + cabeçalhos.
+     */
+    setTrackHeightScale(scale) {
+        const clamped = Math.min(1.7, Math.max(0.5, scale));
+        if (clamped === this.trackHeightScale) return;
+        this.trackHeightScale = clamped;
+        STATE.emit("timelineTracksChanged", this.tracks);
+    }
+
+    /** Define a altura absoluta (px) de UMA pista específica (arraste individual). */
+    setTrackHeight(trackId, px) {
+        const track = this.tracks.find(t => t.id === trackId);
+        if (!track) return;
+        track.heightPx = Math.min(240, Math.max(22, Math.round(px)));
+        STATE.emit("timelineTracksChanged", this.tracks);
     }
 
     /** Altura total ocupada por todas as pistas (px). */
@@ -184,7 +210,8 @@ export class CapiauTimelineState {
                 volume: t.volume !== undefined ? Number(t.volume) : 1.0,
                 muted: !!t.muted,
                 locked: !!t.locked,
-                magnetic: !!t.magnetic
+                magnetic: !!t.magnetic,
+                heightPx: t.heightPx != null ? Number(t.heightPx) : null
             }));
             if (!this.tracks.some(t => t.kind === "ai")) {
                 this.tracks.unshift({ id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, magnetic: false });
