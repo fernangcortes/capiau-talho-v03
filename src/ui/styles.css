@@ -86,8 +86,9 @@ body {
     justify-content: space-between;
     height: 46px;
     padding: 0 16px;
-    margin: 8px 8px 0 8px;
-    border-radius: 8px;
+    margin: 0;
+    border-radius: 0;
+    border-bottom: 1px solid var(--border-glass);
     z-index: 100;
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), margin 0.3s ease, height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
 }
@@ -185,51 +186,36 @@ body {
     font-size: 12px;
 }
 
-/* ── CUSTOM PREMIUM TOOLTIPS ────────────────────────────────────────── */
-[data-tooltip] {
-    position: relative;
+/* ── CUSTOM PREMIUM TOOLTIPS (GLOBAL JS ENGINE) ────────────────────── */
+#global-tooltip {
+    position: fixed;
+    z-index: 999999 !important; /* Acima de absolutamente tudo no DOM */
+    background: rgba(15, 11, 28, 0.96) !important;
+    border: 1px solid rgba(138, 92, 246, 0.5) !important;
+    color: #f3f1f5 !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    white-space: normal !important;
+    width: max-content !important;
+    max-width: 250px !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    transform: translateY(4px) scale(0.95) !important;
+    transition: opacity 0.1s ease, transform 0.1s ease !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    line-height: 1.4 !important;
+    text-align: left !important;
+    top: 0;
+    left: 0;
 }
 
-[data-tooltip]::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translate(-50%, 100%) scale(0.9);
-    background: rgba(15, 11, 28, 0.96);
-    border: 1px solid rgba(138, 92, 246, 0.35);
-    color: #f3f1f5;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 500;
-    white-space: normal;
-    width: max-content;
-    max-width: 250px;
-    z-index: 1000;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    line-height: 1.4;
-    text-align: left;
-}
-
-[data-tooltip]:hover::after {
-    opacity: 1;
-    transform: translate(-50%, 100%) scale(1);
-}
-
-.actions-area [data-tooltip]::after {
-    left: auto;
-    right: 0;
-    transform: translate(0, 100%) scale(0.9);
-}
-
-.actions-area [data-tooltip]:hover::after {
-    transform: translate(0, 100%) scale(1);
+#global-tooltip.visible {
+    opacity: 1 !important;
+    transform: translateY(0) scale(1) !important;
 }
 
 /* ── RETRACTABLE HEADER CLASSES ──────────────────────────────────────── */
@@ -332,15 +318,16 @@ button {
 .workspace {
     display: flex;
     flex: 1;
-    height: calc(100vh - 66px);
-    padding: 10px;
-    gap: 10px;
+    height: calc(100vh - 46px);
+    padding: 0;
+    gap: 0;
     position: relative;
     transition: height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    background: #080b11;
 }
 
 .header-collapsed .workspace {
-    height: calc(100vh - 20px);
+    height: 100vh;
 }
 
 /* ── RETRACTABLE SIDEBARS ────────────────────────────────────────────── */
@@ -355,12 +342,14 @@ button {
 }
 
 .sidebar-left.collapsed, .sidebar-right.collapsed {
-    width: 0px;
-    padding: 0;
-    margin: 0;
-    border: none;
-    opacity: 0;
-    pointer-events: none;
+    width: 0px !important;
+    flex-basis: 0px !important;
+    min-width: 0px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 /* Suporte para ocultar sidebars maximizados quando recolhidos */
@@ -424,6 +413,13 @@ button {
     border-radius: 0;
     font-weight: 600;
     transition: all 0.2s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 }
 
 .tab-btn.active {
@@ -1133,7 +1129,7 @@ button {
     display: flex;
     flex-direction: column;
     flex: 1;
-    gap: 10px;
+    gap: 0;
     min-width: 0; /* Permite encolhimento correto */
 }
 
@@ -1371,6 +1367,148 @@ button {
     height: 36px;
 }
 
+/* ── PLAYER CONTROLS FLAT NLE STYLING ── */
+.player-controls .btn-control {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--text-secondary) !important;
+    width: auto !important;
+    height: auto !important;
+    border-radius: 0 !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 4px 6px !important;
+}
+.player-controls .btn-control:hover {
+    color: var(--color-cyan) !important;
+    transform: scale(1.1);
+}
+
+.player-controls .play-btn {
+    color: var(--color-violet) !important;
+}
+.player-controls .play-btn:hover {
+    color: var(--color-cyan) !important;
+}
+
+.player-controls .btn-marker {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    border-radius: 0 !important;
+    width: auto !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 4px 6px !important;
+}
+.player-controls #btn-mark-in {
+    color: var(--color-cyan) !important;
+}
+.player-controls #btn-mark-in:hover {
+    color: #fff !important;
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+.player-controls #btn-mark-out {
+    color: var(--color-rose) !important;
+}
+.player-controls #btn-mark-out:hover {
+    color: #fff !important;
+    text-shadow: 0 0 8px var(--color-rose);
+}
+
+.player-controls .btn-append {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--color-violet) !important;
+    font-weight: 700 !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    height: auto !important;
+    padding: 4px 6px !important;
+}
+.player-controls .btn-append:hover {
+    color: var(--color-cyan) !important;
+}
+
+/* Custom Flat Resolution Selector */
+.player-controls .dropdown-wrapper {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    height: 24px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    color: var(--text-secondary) !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease;
+}
+
+.player-controls .dropdown-wrapper:hover {
+    color: var(--color-cyan) !important;
+}
+
+/* Resolution select inside the player controls */
+.player-controls .dropdown-wrapper select {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--text-secondary) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    padding: 0 16px 0 0 !important;
+    margin: 0 !important;
+    height: 24px !important;
+    outline: none !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2210%22%20height%3D%2210%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2306b6d4%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right center !important;
+}
+
+.player-controls .dropdown-wrapper select:hover {
+    color: var(--color-cyan) !important;
+}
+
+/* Cabeçalhos Transparentes e Botões Ocultados até Hover */
+.player-header {
+    background: transparent !important;
+    border-bottom: none !important;
+    padding: 10px 15px !important;
+}
+
+.player-header .btn-control {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.2s ease, color 0.2s ease !important;
+    background: transparent !important;
+    border: none !important;
+    width: auto !important;
+    height: auto !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.player-panel:hover .player-header .btn-control {
+    opacity: 0.6 !important;
+    pointer-events: auto !important;
+}
+
+.player-panel:hover .player-header .btn-control:hover {
+    opacity: 1 !important;
+    color: var(--color-cyan) !important;
+}
+
 .dropdown-wrapper {
     display: flex;
     align-items: center;
@@ -1404,12 +1542,14 @@ button {
 }
 
 .timeline-panel.collapsed {
-    height: 0px;
-    padding: 0;
-    margin: 0;
-    border: none;
-    opacity: 0;
-    pointer-events: none;
+    height: 0px !important;
+    flex-basis: 0px !important;
+    min-height: 0px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 .panel-header {
@@ -1614,8 +1754,35 @@ button {
 }
 
 .transcription-actions {
-    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 8px;
     border-bottom: 1px solid var(--border-glass);
+    background: rgba(0, 0, 0, 0.15);
+    gap: 6px;
+    height: 38px;
+    box-sizing: border-box;
+}
+
+#asr-actions-row button,
+#vision-actions-row button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--text-secondary) !important;
+    padding: 4px 6px !important;
+    height: 24px !important;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+#asr-actions-row button:hover,
+#vision-actions-row button:hover {
+    color: var(--color-cyan) !important;
 }
 
 .w-100 {
@@ -2927,19 +3094,60 @@ mark.search-highlight {
 
 /* ── DIVISORES ARRASTÁVEIS (SPLITTERS) ── */
 .panel-splitter {
-    width: 6px;
+    width: 4px;
     cursor: col-resize;
-    background: rgba(255, 255, 255, 0.05);
-    transition: background 0.2s, box-shadow 0.2s;
+    background: rgba(0, 0, 0, 0.4);
+    transition: background 0.15s, box-shadow 0.15s;
     position: relative;
-    z-index: 10;
+    z-index: 95;
     flex-shrink: 0;
-    border-left: 1px solid rgba(255, 255, 255, 0.03);
-    border-right: 1px solid rgba(255, 255, 255, 0.03);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
-.panel-splitter:hover, .panel-splitter.active {
+
+.panel-splitter-v {
+    height: 4px;
+    cursor: row-resize;
+    background: rgba(0, 0, 0, 0.4);
+    transition: background 0.15s, box-shadow 0.15s;
+    position: relative;
+    z-index: 95;
+    flex-shrink: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.panel-splitter:hover, .panel-splitter.active,
+.panel-splitter-v:hover, .panel-splitter-v.active {
     background: var(--color-cyan) !important;
-    box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.8);
+}
+
+/* Ocultação de splitters quando os painéis estão colapsados ou maximizados */
+.workspace:has(#sidebar-left.collapsed) .splitter-sidebar-left { display: none !important; }
+.workspace:has(#sidebar-right.collapsed) .splitter-sidebar-right { display: none !important; }
+.center-stage:has(#timeline-panel.collapsed) .splitter-timeline { display: none !important; }
+.monitors-container:has(.player-panel.maximized) .splitter-players { display: none !important; }
+
+/* Desativa os splitters no modo montagem para evitar conflitos de posicionamento fixo */
+body.montagem .panel-splitter,
+body.montagem .panel-splitter-v {
+    display: none !important;
+}
+
+/* Prevenção de travamentos e transições lentas durante o arraste */
+body.layout-resizing * {
+    transition: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+/* Flat layout sem espaçamento e cantos arredondados quando ancorados no workspace */
+.workspace > .sidebar-left,
+.workspace > .sidebar-right,
+.workspace .player-panel,
+.workspace .timeline-panel {
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 /* ── SIDEBARS MAXIMIZADOS (MAIN WINDOW) ── */
@@ -3242,6 +3450,219 @@ body.montagem #photo-viewer-modal {
 .group-manager-face-select-badge i {
     color: #000;
     font-size: 9px;
+}
+
+/* ── ADAPTATIVE LAYOUT STATES FOR SIDEBARS ── */
+
+/* 1. COMPACT STATE (width < 320px) */
+/* Reduz fonte e espaçamento do cabeçalho */
+.sidebar-compact .sidebar-header {
+    padding: 6px 8px !important;
+}
+.sidebar-compact .sidebar-header h2 {
+    font-size: 13px !important;
+    gap: 4px !important;
+}
+.sidebar-compact .sidebar-header h2 button,
+.sidebar-compact .sidebar-header h2 span {
+    margin-left: 0 !important;
+}
+.sidebar-compact .sidebar-header div {
+    gap: 4px !important;
+}
+
+/* Reduz o tamanho das abas e margens e esconde textos (apenas ícones) */
+.sidebar-compact .media-tabs {
+    margin: 6px 6px 3px 6px !important;
+    gap: 2px !important;
+}
+.sidebar-compact .tab-btn .tab-text,
+.sidebar-minimal .tab-btn .tab-text {
+    display: none !important;
+}
+.sidebar-compact .tab-btn,
+.sidebar-minimal .tab-btn {
+    padding: 6px 0 !important;
+}
+.sidebar-compact .tab-btn i,
+.sidebar-minimal .tab-btn i {
+    font-size: 13px !important;
+}
+
+/* Toggles de textos no header direito */
+.sidebar-right.sidebar-compact .text-full {
+    display: none !important;
+}
+.sidebar-right.sidebar-compact .text-short {
+    display: inline !important;
+}
+
+/* Esconde zoom na biblioteca */
+.sidebar-left.sidebar-compact #library-filter-bar div[style*="justify-content: space-between"] > div:first-child {
+    display: none !important;
+}
+.sidebar-left.sidebar-compact #library-filter-bar {
+    padding: 6px 8px !important;
+}
+
+
+/* 2. MINIMAL STATE (width < 240px) */
+/* Esconde texto do título do cabeçalho, deixando apenas o ícone principal */
+.sidebar-minimal .sidebar-header h2 .header-title-text {
+    display: none !important;
+}
+
+/* Cabeçalho ultra compacto */
+.sidebar-minimal .sidebar-header {
+    padding: 4px 6px !important;
+}
+.sidebar-minimal .sidebar-header h2 {
+    gap: 3px !important;
+}
+.sidebar-minimal .sidebar-header h2 button,
+.sidebar-minimal .sidebar-header h2 span {
+    margin-left: 0 !important;
+}
+.sidebar-minimal .sidebar-header div {
+    gap: 3px !important;
+}
+
+/* Botões de Ação na barra lateral e chat (estilo flat unificado) */
+.flat-sidebar-btn {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--text-secondary) !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.flat-sidebar-btn:hover {
+    color: var(--color-cyan) !important;
+}
+
+/* Ocultar texto dos botões no estado compacto/minimal */
+.sidebar-compact .btn-text,
+.sidebar-minimal .btn-text {
+    display: none !important;
+}
+
+/* Dimensionar botões flat como ícones puros no estado compacto/minimal */
+.sidebar-compact .flat-sidebar-btn,
+.sidebar-minimal .flat-sidebar-btn {
+    padding: 6px 2px !important;
+    min-width: 24px !important;
+    width: 24px !important;
+    height: 24px !important;
+    flex: 0 0 auto !important;
+    border-radius: 4px !important;
+}
+
+/* Margem unificada para as abas da direita no estado compacto/minimal */
+.sidebar-compact #right-tabs,
+.sidebar-minimal #right-tabs {
+    margin: 6px 6px 3px 6px !important;
+    gap: 2px !important;
+}
+.transcription-actions #right-tabs {
+    margin: 0 !important;
+    gap: 2px !important;
+}
+
+/* Compacta a barra de busca e filtros da biblioteca */
+.sidebar-left.sidebar-minimal #library-filter-bar {
+    padding: 4px 6px !important;
+}
+.sidebar-left.sidebar-minimal #library-filter-bar input {
+    font-size: 9px !important;
+    padding: 2px 4px !important;
+}
+.sidebar-left.sidebar-minimal #library-filter-bar select {
+    font-size: 8px !important;
+}
+.sidebar-left.sidebar-minimal #library-filter-bar .dropdown-wrapper {
+    padding: 0 3px !important;
+    height: 20px !important;
+}
+/* Esconde botões de zoom e texto da terceira linha na biblioteca minimal */
+.sidebar-left.sidebar-minimal #library-filter-bar div[style*="justify-content: space-between"] {
+    display: none !important;
+}
+
+/* Estilos para os labels do painel de agentes */
+.agent-control-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+/* No estado mínimo (width < 240px): exibe apenas o ícone com tooltip */
+.sidebar-minimal .agent-control-label {
+    width: 20px !important;
+}
+.sidebar-minimal .agent-control-label .label-text {
+    display: none !important;
+}
+
+/* ── PREMIUM SELECT BOX & OPTION STYLING ── */
+select, .nle-select {
+    background: rgba(20, 20, 30, 0.45) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-glass) !important;
+    border-radius: 4px !important;
+    padding: 3px 22px 3px 8px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    font-family: inherit !important;
+    outline: none !important;
+    cursor: pointer !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2210%22%20height%3D%2210%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23c084fc%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 6px center !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+}
+
+select:hover, .nle-select:hover {
+    background: rgba(30, 30, 45, 0.6) !important;
+    border-color: rgba(192, 132, 252, 0.5) !important;
+    box-shadow: 0 0 8px rgba(192, 132, 252, 0.3) !important;
+}
+
+/* Evita menus nativos feios no Windows (fundo escuro e fonte premium) */
+select option, .nle-select option {
+    background-color: #121218 !important;
+    color: #e2e8f0 !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 11px !important;
+    padding: 6px !important;
+}
+
+/* Overrides para caixas de seleção que já possuem wrappers glassmorphic */
+.project-area select,
+.search-area select,
+.dropdown-wrapper select {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 2px 18px 2px 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+}
+.project-area select:hover,
+.search-area select:hover,
+.dropdown-wrapper select:hover {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 

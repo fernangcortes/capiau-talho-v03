@@ -98,7 +98,7 @@
             <aside class="sidebar-left glassmorphism" id="sidebar-left">
                 <div class="sidebar-header">
                     <h2>
-                        <i class="fa-solid fa-folder-open"></i> Biblioteca
+                        <i class="fa-solid fa-folder-open"></i> <span class="header-title-text">Biblioteca</span>
                         <button id="btn-reload-library" class="btn-icon" title="Recarregar Biblioteca" style="margin-left: 6px; font-size: 13px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
                             <i class="fa-solid fa-arrows-rotate"></i>
                         </button>
@@ -120,11 +120,11 @@
                 </div>
                 
                 <div class="media-tabs">
-                    <button class="tab-btn active" data-tab="tab-videos">Mídias</button>
-                    <button class="tab-btn" data-tab="tab-photos">Fotos Set</button>
-                    <button class="tab-btn" data-tab="tab-themes">Temas</button>
-                    <button class="tab-btn" data-tab="tab-docs">Documentos</button>
-                    <button class="tab-btn" data-tab="tab-faces">Rostos</button>
+                    <button class="tab-btn active" data-tab="tab-videos" title="Mídias"><i class="fa-solid fa-photo-film"></i> <span class="tab-text">Mídias</span></button>
+                    <button class="tab-btn" data-tab="tab-photos" title="Fotos Set"><i class="fa-solid fa-camera"></i> <span class="tab-text">Fotos Set</span></button>
+                    <button class="tab-btn" data-tab="tab-themes" title="Temas"><i class="fa-solid fa-tags"></i> <span class="tab-text">Temas</span></button>
+                    <button class="tab-btn" data-tab="tab-docs" title="Documentos"><i class="fa-solid fa-file-text"></i> <span class="tab-text">Docs</span></button>
+                    <button class="tab-btn" data-tab="tab-faces" title="Rostos"><i class="fa-solid fa-user-friends"></i> <span class="tab-text">Rostos</span></button>
                 </div>
                 
                 <div class="library-toolbar" id="library-filter-bar" style="padding: 8px 12px; border-bottom: 1px solid var(--border-glass); display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.15); position: relative;">
@@ -318,7 +318,7 @@
             <!-- ── CENTER AREA (ADVANCED PLAYER & TIMELINE) ────────────────── -->
             <main class="center-stage">
                 <!-- Contêiner de Monitores Duplos (Source & Program) -->
-                <div class="monitors-container" style="display: flex; gap: 15px; width: 100%; flex: 1; min-height: 300px; box-sizing: border-box;">
+                <div class="monitors-container" style="display: flex; gap: 0; width: 100%; flex: 1; min-height: 300px; box-sizing: border-box;">
                     <!-- Monitor de Origem (Source - Esquerda) -->
                     <section class="player-panel glassmorphism" id="source-player-panel" style="flex: 1; display: flex; flex-direction: column; position: relative;">
                         <div class="player-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-glass);">
@@ -414,7 +414,7 @@
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: center;">
                                     <!-- Volume / Resolution selector -->
-                                    <div class="dropdown-wrapper">
+                                    <div class="dropdown-wrapper" title="Resolução do Preview">
                                         <i class="fa-solid fa-display"></i>
                                         <select id="program-select-resolution" style="font-size: 10px; height: 22px; padding: 0 4px;">
                                             <option value="proxy_low">360p Proxy</option>
@@ -500,7 +500,7 @@
             <!-- ── RIGHT SIDEBAR (COLLAPSIBLE - TRANSCRIPTION / DIALOGUES) ──── -->
             <aside class="sidebar-right glassmorphism" id="sidebar-right">
                 <div class="sidebar-header">
-                    <h2><i class="fa-solid fa-comment-dots"></i> Transcrição & Falas</h2>
+                    <h2><i class="fa-solid fa-comment-dots"></i> <span class="header-title-text"><span class="text-full">Transcrição & Falas</span><span class="text-short" style="display:none;">Transcrição</span></span></h2>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <button id="btn-maximize-right" class="btn-icon" title="Maximizar Painel" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-expand"></i></button>
                         <button id="btn-popout-right" class="btn-icon" title="Destacar Painel Lateral" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
@@ -511,28 +511,32 @@
                 </div>
                 
                 <div class="transcription-actions">
-                    <div id="asr-actions-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
-                        <button id="btn-transcribe-now" class="btn-outline" style="flex: 1; font-size: 11px; padding: 8px 4px;" title="Transcrever apenas o vídeo carregado no player">
-                            <i class="fa-solid fa-microphone-lines"></i> Transcrever Atual
+                    <div class="media-tabs" id="right-tabs" style="margin: 0; display: flex; flex: 1; border: none; gap: 2px;">
+                        <button class="tab-btn active" id="btn-tab-transcript" data-right-tab="transcript" style="flex: 1;" title="Falas (ASR)"><i class="fa-solid fa-microphone"></i> <span class="tab-text">Falas</span></button>
+                        <button class="tab-btn" id="btn-tab-vision" data-right-tab="vision" style="flex: 1;" title="Visão IA"><i class="fa-solid fa-eye"></i> <span class="tab-text">Visão</span></button>
+                        <button class="tab-btn" id="btn-tab-tasks" data-right-tab="tasks" style="flex: 1;" title="Tarefas"><i class="fa-solid fa-list-check"></i> <span class="tab-text">Tarefas</span></button>
+                        <button class="tab-btn" id="btn-tab-chat" data-right-tab="chat" style="flex: 1;" title="Chat IA"><i class="fa-solid fa-comments"></i> <span class="tab-text">Chat</span></button>
+                        <button class="tab-btn" id="btn-tab-search" data-right-tab="search" style="flex: 1; display: none;" title="Busca"><i class="fa-solid fa-magnifying-glass"></i> <span class="tab-text">Busca</span></button>
+                    </div>
+                    
+                    <div id="asr-actions-row" style="display: flex; gap: 4px; align-items: center; margin: 0; flex: 0 0 auto;">
+                        <div class="action-separator" style="width: 1px; height: 16px; background: rgba(255,255,255,0.15); margin: 0 2px 0 4px;"></div>
+                        <button id="btn-transcribe-now" class="btn-outline flat-sidebar-btn" style="font-size: 10px; padding: 4px 6px; height: 24px; display: flex; align-items: center; gap: 4px;" title="Transcrever clipe atual">
+                            <i class="fa-solid fa-microphone-lines"></i> <span class="btn-text">Clipe</span>
                         </button>
-                        <button id="btn-transcribe-all" class="btn-secondary" style="flex: 1; font-size: 11px; padding: 8px 4px;" title="Transcrever em lote todos os vídeos do projeto que ainda não possuem transcrição">
-                            <i class="fa-solid fa-layer-group"></i> Transcrever Tudo
+                        <button id="btn-transcribe-all" class="btn-secondary flat-sidebar-btn" style="font-size: 10px; padding: 4px 6px; height: 24px; display: flex; align-items: center; gap: 4px;" title="Transcrever todos os vídeos">
+                            <i class="fa-solid fa-layer-group"></i> <span class="btn-text">Tudo</span>
                         </button>
                     </div>
-                    <div id="vision-actions-row" style="display: none; gap: 8px; margin-bottom: 8px;">
-                        <button id="btn-analyze-vision-now" class="btn-outline" style="flex: 1; font-size: 11px; padding: 8px 4px;" title="Analisar frames do B-Roll atual via VLM">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Analisar Visão
+                    
+                    <div id="vision-actions-row" style="display: none; gap: 4px; align-items: center; margin: 0; flex: 0 0 auto;">
+                        <div class="action-separator" style="width: 1px; height: 16px; background: rgba(255,255,255,0.15); margin: 0 2px 0 4px;"></div>
+                        <button id="btn-analyze-vision-now" class="btn-outline flat-sidebar-btn" style="font-size: 10px; padding: 4px 6px; height: 24px; display: flex; align-items: center; gap: 4px;" title="Analisar visão clipe atual">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">Clipe</span>
                         </button>
-                        <button id="btn-analyze-vision-all" class="btn-secondary" style="flex: 1; font-size: 11px; padding: 8px 4px;" title="Analisar em lote todos os B-rolls e fotos pendentes do projeto">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Analisar Tudo (Visão)
+                        <button id="btn-analyze-vision-all" class="btn-secondary flat-sidebar-btn" style="font-size: 10px; padding: 4px 6px; height: 24px; display: flex; align-items: center; gap: 4px;" title="Analisar visão todos os clipes">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">Tudo</span>
                         </button>
-                    </div>
-                    <div class="media-tabs" id="right-tabs" style="margin: 4px 0 0 0; display: flex; width: 100%;">
-                        <button class="tab-btn active" id="btn-tab-transcript" data-right-tab="transcript" style="flex: 1;">Falas (ASR)</button>
-                        <button class="tab-btn" id="btn-tab-vision" data-right-tab="vision" style="flex: 1;">Visão IA</button>
-                        <button class="tab-btn" id="btn-tab-tasks" data-right-tab="tasks" style="flex: 1;"><i class="fa-solid fa-list-check"></i> Tarefas</button>
-                        <button class="tab-btn" id="btn-tab-chat" data-right-tab="chat" style="flex: 1;"><i class="fa-solid fa-comments"></i> Chat IA</button>
-                        <button class="tab-btn" id="btn-tab-search" data-right-tab="search" style="flex: 1; display: none;"><i class="fa-solid fa-magnifying-glass"></i> Busca</button>
                     </div>
                 </div>
 
@@ -565,26 +569,30 @@
                     <!-- Tab: Chat IA -->
                     <div id="chat-container" style="display: none; height: 100%; display: flex; flex-direction: column;">
                         <h4 style="font-size:12px; color:var(--color-cyan); display:flex; align-items:center; justify-content:space-between; width:100%; margin:0; padding: 10px 15px 5px 15px; flex-shrink: 0;">
-                            <span><i class="fa-solid fa-comments"></i> Assistente Editorial IA</span>
+                            <span title="Chat assistente de montagem" style="cursor: help;"><i class="fa-solid fa-comments"></i> CapIAu</span>
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <button class="btn-outline" id="btn-chat-layout" style="font-size:9px; padding:2px 8px; height:20px; display:none; align-items:center; gap:4px;" title="Alternar Layout">
-                                    <i class="fa-solid fa-columns"></i> <span>Split</span>
+                                <button class="flat-sidebar-btn" id="btn-chat-layout" style="font-size:9px; padding:2px 8px; height:20px; display:none; align-items:center; gap:4px;" title="Alternar Layout">
+                                    <i class="fa-solid fa-columns"></i> <span class="btn-text">Split</span>
                                 </button>
-                                <button class="btn-outline" id="btn-clear-chat" style="font-size:9px; padding:2px 8px; height:20px; display:flex; align-items:center; gap:4px;">
-                                    <i class="fa-solid fa-trash"></i> Limpar Chat
+                                <button class="flat-sidebar-btn" id="btn-clear-chat" style="font-size:9px; padding:2px 8px; height:20px; display:flex; align-items:center; gap:4px;" title="Limpar histórico do chat">
+                                    <i class="fa-solid fa-trash"></i> <span class="btn-text">Limpar Chat</span>
                                 </button>
                             </div>
                         </h4>
                         <!-- Controles de Configuração do Agente (Modelo e Chave) -->
                         <div id="agent-controls" style="display: flex; flex-direction: column; gap: 6px; padding: 8px 15px; border-bottom: 1px solid var(--border-glass); background: rgba(0,0,0,0.1); flex-shrink: 0;">
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <label style="font-size: 10px; color: var(--text-secondary); width: 60px; font-weight: bold;">Modelo IA:</label>
+                                <label class="agent-control-label" id="label-agent-model" style="font-size: 10px; color: var(--text-secondary); width: 66px; font-weight: bold; display: flex; align-items: center; gap: 4px; cursor: help; white-space: nowrap;" title="Modelo de IA do Agente">
+                                    <i class="fa-solid fa-robot"></i> <span class="label-text">Modelo IA:</span>
+                                </label>
                                 <select id="agent-model-select" style="flex: 1; height: 24px; font-size: 11px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-primary); padding: 0 4px; outline: none; cursor: pointer;">
                                     <!-- Preenchido via API -->
                                 </select>
                             </div>
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <label style="font-size: 10px; color: var(--text-secondary); width: 60px; font-weight: bold;">Chave API:</label>
+                                <label class="agent-control-label" id="label-agent-key" style="font-size: 10px; color: var(--text-secondary); width: 66px; font-weight: bold; display: flex; align-items: center; gap: 4px; cursor: help; white-space: nowrap;" title="Chave API do OpenRouter">
+                                    <i class="fa-solid fa-key"></i> <span class="label-text">Chave API:</span>
+                                </label>
                                 <input type="password" id="agent-api-key-input" placeholder="OpenRouter API Key (deixe vazio para usar a do .env)..." style="flex: 1; height: 24px; font-size: 11px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-primary); padding: 0 6px; outline: none;">
                             </div>
                         </div>

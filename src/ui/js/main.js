@@ -1061,6 +1061,86 @@ function updateActionsRowVisibility(tab) {
 window.addEventListener("DOMContentLoaded", () => {
     console.log("CapIAu-Talho: Inicializando os módulos...");
 
+    // Auto-converter de title para data-tooltip para tooltips premium unificadas
+    const convertTitleToTooltip = (root = document) => {
+        root.querySelectorAll("[title]").forEach(el => {
+            const title = el.getAttribute("title");
+            if (title && !el.hasAttribute("data-tooltip")) {
+                el.setAttribute("data-tooltip", title);
+                el.removeAttribute("title");
+            }
+        });
+    };
+    convertTitleToTooltip();
+    
+    // Configura um MutationObserver para lidar com elementos criados dinamicamente
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach(mutation => {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.hasAttribute("title")) {
+                        const title = node.getAttribute("title");
+                        node.setAttribute("data-tooltip", title);
+                        node.removeAttribute("title");
+                    }
+                    node.querySelectorAll("[title]").forEach(el => {
+                        const title = el.getAttribute("title");
+                        el.setAttribute("data-tooltip", title);
+                        el.removeAttribute("title");
+                    });
+                }
+            });
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Criar elemento global de tooltip
+    const globalTooltip = document.createElement("div");
+    globalTooltip.id = "global-tooltip";
+    document.body.appendChild(globalTooltip);
+
+    // Eventos mouseover/mouseout delegados para exibir e posicionar a tooltip global
+    document.body.addEventListener("mouseover", (e) => {
+        const target = e.target.closest("[data-tooltip]");
+        if (!target) return;
+
+        const text = target.getAttribute("data-tooltip");
+        if (!text) return;
+
+        globalTooltip.textContent = text;
+        globalTooltip.classList.add("visible");
+
+        // Calcula a posição da tooltip
+        const rect = target.getBoundingClientRect();
+        const tooltipRect = globalTooltip.getBoundingClientRect();
+
+        // Posição padrão: acima do elemento
+        let top = rect.top - tooltipRect.height - 8;
+        let left = rect.left + (rect.width - tooltipRect.width) / 2;
+
+        // Se sair do topo da tela, coloca abaixo do elemento
+        if (top < 8) {
+            top = rect.bottom + 8;
+        }
+
+        // Garante que não ultrapasse as bordas laterais da tela
+        const screenMargin = 8;
+        if (left < screenMargin) {
+            left = screenMargin;
+        } else if (left + tooltipRect.width > window.innerWidth - screenMargin) {
+            left = window.innerWidth - tooltipRect.width - screenMargin;
+        }
+
+        globalTooltip.style.top = `${top}px`;
+        globalTooltip.style.left = `${left}px`;
+    });
+
+    document.body.addEventListener("mouseout", (e) => {
+        const target = e.target.closest("[data-tooltip]");
+        if (!target) return;
+        globalTooltip.classList.remove("visible");
+    });
+
     // Instanciando os gerenciadores
     const workspace = new WorkspaceManager();
     window.workspaceManager = workspace;
