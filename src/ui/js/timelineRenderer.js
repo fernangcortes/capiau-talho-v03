@@ -59,6 +59,7 @@ export class CapiauTimelineRenderer {
         };
 
         this.isDirty = true; // Flag para solicitar redesenho reativo
+        this.photoThumbCache = {}; // Cache de miniaturas (Image) de fotos por id
         this.init();
     }
 
@@ -370,6 +371,9 @@ export class CapiauTimelineRenderer {
 
             const style = this.getTrackStyle(lane.track);
             const laneKind = lane.track.kind || "video";
+            const isPhoto = cut.type === "photo";
+            const video = isPhoto ? null : STATE.allVideos.find(v => v.id === cut.video_id);
+            const photo = isPhoto ? STATE.allPhotos.find(p => p.id === cut.photo_id) : null;
 
             // Espaçamento interno vertical do clipe
             const clipY = lane.top + 6;
@@ -379,6 +383,21 @@ export class CapiauTimelineRenderer {
             ctx.fillStyle = style.clipBg;
             ctx.fillRect(startX, clipY, width, clipHeight);
 
+            // Miniatura da foto como fundo (cover) + véu escuro para legibilidade do rótulo
+            if (isPhoto && photo) {
+                const thumb = this.getPhotoThumb(photo);
+                if (thumb) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(startX, clipY, width, clipHeight);
+                    ctx.clip();
+                    this.drawImageCover(thumb, startX, clipY, width, clipHeight);
+                    ctx.fillStyle = "rgba(0,0,0,0.35)";
+                    ctx.fillRect(startX, clipY, width, clipHeight);
+                    ctx.restore();
+                }
+            }
+
             const isSelected = TIMELINE_STATE.selectedClipId === cut.id;
             const isPartner = !isSelected && selectedLink && cut.link_id === selectedLink;
             ctx.strokeStyle = (isSelected || isPartner) ? this.colors.selection : style.border;
@@ -387,16 +406,22 @@ export class CapiauTimelineRenderer {
             ctx.strokeRect(startX, clipY, width, clipHeight);
             if (isPartner) ctx.setLineDash([]);
 
-            // Waveform nos clipes das pistas de áudio
-            const video = STATE.allVideos.find(v => v.id === cut.video_id);
+            // Waveform apenas nos clipes das pistas de áudio (fotos não têm áudio)
             if (laneKind === "audio") {
                 this.drawWaveform(cut, startX, clipY, width, clipHeight, style.wave);
             }
 
-            // Desenhar texto descritivo do clipe (Nome do arquivo)
-            const name = video ? video.filename : `Vídeo ${cut.video_id}`;
-            const prefix = laneKind === "audio" ? (cut.link_id ? "♪⇅" : "♪") : "#";
-            const label = `${prefix} ${name} [${framesToTimecode(cut.inFrame, TIMELINE_STATE.fps).substring(6)} -> ${framesToTimecode(cut.outFrame, TIMELINE_STATE.fps).substring(6)}]`;
+            // Rótulo do clipe
+            let label;
+            if (isPhoto) {
+                const name = photo ? photo.filename : `Foto ${cut.photo_id}`;
+                const durS = framesToSeconds(cut.outFrame - cut.inFrame, TIMELINE_STATE.fps);
+                label = `▣ ${name} [${durS.toFixed(1)}s]`;
+            } else {
+                const name = video ? video.filename : `Vídeo ${cut.video_id}`;
+                const prefix = laneKind === "audio" ? (cut.link_id ? "♪⇅" : "♪") : "#";
+                label = `${prefix} ${name} [${framesToTimecode(cut.inFrame, TIMELINE_STATE.fps).substring(6)} -> ${framesToTimecode(cut.outFrame, TIMELINE_STATE.fps).substring(6)}]`;
+            }
 
             ctx.save();
             ctx.beginPath();
@@ -408,6 +433,35 @@ export class CapiauTimelineRenderer {
             ctx.fillText(label, startX + 8, clipY + 14);
             ctx.restore();
         });
+    }
+
+    /**
+     * Miniatura (Image) de uma foto, carregada sob demanda e cacheada por id.
+     * Retorna null enquanto carrega (dispara redesenho ao concluir).
+     */
+    getPhotoThumb(photo) {
+        if (!photo || !photo.proxy_path) return null;
+        const key = photo.id;
+        const cached = this.photoThumbCache[key];
+        if (cached) return cached.loaded ? cached.img : null;
+        const img = new Image();
+        const entry = { img, loaded: false };
+        this.photoThumbCache[key] = entry;
+        img.onload = () => { entry.loaded = true; this.requestRedraw(); };
+        img.onerror = () => { entry.loaded = false; };
+        img.src = String(photo.proxy_path).replace(/\\/g, "/");
+        return null;
+    }
+
+    /** Desenha uma imagem cobrindo (cover) o retângulo dado, preservando proporção. */
+    drawImageCover(img, x, y, w, h) {
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+        if (!iw || !ih) return;
+        const scale = Math.max(w / iw, h / ih);
+        const dw = iw * scale, dh = ih * scale;
+        const dx = x + (w - dw) / 2, dy = y + (h - dh) / 2;
+        this.ctx.drawImage(img, dx, dy, dw, dh);
     }
 
     /**
@@ -541,14 +595,18 @@ export class CapiauTimelineRenderer {
                 ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
                 ctx.setLineDash([]); // Restaura borda sólida
 
-                // Rótulo: destino + duração
-                const video = STATE.allVideos.find(v => v.id === ghost.video_id);
+                // Rótulo: destino + duração (resolve mídia por vídeo ou foto)
+                const isPhotoGhost = ghost.type === "photo";
+                const media = isPhotoGhost
+                    ? STATE.allPhotos.find(p => p.id === ghost.photo_id)
+                    : STATE.allVideos.find(v => v.id === ghost.video_id);
+                const mediaName = media ? media.filename : (isPhotoGhost ? "foto" : "clipe");
                 const targetTrack = TIMELINE_STATE.getTrack(ghost.track);
                 const trackName = targetTrack ? (targetTrack.name || targetTrack.id) : ghost.track;
                 const durS = framesToSeconds(ghost.outFrame - ghost.inFrame, TIMELINE_STATE.fps);
                 const label = isReplace
                     ? `[IA: SUBSTITUIR → ${trackName}]`
-                    : `[IA: + ${video ? video.filename.substring(0, 18) : "clipe"} → ${trackName} | ${durS.toFixed(1)}s]`;
+                    : `[IA: ${isPhotoGhost ? "▣" : "+"} ${mediaName.substring(0, 18)} → ${trackName} | ${durS.toFixed(1)}s]`;
 
                 ctx.save();
                 ctx.beginPath();

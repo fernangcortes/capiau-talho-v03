@@ -547,6 +547,12 @@ export class ChatManager {
                 TIMELINE_STATE.addCut(item.id, item.start, item.end, null);
                 console.log(`[ChatManager] Clipe inserido: vídeo ${item.id} (${item.start}s - ${item.end}s)`);
             }
+        } else if (item.type === "photo") {
+            const photo = STATE.allPhotos.find(p => p.id === item.id);
+            if (photo) {
+                TIMELINE_STATE.addPhotoCut(item.id, {});
+                console.log(`[ChatManager] Foto inserida na timeline: ${item.id}`);
+            }
         }
     }
 

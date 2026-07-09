@@ -866,11 +866,11 @@ button {
 }
 
 #btn-view-mode-list, #btn-view-mode-grid {
-    background: rgba(255, 255, 255, 0.04) !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 4px !important;
-    width: 24px !important;
-    height: 20px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    width: auto !important;
+    height: auto !important;
     padding: 0 !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -878,17 +878,26 @@ button {
     color: var(--text-muted) !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
+    font-size: 11px !important;
 }
 
 #btn-view-mode-list:hover, #btn-view-mode-grid:hover {
-    background: rgba(255, 255, 255, 0.08) !important;
+    background: transparent !important;
     color: var(--text-primary) !important;
 }
 
 #btn-view-mode-list.active, #btn-view-mode-grid.active {
-    background: rgba(6, 182, 212, 0.15) !important;
-    border-color: rgba(6, 182, 212, 0.4) !important;
+    background: transparent !important;
+    border-color: transparent !important;
     color: var(--color-cyan) !important;
+}
+
+#btn-expand-all:hover {
+    color: #fff !important;
+}
+
+#btn-collapse-all:hover, #btn-library-photos-in-player:hover {
+    color: var(--text-primary) !important;
 }
 
 /* Botões de controle de alternância */
@@ -2934,6 +2943,77 @@ mark.search-highlight {
 }
 .sidebar-right.sidebar-maximized {
     right: 10px;
+}
+
+/* ── MODO MONTAGEM (biblioteca no topo + timeline ancorada na base) ── */
+/* Painel de transcrição some para dar espaço à montagem */
+body.montagem .sidebar-right { display: none !important; }
+
+/* Biblioteca maximizada ocupa só o topo, cedendo ~44vh da base à timeline.
+   (Sobrescreve o height !important da regra base de .sidebar-maximized.) */
+body.montagem .sidebar-left.sidebar-maximized {
+    top: 10px !important;
+    bottom: auto !important;
+    height: calc(56vh - 30px) !important;
+}
+
+/* Timeline ancorada em largura total na base da tela */
+body.montagem #timeline-panel {
+    position: fixed !important;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    height: 44vh;
+    z-index: 1001;
+    margin: 0;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55);
+}
+/* No modo montagem a timeline nunca fica recolhida */
+body.montagem #timeline-panel.collapsed { display: flex !important; }
+body.montagem #reopen-timeline { display: none !important; }
+
+/* Mini-monitores flutuantes (Source + Program), liga/desliga.
+   Usa !important para vencer os estilos inline (width:100%, flex:1, min-height:300px). */
+body.montagem .monitors-container {
+    position: fixed !important;
+    top: 84px !important;
+    right: 24px !important;
+    left: auto !important;
+    width: 480px !important;
+    height: 172px !important;
+    min-height: 0 !important;
+    flex: 0 0 auto !important;
+    z-index: 1002;
+    gap: 8px !important;
+}
+body.montagem.montagem-monitors-hidden .monitors-container { display: none !important; }
+
+/* Botão flutuante para alternar os mini-monitores */
+#btn-montagem-monitors {
+    position: fixed;
+    top: 46px;
+    right: 24px;
+    z-index: 1003;
+    width: 30px;
+    height: 30px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid var(--border-glass);
+    background: rgba(15, 23, 42, 0.92);
+    color: var(--color-cyan);
+    cursor: pointer;
+    font-size: 13px;
+}
+body.montagem.montagem-monitors-hidden #btn-montagem-monitors { color: var(--text-muted); }
+
+/* Modais detalhados (entrevista/foto) não cobrem a timeline ancorada */
+body.montagem #interview-modal,
+body.montagem #photo-viewer-modal {
+    height: calc(56vh - 24px) !important;
+    bottom: auto !important;
+    top: 0 !important;
 }
 
 /* ── CHAT IA WIDESCREEN LAYOUTS ── */

@@ -112,7 +112,20 @@ export class WorkspaceManager {
             this.restorePanel(panelId);
         }
 
-        if (ws === "default") {
+        // Trocar de preset sempre sai do modo Montagem (reativado abaixo se aplicável)
+        if (ws !== "montagem") this.setMontagem(false);
+
+        if (ws === "montagem") {
+            const left = document.getElementById("sidebar-left");
+            if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left").click();
+            const timeline = document.getElementById("timeline-panel");
+            if (timeline && timeline.classList.contains("collapsed")) {
+                const reopen = document.getElementById("reopen-timeline");
+                if (reopen) reopen.click();
+            }
+            this.setMontagem(true);
+        }
+        else if (ws === "default") {
             // Workspace Padrão: Tudo na janela principal
             const left = document.getElementById("sidebar-left");
             const right = document.getElementById("sidebar-right");
@@ -291,20 +304,57 @@ export class WorkspaceManager {
         }
     }
 
+    /**
+     * Ativa/desativa o modo "Montagem": biblioteca maximizada no topo + timeline
+     * ancorada em largura total na base, com mini-monitores flutuantes.
+     * Reusa o mesmo #timeline-panel/#timeline-canvas (renderer intacto); só re-dimensiona.
+     */
+    setMontagem(on) {
+        const sidebarLeft = document.getElementById("sidebar-left");
+        const btnMaxLib = document.getElementById("btn-maximize-library");
+        document.body.classList.toggle("montagem", on);
+        if (sidebarLeft) sidebarLeft.classList.toggle("sidebar-maximized", on);
+        if (btnMaxLib) {
+            btnMaxLib.innerHTML = on
+                ? `<i class="fa-solid fa-compress"></i>`
+                : `<i class="fa-solid fa-expand"></i>`;
+            btnMaxLib.title = on ? "Sair do modo Montagem" : "Modo Montagem (timeline ancorada)";
+        }
+        this.ensureMontagemMonitorToggle(on);
+        // A timeline dock reusa o mesmo canvas: basta recalcular tamanho no próximo frame
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
+    }
+
+    /** Cria/exibe o botão flutuante que alterna os mini-monitores no modo Montagem. */
+    ensureMontagemMonitorToggle(on) {
+        let btn = document.getElementById("btn-montagem-monitors");
+        if (on) {
+            if (!btn) {
+                btn = document.createElement("button");
+                btn.id = "btn-montagem-monitors";
+                btn.title = "Mostrar/ocultar monitores (Source/Program)";
+                btn.innerHTML = `<i class="fa-solid fa-tv"></i>`;
+                btn.addEventListener("click", () => {
+                    document.body.classList.toggle("montagem-monitors-hidden");
+                    window.dispatchEvent(new Event("resize"));
+                });
+                document.body.appendChild(btn);
+            }
+            btn.style.display = "flex";
+        } else if (btn) {
+            btn.style.display = "none";
+            document.body.classList.remove("montagem-monitors-hidden");
+        }
+    }
+
     initMaximizeButtons() {
         const btnMaxLib = document.getElementById("btn-maximize-library");
         const sidebarLeft = document.getElementById("sidebar-left");
         if (btnMaxLib && sidebarLeft) {
             btnMaxLib.addEventListener("click", (e) => {
                 e.stopPropagation();
-                const isMax = sidebarLeft.classList.toggle("sidebar-maximized");
-                btnMaxLib.innerHTML = isMax 
-                    ? `<i class="fa-solid fa-compress"></i>` 
-                    : `<i class="fa-solid fa-expand"></i>`;
-                btnMaxLib.title = isMax ? "Restaurar Biblioteca" : "Maximizar Biblioteca";
-                
-                // Força atualização da timeline ou outros elementos no resize do editor
-                window.dispatchEvent(new Event("resize"));
+                // Maximizar a biblioteca entra/sai do modo Montagem (timeline ancorada)
+                this.setMontagem(!document.body.classList.contains("montagem"));
             });
         }
 

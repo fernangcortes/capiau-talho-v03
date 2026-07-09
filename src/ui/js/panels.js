@@ -722,7 +722,9 @@ export class PanelsManager {
             const fps = TIMELINE_STATE.fps || 24;
             const cuts = STATE.activeTimelineCuts.map(c => ({
                 id: String(c.id),
-                video_id: c.video_id,
+                type: c.type || "video",
+                video_id: c.video_id ?? null,
+                photo_id: c.photo_id ?? null,
                 in_time: c.in,
                 out_time: c.out,
                 track: c.track,
@@ -1013,7 +1015,9 @@ export class PanelsManager {
                 // Só clipes de vídeo: o áudio vinculado é derivado e pollui o contexto do LLM
                 clips: cuts.filter(c => TIMELINE_STATE.trackKindOf(c.track) === "video").map(c => ({
                     id: String(c.id),
-                    video_id: c.video_id,
+                    type: c.type || "video",
+                    video_id: c.video_id ?? null,
+                    photo_id: c.photo_id ?? null,
                     in_s: c.in,
                     out_s: c.out,
                     timeline_start_s: (c.timelineStartFrame || 0) / fps,
@@ -1030,7 +1034,9 @@ export class PanelsManager {
             }
 
             const suggestions = (res.suggestions || []).map(s => ({
-                video_id: s.video_id,
+                type: s.type || "video",
+                video_id: s.video_id ?? null,
+                photo_id: s.photo_id ?? null,
                 in: s.in,
                 out: s.out,
                 timelineStartFrame: secondsToFrames(s.timeline_start_s || 0, fps),
@@ -1189,7 +1195,9 @@ export class PanelsManager {
                 const fps = TIMELINE_STATE.fps || 24;
                 const cuts = (sequence.clips || []).map((c, idx) => ({
                     id: c.id || `cut_loaded_${idx}_${Date.now()}`,
-                    video_id: c.video_id,
+                    type: c.type || "video",
+                    video_id: c.video_id ?? null,
+                    photo_id: c.photo_id ?? null,
                     in: c.in,
                     out: c.out,
                     track: c.track || "V1",

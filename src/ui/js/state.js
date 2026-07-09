@@ -189,7 +189,9 @@ class AppState extends EventEmitter {
             return {
                 ...cut,
                 id: cut.id || `cut_${index}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                video_id: cut.video_id,
+                type: cut.type || "video",
+                video_id: cut.video_id ?? null,
+                photo_id: cut.photo_id ?? null,
                 inFrame: Math.round(inFrame),
                 outFrame: Math.round(outFrame),
                 in: cut.in !== undefined ? cut.in : inFrame / timelineFps,
