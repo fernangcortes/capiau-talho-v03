@@ -253,6 +253,41 @@ export class CapIAuAPI {
         });
     }
 
+    static editDialogueSegment(videoId, startTime, endTime, newText, speakerId) {
+        return this.request(`/api/video/${videoId}/edit-dialogue`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                start_time: startTime,
+                end_time: endTime,
+                new_text: newText,
+                speaker_id: speakerId
+            })
+        });
+    }
+
+    static addThemeSegmentManual(themeId, projectId, videoId, startTime, endTime, speakerId, textExcerpt) {
+        return this.request(`/api/theme/segment`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                theme_id: themeId,
+                project_id: projectId,
+                video_id: videoId,
+                start_time: startTime,
+                end_time: endTime,
+                speaker_id: speakerId,
+                text_excerpt: textExcerpt
+            })
+        });
+    }
+
+    static deleteThemeSegment(segmentId) {
+        return this.request(`/api/theme/segment/${segmentId}`, {
+            method: "DELETE"
+        });
+    }
+
     static fetchDiarizationClues(videoId, silenceThreshold = 1.2, enableSilence = true, enableQuestions = true, enableFaces = true) {
         return this.request(`/api/video/${videoId}/diarization-clues?silence_threshold=${silenceThreshold}&enable_silence=${enableSilence}&enable_questions=${enableQuestions}&enable_faces=${enableFaces}`);
     }
