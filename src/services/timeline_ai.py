@@ -13,10 +13,10 @@ from src.config import CONFIG
 from src.db.connection import get_db
 from src.nlp.prompt_templates import get_timeline_suggestion_prompt, TIMELINE_PERSONAS
 from src.nlp.json_parser import extract_json_from_markdown
+from src.services.settings_service import SettingsService
 
-MAX_CANDIDATE_VIDEOS = 25
-MAX_CANDIDATE_PHOTOS = 15
-MAX_FRAMES_PER_CLIP = 8
+# Defaults preservados no SETTINGS_REGISTRY (timeline.max_candidate_videos etc.);
+# os valores efetivos são lidos das configurações resolvidas por projeto.
 
 
 class TimelineAIService:
@@ -51,7 +51,8 @@ class TimelineAIService:
                 for f in frames
                 if in_s - 2.0 <= f.get("timestamp", 0.0) <= out_s + 2.0 and f.get("description")
             ]
-            return hits[:MAX_FRAMES_PER_CLIP]
+            max_frames = SettingsService.get_settings(project_id).get("timeline.max_frames_per_clip")
+            return hits[:max_frames]
         except Exception:
             return []
 
@@ -134,7 +135,8 @@ class TimelineAIService:
                 if cursor_pos < s_end:
                     gaps.append((cursor_pos, s_end))
 
-            significant_gaps = [(g0, g1) for (g0, g1) in gaps if (g1 - g0) >= 3.0]
+            min_gap = SettingsService.get_settings(project_id).get("timeline.min_gap_s")
+            significant_gaps = [(g0, g1) for (g0, g1) in gaps if (g1 - g0) >= min_gap]
             if significant_gaps:
                 lines.append("LACUNAS DE COBERTURA (fala sem b-roll por cima — candidatas a receber INSERT de b-roll):")
                 for g0, g1 in significant_gaps[:10]:
@@ -149,6 +151,10 @@ class TimelineAIService:
         lines = []
         exclude_video_ids = exclude_video_ids or set()
 
+        S = SettingsService.get_settings(project_id)
+        max_videos = S.get("timeline.max_candidate_videos")
+        max_photos = S.get("timeline.max_candidate_photos")
+
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -157,7 +163,7 @@ class TimelineAIService:
                 WHERE project_id = ? AND status IN ('transcribed', 'analyzed')
                 ORDER BY video_type DESC, id
                 LIMIT ?
-            """, (project_id, MAX_CANDIDATE_VIDEOS * 2))
+            """, (project_id, max_videos * 2))
             rows = cursor.fetchall()
             # Fotos still de set/bastidores analisadas (candidatas a cobrir falas)
             cursor.execute("""
@@ -166,12 +172,12 @@ class TimelineAIService:
                 WHERE project_id = ? AND status = 'analyzed'
                 ORDER BY id
                 LIMIT ?
-            """, (project_id, MAX_CANDIDATE_PHOTOS))
+            """, (project_id, max_photos))
             photo_rows = cursor.fetchall()
 
         count = 0
         for r in rows:
-            if count >= MAX_CANDIDATE_VIDEOS:
+            if count >= max_videos:
                 break
             desc = r["description"] or ""
             tags = ""
@@ -213,32 +219,35 @@ class TimelineAIService:
         brief: str = ""
     ) -> Dict[str, Any]:
         """Gera sugestões de edição estruturadas para a pista de IA."""
-        api_key = CONFIG.OPENROUTER_API_KEY
+        S = SettingsService.get_settings(project_id)
+        api_key = S.api_key("openrouter")
         if not api_key or api_key == "your_openrouter_api_key_here":
-            return {"suggestions": [], "error": "OPENROUTER_API_KEY não configurada no .env"}
+            return {"suggestions": [], "error": "Chave OpenRouter não configurada (painel de configurações da IA ou .env)"}
 
         if not clips:
             return {"suggestions": [], "error": "Timeline vazia: adicione ao menos um clipe para a IA analisar o contexto."}
 
         if persona not in TIMELINE_PERSONAS:
-            persona = "diretora"
+            persona = S.get("timeline.default_persona")
+            if persona not in TIMELINE_PERSONAS:
+                persona = "diretora"
 
         used_ids = {c.get("video_id") for c in clips}
         timeline_context = TimelineAIService.build_timeline_context(project_id, clips, tracks, fps)
         candidates_context = TimelineAIService.build_candidates_context(project_id, used_ids)
 
-        prompt = get_timeline_suggestion_prompt(persona, timeline_context, candidates_context, brief)
+        prompt = get_timeline_suggestion_prompt(persona, timeline_context, candidates_context, brief, project_id=project_id)
 
         try:
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={
-                    "model": CONFIG.TEXT_MODEL,
+                    "model": S.get("llm.text_model"),
                     "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.4
+                    "temperature": S.get("timeline.temperature")
                 },
-                timeout=60
+                timeout=S.get("timeline.timeout")
             )
             if response.status_code != 200:
                 return {"suggestions": [], "error": f"Falha no LLM (status {response.status_code}): {response.text[:200]}"}
@@ -293,7 +302,8 @@ class TimelineAIService:
                     photo_id = s.get("photo_id")
                     if action in ("INSERT", "REPLACE") and photo_id not in photo_ids:
                         continue
-                    dur = max(0.5, min(float(s.get("duration_s", 5.0) or 5.0), 30.0))
+                    default_dur = S.get("timeline.photo_default_duration")
+                    dur = max(0.5, min(float(s.get("duration_s", default_dur) or default_dur), 30.0))
                     validated.append({
                         **base,
                         "type": "photo",
@@ -329,4 +339,4 @@ class TimelineAIService:
             except Exception:
                 continue
 
-        return {"suggestions": validated[:5], "persona": persona}
+        return {"suggestions": validated[:S.get("timeline.max_suggestions")], "persona": persona}

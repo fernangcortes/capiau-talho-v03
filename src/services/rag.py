@@ -7,6 +7,7 @@ from src.config import CONFIG
 from src.db.connection import get_db
 from src.db.repositories.media import MediaRepository
 from src.search.semantic import SemanticSearch
+from src.services.settings_service import SettingsService
 from src.nlp.prompt_templates import get_chatbot_system_prompt
 
 def enrich_description(text: str, names: List[str], text_replacements: Optional[Dict[str, str]] = None) -> str:
@@ -366,9 +367,10 @@ class RAGService:
         return final_results[offset : offset + limit]
 
     @staticmethod
-    def categorize_results_with_llm(query: str, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def categorize_results_with_llm(query: str, items: List[Dict[str, Any]], project_id: Optional[int] = None) -> Dict[str, Any]:
         """Usa LLM para agrupar semanticamente resultados de busca em categorias de desambiguação."""
-        api_key = CONFIG.OPENROUTER_API_KEY
+        S = SettingsService.get_settings(project_id)
+        api_key = S.api_key("openrouter")
         if not api_key or api_key == "your_openrouter_api_key_here":
             return {"categories": []}
 
@@ -382,19 +384,8 @@ class RAGService:
 
         items_str = "\n".join(items_desc)
 
-        system_prompt = (
-            "Você é um assistente de edição de vídeo e documentários. Sua tarefa é analisar uma lista de resultados de busca "
-            "e agrupá-los em categorias temáticas ou de desambiguação baseadas no termo pesquisado.\n"
-            "Retorne APENAS um objeto JSON no seguinte formato (sem formatação markdown ou explicações extra):\n"
-            "{\n"
-            "  \"categories\": [\n"
-            "    {\n"
-            "      \"name\": \"Nome Curto e Claro da Categoria (máx 3 palavras)\",\n"
-            "      \"result_ids\": [\"id1\", \"id2\"]\n"
-            "    }\n"
-            "  ]\n"
-            "}"
-        )
+        from src.nlp.prompt_registry import get_prompt
+        system_prompt = get_prompt("rag_categorize", project_id=project_id)
 
         user_content = f"Termo buscado: '{query}'\n\nResultados encontrados:\n{items_str}"
 
@@ -404,17 +395,17 @@ class RAGService:
             "Content-Type": "application/json"
         }
         payload = {
-            "model": CONFIG.TEXT_MODEL,
+            "model": S.get("llm.text_model"),
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
             ],
-            "temperature": 0.3,
+            "temperature": S.get("chat.categorize_temperature"),
             "response_format": {"type": "json_object"}
         }
 
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=20)
+            response = requests.post(url, headers=headers, json=payload, timeout=S.get("chat.categorize_timeout"))
             if response.status_code == 200:
                 res_json = response.json()
                 ai_text = res_json['choices'][0]['message']['content'].strip()
@@ -428,7 +419,8 @@ class RAGService:
     @staticmethod
     def chat(project_id: int, message: str, history: List[Dict[str, str]]) -> Dict[str, Any]:
         """Processa a mensagem RAG gerando respostas contextualizadas com mídias citadas."""
-        raw_results = RAGService.search_hybrid(project_id, message, limit=15)
+        S = SettingsService.get_settings(project_id)
+        raw_results = RAGService.search_hybrid(project_id, message, limit=S.get("chat.search_limit"))
         
         context_items = []
         with get_db() as conn:
@@ -462,20 +454,21 @@ class RAGService:
                     context_items.append(f'- [Documento ID {docid} | Arquivo: {fname}]: "{text}"')
 
         context_str = "\n".join(context_items)
-        system_prompt = get_chatbot_system_prompt(context_str)
+        system_prompt = get_chatbot_system_prompt(context_str, project_id=project_id)
         
         messages = [{"role": "system", "content": system_prompt}]
-        for h in history[-8:]:
+        history_window = S.get("chat.history_window")
+        for h in (history[-history_window:] if history_window > 0 else []):
             messages.append({
                 "role": h.get("role", "user"),
                 "content": h.get("content", "")
             })
         messages.append({"role": "user", "content": message})
         
-        api_key = CONFIG.OPENROUTER_API_KEY
+        api_key = S.api_key("openrouter")
         if not api_key or api_key == "your_openrouter_api_key_here":
             return {
-                "response": "Olá! Sou o assistente de edição do CapIAu-Talho. Configure a chave `OPENROUTER_API_KEY` no arquivo `.env` para conversar.",
+                "response": "Olá! Sou o assistente de edição do CapIAu-Talho. Configure a chave OpenRouter no painel de configurações da IA (engrenagem no topo) ou no `.env` para conversar.",
                 "context_used": []
             }
             
@@ -485,13 +478,13 @@ class RAGService:
             "Content-Type": "application/json"
         }
         payload = {
-            "model": CONFIG.TEXT_MODEL,
+            "model": S.get("llm.text_model"),
             "messages": messages,
-            "temperature": 0.5
+            "temperature": S.get("chat.temperature")
         }
-        
+
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            response = requests.post(url, headers=headers, json=payload, timeout=S.get("chat.timeout"))
             if response.status_code == 200:
                 res_json = response.json()
                 ai_text = res_json['choices'][0]['message']['content'].strip()

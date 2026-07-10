@@ -10,6 +10,7 @@ from pathlib import Path
 from src.config import CONFIG
 from src.db.connection import get_db
 from src.services.rag import RAGService
+from src.services.settings_service import SettingsService
 from src.db.repositories.projects import ProjectRepository
 from src.nlp.prompt_templates import get_agent_system_prompt
 
@@ -682,18 +683,21 @@ class ChatAgentService:
     ) -> Dict[str, Any]:
         """Loop principal do Agente de Edição. Executa chamadas OpenRouter e aplica tools na cópia-sombra."""
         
-        # Chave API a ser utilizada
-        api_key = custom_api_key or CONFIG.OPENROUTER_API_KEY
+        # Configurações resolvidas (default -> global -> projeto), uma vez por chamada
+        S = SettingsService.get_settings(project_id)
+
+        # Chave API: custom por requisição > painel de configurações > .env
+        api_key = custom_api_key or S.api_key("openrouter")
         if not api_key or api_key == "your_openrouter_api_key_here":
             return {
-                "response": "Olá! Configure a chave do OpenRouter no `.env` ou insira no painel de configurações de chave da UI para liberar a IA.",
+                "response": "Olá! Configure a chave do OpenRouter no painel de configurações da IA (engrenagem no topo) ou no `.env` para liberar a IA.",
                 "operations": [],
                 "final_cuts": clips,
                 "final_tracks": tracks
             }
 
-        # Modelo padrão do agente
-        model_name = agent_model or CONFIG.AGENT_MODEL
+        # Modelo do agente: override por requisição > configurações
+        model_name = agent_model or S.get("agent.model")
 
         # Inicializa a cópia-sombra
         shadow_timeline = TimelineShadowCopy(clips, tracks, fps)
@@ -737,13 +741,13 @@ class ChatAgentService:
             pass
         context_str = "\n".join(context_items)
 
-        system_prompt = get_agent_system_prompt(timeline_context, context_str)
+        system_prompt = get_agent_system_prompt(timeline_context, context_str, project_id=project_id)
 
         # Prepara mensagens para o LLM
         messages = [{"role": "system", "content": system_prompt}]
         
         # Histórico resumido para não estourar a janela em loops longos
-        for h in history[-6:]:
+        for h in history[-S.get("agent.history_window"):] if S.get("agent.history_window") > 0 else []:
             messages.append({
                 "role": h.get("role", "user"),
                 "content": h.get("content", "")
@@ -753,7 +757,7 @@ class ChatAgentService:
         accumulated_ops = []
         bulk_operations = []  # Armazena propostas de bulk_edit
         steps = 0
-        max_steps = 8
+        max_steps = S.get("agent.max_steps")
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -766,7 +770,7 @@ class ChatAgentService:
                 "messages": messages,
                 "tools": ChatAgentService.TOOLS,
                 "tool_choice": "auto",
-                "temperature": 0.3
+                "temperature": S.get("agent.temperature")
             }
 
             try:
@@ -774,7 +778,7 @@ class ChatAgentService:
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers=headers,
                     json=payload,
-                    timeout=40
+                    timeout=S.get("agent.timeout")
                 )
                 if response.status_code != 200:
                     return {
@@ -925,7 +929,7 @@ class ChatAgentService:
                             if cursor_pos < s_end:
                                 gaps.append((cursor_pos, s_end))
                                 
-                        significant = [g for g in gaps if (g[1] - g[0]) >= 3.0]
+                        significant = [g for g in gaps if (g[1] - g[0]) >= S.get("timeline.min_gap_s")]
                         tool_result = json.dumps([{"start_s": g[0], "end_s": g[1], "duration_s": g[1] - g[0]} for g in significant])
 
                     elif func_name == "insert_clip":

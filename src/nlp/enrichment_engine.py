@@ -29,26 +29,29 @@ def _enrich_key(raw_text: str, entities: List[Dict[str, str]], replacements: Dic
 def rewrite_description_llm(
     original: str,
     entities: List[Dict[str, str]],
-    replacements: Optional[Dict[str, str]] = None
+    replacements: Optional[Dict[str, str]] = None,
+    project_id: Optional[int] = None
 ) -> Optional[str]:
     """Reescreve a descrição via LLM. Retorna None em falha (chamador usa fallback regex)."""
-    api_key = CONFIG.OPENROUTER_API_KEY
+    from src.services.settings_service import SettingsService
+    S = SettingsService.get_settings(project_id)
+    api_key = S.api_key("openrouter")
     if not api_key or api_key == "your_openrouter_api_key_here":
         return None
     if not original or (not entities and not replacements):
         return None
 
-    prompt = get_enrichment_rewrite_prompt(original, entities, replacements)
+    prompt = get_enrichment_rewrite_prompt(original, entities, replacements, project_id=project_id)
     try:
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": CONFIG.TEXT_MODEL,
+                "model": S.get("llm.text_model"),
                 "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.1
+                "temperature": S.get("enrichment.temperature")
             },
-            timeout=25
+            timeout=S.get("enrichment.timeout")
         )
         if response.status_code != 200:
             print(f"[ENRICH] Falha LLM (status {response.status_code}): {response.text[:200]}")
@@ -67,10 +70,11 @@ def rewrite_description_llm(
 def _rewrite_with_fallback(
     original: str,
     entities: List[Dict[str, str]],
-    replacements: Dict[str, str]
+    replacements: Dict[str, str],
+    project_id: Optional[int] = None
 ) -> str:
     """Tenta LLM; se indisponível, cai para a substituição por regex legada."""
-    rewritten = rewrite_description_llm(original, entities, replacements)
+    rewritten = rewrite_description_llm(original, entities, replacements, project_id=project_id)
     if rewritten:
         return rewritten
     # Fallback: regex legada (import tardio para evitar ciclo)
@@ -136,7 +140,7 @@ def enrich_video_frames(project_id: int, video_id: int, only_timestamps: Optiona
         payload = task["payload"]
         key = task["key"]
 
-        enriched = _rewrite_with_fallback(raw_text, entities, replacements)
+        enriched = _rewrite_with_fallback(raw_text, entities, replacements, project_id=project_id)
         if not enriched or enriched == payload.get("text"):
             continue
 
@@ -178,7 +182,7 @@ def enrich_photo(project_id: int, photo_id: int) -> bool:
         tags_raw = row["tags"]
 
     # 2. Executar reescrita LLM (chamada HTTP) fora da transação do banco
-    enriched = _rewrite_with_fallback(raw, entities, replacements)
+    enriched = _rewrite_with_fallback(raw, entities, replacements, project_id=project_id)
     if not enriched:
         return False
 

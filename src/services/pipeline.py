@@ -30,10 +30,11 @@ from src.media.ffmpeg import extract_audio_mono, extract_frame, has_audio_stream
 from src.search.semantic import SemanticSearch
 from src.vision.face_engine import process_video_frame_faces, process_photo_faces
 from src.core.tasks import TASK_MANAGER
+from src.services.settings_service import SettingsService
 
 class PipelineService:
     @staticmethod
-    def detect_voice_activity_offline(video_path: Path, video_id: int) -> bool:
+    def detect_voice_activity_offline(video_path: Path, video_id: int, project_id: Optional[int] = None) -> bool:
         """Detecção local de voz (VAD) em CPU para pular ASR em B-rolls mudos."""
         temp_wav_path = CONFIG.CACHE_DIR / f"vad_temp_{video_id}.wav"
         if temp_wav_path.exists():
@@ -93,16 +94,17 @@ class PipelineService:
             mean_energy = np.mean(energies_np) if len(energies_np) > 0 else 0
             max_energy = np.max(energies_np) if len(energies_np) > 0 else 0
             
-            energy_threshold = max(250.0, mean_energy * 1.5)
+            S = SettingsService.get_settings(project_id)
+            energy_threshold = max(S.get("vad.energy_floor"), mean_energy * 1.5)
             speech_frames = 0
             for rms, zcr in zip(energies_np, zcrs_np):
                 if rms > energy_threshold and 0.06 <= zcr <= 0.35:
                     speech_frames += 1
-                    
+
             total_frames = len(energies_np)
             speech_ratio = speech_frames / total_frames if total_frames > 0 else 0.0
-            
-            return speech_ratio > 0.04 and max_energy > 350.0
+
+            return speech_ratio > S.get("vad.speech_ratio_min") and max_energy > S.get("vad.max_energy_min")
         except Exception as e:
             print(f"[VAD] Erro na análise offline VAD para {video_path.name}: {e}")
             return False
@@ -116,13 +118,6 @@ class PipelineService:
     @staticmethod
     def transcribe_video(video_id: int, video_path: Path) -> bool:
         """Executa o pipeline completo de transcrição AssemblyAI (nuvem) e indexação local (Qdrant)."""
-        api_key = CONFIG.ASSEMBLYAI_API_KEY
-        if not api_key or api_key == "your_assemblyai_api_key_here":
-            err_msg = "AssemblyAI API Key não configurada no .env"
-            with get_db() as conn:
-                MediaRepository.update_video_status(conn, video_id, 'error', error_message=err_msg)
-            return False
-
         # Verifica tipo de vídeo no banco
         with get_db() as conn:
             video = MediaRepository.get_video(conn, video_id)
@@ -131,9 +126,18 @@ class PipelineService:
             video_type = video['video_type']
             project_id = video['project_id']
 
+        # Configurações resolvidas do projeto (chave, idioma, diarização, VAD)
+        S = SettingsService.get_settings(project_id)
+        api_key = S.api_key("assemblyai")
+        if not api_key or api_key == "your_assemblyai_api_key_here":
+            err_msg = "AssemblyAI API Key não configurada (painel de configurações da IA ou .env)"
+            with get_db() as conn:
+                MediaRepository.update_video_status(conn, video_id, 'error', error_message=err_msg)
+            return False
+
         # Pula transcrição se for B-roll sem áudio de diálogo
         if video_type == "broll":
-            if not PipelineService.detect_voice_activity_offline(video_path, video_id):
+            if not PipelineService.detect_voice_activity_offline(video_path, video_id, project_id):
                 with get_db() as conn:
                     NarrativeRepository.save_transcript_words(conn, video_id, [])
                     MediaRepository.update_video_status(conn, video_id, 'transcribed')
@@ -160,8 +164,8 @@ class PipelineService:
         try:
             aai.settings.api_key = api_key
             config = aai.TranscriptionConfig(
-                language_code="pt",
-                speaker_labels=True,
+                language_code=S.get("asr.language"),
+                speaker_labels=S.get("asr.speaker_labels"),
                 punctuate=True,
                 format_text=True
             )
@@ -222,13 +226,14 @@ class PipelineService:
                     pass
 
     @staticmethod
-    def call_openrouter_vision(base64_image: str, extension: str = "jpeg", prompt: Optional[str] = None) -> Dict[str, Any]:
+    def call_openrouter_vision(base64_image: str, extension: str = "jpeg", prompt: Optional[str] = None, project_id: Optional[int] = None) -> Dict[str, Any]:
         """Chama a API do OpenRouter Vision para analisar frames ou fotos.
 
         'prompt' permite injetar o prompt estruturado com entidades conhecidas do projeto
         (get_vision_prompt); sem ele, usa o prompt legado simples.
         """
-        api_key = CONFIG.OPENROUTER_API_KEY
+        S = SettingsService.get_settings(project_id)
+        api_key = S.api_key("openrouter")
         if not api_key or api_key == "your_openrouter_api_key_here":
             return {"descricao": "Análise indisponível", "tags": []}
 
@@ -240,7 +245,7 @@ class PipelineService:
         mime_type = "image/jpeg" if extension in ["jpeg", "jpg"] else f"image/{extension}"
 
         payload = {
-            "model": CONFIG.VISION_MODEL,
+            "model": S.get("llm.vision_model"),
             "messages": [
                 {
                     "role": "user",
@@ -253,11 +258,11 @@ class PipelineService:
                     ]
                 }
             ],
-            "temperature": 0.2
+            "temperature": S.get("vision.temperature")
         }
-        
+
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=20)
+            response = requests.post(url, headers=headers, json=payload, timeout=S.get("vision.timeout"))
             if response.status_code == 200:
                 res_json = response.json()
                 content = res_json['choices'][0]['message']['content'].strip()
@@ -330,7 +335,7 @@ class PipelineService:
         video_cache_dir.mkdir(exist_ok=True)
         
         descriptions_indexed = []
-        interval = CONFIG.FRAME_INTERVAL
+        interval = SettingsService.get_settings(project_id).get("vision.frame_interval")
         
         timestamps = []
         t = 0.0
@@ -386,8 +391,8 @@ class PipelineService:
                 with open(frame_path, "rb") as img_file:
                     base64_img = base64.b64encode(img_file.read()).decode('utf-8')
 
-                vision_prompt = get_vision_prompt(known_entities, detected_people)
-                analysis = PipelineService.call_openrouter_vision(base64_img, "jpg", prompt=vision_prompt)
+                vision_prompt = get_vision_prompt(known_entities, detected_people, project_id=project_id)
+                analysis = PipelineService.call_openrouter_vision(base64_img, "jpg", prompt=vision_prompt, project_id=project_id)
                 descriptions_indexed.append({
                     "timestamp": timestamp,
                     "description": analysis.get("descricao", ""),
@@ -499,8 +504,8 @@ class PipelineService:
                         bbox = None
                     detected_people.append({"name": r["name"], "bbox": bbox})
 
-            vision_prompt = get_vision_prompt(known_entities, detected_people)
-            analysis = PipelineService.call_openrouter_vision(base64_img, ext, prompt=vision_prompt)
+            vision_prompt = get_vision_prompt(known_entities, detected_people, project_id=project_id)
+            analysis = PipelineService.call_openrouter_vision(base64_img, ext, prompt=vision_prompt, project_id=project_id)
             desc = analysis.get("descricao", "Foto de set analisada.")
             tags = analysis.get("tags", [])
 
@@ -665,26 +670,28 @@ class PipelineService:
     @staticmethod
     def generate_video_summary(video_id: int, video_type: str, project_id: int, visual_descriptions: Optional[List[Dict[str, Any]]] = None) -> bool:
         """Gera descrição, sumário em marcadores e tags por IA para o vídeo."""
-        api_key = CONFIG.OPENROUTER_API_KEY
+        S = SettingsService.get_settings(project_id)
+        api_key = S.api_key("openrouter")
         if not api_key or api_key == "your_openrouter_api_key_here":
             return False
-            
+
+        max_chars = S.get("summary.transcript_max_chars")
         if video_type == "interview":
             with get_db() as conn:
                 dialogues = NarrativeRepository.get_transcript_dialogues(conn, video_id)
-                
+
             if not dialogues:
                 return False
-                
+
             formatted = ""
             for block in dialogues:
                 formatted += f"[{block['speaker_id']} | {block['start_time']:.1f}s - {block['end_time']:.1f}s]: \"{block['text']}\"\n\n"
-            prompt = get_interview_summary_prompt(formatted[:25000])
+            prompt = get_interview_summary_prompt(formatted[:max_chars])
         elif video_type == "broll" and visual_descriptions:
             formatted = ""
             for frame in visual_descriptions:
                 formatted += f"[Tempo: {frame['timestamp']:.1f}s]: {frame['description']} (Tags visuais: {', '.join(frame['tags'])})\n"
-            prompt = get_broll_summary_prompt(formatted[:25000])
+            prompt = get_broll_summary_prompt(formatted[:max_chars])
         else:
             return False
             
@@ -694,18 +701,18 @@ class PipelineService:
             "Content-Type": "application/json"
         }
         payload = {
-            "model": CONFIG.TEXT_MODEL,
+            "model": S.get("llm.text_model"),
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.3
+            "temperature": S.get("summary.temperature")
         }
-        
+
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            response = requests.post(url, headers=headers, json=payload, timeout=S.get("summary.timeout"))
             if response.status_code == 200:
                 res_json = response.json()
                 content = res_json['choices'][0]['message']['content'].strip()
                 data = extract_json_from_markdown(content)
-                
+
                 desc = data.get("description", "")
                 if isinstance(desc, list):
                     desc = " ".join([str(x) for x in desc])
