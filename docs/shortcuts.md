@@ -17,6 +17,9 @@ Os atalhos abaixo controlam o player de origem (*Source*) ou o player de timelin
 | **`L`** | **Avançar Vídeo** | Pressione consecutivamente para acelerar a velocidade de avanço (1.5x, 2x, 4x, 8x). |
 | **`Espaço`** | **Play / Pause (Geral)** | Atalho rápido para alternar reprodução/pausa no monitor ativo. |
 | **`Setas (← / →)`** | **Navegar Frames** | Retrocede ou avança exatamente 1 frame do vídeo para cortes cirúrgicos. |
+| **`Q`** | **Alternar Monitor Maximizado** | Quando um dos players estiver maximizado (tela cheia), alterna instantaneamente para o outro monitor maximizado. |
+| **`Clique Simples`** | **Play / Pause** | Clicar na área de vídeo de qualquer player (Source/Program) alterna a reprodução. |
+| **`Duplo Clique`** | **Maximizar / Minimizar** | Clicar duas vezes rápido na área de vídeo de qualquer player maximiza ou minimiza sua visualização. |
 
 ---
 
@@ -31,15 +34,15 @@ Os atalhos abaixo controlam o player de origem (*Source*) ou o player de timelin
 
 ---
 
-## 🔄 Edição e Controle de Alternativas (IA) & Histórico
+## 🔄 Edição e Controle de Alternativas (IA), Inspetor & Histórico
 
-Os comandos abaixo ficam disponíveis ao interagir com a linha do tempo ou com clipes propostos pelo agente de IA.
+Os comandos abaixo mudam de comportamento contextualmente baseado em qual painel do programa você está interagindo (Biblioteca de Mídias vs. Timeline).
 
 | Tecla | Ação | Descrição |
 | :---: | :--- | :--- |
-| **`A`** | **Abrir/Fechar Alternativas** | Abre o modal de alternativas da IA para o clipe de IA selecionado, ou o fecha caso esteja aberto. |
-| **`Esc (Escape)`** | **Fechar Alternativas** | Fecha o modal de alternativas da IA caso esteja aberto. |
-| **`Delete` / `Backspace`** | **Deletar Clipe / Rejeitar Ghost** | Apaga o clipe selecionado na timeline (e seu par de áudio vinculado). Se for um clipe fantasma (*ghost clip*), rejeita a sugestão. |
+| **`A`** | **Abrir/Fechar Inspetor ou Alternativas** | **Se focado na Biblioteca/Mídias:** Abre ou fecha o Inspetor de Mídia Integrado.<br>**Se focado na Timeline:** Abre ou fecha o modal de alternativas da IA para o clipe selecionado. |
+| **`Esc (Escape)`** | **Fechar Inspetor ou Alternativas** | Fecha o Inspetor de Mídia ou o modal de alternativas da IA caso estejam abertos. |
+| **`Delete` / `Backspace`** | **Deletar Clipe / Rejeitar Ghost** | Apaga o clipe selecionado na timeline. Se for um clipe fantasma (*ghost clip*), rejeita a sugestão. |
 | **`Enter` / `Y`** | **Aceitar Sugestão da IA** | Aceita e consolida o clipe fantasma (*ghost clip*) selecionado na timeline. |
 | **`U`** | **Desvincular Par A/V** | Desvincula o clipe de vídeo selecionado de seu respectivo par de áudio para trims independentes (J/L-cuts). |
 | **`Z`** | **Dividir Clipe (Split)** | Divide o clipe selecionado na timeline ao meio, exatamente na posição atual da agulha (playhead). Se estiver vinculado (A/V), divide ambos. |

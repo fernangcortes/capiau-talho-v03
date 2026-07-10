@@ -156,6 +156,24 @@ Se você encontrar algum erro, quiser auditar as ações de sua edição ou quei
 
 ## 🎛️ 8. Layout e Organização Avançada
 
+### 📺 Inspetor de Mídia Integrado (Atalho `A` na Biblioteca)
+O sistema conta com um **Inspetor de Mídia Integrado** no menu lateral esquerdo, projetado para decupagens e análises profundas sem a poluição de popups flutuantes.
+* **Ativação Dinâmica:** Com uma mídia selecionada na biblioteca de arquivos, pressione a tecla **`A`** (ou clique no card/lista). A barra lateral direita é ocultada, a barra esquerda se expande para uma área maior de destaque (recuperada do `localStorage`, padrão `650px`) e o **Source Player** é maximizado automaticamente para inspeção.
+* **Abas do Inspetor:**
+  * **Índice:** Exibe resumos IA e capítulos navegáveis (seeking no player clássico).
+  * **Legenda:** Transcrição atômica e falantes editáveis (com dropdown inteligente e criação de novos falantes), além de função para fatiar/dividir diálogos no ponto da agulha.
+  * **Temas:** Adicione e remova temas narrativos diretamente e filtre trechos com ponto de In/Out capturados em tempo real.
+  * **Rostos:** Galeria de rostos detectados com marcações temporais e caixas de texto premium para rotular e desambiguar a identidade dos personagens.
+  * **IA:** Gatilhos rápidos para processamento individual de ASR, Visão (Gemini) e Rostos.
+* **Restauração de Estado:** Pressionar a tecla **`A`** novamente, a tecla **`Esc`** ou clicar em **"Voltar"** fecha o Inspetor e restaura a biblioteca exatamente como estava (sua aba ativa anterior, a barra direita é reaberta e o clipe ativo anterior fica focado e com rolagem automática).
+
+### 🎬 Operação e Interatividade Avançada dos Players
+Os painéis de monitor de vídeo (Source & Program) foram otimizados com controles intuitivos rápidos:
+* **Play / Pause:** Clique simples na área de vídeo de qualquer player ativa ou pausa a reprodução.
+* **Maximizar / Minimizar:** Clique duplo rápido na área de vídeo de qualquer player expande-o em tela cheia na área de visualização (ou restaura a visualização dupla).
+* **Atalho de Swap (`Q`):** Quando um dos players estiver maximizado, pressione a tecla **`Q`** ou clique no ícone de troca (`⇄`) no cabeçalho do player para alternar instantaneamente entre a visualização maximizada do Source e do Program.
+* **Exibição Inteligente do Program:** Se o Source Player estiver maximizado e você interagir com a timeline (clicando em um clipe), o sistema detecta que seu foco mudou para a montagem e **abre/maximiza o Program Player automaticamente**, garantindo que você veja o resultado do corte na linha do tempo.
+
 ### Workspace "Estúdio" (Layout Flexível de Alta Densidade)
 * Para decupagens robustas, ative o botão **Estúdio** no topo da tela.
 * Este modo reorganiza completamente a interface. A biblioteca ganha espaço predominante. Os dois monitores (Source e Program) são empilhados na segunda coluna em formato ultralimpo, onde seus controles de player só aparecem no *hover* do mouse (`position:absolute`), e a transcrição fica disponível como uma terceira coluna colapsável. A linha do tempo expande em 100% da largura inferior.
