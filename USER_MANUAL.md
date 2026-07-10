@@ -129,12 +129,28 @@ Sempre que a IA propuser e inserir um vídeo na timeline, ela indexará trechos 
 
 ---
 
-## 🎬 7. Salvando e Exportando sua Timeline
+## 🎬 7. Salvando, Auto-Salvamento & Logs com IA
 
-1. À medida que edita, dê um nome para a sua sequência no campo de texto (ex: *Montagem Inicial*).
+### A. Auto-Salvamento Automático
+Você não precisa se preocupar em salvar manualmente a cada modificação. O sistema possui um mecanismo de **auto-salvamento em segundo plano** super otimizado (debounce de 1s) que grava automaticamente no `localStorage` do seu navegador:
+* **Resiliência Total:** Se você fechar a aba ou atualizar a página com `F5` ou `Ctrl+F5`, toda a timeline (cortes, pistas, ghosts) e preferências de visualização (zoom, scrolls, playhead, seleções) serão restauradas instantaneamente.
+* **Histórico Retido:** A pilha completa de Undo/Redo (`Ctrl+Z` / `Ctrl+Y`) também é restaurada, permitindo continuar desfazendo ações livremente.
+* **Por Projeto:** Os auto-salvamentos são salvos individualmente por ID de projeto, evitando misturar timelines de trabalhos diferentes.
+
+### B. Salvamento Permanente e Exportação
+1. Para criar uma versão fixa no banco de dados, dê um nome para a sua sequência no campo de texto (ex: *Montagem Inicial*).
 2. Clique em **`Salvar`** para gravar a timeline no SQLite.
 3. Escolha o formato de saída no seletor (XML para Premiere/Resolve/FCP, OpenTimelineIO `.otio` ou EDL).
 4. Clique em **`Exportar`**. O download iniciará no seu navegador e o arquivo estará pronto para ser importado no seu editor NLE profissional.
+
+### C. Painel de Logs Avançado com IA
+Se você encontrar algum erro, quiser auditar as ações de sua edição ou queira gerar relatórios de forma assistida:
+1. Abra a aba **Logs** na barra lateral direita (ícone de terminal `>_`).
+2. Lá você verá o console do sistema registrando ações, requisições de APIs e erros em tempo real.
+3. **Assistente de Logs (IA):**
+   * **Relatório Humano:** Clique neste botão para que a IA analise os logs do terminal e crie uma lista resumida, não-técnica, de tudo o que você fez durante a sessão.
+   * **Análise Técnica (OR):** Clique neste botão para acionar o OpenRouter e realizar uma auditoria técnica profunda nos logs para encontrar erros ou sugerir melhorias de desempenho.
+   * **Copiar & Limpar:** Use os botões de ação superior para copiar os logs formatados para área de transferência ou limpar o histórico atual.
 
 ---
 

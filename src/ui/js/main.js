@@ -7,6 +7,8 @@ import { ChatManager } from "./chat.js";
 import { ProjectsManager } from "./projects.js";
 import { FaceManager } from "./faces.js";
 import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
+import { initAutosave } from "./timelineAutosave.js";
+import { LOG_MANAGER } from "./logManager.js";
 
 // Função para destacar os termos da busca com <mark>
 function highlightTerms(text, query) {
@@ -1152,6 +1154,9 @@ window.addEventListener("DOMContentLoaded", () => {
     const chat = new ChatManager();
     const projects = new ProjectsManager();
     FaceManager.init();
+    
+    // Inicializa o sistema de auto-salvamento local
+    initAutosave();
 
     // -- Open Photos in Player Configuration --
     const btnLibrary = document.getElementById("btn-library-photos-in-player");
@@ -1368,6 +1373,7 @@ window.addEventListener("DOMContentLoaded", () => {
         vision: document.getElementById("vision-container"),
         tasks: document.getElementById("tasks-container"),
         chat: document.getElementById("chat-container"),
+        logs: document.getElementById("logs-container"),
         search: document.getElementById("search-container"),
     };
 
