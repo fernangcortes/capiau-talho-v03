@@ -255,11 +255,13 @@ export class WorkspaceManager {
                 this.studioTop = document.createElement("div");
                 this.studioTop.className = "studio-top";
             }
-            // Monta a linha superior: [Biblioteca | Players | Transcrição]
+            // Monta a linha superior: [Biblioteca | ReopenLeft | Players | Transcrição | ReopenRight]
             // (timelinePanel ainda está dentro de centerStage neste ponto)
             this.studioTop.appendChild(sidebarLeft);
+            if (reopenLeft) this.studioTop.appendChild(reopenLeft);
             this.studioTop.appendChild(centerStage);
             this.studioTop.appendChild(sidebarRight);
+            if (reopenRight) this.studioTop.appendChild(reopenRight);
             // Linha superior no topo do workspace; timeline extraída para baixo (full-width)
             workspace.appendChild(this.studioTop);
             workspace.appendChild(timelinePanel);
