@@ -12,7 +12,9 @@ from src.api.schemas import (
     SplitTranscriptPayload,
     ChatPayload,
     SearchCategorizePayload,
-    RenameSpeakerPayload
+    RenameSpeakerPayload,
+    EditDialoguePayload,
+    AddThemeSegmentPayload
 )
 from src.db.repositories.projects import ProjectRepository
 from src.db.repositories.narrative import NarrativeRepository
@@ -302,6 +304,63 @@ def rename_speaker(video_id: int, payload: RenameSpeakerPayload, conn: sqlite3.C
             search_engine.index_transcript_chunks(proj_id, video_id, dialogues, v_type)
             
         return {"status": "success", "message": "Falante renomeado com sucesso."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/video/{video_id}/edit-dialogue")
+def edit_dialogue(video_id: int, payload: EditDialoguePayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Atualiza o diálogo em um trecho específico e re-indexa no Qdrant."""
+    try:
+        NarrativeRepository.edit_dialogue_segment(
+            conn,
+            video_id=video_id,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+            new_text=payload.new_text,
+            speaker_id=payload.speaker_id
+        )
+        conn.commit()
+        
+        # Re-indexa o diálogo no Qdrant
+        dialogues = NarrativeRepository.get_transcript_dialogues(conn, video_id)
+        if dialogues:
+            video = MediaRepository.get_video(conn, video_id)
+            proj_id = video['project_id'] if video else 1
+            v_type = video['video_type'] if video else 'interview'
+            
+            search_engine = SemanticSearch.get_instance()
+            search_engine.index_transcript_chunks(proj_id, video_id, dialogues, v_type)
+            
+        return {"status": "success", "message": "Diálogo editado com sucesso."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/theme/segment")
+def add_theme_segment(payload: AddThemeSegmentPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Associa um trecho de vídeo a um tema narrativo."""
+    try:
+        segment_id = NarrativeRepository.add_theme_segment_manual(
+            conn,
+            theme_id=payload.theme_id,
+            project_id=payload.project_id,
+            video_id=payload.video_id,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+            speaker_id=payload.speaker_id,
+            text_excerpt=payload.text_excerpt
+        )
+        conn.commit()
+        return {"status": "success", "segment_id": segment_id, "message": "Segmento vinculado ao tema com sucesso."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/api/theme/segment/{segment_id}")
+def delete_theme_segment(segment_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Remove uma associação de tema segmentado."""
+    try:
+        NarrativeRepository.delete_theme_segment(conn, segment_id)
+        conn.commit()
+        return {"status": "success", "message": "Segmento desvinculado do tema com sucesso."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

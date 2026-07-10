@@ -118,3 +118,20 @@ class RenameSpeakerPayload(BaseModel):
     end_time: Optional[float] = None
 
 
+class EditDialoguePayload(BaseModel):
+    start_time: float
+    end_time: float
+    new_text: str
+    speaker_id: str
+
+
+class AddThemeSegmentPayload(BaseModel):
+    theme_id: int
+    project_id: int
+    video_id: int
+    start_time: float
+    end_time: float
+    speaker_id: str
+    text_excerpt: str
+
+

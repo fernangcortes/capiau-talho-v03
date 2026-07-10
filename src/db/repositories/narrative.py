@@ -198,3 +198,46 @@ class NarrativeRepository:
                 WHERE video_id = ? AND speaker_id = ? AND start_time >= ? AND end_time <= ?
             """, (new_speaker_id, video_id, old_speaker_id, start_time - 0.05, end_time + 0.05))
 
+    @staticmethod
+    def edit_dialogue_segment(conn: sqlite3.Connection, video_id: int, start_time: float, end_time: float, new_text: str, speaker_id: str) -> None:
+        """Apaga as palavras antigas no intervalo e insere as novas, distribuindo timestamps linearmente."""
+        cursor = conn.cursor()
+        cursor.execute("""
+            DELETE FROM transcript
+            WHERE video_id = ? AND start_time >= ? AND end_time <= ?
+        """, (video_id, start_time - 0.05, end_time + 0.05))
+        
+        words = [w.strip() for w in new_text.split() if w.strip()]
+        if not words:
+            return
+            
+        duration = end_time - start_time
+        if duration <= 0:
+            duration = 1.0
+            
+        word_duration = duration / len(words)
+        
+        for idx, w in enumerate(words):
+            w_start = start_time + (idx * word_duration)
+            w_end = w_start + word_duration
+            cursor.execute("""
+                INSERT INTO transcript (video_id, word, start_time, end_time, speaker_id, confidence)
+                VALUES (?, ?, ?, ?, ?, 1.0)
+            """, (video_id, w, round(w_start, 3), round(w_end, 3), speaker_id))
+
+    @staticmethod
+    def add_theme_segment_manual(conn: sqlite3.Connection, theme_id: int, project_id: int, video_id: int, start_time: float, end_time: float, speaker_id: str, text_excerpt: str) -> int:
+        """Cria uma associação manual entre vídeo e tema."""
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO theme_segment (theme_id, project_id, video_id, start_time, end_time, speaker_id, text_excerpt, relevance)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1.0)
+        """, (theme_id, project_id, video_id, start_time, end_time, speaker_id, text_excerpt))
+        return cursor.lastrowid
+
+    @staticmethod
+    def delete_theme_segment(conn: sqlite3.Connection, segment_id: int) -> None:
+        """Remove a associação entre trecho de vídeo e tema."""
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM theme_segment WHERE id = ?", (segment_id,))
+
