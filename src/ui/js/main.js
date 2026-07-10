@@ -1399,7 +1399,7 @@ window.addEventListener("DOMContentLoaded", () => {
         // pelo overflow:hidden), fazendo parecer que ele "não abre" após trocar de aba.
         const activeContainer = rightContainers[tab];
         if (activeContainer) {
-            activeContainer.style.display = (tab === "chat" || tab === "transcript") ? "flex" : "block";
+            activeContainer.style.display = (tab === "chat" || tab === "transcript" || tab === "logs") ? "flex" : "block";
         }
         
         // Manter destaque no botão ativo
