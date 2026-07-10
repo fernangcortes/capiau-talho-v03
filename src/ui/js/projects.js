@@ -1,6 +1,7 @@
 // Gerenciador de Projetos, seleção, criação, deleção e sincronização ZIP.
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
+import { TIMELINE_STATE } from "./timelineState.js";
 
 export class ProjectsManager {
     constructor() {
@@ -48,10 +49,12 @@ export class ProjectsManager {
             if (this.selector && this.selector.value != projectId) {
                 this.selector.value = projectId;
             }
-            // Limpa chat
+            // Limpa chat, mídias ativas, cuts da timeline e sugestões fantasmas
             STATE.chatHistory = [];
             STATE.activeVideo = null;
             STATE.activeTimelineCuts = [];
+            TIMELINE_STATE.ghostTrack = [];
+            STATE.emit("timelineGhostUpdated", []);
         });
     }
 

@@ -23,6 +23,8 @@ class LogManager {
         
         // Variáveis de estado adicionais
         this.isAiMaximized = false;
+        this.lastReportContent = { human: "", technical: "" };
+        this.lastReportType = null;
         
         this.init();
     }
@@ -99,6 +101,12 @@ class LogManager {
         // Log de mudanças de projeto
         STATE.on("projectChanged", (projectId) => {
             this.log("Project", `Projeto ativo alterado para ID: ${projectId}`, "ACTION");
+            // Limpa o cache de relatórios ao trocar de projeto
+            this.lastReportContent = { human: "", technical: "" };
+            this.lastReportType = null;
+            if (this.aiContainer) this.aiContainer.style.display = "none";
+            const restoreLine = document.getElementById("reopen-logs-ai");
+            if (restoreLine) restoreLine.style.display = "none";
         });
 
         // Log de alterações na timeline
@@ -144,6 +152,8 @@ class LogManager {
                 if (this.aiContainer) this.aiContainer.style.display = "none";
                 const restoreLine = document.getElementById("reopen-logs-ai");
                 if (restoreLine) restoreLine.style.display = "none";
+                this.lastReportContent = { human: "", technical: "" };
+                this.lastReportType = null;
                 this.log("System", "Histórico de logs limpo pelo usuário.", "INFO");
             });
         }
@@ -353,6 +363,29 @@ class LogManager {
     async generateAiAnalysis(type) {
         if (!this.aiOutput || !this.aiContainer) return;
         
+        const aiHeaderTitle = this.aiContainer.querySelector("#logs-ai-header span");
+        const isContainerHidden = this.aiContainer.style.display === "none";
+        
+        // Se o relatório solicitado já foi gerado e o contêiner está fechado, apenas mostra o anterior
+        if (this.lastReportContent[type] && isContainerHidden) {
+            this.showAiReport();
+            this.aiOutput.innerHTML = this.lastReportContent[type];
+            this.lastReportType = type;
+            if (aiHeaderTitle) {
+                const icon = type === "human" ? "fa-user-check" : "fa-gears";
+                const titleText = type === "human" ? "Relatório Humano (IA)" : "Análise Técnica (IA)";
+                aiHeaderTitle.innerHTML = `<i class="fa-solid ${icon}"></i> ${titleText}`;
+            }
+            return;
+        }
+
+        // Se já está exibindo o mesmo relatório na tela, solicita confirmação antes de regenerar
+        if (this.lastReportContent[type] && !isContainerHidden && this.lastReportType === type) {
+            if (!confirm(`Deseja gerar um novo relatório do tipo "${type === "human" ? "Humano" : "Técnico"}"? Isso substituirá o atual.`)) {
+                return;
+            }
+        }
+        
         const logsText = this.formatLogsText();
         if (!logsText) {
             alert("Nenhum log disponível para análise.");
@@ -363,6 +396,10 @@ class LogManager {
         const restoreLine = document.getElementById("reopen-logs-ai");
         if (restoreLine) restoreLine.style.display = "none";
         
+        if (aiHeaderTitle) {
+            aiHeaderTitle.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processando...`;
+        }
+
         this.aiOutput.innerHTML = `
             <div style="display:flex; align-items:center; gap:8px; color:var(--color-cyan); font-size:12px;">
                 <i class="fa-solid fa-spinner fa-spin"></i> Processando análise de logs com a IA...
@@ -410,7 +447,19 @@ ${logsText}
             );
             
             if (res && res.response) {
-                this.aiOutput.innerHTML = this.renderMarkdown(res.response);
+                const rendered = this.renderMarkdown(res.response);
+                this.aiOutput.innerHTML = rendered;
+                
+                // Salva no cache do painel
+                this.lastReportContent[type] = rendered;
+                this.lastReportType = type;
+                
+                // Atualiza o título do painel final
+                if (aiHeaderTitle) {
+                    const icon = type === "human" ? "fa-user-check" : "fa-gears";
+                    const titleText = type === "human" ? "Relatório Humano (IA)" : "Análise Técnica (IA)";
+                    aiHeaderTitle.innerHTML = `<i class="fa-solid ${icon}"></i> ${titleText}`;
+                }
             } else {
                 throw new Error("Resposta inválida da IA.");
             }
@@ -421,6 +470,9 @@ ${logsText}
                     <i class="fa-solid fa-circle-exclamation"></i> Falha na chamada da IA: ${e.message || e}. Verifique se sua chave API está correta ou se o servidor backend está online.
                 </div>
             `;
+            if (aiHeaderTitle) {
+                aiHeaderTitle.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> Erro`;
+            }
         }
     }
 

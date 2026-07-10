@@ -72,9 +72,11 @@ export function restoreAutosave(projectId) {
             console.log(`[Autosave] Nenhum backup encontrado para o projeto ${projectId}.`);
         }
         
-        // Limpa o histórico atual para evitar vazamento entre projetos
+        // Limpa o histórico e ghost clips para evitar vazamento entre projetos
         isAutosaveSuspended = true;
         TIMELINE_HISTORY.clear();
+        TIMELINE_STATE.ghostTrack = [];
+        STATE.emit("timelineGhostUpdated", []);
         isAutosaveSuspended = false;
         return;
     }
@@ -147,6 +149,11 @@ export function restoreAutosave(projectId) {
 export function initAutosave() {
     // Escuta mudança de projeto com atraso para garantir que os resets de interface rodem primeiro
     STATE.on("projectChanged", (projectId) => {
+        isAutosaveSuspended = true;
+        if (autosaveTimeout) {
+            clearTimeout(autosaveTimeout);
+            autosaveTimeout = null;
+        }
         setTimeout(() => {
             restoreAutosave(projectId);
         }, 100);
