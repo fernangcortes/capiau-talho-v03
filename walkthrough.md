@@ -593,3 +593,29 @@ Implementamos a funcionalidade completa de suporte a fotos (stills) na timeline 
    - Novo preset de workspace chamado "Montagem" (`workspaceManager.js`): maximiza a biblioteca no topo e ancora a timeline horizontalmente na base da tela, permitindo gerenciar grandes volumes de mídia com monitores flutuantes de Source/Program (com toggle ocultável `#btn-montagem-monitors`).
    - Posicionamento melhorado dos controles de **Visualização** (modo Lista/Cards) e **Zoom** (ícone de lupa, range slider e rótulo de pixels), movidos do dropdown de opções de exibição para o lado esquerdo da terceira linha da barra de ferramentas da biblioteca.
    - Removidos os boxes de contorno, bordas e fundos de todos os botões da terceira linha (Visualização, Zoom, Expandir, Recolher, Fotos no Player), tornando-os ícones limpos (*line-icons*) com efeitos suaves de hover.
+
+---
+
+## 📺 Fase 15: Inspetor de Mídia Integrado & Persistência de Painéis (10/07/2026)
+
+Implementamos a funcionalidade completa de Inspetor de Mídia Integrado no painel lateral esquerdo (ativado via atalho `A` ou clicando em "Voltar") e persistência de layout/abas no `localStorage`:
+
+1. **Lógica de Interface & Adaptador de Layout Dinâmico (Atalho A):**
+   - Mapeamos o atalho `A` em elementos que não sejam inputs ou editores de texto para transicionar a barra lateral esquerda para o modo **Inspetor de Mídia** (ocultando `#library-main-view` e exibindo `#library-inspector-view`).
+   - Ao abrir o inspetor, o painel da direita se recolhe automaticamente e a barra esquerda se expande para uma largura maior de destaque (recuperada do `localStorage`, padrão `650px`).
+   - Ao fechar o inspetor (tecla `A` novamente, `Esc` ou clicando na seta "Voltar"), a largura da barra esquerda e o estado de visibilidade da barra direita são restaurados exatamente como estavam antes da ativação.
+   - O redimensionamento do painel por splitter durante o modo inspetor é armazenado separadamente (`layout-dim-splitter-sidebar-left-inspector`), permitindo ao usuário definir larguras independentes para o modo de navegação clássico e o modo inspetor.
+
+2. **Abas Detalhadas do Inspetor de Mídia:**
+   - **Índice (Resumo e Navegação):** Mostra o resumo executivo gerado por IA e permite navegar e buscar capítulos/blocos temáticos de entrevistas ou descrições de visão de B-roll, clicando no timecode para buscar a agulha diretamente no **Source Player** clássico do programa (eliminando o modal de preview antigo).
+   - **Legenda (Transcrição Editável):** Permite alterar o falante (speaker) selecionando falantes existentes do projeto ou adicionando um falante novo, editar livremente o texto do diálogo com salvamento por bloco e dividir o diálogo em partes baseadas na agulha atual do player.
+   - **Temas Narrativos:** Exibe a lista de temas narrativos do documentário associados à mídia com exclusão imediata e formulário para vincular manualmente novos trechos a temas específicos com inputs de In/Out preenchidos automaticamente.
+   - **Rostos Detectados (Desambiguação):** Renderiza rostos identificados com suas marcações temporais (seeking com um clique) e caixas de texto premium para rotular e desambiguar a identidade dos personagens.
+   - **Processamento IA:** Atalhos dedicados para acionar rotinas de ASR (AssemblyAI), Visão (Gemini) e Clusterização de Faces.
+
+3. **Persistência de Abas e Estados:**
+   - As sidebars e a timeline agora salvam e restauram suas dimensões automaticamente no `localStorage` após arraste dos divisores (splitters).
+   - A aba selecionada ativa da biblioteca (esquerda) e da transcrição (direita) são salvas no `localStorage` sob as chaves `active-left-tab` e `active-right-tab`, restaurando sua seleção exata no carregamento da página.
+
+4. **Rotas de Backend & Banco de Dados:**
+   - Desenvolvemos rotas robustas FastAPI e queries SQLite no repositório `NarrativeRepository` para suportar `edit_dialogue_segment` (com exclusão e inserção linear interpolada dos tempos das palavras), `add_theme_segment_manual` e `delete_theme_segment`, garantindo consistência completa dos dados e re-indexação imediata no banco vetorial Qdrant para buscas semânticas RAG em tempo real.
