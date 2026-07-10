@@ -22,7 +22,7 @@ export class CapiauTimelineInteraction {
         // Guarda referências bound para permitir remoção
         this.boundMouseDown = (e) => this.onMouseDown(e);
         this.boundMouseMove = (e) => this.onMouseMove(e);
-        this.boundMouseUp = () => this.onMouseUp();
+        this.boundMouseUp = (e) => this.onMouseUp(e);
         this.boundWheel = (e) => this.onWheel(e);
         this.boundMouseLeave = () => this.hideHoverPreview();
         this.boundKeyDown = (e) => this.onKeyDown(e);
@@ -142,8 +142,30 @@ export class CapiauTimelineInteraction {
 
     onMouseDown(e) {
         window.activeFocusedPlayer = "program";
+        this.mouseDownX = e.clientX;
+        this.mouseDownY = e.clientY;
+
+        // Se o source estiver maximizado, mostra o program ao interagir com a timeline
+        const sourcePanel = document.getElementById("source-player-panel");
+        if (sourcePanel && sourcePanel.classList.contains("maximized")) {
+            const btnExpandSource = document.getElementById("btn-expand-source");
+            if (btnExpandSource) btnExpandSource.click();
+            const programPanel = document.getElementById("program-player-panel");
+            if (programPanel && !programPanel.classList.contains("maximized")) {
+                const btnExpandProgram = document.getElementById("btn-expand-program");
+                if (btnExpandProgram) btnExpandProgram.click();
+            }
+        }
+        
         const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);
         this.hideHoverPreview();
+        
+        if (track) {
+            const hit = this.findClipAt(frame, track, y);
+            this.mouseDownClip = hit && hit.type === "clip" ? hit.data : null;
+        } else {
+            this.mouseDownClip = null;
+        }
         
         // 1. Clique na régua de tempo (Scrubbing / Mover Playhead)
         if (y < this.renderer.rulerHeight) {
@@ -286,11 +308,12 @@ export class CapiauTimelineInteraction {
         }
     }
 
-    onMouseUp() {
+    onMouseUp(e) {
         // Fecha a transação do drag/trim (no-op se nada mudou)
         TIMELINE_HISTORY.commit();
         this.dragState = null;
         this.draggedClipId = null;
+        this.mouseDownClip = null;
         if (this.canvas) this.canvas.style.cursor = "default";
     }
 
@@ -493,6 +516,9 @@ export class CapiauTimelineInteraction {
 
         // Toggle do popup de alternativas com a tecla 'A'
         if (e.key.toLowerCase() === "a" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (window.activeFocusedPlayer === "source") {
+                return; // Let the media library inspector handle it
+            }
             const popup = this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup");
             if (popup && popup.style.display === "flex") {
                 this.hideAlternativesPopup();

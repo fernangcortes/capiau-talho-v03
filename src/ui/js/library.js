@@ -405,6 +405,7 @@ function renderTreeNode(node, container, depth = 0) {
         
         card.addEventListener("click", () => {
             STATE.activeVideo = v;
+            window.activeFocusedPlayer = "source";
         });
 
         // Arrastar-e-soltar do vídeo para a timeline
@@ -750,7 +751,7 @@ export class LibraryManager {
             });
         }
 
-        // Atalho 'a' ou 'A' para abrir o Modal de Entrevista
+        // Atalho 'a' ou 'A' para abrir o Inspetor de Mídia no lugar do modal
         document.addEventListener("keydown", (e) => {
             const activeTag = document.activeElement.tagName;
             if (activeTag === "INPUT" || activeTag === "TEXTAREA" || document.activeElement.isContentEditable) {
@@ -758,100 +759,21 @@ export class LibraryManager {
             }
             
             if (e.key.toLowerCase() === 'a') {
+                if (window.activeFocusedPlayer === "program") {
+                    return; // Let the timeline handle it
+                }
                 if (STATE.activeVideo) {
                     e.preventDefault();
-                    this.openInterviewModal(STATE.activeVideo);
+                    this.toggleMediaInspector(STATE.activeVideo);
                 }
             }
         });
 
-        // Eventos do Modal de Entrevista
-        const btnCloseInterview = document.getElementById("btn-close-interview-modal");
-        const interviewModal = document.getElementById("interview-modal");
-        
-        const closeInterviewModal = () => {
-            if (interviewModal) {
-                interviewModal.style.display = "none";
-            }
-            const modalVideo = document.getElementById("interview-modal-video");
-            if (modalVideo) {
-                modalVideo.pause();
-                modalVideo.src = "";
-            }
-        };
-
-        if (btnCloseInterview && interviewModal) {
-            btnCloseInterview.addEventListener("click", closeInterviewModal);
-            interviewModal.addEventListener("click", (e) => {
-                if (e.target === interviewModal) {
-                    closeInterviewModal();
-                }
-            });
-        }
-
-        // Controles de Ponto In/Out/Append e Miniatura no Modal de Entrevista
-        const btnModalMarkIn = document.getElementById("btn-interview-modal-mark-in");
-        const btnModalMarkOut = document.getElementById("btn-interview-modal-mark-out");
-        const btnModalSetThumb = document.getElementById("btn-interview-modal-set-thumb");
-        const btnModalAppend = document.getElementById("btn-interview-modal-append");
-
-        if (btnModalMarkIn) {
-            btnModalMarkIn.addEventListener("click", () => this.markModalIn());
-        }
-        if (btnModalMarkOut) {
-            btnModalMarkOut.addEventListener("click", () => this.markModalOut());
-        }
-        if (btnModalSetThumb) {
-            btnModalSetThumb.addEventListener("click", () => {
-                if (STATE.activeVideo) this.setModalThumbnail(STATE.activeVideo);
-            });
-        }
-        if (btnModalAppend) {
-            btnModalAppend.addEventListener("click", () => {
-                if (STATE.activeVideo) this.appendModalToTimeline(STATE.activeVideo);
-            });
-        }
-
-        // Atalhos de teclado locais do Modal de Entrevista (I, O, E)
-        document.addEventListener("keydown", (e) => {
-            if (!interviewModal || interviewModal.style.display !== "flex") return;
-            
-            const activeTag = document.activeElement.tagName.toLowerCase();
-            if (activeTag === "input" || activeTag === "textarea" || document.activeElement.isContentEditable) {
-                return; // Ignora se o usuário estiver digitando
-            }
-            
-            const key = e.key.toLowerCase();
-            if (key === 'i') {
-                e.preventDefault();
-                this.markModalIn();
-            } else if (key === 'o') {
-                e.preventDefault();
-                this.markModalOut();
-            } else if (key === 'e') {
-                e.preventDefault();
-                if (STATE.activeVideo) this.appendModalToTimeline(STATE.activeVideo);
-            }
-        });
-
-        // Abas do Modal de Entrevista
-        const tabHeader = document.getElementById("interview-tabs-header");
-        if (tabHeader) {
-            tabHeader.querySelectorAll(".tab-btn").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    const tabId = btn.dataset.interviewTab;
-                    this.switchInterviewTab(tabId);
-                });
-            });
-        }
-
-        // Copiar Notas
-        const btnCopyNotes = document.getElementById("btn-interview-copy-notes");
-        if (btnCopyNotes) {
-            btnCopyNotes.addEventListener("click", () => {
-                if (STATE.activeVideo) {
-                    this.copyInterviewNotes(STATE.activeVideo);
-                }
+        // Força foco do player de origem ao clicar na biblioteca
+        const sidebarLeft = document.getElementById("sidebar-left");
+        if (sidebarLeft) {
+            sidebarLeft.addEventListener("click", () => {
+                window.activeFocusedPlayer = "source";
             });
         }
     }
@@ -1259,77 +1181,446 @@ export class LibraryManager {
         }
     }
 
-    seekModalVideo(time) {
-        const modalVideo = document.getElementById("interview-modal-video");
-        if (modalVideo) {
-            modalVideo.currentTime = time;
-            modalVideo.play().catch(err => {
-                console.warn("Play programmatic blocked:", err);
+    initInspectorListeners() {
+        if (this.inspectorListenersInitialized) return;
+        this.inspectorListenersInitialized = true;
+
+        const btnBack = document.getElementById("btn-inspector-back");
+        if (btnBack) btnBack.addEventListener("click", () => this.closeMediaInspector());
+
+        const btnMarkIn = document.getElementById("btn-inspector-mark-in");
+        if (btnMarkIn) btnMarkIn.addEventListener("click", () => this.markInspectorIn());
+
+        const btnMarkOut = document.getElementById("btn-inspector-mark-out");
+        if (btnMarkOut) btnMarkOut.addEventListener("click", () => this.markInspectorOut());
+
+        const btnSetThumb = document.getElementById("btn-inspector-set-thumb");
+        if (btnSetThumb) {
+            btnSetThumb.addEventListener("click", () => {
+                if (STATE.activeVideo) this.setInspectorThumbnail(STATE.activeVideo);
             });
+        }
+
+        const btnAppend = document.getElementById("btn-inspector-append");
+        if (btnAppend) {
+            btnAppend.addEventListener("click", () => {
+                if (STATE.activeVideo) this.appendInspectorToTimeline(STATE.activeVideo);
+            });
+        }
+
+        const btnCopyNotes = document.getElementById("btn-inspector-copy-notes");
+        if (btnCopyNotes) {
+            btnCopyNotes.addEventListener("click", () => {
+                if (STATE.activeVideo) this.copyInspectorNotes(STATE.activeVideo);
+            });
+        }
+
+        // Link Theme Submit
+        const btnLinkTheme = document.getElementById("btn-inspector-link-theme-submit");
+        if (btnLinkTheme) {
+            btnLinkTheme.addEventListener("click", async () => {
+                const video = STATE.activeVideo;
+                if (!video) return;
+                const themeSelect = document.getElementById("sel-inspector-link-theme");
+                const startTimeInput = document.getElementById("num-inspector-link-start");
+                const endTimeInput = document.getElementById("num-inspector-link-end");
+                const excerptTextarea = document.getElementById("txt-inspector-link-excerpt");
+                
+                const themeId = parseInt(themeSelect.value);
+                const start = parseFloat(startTimeInput.value) || 0;
+                const end = parseFloat(endTimeInput.value) || 0;
+                const excerpt = excerptTextarea.value || "";
+
+                if (!themeId) {
+                    alert("Por favor, selecione um tema.");
+                    return;
+                }
+                if (start >= end) {
+                    alert("O tempo de início deve ser menor que o tempo de fim.");
+                    return;
+                }
+
+                try {
+                    await CapIAuAPI.addThemeSegmentManual(themeId, STATE.currentProjectId, video.id, start, end, "", excerpt);
+                    alert("Tema vinculado com sucesso!");
+                    excerptTextarea.value = "";
+                    this.loadInspectorThemes(video);
+                } catch(e) {
+                    alert("Erro ao vincular tema: " + e.message);
+                }
+            });
+        }
+
+        // AI trigger buttons
+        const btnASR = document.getElementById("btn-inspector-ai-transcribe");
+        if (btnASR) {
+            btnASR.addEventListener("click", async () => {
+                const video = STATE.activeVideo;
+                if (!video) return;
+                try {
+                    await CapIAuAPI.transcribeVideo(video.id);
+                    alert("Transcrição de áudio iniciada! Progresso na aba de tarefas.");
+                } catch (e) {
+                    alert("Erro ao iniciar transcrição: " + e.message);
+                }
+            });
+        }
+
+        const btnVision = document.getElementById("btn-inspector-ai-vision");
+        if (btnVision) {
+            btnVision.addEventListener("click", async () => {
+                const video = STATE.activeVideo;
+                if (!video) return;
+                try {
+                    await CapIAuAPI.analyzeVideoVision(video.id);
+                    alert("Análise de visão iniciada! Progresso na aba de tarefas.");
+                } catch (e) {
+                    alert("Erro ao iniciar análise visual: " + e.message);
+                }
+            });
+        }
+
+        const btnDetectFaces = document.getElementById("btn-inspector-ai-detect-faces");
+        if (btnDetectFaces) {
+            btnDetectFaces.addEventListener("click", async () => {
+                const video = STATE.activeVideo;
+                if (!video) return;
+                try {
+                    await CapIAuAPI.clusterFaces(STATE.currentProjectId);
+                    alert("Agrupamento de rostos do projeto iniciado!");
+                } catch (e) {
+                    alert("Erro ao rodar agrupamento de rostos: " + e.message);
+                }
+            });
+        }
+
+        // Keyboard navigation I, O, E inside inspector
+        document.addEventListener("keydown", (e) => {
+            if (!this.mediaInspectorActive) return;
+            const activeTag = document.activeElement.tagName.toLowerCase();
+            if (activeTag === "input" || activeTag === "textarea" || document.activeElement.isContentEditable) {
+                return;
+            }
+            const key = e.key.toLowerCase();
+            if (key === 'i') {
+                e.preventDefault();
+                this.markInspectorIn();
+            } else if (key === 'o') {
+                e.preventDefault();
+                this.markInspectorOut();
+            } else if (key === 'e') {
+                e.preventDefault();
+                if (STATE.activeVideo) this.appendInspectorToTimeline(STATE.activeVideo);
+            }
+        });
+
+        // Tab selection listeners
+        const tabs = document.querySelectorAll("#inspector-tabs .tab-btn");
+        tabs.forEach(btn => {
+            btn.addEventListener("click", () => {
+                tabs.forEach(t => t.classList.remove("active"));
+                btn.classList.add("active");
+                const target = btn.dataset.inspectorTab;
+                document.querySelectorAll(".inspector-tab-page").forEach(page => {
+                    page.style.display = page.id === target ? "flex" : "none";
+                });
+            });
+        });
+    }
+
+    toggleMediaInspector(video) {
+        if (!video) return;
+        this.initInspectorListeners();
+
+        if (this.mediaInspectorActive && STATE.activeVideo && STATE.activeVideo.id === video.id) {
+            this.closeMediaInspector();
+        } else {
+            this.openMediaInspector(video);
         }
     }
 
-    async openInterviewModal(video) {
-        const modal = document.getElementById("interview-modal");
-        if (!modal) return;
+    openMediaInspector(video) {
+        this.mediaInspectorActive = true;
         
-        modal.style.display = "flex";
+        const sidebarLeft = document.getElementById("sidebar-left");
+        const sidebarRight = document.getElementById("sidebar-right");
         
-        const titleEl = document.getElementById("interview-modal-title");
-        const fileInfoEl = document.getElementById("interview-modal-file-info");
-        const durInfoEl = document.getElementById("interview-modal-dur-info");
-        const summaryEl = document.getElementById("interview-modal-summary");
-        
-        const friendlyTitle = getFriendlyTitle(video);
-        if (titleEl) titleEl.textContent = friendlyTitle;
-        if (fileInfoEl) fileInfoEl.textContent = `Arquivo: ${video.filename}`;
-        if (durInfoEl) durInfoEl.textContent = `Duração: ${video.duration ? formatTimecode(video.duration) : "00:00:00:00"}`;
-        
-        if (summaryEl) {
-            summaryEl.textContent = video.summary || video.description || "Nenhum metadado de IA gerado para este clipe.";
+        // Salva dimensões anteriores do estado normal
+        this.preInspectorLeftWidth = sidebarLeft.style.width || "350px";
+        this.preInspectorLeftFlex = sidebarLeft.style.flex || "0 0 350px";
+        this.preInspectorRightCollapsed = sidebarRight ? sidebarRight.classList.contains("collapsed") : true;
+
+        // Salva a aba ativa da biblioteca antes de trocar
+        const activeTabBtn = document.querySelector(".sidebar-left .tab-btn.active");
+        this.preInspectorActiveTab = activeTabBtn ? activeTabBtn.dataset.tab : "tab-videos";
+
+        // Salva estado do source player (maximizado ou não)
+        const sourcePanel = document.getElementById("source-player-panel");
+        const programPanel = document.getElementById("program-player-panel");
+        this.preInspectorSourceMaximized = sourcePanel ? sourcePanel.classList.contains("maximized") : false;
+        this.preInspectorProgramMaximized = programPanel ? programPanel.classList.contains("maximized") : false;
+
+        // Recolhe a barra direita
+        if (sidebarRight && !sidebarRight.classList.contains("collapsed")) {
+            const toggleRight = document.getElementById("toggle-right");
+            if (toggleRight) toggleRight.click();
         }
-        
-        // Carrega o Vídeo no Player do Modal
-        const modalVideo = document.getElementById("interview-modal-video");
-        if (modalVideo) {
-            let videoSrc = video.filepath || "";
-            videoSrc = videoSrc.replace(/\\/g, "/");
-            const isRemote = videoSrc.startsWith("http") || videoSrc.startsWith("/proxies/") || videoSrc.startsWith("/");
-            
-            if (video.proxy_path) {
-                videoSrc = video.proxy_path.replace(/\\/g, "/");
-            } else if (!isRemote) {
-                videoSrc = `/originals/${video.filename}`;
+
+        // Maximiza o source player se o program estiver visível (não maximizado)
+        if (sourcePanel && !sourcePanel.classList.contains("maximized")) {
+            const btnExpandSource = document.getElementById("btn-expand-source");
+            if (btnExpandSource) btnExpandSource.click();
+        }
+        // Se o program estiver maximizado, troca para source maximizado
+        if (programPanel && programPanel.classList.contains("maximized")) {
+            const btnExpandProgram = document.getElementById("btn-expand-program");
+            if (btnExpandProgram) btnExpandProgram.click();
+            const btnExpandSource = document.getElementById("btn-expand-source");
+            if (btnExpandSource && sourcePanel && !sourcePanel.classList.contains("maximized")) {
+                btnExpandSource.click();
             }
-            
-            console.log("Loading video in modal: filename =", video.filename, "proxy_path =", video.proxy_path, "resolved src =", videoSrc);
-            
-            modalVideo.src = videoSrc;
-            modalVideo.muted = false;
-            modalVideo.volume = 1.0;
-            modalVideo.load();
+        }
+
+        // Recupera largura do inspetor salva ou usa 650px como padrão
+        let inspectorWidth = 650;
+        const savedInspectorWidth = localStorage.getItem("layout-dim-splitter-sidebar-left-inspector");
+        if (savedInspectorWidth) {
+            const parsed = parseInt(savedInspectorWidth);
+            if (!isNaN(parsed)) inspectorWidth = parsed;
+        }
+
+        // Expande a esquerda
+        sidebarLeft.style.width = `${inspectorWidth}px`;
+        sidebarLeft.style.flex = `0 0 ${inspectorWidth}px`;
+
+        // Alterna visualizações
+        const mainView = document.getElementById("library-main-view");
+        const inspectorView = document.getElementById("library-inspector-view");
+        if (mainView) mainView.style.display = "none";
+        if (inspectorView) inspectorView.style.display = "flex";
+
+        window.dispatchEvent(new Event("resize"));
+
+        // Carrega o Source Player com a mídia
+        STATE.activeVideo = video;
+        window.activeFocusedPlayer = "source";
+
+        this.loadMediaInspector(video);
+    }
+
+    closeMediaInspector() {
+        this.mediaInspectorActive = false;
+
+        const sidebarLeft = document.getElementById("sidebar-left");
+        const sidebarRight = document.getElementById("sidebar-right");
+
+        // Restaura largura anterior da esquerda
+        sidebarLeft.style.width = this.preInspectorLeftWidth || "350px";
+        sidebarLeft.style.flex = this.preInspectorLeftFlex || "0 0 350px";
+
+        // Restaura barra direita se necessário
+        if (sidebarRight && !this.preInspectorRightCollapsed) {
+            const reopenRight = document.getElementById("reopen-right");
+            if (reopenRight && reopenRight.style.display !== "none") {
+                reopenRight.click();
+            }
+        }
+
+        // Restaura estado dos players
+        const sourcePanel = document.getElementById("source-player-panel");
+        const programPanel = document.getElementById("program-player-panel");
+
+        // Se source estava maximizado pelo inspetor, desfaz
+        if (sourcePanel && sourcePanel.classList.contains("maximized") && !this.preInspectorSourceMaximized) {
+            const btnExpandSource = document.getElementById("btn-expand-source");
+            if (btnExpandSource) btnExpandSource.click();
+        }
+        // Se program estava maximizado antes, restaura
+        if (this.preInspectorProgramMaximized && programPanel && !programPanel.classList.contains("maximized")) {
+            const btnExpandProgram = document.getElementById("btn-expand-program");
+            if (btnExpandProgram) btnExpandProgram.click();
+        }
+
+        // Alterna visualizações de volta
+        const mainView = document.getElementById("library-main-view");
+        const inspectorView = document.getElementById("library-inspector-view");
+        if (mainView) mainView.style.display = "flex";
+        if (inspectorView) inspectorView.style.display = "none";
+
+        // Restaura a aba ativa que o usuário tinha antes de abrir o inspetor
+        if (this.preInspectorActiveTab) {
+            const tabBtn = document.querySelector(`.sidebar-left .tab-btn[data-tab="${this.preInspectorActiveTab}"]`);
+            if (tabBtn) tabBtn.click();
+        }
+
+        // Faz scroll até o card do vídeo ativo na biblioteca
+        if (STATE.activeVideo) {
+            requestAnimationFrame(() => {
+                const activeCard = document.querySelector(`.media-card.tree-file-item[data-video-id="${STATE.activeVideo.id}"]`);
+                if (activeCard) {
+                    activeCard.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                }
+            });
+        }
+
+        window.dispatchEvent(new Event("resize"));
+    }
+
+    markInspectorIn() {
+        const sourceVideo = document.getElementById("source-video");
+        if (!sourceVideo) return;
+        this.inspectorMarkerIn = sourceVideo.currentTime;
+        this.updateInspectorMarkersUI();
+
+        // Atualiza campos de tempo de tema se existirem
+        const linkStart = document.getElementById("num-inspector-link-start");
+        if (linkStart) linkStart.value = this.inspectorMarkerIn.toFixed(1);
+    }
+
+    markInspectorOut() {
+        const sourceVideo = document.getElementById("source-video");
+        if (!sourceVideo) return;
+        this.inspectorMarkerOut = sourceVideo.currentTime;
+        this.updateInspectorMarkersUI();
+
+        // Atualiza campos de tempo de tema se existirem
+        const linkEnd = document.getElementById("num-inspector-link-end");
+        if (linkEnd) linkEnd.value = this.inspectorMarkerOut.toFixed(1);
+    }
+
+    updateInspectorMarkersUI() {
+        const lblIn = document.getElementById("lbl-inspector-in");
+        const lblOut = document.getElementById("lbl-inspector-out");
+        if (lblIn) {
+            lblIn.textContent = this.inspectorMarkerIn !== undefined && this.inspectorMarkerIn !== null 
+                ? formatTimecode(this.inspectorMarkerIn).substring(3, 11) 
+                : "00:00:00";
+        }
+        if (lblOut) {
+            lblOut.textContent = this.inspectorMarkerOut !== undefined && this.inspectorMarkerOut !== null 
+                ? formatTimecode(this.inspectorMarkerOut).substring(3, 11) 
+                : "00:00:00";
+        }
+    }
+
+    appendInspectorToTimeline(video) {
+        if (!video) return;
+        const sourceVideo = document.getElementById("source-video");
+        const inTime = this.inspectorMarkerIn !== undefined && this.inspectorMarkerIn !== null ? this.inspectorMarkerIn : 0.0;
+        const outTime = this.inspectorMarkerOut !== undefined && this.inspectorMarkerOut !== null ? this.inspectorMarkerOut : (sourceVideo ? sourceVideo.duration : 0.0);
+        
+        if (inTime >= outTime) {
+            alert("Ponto In deve ser menor que o ponto Out.");
+            return;
         }
         
-        // Inicializa Marcadores do Modal
-        this.modalMarkerIn = null;
-        this.modalMarkerOut = null;
-        this.updateModalMarkersUI();
+        if (window.TIMELINE_STATE) {
+            window.TIMELINE_STATE.addCut(video.id, inTime, outTime, null);
+            alert("Sub-clipe adicionado à timeline!");
+        } else {
+            console.error("TIMELINE_STATE não encontrado.");
+        }
         
-        this.interviewDialogueList = [];
-        this.switchInterviewTab("tab-interview-index");
+        this.inspectorMarkerIn = null;
+        this.inspectorMarkerOut = null;
+        this.updateInspectorMarkersUI();
+    }
+
+    async setInspectorThumbnail(video) {
+        if (!video) return;
+        const sourceVideo = document.getElementById("source-video");
+        if (!sourceVideo) return;
         
-        const chaptersList = document.getElementById("interview-chapters-list");
-        const themesList = document.getElementById("interview-themes-list");
-        const wordsList = document.getElementById("interview-transcript-words");
+        const timestamp = sourceVideo.currentTime;
+        try {
+            const response = await fetch(`/api/video/${video.id}/thumbnail?timestamp=${timestamp}`, {
+                method: "POST"
+            });
+            if (response.ok) {
+                alert("Miniatura física atualizada com sucesso!");
+                STATE.emit("videosUpdated", STATE.allVideos);
+            } else {
+                const err = await response.json();
+                alert("Erro ao definir miniatura: " + (err.detail || "Desconhecido"));
+            }
+        } catch (e) {
+            alert("Erro de rede ao salvar miniatura.");
+        }
+    }
+
+    copyInspectorNotes(video) {
+        if (!video) return;
+        
+        let markdown = `# Notas de Decupagem: ${video.filename}\n\n`;
+        markdown += `**Título**: ${getFriendlyTitle(video)}\n`;
+        markdown += `**Duração**: ${video.duration ? formatTimecode(video.duration) : "00:00:00"}\n\n`;
+        
+        markdown += `## Resumo Executivo\n`;
+        markdown += `${video.summary || video.description || "Nenhum resumo disponível."}\n\n`;
+        
+        if (this.inspectorDialogueList && this.inspectorDialogueList.length > 0) {
+            markdown += `## Índice de Tempos e Falas\n`;
+            let currentSpeaker = null;
+            let lastChapterTime = -100;
+            this.inspectorDialogueList.forEach(d => {
+                const timeDiff = d.start_time - lastChapterTime;
+                if (d.speaker_id !== currentSpeaker || timeDiff > 40) {
+                    currentSpeaker = d.speaker_id;
+                    lastChapterTime = d.start_time;
+                    const tc = formatTimecode(d.start_time).substring(3, 11);
+                    markdown += `* **[${tc}]** *${d.speaker_id}*: "${d.text}"\n`;
+                }
+            });
+        }
+        
+        navigator.clipboard.writeText(markdown)
+            .then(() => alert("Notas de decupagem copiadas para a área de transferência!"))
+            .catch(err => alert("Erro ao copiar notas: " + err));
+    }
+
+    async loadMediaInspector(video) {
+        const titleEl = document.getElementById("inspector-media-title");
+        const statusBadge = document.getElementById("inspector-media-status-badge");
+        const summaryEl = document.getElementById("inspector-summary");
+        
+        if (titleEl) titleEl.textContent = getFriendlyTitle(video);
+        if (statusBadge) {
+            statusBadge.textContent = video.status || "Pendente";
+            statusBadge.style.color = video.status === "analyzed" ? "var(--color-emerald)" : "var(--text-secondary)";
+        }
+        if (summaryEl) {
+            summaryEl.textContent = video.summary || video.description || "Nenhum resumo ou metadado gerado para esta mídia.";
+        }
+
+        this.inspectorMarkerIn = null;
+        this.inspectorMarkerOut = null;
+        this.updateInspectorMarkersUI();
+
+        // Limpa campos de temas do form
+        const linkStart = document.getElementById("num-inspector-link-start");
+        const linkEnd = document.getElementById("num-inspector-link-end");
+        if (linkStart) linkStart.value = "0";
+        if (linkEnd) linkEnd.value = video.duration ? video.duration.toFixed(1) : "0";
+
+        this.inspectorDialogueList = [];
+        this.loadInspectorDialogue(video);
+        this.loadInspectorThemes(video);
+        this.loadInspectorFaces(video);
+    }
+
+    async loadInspectorDialogue(video) {
+        const chaptersList = document.getElementById("inspector-chapters-list");
+        const editorContainer = document.getElementById("inspector-transcript-editor");
+        
         if (chaptersList) chaptersList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando índice...</div>`;
-        if (themesList) themesList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando temas...</div>`;
-        if (wordsList) wordsList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando transcrição...</div>`;
-        
+        if (editorContainer) editorContainer.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando diálogos...</div>`;
+
         try {
             const data = await CapIAuAPI.fetchTranscript(video.id);
             const dialogues = data.dialogues || [];
-            this.interviewDialogueList = dialogues;
-            
+            this.inspectorDialogueList = dialogues;
+
+            // Render Índice
             if (chaptersList) {
                 chaptersList.innerHTML = "";
                 if (dialogues.length === 0) {
@@ -1350,11 +1641,11 @@ export class LibraryManager {
                             item.innerHTML = `
                                 <span class="timeline-chapter-time" data-time="${d.start_time}">${timecode}</span>
                                 <div style="font-weight: 700; font-size: 11px; color: var(--color-cyan); margin-bottom: 2px;">${d.speaker_id}</div>
-                                <div class="timeline-chapter-text">"${d.text.substring(0, 100)}${d.text.length > 100 ? '...' : ''}"</div>
+                                <div class="timeline-chapter-text">"${d.text.substring(0, 80)}${d.text.length > 80 ? '...' : ''}"</div>
                             `;
                             
                             item.querySelector(".timeline-chapter-time").addEventListener("click", () => {
-                                this.seekModalVideo(d.start_time);
+                                window.player.sourcePlayer.seek(d.start_time);
                             });
                             
                             chaptersList.appendChild(item);
@@ -1362,16 +1653,158 @@ export class LibraryManager {
                     });
                 }
             }
-            
-            this.renderInterviewTranscript(dialogues, data.words || []);
-            
-        } catch(err) {
-            console.warn("Sem transcrição para este vídeo:", err);
-            if (chaptersList) chaptersList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Material não transcrito ou B-roll de bastidores.</div>`;
-            if (wordsList) wordsList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Mídia de B-roll sem áudio transcrito.</div>`;
-            
+
+            // Render Editor de Transcrição
+            if (editorContainer) {
+                editorContainer.innerHTML = "";
+                if (dialogues.length === 0) {
+                    editorContainer.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Sem falas disponíveis para edição.</div>`;
+                } else {
+                    // Carrega todos os falantes conhecidos do projeto para o dropdown
+                    const speakersList = await CapIAuAPI.fetchProjectSpeakers(STATE.currentProjectId).catch(() => []);
+                    
+                    dialogues.forEach((d, index) => {
+                        const block = document.createElement("div");
+                        block.className = "inspector-dialogue-block";
+                        
+                        const timecode = formatTimecode(d.start_time).substring(3, 11);
+                        
+                        // Dropdown de falantes
+                        let optionsHtml = `<option value="${d.speaker_id}" selected>${d.speaker_id}</option>`;
+                        speakersList.forEach(s => {
+                            if (s !== d.speaker_id) {
+                                optionsHtml += `<option value="${s}">${s}</option>`;
+                            }
+                        });
+                        optionsHtml += `<option value="_new_">+ Criar Novo Falante...</option>`;
+
+                        block.innerHTML = `
+                            <div class="inspector-dialogue-header">
+                                <div class="inspector-dialogue-speaker">
+                                    <i class="fa-solid fa-user" style="color:var(--color-cyan); font-size: 9px;"></i>
+                                    <select class="nle-select sel-dialogue-speaker" style="padding: 2px 6px; font-size: 10px; width: 120px;">
+                                        ${optionsHtml}
+                                    </select>
+                                    <input type="text" class="input-new-speaker" placeholder="Nome do falante..." style="display:none; width:100px; padding: 2px 4px; font-size: 10px;">
+                                </div>
+                                <span class="inspector-dialogue-time" data-time="${d.start_time}">${timecode}</span>
+                            </div>
+                            <textarea class="inspector-dialogue-text-area txt-dialogue-text">${d.text}</textarea>
+                            <div class="inspector-dialogue-actions">
+                                <button class="btn-flat-action cyan btn-dialogue-split" style="font-size: 9px;" title="Dividir fala neste ponto"><i class="fa-solid fa-scissors"></i> Dividir</button>
+                                <button class="btn-primary btn-dialogue-save" style="font-size: 9px; padding: 2px 8px; border-radius: 4px; border:none; background:rgba(6,182,212,0.15); color:var(--color-cyan); font-weight:bold; cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                            </div>
+                        `;
+
+                        // Lógica de Novo Falante
+                        const speakerSelect = block.querySelector(".sel-dialogue-speaker");
+                        const newSpeakerInput = block.querySelector(".input-new-speaker");
+                        speakerSelect.addEventListener("change", () => {
+                            if (speakerSelect.value === "_new_") {
+                                speakerSelect.style.display = "none";
+                                newSpeakerInput.style.display = "block";
+                                newSpeakerInput.focus();
+                            }
+                        });
+                        newSpeakerInput.addEventListener("blur", () => {
+                            if (!newSpeakerInput.value.trim()) {
+                                speakerSelect.style.display = "block";
+                                speakerSelect.value = d.speaker_id;
+                                newSpeakerInput.style.display = "none";
+                            }
+                        });
+
+                        // Sincronização de clique do tempo
+                        block.querySelector(".inspector-dialogue-time").addEventListener("click", () => {
+                            window.player.sourcePlayer.seek(d.start_time);
+                        });
+
+                        // Botão de Dividir Fala (Split)
+                        block.querySelector(".btn-dialogue-split").addEventListener("click", async () => {
+                            const sourceVideo = document.getElementById("source-video");
+                            const currentTime = sourceVideo ? sourceVideo.currentTime : d.start_time;
+                            if (currentTime < d.start_time || currentTime > d.end_time) {
+                                alert("Navegue o Source Player para a posição de tempo contida dentro desta fala para dividi-la!");
+                                return;
+                            }
+                            const newSpk = prompt("Digite o nome/ID do novo falante a partir deste ponto:", d.speaker_id + "_2");
+                            if (newSpk && newSpk.trim()) {
+                                try {
+                                    await CapIAuAPI.splitTranscript(video.id, currentTime, newSpk.trim());
+                                    alert("Fala dividida com sucesso!");
+                                    this.loadInspectorDialogue(video);
+                                } catch(e) {
+                                    alert("Erro ao dividir fala: " + e.message);
+                                }
+                            }
+                        });
+
+                        // Botão de Salvar
+                        block.querySelector(".btn-dialogue-save").addEventListener("click", async () => {
+                            let selectedSpeaker = speakerSelect.style.display === "none" ? newSpeakerInput.value.trim() : speakerSelect.value;
+                            if (!selectedSpeaker) {
+                                alert("O falante não pode ser vazio.");
+                                return;
+                            }
+                            const txtVal = block.querySelector(".txt-dialogue-text").value.trim();
+                            try {
+                                // 1. Primeiro renomeia o falante se necessário
+                                if (selectedSpeaker !== d.speaker_id) {
+                                    await CapIAuAPI.renameSpeaker(video.id, d.speaker_id, selectedSpeaker, false, d.start_time, d.end_time);
+                                }
+                                // 2. Edita o texto do diálogo
+                                await CapIAuAPI.editDialogueSegment(video.id, d.start_time, d.end_time, txtVal, selectedSpeaker);
+                                alert("Fala atualizada com sucesso!");
+                                this.loadInspectorDialogue(video);
+                            } catch(e) {
+                                alert("Erro ao salvar fala: " + e.message);
+                            }
+                        });
+
+                        editorContainer.appendChild(block);
+                    });
+
+                    // Input de filtro de falas
+                    const searchInput = document.getElementById("inspector-transcript-search");
+                    const searchCount = document.getElementById("inspector-search-count");
+                    if (searchInput) {
+                        searchInput.value = "";
+                        if (searchCount) searchCount.textContent = "";
+
+                        const newSearch = searchInput.cloneNode(true);
+                        searchInput.parentNode.replaceChild(newSearch, searchInput);
+
+                        newSearch.addEventListener("input", () => {
+                            const query = newSearch.value.toLowerCase().trim();
+                            const blocks = editorContainer.querySelectorAll(".inspector-dialogue-block");
+                            let matchesCount = 0;
+                            
+                            blocks.forEach(b => {
+                                const text = b.querySelector(".txt-dialogue-text").value.toLowerCase();
+                                const speaker = b.querySelector(".sel-dialogue-speaker").value.toLowerCase();
+                                const match = !query || text.includes(query) || speaker.includes(query);
+                                b.style.display = match ? "flex" : "none";
+                                if (match && query) {
+                                    matchesCount++;
+                                }
+                            });
+                            
+                            const countEl = document.getElementById("inspector-search-count");
+                            if (countEl) {
+                                countEl.textContent = query ? `${matchesCount} encontrados` : "";
+                            }
+                        });
+                    }
+                }
+            }
+
+        } catch(e) {
+            console.warn("Sem transcrição disponível:", e);
+            if (chaptersList) chaptersList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Mídia de B-roll sem índice. Carregando frames de visão...</div>`;
+            if (editorContainer) editorContainer.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Falas não disponíveis.</div>`;
+
+            // Se for broll, carrega descrições de visão
             if (video.video_type === "broll" || video.status === "analyzed") {
-                if (chaptersList) chaptersList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando frames de visão...</div>`;
                 try {
                     const data = await CapIAuAPI.fetchVideoVision(video.id, STATE.currentProjectId);
                     const frames = data.frames || [];
@@ -1389,280 +1822,149 @@ export class LibraryManager {
                                     <div class="timeline-chapter-text">${f.description || "Descrição de cena"}</div>
                                 `;
                                 item.querySelector(".timeline-chapter-time").addEventListener("click", () => {
-                                    this.seekModalVideo(f.timestamp);
+                                    window.player.sourcePlayer.seek(f.timestamp);
                                 });
                                 chaptersList.appendChild(item);
                             });
                         }
                     }
-                } catch(e) {
+                } catch(err) {
                     if (chaptersList) chaptersList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Sem frames de visão processados.</div>`;
                 }
             }
         }
-        
+    }
+
+    async loadInspectorThemes(video) {
+        const themesList = document.getElementById("inspector-themes-list");
+        const themeSelect = document.getElementById("sel-inspector-link-theme");
+
+        if (themesList) themesList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando temas...</div>`;
+        if (themeSelect) themeSelect.innerHTML = `<option value="">Carregando...</option>`;
+
         try {
             const themesData = await CapIAuAPI.fetchThemes(STATE.currentProjectId);
             const themes = themesData.themes || [];
+            
+            // Popula dropdown select
+            if (themeSelect) {
+                themeSelect.innerHTML = `<option value="">-- Selecione o Tema Narrativo --</option>`;
+                themes.forEach(t => {
+                    const opt = document.createElement("option");
+                    opt.value = t.id;
+                    opt.textContent = t.title;
+                    themeSelect.appendChild(opt);
+                });
+            }
+
             if (themesList) {
                 themesList.innerHTML = "";
                 let hasThemes = false;
-                
+
                 for (const theme of themes) {
                     const segsData = await CapIAuAPI.fetchThemeSegments(theme.id);
                     const segments = segsData.segments || [];
                     const matchingSegs = segments.filter(s => s.video_id === video.id);
-                    
+
                     if (matchingSegs.length > 0) {
                         hasThemes = true;
                         
-                        const card = document.createElement("div");
-                        card.className = "interview-theme-card";
-                        
-                        let segsHtml = "";
-                        matchingSegs.forEach(s => {
-                            const timecode = formatTimecode(s.start_time || 0).substring(3, 11);
-                            segsHtml += `
-                                <div style="margin-top: 8px; padding-left: 8px; border-left: 2px solid var(--color-cyan); font-size: 11px;">
-                                    <span class="timeline-chapter-time" style="padding: 1px 4px; font-size: 9px;" data-time="${s.start_time}">${timecode}</span>
-                                    <span style="color: var(--text-secondary);">"${s.text_excerpt || ''}"</span>
-                                </div>
+                        matchingSegs.forEach(seg => {
+                            const card = document.createElement("div");
+                            card.className = "inspector-theme-card";
+                            
+                            const timecodeStart = formatTimecode(seg.start_time || 0).substring(3, 11);
+                            const timecodeEnd = formatTimecode(seg.end_time || 0).substring(3, 11);
+                            
+                            card.innerHTML = `
+                                <div class="inspector-theme-title">${theme.title}</div>
+                                <div class="inspector-theme-desc" style="font-size: 9px; color: var(--text-muted);">Intervalo: ${timecodeStart} - ${timecodeEnd}</div>
+                                ${seg.text_excerpt ? `<div class="inspector-theme-excerpt">"${seg.text_excerpt}"</div>` : ''}
+                                <button class="inspector-theme-delete-btn" data-segment-id="${seg.id}" title="Desvincular tema"><i class="fa-solid fa-trash-can"></i></button>
                             `;
+
+                            // Delete segment link
+                            card.querySelector(".inspector-theme-delete-btn").addEventListener("click", async (e) => {
+                                e.stopPropagation();
+                                if (confirm(`Deseja desvincular o tema "${theme.title}" deste segmento?`)) {
+                                    try {
+                                        await CapIAuAPI.deleteThemeSegment(seg.id);
+                                        alert("Tema desvinculado com sucesso!");
+                                        this.loadInspectorThemes(video);
+                                    } catch(err) {
+                                        alert("Erro ao desvincular tema: " + err.message);
+                                    }
+                                }
+                            });
+
+                            themesList.appendChild(card);
                         });
+                    }
+                }
+
+                if (!hasThemes) {
+                    themesList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Nenhum tema narrativo vinculado a este vídeo. Utilize o formulário acima para vincular.</div>`;
+                }
+            }
+
+        } catch (e) {
+            console.warn("Erro ao carregar temas:", e);
+            if (themesList) themesList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Falha ao carregar temas narrativos.</div>`;
+        }
+    }
+
+    async loadInspectorFaces(video) {
+        const grid = document.getElementById("inspector-faces-grid");
+        if (grid) grid.innerHTML = `<div style="font-size:11px; color:var(--text-muted); grid-column: 1/-1;">Carregando rostos...</div>`;
+
+        try {
+            const faces = await CapIAuAPI.fetchVideoFaces(video.id).catch(() => []);
+            if (grid) {
+                grid.innerHTML = "";
+                if (faces.length === 0) {
+                    grid.innerHTML = `<div style="font-size:11px; color:var(--text-muted); grid-column: 1/-1;">Nenhum rosto detectado neste clipe de vídeo.</div>`;
+                } else {
+                    faces.forEach(face => {
+                        const card = document.createElement("div");
+                        card.className = "inspector-face-card";
+                        
+                        const timecode = formatTimecode(face.timestamp || 0).substring(3, 11);
                         
                         card.innerHTML = `
-                            <div class="interview-theme-title">${theme.title}</div>
-                            <div class="interview-theme-desc">${theme.description || ''}</div>
-                            ${segsHtml}
+                            <img src="/api/faces/face/${face.id}/thumbnail" class="inspector-face-thumb" onerror="this.src='https://placehold.co/60x60/11131a/cyan?text=Face'">
+                            <span class="inspector-face-time" title="Buscar no Source Player">${timecode}</span>
+                            <input type="text" class="inspector-face-input" value="${face.name || 'Pessoa Desconhecida'}" placeholder="Nome do rosto...">
+                            <button class="btn-primary btn-face-save" style="font-size: 8px; padding: 2px 6px; border-radius: 4px; border:none; background:rgba(6,182,212,0.1); color:var(--color-cyan); font-weight:bold; cursor:pointer; width: 100%; margin-top:2px;">Salvar Rótulo</button>
                         `;
-                        
-                        card.querySelectorAll(".timeline-chapter-time").forEach(btn => {
-                            btn.addEventListener("click", () => {
-                                const time = parseFloat(btn.dataset.time);
-                                this.seekModalVideo(time);
-                            });
+
+                        card.querySelector(".inspector-face-time").addEventListener("click", () => {
+                            window.player.sourcePlayer.seek(face.timestamp);
                         });
-                        
-                        themesList.appendChild(card);
-                    }
-                }
-                
-                if (!hasThemes) {
-                    themesList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Nenhum tema narrativo mapeado para este clipe.</div>`;
+
+                        const input = card.querySelector(".inspector-face-input");
+                        const btnSave = card.querySelector(".btn-face-save");
+
+                        btnSave.addEventListener("click", async () => {
+                            const name = input.value.trim();
+                            if (!name) return;
+                            try {
+                                await CapIAuAPI.labelFace(face.id, name);
+                                alert("Identidade do rosto confirmada!");
+                                this.loadInspectorFaces(video);
+                                // Dispara evento global
+                                STATE.emit("videoFacesUpdated", video.id);
+                            } catch(err) {
+                                alert("Erro ao rotular rosto: " + err.message);
+                            }
+                        });
+
+                        grid.appendChild(card);
+                    });
                 }
             }
-        } catch(err) {
-            console.warn("Erro ao carregar temas:", err);
-            if (themesList) themesList.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Erro ao processar temas narrativos.</div>`;
-        }
-    }
-
-    renderInterviewTranscript(dialogues, words) {
-        const container = document.getElementById("interview-transcript-words");
-        if (!container) return;
-        
-        container.innerHTML = "";
-        if (dialogues.length === 0) {
-            container.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Sem transcrição disponível.</div>`;
-            return;
-        }
-        
-        dialogues.forEach((d, idx) => {
-            const block = document.createElement("div");
-            block.className = "interview-speech-block";
-            
-            const timecode = formatTimecode(d.start_time).substring(3, 11);
-            
-            let blockWords = [];
-            if (words && words.length > 0) {
-                blockWords = words.filter(w => w.start_time >= d.start_time && w.start_time <= d.end_time);
-            }
-            
-            let speechContent = "";
-            if (blockWords.length > 0) {
-                speechContent = blockWords.map(w => {
-                    return `<span class="interview-speech-word" data-start="${w.start_time}">${w.word}</span>`;
-                }).join(" ");
-            } else {
-                speechContent = d.text.split(" ").map(w => {
-                    return `<span class="interview-speech-word" data-start="${d.start_time}">${w}</span>`;
-                }).join(" ");
-            }
-            
-            block.innerHTML = `
-                <div class="interview-speech-header">
-                    <span style="color: var(--color-cyan); font-weight: 700;">${d.speaker_id}</span>
-                    <span class="timeline-chapter-time" style="padding: 1px 4px; font-size: 9px;" data-time="${d.start_time}">${timecode}</span>
-                </div>
-                <div class="interview-speech-text">${speechContent}</div>
-            `;
-            
-            block.querySelectorAll(".interview-speech-word, .timeline-chapter-time").forEach(el => {
-                el.addEventListener("click", () => {
-                    const time = parseFloat(el.dataset.start || el.dataset.time);
-                    this.seekModalVideo(time);
-                });
-            });
-            
-            container.appendChild(block);
-        });
-
-        // Configuração de busca no transcrito
-        const transcriptSearch = document.getElementById("interview-transcript-search");
-        const searchCount = document.getElementById("interview-search-count");
-        if (transcriptSearch) {
-            // Remove listeners antigos re-criando o elemento ou limpando o input
-            transcriptSearch.value = "";
-            if (searchCount) searchCount.textContent = "";
-            
-            // Clone do input para limpar event listeners anteriores
-            const newSearch = transcriptSearch.cloneNode(true);
-            transcriptSearch.parentNode.replaceChild(newSearch, transcriptSearch);
-            
-            newSearch.addEventListener("input", () => {
-                const query = newSearch.value.toLowerCase().trim();
-                const blocks = container.querySelectorAll(".interview-speech-block");
-                let matchesCount = 0;
-                
-                blocks.forEach(b => {
-                    const text = b.querySelector(".interview-speech-text").textContent.toLowerCase();
-                    const match = !query || text.includes(query);
-                    b.style.display = match ? "flex" : "none";
-                    if (match && query) {
-                        matchesCount++;
-                    }
-                });
-                
-                const newSearchCount = document.getElementById("interview-search-count");
-                if (newSearchCount) {
-                    newSearchCount.textContent = query ? `${matchesCount} encontrados` : "";
-                }
-            });
-        }
-    }
-
-    switchInterviewTab(tabId) {
-        const header = document.getElementById("interview-tabs-header");
-        if (header) {
-            header.querySelectorAll(".tab-btn").forEach(btn => {
-                if (btn.dataset.interviewTab === tabId) {
-                    btn.classList.add("active");
-                } else {
-                    btn.classList.remove("active");
-                }
-            });
-        }
-        
-        const modal = document.getElementById("interview-modal");
-        if (modal) {
-            modal.querySelectorAll(".interview-tab-content").forEach(content => {
-                if (content.id === tabId) {
-                    content.style.display = "flex";
-                } else {
-                    content.style.display = "none";
-                }
-            });
-        }
-    }
-
-    copyInterviewNotes(video) {
-        if (!video) return;
-        
-        let markdown = `# Notas de Decupagem: ${video.filename}\n\n`;
-        markdown += `**Título**: ${getFriendlyTitle(video)}\n`;
-        markdown += `**Duração**: ${video.duration ? formatTimecode(video.duration) : "00:00:00"}\n\n`;
-        
-        markdown += `## Resumo Executivo\n`;
-        markdown += `${video.summary || video.description || "Nenhum resumo disponível."}\n\n`;
-        
-        if (this.interviewDialogueList && this.interviewDialogueList.length > 0) {
-            markdown += `## Índice de Tempos e Falas\n`;
-            let currentSpeaker = null;
-            let lastChapterTime = -100;
-            this.interviewDialogueList.forEach(d => {
-                const timeDiff = d.start_time - lastChapterTime;
-                if (d.speaker_id !== currentSpeaker || timeDiff > 40) {
-                    currentSpeaker = d.speaker_id;
-                    lastChapterTime = d.start_time;
-                    const tc = formatTimecode(d.start_time).substring(3, 11);
-                    markdown += `* **[${tc}]** *${d.speaker_id}*: "${d.text}"\n`;
-                }
-            });
-        }
-        
-        navigator.clipboard.writeText(markdown)
-            .then(() => alert("Notas de decupagem copiadas em Markdown para a área de transferência!"))
-            .catch(err => alert("Erro ao copiar notas: " + err));
-    }
-
-    markModalIn() {
-        const modalVideo = document.getElementById("interview-modal-video");
-        if (!modalVideo) return;
-        this.modalMarkerIn = modalVideo.currentTime;
-        this.updateModalMarkersUI();
-    }
-
-    markModalOut() {
-        const modalVideo = document.getElementById("interview-modal-video");
-        if (!modalVideo) return;
-        this.modalMarkerOut = modalVideo.currentTime;
-        this.updateModalMarkersUI();
-    }
-
-    updateModalMarkersUI() {
-        const lblIn = document.getElementById("lbl-interview-modal-in");
-        const lblOut = document.getElementById("lbl-interview-modal-out");
-        if (lblIn) {
-            lblIn.textContent = this.modalMarkerIn !== null ? formatTimecode(this.modalMarkerIn).substring(3, 11) : "00:00:00";
-        }
-        if (lblOut) {
-            lblOut.textContent = this.modalMarkerOut !== null ? formatTimecode(this.modalMarkerOut).substring(3, 11) : "00:00:00";
-        }
-    }
-
-    appendModalToTimeline(video) {
-        if (!video) return;
-        const modalVideo = document.getElementById("interview-modal-video");
-        const inTime = this.modalMarkerIn !== null ? this.modalMarkerIn : 0.0;
-        const outTime = this.modalMarkerOut !== null ? this.modalMarkerOut : (modalVideo ? modalVideo.duration : 0.0);
-        
-        if (inTime >= outTime) {
-            alert("Ponto In deve ser menor que o ponto Out.");
-            return;
-        }
-        
-        if (window.TIMELINE_STATE) {
-            window.TIMELINE_STATE.addCut(video.id, inTime, outTime, null);
-            alert("Sub-clipe adicionado à timeline!");
-        } else {
-            console.error("TIMELINE_STATE não encontrado.");
-        }
-        
-        this.modalMarkerIn = null;
-        this.modalMarkerOut = null;
-        this.updateModalMarkersUI();
-    }
-
-    async setModalThumbnail(video) {
-        if (!video) return;
-        const modalVideo = document.getElementById("interview-modal-video");
-        if (!modalVideo) return;
-        
-        const timestamp = modalVideo.currentTime;
-        try {
-            const response = await fetch(`/api/video/${video.id}/thumbnail?timestamp=${timestamp}`, {
-                method: "POST"
-            });
-            if (response.ok) {
-                alert("Miniatura física atualizada com o frame atual do modal!");
-                // Força a atualização da lista na biblioteca
-                STATE.emit("videosUpdated", STATE.allVideos);
-            } else {
-                const err = await response.json();
-                alert("Erro ao definir miniatura: " + (err.detail || "Desconhecido"));
-            }
-        } catch (e) {
-            alert("Erro de rede ao salvar miniatura.");
+        } catch(e) {
+            console.warn("Erro ao carregar faces do inspetor:", e);
+            if (grid) grid.innerHTML = `<div style="font-size:11px; color:var(--text-muted); grid-column: 1/-1;">Erro ao processar rostos detectados.</div>`;
         }
     }
 }

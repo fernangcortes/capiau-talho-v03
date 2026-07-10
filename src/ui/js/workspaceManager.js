@@ -65,6 +65,18 @@ export class WorkspaceManager {
 
         // Atalhos de maximização local de players (Source / Program)
         const btnExpandSource = document.getElementById("btn-expand-source");
+        const btnSwapToProgram = document.getElementById("btn-swap-to-program");
+        const btnSwapToSource = document.getElementById("btn-swap-to-source");
+
+        const updateSwapButtonsVisibility = () => {
+            const src = document.getElementById("source-player-panel");
+            const prg = document.getElementById("program-player-panel");
+            const srcMax = src && src.classList.contains("maximized");
+            const prgMax = prg && prg.classList.contains("maximized");
+            if (btnSwapToProgram) btnSwapToProgram.style.display = srcMax ? "" : "none";
+            if (btnSwapToSource) btnSwapToSource.style.display = prgMax ? "" : "none";
+        };
+
         if (btnExpandSource) {
             btnExpandSource.addEventListener("click", (e) => {
                 e.stopPropagation();
@@ -73,6 +85,7 @@ export class WorkspaceManager {
                 btnExpandSource.innerHTML = panel.classList.contains("maximized") 
                     ? `<i class="fa-solid fa-compress"></i>` 
                     : `<i class="fa-solid fa-expand"></i>`;
+                updateSwapButtonsVisibility();
             });
         }
 
@@ -85,8 +98,97 @@ export class WorkspaceManager {
                 btnExpandProgram.innerHTML = panel.classList.contains("maximized") 
                     ? `<i class="fa-solid fa-compress"></i>` 
                     : `<i class="fa-solid fa-expand"></i>`;
+                updateSwapButtonsVisibility();
             });
         }
+
+        // Botões de troca de player maximizado (swap)
+        const swapToProgram = () => {
+            const src = document.getElementById("source-player-panel");
+            const prg = document.getElementById("program-player-panel");
+            if (src && src.classList.contains("maximized")) {
+                if (btnExpandSource) btnExpandSource.click();
+                if (btnExpandProgram) btnExpandProgram.click();
+                window.activeFocusedPlayer = "program";
+            }
+        };
+        const swapToSource = () => {
+            const src = document.getElementById("source-player-panel");
+            const prg = document.getElementById("program-player-panel");
+            if (prg && prg.classList.contains("maximized")) {
+                if (btnExpandProgram) btnExpandProgram.click();
+                if (btnExpandSource) btnExpandSource.click();
+                window.activeFocusedPlayer = "source";
+            }
+        };
+
+        if (btnSwapToProgram) btnSwapToProgram.addEventListener("click", (e) => { e.stopPropagation(); swapToProgram(); });
+        if (btnSwapToSource) btnSwapToSource.addEventListener("click", (e) => { e.stopPropagation(); swapToSource(); });
+
+        // Atalho Q para alternar entre Source e Program maximizado
+        document.addEventListener("keydown", (e) => {
+            if (e.key.toLowerCase() === "q" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                const tag = document.activeElement.tagName;
+                if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement.isContentEditable) return;
+                const src = document.getElementById("source-player-panel");
+                const prg = document.getElementById("program-player-panel");
+                if (src && src.classList.contains("maximized")) {
+                    e.preventDefault();
+                    swapToProgram();
+                } else if (prg && prg.classList.contains("maximized")) {
+                    e.preventDefault();
+                    swapToSource();
+                }
+            }
+        });
+
+        // Clique simples nos players: play/pause | Clique duplo: maximizar/minimizar
+        const sourceWrapper = document.getElementById("source-video-wrapper");
+        const programWrapper = document.getElementById("program-video-wrapper");
+
+        const setupPlayerClickHandlers = (wrapper, videoId, btnPlayId, btnExpandId) => {
+            if (!wrapper) return;
+            let clickTimer = null;
+            
+            // Ouvinte de clique geral no wrapper (e elementos internos que propagam)
+            wrapper.addEventListener("click", (e) => {
+                // Ignora se clicou em algum botão ou controle, ou se clicou em face-box (desambiguação)
+                if (e.target.closest("button") || e.target.closest(".face-box") || e.target.closest(".player-controls")) return;
+                
+                // Evita disparar se o usuário acabou de desenhar um retângulo de rosto no overlayContainer
+                if (window.player && window.player.isDrawing) return;
+
+                if (clickTimer) { 
+                    clearTimeout(clickTimer); 
+                    clickTimer = null; 
+                    return; 
+                }
+                
+                clickTimer = setTimeout(() => {
+                    clickTimer = null;
+                    // Play/Pause
+                    const vid = document.getElementById(videoId);
+                    if (vid && vid.src) {
+                        if (vid.paused) vid.play(); else vid.pause();
+                        const btnPlay = document.getElementById(btnPlayId);
+                        if (btnPlay) {
+                            btnPlay.innerHTML = vid.paused
+                                ? `<i class="fa-solid fa-play"></i>`
+                                : `<i class="fa-solid fa-pause"></i>`;
+                        }
+                    }
+                }, 220);
+            });
+
+            wrapper.addEventListener("dblclick", (e) => {
+                if (e.target.closest("button") || e.target.closest(".face-box") || e.target.closest(".player-controls")) return;
+                const btnExpand = document.getElementById(btnExpandId);
+                if (btnExpand) btnExpand.click();
+            });
+        };
+
+        setupPlayerClickHandlers(sourceWrapper, "source-video", "btn-source-play", "btn-expand-source");
+        setupPlayerClickHandlers(programWrapper, "program-video-a", "btn-program-play", "btn-expand-program");
 
         const selectWorkspace = document.getElementById("select-workspace");
         if (selectWorkspace) {
@@ -580,8 +682,20 @@ export class SplitterHelper {
         const unit = options.unit || "%"; // "%" or "px"
         const minVal = options.minVal || (unit === "%" ? (options.minPct || 20) : 150);
         const maxVal = options.maxVal || (unit === "%" ? (options.maxPct || 80) : 800);
-        const defaultVal = options.defaultVal || (unit === "%" ? (options.defaultPct || 50) : 350);
+        let defaultVal = options.defaultVal || (unit === "%" ? (options.defaultPct || 50) : 350);
         const className = options.className || "";
+
+        // Tenta recuperar do localStorage se aplicável
+        const storageKey = className ? `layout-dim-${className.split(" ")[0]}` : null;
+        if (storageKey) {
+            const savedVal = localStorage.getItem(storageKey);
+            if (savedVal !== null) {
+                const parsed = parseFloat(savedVal);
+                if (!isNaN(parsed)) {
+                    defaultVal = parsed;
+                }
+            }
+        }
 
         const leftEl = container.querySelector(leftSelector);
         const rightEl = container.querySelector(rightSelector);
@@ -703,6 +817,28 @@ export class SplitterHelper {
                 container.ownerDocument.removeEventListener("mousemove", handleMouseMove);
                 container.ownerDocument.removeEventListener("mouseup", handleMouseUp);
                 
+                // Salva o novo valor no localStorage
+                if (storageKey) {
+                    const targetEl = resizeTarget === "left" ? leftEl : rightEl;
+                    let storedValue;
+                    if (unit === "px") {
+                        storedValue = (direction === "horizontal") ? parseInt(targetEl.style.width) : parseInt(targetEl.style.height);
+                    } else {
+                        const flexVal = leftEl.style.flex;
+                        const match = flexVal.match(/(\d+\.?\d*)%/);
+                        storedValue = match ? parseFloat(match[1]) : flexVal;
+                    }
+                    
+                    let key = storageKey;
+                    if (storageKey === "layout-dim-splitter-sidebar-left") {
+                        const inspector = container.ownerDocument.getElementById("library-inspector-view");
+                        if (inspector && inspector.style.display === "flex") {
+                            key = "layout-dim-splitter-sidebar-left-inspector";
+                        }
+                    }
+                    localStorage.setItem(key, storedValue);
+                }
+
                 // Dispara resize final para garantir sincronia
                 window.dispatchEvent(new Event("resize"));
             };

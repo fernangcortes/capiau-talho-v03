@@ -160,10 +160,14 @@ export class SourcePlayer {
         // Vincula foco visual
         const panel = document.getElementById("source-player-panel");
         if (panel) {
-            panel.addEventListener("click", () => {
-                window.activeFocusedPlayer = "source";
-                console.log("[Player] Foco do teclado definido para SOURCE");
-            });
+            const setSourceFocus = () => {
+                if (window.activeFocusedPlayer !== "source") {
+                    window.activeFocusedPlayer = "source";
+                    console.log("[Player] Foco do teclado definido para SOURCE");
+                }
+            };
+            panel.addEventListener("click", setSourceFocus, true);
+            panel.addEventListener("mousedown", setSourceFocus, true);
         }
     }
 
@@ -628,6 +632,8 @@ export class SourcePlayer {
     }
 
     onMouseDown(e) {
+        window.activeFocusedPlayer = "source";
+        console.log("[Player] Foco do teclado definido para SOURCE via overlay mousedown");
         if (e.target.closest(".face-box")) return;
 
         e.preventDefault();
@@ -691,7 +697,38 @@ export class SourcePlayer {
         this.drawingBox.remove();
         this.drawingBox = null;
 
-        if (finalWidth < 15 || finalHeight < 15) return;
+        if (finalWidth < 15 || finalHeight < 15) {
+            window.activeFocusedPlayer = "source";
+            console.log("[Player] Foco do teclado definido para SOURCE via overlay click");
+            
+            const now = Date.now();
+            const lastClick = this.lastOverlayClick || 0;
+            this.lastOverlayClick = now;
+            
+            if (now - lastClick < 300) {
+                if (this.clickTimeout) {
+                    clearTimeout(this.clickTimeout);
+                    this.clickTimeout = null;
+                }
+                const btnExpand = document.getElementById("btn-expand-source");
+                if (btnExpand) btnExpand.click();
+            } else {
+                this.clickTimeout = setTimeout(() => {
+                    this.clickTimeout = null;
+                    const vid = this.el("source-video");
+                    if (vid && vid.src) {
+                        if (vid.paused) vid.play(); else vid.pause();
+                        const btnPlay = this.el("btn-source-play");
+                        if (btnPlay) {
+                            btnPlay.innerHTML = vid.paused
+                                ? `<i class="fa-solid fa-play"></i>`
+                                : `<i class="fa-solid fa-pause"></i>`;
+                        }
+                    }
+                }, 220);
+            }
+            return;
+        }
 
         const x = finalLeft / rect.width;
         const y = finalTop / rect.height;
@@ -789,10 +826,14 @@ export class ProgramPlayer {
         // Foco visual do teclado
         const panel = document.getElementById("program-player-panel");
         if (panel) {
-            panel.addEventListener("click", () => {
-                window.activeFocusedPlayer = "program";
-                console.log("[Player] Foco do teclado definido para PROGRAM");
-            });
+            const setProgramFocus = () => {
+                if (window.activeFocusedPlayer !== "program") {
+                    window.activeFocusedPlayer = "program";
+                    console.log("[Player] Foco do teclado definido para PROGRAM");
+                }
+            };
+            panel.addEventListener("click", setProgramFocus, true);
+            panel.addEventListener("mousedown", setProgramFocus, true);
         }
     }
 

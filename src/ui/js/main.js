@@ -1194,6 +1194,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
     const collapseSidebar = (side) => {
         if (side === "left" && sidebarLeft && reopenLeft) {
+            // Se o inspetor estiver aberto, fecha primeiro para restaurar players
+            if (window.libraryManager && window.libraryManager.mediaInspectorActive) {
+                window.libraryManager.closeMediaInspector();
+            }
             sidebarLeft.classList.add("collapsed");
             reopenLeft.style.display = "block";
             window.dispatchEvent(new Event("resize"));
@@ -1357,6 +1361,8 @@ window.addEventListener("DOMContentLoaded", () => {
             if (targetContent) {
                 targetContent.classList.add("active");
             }
+            // Salva no localStorage
+            localStorage.setItem("active-left-tab", btn.dataset.tab);
         });
     });
 
@@ -1378,8 +1384,22 @@ window.addEventListener("DOMContentLoaded", () => {
             
             const tab = btn.dataset.rightTab;
             STATE.currentRightTab = tab;
+            // Salva no localStorage
+            localStorage.setItem("active-right-tab", tab);
         });
     });
+
+    // Restaurar abas do localStorage na inicialização
+    const savedLeftTab = localStorage.getItem("active-left-tab");
+    if (savedLeftTab) {
+        const btn = document.querySelector(`.sidebar-left .tab-btn[data-tab="${savedLeftTab}"]`);
+        if (btn) btn.click();
+    }
+    const savedRightTab = localStorage.getItem("active-right-tab");
+    if (savedRightTab) {
+        const btn = document.querySelector(`#right-tabs .tab-btn[data-right-tab="${savedRightTab}"]`);
+        if (btn) btn.click();
+    }
 
     STATE.on("rightTabChanged", (tab) => {
         // Ocultar todos os containers
