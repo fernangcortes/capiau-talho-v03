@@ -1379,14 +1379,13 @@ window.addEventListener("DOMContentLoaded", () => {
             if (c) c.style.display = "none";
         });
         
-        // Exibir container ativo
+        // Exibir container ativo.
+        // "transcript" É flex-row (lista de falas + inspetor lado a lado) e "chat" é flex-column —
+        // ambos PRECISAM de flex. Usar "block" aqui quebrava o inspetor (empurrado p/ baixo e cortado
+        // pelo overflow:hidden), fazendo parecer que ele "não abre" após trocar de aba.
         const activeContainer = rightContainers[tab];
         if (activeContainer) {
-            if (tab === "chat") {
-                activeContainer.style.display = "flex";
-            } else {
-                activeContainer.style.display = "block";
-            }
+            activeContainer.style.display = (tab === "chat" || tab === "transcript") ? "flex" : "block";
         }
         
         // Manter destaque no botão ativo

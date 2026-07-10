@@ -396,7 +396,16 @@ export class PanelsManager {
                 player.play();
             }
         });
-        
+
+        // Botão direito em QUALQUER parte do balão abre o menu (não só nas palavras).
+        // Os word-spans usam stopPropagation, então este fallback só dispara no espaço
+        // entre palavras, no padding e na área do falante — corrige o "às vezes não abre".
+        bubble.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            const fallbackWord = bubbleWords[0] || { start_time: d.start_time, end_time: d.end_time, word: "" };
+            this.showCustomContextMenu(e.clientX, e.clientY, fallbackWord, d, bubble);
+        });
+
         bubble.addEventListener("dblclick", (e) => {
             e.stopPropagation();
             if (STATE.activeVideo) {
@@ -640,10 +649,35 @@ export class PanelsManager {
     async openBubbleInspector(d, bubble) {
         if (!this.inspectorPanel) return;
         
-        // Expand right sidebar to 700px
+        // Alarga a sidebar-right para caber transcrição + inspetor lado a lado.
+        // É preciso setar a BASE flex (não só width): a sidebar é um item flex de base fixa
+        // (flex: 0 0 350px no Padrão / 0 0 320px no Estúdio), então `width` sozinho é ignorado.
+        // Salva o tamanho anterior (uma vez) para restaurar exatamente ao fechar.
         const sidebar = document.getElementById("sidebar-right");
         if (sidebar) {
-            sidebar.style.width = "700px";
+            if (this._inspectorPrevSize === undefined) {
+                this._inspectorPrevSize = { flex: sidebar.style.flex, width: sidebar.style.width };
+            }
+            // No Estúdio a biblioteca ocupa 74% (base fixa) e não sobra espaço; encolhe-a
+            // temporariamente para o inspetor respirar (restaurada ao fechar).
+            if (document.body.classList.contains("studio") && this._inspectorPrevLib === undefined) {
+                const lib = document.getElementById("sidebar-left");
+                if (lib) {
+                    this._inspectorPrevLib = { flex: lib.style.flex, width: lib.style.width };
+                    lib.style.flex = "0 0 40%";
+                    lib.style.width = "";
+                }
+            }
+            // Alarga "pegando emprestado" a largura da coluna central (players/timeline),
+            // deixando um mínimo para ela. Cresce o máximo possível SEM estourar, nos dois
+            // layouts. Ler getBoundingClientRect após ajustar a biblioteca força o reflow.
+            const centerStage = document.querySelector(".center-stage");
+            const csW = centerStage ? centerStage.getBoundingClientRect().width : 0;
+            const curW = sidebar.getBoundingClientRect().width;
+            const CENTER_MIN = 340; // espaço reservado p/ players/timeline durante a inspeção
+            const w = Math.round(curW + Math.max(0, csW - CENTER_MIN));
+            sidebar.style.flex = `0 0 ${w}px`;
+            sidebar.style.width = `${w}px`;
             window.dispatchEvent(new Event("resize"));
         }
         
@@ -804,9 +838,24 @@ export class PanelsManager {
         }
         const sidebar = document.getElementById("sidebar-right");
         if (sidebar) {
-            sidebar.style.width = ""; // Restaura largura original da sidebar
-            window.dispatchEvent(new Event("resize"));
+            // Restaura exatamente o flex/width que a sidebar tinha antes de abrir o inspetor
+            // (320px no Estúdio / 350px ou o valor arrastado no Padrão).
+            const prev = this._inspectorPrevSize || { flex: "", width: "" };
+            sidebar.style.flex = prev.flex;
+            sidebar.style.width = prev.width;
+            this._inspectorPrevSize = undefined;
         }
+        // Restaura a biblioteca caso tenha sido encolhida no Estúdio ao abrir o inspetor.
+        if (this._inspectorPrevLib !== undefined) {
+            const lib = document.getElementById("sidebar-left");
+            if (lib) {
+                lib.style.flex = this._inspectorPrevLib.flex;
+                lib.style.width = this._inspectorPrevLib.width;
+            }
+            this._inspectorPrevLib = undefined;
+        }
+        // Recalcula o canvas da timeline após restaurar todas as colunas.
+        window.dispatchEvent(new Event("resize"));
     }
 
     renderInspectorWaveform(d) {
