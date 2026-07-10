@@ -16,6 +16,7 @@ from src.config import CONFIG
 from src.db.connection import get_db
 from src.nlp.prompt_templates import get_theme_naming_prompt
 from src.nlp.json_parser import extract_json_from_markdown
+from src.services.settings_service import SettingsService
 
 # Similaridade mínima para: fundir cluster em tema existente / atribuição incremental
 THEME_MATCH_THRESHOLD = 0.60
@@ -35,6 +36,9 @@ CENTROID_MERGE_THRESHOLD = 0.86
 def _collect_project_items(project_id: int) -> List[Dict[str, Any]]:
     """Reúne os itens de conteúdo do projeto: blocos de fala, frames de b-roll e fotos."""
     items: List[Dict[str, Any]] = []
+    S = SettingsService.get_settings(project_id)
+    MIN_ITEM_CHARS = S.get("themes.min_item_chars")
+    frame_interval = S.get("vision.frame_interval")
 
     with get_db() as conn:
         cursor = conn.cursor()
@@ -126,8 +130,10 @@ def _embed_texts(texts: List[str]) -> np.ndarray:
     return vectors / norms
 
 
-def _cluster_embeddings(vectors: np.ndarray) -> np.ndarray:
+def _cluster_embeddings(vectors: np.ndarray, project_id: Optional[int] = None) -> np.ndarray:
     """Clustering aglomerativo por cosseno; fallback para DBSCAN NumPy local."""
+    S = SettingsService.get_settings(project_id)
+    CLUSTER_DISTANCE_THRESHOLD = S.get("themes.cluster_distance")
     n = vectors.shape[0]
     if n < 2:
         return np.zeros(n, dtype=int)
@@ -149,16 +155,18 @@ def _cluster_embeddings(vectors: np.ndarray) -> np.ndarray:
 
 # ── Nomeação por LLM ─────────────────────────────────────────────────────────
 
-def _name_clusters_llm(clusters: Dict[int, List[Dict[str, Any]]], existing_titles: List[str]) -> Dict[int, Dict[str, str]]:
+def _name_clusters_llm(clusters: Dict[int, List[Dict[str, Any]]], existing_titles: List[str], project_id: Optional[int] = None) -> Dict[int, Dict[str, str]]:
     """Envia amostras representativas de cada cluster para o LLM nomear.
 
     Em lotes de NAMING_BATCH_SIZE para escalar a projetos com muitos clusters
     sem estourar o contexto do modelo.
     """
-    api_key = CONFIG.OPENROUTER_API_KEY
+    S = SettingsService.get_settings(project_id)
+    api_key = S.api_key("openrouter")
     if not api_key or api_key == "your_openrouter_api_key_here":
         return {}
 
+    NAMING_BATCH_SIZE = S.get("themes.naming_batch_size")
     cluster_ids = list(clusters.keys())
     result: Dict[int, Dict[str, str]] = {}
 
@@ -171,18 +179,18 @@ def _name_clusters_llm(clusters: Dict[int, List[Dict[str, Any]]], existing_title
             sample_lines = "\n".join([f'  - "{s}"' for s in samples])
             blocks.append(f"[Grupo {cid} | {len(cluster_items)} trechos]:\n{sample_lines}")
 
-        prompt = get_theme_naming_prompt("\n\n".join(blocks), existing_titles)
+        prompt = get_theme_naming_prompt("\n\n".join(blocks), existing_titles, project_id=project_id)
 
         try:
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={
-                    "model": CONFIG.TEXT_MODEL,
+                    "model": S.get("llm.text_model"),
                     "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.3
+                    "temperature": S.get("themes.naming_temperature")
                 },
-                timeout=90
+                timeout=S.get("themes.naming_timeout")
             )
             if response.status_code != 200:
                 print(f"[THEME] Falha LLM na nomeação (status {response.status_code}) no lote {batch_start}")
@@ -224,6 +232,8 @@ def _load_existing_themes(conn) -> List[Dict[str, Any]]:
 
 def _match_existing_theme(centroid: np.ndarray, title: str, existing: List[Dict[str, Any]], project_id: int) -> Optional[int]:
     """Retorna o ID de um tema existente equivalente (por título exato ou centroide próximo)."""
+    S = SettingsService.get_settings(project_id)
+    THEME_MATCH_THRESHOLD = S.get("themes.match_threshold")
     title_lower = (title or "").strip().lower()
     for t in existing:
         if t["project_id"] != project_id:
@@ -245,6 +255,8 @@ def _match_existing_theme(centroid: np.ndarray, title: str, existing: List[Dict[
 
 def run_theme_clustering_v2(project_id: int) -> Dict[str, Any]:
     """Pipeline completo: coleta → embeddings → clusters → nomeação → theme + theme_segment."""
+    S = SettingsService.get_settings(project_id)
+    MAX_CLUSTERS = S.get("themes.max_clusters")
     print(f"\n[THEME] Iniciando clustering temático v2 (embeddings) para projeto {project_id}...")
 
     items = _collect_project_items(project_id)
@@ -254,7 +266,7 @@ def run_theme_clustering_v2(project_id: int) -> Dict[str, Any]:
 
     print(f"[THEME] {len(items)} itens coletados (falas, b-rolls, fotos). Gerando embeddings locais...")
     vectors = _embed_texts([it["text"] for it in items])
-    labels = _cluster_embeddings(vectors)
+    labels = _cluster_embeddings(vectors, project_id=project_id)
 
     clusters: Dict[int, List[int]] = {}
     for idx, label in enumerate(labels):
@@ -281,7 +293,7 @@ def run_theme_clustering_v2(project_id: int) -> Dict[str, Any]:
     existing_titles = [t["title"] for t in existing if t["project_id"] == project_id]
 
     cluster_samples = {cid: [items[i] for i in idxs] for cid, idxs in clusters.items()}
-    names = _name_clusters_llm(cluster_samples, existing_titles)
+    names = _name_clusters_llm(cluster_samples, existing_titles, project_id=project_id)
 
     created_themes = []
     total_segments = 0
@@ -395,6 +407,9 @@ def merge_similar_themes(project_id: int) -> int:
     Segmentos, relações e vínculos de transcrição são reapontados; duplicatas apagadas.
     Retorna o número de temas absorvidos.
     """
+    S = SettingsService.get_settings(project_id)
+    TITLE_MERGE_THRESHOLD = S.get("themes.title_merge_threshold")
+    CENTROID_MERGE_THRESHOLD = S.get("themes.centroid_merge_threshold")
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -520,6 +535,8 @@ def assign_media_to_themes(project_id: int, video_id: Optional[int] = None, phot
 
     Evita re-clusterizar o projeto inteiro a cada ingestão. Retorna segmentos criados.
     """
+    S = SettingsService.get_settings(project_id)
+    THEME_MATCH_THRESHOLD = S.get("themes.match_threshold")
     with get_db() as conn:
         themes = [t for t in _load_existing_themes(conn) if t["project_id"] == project_id and t["centroid"] is not None]
     if not themes:

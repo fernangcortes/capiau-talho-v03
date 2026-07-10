@@ -84,7 +84,8 @@ class FacePipeline:
         min_tier: int = 0,
         max_tier: int = 3,
         force: bool = False,
-        quality_threshold: float = 0.0
+        quality_threshold: float = 0.0,
+        project_id: Optional[int] = None
     ) -> List[BackendResult]:
         """Executa o pipeline de reconhecimento facial em cascata.
         
@@ -94,6 +95,7 @@ class FacePipeline:
             max_tier: Tier maximo a executar (0-3)
             force: Se True, reprocessa mesmo se ja houver resultado do tier
             quality_threshold: Se > 0, sobe de tier se confidence < threshold
+            project_id: ID do projeto para carregar as configurações do settings
             
         Returns:
             Lista de BackendResult, um por tier executado
@@ -117,7 +119,7 @@ class FacePipeline:
             print(f"[FACE_PIPELINE] Executando Tier {tier}: {backend.name} para {image_path.name}")
             
             try:
-                result = backend.detect_and_recognize(image_path)
+                result = backend.detect_and_recognize(image_path, project_id=project_id)
                 results.append(result)
                 
                 if result.error:
@@ -144,12 +146,12 @@ class FacePipeline:
         
         return results
 
-    def process_first_pass(self, image_path: Path) -> BackendResult:
+    def process_first_pass(self, image_path: Path, project_id: Optional[int] = None) -> BackendResult:
         """Executa apenas Tier 0 (local rapido) - primeira passada em todos os arquivos.
         
         Retorna resultado em ~2-5 segundos por imagem.
         """
-        results = self.process(image_path, min_tier=0, max_tier=0)
+        results = self.process(image_path, min_tier=0, max_tier=0, project_id=project_id)
         return results[0] if results else BackendResult(
             tier=0, model_name="none", model_version="none",
             detections=[], recognitions=[], error="No backend available"
@@ -159,7 +161,8 @@ class FacePipeline:
         self,
         image_path: Path,
         current_confidence: float,
-        confidence_threshold: float = 0.7
+        confidence_threshold: float = 0.7,
+        project_id: Optional[int] = None
     ) -> Optional[BackendResult]:
         """Refina deteccoes com baixa confianca usando Tier 1 (Azure free).
         
@@ -167,6 +170,7 @@ class FacePipeline:
             image_path: Caminho da imagem
             current_confidence: Confidencia atual do Tier 0
             confidence_threshold: Se confidence < threshold, refina
+            project_id: ID do projeto
             
         Returns:
             BackendResult do Tier 1 se refinado, None se nao necessario
@@ -179,10 +183,10 @@ class FacePipeline:
             return None
         
         print(f"[FACE_PIPELINE] Refinando: confidence {current_confidence:.2f} < threshold {confidence_threshold:.2f}")
-        results = self.process(image_path, min_tier=1, max_tier=1)
+        results = self.process(image_path, min_tier=1, max_tier=1, project_id=project_id)
         return results[0] if results else None
 
-    def process_precise(self, image_path: Path) -> Optional[BackendResult]:
+    def process_precise(self, image_path: Path, project_id: Optional[int] = None) -> Optional[BackendResult]:
         """Executa Tier 3 (InsightFace GPU) para maxima precisao.
         Usado para arquivos especificos selecionados pelo usuario.
         """
@@ -191,7 +195,7 @@ class FacePipeline:
             return None
         
         print(f"[FACE_PIPELINE] Processamento de precisao (Tier 3) para {image_path.name}")
-        results = self.process(image_path, min_tier=3, max_tier=3)
+        results = self.process(image_path, min_tier=3, max_tier=3, project_id=project_id)
         return results[0] if results else None
 
     def compare_embeddings(self, emb1: List[float], emb2: List[float], tier: int = 0) -> float:

@@ -46,7 +46,7 @@ class FaceService:
         self._clear_auto_detections(photo_id=photo_id)
         
         # Executar pipeline Tier 0
-        result = self.pipeline.process_first_pass(image_path)
+        result = self.pipeline.process_first_pass(image_path, project_id=project_id)
         
         if result.error:
             print(f"[FACE_SERVICE] Erro na deteccao: {result.error}")
@@ -97,7 +97,7 @@ class FaceService:
         """Executa Tier 0 em um frame de video e persiste deteccoes."""
         self._clear_auto_detections(video_id=video_id, timestamp=timestamp)
         
-        result = self.pipeline.process_first_pass(image_path)
+        result = self.pipeline.process_first_pass(image_path, project_id=project_id)
         
         if result.error:
             return 0
@@ -188,7 +188,7 @@ class FaceService:
 
     # ── Clustering ──
 
-    def cluster_project_faces(self, project_id: int, eps: float = 0.38, min_samples: int = 3) -> Dict[str, Any]:
+    def cluster_project_faces(self, project_id: int, eps: Optional[float] = None, min_samples: Optional[int] = None) -> Dict[str, Any]:
         """Clusteriza todas as faces do projeto usando DBSCAN nos embeddings.
         
         Usa os embeddings autoritativos (get_authoritative_recognition) para
@@ -198,6 +198,13 @@ class FaceService:
         from src.core.tasks import TASK_MANAGER
         task_key = f"enrich-project-{project_id}"
         TASK_MANAGER.cancelled_tasks.add(task_key)
+
+        from src.services.settings_service import SettingsService
+        S = SettingsService.get_settings(project_id)
+        if eps is None:
+            eps = S.get("faces.dbscan_eps")
+        if min_samples is None:
+            min_samples = S.get("faces.dbscan_min_samples")
 
         # --- Autocura: Restaurar consistência de faces manualmente confirmadas ou rejeitadas ---
         with get_db() as conn:
