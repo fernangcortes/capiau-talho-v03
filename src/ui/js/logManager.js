@@ -21,6 +21,9 @@ class LogManager {
         this.aiOutput = null;
         this.aiContainer = null;
         
+        // Variáveis de estado adicionais
+        this.isAiMaximized = false;
+        
         this.init();
     }
 
@@ -123,6 +126,12 @@ class LogManager {
         this.aiOutput = document.getElementById("logs-ai-output");
         this.aiContainer = document.getElementById("logs-ai-container");
 
+        // Novos botões do cabeçalho da IA
+        const btnCopyAiReport = document.getElementById("btn-copy-ai-report");
+        const btnMaximizeAiReport = document.getElementById("btn-maximize-ai-report");
+        const btnCloseAiReport = document.getElementById("btn-close-ai-report");
+        const restoreLineLogsAi = document.getElementById("reopen-logs-ai");
+
         if (this.filterSelect) {
             this.filterSelect.addEventListener("change", () => this.refreshUI());
         }
@@ -133,6 +142,8 @@ class LogManager {
                 if (this.logsOutput) this.logsOutput.innerHTML = "";
                 if (this.aiOutput) this.aiOutput.innerHTML = "";
                 if (this.aiContainer) this.aiContainer.style.display = "none";
+                const restoreLine = document.getElementById("reopen-logs-ai");
+                if (restoreLine) restoreLine.style.display = "none";
                 this.log("System", "Histórico de logs limpo pelo usuário.", "INFO");
             });
         }
@@ -149,8 +160,104 @@ class LogManager {
             this.btnTechnicalAnalysis.addEventListener("click", () => this.generateAiAnalysis("technical"));
         }
 
+        if (btnCopyAiReport) {
+            btnCopyAiReport.addEventListener("click", () => this.copyAiReportToClipboard());
+        }
+
+        if (btnMaximizeAiReport) {
+            btnMaximizeAiReport.addEventListener("click", () => this.toggleAiMaximize());
+        }
+
+        if (btnCloseAiReport) {
+            btnCloseAiReport.addEventListener("click", () => this.hideAiReport());
+        }
+
+        if (restoreLineLogsAi) {
+            restoreLineLogsAi.addEventListener("click", () => this.showAiReport());
+        }
+
         // Renderiza logs retroativos acumulados antes do bind
         this.refreshUI();
+    }
+
+    copyAiReportToClipboard() {
+        const text = this.aiOutput ? this.aiOutput.innerText : "";
+        if (!text || text.includes("Processando análise")) {
+            alert("Nenhum relatório de IA disponível para copiar.");
+            return;
+        }
+        
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                alert("Relatório de IA copiado para a área de transferência!");
+                this.log("System", "Relatório de IA copiado para o clipboard pelo usuário.", "INFO");
+            })
+            .catch(err => {
+                alert("Falha ao copiar relatório: " + err);
+            });
+    }
+
+    toggleAiMaximize() {
+        const btnMaximize = document.getElementById("btn-maximize-ai-report");
+        if (!this.aiContainer || !btnMaximize) return;
+        
+        this.isAiMaximized = !this.isAiMaximized;
+        if (this.isAiMaximized) {
+            // Maximizado: Esconde o terminal de logs e expande o relatório 100%
+            if (this.logsOutput) this.logsOutput.style.display = "none";
+            this.aiContainer.style.maxHeight = "100%";
+            this.aiContainer.style.height = "100%";
+            this.aiContainer.style.flex = "1";
+            btnMaximize.innerHTML = '<i class="fa-solid fa-compress"></i> Reduzir';
+            btnMaximize.setAttribute("title", "Restaurar tamanho do relatório");
+            this.log("System", "Relatório de IA maximizado.", "INFO");
+        } else {
+            // Restaurado: Divide o espaço com o terminal de logs
+            if (this.logsOutput) this.logsOutput.style.display = "block";
+            this.aiContainer.style.maxHeight = "50%";
+            this.aiContainer.style.height = "auto";
+            this.aiContainer.style.flex = "0 0 auto";
+            btnMaximize.innerHTML = '<i class="fa-solid fa-expand"></i> Ampliar';
+            btnMaximize.setAttribute("title", "Maximizar relatório");
+            this.log("System", "Relatório de IA restaurado ao tamanho compartilhado.", "INFO");
+        }
+        window.dispatchEvent(new Event("resize"));
+    }
+
+    hideAiReport() {
+        if (!this.aiContainer) return;
+        this.aiContainer.style.display = "none";
+        
+        // Exibe a linha restauradora sutil (Design System)
+        const restoreLine = document.getElementById("reopen-logs-ai");
+        if (restoreLine) {
+            restoreLine.style.display = "block";
+        }
+        
+        // Restaura a visibilidade do console caso estivesse oculto por maximização
+        if (this.logsOutput) this.logsOutput.style.display = "block";
+        this.log("System", "Relatório de IA minimizado (ocultado).", "INFO");
+        window.dispatchEvent(new Event("resize"));
+    }
+
+    showAiReport() {
+        if (!this.aiContainer) return;
+        this.aiContainer.style.display = "flex";
+        
+        // Esconde a linha restauradora
+        const restoreLine = document.getElementById("reopen-logs-ai");
+        if (restoreLine) {
+            restoreLine.style.display = "none";
+        }
+        
+        // Se estava maximizado, mantém o terminal ocultado
+        if (this.isAiMaximized) {
+            if (this.logsOutput) this.logsOutput.style.display = "none";
+        } else {
+            if (this.logsOutput) this.logsOutput.style.display = "block";
+        }
+        this.log("System", "Relatório de IA exibido.", "INFO");
+        window.dispatchEvent(new Event("resize"));
     }
 
     refreshUI() {
@@ -253,6 +360,9 @@ class LogManager {
         }
 
         this.aiContainer.style.display = "flex";
+        const restoreLine = document.getElementById("reopen-logs-ai");
+        if (restoreLine) restoreLine.style.display = "none";
+        
         this.aiOutput.innerHTML = `
             <div style="display:flex; align-items:center; gap:8px; color:var(--color-cyan); font-size:12px;">
                 <i class="fa-solid fa-spinner fa-spin"></i> Processando análise de logs com a IA...
