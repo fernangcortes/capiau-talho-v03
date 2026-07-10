@@ -116,7 +116,7 @@ export class WorkspaceManager {
                 resizeTarget: "left",
                 unit: "px",
                 minVal: 200,
-                maxVal: 600,
+                maxVal: 1000,
                 defaultVal: 350,
                 className: "splitter-sidebar-left"
             });
@@ -127,7 +127,7 @@ export class WorkspaceManager {
                 resizeTarget: "right",
                 unit: "px",
                 minVal: 250,
-                maxVal: 600,
+                maxVal: 1000,
                 defaultVal: 350,
                 className: "splitter-sidebar-right"
             });
@@ -184,8 +184,8 @@ export class WorkspaceManager {
                 direction: "horizontal",
                 resizeTarget: "left",
                 unit: "%",
-                minVal: 45,
-                maxVal: 85,
+                minVal: 30,
+                maxVal: 90,
                 defaultVal: 74,
                 className: "splitter-studio-lib"
             });
@@ -196,7 +196,7 @@ export class WorkspaceManager {
                 resizeTarget: "right",
                 unit: "px",
                 minVal: 220,
-                maxVal: 600,
+                maxVal: 1000,
                 defaultVal: 320,
                 className: "splitter-studio-right"
             });

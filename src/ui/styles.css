@@ -3227,6 +3227,53 @@ body.layout-resizing * {
 /* ── LAYOUT ESTÚDIO (biblioteca grande | players empilhados | transcrição + timeline full-width) ──
    Reflui em flex real (sem position:fixed). O reparent é feito em workspaceManager.applyStudio(). */
 
+/* ── Players limpos: só vídeo; cabeçalho e controles surgem no hover ── */
+.player-panel {
+    position: relative !important;
+}
+.player-panel .player-header,
+.player-panel .player-controls {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 20 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.2s ease !important;
+    border: none !important;
+}
+.player-panel .player-header {
+    top: 0 !important;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent) !important;
+}
+.player-panel .player-controls {
+    bottom: 0 !important;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent) !important;
+}
+.player-panel:hover .player-header,
+.player-panel:hover .player-controls {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Vídeo/foto preenchem o painel (remove o cap 52vh do layout padrão) */
+.player-panel .video-container video,
+.player-panel .video-container img {
+    max-height: none !important;
+}
+
+/* ── Mini-Player do Chat em Hover ── */
+.chat-media-player-container:hover .chat-mini-player-header {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* ── Player do Modal de Transcrição/Decupagem em Hover ── */
+#interview-modal-player-container:hover .modal-player-controls {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
 /* Workspace passa a empilhar: [linha superior] sobre [timeline full-width] */
 body.studio .workspace {
     flex-direction: column;
