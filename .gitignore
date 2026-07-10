@@ -15,6 +15,19 @@ ENV/
 data/
 data_test/
 data_test_ingest/
+data_test_face/
+
+# Bancos de dados locais (SQLite e afins)
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+
+# Arquivos compactados / exports (não versionar no repositório)
+*.zip
+*.tar
+*.tar.gz
 
 # Pasta Watch (Manter a pasta, mas ignorar mídias dentro dela)
 watch/*
