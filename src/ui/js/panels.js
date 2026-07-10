@@ -10,9 +10,10 @@ import { getActiveElement, getActiveQuerySelector } from "./workspaceManager.js"
 export class PanelsManager {
     constructor() {
         this.transcriptContainer = document.getElementById("transcript-container");
-        this.visionContainer = document.getElementById("vision-container");
+        this.visionContainer = document.getElementById("vision-feed-scroll");
         this.themesContainer = document.getElementById("theme-list");
         this.tasksContainer = document.getElementById("tasks-container");
+        this.lastTasksState = {}; // Para monitoramento de mudança de estado de tarefas
         
         // Inicializa o novo renderizador Canvas e interações
         this.timelineRenderer = new CapiauTimelineRenderer();
@@ -47,6 +48,28 @@ export class PanelsManager {
         
         
         if (this.btnCluster) this.btnCluster.addEventListener("click", () => this.runClustering());
+         const btnTranscribeNow = document.getElementById("btn-transcribe-now");
+        if (btnTranscribeNow) {
+            btnTranscribeNow.addEventListener("click", async () => {
+                if (!STATE.activeVideo) {
+                    alert("Selecione um depoimento na Biblioteca para transcrever.");
+                    return;
+                }
+                const filename = STATE.activeVideo.filename;
+                try {
+                    await CapIAuAPI.transcribeVideo(STATE.activeVideo.id);
+                    if (window.logManager) {
+                        window.logManager.log("ASR", `Solicitada transcrição para o clipe: ${filename}`, "ACTION");
+                    }
+                    alert("Transcrição do clipe iniciada! O progresso será exibido na aba de Tarefas.");
+                } catch (err) {
+                    if (window.logManager) {
+                        window.logManager.log("ASR", `Falha ao iniciar transcrição do clipe ${filename}: ${err.message}`, "ERROR");
+                    }
+                    alert("Erro ao iniciar transcrição: " + err.message);
+                }
+            });
+        }
         
         const btnAnalyzeVisionNow = document.getElementById("btn-analyze-vision-now");
         if (btnAnalyzeVisionNow) {
@@ -55,15 +78,22 @@ export class PanelsManager {
                     alert("Selecione um vídeo na Biblioteca para analisar.");
                     return;
                 }
+                const filename = STATE.activeVideo.filename;
                 try {
                     await CapIAuAPI.analyzeVideoVision(STATE.activeVideo.id);
+                    if (window.logManager) {
+                        window.logManager.log("VisãoIA", `Solicitada análise de visão para o clipe: ${filename}`, "ACTION");
+                    }
                     alert("Análise visual do B-roll iniciada! O progresso será exibido na aba de Tarefas.");
                 } catch (err) {
+                    if (window.logManager) {
+                        window.logManager.log("VisãoIA", `Falha ao iniciar análise de visão para o clipe ${filename}: ${err.message}`, "ERROR");
+                    }
                     alert("Erro ao iniciar análise: " + err.message);
                 }
             });
         }
-
+        
         const btnAnalyzeVisionAll = document.getElementById("btn-analyze-vision-all");
         if (btnAnalyzeVisionAll) {
             btnAnalyzeVisionAll.addEventListener("click", async () => {
@@ -71,16 +101,28 @@ export class PanelsManager {
                 if (force) {
                     try {
                         await CapIAuAPI.analyzeAllVision(STATE.currentProjectId, true);
+                        if (window.logManager) {
+                            window.logManager.log("VisãoIA", "Disparada reanálise completa em lote (todas as mídias).", "ACTION");
+                        }
                         alert("Reanálise completa em lote de IA disparada! Acompanhe o progresso na aba de tarefas.");
                     } catch (err) {
+                        if (window.logManager) {
+                            window.logManager.log("VisãoIA", `Falha ao disparar reanálise em lote: ${err.message}`, "ERROR");
+                        }
                         alert("Erro ao disparar reanálise: " + err.message);
                     }
                 } else {
                     if (confirm("Disparar análise apenas para as novas mídias pendentes?")) {
                         try {
                             await CapIAuAPI.analyzeAllVision(STATE.currentProjectId, false);
+                            if (window.logManager) {
+                                window.logManager.log("VisãoIA", "Disparada análise em lote (apenas pendentes).", "ACTION");
+                            }
                             alert("Análise de mídias pendentes disparada! Acompanhe o progresso na aba de tarefas.");
                         } catch (err) {
+                            if (window.logManager) {
+                                window.logManager.log("VisãoIA", `Falha ao disparar análise em lote de pendentes: ${err.message}`, "ERROR");
+                            }
                             alert("Erro ao disparar análise: " + err.message);
                         }
                     }
@@ -1555,6 +1597,54 @@ export class PanelsManager {
 
     renderTasks(tasks) {
         const taskKeys = Object.keys(tasks);
+        
+        // Log de mudanças de estado das tarefas
+        taskKeys.forEach(key => {
+            const currentTask = tasks[key];
+            const prevTask = this.lastTasksState[key];
+            
+            if (!prevTask) {
+                let taskType = currentTask.type || 'proxy';
+                let msg = `Tarefa iniciada - ID: ${key} (${taskType.toUpperCase()})`;
+                if (key.startsWith('recover-faces-')) msg = `Tarefa iniciada - Recuperação de rostos do projeto`;
+                else if (currentTask.type === 'enrich') msg = `Tarefa iniciada - Sincronização de descrições do projeto`;
+                
+                if (window.logManager) {
+                    window.logManager.log("Tasks", msg, "INFO");
+                }
+            } else if (prevTask.status !== currentTask.status) {
+                let taskType = currentTask.type || 'proxy';
+                let level = "INFO";
+                let msg = `Tarefa ID: ${key} (${taskType.toUpperCase()}) mudou para status: ${currentTask.status.toUpperCase()}`;
+                
+                if (currentTask.status === "finished") {
+                    level = "INFO";
+                    msg = `Tarefa concluída com sucesso - ID: ${key} (${taskType.toUpperCase()})`;
+                } else if (currentTask.status === "failed") {
+                    level = "ERROR";
+                    msg = `Tarefa falhou - ID: ${key} (${taskType.toUpperCase()})`;
+                }
+                
+                if (window.logManager) {
+                    window.logManager.log("Tasks", msg, level);
+                }
+            }
+        });
+
+        // Limpa tarefas que foram removidas
+        Object.keys(this.lastTasksState).forEach(key => {
+            if (!tasks[key]) {
+                const lastTask = this.lastTasksState[key];
+                if (lastTask.status !== "finished" && lastTask.status !== "failed") {
+                    if (window.logManager) {
+                        window.logManager.log("Tasks", `Tarefa ID: ${key} encerrada.`, "INFO");
+                    }
+                }
+            }
+        });
+
+        this.lastTasksState = JSON.parse(JSON.stringify(tasks));
+
         this.tasksContainer.innerHTML = "";
         
         if (taskKeys.length === 0) {

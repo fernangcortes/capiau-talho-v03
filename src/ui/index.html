@@ -561,26 +561,6 @@
                         <button class="tab-btn" id="btn-tab-logs" data-right-tab="logs" style="flex: 1;" title="Logs do Sistema"><i class="fa-solid fa-terminal"></i> <span class="tab-text">Logs</span></button>
                         <button class="tab-btn" id="btn-tab-search" data-right-tab="search" style="flex: 1; display: none;" title="Busca"><i class="fa-solid fa-magnifying-glass"></i> <span class="tab-text">Busca</span></button>
                     </div>
-                    
-                    <div id="asr-actions-row" style="display: flex; gap: 4px; align-items: center; margin: 0; flex: 0 0 auto;">
-                        <div class="action-separator" style="width: 1px; height: 16px; background: rgba(255,255,255,0.15); margin: 0 2px 0 4px;"></div>
-                        <button id="btn-transcribe-now" class="btn-outline flat-sidebar-btn" style="font-size: 10px; padding: 4px 6px; height: 24px; display: flex; align-items: center; gap: 4px;" title="Transcrever clipe atual">
-                            <i class="fa-solid fa-microphone-lines"></i> <span class="btn-text">Clipe</span>
-                        </button>
-                        <button id="btn-transcribe-all" class="btn-secondary flat-sidebar-btn" style="font-size: 10px; padding: 4px 6px; height: 24px; display: flex; align-items: center; gap: 4px;" title="Transcrever todos os vídeos">
-                            <i class="fa-solid fa-layer-group"></i> <span class="btn-text">Tudo</span>
-                        </button>
-                    </div>
-                    
-                    <div id="vision-actions-row" style="display: none; gap: 4px; align-items: center; margin: 0; flex: 0 0 auto;">
-                        <div class="action-separator" style="width: 1px; height: 16px; background: rgba(255,255,255,0.15); margin: 0 2px 0 4px;"></div>
-                        <button id="btn-analyze-vision-now" class="btn-outline flat-sidebar-btn" style="font-size: 10px; padding: 4px 6px; height: 24px; display: flex; align-items: center; gap: 4px;" title="Analisar visão clipe atual">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">Clipe</span>
-                        </button>
-                        <button id="btn-analyze-vision-all" class="btn-secondary flat-sidebar-btn" style="font-size: 10px; padding: 4px 6px; height: 24px; display: flex; align-items: center; gap: 4px;" title="Analisar visão todos os clipes">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="btn-text">Tudo</span>
-                        </button>
-                    </div>
                 </div>
 
                 
@@ -589,6 +569,20 @@
                     <div class="transcript-feed active" id="transcript-container" style="display: flex; flex-direction: row; width: 100%; height: 100%; overflow: hidden; padding: 0;">
                         <!-- Coluna 1: Lista e Pistas -->
                         <div id="transcript-list-col" style="flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; min-width: 250px;">
+                            <!-- Sub-header de Ações ASR dentro da aba Falas -->
+                            <div class="panel-sub-actions" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-bottom: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.12); flex-shrink: 0;">
+                                <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fa-solid fa-microphone" style="color: var(--color-cyan);"></i> Controles ASR
+                                </span>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <button id="btn-transcribe-now" class="flat-sub-btn" data-tooltip="Transcrever o depoimento atualmente selecionado na biblioteca">
+                                        <i class="fa-solid fa-microphone-lines"></i> Clipe
+                                    </button>
+                                    <button id="btn-transcribe-all" class="flat-sub-btn" data-tooltip="Transcrever todos os depoimentos pendentes do projeto">
+                                        <i class="fa-solid fa-layer-group"></i> Tudo
+                                    </button>
+                                </div>
+                            </div>
                             <!-- Gaveta de Pistas Globais (Assistente de Falas) -->
                             <div id="speech-assistant-drawer" class="speech-assistant-drawer collapsed">
                                 <div class="drawer-header" id="btn-toggle-assistant-drawer" style="cursor: pointer; padding: 8px 12px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 600; color: var(--color-cyan);">
@@ -624,10 +618,27 @@
                     </div>
 
                     <!-- Tab: Visão IA -->
-                    <div class="transcript-feed" id="vision-container" style="display: none;">
-                        <div class="empty-state">
-                            <i class="fa-solid fa-eye-slash"></i>
-                            <p>Selecione um B-roll para visualizar a descrição de visão.</p>
+                    <div id="vision-container" style="display: none; flex-direction: column; height: 100%; overflow: hidden; padding: 0;">
+                        <!-- Sub-header de Ações Visão IA dentro da aba Visão -->
+                        <div class="panel-sub-actions" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-bottom: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.12); flex-shrink: 0;">
+                            <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
+                                <i class="fa-solid fa-eye" style="color: var(--color-cyan);"></i> Controles Visão IA
+                            </span>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <button id="btn-analyze-vision-now" class="flat-sub-btn" data-tooltip="Analisar a visão do clipe de B-roll atualmente selecionado">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Clipe
+                                </button>
+                                <button id="btn-analyze-vision-all" class="flat-sub-btn" data-tooltip="Analisar todos os B-rolls do projeto">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Tudo
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Feed de Visão IA -->
+                        <div id="vision-feed-scroll" class="scrollable transcript-feed" style="flex: 1; overflow-y: auto; padding: 15px; min-height: 0;">
+                            <div class="empty-state">
+                                <i class="fa-solid fa-eye-slash"></i>
+                                <p>Selecione um B-roll para visualizar a descrição de visão.</p>
+                            </div>
                         </div>
                     </div>
 

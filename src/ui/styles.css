@@ -1744,6 +1744,29 @@ button {
     animation: slideIn 0.3s ease-out;
 }
 
+.flat-sub-btn {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--text-secondary) !important;
+    font-family: 'Outfit', sans-serif;
+    font-size: 10px !important;
+    padding: 3px 6px !important;
+    height: 22px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: color 0.2s ease, transform 0.2s ease, text-shadow 0.2s ease;
+    border-radius: 4px;
+}
+
+.flat-sub-btn:hover {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan);
+    transform: scale(1.05);
+}
+
 .block-speech {
     background: rgba(6, 182, 212, 0.1);
     border-color: rgba(6, 182, 212, 0.25);

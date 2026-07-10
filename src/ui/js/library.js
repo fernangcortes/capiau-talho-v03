@@ -1085,8 +1085,18 @@ export class LibraryManager {
 
     async triggerTranscribeAll() {
         if (confirm("Disparar transcrição AssemblyAI para todas as mídias não transcritas do projeto ativo?")) {
-            await CapIAuAPI.transcribeAll(STATE.currentProjectId);
-            alert("Transcrição em lote disparada.");
+            try {
+                await CapIAuAPI.transcribeAll(STATE.currentProjectId);
+                if (window.logManager) {
+                    window.logManager.log("ASR", "Disparada transcrição em lote (todos os depoimentos) via AssemblyAI.", "ACTION");
+                }
+                alert("Transcrição em lote disparada.");
+            } catch (err) {
+                if (window.logManager) {
+                    window.logManager.log("ASR", `Falha ao disparar transcrição em lote: ${err.message}`, "ERROR");
+                }
+                alert("Erro ao disparar transcrição: " + err.message);
+            }
         }
     }
 

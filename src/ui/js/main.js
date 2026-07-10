@@ -1051,13 +1051,7 @@ async function runSemanticSearch() {
 }
 window.runSemanticSearch = runSemanticSearch;
 
-function updateActionsRowVisibility(tab) {
-    const asrRow = getActiveElement("asr-actions-row");
-    const visionRow = getActiveElement("vision-actions-row");
-    
-    if (asrRow) asrRow.style.display = (tab === "transcript") ? "flex" : "none";
-    if (visionRow) visionRow.style.display = (tab === "vision") ? "flex" : "none";
-}
+// updateActionsRowVisibility removed as actions are now persistent inside each panel container
 
 // Inicialização da Aplicação
 window.addEventListener("DOMContentLoaded", () => {
@@ -1399,7 +1393,7 @@ window.addEventListener("DOMContentLoaded", () => {
         // pelo overflow:hidden), fazendo parecer que ele "não abre" após trocar de aba.
         const activeContainer = rightContainers[tab];
         if (activeContainer) {
-            activeContainer.style.display = (tab === "chat" || tab === "transcript" || tab === "logs") ? "flex" : "block";
+            activeContainer.style.display = (tab === "chat" || tab === "transcript" || tab === "logs" || tab === "vision") ? "flex" : "block";
         }
         
         // Manter destaque no botão ativo
@@ -1411,9 +1405,6 @@ window.addEventListener("DOMContentLoaded", () => {
                 btn.classList.remove("active");
             }
         });
-
-        // Atualizar headers das ações
-        updateActionsRowVisibility(tab);
     });
 
     // Ocultar ou mostrar botão de visão baseado no tipo do vídeo ativo
