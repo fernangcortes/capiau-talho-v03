@@ -1196,26 +1196,32 @@ window.addEventListener("DOMContentLoaded", () => {
     const collapseSidebar = (side) => {
         if (side === "left" && sidebarLeft && reopenLeft) {
             sidebarLeft.classList.add("collapsed");
-            reopenLeft.classList.add("visible");
+            reopenLeft.style.display = "block";
+            window.dispatchEvent(new Event("resize"));
         } else if (side === "right" && sidebarRight && reopenRight) {
             sidebarRight.classList.add("collapsed");
-            reopenRight.classList.add("visible");
+            reopenRight.style.display = "block";
+            window.dispatchEvent(new Event("resize"));
         } else if (side === "timeline" && timelinePanel && reopenTimeline) {
             timelinePanel.classList.add("collapsed");
             reopenTimeline.classList.add("visible");
+            window.dispatchEvent(new Event("resize"));
         }
     };
     
     const expandSidebar = (side) => {
         if (side === "left" && sidebarLeft && reopenLeft) {
             sidebarLeft.classList.remove("collapsed");
-            reopenLeft.classList.remove("visible");
+            reopenLeft.style.display = "none";
+            window.dispatchEvent(new Event("resize"));
         } else if (side === "right" && sidebarRight && reopenRight) {
             sidebarRight.classList.remove("collapsed");
-            reopenRight.classList.remove("visible");
+            reopenRight.style.display = "none";
+            window.dispatchEvent(new Event("resize"));
         } else if (side === "timeline" && timelinePanel && reopenTimeline) {
             timelinePanel.classList.remove("collapsed");
             reopenTimeline.classList.remove("visible");
+            window.dispatchEvent(new Event("resize"));
         }
     };
 
@@ -1329,12 +1335,14 @@ window.addEventListener("DOMContentLoaded", () => {
     if (btnCollapseHeader && headerRestoreTrigger && appContainer) {
         btnCollapseHeader.addEventListener("click", () => {
             appContainer.classList.add("header-collapsed");
-            headerRestoreTrigger.style.display = "flex";
+            headerRestoreTrigger.style.display = "block";
+            window.dispatchEvent(new Event("resize"));
         });
 
         headerRestoreTrigger.addEventListener("click", () => {
             appContainer.classList.remove("header-collapsed");
             headerRestoreTrigger.style.display = "none";
+            window.dispatchEvent(new Event("resize"));
         });
     }
 

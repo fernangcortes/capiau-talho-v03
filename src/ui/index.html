@@ -26,7 +26,7 @@
 
             <div class="project-area glassmorphism">
                 <i class="fa-solid fa-folder-tree project-icon"></i>
-                <select id="project-selector" title="Projeto Ativo">
+                <select id="project-selector" data-tooltip="Projeto Ativo">
                     <!-- Projetos inseridos dinamicamente -->
                 </select>
                 <button id="btn-new-project" class="btn-icon" data-tooltip="Criar um novo projeto no banco de dados local.">
@@ -43,7 +43,7 @@
             <!-- Seletor de Workspace -->
             <div class="project-area glassmorphism" style="background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.3);">
                 <i class="fa-solid fa-table-columns" style="color: #c084fc;"></i>
-                <select id="select-workspace" title="Configuração de Workspace" style="color: #c084fc; max-width: 140px; background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; cursor: pointer;">
+                <select id="select-workspace" data-tooltip="Configuração de Workspace" style="color: #c084fc; max-width: 140px; background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; cursor: pointer;">
                     <option value="default">Workspace: Padrão</option>
                     <option value="decupagem">Workspace: Decupagem</option>
                     <option value="montagem">Workspace: Estúdio</option>
@@ -87,17 +87,18 @@
             </div>
         </header>
 
-        <!-- Botão flutuante para restaurar o cabeçalho quando recolhido -->
-        <div id="header-restore-trigger" class="header-restore-btn" data-tooltip="Expandir cabeçalho" style="display: none;">
-            <i class="fa-solid fa-chevron-down"></i>
-        </div>
+        <!-- Linha restauradora para o cabeçalho quando recolhido -->
+        <div id="header-restore-trigger" class="header-restore-line" data-tooltip="Expandir cabeçalho" style="display: none;"></div>
 
         <!-- ── MAIN CONTENT WORKSPACE ───────────────────────────────────── -->
         <div class="workspace">
             <!-- ── LEFT SIDEBAR (COLLAPSIBLE - MEDIA LIBRARY) ─────────────── -->
             <aside class="sidebar-left glassmorphism" id="sidebar-left">
                 <div class="sidebar-header">
-                    <h2>
+                    <button class="btn-toggle-sidebar" id="toggle-left" title="Recolher Painel" style="margin-right: 4px; padding: 4px; font-size: 12px;">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <h2 style="flex: 1; display: flex; align-items: center; gap: 8px; margin-left: 2px;">
                         <i class="fa-solid fa-folder-open"></i> <span class="header-title-text">Biblioteca</span>
                         <button id="btn-reload-library" class="btn-icon" title="Recarregar Biblioteca" style="margin-left: 6px; font-size: 13px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: color 0.2s;">
                             <i class="fa-solid fa-arrows-rotate"></i>
@@ -113,9 +114,6 @@
                         <button id="btn-toggle-library-filters" class="btn-icon" title="Ocultar Filtros/Abas" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-eye"></i></button>
                         <button id="btn-maximize-library" class="btn-icon" title="Layout Estúdio (biblioteca + players + timeline)" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-expand"></i></button>
                         <button id="btn-popout-library" class="btn-icon" title="Destacar Biblioteca" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
-                        <button class="btn-toggle-sidebar" id="toggle-left" title="Recolher Painel">
-                            <i class="fa-solid fa-chevron-left"></i>
-                        </button>
                     </div>
                 </div>
                 
@@ -310,10 +308,8 @@
             </aside>
 
             
-            <!-- Botão flutuante para reabrir Sidebar Esquerda -->
-            <button class="btn-reopen-sidebar left" id="reopen-left" data-tooltip="Abrir Biblioteca de Mídias">
-                <i class="fa-solid fa-chevron-right"></i>
-            </button>
+            <!-- Linha restauradora para a Sidebar Esquerda (no fluxo flexbox) -->
+            <div id="reopen-left" class="left-restore-line" data-tooltip="Expandir Biblioteca de Mídias" style="display: none;"></div>
 
             <!-- ── CENTER AREA (ADVANCED PLAYER & TIMELINE) ────────────────── -->
             <main class="center-stage">
@@ -714,10 +710,8 @@
                 </div>
             </aside>
             
-            <!-- Botão flutuante para reabrir Sidebar Direita -->
-            <button class="btn-reopen-sidebar right" id="reopen-right" data-tooltip="Abrir Painel de Transcrição & Falas">
-                <i class="fa-solid fa-chevron-left"></i>
-            </button>
+            <!-- Linha restauradora para a Sidebar Direita (no fluxo flexbox) -->
+            <div id="reopen-right" class="right-restore-line" data-tooltip="Expandir Transcrição & Falas" style="display: none;"></div>
         </div>
     </div>
     

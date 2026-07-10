@@ -186,6 +186,29 @@ body {
     font-size: 12px;
 }
 
+/* ── CLEAN BOXLESS STYLING FOR HEADER ── */
+.header .project-area {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 4px !important;
+}
+
+.header .search-area {
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid var(--border-glass) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 0 2px 0 !important;
+    transition: border-bottom-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.header .search-area:focus-within {
+    border-bottom-color: var(--color-cyan) !important;
+    box-shadow: 0 1px 0 var(--color-cyan) !important;
+}
+
 /* ── CUSTOM PREMIUM TOOLTIPS (GLOBAL JS ENGINE) ────────────────────── */
 #global-tooltip {
     position: fixed;
@@ -229,41 +252,100 @@ body {
     pointer-events: none;
 }
 
-.header-restore-btn {
-    position: fixed;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 32px;
-    height: 14px;
-    background: rgba(138, 92, 246, 0.15);
-    border: 1px solid rgba(138, 92, 246, 0.3);
-    border-top: none;
-    border-radius: 0 0 6px 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.header-restore-line {
+    display: none; /* Controlled dynamically by JS */
+    width: 100%;
+    height: 4px;
+    background: rgba(6, 182, 212, 0.15);
+    border-bottom: 1px solid rgba(6, 182, 212, 0.3);
     cursor: pointer;
-    z-index: 1000;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    transition: background 0.2s, height 0.2s;
+    z-index: 100;
+    transition: background 0.2s, box-shadow 0.2s;  /* NO height/width transition to avoid flicker */
+    flex-shrink: 0;
 }
 
-.header-restore-btn i {
-    font-size: 8px;
-    color: var(--color-violet);
-    transition: transform 0.2s;
+.header-restore-line:hover {
+    background: rgba(6, 182, 212, 0.85);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
 }
 
-.header-restore-btn:hover {
-    background: var(--color-violet);
-    height: 18px;
+/* ── FLAT HEADER BUTTONS STYLING ── */
+.header button.btn-outline,
+.header button.btn-icon,
+.header button.btn-secondary,
+.header button#btn-search {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text-secondary);
 }
 
-.header-restore-btn:hover i {
-    color: #fff;
-    transform: scale(1.2);
+/* Hover base scale */
+.header button.btn-outline:hover,
+.header button.btn-icon:hover,
+.header button.btn-secondary:hover,
+.header button#btn-search:hover {
+    transform: scale(1.1);
+}
+
+.header button.btn-outline i,
+.header button.btn-icon i,
+.header button.btn-secondary i,
+.header button#btn-search i {
+    transition: color 0.2s ease, text-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* Hover de Ícone Leve Mudança (rotate/scale/glow) */
+.header button.btn-outline:hover i,
+.header button.btn-icon:hover i,
+.header button.btn-secondary:hover i,
+.header button#btn-search:hover i {
+    transform: scale(1.05);
+}
+
+/* 1. Cores Temáticas e Brilhos (Glows) */
+/* CIANO - Ações Gerais & Navegação */
+#btn-scan:hover,
+#btn-import-external:hover,
+#btn-open-proxies:hover,
+#btn-sync-project:hover,
+#btn-collapse-header:hover,
+#btn-search:hover {
+    color: var(--color-cyan) !important;
+}
+#btn-scan:hover i,
+#btn-import-external:hover i,
+#btn-open-proxies:hover i,
+#btn-sync-project:hover i,
+#btn-collapse-header:hover i,
+#btn-search:hover i {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+
+/* VIOLETA - IA / Ações de Projeto */
+#btn-cluster:hover,
+#btn-new-project:hover {
+    color: var(--color-violet) !important;
+}
+#btn-cluster:hover i,
+#btn-new-project:hover i {
+    color: var(--color-violet) !important;
+    text-shadow: 0 0 8px var(--color-violet);
+}
+
+/* ROSA - Ações Destrutivas / Erro */
+#btn-delete-project:hover,
+#btn-retry-failed:hover {
+    color: var(--color-rose) !important;
+}
+#btn-delete-project:hover i,
+#btn-retry-failed:hover i {
+    color: var(--color-rose) !important;
+    text-shadow: 0 0 8px var(--color-rose);
 }
 
 /* ── BUTTONS ───────────────────────────────────────────────────────── */
@@ -439,89 +521,44 @@ button {
     display: block;
 }
 
-/* ── SIDEBAR REOPEN FLOATING BUTTONS ────────────────────────────────── */
-.btn-reopen-sidebar {
-    position: absolute;
-    z-index: 90;
-    background: var(--bg-glass);
-    border: 1px solid var(--border-glass);
-    color: var(--text-secondary);
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    box-shadow: var(--shadow-premium);
-    opacity: 0;
-    pointer-events: none;
-    transition: var(--transition-smooth);
+/* ── SIDEBAR RESTORE LINES (IN FLOW FLEXBOX) ────────────────────────── */
+.left-restore-line,
+.right-restore-line {
+    display: none; /* Controlled dynamically by JS */
+    width: 4px;
+    height: 100%;
+    cursor: pointer;
+    z-index: 100;
+    transition: background 0.2s, box-shadow 0.2s;  /* NO width/height transition to avoid flicker */
+    flex-shrink: 0;
 }
 
-.btn-reopen-sidebar:hover {
-    color: var(--color-violet);
-    border-color: var(--border-glass-glow);
-    transform: scale(1.1);
+/* Emerald for Left Sidebar (Media/Library) */
+.left-restore-line {
+    background: rgba(16, 185, 129, 0.15);
+    border-right: 1px solid rgba(16, 185, 129, 0.3);
+}
+.left-restore-line:hover {
+    background: rgba(16, 185, 129, 0.85);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
 }
 
-.btn-reopen-sidebar.left {
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 14px;
-    height: 32px;
-    border-radius: 0 6px 6px 0;
-    border-left: none;
-    background: rgba(138, 92, 246, 0.15);
-    border-color: rgba(138, 92, 246, 0.3);
-    box-shadow: none;
-    transition: background 0.2s, width 0.2s, opacity 0.2s;
+/* Violet for Right Sidebar (AI/Transcription) */
+.right-restore-line {
+    background: rgba(139, 92, 246, 0.15);
+    border-left: 1px solid rgba(139, 92, 246, 0.3);
+}
+.right-restore-line:hover {
+    background: rgba(139, 92, 246, 0.85);
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
 }
 
-.btn-reopen-sidebar.right {
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 14px;
-    height: 32px;
-    border-radius: 6px 0 0 6px;
-    border-right: none;
-    background: rgba(138, 92, 246, 0.15);
-    border-color: rgba(138, 92, 246, 0.3);
-    box-shadow: none;
-    transition: background 0.2s, width 0.2s, opacity 0.2s;
+/* Adjustments for borders to separate sidebars when docked in workspace */
+.workspace > .sidebar-left {
+    border-right: 1px solid var(--border-glass) !important;
 }
-
-.btn-reopen-sidebar.left i, .btn-reopen-sidebar.right i {
-    font-size: 8px;
-    color: var(--color-violet);
-    transition: transform 0.2s;
-}
-
-.btn-reopen-sidebar.left:hover, .btn-reopen-sidebar.right:hover {
-    background: var(--color-violet);
-    color: #fff;
-}
-
-.btn-reopen-sidebar.left:hover {
-    transform: translateY(-50%) scale(1);
-    width: 18px;
-}
-
-.btn-reopen-sidebar.right:hover {
-    transform: translateY(-50%) scale(1);
-    width: 18px;
-}
-
-.btn-reopen-sidebar.left:hover i, .btn-reopen-sidebar.right:hover i {
-    color: #fff;
-    transform: scale(1.2);
-}
-
-.btn-reopen-sidebar.visible {
-    opacity: 1;
-    pointer-events: auto;
+.workspace > .sidebar-right {
+    border-left: 1px solid var(--border-glass) !important;
 }
 
 /* ── MEDIA CARDS (LISTS) ────────────────────────────────────────────── */
@@ -3624,7 +3661,7 @@ select, .nle-select {
     padding: 3px 22px 3px 8px !important;
     font-size: 11px !important;
     font-weight: 600 !important;
-    font-family: inherit !important;
+    font-family: 'Outfit', sans-serif !important;
     outline: none !important;
     cursor: pointer !important;
     appearance: none !important;
