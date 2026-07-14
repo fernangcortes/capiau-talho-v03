@@ -1,6 +1,7 @@
 """Teste unitário para validação das exportações OTIO, XML e EDL com suporte a pistas de áudio da Fase 0."""
 import unittest
 import shutil
+import tempfile
 from pathlib import Path
 import opentimelineio as otio
 from src.config import CONFIG
@@ -13,9 +14,8 @@ from src.db.connection import get_db
 class TestF0OTIOTimelineExport(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Usar paths de teste temporários para não poluir ou sobrescrever o ambiente
-        cls.test_dir = Path(__file__).resolve().parent.parent / "data_test_otio_export"
-        cls.test_dir.mkdir(exist_ok=True)
+        # Diretorio proprio desta execucao, fora da arvore do repositorio
+        cls.test_dir = Path(tempfile.mkdtemp(prefix="capiau_otio_export_"))
         
         cls.original_db = CONFIG.DB_PATH
         cls.original_exports = CONFIG.EXPORTS_DIR

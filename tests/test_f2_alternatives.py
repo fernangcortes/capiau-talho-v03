@@ -1,6 +1,7 @@
 """Teste unitário para validação das mídias alternativas e origens dos clipes (Fase 2)."""
 import unittest
 import shutil
+import tempfile
 from pathlib import Path
 from src.config import CONFIG
 from src.db.schema import init_db
@@ -12,8 +13,8 @@ from unittest.mock import patch, MagicMock
 class TestF2Alternatives(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.test_dir = Path(__file__).resolve().parent.parent / "data_test_f2_alternatives"
-        cls.test_dir.mkdir(exist_ok=True)
+        # Diretorio proprio desta execucao, fora da arvore do repositorio
+        cls.test_dir = Path(tempfile.mkdtemp(prefix="capiau_f2_alternatives_"))
         
         cls.original_db = CONFIG.DB_PATH
         CONFIG.DB_PATH = cls.test_dir / "test_capiau_f2.db"

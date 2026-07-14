@@ -4,6 +4,7 @@ Usa CLIP real sobre fixtures sintéticas: uma "rajada" (mesma imagem com ruído 
 como quadros consecutivos de um disparo contínuo) e uma foto claramente diferente.
 """
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -111,8 +112,8 @@ class TestBurstReplication(unittest.TestCase):
         from src.config import CONFIG
         from src.db.schema import init_db
 
-        cls.test_dir = Path(__file__).resolve().parent.parent / "data_test_burst"
-        cls.test_dir.mkdir(exist_ok=True)
+        # Diretorio proprio desta execucao, fora da arvore do repositorio
+        cls.test_dir = Path(tempfile.mkdtemp(prefix="capiau_burst_"))
         cls._orig_db, cls._orig_proxies = CONFIG.DB_PATH, CONFIG.PROXIES_DIR
         CONFIG.DB_PATH = cls.test_dir / "test_burst.db"
         CONFIG.PROXIES_DIR = cls.test_dir / "proxies"

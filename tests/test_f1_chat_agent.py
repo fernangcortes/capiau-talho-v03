@@ -1,6 +1,7 @@
 """Teste unitário para validação das mutações na TimelineShadowCopy e integridade do ChatAgentService (Fase 1)."""
 import unittest
 import shutil
+import tempfile
 from pathlib import Path
 from src.config import CONFIG
 from src.db.schema import init_db
@@ -11,9 +12,8 @@ from src.services.chat_agent import TimelineShadowCopy, ChatAgentService
 class TestF1ChatAgent(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Configurar caminhos temporários
-        cls.test_dir = Path(__file__).resolve().parent.parent / "data_test_chat_agent"
-        cls.test_dir.mkdir(exist_ok=True)
+        # Diretorio proprio desta execucao, fora da arvore do repositorio
+        cls.test_dir = Path(tempfile.mkdtemp(prefix="capiau_chat_agent_"))
         
         cls.original_db = CONFIG.DB_PATH
         CONFIG.DB_PATH = cls.test_dir / "test_capiau_agent.db"
