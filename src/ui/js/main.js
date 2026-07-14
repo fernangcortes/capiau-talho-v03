@@ -7,6 +7,7 @@ import { ChatManager } from "./chat.js";
 import { ProjectsManager } from "./projects.js";
 import { FaceManager } from "./faces.js";
 import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
+import { SettingsPanelManager } from "./settingsPanel.js";
 import { initAutosave } from "./timelineAutosave.js";
 import { LOG_MANAGER } from "./logManager.js";
 
@@ -1051,6 +1052,46 @@ async function runSemanticSearch() {
 }
 window.runSemanticSearch = runSemanticSearch;
 
+/**
+ * Busca visual "Encontrar similares" (E2.B6): mostra no painel de busca as mídias
+ * visualmente próximas de uma foto ou de um momento de vídeo, via CLIP local.
+ * @param {"photo"|"video"} kind
+ * @param {number} id - photo_id ou video_id
+ * @param {{timestamp?: number, label?: string}} opts
+ */
+async function showSimilarMedia(kind, id, opts = {}) {
+    const searchContainer = getActiveElement("search-container");
+    if (searchContainer) {
+        searchContainer.innerHTML = "<div class='loading' style='padding: 15px;'>Buscando mídias visualmente similares (CLIP local)...</div>";
+    }
+    STATE.currentRightTab = "search";
+
+    SEARCH_STATE.query = "";
+    SEARCH_STATE.offset = 0;
+    SEARCH_STATE.hasMore = false; // resultado fechado: sem paginação/infinite scroll
+    SEARCH_STATE.isLoading = false;
+    SEARCH_STATE.loadedResults = [];
+    SEARCH_STATE.activeMediaFilter = "";
+    SEARCH_STATE.activeContextFilters.clear();
+    SEARCH_STATE.aiCategories = null;
+    SEARCH_STATE.activeAiCategory = null;
+    SEARCH_STATE.showAllTags = false;
+
+    try {
+        const params = new URLSearchParams({ project_id: STATE.currentProjectId });
+        if (kind === "video" && opts.timestamp != null) params.set("timestamp", opts.timestamp.toFixed(2));
+        const data = await CapIAuAPI.request(`/api/media/${kind}/${id}/similar?${params}`);
+        SEARCH_STATE.loadedResults = data.results || [];
+        renderSearchResults(opts.label ? `Similares a: ${opts.label}` : "Similares (visual)");
+    } catch (err) {
+        console.error("Erro na busca de similares:", err);
+        if (searchContainer) {
+            searchContainer.innerHTML = `<div class='error' style='padding: 15px;'>Erro ao buscar similares: ${err.message}</div>`;
+        }
+    }
+}
+window.showSimilarMedia = showSimilarMedia;
+
 // updateActionsRowVisibility removed as actions are now persistent inside each panel container
 
 // Inicialização da Aplicação
@@ -1145,9 +1186,12 @@ window.addEventListener("DOMContentLoaded", () => {
     const library = new LibraryManager();
     window.libraryManager = library;
     const panels = new PanelsManager();
+    window.panelsManager = panels;
     const chat = new ChatManager();
     const projects = new ProjectsManager();
     FaceManager.init();
+    const settingsPanel = new SettingsPanelManager();
+    window.settingsPanel = settingsPanel;
     
     // Inicializa o sistema de auto-salvamento local
     initAutosave();
@@ -1413,7 +1457,7 @@ window.addEventListener("DOMContentLoaded", () => {
         // pelo overflow:hidden), fazendo parecer que ele "não abre" após trocar de aba.
         const activeContainer = rightContainers[tab];
         if (activeContainer) {
-            activeContainer.style.display = (tab === "chat" || tab === "transcript" || tab === "logs" || tab === "vision") ? "flex" : "block";
+            activeContainer.style.display = (tab === "chat" || tab === "transcript" || tab === "logs" || tab === "vision" || tab === "tasks") ? "flex" : "block";
         }
         
         // Manter destaque no botão ativo

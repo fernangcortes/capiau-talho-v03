@@ -130,8 +130,9 @@ export class CapIAuAPI {
         return this.request(`/api/project/${projectId}/transcribe-all`, { method: "POST" });
     }
 
-    static analyzeVideoVision(videoId) {
-        return this.request(`/api/video/${videoId}/analyze-vision`, { method: "POST" });
+    static analyzeVideoVision(videoId, beatEmbedder = null) {
+        const qs = beatEmbedder ? `?beat_embedder=${beatEmbedder}` : "";
+        return this.request(`/api/video/${videoId}/analyze-vision${qs}`, { method: "POST" });
     }
 
     static analyzePhotoVision(photoId) {
@@ -381,6 +382,69 @@ export class CapIAuAPI {
 
     static backupDatabase() {
         return this.request("/api/project/backup-db", { method: "POST" });
+    }
+
+    // -- Painel de Configurações da IA
+    static fetchSettingsRegistry() {
+        return this.request("/api/settings/registry");
+    }
+
+    static fetchSettings(projectId = null) {
+        const qs = projectId ? `?project_id=${projectId}` : "";
+        return this.request(`/api/settings${qs}`);
+    }
+
+    static updateGlobalSettings(values) {
+        return this.request("/api/settings/global", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ values })
+        });
+    }
+
+    static updateProjectSettings(projectId, values) {
+        return this.request(`/api/settings/project/${projectId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ values })
+        });
+    }
+
+    static resetSettings(scope, projectId = null, keys = null) {
+        const url = scope === "project"
+            ? `/api/settings/project/${projectId}/reset`
+            : "/api/settings/global/reset";
+        return this.request(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keys })
+        });
+    }
+
+    static applySettingsPreset(presetId, scope = "global", projectId = null) {
+        return this.request("/api/settings/preset", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ preset_id: presetId, scope, project_id: projectId })
+        });
+    }
+
+    static fetchPrompts(projectId = null) {
+        const qs = projectId ? `?project_id=${projectId}` : "";
+        return this.request(`/api/settings/prompts${qs}`);
+    }
+
+    static updatePrompt(promptId, template, scope = "global", projectId = null) {
+        return this.request(`/api/settings/prompts/${encodeURIComponent(promptId)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ template, scope, project_id: projectId })
+        });
+    }
+
+    static deletePromptOverride(promptId, scope = "global", projectId = null) {
+        const qs = scope === "project" ? `?scope=project&project_id=${projectId}` : "?scope=global";
+        return this.request(`/api/settings/prompts/${encodeURIComponent(promptId)}${qs}`, { method: "DELETE" });
     }
 }
 

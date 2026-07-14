@@ -2,6 +2,7 @@
 import unittest
 import os
 import shutil
+import tempfile
 from pathlib import Path
 from src.config import CONFIG
 from src.db.schema import init_db
@@ -11,9 +12,8 @@ from src.search.semantic import SemanticSearch
 class TestDatabaseAndSemantic(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Usar paths de teste temporários para não sobrescrever o DB de produção
-        cls.test_dir = Path(__file__).resolve().parent.parent / "data_test"
-        cls.test_dir.mkdir(exist_ok=True)
+        # Diretorio proprio desta execucao, fora da arvore do repositorio
+        cls.test_dir = Path(tempfile.mkdtemp(prefix="capiau_database_"))
         
         # Sobrescrever temporariamente os caminhos da CONFIG
         cls.original_db = CONFIG.DB_PATH

@@ -150,6 +150,17 @@ def search_media(
     results = RAGService.search_hybrid(project_id, query, media_type=media_type, limit=limit, offset=offset)
     return {"query": query, "results": results}
 
+@router.get("/api/search/visual")
+def search_visual(
+    query: str = Query(..., min_length=1, alias="q"),
+    project_id: int = Query(1),
+    limit: int = Query(20)
+):
+    """Busca visual pura por CLIP local (texto → imagem, sem custo de API)."""
+    from src.search.image_semantic import ImageSearch
+    results = ImageSearch.get_instance().search_text(project_id, query, limit=limit)
+    return {"query": query, "results": results}
+
 @router.post("/api/search/categorize")
 def categorize_search(payload: SearchCategorizePayload):
     """Agrupa os resultados da busca em categorias semânticas via LLM."""

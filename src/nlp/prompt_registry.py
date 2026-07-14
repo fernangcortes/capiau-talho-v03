@@ -11,6 +11,23 @@ from src.db.connection import get_db
 
 # ── Catálogo de Prompts Padrão do Sistema ────────────────────────────────────
 
+# Taxonomia fixa de triagem (Eixo A — natureza do material, universal)
+TRIAGE_CATEGORIES: Dict[str, str] = {
+    "obra": "material da própria obra: takes de cena, stills de cena, material que pode ir ao corte final",
+    "processo": "registro do fazer: making of, bastidores de gravação, montagem de set, equipe trabalhando",
+    "depoimento": "entrevistas e falas dirigidas à câmera",
+    "cotidiano": "conversas informais, vida da equipe, registros sociais no entorno do trabalho",
+    "evento": "lançamentos, festivais, coletivas de imprensa, celebrações",
+    "tecnico": "testes de câmera/luz/som, calibração, claquetes vazias, enquadramentos de teste",
+    "arquivo": "material recebido de terceiros, banco de imagens, material histórico",
+    "pessoal": "sem relação com o projeto (registros pessoais que vieram junto no cartão)",
+    "documento": "papéis, telas, roteiros ou documentos filmados/fotografados",
+}
+
+def _triage_categories_block() -> str:
+    return "\n".join([f'- "{k}": {v}' for k, v in TRIAGE_CATEGORIES.items()])
+
+
 PROMPT_REGISTRY: Dict[str, Dict[str, Any]] = {
     "vision": {
         "label": "IA de Visão (Frames/Fotos)",
@@ -18,14 +35,36 @@ PROMPT_REGISTRY: Dict[str, Dict[str, Any]] = {
         "variables": {
             "context_block": "Bloco contendo objetos/locais e rostos confirmados na cena."
         },
-        "default": """Você é um assistente especialista em cinema. Analise esta imagem de bastidores (making of) ou set de filmagem.
+        "default": """Você é um assistente de catalogação de material audiovisual, especialista em cinema. Descreva o que esta imagem realmente mostra — NÃO presuma que se trata de bastidores, making of ou set de filmagem; pode ser uma conversa informal, um registro pessoal, uma cena da obra ou qualquer outra coisa.
 {context_block}
 Responda estritamente em Português e em formato JSON com a seguinte estrutura (não inclua marcações markdown adicionais, apenas o JSON puro):
 {
-  "descricao": "Uma frase concisa descrevendo o que está acontecendo e quem ou o que aparece na cena, usando nomes próprios do contexto quando aplicável",
+  "descricao": "Uma frase concisa e específica descrevendo o que está acontecendo e quem ou o que aparece, usando nomes próprios do contexto quando aplicável",
   "pessoas": ["nomes próprios ou descrições curtas das pessoas visíveis, ex: 'Fernando' ou 'homem de boné'"],
-  "objetos": ["objetos/equipamentos relevantes visíveis, ex: 'câmera Blackmagic', 'rebatedor', 'tripé'"],
-  "tags": ["tag1", "tag2", "tag3"]
+  "objetos": ["APENAS objetos relevantes para a cena ou listados no contexto do projeto; não liste itens banais de fundo"],
+  "tags": ["3 a 6 tags específicas sobre a AÇÃO, o LOCAL e o CONTEXTO (ex: 'ensaio de coreografia', 'cozinha', 'entardecer'); PROIBIDO tags genéricas como 'making of', 'bastidores', 'set de filmagem', 'cinema', 'filmagem', 'vídeo', 'foto'"]
+}"""
+    },
+    "triage": {
+        "label": "IA de Triagem (Categoria & Título)",
+        "category": "vision",
+        "variables": {
+            "categories_block": "Lista das categorias válidas da taxonomia (Eixo A).",
+            "context_block": "Contexto disponível: nome do arquivo, pasta, trecho de transcrição, entidades do projeto."
+        },
+        "default": """Você é um assistente de catalogação de material audiovisual bruto de um projeto.
+Você verá um ou mais quadros extraídos de um MESMO arquivo (em ordem cronológica) e um contexto opcional.
+Sua tarefa é classificar O QUE este material é em relação à produção — observe com neutralidade, sem presumir nada.
+
+CATEGORIAS POSSÍVEIS (escolha exatamente UMA, a que melhor descreve o arquivo como um todo):
+{categories_block}
+{context_block}
+Responda estritamente em Português e em JSON puro (sem markdown):
+{
+  "categoria": "uma das chaves acima, ex: 'cotidiano'",
+  "confianca": 0.85,
+  "titulo": "título curto e específico de 3 a 6 palavras que diferencie este arquivo dos demais (ex: 'Almoço da equipe na varanda')",
+  "justificativa": "uma frase curta explicando a escolha"
 }"""
     },
     "enrichment_rewrite": {
@@ -36,7 +75,7 @@ Responda estritamente em Português e em formato JSON com a seguinte estrutura (
             "entities_block": "Lista das entidades confirmadas presentes na cena.",
             "replacements_block": "Lista de substituições literais obrigatórias."
         },
-        "default": """Você reescreve descrições de imagens de bastidores de filmagem inserindo os nomes REAIS confirmados.
+        "default": """Você reescreve descrições de imagens de um projeto audiovisual inserindo os nomes REAIS confirmados.
 
 DESCRIÇÃO ORIGINAL (gerada por IA de visão, com termos genéricos):
 "{original_description}"
@@ -66,7 +105,7 @@ Responda estritamente em JSON puro (sem markdown):
         },
         "default": """{persona_block}
 
-ESTADO ATUAL DA TIMELINE (corte em andamento do making of):
+ESTADO ATUAL DA TIMELINE (corte em andamento do projeto):
 {timeline_context}
 
 MATERIAL DISPONÍVEL NA BIBLIOTECA (candidatos para inserção):
@@ -114,34 +153,39 @@ Responda estritamente em JSON puro (sem markdown), mapeando pelo id do grupo:
         },
         "default": """Você é um editor sênior de documentários de cinema.
 Analise a transcrição abaixo (composta por trechos falados com marcação de tempo e falante) e gere metadados editoriais úteis para a montagem.
+Atenção: nem toda fala é uma entrevista formal — pode ser uma conversa informal, uma reunião ou uma instrução de trabalho. Descreva o que a transcrição realmente é.
 
 TRANSCRIÇÃO DO VÍDEO:
 {formatted_transcript}
 
 Responda estritamente em Português e em formato JSON com a seguinte estrutura (não inclua marcações markdown adicionais de código como ```json, responda apenas o JSON puro):
 {
-  "description": "Uma frase concisa resumindo quem é o entrevistado e o tema principal discutido (ex: Entrevista com o Diretor de Fotografia sobre a escolha da câmera RED e o tom sombrio)",
-  "summary": "Um resumo detalhado em tópicos (bullet points) destacando as principais ideias, reflexões ou histórias contadas na entrevista, adequado para entender o conteúdo sem assistir todo o clipe",
-  "tags": ["tag1", "tag2", "tag3"]
+  "titulo": "título curto de 3 a 6 palavras identificando quem fala e o assunto central (ex: 'Diretor sobre escolha da câmera')",
+  "description": "Uma frase concisa resumindo quem fala e o tema principal discutido",
+  "summary": "Um resumo detalhado em tópicos (bullet points) destacando as principais ideias, reflexões ou histórias contadas, adequado para entender o conteúdo sem assistir todo o clipe",
+  "tags": ["3 a 6 tags específicas sobre os ASSUNTOS tratados; PROIBIDO tags genéricas como 'entrevista', 'making of', 'bastidores', 'depoimento'"]
 }"""
     },
     "broll_summary": {
         "label": "Sumário de B-Rolls",
         "category": "vision",
         "variables": {
-            "formatted_visuals": "Sequência cronológica de descrições visuais dos frames do clipe."
+            "formatted_visuals": "Sequência cronológica de descrições visuais dos frames do clipe.",
+            "category_block": "Categoria de triagem do vídeo (quando conhecida)."
         },
-        "default": """Você é um editor sênior de documentários de cinema.
-Analise a sequência de ações visuais descritas abaixo, capturadas em frames a cada 10 segundos em um vídeo de B-roll (material de cobertura / bastidores), e gere metadados editoriais úteis.
-
+        "default": """Você é um editor sênior de cinema e vídeo.
+Analise a sequência cronológica de ações visuais descritas abaixo, capturadas em frames de um mesmo vídeo, e gere metadados editoriais úteis.
+Descreva o que o vídeo realmente mostra — NÃO presuma que é making of ou bastidores.
+{category_block}
 SEQUÊNCIA DE AÇÕES VISUAIS:
 {formatted_visuals}
 
 Responda estritamente em Português e em formato JSON com a seguinte estrutura (não inclua marcações markdown adicionais de código como ```json, responda apenas o JSON puro):
 {
-  "description": "Uma frase concisa descrevendo o conteúdo visual e a ação geral ocorrendo neste B-roll (ex: Bastidores da equipe preparando a iluminação e tripé da câmera no set de gravação externo)",
-  "summary": "Um resumo do desenrolar da ação ou cenário apresentado neste clipe, descrevendo sua utilidade e valor editorial/estético para a edição (ex: Sequência útil para transições, mostrando a interação informal entre o diretor e atores antes do 'ação')",
-  "tags": ["tag1", "tag2", "tag3"]
+  "titulo": "título curto de 3 a 6 palavras que diferencie este clipe dos demais (ex: 'Montagem da luz no galpão')",
+  "description": "Uma frase concisa descrevendo o conteúdo visual e a ação geral ocorrendo neste vídeo",
+  "summary": "Um resumo do desenrolar da ação ou cenário apresentado neste clipe, descrevendo sua utilidade e valor editorial/estético para a edição",
+  "tags": ["3 a 6 tags específicas sobre a AÇÃO, o LOCAL e o CONTEXTO; PROIBIDO tags genéricas como 'making of', 'bastidores', 'set de filmagem', 'b-roll', 'vídeo'"]
 }"""
     },
     "theme_clustering": {
@@ -150,8 +194,8 @@ Responda estritamente em Português e em formato JSON com a seguinte estrutura (
         "variables": {
             "formatted_transcript": "Transcrição formatada de entradas de depoimentos."
         },
-        "default": """Você é um editor sênior de documentários de cinema. 
-Analise a transcrição abaixo (composta de trechos de making of e bastidores de um filme) e identifique de 5 a 8 temas/tópicos narrativos principais abordados (ex: "Direção de Atores", "Desafios de Efeitos Especiais", "Desenvolvimento de Roteiro", "Luz e Fotografia", etc.).
+        "default": """Você é um editor sênior de documentários de cinema.
+Analise a transcrição abaixo (composta de trechos de falas do material bruto de um projeto audiovisual) e identifique de 5 a 8 temas/tópicos narrativos principais abordados (ex: "Direção de Atores", "Desafios de Efeitos Especiais", "Desenvolvimento de Roteiro", "Luz e Fotografia", etc.).
 
 Para cada tema identificado:
 1. Crie um título claro e profissional.
@@ -179,9 +223,10 @@ Responda estritamente em Português e em formato JSON puro, sem marcações mark
             "context_str": "Trechos relevantes do projeto injetados da base vetorial."
         },
         "default": """Você é o Assistente IA do CapIAu-Talho, um co-editor e assistente de roteiro/produção de cinema inteligente.
-Você ajuda o usuário a montar seu filme a partir do material de bastidores (making of), fotos de set e documentos de produção.
+Você ajuda o usuário a montar seu filme a partir do material bruto do projeto: vídeos (falas, cenas, registros diversos), fotos e documentos de produção.
 
-Ao responder às perguntas do usuário, use o contexto fornecido abaixo, que contém trechos de transcrição de depoimentos, descrições visuais de B-roll, descrições de fotos de set e documentos de produção.
+Ao responder às perguntas do usuário, use o contexto fornecido abaixo, que contém trechos de transcrição de falas, descrições visuais de vídeos, descrições de fotos e documentos de produção.
+Diversifique as mídias que você sugere: quando houver alternativas no contexto, evite repetir sempre os mesmos arquivos e trechos já citados nesta conversa.
 IMPORTANTE: Sempre cite as mídias específicas em sua resposta quando apropriado, usando o formato de link markdown exato:
 - Para vídeos (entrevistas ou b-rolls): `[Texto descritivo ou Nome do Arquivo](video_id: ID_DO_VIDEO, start: START_TIME, end: END_TIME)` (Ex: [Depoimento do Diretor](video_id: 2, start: 15.4, end: 28.0)). O player pulará para esse tempo.
 - Para fotos: `[Texto descritivo](photo_id: ID_DA_FOTO)` (Ex: [Foto da equipe de luz](photo_id: 5)).

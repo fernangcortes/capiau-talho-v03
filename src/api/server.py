@@ -16,7 +16,7 @@ from src.core.tasks import TASK_MANAGER
 from src.db.schema import init_db
 from src.db.connection import get_db
 from src.db.repositories.media import MediaRepository
-from src.api.routes import projects, media, narrative, faces, entities
+from src.api.routes import projects, media, narrative, faces, entities, settings
 
 # Silencia polling logs repetitivos do uvicorn no terminal
 class EndpointFilter(logging.Filter):
@@ -76,6 +76,7 @@ app.include_router(media.router)
 app.include_router(narrative.router)
 app.include_router(faces.router)
 app.include_router(entities.router)
+app.include_router(settings.router)
 
 @app.on_event("shutdown")
 def on_shutdown_cleanup() -> None:

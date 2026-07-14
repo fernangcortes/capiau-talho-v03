@@ -51,3 +51,4 @@ docs/graficos/
 
 # Metadados e arquivos temporários locais
 .claude/
+.gemini/

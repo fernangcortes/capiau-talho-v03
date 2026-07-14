@@ -81,6 +81,9 @@
                 <button id="btn-cluster" class="btn-secondary" data-tooltip="Executar inteligência artificial para agrupar e organizar trechos e transcrições em blocos temáticos.">
                     <i class="fa-solid fa-brain"></i>
                 </button>
+                <button id="btn-open-settings" class="btn-outline" data-tooltip="Abrir Painel de Configurações da IA (Modelos, Chaves e Parâmetros)">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
                 <button id="btn-collapse-header" class="btn-outline" data-tooltip="Ocultar cabeçalho para expandir o espaço vertical de trabalho e edição.">
                     <i class="fa-solid fa-chevron-up"></i>
                 </button>
@@ -427,6 +430,9 @@
                                     <button id="btn-inspector-ai-detect-faces" class="btn-secondary" style="height: 30px; font-size: 11px; display: flex; align-items: center; gap: 8px; justify-content: flex-start; padding-left: 12px; cursor: pointer; border-radius: 4px; background: rgba(255,255,255,0.03); color: var(--text-primary); border: 1px solid var(--border-glass);">
                                         <i class="fa-solid fa-user-gear" style="color: var(--color-cyan);"></i> Detectar & Agrupar Rostos
                                     </button>
+                                    <button id="btn-inspector-ai-similar" class="btn-secondary" title="Buscar mídias visualmente parecidas com o frame atual do player (CLIP local, sem custo de API)" style="height: 30px; font-size: 11px; display: flex; align-items: center; gap: 8px; justify-content: flex-start; padding-left: 12px; cursor: pointer; border-radius: 4px; background: rgba(255,255,255,0.03); color: var(--text-primary); border: 1px solid var(--border-glass);">
+                                        <i class="fa-solid fa-images" style="color: #a855f7;"></i> Encontrar Similares (Visual)
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -760,6 +766,9 @@
                                 <button id="btn-analyze-vision-all" class="flat-sub-btn" data-tooltip="Analisar todos os B-rolls do projeto">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i> Tudo
                                 </button>
+                                <button id="btn-reanalyze-beats-clip" class="flat-sub-btn" data-tooltip="Reanalisar o clipe selecionado usando CLIP na deriva dos beats (mais preciso, porém mais lento)">
+                                    <i class="fa-solid fa-clapperboard"></i> Beats CLIP
+                                </button>
                             </div>
                         </div>
                         <!-- Feed de Visão IA -->
@@ -772,10 +781,27 @@
                     </div>
 
                     <!-- Tab: Tarefas -->
-                    <div class="transcript-feed" id="tasks-container" style="display: none;">
-                        <div class="empty-state">
-                            <i class="fa-solid fa-list-check"></i>
-                            <p>Nenhuma tarefa em execução.</p>
+                    <div id="tasks-container" style="display: none; flex-direction: column; height: 100%; overflow: hidden; padding: 0;">
+                        <!-- Sub-header de Ações das Tarefas -->
+                        <div class="panel-sub-actions" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-bottom: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.12); flex-shrink: 0;">
+                            <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
+                                <i class="fa-solid fa-list-check" style="color: var(--color-cyan);"></i> Tarefas
+                            </span>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <button id="btn-tasks-toggle-thumbs" class="flat-sub-btn" data-tooltip="Mostrar/ocultar miniaturas nas tarefas">
+                                    <i class="fa-solid fa-image"></i> Thumbs
+                                </button>
+                                <button id="btn-tasks-toggle-compact" class="flat-sub-btn" data-tooltip="Alternar entre cartões e lista compacta de uma linha">
+                                    <i class="fa-solid fa-bars"></i> Compacto
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Feed rolável de tarefas -->
+                        <div id="tasks-feed-scroll" class="scrollable" style="flex: 1; overflow-y: auto; min-height: 0; padding: 12px;">
+                            <div class="empty-state">
+                                <i class="fa-solid fa-list-check"></i>
+                                <p>Nenhuma tarefa em execução.</p>
+                            </div>
                         </div>
                     </div>
 
@@ -807,6 +833,9 @@
                                     <i class="fa-solid fa-key"></i> <span class="label-text">Chave API:</span>
                                 </label>
                                 <input type="password" id="agent-api-key-input" placeholder="OpenRouter API Key (deixe vazio para usar a do .env)..." style="flex: 1; height: 24px; font-size: 11px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-primary); padding: 0 6px; outline: none;">
+                            </div>
+                            <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px; margin-bottom: 2px; text-align: right; width: 100%;">
+                                Ajustes finos no <a href="#" id="link-open-settings-from-chat" style="color: var(--color-cyan); text-decoration: none;">painel de configurações da IA</a>.
                             </div>
                         </div>
                         <div class="chat-main-layout" style="display: flex; flex: 1; overflow: hidden; position: relative; width: 100%;">
@@ -1122,6 +1151,7 @@
             <div class="modal-footer" style="justify-content: center; padding-top: 10px; border-top: 1px solid var(--border-glass); gap: 10px;">
                 <span id="photo-viewer-counter" style="font-size: 11px; color: var(--text-muted); margin-right: 15px;">Foto 0 de 0</span>
                 <button id="btn-analyze-photo-vision" class="btn-primary" style="height: 30px; font-size: 12px; padding: 0 15px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Analisar com IA</button>
+                <button id="btn-photo-viewer-similar" class="btn-secondary" title="Buscar mídias visualmente parecidas (CLIP local, sem custo de API)" style="height: 30px; font-size: 12px; padding: 0 15px; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc;"><i class="fa-solid fa-images"></i> Similares</button>
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <input id="photo-viewer-duration" type="number" min="0.5" step="0.5" value="5" title="Duração (segundos) do still na timeline" style="width: 54px; height: 30px; font-size: 12px; text-align: center; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); border-radius: 6px; color: #fff;">
                     <button id="btn-add-photo-timeline" class="btn-primary btn-append" style="height: 30px; font-size: 12px; padding: 0 15px; display: flex; align-items: center; gap: 6px;" title="Adicionar esta foto à timeline (still)"><i class="fa-solid fa-plus"></i> Adicionar à timeline</button>
@@ -1269,6 +1299,38 @@
     <div id="timeline-preview-card">
         <video autoplay muted loop playsinline></video>
         <div class="preview-info">00:00:00:00</div>
+    </div>
+
+    <!-- Modal de Configurações da IA -->
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content settings-modal-content glassmorphism">
+            <div class="settings-modal-header">
+                <h2><i class="fa-solid fa-gears"></i> Configurações da IA</h2>
+                <div class="settings-header-controls">
+                    <div id="settings-scope-selector" class="settings-scope-selector">
+                        <button class="scope-btn active" data-scope="global">Global</button>
+                        <button id="settings-scope-project-btn" class="scope-btn" data-scope="project">Projeto atual</button>
+                    </div>
+                    <div id="settings-mode-switch" class="settings-mode-switch">
+                        <button class="mode-btn active" data-mode="simple">Simples</button>
+                        <button class="mode-btn" data-mode="pro">Profissional</button>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btn-close-settings-modal">&times;</button>
+            </div>
+            <div class="settings-modal-body">
+                <nav id="settings-nav" class="settings-nav"></nav>
+                <div id="settings-content" class="settings-content"></div>
+            </div>
+            <div class="settings-modal-footer">
+                <div id="settings-presets" class="settings-presets"></div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span id="settings-dirty-count" class="settings-dirty-count" style="font-size: 11px; color: var(--color-rose);"></span>
+                    <button id="btn-settings-discard" class="btn-outline" style="height: 36px; padding: 0 15px; font-size: 12px;" disabled>Descartar</button>
+                    <button id="btn-settings-save" class="btn-primary" style="height: 36px; padding: 0 15px; font-size: 12px;" disabled>Salvar</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal de Ajuda de Atalhos e Manual -->

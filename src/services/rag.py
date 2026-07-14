@@ -132,6 +132,54 @@ def enrich_description(text: str, names: List[str], text_replacements: Optional[
 class RAGService:
 
     @staticmethod
+    def _mmr_rerank(results: List[Dict[str, Any]], query: str, lambda_: float = 0.7, pool: int = 40) -> List[Dict[str, Any]]:
+        """Re-ranking Maximal Marginal Relevance: diversifica os resultados do topo.
+
+        Resultados quase idênticos entre si (ex: vários frames do mesmo assunto)
+        deixam de monopolizar as primeiras posições. Resultados de match exato
+        (rostos/falantes, score >= 0.95) ficam fixados no topo, fora do MMR.
+        """
+        if len(results) < 3 or lambda_ >= 0.999:
+            return results
+
+        pinned = [r for r in results if r.get("score", 0.0) >= 0.95]
+        rest = [r for r in results if r.get("score", 0.0) < 0.95]
+        if len(rest) < 3:
+            return results
+
+        head = rest[:pool]
+        tail = rest[pool:]
+        try:
+            import numpy as np
+            engine = SemanticSearch.get_instance()
+            texts = [str(r.get("payload", {}).get("text", ""))[:400] or " " for r in head]
+            vecs = engine.encoder.encode([query] + texts, show_progress_bar=False)
+            vecs = np.asarray(vecs, dtype=np.float32)
+            norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0
+            vecs = vecs / norms
+            qv, dv = vecs[0], vecs[1:]
+            rel = dv @ qv
+
+            selected: List[int] = []
+            remaining = list(range(len(head)))
+            while remaining:
+                if not selected:
+                    best = max(remaining, key=lambda i: float(rel[i]))
+                else:
+                    def mmr_score(i: int) -> float:
+                        max_sim = max(float(dv[i] @ dv[j]) for j in selected)
+                        return lambda_ * float(rel[i]) - (1.0 - lambda_) * max_sim
+                    best = max(remaining, key=mmr_score)
+                selected.append(best)
+                remaining.remove(best)
+
+            return pinned + [head[i] for i in selected] + tail
+        except Exception as e:
+            print(f"[RAGSearch] Falha no re-ranking MMR (mantendo ordem original): {e}")
+            return results
+
+    @staticmethod
     def search_hybrid(project_id: int, query: str, media_type: Optional[str] = None, limit: int = 30, offset: int = 0) -> List[Dict[str, Any]]:
         """Realiza busca híbrida: cruzando rostos/falantes no SQLite e vetores no Qdrant."""
         face_results = []
@@ -154,7 +202,7 @@ class RAGService:
                     cursor.execute("SELECT DISTINCT name FROM face WHERE photo_id = ? AND name IS NOT NULL AND name != 'Não Relevante' AND name != 'Não é Rosto'", (pr["photo_id"],))
                     names = [r["name"] for r in cursor.fetchall()]
                     
-                    raw_desc = pr["description"] or "Foto de bastidores."
+                    raw_desc = pr["description"] or "Foto sem descrição."
                     enriched_desc = enrich_description(raw_desc, names)
                     
                     face_results.append({
@@ -187,7 +235,7 @@ class RAGService:
                         pass
                     
                     if not frame_desc:
-                        frame_desc = vr["description"] or "Frame de bastidores."
+                        frame_desc = vr["description"] or "Trecho de vídeo sem descrição."
                         
                     # Obter os rostos rotulados no mesmo frame com 5s de tolerância
                     cursor.execute("""
@@ -261,9 +309,26 @@ class RAGService:
         except Exception as qdrant_err:
             print(f"[RAGSearch] Erro ao pesquisar no Qdrant: {qdrant_err}")
 
+        # 3b. Busca visual CLIP local — entra na fusão com peso configurável (E2.B3)
+        visual_results = []
+        try:
+            S_clip = SettingsService.get_settings(project_id)
+            img_weight = S_clip.get("search.image_weight")
+            if S_clip.get("clip.enabled") and img_weight > 0 and media_type != "interview":
+                from src.search.image_semantic import ImageSearch
+                for vh in ImageSearch.get_instance().search_text(project_id, query, limit=30):
+                    vp = dict(vh.get("payload") or {})
+                    if media_type and vp.get("media_type") != media_type:
+                        continue
+                    vp.setdefault("text", "")
+                    vp["match_source"] = "clip"
+                    visual_results.append({"score": vh["score"] * img_weight, "payload": vp})
+        except Exception as clip_err:
+            print(f"[RAGSearch] Busca visual indisponível: {clip_err}")
+
         # 4. Mescla resultados agrupando ocorrências por mídia
         media_groups = {} # key -> list of results
-        all_candidates = face_results + speaker_results + results
+        all_candidates = face_results + speaker_results + results + visual_results
         
         for r in all_candidates:
             payload = r.get("payload", {})
@@ -323,7 +388,7 @@ class RAGService:
                             # Enriquece com rostos conhecidos
                             cursor.execute("SELECT DISTINCT name FROM face WHERE photo_id = ? AND name IS NOT NULL AND name != 'Não Relevante' AND name != 'Não é Rosto'", (photo_id,))
                             names = [f_row["name"] for f_row in cursor.fetchall()]
-                            raw_desc = photo_row["description"] or payload.get("text") or "Foto de bastidores."
+                            raw_desc = photo_row["description"] or payload.get("text") or "Foto sem descrição."
                             payload["text"] = enrich_description(raw_desc, names)
                             
                             proxy_relative = f"photos/proxy_photo_{photo_id}.webp"
@@ -353,7 +418,14 @@ class RAGService:
                         payload["text"] = enrich_description(raw_desc, names, text_replacements=replacements)
 
 
-        # 6. Atribui IDs estáveis para referência no frontend e categorização
+        # 6. Diversificação MMR: evita que resultados quase idênticos monopolizem o topo
+        try:
+            S = SettingsService.get_settings(project_id)
+            final_results = RAGService._mmr_rerank(final_results, query, lambda_=S.get("search.mmr_lambda"))
+        except Exception as mmr_err:
+            print(f"[RAGSearch] MMR indisponível: {mmr_err}")
+
+        # 7. Atribui IDs estáveis para referência no frontend e categorização
         for idx, r in enumerate(final_results):
             payload = r.get("payload", {})
             m_type = payload.get("media_type", "unknown")

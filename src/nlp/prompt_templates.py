@@ -4,7 +4,20 @@ Delegam a resolução dos templates para o PromptRegistry para suportar
 prompts editáveis pelo painel de configurações.
 """
 from typing import Optional
-from src.nlp.prompt_registry import get_prompt, PROMPT_REGISTRY
+from src.nlp.prompt_registry import get_prompt, PROMPT_REGISTRY, TRIAGE_CATEGORIES, _triage_categories_block
+
+# Rótulos amigáveis das categorias de triagem (para injetar em prompts e UI)
+CATEGORY_LABELS = {
+    "obra": "Obra (cena/take)",
+    "processo": "Making of / Processo",
+    "depoimento": "Depoimento",
+    "cotidiano": "Cotidiano da equipe",
+    "evento": "Evento",
+    "tecnico": "Material técnico",
+    "arquivo": "Arquivo / Terceiros",
+    "pessoal": "Pessoal / Sem relação",
+    "documento": "Documento",
+}
 
 # Mantido para retrocompatibilidade com chamadores legados
 VISION_PROMPT = PROMPT_REGISTRY["vision"]["default"]
@@ -16,9 +29,40 @@ TIMELINE_PERSONAS = {
 }
 
 
-def get_vision_prompt(known_entities: list = None, detected_people: list = None, project_id: Optional[int] = None) -> str:
+def get_triage_prompt(filename: str = "", folder_hint: str = "", transcript_snippet: str = "", known_entities: list = None, project_id: Optional[int] = None) -> str:
+    """Gera o prompt de triagem (categoria Eixo A + título) com o contexto barato disponível."""
+    context_lines = []
+    if filename:
+        context_lines.append(f"- Nome do arquivo: {filename}")
+    if folder_hint:
+        context_lines.append(f"- Pasta de origem: {folder_hint}")
+    if transcript_snippet:
+        context_lines.append(f"- Trecho da transcrição do áudio: \"{transcript_snippet[:800]}\"")
+    if known_entities:
+        names = ", ".join([e["name"] for e in known_entities[:30]])
+        context_lines.append(f"- Pessoas/objetos/locais já catalogados no projeto: {names}")
+
+    context_block = ""
+    if context_lines:
+        context_block = "\nCONTEXTO DISPONÍVEL (pistas, não verdades absolutas — a imagem manda):\n" + "\n".join(context_lines) + "\n"
+
+    return get_prompt(
+        "triage",
+        project_id=project_id,
+        categories_block=_triage_categories_block(),
+        context_block=context_block
+    )
+
+
+def get_vision_prompt(known_entities: list = None, detected_people: list = None, project_id: Optional[int] = None, category: Optional[str] = None) -> str:
     """Gera o prompt de visão estruturado, injetando entidades conhecidas do projeto."""
     context_block = ""
+    if category and category in TRIAGE_CATEGORIES:
+        label = CATEGORY_LABELS.get(category, category)
+        context_block += (
+            f"\nCLASSIFICAÇÃO DO ARQUIVO: este vídeo foi classificado como '{label}' "
+            f"({TRIAGE_CATEGORIES[category]}). Descreva o frame dentro desse contexto, sem repetir a categoria como descrição."
+        )
     if known_entities:
         objects = [e["name"] for e in known_entities if e.get("entity_type") in ("object", "location", "other")]
         if objects:
@@ -44,6 +88,20 @@ def get_vision_prompt(known_entities: list = None, detected_people: list = None,
         )
 
     return get_prompt("vision", project_id=project_id, context_block=context_block)
+
+
+def get_photo_vision_prompt(known_entities: list = None, detected_people: list = None, project_id: Optional[int] = None) -> str:
+    """Prompt de visão para FOTOS: descrição + triagem (categoria/título) em uma única chamada."""
+    base = get_vision_prompt(known_entities, detected_people, project_id=project_id)
+    cats = ", ".join([f"'{k}'" for k in TRIAGE_CATEGORIES.keys()])
+    suffix = (
+        "\n\nADICIONALMENTE, inclua no MESMO objeto JSON os campos de triagem desta foto:\n"
+        f'  "categoria": a chave que melhor descreve a foto, entre: {cats}\n'
+        '  "confianca": número de 0.0 a 1.0\n'
+        '  "titulo": "título curto de 3 a 6 palavras específico desta foto"\n'
+        "Definições das categorias:\n" + _triage_categories_block()
+    )
+    return base + suffix
 
 
 def get_enrichment_rewrite_prompt(original_description: str, entities: list, replacements: dict = None, project_id: Optional[int] = None) -> str:
@@ -107,9 +165,13 @@ def get_interview_summary_prompt(formatted_transcript: str, project_id: Optional
     return get_prompt("interview_summary", project_id=project_id, formatted_transcript=formatted_transcript)
 
 
-def get_broll_summary_prompt(formatted_visuals: str, project_id: Optional[int] = None) -> str:
-    """Gera o prompt para sumarização de vídeos B-roll a partir de descrições de frames."""
-    return get_prompt("broll_summary", project_id=project_id, formatted_visuals=formatted_visuals)
+def get_broll_summary_prompt(formatted_visuals: str, project_id: Optional[int] = None, category: Optional[str] = None) -> str:
+    """Gera o prompt para sumarização de vídeos a partir de descrições de frames."""
+    category_block = ""
+    if category and category in TRIAGE_CATEGORIES:
+        label = CATEGORY_LABELS.get(category, category)
+        category_block = f"CLASSIFICAÇÃO DO ARQUIVO: '{label}' ({TRIAGE_CATEGORIES[category]}).\n"
+    return get_prompt("broll_summary", project_id=project_id, formatted_visuals=formatted_visuals, category_block=category_block)
 
 
 def get_theme_clustering_prompt(formatted_transcript: str, project_id: Optional[int] = None) -> str:

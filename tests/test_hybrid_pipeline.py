@@ -2,6 +2,7 @@
 import unittest
 import os
 import shutil
+import tempfile
 import time
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -15,11 +16,9 @@ from src.ingest.watcher import ingest_file, generate_photo_proxy
 class TestIngestPipeline(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Pasta de testes dedicada - limpa se já existir para evitar banco sujo
-        cls.test_dir = Path(__file__).resolve().parent.parent / "data_test_ingest"
-        if cls.test_dir.exists():
-            shutil.rmtree(cls.test_dir, ignore_errors=True)
-        cls.test_dir.mkdir(exist_ok=True)
+        # Diretorio proprio desta execucao, fora da arvore do repositorio.
+        # Por ser sempre novo, nao ha banco sujo de rodada anterior para limpar.
+        cls.test_dir = Path(tempfile.mkdtemp(prefix="capiau_ingest_"))
         
         cls.original_db = CONFIG.DB_PATH
         cls.original_originals = CONFIG.ORIGINALS_DIR

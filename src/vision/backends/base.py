@@ -86,17 +86,17 @@ class FaceBackend(ABC):
         pass
 
     @abstractmethod
-    def detect(self, image_path: Path) -> List[FaceDetection]:
+    def detect(self, image_path: Path, project_id: Optional[int] = None) -> List[FaceDetection]:
         """Detecta rostos em uma imagem. Retorna lista de FaceDetection."""
         pass
 
     @abstractmethod
-    def recognize(self, image_path: Path, detections: List[FaceDetection]) -> List[FaceRecognition]:
+    def recognize(self, image_path: Path, detections: List[FaceDetection], project_id: Optional[int] = None) -> List[FaceRecognition]:
         """Reconhece rostos previamente detectados. Retorna lista de FaceRecognition."""
         pass
 
     @abstractmethod
-    def detect_and_recognize(self, image_path: Path) -> BackendResult:
+    def detect_and_recognize(self, image_path: Path, project_id: Optional[int] = None) -> BackendResult:
         """Executa deteccao + reconhecimento em uma imagem. Metodo principal."""
         pass
 

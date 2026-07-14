@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import unittest
 import json
+import tempfile
 import numpy as np
 from fastapi.testclient import TestClient
 from src.config import CONFIG
@@ -18,9 +19,8 @@ from src.api.server import app
 class TestFaceRecognitionAndClustering(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Pasta temporária para a execução do teste
-        cls.test_dir = Path(__file__).resolve().parent.parent / "data_test_face"
-        cls.test_dir.mkdir(exist_ok=True)
+        # Diretorio proprio desta execucao, fora da arvore do repositorio
+        cls.test_dir = Path(tempfile.mkdtemp(prefix="capiau_face_"))
         
         cls.original_db = CONFIG.DB_PATH
         CONFIG.DB_PATH = cls.test_dir / "test_face.db"

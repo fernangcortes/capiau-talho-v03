@@ -18,6 +18,7 @@ from src.db.repositories.media import MediaRepository
 from src.core.tasks import TASK_MANAGER
 from src.services.ingest import IngestService
 from src.services.pipeline import PipelineService
+from src.services.burst_service import group_photo_bursts, replicate_to_members
 from src.search.semantic import SemanticSearch
 
 router = APIRouter(tags=["Media & Ingestion"])
@@ -63,6 +64,43 @@ def list_photos(project_id: int = Query(1), conn: sqlite3.Connection = Depends(g
         except Exception:
             p['tags'] = []
     return photos
+
+def _enrich_image_hits(conn: sqlite3.Connection, hits: List[dict]) -> List[dict]:
+    """Decora hits da coleção CLIP com metadados do banco (fotos ganham nome/proxy/título).
+
+    Os cards da UI de busca esperam esses campos no payload; hits de vídeo já
+    carregam video_id/start_time e são resolvidos pelo frontend."""
+    results = []
+    cursor = conn.cursor()
+    for h in hits:
+        p = dict(h["payload"])
+        pid = p.get("photo_id")
+        if pid:
+            cursor.execute("SELECT filename, filepath, title, description FROM photo WHERE id = ?", (pid,))
+            row = cursor.fetchone()
+            if row:
+                p.update({"filename": row["filename"], "filepath": row["filepath"],
+                          "title": row["title"], "description": row["description"]})
+                p.setdefault("text", row["title"] or row["description"] or row["filename"])
+            proxy_rel = f"photos/proxy_photo_{pid}.webp"
+            if (CONFIG.PROXIES_DIR / proxy_rel).exists():
+                p["proxy_path"] = f"/proxies/{proxy_rel}"
+        results.append({"id": h.get("id"), "score": h["score"], "payload": p})
+    return results
+
+@router.get("/api/media/photo/{photo_id}/similar")
+def photo_similar(photo_id: int, project_id: int = Query(1), limit: int = Query(12), conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Fotos visualmente próximas via CLIP local (E2.B6)."""
+    from src.search.image_semantic import ImageSearch
+    hits = ImageSearch.get_instance().similar_to_photo(project_id, photo_id, limit=limit)
+    return {"photo_id": photo_id, "results": _enrich_image_hits(conn, hits)}
+
+@router.get("/api/media/video/{video_id}/similar")
+def video_similar(video_id: int, project_id: int = Query(1), timestamp: float = Query(0.0), limit: int = Query(12), conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Trechos/fotos visualmente próximos do keyframe indexado mais perto do timestamp (E2.B6)."""
+    from src.search.image_semantic import ImageSearch
+    hits = ImageSearch.get_instance().similar_to_video_moment(project_id, video_id, timestamp=timestamp, limit=limit)
+    return {"video_id": video_id, "timestamp": timestamp, "results": _enrich_image_hits(conn, hits)}
 
 @router.post("/api/ingest/select-folder")
 def select_folder_dialog():
@@ -118,9 +156,9 @@ def trigger_transcribe_all(project_id: int, background_tasks: BackgroundTasks, c
     """Inicia transcrição ASR em lote para todos os depoimentos pendentes do projeto."""
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, filepath 
-        FROM video 
-        WHERE project_id = ? AND status != 'transcribed' AND video_type IN ('interview', 'broll')
+        SELECT id, filepath
+        FROM video
+        WHERE project_id = ? AND status != 'transcribed' AND video_type IN ('interview', 'broll', 'unknown')
     """, (project_id,))
     rows = cursor.fetchall()
     
@@ -138,16 +176,28 @@ def trigger_transcribe_all(project_id: int, background_tasks: BackgroundTasks, c
     return {"status": "success", "message": f"Transcrição em lote de {len(rows)} vídeos iniciada.", "count": len(rows)}
 
 @router.post("/api/video/{video_id}/analyze-vision")
-def trigger_vision_video(video_id: int, background_tasks: BackgroundTasks, conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Inicia a decupagem visual multimodal do B-roll via OpenRouter Vision."""
+def trigger_vision_video(
+    video_id: int,
+    background_tasks: BackgroundTasks,
+    beat_embedder: Optional[str] = Query(None, description="Força 'hsv' ou 'clip' na deriva dos beats desta análise."),
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Inicia a decupagem visual multimodal do B-roll via OpenRouter Vision.
+
+    `beat_embedder=clip` reanalisa este vídeo com beats de melhor qualidade (mais
+    lento); sem o parâmetro usa o método padrão do projeto (HSV).
+    """
     video = MediaRepository.get_video(conn, video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
+    if beat_embedder not in (None, "hsv", "clip"):
+        raise HTTPException(status_code=400, detail="beat_embedder deve ser 'hsv' ou 'clip'.")
     filepath = Path(video['filepath'])
     duration = video['duration']
-    
-    background_tasks.add_task(PipelineService.analyze_video_vision, video_id, filepath, duration)
-    return {"status": "success", "message": "Decupagem visual do B-roll iniciada."}
+
+    background_tasks.add_task(PipelineService.analyze_video_vision, video_id, filepath, duration, beat_embedder)
+    msg = "Reanálise com beats CLIP iniciada." if beat_embedder == "clip" else "Decupagem visual do B-roll iniciada."
+    return {"status": "success", "message": msg}
 
 @router.post("/api/photo/{photo_id}/analyze-vision")
 def trigger_vision_photo(photo_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
@@ -187,13 +237,13 @@ def trigger_all_vision(
     """Analisa de forma assíncrona todas as mídias pendentes ou todas (se force=True) de visão, aplicando detecção facial e burst-sequencing de fotos."""
     cursor = conn.cursor()
     if force:
-        cursor.execute("SELECT id, filepath, duration FROM video WHERE project_id = ? AND video_type = 'broll'", (project_id,))
+        cursor.execute("SELECT id, filepath, duration FROM video WHERE project_id = ? AND video_type IN ('broll', 'unknown')", (project_id,))
         video_rows = cursor.fetchall()
-        
+
         cursor.execute("SELECT id, filepath FROM photo WHERE project_id = ?", (project_id,))
         photo_rows = cursor.fetchall()
     else:
-        cursor.execute("SELECT id, filepath, duration FROM video WHERE project_id = ? AND video_type = 'broll' AND status IN ('ingested', 'analyzing', 'error')", (project_id,))
+        cursor.execute("SELECT id, filepath, duration FROM video WHERE project_id = ? AND video_type IN ('broll', 'unknown') AND status IN ('ingested', 'analyzing', 'error')", (project_id,))
         video_rows = cursor.fetchall()
         
         cursor.execute("SELECT id, filepath FROM photo WHERE project_id = ? AND status IN ('ingested', 'pending', 'error')", (project_id,))
@@ -207,7 +257,7 @@ def trigger_all_vision(
             except Exception as e:
                 print(f"[VisionBatch] Erro no vídeo ID {v['id']}: {e}")
                 
-        # 2. Processa fotos sequencialmente
+        # 2. Fotos: agrupa rajadas por semelhança visual (CLIP local) e analisa 1 por grupo
         photos_with_time = []
         for p in photo_rows:
             path = Path(p['filepath'])
@@ -218,47 +268,28 @@ def trigger_all_vision(
                 "mtime": mtime,
                 "parent_dir": str(path.parent)
             })
-            
+
         photos_with_time.sort(key=lambda x: (x["parent_dir"], x["mtime"]))
-        last_analyzed = None
-        
-        for p in photos_with_time:
-            photo_id = p["id"]
-            filepath = p["filepath"]
-            
-            # Detecta burst sequencial (fotos tiradas no mesmo diretório com intervalo menor que 5s)
-            is_sequence = False
-            if last_analyzed and last_analyzed["parent_dir"] == p["parent_dir"]:
-                time_diff = abs(p["mtime"] - last_analyzed["mtime"])
-                if time_diff < 5.0:
-                    is_sequence = True
-                    
-            if is_sequence:
-                # Reutiliza metadados para economizar tokens
+
+        groups = group_photo_bursts(project_id, photos_with_time)
+        for group in groups:
+            leader = group.leader
+            try:
+                PipelineService.analyze_photo_vision(leader["id"], leader["filepath"])
+            except Exception as ex:
+                print(f"[VisionBatch] Falha na análise da foto {leader['id']}: {ex}")
+                continue
+
+            if group.members:
+                for m in group.members:
+                    TASK_MANAGER.update_progress(f"photo-{m['id']}", 0.0, "running", task_type="vision")
                 try:
-                    with get_db() as con:
-                        cur = con.cursor()
-                        cur.execute("SELECT description, tags FROM photo WHERE id = ?", (last_analyzed["id"],))
-                        row = cur.fetchone()
-                        if row:
-                            desc = f"{row[0]} (Foto em sequência)"
-                            tags = json.loads(row[1]) if row[1] else []
-                            
-                            MediaRepository.update_photo_analysis(con, photo_id, desc, tags)
-                            
-                            # Indexa no Qdrant
-                            search_engine = SemanticSearch.get_instance()
-                            search_engine.index_photo_description(project_id, photo_id, desc, tags)
-                            con.commit()
+                    replicate_to_members(project_id, group)
                 except Exception as ex:
-                    print(f"[VisionBatch] Falha ao replicar metadados da foto {photo_id}: {ex}")
-            else:
-                try:
-                    PipelineService.analyze_photo_vision(photo_id, filepath)
-                    last_analyzed = p
-                except Exception as ex:
-                    print(f"[VisionBatch] Falha na análise da foto {photo_id}: {ex}")
-                    
+                    print(f"[VisionBatch] Falha ao replicar rajada da foto {leader['id']}: {ex}")
+                for m in group.members:
+                    TASK_MANAGER.update_progress(f"photo-{m['id']}", 100.0, "finished", task_type="vision")
+
     background_tasks.add_task(bg_vision_all)
     return {"status": "success", "message": "Análise visual em lote iniciada em background."}
 

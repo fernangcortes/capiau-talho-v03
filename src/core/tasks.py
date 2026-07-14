@@ -16,11 +16,13 @@ class TaskManager:
                 cls._instance._initialized = False
             return cls._instance
 
-    def __init__(self, max_workers: int = 2) -> None:
+    def __init__(self, max_workers: Optional[int] = None) -> None:
         if self._initialized:
             return
         self._lock = threading.Lock()
-        self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="capiau-worker")
+        from src.config import CONFIG
+        workers = max_workers if max_workers is not None else CONFIG.MAX_CONVERSION_WORKERS
+        self.executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="capiau-worker")
         self.active_processes: Dict[int, subprocess.Popen] = {}
         self.progress: Dict[str, Dict[str, Any]] = {}
         self.active_clustering: set = set()

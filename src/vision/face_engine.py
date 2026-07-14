@@ -5,6 +5,7 @@ import numpy as np
 import requests
 from pathlib import Path
 from src.db.connection import get_db
+from src.vision.cv_utils import imread_unicode
 
 _detector = None
 _recognizer = None
@@ -82,7 +83,7 @@ def detect_and_embed_faces(image_path: Path) -> list:
     Retorna uma lista de dicts: [{"box": [rx, ry, rw, rh], "embedding": [...]}, ...]
     """
     try:
-        img = cv2.imread(str(image_path))
+        img = imread_unicode(image_path)
         if img is None:
             return []
             

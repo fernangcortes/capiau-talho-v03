@@ -3,6 +3,7 @@ import unittest
 import os
 import shutil
 import json
+import tempfile
 from pathlib import Path
 from src.config import CONFIG
 from src.db.schema import init_db
@@ -16,22 +17,16 @@ from src.search.semantic import SemanticSearch
 class TestProjectExportImport(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Usar paths de teste temporários para não sobrescrever o DB de produção
-        cls.test_dir = Path(__file__).resolve().parent.parent / "data_test_export"
-        cls.test_dir.mkdir(exist_ok=True)
-        
+        # Diretorio proprio desta execucao, fora da arvore do repositorio.
+        # Por ser sempre novo, nao ha resto de rodada anterior para limpar aqui.
+        cls.test_dir = Path(tempfile.mkdtemp(prefix="capiau_export_"))
+
         # Sobrescrever temporariamente os caminhos da CONFIG
         cls.original_db = CONFIG.DB_PATH
         cls.original_qdrant = CONFIG.QDRANT_DB_PATH
-        
+
         CONFIG.DB_PATH = cls.test_dir / "test_capiau.db"
         CONFIG.QDRANT_DB_PATH = cls.test_dir / "test_qdrant.db"
-        
-        # Remover arquivos antigos de teste se houver
-        if CONFIG.DB_PATH.exists():
-            CONFIG.DB_PATH.unlink()
-        if CONFIG.QDRANT_DB_PATH.exists():
-            shutil.rmtree(CONFIG.QDRANT_DB_PATH, ignore_errors=True)
 
     @classmethod
     def tearDownClass(cls):
