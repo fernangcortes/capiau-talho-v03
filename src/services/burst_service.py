@@ -64,9 +64,11 @@ def group_photo_bursts(project_id: int, photos: List[Dict[str, Any]]) -> List[Bu
     if not S.get("burst.enabled") or not S.get("clip.enabled"):
         return [BurstGroup(leader=p) for p in photos]
 
-    threshold = float(S.get("burst.similarity_threshold", 0.97))
-    window = float(S.get("burst.time_window_s", 30))
-    max_size = int(S.get("burst.max_group_size", 30))
+    # Sem default aqui: o default é o do settings_registry (fonte da verdade).
+    # ResolvedSettings.get() é de 1 argumento — passar default levanta TypeError.
+    threshold = float(S.get("burst.similarity_threshold"))
+    window = float(S.get("burst.time_window_s"))
+    max_size = int(S.get("burst.max_group_size"))
 
     try:
         from src.search.image_semantic import ImageSearch

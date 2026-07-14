@@ -259,15 +259,29 @@ def trigger_all_vision(
                 
         # 2. Fotos: agrupa rajadas por semelhança visual (CLIP local) e analisa 1 por grupo
         photos_with_time = []
+        offline = 0
         for p in photo_rows:
             path = Path(p['filepath'])
-            mtime = path.stat().st_mtime if path.exists() else 0.0
+            exists = path.exists()
+            if not exists:
+                offline += 1
+            mtime = path.stat().st_mtime if exists else 0.0
             photos_with_time.append({
                 "id": p["id"],
                 "filepath": path,
                 "mtime": mtime,
                 "parent_dir": str(path.parent)
             })
+
+        # Original inacessível (cartão/HD externo desconectado) => mtime 0 para todas:
+        # a janela de tempo das rajadas vira inerte e o agrupamento passa a depender
+        # só de pasta + CLIP. O proxy WebP local ainda permite agrupar, mas o usuário
+        # precisa saber que uma salvaguarda saiu do ar — degradação silenciosa, não.
+        if offline:
+            print(f"[VisionBatch] ATENCAO: {offline} de {len(photo_rows)} fotos estao com o "
+                  f"original inacessivel; sem mtime a janela 'burst.time_window_s' nao filtra "
+                  f"nada e as rajadas serao decididas so por pasta + semelhanca CLIP. "
+                  f"Conecte o drive de origem para o agrupamento por tempo valer.")
 
         photos_with_time.sort(key=lambda x: (x["parent_dir"], x["mtime"]))
 

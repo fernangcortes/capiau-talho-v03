@@ -24,6 +24,17 @@ SETTINGS = {
 }
 
 
+def _resolved(values):
+    """Dublê de configurações com o tipo real (ResolvedSettings), não um dict.
+
+    Um dict aceita `.get(chave, default)` e o ResolvedSettings real não — foi essa
+    divergência que deixou passar um TypeError que quebrava o agrupamento inteiro
+    em produção enquanto estes testes passavam (14/07).
+    """
+    from src.services.settings_service import ResolvedSettings
+    return ResolvedSettings(values)
+
+
 def _make_fixtures():
     """3 quadros quase idênticos (ruído leve) + 1 imagem visualmente distinta."""
     from PIL import Image
@@ -59,7 +70,7 @@ class TestBurstGrouping(unittest.TestCase):
         _make_fixtures()
 
     def _group(self, photos, settings=None):
-        merged = {**SETTINGS, **(settings or {})}
+        merged = _resolved({**SETTINGS, **(settings or {})})
         # photo_image_path aponta para o proxy do app; nas fixtures o caminho já é o arquivo
         with patch("src.services.burst_service.SettingsService.get_settings", return_value=merged), \
              patch("src.services.burst_service.photo_image_path", side_effect=lambda pid, fp: fp):
@@ -156,7 +167,7 @@ class TestBurstReplication(unittest.TestCase):
                      for i, pid in enumerate(ids[1:], start=1)],
         )
 
-        with patch("src.services.burst_service.SettingsService.get_settings", return_value=SETTINGS), \
+        with patch("src.services.burst_service.SettingsService.get_settings", return_value=_resolved(SETTINGS)), \
              patch("src.services.burst_service.SemanticSearch") as mock_sem, \
              patch("src.search.image_semantic.ImageSearch") as mock_img:
             from src.services.burst_service import replicate_to_members
@@ -193,7 +204,7 @@ class TestBurstReplication(unittest.TestCase):
         group = BurstGroup(leader={"id": pending, "filepath": FIXTURE_DIR / "burst_0.png"},
                            members=[{"id": member, "filepath": FIXTURE_DIR / "burst_1.png"}])
 
-        with patch("src.services.burst_service.SettingsService.get_settings", return_value=SETTINGS):
+        with patch("src.services.burst_service.SettingsService.get_settings", return_value=_resolved(SETTINGS)):
             self.assertEqual(replicate_to_members(project_id=1, group=group), 0)
 
 

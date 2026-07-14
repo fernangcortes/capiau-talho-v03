@@ -124,6 +124,38 @@ class TestKeyframePlanner(unittest.TestCase):
         segs = [{"start": t, "end": t + 0.5} for t in range(0, 400)]  # patológico
         self.assertLessEqual(len(self._plan(segs, 200.0, cap=26)), 26)
 
+    def test_ceiling_sacrifices_redundancy_not_coverage(self):
+        """Teto apertado corta fatia extra de plano longo, não corte distinto.
+
+        Regressão de qualidade: a subamostragem uniforme por índice apagava shots
+        curtos inteiros (material que a busca nunca encontraria) enquanto mantinha
+        fatias quase idênticas do mesmo plano longo.
+        """
+        # 1 plano de 200s (muitas fatias redundantes) + 12 cortes distintos de 4s
+        segs = [{"start": 0.0, "end": 200.0}]
+        segs += [{"start": 200.0 + i * 4, "end": 204.0 + i * 4} for i in range(12)]
+        dur = 248.0
+        jobs = self._plan(segs, dur, interval=10.0, min_gap=2.0, cap=16)
+        self.assertLessEqual(len(jobs), 16)
+
+        def coberto(seg):
+            return any(seg["start"] - 0.01 <= j["timestamp"] <= seg["end"] + 0.01 for j in jobs)
+
+        curtos = segs[1:]
+        cobertos = [s for s in curtos if coberto(s)]
+        self.assertEqual(len(cobertos), len(curtos),
+                         "todo corte distinto precisa de ao menos 1 keyframe: sem frame, "
+                         "o trecho não é descrito nem indexado e some da busca")
+
+    def test_no_segment_left_blind_when_budget_allows(self):
+        """Havendo orçamento para 1 por trecho, nenhum trecho fica sem keyframe."""
+        segs = [{"start": float(i * 6), "end": float(i * 6 + 6)} for i in range(20)]
+        jobs = self._plan(segs, 120.0, interval=10.0, min_gap=2.0, cap=20)
+        for s in segs:
+            self.assertTrue(
+                any(s["start"] - 0.01 <= j["timestamp"] <= s["end"] + 0.01 for j in jobs),
+                f"trecho {s['start']}-{s['end']}s ficou invisível para a busca")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -38,6 +38,7 @@ Código pronto e verificado (servidor sobe, migração aplicada, testes passam).
 - [x] **E1.T3** Fazer 3 buscas que antes retornavam resultados repetidos. O topo está mais variado? (MMR ativo; ajustar em Configurações → Temas & Busca → `search.mmr_lambda`.)
 - [x] **E1.T4** Perguntar ao chat algo que antes gerava sugestões repetidas; conferir diversidade.
 - [ ] **E1.T5** Se aprovado: reanálise completa (`analyze-all-vision?force=true`), reindexação de embeddings e re-clusterização de temas. **Atenção: custa API para o acervo inteiro (541 vídeos + 1.424 fotos).** ⚠️ **Não rodar antes de E2.B4 (dedupe de rajadas) e E2.C1 (perfis de esforço) estarem prontos — ambos reduzem diretamente o custo desta rodada única.**
+  ✅ **(14/07) Corrigido: caminhos das 1.424 fotos estavam obsoletos no banco.** Apontavam para `D:\makinof-monstro\Fotos\` (o `D:` atual é o disco de sistema, sem essa pasta); os arquivos reais estão em `F:\Making Off - O Monstro\Fotos O MONSTRO\`. Conferido 1.424/1.424 por nome (zero duplicatas, `filename` = basename), backup do banco tirado antes (`data/capiau.db.pre_fix_paths_*.bak`), `UPDATE` aplicado, verificado 0 caminhos quebrados após. Efeito: o CLIP e a análise de foto já funcionavam antes (usam o proxy WebP local), mas o **`mtime` estava zerado para as 1.424** → a trava `burst.time_window_s` (30s) do dedupe de rajadas rodava inerte, sem a proteção contra falso agrupamento. Com os caminhos corrigidos os mtimes agora são reais e a trava está ativa — remedição abaixo.
 - [ ] **E1.T6** Instalar `opentimelineio` quando houver solução para Python 3.14 (ou venv 3.12) para reativar exportação OTIO/XML/EDL.
 
 ---
@@ -45,7 +46,8 @@ Código pronto e verificado (servidor sobe, migração aplicada, testes passam).
 ## ETAPA 2 — Segmentação, CLIP local e análise condicional
 
 **Objetivo:** substituir o relógio de 10s por segmentação real (shots + beats), ganhar busca por imagem sem custo de API, e gastar análise cara só onde a categoria justifica.
-**Esforço estimado:** 2–3 semanas. **Custo de API esperado: cai** (menos frames, análise leve para categorias baratas).
+**Esforço estimado:** 2–3 semanas. ~~**Custo de API esperado: cai** (menos frames, análise leve para categorias baratas).~~
+**Corrigido em 14/07 com medição real (ver E2.E):** a segmentação **não** produz menos frames — produz **+13%** (o piso de cobertura garante `keyframes >= baseline`); as rajadas economizam **−6%** neste acervo, não uma ordem de grandeza. **A queda de custo vem essencialmente do E2.C1 (análise leve por categoria)**; sem ele a Etapa 2 sai **mais cara** que a Etapa 1. O que a segmentação entrega de fato é **precisão de janela** (E2.A6) e a base para as facetas (E2.D).
 
 ### E2.A — Segmentação (shots + beats)
 
@@ -68,6 +70,7 @@ Código pronto e verificado (servidor sobe, migração aplicada, testes passam).
 - [x] **E2.A5 — Integrar na visão**
   Em `analyze_video_vision`: quando `vision.use_segments = true` (novo setting, default true), extrair **1 keyframe por shot/beat (ponto médio)** em vez de frame a cada 10s. Manter `vision.frame_interval` como teto (nunca mais frames que duração/intervalo).
   *Aceite:* contagem de chamadas de visão por vídeo cai vs. baseline de 10s; log mostra "N segmentos → N chamadas".
+  ⚠️ **(14/07) O aceite de custo não é atendido e não é atingível como o código está.** Medido em material real: **+13% de keyframes**, não menos (ver tabela no E2.E). O piso de cobertura do `_plan_keyframes` garante `keyframes >= baseline` por construção. O log "N segmentos -> N keyframes" funciona; o que era falso era a premissa de economia. **O valor entregue por este item é o do E2.A6 (janela precisa), não custo.**
   ⚠️ **(14/07) Estava quebrado desde a implementação e ninguém viu.** O próprio log de sucesso continha `→`/`≤`, que o console cp1252 não codifica: o `UnicodeEncodeError` era engolido pelo `except` do bloco, que zerava `frame_jobs` e **rebaixava toda análise para o relógio fixo de 10s**, imprimindo "Falha na segmentação, usando relógio fixo". Como os segmentos são gravados no banco *antes* do log, `media_segment` ficava correto e a validação de beats (E2.A3) passava — mas a visão nunca usou os keyframes. **Nenhuma economia de API foi obtida até aqui.** Corrigido: log em ASCII e movido para fora do `try` (log não pode alterar o pipeline) + rede de segurança no boot. Verificado ponta a ponta: `2 segmentos -> 2 keyframes` no vídeo-fixture, com a API mockada.
 
 - [x] **E2.A6 — Fronteiras reais no Qdrant**
@@ -91,6 +94,35 @@ Código pronto e verificado (servidor sobe, migração aplicada, testes passam).
 - [x] **E2.B4 — Dedupe e rajadas de fotos**
   Agrupar fotos com similaridade CLIP > 0.97: coluna `burst_group_id` em `photo` (migração). Análise de visão roda **1x por grupo** e replica descrição/categoria/título para o grupo (com sufixo de variação).
   *Aceite:* rajada de 20 fotos = 1 chamada de API; biblioteca continua mostrando todas.
+  ⚠️ **(14/07, no E2.E) Estava quebrado em produção: `group_photo_bursts` levantava `TypeError` na primeira linha útil.** O código chamava `S.get("burst.similarity_threshold", 0.97)`, mas `ResolvedSettings.get()` aceita **1 argumento** — o default vem do `settings_registry`. Os 8 testes passavam porque o dublê de configuração era um **dict** (`dict.get(k, default)` aceita o default) em vez do tipo real. Como a chamada está fora de `try` no `analyze-all-vision`, o E1.T5 teria analisado os 529 vídeos e **quebrado inteiro na fase das fotos, sem agrupar nada**. Corrigido (sem default na chamada) e os testes agora usam `ResolvedSettings` de verdade — mesma classe de bug do E2.A5: o caminho real nunca era exercitado.
+  ⚠️ **Economia real medida no acervo (14/07): −6%, não a ordem de grandeza do aceite.** Dry-run nas 1.424 fotos reais (CLIP local, 7,2 min): **1.424 → 1.343 chamadas (81 economizadas, 72 rajadas, maior grupo = 4 fotos)**. O aceite "rajada de 20 fotos = 1 chamada" é propriedade da fixture sintética, não deste acervo. Além disso os originais estão em `D:\makinof-monstro\Fotos` (drive **offline**): sem `mtime` legível, **`burst.time_window_s` não filtra nada** e o agrupamento fica só por pasta + CLIP (e as 1.424 fotos estão todas na mesma pasta). Os proxies WebP locais existem (1.424/1.424), então o CLIP roda. Com o drive conectado a janela volta a valer e a economia **só pode diminuir** — os −6% são teto. Um aviso no log passou a sinalizar essa degradação em vez de deixá-la silenciosa.
+  **Sweep do limiar no acervo real (14/07)** — vetores CLIP das 1.424 fotos, mesma regra de encadeamento:
+
+  | limiar | chamadas | economia | rajadas | maior grupo |
+  |---|---|---|---|---|
+  | 0.99 | 1.407 | −1% | 16 | 3 |
+  | 0.985 (preset máx. qualidade) | 1.394 | −2% | 29 | 3 |
+  | **0.97 (default atual)** | **1.343** | **−6%** | 72 | 4 |
+  | 0.95 (preset econômico) | 1.262 | −11% | 133 | 5 |
+  | **0.93** | **1.159** | **−19%** | 195 | 8 |
+  | 0.90 | 1.009 | −29% | 268 | 10 |
+  | 0.85 | 805 | −43% | 354 | 11 |
+
+  **Inspeção visual (14/07): 3 grupos a 0.97 + os 30 maiores a 0.93**, em contact sheets gerados dos proxies (1 linha = 1 grupo, com o cosseno de cada foto contra a líder).
+  - **0.97 — 3/3 legítimos**, quadros praticamente idênticos (limiar conservador).
+  - **0.93 — 30/30 legítimos.** Nenhum falso agrupamento: mesma vista de janela com só o trânsito mudando, mesma pessoa à noite no mesmo caminho, mesmo carro no set, mesma bancada de maquiagem, mesmo pôr do sol. Nomes consecutivos (`IMG_3452`–`3459`) confirmam disparo contínuo.
+  - Deriva observada dentro de grupos legítimos: pessoas entram/saem de quadro (ex.: `IMG_3373`, alguém entra no 3º frame). A descrição herdada da líder não menciona quem chegou depois — aceitável para rajada, mas é o limite do método.
+
+  **Remedição (14/07) com a janela de tempo já ativa** (caminhos corrigidos, mtimes reais):
+
+  | limiar | chamadas | economia | rajadas | maior grupo |
+  |---|---|---|---|---|
+  | 0.97 | 1.343 | −6% (81) | 72 | 4 (igual a antes) |
+  | **0.93** | **1.164** | **−18% (260)** | 196 | **5–6** (era 8 sem a trava) |
+
+  A economia mudou pouco (265→260 fotos a 0.93): rajadas reais já acontecem em poucos segundos, então a janela de 30s raramente precisa cortar. O que ela fez foi exatamente o esperado: **podar os grupos mais longos/arriscados sem derrubar a economia** — o grupo de 8 fotos (`IMG_3452`–`3459`, inspecionado antes) se estende por 56s e a janela agora o divide ao redor da 6ª foto, mantendo a liderança sempre a ≤30s do quadro que ela representa.
+
+  **Decisão: `burst.similarity_threshold` = 0.93.** Confirmado com a trava de tempo ativa; os 30 grupos inspecionados visualmente continuam válidos (a maioria não chegava a durar 30s).
   *(14/07: `src/services/burst_service.py` substitui a heurística antiga de mtime (<5s na mesma pasta) do `analyze-all-vision`. Encadeia por pasta+tempo e decide por cosseno CLIP contra a **líder** do grupo — não contra a foto anterior — para a deriva lenta não arrastar o grupo. Membros herdam descrição/tags/categoria/título/`raw_description` com sufixo "Quadro N de M da mesma sequência" e são indexados no Qdrant reaproveitando o embedding do agrupamento. Reanálise individual de um membro zera seu `burst_group_id`. Settings: `burst.enabled` (simples), `burst.similarity_threshold`/`time_window_s`/`max_group_size` (pro) + limiar nos presets econômico (0.95) e máxima qualidade (0.985). 8 testes novos em `tests/test_f4_bursts.py` com CLIP real; migração validada no banco real (1.424 fotos, idempotente).)*
 
 - [ ] **E2.B5 — Zero-shot tagging de entidades**
@@ -104,9 +136,10 @@ Código pronto e verificado (servidor sobe, migração aplicada, testes passam).
 
 ### E2.C — Análise condicional por categoria
 
-- [ ] **E2.C1 — Perfis de esforço**
+- [x] **E2.C1 — Perfis de esforço**
   Mapa categoria → esforço em `src/services/analysis_policy.py`: `obra|processo|depoimento|evento` = completo; `tecnico|arquivo` = keyframes reduzidos (1 por shot, sem beats); `cotidiano|pessoal` = só triagem + 2 keyframes + sumário curto. Configurável por setting `analysis.effort_overrides` (JSON).
   *Aceite:* vídeo classificado `cotidiano` consome ≤ 3 chamadas de visão no total.
+  *(14/07: implementado. `documento` — que o plano não citava — entrou como `reduzido` (página filmada é conteúdo estático). Categoria ausente/desconhecida = `completo`: nunca economizar às cegas. O perfil controla 3 coisas: `detect_beats_enabled` no `segment_video`, `coverage_floor` no `_plan_keyframes` (o piso que fatia segmento longo em keyframes de ~`frame_interval`) e o teto `max_keyframes`. O aceite fecha assim: 1 chamada de triagem + 2 keyframes = 3. **O teto vale também no fallback do relógio fixo** — sem isso uma falha de segmentação devolveria o vídeo barato ao custo cheio em silêncio (a mesma classe de bug do E2.A5). O "sumário curto" sai de graça: com 2 keyframes o `broll_summary` já recebe 2 descrições. JSON inválido é **rejeitado na escrita** (`validate_value`), não ignorado na análise. 17 testes em `tests/test_f6_effort_profiles.py`, incluindo paridade do perfil completo com o comportamento anterior.)*
 
 - [ ] **E2.C2 — Fila de revisão de triagem**
   Endpoint `GET /api/project/{id}/triage/review` (mídias com `category_confidence < triage.min_confidence` ou categoria `outro`) + `PATCH /api/{video|photo}/{id}/category`. UI: filtro "Revisar triagem" na biblioteca + dropdown de categoria no inspetor.
@@ -127,8 +160,95 @@ Código pronto e verificado (servidor sobe, migração aplicada, testes passam).
 
 ### E2.E — Parada de teste (usuário)
 
-- [ ] Validar beats em 5 planos-sequência reais; comparar custo de visão antes/depois; testar busca visual e filtros de faceta; aprovar ou ajustar limiares.
-- [ ] **Revalidar E2.A5/E2.A6 com material real.** O bug de log (ver E2.A5) mascarou a segmentação na visão até 14/07: qualquer medição de custo ou janela de busca feita antes disso não vale. Reanalisar alguns vídeos e conferir no console o log `N segmentos -> N keyframes` (se aparecer "Falha na segmentação, usando relógio fixo", avisar).
+- [x] Validar beats em 5 planos-sequência reais; comparar custo de visão antes/depois; aprovar ou ajustar limiares. *(14/07: beats validados em material real — `handcam (70)` e `MVI_3247`; custo medido e projetado nas tabelas acima; limiar de rajada decidido em 0.93. Filtros de faceta ficam de fora — dependem do E2.D, ainda não implementado.)*
+- [x] **Revalidar E2.A5/E2.A6 com material real.** *(14/07: revalidação ponta a ponta no vídeo 265 confirmou segmentação alimentando a visão de fato — 66 keyframes reais, zero fallback para relógio fixo.)*
+
+**Etapa 2 — encerramento parcial (14/07):** E2.A, E2.B (exceto B5) e E2.C1 concluídos e validados em material real; parada de teste aprovada nesses pontos. **Em aberto para fechar a etapa por completo:** E2.B5 (zero-shot de entidades), E2.C2/C3 (fila de revisão + few-shot) e E2.D (Gramática do Plano — escala/paleta/facetas de busca). Nenhum desses bloqueia o E1.T5.
+
+#### Revalidação do E2.A5/E2.A6 em material real (14/07) — sem gastar API
+
+Reanálise completa do vídeo **265** (`MVI_3476.MOV`, 572s) rodando o `analyze_video_vision` de verdade sobre uma **cópia descartável do banco** (Qdrant temporário; acervo real intocado), com a chamada de visão mockada. Isto prova o caminho que o bug do E2.A5 quebrava — segmentação → keyframes → log — que acontece **inteiro antes da primeira chamada de API**. O que exigiria API real é a *qualidade* da descrição, não o custo (que é a contagem de keyframes, medida aqui).
+
+Resultado: `[Vision] Video 265: categoria='processo' -> esforco 'completo'` → **1 triagem + 66 keyframes = 67 chamadas**, `media_segment` com **39 shots + 17 beats**, 66 frames indexados no Qdrant com as janelas reais dos segmentos (E2.A6). **Zero ocorrências de "Falha na segmentação, usando relógio fixo"** e 66 ≠ 58 (o que o relógio fixo daria) — ou seja, a segmentação está mesmo alimentando a visão. O bug do log está corrigido em material real, não só na fixture.
+
+#### Medições de 14/07 (segmentação local sobre o acervo real, sem custo de API)
+
+Rodadas em 6 vídeos reais (`handcam (70).MTS` 637s, `MVI_2810` 702s, `00050.MTS` 700s, `MVI_3476` 572s, `MVI_3247` 529s, `entrevista-suzana` 2016s), com os defaults atuais (interval 10s, min_gap 2s, HSV, drift 0.35):
+
+| vídeo | duração | segmentos | keyframes | baseline 10s | Δ |
+|---|---|---|---|---|---|
+| handcam (70) | 637s | 82 (66 shots + 16 beats) | 72 | 64 | **+12%** |
+| MVI_2810 | 702s | 32 (32 shots) | 79 | 71 | **+11%** |
+| 00050.MTS | 700s | 15 (0+15) | 78 | 70 | **+11%** |
+| MVI_3476 | 572s | 56 (39+17) | 66 | 58 | **+14%** |
+| MVI_3247 | 529s | 73 (61+12) | 61 | 53 | **+15%** |
+| entrevista-suzana | 2016s | 39 (33+6) | 210 | 202 | **+4%** |
+| **total** | | | **566** | **518** | **+9%** |
+
+⚠️ **A segmentação NÃO reduz o custo de visão — ela aumenta (~+13%).** O *aceite* do E2.A5 ("contagem de chamadas cai vs. baseline de 10s") **não é atendido**, e isso é estrutural, não um bug: o **piso de cobertura** do `_plan_keyframes` fatia todo segmento maior que `frame_interval` em keyframes de ~`interval`. Como `Σ ceil(dur_i/interval) ≥ ceil(Σ dur_i/interval)`, o total é **matematicamente ≥ baseline** — só cai se houver cortes mais rápidos que `min_gap` (não acontece em material bruto). O ganho real da segmentação é o do **E2.A6 (janela precisa)**, não custo.
+
+**Portanto a economia de API da Etapa 2 vem só de E2.B4 (rajadas) e E2.C1 (perfis de esforço)** — o que torna o E2.C1 pré-requisito ainda mais crítico para o E1.T5 do que o plano supunha.
+
+**Nuance importante:** o piso, sozinho, pede **+51%** de keyframes; quem segura em +13% é o **teto de custo** (`max_frames = ceil(duração/interval) + 8`). Ou seja, o teto está *ativamente cortando* cobertura na maior parte do material bruto — o pipeline hoje opera sempre encostado no teto.
+
+#### 🔴 Defeito de QUALIDADE no teto (14/07) — trechos invisíveis para a busca
+
+O teto não era só uma trava de custo: ele **apagava material do acervo**. `_subsample_uniform` cortava por `np.linspace` **uniforme por índice**, tratando igual uma fatia redundante de um plano de 2 min e um corte distinto de 1s. Resultado: descartava o corte (que vira trecho **não descrito e não indexado — a busca nunca o encontra**) e mantinha dez fatias quase idênticas do mesmo plano. O pior dos dois mundos: perde-se cobertura *e* o que sobra é redundante.
+
+Em 2 dos 4 vídeos medidos o teto é **menor que o número de trechos distintos**, então a perda era garantida por aritmética:
+
+| vídeo | trechos distintos | teto | trechos sem nenhum keyframe |
+|---|---|---|---|
+| handcam (70) | **82** | 72 | **≥ 10** |
+| MVI_3247 | **73** | 61 | **≥ 12** |
+| MVI_3476 | 56 | 66 | cobrível |
+| MVI_2810 | 32 | 79 | cobrível |
+
+**Corrigido:** `_cap_keeping_coverage` inverte a prioridade — a fatia central de cada segmento (`_representa_trecho`) é a **última** a ser cortada; as fatias extras de planos longos disputam só a folga do orçamento. Quando o teto não comporta nem 1 por trecho, aí sim espalha no tempo (não há escolha boa). Guardado por 2 testes de regressão em `test_f3_segmentation.py`. **O custo não muda** (o teto é o mesmo) — muda *quais* frames se paga: cobertura em vez de redundância.
+
+**Sweep do piso de cobertura** (4 vídeos, 2.440s, com o teto real aplicado):
+
+| piso | keyframes | vs. relógio fixo 10s |
+|---|---|---|
+| **10s (atual)** | 278 | **+13%** |
+| 20s | 249 | +1% |
+| 30s | 234 | −5% |
+| sem piso (1/segmento) | 207 | −16% |
+
+**Decisão sobre o piso — recomendação revista (prioridade: qualidade).** Eu havia sugerido afrouxar o piso para ~30s para economizar. **Retiro a sugestão.** O piso é o que garante que um plano-sequência de 2 min não fique com 1 frame só: afrouxá-lo troca ~5% de custo por buracos de cobertura dentro de planos longos — exatamente o material mais rico do acervo (câmera na mão andando pelo set). Economia que produz busca pior é prejuízo. **Manter o piso em `frame_interval`.** Se algum dia o custo apertar, o lugar certo de cortar é a redundância (E2.C1, rajadas), não a cobertura.
+
+**Qualidade dos beats:** em plano-sequência real (`handcam (70)`, câmera na mão andando pelo set) os beats acompanham a mudança de conteúdo. Já `00050.MTS` (700s) é **câmera esquecida ligada apontada para uma parede** — os beats picotam quadros quase idênticos por deriva de exposição. Material assim existe no acervo e custaria ~70 chamadas por arquivo no baseline: é exatamente o caso que o E2.C1 (`tecnico`/`pessoal` → 2 keyframes) precisa capturar na triagem.
+
+**Escopo real do E1.T5:** o `analyze-all-vision` só varre `video_type IN ('broll','unknown')` = **529 vídeos (12,9h)**; as 12 entrevistas vão por transcrição. Baseline ≈ **5.432 chamadas** de visão (4.903 keyframes + 529 triagens); com a segmentação atual ≈ **6.069**.
+
+#### Projeção do E1.T5 (529 vídeos + 1.424 fotos), com os números medidos
+
+#### ✅ Amostra de triagem executada (14/07) — o mix real do acervo
+
+30 vídeos sorteados por **amostragem estratificada** (origem × duração; seed 20260714) entre os 519 sem categoria. **30 chamadas de visão reais gastas**, 2,5 min, **triagem bem-sucedida em 30/30** (confiança média 0,90). As categorias foram gravadas no banco real de propósito — o `analyze_video_vision` só triaga `if not category`, então o E1.T5 reaproveita e não paga essas 30 de novo.
+
+| categoria | n | % | esforço |
+|---|---|---|---|
+| `processo` | 15 | 50,0% | completo |
+| `obra` | 8 | 26,7% | completo |
+| `tecnico` | 4 | 13,3% | reduzido |
+| `cotidiano` | 2 | 6,7% | triagem |
+| `evento` | 1 | 3,3% | completo |
+
+**Mix de esforço real: 80% completo / 13% reduzido / 7% triagem** — ou seja, o **cenário pessimista** que eu havia projetado. Faz sentido e não é defeito: num making of, o acervo é majoritariamente `processo` + `obra` (77%), que é exatamente o material que *merece* análise completa. **Perfil de esforço economiza pouco quando quase tudo é o assunto principal.** Títulos gerados são específicos e sem viés ("Prep. de cabelo e maquiagem", "Ajustes de cor e HDR", "Testes de câmera no escuro").
+
+#### Projeção do E1.T5 (529 vídeos + 1.424 fotos) — **com o mix medido**
+
+| cenário | chamadas de visão | vs. baseline |
+|---|---|---|
+| **A) Baseline pós-Etapa-1** (relógio 10s, 1 chamada/foto) | **6.856** | — |
+| **B) Hoje, sem E2.C1** (segmentação +13%) | **7.463** | **+9%** |
+| **C) com E2.C1, mix real 80/13/7** | **6.343** | **−7%** |
+| **D) C + rajadas a 0.93** | **6.078** | **−11%** |
+
+Ganho isolado do **E2.C1: −15%** (C vs. B). Ganho isolado das **rajadas a 0.93: −4%** (D vs. C).
+
+⚠️ **Conclusão honesta: a Etapa 2 inteira entrega ~−11% de custo no E1.T5, não os −26/−29% que a projeção otimista sugeria.** Sem o E2.C1 a rodada sairia **+9% mais cara** que antes da Etapa 2 — então o C1 continua sendo pré-requisito, mas para *neutralizar* o custo que a segmentação adiciona, não para gerar economia grande. O ganho real da Etapa 2 é **qualitativo** (janelas de busca precisas, busca visual CLIP, rajadas, triagem), não de custo. A premissa do cabeçalho ("Custo de API esperado: cai") só se sustenta na margem.
 
 ---
 

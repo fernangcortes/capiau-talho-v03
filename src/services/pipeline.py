@@ -26,6 +26,7 @@ from src.nlp.prompt_templates import (
     get_theme_clustering_prompt
 )
 from src.nlp.prompt_registry import TRIAGE_CATEGORIES
+from src.services.analysis_policy import get_profile
 
 # Tags de categoria são proibidas como tag de busca: se quase tudo é "making of",
 # a tag não discrimina nada — a categoria vive no campo próprio (video/photo.category)
@@ -503,13 +504,52 @@ class PipelineService:
         return filepath
 
     @staticmethod
+    def _subsample_uniform(jobs: List[Dict[str, Any]], max_frames: int) -> List[Dict[str, Any]]:
+        """Teto de custo: no máximo `max_frames` keyframes, espalhados no tempo.
+
+        Mantém as pontas (primeiro e último) e distribui o resto uniformemente.
+        `max_frames <= 0` = sem teto.
+        """
+        if max_frames <= 0 or len(jobs) <= max_frames:
+            return jobs
+        idxs = sorted(set(np.linspace(0, len(jobs) - 1, max_frames).astype(int).tolist()))
+        return [jobs[i] for i in idxs]
+
+    @staticmethod
+    def _cap_keeping_coverage(jobs: List[Dict[str, Any]], max_frames: int) -> List[Dict[str, Any]]:
+        """Teto de custo priorizando COBERTURA: cada trecho distinto antes de fatia extra.
+
+        Subamostrar uniforme por índice trata igual uma fatia redundante de um plano
+        de 2 min e um corte distinto de 1s — e acaba apagando o corte enquanto mantém
+        dez fatias quase iguais. O trecho apagado não é descrito nem indexado: vira
+        material que a busca nunca encontra. Aqui o keyframe representante de cada
+        segmento vem primeiro; as fatias extras disputam só o que sobra do orçamento.
+        """
+        if max_frames <= 0 or len(jobs) <= max_frames:
+            return jobs
+        representantes = [j for j in jobs if j.get("_representa_trecho")]
+        extras = [j for j in jobs if not j.get("_representa_trecho")]
+
+        if len(representantes) >= max_frames:
+            # Nem 1 por trecho cabe no teto: aí não há escolha boa, só espalhar no tempo
+            return PipelineService._subsample_uniform(representantes, max_frames)
+
+        folga = max_frames - len(representantes)
+        escolhidos = representantes + (PipelineService._subsample_uniform(extras, folga) if folga > 0 else [])
+        escolhidos.sort(key=lambda j: j["timestamp"])
+        return escolhidos
+
+    @staticmethod
     def _plan_keyframes(segments: List[Dict[str, Any]], duration: float, interval: float,
-                        min_gap: float, max_frames: int) -> List[Dict[str, Any]]:
+                        min_gap: float, max_frames: int,
+                        coverage_floor: bool = True) -> List[Dict[str, Any]]:
         """Escolhe os keyframes a analisar a partir dos segmentos (shots/beats).
 
         Resolve os dois extremos da segmentação bruta:
         - **Piso de cobertura:** segmento mais longo que `interval` é fatiado em vários
           keyframes de ~`interval` (um plano-sequência de 2 min não fica com 1 frame só).
+          `coverage_floor=False` (perfis de esforço reduzido, E2.C1) desliga o piso:
+          1 keyframe por segmento, no ponto médio.
         - **Teto de redundância:** keyframes a menos de `min_gap` do anterior são fundidos
           (cortes rápidos deixam de gerar frames quase idênticos).
         - **Teto de custo:** no máximo `max_frames`, subamostrados de forma uniforme.
@@ -523,13 +563,16 @@ class PipelineService:
             s, e = float(seg["start"]), float(seg["end"])
             seg_dur = max(e - s, 0.0)
             # nº de fatias garantindo que nenhuma passe de `interval` (ceil com folga)
-            n = max(1, int(np.ceil(seg_dur / interval - 1e-6))) if interval > 0 else 1
+            n = max(1, int(np.ceil(seg_dur / interval - 1e-6))) if (interval > 0 and coverage_floor) else 1
             for i in range(n):
                 w_start = s + seg_dur * i / n
                 w_end = s + seg_dur * (i + 1) / n
                 t = (w_start + w_end) / 2.0
                 raw.append({"timestamp": min(t, cap_ts), "start": w_start, "end": w_end,
-                            "segment_id": seg.get("id")})
+                            "segment_id": seg.get("id"),
+                            # A fatia central representa o trecho: é a última a ser
+                            # cortada pelo teto, para nenhum shot/beat sumir da busca.
+                            "_representa_trecho": (i == n // 2)})
 
         raw.sort(key=lambda j: j["timestamp"])
 
@@ -538,15 +581,14 @@ class PipelineService:
         for j in raw:
             if kept and (j["timestamp"] - kept[-1]["timestamp"]) < min_gap:
                 kept[-1]["end"] = max(kept[-1]["end"], j["end"])
+                # O sobrevivente herda a representação: sua janela agora cobre os dois
+                # trechos, então ele não pode ser tratado como fatia descartável.
+                kept[-1]["_representa_trecho"] = kept[-1]["_representa_trecho"] or j["_representa_trecho"]
                 continue
             kept.append(j)
 
-        # Teto de custo: subamostragem uniforme no tempo
-        if max_frames > 0 and len(kept) > max_frames:
-            idxs = sorted(set(np.linspace(0, len(kept) - 1, max_frames).astype(int).tolist()))
-            kept = [kept[i] for i in idxs]
-
-        return kept
+        # Teto de custo: corta redundância antes de cobertura
+        return PipelineService._cap_keeping_coverage(kept, max_frames)
 
     @staticmethod
     def analyze_video_vision(video_id: int, filepath: Path, duration: float, beat_embedder: Optional[str] = None) -> bool:
@@ -593,6 +635,14 @@ class PipelineService:
         # absorve os frames extras alinhados às fronteiras dos shots sem cortar a cobertura.
         max_frames = max(4, int(np.ceil(duration / interval)) + 8) if interval > 0 else 8
 
+        # Perfil de esforço (E2.C1): a categoria da triagem decide quanta análise cara
+        # este material merece. Sem categoria, o perfil é o completo (comportamento antigo).
+        profile = get_profile(category, S.get("analysis.effort_overrides"))
+        if profile.max_keyframes is not None:
+            max_frames = min(max_frames, profile.max_keyframes)
+        print(f"[Vision] Video {video_id}: categoria='{category or 'sem categoria'}' "
+              f"-> esforco '{profile.effort}' ({profile.label})")
+
         # Cada job de frame carrega a janela real do trecho (para o payload do Qdrant)
         frame_jobs: List[Dict[str, Any]] = []
         seg_log = ""
@@ -621,15 +671,21 @@ class PipelineService:
                     drift_threshold=S.get("segment.beat_drift_threshold"),
                     motion_enabled=S.get("segment.motion_enabled"),
                     embed_fn=embed_fn,
+                    detect_beats_enabled=profile.detect_beats,
                 )
                 if segments:
                     with get_db() as conn:
                         MediaRepository.replace_video_segments(conn, project_id, video_id, segments)
                         conn.commit()
                     min_gap = S.get("segment.min_keyframe_gap_s")
-                    frame_jobs = PipelineService._plan_keyframes(segments, duration, interval, min_gap, max_frames)
+                    frame_jobs = PipelineService._plan_keyframes(
+                        segments, duration, interval, min_gap, max_frames,
+                        coverage_floor=profile.coverage_floor,
+                    )
+                    cobertura = f"cobertura <={interval}s, " if profile.coverage_floor else "1 keyframe/segmento, "
                     seg_log = (f"[Vision] Vídeo {video_id}: {len(segments)} segmentos -> {len(frame_jobs)} keyframes "
-                               f"(cobertura <={interval}s, min {min_gap}s, baseline {max(1, int(duration / interval) + 1)})")
+                               f"({cobertura}min {min_gap}s, esforco '{profile.effort}', "
+                               f"baseline {max(1, int(duration / interval) + 1)})")
             except Exception as seg_err:
                 print(f"[Vision] Falha na segmentação do vídeo {video_id}, usando relógio fixo: {seg_err}")
                 frame_jobs = []
@@ -645,6 +701,13 @@ class PipelineService:
             while t < duration:
                 frame_jobs.append({"timestamp": t, "start": t, "end": min(t + interval, duration)})
                 t += interval
+            # O teto do perfil vale também aqui: sem isto, uma falha de segmentação
+            # devolveria um vídeo 'cotidiano' ao custo cheio sem ninguém perceber
+            # (mesma classe de degradação silenciosa do bug do E2.A5).
+            if profile.max_keyframes is not None and len(frame_jobs) > profile.max_keyframes:
+                frame_jobs = PipelineService._subsample_uniform(frame_jobs, profile.max_keyframes)
+                print(f"[Vision] Video {video_id}: relogio fixo limitado a {len(frame_jobs)} keyframes "
+                      f"pelo esforco '{profile.effort}'")
 
         # Entidades já catalogadas no projeto — o modelo de visão nomeia direto na análise
         known_entities = []

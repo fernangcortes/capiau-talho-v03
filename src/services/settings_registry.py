@@ -174,6 +174,13 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": True,
     },
     {
+        "key": "analysis.effort_overrides", "type": "string", "default": "", "json_map": "effort_overrides",
+        "label": "Análise: esforço por categoria (JSON)",
+        "help": 'Quanto de análise cara cada tipo de material recebe. Vazio = padrão: obra/processo/depoimento/evento recebem análise completa; tecnico/arquivo/documento recebem 1 frame por plano; cotidiano/pessoal recebem só 2 frames. Para mudar, escreva um JSON como {"cotidiano": "completo", "arquivo": "triagem"}. Esforços válidos: completo | reduzido | triagem.',
+        "help_tech": "Override do DEFAULT_EFFORT_BY_CATEGORY em analysis_policy.py; get_profile() controla beats, piso de cobertura e teto de keyframes em analyze_video_vision.",
+        "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": True,
+    },
+    {
         "key": "triage.min_confidence", "type": "float", "default": 0.55, "min": 0.0, "max": 1.0, "step": 0.05,
         "label": "Triagem: confiança mínima",
         "help": "Confiança mínima da IA de triagem para definir automaticamente o tipo do vídeo (entrevista/b-roll) a partir da categoria detectada.",
@@ -646,5 +653,13 @@ def validate_value(key: str, value: Any) -> Tuple[bool, Any]:
             return False, f"'{key}': mínimo permitido é {entry['min']}"
         if entry.get("max") is not None and coerced > entry["max"]:
             return False, f"'{key}': máximo permitido é {entry['max']}"
+
+    # Settings que carregam JSON: rejeitar na escrita em vez de ignorar em silêncio
+    # na hora da análise (um typo aqui viraria "o perfil não pegou e ninguém viu").
+    if entry.get("json_map") == "effort_overrides":
+        from src.services.analysis_policy import validate_overrides
+        ok, err = validate_overrides(coerced)
+        if not ok:
+            return False, f"'{key}': {err}"
 
     return True, coerced

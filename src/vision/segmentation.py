@@ -214,11 +214,14 @@ def segment_video(
     drift_threshold: float = 0.35,
     motion_enabled: bool = True,
     embed_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+    detect_beats_enabled: bool = True,
 ) -> List[Dict[str, Any]]:
     """Orquestra shots + beats + movimento e devolve a lista final de segmentos.
 
     Retorna [{'start', 'end', 'kind', 'reason', 'motion_label'}] ordenada no tempo.
     Shots que geraram beats são substituídos pelos beats (granularidade final).
+    `detect_beats_enabled=False` (perfis de esforço reduzido, E2.C1) para na
+    granularidade de shot — também poupa o decode da amostragem de beats.
     """
     shots = detect_shots(video_path, threshold=detect_threshold)
     if not shots:
@@ -230,7 +233,7 @@ def segment_video(
         sample_interval_s=sample_interval_s,
         drift_threshold=drift_threshold,
         embed_fn=embed_fn,
-    )
+    ) if detect_beats_enabled else []
 
     # Shots cobertos por beats saem da lista final; os demais entram como estão
     def _covered(shot: Dict[str, float]) -> bool:
