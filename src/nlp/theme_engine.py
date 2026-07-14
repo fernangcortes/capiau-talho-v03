@@ -495,7 +495,7 @@ def merge_similar_themes(project_id: int) -> int:
                 """, (str(canon["id"]), project_id, str(dup["id"])))
                 cursor.execute("DELETE FROM theme WHERE id = ?", (dup["id"],))
                 merged_count += 1
-                print(f"[THEME] Fusão: \"{dup['title']}\" → \"{canon['title']}\"")
+                print(f"[THEME] Fusão: \"{dup['title']}\" -> \"{canon['title']}\"")
 
             # Atualiza centroide do canônico (média dos membros)
             if centroids and not canon["pinned"]:

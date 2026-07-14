@@ -165,7 +165,7 @@ Responda estritamente em Português e em formato JSON puro, sem marcações mark
                                 object_id=str(theme_id),
                                 weight=1.0
                             )
-                print("  🎉 Agrupamento temático processado com sucesso!")
+                print("  [OK] Agrupamento temático processado com sucesso!")
                 return result
             except Exception as db_err:
                 print(f"  [ERROR] Erro ao salvar relações de temas no banco: {db_err}")

@@ -19,6 +19,7 @@ from src.db.repositories.entities import EntityRepository
 from src.nlp.enrichment_engine import enrich_after_face_labeling, enrich_photo, enrich_video_frames, enrich_in_background
 from src.services.face_service import get_face_service, FaceService
 from src.vision.face_pipeline import get_pipeline, FacePipeline
+from src.vision.cv_utils import imread_unicode
 
 router = APIRouter(prefix="/api/faces", tags=["Faces"])
 
@@ -1126,7 +1127,7 @@ def get_face_thumbnail(face_id: int):
                 img = None
         
         if img is None:
-            img = cv2.imread(str(img_path))
+            img = imread_unicode(img_path)
             
         if img is None:
             raise HTTPException(status_code=500, detail="Erro ao ler imagem original para corte dinâmico.")

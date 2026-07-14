@@ -30,10 +30,13 @@ CREATE TABLE IF NOT EXISTS video (
     bitrate INTEGER,
     
     -- Metadados editoriais / de IA
+    title TEXT,       -- titulo curto (3-6 palavras) gerado pela IA
+    category TEXT,    -- categoria de triagem (Eixo A: obra, processo, depoimento, ...)
+    category_confidence REAL,
     description TEXT,
     summary TEXT,
     tags TEXT, -- JSON array de tags gerais
-    
+
     -- Status no pipeline
     status TEXT CHECK(status IN ('pending', 'ingested', 'transcribing', 'transcribed', 'analyzing', 'analyzed', 'error')) DEFAULT 'pending',
     error_message TEXT,
@@ -48,8 +51,12 @@ CREATE TABLE IF NOT EXISTS photo (
     filename TEXT NOT NULL,
     filepath TEXT NOT NULL,
     hash TEXT UNIQUE NOT NULL,
+    title TEXT,       -- titulo curto (3-6 palavras) gerado pela IA
+    category TEXT,    -- categoria de triagem (Eixo A)
+    category_confidence REAL,
     description TEXT,
     tags TEXT, -- JSON array de tags visuais
+    burst_group_id INTEGER, -- id da foto lider da rajada (a unica analisada por API); NULL = foto isolada
     status TEXT CHECK(status IN ('pending', 'ingested', 'analyzed', 'error')) DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -213,6 +220,19 @@ CREATE TABLE IF NOT EXISTS theme_segment (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Segmentos de Mídia (Shots/Cortes e Beats de Decupagem)
+CREATE TABLE IF NOT EXISTS media_segment (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+    kind TEXT CHECK(kind IN ('shot', 'beat')) NOT NULL,
+    start_time REAL NOT NULL,
+    end_time REAL NOT NULL,
+    reason TEXT,
+    motion_label TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Grafo Relacional (Triplas RDF-like para matches, continuidades e tags)
 CREATE TABLE IF NOT EXISTS relation (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -227,6 +247,7 @@ CREATE TABLE IF NOT EXISTS relation (
 );
 
 -- Indices de performance
+CREATE INDEX IF NOT EXISTS idx_segment_video ON media_segment(video_id);
 CREATE INDEX IF NOT EXISTS idx_video_project ON video(project_id);
 CREATE INDEX IF NOT EXISTS idx_video_hash ON video(hash);
 CREATE INDEX IF NOT EXISTS idx_photo_project ON photo(project_id);
@@ -249,6 +270,22 @@ CREATE INDEX IF NOT EXISTS idx_mention_video ON entity_mention(video_id, timesta
 CREATE INDEX IF NOT EXISTS idx_mention_photo ON entity_mention(photo_id);
 CREATE INDEX IF NOT EXISTS idx_theme_segment_theme ON theme_segment(theme_id);
 CREATE INDEX IF NOT EXISTS idx_theme_segment_video ON theme_segment(video_id);
+
+-- Configurações da IA: apenas OVERRIDES (ausência de linha = default do código).
+-- Resolução em camadas: default -> app_setting (global) -> project_setting (projeto).
+CREATE TABLE IF NOT EXISTS app_setting (
+    key        TEXT PRIMARY KEY,
+    value_json TEXT NOT NULL,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS project_setting (
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    key        TEXT NOT NULL,
+    value_json TEXT NOT NULL,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (project_id, key)
+);
 """
 
 def init_db(db_path: Path = None):
@@ -315,6 +352,16 @@ def init_db(db_path: Path = None):
         if "tags" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN tags TEXT")
             print("[MIGRATION] Coluna 'tags' adicionada a tabela video.")
+        # Triagem por categoria (Eixo A) e titulo curto gerado por IA
+        if "title" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN title TEXT")
+            print("[MIGRATION] Coluna 'title' adicionada a tabela video.")
+        if "category" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN category TEXT")
+            print("[MIGRATION] Coluna 'category' adicionada a tabela video.")
+        if "category_confidence" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN category_confidence REAL")
+            print("[MIGRATION] Coluna 'category_confidence' adicionada a tabela video.")
 
         # Migracoes para tabela photo (descricao original preservada antes do enriquecimento)
         cursor.execute("PRAGMA table_info(photo)")
@@ -322,6 +369,19 @@ def init_db(db_path: Path = None):
         if "raw_description" not in photo_cols:
             cursor.execute("ALTER TABLE photo ADD COLUMN raw_description TEXT")
             print("[MIGRATION] Coluna 'raw_description' adicionada a tabela photo.")
+        if "title" not in photo_cols:
+            cursor.execute("ALTER TABLE photo ADD COLUMN title TEXT")
+            print("[MIGRATION] Coluna 'title' adicionada a tabela photo.")
+        if "category" not in photo_cols:
+            cursor.execute("ALTER TABLE photo ADD COLUMN category TEXT")
+            print("[MIGRATION] Coluna 'category' adicionada a tabela photo.")
+        if "category_confidence" not in photo_cols:
+            cursor.execute("ALTER TABLE photo ADD COLUMN category_confidence REAL")
+            print("[MIGRATION] Coluna 'category_confidence' adicionada a tabela photo.")
+        if "burst_group_id" not in photo_cols:
+            cursor.execute("ALTER TABLE photo ADD COLUMN burst_group_id INTEGER")
+            print("[MIGRATION] Coluna 'burst_group_id' adicionada a tabela photo.")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_photo_burst_group ON photo(project_id, burst_group_id)")
 
         # Migracoes para tabela theme (centroide de embedding e temas fixados pelo usuario)
         cursor.execute("PRAGMA table_info(theme)")

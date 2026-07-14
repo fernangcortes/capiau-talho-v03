@@ -135,3 +135,25 @@ class AddThemeSegmentPayload(BaseModel):
     text_excerpt: str
 
 
+# ── Painel de Configurações da IA ──────────────────────────────────────────
+
+class SettingsUpdatePayload(BaseModel):
+    values: Dict[str, Any]  # {"timeline.max_suggestions": 3, ...}
+
+
+class SettingsResetPayload(BaseModel):
+    keys: Optional[List[str]] = None  # None = reset total do escopo
+
+
+class PresetApplyPayload(BaseModel):
+    preset_id: str                    # economico | equilibrado | maxima_qualidade
+    scope: str = "global"             # global | project
+    project_id: Optional[int] = None
+
+
+class PromptUpdatePayload(BaseModel):
+    template: str
+    scope: str = "global"             # global | project
+    project_id: Optional[int] = None
+
+

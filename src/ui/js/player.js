@@ -59,6 +59,17 @@ export class SourcePlayer {
         STATE.on("markerInChanged", () => this.updateMarkersUI());
         STATE.on("markerOutChanged", () => this.updateMarkersUI());
 
+        STATE.on("playerPlayed", (sender) => {
+            if (sender !== "source") {
+                const vid = this.el("source-video");
+                if (vid && !vid.paused) {
+                    vid.pause();
+                }
+                this.stopReverse();
+                this.jklState = 'K';
+            }
+        });
+
         STATE.on("videoFacesUpdated", (videoId) => {
             if (STATE.activeVideo && STATE.activeVideo.id === videoId) {
                 CapIAuAPI.fetchVideoFaces(videoId)
@@ -78,7 +89,10 @@ export class SourcePlayer {
         if (video) {
             video.addEventListener("timeupdate", () => this.onTimeUpdate());
             video.addEventListener("loadedmetadata", () => this.onLoadedMetadata());
-            video.addEventListener("play", () => this.onPlayStateChange(true));
+            video.addEventListener("play", () => {
+                this.onPlayStateChange(true);
+                STATE.emit("playerPlayed", "source");
+            });
             video.addEventListener("pause", () => this.onPlayStateChange(false));
             video.addEventListener("seeked", () => {
                 const vid = this.el("source-video");
@@ -385,6 +399,7 @@ export class SourcePlayer {
         if (!vid) return;
 
         vid.pause();
+        STATE.emit("playerPlayed", "source");
         const step = 0.04 * Math.abs(rate);
         this.reverseInterval = setInterval(() => {
             if (vid.currentTime <= 0) {
@@ -835,6 +850,12 @@ export class ProgramPlayer {
             panel.addEventListener("click", setProgramFocus, true);
             panel.addEventListener("mousedown", setProgramFocus, true);
         }
+
+        STATE.on("playerPlayed", (sender) => {
+            if (sender !== "program") {
+                this.pause();
+            }
+        });
     }
 
     getDurationFrames() {
@@ -858,6 +879,8 @@ export class ProgramPlayer {
     play() {
         if (this.isPlaying) return;
         this.isPlaying = true;
+
+        STATE.emit("playerPlayed", "program");
 
         const btnPlay = this.el("btn-program-play");
         if (btnPlay) btnPlay.innerHTML = `<i class="fa-solid fa-pause"></i>`;

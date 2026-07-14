@@ -13,7 +13,12 @@ export class PanelsManager {
         this.visionContainer = document.getElementById("vision-feed-scroll");
         this.themesContainer = document.getElementById("theme-list");
         this.tasksContainer = document.getElementById("tasks-container");
+        this.tasksFeed = document.getElementById("tasks-feed-scroll");
         this.lastTasksState = {}; // Para monitoramento de mudança de estado de tarefas
+        this._lastTasks = {};     // Último payload de tarefas (para re-render nos toggles)
+        // Preferências da aba Tarefas (persistidas): miniaturas ON por padrão, compacto OFF
+        this.tasksShowThumbs = localStorage.getItem("tasks-show-thumbs") !== "false";
+        this.tasksCompact = localStorage.getItem("tasks-compact") === "true";
         
         // Inicializa o novo renderizador Canvas e interações
         this.timelineRenderer = new CapiauTimelineRenderer();
@@ -94,6 +99,32 @@ export class PanelsManager {
             });
         }
         
+        const btnReanalyzeBeatsClip = document.getElementById("btn-reanalyze-beats-clip");
+        if (btnReanalyzeBeatsClip) {
+            btnReanalyzeBeatsClip.addEventListener("click", async () => {
+                if (!STATE.activeVideo) {
+                    alert("Selecione um vídeo na Biblioteca para reanalisar.");
+                    return;
+                }
+                const filename = STATE.activeVideo.filename;
+                if (!confirm(`Reanalisar "${filename}" com CLIP na deriva dos beats?\n\nMais preciso em planos longos, porém mais lento na CPU. Substitui a análise atual deste clipe.`)) {
+                    return;
+                }
+                try {
+                    await CapIAuAPI.analyzeVideoVision(STATE.activeVideo.id, "clip");
+                    if (window.logManager) {
+                        window.logManager.log("VisãoIA", `Solicitada reanálise com beats CLIP para o clipe: ${filename}`, "ACTION");
+                    }
+                    alert("Reanálise com beats CLIP iniciada! O progresso será exibido na aba de Tarefas.");
+                } catch (err) {
+                    if (window.logManager) {
+                        window.logManager.log("VisãoIA", `Falha ao iniciar reanálise com beats CLIP para ${filename}: ${err.message}`, "ERROR");
+                    }
+                    alert("Erro ao iniciar reanálise: " + err.message);
+                }
+            });
+        }
+
         const btnAnalyzeVisionAll = document.getElementById("btn-analyze-vision-all");
         if (btnAnalyzeVisionAll) {
             btnAnalyzeVisionAll.addEventListener("click", async () => {
@@ -234,6 +265,28 @@ export class PanelsManager {
 
         // Inicializa gaveta do assistente e propriedades do inspetor
         this.initSpeechAssistant();
+
+        // Toggles da aba Tarefas (miniaturas e modo compacto), persistidos em localStorage
+        const btnThumbs = document.getElementById("btn-tasks-toggle-thumbs");
+        if (btnThumbs) {
+            btnThumbs.classList.toggle("toggle-on", this.tasksShowThumbs);
+            btnThumbs.addEventListener("click", () => {
+                this.tasksShowThumbs = !this.tasksShowThumbs;
+                localStorage.setItem("tasks-show-thumbs", this.tasksShowThumbs ? "true" : "false");
+                btnThumbs.classList.toggle("toggle-on", this.tasksShowThumbs);
+                this.renderTasks(this._lastTasks || {});
+            });
+        }
+        const btnCompact = document.getElementById("btn-tasks-toggle-compact");
+        if (btnCompact) {
+            btnCompact.classList.toggle("toggle-on", this.tasksCompact);
+            btnCompact.addEventListener("click", () => {
+                this.tasksCompact = !this.tasksCompact;
+                localStorage.setItem("tasks-compact", this.tasksCompact ? "true" : "false");
+                btnCompact.classList.toggle("toggle-on", this.tasksCompact);
+                this.renderTasks(this._lastTasks || {});
+            });
+        }
 
         // Inicia pooling de progresso de tarefas a cada 2.5 segundos
         this.startTasksProgressLoop();
@@ -1596,8 +1649,9 @@ export class PanelsManager {
     }
 
     renderTasks(tasks) {
+        this._lastTasks = tasks;
         const taskKeys = Object.keys(tasks);
-        
+
         // Log de mudanças de estado das tarefas
         taskKeys.forEach(key => {
             const currentTask = tasks[key];
@@ -1645,42 +1699,67 @@ export class PanelsManager {
 
         this.lastTasksState = JSON.parse(JSON.stringify(tasks));
 
-        this.tasksContainer.innerHTML = "";
-        
+        const feed = this.tasksFeed || this.tasksContainer;
+        if (!feed) return;
+        feed.innerHTML = "";
+
         if (taskKeys.length === 0) {
-            this.tasksContainer.innerHTML = `<div class="empty-state-text">Nenhuma conversão de proxy ou análise ativa no momento.</div>`;
+            feed.innerHTML = `<div class="empty-state-text">Nenhuma conversão de proxy ou análise ativa no momento.</div>`;
             return;
         }
 
+        const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const showThumbs = this.tasksShowThumbs;
+        const compact = this.tasksCompact;
+
         taskKeys.forEach(key => {
             const t = tasks[key];
-            const item = document.createElement("div");
-            item.className = "task-progress-card";
-            
             const isFinished = t.status === "finished";
             const isFailed = t.status === "failed";
-            
-            let taskTitle = `Mídia ID: ${key} (${t.type || 'proxy'})`;
-            if (t.type === 'enrich') {
-                taskTitle = `Sincronização de Descrições (Projeto)`;
-            } else if (key.startsWith('recover-faces-')) {
-                taskTitle = `Recuperação de Rostos (Projeto)`;
+            const isCancellable = !isFinished && !isFailed && !isNaN(Number(key));
+            const media = this._resolveTaskMedia(key, t);
+            const typeHint = String(t.type || "proxy").toUpperCase();
+            const pct = Math.round(Number(t.percent) || 0);
+            const title = esc(media.title);
+
+            // Miniatura (img com fallback: se falhar ao carregar, some e mostra o ícone)
+            const thumbFull = (showThumbs && media.thumbUrl)
+                ? `<img class="task-thumb" src="${media.thumbUrl}" alt="" loading="lazy" onerror="this.remove()">` : "";
+            const thumbCompact = showThumbs
+                ? (media.thumbUrl
+                    ? `<img class="task-row-thumb" src="${media.thumbUrl}" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;task-row-icon&quot;><i class=&quot;fa-solid ${media.icon}&quot;></i></span>'">`
+                    : `<span class="task-row-icon"><i class="fa-solid ${media.icon}"></i></span>`)
+                : `<span class="task-row-dot status-${t.status}"></span>`;
+
+            const item = document.createElement("div");
+            if (compact) {
+                item.className = "task-row";
+                item.innerHTML = `
+                    ${thumbCompact}
+                    <span class="task-row-title" title="${title} — ${typeHint} · ${esc(t.status)}">${title}</span>
+                    <div class="task-row-bar"><div class="task-row-bar-fill" style="width:${pct}%"></div></div>
+                    <span class="task-row-pct">${pct}%</span>
+                    ${isCancellable ? `<button class="btn-cancel-task" data-id="${key}" title="Cancelar" style="background:none;border:none;color:var(--color-rose);cursor:pointer;font-size:14px;line-height:1;padding:0 2px;">&times;</button>` : ""}
+                `;
+            } else {
+                item.className = "task-progress-card";
+                item.innerHTML = `
+                    ${thumbFull}
+                    <div class="task-info">
+                        <span class="task-title" title="${title}">${title}</span>
+                        <span class="task-status status-${t.status}">${t.status.toUpperCase()}</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" style="width: ${pct}%"></div>
+                    </div>
+                    <div class="task-actions">
+                        <span class="task-percent">${typeHint} · ${pct}%</span>
+                        ${isCancellable ? `<button class="btn-action btn-cancel-task" data-id="${key}">Cancelar</button>` : ""}
+                    </div>
+                `;
             }
-            
-            item.innerHTML = `
-                <div class="task-info">
-                    <span class="task-title">${taskTitle}</span>
-                    <span class="task-status status-${t.status}">${t.status.toUpperCase()}</span>
-                </div>
-                <div class="progress-bar-container">
-                    <div class="progress-bar-fill" style="width: ${t.percent}%"></div>
-                </div>
-                <div class="task-actions">
-                    <span class="task-percent">${t.percent}%</span>
-                    ${(!isFinished && !isFailed && !isNaN(Number(key))) ? `<button class="btn-action btn-cancel-task" data-id="${key}">Cancelar</button>` : ''}
-                </div>
-            `;
-            
+
+            // Cancelar conversão de proxy
             const cancelBtn = item.querySelector(".btn-cancel-task");
             if (cancelBtn) {
                 cancelBtn.addEventListener("click", async (e) => {
@@ -1690,67 +1769,55 @@ export class PanelsManager {
                     }
                 });
             }
-            
-            if (isFinished) {
-                item.style.cursor = "pointer";
-                item.title = "Clique para abrir esta mídia";
-                
-                // Efeito hover simples
-                item.addEventListener("mouseenter", () => {
-                    item.style.background = "rgba(255, 255, 255, 0.05)";
-                    item.style.transform = "translateY(-1px)";
-                });
-                item.addEventListener("mouseleave", () => {
-                    item.style.background = "";
-                    item.style.transform = "";
-                });
-                
+
+            // Clique revela a mídia em 'Mídias' (qualquer status; só para vídeo/foto)
+            if (media.kind === "video" || media.kind === "photo") {
+                item.classList.add("task-card-clickable");
+                item.title = "Clique para mostrar em Mídias";
                 item.addEventListener("click", () => {
-                    if (key.startsWith("photo-")) {
-                        const photoId = Number(key.split("photo-")[1]);
-                        const photo = STATE.allPhotos.find(p => p.id === photoId);
-                        if (photo) {
-                            // Muda para a aba de fotos
-                            const tabBtn = getActiveQuerySelector(`.tab-btn[data-tab="tab-photos"]`);
-                            if (tabBtn) tabBtn.click();
-                            
-                            // Abre a lightbox da foto
-                            if (window.libraryManager) {
-                                STATE.currentPhotoList = STATE.allPhotos;
-                                STATE.currentPhotoIndex = STATE.allPhotos.indexOf(photo);
-                                window.libraryManager.openLightbox(photo);
-                            }
-                        } else {
-                            alert("Foto correspondente não encontrada na biblioteca local.");
-                        }
-                    } else {
-                        const videoId = Number(key);
-                        if (!isNaN(videoId)) {
-                            const video = STATE.allVideos.find(v => v.id === videoId);
-                            if (video) {
-                                // Muda para a aba de mídias/vídeos
-                                const tabBtn = getActiveQuerySelector(`.tab-btn[data-tab="tab-videos"]`);
-                                if (tabBtn) tabBtn.click();
-                                
-                                // Foca no vídeo e carrega no player
-                                STATE.activeVideo = video;
-                                
-                                // Muda para a aba direita correspondente (Transcrição para entrevistas, Visão para B-rolls)
-                                if (video.video_type === "interview") {
-                                    STATE.currentRightTab = "transcript";
-                                } else {
-                                    STATE.currentRightTab = "vision";
-                                }
-                            } else {
-                                alert("Vídeo correspondente não encontrado na biblioteca local.");
-                            }
-                        }
+                    const ok = media.kind === "photo"
+                        ? (window.libraryManager && window.libraryManager.revealPhotoById(media.id))
+                        : (window.libraryManager && window.libraryManager.revealVideoById(media.id));
+                    if (!ok) {
+                        alert(media.kind === "photo"
+                            ? "Foto correspondente não encontrada na biblioteca local."
+                            : "Vídeo correspondente não encontrado na biblioteca local.");
                     }
                 });
             }
-            
-            this.tasksContainer.appendChild(item);
+
+            feed.appendChild(item);
         });
+    }
+
+    /** Resolve a mídia de uma tarefa: título amigável, miniatura e tipo (video/photo/other). */
+    _resolveTaskMedia(key, t) {
+        if (key.startsWith("photo-")) {
+            const id = Number(key.split("photo-")[1]);
+            const photo = (STATE.allPhotos || []).find(p => p.id === id);
+            return {
+                kind: "photo", id, icon: "fa-image",
+                title: photo ? (photo.title || photo.filename || `Foto ${id}`) : `Foto ${id}`,
+                thumbUrl: photo ? (photo.proxy_path || `/proxies/photos/proxy_photo_${id}.webp`) : `/proxies/photos/proxy_photo_${id}.webp`,
+            };
+        }
+        if (key !== "" && !isNaN(Number(key))) {
+            const id = Number(key);
+            const video = (STATE.allVideos || []).find(v => v.id === id);
+            return {
+                kind: "video", id, icon: "fa-film",
+                title: video ? (video.title || video.filename || `Vídeo ${id}`) : `Vídeo ${id}`,
+                thumbUrl: `/api/video/${id}/thumbnail`,
+            };
+        }
+        // Tarefas de projeto (sem mídia navegável)
+        let title = `Tarefa (${t.type || "proxy"})`;
+        let icon = "fa-gears";
+        if (key.startsWith("recover-faces-")) { title = "Recuperação de Rostos (Projeto)"; icon = "fa-user-group"; }
+        else if (key.startsWith("cluster-")) { title = "Clusterização de Temas (Projeto)"; icon = "fa-diagram-project"; }
+        else if (key.startsWith("reindex")) { title = "Reindexação de Embeddings"; icon = "fa-database"; }
+        else if (t.type === "enrich" || key.startsWith("enrich")) { title = "Sincronização de Descrições (Projeto)"; icon = "fa-wand-magic-sparkles"; }
+        return { kind: "other", id: null, title, icon, thumbUrl: null };
     }
 
     showFloatingLinkButton(x, y, selectedText, timestamp, videoId) {

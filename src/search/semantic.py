@@ -101,8 +101,10 @@ class SemanticSearch:
                 "project_id": project_id,
                 "video_id": video_id,
                 "media_type": "broll",
-                "start_time": desc['timestamp'],
-                "end_time": desc['timestamp'] + CONFIG.FRAME_INTERVAL,
+                # Fronteiras reais do segmento (shot/beat) quando disponíveis;
+                # fallback: janela legada timestamp + FRAME_INTERVAL
+                "start_time": desc.get('start_time', desc['timestamp']),
+                "end_time": desc.get('end_time', desc['timestamp'] + CONFIG.FRAME_INTERVAL),
                 "text": desc['description'],
                 "raw_text": desc['description'],
                 "tags": desc['tags']
@@ -126,9 +128,23 @@ class SemanticSearch:
             )
             print(f"[QDRANT] {len(points)} frames de B-roll indexados para projeto {project_id}, vídeo {video_id}")
 
+    def delete_video_broll_points(self, project_id: int, video_id: int) -> None:
+        """Remove os pontos de B-roll (frames) de um vídeo — evita órfãos ao reanalisar."""
+        try:
+            self.client.delete(
+                collection_name=self.collection_name,
+                points_selector=Filter(must=[
+                    FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                    FieldCondition(key="video_id", match=MatchValue(value=video_id)),
+                    FieldCondition(key="media_type", match=MatchValue(value="broll")),
+                ]),
+            )
+        except Exception as e:
+            print(f"[QDRANT] Erro ao limpar frames do vídeo {video_id}: {e}")
+
     def index_photo_description(self, project_id: int, photo_id: int, description: str, tags: list):
-        """Indexa a descrição de uma foto de set isolada por project_id."""
-        text_to_embed = f"Foto de set: {description}. Tags: {', '.join(tags)}"
+        """Indexa a descrição de uma foto isolada por project_id."""
+        text_to_embed = f"Foto: {description}. Tags: {', '.join(tags)}"
         vector = self.encoder.encode(text_to_embed).tolist()
         
         point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"proj_{project_id}_photo_{photo_id}"))
@@ -305,7 +321,7 @@ class SemanticSearch:
             ts = payload.get("start_time", 0.0)
             return f"B-Roll frame {ts}s: {text}. Elementos: {', '.join(tags)}"
         if media_type == "photo":
-            return f"Foto de set: {text}. Tags: {', '.join(tags)}"
+            return f"Foto: {text}. Tags: {', '.join(tags)}"
         if media_type == "doc":
             return f"Documento '{payload.get('filename', '')}' | Parágrafo: {text}"
         return text

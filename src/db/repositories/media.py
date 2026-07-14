@@ -52,18 +52,48 @@ class MediaRepository:
         conn.execute("UPDATE video SET status = ?, error_message = ? WHERE id = ?", (status, error_message, video_id))
 
     @staticmethod
-    def update_video_metadata(conn: sqlite3.Connection, video_id: int, description: str, summary: str, tags: List[str]) -> None:
-        """Atualiza a decupagem editorial e tags do vídeo."""
+    def update_video_metadata(conn: sqlite3.Connection, video_id: int, description: str, summary: str, tags: List[str], title: Optional[str] = None) -> None:
+        """Atualiza a decupagem editorial, tags e título curto do vídeo."""
         conn.execute("""
-            UPDATE video 
-            SET description = ?, summary = ?, tags = ? 
+            UPDATE video
+            SET description = ?, summary = ?, tags = ?,
+                title = COALESCE(NULLIF(?, ''), title)
             WHERE id = ?
-        """, (description, summary, json.dumps(tags), video_id))
+        """, (description, summary, json.dumps(tags), title or "", video_id))
 
     @staticmethod
     def delete_video(conn: sqlite3.Connection, video_id: int) -> None:
         """Deleta o vídeo e suas dependências."""
         conn.execute("DELETE FROM video WHERE id = ?", (video_id,))
+
+    @staticmethod
+    def replace_video_segments(
+        conn: sqlite3.Connection,
+        project_id: int,
+        video_id: int,
+        segments: List[Dict[str, Any]]
+    ) -> None:
+        """Substitui os segmentos (shots/beats) do vídeo pela nova segmentação.
+
+        Grava o id inserido em cada dict de `segments` (chave 'id') para que o
+        chamador possa vincular keyframes/vetores ao segmento de origem."""
+        conn.execute("DELETE FROM media_segment WHERE video_id = ?", (video_id,))
+        for s in segments:
+            cursor = conn.execute("""
+                INSERT INTO media_segment (project_id, video_id, kind, start_time, end_time, reason, motion_label)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (project_id, video_id, s["kind"], s["start"], s["end"],
+                  s.get("reason", ""), s.get("motion_label", "")))
+            s["id"] = cursor.lastrowid
+
+    @staticmethod
+    def get_video_segments(conn: sqlite3.Connection, video_id: int) -> List[Dict[str, Any]]:
+        """Retorna os segmentos do vídeo ordenados no tempo."""
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM media_segment WHERE video_id = ? ORDER BY start_time", (video_id,)
+        )
+        return [dict(r) for r in cursor.fetchall()]
 
     @staticmethod
     def add_photo(

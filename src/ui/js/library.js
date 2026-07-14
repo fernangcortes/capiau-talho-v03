@@ -54,10 +54,25 @@ export function cleanTitle(text) {
     return clean;
 }
 
+export const CATEGORY_LABELS = {
+    obra: "Obra",
+    processo: "Making of",
+    depoimento: "Depoimento",
+    cotidiano: "Cotidiano",
+    evento: "Evento",
+    tecnico: "Técnico",
+    arquivo: "Arquivo",
+    pessoal: "Pessoal",
+    documento: "Documento"
+};
+
 export function getFriendlyTitle(v) {
     // Se o usuário optou por forçar nome do arquivo real para este clipe
     const forceRealFilename = window.titleDisplayPreferences && window.titleDisplayPreferences[v.id] === "filename";
     if (forceRealFilename) return v.filename;
+
+    // Título curto gerado pela triagem/sumário da IA tem prioridade
+    if (v.title && v.title.trim()) return v.title.trim();
 
     if (v.video_type === "interview") {
         let name = "";
@@ -382,7 +397,8 @@ function renderTreeNode(node, container, depth = 0) {
         const toggleBtnHtml = `<button class="btn-toggle-filename" title="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
 
         // Tooltip completa
-        const tooltip = `Título: ${friendlyTitle}\nArquivo: ${v.filename}\nTipo: ${v.video_type === 'interview' ? 'Entrevista' : 'Bastidores'}\nDescrição: ${v.description || v.summary || 'Sem decupagem'}`;
+        const categoryLabel = v.category ? (CATEGORY_LABELS[v.category] || v.category) : (v.video_type === 'interview' ? 'Entrevista' : 'B-roll');
+        const tooltip = `Título: ${friendlyTitle}\nArquivo: ${v.filename}\nCategoria: ${categoryLabel}\nDescrição: ${v.description || v.summary || 'Sem decupagem'}`;
 
         card.innerHTML = `
             <div class="media-thumbnail">
@@ -619,6 +635,16 @@ export class LibraryManager {
             this.btnAnalyzePhoto.addEventListener("click", () => this.analyzeCurrentPhoto());
         }
 
+        const btnPhotoViewerSimilar = document.getElementById("btn-photo-viewer-similar");
+        if (btnPhotoViewerSimilar) {
+            btnPhotoViewerSimilar.addEventListener("click", () => {
+                const photo = this.currentLightboxPhoto || (STATE.currentPhotoList || [])[STATE.currentPhotoIndex];
+                if (!photo || !window.showSimilarMedia) return;
+                this.closeLightbox();
+                window.showSimilarMedia("photo", photo.id, { label: photo.title || photo.filename });
+            });
+        }
+
         const btnAddPhotoTimeline = document.getElementById("btn-add-photo-timeline");
         if (btnAddPhotoTimeline) {
             btnAddPhotoTimeline.addEventListener("click", () => {
@@ -842,6 +868,74 @@ export class LibraryManager {
         });
     }
 
+    /**
+     * Revela um vídeo na biblioteca (aba Mídias): abre a aba de vídeos, expande as
+     * pastas ancestrais no tree, seleciona o card, rola até ele e dá um pulso visual.
+     * Usado pelo clique numa tarefa. Retorna false se o vídeo não estiver na biblioteca.
+     */
+    revealVideoById(videoId) {
+        const video = (STATE.allVideos || []).find(v => v.id === videoId);
+        if (!video) return false;
+
+        // Abre a aba de vídeos na sidebar esquerda
+        const tabBtn = document.querySelector('.sidebar-left .tab-btn[data-tab="tab-videos"]');
+        if (tabBtn) tabBtn.click();
+
+        // Expande as pastas ancestrais do arquivo (mesmo cálculo do buildTree)
+        try {
+            const filepaths = STATE.allVideos.map(v => v.filepath.replace(/\\/g, "/"));
+            const commonBase = getCommonBasePath(filepaths);
+            const normalized = video.filepath.replace(/\\/g, "/");
+            const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
+            const parts = relative.split("/").filter(Boolean);
+            let currentPath = "root";
+            for (let i = 0; i < parts.length - 1; i++) {
+                currentPath = currentPath + "/" + parts[i];
+                openFoldersSet.add(currentPath);
+            }
+        } catch (e) {
+            console.warn("Não foi possível calcular as pastas ancestrais:", e);
+        }
+
+        // Re-renderiza a árvore já com as pastas abertas e destaca a seleção
+        this.renderVideos(STATE.allVideos);
+        STATE.activeVideo = video;
+
+        requestAnimationFrame(() => {
+            const card = document.querySelector(`.media-card.tree-file-item[data-video-id="${videoId}"]`);
+            if (card) {
+                card.scrollIntoView({ block: "center", behavior: "smooth" });
+                card.classList.remove("reveal-pulse");
+                void card.offsetWidth; // reinicia a animação se já estava aplicada
+                card.classList.add("reveal-pulse");
+                setTimeout(() => card.classList.remove("reveal-pulse"), 1600);
+            }
+        });
+        return true;
+    }
+
+    /** Revela uma foto na aba Fotos: rola até o card e dá o pulso visual. */
+    revealPhotoById(photoId) {
+        const photo = (STATE.allPhotos || []).find(p => p.id === photoId);
+        if (!photo) return false;
+
+        const tabBtn = document.querySelector('.sidebar-left .tab-btn[data-tab="tab-photos"]');
+        if (tabBtn) tabBtn.click();
+        STATE.activePhoto = photo;
+
+        requestAnimationFrame(() => {
+            const card = document.querySelector(`.photo-card[data-photo-id="${photoId}"]`);
+            if (card) {
+                card.scrollIntoView({ block: "center", behavior: "smooth" });
+                card.classList.remove("reveal-pulse");
+                void card.offsetWidth;
+                card.classList.add("reveal-pulse");
+                setTimeout(() => card.classList.remove("reveal-pulse"), 1600);
+            }
+        });
+        return true;
+    }
+
     renderVideos(videos) {
         if (!this.videoListEl) return;
         this.videoListEl.innerHTML = "";
@@ -914,7 +1008,8 @@ export class LibraryManager {
             card.innerHTML = `
                 ${imgHtml}
                 <button class="btn-photo-add-timeline" title="Adicionar à timeline (still)" style="position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:5px; border:none; background:rgba(6,182,212,0.9); color:#00141a; font-size:11px; cursor:pointer; z-index:3; display:none; align-items:center; justify-content:center;"><i class="fa-solid fa-plus"></i></button>
-                <p title="${p.description || p.filename}">${p.description || p.filename}</p>
+                <button class="btn-photo-similar" title="Encontrar similares (busca visual local)" style="position:absolute; top:4px; right:30px; width:22px; height:22px; border-radius:5px; border:none; background:rgba(168,85,247,0.9); color:#fff; font-size:11px; cursor:pointer; z-index:3; display:none; align-items:center; justify-content:center;"><i class="fa-solid fa-images"></i></button>
+                <p title="${p.description || p.filename}">${p.title || p.description || p.filename}</p>
             `;
 
             if (clickEnabled) {
@@ -928,14 +1023,24 @@ export class LibraryManager {
                     e.dataTransfer.effectAllowed = "copy";
                 });
 
-                // Botão "+" flutuante (aparece no hover) para adicionar à timeline
+                // Botões flutuantes (aparecem no hover): "+" timeline e similares
                 const addBtn = card.querySelector(".btn-photo-add-timeline");
+                const similarBtn = card.querySelector(".btn-photo-similar");
+                const hoverBtns = [addBtn, similarBtn].filter(Boolean);
+                if (hoverBtns.length) {
+                    card.addEventListener("mouseenter", () => hoverBtns.forEach(b => { b.style.display = "flex"; }));
+                    card.addEventListener("mouseleave", () => hoverBtns.forEach(b => { b.style.display = "none"; }));
+                }
                 if (addBtn) {
-                    card.addEventListener("mouseenter", () => { addBtn.style.display = "flex"; });
-                    card.addEventListener("mouseleave", () => { addBtn.style.display = "none"; });
                     addBtn.addEventListener("click", (e) => {
                         e.stopPropagation();
                         if (window.TIMELINE_STATE) window.TIMELINE_STATE.addPhotoCut(p.id, {});
+                    });
+                }
+                if (similarBtn) {
+                    similarBtn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        if (window.showSimilarMedia) window.showSimilarMedia("photo", p.id, { label: p.title || p.filename });
                     });
                 }
 
@@ -1277,6 +1382,17 @@ export class LibraryManager {
                 } catch (e) {
                     alert("Erro ao iniciar análise visual: " + e.message);
                 }
+            });
+        }
+
+        const btnInspectorSimilar = document.getElementById("btn-inspector-ai-similar");
+        if (btnInspectorSimilar) {
+            btnInspectorSimilar.addEventListener("click", () => {
+                const video = STATE.activeVideo;
+                if (!video) return;
+                const player = document.getElementById("source-video");
+                const ts = (player && isFinite(player.currentTime)) ? player.currentTime : 0.0;
+                if (window.showSimilarMedia) window.showSimilarMedia("video", video.id, { timestamp: ts, label: video.filename });
             });
         }
 

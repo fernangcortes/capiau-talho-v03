@@ -47,6 +47,23 @@ export class ChatManager {
             chatMessagesMain.addEventListener("click", (e) => this.handleChatLinkClick(e));
         }
 
+        // Sincronização com o motor de player único
+        const miniVideoMain = document.getElementById("chat-mini-video");
+        if (miniVideoMain) {
+            miniVideoMain.addEventListener("play", () => {
+                STATE.emit("playerPlayed", "chat-mini");
+            });
+        }
+
+        STATE.on("playerPlayed", (sender) => {
+            if (sender !== "chat-mini") {
+                const miniVideo = getActiveQuerySelector("#chat-mini-video");
+                if (miniVideo && !miniVideo.paused) {
+                    miniVideo.pause();
+                }
+            }
+        });
+
         // Listener de histórico de chat
         STATE.on("chatHistoryUpdated", (history) => this.renderHistory(history));
 
@@ -132,26 +149,12 @@ export class ChatManager {
 
     async loadAgentSettings() {
         const modelSelect = document.getElementById("agent-model-select");
-        const apiKeyInput = document.getElementById("agent-api-key-input");
-        if (!modelSelect || !apiKeyInput) return;
-
-        // Recupera valores do LocalStorage
-        const savedModel = localStorage.getItem("capiau_agent_model");
-        const savedKey = localStorage.getItem("capiau_agent_api_key");
-
-        if (savedKey) {
-            apiKeyInput.value = savedKey;
-        }
-
-        // Salvar chave no LocalStorage quando alterada
-        apiKeyInput.addEventListener("input", () => {
-            localStorage.setItem("capiau_agent_api_key", apiKeyInput.value);
-        });
+        if (!modelSelect) return;
 
         try {
             const data = await CapIAuAPI.fetchAgentModels();
             modelSelect.innerHTML = "";
-            
+
             data.models.forEach(model => {
                 const opt = document.createElement("option");
                 opt.value = model;
@@ -159,20 +162,71 @@ export class ChatManager {
                 modelSelect.appendChild(opt);
             });
 
-            // Restaura o modelo anterior ou define o padrão
-            if (savedModel && data.models.includes(savedModel)) {
-                modelSelect.value = savedModel;
+            // O modelo do agente agora vive nas configurações da IA (agent.model);
+            // o seletor do chat é apenas um atalho para o mesmo valor global.
+            await this.migrateLegacyAgentPrefs(data.models);
+
+            const settings = await CapIAuAPI.fetchSettings(STATE.currentProjectId);
+            const resolved = settings.values && settings.values["agent.model"];
+            if (resolved && data.models.includes(resolved.value)) {
+                modelSelect.value = resolved.value;
             } else if (data.default) {
                 modelSelect.value = data.default;
-                localStorage.setItem("capiau_agent_model", data.default);
             }
 
-            modelSelect.addEventListener("change", () => {
-                localStorage.setItem("capiau_agent_model", modelSelect.value);
+            modelSelect.addEventListener("change", async () => {
+                try {
+                    await CapIAuAPI.updateGlobalSettings({ "agent.model": modelSelect.value });
+                    STATE.emit("settingsChanged", { scope: "global" });
+                } catch (err) {
+                    console.error("Falha ao salvar modelo do agente:", err);
+                }
+            });
+
+            // Reflete mudanças feitas pelo painel de configurações
+            STATE.on("settingsChanged", async () => {
+                try {
+                    const s = await CapIAuAPI.fetchSettings(STATE.currentProjectId);
+                    const r = s.values && s.values["agent.model"];
+                    if (r && data.models.includes(r.value)) modelSelect.value = r.value;
+                } catch (_) { /* silencioso: apenas sincronização visual */ }
             });
         } catch (err) {
             console.error("Falha ao carregar modelos do agente:", err);
             modelSelect.innerHTML = `<option value="deepseek/deepseek-v4-flash">deepseek/deepseek-v4-flash (Erro)</option>`;
+        }
+    }
+
+    // Migração única das preferências antigas do chat (localStorage) para o backend.
+    async migrateLegacyAgentPrefs(availableModels) {
+        const savedModel = localStorage.getItem("capiau_agent_model");
+        const savedKey = localStorage.getItem("capiau_agent_api_key");
+        if (!savedModel && !savedKey) return;
+
+        try {
+            const settings = await CapIAuAPI.fetchSettings(null);
+            const values = {};
+
+            const modelInfo = settings.values && settings.values["agent.model"];
+            if (savedModel && availableModels.includes(savedModel) &&
+                modelInfo && modelInfo.origin === "default") {
+                values["agent.model"] = savedModel;
+            }
+
+            const keyInfo = settings.values && settings.values["api.openrouter_key"];
+            if (savedKey && keyInfo && keyInfo.origin === "default") {
+                if (confirm("Encontrei sua chave OpenRouter salva no navegador (campo antigo do chat). Migrar para o novo painel de configurações da IA? Ela passa a ser guardada no banco local do app.")) {
+                    values["api.openrouter_key"] = savedKey;
+                }
+            }
+
+            if (Object.keys(values).length) {
+                await CapIAuAPI.updateGlobalSettings(values);
+            }
+            localStorage.removeItem("capiau_agent_model");
+            localStorage.removeItem("capiau_agent_api_key");
+        } catch (err) {
+            console.error("Falha na migração das preferências do agente:", err);
         }
     }
 
@@ -201,18 +255,16 @@ export class ChatManager {
             const modelSelect = document.getElementById("agent-model-select");
             const agentModel = modelSelect ? modelSelect.value : null;
 
-            const apiKeyInput = document.getElementById("agent-api-key-input");
-            const customApiKey = apiKeyInput ? apiKeyInput.value.trim() : null;
-
+            // A chave API agora é resolvida pelo backend (painel de configurações > .env)
             const response = await CapIAuAPI.chat(
-                STATE.currentProjectId, 
-                msg, 
-                STATE.chatHistory, 
-                clips, 
-                tracks, 
-                fps, 
-                agentModel, 
-                customApiKey
+                STATE.currentProjectId,
+                msg,
+                STATE.chatHistory,
+                clips,
+                tracks,
+                fps,
+                agentModel,
+                null
             );
             this.hideTypingIndicator();
             

@@ -13,6 +13,7 @@ import json
 import cv2
 import numpy as np
 from pathlib import Path
+from src.vision.cv_utils import imread_unicode
 from typing import List, Optional, Dict, Any, Tuple
 
 from src.config import CONFIG
@@ -703,7 +704,7 @@ class FaceService:
     ) -> Optional[Path]:
         """Salva o crop do rosto para referencia visual."""
         try:
-            img = cv2.imread(str(image_path))
+            img = imread_unicode(image_path)
             if img is None:
                 return None
             

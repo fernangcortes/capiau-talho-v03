@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from src.vision.backends.base import FaceBackend, FaceDetection, FaceRecognition, BackendResult
+from src.vision.cv_utils import imread_unicode
 
 _detector = None
 _recognizer = None
@@ -110,9 +111,9 @@ class LocalBackend(FaceBackend):
     def get_embedding_dimension(self) -> int:
         return 128
 
-    def detect(self, image_path: Path) -> List[FaceDetection]:
+    def detect(self, image_path: Path, project_id: Optional[int] = None) -> List[FaceDetection]:
         """Detecta rostos com YuNet."""
-        img = cv2.imread(str(image_path))
+        img = imread_unicode(image_path)
         if img is None:
             return []
         
@@ -120,8 +121,20 @@ class LocalBackend(FaceBackend):
         if height == 0 or width == 0:
             return []
         
+        # Resolve thresholds from SettingsService
+        from src.services.settings_service import SettingsService
+        S = SettingsService.get_settings(project_id)
+        detector_score = S.get("faces.detector_score")
+        nms_threshold = S.get("faces.nms_threshold")
+        blur_threshold = S.get("faces.blur_threshold")
+
         detector, _ = _get_models()
         detector.setInputSize((width, height))
+        try:
+            detector.setScoreThreshold(detector_score)
+            detector.setNMSThreshold(nms_threshold)
+        except Exception as te:
+            print(f"[LOCAL_BACKEND] Falha ao definir thresholds no detector YuNet: {te}")
         
         retval, faces = detector.detect(img)
         if faces is None or len(faces) == 0:
@@ -134,7 +147,7 @@ class LocalBackend(FaceBackend):
             x, y, w, h = map(int, face[0:4])
             confidence = float(face[14])
             
-            if confidence < 0.6:
+            if confidence < detector_score:
                 continue
             
             x1, y1 = max(0, x), max(0, y)
@@ -146,7 +159,7 @@ class LocalBackend(FaceBackend):
             
             # Heuristica de multidao vs nitidez
             is_small = (w < 40 or h < 40)
-            blurry = _is_blurry(crop_img, threshold=15.0)
+            blurry = _is_blurry(crop_img, threshold=blur_threshold)
             
             if is_small and blurry and total_faces > 8:
                 continue
@@ -180,9 +193,9 @@ class LocalBackend(FaceBackend):
         
         return results
 
-    def recognize(self, image_path: Path, detections: List[FaceDetection]) -> List[FaceRecognition]:
+    def recognize(self, image_path: Path, detections: List[FaceDetection], project_id: Optional[int] = None) -> List[FaceRecognition]:
         """Extrai embeddings SFace para cada deteccao."""
-        img = cv2.imread(str(image_path))
+        img = imread_unicode(image_path)
         if img is None:
             return [FaceRecognition(confidence=0.0) for _ in detections]
         
@@ -237,12 +250,12 @@ class LocalBackend(FaceBackend):
         
         return results
 
-    def detect_and_recognize(self, image_path: Path) -> BackendResult:
+    def detect_and_recognize(self, image_path: Path, project_id: Optional[int] = None) -> BackendResult:
         """Executa deteccao + reconhecimento completo."""
         start = time.time()
         
-        detections = self.detect(image_path)
-        recognitions = self.recognize(image_path, detections) if detections else []
+        detections = self.detect(image_path, project_id=project_id)
+        recognitions = self.recognize(image_path, detections, project_id=project_id) if detections else []
         
         elapsed_ms = int((time.time() - start) * 1000)
         

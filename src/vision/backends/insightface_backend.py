@@ -16,6 +16,7 @@ from typing import List, Optional
 import numpy as np
 
 from src.vision.backends.base import FaceBackend, FaceDetection, FaceRecognition, BackendResult
+from src.vision.cv_utils import imread_unicode
 
 
 class InsightFaceBackend(FaceBackend):
@@ -88,9 +89,7 @@ class InsightFaceBackend(FaceBackend):
 
     def detect(self, image_path: Path) -> List[FaceDetection]:
         """Detecta rostos com RetinaFace via InsightFace."""
-        import cv2
-        
-        img = cv2.imread(str(image_path))
+        img = imread_unicode(image_path)
         if img is None:
             return []
         
@@ -131,9 +130,7 @@ class InsightFaceBackend(FaceBackend):
 
     def recognize(self, image_path: Path, detections: List[FaceDetection]) -> List[FaceRecognition]:
         """Extrai embeddings ArcFace (512-d) para cada deteccao."""
-        import cv2
-        
-        img = cv2.imread(str(image_path))
+        img = imread_unicode(image_path)
         if img is None:
             return [FaceRecognition(confidence=0.0) for _ in detections]
         

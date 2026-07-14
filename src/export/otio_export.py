@@ -2,16 +2,31 @@
 import sqlite3
 import json
 from pathlib import Path
-import opentimelineio as otio
+
+# Import opcional: sem o pacote (ex.: Python sem wheel disponível), o app sobe
+# normalmente e apenas a exportação OTIO/XML/EDL fica indisponível com erro claro.
+try:
+    import opentimelineio as otio
+    OTIO_AVAILABLE = True
+except ImportError:
+    otio = None
+    OTIO_AVAILABLE = False
+    print("[EXPORT] Aviso: 'opentimelineio' não instalado — exportação de timeline desabilitada até instalar o pacote.")
+
 from src.config import CONFIG
 from src.db.connection import get_db
 
-def generate_otio_timeline(timeline_id: int) -> otio.schema.Timeline:
+def generate_otio_timeline(timeline_id: int) -> "otio.schema.Timeline":
     """Carrega os cortes salvos na tabela 'timeline' e monta uma timeline do OpenTimelineIO.
 
     Suporta o formato v2 multipista (tracks nomeadas + posições absolutas com Gaps)
     e o formato legado v1 (lista sequencial de cortes).
     """
+    if not OTIO_AVAILABLE:
+        raise RuntimeError(
+            "Exportação indisponível: o pacote 'opentimelineio' não está instalado neste Python. "
+            "Instale com: pip install opentimelineio"
+        )
     from src.db.repositories.projects import ProjectRepository
 
     with get_db() as conn:

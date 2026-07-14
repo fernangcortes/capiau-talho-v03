@@ -43,6 +43,7 @@ class Config:
     THUMBNAILS_DIR = PROXIES_DIR / "thumbnails"
     
     # ── Configurações de Ingestão e Proxy ──────────────────────
+    MAX_CONVERSION_WORKERS = int(os.getenv("MAX_CONVERSION_WORKERS", "2"))
     PROXY_RESOLUTION = "1280x720" # HD 720p para preview suave
     PROXY_CRF = 23
     PROXY_PRESET = "fast"
