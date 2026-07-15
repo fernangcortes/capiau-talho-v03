@@ -359,6 +359,30 @@ export class CapIAuAPI {
         });
     }
 
+    static renameProjectName(projectId, oldName, newName) {
+        return this.request(`/api/faces/project/${projectId}/names/rename`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ old_name: oldName, new_name: newName })
+        });
+    }
+
+    static deleteProjectName(projectId, name) {
+        return this.request(`/api/faces/project/${projectId}/names/delete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name })
+        });
+    }
+
+    static mergeProjectNames(projectId, srcName, destName) {
+        return this.request(`/api/faces/project/${projectId}/names/merge`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ src_name: srcName, dest_name: destName })
+        });
+    }
+
     static dissociateFaces(projectId, faceIds) {
         return this.request(`/api/faces/project/${projectId}/faces/dissociate`, {
             method: "POST",

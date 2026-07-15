@@ -92,6 +92,17 @@ class PipelineStatusResponse(BaseModel):
 class LabelFaceRequest(BaseModel):
     name: str
 
+class RenameNameRequest(BaseModel):
+    old_name: str
+    new_name: str
+
+class DeleteNameRequest(BaseModel):
+    name: str
+
+class MergeNamesRequest(BaseModel):
+    src_name: str
+    dest_name: str
+
 class RejectFaceRequest(BaseModel):
     name: Optional[str] = None
 
@@ -1268,3 +1279,174 @@ def reject_face(face_id: int, payload: Optional[RejectFaceRequest] = None):
             print(f"[Entities] Falha ao registrar objeto rejeitado: {e}")
 
     return {"status": "success", "message": f"Face rejeitada com sucesso (rotulada como '{target_name}')."}
+
+
+@router.post("/project/{project_id}/names/rename")
+def rename_project_name(project_id: int, request: RenameNameRequest):
+    """Renomeia uma pessoa/falante globalmente no projeto, atualizando rostos, falas e entidades."""
+    old_name = request.old_name.strip()
+    new_name = request.new_name.strip()
+    if not old_name or not new_name:
+        raise HTTPException(status_code=400, detail="Nomes antigo e novo não podem ser vazios.")
+    if old_name == new_name:
+        return {"status": "success", "message": "Nomes são idênticos, nada a fazer."}
+
+    from src.db.repositories.narrative import NarrativeRepository
+    from src.db.repositories.media import MediaRepository
+    from src.search.semantic import SemanticSearch
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # 1. Atualizar na tabela face
+        cursor.execute("""
+            UPDATE face 
+            SET name = ? 
+            WHERE project_id = ? AND name = ?
+        """, (new_name, project_id, old_name))
+        
+        # 2. Atualizar na tabela transcript (falas de videos do projeto)
+        cursor.execute("""
+            UPDATE transcript 
+            SET speaker_id = ? 
+            WHERE speaker_id = ? AND video_id IN (SELECT id FROM video WHERE project_id = ?)
+        """, (new_name, old_name, project_id))
+        
+        # 3. Atualizar na tabela person (se existir)
+        cursor.execute("SELECT id FROM person WHERE project_id = ? AND name = ?", (project_id, new_name))
+        new_person_row = cursor.fetchone()
+        
+        cursor.execute("SELECT id FROM person WHERE project_id = ? AND name = ?", (project_id, old_name))
+        old_person_row = cursor.fetchone()
+        
+        if old_person_row:
+            old_pid = old_person_row["id"]
+            if new_person_row:
+                new_pid = new_person_row["id"]
+                # Mesclar reconhecimentos e deletar registro antigo
+                cursor.execute("UPDATE face_recognition SET person_id = ? WHERE person_id = ?", (new_pid, old_pid))
+                cursor.execute("DELETE FROM person WHERE id = ?", (old_pid,))
+            else:
+                cursor.execute("UPDATE person SET name = ? WHERE id = ?", (new_name, old_pid))
+        
+        # 4. Atualizar na tabela entity
+        cursor.execute("SELECT id FROM entity WHERE project_id = ? AND name = ?", (project_id, new_name))
+        new_entity_row = cursor.fetchone()
+        
+        cursor.execute("SELECT id FROM entity WHERE project_id = ? AND name = ?", (project_id, old_name))
+        old_entity_row = cursor.fetchone()
+        
+        if old_entity_row:
+            old_eid = old_entity_row["id"]
+            if new_entity_row:
+                new_eid = new_entity_row["id"]
+                cursor.execute("UPDATE entity_mention SET entity_id = ? WHERE entity_id = ?", (new_eid, old_eid))
+                cursor.execute("DELETE FROM entity WHERE id = ?", (old_eid,))
+            else:
+                cursor.execute("UPDATE entity SET name = ? WHERE id = ?", (new_name, old_eid))
+                
+        # Obter videos afetados para reindexação do Qdrant
+        cursor.execute("""
+            SELECT DISTINCT video_id FROM transcript 
+            WHERE speaker_id = ? AND video_id IN (SELECT id FROM video WHERE project_id = ?)
+        """, (new_name, project_id))
+        video_ids = [r["video_id"] for r in cursor.fetchall()]
+        
+        conn.commit()
+
+    # Reindexar fora do bloco do banco para evitar manter conexão travada
+    try:
+        search_engine = SemanticSearch.get_instance()
+        with get_db() as conn:
+            for vid in video_ids:
+                dialogues = NarrativeRepository.get_transcript_dialogues(conn, vid)
+                if dialogues:
+                    video = MediaRepository.get_video(conn, vid)
+                    v_type = video['video_type'] if video else 'interview'
+                    search_engine.index_transcript_chunks(project_id, vid, dialogues, v_type)
+    except Exception as e:
+        print(f"[Names] Erro ao reindexar transcrições no Qdrant: {e}")
+
+    return {"status": "success", "message": f"Nome renomeado de '{old_name}' para '{new_name}' com sucesso."}
+
+
+@router.post("/project/{project_id}/names/delete")
+def delete_project_name(project_id: int, request: DeleteNameRequest):
+    """Remove a associação de um nome/falante globalmente no projeto (faces, falas, pessoa, entidades)."""
+    name = request.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Nome não pode ser vazio.")
+
+    from src.db.repositories.narrative import NarrativeRepository
+    from src.db.repositories.media import MediaRepository
+    from src.search.semantic import SemanticSearch
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # 1. Resetar na tabela face (desassociar, name = NULL)
+        cursor.execute("""
+            UPDATE face 
+            SET name = NULL 
+            WHERE project_id = ? AND name = ?
+        """, (project_id, name))
+        
+        # 2. Resetar na tabela transcript (voltar para 'Desconhecido')
+        cursor.execute("""
+            UPDATE transcript 
+            SET speaker_id = 'Desconhecido' 
+            WHERE speaker_id = ? AND video_id IN (SELECT id FROM video WHERE project_id = ?)
+        """, (name, project_id))
+        
+        # 3. Remover da tabela person e resetar reconhecimentos
+        cursor.execute("SELECT id FROM person WHERE project_id = ? AND name = ?", (project_id, name))
+        person_row = cursor.fetchone()
+        if person_row:
+            pid = person_row["id"]
+            cursor.execute("UPDATE face_recognition SET person_id = NULL, status = 'auto' WHERE person_id = ?", (pid,))
+            cursor.execute("DELETE FROM person WHERE id = ?", (pid,))
+            
+        # 4. Remover da tabela entity e entity_mention
+        cursor.execute("SELECT id FROM entity WHERE project_id = ? AND name = ?", (project_id, name))
+        entity_row = cursor.fetchone()
+        if entity_row:
+            eid = entity_row["id"]
+            cursor.execute("DELETE FROM entity_mention WHERE entity_id = ?", (eid,))
+            cursor.execute("DELETE FROM entity WHERE id = ?", (eid,))
+            
+        # Obter videos afetados para reindexação do Qdrant
+        cursor.execute("""
+            SELECT DISTINCT video_id FROM transcript 
+            WHERE speaker_id = 'Desconhecido' AND video_id IN (SELECT id FROM video WHERE project_id = ?)
+        """, (project_id,))
+        video_ids = [r["video_id"] for r in cursor.fetchall()]
+        
+        conn.commit()
+
+    # Reindexar
+    try:
+        search_engine = SemanticSearch.get_instance()
+        with get_db() as conn:
+            for vid in video_ids:
+                dialogues = NarrativeRepository.get_transcript_dialogues(conn, vid)
+                if dialogues:
+                    video = MediaRepository.get_video(conn, vid)
+                    v_type = video['video_type'] if video else 'interview'
+                    search_engine.index_transcript_chunks(project_id, vid, dialogues, v_type)
+    except Exception as e:
+        print(f"[Names] Erro ao reindexar transcrições no Qdrant: {e}")
+
+    return {"status": "success", "message": f"Associação do nome '{name}' removida com sucesso."}
+
+
+@router.post("/project/{project_id}/names/merge")
+def merge_project_names(project_id: int, request: MergeNamesRequest):
+    """Mescla as ocorrências de um nome (src_name) em outro (dest_name)."""
+    src_name = request.src_name.strip()
+    dest_name = request.dest_name.strip()
+    if not src_name or not dest_name:
+        raise HTTPException(status_code=400, detail="Nomes de origem e destino não podem ser vazios.")
+    if src_name == dest_name:
+        return {"status": "success", "message": "Nomes são idênticos, nada a fazer."}
+        
+    return rename_project_name(project_id, RenameNameRequest(old_name=src_name, new_name=dest_name))

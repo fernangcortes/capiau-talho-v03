@@ -1816,10 +1816,12 @@ export class PanelsManager {
                 thumbUrl: `/api/video/${id}/thumbnail`,
             };
         }
-        // Tarefas de projeto (sem mídia navegável)
-        let title = `Tarefa (${t.type || "proxy"})`;
+        // Tarefas de projeto (sem mídia navegável). 'label' vem pronto de quem
+        // publicou a tarefa (ex.: o worker de lote manda o nome do arquivo da vez).
+        let title = t.label || `Tarefa (${t.type || "proxy"})`;
         let icon = "fa-gears";
-        if (key.startsWith("recover-faces-")) { title = "Recuperação de Rostos (Projeto)"; icon = "fa-user-group"; }
+        if (key === "lote-visao") { icon = "fa-list-check"; }
+        else if (key.startsWith("recover-faces-")) { title = "Recuperação de Rostos (Projeto)"; icon = "fa-user-group"; }
         else if (key.startsWith("cluster-")) { title = "Clusterização de Temas (Projeto)"; icon = "fa-diagram-project"; }
         else if (key.startsWith("reindex")) { title = "Reindexação de Embeddings"; icon = "fa-database"; }
         else if (t.type === "enrich" || key.startsWith("enrich")) { title = "Sincronização de Descrições (Projeto)"; icon = "fa-wand-magic-sparkles"; }

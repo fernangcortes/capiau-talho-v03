@@ -121,6 +121,41 @@ export class FaceManager {
             btnReassignConfirm.addEventListener("click", () => this.confirmReassignFaces());
         }
 
+        // --- Names Manager Bindings ---
+        const btnManageNames = document.getElementById("btn-manage-names");
+        if (btnManageNames) {
+            btnManageNames.addEventListener("click", () => this.openNamesManagerModal());
+        }
+
+        const btnCloseNamesManager = document.getElementById("btn-close-names-manager");
+        if (btnCloseNamesManager) {
+            btnCloseNamesManager.addEventListener("click", () => this.closeNamesManagerModal());
+        }
+
+        const searchNamesManager = document.getElementById("names-manager-search");
+        if (searchNamesManager) {
+            searchNamesManager.addEventListener("input", () => this.loadNamesManagerList());
+        }
+
+        const chkSelectAll = document.getElementById("chk-names-select-all");
+        if (chkSelectAll) {
+            chkSelectAll.addEventListener("change", () => {
+                const checkboxes = document.querySelectorAll(".name-select-checkbox");
+                checkboxes.forEach(cb => cb.checked = chkSelectAll.checked);
+                this.updateNamesBulkActionsBar();
+            });
+        }
+
+        const btnBulkDelete = document.getElementById("btn-names-bulk-delete");
+        if (btnBulkDelete) {
+            btnBulkDelete.addEventListener("click", () => this.handleNamesBulkDelete());
+        }
+
+        const btnBulkMerge = document.getElementById("btn-names-bulk-merge");
+        if (btnBulkMerge) {
+            btnBulkMerge.addEventListener("click", () => this.handleNamesBulkMerge());
+        }
+
         // Listen for project change to load face clusters
         STATE.on("projectChanged", () => {
             this.loadFaceClusters();
@@ -1385,6 +1420,293 @@ export class FaceManager {
         } catch (e) {
             console.error("Erro ao rejeitar faces:", e);
             alert("Erro ao descartar faces selecionadas.");
+        }
+    }
+
+    static async openNamesManagerModal() {
+        const modal = document.getElementById("names-manager-modal");
+        if (modal) {
+            modal.style.display = "flex";
+            const searchInput = document.getElementById("names-manager-search");
+            if (searchInput) searchInput.value = "";
+            await this.loadNamesManagerList();
+        }
+    }
+
+    static closeNamesManagerModal() {
+        const modal = document.getElementById("names-manager-modal");
+        if (modal) {
+            modal.style.display = "none";
+        }
+    }
+
+    static async loadNamesManagerList() {
+        const tbody = document.getElementById("names-manager-tbody");
+        if (!tbody) return;
+
+        // Reset check all and bulk actions bar
+        const chkSelectAll = document.getElementById("chk-names-select-all");
+        if (chkSelectAll) chkSelectAll.checked = false;
+        this.updateNamesBulkActionsBar();
+
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Carregando nomes...</td></tr>';
+
+        try {
+            const projectId = STATE.currentProjectId;
+            if (!projectId) return;
+
+            const speakers = await CapIAuAPI.fetchProjectSpeakers(projectId).catch(() => []);
+            
+            // Remove duplicates, empty values and default placeholders
+            const cleanSpeakers = Array.from(new Set(speakers))
+                .filter(s => s && !s.startsWith("Pessoa Desconhecida") && !s.startsWith("SPEAKER_"))
+                .sort();
+
+            const searchInput = document.getElementById("names-manager-search");
+            const filterText = searchInput ? searchInput.value.toLowerCase().trim() : "";
+            
+            const filteredSpeakers = cleanSpeakers.filter(sp => sp.toLowerCase().includes(filterText));
+
+            if (filteredSpeakers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhum nome encontrado.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = "";
+            filteredSpeakers.forEach(sp => {
+                const tr = document.createElement("tr");
+                tr.style.borderBottom = "1px solid rgba(255,255,255,0.04)";
+                
+                tr.innerHTML = `
+                    <td style="padding: 10px 12px; width: 40px; text-align: center;">
+                        <input type="checkbox" class="name-select-checkbox" data-name="${sp}" style="cursor: pointer;">
+                    </td>
+                    <td style="padding: 10px 12px; font-weight: 500; color: #fff; font-size: 13px;">${sp}</td>
+                    <td class="names-actions-cell" style="padding: 10px 12px; text-align: right; display: flex; gap: 8px; justify-content: flex-end; align-items: center; width: 280px;">
+                        <button class="btn-flat-action cyan btn-rename" title="Renomear" style="background: transparent; border: none; padding: 4px 8px; font-size: 11px; cursor: pointer;">
+                            <i class="fa-solid fa-user-pen"></i> Renomear
+                        </button>
+                        <button class="btn-flat-action violet btn-merge" title="Mesclar" style="background: transparent; border: none; padding: 4px 8px; font-size: 11px; cursor: pointer;">
+                            <i class="fa-solid fa-code-merge"></i> Mesclar
+                        </button>
+                        <button class="btn-flat-action rose btn-delete" title="Deletar" style="background: transparent; border: none; padding: 4px 8px; font-size: 11px; cursor: pointer;">
+                            <i class="fa-solid fa-trash"></i> Deletar
+                        </button>
+                    </td>
+                `;
+
+                // Checkbox binding
+                tr.querySelector(".name-select-checkbox").addEventListener("change", () => this.updateNamesBulkActionsBar());
+
+                // Individual bindings
+                tr.querySelector(".btn-rename").addEventListener("click", () => this.handleNameRename(sp));
+                tr.querySelector(".btn-delete").addEventListener("click", () => this.handleNameDelete(sp));
+                
+                // Inline Merge dropdown trigger
+                tr.querySelector(".btn-merge").addEventListener("click", () => {
+                    const actionsCell = tr.querySelector(".names-actions-cell");
+                    actionsCell.innerHTML = `
+                        <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end; width: 100%;">
+                            <span style="font-size: 11px; color: var(--text-secondary);">Mesclar em:</span>
+                            <input type="text" list="speakers-datalist" class="merge-target-input" placeholder="Digite/Selecione..." style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; font-size: 11px; width: 130px; outline: none;">
+                            <button class="btn-flat-action cyan btn-confirm-merge-inline" style="font-size: 11px; padding: 4px 6px;" title="Confirmar"><i class="fa-solid fa-check"></i></button>
+                            <button class="btn-flat-action rose btn-cancel-merge-inline" style="font-size: 11px; padding: 4px 6px;" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    `;
+
+                    // Focus input
+                    const mergeInput = actionsCell.querySelector(".merge-target-input");
+                    mergeInput.focus();
+
+                    // Confirm merge
+                    actionsCell.querySelector(".btn-confirm-merge-inline").addEventListener("click", async () => {
+                        const targetName = mergeInput.value.trim();
+                        if (!targetName) {
+                            alert("Nome de destino inválido.");
+                            return;
+                        }
+                        if (targetName === sp) {
+                            alert("Não é possível mesclar um nome nele mesmo.");
+                            return;
+                        }
+                        if (!confirm(`Deseja realmente mesclar "${sp}" em "${targetName}"? Isso atualizará faces, falas e entidades.`)) {
+                            return;
+                        }
+                        try {
+                            const res = await CapIAuAPI.mergeProjectNames(projectId, sp, targetName);
+                            if (res && res.status === "success") {
+                                alert(`Fusão de "${sp}" para "${targetName}" realizada com sucesso!`);
+                                await this.loadNamesManagerList();
+                                await this.loadFaceClusters();
+                                if (STATE.activeVideo) {
+                                    STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+                                }
+                            } else {
+                                alert(res ? res.message : "Erro ao mesclar nomes.");
+                            }
+                        } catch (e) {
+                            console.error("Erro ao mesclar:", e);
+                            alert("Erro de comunicação ao mesclar.");
+                        }
+                    });
+
+                    // Cancel merge
+                    actionsCell.querySelector(".btn-cancel-merge-inline").addEventListener("click", () => {
+                        this.loadNamesManagerList();
+                    });
+                });
+
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error("[NamesManager] Error loading speakers:", e);
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:#ef4444;">Erro ao carregar nomes.</td></tr>';
+        }
+    }
+
+    static updateNamesBulkActionsBar() {
+        const bar = document.getElementById("names-bulk-actions-bar");
+        const countSpan = document.getElementById("names-bulk-select-count");
+        const chkSelectAll = document.getElementById("chk-names-select-all");
+        
+        if (!bar || !countSpan) return;
+
+        const checked = document.querySelectorAll(".name-select-checkbox:checked");
+        const allCheckbox = document.querySelectorAll(".name-select-checkbox");
+
+        countSpan.textContent = checked.length;
+        bar.style.display = checked.length > 0 ? "flex" : "none";
+
+        if (chkSelectAll && allCheckbox.length > 0) {
+            chkSelectAll.checked = checked.length === allCheckbox.length;
+        }
+    }
+
+    static async handleNamesBulkDelete() {
+        const checked = document.querySelectorAll(".name-select-checkbox:checked");
+        if (checked.length === 0) return;
+
+        const names = Array.from(checked).map(cb => cb.dataset.name);
+        if (!confirm(`Deseja realmente remover os ${names.length} nomes selecionados globalmente?\n\nOs rostos associados serão desassociados e as falas na transcrição voltarão a ser "Desconhecido".`)) {
+            return;
+        }
+
+        try {
+            const projectId = STATE.currentProjectId;
+            let successCount = 0;
+            for (const name of names) {
+                const res = await CapIAuAPI.deleteProjectName(projectId, name).catch(() => null);
+                if (res && res.status === "success") {
+                    successCount++;
+                }
+            }
+            alert(`Remoção concluída: ${successCount} de ${names.length} nomes removidos com sucesso!`);
+            await this.loadNamesManagerList();
+            await this.loadFaceClusters();
+            if (STATE.activeVideo) {
+                STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+            }
+        } catch (e) {
+            console.error("Erro na exclusão em lote:", e);
+            alert("Erro ao executar a exclusão em lote.");
+        }
+    }
+
+    static async handleNamesBulkMerge() {
+        const checked = document.querySelectorAll(".name-select-checkbox:checked");
+        if (checked.length === 0) return;
+
+        const names = Array.from(checked).map(cb => cb.dataset.name);
+        const targetInput = document.getElementById("names-bulk-merge-target");
+        const targetName = targetInput ? targetInput.value.trim() : "";
+
+        if (!targetName) {
+            alert("Por favor, digite ou selecione um nome de destino válido.");
+            return;
+        }
+
+        if (names.includes(targetName)) {
+            alert("O nome de destino não pode estar entre os nomes selecionados para serem mesclados.");
+            return;
+        }
+
+        if (!confirm(`Deseja realmente mesclar os ${names.length} nomes selecionados no nome de destino "${targetName}"?\nEsta ação não poderá ser desfeita.`)) {
+            return;
+        }
+
+        try {
+            const projectId = STATE.currentProjectId;
+            let successCount = 0;
+            for (const name of names) {
+                const res = await CapIAuAPI.mergeProjectNames(projectId, name, targetName).catch(() => null);
+                if (res && res.status === "success") {
+                    successCount++;
+                }
+            }
+            alert(`Fusão concluída: ${successCount} de ${names.length} nomes mesclados em "${targetName}"!`);
+            if (targetInput) targetInput.value = "";
+            await this.loadNamesManagerList();
+            await this.loadFaceClusters();
+            if (STATE.activeVideo) {
+                STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+            }
+        } catch (e) {
+            console.error("Erro na fusão em lote:", e);
+            alert("Erro ao executar a fusão em lote.");
+        }
+    }
+
+    static async handleNameRename(oldName) {
+        const newName = prompt(`Digite o novo nome para substituir "${oldName}" globalmente:`, oldName);
+        if (newName === null) return; // Cancelled
+        const trimmed = newName.trim();
+        if (!trimmed) {
+            alert("O nome não pode ser vazio.");
+            return;
+        }
+        if (trimmed === oldName) return;
+
+        try {
+            const projectId = STATE.currentProjectId;
+            const res = await CapIAuAPI.renameProjectName(projectId, oldName, trimmed);
+            if (res && res.status === "success") {
+                alert(`Nome renomeado de "${oldName}" para "${trimmed}" com sucesso!`);
+                await this.loadNamesManagerList();
+                await this.loadFaceClusters();
+                // Refresh active video transcript panel if any
+                if (STATE.activeVideo) {
+                    STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+                }
+            } else {
+                alert(res ? res.message : "Erro ao renomear nome.");
+            }
+        } catch (e) {
+            console.error("Erro ao renomear nome:", e);
+            alert("Erro de comunicação ao renomear nome.");
+        }
+    }
+
+    static async handleNameDelete(name) {
+        if (!confirm(`Deseja realmente remover o nome "${name}" globalmente?\n\nOs rostos associados serão desassociados e as falas na transcrição voltarão a ser "Desconhecido".`)) {
+            return;
+        }
+
+        try {
+            const projectId = STATE.currentProjectId;
+            const res = await CapIAuAPI.deleteProjectName(projectId, name);
+            if (res && res.status === "success") {
+                alert(`Associação do nome "${name}" removida com sucesso!`);
+                await this.loadNamesManagerList();
+                await this.loadFaceClusters();
+                if (STATE.activeVideo) {
+                    STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+                }
+            } else {
+                alert(res ? res.message : "Erro ao excluir nome.");
+            }
+        } catch (e) {
+            console.error("Erro ao excluir nome:", e);
+            alert("Erro de comunicação ao excluir nome.");
         }
     }
 }

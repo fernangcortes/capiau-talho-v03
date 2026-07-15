@@ -1,9 +1,20 @@
 """Gerenciador centralizado de tarefas em background, subprocessos e progresso."""
+import json
 import os
 import subprocess
 import threading
+import time
+from pathlib import Path
 from typing import Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
+
+# Progresso espelhado em disco pelo worker de lote (src/worker_vision.py). Como ele
+# roda num processo separado do servidor, este arquivo e a unica forma da tela de
+# Tarefas enxergar o andamento da rodada. Some da tela quando fica velho demais.
+# Ancorado na raiz do projeto (nao no CWD): worker e servidor precisam apontar para
+# o MESMO arquivo, independente de onde cada um foi iniciado.
+WORKER_PROGRESS_FILE = Path(__file__).resolve().parents[2] / "data" / "logs" / "worker_progress.json"
+WORKER_PROGRESS_MAX_AGE_S = 600
 
 class TaskManager:
     _instance: Optional["TaskManager"] = None
@@ -27,7 +38,40 @@ class TaskManager:
         self.progress: Dict[str, Dict[str, Any]] = {}
         self.active_clustering: set = set()
         self.cancelled_tasks: set = set()
+        self._sink_path: Optional[Path] = None
+        self._sink_last_write: float = 0.0
         self._initialized = True
+
+    def enable_file_sink(self, path: Path) -> None:
+        """Passa a espelhar o progresso num arquivo, para OUTRO processo poder ler.
+
+        Usado pelo worker de lote: como ele roda fora do servidor, sem isso a tela
+        de Tarefas ficaria vazia durante toda a rodada.
+        """
+        with self._lock:
+            self._sink_path = Path(path)
+            self._sink_path.parent.mkdir(parents=True, exist_ok=True)
+            self._sink_last_write = 0.0
+        self._flush_sink(force=True)
+
+    def _flush_sink(self, force: bool = False) -> None:
+        """Grava o progresso no arquivo espelho. Nunca levanta: progresso e cosmetico
+        e não pode derrubar o lote (mesma licao do bug de log do E2.A5)."""
+        if self._sink_path is None:
+            return
+        now = time.monotonic()
+        with self._lock:
+            if not force and (now - self._sink_last_write) < 1.0:
+                return
+            self._sink_last_write = now
+            snapshot = dict(self.progress)
+            path = self._sink_path
+        try:
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(snapshot), encoding="utf-8")
+            os.replace(tmp, path)  # troca atomica: o leitor nunca ve JSON pela metade
+        except Exception:
+            pass
 
     def register_process(self, video_id: int, process: subprocess.Popen) -> None:
         """Registra um processo FFmpeg ativo associado a um vídeo."""
@@ -59,14 +103,22 @@ class TaskManager:
             print(f"[TaskManager] Erro ao encerrar processo FFmpeg do vídeo {video_id}: {e}")
             return False
 
-    def update_progress(self, task_key: str, percent: float, status: str, task_type: str = "conversion") -> None:
-        """Atualiza de forma thread-safe o progresso de uma tarefa de conversão ou análise."""
+    def update_progress(self, task_key: str, percent: float, status: str, task_type: str = "conversion",
+                        label: Optional[str] = None) -> None:
+        """Atualiza de forma thread-safe o progresso de uma tarefa de conversão ou análise.
+
+        'label' é o texto que a tela mostra; sem ele a tela deduz o nome pela mídia.
+        """
         with self._lock:
-            self.progress[task_key] = {
+            entry: Dict[str, Any] = {
                 "percent": percent,
                 "status": status,
                 "type": task_type
             }
+            if label:
+                entry["label"] = label
+            self.progress[task_key] = entry
+        self._flush_sink()
 
     def remove_progress(self, task_key: str) -> None:
         """Remove o progresso de uma tarefa finalizada."""
@@ -105,6 +157,22 @@ class TaskManager:
                     process.kill()
             except Exception:
                 pass
+
+
+def read_worker_progress() -> Dict[str, Dict[str, Any]]:
+    """Le o progresso do worker de lote, que roda em processo separado.
+
+    Ignora arquivo velho: se o worker morreu ou terminou, a tela nao pode ficar
+    mostrando uma rodada fantasma para sempre.
+    """
+    try:
+        if not WORKER_PROGRESS_FILE.exists():
+            return {}
+        if (time.time() - WORKER_PROGRESS_FILE.stat().st_mtime) > WORKER_PROGRESS_MAX_AGE_S:
+            return {}
+        return json.loads(WORKER_PROGRESS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
 
 
 # Instância global Singleton

@@ -266,6 +266,9 @@
                                     <i class="fa-solid fa-expand"></i> Tela Cheia
                                 </button>
                             </div>
+                            <button id="btn-manage-names" class="btn-secondary" style="font-size:11px; padding:8px 12px; display:flex; align-items:center; justify-content:center; gap:6px; height: 32px; border: 1px solid rgba(6, 182, 212, 0.3); color: var(--color-cyan); background: transparent; cursor: pointer; transition: all 0.2s; border-radius: 4px; width: 100%;">
+                                <i class="fa-solid fa-user-gear"></i> Gerenciar Nomes/Pessoas
+                            </button>
 
                             <!-- Painel de Configurações do Agrupamento -->
                             <div id="clustering-settings-toggle" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-secondary); padding: 6px 8px; border-radius: 4px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); user-select: none;">
@@ -1182,6 +1185,62 @@
             <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid var(--border-glass); gap: 10px; margin-top: 10px; justify-content: flex-end;">
                 <button id="btn-disambiguation-fuse-all" class="btn-secondary" style="height: 30px; font-size: 11px; padding: 0 12px;">Fusão Total (Mesclar Todos)</button>
                 <button id="btn-disambiguation-approve" class="btn-primary" style="height: 30px; font-size: 11px; padding: 0 12px;">Confirmar Selecionados</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gerenciador de Nomes & Falantes -->
+    <div id="names-manager-modal" class="modal-overlay" style="display: none; z-index: 2000; background: rgba(10, 8, 14, 0.95); backdrop-filter: blur(20px);">
+        <div class="modal-content glassmorphism" style="width: 80%; max-width: 700px; height: 80vh; display: flex; flex-direction: column; padding: 25px; box-sizing: border-box; gap: 15px; border: 1px solid rgba(6, 182, 212, 0.3);">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <i class="fa-solid fa-address-book" style="color: var(--color-cyan); font-size: 20px;"></i>
+                    <div>
+                        <h3 style="margin: 0; font-size: 18px; font-weight: 700; font-family: 'Outfit', sans-serif;">Gerenciador de Nomes & Falantes</h3>
+                        <span style="font-size: 12px; color: var(--text-muted);">Edite, delete ou mescle nomes e falantes do projeto</span>
+                    </div>
+                </div>
+                <button id="btn-close-names-manager" class="btn-secondary" style="height: 32px; width: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body" style="flex: 1; display: flex; flex-direction: column; gap: 12px; overflow: hidden;">
+                <!-- Campo de busca de nomes -->
+                <div style="position: relative; display: flex; align-items: center; flex-shrink: 0;">
+                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; color: var(--text-muted); font-size: 13px;"></i>
+                    <input type="text" id="names-manager-search" placeholder="Buscar nome..." style="width: 100%; padding: 8px 12px 8px 36px; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.2); color: #fff; font-size: 13px; outline: none;">
+                </div>
+                
+                <!-- Barra de Ações em Massa (oculta por padrão) -->
+                <div id="names-bulk-actions-bar" style="display: none; align-items: center; justify-content: space-between; background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); padding: 8px 12px; border-radius: 6px; font-size: 11px; flex-shrink: 0; margin-bottom: 5px;">
+                    <span style="color: #fff;"><strong id="names-bulk-select-count" style="color: var(--color-cyan);">0</strong> nomes selecionados</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button id="btn-names-bulk-delete" class="btn-secondary" style="border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); height: 26px; font-size: 11px; padding: 0 8px; cursor: pointer; border-radius: 4px;">
+                            <i class="fa-solid fa-trash"></i> Deletar
+                        </button>
+                        <div style="display: flex; gap: 6px; align-items: center; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 8px;">
+                            <span style="color: var(--text-secondary);">Mesclar todos em:</span>
+                            <input type="text" id="names-bulk-merge-target" list="speakers-datalist" placeholder="Nome de destino..." style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; font-size: 11px; width: 140px; outline: none;">
+                            <button id="btn-names-bulk-merge" class="btn-primary" style="height: 26px; font-size: 11px; padding: 0 10px; cursor: pointer; border-radius: 4px;">Mesclar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="flex: 1; overflow-y: auto; padding-right: 4px; border: 1px solid var(--border-glass); border-radius: 6px; background: rgba(0,0,0,0.15);">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); font-weight: 600;">
+                                <th style="padding: 10px 12px; width: 40px; text-align: center;"><input type="checkbox" id="chk-names-select-all" style="cursor: pointer;"></th>
+                                <th style="padding: 10px 12px;">Nome Atual</th>
+                                <th style="padding: 10px 12px; text-align: right; width: 280px;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="names-manager-tbody">
+                            <!-- Preenchido dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

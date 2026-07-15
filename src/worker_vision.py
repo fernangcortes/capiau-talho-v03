@@ -22,6 +22,7 @@ nao ser pulada inteira.
 """
 import argparse
 
+from src.core.tasks import TASK_MANAGER, WORKER_PROGRESS_FILE
 from src.services.vision_batch import run_vision_batch
 
 
@@ -39,6 +40,11 @@ def main() -> None:
         help="Reanalisa tambem as fotos ja com status='analyzed'."
     )
     args = parser.parse_args()
+
+    # Espelha o progresso em disco: e o unico jeito da tela de Tarefas do servidor
+    # enxergar esta rodada, ja que ela acontece em outro processo.
+    TASK_MANAGER.enable_file_sink(WORKER_PROGRESS_FILE)
+    print(f"[Worker] Progresso espelhado em: {WORKER_PROGRESS_FILE}")
 
     run_vision_batch(
         args.project,

@@ -15,7 +15,7 @@ from src.db.connection import get_db
 from src.api.dependencies import get_db_conn
 from src.api.schemas import ExternalPathIngest, LabelFacePayload, MergeClustersPayload, ReassignFacesPayload
 from src.db.repositories.media import MediaRepository
-from src.core.tasks import TASK_MANAGER
+from src.core.tasks import TASK_MANAGER, read_worker_progress
 from src.services.ingest import IngestService
 from src.services.pipeline import PipelineService
 from src.services.burst_service import group_photo_bursts, replicate_to_members
@@ -247,8 +247,14 @@ def trigger_all_vision(
 
 @router.get("/api/conversions")
 def get_all_conversions():
-    """Retorna o progresso em tempo real das conversões de vídeo/foto em execução."""
-    return TASK_MANAGER.get_progress()
+    """Retorna o progresso em tempo real das conversões de vídeo/foto em execução.
+
+    Inclui o progresso do worker de lote, que roda FORA deste processo — sem essa
+    fusão a tela de Tarefas ficaria vazia durante toda a rodada do acervo.
+    """
+    progress = TASK_MANAGER.get_progress()
+    progress.update(read_worker_progress())
+    return progress
 
 @router.post("/api/video/{video_id}/cancel-conversion")
 def cancel_conversion(video_id: int):
