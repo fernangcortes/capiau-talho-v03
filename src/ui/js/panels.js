@@ -1288,7 +1288,14 @@ export class PanelsManager {
         this.visionContainer.innerHTML = "";
 
         if (frames.length === 0) {
-            this.visionContainer.innerHTML = `<div class="empty-state-text">Visão IA não executada para este B-Roll. Clique em "Análise Visão" na biblioteca.</div>`;
+            // Frames vêm do Qdrant, não do SQL: um clipe pode estar 'analyzed' (visão já
+            // rodou, descrição gravada) e ainda assim voltar frames=[] se o Qdrant estiver
+            // com trava exclusiva de outro processo (ex.: o worker de lote rodando). Sem
+            // essa distinção a mensagem manda o usuário reanalisar algo que já foi feito.
+            const status = STATE.activeVideo?.status;
+            this.visionContainer.innerHTML = (status === "analyzed")
+                ? `<div class="empty-state-text">A visão deste clipe já foi analisada, mas o índice de busca visual está ocupado agora (provavelmente por uma análise em lote rodando). Os frames voltam a aparecer quando ele terminar.</div>`
+                : `<div class="empty-state-text">Visão IA não executada para este B-Roll. Clique em "Análise Visão" na biblioteca.</div>`;
             return;
         }
 
