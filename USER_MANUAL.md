@@ -51,7 +51,7 @@ ingestão:
     compressão do proxy H.264 em background no seu processador i7.
 
 4.  As mídias aparecerão na barra lateral esquerda nas abas **Mídias** e
-    **Fotos Set**.
+    **Fotos**.
 
 ### Passo B: Transcrição (ASR) e Diarização de Entrevistas
 
@@ -105,7 +105,7 @@ ingestão:
     automáticas (ex: câmera, luz, dolly).
 
 3.  Para as fotos de set, o mesmo acontece: elas são analisadas
-    visualmente e catalogadas na aba **Fotos Set** com descrições ricas.
+    visualmente e catalogadas na aba **Fotos** com descrições ricas.
 
 4.  **Busca Visual e "Encontrar Similares" (CLIP local, sem custo de
     API):** todo keyframe de vídeo e foto é também embedado localmente

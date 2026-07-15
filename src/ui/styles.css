@@ -5567,3 +5567,16 @@ select option, .nle-select option {
     color: var(--color-cyan) !important;
     text-shadow: 0 0 8px var(--color-cyan);
 }
+
+/* ── CUSTOMIZAÇÃO DE ABAS LATERAIS ── */
+
+/* No primeiro estado (sidebar-normal), as abas devem exibir apenas texto (oculta os ícones) */
+.sidebar-normal .media-tabs .tab-btn i {
+    display: none !important;
+}
+
+/* Estado visual ao arrastar uma aba */
+.tab-btn.dragging {
+    opacity: 0.4;
+    border: 1px dashed var(--color-violet) !important;
+}
