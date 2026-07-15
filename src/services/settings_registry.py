@@ -519,7 +519,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "faces", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {
-        "key": "faces.dbscan_min_samples", "type": "int", "default": 3, "min": 1, "max": 15, "step": 1,
+        "key": "faces.dbscan_min_samples", "type": "int", "default": 2, "min": 1, "max": 15, "step": 1,
         "label": "Agrupamento: mín. de rostos por grupo",
         "help": "Quantos rostos parecidos são necessários para formar um grupo de pessoa.",
         "help_tech": "min_samples do cluster_faces_dbscan.",

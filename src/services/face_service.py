@@ -332,6 +332,19 @@ class FaceService:
                     if row:
                         actual_cluster_id = row["cluster_id"]
 
+                # Se o cluster_name sugerido for um placeholder, verificar se já existe um nome real
+                # associado a esse actual_cluster_id no banco de dados (ex: por confirmações manuais)
+                if cluster_name.startswith("Pessoa Desconhecida") or cluster_name in ("Não Relevante", "Não é Rosto"):
+                    cursor.execute("""
+                        SELECT name FROM face
+                        WHERE project_id = ? AND cluster_id = ? AND name IS NOT NULL AND name != ''
+                          AND name NOT LIKE 'Pessoa Desconhecida%' AND name NOT IN ('Não Relevante', 'Não é Rosto')
+                        LIMIT 1
+                    """, (project_id, actual_cluster_id))
+                    row_real = cursor.fetchone()
+                    if row_real:
+                        cluster_name = row_real["name"]
+
                 # Atualizar cada face individualmente, pulando as que têm confirmação manual
                 for f_id in f_ids:
                     # Verificar se tem confirmação manual ativa
@@ -345,17 +358,14 @@ class FaceService:
                     if not is_confirmed:
                         cursor.execute("""
                             UPDATE face
-                            SET cluster_id = ?, name = COALESCE(name, ?)
+                            SET cluster_id = ?,
+                                name = CASE 
+                                    WHEN name IS NULL OR TRIM(name) = '' OR name LIKE 'Pessoa Desconhecida%' THEN ?
+                                    ELSE name 
+                                END
                             WHERE id = ?
                         """, (actual_cluster_id, cluster_name, f_id))
-                        
-                        if not cluster_name.startswith("Pessoa Desconhecida") and cluster_name not in ("Não Relevante", "Não é Rosto"):
-                            cursor.execute("""
-                                UPDATE face
-                                SET name = ?
-                                WHERE id = ? AND name LIKE 'Pessoa Desconhecida%'
-                            """, (cluster_name, f_id))
-            
+
             # Ruído: cluster_id = -1
             noise_ids = [face_ids[i] for i, l in enumerate(labels) if l == -1]
             for f_id in noise_ids:

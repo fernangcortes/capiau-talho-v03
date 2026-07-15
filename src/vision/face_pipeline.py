@@ -214,7 +214,7 @@ class FacePipeline:
         self,
         embeddings: List[List[float]],
         eps: float = 0.38,
-        min_samples: int = 3
+        min_samples: int = 2
     ) -> List[int]:
         """Clusteriza embeddings usando DBSCAN (implementacao NumPy).
         

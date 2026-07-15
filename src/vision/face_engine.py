@@ -268,7 +268,7 @@ def dbscan_numpy(distances, eps, min_samples):
         
     return labels
 
-def cluster_faces_dbscan(project_id: int, eps: float = 0.38, min_samples: int = 3) -> dict:
+def cluster_faces_dbscan(project_id: int, eps: float = 0.38, min_samples: int = 2) -> dict:
     """Carrega embeddings do SQLite, agrupa via DBSCAN (similaridade cosseno NumPy) e salva os clusters."""
     try:
         with get_db() as conn:

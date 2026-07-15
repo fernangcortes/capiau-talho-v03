@@ -628,32 +628,40 @@ export class FaceManager {
                             const modal = document.getElementById("face-disambiguation-modal");
                             if (modal && modal.style.display === "none") {
                                 clearInterval(checkClose);
-                                card.classList.add("fade-out");
-                                setTimeout(() => {
-                                    card.remove();
-                                    if (grid.querySelectorAll(".fullscreen-face-card").length === 0) {
-                                        if (this.currentPage * this.pageSize < this.unlabeledFaces.length) {
-                                            this.renderNextPage();
-                                        } else {
-                                            this.renderFullscreenFaces([]);
+                                if (face.cluster_id !== null && face.cluster_id !== undefined && face.cluster_id >= 0) {
+                                    FaceManager.removeCardsByClusterId(face.cluster_id);
+                                } else {
+                                    card.classList.add("fade-out");
+                                    setTimeout(() => {
+                                        card.remove();
+                                        if (grid.querySelectorAll(".fullscreen-face-card").length === 0) {
+                                            if (this.currentPage * this.pageSize < this.unlabeledFaces.length) {
+                                                this.renderNextPage();
+                                            } else {
+                                                this.renderFullscreenFaces([]);
+                                            }
                                         }
-                                    }
-                                }, 300);
+                                    }, 300);
+                                }
                             }
                         }, 500);
                     } else {
                         // Success animation
-                        card.classList.add("fade-out");
-                        setTimeout(() => {
-                            card.remove();
-                            if (grid.querySelectorAll(".fullscreen-face-card").length === 0) {
-                                if (this.currentPage * this.pageSize < this.unlabeledFaces.length) {
-                                    this.renderNextPage();
-                                } else {
-                                    this.renderFullscreenFaces([]);
+                        if (face.cluster_id !== null && face.cluster_id !== undefined && face.cluster_id >= 0) {
+                            FaceManager.removeCardsByClusterId(face.cluster_id);
+                        } else {
+                            card.classList.add("fade-out");
+                            setTimeout(() => {
+                                card.remove();
+                                if (grid.querySelectorAll(".fullscreen-face-card").length === 0) {
+                                    if (this.currentPage * this.pageSize < this.unlabeledFaces.length) {
+                                        this.renderNextPage();
+                                    } else {
+                                        this.renderFullscreenFaces([]);
+                                    }
                                 }
-                            }
-                        }, 300);
+                            }, 300);
+                        }
                     }
                 } catch (e) {
                     console.error("[FaceManager] Error labeling face in fullscreen:", e);
@@ -764,6 +772,28 @@ export class FaceManager {
         }
     }
 
+    static removeCardsByClusterId(clusterId) {
+        if (clusterId === null || clusterId === undefined || clusterId === "" || clusterId < 0) return;
+        const grid = document.getElementById("fullscreen-faces-grid");
+        if (!grid) return;
+        const cards = Array.from(grid.querySelectorAll(".fullscreen-face-card"));
+        const cardsToRemove = cards.filter(c => c.dataset.clusterId == clusterId);
+        
+        if (cardsToRemove.length === 0) return;
+        
+        cardsToRemove.forEach(c => c.classList.add("fade-out"));
+        setTimeout(() => {
+            cardsToRemove.forEach(c => c.remove());
+            if (grid.querySelectorAll(".fullscreen-face-card").length === 0) {
+                if (FaceManager.currentPage * FaceManager.pageSize < FaceManager.unlabeledFaces.length) {
+                    FaceManager.renderNextPage();
+                } else {
+                    FaceManager.renderFullscreenFaces([]);
+                }
+            }
+        }, 300);
+    }
+
     static updateBulkActionsBar() {
         const selectedCards = document.querySelectorAll(".fullscreen-face-card.selected");
         const count = selectedCards.length;
@@ -798,6 +828,7 @@ export class FaceManager {
         let successCount = 0;
         let errorCount = 0;
 
+        const processedClusters = new Set();
         for (const card of selectedCards) {
             const faceId = parseInt(card.dataset.faceId);
             const clusterId = parseInt(card.dataset.clusterId);
@@ -810,6 +841,13 @@ export class FaceManager {
                     if (srcCluster !== null && destCluster !== null && srcCluster !== destCluster) {
                         await CapIAuAPI.mergeClusters(projectId, srcCluster, destCluster, newName);
                     }
+                    if (srcCluster !== null && srcCluster !== undefined && srcCluster >= 0) {
+                        processedClusters.add(srcCluster);
+                    }
+                } else {
+                    if (clusterId !== null && clusterId !== undefined && clusterId >= 0) {
+                        processedClusters.add(clusterId);
+                    }
                 }
                 successCount++;
                 card.classList.add("fade-out");
@@ -818,6 +856,11 @@ export class FaceManager {
                 console.error("Erro ao aplicar nome no rosto:", faceId, err);
                 errorCount++;
             }
+        }
+
+        // Remove any other cards on the screen that belong to the processed clusters
+        for (const cid of processedClusters) {
+            FaceManager.removeCardsByClusterId(cid);
         }
 
         btnApply.disabled = false;
