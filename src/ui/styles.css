@@ -5477,3 +5477,93 @@ select option, .nle-select option {
 .library-search-area input {
     font-family: 'Outfit', sans-serif !important;
 }
+
+/* Estilos de Autocomplete da Biblioteca */
+.autocomplete-suggestion-category {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-cyan);
+    padding: 6px 10px 3px 10px;
+    letter-spacing: 0.5px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.autocomplete-suggestion-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    font-family: monospace;
+}
+
+.autocomplete-suggestion-item:hover,
+.autocomplete-suggestion-item.active {
+    background: rgba(6, 182, 212, 0.12);
+    color: #fff;
+}
+
+.autocomplete-suggestion-item .suggestion-count {
+    font-size: 8px;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1px 5px;
+    border-radius: 8px;
+    font-family: 'Outfit', sans-serif;
+}
+
+/* Chips de Busca Avançada */
+.adv-suggestion-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    font-size: 9px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    font-family: monospace;
+}
+
+.adv-suggestion-chip:hover {
+    background: rgba(6, 182, 212, 0.1);
+    border-color: rgba(6, 182, 212, 0.4);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.adv-suggestion-chip.category-status {
+    border-color: rgba(139, 92, 246, 0.25);
+}
+.adv-suggestion-chip.category-status:hover {
+    background: rgba(139, 92, 246, 0.1);
+    border-color: rgba(139, 92, 246, 0.5);
+}
+
+.adv-suggestion-chip.category-pessoas {
+    border-color: rgba(236, 72, 153, 0.25);
+}
+.adv-suggestion-chip.category-pessoas:hover {
+    background: rgba(236, 72, 153, 0.1);
+    border-color: rgba(236, 72, 153, 0.5);
+}
+
+.adv-suggestion-chip .chip-count {
+    font-size: 8px;
+    color: var(--text-muted);
+    font-family: 'Outfit', sans-serif;
+}
+
+#btn-toggle-advanced-search.active {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan);
+}

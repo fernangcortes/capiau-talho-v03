@@ -135,7 +135,54 @@
                             <i class="fa-solid fa-magnifying-glass search-icon" style="color: var(--text-muted); font-size: 10px;"></i>
                             <input type="text" id="library-search-input" placeholder="Buscar mídias..." style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; font-size: 10px; color: #fff;">
                         </div>
+                        <button id="btn-toggle-advanced-search" title="Busca Avançada & Tags" style="background: transparent; border: none; padding: 4px; color: var(--color-cyan); cursor: pointer; font-size: 13px; transition: all 0.2s; flex-shrink: 0;"><i class="fa-solid fa-sliders"></i></button>
                         <button id="btn-library-display-settings" title="Opções de Exibição" style="background: transparent; border: none; padding: 4px; color: var(--color-cyan); cursor: pointer; font-size: 13px; transition: all 0.2s; flex-shrink: 0;"><i class="fa-solid fa-gear"></i></button>
+                    </div>
+
+                    <!-- Dropdown de Autocomplete Flutuante -->
+                    <div id="library-autocomplete-dropdown" class="glassmorphism" style="display: none; position: absolute; top: 38px; left: 12px; right: 46px; z-index: 2000; max-height: 220px; overflow-y: auto; border: 1px solid rgba(6,182,212,0.35); background: rgba(18, 16, 22, 0.98); border-radius: 6px; box-shadow: 0 8px 32px rgba(0,0,0,0.6); padding: 4px 0;">
+                        <!-- Itens inseridos dinamicamente via JS -->
+                    </div>
+
+                    <!-- Painel de Busca Avançada (Retrátil) -->
+                    <div id="advanced-search-panel" class="glassmorphism" style="display: none; flex-direction: column; gap: 8px; padding: 10px; border-radius: 6px; border: 1px solid rgba(6,182,212,0.3); background: rgba(20, 18, 25, 0.98); box-shadow: 0 4px 20px rgba(0,0,0,0.5); font-size: 10px; margin-bottom: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px; margin-bottom: 4px;">
+                            <span style="font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Busca Avançada & Filtros</span>
+                            <button id="btn-close-advanced-search" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; font-size: 10px;"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        
+                        <!-- Construtor de Filtros -->
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <div style="font-weight: 600; color: var(--text-muted);">Adicionar Filtro Rápido:</div>
+                            <div style="display: flex; gap: 4px; align-items: center; width: 100%;">
+                                <select id="adv-filter-key" style="flex: 1.5; height: 22px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #fff; border-radius: 4px; cursor: pointer; outline: none;">
+                                    <!-- Dinâmico via JS -->
+                                </select>
+                                <select id="adv-filter-op" style="width: 38px; height: 22px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #fff; border-radius: 4px; cursor: pointer; outline: none;">
+                                    <option value="=">=</option>
+                                    <option value=">">&gt;</option>
+                                    <option value="<">&lt;</option>
+                                </select>
+                                <input type="text" id="adv-filter-value" placeholder="Valor" style="flex: 1.5; height: 22px; font-size: 9px; padding: 0 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff; outline: none;">
+                                <button id="btn-add-adv-filter" style="height: 22px; padding: 0 8px; font-size: 9px; font-weight: 600; color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.3); background: rgba(6,182,212,0.08); border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 2px;">
+                                    <i class="fa-solid fa-plus"></i> Inserir
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tags e Filtros Sugeridos -->
+                        <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+                            <div style="font-weight: 600; color: var(--text-muted);">Sugestões do Material (Clique para adicionar):</div>
+                            <div id="advanced-suggestions-chips" style="display: flex; flex-wrap: wrap; gap: 4px; max-height: 90px; overflow-y: auto; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);">
+                                <!-- Chips dinâmicos via JS -->
+                            </div>
+                        </div>
+
+                        <!-- Legenda de sintaxe booleana -->
+                        <div style="color: var(--text-muted); font-size: 8px; line-height: 1.3; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px; margin-top: 4px; display: flex; flex-direction: column; gap: 1px;">
+                            <div><strong>Operadores:</strong> <code>AND</code> (espaço), <code>OR</code>, <code>NOT</code> (ou <code>-</code>), parênteses <code>()</code>.</div>
+                            <div><strong>Exemplos:</strong> <code>tipo:fala -obra</code>, <code>duracao>15 OR tag:câmera</code></div>
+                        </div>
                     </div>
 
                     <!-- Dropdown de exibição (Popover) -->

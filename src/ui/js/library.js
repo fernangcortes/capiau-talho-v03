@@ -2,6 +2,7 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { FaceManager } from "./faces.js";
+import { parseQuery, evaluateAST, getAvailableSuggestions } from "./searchParser.js";
 
 // Armazena o estado das pastas expandidas/recolhidas
 const openFoldersSet = new Set();
@@ -117,15 +118,16 @@ export function getFriendlyTitle(v) {
     return v.filename;
 }
 
-function hasMatchingChildren(node, query) {
+function hasMatchingChildren(node, query, ast = null) {
     if (!query) return true;
+    if (!ast) ast = parseQuery(query);
+    if (!ast) return true;
+    
     if (node.type === "file") {
-        const friendlyTitle = getFriendlyTitle(node.video).toLowerCase();
-        const filename = node.video.filename.toLowerCase();
-        return friendlyTitle.includes(query) || filename.includes(query);
+        return evaluateAST(ast, node.video, "tab-videos");
     }
     if (node.type === "folder") {
-        return Object.values(node.children).some(child => hasMatchingChildren(child, query));
+        return Object.values(node.children).some(child => hasMatchingChildren(child, query, ast));
     }
     return false;
 }
@@ -332,16 +334,15 @@ function renderTreeNode(node, container, depth = 0) {
         
         // Verifica se corresponde ao filtro de busca
         const searchInput = document.getElementById("library-search-input");
-        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        const query = searchInput ? searchInput.value.trim() : "";
         
         const friendlyTitle = getFriendlyTitle(v);
         const forceRealFilename = window.titleDisplayPreferences && window.titleDisplayPreferences[v.id] === "filename";
         const currentTitle = forceRealFilename ? v.filename : friendlyTitle;
         
         if (query) {
-            const matchesFriendly = friendlyTitle.toLowerCase().includes(query);
-            const matchesFilename = v.filename.toLowerCase().includes(query);
-            if (!matchesFriendly && !matchesFilename) {
+            const ast = parseQuery(query);
+            if (ast && !evaluateAST(ast, v, "tab-videos")) {
                 return; // Oculta se não corresponder
             }
         }
@@ -815,6 +816,86 @@ export class LibraryManager {
             }
         });
 
+        // Setup advanced search button toggle
+        const btnToggleAdv = document.getElementById("btn-toggle-advanced-search");
+        const advPanel = document.getElementById("advanced-search-panel");
+        if (btnToggleAdv && advPanel) {
+            btnToggleAdv.addEventListener("click", () => {
+                const isVisible = advPanel.style.display === "flex";
+                advPanel.style.display = isVisible ? "none" : "flex";
+                btnToggleAdv.classList.toggle("active", !isVisible);
+                if (!isVisible) {
+                    this.populateAdvancedFilterKeys();
+                    this.renderSuggestionsChips();
+                }
+            });
+        }
+        
+        const btnCloseAdv = document.getElementById("btn-close-advanced-search");
+        if (btnCloseAdv && advPanel && btnToggleAdv) {
+            btnCloseAdv.addEventListener("click", () => {
+                advPanel.style.display = "none";
+                btnToggleAdv.classList.remove("active");
+            });
+        }
+
+        // Add filter button
+        const btnAddAdv = document.getElementById("btn-add-adv-filter");
+        if (btnAddAdv) {
+            btnAddAdv.addEventListener("click", () => {
+                const key = document.getElementById("adv-filter-key")?.value;
+                const op = document.getElementById("adv-filter-op")?.value;
+                let val = document.getElementById("adv-filter-value")?.value.trim();
+                if (!key || !val) return;
+                
+                if (val.includes(" ")) {
+                    val = `"${val}"`;
+                }
+                
+                const filterExpr = `${key}${op}${val}`;
+                const searchInput = document.getElementById("library-search-input");
+                if (searchInput) {
+                    let currentVal = searchInput.value.trim();
+                    if (currentVal) {
+                        searchInput.value = currentVal + " " + filterExpr;
+                    } else {
+                        searchInput.value = filterExpr;
+                    }
+                    searchInput.dispatchEvent(new Event("input"));
+                    document.getElementById("adv-filter-value").value = "";
+                }
+            });
+        }
+
+        // Connect dormant library-filter-status dropdown
+        const statusSelect = document.getElementById("library-filter-status");
+        if (statusSelect) {
+            statusSelect.addEventListener("change", () => {
+                const val = statusSelect.value;
+                const searchInput = document.getElementById("library-search-input");
+                if (!searchInput) return;
+                
+                let query = searchInput.value;
+                // Remove existing status filters
+                query = query.replace(/\bstatus:\S+/g, "").trim();
+                query = query.replace(/\(status:[^)]+\)/g, "").trim();
+                
+                if (val === "pending") {
+                    query = (query ? query + " " : "") + "status:pendente";
+                } else if (val === "processed") {
+                    query = (query ? query + " " : "") + "(status:asr OR status:visao)";
+                } else if (val === "error") {
+                    query = (query ? query + " " : "") + "status:erro";
+                }
+                
+                searchInput.value = query;
+                searchInput.dispatchEvent(new Event("input"));
+            });
+        }
+
+        // Setup Autocomplete
+        this.setupAutocomplete();
+
         // Força foco do player de origem ao clicar na biblioteca
         const sidebarLeft = document.getElementById("sidebar-left");
         if (sidebarLeft) {
@@ -825,6 +906,10 @@ export class LibraryManager {
     }
 
     updateSearchPlaceholder(tabId) {
+        this.currentTabId = tabId;
+        this.populateAdvancedFilterKeys();
+        this.renderSuggestionsChips();
+        
         const searchInput = document.getElementById("library-search-input");
         if (!searchInput) return;
         
@@ -847,6 +932,238 @@ export class LibraryManager {
             default:
                 searchInput.placeholder = "Buscar...";
         }
+    }
+
+    populateAdvancedFilterKeys() {
+        const keySelect = document.getElementById("adv-filter-key");
+        if (!keySelect) return;
+        keySelect.innerHTML = "";
+        
+        let options = [];
+        const tabId = this.currentTabId || "tab-videos";
+        if (tabId === "tab-videos") {
+            options = [
+                { value: "tipo", label: "Tipo (fala/bastidores)" },
+                { value: "status", label: "Status (pendente/asr/visao/erro)" },
+                { value: "cat", label: "Categoria (obra/processo...)" },
+                { value: "duracao", label: "Duração (segundos)" },
+                { value: "tag", label: "Tag" },
+                { value: "fps", label: "FPS" },
+                { value: "res", label: "Resolução" }
+            ];
+        } else if (tabId === "tab-photos") {
+            options = [
+                { value: "status", label: "Status (pendente/processado/erro)" },
+                { value: "tag", label: "Tag" },
+                { value: "formato", label: "Formato (raw/jpg)" }
+            ];
+        } else if (tabId === "tab-themes") {
+            options = [
+                { value: "trechos", label: "Qtd. Trechos" }
+            ];
+        } else if (tabId === "tab-docs") {
+            options = [
+                { value: "tipo", label: "Tipo Doc (roteiro/pauta/outros)" }
+            ];
+        } else if (tabId === "tab-faces") {
+            options = [
+                { value: "nome", label: "Nome" },
+                { value: "aparicoes", label: "Aparições" },
+                { value: "grupo", label: "Grupo ID" }
+            ];
+        }
+        
+        options.forEach(opt => {
+            const o = document.createElement("option");
+            o.value = opt.value;
+            o.textContent = opt.label;
+            keySelect.appendChild(o);
+        });
+    }
+
+    renderSuggestionsChips() {
+        const chipsContainer = document.getElementById("advanced-suggestions-chips");
+        if (!chipsContainer) return;
+        chipsContainer.innerHTML = "";
+        
+        const tabId = this.currentTabId || "tab-videos";
+        let items = [];
+        if (tabId === "tab-videos") items = STATE.allVideos || [];
+        else if (tabId === "tab-photos") items = STATE.allPhotos || [];
+        else if (tabId === "tab-docs") items = this.allDocuments || [];
+        else if (tabId === "tab-themes") items = window.panelsManager?.allThemes || [];
+        else if (tabId === "tab-faces") items = FaceManager?.allClusters || [];
+        
+        const suggestions = getAvailableSuggestions(items, tabId);
+        if (suggestions.length === 0) {
+            chipsContainer.innerHTML = `<span style="color:var(--text-muted); font-size:9px; padding: 4px;">Nenhuma tag sugerida para este material.</span>`;
+            return;
+        }
+        
+        suggestions.slice(0, 20).forEach(s => {
+            const chip = document.createElement("span");
+            chip.className = `adv-suggestion-chip category-${s.category.toLowerCase().replace(/\//g, "-")}`;
+            chip.innerHTML = `${s.value} <span class="chip-count">${s.count}</span>`;
+            chip.title = `Filtrar por ${s.value} (${s.count} ocorrências)`;
+            chip.addEventListener("click", () => {
+                const searchInput = document.getElementById("library-search-input");
+                if (searchInput) {
+                    let query = searchInput.value.trim();
+                    if (query) {
+                        if (!query.includes(s.value)) {
+                            query += " " + s.value;
+                        }
+                    } else {
+                        query = s.value;
+                    }
+                    searchInput.value = query;
+                    searchInput.dispatchEvent(new Event("input"));
+                }
+            });
+            chipsContainer.appendChild(chip);
+        });
+    }
+
+    setupAutocomplete() {
+        const searchInput = document.getElementById("library-search-input");
+        const dropdown = document.getElementById("library-autocomplete-dropdown");
+        if (!searchInput || !dropdown) return;
+        
+        let activeIdx = -1;
+        let visibleItems = [];
+        
+        const closeDropdown = () => {
+            dropdown.style.display = "none";
+            activeIdx = -1;
+        };
+        
+        const updateDropdown = () => {
+            const query = searchInput.value.trim();
+            
+            // Só mostra sugestões quando há pelo menos 1 caractere digitado
+            if (!query) {
+                closeDropdown();
+                return;
+            }
+            
+            const lastWord = query.split(/\s+/).pop().toLowerCase();
+            
+            const tabId = this.currentTabId || "tab-videos";
+            let items = [];
+            if (tabId === "tab-videos") items = STATE.allVideos || [];
+            else if (tabId === "tab-photos") items = STATE.allPhotos || [];
+            else if (tabId === "tab-docs") items = this.allDocuments || [];
+            else if (tabId === "tab-themes") items = window.panelsManager?.allThemes || [];
+            else if (tabId === "tab-faces") items = FaceManager?.allClusters || [];
+            
+            const suggestions = getAvailableSuggestions(items, tabId);
+            
+            // Filtra pelo que o usuário está digitando atualmente
+            let matches = suggestions;
+            if (lastWord) {
+                matches = suggestions.filter(s => {
+                    return s.displayLabel.toLowerCase().includes(lastWord) ||
+                           s.value.toLowerCase().includes(lastWord);
+                });
+            }
+            
+            if (matches.length === 0) {
+                closeDropdown();
+                return;
+            }
+            
+            dropdown.innerHTML = "";
+            visibleItems = matches.slice(0, 10);
+            
+            let currentCategory = "";
+            visibleItems.forEach((item, idx) => {
+                if (item.category !== currentCategory) {
+                    currentCategory = item.category;
+                    const catHeader = document.createElement("div");
+                    catHeader.className = "autocomplete-suggestion-category";
+                    catHeader.textContent = currentCategory;
+                    dropdown.appendChild(catHeader);
+                }
+                
+                const row = document.createElement("div");
+                row.className = "autocomplete-suggestion-item" + (idx === activeIdx ? " active" : "");
+                row.innerHTML = `
+                    <span>${item.displayLabel}</span>
+                    <span class="suggestion-count">${item.count}</span>
+                `;
+                
+                row.addEventListener("mousedown", (e) => {
+                    e.preventDefault();
+                    selectSuggestion(item);
+                });
+                
+                dropdown.appendChild(row);
+            });
+            
+            dropdown.style.display = "block";
+        };
+        
+        const selectSuggestion = (item) => {
+            const currentVal = searchInput.value;
+            const words = currentVal.split(/\s+/);
+            words.pop();
+            words.push(item.insertValue);
+            searchInput.value = words.join(" ") + " ";
+            searchInput.dispatchEvent(new Event("input"));
+            // Mantém o dropdown aberto e atualiza sugestões após seleção
+            searchInput.focus();
+            setTimeout(() => {
+                activeIdx = -1;
+                updateDropdown();
+            }, 50);
+        };
+        
+        searchInput.addEventListener("input", () => {
+            activeIdx = -1;
+            updateDropdown();
+        });
+        
+        searchInput.addEventListener("blur", () => {
+            setTimeout(closeDropdown, 200);
+        });
+        
+        searchInput.addEventListener("keydown", (e) => {
+            if (dropdown.style.display === "none") return;
+            
+            const rows = dropdown.querySelectorAll(".autocomplete-suggestion-item");
+            
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                activeIdx = (activeIdx + 1) % visibleItems.length;
+                rows.forEach((r, idx) => {
+                    if (idx === activeIdx) {
+                        r.classList.add("active");
+                        r.scrollIntoView({ block: "nearest" });
+                    } else {
+                        r.classList.remove("active");
+                    }
+                });
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                activeIdx = (activeIdx - 1 + visibleItems.length) % visibleItems.length;
+                rows.forEach((r, idx) => {
+                    if (idx === activeIdx) {
+                        r.classList.add("active");
+                        r.scrollIntoView({ block: "nearest" });
+                    } else {
+                        r.classList.remove("active");
+                    }
+                });
+            } else if (e.key === "Enter") {
+                if (activeIdx >= 0 && activeIdx < visibleItems.length) {
+                    e.preventDefault();
+                    selectSuggestion(visibleItems[activeIdx]);
+                }
+            } else if (e.key === "Escape") {
+                e.preventDefault();
+                closeDropdown();
+            }
+        });
     }
 
     async reloadData() {
@@ -884,15 +1201,14 @@ export class LibraryManager {
 
         // Apply search input query filter
         const searchInput = document.getElementById("library-search-input");
-        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        const query = searchInput ? searchInput.value.trim() : "";
         
         let filtered = docs;
         if (query) {
-            filtered = docs.filter(doc => {
-                const filename = (doc.filename || "").toLowerCase();
-                const type = (doc.doc_type || "").toLowerCase();
-                return filename.includes(query) || type.includes(query);
-            });
+            const ast = parseQuery(query);
+            if (ast) {
+                filtered = docs.filter(doc => evaluateAST(ast, doc, "tab-docs"));
+            }
         }
         
         if (filtered.length === 0) {
@@ -1030,16 +1346,14 @@ export class LibraryManager {
 
         // Apply search input query filter
         const searchInput = document.getElementById("library-search-input");
-        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        const query = searchInput ? searchInput.value.trim() : "";
         
         let filtered = photos;
         if (query) {
-            filtered = photos.filter(p => {
-                const title = (p.title || "").toLowerCase();
-                const desc = (p.description || "").toLowerCase();
-                const filename = (p.filename || "").toLowerCase();
-                return title.includes(query) || desc.includes(query) || filename.includes(query);
-            });
+            const ast = parseQuery(query);
+            if (ast) {
+                filtered = photos.filter(p => evaluateAST(ast, p, "tab-photos"));
+            }
         }
         
         if (filtered.length === 0) {

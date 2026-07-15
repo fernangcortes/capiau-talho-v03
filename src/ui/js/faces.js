@@ -1,5 +1,6 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
+import { parseQuery, evaluateAST } from "./searchParser.js";
 
 export class FaceManager {
     static init() {
@@ -267,15 +268,14 @@ export class FaceManager {
         }
 
         const searchInput = document.getElementById("library-search-input");
-        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        const query = searchInput ? searchInput.value.trim() : "";
         
         let filtered = clusters;
         if (query) {
-            filtered = clusters.filter(cluster => {
-                const name = (cluster.name || "").toLowerCase();
-                const groupText = `grupo ${cluster.cluster_id + 1}`;
-                return name.includes(query) || groupText.includes(query);
-            });
+            const ast = parseQuery(query);
+            if (ast) {
+                filtered = clusters.filter(cluster => evaluateAST(ast, cluster, "tab-faces"));
+            }
         }
 
         if (filtered.length === 0) {

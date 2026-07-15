@@ -2,6 +2,7 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { formatTimecode, showAnnotationModal } from "./player.js";
+import { parseQuery, evaluateAST } from "./searchParser.js";
 import { CapiauTimelineRenderer } from "./timelineRenderer.js";
 import { CapiauTimelineInteraction } from "./timelineInteraction.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames } from "./timelineState.js";
@@ -1441,15 +1442,14 @@ export class PanelsManager {
         const themes = this.allThemes || [];
         
         const searchInput = document.getElementById("library-search-input");
-        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        const query = searchInput ? searchInput.value.trim() : "";
         
         let filtered = themes;
         if (query) {
-            filtered = themes.filter(t => {
-                const title = (t.title || "").toLowerCase();
-                const desc = (t.description || "").toLowerCase();
-                return title.includes(query) || desc.includes(query);
-            });
+            const ast = parseQuery(query);
+            if (ast) {
+                filtered = themes.filter(t => evaluateAST(ast, t, "tab-themes"));
+            }
         }
         
         if (filtered.length === 0) {
