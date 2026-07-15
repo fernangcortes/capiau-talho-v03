@@ -2,18 +2,19 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { FaceManager } from "./faces.js";
-import { TIMELINE_STATE } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY } from "./timelineState.js";
 import { getActiveElement } from "./workspaceManager.js";
 
 // Foco global do teclado para players: "source" ou "program"
 window.activeFocusedPlayer = "source";
 
-export function formatTimecode(secs) {
+export function formatTimecode(secs, fps = null) {
     if (isNaN(secs) || secs === null) return "00:00:00:00";
+    const currentFps = fps || TIMELINE_STATE?.fps || 24;
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
     const s = Math.floor(secs % 60);
-    const f = Math.floor((secs % 1) * 24); // Assume 24fps
+    const f = Math.floor((secs % 1) * currentFps);
     return [
         h.toString().padStart(2, '0'),
         m.toString().padStart(2, '0'),
@@ -785,6 +786,40 @@ export class SourcePlayer {
     }
 }
 
+let _observedWrapper = null;
+let _viewportResizeObserver = null;
+
+export function syncProgramViewport() {
+    const wrapper = getActiveElement("program-video-wrapper");
+    const viewport = getActiveElement("program-player-viewport");
+    if (!wrapper || !viewport) return;
+
+    if (_observedWrapper !== wrapper) {
+        if (_viewportResizeObserver) {
+            _viewportResizeObserver.disconnect();
+        }
+        _observedWrapper = wrapper;
+        _viewportResizeObserver = new ResizeObserver(() => {
+            syncProgramViewport();
+        });
+        _viewportResizeObserver.observe(wrapper);
+    }
+
+    const tw = TIMELINE_STATE.width || 1920;
+    const th = TIMELINE_STATE.height || 1080;
+    const PAD = 16;
+
+    const availW = Math.max(0, wrapper.clientWidth - PAD * 2);
+    const availH = Math.max(0, wrapper.clientHeight - PAD * 2);
+    const fitScale = Math.min(availW / tw, availH / th);
+
+    const zoom = TIMELINE_STATE.previewZoom || "fit";
+    const scale = (zoom === "fit") ? fitScale : zoom;
+
+    viewport.style.width = `${Math.round(tw * scale)}px`;
+    viewport.style.height = `${Math.round(th * scale)}px`;
+}
+
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * 2. PROGRAM PLAYER - MONITOR DE PROGRAMA / TIMELINE (DIREITA)
@@ -804,12 +839,20 @@ export class ProgramPlayer {
     init() {
         // Redesenha e sincroniza o player sempre que a timeline muda
         STATE.on("timelineCutsUpdated", () => this.syncVideoToPlayhead());
+        STATE.on("timelineRestored", () => this.syncVideoToPlayhead());
 
         // Escuta mudanças manuais da agulha (scrubbing)
         STATE.on("timelinePlayheadChanged", () => this.syncVideoToPlayhead());
 
         // Fotos podem carregar depois da timeline: recompõe quando a lista chega
         STATE.on("photosUpdated", () => this.syncVideoToPlayhead());
+
+        // Sincroniza o viewport caso as propriedades ou zoom de preview mudem
+        STATE.on("timelinePropertiesChanged", () => syncProgramViewport());
+        STATE.on("previewZoomChanged", () => syncProgramViewport());
+
+        // Atualiza o overlay de transformações quando a seleção muda
+        STATE.on("timelineSelectionChanged", () => this.syncVideoToPlayhead());
 
         // Botão Play Program
         const btnPlay = this.el("btn-program-play");
@@ -899,7 +942,7 @@ export class ProgramPlayer {
                 return;
             }
 
-            const elapsedFrames = elapsedSecs * 24; // assume 24 FPS
+            const elapsedFrames = elapsedSecs * (TIMELINE_STATE?.fps || 24); // assume timeline FPS
             TIMELINE_STATE.setPlayheadFrame(TIMELINE_STATE.playheadFrame + elapsedFrames);
 
             this.playRequest = requestAnimationFrame(step);
@@ -929,15 +972,18 @@ export class ProgramPlayer {
     }
 
     syncVideoToPlayhead() {
+        syncProgramViewport();
+
         const currentFrame = TIMELINE_STATE.playheadFrame;
         const durationFrames = this.getDurationFrames();
 
         // Atualiza tempos de scrubber
         const curTimeEl = this.el("program-current-time");
-        if (curTimeEl) curTimeEl.textContent = formatTimecode(currentFrame / 24);
+        const fpsVal = TIMELINE_STATE?.fps || 24;
+        if (curTimeEl) curTimeEl.textContent = formatTimecode(currentFrame / fpsVal, fpsVal);
 
         const durTimeEl = this.el("program-duration-time");
-        if (durTimeEl) durTimeEl.textContent = formatTimecode(durationFrames / 24);
+        if (durTimeEl) durTimeEl.textContent = formatTimecode(durationFrames / fpsVal, fpsVal);
 
         const fill = this.el("program-scrubber-progress-fill");
         const handle = this.el("program-scrubber-progress-handle");
@@ -1009,7 +1055,7 @@ export class ProgramPlayer {
 
             // Calcula o tempo correspondente no arquivo
             const offsetFrames = currentFrame - cut.timelineStartFrame;
-            const targetSeconds = cut.in + (offsetFrames / 24);
+            const targetSeconds = cut.in + (offsetFrames / (TIMELINE_STATE?.fps || 24));
 
             const clipChanged = el.dataset.activeClipId !== String(cut.id);
             if (clipChanged) el.dataset.activeClipId = String(cut.id);
@@ -1053,6 +1099,7 @@ export class ProgramPlayer {
             }
             if (el.style.display !== "block") el.style.display = "block";
             el.style.zIndex = String(zIndex);
+            this.applyMediaEffects(el, cut, currentFrame);
         };
 
         const videoA = this.el("program-video-a");
@@ -1084,9 +1131,11 @@ export class ProgramPlayer {
         this.applyPhotoSlot(imgA, (baseCut && baseCut.type === "photo") ? baseCut : null, currentFrame, 2);
         this.applyPhotoSlot(imgB, (overlayCut && overlayCut.type === "photo") ? overlayCut : null, currentFrame, 11);
 
-        // ────────── ÁUDIO MULTIPISTA ──────────
         // Cada pista de áudio tem seu próprio elemento <audio> tocando o clipe sob o playhead
         this.syncAudioTracks(cuts, currentFrame);
+
+        // Atualiza overlay de transformação (Fase 4)
+        this.syncTransformOverlay();
     }
 
     /**
@@ -1100,7 +1149,7 @@ export class ProgramPlayer {
             imgEl.dataset.activeClipId = "";
             return;
         }
-        const photo = STATE.allPhotos.find(p => p.id === cut.photo_id);
+        const photo = STATE.allPhotos.find(p => String(p.id) === String(cut.photo_id));
         if (!photo) {
             if (imgEl.style.display !== "none") imgEl.style.display = "none";
             imgEl.dataset.activeClipId = "";
@@ -1115,29 +1164,46 @@ export class ProgramPlayer {
         imgEl.dataset.activeClipId = String(cut.id);
         imgEl.style.zIndex = String(zIndex);
         if (imgEl.style.display !== "block") imgEl.style.display = "block";
-        this.applyPhotoEffects(imgEl, cut, currentFrame);
+        this.applyMediaEffects(imgEl, cut, currentFrame);
     }
 
     /**
-     * Aplica enquadramento (fit/fill), crop/movimento (Ken Burns) e fades (dissolve)
-     * à foto, derivando o progresso do clipe a partir do frame atual do playhead.
+     * Aplica enquadramento (fit/fill), transformações geométricas (posição, escala, rotação, opacidade),
+     * crop/movimento (Ken Burns) e filtros de cor (brilho, contraste, saturação, matiz, sépia, grayscale, blur)
+     * e fades à foto ou vídeo, derivando o progresso a partir do frame atual.
      */
-    applyPhotoEffects(imgEl, cut, currentFrame) {
+    applyMediaEffects(el, cut, currentFrame) {
+        if (!el || !cut) return;
         const effects = cut.effects || [];
         const fps = TIMELINE_STATE.fps || 24;
         const durFrames = Math.max(1, cut.outFrame - cut.inFrame);
         const p = Math.min(1, Math.max(0, (currentFrame - cut.timelineStartFrame) / durFrames));
 
-        // Enquadramento
+        // 1. Enquadramento (fit/fill)
         const fit = effects.find(e => e.type === "fit");
-        imgEl.style.objectFit = (fit && fit.mode === "fit") ? "contain" : "cover";
-        imgEl.style.transformOrigin = "center center";
+        const fitMode = fit ? fit.mode : "fill";
+        el.style.objectFit = (fitMode === "fit") ? "contain" : "cover";
+        el.style.transformOrigin = "center center";
 
-        // Movimento (Ken Burns) ou crop estático
+        // 2. Transformações Geométricas e Movimento (Ken Burns)
         const kb = effects.find(e => e.type === "ken_burns");
-        const tf = effects.find(e => e.type === "transform");
-        let scale = 1, tx = 0, ty = 0;
-        if (kb) {
+        const tf = effects.find(e => e.type === "transform") || {};
+
+        let scale = 1.0;
+        let tx = 0;
+        let ty = 0;
+        let rotation = 0;
+        let baseOpacity = 1.0;
+
+        if (!tf.disabled) {
+            scale = tf.scale !== undefined ? tf.scale : 1.0;
+            tx = tf.x !== undefined ? tf.x : 0;
+            ty = tf.y !== undefined ? tf.y : 0;
+            rotation = tf.rotation !== undefined ? tf.rotation : 0;
+            baseOpacity = tf.opacity !== undefined ? tf.opacity : 1.0;
+        }
+
+        if (kb && !kb.disabled && cut.type === "photo") {
             const ease = kb.easing === "easeInOut"
                 ? (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2)
                 : p;
@@ -1148,21 +1214,64 @@ export class ProgramPlayer {
             scale = fs + (ts - fs) * ease;
             tx = fx + (txx - fx) * ease;
             ty = fy + (tyy - fy) * ease;
-        } else if (tf) {
-            scale = tf.scale ?? 1; tx = tf.x ?? 0; ty = tf.y ?? 0;
         }
-        imgEl.style.transform = `translate(${tx}%, ${ty}%) scale(${scale})`;
 
-        // Fades (dissolve) de entrada/saída por opacidade
-        let opacity = 1;
+        el.style.transform = `translate(${tx}%, ${ty}%) scale(${scale}) rotate(${rotation}deg)`;
+
+        // 3. Filtros de Cor
+        const col = effects.find(e => e.type === "color") || {};
+        let brightness = 0, contrast = 0, saturation = 100, hue = 0, sepia = 0, grayscale = 0, blur = 0;
+        
+        if (!col.disabled) {
+            brightness = col.brightness !== undefined ? col.brightness : 0;
+            contrast = col.contrast !== undefined ? col.contrast : 0;
+            saturation = col.saturation !== undefined ? col.saturation : 100;
+            hue = col.hue !== undefined ? col.hue : 0;
+            sepia = col.sepia !== undefined ? col.sepia : 0;
+            grayscale = col.grayscale !== undefined ? col.grayscale : 0;
+            blur = col.blur !== undefined ? col.blur : 0;
+        }
+
+        const cssFilter = `
+            brightness(${1.0 + brightness / 100})
+            contrast(${1.0 + contrast / 100})
+            saturate(${saturation / 100})
+            hue-rotate(${hue}deg)
+            sepia(${sepia}%)
+            grayscale(${grayscale}%)
+            blur(${blur}px)
+        `.trim().replace(/\s+/g, ' ');
+        el.style.filter = cssFilter;
+
+        // 4. Fades (dissolve) de entrada/saída por opacidade
+        let fadeOpacity = 1.0;
         const tIn = (currentFrame - cut.timelineStartFrame) / fps;                       // s desde o início
         const tOut = (cut.timelineStartFrame + durFrames - currentFrame) / fps;          // s até o fim
         effects.filter(e => e.type === "crossfade").forEach(cf => {
+            if (cf.disabled) return;
             const d = Math.max(0.05, cf.duration_s || 0.5);
-            if (cf.side === "in" && tIn < d) opacity = Math.min(opacity, Math.max(0, tIn / d));
-            if (cf.side === "out" && tOut < d) opacity = Math.min(opacity, Math.max(0, tOut / d));
+            if (cf.side === "in" && tIn < d) fadeOpacity = Math.min(fadeOpacity, Math.max(0, tIn / d));
+            if (cf.side === "out" && tOut < d) fadeOpacity = Math.min(fadeOpacity, Math.max(0, tOut / d));
         });
-        imgEl.style.opacity = String(opacity);
+        
+        el.style.opacity = String(baseOpacity * fadeOpacity);
+
+        // 5. Recorte Dinâmico (Crop)
+        const cropEffect = effects.find(e => e.type === "crop") || {};
+        let cropTop = 0, cropRight = 0, cropBottom = 0, cropLeft = 0;
+
+        if (!cropEffect.disabled) {
+            cropTop = cropEffect.top !== undefined ? cropEffect.top : 0;
+            cropRight = cropEffect.right !== undefined ? cropEffect.right : 0;
+            cropBottom = cropEffect.bottom !== undefined ? cropEffect.bottom : 0;
+            cropLeft = cropEffect.left !== undefined ? cropEffect.left : 0;
+        }
+
+        if (cropTop > 0 || cropRight > 0 || cropBottom > 0 || cropLeft > 0) {
+            el.style.clipPath = `inset(${cropTop}% ${cropRight}% ${cropBottom}% ${cropLeft}%)`;
+        } else {
+            el.style.clipPath = "";
+        }
     }
 
     /** Elemento <audio> dedicado de uma pista (criado sob demanda, fora do DOM visível). */
@@ -1213,7 +1322,7 @@ export class ProgramPlayer {
             }
 
             const offsetFrames = currentFrame - cut.timelineStartFrame;
-            const targetSeconds = cut.in + (offsetFrames / 24);
+            const targetSeconds = cut.in + (offsetFrames / (TIMELINE_STATE?.fps || 24));
             const clipChanged = el.dataset.activeClipId !== String(cut.id);
             if (clipChanged) el.dataset.activeClipId = String(cut.id);
 
@@ -1233,8 +1342,25 @@ export class ProgramPlayer {
                 if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
             }
 
+            // Volume do clipe individual
+            const clipVolEff = (cut.effects || []).find(e => e.type === "volume");
+            const clipVol = (clipVolEff && !clipVolEff.disabled) ? clipVolEff.level : 1.0;
+
+            // Audio Fade-in / Fade-out duration
+            let fadeVol = 1.0;
+            const fpsVal = TIMELINE_STATE?.fps || 24;
+            const tIn = (currentFrame - cut.timelineStartFrame) / fpsVal; // s desde o início
+            const tOut = (cut.timelineStartFrame + (cut.outFrame - cut.inFrame) - currentFrame) / fpsVal; // s até o fim
+            const effects = cut.effects || [];
+            effects.filter(e => e.type === "crossfade").forEach(cf => {
+                if (cf.disabled) return;
+                const d = Math.max(0.05, cf.duration_s || 0.5);
+                if (cf.side === "in" && tIn < d) fadeVol = Math.min(fadeVol, Math.max(0, tIn / d));
+                if (cf.side === "out" && tOut < d) fadeVol = Math.min(fadeVol, Math.max(0, tOut / d));
+            });
+
             const vol = track.volume !== undefined ? track.volume : 1.0;
-            el.volume = track.muted ? 0 : Math.max(0, Math.min(1, vol));
+            el.volume = track.muted ? 0 : Math.max(0, Math.min(1.0, vol * clipVol * fadeVol));
             if (this.isPlaying && el.paused) {
                 el.play().catch(() => {});
             } else if (!this.isPlaying && !el.paused) {
@@ -1242,7 +1368,6 @@ export class ProgramPlayer {
             }
         });
 
-        // Pistas de áudio removidas: descarta os elementos órfãos
         if (this.audioPool) {
             Object.keys(this.audioPool).forEach(tid => {
                 if (!seen.has(tid)) {
@@ -1254,6 +1379,230 @@ export class ProgramPlayer {
                 }
             });
         }
+    }
+
+    syncTransformOverlay() {
+        const selectedId = TIMELINE_STATE.selectedClipId;
+        const overlay = this.el("program-transform-overlay");
+        if (!overlay) return;
+
+        if (!selectedId) {
+            overlay.style.display = "none";
+            overlay.innerHTML = "";
+            overlay.dataset.clipId = "";
+            return;
+        }
+
+        const currentFrame = TIMELINE_STATE.playheadFrame;
+        const cuts = STATE.activeTimelineCuts;
+        const activeClip = cuts.find(c =>
+            String(c.id) === String(selectedId) &&
+            currentFrame >= c.timelineStartFrame &&
+            currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame))
+        );
+
+        if (!activeClip) {
+            overlay.style.display = "none";
+            overlay.innerHTML = "";
+            overlay.dataset.clipId = "";
+            return;
+        }
+
+        const effects = activeClip.effects || [];
+        const tf = effects.find(e => e.type === "transform") || {};
+
+        if (tf.disabled) {
+            overlay.style.display = "none";
+            overlay.innerHTML = "";
+            overlay.dataset.clipId = "";
+            return;
+        }
+
+        const scale = tf.scale !== undefined ? tf.scale : 1.0;
+        const tx = tf.x !== undefined ? tf.x : 0;
+        const ty = tf.y !== undefined ? tf.y : 0;
+        const rotation = tf.rotation !== undefined ? tf.rotation : 0;
+
+        // Aplica o mesmo transform CSS da imagem
+        overlay.style.transform = `translate(${tx}%, ${ty}%) scale(${scale}) rotate(${rotation}deg)`;
+        overlay.style.transformOrigin = "center center";
+        overlay.style.display = "block";
+
+        // Aplica o mesmo clip-path para o Crop (Fase 5)
+        const cropEffect = effects.find(e => e.type === "crop") || {};
+        let cropTop = 0, cropRight = 0, cropBottom = 0, cropLeft = 0;
+
+        if (!cropEffect.disabled) {
+            cropTop = cropEffect.top !== undefined ? cropEffect.top : 0;
+            cropRight = cropEffect.right !== undefined ? cropEffect.right : 0;
+            cropBottom = cropEffect.bottom !== undefined ? cropEffect.bottom : 0;
+            cropLeft = cropEffect.left !== undefined ? cropEffect.left : 0;
+        }
+
+        if (cropTop > 0 || cropRight > 0 || cropBottom > 0 || cropLeft > 0) {
+            overlay.style.clipPath = `inset(${cropTop}% ${cropRight}% ${cropBottom}% ${cropLeft}%)`;
+        } else {
+            overlay.style.clipPath = "";
+        }
+
+        if (overlay.dataset.clipId !== String(activeClip.id)) {
+            overlay.dataset.clipId = String(activeClip.id);
+            overlay.innerHTML = `
+                <!-- Centro (Âncora) -->
+                <div class="transform-anchor"></div>
+
+                <!-- Linha e alça de Rotação -->
+                <div class="transform-rot-line"></div>
+                <div class="transform-handle-rot" data-handle="rot"></div>
+
+                <!-- 8 Alças de Redimensionamento -->
+                <div class="transform-handle tl" data-handle="tl"></div>
+                <div class="transform-handle tc" data-handle="tc"></div>
+                <div class="transform-handle tr" data-handle="tr"></div>
+                <div class="transform-handle ml" data-handle="ml"></div>
+                <div class="transform-handle mr" data-handle="mr"></div>
+                <div class="transform-handle bl" data-handle="bl"></div>
+                <div class="transform-handle bc" data-handle="bc"></div>
+                <div class="transform-handle br" data-handle="br"></div>
+            `;
+            this.attachOverlayDragListeners(overlay, activeClip.id);
+        }
+
+        // Contra-escala e contra-rotação nas alças
+        const invScale = 1 / scale;
+        const invRot = -rotation;
+        overlay.querySelectorAll(".transform-handle, .transform-handle-rot").forEach(handle => {
+            handle.style.transform = `scale(${invScale}) rotate(${invRot}deg)`;
+        });
+        const anchor = overlay.querySelector(".transform-anchor");
+        if (anchor) {
+            anchor.style.transform = `scale(${invScale}) rotate(${invRot}deg)`;
+        }
+    }
+
+    attachOverlayDragListeners(overlay, clipId) {
+        if (overlay._dragCleanups) {
+            overlay._dragCleanups();
+        }
+
+        const cleanups = [];
+        overlay._dragCleanups = () => {
+            cleanups.forEach(fn => fn());
+            overlay._dragCleanups = null;
+        };
+
+        const onClick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
+        overlay.addEventListener("click", onClick);
+        cleanups.push(() => overlay.removeEventListener("click", onClick));
+
+        const onMouseDown = (e) => {
+            const clip = STATE.activeTimelineCuts.find(c => c.id === clipId);
+            if (!clip) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const target = e.target;
+            const handleType = target.dataset.handle; // "tl", "tc", "tr", "ml", "mr", "bl", "bc", "br", "rot" ou undefined (corpo)
+
+            const startX = e.clientX;
+            const startY = e.clientY;
+
+            const effects = clip.effects || [];
+            let tf = effects.find(e => e.type === "transform");
+            if (!tf) {
+                tf = { type: "transform", scale: 1.0, x: 0, y: 0, rotation: 0, opacity: 1.0 };
+            }
+
+            const initialX = tf.x !== undefined ? tf.x : 0;
+            const initialY = tf.y !== undefined ? tf.y : 0;
+            const initialScale = tf.scale !== undefined ? tf.scale : 1.0;
+            const initialRot = tf.rotation !== undefined ? tf.rotation : 0;
+
+            TIMELINE_HISTORY.begin();
+
+            const viewport = this.el("program-player-viewport");
+            const vW = viewport.clientWidth || 1920;
+            const vH = viewport.clientHeight || 1080;
+
+            let moved = false;
+
+            const onMouseMove = (moveEv) => {
+                const deltaX = moveEv.clientX - startX;
+                const deltaY = moveEv.clientY - startY;
+
+                if (Math.hypot(deltaX, deltaY) > 3) {
+                    moved = true;
+                }
+
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === clipId);
+                if (!targetClip) return;
+
+                targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
+                let localTf = targetClip.effects.find(e => e.type === "transform");
+                if (!localTf) {
+                    localTf = { type: "transform", scale: 1.0, x: 0, y: 0, rotation: 0, opacity: 1.0 };
+                    targetClip.effects.push(localTf);
+                }
+
+                if (!handleType) {
+                    // ARRASHAR O CLIPE (TRADUÇÃO X, Y)
+                    const pctX = (deltaX / vW) * 100;
+                    const pctY = (deltaY / vH) * 100;
+                    localTf.x = initialX + pctX;
+                    localTf.y = initialY + pctY;
+                } else if (handleType === "rot") {
+                    // ROTAÇÃO
+                    const rect = viewport.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    const startAngle = Math.atan2(startY - centerY, startX - centerX) * 180 / Math.PI;
+                    const currentAngle = Math.atan2(moveEv.clientY - centerY, moveEv.clientX - centerX) * 180 / Math.PI;
+                    let newRot = initialRot + (currentAngle - startAngle);
+                    localTf.rotation = Math.round(newRot);
+                } else {
+                    // ESCALA
+                    const rect = viewport.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+
+                    const startDist = Math.hypot(startX - centerX, startY - centerY);
+                    const currentDist = Math.hypot(moveEv.clientX - centerX, moveEv.clientY - centerY);
+                    if (startDist > 0) {
+                        const ratio = currentDist / startDist;
+                        localTf.scale = Math.max(0.1, Math.min(10.0, parseFloat((initialScale * ratio).toFixed(3))));
+                    }
+                }
+
+                STATE.activeTimelineCuts = cuts;
+                this.syncVideoToPlayhead();
+
+                if (window.workspaceManager && window.workspaceManager.timelinePanel && window.workspaceManager.timelinePanel.timelineInteraction) {
+                    window.workspaceManager.timelinePanel.timelineInteraction.refreshClipInspector();
+                }
+            };
+
+            const onMouseUp = () => {
+                document.removeEventListener("mousemove", onMouseMove);
+                document.removeEventListener("mouseup", onMouseUp);
+                TIMELINE_HISTORY.commit();
+
+                // Se clicou rápido no corpo sem arrastar, alterna play/pause
+                if (!moved && !handleType) {
+                    this.togglePlay();
+                }
+            };
+
+            document.addEventListener("mousemove", onMouseMove);
+            document.addEventListener("mouseup", onMouseUp);
+        };
+
+        overlay.addEventListener("mousedown", onMouseDown);
+        cleanups.push(() => overlay.removeEventListener("mousedown", onMouseDown));
     }
 
     seekScrubber(e) {
