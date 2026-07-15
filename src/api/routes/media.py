@@ -19,6 +19,7 @@ from src.core.tasks import TASK_MANAGER
 from src.services.ingest import IngestService
 from src.services.pipeline import PipelineService
 from src.services.burst_service import group_photo_bursts, replicate_to_members
+from src.services.vision_batch import run_vision_batch
 from src.search.semantic import SemanticSearch
 
 router = APIRouter(tags=["Media & Ingestion"])
@@ -234,77 +235,14 @@ def trigger_all_vision(
     background_tasks: BackgroundTasks = None,
     conn: sqlite3.Connection = Depends(get_db_conn)
 ):
-    """Analisa de forma assíncrona todas as mídias pendentes ou todas (se force=True) de visão, aplicando detecção facial e burst-sequencing de fotos."""
-    cursor = conn.cursor()
-    if force:
-        cursor.execute("SELECT id, filepath, duration FROM video WHERE project_id = ? AND video_type IN ('broll', 'unknown')", (project_id,))
-        video_rows = cursor.fetchall()
+    """Analisa de forma assíncrona todas as mídias pendentes ou todas (se force=True) de visão, aplicando detecção facial e burst-sequencing de fotos.
 
-        cursor.execute("SELECT id, filepath FROM photo WHERE project_id = ?", (project_id,))
-        photo_rows = cursor.fetchall()
-    else:
-        cursor.execute("SELECT id, filepath, duration FROM video WHERE project_id = ? AND video_type IN ('broll', 'unknown') AND status IN ('ingested', 'analyzing', 'error')", (project_id,))
-        video_rows = cursor.fetchall()
-        
-        cursor.execute("SELECT id, filepath FROM photo WHERE project_id = ? AND status IN ('ingested', 'pending', 'error')", (project_id,))
-        photo_rows = cursor.fetchall()
-    
-    def bg_vision_all():
-        # 1. Processa B-rolls
-        for v in video_rows:
-            try:
-                PipelineService.analyze_video_vision(v['id'], Path(v['filepath']), v['duration'])
-            except Exception as e:
-                print(f"[VisionBatch] Erro no vídeo ID {v['id']}: {e}")
-                
-        # 2. Fotos: agrupa rajadas por semelhança visual (CLIP local) e analisa 1 por grupo
-        photos_with_time = []
-        offline = 0
-        for p in photo_rows:
-            path = Path(p['filepath'])
-            exists = path.exists()
-            if not exists:
-                offline += 1
-            mtime = path.stat().st_mtime if exists else 0.0
-            photos_with_time.append({
-                "id": p["id"],
-                "filepath": path,
-                "mtime": mtime,
-                "parent_dir": str(path.parent)
-            })
-
-        # Original inacessível (cartão/HD externo desconectado) => mtime 0 para todas:
-        # a janela de tempo das rajadas vira inerte e o agrupamento passa a depender
-        # só de pasta + CLIP. O proxy WebP local ainda permite agrupar, mas o usuário
-        # precisa saber que uma salvaguarda saiu do ar — degradação silenciosa, não.
-        if offline:
-            print(f"[VisionBatch] ATENCAO: {offline} de {len(photo_rows)} fotos estao com o "
-                  f"original inacessivel; sem mtime a janela 'burst.time_window_s' nao filtra "
-                  f"nada e as rajadas serao decididas so por pasta + semelhanca CLIP. "
-                  f"Conecte o drive de origem para o agrupamento por tempo valer.")
-
-        photos_with_time.sort(key=lambda x: (x["parent_dir"], x["mtime"]))
-
-        groups = group_photo_bursts(project_id, photos_with_time)
-        for group in groups:
-            leader = group.leader
-            try:
-                PipelineService.analyze_photo_vision(leader["id"], leader["filepath"])
-            except Exception as ex:
-                print(f"[VisionBatch] Falha na análise da foto {leader['id']}: {ex}")
-                continue
-
-            if group.members:
-                for m in group.members:
-                    TASK_MANAGER.update_progress(f"photo-{m['id']}", 0.0, "running", task_type="vision")
-                try:
-                    replicate_to_members(project_id, group)
-                except Exception as ex:
-                    print(f"[VisionBatch] Falha ao replicar rajada da foto {leader['id']}: {ex}")
-                for m in group.members:
-                    TASK_MANAGER.update_progress(f"photo-{m['id']}", 100.0, "finished", task_type="vision")
-
-    background_tasks.add_task(bg_vision_all)
+    ⚠️ Rodar acervo inteiro por aqui derruba a interface: o lote consome o GIL
+    deste processo e o event loop para de responder a QUALQUER rota (medido em
+    15/07 — servidor mudo por horas). Para rodadas grandes use o worker em
+    processo separado: `python -m src.worker_vision --project N --force-photos`.
+    """
+    background_tasks.add_task(run_vision_batch, project_id, force, force)
     return {"status": "success", "message": "Análise visual em lote iniciada em background."}
 
 @router.get("/api/conversions")

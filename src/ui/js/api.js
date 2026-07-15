@@ -144,7 +144,10 @@ export class CapIAuAPI {
     }
 
     static fetchConversions() {
-        return this.request("/api/conversions");
+        // Timeout obrigatório: sem ele, um servidor engasgado deixa o pedido pendurado
+        // para sempre e o laço da tela de Tarefas empilha conexões até estourar o limite
+        // do navegador (6 por origem) — aí nem F5 recupera a página.
+        return this.request("/api/conversions", { signal: AbortSignal.timeout(10000) });
     }
 
     static cancelConversion(videoId) {

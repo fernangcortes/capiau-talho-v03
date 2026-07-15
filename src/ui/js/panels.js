@@ -1637,15 +1637,21 @@ export class PanelsManager {
 
     // Fila de Conversão (Tasks Progress loop)
     startTasksProgressLoop() {
-        setInterval(async () => {
-            if (!this.tasksContainer) return;
-            try {
-                const tasks = await CapIAuAPI.fetchConversions();
-                this.renderTasks(tasks);
-            } catch (e) {
-                // Falha silenciosa de pooling offline
+        // Agenda o próximo ciclo só depois que o anterior termina. Com setInterval,
+        // um servidor lento fazia os pedidos se acumularem em vez de se substituírem,
+        // até travar a tela de vez (medido em 15/07 durante o E1.T5).
+        const tick = async () => {
+            if (this.tasksContainer) {
+                try {
+                    const tasks = await CapIAuAPI.fetchConversions();
+                    this.renderTasks(tasks);
+                } catch (e) {
+                    // Falha silenciosa de polling offline
+                }
             }
-        }, 2500);
+            setTimeout(tick, 2500);
+        };
+        tick();
     }
 
     renderTasks(tasks) {
