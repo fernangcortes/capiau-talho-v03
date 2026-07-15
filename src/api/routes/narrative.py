@@ -216,7 +216,8 @@ def save_timeline(timeline: TimelineCreate, conn: sqlite3.Connection = Depends(g
         tracks_dict = [t.dict() for t in timeline.tracks] if timeline.tracks else None
         timeline_id = ProjectRepository.save_timeline(
             conn, timeline.project_id, timeline.name, timeline.description,
-            cuts_dict, tracks=tracks_dict, fps=timeline.fps
+            cuts_dict, tracks=tracks_dict, fps=timeline.fps,
+            width=timeline.width, height=timeline.height
         )
         conn.commit()
         return {"status": "success", "timeline_id": timeline_id}

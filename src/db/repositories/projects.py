@@ -75,12 +75,16 @@ class ProjectRepository:
         description: str,
         cuts: List[Dict[str, Any]],
         tracks: Optional[List[Dict[str, Any]]] = None,
-        fps: float = 24.0
+        fps: float = 24.0,
+        width: Optional[int] = 1920,
+        height: Optional[int] = 1080
     ) -> int:
         """Salva uma timeline no formato v2 multipista (tracks + clips com posição absoluta)."""
         payload = {
             "version": 2,
             "fps": fps,
+            "width": width,
+            "height": height,
             "tracks": tracks if tracks else ProjectRepository.DEFAULT_TRACKS,
             "clips": cuts
         }

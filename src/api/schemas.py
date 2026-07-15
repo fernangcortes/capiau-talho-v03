@@ -50,6 +50,8 @@ class TimelineCreate(BaseModel):
     project_id: int = 1
     tracks: Optional[List[TrackItem]] = None  # formato v2 multipista
     fps: float = 24.0
+    width: Optional[int] = 1920
+    height: Optional[int] = 1080
 
 class TimelineAISuggestClip(BaseModel):
     id: str
