@@ -10,6 +10,7 @@ import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
 import { SettingsPanelManager } from "./settingsPanel.js";
 import { initAutosave } from "./timelineAutosave.js";
 import { LOG_MANAGER } from "./logManager.js";
+import { initTabsCustomization } from "./tabsCustomization.js";
 
 // Função para destacar os termos da busca com <mark>
 function highlightTerms(text, query) {
@@ -1098,6 +1099,9 @@ window.showSimilarMedia = showSimilarMedia;
 window.addEventListener("DOMContentLoaded", () => {
     console.log("CapIAu-Talho: Inicializando os módulos...");
 
+    // Inicializa a customização de abas (Drag & Drop e Visibilidade)
+    initTabsCustomization();
+
     // Auto-converter de title para data-tooltip para tooltips premium unificadas
     const convertTitleToTooltip = (root = document) => {
         root.querySelectorAll("[title]").forEach(el => {
@@ -1445,12 +1449,12 @@ window.addEventListener("DOMContentLoaded", () => {
     const savedLeftTab = localStorage.getItem("active-left-tab");
     if (savedLeftTab) {
         const btn = document.querySelector(`.sidebar-left .tab-btn[data-tab="${savedLeftTab}"]`);
-        if (btn) btn.click();
+        if (btn && btn.style.display !== "none") btn.click();
     }
     const savedRightTab = localStorage.getItem("active-right-tab");
     if (savedRightTab) {
         const btn = document.querySelector(`#right-tabs .tab-btn[data-right-tab="${savedRightTab}"]`);
-        if (btn) btn.click();
+        if (btn && btn.style.display !== "none") btn.click();
     }
 
     STATE.on("rightTabChanged", (tab) => {
@@ -1465,14 +1469,13 @@ window.addEventListener("DOMContentLoaded", () => {
         // pelo overflow:hidden), fazendo parecer que ele "não abre" após trocar de aba.
         const activeContainer = rightContainers[tab];
         if (activeContainer) {
-            activeContainer.style.display = (tab === "chat" || tab === "transcript" || tab === "logs" || tab === "vision" || tab === "tasks") ? "flex" : "block";
+            activeContainer.style.display = (tab === "chat" || tab === "transcript" || tab === "logs" || tab === "vision" || tab === "tasks" || tab === "search") ? "flex" : "block";
         }
         
         // Manter destaque no botão ativo
         rightTabs.forEach(btn => {
             if (btn.dataset.rightTab === tab) {
                 btn.classList.add("active");
-                btn.style.display = "block"; // Se for o de busca oculto, força visibilidade
             } else {
                 btn.classList.remove("active");
             }
@@ -1482,15 +1485,25 @@ window.addEventListener("DOMContentLoaded", () => {
     // Ocultar ou mostrar botão de visão baseado no tipo do vídeo ativo
     STATE.on("activeVideoChanged", (video) => {
         const btnTabVision = document.getElementById("btn-tab-vision");
+        if (!btnTabVision) return;
+
+        // Verifica se a visão foi desativada explicitamente pelo usuário
+        const savedVisibility = localStorage.getItem("right-tabs-visibility");
+        const visibility = savedVisibility ? JSON.parse(savedVisibility) : {};
+        if (visibility["vision"] === false) {
+            btnTabVision.style.display = "none";
+            return;
+        }
+
         if (!video) {
-            if (btnTabVision) btnTabVision.style.display = "none";
+            btnTabVision.style.display = "none";
             return;
         }
 
         if (video.video_type === "broll") {
-            if (btnTabVision) btnTabVision.style.display = "block";
+            btnTabVision.style.display = ""; // deixa o CSS controlar o display (inline-flex)
         } else {
-            if (btnTabVision) btnTabVision.style.display = "none";
+            btnTabVision.style.display = "none";
             if (STATE.currentRightTab === "vision") {
                 STATE.currentRightTab = "transcript";
             }
