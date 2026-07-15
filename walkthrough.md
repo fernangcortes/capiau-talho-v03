@@ -1067,3 +1067,42 @@ Substituímos o relógio fixo de extração de frames (1 a cada 10s) por uma dec
     - Testado end-to-end no navegador contra o servidor real: função definida globalmente, 1.424 cards de foto com botão de similares funcional, e fluxo completo clique → painel → renderização de cards mistos (foto + b-roll) validado com stub de rede controlado.
 
     - **Pendências da Etapa 2** (ver `docs/PLANO_IMPLEMENTACAO.md`): dedupe de rajadas de fotos (E2.B4), zero-shot tagging de entidades por CLIP (E2.B5), perfis de esforço por categoria (E2.C), fila de revisão de triagem (E2.C2) e gramática do plano — escala, paleta, facetas (E2.D). Recomendado **não** disparar a reanálise completa do acervo (E1.T5, 541 vídeos + 1.424 fotos) antes de E2.B4 e E2.C1 estarem prontos, já que ambos reduzem diretamente o custo dessa rodada única.
+
+## 📐 Fase 17: Configurações da Sequência, Viewport Estável, Alças de Transformação e Efeito de Crop (15/07/2026)
+
+Implementamos a fundação para controle preciso de enquadramento da timeline, propriedades da sequência, e manipulação direta de efeitos de transform e crop no player do Program. Detalhado em `docs/PLANO_VIEWPORT_TRANSFORM_CROP.md`.
+
+1.  **Fundação e Correções de Bugs (Fase 0):**
+    - Descravado o FPS do player: todas as rotinas de sincronia e seek leem dinamicamente `TIMELINE_STATE.fps` em runtime.
+    - Undo de sliders consertado: adicionado padrão transacional (begin no `oninput`, commit no `onchange`) nos sliders de transformação, cor e volume.
+    - Refresh pós-undo/redo: emitido evento `timelineRestored` ao reverter estados, atualizando os sliders e caixas delimitadoras no painel Ajustes.
+    - Volume redirecionado: clipes de vídeo associados a um clipe de áudio (link_id) agora redirecionam suas alterações de volume para o par de áudio correspondente.
+    - Preservação de scroll: ao reconstruir o HTML do painel Ajustes, a posição do scroll do container é salva e restaurada, evitando saltos visuais.
+    - Proteção de abas: ao selecionar um clipe, a aba Ajustes é reexibida automaticamente se tiver sido ocultada pelo usuário.
+
+2.  **Viewport Estável e Transbordo (Fase 1):**
+    - Novo elemento `#program-player-viewport` com dimensões físicas controladas por JS, centralizando as 4 camadas de mídia.
+    - Máscara de transbordo `#program-viewport-shade` posicionada acima das mídias com `z-index: 50` e `box-shadow` externo de 9999px. Exibe a área fora do corte com 70% de sombra e borda pontilhada ciano de 1px.
+    - ResizeObserver observa o wrapper para recalcular e readequar a escala visual da sequência em qualquer redimensionamento do painel.
+
+3.  **Configurações da Sequência e Auto-Configuração (Fase 2):**
+    - Propriedades de resolução (`width`, `height`) e FPS adicionadas ao estado da timeline, com persistência no *localStorage* e SQLite.
+    - Auto-configuração automática no primeiro clipe: quando a timeline está vazia, o primeiro vídeo adicionado define a resolução e o FPS padrão da sequência.
+    - Painel de Configurações da Sequência: exibido quando nenhum clipe está selecionado. Oferece presets de resolução (16:9, 9:16, 4K, 1:1, Personalizado) e inputs manuais, com aviso visual e reescalagem automática de frames dos clipes existentes para preservar suas durações em segundos.
+    - Botões rápidos de engrenagem adicionados no cabeçalho do player Program e no sidebar lateral da timeline.
+
+4.  **Zoom do Preview (Fase 3):**
+    - Seletor de zoom (`Fit / 25% / 50% / 75% / 100%`) adicionado ao toolbar do Program Player.
+    - O viewport se redimensiona mantendo a proporção exata da sequência, cortando o conteúdo de transbordo no limite do painel com base no zoom fixo escolhido.
+
+5.  **Alças de Transformação Interativa (Fase 4):**
+    - Caixa delimitadora ciano desenhada sobre a imagem com base no *content rect* real do clipe (compensando faixas pretas).
+    - Suporte a arrastar o interior da caixa para alterar a posição (translação X/Y).
+    - Suporte a arrastar qualquer uma das 4 alças quadradas dos cantos para escalar uniformemente.
+    - Suporte a arrastar a alça estendida no topo para rotacionar o clipe.
+    - Transação de histórico integrada: o gesto inicia uma transação com `TIMELINE_HISTORY.begin()` no pointerdown e encerra com `commit()` no pointerup, atualizando os sliders no painel.
+
+6.  **Efeito de Recorte / Crop (Fase 5):**
+    - Sliders dedicados no painel Ajustes para cortar bordas esquerda, direita, superior e inferior de 0% a 90%.
+    - Recorte relativo ao conteúdo real da imagem, aplicado usando `clip-path: inset(...)` em pixels relativos ao *content rect*, acompanhando transformações e rotações perfeitamente.
+

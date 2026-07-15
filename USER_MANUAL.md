@@ -486,3 +486,54 @@ controles intuitivos rápidos:
       foto para revelar um botão flutuante \"+\". O clique adicionará a
       imagem como still (duração padrão de 5s) na timeline no ponto da
       agulha.
+
+## ⚙️ 9. Configurações da Sequência, Auto-Configuração e Zoom do Preview
+
+### A. Auto-Configuração Inteligente da Timeline
+Para agilizar o início do trabalho e garantir a consistência técnica, o CapIAu-Talho conta com um sistema de **auto-configuração automática no primeiro clipe**.
+- Ao arrastar ou inserir o primeiro clipe de vídeo em uma timeline totalmente vazia, o sistema lê as propriedades técnicas desse vídeo (extraídas via FFprobe na ingestão) e configura automaticamente a resolução (largura e altura) e o FPS da timeline para coincidir com os do vídeo.
+- A inserção de imagens estáticas (fotos stills) não dispara a auto-configuração, permitindo que a timeline permaneça nos valores padrão ou nas configurações manuais que você escolher.
+
+### B. Painel de Configurações da Sequência
+Sempre que não houver nenhum clipe selecionado na timeline (ou ao acessar a aba **Ajustes** com a seleção limpa), o painel lateral direito exibirá as **Configurações da Sequência**:
+- **Presets de Resolução:** Selecione proporções comuns através do menu suspenso, como *1920×1080 (16:9)*, *1080×1920 (9:16 - Vertical)*, *3840×2160 (4K)*, *1080×1080 (1:1)* ou *Personalizado*.
+- **Dimensões Customizadas:** Ao selecionar o preset *Personalizado*, os campos de largura e altura numéricos são habilitados para você definir qualquer resolução (como resoluções específicas de redes sociais ou formatos panorâmicos). A proporção da tela é calculada e exibida em tempo real.
+- **Controle de FPS:** Altere a taxa de quadros da timeline selecionando opções de *23.976 a 60 FPS*.
+- **Aviso e Reescalagem de Frames:** Se você alterar o FPS de uma timeline que já contém clipes de vídeo ou áudio, o sistema exibirá um aviso informando que as posições em frames serão recalculadas. O CapIAu-Talho reajusta os pontos de início e fim dos clipes para **preservar exatamente a sua duração e tempo em segundos**, evitando desalinhamentos. Toda a alteração é gravada no histórico como um único passo e pode ser desfeita pressionando **Ctrl+Z**.
+
+### C. Acesso Rápido e Persistência
+- Você pode abrir as configurações da sequência a qualquer momento clicando no botão de **Engrenagem** localizado no cabeçalho do Program Player (ao lado do botão de Popout) ou na barra de ferramentas lateral da timeline (`#timeline-actions-sidebar`).
+- As propriedades da sequência são persistidas automaticamente em segundo plano tanto no *localStorage* (autosave) quanto no banco de dados SQLite principal ao salvar a timeline.
+
+### D. Zoom de Visualização do Program Player
+No painel do Program Player, ao lado do seletor de resolução, há um seletor de zoom com as opções: **Fit, 25%, 50%, 75% e 100%**:
+- **Fit:** Redimensiona dinamicamente a área de renderização para se ajustar perfeitamente ao tamanho da janela e dos splitters do painel, garantindo que toda a sequência fique visível.
+- **Percentuais Fixos:** Força o viewport a adotar um tamanho de escala estrito da sequência. Se o clipe escalado exceder o viewport, o transbordo será cortado/escurecido pela máscara, facilitando o alinhamento de detalhes finos sem que a janela de reprodução se desloque.
+
+---
+
+## 📐 10. Viewport Estável, Alças de Transformação e Recorte (Crop)
+
+### A. Viewport Estável e Máscara de Transbordo
+A área de visualização da montagem no Program Player agora funciona dentro de um **Viewport Estável** (`#program-player-viewport`):
+- O enquadramento visível não é mais afetado pelo tamanho físico da janela do seu navegador ou pela posição das barras divisorias de painéis. O viewport possui dimensões baseadas na proporção real da sequência (ex.: 16:9 ou 9:16).
+- **Máscara de Transbordo (Shade Overlay):** Todo conteúdo visual que ultrapassar os limites do enquadramento da sequência (como um clipe escalado ou transladado) fica visível além das bordas pontilhadas, mas é suavizado por uma máscara escura com opacidade de 70%. Isso permite que o editor veja o transbordo e posicione as mídias de forma precisa, sabendo exatamente o que será cortado na exportação.
+
+### B. Alças de Transformação Interativa (Bounding Box)
+Ao selecionar qualquer clipe de vídeo ou foto na timeline e posicionar a agulha de reprodução (playhead) sobre ele, uma caixa delimitadora (*bounding box*) ciano se acenderá ao redor da imagem ativa no Program Player:
+- **Cálculo Preciso da Imagem:** A caixa delimita o retângulo real do conteúdo visível (*content rect*), compensando faixas pretas ou letterboxes geradas pelo modo *fit/contain*.
+- **Mover (Translação X/Y):** Clique e arraste em qualquer parte do interior do clipe selecionado para reposicioná-lo na tela. Os valores de posição X e Y serão atualizados dinamicamente.
+- **Escalar (Redimensionamento Uniforme):** Clique e arraste qualquer uma das 4 alças quadradas brancas nos cantos da caixa delimitadora para aumentar ou diminuir a escala do clipe de maneira uniforme.
+- **Rotacionar:** Arraste a alça de rotação estendida no topo da caixa para rotacionar o clipe livremente ao redor de seu centro.
+- **Integração com o Histórico e Sliders:** 
+  - Durante o arraste com o mouse/ponteiro, a imagem se move de forma fluida.
+  - Ao soltar o clique, o gesto é consolidado no histórico. Os sliders de transformação na aba **Ajustes** são atualizados automaticamente para refletir os valores finais obtidos pelo gesto.
+  - Pressionar **Ctrl+Z** reverte o arraste completo (posição, rotação ou escala) e atualiza o player e a interface de sliders instantaneamente.
+  - Cliques curtos sem arrasto na caixa delimitadora do clipe selecionado continuam funcionando normalmente como comando de *Play/Pause* do vídeo.
+
+### C. Efeito de Recorte (Crop)
+O CapIAu-Talho suporta o efeito nativo de **Recorte (Crop)** por clipe:
+- Na aba **Ajustes**, localize a seção **Recorte (Crop)** (abaixo das transformações geométricas) para ajustar as bordas do clipe individualmente (*Esquerda*, *Direita*, *Topo*, *Base*) de 0% a 90%.
+- **Corte Relativo à Imagem:** O recorte é relativo ao conteúdo visível do clipe, o que significa que o ajuste de 10% na esquerda cortará 10% da imagem útil, e não a borda ou a faixa preta de preenchimento.
+- **Compatibilidade com Transformações:** O crop é aplicado no pipeline gráfico via CSS `clip-path` antes das rotações e posições do clipe, fazendo com que a área recortada acompanhe perfeitamente a escala, rotação e movimento definidos para o clipe.
+- **Preservação de Foco:** O painel de ajustes possui preservação automática de scroll, garantindo que o scroll não pule de volta ao topo quando você interage com os sliders de Crop localizados no rodapé do painel.

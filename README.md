@@ -123,6 +123,18 @@ Cut**.
   ajustar enquadramento (Fit/Fill) e fades por meio do Inspetor de Foto
   e compose no Program Player.
 
+- **📐 Viewport Estável, Transformação Interativa (Bounding Box) & Crop:** Viewport do player Program
+  com proporção física estável de sequência e máscara de transbordo escurecida pontilhada em ciano.
+  Permite selecionar clipes e interagir com uma caixa delimitadora (*bounding box*) diretamente no player
+  para mover (transladar), escalar (uniformemente pelas alças de canto) ou rotacionar em tempo real.
+  Adiciona suporte para efeito de recorte (*Crop*) relativo ao conteúdo da imagem com preservação de scroll
+  no painel e integração total com o histórico (Undo/Redo via Ctrl+Z).
+
+- **⚙️ Configurações da Sequência (Timeline) & Auto-Configuração:** Definição e persistência (local e backend)
+  de resolução e taxa de quadros (FPS) da timeline. O sistema autodetectará a resolução e o FPS do primeiro
+  vídeo inserido para configurar automaticamente uma timeline vazia. Alterar as configurações exibe avisos de
+  reescalagem, atualizando a representação em frames dos clipes de modo a preservar suas durações em segundos.
+
 - **🎛️ Layout Estúdio & Controle Flexível (Workspaces):** Preset de
   interface robusto para decupagem que reposiciona a biblioteca
   (maximizada) e empilha os players de Source/Program em formato limpo
