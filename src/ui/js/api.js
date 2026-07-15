@@ -199,11 +199,11 @@ export class CapIAuAPI {
         });
     }
 
-    static saveTimeline(projectId, name, description, cuts, tracks = null, fps = 24) {
+    static saveTimeline(projectId, name, description, cuts, tracks = null, fps = 24, width = 1920, height = 1080) {
         return this.request("/api/timeline", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ project_id: projectId, name, description, cuts, tracks, fps })
+            body: JSON.stringify({ project_id: projectId, name, description, cuts, tracks, fps, width, height })
         });
     }
 

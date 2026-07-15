@@ -38,7 +38,11 @@ function performAutosave() {
             selectedClipId: TIMELINE_STATE.selectedClipId,
             selectedTrack: TIMELINE_STATE.selectedTrack,
             undoStack: TIMELINE_HISTORY.undoStack,
-            redoStack: TIMELINE_HISTORY.redoStack
+            redoStack: TIMELINE_HISTORY.redoStack,
+            fps: TIMELINE_STATE.fps,
+            width: TIMELINE_STATE.width || 1920,
+            height: TIMELINE_STATE.height || 1080,
+            previewZoom: TIMELINE_STATE.previewZoom || "fit"
         };
         
         localStorage.setItem(`capiau_timeline_autosave_${projectId}`, JSON.stringify(data));
@@ -91,12 +95,35 @@ export function restoreAutosave(projectId) {
 
         isAutosaveSuspended = true;
 
-        // 1. Restaura pistas
+        // 1. Restaura propriedades de resolução/fps antes dos cortes
+        if (data.fps !== undefined) {
+            TIMELINE_STATE.fps = data.fps;
+        }
+        if (data.width !== undefined) {
+            TIMELINE_STATE.width = data.width;
+        }
+        if (data.height !== undefined) {
+            TIMELINE_STATE.height = data.height;
+        }
+        if (data.fps !== undefined || data.width !== undefined || data.height !== undefined) {
+            STATE.emit("timelinePropertiesChanged", {
+                fps: TIMELINE_STATE.fps,
+                width: TIMELINE_STATE.width || 1920,
+                height: TIMELINE_STATE.height || 1080
+            });
+        }
+
+        if (data.previewZoom !== undefined) {
+            TIMELINE_STATE.previewZoom = data.previewZoom;
+            STATE.emit("previewZoomChanged", TIMELINE_STATE.previewZoom);
+        }
+
+        // 2. Restaura pistas
         if (data.tracks) {
             TIMELINE_STATE.setTracks(data.tracks);
         }
         
-        // 2. Restaura cortes
+        // 3. Restaura cortes
         STATE.activeTimelineCuts = data.cuts || [];
 
         // 3. Restaura clipes fantasma (IA)

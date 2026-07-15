@@ -1628,7 +1628,9 @@ export class PanelsManager {
                 origin: c.origin || "user"
             }));
             const tracks = TIMELINE_STATE.serializeTracks();
-            await CapIAuAPI.saveTimeline(STATE.currentProjectId, name, "Corte criado no editor", cuts, tracks, fps);
+            const width = TIMELINE_STATE.width || 1920;
+            const height = TIMELINE_STATE.height || 1080;
+            await CapIAuAPI.saveTimeline(STATE.currentProjectId, name, "Corte criado no editor", cuts, tracks, fps, width, height);
             alert("Timeline salva com sucesso (formato multipista v2).");
         } catch (e) {
             alert("Erro ao salvar timeline.");
@@ -2181,9 +2183,12 @@ export class PanelsManager {
 
             // O carregamento é 1 passo de undo: Ctrl+Z restaura a timeline anterior
             TIMELINE_HISTORY.record(() => {
-                // Restaura as pistas e os clipes com posições absolutas
+                // Restaura as pistas e as propriedades de tela
                 TIMELINE_STATE.setTracks(sequence.tracks || []);
-                if (sequence.fps) TIMELINE_STATE.setFps(sequence.fps);
+                const loadWidth = sequence.width || 1920;
+                const loadHeight = sequence.height || 1080;
+                const loadFps = sequence.fps || 24;
+                TIMELINE_STATE.setTimelineProperties({ width: loadWidth, height: loadHeight, fps: loadFps });
 
                 const fps = TIMELINE_STATE.fps || 24;
                 const cuts = (sequence.clips || []).map((c, idx) => ({

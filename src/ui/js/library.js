@@ -206,10 +206,11 @@ function buildTree(videos) {
 
 function formatTimecode(sec) {
     if (isNaN(sec)) return "00:00:00:00";
+    const fpsVal = window.TIMELINE_STATE?.fps || 24;
     const hrs = Math.floor(sec / 3600);
     const mins = Math.floor((sec % 3600) / 60);
     const secs = Math.floor(sec % 60);
-    const frames = Math.floor((sec % 1) * 24); // 24fps
+    const frames = Math.floor((sec % 1) * fpsVal);
     
     const pad = (n) => String(n).padStart(2, '0');
     return `${pad(hrs)}:${pad(mins)}:${pad(secs)}:${pad(frames)}`;

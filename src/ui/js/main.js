@@ -8,9 +8,9 @@ import { ProjectsManager } from "./projects.js";
 import { FaceManager } from "./faces.js";
 import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
 import { SettingsPanelManager } from "./settingsPanel.js";
-import { initAutosave } from "./timelineAutosave.js";
+import { initAutosave, triggerAutosave } from "./timelineAutosave.js";
 import { LOG_MANAGER } from "./logManager.js";
-import { initTabsCustomization } from "./tabsCustomization.js";
+import { initTabsCustomization, setTabVisibility } from "./tabsCustomization.js";
 
 // Função para destacar os termos da busca com <mark>
 function highlightTerms(text, query) {
@@ -1633,6 +1633,59 @@ window.addEventListener("DOMContentLoaded", () => {
             console.log("Autoplay: video ended. Advancing.");
             playNextSearchItem();
         });
+    }
+
+    // ── CONFIGURAÇÕES DA SEQUÊNCIA (FASE 2) ──
+    const openSequenceSettings = () => {
+        const timelineState = window.TIMELINE_STATE;
+        if (!timelineState) return;
+
+        timelineState.selectedClipId = null;
+
+        if (window.workspaceManager && window.workspaceManager.timelinePanel && window.workspaceManager.timelinePanel.timelineInteraction) {
+            const interaction = window.workspaceManager.timelinePanel.timelineInteraction;
+            interaction.refreshClipInspector();
+
+            const tabBtn = document.querySelector('.sidebar-left .tab-btn[data-tab="tab-adjustments"]');
+            if (tabBtn) {
+                if (tabBtn.style.display === "none") {
+                    setTabVisibility("tab-adjustments", true);
+                }
+                if (!tabBtn.classList.contains("active")) {
+                    tabBtn.click();
+                }
+            }
+        }
+    };
+
+    const btnSeqSettingsProgram = document.getElementById("btn-seq-settings-program");
+    if (btnSeqSettingsProgram) {
+        btnSeqSettingsProgram.addEventListener("click", openSequenceSettings);
+    }
+    const btnSeqSettingsTimeline = document.getElementById("btn-seq-settings-timeline");
+    if (btnSeqSettingsTimeline) {
+        btnSeqSettingsTimeline.addEventListener("click", openSequenceSettings);
+    }
+
+    // ── CONTROLE DE ZOOM DO PREVIEW (FASE 3) ──
+    const previewZoomSelect = document.getElementById("program-preview-zoom");
+    if (previewZoomSelect) {
+        previewZoomSelect.addEventListener("change", () => {
+            const val = previewZoomSelect.value;
+            const parsedZoom = val === "fit" ? "fit" : parseFloat(val);
+            TIMELINE_STATE.previewZoom = parsedZoom;
+            STATE.emit("previewZoomChanged", parsedZoom);
+            triggerAutosave();
+        });
+
+        STATE.on("previewZoomChanged", (newZoom) => {
+            const selectVal = newZoom === "fit" ? "fit" : String(newZoom);
+            previewZoomSelect.value = selectVal;
+        });
+
+        if (TIMELINE_STATE.previewZoom !== undefined) {
+            previewZoomSelect.value = TIMELINE_STATE.previewZoom === "fit" ? "fit" : String(TIMELINE_STATE.previewZoom);
+        }
     }
 
     // Inicializa status S3 e atualiza a cada 60 segundos

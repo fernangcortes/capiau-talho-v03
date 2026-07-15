@@ -204,3 +204,24 @@ function applyTabVisibility(btn, isVisible, container, tabVal, visibilityKey, ac
         }
     }
 }
+
+export function setTabVisibility(tabVal, isVisible) {
+    const leftContainer = document.getElementById("left-tabs");
+    const rightContainer = document.getElementById("right-tabs");
+    
+    if (leftContainer) {
+        const btn = leftContainer.querySelector(`[data-tab="${tabVal}"]`);
+        if (btn) {
+            applyTabVisibility(btn, isVisible, leftContainer, tabVal, "left-tabs-visibility", "active-left-tab", "data-tab");
+            return;
+        }
+    }
+    
+    if (rightContainer) {
+        const btn = rightContainer.querySelector(`[data-right-tab="${tabVal}"]`);
+        if (btn) {
+            applyTabVisibility(btn, isVisible, rightContainer, tabVal, "right-tabs-visibility", "active-right-tab", "data-right-tab");
+            return;
+        }
+    }
+}
