@@ -127,6 +127,7 @@
                     <button class="tab-btn" data-tab="tab-themes" title="Temas"><i class="fa-solid fa-tags"></i> <span class="tab-text">Temas</span></button>
                     <button class="tab-btn" data-tab="tab-faces" title="Rostos"><i class="fa-solid fa-user-friends"></i> <span class="tab-text">Rostos</span></button>
                     <button class="tab-btn" data-tab="tab-docs" title="Documentos"><i class="fa-solid fa-file-text"></i> <span class="tab-text">Docs</span></button>
+                    <button class="tab-btn" data-tab="tab-adjustments" title="Ajustes de Mídia"><i class="fa-solid fa-sliders"></i> <span class="tab-text">Ajustes</span></button>
                 </div>
                 
                 <div class="library-toolbar" id="library-filter-bar" style="padding: 8px 12px; border-bottom: 1px solid var(--border-glass); display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.15); position: relative;">
@@ -359,6 +360,13 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Tab: Ajustes de Mídia -->
+                    <div class="tab-content" id="tab-adjustments">
+                        <div id="adjustments-panel-content" style="padding: 12px; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow-y: auto;">
+                            <!-- Dinâmico via JS -->
+                        </div>
+                    </div>
                 </div>
                     <div class="sidebar-footer status-container" id="system-status-bar" style="padding: 12px 16px; border-top: 1px solid var(--border-glass); display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text-secondary); background: rgba(0,0,0,0.15);">
                         <i class="fa-solid fa-circle-check status-icon" id="system-status-icon" style="color: var(--color-emerald); font-size: 12px;"></i>
@@ -564,19 +572,36 @@
                             </div>
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 <button id="btn-swap-to-source" class="btn-control btn-swap-player" title="Alternar para Source (Q)" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px; display: none;"><i class="fa-solid fa-right-left"></i></button>
+                                <select id="program-preview-zoom" title="Zoom do Preview" style="font-size: 10px; height: 20px; padding: 0 4px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; border-radius: 4px; outline: none; cursor: pointer;">
+                                    <option value="fit">Ajustar</option>
+                                    <option value="0.25">25%</option>
+                                    <option value="0.5">50%</option>
+                                    <option value="0.75">75%</option>
+                                    <option value="1">100%</option>
+                                    <option value="2">200%</option>
+                                </select>
+                                <button id="btn-seq-settings-program" class="btn-control" title="Configurações da Sequência" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-gear"></i></button>
                                 <button id="btn-popout-program" class="btn-control" title="Destacar Player" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-up-right-from-square"></i></button>
                                 <button id="btn-expand-program" class="btn-control" title="Maximizar" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-expand"></i></button>
                             </div>
                         </div>
                         
                         <div class="video-container" id="program-video-wrapper" style="flex: 1; background: #000; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                            <!-- Pool A/B de Vídeos para reprodução sequencial sem lag -->
-                            <video id="program-video-a" src="" preload="auto" style="position: absolute; width: 100%; height: 100%; object-fit: contain; display: block;"></video>
-                            <video id="program-video-b" src="" preload="auto" style="position: absolute; width: 100%; height: 100%; object-fit: contain; display: none;"></video>
-                            
-                            <!-- Camadas de foto (still) da timeline: A = base, B = sobreposição -->
-                            <img id="program-player-photo" style="display:none; width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;" src="">
-                            <img id="program-player-photo-b" style="display:none; width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;" src="">
+                            <div id="program-player-viewport" style="position: relative; overflow: visible; display: flex; align-items: center; justify-content: center;">
+                                <!-- Pool A/B de Vídeos para reprodução sequencial sem lag -->
+                                <video id="program-video-a" src="" preload="auto" style="position: absolute; inset: 0; width: 100%; height: 100%; display: block;"></video>
+                                <video id="program-video-b" src="" preload="auto" style="position: absolute; inset: 0; width: 100%; height: 100%; display: none;"></video>
+                                
+                                <!-- Camadas de foto (still) da timeline: A = base, B = sobreposição -->
+                                <img id="program-player-photo" style="display:none; position: absolute; inset: 0; width: 100%; height: 100%;" src="">
+                                <img id="program-player-photo-b" style="display:none; position: absolute; inset: 0; width: 100%; height: 100%;" src="">
+
+                                <!-- Máscara de transbordo (Fase 1) -->
+                                <div id="program-viewport-shade"></div>
+
+                                <!-- Overlay de transformação (Fase 4) -->
+                                <div id="program-transform-overlay"></div>
+                            </div>
                         </div>
                         
                         <!-- Controles Program -->
@@ -645,6 +670,7 @@
 
                                 <!-- Nome/Renomear Timeline -->
                                 <button id="btn-rename-timeline" class="btn-toolbar-action" data-tooltip="Renomear Timeline (Clique para editar)"><i class="fa-solid fa-pen-to-square"></i></button>
+                                <button id="btn-seq-settings-timeline" class="btn-toolbar-action" data-tooltip="Configurações da Sequência (Resolução/FPS)"><i class="fa-solid fa-gear"></i></button>
                                 <input type="text" id="timeline-name-input" value="Rascunho Making Of #1" style="display: none;">
                                 
                                 <div class="toolbar-divider"></div>

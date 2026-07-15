@@ -3346,7 +3346,7 @@ body.layout-resizing * {
     position: absolute !important;
     left: 0 !important;
     right: 0 !important;
-    z-index: 20 !important;
+    z-index: 100 !important;
     opacity: 0 !important;
     pointer-events: none !important;
     transition: opacity 0.2s ease !important;
@@ -3354,6 +3354,7 @@ body.layout-resizing * {
 }
 .player-panel .player-header {
     top: 0 !important;
+    z-index: 100 !important;
     background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent) !important;
 }
 .player-panel .player-controls {
@@ -5580,3 +5581,194 @@ select option, .nle-select option {
     opacity: 0.4;
     border: 1px dashed var(--color-violet) !important;
 }
+
+/* ── AJUSTES DE CLIPE DE TIMELINE ── */
+.adjustments-section {
+    border-bottom: 1px solid var(--border-glass);
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+.adjustments-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-cyan);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.adjustments-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+.adjustments-row label {
+    font-size: 10.5px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+.adjustments-row .control-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.adjustments-row input[type="range"] {
+    width: 100px;
+    height: 4px;
+    cursor: pointer;
+    accent-color: var(--color-cyan);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    border: none;
+    outline: none;
+    transition: all 0.2s ease;
+}
+.adjustments-row input[type="range"]:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+.adjustments-row .value-disp {
+    font-size: 9px;
+    font-family: monospace;
+    color: var(--text-muted);
+    min-width: 38px;
+    text-align: right;
+}
+.adjustments-row input[type="number"] {
+    width: 50px;
+    height: 22px;
+    font-size: 10px;
+    text-align: center;
+    background: rgba(20, 20, 30, 0.45);
+    border: 1px solid var(--border-glass);
+    border-radius: 4px;
+    color: #fff;
+    outline: none;
+}
+.adjustments-row input[type="number"]:focus {
+    border-color: var(--color-cyan);
+}
+
+/* Modo Compacto e Mínimo da Sidebar */
+.sidebar-compact .adjustments-row label,
+.sidebar-minimal .adjustments-row label {
+    display: none;
+}
+.sidebar-compact .adjustments-row input[type="range"],
+.sidebar-minimal .adjustments-row input[type="range"] {
+    width: 120px;
+}
+.sidebar-compact .adjustments-row,
+.sidebar-minimal .adjustments-row {
+    justify-content: center;
+}
+
+#tab-adjustments {
+    display: none;
+    height: 100%;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+}
+#tab-adjustments.active {
+    display: flex;
+}
+
+/* ── VIEWPORT ESTÁVEL E MÁSCARA (FASE 1) ── */
+#program-player-viewport {
+    position: relative;
+    overflow: visible;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+#program-viewport-shade {
+    position: absolute;
+    inset: 0;
+    z-index: 50;                 /* acima das 4 camadas de mídia (1..11) */
+    pointer-events: none;        /* não bloqueia cliques de play/pause nem drags futuros */
+    box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.7);
+    border: 1px dashed rgba(6, 182, 212, 0.45);
+}
+
+/* ── OVERLAY DE TRANSFORMAÇÃO E ALÇAS (FASE 4) ── */
+#program-transform-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 60;                 /* acima da máscara (50) */
+    pointer-events: auto;        /* permite arrastar o corpo do overlay */
+    border: 1px solid var(--color-cyan);
+    box-sizing: border-box;
+    display: none;               /* exibido apenas quando ativo */
+    background: rgba(6, 182, 212, 0.05); /* leve tom ciano para identificação visual */
+}
+
+/* Alças de redimensionamento */
+.transform-handle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border: 1px solid #000;
+    box-sizing: border-box;
+    pointer-events: auto;        /* intercepta cliques para drag */
+}
+
+/* Cursor correspondente à orientação geométrica */
+.transform-handle.tl { top: -4px; left: -4px; cursor: nwse-resize; }
+.transform-handle.tc { top: -4px; left: calc(50% - 4px); cursor: ns-resize; }
+.transform-handle.tr { top: -4px; right: -4px; cursor: nesw-resize; }
+.transform-handle.ml { top: calc(50% - 4px); left: -4px; cursor: ew-resize; }
+.transform-handle.mr { top: calc(50% - 4px); right: -4px; cursor: ew-resize; }
+.transform-handle.bl { bottom: -4px; left: -4px; cursor: nesw-resize; }
+.transform-handle.bc { bottom: -4px; left: calc(50% - 4px); cursor: ns-resize; }
+.transform-handle.br { bottom: -4px; right: -4px; cursor: nwse-resize; }
+
+/* Linha e Alça de Rotação */
+.transform-rot-line {
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    width: 1px;
+    height: 20px;
+    background: var(--color-cyan);
+}
+.transform-handle-rot {
+    position: absolute;
+    top: -30px;
+    left: calc(50% - 4px);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-cyan);
+    border: 1px solid #fff;
+    box-sizing: border-box;
+    cursor: grab;
+    pointer-events: auto;
+}
+
+/* Ponto de Âncora (Centro) */
+.transform-anchor {
+    position: absolute;
+    top: calc(50% - 4px);
+    left: calc(50% - 4px);
+    width: 8px;
+    height: 8px;
+    pointer-events: none;
+}
+.transform-anchor::before, .transform-anchor::after {
+    content: '';
+    position: absolute;
+    background: var(--color-cyan);
+}
+.transform-anchor::before { top: 3px; left: -2px; width: 12px; height: 1px; }
+.transform-anchor::after { top: -2px; left: 3px; width: 1px; height: 12px; }
+
