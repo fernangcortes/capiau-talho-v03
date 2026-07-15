@@ -13,7 +13,7 @@ import json
 import cv2
 import numpy as np
 from pathlib import Path
-from src.vision.cv_utils import imread_unicode
+from src.vision.cv_utils import imread_unicode, imwrite_unicode
 from typing import List, Optional, Dict, Any, Tuple
 
 from src.config import CONFIG
@@ -727,7 +727,7 @@ class FaceService:
                 filename = f"face_vid_{video_id}_{int(timestamp)}_{face_idx}.jpg"
             
             crop_path = self.crops_dir / filename
-            cv2.imwrite(str(crop_path), crop)
+            imwrite_unicode(crop_path, crop)
             
             # S3 Upload in background
             try:

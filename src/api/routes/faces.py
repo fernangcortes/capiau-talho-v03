@@ -19,7 +19,7 @@ from src.db.repositories.entities import EntityRepository
 from src.nlp.enrichment_engine import enrich_after_face_labeling, enrich_photo, enrich_video_frames, enrich_in_background
 from src.services.face_service import get_face_service, FaceService
 from src.vision.face_pipeline import get_pipeline, FacePipeline
-from src.vision.cv_utils import imread_unicode
+from src.vision.cv_utils import imread_unicode, imwrite_unicode
 
 router = APIRouter(prefix="/api/faces", tags=["Faces"])
 
@@ -1052,8 +1052,10 @@ def get_face_thumbnail(face_id: int):
         if row["crop_path"]:
             crop_p = Path(row["crop_path"])
             if not crop_p.exists():
-                # Tenta resolver relativo à pasta de trabalho
-                crop_p = Path("c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP") / crop_p
+                # Tenta resolver relativo ao BASE_DIR ou usando apenas o nome
+                crop_p = CONFIG.BASE_DIR / crop_p
+                if not crop_p.exists():
+                    crop_p = CONFIG.BASE_DIR / "data/crops" / Path(row["crop_path"]).name
             
             if crop_p.exists():
                 return FileResponse(str(crop_p), media_type="image/jpeg", headers=cache_headers)
@@ -1093,11 +1095,28 @@ def get_face_thumbnail(face_id: int):
             else:
                 img_path = Path(row["photo_path"])
                 if not img_path.exists():
-                    img_path = Path("c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP") / img_path
+                    proj_rel_path = CONFIG.BASE_DIR / img_path
+                    if proj_rel_path.exists():
+                        img_path = proj_rel_path
+                    else:
+                        orig_path = CONFIG.ORIGINALS_DIR / img_path.name
+                        if orig_path.exists():
+                            img_path = orig_path
         elif row["video_id"] is not None:
             video_path = Path(row["video_path"])
             if not video_path.exists():
-                video_path = Path("c:/Users/FGC/Desktop/Capiau-Talho-Kimi_MVP") / video_path
+                proj_rel_path = CONFIG.BASE_DIR / video_path
+                if proj_rel_path.exists():
+                    video_path = proj_rel_path
+                else:
+                    orig_path = CONFIG.ORIGINALS_DIR / video_path.name
+                    if orig_path.exists():
+                        video_path = orig_path
+                    else:
+                        proxy_rel = f"proxy_vid_{row['video_id']}.mp4"
+                        proxy_path = CONFIG.PROXIES_DIR / proxy_rel
+                        if proxy_path.exists():
+                            video_path = proxy_path
                 
             if video_path.exists():
                 from src.vision.multimodal_engine import extract_frame_ffmpeg
@@ -1143,7 +1162,7 @@ def get_face_thumbnail(face_id: int):
         if crop.size == 0:
             raise HTTPException(status_code=500, detail="Crop dinâmico inválido.")
             
-        cv2.imwrite(str(out_crop_path), crop)
+        imwrite_unicode(out_crop_path, crop)
         return FileResponse(str(out_crop_path), media_type="image/jpeg", headers=cache_headers)
 
     except Exception as e:
