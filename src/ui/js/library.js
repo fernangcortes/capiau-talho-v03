@@ -562,6 +562,7 @@ export class LibraryManager {
         STATE.on("videosUpdated", (videos) => this.renderVideos(videos));
         STATE.on("photosUpdated", (photos) => this.renderPhotos(photos));
         STATE.on("projectChanged", () => this.reloadData());
+        STATE.on("leftTabChanged", (tabId) => this.updateSearchPlaceholder(tabId));
         STATE.on("activeVideoChanged", (video) => {
             document.querySelectorAll(".media-card.tree-file-item").forEach(el => {
                 if (video && el.getAttribute("data-video-id") == video.id) {
@@ -773,7 +774,26 @@ export class LibraryManager {
         const searchInput = document.getElementById("library-search-input");
         if (searchInput) {
             searchInput.addEventListener("input", () => {
+                // 1. Update Videos tab
                 STATE.emit("videosUpdated", STATE.allVideos);
+                
+                // 2. Update Photos tab
+                STATE.emit("photosUpdated", STATE.allPhotos);
+                
+                // 3. Update Docs tab
+                if (this.allDocuments) {
+                    this.renderDocuments(this.allDocuments);
+                }
+                
+                // 4. Update Themes tab
+                if (window.panelsManager && typeof window.panelsManager.renderThemesList === 'function') {
+                    window.panelsManager.renderThemesList();
+                }
+                
+                // 5. Update Faces tab
+                if (window.FaceManager && typeof window.FaceManager.renderFaceClusters === 'function') {
+                    window.FaceManager.renderFaceClusters();
+                }
             });
         }
 
@@ -804,6 +824,31 @@ export class LibraryManager {
         }
     }
 
+    updateSearchPlaceholder(tabId) {
+        const searchInput = document.getElementById("library-search-input");
+        if (!searchInput) return;
+        
+        switch (tabId) {
+            case "tab-videos":
+                searchInput.placeholder = "Buscar mídias...";
+                break;
+            case "tab-photos":
+                searchInput.placeholder = "Buscar fotos...";
+                break;
+            case "tab-themes":
+                searchInput.placeholder = "Buscar temas...";
+                break;
+            case "tab-docs":
+                searchInput.placeholder = "Buscar documentos...";
+                break;
+            case "tab-faces":
+                searchInput.placeholder = "Buscar rostos...";
+                break;
+            default:
+                searchInput.placeholder = "Buscar...";
+        }
+    }
+
     async reloadData() {
         try {
             const videos = await CapIAuAPI.fetchVideos(STATE.currentProjectId);
@@ -821,6 +866,7 @@ export class LibraryManager {
         this.docsListEl.innerHTML = "<div class='loading' style='font-size:11px; color:var(--text-muted);'>Carregando documentos...</div>";
         try {
             const docs = await CapIAuAPI.fetchDocuments(STATE.currentProjectId);
+            this.allDocuments = docs;
             this.renderDocuments(docs);
         } catch (e) {
             this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:11px; padding:8px;'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
@@ -831,12 +877,30 @@ export class LibraryManager {
         if (!this.docsListEl) return;
         this.docsListEl.innerHTML = "";
         
-        if (docs.length === 0) {
+        if (!docs || docs.length === 0) {
             this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:11px; padding:8px;'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
             return;
         }
+
+        // Apply search input query filter
+        const searchInput = document.getElementById("library-search-input");
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
         
-        docs.forEach(doc => {
+        let filtered = docs;
+        if (query) {
+            filtered = docs.filter(doc => {
+                const filename = (doc.filename || "").toLowerCase();
+                const type = (doc.doc_type || "").toLowerCase();
+                return filename.includes(query) || type.includes(query);
+            });
+        }
+        
+        if (filtered.length === 0) {
+            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:11px; padding:8px;'>Nenhum documento encontrado.</div>";
+            return;
+        }
+        
+        filtered.forEach(doc => {
             const card = document.createElement("div");
             card.className = "media-card";
             card.setAttribute("data-doc-id", doc.id);
@@ -959,12 +1023,31 @@ export class LibraryManager {
         if (!this.photoListEl) return;
         this.photoListEl.innerHTML = "";
         
-        if (photos.length === 0) {
+        if (!photos || photos.length === 0) {
             this.photoListEl.innerHTML = `<div class="empty-state-text">Nenhuma foto de set cadastrada.</div>`;
             return;
         }
 
-        photos.forEach(p => {
+        // Apply search input query filter
+        const searchInput = document.getElementById("library-search-input");
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        
+        let filtered = photos;
+        if (query) {
+            filtered = photos.filter(p => {
+                const title = (p.title || "").toLowerCase();
+                const desc = (p.description || "").toLowerCase();
+                const filename = (p.filename || "").toLowerCase();
+                return title.includes(query) || desc.includes(query) || filename.includes(query);
+            });
+        }
+        
+        if (filtered.length === 0) {
+            this.photoListEl.innerHTML = `<div class="empty-state-text">Nenhuma foto encontrada.</div>`;
+            return;
+        }
+
+        filtered.forEach(p => {
             const card = document.createElement("div");
             card.className = "photo-card";
             card.setAttribute("data-photo-id", p.id);

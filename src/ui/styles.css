@@ -5457,3 +5457,23 @@ select option, .nle-select option {
     color: var(--color-orange);
     border: 1px dashed var(--color-orange);
 }
+
+/* Harmonization of Left Sidebar Media Search with Header Search */
+.library-search-area {
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid var(--border-glass) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 0 2px 0 !important;
+    transition: border-bottom-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.library-search-area:focus-within {
+    border-bottom-color: var(--color-cyan) !important;
+    box-shadow: 0 1px 0 var(--color-cyan) !important;
+}
+
+.library-search-area input {
+    font-family: 'Outfit', sans-serif !important;
+}

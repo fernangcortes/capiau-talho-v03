@@ -1189,6 +1189,7 @@ window.addEventListener("DOMContentLoaded", () => {
     window.panelsManager = panels;
     const chat = new ChatManager();
     const projects = new ProjectsManager();
+    window.FaceManager = FaceManager;
     FaceManager.init();
     const settingsPanel = new SettingsPanelManager();
     window.settingsPanel = settingsPanel;
@@ -1407,6 +1408,13 @@ window.addEventListener("DOMContentLoaded", () => {
             }
             // Salva no localStorage
             localStorage.setItem("active-left-tab", btn.dataset.tab);
+            STATE.emit("leftTabChanged", btn.dataset.tab);
+            
+            // Dispatch input event to apply search filter immediately to the active tab
+            const searchInput = doc.getElementById("library-search-input");
+            if (searchInput) {
+                searchInput.dispatchEvent(new Event("input"));
+            }
         });
     });
 

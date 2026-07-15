@@ -1428,148 +1428,166 @@ export class PanelsManager {
         if (!this.themesContainer) return;
         try {
             const data = await CapIAuAPI.fetchThemes(STATE.currentProjectId);
-            this.themesContainer.innerHTML = "";
-            const themes = data.themes || [];
-            
-            if (themes.length === 0) {
-                this.themesContainer.innerHTML = `
-                    <div style="color:var(--text-muted); font-size:11px; padding:12px; text-align:center;">
-                        Nenhum tema catalogado ainda. Clique em "Agrupar Temas" no cabeçalho para gerar o clustering por IA!
-                    </div>
-                `;
-                return;
-            }
-            
-            themes.forEach(t => {
-                const card = document.createElement("div");
-                card.className = "media-card";
-                card.style.flexDirection = "column";
-                card.style.alignItems = "flex-start";
-                card.style.gap = "6px";
-                card.style.padding = "12px";
-
-                const segmentsBadge = t.segments_count
-                    ? `<span style="font-size: 9px; color: var(--color-emerald); background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 1px 7px; font-weight: 600;">${t.segments_count} trechos</span>`
-                    : "";
-
-                card.innerHTML = `
-                    <h4 style="color: var(--color-cyan); margin: 0; font-size: 12px; font-weight: 600; display:flex; align-items:center; gap:6px; width: 100%;"><i class="fa-solid fa-brain"></i> <span style="flex:1;">${t.title}</span> ${segmentsBadge}</h4>
-                    <p style="font-size: 11px; color: var(--text-secondary); margin: 0; line-height: 1.4; text-align: left;">${t.description}</p>
-                    <div style="display:flex; gap:6px; margin-top:6px; width: 100%; flex-wrap: wrap;">
-                        ${t.segments_count ? `<button class="btn-secondary btn-theme-segments" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--color-emerald); border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.06);" data-theme-id="${t.id}">
-                            <i class="fa-solid fa-clock"></i> Ver Trechos
-                        </button>` : ""}
-                        <button class="btn-primary btn-theme-search" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; border: none;" data-title="${t.title}">
-                            <i class="fa-solid fa-magnifying-glass"></i> Buscar Cortes
-                        </button>
-                        <button class="btn-secondary btn-theme-chat" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--text-primary); border: none;" data-title="${t.title}">
-                            <i class="fa-solid fa-comments"></i> Perguntar IA
-                        </button>
-                    </div>
-                    <div class="theme-segments-list" style="display: none; width: 100%; margin-top: 6px; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto;"></div>
-                `;
-
-                // Listener: expandir/recolher trechos do tema (com seek na mídia)
-                const segmentsBtn = card.querySelector(".btn-theme-segments");
-                if (segmentsBtn) {
-                    segmentsBtn.addEventListener("click", async (e) => {
-                        e.stopPropagation();
-                        const listEl = card.querySelector(".theme-segments-list");
-                        if (listEl.style.display !== "none") {
-                            listEl.style.display = "none";
-                            return;
-                        }
-                        listEl.style.display = "flex";
-                        listEl.innerHTML = `<span style="font-size: 10px; color: var(--text-muted);">Carregando trechos...</span>`;
-                        try {
-                            const data = await CapIAuAPI.fetchThemeSegments(t.id);
-                            const segments = data.segments || [];
-                            listEl.innerHTML = "";
-                            if (segments.length === 0) {
-                                listEl.innerHTML = `<span style="font-size: 10px; color: var(--text-muted);">Nenhum trecho registrado. Rode o agrupamento temático novamente.</span>`;
-                                return;
-                            }
-                            segments.forEach(seg => {
-                                const item = document.createElement("div");
-                                item.style.cssText = "display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 5px; cursor: pointer; transition: background 0.15s;";
-                                const isPhoto = seg.photo_id !== null && seg.photo_id !== undefined;
-                                const mediaLabel = isPhoto
-                                    ? `<i class="fa-solid fa-image"></i> ${seg.photo_filename || 'Foto ' + seg.photo_id}`
-                                    : `<i class="fa-solid fa-film"></i> ${seg.video_filename || 'Vídeo ' + seg.video_id} · ${formatTimecode(seg.start_time || 0).substring(3)}${seg.speaker_id ? ' · ' + seg.speaker_id : ''}`;
-                                item.innerHTML = `
-                                    <span style="font-size: 9px; font-weight: 700; color: var(--color-cyan);">${mediaLabel}</span>
-                                    <span style="font-size: 10px; color: var(--text-secondary); line-height: 1.35;">${(seg.text_excerpt || '').substring(0, 140)}${(seg.text_excerpt || '').length > 140 ? '…' : ''}</span>
-                                `;
-                                item.addEventListener("mouseenter", () => item.style.background = "rgba(6,182,212,0.08)");
-                                item.addEventListener("mouseleave", () => item.style.background = "rgba(255,255,255,0.03)");
-                                item.addEventListener("click", () => {
-                                    if (isPhoto) {
-                                        const photo = STATE.allPhotos.find(p => p.id === seg.photo_id);
-                                        if (photo && window.libraryManager) {
-                                            STATE.currentPhotoList = STATE.allPhotos;
-                                            STATE.currentPhotoIndex = STATE.allPhotos.indexOf(photo);
-                                            window.libraryManager.openLightbox(photo);
-                                        }
-                                    } else {
-                                        const video = STATE.allVideos.find(v => v.id === seg.video_id);
-                                        if (video) {
-                                            STATE.activeVideo = video;
-                                            setTimeout(() => {
-                                                const player = getActiveElement("source-video");
-                                                if (player) player.currentTime = seg.start_time || 0;
-                                            }, 350);
-                                        }
-                                    }
-                                });
-                                listEl.appendChild(item);
-                            });
-                        } catch (err) {
-                            listEl.innerHTML = `<span style="font-size: 10px; color: var(--color-rose);">Erro ao carregar trechos.</span>`;
-                        }
-                    });
-                }
-
-                // Listeners
-                const searchBtn = card.querySelector(".btn-theme-search");
-                searchBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    const title = searchBtn.getAttribute("data-title");
-                    const searchInput = document.getElementById("semantic-search-input");
-                    const filterSelect = document.getElementById("search-filter");
-                    if (searchInput) {
-                        searchInput.value = title;
-                        if (filterSelect) filterSelect.value = ""; // todas as mídias
-                        window.runSemanticSearch();
-                    }
-                });
-                
-                const chatBtn = card.querySelector(".btn-theme-chat");
-                chatBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    const title = chatBtn.getAttribute("data-title");
-                    
-                    // Alternar para aba do chat
-                    const btnTabChat = document.getElementById("btn-tab-chat");
-                    if (btnTabChat) {
-                        btnTabChat.click();
-                    }
-                    
-                    // Preencher input do chat e disparar
-                    setTimeout(() => {
-                        const chatTextarea = document.getElementById("chat-input-textarea");
-                        const chatSendBtn = document.getElementById("chat-send-btn");
-                        if (chatTextarea && chatSendBtn) {
-                            chatTextarea.value = `Quais mídias e reflexões temos relacionadas ao tema '${title}'?`;
-                            chatSendBtn.click();
-                        }
-                    }, 100);
-                });
-                
-                this.themesContainer.appendChild(card);
-            });
+            this.allThemes = data.themes || [];
+            this.renderThemesList();
         } catch (e) {
             this.themesContainer.innerHTML = `<div class="empty-state-text">Erro ao carregar temas.</div>`;
         }
+    }
+
+    renderThemesList() {
+        if (!this.themesContainer) return;
+        this.themesContainer.innerHTML = "";
+        const themes = this.allThemes || [];
+        
+        const searchInput = document.getElementById("library-search-input");
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        
+        let filtered = themes;
+        if (query) {
+            filtered = themes.filter(t => {
+                const title = (t.title || "").toLowerCase();
+                const desc = (t.description || "").toLowerCase();
+                return title.includes(query) || desc.includes(query);
+            });
+        }
+        
+        if (filtered.length === 0) {
+            this.themesContainer.innerHTML = `
+                <div style="color:var(--text-muted); font-size:11px; padding:12px; text-align:center;">
+                    Nenhum tema encontrado.
+                </div>
+            `;
+            return;
+        }
+        
+        filtered.forEach(t => {
+            const card = document.createElement("div");
+            card.className = "media-card";
+            card.style.flexDirection = "column";
+            card.style.alignItems = "flex-start";
+            card.style.gap = "6px";
+            card.style.padding = "12px";
+
+            const segmentsBadge = t.segments_count
+                ? `<span style="font-size: 9px; color: var(--color-emerald); background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 1px 7px; font-weight: 600;">${t.segments_count} trechos</span>`
+                : "";
+
+            card.innerHTML = `
+                <h4 style="color: var(--color-cyan); margin: 0; font-size: 12px; font-weight: 600; display:flex; align-items:center; gap:6px; width: 100%;"><i class="fa-solid fa-brain"></i> <span style="flex:1;">${t.title}</span> ${segmentsBadge}</h4>
+                <p style="font-size: 11px; color: var(--text-secondary); margin: 0; line-height: 1.4; text-align: left;">${t.description}</p>
+                <div style="display:flex; gap:6px; margin-top:6px; width: 100%; flex-wrap: wrap;">
+                    ${t.segments_count ? `<button class="btn-secondary btn-theme-segments" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--color-emerald); border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.06);" data-theme-id="${t.id}">
+                        <i class="fa-solid fa-clock"></i> Ver Trechos
+                    </button>` : ""}
+                    <button class="btn-primary btn-theme-search" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; border: none;" data-title="${t.title}">
+                        <i class="fa-solid fa-magnifying-glass"></i> Buscar Cortes
+                    </button>
+                    <button class="btn-secondary btn-theme-chat" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--text-primary); border: none;" data-title="${t.title}">
+                        <i class="fa-solid fa-comments"></i> Perguntar IA
+                    </button>
+                </div>
+                <div class="theme-segments-list" style="display: none; width: 100%; margin-top: 6px; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto;"></div>
+            `;
+
+            // Listener: expandir/recolher trechos do tema (com seek na mídia)
+            const segmentsBtn = card.querySelector(".btn-theme-segments");
+            if (segmentsBtn) {
+                segmentsBtn.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    const listEl = card.querySelector(".theme-segments-list");
+                    if (listEl.style.display !== "none") {
+                        listEl.style.display = "none";
+                        return;
+                    }
+                    listEl.style.display = "flex";
+                    listEl.innerHTML = `<span style="font-size: 10px; color: var(--text-muted);">Carregando trechos...</span>`;
+                    try {
+                        const data = await CapIAuAPI.fetchThemeSegments(t.id);
+                        const segments = data.segments || [];
+                        listEl.innerHTML = "";
+                        if (segments.length === 0) {
+                            listEl.innerHTML = `<span style="font-size: 10px; color: var(--text-muted);">Nenhum trecho registrado. Rode o agrupamento temático novamente.</span>`;
+                            return;
+                        }
+                        segments.forEach(seg => {
+                            const item = document.createElement("div");
+                            item.style.cssText = "display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 5px; cursor: pointer; transition: background 0.15s;";
+                            const isPhoto = seg.photo_id !== null && seg.photo_id !== undefined;
+                            const mediaLabel = isPhoto
+                                ? `<i class="fa-solid fa-image"></i> ${seg.photo_filename || 'Foto ' + seg.photo_id}`
+                                : `<i class="fa-solid fa-film"></i> ${seg.video_filename || 'Vídeo ' + seg.video_id} · ${formatTimecode(seg.start_time || 0).substring(3)}${seg.speaker_id ? ' · ' + seg.speaker_id : ''}`;
+                            item.innerHTML = `
+                                <span style="font-size: 9px; font-weight: 700; color: var(--color-cyan);">${mediaLabel}</span>
+                                <span style="font-size: 10px; color: var(--text-secondary); line-height: 1.35;">${(seg.text_excerpt || '').substring(0, 140)}${(seg.text_excerpt || '').length > 140 ? '…' : ''}</span>
+                            `;
+                            item.addEventListener("mouseenter", () => item.style.background = "rgba(6,182,212,0.08)");
+                            item.addEventListener("mouseleave", () => item.style.background = "rgba(255,255,255,0.03)");
+                            item.addEventListener("click", () => {
+                                if (isPhoto) {
+                                    const photo = STATE.allPhotos.find(p => p.id === seg.photo_id);
+                                    if (photo && window.libraryManager) {
+                                        STATE.currentPhotoList = STATE.allPhotos;
+                                        STATE.currentPhotoIndex = STATE.allPhotos.indexOf(photo);
+                                        window.libraryManager.openLightbox(photo);
+                                    }
+                                } else {
+                                    const video = STATE.allVideos.find(v => v.id === seg.video_id);
+                                    if (video) {
+                                        STATE.activeVideo = video;
+                                        setTimeout(() => {
+                                            const player = getActiveElement("source-video");
+                                            if (player) player.currentTime = seg.start_time || 0;
+                                        }, 350);
+                                    }
+                                }
+                            });
+                            listEl.appendChild(item);
+                        });
+                    } catch (err) {
+                        listEl.innerHTML = `<span style="font-size: 10px; color: var(--color-rose);">Erro ao carregar trechos.</span>`;
+                    }
+                });
+            }
+
+            // Listeners
+            const searchBtn = card.querySelector(".btn-theme-search");
+            searchBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const title = searchBtn.getAttribute("data-title");
+                const searchInput = document.getElementById("semantic-search-input");
+                const filterSelect = document.getElementById("search-filter");
+                if (searchInput) {
+                    searchInput.value = title;
+                    if (filterSelect) filterSelect.value = ""; // todas as mídias
+                    window.runSemanticSearch();
+                }
+            });
+            
+            const chatBtn = card.querySelector(".btn-theme-chat");
+            chatBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const title = chatBtn.getAttribute("data-title");
+                
+                // Alternar para aba do chat
+                const btnTabChat = document.getElementById("btn-tab-chat");
+                if (btnTabChat) {
+                    btnTabChat.click();
+                }
+                
+                // Preencher input do chat e disparar
+                setTimeout(() => {
+                    const chatTextarea = document.getElementById("chat-input-textarea");
+                    const chatSendBtn = document.getElementById("chat-send-btn");
+                    if (chatTextarea && chatSendBtn) {
+                        chatTextarea.value = `Quais mídias e reflexões temos relacionadas ao tema '${title}'?`;
+                        chatSendBtn.click();
+                    }
+                }, 100);
+            });
+            
+            this.themesContainer.appendChild(card);
+        });
     }
 
     renderTimeline(cuts) {

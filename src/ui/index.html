@@ -130,9 +130,11 @@
                 </div>
                 
                 <div class="library-toolbar" id="library-filter-bar" style="padding: 8px 12px; border-bottom: 1px solid var(--border-glass); display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.15); position: relative;">
-                    <!-- Linha 1: Campo de Busca e Configurações -->
                     <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
-                        <input type="text" id="library-search-input" placeholder="Buscar mídias..." style="flex: 1; min-width: 0; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 4px 8px; font-size: 10px; color: #fff; outline: none;">
+                        <div class="search-area glassmorphism library-search-area" style="flex: 1; display: flex; align-items: center; gap: 6px; height: 28px; width: 100%;">
+                            <i class="fa-solid fa-magnifying-glass search-icon" style="color: var(--text-muted); font-size: 10px;"></i>
+                            <input type="text" id="library-search-input" placeholder="Buscar mídias..." style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; font-size: 10px; color: #fff;">
+                        </div>
                         <button id="btn-library-display-settings" title="Opções de Exibição" style="background: transparent; border: none; padding: 4px; color: var(--color-cyan); cursor: pointer; font-size: 13px; transition: all 0.2s; flex-shrink: 0;"><i class="fa-solid fa-gear"></i></button>
                     </div>
 

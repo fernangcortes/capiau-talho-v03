@@ -241,97 +241,125 @@ export class FaceManager {
                 CapIAuAPI.fetchProjectSpeakers(projectId).catch(() => [])
             ]);
 
+            this.allClusters = clusters;
+            this.allSpeakers = speakers;
+
             // Update global datalist for speakers autocompletion
             this.updateSpeakersDatalist(speakers);
 
-            if (!clusters || clusters.length === 0) {
-                container.innerHTML = '<div class="empty-state-text">Nenhum rosto agrupado ainda. Clique em "Agrupar Rostos" acima.</div>';
-                return;
-            }
-
-            container.innerHTML = "";
-            clusters.forEach(cluster => {
-                const card = document.createElement("div");
-                card.className = "face-cluster-card";
-                card.dataset.clusterId = cluster.cluster_id;
-
-                const thumbUrl = `/api/faces/face/${cluster.rep_face_id}/thumbnail`;
-                const occurrencesText = cluster.occurrences === 1 ? "1 aparição" : `${cluster.occurrences} aparições`;
-
-                // If name is the placeholder (e.g. Pessoa Desconhecida...), show empty input value or placeholder
-                const isPlaceholder = cluster.name && cluster.name.startsWith("Pessoa Desconhecida");
-                const inputValue = isPlaceholder ? "" : (cluster.name || "");
-                const inputPlaceholder = isPlaceholder ? cluster.name : "Quem é esta pessoa?";
-
-                card.innerHTML = `
-                    <img class="face-cluster-thumb" src="${thumbUrl}" alt="Crop do rosto" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22><rect width=%2248%22 height=%2248%22 fill=%22%23222%22/><text x=%2250%%22 y=%2250%%22 font-size=%2216%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23666%22>?</text></svg>'">
-                    <div class="face-cluster-info">
-                        <div class="face-cluster-meta">
-                            <span class="face-cluster-id">Grupo ${cluster.cluster_id + 1}</span>
-                            <span class="face-cluster-count">${occurrencesText}</span>
-                        </div>
-                        <input class="face-cluster-input" type="text" list="speakers-datalist" value="${inputValue}" placeholder="${inputPlaceholder}">
-                    </div>
-                `;
-
-                const inputEl = card.querySelector(".face-cluster-input");
-                
-                // Handle naming change
-                let isChanging = false;
-                const saveName = async () => {
-                    if (isChanging) return;
-                    const newName = inputEl.value.trim();
-                    const oldName = cluster.name;
-                    
-                    // Don't save if empty or same
-                    if (newName === (isPlaceholder ? "" : oldName)) return;
-
-                    isChanging = true;
-                    try {
-                        const res = await CapIAuAPI.labelFace(cluster.rep_face_id, newName);
-                        if (res && res.status === "conflict") {
-                            // Revert input value before modal
-                            inputEl.value = isPlaceholder ? "" : oldName;
-                            
-                            // Open Conflict / Disambiguation Modal
-                            this.openDisambiguationModal({
-                                faceId: cluster.rep_face_id,
-                                currentClusterId: res.current_cluster_id,
-                                existingClusterId: res.existing_cluster_id,
-                                targetName: res.target_name
-                            });
-                        } else {
-                            // Success, reload
-                            await this.loadFaceClusters();
-                        }
-                    } catch (e) {
-                        console.error("[FaceManager] Error labeling face:", e);
-                        alert("Erro ao salvar o nome.");
-                    } finally {
-                        isChanging = false;
-                    }
-                };
-
-                inputEl.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") {
-                        inputEl.blur();
-                    }
-                });
-                inputEl.addEventListener("blur", saveName);
-
-                // Click card (outside input) to manage/edit group
-                card.addEventListener("click", (e) => {
-                    if (e.target.closest(".face-cluster-input")) return;
-                    this.openGroupManagerModal(cluster);
-                });
-
-                container.appendChild(card);
-            });
-
+            this.renderFaceClusters();
         } catch (e) {
             console.error("[FaceManager] Error loading face clusters:", e);
             container.innerHTML = '<div class="empty-state-text">Erro ao carregar os grupos de rostos.</div>';
         }
+    }
+
+    static renderFaceClusters() {
+        const container = document.getElementById("face-clusters-list");
+        if (!container) return;
+
+        const clusters = this.allClusters || [];
+        container.innerHTML = "";
+        
+        if (clusters.length === 0) {
+            container.innerHTML = '<div class="empty-state-text">Nenhum rosto agrupado ainda. Clique em "Agrupar Rostos" acima.</div>';
+            return;
+        }
+
+        const searchInput = document.getElementById("library-search-input");
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        
+        let filtered = clusters;
+        if (query) {
+            filtered = clusters.filter(cluster => {
+                const name = (cluster.name || "").toLowerCase();
+                const groupText = `grupo ${cluster.cluster_id + 1}`;
+                return name.includes(query) || groupText.includes(query);
+            });
+        }
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="empty-state-text">Nenhum grupo de rosto encontrado.</div>';
+            return;
+        }
+
+        filtered.forEach(cluster => {
+            const card = document.createElement("div");
+            card.className = "face-cluster-card";
+            card.dataset.clusterId = cluster.cluster_id;
+
+            const thumbUrl = `/api/faces/face/${cluster.rep_face_id}/thumbnail`;
+            const occurrencesText = cluster.occurrences === 1 ? "1 aparição" : `${cluster.occurrences} aparições`;
+
+            // If name is the placeholder (e.g. Pessoa Desconhecida...), show empty input value or placeholder
+            const isPlaceholder = cluster.name && cluster.name.startsWith("Pessoa Desconhecida");
+            const inputValue = isPlaceholder ? "" : (cluster.name || "");
+            const inputPlaceholder = isPlaceholder ? cluster.name : "Quem é esta pessoa?";
+
+            card.innerHTML = `
+                <img class="face-cluster-thumb" src="${thumbUrl}" alt="Crop do rosto" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22><rect width=%2248%22 height=%2248%22 fill=%22%23222%22/><text x=%2250%%22 y=%2250%%22 font-size=%2216%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23666%22>?</text></svg>'">
+                <div class="face-cluster-info">
+                    <div class="face-cluster-meta">
+                        <span class="face-cluster-id">Grupo ${cluster.cluster_id + 1}</span>
+                        <span class="face-cluster-count">${occurrencesText}</span>
+                    </div>
+                    <input class="face-cluster-input" type="text" list="speakers-datalist" value="${inputValue}" placeholder="${inputPlaceholder}">
+                </div>
+            `;
+
+            const inputEl = card.querySelector(".face-cluster-input");
+            
+            // Handle naming change
+            let isChanging = false;
+            const saveName = async () => {
+                if (isChanging) return;
+                const newName = inputEl.value.trim();
+                const oldName = cluster.name;
+                
+                // Don't save if empty or same
+                if (newName === (isPlaceholder ? "" : oldName)) return;
+
+                isChanging = true;
+                try {
+                    const res = await CapIAuAPI.labelFace(cluster.rep_face_id, newName);
+                    if (res && res.status === "conflict") {
+                        // Revert input value before modal
+                        inputEl.value = isPlaceholder ? "" : oldName;
+                        
+                        // Open Conflict / Disambiguation Modal
+                        this.openDisambiguationModal({
+                            faceId: cluster.rep_face_id,
+                            currentClusterId: res.current_cluster_id,
+                            existingClusterId: res.existing_cluster_id,
+                            targetName: res.target_name
+                        });
+                    } else {
+                        // Success, reload
+                        await this.loadFaceClusters();
+                    }
+                } catch (e) {
+                    console.error("[FaceManager] Error labeling face:", e);
+                    alert("Erro ao salvar o nome.");
+                } finally {
+                    isChanging = false;
+                }
+            };
+
+            inputEl.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    inputEl.blur();
+                }
+            });
+            inputEl.addEventListener("blur", saveName);
+
+            // Click card (outside input) to manage/edit group
+            card.addEventListener("click", (e) => {
+                if (e.target.closest(".face-cluster-input")) return;
+                this.openGroupManagerModal(cluster);
+            });
+
+            container.appendChild(card);
+        });
     }
 
     static updateSpeakersDatalist(speakers) {
