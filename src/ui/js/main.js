@@ -1251,7 +1251,7 @@ window.addEventListener("DOMContentLoaded", () => {
             window.dispatchEvent(new Event("resize"));
         } else if (side === "timeline" && timelinePanel && reopenTimeline) {
             timelinePanel.classList.add("collapsed");
-            reopenTimeline.classList.add("visible");
+            reopenTimeline.style.display = "block";
             window.dispatchEvent(new Event("resize"));
         }
     };
@@ -1267,7 +1267,7 @@ window.addEventListener("DOMContentLoaded", () => {
             window.dispatchEvent(new Event("resize"));
         } else if (side === "timeline" && timelinePanel && reopenTimeline) {
             timelinePanel.classList.remove("collapsed");
-            reopenTimeline.classList.remove("visible");
+            reopenTimeline.style.display = "none";
             window.dispatchEvent(new Event("resize"));
         }
     };

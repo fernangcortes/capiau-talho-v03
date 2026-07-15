@@ -367,15 +367,17 @@ export class WorkspaceManager {
             // Linha superior no topo do workspace; timeline extraída para baixo (full-width)
             workspace.appendChild(this.studioTop);
             workspace.appendChild(timelinePanel);
+            if (reopenTimeline) {
+                workspace.appendChild(reopenTimeline);
+            }
 
             document.body.classList.add("studio");
             this.initStudioSplitters();
         } else {
-            // Timeline volta para dentro de center-stage (antes do seu reopen fixo)
-            if (reopenTimeline && reopenTimeline.parentNode === centerStage) {
-                centerStage.insertBefore(timelinePanel, reopenTimeline);
-            } else {
-                centerStage.appendChild(timelinePanel);
+            // Timeline volta para dentro de center-stage (como irmão direto antes da linha restauradora)
+            centerStage.appendChild(timelinePanel);
+            if (reopenTimeline) {
+                centerStage.appendChild(reopenTimeline);
             }
             // Restaura a ordem original dos filhos do workspace
             workspace.appendChild(sidebarLeft);
