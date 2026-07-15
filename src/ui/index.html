@@ -257,25 +257,28 @@
 
                     <!-- Tab: Rostos -->
                     <div class="tab-content" id="tab-faces">
-                        <div class="faces-section" style="padding: 12px; display:flex; flex-direction:column; gap:10px;">
-                            <div style="display:flex; gap:8px;">
-                                <button id="btn-cluster-faces" class="btn-primary" style="font-size:11px; padding:8px 12px; display:flex; align-items:center; justify-content:center; gap:6px; height: 32px; flex: 1;">
-                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Agrupar (DBSCAN)
-                                </button>
-                                <button id="btn-fullscreen-faces" class="btn-secondary" style="font-size:11px; padding:8px 12px; display:flex; align-items:center; justify-content:center; gap:6px; height: 32px; flex: 1; border: 1px solid rgba(139, 92, 246, 0.3); color: var(--color-purple);">
-                                    <i class="fa-solid fa-expand"></i> Tela Cheia
-                                </button>
-                            </div>
-                            <button id="btn-manage-names" class="btn-secondary" style="font-size:11px; padding:8px 12px; display:flex; align-items:center; justify-content:center; gap:6px; height: 32px; border: 1px solid rgba(6, 182, 212, 0.3); color: var(--color-cyan); background: transparent; cursor: pointer; transition: all 0.2s; border-radius: 4px; width: 100%;">
-                                <i class="fa-solid fa-user-gear"></i> Gerenciar Nomes/Pessoas
+                        <div class="panel-sub-actions" style="display: flex; align-items: center; justify-content: flex-start; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.12); flex-shrink: 0;">
+                            <button id="btn-cluster-faces" class="flat-sub-btn violet-btn" data-tooltip="Agrupar rostos usando DBSCAN (CLIP + Embeddings)">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                <span class="btn-text">Agrupar</span>
                             </button>
-
+                            <button id="btn-manage-names" class="flat-sub-btn cyan-btn" data-tooltip="Gerenciar nomes e pessoas cadastradas">
+                                <i class="fa-solid fa-user-gear"></i>
+                                <span class="btn-text">Gerenciar</span>
+                            </button>
+                            <button id="clustering-settings-toggle" class="flat-sub-btn violet-btn" data-tooltip="Ajustes de Agrupamento">
+                                <i class="fa-solid fa-sliders"></i>
+                                <span class="btn-text">Ajustes</span>
+                                <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 8px; transition: transform 0.2s;"></i>
+                            </button>
+                            <button id="btn-fullscreen-faces" class="flat-sub-btn violet-btn" data-tooltip="Alternar visualização em tela cheia">
+                                <i class="fa-solid fa-expand"></i>
+                                <span class="btn-text">Cheia</span>
+                            </button>
+                        </div>
+                        <div class="faces-section" style="padding: 12px; display:flex; flex-direction:column; gap:10px; flex: 1; overflow-y: auto;">
                             <!-- Painel de Configurações do Agrupamento -->
-                            <div id="clustering-settings-toggle" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-secondary); padding: 6px 8px; border-radius: 4px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); user-select: none;">
-                                <span><i class="fa-solid fa-sliders" style="margin-right: 4px; color: var(--color-purple);"></i> Ajustes de Agrupamento</span>
-                                <i class="fa-solid fa-chevron-down toggle-icon" style="transition: transform 0.2s;"></i>
-                            </div>
-                            <div id="clustering-settings-panel" style="display: none; flex-direction: column; gap: 8px; padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); font-size: 11px;">
+                            <div id="clustering-settings-panel" style="display: none; flex-direction: column; gap: 8px; padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); font-size: 11px; margin-bottom: 8px;">
                                 <div style="display: flex; flex-direction: column; gap: 4px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center;">
                                         <span style="color: var(--text-secondary);">Tolerância (Epsilon):</span>

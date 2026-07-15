@@ -180,7 +180,7 @@ export class FaceManager {
 
         const originalText = btnCluster.innerHTML;
         btnCluster.disabled = true;
-        btnCluster.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Agrupando...';
+        btnCluster.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span class="btn-text">Agrupando...</span>';
 
         try {
             const res = await CapIAuAPI.clusterFaces(STATE.currentProjectId, eps, minSamples);

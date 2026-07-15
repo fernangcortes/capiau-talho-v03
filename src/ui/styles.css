@@ -521,6 +521,17 @@ button {
     display: block;
 }
 
+#tab-faces {
+    display: none;
+    height: 100%;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+}
+#tab-faces.active {
+    display: flex;
+}
+
 /* ── SIDEBAR RESTORE LINES (IN FLOW FLEXBOX) ────────────────────────── */
 .left-restore-line,
 .right-restore-line {
@@ -1748,6 +1759,16 @@ button {
     color: var(--color-cyan) !important;
     text-shadow: 0 0 8px var(--color-cyan);
     transform: scale(1.05);
+}
+
+.flat-sub-btn.cyan-btn:hover {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan) !important;
+}
+
+.flat-sub-btn.violet-btn:hover {
+    color: var(--color-violet) !important;
+    text-shadow: 0 0 8px var(--color-violet) !important;
 }
 
 .block-speech {
