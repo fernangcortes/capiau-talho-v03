@@ -140,3 +140,26 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
     há mais cabeçalho/controles ocupando espaço fixo no fluxo.
 * **Referência de implementação:** ver o layout "Estúdio" (`body.studio .player-panel/.player-header/.player-controls`
   em `styles.css`), que reaproveita esse padrão para os monitores Source/Program empilhados.
+
+---
+
+## 8. Abas Customizáveis dos Menus Laterais (Sidebar Tabs)
+
+* **Objetivo:** Permitir ao usuário reordenar as abas livremente por arrasto (drag and drop) e controlar a visibilidade de cada uma (show/hide), mantendo a integridade da interface clássica de edição.
+* **Diretrizes:**
+  * **Visualização Baseada em Estados (3 Níveis):**
+    * **Normal (Largura $\ge 320\text{px}$):** Exibe **apenas o texto** da aba. Os ícones devem ser ocultados com a regra:
+      ```css
+      .sidebar-normal .media-tabs .tab-btn i {
+          display: none !important;
+      }
+      ```
+    * **Compacto / Mínimo (Largura $< 320\text{px}$):** Exibe **apenas o ícone** da aba. Os textos são ocultados com `display: none !important`.
+  * **Intercambialidade (Drag & Drop):**
+    * Todos os botões de aba (`.tab-btn`) devem conter o atributo `draggable="true"`.
+    * A reordenação deve ser processada dinamicamente no DOM no evento `dragover` do contêiner `.media-tabs` (`#left-tabs` e `#right-tabs`).
+    * A ordenação deve ser persistida localmente com chaves `left-tabs-order` e `right-tabs-order`.
+  * **Visibilidade Dinâmica (Show/Hide):**
+    * O clique com o botão direito (`contextmenu`) na barra de abas deve abrir um menu de contexto customizado (`.custom-context-menu`) listando todas as abas com checkboxes.
+    * A visibilidade deve ser persistida com chaves `left-tabs-visibility` e `right-tabs-visibility`.
+    * **Troca de Foco:** Se o usuário desativar a visibilidade da aba que está ativa no momento, a aplicação deve selecionar reativamente a primeira aba visível restante no menu correspondente.
