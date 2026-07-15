@@ -1,6 +1,7 @@
 // Controlador de Interatividade, Cliques e Atalhos da Timeline (CapIAu-Talho)
 import { STATE } from "./state.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds } from "./timelineState.js";
+import { setTabVisibility } from "./tabsCustomization.js";
 
 export class CapiauTimelineInteraction {
     constructor(renderer) {
@@ -49,6 +50,21 @@ export class CapiauTimelineInteraction {
 
         // Keyboard Listener global
         win.addEventListener("keydown", this.boundKeyDown);
+
+        // Ouvir mudança de abas no painel esquerdo para atualizar ajustes
+        STATE.on("leftTabChanged", (tabId) => {
+            if (tabId === "tab-adjustments") {
+                this.refreshClipInspector();
+            }
+        });
+
+        // Ouvir restauração do histórico (undo/redo) para sincronizar o painel
+        STATE.on("timelineRestored", () => {
+            this.refreshClipInspector();
+            if (this.renderer) {
+                this.renderer.requestRedraw();
+            }
+        });
     }
 
     removeListeners() {
@@ -196,7 +212,7 @@ export class CapiauTimelineInteraction {
                         TIMELINE_STATE.selectedClipId = clip.id;
                         TIMELINE_STATE.selectedTrack = track;
                         this.syncPlayerToClip(clip);
-                        this.refreshPhotoInspector();
+                        this.refreshClipInspector();
                         this.renderer.requestRedraw();
                         return;
                     }
@@ -245,7 +261,7 @@ export class CapiauTimelineInteraction {
                 TIMELINE_STATE.selectedClipId = null;
                 TIMELINE_STATE.selectedGhostClipId = null;
             }
-            this.refreshPhotoInspector();
+            this.refreshClipInspector();
             this.renderer.requestRedraw();
         }
     }
@@ -344,42 +360,61 @@ export class CapiauTimelineInteraction {
         }
     }
 
-    // ── INSPETOR DE CLIPE DE FOTO (enquadramento / Ken Burns / fades) ──
+    // ── INSPETOR E AJUSTES DE CLIPE DE TIMELINE ──
 
-    /** Mostra o inspetor se o clipe selecionado for foto; senão oculta. */
-    refreshPhotoInspector() {
+    /** Mostra os ajustes se houver um clipe selecionado; senão limpa. */
+    refreshClipInspector() {
         const clip = STATE.activeTimelineCuts.find(c => c.id === TIMELINE_STATE.selectedClipId);
-        if (clip && clip.type === "photo") this.showPhotoInspector(clip);
-        else this.hidePhotoInspector();
+        if (clip) {
+            this.showClipInspector(clip);
+        } else {
+            this.renderAdjustmentsPanel(null);
+        }
+        STATE.emit("timelineSelectionChanged", TIMELINE_STATE.selectedClipId);
     }
 
-    hidePhotoInspector() {
-        const panel = this.canvas.ownerDocument.querySelector("#timeline-photo-inspector");
-        if (panel) panel.style.display = "none";
+    showClipInspector(clip) {
+        // Renderiza o painel de ajustes na aba correspondente
+        this.renderAdjustmentsPanel(clip);
+
+        // Abre automaticamente a aba de ajustes no menu esquerdo
+        const tabBtn = this.canvas.ownerDocument.querySelector('.sidebar-left .tab-btn[data-tab="tab-adjustments"]');
+        if (tabBtn) {
+            if (tabBtn.style.display === "none") {
+                setTabVisibility("tab-adjustments", true);
+            }
+            if (!tabBtn.classList.contains("active")) {
+                tabBtn.click();
+            }
+        }
     }
 
-    /** Aplica uma mutação nos effects do clipe de foto (com undo) e re-renderiza o painel. */
-    _mutatePhotoEffects(clipId, fn) {
+    _mutateClipEffects(clipId, fn) {
         TIMELINE_HISTORY.record(() => {
             const cuts = [...STATE.activeTimelineCuts];
             const clip = cuts.find(c => c.id === clipId);
-            if (!clip || clip.type !== "photo") return;
+            if (!clip) return;
             clip.effects = clip.effects ? clip.effects.map(e => ({ ...e })) : [];
             fn(clip);
             STATE.activeTimelineCuts = cuts; // dispara recomposição do Program + redraw
         });
-        const clip = STATE.activeTimelineCuts.find(c => c.id === clipId);
-        if (clip) this.showPhotoInspector(clip);
+        const selected = STATE.activeTimelineCuts.find(c => c.id === TIMELINE_STATE.selectedClipId);
+        if (selected) {
+            this.showClipInspector(selected);
+        } else {
+            const clip = STATE.activeTimelineCuts.find(c => c.id === clipId);
+            if (clip) this.showClipInspector(clip);
+        }
     }
 
-    setPhotoFit(clipId, mode) {
-        this._mutatePhotoEffects(clipId, (clip) => {
+    setClipFit(clipId, mode) {
+        this._mutateClipEffects(clipId, (clip) => {
             clip.effects = clip.effects.filter(e => e.type !== "fit");
             clip.effects.push({ type: "fit", mode });
         });
     }
 
-    setPhotoKenBurns(clipId, preset) {
+    setClipKenBurns(clipId, preset) {
         const presets = {
             none: null,
             zoomIn: { from: { scale: 1, x: 0, y: 0 }, to: { scale: 1.25, x: 0, y: 0 } },
@@ -387,87 +422,847 @@ export class CapiauTimelineInteraction {
             panRight: { from: { scale: 1.18, x: 6, y: 0 }, to: { scale: 1.18, x: -6, y: 0 } },
             panLeft: { from: { scale: 1.18, x: -6, y: 0 }, to: { scale: 1.18, x: 6, y: 0 } }
         };
-        this._mutatePhotoEffects(clipId, (clip) => {
+        this._mutateClipEffects(clipId, (clip) => {
             clip.effects = clip.effects.filter(e => e.type !== "ken_burns");
             const cfg = presets[preset];
             if (cfg) clip.effects.push({ type: "ken_burns", preset, easing: "easeInOut", ...cfg });
         });
     }
 
-    setPhotoFade(clipId, side, dur) {
-        this._mutatePhotoEffects(clipId, (clip) => {
+    setClipTransform(clipId, key, value) {
+        this._mutateClipEffects(clipId, (clip) => {
+            let tf = clip.effects.find(e => e.type === "transform");
+            if (!tf) {
+                tf = { type: "transform", scale: 1.0, x: 0, y: 0, rotation: 0, opacity: 1.0 };
+                clip.effects.push(tf);
+            }
+            tf[key] = value;
+        });
+    }
+
+    setClipColor(clipId, key, value) {
+        this._mutateClipEffects(clipId, (clip) => {
+            let col = clip.effects.find(e => e.type === "color");
+            if (!col) {
+                col = { type: "color", brightness: 0, contrast: 0, saturation: 100, hue: 0, sepia: 0, grayscale: 0, blur: 0 };
+                clip.effects.push(col);
+            }
+            col[key] = value;
+        });
+    }
+
+    setClipCrop(clipId, key, value) {
+        this._mutateClipEffects(clipId, (clip) => {
+            let crop = clip.effects.find(e => e.type === "crop");
+            if (!crop) {
+                crop = { type: "crop", top: 0, right: 0, bottom: 0, left: 0 };
+                clip.effects.push(crop);
+            }
+            crop[key] = value;
+        });
+    }
+
+    setClipVolume(clipId, level) {
+        this._mutateClipEffects(clipId, (clip) => {
+            clip.effects = clip.effects.filter(e => e.type !== "volume");
+            clip.effects.push({ type: "volume", level });
+        });
+    }
+
+    setClipFade(clipId, side, dur) {
+        this._mutateClipEffects(clipId, (clip) => {
             clip.effects = clip.effects.filter(e => !(e.type === "crossfade" && e.side === side));
             if (dur > 0) clip.effects.push({ type: "crossfade", side, duration_s: dur });
         });
     }
 
-    /** Painel flutuante de ajustes do clipe de foto selecionado. */
-    showPhotoInspector(clip) {
-        const doc = this.canvas.ownerDocument;
-        const win = doc.defaultView || window;
-        let panel = doc.querySelector("#timeline-photo-inspector");
-        if (!panel) {
-            panel = doc.createElement("div");
-            panel.id = "timeline-photo-inspector";
-            panel.style.cssText = `position: fixed; z-index: 10002; background: rgba(15,23,42,0.97); border: 1px solid var(--color-cyan); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.6); font-family: sans-serif; width: 300px; backdrop-filter: blur(8px); color: #fff;`;
-            doc.body.appendChild(panel);
+    renderAdjustmentsPanel(clip) {
+        const container = this.canvas.ownerDocument.getElementById("adjustments-panel-content");
+        if (!container) return;
+
+        if (!clip) {
+            const currentRes = `${TIMELINE_STATE.width}x${TIMELINE_STATE.height}`;
+            const presetVal = ["1920x1080", "1080x1920", "3840x2160", "1080x1080"].includes(currentRes) ? currentRes : "custom";
+
+            const gcd = (a, b) => b ? gcd(b, a % b) : a;
+            const getAspectRatioText = (w, h) => {
+                if (!w || !h) return "Desconhecido";
+                const divisor = gcd(w, h);
+                const rw = w / divisor;
+                const rh = h / divisor;
+                if (rw === 16 && rh === 9) return "16:9 (Widescreen)";
+                if (rw === 9 && rh === 16) return "9:16 (Vertical)";
+                if (rw === 4 && rh === 3) return "4:3 (Clássico)";
+                if (rw === 1 && rh === 1) return "1:1 (Quadrado)";
+                if (rw === 21 && rh === 9) return "21:9 (Ultrawide)";
+                return `${rw}:${rh}`;
+            };
+
+            const html = `
+                <div class="adjustments-section" style="padding: 16px;">
+                    <div style="font-size:11px; font-weight:bold; color:var(--color-cyan); display:flex; gap: 6px; align-items:center; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; margin-bottom: 12px;">
+                        <i class="fa-solid fa-gear"></i>
+                        <span>Configurações da Sequência</span>
+                    </div>
+
+                    <!-- Preset Selection -->
+                    <div class="adjustments-row" style="margin-bottom: 12px;">
+                        <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Formato</label>
+                        <div class="control-wrap" style="flex:1;">
+                            <select id="seq-preset" class="nle-select" style="width:100%; height:24px; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px; padding:0 4px;">
+                                <option value="1920x1080">Horizontal (1920×1080 - 16:9)</option>
+                                <option value="1080x1920">Vertical (1080×1920 - 9:16)</option>
+                                <option value="3840x2160">Ultra HD (3840×2160 - 4K)</option>
+                                <option value="1080x1080">Quadrado (1080×1080 - 1:1)</option>
+                                <option value="custom">Personalizado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Dimensions -->
+                    <div class="adjustments-row" id="seq-dims-row" style="margin-bottom: 12px;">
+                        <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Resolução</label>
+                        <div class="control-wrap" style="flex:1; display:flex; gap:6px; align-items:center;">
+                            <input id="seq-width" type="number" class="nle-input" style="width:65px; height:24px; text-align:center; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px;" min="2" step="2" value="${TIMELINE_STATE.width}">
+                            <span style="color:var(--text-muted); font-size:10px;">×</span>
+                            <input id="seq-height" type="number" class="nle-input" style="width:65px; height:24px; text-align:center; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px;" min="2" step="2" value="${TIMELINE_STATE.height}">
+                        </div>
+                    </div>
+
+                    <!-- Aspect Ratio display -->
+                    <div class="adjustments-row" style="margin-bottom: 12px;">
+                        <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Proporção</label>
+                        <div class="control-wrap" style="flex:1;">
+                            <span id="seq-aspect-ratio" style="color:var(--text-secondary); font-size:11px; font-weight:bold;">${getAspectRatioText(TIMELINE_STATE.width, TIMELINE_STATE.height)}</span>
+                        </div>
+                    </div>
+
+                    <!-- FPS Selection -->
+                    <div class="adjustments-row" style="margin-bottom: 12px;">
+                        <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Taxa (FPS)</label>
+                        <div class="control-wrap" style="flex:1;">
+                            <select id="seq-fps" class="nle-select" style="width:100%; height:24px; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px; padding:0 4px;">
+                                <option value="23.976">23.976 fps</option>
+                                <option value="24">24 fps</option>
+                                <option value="25">25 fps</option>
+                                <option value="29.97">29.97 fps</option>
+                                <option value="30">30 fps</option>
+                                <option value="50">50 fps</option>
+                                <option value="60">60 fps</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Warning message when clips exist -->
+                    ${STATE.activeTimelineCuts.length > 0 ? `
+                        <div id="seq-warning" style="margin-top:16px; padding:10px; border-radius:6px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:10px; line-height:1.4; display:flex; gap:6px;">
+                            <i class="fa-solid fa-triangle-exclamation" style="font-size:12px; margin-top:2px;"></i>
+                            <span><strong>Aviso:</strong> A timeline possui clipes. Alterar o FPS irá reescalar os frames físicos para manter a sincronia em segundos.</span>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            container.innerHTML = html;
+
+            const presetSelect = container.querySelector("#seq-preset");
+            if (presetSelect) presetSelect.value = presetVal;
+
+            const fpsSelect = container.querySelector("#seq-fps");
+            if (fpsSelect) {
+                const exists = Array.from(fpsSelect.options).some(opt => parseFloat(opt.value) === TIMELINE_STATE.fps);
+                if (!exists) {
+                    const opt = this.canvas.ownerDocument.createElement("option");
+                    opt.value = TIMELINE_STATE.fps;
+                    opt.textContent = `${TIMELINE_STATE.fps} fps`;
+                    fpsSelect.appendChild(opt);
+                }
+                fpsSelect.value = TIMELINE_STATE.fps;
+            }
+
+            const widthInput = container.querySelector("#seq-width");
+            const heightInput = container.querySelector("#seq-height");
+
+            const updateDimInputsState = () => {
+                if (presetSelect.value === "custom") {
+                    widthInput.removeAttribute("disabled");
+                    heightInput.removeAttribute("disabled");
+                    widthInput.style.opacity = "1";
+                    heightInput.style.opacity = "1";
+                } else {
+                    widthInput.setAttribute("disabled", "true");
+                    heightInput.setAttribute("disabled", "true");
+                    widthInput.style.opacity = "0.5";
+                    heightInput.style.opacity = "0.5";
+                    const [w, h] = presetSelect.value.split("x").map(Number);
+                    widthInput.value = w;
+                    heightInput.value = h;
+                }
+            };
+            
+            updateDimInputsState();
+
+            const applySettings = () => {
+                let wVal = parseInt(widthInput.value) || 1920;
+                let hVal = parseInt(heightInput.value) || 1080;
+                
+                const w = wVal % 2 === 0 ? wVal : wVal + 1;
+                const h = hVal % 2 === 0 ? hVal : hVal + 1;
+                
+                if (w !== wVal) widthInput.value = w;
+                if (h !== hVal) heightInput.value = h;
+
+                const fps = parseFloat(fpsSelect.value) || 24;
+
+                TIMELINE_STATE.setTimelineProperties({ width: w, height: h, fps });
+
+                const aspectSpan = container.querySelector("#seq-aspect-ratio");
+                if (aspectSpan) aspectSpan.textContent = getAspectRatioText(w, h);
+            };
+
+            presetSelect.onchange = () => {
+                updateDimInputsState();
+                applySettings();
+            };
+
+            widthInput.onchange = applySettings;
+            heightInput.onchange = applySettings;
+            fpsSelect.onchange = applySettings;
+
+            return;
         }
-        panel.dataset.clipId = clip.id;
 
-        const eff = clip.effects || [];
-        const fit = eff.find(e => e.type === "fit");
+        const effects = clip.effects || [];
+        const isPhoto = clip.type === "photo";
+        const isAudioTrack = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+        let partnerAudioClip = null;
+        if (!isAudioTrack && clip.type === "video" && clip.link_id) {
+            partnerAudioClip = STATE.activeTimelineCuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
+        }
+        
+        let filename = "Clipe de Áudio";
+        if (isPhoto) {
+            const photoData = STATE.allPhotos.find(p => String(p.id) === String(clip.photo_id));
+            filename = photoData ? photoData.filename : "Foto";
+        } else {
+            const videoData = STATE.allVideos.find(v => String(v.id) === String(clip.video_id));
+            if (isAudioTrack) {
+                filename = videoData ? `${videoData.filename} (Áudio)` : "Áudio";
+            } else {
+                filename = videoData ? videoData.filename : "Vídeo";
+            }
+        }
+
+        // Obter valores de efeito
+        const fit = effects.find(e => e.type === "fit");
         const fitMode = fit ? fit.mode : "fill";
-        const kb = eff.find(e => e.type === "ken_burns");
-        const kbPreset = kb ? (kb.preset || "custom") : "none";
-        const fadeIn = eff.find(e => e.type === "crossfade" && e.side === "in");
-        const fadeOut = eff.find(e => e.type === "crossfade" && e.side === "out");
 
-        const btn = (label, active, act) => `<button data-act="${act}" style="flex:1; min-width:56px; padding:4px 6px; font-size:10px; border-radius:5px; cursor:pointer; border:1px solid ${active ? 'var(--color-cyan)' : 'rgba(255,255,255,0.15)'}; background:${active ? 'rgba(6,182,212,0.25)' : 'rgba(255,255,255,0.05)'}; color:#fff;">${label}</button>`;
+        const kb = effects.find(e => e.type === "ken_burns");
+        const kbPreset = kb ? (kb.preset || "none") : "none";
 
-        panel.innerHTML = `
-            <div style="font-size:11px; font-weight:bold; color:var(--color-cyan); display:flex; justify-content:space-between; align-items:center;">
-                <span><i class="fa-solid fa-image"></i> Foto — Ajustes</span>
-                <span id="photo-insp-close" style="cursor:pointer; color:var(--text-secondary);"><i class="fa-solid fa-xmark"></i></span>
-            </div>
-            <div style="font-size:10px; color:var(--text-secondary);">Enquadramento</div>
-            <div style="display:flex; gap:6px;">${btn("Preencher (fill)", fitMode === "fill", "fit:fill")}${btn("Ajustar (fit)", fitMode === "fit", "fit:fit")}</div>
-            <div style="font-size:10px; color:var(--text-secondary);">Movimento (Ken Burns)</div>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                ${btn("Nenhum", kbPreset === "none", "kb:none")}
-                ${btn("Zoom In", kbPreset === "zoomIn", "kb:zoomIn")}
-                ${btn("Zoom Out", kbPreset === "zoomOut", "kb:zoomOut")}
-                ${btn("Pan →", kbPreset === "panRight", "kb:panRight")}
-                ${btn("Pan ←", kbPreset === "panLeft", "kb:panLeft")}
-            </div>
-            <div style="font-size:10px; color:var(--text-secondary);">Transições (dissolve, s)</div>
-            <div style="display:flex; gap:6px; align-items:center;">
-                <span style="font-size:10px;">In</span>
-                <input id="photo-insp-fadein" type="number" min="0" step="0.1" value="${fadeIn ? fadeIn.duration_s : 0}" style="width:56px; height:24px; font-size:11px; text-align:center; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:5px; color:#fff;">
-                <span style="font-size:10px;">Out</span>
-                <input id="photo-insp-fadeout" type="number" min="0" step="0.1" value="${fadeOut ? fadeOut.duration_s : 0}" style="width:56px; height:24px; font-size:11px; text-align:center; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:5px; color:#fff;">
+        const tf = effects.find(e => e.type === "transform") || {};
+        const scale = tf.scale !== undefined ? tf.scale : 1.0;
+        const x = tf.x !== undefined ? tf.x : 0;
+        const y = tf.y !== undefined ? tf.y : 0;
+        const rotation = tf.rotation !== undefined ? tf.rotation : 0;
+        const opacity = tf.opacity !== undefined ? tf.opacity : 1.0;
+
+        const col = effects.find(e => e.type === "color") || {};
+        const brightness = col.brightness !== undefined ? col.brightness : 0;
+        const contrast = col.contrast !== undefined ? col.contrast : 0;
+        const saturation = col.saturation !== undefined ? col.saturation : 100;
+        const hue = col.hue !== undefined ? col.hue : 0;
+        const sepia = col.sepia !== undefined ? col.sepia : 0;
+        const grayscale = col.grayscale !== undefined ? col.grayscale : 0;
+        const blur = col.blur !== undefined ? col.blur : 0;
+
+        const cropEffect = effects.find(e => e.type === "crop") || {};
+        const cropTop = cropEffect.top !== undefined ? cropEffect.top : 0;
+        const cropRight = cropEffect.right !== undefined ? cropEffect.right : 0;
+        const cropBottom = cropEffect.bottom !== undefined ? cropEffect.bottom : 0;
+        const cropLeft = cropEffect.left !== undefined ? cropEffect.left : 0;
+
+        let level = 1.0;
+        if (isAudioTrack) {
+            const vol = effects.find(e => e.type === "volume") || {};
+            level = vol.level !== undefined ? vol.level : 1.0;
+        } else if (partnerAudioClip) {
+            const partnerEffects = partnerAudioClip.effects || [];
+            const vol = partnerEffects.find(e => e.type === "volume") || {};
+            level = vol.level !== undefined ? vol.level : 1.0;
+        }
+
+        const fadeIn = effects.find(e => e.type === "crossfade" && e.side === "in");
+        const fadeOut = effects.find(e => e.type === "crossfade" && e.side === "out");
+        const fadeInDur = fadeIn ? fadeIn.duration_s : 0;
+        const fadeOutDur = fadeOut ? fadeOut.duration_s : 0;
+
+        // Renderizar seções
+        let html = `
+            <div style="font-size:11px; font-weight:bold; color:var(--color-cyan); display:flex; gap: 6px; align-items:center; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; margin-bottom: 4px;">
+                <i class="fa-solid fa-sliders"></i>
+                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${filename}</span>
+                <span style="font-size:8.5px; padding:2px 6px; border-radius:4px; font-weight:bold; background:rgba(6,182,212,0.1); color:var(--color-cyan); text-transform:uppercase; letter-spacing:0.5px;">${clip.track}</span>
             </div>
         `;
 
-        // Posiciona acima (à direita) do canvas da timeline
-        const rect = this.canvas.getBoundingClientRect();
-        let top = rect.top - 232;
-        if (top < 8) top = Math.min(rect.top + 8, win.innerHeight - 244);
-        panel.style.top = `${Math.max(8, top)}px`;
-        panel.style.left = `${Math.max(8, Math.min(rect.right - 312, win.innerWidth - 312))}px`;
-        panel.style.display = "flex";
+        if (!isAudioTrack) {
+            // ── SEÇÃO: ENQUADRAMENTO ──
+            html += `
+                <div class="adjustments-section">
+                    <div class="adjustments-section-title"><i class="fa-solid fa-crop"></i> Enquadramento</div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="nle-select-btn ${fitMode === 'fill' ? 'active' : ''}" data-action="fit:fill" style="flex:1; padding:4px 6px; font-size:10px; border-radius:4px; border:1px solid ${fitMode === 'fill' ? 'var(--color-cyan)' : 'rgba(255,255,255,0.15)'}; background:${fitMode === 'fill' ? 'rgba(6,182,212,0.2)' : 'transparent'}; color:#fff; cursor:pointer;">Preencher</button>
+                        <button class="nle-select-btn ${fitMode === 'fit' ? 'active' : ''}" data-action="fit:fit" style="flex:1; padding:4px 6px; font-size:10px; border-radius:4px; border:1px solid ${fitMode === 'fit' ? 'var(--color-cyan)' : 'rgba(255,255,255,0.15)'}; background:${fitMode === 'fit' ? 'rgba(6,182,212,0.2)' : 'transparent'}; color:#fff; cursor:pointer;">Ajustar</button>
+                    </div>
+                </div>
+            `;
 
-        panel.querySelector("#photo-insp-close").onclick = () => this.hidePhotoInspector();
-        panel.querySelectorAll("button[data-act]").forEach(b => {
-            b.onclick = () => {
-                const [kind, val] = b.dataset.act.split(":");
-                if (kind === "fit") this.setPhotoFit(clip.id, val);
-                else if (kind === "kb") this.setPhotoKenBurns(clip.id, val);
+            // ── SEÇÃO: MOVIMENTO (KEN BURNS) ──
+            if (isPhoto) {
+                html += `
+                    <div class="adjustments-section">
+                        <div class="adjustments-section-title"><i class="fa-solid fa-circle-nodes"></i> Movimento (Ken Burns)</div>
+                        <div class="adjustments-row" style="margin-bottom:0;">
+                            <select id="adj-kb-preset" class="nle-select" style="width:100%;">
+                                <option value="none" ${kbPreset === 'none' ? 'selected' : ''}>Nenhum</option>
+                                <option value="zoomIn" ${kbPreset === 'zoomIn' ? 'selected' : ''}>Zoom In</option>
+                                <option value="zoomOut" ${kbPreset === 'zoomOut' ? 'selected' : ''}>Zoom Out</option>
+                                <option value="panRight" ${kbPreset === 'panRight' ? 'selected' : ''}>Pan Direita →</option>
+                                <option value="panLeft" ${kbPreset === 'panLeft' ? 'selected' : ''}>Pan Esquerda ←</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // ── SEÇÃO: GEOMETRIA ──
+            const tfDisabled = tf.disabled === true;
+            html += `
+                <div class="adjustments-section">
+                    <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                        <span style="display:flex; gap:6px; align-items:center;">
+                            <i class="fa-solid fa-arrows-up-down-left-right"></i> Transformações
+                        </span>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <button class="btn-adj-bypass" data-section="transform" title="${tfDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="background:none; border:none; color:${tfDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${tfDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                            <button class="btn-adj-reset" data-section="transform" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                        </div>
+                    </div>
+                    <div class="adjustments-section-body" style="opacity:${tfDisabled ? 0.4 : 1}; pointer-events:${tfDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
+                        <div class="adjustments-row">
+                            <label>Posição X</label>
+                            <div class="control-wrap">
+                                <input type="range" data-prop="x" min="-100" max="100" value="${x}">
+                                <span class="value-disp">${x}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Posição Y</label>
+                            <div class="control-wrap">
+                                <input type="range" data-prop="y" min="-100" max="100" value="${y}">
+                                <span class="value-disp">${y}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Escala</label>
+                            <div class="control-wrap">
+                                <input type="range" data-prop="scale" min="50" max="300" value="${Math.round(scale * 100)}">
+                                <span class="value-disp">${Math.round(scale * 100)}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Rotação</label>
+                            <div class="control-wrap">
+                                <input type="range" data-prop="rotation" min="-180" max="180" value="${rotation}">
+                                <span class="value-disp">${rotation}°</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Opacidade</label>
+                            <div class="control-wrap">
+                                <input type="range" data-prop="opacity" min="0" max="100" value="${Math.round(opacity * 100)}">
+                                <span class="value-disp">${Math.round(opacity * 100)}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // ── SEÇÃO: CORTE (CROP) ──
+            const cropDisabled = cropEffect.disabled === true;
+            html += `
+                <div class="adjustments-section">
+                    <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                        <span style="display:flex; gap:6px; align-items:center;">
+                            <i class="fa-solid fa-scissors"></i> Recorte (Crop)
+                        </span>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <button class="btn-adj-bypass" data-section="crop" title="${cropDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="background:none; border:none; color:${cropDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${cropDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                            <button class="btn-adj-reset" data-section="crop" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                        </div>
+                    </div>
+                    <div class="adjustments-section-body" style="opacity:${cropDisabled ? 0.4 : 1}; pointer-events:${cropDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
+                        <div class="adjustments-row">
+                            <label>Esquerda</label>
+                            <div class="control-wrap">
+                                <input type="range" data-crop="left" min="0" max="100" value="${cropLeft}">
+                                <span class="value-disp">${cropLeft}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Direita</label>
+                            <div class="control-wrap">
+                                <input type="range" data-crop="right" min="0" max="100" value="${cropRight}">
+                                <span class="value-disp">${cropRight}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Topo</label>
+                            <div class="control-wrap">
+                                <input type="range" data-crop="top" min="0" max="100" value="${cropTop}">
+                                <span class="value-disp">${cropTop}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Base</label>
+                            <div class="control-wrap">
+                                <input type="range" data-crop="bottom" min="0" max="100" value="${cropBottom}">
+                                <span class="value-disp">${cropBottom}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // ── SEÇÃO: CORES & FILTROS ──
+            const colDisabled = col.disabled === true;
+            html += `
+                <div class="adjustments-section">
+                    <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                        <span style="display:flex; gap:6px; align-items:center;">
+                            <i class="fa-solid fa-palette"></i> Efeitos de Cor
+                        </span>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <button class="btn-adj-bypass" data-section="color" title="${colDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="background:none; border:none; color:${colDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${colDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                            <button class="btn-adj-reset" data-section="color" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                        </div>
+                    </div>
+                    <div class="adjustments-section-body" style="opacity:${colDisabled ? 0.4 : 1}; pointer-events:${colDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
+                        <div class="adjustments-row">
+                            <label>Brilho</label>
+                            <div class="control-wrap">
+                                <input type="range" data-color="brightness" min="-100" max="100" value="${brightness}">
+                                <span class="value-disp">${brightness}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Contraste</label>
+                            <div class="control-wrap">
+                                <input type="range" data-color="contrast" min="-100" max="100" value="${contrast}">
+                                <span class="value-disp">${contrast}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Saturação</label>
+                            <div class="control-wrap">
+                                <input type="range" data-color="saturation" min="0" max="200" value="${saturation}">
+                                <span class="value-disp">${saturation}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Matiz</label>
+                            <div class="control-wrap">
+                                <input type="range" data-color="hue" min="-180" max="180" value="${hue}">
+                                <span class="value-disp">${hue}°</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Sépia</label>
+                            <div class="control-wrap">
+                                <input type="range" data-color="sepia" min="0" max="100" value="${sepia}">
+                                <span class="value-disp">${sepia}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Cinzas</label>
+                            <div class="control-wrap">
+                                <input type="range" data-color="grayscale" min="0" max="100" value="${grayscale}">
+                                <span class="value-disp">${grayscale}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row">
+                            <label>Desfoque</label>
+                            <div class="control-wrap">
+                                <input type="range" data-color="blur" min="0" max="20" value="${blur}">
+                                <span class="value-disp">${blur}px</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ── SEÇÃO: VOLUME DE ÁUDIO ──
+        if (isAudioTrack || partnerAudioClip) {
+            const dbVal = level > 0 ? (20 * Math.log10(level)).toFixed(1) : "-inf";
+            const targetVolClip = isAudioTrack ? clip : partnerAudioClip;
+            const volEffect = targetVolClip ? (targetVolClip.effects || []).find(e => e.type === "volume") : null;
+            const volDisabled = volEffect ? volEffect.disabled === true : false;
+
+            html += `
+                <div class="adjustments-section">
+                    <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                        <span style="display:flex; gap:6px; align-items:center;">
+                            <i class="fa-solid fa-volume-high"></i> Áudio / Volume
+                        </span>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <button class="btn-adj-bypass" data-section="volume" title="${volDisabled ? 'Ativar volume' : 'Desativar volume'}" style="background:none; border:none; color:${volDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${volDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                            <button class="btn-adj-reset" data-section="volume" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                        </div>
+                    </div>
+                    <div class="adjustments-section-body" style="opacity:${volDisabled ? 0.4 : 1}; pointer-events:${volDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
+                        <div class="adjustments-row">
+                            <label>Nível</label>
+                            <div class="control-wrap">
+                                <input id="adj-volume-slider" type="range" min="0" max="200" value="${Math.round(level * 100)}">
+                                <span class="value-disp" style="min-width: 60px;">${Math.round(level * 100)}% (${dbVal} dB)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ── SEÇÃO: TRANSIÇÕES (FADES) ──
+        const fadesDisabled = (fadeIn && fadeIn.disabled === true) || (fadeOut && fadeOut.disabled === true);
+        html += `
+            <div class="adjustments-section">
+                <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                    <span style="display:flex; gap:6px; align-items:center;">
+                        <i class="fa-solid fa-circle-half-stroke"></i> Transições (Dissolve)
+                    </span>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button class="btn-adj-bypass" data-section="fades" title="${fadesDisabled ? 'Ativar transições' : 'Desativar transições'}" style="background:none; border:none; color:${fadesDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${fadesDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-reset" data-section="fades" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                    </div>
+                </div>
+                <div class="adjustments-section-body" style="opacity:${fadesDisabled ? 0.4 : 1}; pointer-events:${fadesDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
+                    <div class="adjustments-row">
+                        <label>Fade In (s)</label>
+                        <div class="control-wrap">
+                            <input id="adj-fadein" type="number" min="0" step="0.1" value="${fadeInDur}">
+                        </div>
+                    </div>
+                    <div class="adjustments-row">
+                        <label>Fade Out (s)</label>
+                        <div class="control-wrap">
+                            <input id="adj-fadeout" type="number" min="0" step="0.1" value="${fadeOutDur}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const savedScrollTop = container.scrollTop;
+        container.innerHTML = html;
+        container.scrollTop = savedScrollTop;
+
+        // Acoplar listeners
+        this.attachAdjustmentsListeners(container, clip.id);
+    }
+
+    attachAdjustmentsListeners(container, clipId) {
+        const clip = STATE.activeTimelineCuts.find(c => c.id === clipId);
+        if (!clip) return;
+
+        // Enquadramento (fit/fill)
+        container.querySelectorAll(".nle-select-btn").forEach(btn => {
+            btn.onclick = () => {
+                const action = btn.dataset.action;
+                const [kind, val] = action.split(":");
+                if (kind === "fit") {
+                    this.setClipFit(clipId, val);
+                }
             };
         });
-        const fi = panel.querySelector("#photo-insp-fadein");
-        const fo = panel.querySelector("#photo-insp-fadeout");
-        fi.onchange = () => this.setPhotoFade(clip.id, "in", parseFloat(fi.value) || 0);
-        fo.onchange = () => this.setPhotoFade(clip.id, "out", parseFloat(fo.value) || 0);
+
+        // Presets Ken Burns
+        const kbSelect = container.querySelector("#adj-kb-preset");
+        if (kbSelect) {
+            kbSelect.onchange = () => {
+                this.setClipKenBurns(clipId, kbSelect.value);
+            };
+        }
+
+        // Transformações (Geometria)
+        container.querySelectorAll("input[data-prop]").forEach(slider => {
+            const prop = slider.dataset.prop;
+            const disp = slider.nextElementSibling;
+
+            slider.oninput = () => {
+                TIMELINE_HISTORY.begin();
+                let val = parseFloat(slider.value);
+                if (prop === "scale") val = val / 100;
+                else if (prop === "opacity") val = val / 100;
+
+                if (disp) {
+                    disp.textContent = slider.value + (prop === "rotation" ? "°" : "%");
+                }
+
+                // Mutação rápida sem Undo/Redo no meio do arrasto para feedback em tempo real
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === clipId);
+                if (targetClip) {
+                    targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
+                    let tf = targetClip.effects.find(e => e.type === "transform");
+                    if (!tf) {
+                        tf = { type: "transform", scale: 1.0, x: 0, y: 0, rotation: 0, opacity: 1.0 };
+                        targetClip.effects.push(tf);
+                    }
+                    tf[prop] = val;
+                    STATE.activeTimelineCuts = cuts;
+                }
+            };
+
+            slider.onchange = () => {
+                let val = parseFloat(slider.value);
+                if (prop === "scale") val = val / 100;
+                else if (prop === "opacity") val = val / 100;
+                this.setClipTransform(clipId, prop, val);
+                TIMELINE_HISTORY.commit();
+            };
+        });
+
+        // Recorte (Crop)
+        container.querySelectorAll("input[data-crop]").forEach(slider => {
+            const prop = slider.dataset.crop;
+            const disp = slider.nextElementSibling;
+
+            slider.oninput = () => {
+                TIMELINE_HISTORY.begin();
+                const val = parseFloat(slider.value);
+
+                if (disp) {
+                    disp.textContent = slider.value + "%";
+                }
+
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === clipId);
+                if (targetClip) {
+                    targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
+                    let crop = targetClip.effects.find(e => e.type === "crop");
+                    if (!crop) {
+                        crop = { type: "crop", top: 0, right: 0, bottom: 0, left: 0 };
+                        targetClip.effects.push(crop);
+                    }
+                    crop[prop] = val;
+                    STATE.activeTimelineCuts = cuts;
+                }
+            };
+
+            slider.onchange = () => {
+                const val = parseFloat(slider.value);
+                this.setClipCrop(clipId, prop, val);
+                TIMELINE_HISTORY.commit();
+            };
+        });
+
+        // Efeitos de Cor
+        container.querySelectorAll("input[data-color]").forEach(slider => {
+            const prop = slider.dataset.color;
+            const disp = slider.nextElementSibling;
+
+            slider.oninput = () => {
+                TIMELINE_HISTORY.begin();
+                const val = parseFloat(slider.value);
+                if (disp) {
+                    disp.textContent = slider.value + (prop === "blur" ? "px" : prop === "hue" ? "°" : "%");
+                }
+
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === clipId);
+                if (targetClip) {
+                    targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
+                    let col = targetClip.effects.find(e => e.type === "color");
+                    if (!col) {
+                        col = { type: "color", brightness: 0, contrast: 0, saturation: 100, hue: 0, sepia: 0, grayscale: 0, blur: 0 };
+                        targetClip.effects.push(col);
+                    }
+                    col[prop] = val;
+                    STATE.activeTimelineCuts = cuts;
+                }
+            };
+
+            slider.onchange = () => {
+                const val = parseFloat(slider.value);
+                this.setClipColor(clipId, prop, val);
+                TIMELINE_HISTORY.commit();
+            };
+        });
+
+        // Volume de Áudio
+        const volSlider = container.querySelector("#adj-volume-slider");
+        if (volSlider) {
+            const disp = volSlider.nextElementSibling;
+            volSlider.oninput = () => {
+                TIMELINE_HISTORY.begin();
+                const val = parseFloat(volSlider.value) / 100;
+                const dbVal = val > 0 ? (20 * Math.log10(val)).toFixed(1) : "-inf";
+                if (disp) {
+                    disp.textContent = `${volSlider.value}% (${dbVal} dB)`;
+                }
+
+                const isAudioTrack = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+                let targetClipId = clipId;
+                if (!isAudioTrack && clip.type === "video" && clip.link_id) {
+                    const partner = STATE.activeTimelineCuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
+                    if (partner) {
+                        targetClipId = partner.id;
+                    }
+                }
+
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === targetClipId);
+                if (targetClip) {
+                    targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
+                    let vol = targetClip.effects.find(e => e.type === "volume");
+                    if (!vol) {
+                        vol = { type: "volume", level: 1.0 };
+                        targetClip.effects.push(vol);
+                    }
+                    vol.level = val;
+                    STATE.activeTimelineCuts = cuts;
+                }
+            };
+
+            volSlider.onchange = () => {
+                const val = parseFloat(volSlider.value) / 100;
+
+                const isAudioTrack = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+                let targetClipId = clipId;
+                if (!isAudioTrack && clip.type === "video" && clip.link_id) {
+                    const partner = STATE.activeTimelineCuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
+                    if (partner) {
+                        targetClipId = partner.id;
+                    }
+                }
+
+                this.setClipVolume(targetClipId, val);
+                TIMELINE_HISTORY.commit();
+            };
+        }
+
+        // Fades
+        const fi = container.querySelector("#adj-fadein");
+        const fo = container.querySelector("#adj-fadeout");
+        if (fi) {
+            fi.onchange = () => {
+                this.setClipFade(clipId, "in", parseFloat(fi.value) || 0);
+            };
+        }
+        if (fo) {
+            fo.onchange = () => {
+                this.setClipFade(clipId, "out", parseFloat(fo.value) || 0);
+            };
+        }
+
+        // Ouvintes de Bypass (Ativar/Desativar Efeito)
+        container.querySelectorAll(".btn-adj-bypass").forEach(btn => {
+            btn.onclick = () => {
+                const section = btn.dataset.section;
+                TIMELINE_HISTORY.begin();
+
+                const isAudio = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+                let targetClipId = clipId;
+                if (section === "volume" && !isAudio && clip.type === "video" && clip.link_id) {
+                    const partner = STATE.activeTimelineCuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
+                    if (partner) targetClipId = partner.id;
+                }
+
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === targetClipId);
+                if (targetClip) {
+                    targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
+                    if (section === "transform") {
+                        let tf = targetClip.effects.find(e => e.type === "transform");
+                        if (!tf) {
+                            tf = { type: "transform", scale: 1.0, x: 0, y: 0, rotation: 0, opacity: 1.0 };
+                            targetClip.effects.push(tf);
+                        }
+                        tf.disabled = !tf.disabled;
+                    } else if (section === "crop") {
+                        let crop = targetClip.effects.find(e => e.type === "crop");
+                        if (!crop) {
+                            crop = { type: "crop", top: 0, right: 0, bottom: 0, left: 0 };
+                            targetClip.effects.push(crop);
+                        }
+                        crop.disabled = !crop.disabled;
+                    } else if (section === "color") {
+                        let col = targetClip.effects.find(e => e.type === "color");
+                        if (!col) {
+                            col = { type: "color", brightness: 0, contrast: 0, saturation: 100, hue: 0, sepia: 0, grayscale: 0, blur: 0 };
+                            targetClip.effects.push(col);
+                        }
+                        col.disabled = !col.disabled;
+                    } else if (section === "volume") {
+                        let vol = targetClip.effects.find(e => e.type === "volume");
+                        if (!vol) {
+                            vol = { type: "volume", level: 1.0 };
+                            targetClip.effects.push(vol);
+                        }
+                        vol.disabled = !vol.disabled;
+                    } else if (section === "fades") {
+                        const fades = targetClip.effects.filter(e => e.type === "crossfade");
+                        fades.forEach(f => { f.disabled = !f.disabled; });
+                    }
+                    STATE.activeTimelineCuts = cuts;
+                    this.refreshClipInspector();
+                }
+
+                TIMELINE_HISTORY.commit();
+            };
+        });
+
+        // Ouvintes de Reset (Redefinir Padrão)
+        container.querySelectorAll(".btn-adj-reset").forEach(btn => {
+            btn.onclick = () => {
+                const section = btn.dataset.section;
+                TIMELINE_HISTORY.begin();
+
+                const isAudio = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+                let targetClipId = clipId;
+                if (section === "volume" && !isAudio && clip.type === "video" && clip.link_id) {
+                    const partner = STATE.activeTimelineCuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
+                    if (partner) targetClipId = partner.id;
+                }
+
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === targetClipId);
+                if (targetClip) {
+                    targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
+                    if (section === "transform") {
+                        targetClip.effects = targetClip.effects.filter(e => e.type !== "transform");
+                        targetClip.effects.push({ type: "transform", scale: 1.0, x: 0, y: 0, rotation: 0, opacity: 1.0 });
+                    } else if (section === "crop") {
+                        targetClip.effects = targetClip.effects.filter(e => e.type !== "crop");
+                        targetClip.effects.push({ type: "crop", top: 0, right: 0, bottom: 0, left: 0 });
+                    } else if (section === "color") {
+                        targetClip.effects = targetClip.effects.filter(e => e.type !== "color");
+                        targetClip.effects.push({ type: "color", brightness: 0, contrast: 0, saturation: 100, hue: 0, sepia: 0, grayscale: 0, blur: 0 });
+                    } else if (section === "volume") {
+                        targetClip.effects = targetClip.effects.filter(e => e.type !== "volume");
+                        targetClip.effects.push({ type: "volume", level: 1.0 });
+                    } else if (section === "fades") {
+                        targetClip.effects = targetClip.effects.filter(e => e.type !== "crossfade");
+                    }
+                    STATE.activeTimelineCuts = cuts;
+                    this.refreshClipInspector();
+                }
+
+                TIMELINE_HISTORY.commit();
+            };
+        });
     }
 
     onWheel(e) {
@@ -579,7 +1374,7 @@ export class CapiauTimelineInteraction {
                         STATE.activeTimelineCuts = cuts;
                         TIMELINE_STATE.selectedClipId = null;
                     });
-                    this.hidePhotoInspector();
+                    this.refreshClipInspector();
                     e.preventDefault();
                 }
             } else if (TIMELINE_STATE.selectedGhostClipId) {
