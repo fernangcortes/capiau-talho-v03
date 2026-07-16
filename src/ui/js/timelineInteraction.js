@@ -480,6 +480,12 @@ export class CapiauTimelineInteraction {
         const container = this.canvas.ownerDocument.getElementById("adjustments-panel-content");
         if (!container) return;
 
+        const roundVal = (v) => {
+            if (v === undefined || v === null) return 0;
+            const r = Math.round(v);
+            return r === 0 ? 0 : r;
+        };
+
         if (!clip) {
             const currentRes = `${TIMELINE_STATE.width}x${TIMELINE_STATE.height}`;
             const presetVal = ["1920x1080", "1080x1920", "3840x2160", "1080x1080"].includes(currentRes) ? currentRes : "custom";
@@ -753,36 +759,36 @@ export class CapiauTimelineInteraction {
                         <div class="adjustments-row">
                             <label>Posição X</label>
                             <div class="control-wrap">
-                                <input type="range" data-prop="x" min="-100" max="100" value="${x}">
-                                <span class="value-disp">${x}%</span>
+                                <input type="range" data-prop="x" min="-100" max="100" value="${roundVal(x)}">
+                                <span class="value-disp">${roundVal(x)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Posição Y</label>
                             <div class="control-wrap">
-                                <input type="range" data-prop="y" min="-100" max="100" value="${y}">
-                                <span class="value-disp">${y}%</span>
+                                <input type="range" data-prop="y" min="-100" max="100" value="${roundVal(y)}">
+                                <span class="value-disp">${roundVal(y)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Escala</label>
                             <div class="control-wrap">
-                                <input type="range" data-prop="scale" min="50" max="300" value="${Math.round(scale * 100)}">
-                                <span class="value-disp">${Math.round(scale * 100)}%</span>
+                                <input type="range" data-prop="scale" min="50" max="300" value="${roundVal(scale * 100)}">
+                                <span class="value-disp">${roundVal(scale * 100)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Rotação</label>
                             <div class="control-wrap">
-                                <input type="range" data-prop="rotation" min="-180" max="180" value="${rotation}">
-                                <span class="value-disp">${rotation}°</span>
+                                <input type="range" data-prop="rotation" min="-180" max="180" value="${roundVal(rotation)}">
+                                <span class="value-disp">${roundVal(rotation)}°</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Opacidade</label>
                             <div class="control-wrap">
-                                <input type="range" data-prop="opacity" min="0" max="100" value="${Math.round(opacity * 100)}">
-                                <span class="value-disp">${Math.round(opacity * 100)}%</span>
+                                <input type="range" data-prop="opacity" min="0" max="100" value="${roundVal(opacity * 100)}">
+                                <span class="value-disp">${roundVal(opacity * 100)}%</span>
                             </div>
                         </div>
                     </div>
@@ -806,29 +812,29 @@ export class CapiauTimelineInteraction {
                         <div class="adjustments-row">
                             <label>Esquerda</label>
                             <div class="control-wrap">
-                                <input type="range" data-crop="left" min="0" max="100" value="${cropLeft}">
-                                <span class="value-disp">${cropLeft}%</span>
+                                <input type="range" data-crop="left" min="0" max="100" value="${roundVal(cropLeft)}">
+                                <span class="value-disp">${roundVal(cropLeft)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Direita</label>
                             <div class="control-wrap">
-                                <input type="range" data-crop="right" min="0" max="100" value="${cropRight}">
-                                <span class="value-disp">${cropRight}%</span>
+                                <input type="range" data-crop="right" min="0" max="100" value="${roundVal(cropRight)}">
+                                <span class="value-disp">${roundVal(cropRight)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Topo</label>
                             <div class="control-wrap">
-                                <input type="range" data-crop="top" min="0" max="100" value="${cropTop}">
-                                <span class="value-disp">${cropTop}%</span>
+                                <input type="range" data-crop="top" min="0" max="100" value="${roundVal(cropTop)}">
+                                <span class="value-disp">${roundVal(cropTop)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Base</label>
                             <div class="control-wrap">
-                                <input type="range" data-crop="bottom" min="0" max="100" value="${cropBottom}">
-                                <span class="value-disp">${cropBottom}%</span>
+                                <input type="range" data-crop="bottom" min="0" max="100" value="${roundVal(cropBottom)}">
+                                <span class="value-disp">${roundVal(cropBottom)}%</span>
                             </div>
                         </div>
                     </div>
@@ -852,50 +858,50 @@ export class CapiauTimelineInteraction {
                         <div class="adjustments-row">
                             <label>Brilho</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="brightness" min="-100" max="100" value="${brightness}">
-                                <span class="value-disp">${brightness}%</span>
+                                <input type="range" data-color="brightness" min="-100" max="100" value="${roundVal(brightness)}">
+                                <span class="value-disp">${roundVal(brightness)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Contraste</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="contrast" min="-100" max="100" value="${contrast}">
-                                <span class="value-disp">${contrast}%</span>
+                                <input type="range" data-color="contrast" min="-100" max="100" value="${roundVal(contrast)}">
+                                <span class="value-disp">${roundVal(contrast)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Saturação</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="saturation" min="0" max="200" value="${saturation}">
-                                <span class="value-disp">${saturation}%</span>
+                                <input type="range" data-color="saturation" min="0" max="200" value="${roundVal(saturation)}">
+                                <span class="value-disp">${roundVal(saturation)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Matiz</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="hue" min="-180" max="180" value="${hue}">
-                                <span class="value-disp">${hue}°</span>
+                                <input type="range" data-color="hue" min="-180" max="180" value="${roundVal(hue)}">
+                                <span class="value-disp">${roundVal(hue)}°</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Sépia</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="sepia" min="0" max="100" value="${sepia}">
-                                <span class="value-disp">${sepia}%</span>
+                                <input type="range" data-color="sepia" min="0" max="100" value="${roundVal(sepia)}">
+                                <span class="value-disp">${roundVal(sepia)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Cinzas</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="grayscale" min="0" max="100" value="${grayscale}">
-                                <span class="value-disp">${grayscale}%</span>
+                                <input type="range" data-color="grayscale" min="0" max="100" value="${roundVal(grayscale)}">
+                                <span class="value-disp">${roundVal(grayscale)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Desfoque</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="blur" min="0" max="20" value="${blur}">
-                                <span class="value-disp">${blur}px</span>
+                                <input type="range" data-color="blur" min="0" max="20" value="${roundVal(blur)}">
+                                <span class="value-disp">${roundVal(blur)}px</span>
                             </div>
                         </div>
                     </div>
@@ -925,8 +931,8 @@ export class CapiauTimelineInteraction {
                         <div class="adjustments-row">
                             <label>Nível</label>
                             <div class="control-wrap">
-                                <input id="adj-volume-slider" type="range" min="0" max="200" value="${Math.round(level * 100)}">
-                                <span class="value-disp" style="min-width: 60px;">${Math.round(level * 100)}% (${dbVal} dB)</span>
+                                <input id="adj-volume-slider" type="range" min="0" max="200" value="${roundVal(level * 100)}">
+                                <span class="value-disp" style="min-width: 60px;">${roundVal(level * 100)}% (${dbVal} dB)</span>
                             </div>
                         </div>
                     </div>
