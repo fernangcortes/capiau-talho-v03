@@ -178,6 +178,93 @@ class ImageSearch:
             print(f"[CLIP] Falha em similares do vídeo {video_id}: {e}")
             return []
 
+    def similar_to_multiple_items(
+        self, project_id: int, items: List[Dict[str, Any]], limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Busca imagens visualmente próximas a um conjunto de fotos e momentos de vídeo,
+        combinando seus vetores (média/centroide)."""
+        vectors = []
+        exclude_photos = set()
+        exclude_videos = [] # list of dicts with {"video_id", "start_time"}
+        
+        for item in items:
+            kind = item.get("kind")
+            item_id = item.get("id")
+            
+            if kind == "photo":
+                point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"img_proj_{project_id}_photo_{item_id}"))
+                try:
+                    pts = self.client.retrieve(self.collection_name, ids=[point_id], with_vectors=True)
+                    if pts and pts[0].vector:
+                        vectors.append(np.array(pts[0].vector))
+                        exclude_photos.add(item_id)
+                except Exception as e:
+                    print(f"[CLIP] Erro ao recuperar vetor da foto {item_id}: {e}")
+            elif kind == "video":
+                timestamp = item.get("timestamp")
+                if timestamp is not None:
+                    try:
+                        pts, _ = self.client.scroll(
+                            collection_name=self.collection_name,
+                            scroll_filter=Filter(must=[
+                                FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                                FieldCondition(key="video_id", match=MatchValue(value=item_id)),
+                            ]),
+                            limit=500, with_vectors=True, with_payload=True,
+                        )
+                        if pts:
+                            ref = min(pts, key=lambda p: abs((p.payload or {}).get("start_time", 0.0) - timestamp))
+                            if ref and ref.vector:
+                                vectors.append(np.array(ref.vector))
+                                ref_start = (ref.payload or {}).get("start_time", 0.0)
+                                exclude_videos.append({"video_id": item_id, "start_time": ref_start})
+                    except Exception as e:
+                        print(f"[CLIP] Erro ao recuperar vetor do vídeo {item_id}: {e}")
+                else:
+                    # Video inteiro: pega todos os keyframes
+                    try:
+                        pts, _ = self.client.scroll(
+                            collection_name=self.collection_name,
+                            scroll_filter=Filter(must=[
+                                FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                                FieldCondition(key="video_id", match=MatchValue(value=item_id)),
+                            ]),
+                            limit=500, with_vectors=True, with_payload=True,
+                        )
+                        if pts:
+                            for p in pts:
+                                if p.vector:
+                                    vectors.append(np.array(p.vector))
+                                    exclude_videos.append({"video_id": item_id, "start_time": (p.payload or {}).get("start_time", 0.0)})
+                    except Exception as e:
+                        print(f"[CLIP] Erro ao recuperar vetores do vídeo {item_id}: {e}")
+                        
+        if not vectors:
+            return []
+            
+        mean_vector = np.mean(vectors, axis=0)
+        results = self._query(project_id, mean_vector, limit + len(items) * 3)
+        
+        filtered_results = []
+        for r in results:
+            payload = r["payload"]
+            if payload.get("photo_id") in exclude_photos:
+                continue
+                
+            vid_id = payload.get("video_id")
+            if vid_id is not None:
+                start_time = payload.get("start_time", 0.0)
+                is_excl = False
+                for ex in exclude_videos:
+                    if ex["video_id"] == vid_id and abs(ex["start_time"] - start_time) < 0.5:
+                        is_excl = True
+                        break
+                if is_excl:
+                    continue
+            filtered_results.append(r)
+            
+        return filtered_results[:limit]
+
     def _query(self, project_id: int, vector: np.ndarray, limit: int) -> List[Dict[str, Any]]:
         response = self.client.query_points(
             collection_name=self.collection_name,

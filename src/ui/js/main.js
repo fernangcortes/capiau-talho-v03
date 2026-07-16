@@ -583,19 +583,48 @@ function applyFiltersAndRenderCards() {
                 ? r.payload.filepath
                 : `/originals/${filename}`);
                 
+            const explanationHtml = r.explanation ? `
+                <div class="explanation-box" style="font-size: 9px; color: var(--color-cyan); background: rgba(6,182,212,0.05); padding: 4px 8px; border-radius: 4px; margin-top: 4px; display: flex; align-items: center; gap: 4px; border: 1px solid rgba(6,182,212,0.1);">
+                    <i class="fa-solid fa-circle-info"></i> <span>${r.explanation}</span>
+                </div>
+            ` : "";
+
             card.innerHTML = `
-                <div class="search-result-layout">
-                    <img class="search-result-thumb" src="${src}" alt="Thumb" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; margin-right: 10px;">
-                    <div class="search-result-content">
+                <div class="search-result-layout" style="position: relative;">
+                    <button class="btn-select-similar-item" title="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
+                        <i class="fa-regular fa-square"></i>
+                    </button>
+                    <img class="search-result-thumb" src="${src}" alt="Thumb" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; margin-right: 10px; margin-left: 20px;">
+                    <div class="search-result-content" style="flex: 1;">
                         <div class="bubble-meta" style="margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
                             <span class="speaker-name" style="color:#f59e0b; font-weight:600;"><i class="fa-solid fa-image"></i> Foto de Set</span>
                             ${scoreBadge}
                         </div>
                         <div class="bubble-text">${highlightedText}</div>
                         <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Arquivo: ${filename}</div>
+                        ${explanationHtml}
                     </div>
                 </div>
             `;
+            
+            const selectBtn = card.querySelector(".btn-select-similar-item");
+            if (selectBtn) {
+                selectBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    window.toggleSelectSimilarItem("photo", photoId, filename, card);
+                });
+            }
+
+            const isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => item.kind === "photo" && item.id === photoId);
+            if (isSelected) {
+                card.classList.add("selected-for-similar");
+                const selectIcon = selectBtn ? selectBtn.querySelector("i") : null;
+                if (selectIcon) {
+                    selectIcon.className = "fa-solid fa-square-check";
+                    selectIcon.style.color = "var(--color-cyan)";
+                }
+            }
             
             // Adicionar à playlist
             const playlistItem = {
@@ -635,8 +664,19 @@ function applyFiltersAndRenderCards() {
                 videoDisplayTitle = foundVid.title || foundVid.filename;
             }
             
+            const explanationHtml = r.explanation ? `
+                <div class="explanation-box" style="font-size: 9px; color: var(--color-cyan); background: rgba(6,182,212,0.05); padding: 4px 8px; border-radius: 4px; margin-top: 4px; display: flex; align-items: center; gap: 4px; border: 1px solid rgba(6,182,212,0.1);">
+                    <i class="fa-solid fa-circle-info"></i> <span>${r.explanation}</span>
+                </div>
+            ` : "";
+
             card.innerHTML = `
-                <div class="bubble-meta" style="margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="position: relative;">
+                    <button class="btn-select-similar-item" title="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
+                        <i class="fa-regular fa-square"></i>
+                    </button>
+                </div>
+                <div class="bubble-meta" style="margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; padding-left: 20px;">
                     <span class="speaker-name" style="color:${color}; font-weight:600;"><i class="fa-solid ${icon}"></i> ${title}</span>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="font-weight:600; font-size:11px; color:var(--color-cyan); display:flex; align-items:center; gap:4px;">
@@ -645,14 +685,38 @@ function applyFiltersAndRenderCards() {
                         ${scoreBadge}
                     </div>
                 </div>
-                <div class="bubble-text">${highlightedText}</div>
-                <div style="font-size:10px; color:var(--text-muted); margin-top:4px; display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px;">
+                <div class="bubble-text" style="padding-left: 20px;">${highlightedText}</div>
+                <div style="font-size:10px; color:var(--text-muted); margin-top:4px; display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px; padding-left: 20px;">
                     <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${videoFilename}">Vídeo: ${videoDisplayTitle} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)</span>
                     <button class="view-context-btn" title="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; padding:4px; font-size:12px; display:flex; align-items:center; justify-content:center; border-radius:50%; width:24px; height:24px; flex-shrink:0;">
                         <i class="fa-solid fa-eye"></i>
                     </button>
                 </div>
+                <div style="padding-left: 20px;">
+                    ${explanationHtml}
+                </div>
             `;
+            
+            const selectBtn = card.querySelector(".btn-select-similar-item");
+            if (selectBtn) {
+                selectBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    window.toggleSelectSimilarItem("video", vidId, videoDisplayTitle, card, r.payload.start_time);
+                });
+            }
+
+            const isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => 
+                item.kind === "video" && item.id === vidId && item.timestamp === r.payload.start_time
+            );
+            if (isSelected) {
+                card.classList.add("selected-for-similar");
+                const selectIcon = selectBtn ? selectBtn.querySelector("i") : null;
+                if (selectIcon) {
+                    selectIcon.className = "fa-solid fa-square-check";
+                    selectIcon.style.color = "var(--color-cyan)";
+                }
+            }
             
             // Adicionar à playlist
             const playlistItem = {
@@ -1095,11 +1159,249 @@ async function showSimilarMedia(kind, id, opts = {}) {
 }
 window.showSimilarMedia = showSimilarMedia;
 
+window.selectedSimilarItems = [];
+
+window.toggleSelectSimilarItem = function(kind, id, title, cardEl, timestamp = null) {
+    if (!window.selectedSimilarItems) {
+        window.selectedSimilarItems = [];
+    }
+    const idx = window.selectedSimilarItems.findIndex(item => 
+        item.kind === kind && 
+        item.id === id && 
+        (kind !== "video" || item.timestamp === timestamp)
+    );
+    
+    if (idx >= 0) {
+        window.selectedSimilarItems.splice(idx, 1);
+        cardEl.classList.remove("selected-for-similar");
+        const icon = cardEl.querySelector(".btn-select-similar-item i");
+        if (icon) {
+            icon.className = "fa-regular fa-square";
+            icon.style.color = "var(--text-muted)";
+        }
+    } else {
+        window.selectedSimilarItems.push({ kind, id, title, timestamp });
+        cardEl.classList.add("selected-for-similar");
+        const icon = cardEl.querySelector(".btn-select-similar-item i");
+        if (icon) {
+            icon.className = "fa-solid fa-square-check";
+            icon.style.color = "var(--color-cyan)";
+        }
+    }
+    
+    window.updateSimilarSelectionUI();
+};
+
+window.updateSimilarSelectionUI = function() {
+    const count = window.selectedSimilarItems ? window.selectedSimilarItems.length : 0;
+    
+    const searchBtn = document.getElementById("btn-search-similar-selected");
+    const clearBtn = document.getElementById("btn-clear-similar-selected");
+    const countSpan = document.getElementById("similar-selected-count");
+    
+    if (searchBtn) {
+        searchBtn.style.display = count > 0 ? "inline-flex" : "none";
+    }
+    if (clearBtn) {
+        clearBtn.style.display = count > 0 ? "inline-flex" : "none";
+    }
+    if (countSpan) {
+        countSpan.textContent = count;
+    }
+    
+    document.querySelectorAll(".media-card, .photo-card, .search-result-card").forEach(el => {
+        const vidId = el.getAttribute("data-video-id");
+        const photoId = el.getAttribute("data-photo-id");
+        
+        let isSelected = false;
+        if (vidId) {
+            isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => item.kind === "video" && item.id == vidId && item.timestamp === null);
+        } else if (photoId) {
+            isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => item.kind === "photo" && item.id == photoId);
+        }
+        
+        const selectBtn = el.querySelector(".btn-select-similar-item");
+        const icon = selectBtn ? selectBtn.querySelector("i") : null;
+        
+        const isSearchResult = el.classList.contains("search-result-card");
+        if (isSearchResult) {
+            const isVideo = el.classList.contains("type-interview") || el.classList.contains("type-broll");
+            if (isVideo) {
+                const foundItem = SEARCH_STATE.playlistItems.find(item => item.cardElement === el);
+                if (foundItem) {
+                    isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => 
+                        item.kind === "video" && item.id == foundItem.video_id && item.timestamp === foundItem.start_time
+                    );
+                }
+            } else {
+                const foundItem = SEARCH_STATE.playlistItems.find(item => item.cardElement === el);
+                if (foundItem) {
+                    isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => 
+                        item.kind === "photo" && item.id == foundItem.photo_id
+                    );
+                }
+            }
+        }
+        
+        if (isSelected) {
+            el.classList.add("selected-for-similar");
+            if (icon) {
+                icon.className = "fa-solid fa-square-check";
+                icon.style.color = "var(--color-cyan)";
+            }
+        } else {
+            el.classList.remove("selected-for-similar");
+            if (icon) {
+                icon.className = "fa-regular fa-square";
+                icon.style.color = "var(--text-muted)";
+            }
+        }
+    });
+};
+
+window.clearSimilarSelection = function() {
+    window.selectedSimilarItems = [];
+    document.querySelectorAll(".selected-for-similar").forEach(el => {
+        el.classList.remove("selected-for-similar");
+        const icon = el.querySelector(".btn-select-similar-item i");
+        if (icon) {
+            icon.className = "fa-regular fa-square";
+            icon.style.color = "var(--text-muted)";
+        }
+    });
+    window.updateSimilarSelectionUI();
+};
+
+window.searchSimilarMultiple = async function() {
+    if (!window.selectedSimilarItems || window.selectedSimilarItems.length === 0) return;
+    
+    const searchType = document.getElementById("similar-search-type")?.value || "visual";
+    const targetMedia = document.getElementById("similar-search-target")?.value || "all";
+    
+    const items = window.selectedSimilarItems.map(item => ({
+        kind: item.kind,
+        id: item.id,
+        timestamp: item.timestamp
+    }));
+    
+    const searchContainer = getActiveElement("search-container");
+    if (searchContainer) {
+        searchContainer.innerHTML = "<div class='loading' style='padding: 15px;'>Buscando mídias similares (CLIP local)...</div>";
+    }
+    
+    STATE.currentRightTab = "search";
+    const searchTabBtn = document.querySelector(`.tab-btn[data-tab="tab-search"]`);
+    if (searchTabBtn) {
+        searchTabBtn.click();
+    }
+    
+    const similarDropdown = document.getElementById("library-similar-settings-dropdown");
+    if (similarDropdown) similarDropdown.style.display = "none";
+    
+    SEARCH_STATE.query = "";
+    SEARCH_STATE.offset = 0;
+    SEARCH_STATE.hasMore = false;
+    SEARCH_STATE.isLoading = false;
+    SEARCH_STATE.loadedResults = [];
+    SEARCH_STATE.activeMediaFilter = "";
+    SEARCH_STATE.activeContextFilters.clear();
+    SEARCH_STATE.aiCategories = null;
+    SEARCH_STATE.activeAiCategory = null;
+    SEARCH_STATE.showAllTags = false;
+    
+    try {
+        const response = await fetch("/api/media/similar-batch", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                project_id: STATE.currentProjectId,
+                items: items,
+                search_type: searchType,
+                target_media_type: targetMedia,
+                limit: 20
+            })
+        });
+        
+        const data = await response.json();
+        SEARCH_STATE.loadedResults = data.results || [];
+        
+        const labels = window.selectedSimilarItems.map(item => item.title).join(", ");
+        const summaryLabel = labels.length > 20 ? `${labels.substring(0, 20)}...` : labels;
+        const searchCriteriaName = searchType === "visual" ? "similaridade visual" : "similaridade temática";
+        
+        renderSearchResults(`Lote de ${searchCriteriaName} (${window.selectedSimilarItems.length} itens): ${summaryLabel}`);
+        
+        // Auto-run tooltip conversion for dynamic search cards
+        setTimeout(() => {
+            const convertTitleToTooltip = (root = document) => {
+                root.querySelectorAll("[title]").forEach(el => {
+                    const title = el.getAttribute("title");
+                    if (title && !el.hasAttribute("data-tooltip")) {
+                        el.setAttribute("data-tooltip", title);
+                        el.removeAttribute("title");
+                    }
+                });
+            };
+            convertTitleToTooltip();
+        }, 100);
+        
+    } catch (err) {
+        console.error("Erro na busca de similares em lote:", err);
+        if (searchContainer) {
+            searchContainer.innerHTML = `<div class='error' style='padding: 15px;'>Erro ao buscar similares: ${err.message}</div>`;
+        }
+    }
+};
+
 // updateActionsRowVisibility removed as actions are now persistent inside each panel container
 
 // Inicialização da Aplicação
 window.addEventListener("DOMContentLoaded", () => {
     console.log("CapIAu-Talho: Inicializando os módulos...");
+
+    // Event listeners para busca de similares em lote
+    const searchSimilarBtn = document.getElementById("btn-search-similar-selected");
+    const clearSimilarBtn = document.getElementById("btn-clear-similar-selected");
+    const triggerSimilarBtn = document.getElementById("btn-trigger-similar-search");
+    const similarDropdown = document.getElementById("library-similar-settings-dropdown");
+    
+    if (searchSimilarBtn) {
+        searchSimilarBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (similarDropdown) {
+                if (similarDropdown.style.display === "none") {
+                    similarDropdown.style.display = "flex";
+                } else {
+                    similarDropdown.style.display = "none";
+                }
+            }
+        });
+    }
+    
+    if (clearSimilarBtn) {
+        clearSimilarBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            window.clearSimilarSelection();
+        });
+    }
+    
+    if (triggerSimilarBtn) {
+        triggerSimilarBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            window.searchSimilarMultiple();
+        });
+    }
+    
+    // Close similar settings popover when clicking outside
+    document.addEventListener("click", (e) => {
+        if (similarDropdown && similarDropdown.style.display === "flex") {
+            if (!similarDropdown.contains(e.target) && e.target !== searchSimilarBtn && !searchSimilarBtn.contains(e.target)) {
+                similarDropdown.style.display = "none";
+            }
+        }
+    });
 
     // Inicializa a customização de abas (Drag & Drop e Visibilidade)
     initTabsCustomization();

@@ -159,6 +159,8 @@ def search_visual(
     """Busca visual pura por CLIP local (texto → imagem, sem custo de API)."""
     from src.search.image_semantic import ImageSearch
     results = ImageSearch.get_instance().search_text(project_id, query, limit=limit)
+    for r in results:
+        r["explanation"] = f"Correspondência visual (CLIP) de {r['score']*100:.0f}% com os termos da busca."
     return {"query": query, "results": results}
 
 @router.post("/api/search/categorize")

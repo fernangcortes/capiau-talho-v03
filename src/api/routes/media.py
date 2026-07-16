@@ -89,6 +89,108 @@ def _enrich_image_hits(conn: sqlite3.Connection, hits: List[dict]) -> List[dict]
         results.append({"id": h.get("id"), "score": h["score"], "payload": p})
     return results
 
+from pydantic import BaseModel
+
+class SimilarItem(BaseModel):
+    kind: str  # "photo" or "video"
+    id: int
+    timestamp: Optional[float] = None
+
+class SimilarBatchRequest(BaseModel):
+    project_id: int
+    items: List[SimilarItem]
+    search_type: str = "visual"  # "visual" or "textual"
+    target_media_type: str = "all"  # "all", "interview", "broll", "photo"
+    limit: int = 12
+
+@router.post("/api/media/similar-batch")
+def similar_batch(payload: SimilarBatchRequest, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Busca de mídias por similaridade multimodal (visual ou textual) em lote (E2.B6)."""
+    items_list = [{"kind": item.kind, "id": item.id, "timestamp": item.timestamp} for item in payload.items]
+    
+    if not items_list:
+        return {"results": []}
+        
+    results = []
+    
+    if payload.search_type == "textual":
+        from src.search.semantic import SemanticSearch
+        hits = SemanticSearch.get_instance().similar_to_multiple_items(
+            payload.project_id, items_list, media_type_filter=payload.target_media_type, limit=payload.limit
+        )
+        
+        # Enriquecimento para resultados de busca textual
+        cursor = conn.cursor()
+        for h in hits:
+            p = dict(h["payload"])
+            vid_id = p.get("video_id")
+            photo_id = p.get("photo_id")
+            
+            if photo_id:
+                cursor.execute("SELECT filename, filepath, title, description, tags FROM photo WHERE id = ?", (photo_id,))
+                row = cursor.fetchone()
+                if row:
+                    p.update({
+                        "filename": row["filename"], "filepath": row["filepath"],
+                        "title": row["title"], "description": row["description"]
+                    })
+                    p.setdefault("text", row["title"] or row["description"] or row["filename"])
+                proxy_rel = f"photos/proxy_photo_{photo_id}.webp"
+                if (CONFIG.PROXIES_DIR / proxy_rel).exists():
+                    p["proxy_path"] = f"/proxies/{proxy_rel}"
+            elif vid_id:
+                cursor.execute("SELECT filename, title, video_type FROM video WHERE id = ?", (vid_id,))
+                row = cursor.fetchone()
+                if row:
+                    p["filename"] = row["filename"]
+                    p["title"] = row["title"] or row["filename"]
+                    p["video_type"] = row["video_type"]
+                proxy_rel = f"proxy_vid_{vid_id}.mp4"
+                if (CONFIG.PROXIES_DIR / proxy_rel).exists():
+                    p["proxy_path"] = f"/proxies/{proxy_rel}"
+                    
+            text_snippet = p.get("text", "") or p.get("description", "") or ""
+            explanation = f"Relevância temática de {h['score']*100:.0f}% baseada no trecho: '{text_snippet[:80]}...'"
+            
+            results.append({
+                "id": h.get("id"),
+                "score": h["score"],
+                "explanation": explanation,
+                "payload": p
+            })
+            
+    else:
+        # Busca visual CLIP
+        from src.search.image_semantic import ImageSearch
+        hits = ImageSearch.get_instance().similar_to_multiple_items(
+            payload.project_id, items_list, limit=payload.limit
+        )
+        
+        enriched_hits = _enrich_image_hits(conn, hits)
+        
+        if payload.target_media_type != "all":
+            filtered = []
+            cursor = conn.cursor()
+            for r in enriched_hits:
+                p = r["payload"]
+                if payload.target_media_type == "photo":
+                    if p.get("photo_id") is not None:
+                        filtered.append(r)
+                else:
+                    vid_id = p.get("video_id")
+                    if vid_id is not None:
+                        cursor.execute("SELECT video_type FROM video WHERE id = ?", (vid_id,))
+                        row = cursor.fetchone()
+                        if row and row["video_type"] == payload.target_media_type:
+                            filtered.append(r)
+            enriched_hits = filtered
+            
+        for r in enriched_hits:
+            r["explanation"] = f"Visualmente semelhante (CLIP) com {r['score']*100:.0f}% de match com o lote selecionado."
+            results.append(r)
+            
+    return {"results": results[:payload.limit]}
+
 @router.get("/api/media/photo/{photo_id}/similar")
 def photo_similar(photo_id: int, project_id: int = Query(1), limit: int = Query(12), conn: sqlite3.Connection = Depends(get_db_conn)):
     """Fotos visualmente próximas via CLIP local (E2.B6)."""

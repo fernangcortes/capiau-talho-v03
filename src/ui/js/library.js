@@ -285,7 +285,12 @@ function renderTreeNode(node, container, depth = 0) {
         folderDiv.appendChild(folderHeader);
         folderDiv.appendChild(folderChildren);
         
-        const sortBy = document.getElementById("library-sort-by")?.value || "name_asc";
+        const savedSort = localStorage.getItem("library_sort_by");
+        const sortSelect = document.getElementById("library-sort-by");
+        if (sortSelect && savedSort && sortSelect.value !== savedSort) {
+            sortSelect.value = savedSort;
+        }
+        const sortBy = sortSelect?.value || savedSort || "name_asc";
         const sortedKeys = Object.keys(node.children).sort((a, b) => {
             const nodeA = node.children[a];
             const nodeB = node.children[b];
@@ -403,8 +408,11 @@ function renderTreeNode(node, container, depth = 0) {
         const tooltip = `Título: ${friendlyTitle}\nArquivo: ${v.filename}\nCategoria: ${categoryLabel}\nDescrição: ${v.description || v.summary || 'Sem decupagem'}`;
 
         card.innerHTML = `
-            <div class="media-thumbnail">
+            <div class="media-thumbnail" style="position: relative;">
                 ${thumbContent}
+                <button class="btn-select-similar-item" title="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
+                    <i class="fa-regular fa-square"></i>
+                </button>
             </div>
             <div class="media-info">
                 <h4 title="${tooltip}">
@@ -420,6 +428,25 @@ function renderTreeNode(node, container, depth = 0) {
                 </div>
             </div>
         `;
+        
+        const selectBtn = card.querySelector(".btn-select-similar-item");
+        if (selectBtn) {
+            selectBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                window.toggleSelectSimilarItem("video", v.id, v.filename || friendlyTitle, card);
+            });
+        }
+        
+        const isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => item.kind === "video" && item.id === v.id);
+        if (isSelected) {
+            card.classList.add("selected-for-similar");
+            const selectIcon = selectBtn ? selectBtn.querySelector("i") : null;
+            if (selectIcon) {
+                selectIcon.className = "fa-solid fa-square-check";
+                selectIcon.style.color = "var(--color-cyan)";
+            }
+        }
         
         card.addEventListener("click", () => {
             STATE.activeVideo = v;
@@ -685,6 +712,65 @@ export class LibraryManager {
             });
         }
         
+        // Custom Sort Dropdown Popover Toggling and Logic
+        const btnSort = document.getElementById("btn-library-sort");
+        const sortDropdown = document.getElementById("library-sort-dropdown");
+        
+        if (btnSort && sortDropdown) {
+            btnSort.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const isHidden = sortDropdown.style.display === "none";
+                sortDropdown.style.display = isHidden ? "flex" : "none";
+            });
+            
+            document.addEventListener("click", (e) => {
+                if (sortDropdown.style.display === "flex" && !sortDropdown.contains(e.target) && e.target !== btnSort && !btnSort.contains(e.target)) {
+                    sortDropdown.style.display = "none";
+                }
+            });
+            
+            // Sync initial state of sort options
+            const currentSortVal = localStorage.getItem("library_sort_by") || "name_asc";
+            sortDropdown.querySelectorAll(".sort-option").forEach(opt => {
+                if (opt.getAttribute("data-val") === currentSortVal) {
+                    opt.classList.add("active");
+                } else {
+                    opt.classList.remove("active");
+                }
+                
+                opt.addEventListener("click", () => {
+                    const val = opt.getAttribute("data-val");
+                    const hiddenSortSelect = document.getElementById("library-sort-by");
+                    if (hiddenSortSelect) {
+                        hiddenSortSelect.value = val;
+                        hiddenSortSelect.dispatchEvent(new Event("change"));
+                    }
+                    
+                    sortDropdown.querySelectorAll(".sort-option").forEach(o => o.classList.remove("active"));
+                    opt.classList.add("active");
+                    sortDropdown.style.display = "none";
+                });
+            });
+        }
+        
+        // Status Chips Click and Synchronization
+        const statusChipsPanel = document.getElementById("advanced-search-panel");
+        if (statusChipsPanel) {
+            statusChipsPanel.querySelectorAll(".filter-chip").forEach(chip => {
+                chip.addEventListener("click", () => {
+                    const val = chip.getAttribute("data-val");
+                    const hiddenStatusSelect = document.getElementById("library-filter-status");
+                    if (hiddenStatusSelect) {
+                        hiddenStatusSelect.value = val;
+                        hiddenStatusSelect.dispatchEvent(new Event("change"));
+                    }
+                    
+                    statusChipsPanel.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
+                    chip.classList.add("active");
+                });
+            });
+        }
+        
         // Checkboxes de exibição
         const chkThumbnails = document.getElementById("chk-show-thumbnails");
         const chkDuration = document.getElementById("chk-show-duration");
@@ -894,6 +980,16 @@ export class LibraryManager {
                 
                 searchInput.value = query;
                 searchInput.dispatchEvent(new Event("input"));
+            });
+        }
+
+        // Connect library-sort-by select to trigger real-time re-sort and persist preference
+        const sortSelect = document.getElementById("library-sort-by");
+        if (sortSelect) {
+            sortSelect.addEventListener("change", () => {
+                const val = sortSelect.value;
+                localStorage.setItem("library_sort_by", val);
+                STATE.emit("videosUpdated", STATE.allVideos);
             });
         }
 
@@ -1407,11 +1503,35 @@ export class LibraryManager {
             }
             
             card.innerHTML = `
-                ${imgHtml}
+                <div class="photo-thumb-container" style="position: relative; width: 100%; height: 100%;">
+                    ${imgHtml}
+                    <button class="btn-select-similar-item" title="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
+                        <i class="fa-regular fa-square"></i>
+                    </button>
+                </div>
                 <button class="btn-photo-add-timeline" title="Adicionar à timeline (still)" style="position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:5px; border:none; background:rgba(6,182,212,0.9); color:#00141a; font-size:11px; cursor:pointer; z-index:3; display:none; align-items:center; justify-content:center;"><i class="fa-solid fa-plus"></i></button>
                 <button class="btn-photo-similar" title="Encontrar similares (busca visual local)" style="position:absolute; top:4px; right:30px; width:22px; height:22px; border-radius:5px; border:none; background:rgba(168,85,247,0.9); color:#fff; font-size:11px; cursor:pointer; z-index:3; display:none; align-items:center; justify-content:center;"><i class="fa-solid fa-images"></i></button>
                 <p title="${p.description || p.filename}">${p.title || p.description || p.filename}</p>
             `;
+
+            const selectBtn = card.querySelector(".btn-select-similar-item");
+            if (selectBtn) {
+                selectBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    window.toggleSelectSimilarItem("photo", p.id, p.title || p.filename, card);
+                });
+            }
+
+            const isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => item.kind === "photo" && item.id === p.id);
+            if (isSelected) {
+                card.classList.add("selected-for-similar");
+                const selectIcon = selectBtn ? selectBtn.querySelector("i") : null;
+                if (selectIcon) {
+                    selectIcon.className = "fa-solid fa-square-check";
+                    selectIcon.style.color = "var(--color-cyan)";
+                }
+            }
 
             if (clickEnabled) {
                 card.style.cursor = "pointer";

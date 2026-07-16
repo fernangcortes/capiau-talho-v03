@@ -131,18 +131,14 @@
                 </div>
                 
                 <div class="library-toolbar" id="library-filter-bar" style="padding: 8px 12px; border-bottom: 1px solid var(--border-glass); display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.15); position: relative;">
+                    <!-- Linha 1: Campo de Busca e Botões de Similaridade + Ajustes -->
                     <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
                         <div class="search-area glassmorphism library-search-area" style="flex: 1; display: flex; align-items: center; gap: 6px; height: 28px; width: 100%;">
                             <i class="fa-solid fa-magnifying-glass search-icon" style="color: var(--text-muted); font-size: 10px;"></i>
                             <input type="text" id="library-search-input" placeholder="Buscar mídias..." style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; font-size: 10px; color: #fff;">
                         </div>
-                        <button id="btn-toggle-advanced-search" title="Busca Avançada & Tags" style="background: transparent; border: none; padding: 4px; color: var(--color-cyan); cursor: pointer; font-size: 13px; transition: all 0.2s; flex-shrink: 0;"><i class="fa-solid fa-sliders"></i></button>
-                        <button id="btn-library-display-settings" title="Opções de Exibição" style="background: transparent; border: none; padding: 4px; color: var(--color-cyan); cursor: pointer; font-size: 13px; transition: all 0.2s; flex-shrink: 0;"><i class="fa-solid fa-gear"></i></button>
-                    </div>
-
-                    <!-- Dropdown de Autocomplete Flutuante -->
-                    <div id="library-autocomplete-dropdown" class="glassmorphism" style="display: none; position: absolute; top: 38px; left: 12px; right: 46px; z-index: 2000; max-height: 220px; overflow-y: auto; border: 1px solid rgba(6,182,212,0.35); background: rgba(18, 16, 22, 0.98); border-radius: 6px; box-shadow: 0 8px 32px rgba(0,0,0,0.6); padding: 4px 0;">
-                        <!-- Itens inseridos dinamicamente via JS -->
+                        <button id="btn-toggle-advanced-search" title="Busca Avançada & Filtros" class="lib-action-btn"><i class="fa-solid fa-sliders"></i></button>
+                        <button id="btn-library-display-settings" title="Opções de Exibição" class="lib-action-btn"><i class="fa-solid fa-gear"></i></button>
                     </div>
 
                     <!-- Painel de Busca Avançada (Retrátil) -->
@@ -152,6 +148,17 @@
                             <button id="btn-close-advanced-search" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; font-size: 10px;"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                         
+                        <!-- Filtros por Status de Análise (Chips) -->
+                        <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 6px;">
+                            <div style="font-weight: 600; color: var(--text-muted); margin-bottom: 2px;">Filtrar por Status:</div>
+                            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                                <button class="filter-chip active" data-val="all">Todos</button>
+                                <button class="filter-chip" data-val="pending">Não Analisados</button>
+                                <button class="filter-chip" data-val="processed">Analisados (IA)</button>
+                                <button class="filter-chip" data-val="error">Com Falhas</button>
+                            </div>
+                        </div>
+
                         <!-- Construtor de Filtros -->
                         <div style="display: flex; flex-direction: column; gap: 4px;">
                             <div style="font-weight: 600; color: var(--text-muted);">Adicionar Filtro Rápido:</div>
@@ -166,35 +173,14 @@
                                 </select>
                                 <input type="text" id="adv-filter-value" placeholder="Valor" style="flex: 1.5; height: 22px; font-size: 9px; padding: 0 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff; outline: none;">
                                 <button id="btn-add-adv-filter" style="height: 22px; padding: 0 8px; font-size: 9px; font-weight: 600; color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.3); background: rgba(6,182,212,0.08); border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 2px;">
-                                    <i class="fa-solid fa-plus"></i> Inserir
+                                    <i class="fa-solid fa-plus"></i> Add
                                 </button>
                             </div>
                         </div>
-
-                        <!-- Tags e Filtros Sugeridos -->
-                        <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
-                            <div style="font-weight: 600; color: var(--text-muted);">Sugestões do Material (Clique para adicionar):</div>
-                            <div id="advanced-suggestions-chips" style="display: flex; flex-wrap: wrap; gap: 4px; max-height: 90px; overflow-y: auto; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);">
-                                <!-- Chips dinâmicos via JS -->
-                            </div>
-                        </div>
-
-                        <!-- Legenda de sintaxe booleana -->
-                        <div style="color: var(--text-muted); font-size: 8px; line-height: 1.3; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px; margin-top: 4px; display: flex; flex-direction: column; gap: 1px;">
-                            <div><strong>Operadores:</strong> <code>AND</code> (espaço), <code>OR</code>, <code>NOT</code> (ou <code>-</code>), parênteses <code>()</code>.</div>
-                            <div><strong>Exemplos:</strong> <code>tipo:fala -obra</code>, <code>duracao>15 OR tag:câmera</code></div>
-                        </div>
                     </div>
 
-                    <!-- Dropdown de exibição (Popover) -->
-                    <div id="library-display-settings-dropdown" class="display-settings-popover glassmorphism" style="display: none; position: absolute; top: 100%; left: 12px; right: 12px; z-index: 1000; padding: 10px; border-radius: 6px; border: 1px solid rgba(6,182,212,0.3); background: rgba(20, 18, 25, 0.98); flex-direction: column; gap: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-                        <div style="font-size: 9px; font-weight: 700; color: var(--color-cyan); margin-bottom: 4px; text-transform: uppercase;">Mostrar Metadados:</div>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
-                            <input type="checkbox" id="chk-show-thumbnails" checked style="cursor:pointer;"> Miniaturas Reais
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
-                            <input type="checkbox" id="chk-show-duration" checked style="cursor:pointer;"> Duração
-                        </label>
+                    <!-- Dropdown de Configurações de Exibição da Biblioteca (Retrátil) -->
+                    <div id="library-display-settings-dropdown" class="glassmorphism" style="display: none; flex-direction: column; gap: 8px; padding: 10px; border-radius: 6px; border: 1px solid rgba(6,182,212,0.3); background: rgba(20, 18, 25, 0.98); box-shadow: 0 4px 20px rgba(0,0,0,0.5); position: absolute; top: 100%; right: 12px; z-index: 1000; width: 150px;">
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
                             <input type="checkbox" id="chk-show-tags" checked style="cursor:pointer;"> Tags de Categoria
                         </label>
@@ -203,61 +189,60 @@
                         </label>
                     </div>
 
-                    <!-- Linha 2: Dropdowns de Ordenar e Filtragem -->
-                    <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
-                        <!-- Filtro por status de análise -->
-                        <div class="dropdown-wrapper" style="height: 24px; padding: 0 6px; flex: 1; display: flex; align-items: center;">
-                            <i class="fa-solid fa-filter" style="font-size: 9px; color: var(--color-cyan);"></i>
-                            <select id="library-filter-status" style="background: transparent; border: none; outline: none; color: var(--text-secondary); font-size: 9px; font-weight: 600; cursor: pointer; width: 100%;">
-                                <option value="all">Filtros: Todos</option>
-                                <option value="pending">Não Analisados</option>
-                                <option value="processed">Analisados (IA)</option>
-                                <option value="error">Com Falhas</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Ordenar por metadados -->
-                        <div class="dropdown-wrapper" style="height: 24px; padding: 0 6px; flex: 1; display: flex; align-items: center;">
-                            <i class="fa-solid fa-arrow-down-a-z" style="font-size: 9px; color: var(--color-cyan);"></i>
-                            <select id="library-sort-by" style="background: transparent; border: none; outline: none; color: var(--text-secondary); font-size: 9px; font-weight: 600; cursor: pointer; width: 100%;">
-                                <option value="name_asc">Nome (A-Z)</option>
-                                <option value="name_desc">Nome (Z-A)</option>
-                                <option value="type_interview">Entrevistas 1º</option>
-                                <option value="type_broll">B-Rolls 1º</option>
-                                <option value="duration_desc">Duração 🠗</option>
-                                <option value="date_desc">Adição Recente</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Linha 3: Visualização/Zoom (Esquerda) e Botões Globais (Direita) -->
-                    <div style="display: flex; width: 100%; align-items: center; justify-content: space-between; margin-top: 2px;">
-                        <!-- Lado Esquerdo: Visualização e Zoom -->
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <!-- Visualização -->
-                            <div style="display: flex; gap: 6px; align-items: center;">
-                                <button id="btn-view-mode-list" class="btn-control active" title="Modo Lista"><i class="fa-solid fa-list"></i></button>
-                                <button id="btn-view-mode-grid" class="btn-control" title="Modo Cards"><i class="fa-solid fa-table-cells-large"></i></button>
-                            </div>
+                    <!-- Linha 2: Barra de Ferramentas / Ícones de Ação -->
+                    <div style="display: flex; width: 100%; align-items: center; justify-content: space-between; height: 24px; margin-top: 2px;">
+                        <!-- Esquerda: Modo de Exibição e Zoom -->
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <button id="btn-view-mode-list" class="lib-action-btn active" title="Visualização em Árvore/Lista"><i class="fa-solid fa-list"></i></button>
+                            <button id="btn-view-mode-grid" class="lib-action-btn" title="Visualização em Grade/Cards"><i class="fa-solid fa-table-cells-large"></i></button>
                             
-                            <!-- Separador Vertical -->
-                            <div style="width: 1px; height: 10px; background: rgba(255,255,255,0.12);"></div>
+                            <div style="width: 1px; height: 10px; background: rgba(255,255,255,0.12); margin: 0 2px;"></div>
                             
-                            <!-- Zoom -->
-                            <div style="display: flex; align-items: center; gap: 4px;">
-                                <i class="fa-solid fa-magnifying-glass" style="font-size: 9px; color: var(--text-muted);"></i>
-                                <input type="range" id="library-zoom-slider" min="30" max="150" value="45" style="width: 50px; height: 3px; cursor: pointer; accent-color: var(--color-cyan); margin: 0; padding: 0; background: rgba(255,255,255,0.1); border: none; outline: none;">
-                                <span id="library-zoom-label" style="font-size: 8px; color: var(--text-muted); font-family: monospace;">45px</span>
+                            <div class="zoom-container" style="display: flex; align-items: center; gap: 4px;">
+                                <i class="fa-solid fa-magnifying-glass" style="font-size: 8px; color: var(--text-muted);"></i>
+                                <input type="range" id="library-zoom-slider" min="30" max="150" value="45" style="width: 40px; height: 3px; cursor: pointer; accent-color: var(--color-cyan); margin: 0; padding: 0; background: rgba(255,255,255,0.1); border: none; outline: none;">
+                                <span id="library-zoom-label" style="font-size: 7px; color: var(--text-muted); font-family: monospace;">45px</span>
                             </div>
                         </div>
 
-                        <!-- Lado Direito: Expandir, Recolher e Fotos no Player -->
-                        <div style="display: flex; gap: 8px; align-items: center;">
-                            <button id="btn-expand-all" title="Expandir todas as pastas" onclick="globalExpandCollapseAll(true)" style="background: none; border: none; padding: 0; color: var(--color-cyan); cursor: pointer; font-size: 11px; transition: color 0.2s; flex-shrink: 0;"><i class="fa-solid fa-angles-down"></i></button>
-                            <button id="btn-collapse-all" title="Recolher todas as pastas" onclick="globalExpandCollapseAll(false)" style="background: none; border: none; padding: 0; color: var(--text-muted); cursor: pointer; font-size: 11px; transition: color 0.2s; flex-shrink: 0;"><i class="fa-solid fa-angles-up"></i></button>
-                            <button id="btn-library-photos-in-player" title="Abrir fotos no player de vídeo" style="background: none; border: none; padding: 0; color: var(--text-muted); cursor: pointer; font-size: 11px; transition: color 0.2s; flex-shrink: 0;"><i class="fa-regular fa-circle-play"></i></button>
+                        <!-- Direita: Expandir/Recolher, Fotos no Player, Ordenação Dropdown -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button id="btn-expand-all" class="lib-action-btn" title="Expandir todas as pastas" onclick="globalExpandCollapseAll(true)" style="color: var(--color-cyan);"><i class="fa-solid fa-angles-down"></i></button>
+                            <button id="btn-collapse-all" class="lib-action-btn" title="Recolher todas as pastas" onclick="globalExpandCollapseAll(false)"><i class="fa-solid fa-angles-up"></i></button>
+                            <button id="btn-library-photos-in-player" class="lib-action-btn" title="Abrir fotos no player de vídeo"><i class="fa-regular fa-circle-play"></i></button>
+                            
+                            <div style="width: 1px; height: 10px; background: rgba(255,255,255,0.12); margin: 0 2px;"></div>
+                            
+                            <button id="btn-library-sort" class="lib-action-btn" title="Ordenar Mídias"><i class="fa-solid fa-arrow-down-a-z"></i></button>
                         </div>
                     </div>
+
+                    <!-- Popover de Ordenação Customizado -->
+                    <div id="library-sort-dropdown" class="glassmorphism" style="display: none; position: absolute; top: 100%; right: 12px; z-index: 1000; width: 140px; padding: 4px; border-radius: 6px; border: 1px solid rgba(6,182,212,0.3); background: rgba(20, 18, 25, 0.98); flex-direction: column; gap: 2px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+                        <div class="sort-option active" data-val="name_asc"><i class="fa-solid fa-arrow-down-a-z"></i> Nome (A-Z)</div>
+                        <div class="sort-option" data-val="name_desc"><i class="fa-solid fa-arrow-up-a-z"></i> Nome (Z-A)</div>
+                        <div class="sort-option" data-val="type_interview"><i class="fa-solid fa-microphone"></i> Entrevistas 1º</div>
+                        <div class="sort-option" data-val="type_broll"><i class="fa-solid fa-video"></i> B-Rolls 1º</div>
+                        <div class="sort-option" data-val="duration_desc"><i class="fa-solid fa-clock"></i> Duração 🠗</div>
+                        <div class="sort-option" data-val="date_desc"><i class="fa-solid fa-calendar-days"></i> Adição Recente</div>
+                    </div>
+
+                    <!-- Elementos SELECT ocultos para retrocompatibilidade -->
+                    <select id="library-filter-status" style="display: none;">
+                        <option value="all" selected>all</option>
+                        <option value="pending">pending</option>
+                        <option value="processed">processed</option>
+                        <option value="error">error</option>
+                    </select>
+                    
+                    <select id="library-sort-by" style="display: none;">
+                        <option value="name_asc" selected>name_asc</option>
+                        <option value="name_desc">name_desc</option>
+                        <option value="type_interview">type_interview</option>
+                        <option value="type_broll">type_broll</option>
+                        <option value="duration_desc">duration_desc</option>
+                        <option value="date_desc">date_desc</option>
+                    </select>
                 </div>
                 
                 <div class="sidebar-content scrollable">

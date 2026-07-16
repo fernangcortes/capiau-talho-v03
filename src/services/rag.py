@@ -425,7 +425,7 @@ class RAGService:
         except Exception as mmr_err:
             print(f"[RAGSearch] MMR indisponível: {mmr_err}")
 
-        # 7. Atribui IDs estáveis para referência no frontend e categorização
+        # 7. Atribui IDs estáveis para referência no frontend e categorização e adiciona explicações didáticas
         for idx, r in enumerate(final_results):
             payload = r.get("payload", {})
             m_type = payload.get("media_type", "unknown")
@@ -435,6 +435,17 @@ class RAGService:
             media_id = payload.get("photo_id") or payload.get("video_id") or payload.get("doc_id") or 0
             start_time = payload.get("start_time", 0.0)
             r["id"] = f"{m_type}_{media_id}_{start_time}_{idx}"
+            
+            # Adiciona explicação didática da relevância
+            score_val = r.get("score", 0.0)
+            if score_val == 1.0:
+                r["explanation"] = "Presença confirmada do personagem no frame (reconhecimento facial)."
+            elif score_val == 0.95:
+                r["explanation"] = "Trecho do depoimento falado pelo personagem pesquisado."
+            elif payload.get("match_source") == "clip":
+                r["explanation"] = f"Correspondência visual (CLIP) de {score_val*100:.0f}% com os termos da busca."
+            else:
+                r["explanation"] = f"Correspondência conceitual (Semântica) de {score_val*100:.0f}% no texto do trecho."
 
         return final_results[offset : offset + limit]
 
