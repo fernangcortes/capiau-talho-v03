@@ -763,6 +763,9 @@ export class LibraryManager {
             zoomSlider.addEventListener("input", (e) => {
                 setZoomValue(parseInt(e.target.value));
             });
+            zoomSlider.addEventListener("dblclick", () => {
+                setZoomValue(80);
+            });
         }
         
         // Carrega preferências salvas

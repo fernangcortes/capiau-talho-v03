@@ -30,6 +30,10 @@ export class FaceManager {
             epsInput.addEventListener("input", () => {
                 epsVal.textContent = epsInput.value;
             });
+            epsInput.addEventListener("dblclick", () => {
+                epsInput.value = 0.38;
+                epsVal.textContent = "0.38";
+            });
         }
 
         const btnSyncEnrich = document.getElementById("btn-sync-enrich");

@@ -496,6 +496,13 @@ export class SettingsPanelManager {
             };
             range.addEventListener("input", () => { num.value = range.value; });
             range.addEventListener("change", () => onChange(parse(range.value)));
+            range.addEventListener("dblclick", () => {
+                if (disabled) return;
+                const defVal = entry.default;
+                range.value = defVal;
+                num.value = defVal;
+                onChange(defVal);
+            });
             num.addEventListener("change", () => {
                 const v = parse(num.value);
                 num.value = v;

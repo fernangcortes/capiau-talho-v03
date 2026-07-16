@@ -220,6 +220,10 @@ export class PanelsManager {
             trackHeightSlider.addEventListener("input", (e) => {
                 TIMELINE_STATE.setTrackHeightScale(parseInt(e.target.value, 10) / 100);
             });
+            trackHeightSlider.addEventListener("dblclick", () => {
+                trackHeightSlider.value = 100;
+                TIMELINE_STATE.setTrackHeightScale(1.0);
+            });
         }
 
         // ── Undo / Redo da timeline ──

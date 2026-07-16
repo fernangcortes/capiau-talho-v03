@@ -1005,6 +1005,7 @@ export class CapiauTimelineInteraction {
         container.querySelectorAll("input[data-prop]").forEach(slider => {
             const prop = slider.dataset.prop;
             const disp = slider.nextElementSibling;
+            const defaults = { x: 0, y: 0, scale: 100, rotation: 0, opacity: 100 };
 
             slider.oninput = () => {
                 TIMELINE_HISTORY.begin();
@@ -1038,6 +1039,18 @@ export class CapiauTimelineInteraction {
                 this.setClipTransform(clipId, prop, val);
                 TIMELINE_HISTORY.commit();
             };
+
+            slider.addEventListener("dblclick", () => {
+                const defVal = defaults[prop] !== undefined ? defaults[prop] : 0;
+                slider.value = defVal;
+                if (disp) {
+                    disp.textContent = defVal + (prop === "rotation" ? "°" : "%");
+                }
+                let val = parseFloat(defVal);
+                if (prop === "scale") val = val / 100;
+                else if (prop === "opacity") val = val / 100;
+                this.setClipTransform(clipId, prop, val);
+            });
         });
 
         // Recorte (Crop)
@@ -1072,12 +1085,30 @@ export class CapiauTimelineInteraction {
                 this.setClipCrop(clipId, prop, val);
                 TIMELINE_HISTORY.commit();
             };
+
+            slider.addEventListener("dblclick", () => {
+                const defVal = 0;
+                slider.value = defVal;
+                if (disp) {
+                    disp.textContent = defVal + "%";
+                }
+                this.setClipCrop(clipId, prop, defVal);
+            });
         });
 
         // Efeitos de Cor
         container.querySelectorAll("input[data-color]").forEach(slider => {
             const prop = slider.dataset.color;
             const disp = slider.nextElementSibling;
+            const colorDefaults = {
+                brightness: 0,
+                contrast: 0,
+                saturation: 100,
+                hue: 0,
+                sepia: 0,
+                grayscale: 0,
+                blur: 0
+            };
 
             slider.oninput = () => {
                 TIMELINE_HISTORY.begin();
@@ -1105,6 +1136,15 @@ export class CapiauTimelineInteraction {
                 this.setClipColor(clipId, prop, val);
                 TIMELINE_HISTORY.commit();
             };
+
+            slider.addEventListener("dblclick", () => {
+                const defVal = colorDefaults[prop] !== undefined ? colorDefaults[prop] : 0;
+                slider.value = defVal;
+                if (disp) {
+                    disp.textContent = defVal + (prop === "blur" ? "px" : prop === "hue" ? "°" : "%");
+                }
+                this.setClipColor(clipId, prop, defVal);
+            });
         });
 
         // Volume de Áudio
@@ -1157,6 +1197,25 @@ export class CapiauTimelineInteraction {
                 this.setClipVolume(targetClipId, val);
                 TIMELINE_HISTORY.commit();
             };
+
+            volSlider.addEventListener("dblclick", () => {
+                const defVal = 100; // 100%
+                volSlider.value = defVal;
+                if (disp) {
+                    disp.textContent = `100% (0.0 dB)`;
+                }
+
+                const isAudioTrack = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+                let targetClipId = clipId;
+                if (!isAudioTrack && clip.type === "video" && clip.link_id) {
+                    const partner = STATE.activeTimelineCuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
+                    if (partner) {
+                        targetClipId = partner.id;
+                    }
+                }
+
+                this.setClipVolume(targetClipId, 1.0);
+            });
         }
 
         // Fades
