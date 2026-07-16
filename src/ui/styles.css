@@ -5772,3 +5772,30 @@ select option, .nle-select option {
 .transform-anchor::before { top: 3px; left: -2px; width: 12px; height: 1px; }
 .transform-anchor::after { top: -2px; left: 3px; width: 1px; height: 12px; }
 
+/* Botões flat para seleção de enquadramento (Preencher/Ajustar) */
+.nle-select-btn {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, color 0.2s, text-shadow 0.2s;
+    outline: none;
+}
+
+.nle-select-btn:hover {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan);
+    transform: scale(1.1);
+}
+
+.nle-select-btn.active {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+
+

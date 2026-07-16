@@ -414,11 +414,11 @@ export class CapiauTimelineRenderer {
             // Rótulo do clipe
             let label;
             if (isPhoto) {
-                const name = photo ? photo.filename : `Foto ${cut.photo_id}`;
+                const name = photo ? (photo.title || photo.filename) : `Foto ${cut.photo_id}`;
                 const durS = framesToSeconds(cut.outFrame - cut.inFrame, TIMELINE_STATE.fps);
                 label = `▣ ${name} [${durS.toFixed(1)}s]`;
             } else {
-                const name = video ? video.filename : `Vídeo ${cut.video_id}`;
+                const name = video ? (video.title || video.filename) : `Vídeo ${cut.video_id}`;
                 const prefix = laneKind === "audio" ? (cut.link_id ? "♪⇅" : "♪") : "#";
                 label = `${prefix} ${name} [${framesToTimecode(cut.inFrame, TIMELINE_STATE.fps).substring(6)} -> ${framesToTimecode(cut.outFrame, TIMELINE_STATE.fps).substring(6)}]`;
             }
@@ -600,7 +600,7 @@ export class CapiauTimelineRenderer {
                 const media = isPhotoGhost
                     ? STATE.allPhotos.find(p => p.id === ghost.photo_id)
                     : STATE.allVideos.find(v => v.id === ghost.video_id);
-                const mediaName = media ? media.filename : (isPhotoGhost ? "foto" : "clipe");
+                const mediaName = media ? (media.title || media.filename) : (isPhotoGhost ? "foto" : "clipe");
                 const targetTrack = TIMELINE_STATE.getTrack(ghost.track);
                 const trackName = targetTrack ? (targetTrack.name || targetTrack.id) : ghost.track;
                 const durS = framesToSeconds(ghost.outFrame - ghost.inFrame, TIMELINE_STATE.fps);

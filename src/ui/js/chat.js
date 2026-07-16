@@ -537,7 +537,8 @@ export class ChatManager {
                 if (miniVideo && miniTitle) {
                     const src = video.proxy_path || `/originals/${video.filename}`;
                     miniVideo.src = src;
-                    miniTitle.textContent = video.filename;
+                    miniTitle.textContent = video.title || video.filename;
+                    miniTitle.title = video.filename;
                     
                     miniVideo.onloadedmetadata = () => {
                         miniVideo.currentTime = item.start;

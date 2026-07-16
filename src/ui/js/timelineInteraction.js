@@ -271,15 +271,34 @@ export class CapiauTimelineInteraction {
         this.mouseX = x;
         this.mouseY = y;
 
-        // Atualiza cursores dinâmicos de trim
+        // Atualiza cursores dinâmicos de trim e tooltip com nome do arquivo
         if (!this.dragState && track) {
             const hit = this.findClipAt(frame, track);
             if (hit && hit.type === "clip") {
                 const edge = this.checkTrimZone(x, hit.data);
                 this.canvas.style.cursor = edge ? "w-resize" : "grab";
+                
+                // Exibe nome do arquivo original no hover
+                const cut = hit.data;
+                let hoverFilename = "";
+                if (cut.photo_id) {
+                    const photo = STATE.allPhotos.find(p => String(p.id) === String(cut.photo_id));
+                    if (photo) hoverFilename = photo.filename;
+                } else if (cut.video_id) {
+                    const video = STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
+                    if (video) hoverFilename = video.filename;
+                }
+                if (hoverFilename) {
+                    this.canvas.title = hoverFilename;
+                } else {
+                    this.canvas.removeAttribute("title");
+                }
             } else {
                 this.canvas.style.cursor = "default";
+                this.canvas.removeAttribute("title");
             }
+        } else if (!this.dragState) {
+            this.canvas.removeAttribute("title");
         }
 
         if (!this.dragState) {
@@ -646,16 +665,29 @@ export class CapiauTimelineInteraction {
             partnerAudioClip = STATE.activeTimelineCuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
         }
         
-        let filename = "Clipe de Áudio";
+        let displayTitle = "Clipe de Áudio";
+        let realFilename = "";
         if (isPhoto) {
             const photoData = STATE.allPhotos.find(p => String(p.id) === String(clip.photo_id));
-            filename = photoData ? photoData.filename : "Foto";
+            if (photoData) {
+                displayTitle = photoData.title || photoData.filename;
+                realFilename = photoData.filename;
+            } else {
+                displayTitle = "Foto";
+                realFilename = "";
+            }
         } else {
             const videoData = STATE.allVideos.find(v => String(v.id) === String(clip.video_id));
-            if (isAudioTrack) {
-                filename = videoData ? `${videoData.filename} (Áudio)` : "Áudio";
+            if (videoData) {
+                if (isAudioTrack) {
+                    displayTitle = videoData.title ? `${videoData.title} (Áudio)` : `${videoData.filename} (Áudio)`;
+                } else {
+                    displayTitle = videoData.title || videoData.filename;
+                }
+                realFilename = videoData.filename;
             } else {
-                filename = videoData ? videoData.filename : "Vídeo";
+                displayTitle = isAudioTrack ? "Áudio" : "Vídeo";
+                realFilename = "";
             }
         }
 
@@ -707,22 +739,18 @@ export class CapiauTimelineInteraction {
         let html = `
             <div style="font-size:11px; font-weight:bold; color:var(--color-cyan); display:flex; gap: 6px; align-items:center; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; margin-bottom: 4px;">
                 <i class="fa-solid fa-sliders"></i>
-                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${filename}</span>
-                <span style="font-size:8.5px; padding:2px 6px; border-radius:4px; font-weight:bold; background:rgba(6,182,212,0.1); color:var(--color-cyan); text-transform:uppercase; letter-spacing:0.5px;">${clip.track}</span>
+                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${realFilename}">${displayTitle}</span>
+                <span style="font-size:8.5px; padding:2px 6px; border-radius:4px; font-weight:bold; background:rgba(6,182,212,0.1); color:var(--color-cyan); text-transform:uppercase; letter-spacing:0.5px; margin-right: 4px;">${clip.track}</span>
+                ${!isAudioTrack ? `
+                <div style="display:flex; gap:8px; align-items:center; border-left: 1px solid var(--border-glass); padding-left:8px;">
+                    <button class="nle-select-btn ${fitMode === 'fill' ? 'active' : ''}" data-action="fit:fill" title="Preencher (Fill)"><i class="fa-solid fa-expand"></i></button>
+                    <button class="nle-select-btn ${fitMode === 'fit' ? 'active' : ''}" data-action="fit:fit" title="Ajustar (Fit)"><i class="fa-solid fa-compress"></i></button>
+                </div>
+                ` : ''}
             </div>
         `;
 
         if (!isAudioTrack) {
-            // ── SEÇÃO: ENQUADRAMENTO ──
-            html += `
-                <div class="adjustments-section">
-                    <div class="adjustments-section-title"><i class="fa-solid fa-crop"></i> Enquadramento</div>
-                    <div style="display:flex; gap:6px;">
-                        <button class="nle-select-btn ${fitMode === 'fill' ? 'active' : ''}" data-action="fit:fill" style="flex:1; padding:4px 6px; font-size:10px; border-radius:4px; border:1px solid ${fitMode === 'fill' ? 'var(--color-cyan)' : 'rgba(255,255,255,0.15)'}; background:${fitMode === 'fill' ? 'rgba(6,182,212,0.2)' : 'transparent'}; color:#fff; cursor:pointer;">Preencher</button>
-                        <button class="nle-select-btn ${fitMode === 'fit' ? 'active' : ''}" data-action="fit:fit" style="flex:1; padding:4px 6px; font-size:10px; border-radius:4px; border:1px solid ${fitMode === 'fit' ? 'var(--color-cyan)' : 'rgba(255,255,255,0.15)'}; background:${fitMode === 'fit' ? 'rgba(6,182,212,0.2)' : 'transparent'}; color:#fff; cursor:pointer;">Ajustar</button>
-                    </div>
-                </div>
-            `;
 
             // ── SEÇÃO: MOVIMENTO (KEN BURNS) ──
             if (isPhoto) {

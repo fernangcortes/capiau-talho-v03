@@ -628,9 +628,11 @@ function applyFiltersAndRenderCards() {
             const vidId = r.payload.video_id;
             
             let videoFilename = "Vídeo";
+            let videoDisplayTitle = "Vídeo";
             const foundVid = STATE.allVideos.find(v => v.id === vidId);
             if (foundVid) {
                 videoFilename = foundVid.filename;
+                videoDisplayTitle = foundVid.title || foundVid.filename;
             }
             
             card.innerHTML = `
@@ -645,7 +647,7 @@ function applyFiltersAndRenderCards() {
                 </div>
                 <div class="bubble-text">${highlightedText}</div>
                 <div style="font-size:10px; color:var(--text-muted); margin-top:4px; display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px;">
-                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="Vídeo: ${videoFilename}">Vídeo: ${videoFilename} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)</span>
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${videoFilename}">Vídeo: ${videoDisplayTitle} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)</span>
                     <button class="view-context-btn" title="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; padding:4px; font-size:12px; display:flex; align-items:center; justify-content:center; border-radius:50%; width:24px; height:24px; flex-shrink:0;">
                         <i class="fa-solid fa-eye"></i>
                     </button>

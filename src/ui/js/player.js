@@ -225,7 +225,10 @@ export class SourcePlayer {
         }
         
         const title = this.el("source-player-title");
-        if (title) title.textContent = video.filename;
+        if (title) {
+            title.textContent = video.title || video.filename;
+            title.title = video.filename;
+        }
 
         STATE.markerIn = null;
         STATE.markerOut = null;
@@ -270,7 +273,10 @@ export class SourcePlayer {
         imgEl.style.display = "block";
         
         const title = this.el("source-player-title");
-        if (title) title.textContent = photo.filename;
+        if (title) {
+            title.textContent = photo.title || photo.filename;
+            title.title = photo.filename;
+        }
         
         STATE.markerIn = null;
         STATE.markerOut = null;
