@@ -209,6 +209,7 @@ class RAGService:
                         "score": 1.0,
                         "payload": {
                             "media_type": "photo",
+                            "match_source": "face",
                             "photo_id": pr["photo_id"],
                             "filename": pr["filename"],
                             "filepath": pr["filepath"],
@@ -260,6 +261,7 @@ class RAGService:
                         "score": 1.0,
                         "payload": {
                             "media_type": "broll",
+                            "match_source": "face",
                             "video_id": vr["video_id"],
                             "filename": vr["filename"],
                             "filepath": vr["filepath"],
@@ -292,6 +294,7 @@ class RAGService:
                         "score": 0.95,
                         "payload": {
                             "media_type": "interview",
+                            "match_source": "speaker",
                             "video_id": sr["video_id"],
                             "speaker_id": sr["speaker_id"],
                             "start_time": sr["min_start"],
@@ -436,11 +439,12 @@ class RAGService:
             start_time = payload.get("start_time", 0.0)
             r["id"] = f"{m_type}_{media_id}_{start_time}_{idx}"
             
-            # Adiciona explicação didática da relevância
+            # Adiciona explicação didática da relevância (match_source marca a origem
+            # do resultado — mais confiável que comparar o score com valores-sentinela)
             score_val = r.get("score", 0.0)
-            if score_val == 1.0:
+            if payload.get("match_source") == "face":
                 r["explanation"] = "Presença confirmada do personagem no frame (reconhecimento facial)."
-            elif score_val == 0.95:
+            elif payload.get("match_source") == "speaker":
                 r["explanation"] = "Trecho do depoimento falado pelo personagem pesquisado."
             elif payload.get("match_source") == "clip":
                 r["explanation"] = f"Correspondência visual (CLIP) de {score_val*100:.0f}% com os termos da busca."

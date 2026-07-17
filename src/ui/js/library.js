@@ -434,7 +434,7 @@ function renderTreeNode(node, container, depth = 0) {
             selectBtn.addEventListener("click", (e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                window.toggleSelectSimilarItem("video", v.id, v.filename || friendlyTitle, card);
+                window.toggleSelectSimilarItem("video", v.id, v.filename || friendlyTitle, card, null, v.video_type || null);
             });
         }
         

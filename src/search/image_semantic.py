@@ -178,100 +178,159 @@ class ImageSearch:
             print(f"[CLIP] Falha em similares do vídeo {video_id}: {e}")
             return []
 
+    def _video_keyframes(self, project_id: int, video_id: int) -> list:
+        """Keyframes indexados de um vídeo, ordenados por start_time."""
+        pts, _ = self.client.scroll(
+            collection_name=self.collection_name,
+            scroll_filter=Filter(must=[
+                FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                FieldCondition(key="video_id", match=MatchValue(value=video_id)),
+            ]),
+            limit=500, with_vectors=True, with_payload=True,
+        )
+        return sorted(pts or [], key=lambda p: (p.payload or {}).get("start_time", 0.0))
+
     def similar_to_multiple_items(
-        self, project_id: int, items: List[Dict[str, Any]], limit: int = 10
-    ) -> List[Dict[str, Any]]:
-        """Busca imagens visualmente próximas a um conjunto de fotos e momentos de vídeo,
-        combinando seus vetores (média/centroide)."""
-        vectors = []
+        self, project_id: int, items: List[Dict[str, Any]],
+        media_type_filter: Optional[str] = None, limit: int = 10,
+    ) -> Dict[str, Any]:
+        """Busca visual em lote com agregação automática (ver batch_utils):
+        seleção coesa -> média dos vetores (tema comum); heterogênea -> união por melhor score.
+
+        Retorna {"results", "mode_used", "cohesion", "warnings"}; cada result carrega
+        "best_source" (item de origem mais parecido, para a explicação didática).
+        media_type_filter: "photo" filtra no Qdrant; "interview"/"broll" só separa
+        vídeos de fotos aqui (keyframes não guardam video_type — a rota refina via DB).
+        """
+        from src.search.batch_utils import (
+            best_source_for_vector, merge_union_hits, pick_mode, sample_evenly,
+        )
+        if not items:
+            raise ValueError("Nenhum item informado para a busca em lote.")
+
+        vectors: List[np.ndarray] = []            # sub-vetores (keyframes contam individualmente)
+        sources: List[Dict[str, Any]] = []        # item de origem de cada sub-vetor
+        warnings: List[str] = []
         exclude_photos = set()
-        exclude_videos = [] # list of dicts with {"video_id", "start_time"}
-        
+        exclude_whole_videos = set()
+        exclude_moments = []  # {"video_id", "start_time"} (janela de ±0.5s)
+
         for item in items:
-            kind = item.get("kind")
-            item_id = item.get("id")
-            
-            if kind == "photo":
-                point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"img_proj_{project_id}_photo_{item_id}"))
-                try:
+            kind, item_id = item.get("kind"), item.get("id")
+            found = False
+            try:
+                if kind == "photo":
+                    point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"img_proj_{project_id}_photo_{item_id}"))
                     pts = self.client.retrieve(self.collection_name, ids=[point_id], with_vectors=True)
                     if pts and pts[0].vector:
                         vectors.append(np.array(pts[0].vector))
+                        sources.append(item)
                         exclude_photos.add(item_id)
-                except Exception as e:
-                    print(f"[CLIP] Erro ao recuperar vetor da foto {item_id}: {e}")
-            elif kind == "video":
-                timestamp = item.get("timestamp")
-                if timestamp is not None:
-                    try:
-                        pts, _ = self.client.scroll(
-                            collection_name=self.collection_name,
-                            scroll_filter=Filter(must=[
-                                FieldCondition(key="project_id", match=MatchValue(value=project_id)),
-                                FieldCondition(key="video_id", match=MatchValue(value=item_id)),
-                            ]),
-                            limit=500, with_vectors=True, with_payload=True,
-                        )
-                        if pts:
-                            ref = min(pts, key=lambda p: abs((p.payload or {}).get("start_time", 0.0) - timestamp))
-                            if ref and ref.vector:
+                        found = True
+                elif kind == "video":
+                    keyframes = self._video_keyframes(project_id, item_id)
+                    timestamp = item.get("timestamp")
+                    if timestamp is not None:
+                        if keyframes:
+                            ref = min(keyframes, key=lambda p: abs((p.payload or {}).get("start_time", 0.0) - timestamp))
+                            if ref.vector:
                                 vectors.append(np.array(ref.vector))
-                                ref_start = (ref.payload or {}).get("start_time", 0.0)
-                                exclude_videos.append({"video_id": item_id, "start_time": ref_start})
-                    except Exception as e:
-                        print(f"[CLIP] Erro ao recuperar vetor do vídeo {item_id}: {e}")
-                else:
-                    # Video inteiro: pega todos os keyframes
-                    try:
-                        pts, _ = self.client.scroll(
-                            collection_name=self.collection_name,
-                            scroll_filter=Filter(must=[
-                                FieldCondition(key="project_id", match=MatchValue(value=project_id)),
-                                FieldCondition(key="video_id", match=MatchValue(value=item_id)),
-                            ]),
-                            limit=500, with_vectors=True, with_payload=True,
-                        )
-                        if pts:
-                            for p in pts:
-                                if p.vector:
-                                    vectors.append(np.array(p.vector))
-                                    exclude_videos.append({"video_id": item_id, "start_time": (p.payload or {}).get("start_time", 0.0)})
-                    except Exception as e:
-                        print(f"[CLIP] Erro ao recuperar vetores do vídeo {item_id}: {e}")
-                        
+                                sources.append(item)
+                                exclude_moments.append({
+                                    "video_id": item_id,
+                                    "start_time": (ref.payload or {}).get("start_time", 0.0),
+                                })
+                                found = True
+                    else:
+                        # Vídeo inteiro: amostra keyframes espaçados (não a média cega de todos)
+                        for p in sample_evenly([p for p in keyframes if p.vector]):
+                            vectors.append(np.array(p.vector))
+                            sources.append(item)
+                            found = True
+                        if found:
+                            exclude_whole_videos.add(item_id)
+            except Exception as e:
+                print(f"[CLIP] Erro ao recuperar vetor de {kind} {item_id}: {e}")
+            if not found:
+                warnings.append(f"item_sem_indice:{kind}:{item_id}")
+
         if not vectors:
-            return []
-            
-        mean_vector = np.mean(vectors, axis=0)
-        results = self._query(project_id, mean_vector, limit + len(items) * 3)
-        
-        filtered_results = []
-        for r in results:
+            return {"results": [], "mode_used": "media", "cohesion": 0.0, "warnings": warnings}
+
+        mode, cohesion = pick_mode(vectors)
+
+        # Filtro por tipo no Qdrant: fotos são identificáveis; keyframes de vídeo são
+        # todos "broll" no payload desta coleção, então interview/broll só separa vídeo
+        # de foto — a rota completa o refino consultando o SQLite.
+        extra_conditions = []
+        if media_type_filter == "photo":
+            extra_conditions.append(FieldCondition(key="media_type", match=MatchValue(value="photo")))
+        fetch_limit = limit + len(vectors) * 3
+
+        if mode == "media":
+            mean_vector = np.mean(vectors, axis=0)
+            hits = self._query(
+                project_id, mean_vector, fetch_limit,
+                extra_conditions=extra_conditions, with_vectors=True,
+            )
+            for h in hits:
+                if h.get("vector") is not None:
+                    h["best_source"] = best_source_for_vector(np.array(h.pop("vector")), vectors, sources)
+                else:
+                    h.pop("vector", None)
+                    h["best_source"] = dict(sources[0])
+        else:
+            per_source = []
+            for vec, src in zip(vectors, sources):
+                per_source.append((src, self._query(
+                    project_id, vec, fetch_limit, extra_conditions=extra_conditions,
+                )))
+            hits = merge_union_hits(per_source, fetch_limit)
+
+        # Se o filtro pede vídeos, descarta fotos já aqui
+        if media_type_filter in ("interview", "broll"):
+            hits = [h for h in hits if h["payload"].get("photo_id") is None]
+
+        results = []
+        for r in hits:
             payload = r["payload"]
             if payload.get("photo_id") in exclude_photos:
                 continue
-                
             vid_id = payload.get("video_id")
             if vid_id is not None:
-                start_time = payload.get("start_time", 0.0)
-                is_excl = False
-                for ex in exclude_videos:
-                    if ex["video_id"] == vid_id and abs(ex["start_time"] - start_time) < 0.5:
-                        is_excl = True
-                        break
-                if is_excl:
+                if vid_id in exclude_whole_videos:
                     continue
-            filtered_results.append(r)
-            
-        return filtered_results[:limit]
+                start_time = payload.get("start_time", 0.0)
+                if any(ex["video_id"] == vid_id and abs(ex["start_time"] - start_time) < 0.5
+                       for ex in exclude_moments):
+                    continue
+            results.append(r)
 
-    def _query(self, project_id: int, vector: np.ndarray, limit: int) -> List[Dict[str, Any]]:
+        return {
+            "results": results[:limit],
+            "mode_used": mode,
+            "cohesion": cohesion,
+            "warnings": warnings,
+        }
+
+    def _query(
+        self, project_id: int, vector: np.ndarray, limit: int,
+        extra_conditions: Optional[list] = None, with_vectors: bool = False,
+    ) -> List[Dict[str, Any]]:
+        conditions = [FieldCondition(key="project_id", match=MatchValue(value=project_id))]
+        if extra_conditions:
+            conditions.extend(extra_conditions)
         response = self.client.query_points(
             collection_name=self.collection_name,
             query=vector.tolist(),
-            query_filter=Filter(must=[
-                FieldCondition(key="project_id", match=MatchValue(value=project_id)),
-            ]),
+            query_filter=Filter(must=conditions),
             limit=limit,
+            with_vectors=with_vectors,
         )
-        return [{"id": r.id, "score": r.score, "payload": r.payload} for r in response.points]
+        out = []
+        for r in response.points:
+            hit = {"id": r.id, "score": r.score, "payload": r.payload}
+            if with_vectors:
+                hit["vector"] = r.vector
+            out.append(hit)
+        return out

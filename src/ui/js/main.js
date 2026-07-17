@@ -598,7 +598,7 @@ function applyFiltersAndRenderCards() {
                             ${scoreBadge}
                         </div>
                         <div class="bubble-text" style="font-size:11px; line-height:1.3;">${highlightedText}</div>
-                        <div style="font-size:9px; color:var(--text-muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" data-tooltip="Arquivo: ${filename}">Arquivo: ${filename}</div>
+                        <div style="font-size:9px; color:var(--text-muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" data-tooltip="Arquivo: ${escapeHtml(filename)}">Arquivo: ${filename}</div>
                     </div>
                 </div>
             `;
@@ -662,7 +662,7 @@ function applyFiltersAndRenderCards() {
             
             card.innerHTML = `
                 <div class="bubble-meta" style="margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 6px;">
-                    <span class="speaker-name" style="color:${color}; font-weight:600; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:120px;" data-tooltip="${title}"><i class="fa-solid ${icon}"></i> ${title}</span>
+                    <span class="speaker-name" style="color:${color}; font-weight:600; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:120px;" data-tooltip="${escapeHtml(title)}"><i class="fa-solid ${icon}"></i> ${title}</span>
                     <div style="display:flex; align-items:center; gap:6px; flex-shrink: 0;">
                         <span style="font-weight:600; font-size:10px; color:var(--color-cyan); display:flex; align-items:center; gap:3px;">
                             <i class="fa-solid fa-circle-play"></i> ${timecode}
@@ -672,7 +672,7 @@ function applyFiltersAndRenderCards() {
                 </div>
                 <div class="bubble-text" style="font-size:11px; line-height:1.3;">${highlightedText}</div>
                 <div style="font-size:9px; color:var(--text-muted); margin-top:3px; display:flex; justify-content:space-between; align-items:center; width:100%; gap:6px;">
-                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" data-tooltip="Vídeo: ${videoDisplayTitle} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)">Vídeo: ${videoDisplayTitle} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)</span>
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" data-tooltip="Vídeo: ${escapeHtml(videoDisplayTitle)} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)">Vídeo: ${videoDisplayTitle} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)</span>
                     <div style="display:flex; gap:2px; align-items:center; flex-shrink:0;">
                         <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:2px; font-size:10px; display:none; align-items:center; justify-content:center; border-radius:50%; width:20px; height:20px;">
                             <i class="fa-regular fa-square"></i>
@@ -934,7 +934,7 @@ function renderSearchResults(query) {
 
     searchContainer.innerHTML = `
         <div class="transcription-actions" style="border:none; padding: 6px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0;">
-            <h4 style="font-size:11px; color:var(--color-cyan); display: flex; align-items: center; gap: 4px; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;" data-tooltip="Resultados para: &quot;${query}&quot;">
+            <h4 style="font-size:11px; color:var(--color-cyan); display: flex; align-items: center; gap: 4px; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;" data-tooltip="Resultados para: &quot;${escapeHtml(query)}&quot;">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> "${query}"
             </h4>
             <div class="search-type-tabs" style="margin: 0; padding: 0; border: none; gap: 4px; display: flex; align-items: center; flex-shrink: 0;">
@@ -1271,7 +1271,7 @@ window.clearSimilarSelection = function() {
 function escapeHtml(str) {
     const div = document.createElement("div");
     div.textContent = String(str ?? "");
-    return div.innerHTML;
+    return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 window.escapeHtml = escapeHtml;
 

@@ -218,106 +218,133 @@ class SemanticSearch:
             
         return formatted_results
 
-    def similar_to_multiple_items(
-        self, project_id: int, items: list, media_type_filter: str = None, limit: int = 10
-    ):
-        """Pesquisa trechos semânticos com contexto ou falas próximas de um conjunto de itens,
-        calculando a média de seus vetores textuais no Qdrant."""
-        import numpy as np
-        vectors = []
-        exclude_points = set()
-        
-        for item in items:
-            kind = item.get("kind")
-            item_id = item.get("id")
-            
-            if kind == "photo":
-                point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"proj_{project_id}_photo_{item_id}"))
-                try:
-                    pts = self.client.retrieve(self.collection_name, ids=[point_id], with_vectors=True)
-                    if pts and pts[0].vector:
-                        vectors.append(np.array(pts[0].vector))
-                        exclude_points.add(point_id)
-                except Exception as e:
-                    print(f"[QDRANT] Erro ao recuperar vetor texto de foto {item_id}: {e}")
-            elif kind == "video":
-                # Se especificou um timestamp (momento/resultado de busca)
-                timestamp = item.get("timestamp")
-                if timestamp is not None:
-                    try:
-                        # Scroll para achar os pontos deste vídeo
-                        pts, _ = self.client.scroll(
-                            collection_name=self.collection_name,
-                            scroll_filter=Filter(must=[
-                                FieldCondition(key="project_id", match=MatchValue(value=project_id)),
-                                FieldCondition(key="video_id", match=MatchValue(value=item_id)),
-                            ]),
-                            limit=500, with_vectors=True, with_payload=True,
-                        )
-                        if pts:
-                            # Acha o trecho mais próximo do timestamp
-                            ref = min(pts, key=lambda p: abs((p.payload or {}).get("start_time", 0.0) - timestamp))
-                            if ref and ref.vector:
-                                vectors.append(np.array(ref.vector))
-                                exclude_points.add(ref.id)
-                    except Exception as e:
-                        print(f"[QDRANT] Erro ao obter vetor texto do momento do vídeo {item_id}: {e}")
-                else:
-                    # Se selecionou o vídeo inteiro, pegamos o vetor de todos os seus trechos e fazemos a média!
-                    try:
-                        pts, _ = self.client.scroll(
-                            collection_name=self.collection_name,
-                            scroll_filter=Filter(must=[
-                                FieldCondition(key="project_id", match=MatchValue(value=project_id)),
-                                FieldCondition(key="video_id", match=MatchValue(value=item_id)),
-                            ]),
-                            limit=500, with_vectors=True, with_payload=True,
-                        )
-                        if pts:
-                            for p in pts:
-                                if p.vector:
-                                    vectors.append(np.array(p.vector))
-                                    exclude_points.add(p.id)
-                    except Exception as e:
-                        print(f"[QDRANT] Erro ao obter vetores do vídeo inteiro {item_id}: {e}")
-                        
-        if not vectors:
-            return []
-            
-        mean_vector = np.mean(vectors, axis=0)
-        
-        # Executa a busca vetorial
-        conditions = [
-            FieldCondition(key="project_id", match=MatchValue(value=project_id))
-        ]
-        
+    def _batch_filter_conditions(self, project_id: int, media_type_filter: str = None) -> list:
+        """Condições de filtro compartilhadas da busca em lote (mesma regra do search())."""
+        conditions = [FieldCondition(key="project_id", match=MatchValue(value=project_id))]
         if media_type_filter and media_type_filter != "all":
             if media_type_filter == "interview":
                 conditions.append(FieldCondition(key="media_type", match=MatchAny(any=["interview", "video"])))
             else:
                 conditions.append(FieldCondition(key="media_type", match=MatchValue(value=media_type_filter)))
-                
-        query_filter = Filter(must=conditions)
-        
-        response = self.client.query_points(
-            collection_name=self.collection_name,
-            query=mean_vector.tolist(),
-            query_filter=query_filter,
-            limit=limit + len(exclude_points)
+        return conditions
+
+    def similar_to_multiple_items(
+        self, project_id: int, items: list, media_type_filter: str = None, limit: int = 10
+    ):
+        """Busca textual (transcrições/descrições) em lote com agregação automática
+        (ver batch_utils): seleção coesa -> média dos vetores; heterogênea -> união.
+
+        Retorna {"results", "mode_used", "cohesion", "warnings"}; cada result carrega
+        "best_source" e "matched_text" (trecho que casou, para a explicação didática).
+        """
+        import numpy as np
+        from src.search.batch_utils import (
+            best_source_for_vector, merge_union_hits, pick_mode,
         )
-        
-        # Filtra itens de origem
+        if not items:
+            raise ValueError("Nenhum item informado para a busca em lote.")
+
+        vectors = []          # um vetor textual por item de origem
+        sources = []
+        warnings = []
+        exclude_points = set()
+
+        if any(i.get("kind") == "photo" for i in items):
+            warnings.append("photos_use_descriptions")
+
+        for item in items:
+            kind = item.get("kind")
+            item_id = item.get("id")
+            found = False
+            try:
+                if kind == "photo":
+                    point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"proj_{project_id}_photo_{item_id}"))
+                    pts = self.client.retrieve(self.collection_name, ids=[point_id], with_vectors=True)
+                    if pts and pts[0].vector:
+                        vectors.append(np.array(pts[0].vector))
+                        sources.append(item)
+                        exclude_points.add(point_id)
+                        found = True
+                elif kind == "video":
+                    pts, _ = self.client.scroll(
+                        collection_name=self.collection_name,
+                        scroll_filter=Filter(must=[
+                            FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                            FieldCondition(key="video_id", match=MatchValue(value=item_id)),
+                        ]),
+                        limit=500, with_vectors=True, with_payload=True,
+                    )
+                    timestamp = item.get("timestamp")
+                    if timestamp is not None:
+                        # Momento específico: o trecho indexado mais próximo do timestamp
+                        if pts:
+                            ref = min(pts, key=lambda p: abs((p.payload or {}).get("start_time", 0.0) - timestamp))
+                            if ref and ref.vector:
+                                vectors.append(np.array(ref.vector))
+                                sources.append(item)
+                                exclude_points.add(ref.id)
+                                found = True
+                    else:
+                        # Vídeo inteiro: média dos trechos = "sobre o que o vídeo fala"
+                        vid_vecs = [np.array(p.vector) for p in pts if p.vector]
+                        if vid_vecs:
+                            vectors.append(np.mean(vid_vecs, axis=0))
+                            sources.append(item)
+                            exclude_points.update(p.id for p in pts)
+                            found = True
+            except Exception as e:
+                print(f"[QDRANT] Erro ao recuperar vetor texto de {kind} {item_id}: {e}")
+            if not found:
+                warnings.append(f"item_sem_indice:{kind}:{item_id}")
+
+        if not vectors:
+            return {"results": [], "mode_used": "media", "cohesion": 0.0, "warnings": warnings}
+
+        mode, cohesion = pick_mode(vectors)
+        conditions = self._batch_filter_conditions(project_id, media_type_filter)
+        fetch_limit = limit + len(exclude_points) + len(vectors) * 3
+
+        def _run_query(vec):
+            response = self.client.query_points(
+                collection_name=self.collection_name,
+                query=vec.tolist(),
+                query_filter=Filter(must=conditions),
+                limit=fetch_limit,
+                with_vectors=(mode == "media"),
+            )
+            hits = []
+            for r in response.points:
+                hit = {"id": r.id, "score": r.score, "payload": r.payload}
+                if mode == "media":
+                    hit["vector"] = r.vector
+                hits.append(hit)
+            return hits
+
+        if mode == "media":
+            hits = _run_query(np.mean(vectors, axis=0))
+            for h in hits:
+                vec = h.pop("vector", None)
+                h["best_source"] = (
+                    best_source_for_vector(np.array(vec), vectors, sources)
+                    if vec is not None else dict(sources[0])
+                )
+        else:
+            per_source = [(src, _run_query(vec)) for vec, src in zip(vectors, sources)]
+            hits = merge_union_hits(per_source, fetch_limit)
+
         results = []
-        for r in response.points:
-            if r.id in exclude_points:
+        for r in hits:
+            if r["id"] in exclude_points:
                 continue
-            results.append({
-                "id": r.id,
-                "score": r.score,
-                "payload": r.payload
-            })
-            
-        return results[:limit]
+            r["matched_text"] = (r["payload"] or {}).get("text", "")
+            results.append(r)
+
+        return {
+            "results": results[:limit],
+            "mode_used": mode,
+            "cohesion": cohesion,
+            "warnings": warnings,
+        }
 
     def get_video_vision_frames(self, project_id: int, video_id: int):
         """Recupera todas as descrições de frames do B-Roll indexadas no Qdrant para este vídeo."""
