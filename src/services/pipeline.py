@@ -77,7 +77,8 @@ class PipelineService:
         payload = {
             "model": S.get("llm.vision_model"),
             "messages": [{"role": "user", "content": content}],
-            "temperature": S.get("vision.temperature")
+            "temperature": S.get("vision.temperature"),
+            "max_tokens": S.get("vision.max_tokens")
         }
         try:
             response = requests.post(
@@ -416,7 +417,8 @@ class PipelineService:
                     ]
                 }
             ],
-            "temperature": S.get("vision.temperature")
+            "temperature": S.get("vision.temperature"),
+            "max_tokens": S.get("vision.max_tokens")
         }
 
         try:
@@ -426,6 +428,10 @@ class PipelineService:
                 content = res_json['choices'][0]['message']['content'].strip()
                 return extract_json_from_markdown(content)
             else:
+                # 402 = credito insuficiente para o teto de tokens pedido, nao
+                # necessariamente saldo zerado (ver vision.max_tokens). Logar o
+                # status evita reincidir no mesmo diagnostico errado de novo.
+                print(f"[Vision] Falha na API de visão (status {response.status_code}): {response.text[:300]}")
                 return {"descricao": "Análise falhou", "tags": []}
         except Exception as e:
             print(f"[Vision] Erro ao chamar OpenRouter: {e}")

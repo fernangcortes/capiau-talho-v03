@@ -202,6 +202,17 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {
+        "key": "vision.max_tokens", "type": "int", "default": 800, "min": 100, "max": 4000, "step": 100,
+        "label": "Visão: teto de tokens da resposta",
+        "help": "Limite de tamanho da descrição gerada pela IA. Uma descrição curta cabe em poucas centenas de tokens.",
+        "help_tech": "max_tokens do payload da chamada de visão. Sem isso, a OpenRouter reserva "
+                      "crédito contra o teto de saída do MODELO inteiro (65k+ no Gemini 2.5 Flash) "
+                      "para cada chamada, e recusa com 402 mesmo havendo saldo real de sobra para o "
+                      "uso de fato (achado em 17/07 — 66 triagens recusadas por falta de crédito "
+                      "com a conta ainda com saldo).",
+        "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
         "key": "summary.temperature", "type": "float", "default": 0.3, "min": 0.0, "max": 2.0, "step": 0.05,
         "label": "Resumos: criatividade (temperature)",
         "help": "Criatividade da IA ao gerar descrição, sumário e tags dos vídeos.",
