@@ -676,6 +676,7 @@
                                 <!-- Nome/Renomear Timeline -->
                                 <button id="btn-rename-timeline" class="btn-toolbar-action" data-tooltip="Renomear Timeline (Clique para editar)"><i class="fa-solid fa-pen-to-square"></i></button>
                                 <button id="btn-seq-settings-timeline" class="btn-toolbar-action" data-tooltip="Configurações da Sequência (Resolução/FPS)"><i class="fa-solid fa-gear"></i></button>
+                                <button id="btn-timeline-view-options" class="btn-toolbar-action" data-tooltip="Opções de Visualização (Hover / Miniaturas)"><i class="fa-solid fa-eye"></i></button>
                                 <input type="text" id="timeline-name-input" value="Rascunho Making Of #1" style="display: none;">
                                 
                                 <div class="toolbar-divider"></div>
@@ -726,6 +727,25 @@
                             
                             <!-- Linha finíssima restauradora da toolbar (visível apenas quando colapsada) -->
                             <div id="reopen-toolbar" class="toolbar-restore-line" data-tooltip="Expandir Barra de Ferramentas" style="display: none;"></div>
+
+                            <!-- Dropdown de Opções de Visualização da Timeline (Glassmorphism) -->
+                            <div id="timeline-view-options-dropdown" class="glassmorphism" style="display: none; flex-direction: column; gap: 8px; padding: 10px; border-radius: 6px; border: 1px solid rgba(6,182,212,0.3); background: rgba(20, 18, 25, 0.98); box-shadow: 0 4px 20px rgba(0,0,0,0.5); position: absolute; left: 50px; top: 120px; z-index: 1000; width: 220px; box-sizing: border-box;">
+                                <div style="font-weight: bold; font-size: 10px; color: var(--color-cyan); margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px; font-family: Outfit, sans-serif;">OPÇÕES DE VISUALIZAÇÃO</div>
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-family: Inter, sans-serif; user-select: none;">
+                                    <input type="checkbox" id="chk-timeline-hover-preview" checked style="accent-color: var(--color-cyan);"> Ativar Hover Preview
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-family: Inter, sans-serif; user-select: none;">
+                                    <input type="checkbox" id="chk-timeline-mute-hidden" checked style="accent-color: var(--color-cyan);"> Silenciar pistas ocultas
+                                </label>
+                                <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+                                    <span style="font-size: 9px; color: var(--text-muted); font-family: Inter, sans-serif;">Densidade de Miniaturas:</span>
+                                    <select id="select-timeline-thumbs-density" class="nle-select" style="font-size: 9px; height: 20px; padding: 0 4px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; border-radius: 4px; outline: none; cursor: pointer; width: 100%;">
+                                        <option value="1.0">Alta Densidade (1s)</option>
+                                        <option value="2.0">Média Densidade (2s)</option>
+                                        <option value="0.0">Desativar Miniaturas</option>
+                                    </select>
+                                </div>
+                            </div>
 
                             <!-- Sidebar de trilhas (gerada dinamicamente pelo panels.js) -->
                             <div class="timeline-headers-sidebar" id="timeline-headers-sidebar" style="width: 118px; display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.4); border-right: 1px solid var(--border-glass); z-index: 10; flex-shrink: 0; box-sizing: border-box; overflow: hidden;">
@@ -1437,7 +1457,8 @@
 
     <!-- Card flutuante de preview na timeline -->
     <div id="timeline-preview-card">
-        <video autoplay muted loop playsinline></video>
+        <video autoplay muted loop playsinline style="display: none;"></video>
+        <img class="preview-img" style="width: 100%; height: 112px; object-fit: cover; background: #000; display: block;">
         <div class="preview-info">00:00:00:00</div>
     </div>
 

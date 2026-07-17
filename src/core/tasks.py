@@ -40,7 +40,16 @@ class TaskManager:
         self.cancelled_tasks: set = set()
         self._sink_path: Optional[Path] = None
         self._sink_last_write: float = 0.0
+        self.last_user_activity: float = 0.0
         self._initialized = True
+
+    def report_user_activity(self) -> None:
+        """Reporta que o usuário realizou uma ação na timeline ou player."""
+        self.last_user_activity = time.time()
+
+    def is_user_active(self) -> bool:
+        """Retorna True se houve atividade do usuário nos últimos 5 segundos."""
+        return (time.time() - self.last_user_activity) < 5.0
 
     def enable_file_sink(self, path: Path) -> None:
         """Passa a espelhar o progresso num arquivo, para OUTRO processo poder ler.

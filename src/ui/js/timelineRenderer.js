@@ -60,6 +60,7 @@ export class CapiauTimelineRenderer {
 
         this.isDirty = true; // Flag para solicitar redesenho reativo
         this.photoThumbCache = {}; // Cache de miniaturas (Image) de fotos por id
+        this.videoThumbCache = {}; // Cache de miniaturas de vídeo: key "video_id_time" -> { img: Image, loaded: boolean, timestamp: float }
         this.init();
     }
 
@@ -237,6 +238,18 @@ export class CapiauTimelineRenderer {
         for (const lane of this.getTrackLanes()) {
             if (lane.top + lane.height < this.rulerHeight || lane.top > this.height) continue;
 
+            if (lane.track.hidden) {
+                ctx.fillStyle = "rgba(6, 182, 212, 0.15)";
+                ctx.fillRect(0, lane.top, this.width, lane.height);
+                ctx.strokeStyle = "rgba(6, 182, 212, 0.3)";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, lane.top + lane.height);
+                ctx.lineTo(this.width, lane.top + lane.height);
+                ctx.stroke();
+                continue;
+            }
+
             const style = this.getTrackStyle(lane.track);
             ctx.fillStyle = style.bg;
             ctx.fillRect(0, lane.top, this.width, lane.height);
@@ -361,6 +374,7 @@ export class CapiauTimelineRenderer {
             const lane = laneMap[cut.track] || fallbackLane;
             if (!lane) return;
             if (lane.top + lane.height < this.rulerHeight || lane.top > this.height) return;
+            if (lane.track.hidden) return;
 
             const duration = cut.outFrame - cut.inFrame;
             const startX = (cut.timelineStartFrame - scrollLeft) * zoom;
@@ -372,7 +386,7 @@ export class CapiauTimelineRenderer {
             const style = this.getTrackStyle(lane.track);
             const laneKind = lane.track.kind || "video";
             const isPhoto = cut.type === "photo";
-            const video = isPhoto ? null : STATE.allVideos.find(v => v.id === cut.video_id);
+            const video = isPhoto ? null : STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
             const photo = isPhoto ? STATE.allPhotos.find(p => p.id === cut.photo_id) : null;
 
             // Espaçamento interno vertical do clipe
@@ -382,6 +396,43 @@ export class CapiauTimelineRenderer {
             // Desenhar bloco do clipe
             ctx.fillStyle = style.clipBg;
             ctx.fillRect(startX, clipY, width, clipHeight);
+
+            // Miniaturas para pista de vídeo (se habilitadas na pista e globalmente)
+            if (laneKind === "video" && !isPhoto && lane.track.thumbnailsEnabled && TIMELINE_STATE.globalThumbnailsInterval > 0 && video) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(startX, clipY, width, clipHeight);
+                ctx.clip(); // Corta para caber no bloco do clipe
+
+                const thumbWidth = 80;
+                const durationSecs = duration / (TIMELINE_STATE?.fps || 24);
+                const numThumbs = Math.max(1, Math.ceil(width / thumbWidth));
+
+                for (let i = 0; i < numThumbs; i++) {
+                    const xOffset = i * thumbWidth;
+                    const ratio = (xOffset + thumbWidth / 2) / width;
+                    const timeInClip = ratio * durationSecs;
+                    const targetTime = cut.in + timeInClip;
+
+                    const interval = TIMELINE_STATE.globalThumbnailsInterval || 1.0;
+                    const roundedTime = Math.round(targetTime / interval) * interval;
+
+                    let img = this.getVideoThumb(video.id, roundedTime);
+                    if (!img) {
+                        // Exibição progressiva de fallback (vizinho mais próximo)
+                        img = this.getClosestLoadedVideoThumb(video.id, roundedTime);
+                    }
+
+                    if (img) {
+                        this.drawImageCover(img, startX + xOffset, clipY, thumbWidth, clipHeight);
+                    }
+                }
+
+                // Véu escuro para legibilidade do texto do rótulo
+                ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+                ctx.fillRect(startX, clipY, width, clipHeight);
+                ctx.restore();
+            }
 
             // Miniatura da foto como fundo (cover) + véu escuro para legibilidade do rótulo
             if (isPhoto && photo) {
@@ -451,6 +502,45 @@ export class CapiauTimelineRenderer {
         img.onerror = () => { entry.loaded = false; };
         img.src = String(photo.proxy_path).replace(/\\/g, "/");
         return null;
+    }
+
+    getVideoThumb(videoId, timestamp) {
+        if (!videoId) return null;
+        const key = `${videoId}_${timestamp.toFixed(1)}`;
+        const cached = this.videoThumbCache[key];
+        if (cached) return cached.loaded ? cached.img : null;
+
+        const img = new Image();
+        const entry = { img, loaded: false, timestamp };
+        this.videoThumbCache[key] = entry;
+
+        img.onload = () => {
+            entry.loaded = true;
+            this.requestRedraw();
+        };
+        img.onerror = () => {
+            entry.loaded = false;
+        };
+        img.src = `/api/video/${videoId}/thumbnail-at?time=${timestamp.toFixed(1)}`;
+        return null;
+    }
+
+    getClosestLoadedVideoThumb(videoId, timestamp) {
+        let bestImg = null;
+        let minDiff = Infinity;
+        for (const key in this.videoThumbCache) {
+            if (key.startsWith(`${videoId}_`)) {
+                const entry = this.videoThumbCache[key];
+                if (entry.loaded) {
+                    const diff = Math.abs(entry.timestamp - timestamp);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        bestImg = entry.img;
+                    }
+                }
+            }
+        }
+        return bestImg;
     }
 
     /** Desenha uma imagem cobrindo (cover) o retângulo dado, preservando proporção. */

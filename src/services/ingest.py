@@ -10,7 +10,7 @@ from src.db.connection import get_db
 from src.db.repositories.media import MediaRepository
 from src.core.tasks import TASK_MANAGER
 from src.core.exceptions import IngestError
-from src.media.ffmpeg import get_media_metadata, generate_video_proxy
+from src.media.ffmpeg import get_media_metadata, generate_video_proxy, extract_thumbnail_frame
 from src.media.image_processing import generate_photo_proxy
 from src.vision.face_engine import process_photo_faces
 
@@ -196,6 +196,12 @@ class IngestService:
                     MediaRepository.update_video_status(conn, video_id, 'ingested')
                     TASK_MANAGER.update_progress(str(video_id), 100.0, "finished")
                     
+                    # Dispara a geração de miniaturas progressivas em segundo plano
+                    TASK_MANAGER.executor.submit(
+                        IngestService._generate_timeline_thumbnails_task,
+                        video_id, proxy_path, duration
+                    )
+                    
                     # S3 Upload in background
                     try:
                         from src.services.s3_service import S3Service
@@ -252,4 +258,101 @@ class IngestService:
             print(f"[IngestService] Falha crítica no processamento da foto {photo_id}: {e}")
             with get_db() as conn:
                 MediaRepository.update_photo_status(conn, photo_id, 'error')
+
+    @staticmethod
+    def _generate_timeline_thumbnails_task(video_id: int, filepath: Path, duration: float) -> None:
+        """Gera miniaturas de forma progressiva (subdivisão BFS) com throttling inteligente."""
+        from src.media.ffmpeg import extract_thumbnail_frame
+        
+        task_key = f"thumbs-{video_id}"
+        TASK_MANAGER.update_progress(task_key, 0.0, "running", task_type="thumbnails")
+        
+        # Faixa útil do vídeo (5% a 95%) para evitar as rebarbas
+        start_time = max(1.0, duration * 0.05)
+        end_time = min(duration - 1.0, duration * 0.95)
+        
+        if end_time <= start_time:
+            # Fallback para vídeos curtíssimos
+            start_time = 0.0
+            end_time = duration
+            
+        # Lista de timestamps desejados de 1 em 1 segundo
+        timestamps = list(range(int(start_time), int(end_time) + 1))
+        if not timestamps:
+            # Se ainda estiver vazia, usa o ponto médio
+            timestamps = [duration / 2.0]
+            
+        n = len(timestamps)
+        
+        # Algoritmo BFS para ordenar timestamps de forma progressiva (subdivisão binária)
+        # Queremos: meio, início útil, fim útil, e depois metades recursivas.
+        order_indices = []
+        if n > 0:
+            if n == 1:
+                order_indices = [0]
+            elif n == 2:
+                order_indices = [0, 1]
+            else:
+                first = 0
+                last = n - 1
+                mid = (n - 1) // 2
+                
+                order_indices = [mid, first, last]
+                visited = {mid, first, last}
+                
+                queue = [(first, mid), (mid, last)]
+                while queue:
+                    left, right = queue.pop(0)
+                    if right - left <= 1:
+                        continue
+                    m = (left + right) // 2
+                    if m not in visited:
+                        order_indices.append(m)
+                        visited.add(m)
+                    queue.append((left, m))
+                    queue.append((m, right))
+                    
+                # Adiciona qualquer restante que possa ter escapado
+                for i in range(n):
+                    if i not in visited:
+                        order_indices.append(i)
+                        
+        ordered_timestamps = [float(timestamps[idx]) for idx in order_indices]
+        
+        # Cria diretório de miniaturas se não existir
+        CONFIG.THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
+        
+        successful_extractions = 0
+        total_to_extract = len(ordered_timestamps)
+        
+        try:
+            for idx, timestamp in enumerate(ordered_timestamps):
+                # O nome do arquivo segue o padrão de índice baseado no tempo arredondado
+                # index = round(time / 1.0) + 1
+                file_idx = int(round(timestamp)) + 1
+                out_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_{file_idx:04d}.jpg"
+                
+                # Se já existir, pula a extração física, mas conta como sucesso
+                if out_path.exists() and out_path.stat().st_size > 0:
+                    successful_extractions += 1
+                else:
+                    success = extract_thumbnail_frame(filepath, timestamp, out_path, width=120)
+                    if success:
+                        successful_extractions += 1
+                
+                # Reporta o progresso da tarefa
+                progress_pct = (successful_extractions / total_to_extract) * 100.0
+                TASK_MANAGER.update_progress(task_key, round(progress_pct, 1), "running", task_type="thumbnails")
+                
+                # Throttling cooperativo com base na atividade do usuário
+                if TASK_MANAGER.is_user_active():
+                    time.sleep(0.3)  # desacelera
+                else:
+                    time.sleep(0.02) # velocidade total
+                    
+            TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="thumbnails")
+            print(f"[IngestService] Miniaturas geradas com sucesso para o vídeo ID {video_id} ({successful_extractions}/{total_to_extract} frames).")
+        except Exception as e:
+            print(f"[IngestService] Erro ao gerar miniaturas para o vídeo ID {video_id}: {e}")
+            TASK_MANAGER.update_progress(task_key, 0.0, "failed", task_type="thumbnails")
 

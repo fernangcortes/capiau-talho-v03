@@ -90,11 +90,11 @@ export const PHOTO_DEFAULT_DURATION = 5;
  */
 function defaultTracks() {
     return [
-        { id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, magnetic: false },
-        { id: "V2", name: "B-Roll", kind: "video", volume: 1.0, muted: false, locked: false, magnetic: false },
-        { id: "V1", name: "Falas", kind: "video", volume: 1.0, muted: false, locked: false, magnetic: true },
-        { id: "A1", name: "Áudio Falas", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false },
-        { id: "A2", name: "Áudio B-Roll", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false }
+        { id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, magnetic: false, hidden: false, thumbnailsEnabled: false },
+        { id: "V2", name: "B-Roll", kind: "video", volume: 1.0, muted: false, locked: false, magnetic: false, hidden: false, thumbnailsEnabled: true },
+        { id: "V1", name: "Falas", kind: "video", volume: 1.0, muted: false, locked: false, magnetic: true, hidden: false, thumbnailsEnabled: true },
+        { id: "A1", name: "Áudio Falas", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false, hidden: false, thumbnailsEnabled: false },
+        { id: "A2", name: "Áudio B-Roll", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false, hidden: false, thumbnailsEnabled: false }
     ];
 }
 
@@ -117,6 +117,10 @@ export class CapiauTimelineState {
 
         this.tracks = defaultTracks(); // Lista dinâmica de pistas (ordem visual)
         this.trackHeightScale = 1.0; // Fator de escala vertical das pistas (compacto ↔ alto)
+
+        this.hoverPreviewEnabled = true;
+        this.globalThumbnailsInterval = 1.0; // 1.0 para alta densidade, 2.0 para média densidade
+        this.muteHiddenTracksPlayback = true;
 
         this.ghostTrack = []; // Lista de sugestões da IA (Ghost Clips)
         this.selectedGhostClipId = null; // ID da sugestão de IA ativa
@@ -168,6 +172,9 @@ export class CapiauTimelineState {
     }
 
     trackHeight(track) {
+        if (track.hidden) {
+            return 4; // Restore line height as per design system
+        }
         // Override por pista (arraste individual) tem prioridade sobre a escala global.
         if (track.heightPx != null && isFinite(track.heightPx)) {
             return Math.min(240, Math.max(22, Math.round(track.heightPx)));
@@ -215,10 +222,12 @@ export class CapiauTimelineState {
                 muted: !!t.muted,
                 locked: !!t.locked,
                 magnetic: !!t.magnetic,
-                heightPx: t.heightPx != null ? Number(t.heightPx) : null
+                heightPx: t.heightPx != null ? Number(t.heightPx) : null,
+                hidden: !!t.hidden,
+                thumbnailsEnabled: t.thumbnailsEnabled !== undefined ? !!t.thumbnailsEnabled : (t.kind === "video" || !t.kind)
             }));
             if (!this.tracks.some(t => t.kind === "ai")) {
-                this.tracks.unshift({ id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, magnetic: false });
+                this.tracks.unshift({ id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, magnetic: false, hidden: false, thumbnailsEnabled: false });
             }
         }
         STATE.emit("timelineTracksChanged", this.tracks);
@@ -235,7 +244,9 @@ export class CapiauTimelineState {
             volume: 1.0,
             muted: false,
             locked: false,
-            magnetic: false
+            magnetic: false,
+            hidden: false,
+            thumbnailsEnabled: true
         };
         TIMELINE_HISTORY.record(() => {
             // Insere abaixo da pista de IA (índice 1) para ficar no topo das pistas de vídeo
@@ -257,7 +268,9 @@ export class CapiauTimelineState {
             volume: 1.0,
             muted: false,
             locked: false,
-            magnetic: false
+            magnetic: false,
+            hidden: false,
+            thumbnailsEnabled: false
         };
         TIMELINE_HISTORY.record(() => {
             this.tracks.push(track);
@@ -337,6 +350,36 @@ export class CapiauTimelineState {
         STATE.emit("timelineTracksChanged", this.tracks);
     }
 
+    toggleTrackVisibility(trackId) {
+        const track = this.getTrack(trackId);
+        if (!track) return;
+        track.hidden = !track.hidden;
+        STATE.emit("timelineTracksChanged", this.tracks);
+        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+    }
+
+    toggleTrackThumbnails(trackId) {
+        const track = this.getTrack(trackId);
+        if (!track || track.kind !== "video") return;
+        track.thumbnailsEnabled = !track.thumbnailsEnabled;
+        STATE.emit("timelineTracksChanged", this.tracks);
+        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+    }
+
+    toggleHoverPreview(enabled) {
+        this.hoverPreviewEnabled = enabled !== undefined ? !!enabled : !this.hoverPreviewEnabled;
+    }
+
+    setGlobalThumbnailsInterval(val) {
+        this.globalThumbnailsInterval = Number(val) || 1.0;
+        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+    }
+
+    setMuteHiddenTracksPlayback(enabled) {
+        this.muteHiddenTracksPlayback = !!enabled;
+        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+    }
+
     toggleTrackMagnetic(trackId) {
         const track = this.getTrack(trackId);
         if (!track || track.kind !== "video") return; // ripple magnético só em pistas de vídeo
@@ -358,7 +401,9 @@ export class CapiauTimelineState {
             volume: t.volume,
             muted: t.muted,
             locked: t.locked,
-            magnetic: t.magnetic
+            magnetic: t.magnetic,
+            hidden: !!t.hidden,
+            thumbnailsEnabled: !!t.thumbnailsEnabled
         }));
     }
 

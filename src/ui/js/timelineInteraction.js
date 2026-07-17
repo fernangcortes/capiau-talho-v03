@@ -20,6 +20,13 @@ export class CapiauTimelineInteraction {
         this.mouseX = 0;
         this.mouseY = 0;
 
+        // Rastreamento para temporizador do hover preview
+        this.hoverTimer = null;
+        this.hoverLastX = 0;
+        this.hoverLastY = 0;
+        this.hoverLastTime = 0;
+        this.hoverLastClipId = null;
+
         // Guarda referências bound para permitir remoção
         this.boundMouseDown = (e) => this.onMouseDown(e);
         this.boundMouseMove = (e) => this.onMouseMove(e);
@@ -1827,7 +1834,6 @@ export class CapiauTimelineInteraction {
      */
     updateHoverPreview(clientX, clientY, frame, track) {
         const doc = this.canvas.ownerDocument;
-        // Reutiliza o card estático do index.html; em popouts, cria um no body da janela
         let previewCard = doc.querySelector("#timeline-preview-card");
         if (!previewCard) {
             previewCard = doc.createElement("div");
@@ -1847,13 +1853,16 @@ export class CapiauTimelineInteraction {
                 pointer-events: none;
                 backdrop-filter: blur(8px);
             `;
-            previewCard.innerHTML = `<video autoplay muted loop playsinline style="width: 100%; height: 112px; object-fit: cover; background: #000;"></video><img class="preview-img" style="width: 100%; height: 112px; object-fit: cover; background: #000; display: none;"><div class="preview-info" style="flex: 1; font-size: 10px; color: var(--text-secondary); padding: 6px 8px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-family: monospace;">00:00:00:00</div>`;
+            previewCard.innerHTML = `<video autoplay muted loop playsinline style="width: 100%; height: 112px; object-fit: cover; background: #000; display: none;"></video><img class="preview-img" style="width: 100%; height: 112px; object-fit: cover; background: #000; display: block;"><div class="preview-info" style="flex: 1; font-size: 10px; color: var(--text-secondary); padding: 6px 8px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-family: monospace;">00:00:00:00</div>`;
             doc.body.appendChild(previewCard);
         }
 
-        // Se estiver arrastando ou fazendo scrub, ou fora das trilhas, esconde o preview normal
-        if (this.dragState || !track) {
+        // Se hover preview estiver desativado globalmente, esconde e sai
+        if (TIMELINE_STATE.hoverPreviewEnabled === false || this.dragState || !track || (track && track.hidden)) {
+            this.clearHoverTimer();
             previewCard.style.display = "none";
+            const videoEl = previewCard.querySelector("video");
+            if (videoEl && !videoEl.paused) { videoEl.pause(); videoEl.src = ""; }
             return;
         }
 
@@ -1861,8 +1870,12 @@ export class CapiauTimelineInteraction {
         if (hit && hit.type === "clip") {
             const clip = hit.data;
 
-            // Preview de FOTO (still): mostra a imagem no card, oculta o vídeo
+            // Reporta atividade para o editor (heartbeat)
+            fetch("/api/editor/heartbeat", { method: "POST" }).catch(() => {});
+
+            // Preview de FOTO: mostra a imagem no card, oculta o vídeo, limpa o timer de vídeo
             if (clip.type === "photo") {
+                this.clearHoverTimer();
                 const photo = STATE.allPhotos.find(p => p.id === clip.photo_id);
                 if (photo) {
                     const imgEl = previewCard.querySelector(".preview-img");
@@ -1881,43 +1894,92 @@ export class CapiauTimelineInteraction {
                 }
             }
 
-            const video = STATE.allVideos.find(v => v.id === clip.video_id);
+            // Preview de VÍDEO
+            const video = STATE.allVideos.find(v => String(v.id) === String(clip.video_id));
             if (video) {
                 const imgEl = previewCard.querySelector(".preview-img");
-                if (imgEl) imgEl.style.display = "none";
-                const vEl = previewCard.querySelector("video");
-                if (vEl) vEl.style.display = "block";
-                const videoSrc = video.proxy_path || video.filepath || `/originals/${video.filename}`;
                 const videoEl = previewCard.querySelector("video");
                 const infoEl = previewCard.querySelector(".preview-info");
-                
-                const inSeconds = clip.in;
-                const outSeconds = clip.out;
-                const targetSrc = `${videoSrc}#t=${inSeconds.toFixed(1)},${outSeconds.toFixed(1)}`;
-                
-                const fullTargetSrc = window.location.origin + targetSrc;
-                if (videoEl.src !== fullTargetSrc && !videoEl.src.endsWith(targetSrc)) {
-                    videoEl.src = targetSrc;
-                    videoEl.load();
-                    videoEl.play().catch(() => {});
+
+                const fps = TIMELINE_STATE?.fps || 24;
+                const offsetFrames = frame - clip.timelineStartFrame;
+                const hoverTime = clip.in + (offsetFrames / fps);
+
+                // Mostra a miniatura estática instantaneamente
+                const interval = TIMELINE_STATE.globalThumbnailsInterval || 1.0;
+                const roundedTime = Math.round(hoverTime / interval) * interval;
+                const thumbSrc = `/api/video/${video.id}/thumbnail-at?time=${roundedTime.toFixed(1)}`;
+
+                if (imgEl) {
+                    if (imgEl.src.indexOf(thumbSrc) === -1) imgEl.src = thumbSrc;
+                    imgEl.style.display = "block";
                 }
 
-                const duration = outSeconds - inSeconds;
-                infoEl.textContent = `${video.filename} (${duration.toFixed(1)}s)`;
+                const duration = clip.out - clip.in;
+                infoEl.textContent = `${video.filename} (${duration.toFixed(1)}s) @ ${hoverTime.toFixed(1)}s`;
 
+                // Reposiciona o popup
                 this._placeFixedPopup(previewCard, clientX, clientY, 15);
+
+                // Gerenciamento de mouse & timer para reprodução do vídeo (3s de tolerância a tremores)
+                const dist = Math.hypot(clientX - this.hoverLastX, clientY - this.hoverLastY);
+                const clipChanged = this.hoverLastClipId !== clip.id;
+
+                if (clipChanged || dist > 8) {
+                    // O mouse se moveu além do limite de microvariações humanas ou mudou de clipe
+                    this.clearHoverTimer();
+                    this.hoverLastX = clientX;
+                    this.hoverLastY = clientY;
+                    this.hoverLastTime = hoverTime;
+                    this.hoverLastClipId = clip.id;
+
+                    // Oculta o vídeo e exibe a imagem
+                    if (videoEl) { videoEl.pause(); videoEl.style.display = "none"; }
+                    if (imgEl) imgEl.style.display = "block";
+
+                    // Inicia o timer de 3 segundos para reprodução
+                    this.hoverTimer = setTimeout(() => {
+                        if (videoEl && imgEl) {
+                            imgEl.style.display = "none";
+                            videoEl.style.display = "block";
+
+                            const videoSrc = video.proxy_path || video.filepath || `/originals/${video.filename}`;
+                            // Começa a tocar a partir do exato ponto do hover até o fim do clipe
+                            const targetSrc = `${videoSrc}#t=${hoverTime.toFixed(1)},${clip.out.toFixed(1)}`;
+                            const fullTargetSrc = window.location.origin + targetSrc;
+
+                            if (videoEl.src !== fullTargetSrc && !videoEl.src.endsWith(targetSrc)) {
+                                videoEl.src = targetSrc;
+                                videoEl.load();
+                                videoEl.play().catch(() => {});
+                            }
+                        }
+                    }, 3000);
+                }
+
                 return;
             }
         }
 
-        // Se não houver clipe sob o cursor, esconde
+        // Se não houver clipe sob o cursor, limpa e esconde
+        this.clearHoverTimer();
         previewCard.style.display = "none";
+        const videoEl = previewCard.querySelector("video");
+        if (videoEl && !videoEl.paused) { videoEl.pause(); videoEl.src = ""; }
+    }
+
+    clearHoverTimer() {
+        if (this.hoverTimer) {
+            clearTimeout(this.hoverTimer);
+            this.hoverTimer = null;
+        }
     }
 
     /**
      * Esconde o card de preview.
      */
     hideHoverPreview() {
+        this.clearHoverTimer();
         const previewCard = this.canvas.ownerDocument.querySelector("#timeline-preview-card");
         if (previewCard) {
             previewCard.style.display = "none";

@@ -599,3 +599,54 @@ def set_video_thumbnail(video_id: int, timestamp: float = Query(...), conn: sqli
     raise HTTPException(status_code=500, detail="Falha ao extrair frame no timestamp fornecido.")
 
 
+@router.get("/api/video/{video_id}/thumbnail-at")
+def get_video_thumbnail_at(video_id: int, time: float = Query(...), conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Retorna o thumbnail do vídeo no timestamp fornecido (com cache progressivo)."""
+    from fastapi.responses import FileResponse
+    from src.media.ffmpeg import extract_thumbnail_frame
+    
+    # O nome do arquivo segue o padrão de índice baseado no tempo arredondado (1 frame por segundo)
+    file_idx = int(round(time)) + 1
+    thumb_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_{file_idx:04d}.jpg"
+    
+    if thumb_path.exists() and thumb_path.stat().st_size > 0:
+        return FileResponse(thumb_path)
+        
+    # Se não existir, extrai na hora
+    video = MediaRepository.get_video(conn, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
+        
+    video_path = Path(video['filepath'])
+    if not video_path.exists():
+        proxy_rel = f"proxy_vid_{video_id}.mp4"
+        proxy_path = CONFIG.PROXIES_DIR / proxy_rel
+        if proxy_path.exists():
+            video_path = proxy_path
+        else:
+            raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado: {video_path}")
+            
+    # Dispara a geração progressiva de miniaturas em segundo plano se ainda não foi iniciada
+    task_key = f"thumbs-{video_id}"
+    if task_key not in TASK_MANAGER.get_progress():
+        duration = video.get('duration') or 0.0
+        if duration > 0:
+            TASK_MANAGER.executor.submit(
+                IngestService._generate_timeline_thumbnails_task,
+                video_id, video_path, duration
+            )
+            
+    success = extract_thumbnail_frame(video_path, time, thumb_path, width=120)
+    if success and thumb_path.exists():
+        return FileResponse(thumb_path)
+        
+    raise HTTPException(status_code=500, detail="Não foi possível gerar a miniatura do vídeo no tempo especificado.")
+
+
+@router.post("/api/editor/heartbeat")
+def editor_heartbeat():
+    """Reporta atividade do usuário no editor para desacelerar tarefas de segundo plano."""
+    TASK_MANAGER.report_user_activity()
+    return {"status": "success", "user_active": TASK_MANAGER.is_user_active()}
+
+

@@ -1736,6 +1736,49 @@ window.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // ── DROPDOWN DE OPÇÕES DE VISUALIZAÇÃO DA TIMELINE ──
+    const btnViewOptions = document.getElementById("btn-timeline-view-options");
+    const viewOptionsDropdown = document.getElementById("timeline-view-options-dropdown");
+    if (btnViewOptions && viewOptionsDropdown) {
+        btnViewOptions.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const visible = viewOptionsDropdown.style.display === "flex";
+            viewOptionsDropdown.style.display = visible ? "none" : "flex";
+        });
+
+        // Esconde ao clicar fora
+        document.addEventListener("click", (e) => {
+            if (!viewOptionsDropdown.contains(e.target) && e.target !== btnViewOptions && !btnViewOptions.contains(e.target)) {
+                viewOptionsDropdown.style.display = "none";
+            }
+        });
+
+        // Configura estados iniciais no DOM a partir de TIMELINE_STATE
+        const chkHover = document.getElementById("chk-timeline-hover-preview");
+        if (chkHover) {
+            chkHover.checked = !!TIMELINE_STATE.hoverPreviewEnabled;
+            chkHover.addEventListener("change", (e) => {
+                TIMELINE_STATE.toggleHoverPreview(e.target.checked);
+            });
+        }
+
+        const chkMuteHidden = document.getElementById("chk-timeline-mute-hidden");
+        if (chkMuteHidden) {
+            chkMuteHidden.checked = !!TIMELINE_STATE.muteHiddenTracksPlayback;
+            chkMuteHidden.addEventListener("change", (e) => {
+                TIMELINE_STATE.setMuteHiddenTracksPlayback(e.target.checked);
+            });
+        }
+
+        const selectDensity = document.getElementById("select-timeline-thumbs-density");
+        if (selectDensity) {
+            selectDensity.value = String(TIMELINE_STATE.globalThumbnailsInterval);
+            selectDensity.addEventListener("change", (e) => {
+                TIMELINE_STATE.setGlobalThumbnailsInterval(parseFloat(e.target.value));
+            });
+        }
+    }
+
     // Alternar filtros/abas da biblioteca de mídias (hide/show)
     const btnToggleFilters = document.getElementById("btn-toggle-library-filters");
     if (btnToggleFilters && sidebarLeft) {

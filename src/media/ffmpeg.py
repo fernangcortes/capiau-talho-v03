@@ -199,3 +199,62 @@ def generate_video_proxy(
     except Exception as e:
         print(f"[FFmpeg] Erro ao gerar proxy para {original_path.name}: {e}")
         return False
+
+
+def extract_thumbnail_frame(video_path: Path, timestamp: float, output_path: Path, width: int = 120) -> bool:
+    """Extrai um único frame JPEG em baixa resolução de forma rápida, com tratamento para MTS e busca lenta como fallback."""
+    is_mts = video_path.suffix.lower() == '.mts'
+    
+    cmd_fast = [
+        'ffmpeg', '-y',
+        '-ss', f"{timestamp:.3f}",
+        '-i', str(video_path),
+        '-vf', f'scale={width}:-1',
+        '-vframes', '1',
+        '-q:v', '5',
+        str(output_path)
+    ]
+    
+    cmd_slow = [
+        'ffmpeg', '-y',
+        '-i', str(video_path),
+        '-ss', f"{timestamp:.3f}",
+        '-vf', f'scale={width}:-1',
+        '-vframes', '1',
+        '-q:v', '5',
+        str(output_path)
+    ]
+    
+    startupinfo = None
+    creationflags = 0
+    if os.name == 'nt':
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        creationflags |= subprocess.BELOW_NORMAL_PRIORITY_CLASS
+        
+    try:
+        # Se for MTS, não tenta a busca rápida (costuma gerar frames verdes)
+        if is_mts:
+            raise ValueError("MTS requer busca lenta para evitar frames verdes")
+            
+        if os.name == 'nt':
+            subprocess.run(cmd_fast, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, creationflags=creationflags, check=True)
+        else:
+            cmd_unix = ['nice', '-n', '15'] + cmd_fast
+            subprocess.run(cmd_unix, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            
+        if output_path.exists() and output_path.stat().st_size > 0:
+            return True
+    except Exception:
+        # Fallback de busca lenta
+        try:
+            if os.name == 'nt':
+                subprocess.run(cmd_slow, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, creationflags=creationflags, check=True)
+            else:
+                cmd_unix = ['nice', '-n', '15'] + cmd_slow
+                subprocess.run(cmd_unix, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            return output_path.exists() and output_path.stat().st_size > 0
+        except Exception as e:
+            print(f"[FFmpeg] Falha ao extrair miniatura lenta a {timestamp}s de {video_path.name}: {e}")
+            return False
+    return False

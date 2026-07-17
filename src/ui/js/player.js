@@ -951,6 +951,12 @@ export class ProgramPlayer {
             const elapsedFrames = elapsedSecs * (TIMELINE_STATE?.fps || 24); // assume timeline FPS
             TIMELINE_STATE.setPlayheadFrame(TIMELINE_STATE.playheadFrame + elapsedFrames);
 
+            // Heartbeat de atividade do editor para o backend
+            if (!this.lastHeartbeatTime || now - this.lastHeartbeatTime > 2000) {
+                this.lastHeartbeatTime = now;
+                fetch("/api/editor/heartbeat", { method: "POST" }).catch(() => {});
+            }
+
             this.playRequest = requestAnimationFrame(step);
         };
         this.playRequest = requestAnimationFrame(step);
@@ -1008,7 +1014,7 @@ export class ProgramPlayer {
         // ────────── COMPOSIÇÃO MULTIPISTA ──────────
         // Base (videoA) = clipe da pista de vídeo MAIS BAIXA no playhead (geralmente falas).
         // Sobreposição (videoB) = clipe da pista de vídeo MAIS ALTA acima da base (cobertura b-roll).
-        const videoTracks = TIMELINE_STATE.getVideoTracks(); // ordem visual: topo → base
+        const videoTracks = TIMELINE_STATE.getVideoTracks().filter(t => !TIMELINE_STATE.muteHiddenTracksPlayback || !t.hidden); // ordem visual: topo → base
         const clipAtPlayhead = (trackId) => cuts.find(c =>
             c.track === trackId &&
             currentFrame >= c.timelineStartFrame &&
@@ -1043,7 +1049,7 @@ export class ProgramPlayer {
                 el.dataset.activeClipId = "";
                 return;
             }
-            const videoData = STATE.allVideos.find(v => v.id === cut.video_id);
+            const videoData = STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
             if (!videoData) {
                 if (!el.paused) el.pause();
                 el.style.display = "none";
@@ -1300,6 +1306,14 @@ export class ProgramPlayer {
         audioTracks.forEach(track => {
             seen.add(track.id);
             const el = this.getAudioElement(track.id);
+
+            // Se a pista de áudio estiver oculta e o mute de reprodução estiver ativo
+            if (track.hidden && TIMELINE_STATE.muteHiddenTracksPlayback) {
+                if (!el.paused) el.pause();
+                el.dataset.activeClipId = "";
+                return;
+            }
+
             const cut = cuts.find(c =>
                 c.track === track.id &&
                 currentFrame >= c.timelineStartFrame &&
@@ -1312,7 +1326,7 @@ export class ProgramPlayer {
                 return;
             }
 
-            const videoData = STATE.allVideos.find(v => v.id === cut.video_id);
+            const videoData = STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
             if (!videoData) {
                 if (!el.paused) el.pause();
                 return;
