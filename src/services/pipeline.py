@@ -432,7 +432,11 @@ class PipelineService:
                 # necessariamente saldo zerado (ver vision.max_tokens). Logar o
                 # status evita reincidir no mesmo diagnostico errado de novo.
                 print(f"[Vision] Falha na API de visão (status {response.status_code}): {response.text[:300]}")
-                return {"descricao": "Análise falhou", "tags": []}
+                # {} (nao um "descricao": "Analise falhou" fake) -- achado em 17/07:
+                # esse placeholder era gravado por cima de descricoes BOAS ja existentes
+                # (172 fotos perderam a analise real da Etapa 1 assim). Um dict vazio
+                # deixa o chamador decidir nao escrever nada em cima do que ja existia.
+                return {}
         except Exception as e:
             print(f"[Vision] Erro ao chamar OpenRouter: {e}")
             return {"descricao": "Análise indisponível por erro de requisição", "tags": []}
@@ -768,6 +772,16 @@ class PipelineService:
 
                 vision_prompt = get_vision_prompt(known_entities, detected_people, project_id=project_id, category=category)
                 analysis = PipelineService.call_openrouter_vision(base64_img, "jpg", prompt=vision_prompt, project_id=project_id)
+                if not analysis:
+                    # Chamada falhou -- pula este keyframe em vez de indexar uma
+                    # descricao vazia (um "buraco" silencioso na busca e menos
+                    # ruim que texto de erro poluindo o indice).
+                    print(f"[Vision] Falha no keyframe {timestamp:.1f}s do vídeo {video_id}: pulando.")
+                    try:
+                        frame_path.unlink()
+                    except Exception:
+                        pass
+                    continue
                 frame_tags = PipelineService.clean_tags(analysis.get("tags", []))
                 descriptions_indexed.append({
                     "timestamp": timestamp,
@@ -908,6 +922,15 @@ class PipelineService:
             from src.nlp.prompt_templates import get_photo_vision_prompt
             vision_prompt = get_photo_vision_prompt(known_entities, detected_people, project_id=project_id)
             analysis = PipelineService.call_openrouter_vision(base64_img, ext, prompt=vision_prompt, project_id=project_id)
+            if not analysis:
+                # Chamada falhou (ver call_openrouter_vision) -- NAO sobrescreve a
+                # descricao/tags que ja existiam. Devolve status a 'error' para a
+                # foto ser retentada, mas sem apagar analise boa anterior.
+                print(f"[Vision] Falha na análise da foto {photo_id}: mantendo dados anteriores.")
+                with get_db() as conn:
+                    MediaRepository.update_photo_status(conn, photo_id, 'error')
+                TASK_MANAGER.update_progress(f"photo-{photo_id}", 0.0, "failed", task_type="vision")
+                return False
             desc = analysis.get("descricao", "Foto analisada.")
             tags = PipelineService.clean_tags(analysis.get("tags", []))
 

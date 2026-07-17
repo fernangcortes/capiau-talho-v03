@@ -49,7 +49,8 @@ def rewrite_description_llm(
             json={
                 "model": S.get("llm.text_model"),
                 "messages": [{"role": "user", "content": prompt}],
-                "temperature": S.get("enrichment.temperature")
+                "temperature": S.get("enrichment.temperature"),
+                "max_tokens": S.get("enrichment.max_tokens")
             },
             timeout=S.get("enrichment.timeout")
         )

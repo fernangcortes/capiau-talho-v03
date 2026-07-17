@@ -493,6 +493,14 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "themes_search", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {
+        "key": "enrichment.max_tokens", "type": "int", "default": 400, "min": 100, "max": 2000, "step": 100,
+        "label": "Enriquecimento: teto de tokens da resposta",
+        "help": "Limite de tamanho da descrição reescrita. É só uma frase reescrita, cabe em poucas centenas de tokens.",
+        "help_tech": "max_tokens do rewrite_description_llm. Mesma causa do vision.max_tokens: sem "
+                      "isso a OpenRouter reserva contra o teto do modelo de texto inteiro por chamada.",
+        "category": "themes_search", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
         "key": "enrichment.timeout", "type": "int", "default": 25, "min": 5, "max": 120, "step": 5,
         "label": "Enriquecimento: timeout (s)",
         "help": "Tempo máximo de espera por reescrita de descrição.",
