@@ -571,7 +571,8 @@ function applyFiltersAndRenderCards() {
         } else if (r.score >= 0.5) {
             scoreClass = "medium";
         }
-        const scoreBadge = `<span class="match-badge ${scoreClass}"><i class="fa-solid fa-fire"></i> ${scorePercent}% Match</span>`;
+        const explanationTooltip = r.explanation ? `data-tooltip="${escapeHtml(r.explanation)}"` : '';
+        const scoreBadge = `<span class="match-badge ${scoreClass}" ${explanationTooltip}><i class="fa-solid fa-fire"></i> ${scorePercent}% Match</span>`;
         
         // Match highlights
         const highlightedText = highlightTerms(r.payload.text || "", SEARCH_STATE.query);
@@ -583,26 +584,21 @@ function applyFiltersAndRenderCards() {
                 ? r.payload.filepath
                 : `/originals/${filename}`);
                 
-            const explanationHtml = r.explanation ? `
-                <div class="explanation-box" style="font-size: 9px; color: var(--color-cyan); background: rgba(6,182,212,0.05); padding: 4px 8px; border-radius: 4px; margin-top: 4px; display: flex; align-items: center; gap: 4px; border: 1px solid rgba(6,182,212,0.1);">
-                    <i class="fa-solid fa-circle-info"></i> <span>${r.explanation}</span>
-                </div>
-            ` : "";
-
             card.innerHTML = `
-                <div class="search-result-layout" style="position: relative;">
-                    <button class="btn-select-similar-item" title="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
-                        <i class="fa-regular fa-square"></i>
-                    </button>
-                    <img class="search-result-thumb" src="${src}" alt="Thumb" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; margin-right: 10px; margin-left: 20px;">
-                    <div class="search-result-content" style="flex: 1;">
-                        <div class="bubble-meta" style="margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
-                            <span class="speaker-name" style="color:#f59e0b; font-weight:600;"><i class="fa-solid fa-image"></i> Foto de Set</span>
+                <div class="search-result-layout">
+                    <div style="position: relative; flex-shrink: 0;">
+                        <img class="search-result-thumb" src="${src}" alt="Thumb" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 8px;">
+                        <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.65); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
+                            <i class="fa-regular fa-square"></i>
+                        </button>
+                    </div>
+                    <div class="search-result-content" style="flex: 1; min-width: 0;">
+                        <div class="bubble-meta" style="margin-bottom: 3px; display: flex; justify-content: space-between; align-items: center; gap: 4px;">
+                            <span class="speaker-name" style="color:#f59e0b; font-weight:600; font-size:10px;"><i class="fa-solid fa-image"></i> Foto de Set</span>
                             ${scoreBadge}
                         </div>
-                        <div class="bubble-text">${highlightedText}</div>
-                        <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Arquivo: ${filename}</div>
-                        ${explanationHtml}
+                        <div class="bubble-text" style="font-size:11px; line-height:1.3;">${highlightedText}</div>
+                        <div style="font-size:9px; color:var(--text-muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" data-tooltip="Arquivo: ${filename}">Arquivo: ${filename}</div>
                     </div>
                 </div>
             `;
@@ -615,7 +611,7 @@ function applyFiltersAndRenderCards() {
                     window.toggleSelectSimilarItem("photo", photoId, filename, card);
                 });
             }
-
+ 
             const isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => item.kind === "photo" && item.id === photoId);
             if (isSelected) {
                 card.classList.add("selected-for-similar");
@@ -664,36 +660,27 @@ function applyFiltersAndRenderCards() {
                 videoDisplayTitle = foundVid.title || foundVid.filename;
             }
             
-            const explanationHtml = r.explanation ? `
-                <div class="explanation-box" style="font-size: 9px; color: var(--color-cyan); background: rgba(6,182,212,0.05); padding: 4px 8px; border-radius: 4px; margin-top: 4px; display: flex; align-items: center; gap: 4px; border: 1px solid rgba(6,182,212,0.1);">
-                    <i class="fa-solid fa-circle-info"></i> <span>${r.explanation}</span>
-                </div>
-            ` : "";
-
             card.innerHTML = `
-                <div style="position: relative;">
-                    <button class="btn-select-similar-item" title="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
-                        <i class="fa-regular fa-square"></i>
-                    </button>
-                </div>
-                <div class="bubble-meta" style="margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; padding-left: 20px;">
-                    <span class="speaker-name" style="color:${color}; font-weight:600;"><i class="fa-solid ${icon}"></i> ${title}</span>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-weight:600; font-size:11px; color:var(--color-cyan); display:flex; align-items:center; gap:4px;">
+                <div class="bubble-meta" style="margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                    <span class="speaker-name" style="color:${color}; font-weight:600; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:120px;" data-tooltip="${title}"><i class="fa-solid ${icon}"></i> ${title}</span>
+                    <div style="display:flex; align-items:center; gap:6px; flex-shrink: 0;">
+                        <span style="font-weight:600; font-size:10px; color:var(--color-cyan); display:flex; align-items:center; gap:3px;">
                             <i class="fa-solid fa-circle-play"></i> ${timecode}
                         </span>
                         ${scoreBadge}
                     </div>
                 </div>
-                <div class="bubble-text" style="padding-left: 20px;">${highlightedText}</div>
-                <div style="font-size:10px; color:var(--text-muted); margin-top:4px; display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px; padding-left: 20px;">
-                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${videoFilename}">Vídeo: ${videoDisplayTitle} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)</span>
-                    <button class="view-context-btn" title="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; padding:4px; font-size:12px; display:flex; align-items:center; justify-content:center; border-radius:50%; width:24px; height:24px; flex-shrink:0;">
-                        <i class="fa-solid fa-eye"></i>
-                    </button>
-                </div>
-                <div style="padding-left: 20px;">
-                    ${explanationHtml}
+                <div class="bubble-text" style="font-size:11px; line-height:1.3;">${highlightedText}</div>
+                <div style="font-size:9px; color:var(--text-muted); margin-top:3px; display:flex; justify-content:space-between; align-items:center; width:100%; gap:6px;">
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" data-tooltip="Vídeo: ${videoDisplayTitle} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)">Vídeo: ${videoDisplayTitle} (${((r.payload.end_time || 0) - (r.payload.start_time || 0)).toFixed(1)}s)</span>
+                    <div style="display:flex; gap:2px; align-items:center; flex-shrink:0;">
+                        <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:2px; font-size:10px; display:none; align-items:center; justify-content:center; border-radius:50%; width:20px; height:20px;">
+                            <i class="fa-regular fa-square"></i>
+                        </button>
+                        <button class="view-context-btn" data-tooltip="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; padding:2px; font-size:11px; display:flex; align-items:center; justify-content:center; border-radius:50%; width:20px; height:20px;">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
                 </div>
             `;
             
@@ -702,10 +689,10 @@ function applyFiltersAndRenderCards() {
                 selectBtn.addEventListener("click", (e) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    window.toggleSelectSimilarItem("video", vidId, videoDisplayTitle, card, r.payload.start_time);
+                    window.toggleSelectSimilarItem("video", vidId, videoDisplayTitle, card, r.payload.start_time, r.payload.media_type || null);
                 });
             }
-
+ 
             const isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => 
                 item.kind === "video" && item.id === vidId && item.timestamp === r.payload.start_time
             );
@@ -789,8 +776,8 @@ function applyFiltersAndRenderCards() {
                     subCard.style.background = "rgba(255,255,255,0.01)";
                     subCard.style.border = "1px solid rgba(255,255,255,0.03)";
                     subCard.style.borderRadius = "4px";
-                    subCard.style.padding = "6px";
-                    subCard.style.fontSize = "11px";
+                    subCard.style.padding = "4px 6px";
+                    subCard.style.fontSize = "10px";
                     subCard.style.cursor = "pointer";
                     subCard.style.transition = "background 0.2s";
                     
@@ -808,7 +795,7 @@ function applyFiltersAndRenderCards() {
                             </span>
                             <div style="display: flex; gap: 6px; align-items: center;">
                                 <span class="match-badge ${subScoreClass}" style="font-size: 8px; padding: 1px 4px; line-height: 1;"><i class="fa-solid fa-fire"></i> ${(occ.score * 100).toFixed(0)}%</span>
-                                <button class="view-occ-context-btn" title="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; font-size:10px; padding:2px; display:flex; align-items:center; justify-content:center;">
+                                <button class="view-occ-context-btn" data-tooltip="Ver no Contexto" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; font-size:10px; padding:2px; display:flex; align-items:center; justify-content:center;">
                                     <i class="fa-solid fa-eye"></i>
                                 </button>
                             </div>
@@ -946,50 +933,50 @@ function renderSearchResults(query) {
     if (!searchContainer) return;
 
     searchContainer.innerHTML = `
-        <div class="transcription-actions" style="border:none; padding: 10px 15px 5px 15px;">
-            <h4 style="font-size:12px; color:var(--color-cyan); display: flex; align-items: center; gap: 6px; margin: 0;">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> Resultados para: "${query}"
+        <div class="transcription-actions" style="border:none; padding: 6px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0;">
+            <h4 style="font-size:11px; color:var(--color-cyan); display: flex; align-items: center; gap: 4px; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;" data-tooltip="Resultados para: &quot;${query}&quot;">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> "${query}"
             </h4>
-        </div>
-        
-        <div class="search-type-tabs">
-            <div class="search-type-tab ${SEARCH_STATE.activeMediaFilter === '' ? 'active' : ''}" data-type="" title="Todas as Mídias"><i class="fa-solid fa-border-all"></i></div>
-            <div class="search-type-tab ${SEARCH_STATE.activeMediaFilter === 'interview' ? 'active' : ''}" data-type="interview" title="Entrevistas (ASR)"><i class="fa-solid fa-microphone-lines"></i></div>
-            <div class="search-type-tab ${SEARCH_STATE.activeMediaFilter === 'broll' ? 'active' : ''}" data-type="broll" title="Bastidores (B-roll)"><i class="fa-solid fa-video"></i></div>
-            <div class="search-type-tab ${SEARCH_STATE.activeMediaFilter === 'photo' ? 'active' : ''}" data-type="photo" title="Fotos de Set"><i class="fa-solid fa-camera"></i></div>
+            <div class="search-type-tabs" style="margin: 0; padding: 0; border: none; gap: 4px; display: flex; align-items: center; flex-shrink: 0;">
+                <div class="search-type-tab ${SEARCH_STATE.activeMediaFilter === '' ? 'active' : ''}" data-type="" data-tooltip="Todas as Mídias" style="width: 24px; height: 24px; font-size: 11px;"><i class="fa-solid fa-border-all"></i></div>
+                <div class="search-type-tab ${SEARCH_STATE.activeMediaFilter === 'interview' ? 'active' : ''}" data-type="interview" data-tooltip="Entrevistas (ASR)" style="width: 24px; height: 24px; font-size: 11px;"><i class="fa-solid fa-microphone-lines"></i></div>
+                <div class="search-type-tab ${SEARCH_STATE.activeMediaFilter === 'broll' ? 'active' : ''}" data-type="broll" data-tooltip="Bastidores (B-roll)" style="width: 24px; height: 24px; font-size: 11px;"><i class="fa-solid fa-video"></i></div>
+                <div class="search-type-tab ${SEARCH_STATE.activeMediaFilter === 'photo' ? 'active' : ''}" data-type="photo" data-tooltip="Fotos de Set" style="width: 24px; height: 24px; font-size: 11px;"><i class="fa-solid fa-camera"></i></div>
+            </div>
         </div>
 
-        <div class="search-playlist-controls" style="display: none; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 6px; margin: 5px 15px 10px 15px; padding: 6px 12px; font-size: 11px;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-                <button id="btn-search-prev" class="btn-outline" style="padding: 4px 8px; font-size: 10px; height: 24px; display: flex; align-items: center; justify-content: center; outline: none; border-radius: 4px;" title="Resultado Anterior">
+        <div class="search-playlist-controls" style="display: none; align-items: center; justify-content: space-between; background: transparent; border: none; margin: 0 12px 6px 12px; padding: 0; font-size: 11px; flex-shrink: 0; flex-wrap: wrap; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 4px;">
+                <button id="btn-search-prev" class="flat-sidebar-btn" style="padding: 2px 4px; font-size: 9px; height: 20px; width: 20px; display: flex; align-items: center; justify-content: center;" data-tooltip="Resultado Anterior">
                     <i class="fa-solid fa-step-backward"></i>
                 </button>
-                <button id="btn-search-play-seq" class="btn-outline" style="padding: 4px 10px; font-size: 10px; height: 24px; display: flex; align-items: center; justify-content: center; gap: 4px; font-weight:600; outline: none; border-radius: 4px;" title="Iniciar Reprodução Automática Sequencial">
+                <button id="btn-search-play-seq" class="flat-sidebar-btn" style="padding: 2px 6px; font-size: 10px; height: 20px; display: flex; align-items: center; justify-content: center; gap: 3px; font-weight:600;" data-tooltip="Iniciar Reprodução Automática Sequencial">
                     <i class="fa-solid fa-play"></i> Autoplay
                 </button>
-                <button id="btn-search-next" class="btn-outline" style="padding: 4px 8px; font-size: 10px; height: 24px; display: flex; align-items: center; justify-content: center; outline: none; border-radius: 4px;" title="Próximo Resultado">
+                <button id="btn-search-next" class="flat-sidebar-btn" style="padding: 2px 4px; font-size: 9px; height: 20px; width: 20px; display: flex; align-items: center; justify-content: center;" data-tooltip="Próximo Resultado">
                     <i class="fa-solid fa-step-forward"></i>
                 </button>
             </div>
-            <div id="search-playlist-status" style="color: var(--text-muted); font-size: 10px; font-weight: 600;">
-                Nenhum selecionado
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div id="search-playlist-status" style="color: var(--text-muted); font-size: 10px; font-weight: 600;">
+                    Nenhum selecionado
+                </div>
+                <div class="search-playlist-options" style="display: none; align-items: center; margin: 0; padding: 0;">
+                    <label style="display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-secondary); cursor: pointer; user-select: none;" data-tooltip="Abrir fotos no player de vídeo">
+                        <input type="checkbox" id="chk-search-photos-in-player" style="cursor: pointer; width: 11px; height: 11px; accent-color: var(--color-cyan);">
+                        <span>Abrir fotos</span>
+                    </label>
+                </div>
             </div>
-        </div>
-        
-        <div class="search-playlist-options" style="display: none; align-items: center; margin: -5px 15px 10px 15px; padding: 0 6px;">
-            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; user-select: none;">
-                <input type="checkbox" id="chk-search-photos-in-player" style="cursor: pointer; width: 12px; height: 12px; accent-color: var(--color-cyan);">
-                <span>Abrir fotos no player de vídeo</span>
-            </label>
         </div>
 
         <div class="context-filters-container">
             <!-- Pílulas contextuais e IA injetadas dinamicamente -->
         </div>
 
-        <div class="search-results-list" style="padding: 0 15px 10px 15px;"></div>
+        <div class="search-results-list scrollable" style="flex: 1; overflow-y: auto; padding: 0 12px 10px 12px; min-height: 0;"></div>
         
-        <div class="search-loading-more" style="display:none; text-align:center; padding: 10px; font-size:11px; color:var(--text-muted);">
+        <div class="search-loading-more" style="display:none; text-align:center; padding: 10px; font-size:11px; color:var(--text-muted); flex-shrink: 0;">
             <i class="fa-solid fa-spinner fa-spin"></i> Carregando mais resultados...
         </div>
     `;
@@ -1031,11 +1018,18 @@ function renderSearchResults(query) {
             
             const selectedType = tab.getAttribute("data-type");
             SEARCH_STATE.activeMediaFilter = selectedType;
-            
+
             SEARCH_STATE.activeContextFilters.clear();
             SEARCH_STATE.activeAiCategory = null;
             SEARCH_STATE.showAllTags = false;
-            
+
+            // Resultado de busca em lote: a aba re-consulta a rota similar-batch
+            // com o filtro de tipo (substitui o antigo dropdown de destino)
+            if (SEARCH_STATE.similarBatchContext) {
+                await runSimilarBatch(selectedType || null);
+                return;
+            }
+
             // Fazer uma nova busca no backend com o novo tipo de mídia selecionado
             SEARCH_STATE.offset = 0;
             SEARCH_STATE.hasMore = true;
@@ -1091,6 +1085,7 @@ async function runSemanticSearch() {
     STATE.currentRightTab = "search";
 
     SEARCH_STATE.query = query;
+    SEARCH_STATE.similarBatchContext = null; // sai do modo lote: abas voltam à busca normal
     SEARCH_STATE.offset = 0;
     SEARCH_STATE.hasMore = true;
     SEARCH_STATE.isLoading = false;
@@ -1134,6 +1129,7 @@ async function showSimilarMedia(kind, id, opts = {}) {
     STATE.currentRightTab = "search";
 
     SEARCH_STATE.query = "";
+    SEARCH_STATE.similarBatchContext = null; // sai do modo lote: abas voltam à busca normal
     SEARCH_STATE.offset = 0;
     SEARCH_STATE.hasMore = false; // resultado fechado: sem paginação/infinite scroll
     SEARCH_STATE.isLoading = false;
@@ -1161,16 +1157,16 @@ window.showSimilarMedia = showSimilarMedia;
 
 window.selectedSimilarItems = [];
 
-window.toggleSelectSimilarItem = function(kind, id, title, cardEl, timestamp = null) {
+window.toggleSelectSimilarItem = function(kind, id, title, cardEl, timestamp = null, mediaType = null) {
     if (!window.selectedSimilarItems) {
         window.selectedSimilarItems = [];
     }
-    const idx = window.selectedSimilarItems.findIndex(item => 
-        item.kind === kind && 
-        item.id === id && 
+    const idx = window.selectedSimilarItems.findIndex(item =>
+        item.kind === kind &&
+        item.id === id &&
         (kind !== "video" || item.timestamp === timestamp)
     );
-    
+
     if (idx >= 0) {
         window.selectedSimilarItems.splice(idx, 1);
         cardEl.classList.remove("selected-for-similar");
@@ -1180,7 +1176,7 @@ window.toggleSelectSimilarItem = function(kind, id, title, cardEl, timestamp = n
             icon.style.color = "var(--text-muted)";
         }
     } else {
-        window.selectedSimilarItems.push({ kind, id, title, timestamp });
+        window.selectedSimilarItems.push({ kind, id, title, timestamp, mediaType });
         cardEl.classList.add("selected-for-similar");
         const icon = cardEl.querySelector(".btn-select-similar-item i");
         if (icon) {
@@ -1272,87 +1268,163 @@ window.clearSimilarSelection = function() {
     window.updateSimilarSelectionUI();
 };
 
-window.searchSimilarMultiple = async function() {
-    if (!window.selectedSimilarItems || window.selectedSimilarItems.length === 0) return;
-    
-    const searchType = document.getElementById("similar-search-type")?.value || "visual";
-    const targetMedia = document.getElementById("similar-search-target")?.value || "all";
-    
-    const items = window.selectedSimilarItems.map(item => ({
-        kind: item.kind,
-        id: item.id,
-        timestamp: item.timestamp
-    }));
-    
+function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = String(str ?? "");
+    return div.innerHTML;
+}
+window.escapeHtml = escapeHtml;
+
+/** Traduz os códigos de warning do backend para frases didáticas. */
+function describeSimilarWarnings(warnings = []) {
+    const out = [];
+    let semIndice = 0;
+    warnings.forEach(w => {
+        if (w === "photos_use_descriptions") {
+            out.push("fotos não têm fala — usando as descrições geradas pela análise");
+        } else if (String(w).startsWith("item_sem_indice:")) {
+            semIndice++;
+        }
+    });
+    if (semIndice > 0) {
+        out.push(semIndice === 1
+            ? "1 item foi ignorado (ainda não analisado/indexado)"
+            : `${semIndice} itens foram ignorados (ainda não analisados/indexados)`);
+    }
+    return out;
+}
+
+/** Cabeçalho-receita: mostra COMO a busca em lote foi montada (didática). */
+function injectSimilarRecipeHeader(data) {
+    const ctx = SEARCH_STATE.similarBatchContext;
+    const searchContainer = getActiveElement("search-container");
+    if (!ctx || !searchContainer) return;
+
+    const n = ctx.items.length;
+    const cohesionPct = Math.round((data.cohesion || 0) * 100);
+    const modeLine = data.mode_used === "uniao"
+        ? `<i class="fa-solid fa-arrows-split-up-and-left"></i> Seleção variada (coesão ${cohesionPct}%) — buscando parecidos com <strong>qualquer um</strong> dos ${n} itens`
+        : `<i class="fa-solid fa-arrows-to-circle"></i> Buscando o <strong>tema comum</strong> entre ${n === 1 ? "o item selecionado" : `os ${n} itens`} (coesão da seleção: ${cohesionPct}%)`;
+    const criteriaLine = ctx.searchType === "visual"
+        ? "Critério: aparência visual (CLIP) — cores, enquadramento e composição"
+        : "Critério: assunto e contexto (embeddings de texto) — o que é falado ou descrito";
+    const sourcesLine = ctx.titles.map(t => escapeHtml(t)).join(", ");
+    const warningsHtml = describeSimilarWarnings(data.warnings)
+        .map(w => `<div class="similar-recipe-warning"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(w)}</div>`)
+        .join("");
+
+    const header = document.createElement("div");
+    header.className = "similar-recipe-header";
+    header.innerHTML = `
+        <div class="recipe-mode">${modeLine}</div>
+        <div class="recipe-sources">${escapeHtml(criteriaLine)}</div>
+        <div class="recipe-sources">Itens de origem: ${sourcesLine}</div>
+        ${warningsHtml}
+    `;
+    const titleDiv = searchContainer.querySelector(".transcription-actions");
+    if (titleDiv) titleDiv.insertAdjacentElement("afterend", header);
+    else searchContainer.prepend(header);
+}
+
+/** Executa/re-executa a busca em lote (as abas de tipo re-consultam com filtro). */
+async function runSimilarBatch(mediaTypeFilter = null) {
+    const ctx = SEARCH_STATE.similarBatchContext;
+    if (!ctx) return;
+
     const searchContainer = getActiveElement("search-container");
     if (searchContainer) {
-        searchContainer.innerHTML = "<div class='loading' style='padding: 15px;'>Buscando mídias similares (CLIP local)...</div>";
+        const loadingMsg = ctx.searchType === "visual"
+            ? "Buscando mídias com aparência parecida (CLIP local)..."
+            : "Buscando mídias sobre o mesmo assunto (busca semântica local)...";
+        searchContainer.innerHTML = `<div class='loading' style='padding: 15px;'>${loadingMsg}</div>`;
     }
-    
-    STATE.currentRightTab = "search";
-    const searchTabBtn = document.querySelector(`.tab-btn[data-tab="tab-search"]`);
-    if (searchTabBtn) {
-        searchTabBtn.click();
-    }
-    
-    const similarDropdown = document.getElementById("library-similar-settings-dropdown");
-    if (similarDropdown) similarDropdown.style.display = "none";
-    
+
     SEARCH_STATE.query = "";
     SEARCH_STATE.offset = 0;
     SEARCH_STATE.hasMore = false;
     SEARCH_STATE.isLoading = false;
     SEARCH_STATE.loadedResults = [];
-    SEARCH_STATE.activeMediaFilter = "";
+    SEARCH_STATE.activeMediaFilter = mediaTypeFilter || "";
     SEARCH_STATE.activeContextFilters.clear();
     SEARCH_STATE.aiCategories = null;
     SEARCH_STATE.activeAiCategory = null;
     SEARCH_STATE.showAllTags = false;
-    
+
     try {
-        const response = await fetch("/api/media/similar-batch", {
+        const data = await CapIAuAPI.request("/api/media/similar-batch", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 project_id: STATE.currentProjectId,
-                items: items,
-                search_type: searchType,
-                target_media_type: targetMedia,
+                items: ctx.items,
+                search_type: ctx.searchType,
+                media_type_filter: mediaTypeFilter || "all",
                 limit: 20
             })
         });
-        
-        const data = await response.json();
+
         SEARCH_STATE.loadedResults = data.results || [];
-        
-        const labels = window.selectedSimilarItems.map(item => item.title).join(", ");
-        const summaryLabel = labels.length > 20 ? `${labels.substring(0, 20)}...` : labels;
-        const searchCriteriaName = searchType === "visual" ? "similaridade visual" : "similaridade temática";
-        
-        renderSearchResults(`Lote de ${searchCriteriaName} (${window.selectedSimilarItems.length} itens): ${summaryLabel}`);
-        
-        // Auto-run tooltip conversion for dynamic search cards
-        setTimeout(() => {
-            const convertTitleToTooltip = (root = document) => {
-                root.querySelectorAll("[title]").forEach(el => {
-                    const title = el.getAttribute("title");
-                    if (title && !el.hasAttribute("data-tooltip")) {
-                        el.setAttribute("data-tooltip", title);
-                        el.removeAttribute("title");
-                    }
-                });
-            };
-            convertTitleToTooltip();
-        }, 100);
-        
+        const criteriaName = ctx.searchType === "visual" ? "aparência visual" : "assunto em comum";
+        renderSearchResults(`Similares (${criteriaName}) a ${ctx.items.length} ${ctx.items.length === 1 ? "item" : "itens"}`);
+        injectSimilarRecipeHeader(data);
     } catch (err) {
         console.error("Erro na busca de similares em lote:", err);
         if (searchContainer) {
-            searchContainer.innerHTML = `<div class='error' style='padding: 15px;'>Erro ao buscar similares: ${err.message}</div>`;
+            searchContainer.innerHTML = `<div class='error' style='padding: 15px;'>Erro ao buscar similares: ${escapeHtml(err.message)}</div>`;
         }
     }
+}
+
+/** Pré-sugere o critério conforme a seleção (só fotos -> visual; só entrevistas -> textual). */
+function applySimilarCriteriaSuggestion() {
+    const sel = window.selectedSimilarItems || [];
+    const hint = document.getElementById("similar-criteria-hint");
+    const types = sel.map(i => i.kind === "photo" ? "photo" : (i.mediaType || "video"));
+
+    let suggested = null;
+    if (sel.length > 0 && types.every(t => t === "photo")) suggested = "visual";
+    else if (sel.length > 0 && types.every(t => t === "interview")) suggested = "textual";
+
+    const target = suggested || localStorage.getItem("similar_search_type_last") || "visual";
+    const radio = document.querySelector(`input[name='similar-search-type'][value='${target}']`);
+    if (radio) radio.checked = true;
+
+    if (hint) {
+        if (suggested === "visual") {
+            hint.style.display = "block";
+            hint.textContent = "Sugerido para sua seleção (só fotos): comparar a aparência costuma funcionar melhor.";
+        } else if (suggested === "textual") {
+            hint.style.display = "block";
+            hint.textContent = "Sugerido para sua seleção (só entrevistas): comparar o assunto das falas costuma funcionar melhor.";
+        } else {
+            hint.style.display = "none";
+        }
+    }
+}
+
+window.searchSimilarMultiple = async function() {
+    if (!window.selectedSimilarItems || window.selectedSimilarItems.length === 0) return;
+
+    const checkedRadio = document.querySelector("input[name='similar-search-type']:checked");
+    const searchType = checkedRadio ? checkedRadio.value : "visual";
+    localStorage.setItem("similar_search_type_last", searchType);
+
+    SEARCH_STATE.similarBatchContext = {
+        items: window.selectedSimilarItems.map(item => ({
+            kind: item.kind, id: item.id, timestamp: item.timestamp
+        })),
+        titles: window.selectedSimilarItems.map(item => item.title || `${item.kind} ${item.id}`),
+        searchType
+    };
+
+    STATE.currentRightTab = "search";
+    const searchTabBtn = document.querySelector(`.tab-btn[data-tab="tab-search"]`);
+    if (searchTabBtn) searchTabBtn.click();
+
+    const similarDropdown = document.getElementById("library-similar-settings-dropdown");
+    if (similarDropdown) similarDropdown.style.display = "none";
+
+    await runSimilarBatch(null);
 };
 
 // updateActionsRowVisibility removed as actions are now persistent inside each panel container
@@ -1372,6 +1444,7 @@ window.addEventListener("DOMContentLoaded", () => {
             e.stopPropagation();
             if (similarDropdown) {
                 if (similarDropdown.style.display === "none") {
+                    applySimilarCriteriaSuggestion();
                     similarDropdown.style.display = "flex";
                 } else {
                     similarDropdown.style.display = "none";
