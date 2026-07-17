@@ -60,41 +60,79 @@ class PipelineService:
         return cleaned
 
     @staticmethod
-    def call_openrouter_vision_multi(base64_images: List[str], prompt: str, project_id: Optional[int] = None) -> Dict[str, Any]:
-        """Chama a API de visão com MÚLTIPLAS imagens em uma única requisição (triagem)."""
+    def _call_vision_api(messages: list, project_id: Optional[int], log_prefix: str, timeout_floor: float = 0.0) -> Dict[str, Any]:
+        """Chama a API de visão com retry no modelo principal e fallback automático.
+
+        Tenta 'llm.vision_model' até 'vision.max_retries' vezes; se todas falharem,
+        tenta 'llm.vision_model_fallback' uma vez. Existe para permitir um modelo
+        ':free' como padrão sem depender só dele: modelos grátis da OpenRouter falham
+        sob carga com "Upstream idle timeout exceeded" (504) com frequência real —
+        medido em 17/07/2026, ~metade das chamadas com o prompt de produção.
+
+        Retorna {} se principal E reserva falharem — o chamador decide o que fazer
+        (nunca sobrescrever dado bom com o resultado vazio, ver analyze_photo_vision).
+        """
         S = SettingsService.get_settings(project_id)
         api_key = S.api_key("openrouter")
         if not api_key or api_key == "your_openrouter_api_key_here":
             return {}
 
+        primary = S.get("llm.vision_model")
+        fallback = S.get("llm.vision_model_fallback")
+        retries = max(1, S.get("vision.max_retries"))
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        base_payload = {
+            "messages": messages,
+            "temperature": S.get("vision.temperature"),
+            "max_tokens": S.get("vision.max_tokens"),
+        }
+        timeout = max(S.get("vision.timeout"), timeout_floor)
+
+        def _attempt(model: str) -> Optional[Dict[str, Any]]:
+            payload = {**base_payload, "model": model}
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=timeout)
+                if response.status_code != 200:
+                    print(f"[{log_prefix}] Falha na API de visão (modelo {model}, status {response.status_code}): {response.text[:300]}")
+                    return None
+                res_json = response.json()
+                if "choices" not in res_json:
+                    # status 200 com corpo de erro (ex.: "Upstream idle timeout
+                    # exceeded") acontece de verdade com modelos ':free' sob carga.
+                    print(f"[{log_prefix}] Resposta sem 'choices' do modelo {model}: {res_json.get('error', res_json)}")
+                    return None
+                content = res_json["choices"][0]["message"]["content"].strip()
+                return extract_json_from_markdown(content)
+            except Exception as e:
+                print(f"[{log_prefix}] Erro ao chamar {model}: {e}")
+                return None
+
+        for attempt in range(1, retries + 1):
+            result = _attempt(primary)
+            if result is not None:
+                return result
+            print(f"[{log_prefix}] Tentativa {attempt}/{retries} falhou em {primary}.")
+
+        if fallback and fallback != primary:
+            print(f"[{log_prefix}] {retries} tentativa(s) esgotada(s) em {primary}; usando reserva {fallback}.")
+            result = _attempt(fallback)
+            if result is not None:
+                return result
+
+        return {}
+
+    @staticmethod
+    def call_openrouter_vision_multi(base64_images: List[str], prompt: str, project_id: Optional[int] = None) -> Dict[str, Any]:
+        """Chama a API de visão com MÚLTIPLAS imagens em uma única requisição (triagem)."""
         content = [{"type": "text", "text": prompt}]
         for b64 in base64_images:
             content.append({
                 "type": "image_url",
                 "image_url": {"url": f"data:image/jpeg;base64,{b64}"}
             })
-
-        payload = {
-            "model": S.get("llm.vision_model"),
-            "messages": [{"role": "user", "content": content}],
-            "temperature": S.get("vision.temperature"),
-            "max_tokens": S.get("vision.max_tokens")
-        }
-        try:
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json=payload,
-                timeout=max(S.get("vision.timeout"), 40)
-            )
-            if response.status_code == 200:
-                res_json = response.json()
-                return extract_json_from_markdown(res_json['choices'][0]['message']['content'].strip())
-            print(f"[Triage] Falha na API de visão (status {response.status_code}): {response.text[:200]}")
-            return {}
-        except Exception as e:
-            print(f"[Triage] Erro ao chamar visão multi-imagem: {e}")
-            return {}
+        messages = [{"role": "user", "content": content}]
+        return PipelineService._call_vision_api(messages, project_id, "Triage", timeout_floor=40)
 
     @staticmethod
     def triage_video(video_id: int, filepath: Path, duration: float, project_id: int) -> Dict[str, Any]:
@@ -389,57 +427,25 @@ class PipelineService:
         """Chama a API do OpenRouter Vision para analisar frames ou fotos.
 
         'prompt' permite injetar o prompt estruturado com entidades conhecidas do projeto
-        (get_vision_prompt); sem ele, usa o prompt legado simples.
+        (get_vision_prompt); sem ele, usa o prompt legado simples. {} em qualquer falha
+        (principal + reserva esgotados, ou chave ausente) -- nunca um placeholder de
+        texto fake: o chamador é quem decide não sobrescrever dado bom (ver
+        analyze_photo_vision / analyze_video_vision).
         """
-        S = SettingsService.get_settings(project_id)
-        api_key = S.api_key("openrouter")
-        if not api_key or api_key == "your_openrouter_api_key_here":
-            return {"descricao": "Análise indisponível", "tags": []}
-
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
         mime_type = "image/jpeg" if extension in ["jpeg", "jpg"] else f"image/{extension}"
-
-        payload = {
-            "model": S.get("llm.vision_model"),
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt or VISION_PROMPT},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}
-                        }
-                    ]
-                }
-            ],
-            "temperature": S.get("vision.temperature"),
-            "max_tokens": S.get("vision.max_tokens")
-        }
-
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=S.get("vision.timeout"))
-            if response.status_code == 200:
-                res_json = response.json()
-                content = res_json['choices'][0]['message']['content'].strip()
-                return extract_json_from_markdown(content)
-            else:
-                # 402 = credito insuficiente para o teto de tokens pedido, nao
-                # necessariamente saldo zerado (ver vision.max_tokens). Logar o
-                # status evita reincidir no mesmo diagnostico errado de novo.
-                print(f"[Vision] Falha na API de visão (status {response.status_code}): {response.text[:300]}")
-                # {} (nao um "descricao": "Analise falhou" fake) -- achado em 17/07:
-                # esse placeholder era gravado por cima de descricoes BOAS ja existentes
-                # (172 fotos perderam a analise real da Etapa 1 assim). Um dict vazio
-                # deixa o chamador decidir nao escrever nada em cima do que ja existia.
-                return {}
-        except Exception as e:
-            print(f"[Vision] Erro ao chamar OpenRouter: {e}")
-            return {"descricao": "Análise indisponível por erro de requisição", "tags": []}
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt or VISION_PROMPT},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}
+                    }
+                ]
+            }
+        ]
+        return PipelineService._call_vision_api(messages, project_id, "Vision")
 
     @staticmethod
     def _register_auto_mentions(

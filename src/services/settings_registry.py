@@ -62,10 +62,27 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "help": "Modelo de IA que descreve imagens (frames de B-roll e fotos de set). "
                 "As opções ':free' não custam nada, mas têm limite de pedidos por dia "
                 "da OpenRouter (1000/dia só se a conta já tiver US$10+ em compras "
-                "acumuladas, senão 50/dia) e podem variar de qualidade — compare antes "
-                "de rodar um lote grande nelas.",
+                "acumuladas, senão 50/dia) e podem falhar com timeout sob carga — por "
+                "isso o 'Modelo de reserva' abaixo existe.",
         "help_tech": "Substitui CONFIG.VISION_MODEL em analyze_video_vision/analyze_photo_vision.",
         "category": "models_keys", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "llm.vision_model_fallback", "type": "enum", "default": CONFIG.VISION_MODEL_FALLBACK,
+        "enum": list(CONFIG.VISION_MODELS),
+        "label": "Modelo de visão: reserva",
+        "help": "Entra em ação só depois que o modelo principal falhar 'Tentativas antes "
+                "da reserva' vezes seguidas. Pensado para um modelo grátis como principal "
+                "e um pago e confiável como rede de segurança.",
+        "help_tech": "Usado em _call_vision_api após esgotar vision.max_retries no modelo primário.",
+        "category": "models_keys", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "vision.max_retries", "type": "int", "default": CONFIG.VISION_MAX_RETRIES, "min": 1, "max": 5, "step": 1,
+        "label": "Visão: tentativas antes da reserva",
+        "help": "Quantas vezes tenta o modelo principal antes de cair para o modelo de reserva.",
+        "help_tech": "Loop de retry em _call_vision_api.",
+        "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {
         "key": "agent.model", "type": "enum", "default": CONFIG.AGENT_MODEL,

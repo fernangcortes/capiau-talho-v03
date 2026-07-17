@@ -16,17 +16,24 @@ class Config:
     # Texto/Clustering: deepseek/deepseek-chat, minimax/minimax-m3, qwen/qwen-3.7-max, openai/gpt-5.5
     # Visão/Frames: google/gemini-2.5-flash, google/gemini-3.1-flash-lite, perceptron/perceptron-mk1
     TEXT_MODEL = os.getenv("TEXT_MODEL", "deepseek/deepseek-chat")
-    VISION_MODEL = os.getenv("VISION_MODEL", "google/gemini-2.5-flash")
+    # Padrão gratuito, com fallback pago automático (ver VISION_MODEL_FALLBACK):
+    # comparado lado a lado com o Gemini em 5 fotos reais em 17/07/2026 —
+    # qualidade equivalente, mas ~metade das chamadas com o prompt real batia em
+    # "Upstream idle timeout exceeded" (504) por ser um modelo ':free' sob carga.
+    # O par retry+fallback existe justamente para absorver isso sem intervenção.
+    VISION_MODEL = os.getenv("VISION_MODEL", "nvidia/nemotron-nano-12b-v2-vl:free")
+    VISION_MODEL_FALLBACK = os.getenv("VISION_MODEL_FALLBACK", "google/gemini-2.5-flash")
+    VISION_MAX_RETRIES = int(os.getenv("VISION_MAX_RETRIES", "2"))
     # Opções gratuitas ficam por último de propósito: rate limit da OpenRouter é
     # 20 req/min sempre, e 1000/dia só com >= US$10 em compras acumuladas na conta
     # (senão 50/dia) — vale conferir isso antes de escolher uma delas para um lote
     # grande. DeepSeek NÃO aparece aqui: nenhum modelo da linha aceita imagem hoje
     # na OpenRouter (conferido ao vivo em 17/07/2026).
     VISION_MODELS = [
+        "nvidia/nemotron-nano-12b-v2-vl:free",
         "google/gemini-2.5-flash",
         "google/gemini-3.1-flash-lite",
         "perceptron/perceptron-mk1",
-        "nvidia/nemotron-nano-12b-v2-vl:free",
         "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
     ]
     
