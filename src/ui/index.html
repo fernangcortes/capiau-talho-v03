@@ -171,41 +171,31 @@
                         </button>
                     </div>
 
-                    <!-- Painel de Busca Avançada (Retrátil) -->
-                    <div id="advanced-search-panel" class="glassmorphism" style="display: none; flex-direction: column; gap: 8px; padding: 10px; border-radius: 6px; border: 1px solid rgba(6,182,212,0.3); background: rgba(20, 18, 25, 0.98); box-shadow: 0 4px 20px rgba(0,0,0,0.5); font-size: 10px; margin-bottom: 4px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px; margin-bottom: 4px;">
-                            <span style="font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Busca Avançada & Filtros</span>
-                            <button id="btn-close-advanced-search" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; font-size: 10px;"><i class="fa-solid fa-xmark"></i></button>
-                        </div>
+                    <!-- Painel de Busca Avançada (Retrátil, agora uma única linha compacta) -->
+                    <div id="advanced-search-panel" style="display: none; align-items: center; gap: 6px; font-size: 10px; margin-top: 2px; width: 100%; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 4px;">
+                        <!-- Icone de Filtrar por Status (Cíclico com Tooltip) -->
+                        <button id="btn-status-filter-cycle" class="lib-action-btn" data-tooltip="Status: Todos" style="color: var(--text-secondary); width: 22px; height: 22px;">
+                            <i class="fa-solid fa-filter"></i>
+                        </button>
                         
-                        <!-- Filtros por Status de Análise (Chips) -->
-                        <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 6px;">
-                            <div style="font-weight: 600; color: var(--text-muted); margin-bottom: 2px;">Filtrar por Status:</div>
-                            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                                <button class="filter-chip active" data-val="all">Todos</button>
-                                <button class="filter-chip" data-val="pending">Não Analisados</button>
-                                <button class="filter-chip" data-val="processed">Analisados (IA)</button>
-                                <button class="filter-chip" data-val="error">Com Falhas</button>
-                            </div>
-                        </div>
+                        <!-- Divisor discreto -->
+                        <div style="width: 1px; height: 12px; background: rgba(255,255,255,0.12); flex-shrink: 0;"></div>
 
-                        <!-- Construtor de Filtros -->
-                        <div style="display: flex; flex-direction: column; gap: 4px;">
-                            <div style="font-weight: 600; color: var(--text-muted);">Adicionar Filtro Rápido:</div>
-                            <div style="display: flex; gap: 4px; align-items: center; width: 100%;">
-                                <select id="adv-filter-key" style="flex: 1.5; height: 22px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #fff; border-radius: 4px; cursor: pointer; outline: none;">
-                                    <!-- Dinâmico via JS -->
-                                </select>
-                                <select id="adv-filter-op" style="width: 38px; height: 22px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #fff; border-radius: 4px; cursor: pointer; outline: none;">
-                                    <option value="=">=</option>
-                                    <option value=">">&gt;</option>
-                                    <option value="<">&lt;</option>
-                                </select>
-                                <input type="text" id="adv-filter-value" placeholder="Valor" style="flex: 1.5; height: 22px; font-size: 9px; padding: 0 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff; outline: none;">
-                                <button id="btn-add-adv-filter" style="height: 22px; padding: 0 8px; font-size: 9px; font-weight: 600; color: var(--color-cyan); border: 1px solid rgba(6,182,212,0.3); background: rgba(6,182,212,0.08); border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 2px;">
-                                    <i class="fa-solid fa-plus"></i> Add
-                                </button>
-                            </div>
+                        <!-- Construtor de Filtros Rápido em Linha -->
+                        <div style="display: flex; gap: 4px; align-items: center; flex: 1; min-width: 0;">
+                            <span style="font-size: 9px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0;">Filtro Rápido:</span>
+                            <select id="adv-filter-key" class="nle-select" style="flex: 1.5; height: 20px; font-size: 9px; padding: 0 2px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer; outline: none; min-width: 0;">
+                                <!-- Dinâmico via JS -->
+                            </select>
+                            <select id="adv-filter-op" class="nle-select" style="width: 28px; height: 20px; font-size: 9px; padding: 0 2px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer; outline: none; flex-shrink: 0;">
+                                <option value="=">=</option>
+                                <option value=">">&gt;</option>
+                                <option value="<">&lt;</option>
+                            </select>
+                            <input type="text" id="adv-filter-value" placeholder="Valor" style="flex: 2; height: 20px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 3px; color: #fff; outline: none; min-width: 0;">
+                            <button id="btn-add-adv-filter" class="lib-action-btn" data-tooltip="Adicionar Filtro" style="color: var(--color-cyan); width: 20px; height: 20px;">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
                         </div>
                     </div>
 

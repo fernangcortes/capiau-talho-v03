@@ -753,22 +753,47 @@ export class LibraryManager {
             });
         }
         
-        // Status Chips Click and Synchronization
-        const statusChipsPanel = document.getElementById("advanced-search-panel");
-        if (statusChipsPanel) {
-            statusChipsPanel.querySelectorAll(".filter-chip").forEach(chip => {
-                chip.addEventListener("click", () => {
-                    const val = chip.getAttribute("data-val");
-                    const hiddenStatusSelect = document.getElementById("library-filter-status");
-                    if (hiddenStatusSelect) {
-                        hiddenStatusSelect.value = val;
-                        hiddenStatusSelect.dispatchEvent(new Event("change"));
-                    }
-                    
-                    statusChipsPanel.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
-                    chip.classList.add("active");
-                });
+        // Status Cycle Button and Synchronization
+        const btnStatusCycle = document.getElementById("btn-status-filter-cycle");
+        const statusSelect = document.getElementById("library-filter-status");
+        if (btnStatusCycle && statusSelect) {
+            const statuses = [
+                { val: "all", icon: "fa-solid fa-filter", label: "Status: Todos", color: "var(--text-secondary)" },
+                { val: "pending", icon: "fa-solid fa-hourglass-half", label: "Status: Não Analisados", color: "var(--color-cyan)" },
+                { val: "processed", icon: "fa-solid fa-circle-check", label: "Status: Analisados (IA)", color: "var(--color-emerald)" },
+                { val: "error", icon: "fa-solid fa-circle-exclamation", label: "Status: Com Falhas", color: "var(--color-rose)" }
+            ];
+            
+            let currentIndex = statuses.findIndex(s => s.val === statusSelect.value);
+            if (currentIndex === -1) currentIndex = 0;
+            
+            const updateStatusUI = (index) => {
+                const state = statuses[index];
+                btnStatusCycle.innerHTML = `<i class="${state.icon}"></i>`;
+                btnStatusCycle.style.color = state.color;
+                btnStatusCycle.setAttribute("title", state.label);
+                btnStatusCycle.setAttribute("data-tooltip", state.label);
+            };
+            
+            updateStatusUI(currentIndex);
+            
+            btnStatusCycle.addEventListener("click", () => {
+                currentIndex = (currentIndex + 1) % statuses.length;
+                const nextState = statuses[currentIndex];
+                statusSelect.value = nextState.val;
+                statusSelect.dispatchEvent(new Event("change"));
+                updateStatusUI(currentIndex);
             });
+
+            // Store references on instance for query sync
+            this._btnStatusCycle = btnStatusCycle;
+            this._statusSelect = statusSelect;
+            this._statuses = statuses;
+            this._updateStatusUI = updateStatusUI;
+            this._setCurrentIndex = (val) => {
+                const idx = statuses.findIndex(s => s.val === val);
+                if (idx !== -1) currentIndex = idx;
+            };
         }
         
         // Checkboxes de exibição
@@ -865,6 +890,28 @@ export class LibraryManager {
         const searchInput = document.getElementById("library-search-input");
         if (searchInput) {
             searchInput.addEventListener("input", () => {
+                // Sincroniza o botão cíclico de status se o texto de busca for alterado
+                if (this._btnStatusCycle && this._statusSelect) {
+                    const query = searchInput.value;
+                    let detectedVal = "all";
+                    if (/\bstatus:pendente\b/.test(query)) {
+                        detectedVal = "pending";
+                    } else if (/\(status:(asr|visao)\b/.test(query) || /\bstatus:(asr|visao)\b/.test(query)) {
+                        detectedVal = "processed";
+                    } else if (/\bstatus:erro\b/.test(query)) {
+                        detectedVal = "error";
+                    }
+                    
+                    if (this._statusSelect.value !== detectedVal) {
+                        this._statusSelect.value = detectedVal;
+                        this._setCurrentIndex(detectedVal);
+                        const idx = this._statuses.findIndex(s => s.val === detectedVal);
+                        if (idx !== -1) {
+                            this._updateStatusUI(idx);
+                        }
+                    }
+                }
+
                 // 1. Update Videos tab
                 STATE.emit("videosUpdated", STATE.allVideos);
                 
@@ -921,13 +968,7 @@ export class LibraryManager {
             });
         }
         
-        const btnCloseAdv = document.getElementById("btn-close-advanced-search");
-        if (btnCloseAdv && advPanel && btnToggleAdv) {
-            btnCloseAdv.addEventListener("click", () => {
-                advPanel.style.display = "none";
-                btnToggleAdv.classList.remove("active");
-            });
-        }
+
 
         // Add filter button
         const btnAddAdv = document.getElementById("btn-add-adv-filter");
@@ -958,7 +999,6 @@ export class LibraryManager {
         }
 
         // Connect dormant library-filter-status dropdown
-        const statusSelect = document.getElementById("library-filter-status");
         if (statusSelect) {
             statusSelect.addEventListener("change", () => {
                 const val = statusSelect.value;
