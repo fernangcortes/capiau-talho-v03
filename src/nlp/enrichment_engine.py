@@ -32,7 +32,13 @@ def rewrite_description_llm(
     replacements: Optional[Dict[str, str]] = None,
     project_id: Optional[int] = None
 ) -> Optional[str]:
-    """Reescreve a descrição via LLM. Retorna None em falha (chamador usa fallback regex)."""
+    """Reescreve a descrição via LLM, com retry no modelo principal e fallback automático.
+
+    Retorna None se principal + reserva falharem (o chamador cai pro fallback regex,
+    a última rede de segurança). Achado em 17/07: uma falha de parsing JSON aqui foi
+    transitória (finish_reason='stop', resposta bem formada ao repetir a mesma chamada
+    minutos depois) — por isso a defesa é retry+fallback, não só um teto de tokens maior.
+    """
     from src.services.settings_service import SettingsService
     S = SettingsService.get_settings(project_id)
     api_key = S.api_key("openrouter")
@@ -42,30 +48,55 @@ def rewrite_description_llm(
         return None
 
     prompt = get_enrichment_rewrite_prompt(original, entities, replacements, project_id=project_id)
-    try:
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "model": S.get("llm.text_model"),
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": S.get("enrichment.temperature"),
-                "max_tokens": S.get("enrichment.max_tokens")
-            },
-            timeout=S.get("enrichment.timeout")
-        )
-        if response.status_code != 200:
-            print(f"[ENRICH] Falha LLM (status {response.status_code}): {response.text[:200]}")
+    primary = S.get("llm.text_model")
+    fallback = S.get("llm.text_model_fallback")
+    retries = max(1, S.get("enrichment.max_retries"))
+    base_payload = {
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": S.get("enrichment.temperature"),
+        "max_tokens": S.get("enrichment.max_tokens"),
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    timeout = S.get("enrichment.timeout")
+
+    def _attempt(model: str) -> Optional[str]:
+        try:
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json={**base_payload, "model": model},
+                timeout=timeout
+            )
+            if response.status_code != 200:
+                print(f"[ENRICH] Falha LLM (modelo {model}, status {response.status_code}): {response.text[:200]}")
+                return None
+            res_json = response.json()
+            if "choices" not in res_json:
+                print(f"[ENRICH] Resposta sem 'choices' do modelo {model}: {res_json.get('error', res_json)}")
+                return None
+            content = res_json["choices"][0]["message"]["content"].strip()
+            data = extract_json_from_markdown(content)
+            rewritten = data.get("descricao") or data.get("description")
+            if isinstance(rewritten, str) and rewritten.strip():
+                return rewritten.strip()
             return None
-        content = response.json()["choices"][0]["message"]["content"].strip()
-        data = extract_json_from_markdown(content)
-        rewritten = data.get("descricao") or data.get("description")
-        if isinstance(rewritten, str) and rewritten.strip():
-            return rewritten.strip()
-        return None
-    except Exception as e:
-        print(f"[ENRICH] Erro crítico na reescrita LLM: {e}")
-        return None
+        except Exception as e:
+            print(f"[ENRICH] Erro ao chamar {model}: {e}")
+            return None
+
+    for attempt in range(1, retries + 1):
+        result = _attempt(primary)
+        if result is not None:
+            return result
+        print(f"[ENRICH] Tentativa {attempt}/{retries} falhou em {primary}.")
+
+    if fallback and fallback != primary:
+        print(f"[ENRICH] {retries} tentativa(s) esgotada(s) em {primary}; usando reserva {fallback}.")
+        result = _attempt(fallback)
+        if result is not None:
+            return result
+
+    return None
 
 
 def _rewrite_with_fallback(

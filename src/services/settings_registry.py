@@ -515,11 +515,29 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "themes_search", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {
-        "key": "enrichment.max_tokens", "type": "int", "default": 400, "min": 100, "max": 2000, "step": 100,
+        "key": "enrichment.max_tokens", "type": "int", "default": 700, "min": 100, "max": 2000, "step": 100,
         "label": "Enriquecimento: teto de tokens da resposta",
         "help": "Limite de tamanho da descrição reescrita. É só uma frase reescrita, cabe em poucas centenas de tokens.",
         "help_tech": "max_tokens do rewrite_description_llm. Mesma causa do vision.max_tokens: sem "
-                      "isso a OpenRouter reserva contra o teto do modelo de texto inteiro por chamada.",
+                      "isso a OpenRouter reserva contra o teto do modelo de texto inteiro por chamada. "
+                      "Folga acima do observado (69 tokens numa reescrita típica) — a falha real medida "
+                      "em 17/07 foi transitória (finish_reason='stop', não corte por tamanho), por isso "
+                      "o retry+fallback abaixo é a defesa principal, não o teto em si.",
+        "category": "themes_search", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "llm.text_model_fallback", "type": "string", "default": "google/gemini-2.5-flash",
+        "label": "Modelo de texto: reserva",
+        "help": "Entra em ação para reescritas de enriquecimento (nomes reais nas descrições) "
+                "quando o modelo de texto principal falha 'Tentativas antes da reserva' vezes seguidas.",
+        "help_tech": "Usado em rewrite_description_llm após esgotar enrichment.max_retries no modelo primário.",
+        "category": "models_keys", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "enrichment.max_retries", "type": "int", "default": 2, "min": 1, "max": 5, "step": 1,
+        "label": "Enriquecimento: tentativas antes da reserva",
+        "help": "Quantas vezes tenta o modelo de texto principal antes de cair para o modelo de reserva.",
+        "help_tech": "Loop de retry em rewrite_description_llm.",
         "category": "themes_search", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {
