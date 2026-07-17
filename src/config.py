@@ -17,6 +17,18 @@ class Config:
     # Visão/Frames: google/gemini-2.5-flash, google/gemini-3.1-flash-lite, perceptron/perceptron-mk1
     TEXT_MODEL = os.getenv("TEXT_MODEL", "deepseek/deepseek-chat")
     VISION_MODEL = os.getenv("VISION_MODEL", "google/gemini-2.5-flash")
+    # Opções gratuitas ficam por último de propósito: rate limit da OpenRouter é
+    # 20 req/min sempre, e 1000/dia só com >= US$10 em compras acumuladas na conta
+    # (senão 50/dia) — vale conferir isso antes de escolher uma delas para um lote
+    # grande. DeepSeek NÃO aparece aqui: nenhum modelo da linha aceita imagem hoje
+    # na OpenRouter (conferido ao vivo em 17/07/2026).
+    VISION_MODELS = [
+        "google/gemini-2.5-flash",
+        "google/gemini-3.1-flash-lite",
+        "perceptron/perceptron-mk1",
+        "nvidia/nemotron-nano-12b-v2-vl:free",
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    ]
     
     # ── Configurações do Agente de Edição (Fase 1 - Julho 2026) ──
     AGENT_MODEL = os.getenv("AGENT_MODEL", "deepseek/deepseek-v4-flash")

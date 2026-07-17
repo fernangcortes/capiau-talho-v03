@@ -56,9 +56,14 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "models_keys", "level": "simple", "scope": "both", "requires_reprocess": False,
     },
     {
-        "key": "llm.vision_model", "type": "string", "default": "google/gemini-2.5-flash",
+        "key": "llm.vision_model", "type": "enum", "default": CONFIG.VISION_MODEL,
+        "enum": list(CONFIG.VISION_MODELS),
         "label": "Modelo de visão",
-        "help": "Modelo de IA que descreve imagens (frames de B-roll e fotos de set).",
+        "help": "Modelo de IA que descreve imagens (frames de B-roll e fotos de set). "
+                "As opções ':free' não custam nada, mas têm limite de pedidos por dia "
+                "da OpenRouter (1000/dia só se a conta já tiver US$10+ em compras "
+                "acumuladas, senão 50/dia) e podem variar de qualidade — compare antes "
+                "de rodar um lote grande nelas.",
         "help_tech": "Substitui CONFIG.VISION_MODEL em analyze_video_vision/analyze_photo_vision.",
         "category": "models_keys", "level": "simple", "scope": "both", "requires_reprocess": False,
     },

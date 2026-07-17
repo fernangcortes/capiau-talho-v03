@@ -581,6 +581,9 @@ export class SettingsPanelManager {
                 sound_designer: "Sound Designer", colorista: "Colorista"
             }[opt] || opt;
         }
+        if (key === "llm.vision_model" && opt.endsWith(":free")) {
+            return `${opt} (grátis — rate limit da OpenRouter se aplica)`;
+        }
         return opt;
     }
 
