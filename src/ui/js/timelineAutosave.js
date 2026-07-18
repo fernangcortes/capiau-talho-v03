@@ -35,6 +35,7 @@ function performAutosave() {
             zoom: TIMELINE_STATE.zoom,
             scrollLeftFrame: TIMELINE_STATE.scrollLeftFrame,
             scrollTop: TIMELINE_STATE.scrollTop,
+            trackHeightScale: TIMELINE_STATE.trackHeightScale || 1.0,
             selectedClipId: TIMELINE_STATE.selectedClipId,
             selectedTrack: TIMELINE_STATE.selectedTrack,
             undoStack: TIMELINE_HISTORY.undoStack,
@@ -134,8 +135,10 @@ export function restoreAutosave(projectId) {
 
         // 4. Restaura preferências de visualização (zoom, scrolls, playhead)
         if (data.zoom !== undefined) TIMELINE_STATE.setZoom(data.zoom);
+        if (data.trackHeightScale !== undefined) TIMELINE_STATE.setTrackHeightScale(data.trackHeightScale);
         if (data.scrollLeftFrame !== undefined) TIMELINE_STATE.setScrollLeftFrame(data.scrollLeftFrame);
         if (data.scrollTop !== undefined) TIMELINE_STATE.setScrollTop(data.scrollTop);
+        TIMELINE_STATE.clampScrollTop();
         if (data.playheadFrame !== undefined) TIMELINE_STATE.setPlayheadFrame(data.playheadFrame);
         if (data.selectedClipId !== undefined) TIMELINE_STATE.selectedClipId = data.selectedClipId;
         if (data.selectedTrack !== undefined) TIMELINE_STATE.selectedTrack = data.selectedTrack;

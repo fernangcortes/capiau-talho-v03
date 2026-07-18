@@ -175,31 +175,35 @@ export class CapiauTimelineState {
         if (track.hidden) {
             return 4; // Restore line height as per design system
         }
-        // Override por pista (arraste individual) tem prioridade sobre a escala global.
+        const scale = this.trackHeightScale || 1.0;
+        // Override por pista (arraste individual) ajusta a altura base (escala 1.0)
         if (track.heightPx != null && isFinite(track.heightPx)) {
-            return Math.min(240, Math.max(22, Math.round(track.heightPx)));
+            return Math.min(240, Math.max(22, Math.round(track.heightPx * scale)));
         }
         const base = TRACK_HEIGHTS[track.kind] || TRACK_HEIGHTS.video;
         // Aplica a escala vertical global, com piso para manter as pistas clicáveis/legíveis.
-        return Math.max(22, Math.round(base * (this.trackHeightScale || 1)));
+        return Math.max(22, Math.round(base * scale));
     }
 
     /**
-     * Escala vertical GLOBAL das pistas (slider). Afeta apenas pistas sem override.
+     * Escala vertical GLOBAL das pistas (slider). Aplica escala a todas as pistas (inclusive com override).
      * Clampeia entre 0.5 (compacto) e 1.7 (alto) e re-renderiza pistas + cabeçalhos.
      */
     setTrackHeightScale(scale) {
         const clamped = Math.min(1.7, Math.max(0.5, scale));
         if (clamped === this.trackHeightScale) return;
         this.trackHeightScale = clamped;
+        this.clampScrollTop();
         STATE.emit("timelineTracksChanged", this.tracks);
     }
 
-    /** Define a altura absoluta (px) de UMA pista específica (arraste individual). */
+    /** Define a altura base (px em escala 1.0) de UMA pista específica (arraste individual). */
     setTrackHeight(trackId, px) {
         const track = this.tracks.find(t => t.id === trackId);
         if (!track) return;
-        track.heightPx = Math.min(240, Math.max(22, Math.round(px)));
+        const scale = this.trackHeightScale || 1.0;
+        track.heightPx = Math.min(240, Math.max(22, Math.round(px / scale)));
+        this.clampScrollTop();
         STATE.emit("timelineTracksChanged", this.tracks);
     }
 
@@ -435,10 +439,26 @@ export class CapiauTimelineState {
     }
 
     /**
+     * Re-clampeia o scrollTop baseado na altura total atual das pistas e na viewport.
+     */
+    clampScrollTop(viewportHeight = this.lastViewportHeight || 0) {
+        if (viewportHeight > 0) this.lastViewportHeight = viewportHeight;
+        const vh = this.lastViewportHeight || 0;
+        const maxScroll = Math.max(0, this.totalTracksHeight() - vh);
+        const clamped = Math.max(0, Math.min(maxScroll, this.scrollTop));
+        if (clamped !== this.scrollTop) {
+            this.scrollTop = clamped;
+            STATE.emit("timelineVScrollChanged", this.scrollTop);
+        }
+    }
+
+    /**
      * Define o scroll vertical das pistas em pixels.
      */
-    setScrollTop(val, viewportHeight = 0) {
-        const maxScroll = Math.max(0, this.totalTracksHeight() - Math.max(0, viewportHeight));
+    setScrollTop(val, viewportHeight = this.lastViewportHeight || 0) {
+        if (viewportHeight > 0) this.lastViewportHeight = viewportHeight;
+        const vh = this.lastViewportHeight || 0;
+        const maxScroll = Math.max(0, this.totalTracksHeight() - vh);
         this.scrollTop = Math.max(0, Math.min(maxScroll, val));
         STATE.emit("timelineScrollChanged", this.scrollLeftFrame);
         STATE.emit("timelineVScrollChanged", this.scrollTop);

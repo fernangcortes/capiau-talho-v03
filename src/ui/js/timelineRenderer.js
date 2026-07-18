@@ -70,6 +70,8 @@ export class CapiauTimelineRenderer {
      * Retorna a lista de lanes visíveis: [{track, top, height}] já com scroll vertical aplicado.
      */
     getTrackLanes() {
+        const viewportH = Math.max(0, (this.height || 200) - (this.rulerHeight || 30));
+        TIMELINE_STATE.clampScrollTop(viewportH);
         const lanes = [];
         let y = this.rulerHeight - TIMELINE_STATE.scrollTop;
         for (const track of TIMELINE_STATE.tracks) {
@@ -175,6 +177,8 @@ export class CapiauTimelineRenderer {
         const rect = this.canvas.parentNode.getBoundingClientRect();
         this.width = rect.width;
         this.height = rect.height || 200; // Altura padrão do wrapper
+        const viewportH = Math.max(0, this.height - this.rulerHeight);
+        TIMELINE_STATE.clampScrollTop(viewportH);
 
         const dpr = window.devicePixelRatio || 1;
         this.canvas.width = this.width * dpr;

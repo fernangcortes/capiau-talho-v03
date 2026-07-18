@@ -49,6 +49,10 @@ export class CapiauTimelineInteraction {
         this.canvas.addEventListener("mousemove", this.boundMouseMove);
         win.addEventListener("mouseup", this.boundMouseUp);
         this.canvas.addEventListener("wheel", this.boundWheel);
+        const headersSidebar = this.canvas.ownerDocument.getElementById("timeline-headers-sidebar");
+        if (headersSidebar) {
+            headersSidebar.addEventListener("wheel", this.boundWheel);
+        }
         this.canvas.addEventListener("mouseleave", this.boundMouseLeave);
 
         // Arrastar-e-soltar de mídias da biblioteca para a timeline
@@ -1388,10 +1392,10 @@ export class CapiauTimelineInteraction {
             const deltaFrames = (e.deltaY || e.deltaX) / TIMELINE_STATE.zoom;
             TIMELINE_STATE.setScrollLeftFrame(TIMELINE_STATE.scrollLeftFrame + deltaFrames);
         } else {
-            // Roda simples: scroll vertical das pistas quando excedem a área visível
-            const viewportH = (this.renderer.height || 200) - this.renderer.rulerHeight;
+            // Roda simples: scroll vertical das pistas quando excedem a área visível ou quando scrollTop > 0
+            const viewportH = (this.renderer.height || 200) - (this.renderer.rulerHeight || 30);
             const overflow = TIMELINE_STATE.totalTracksHeight() > viewportH;
-            if (overflow && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            if ((overflow || TIMELINE_STATE.scrollTop > 0) && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
                 TIMELINE_STATE.setScrollTop(TIMELINE_STATE.scrollTop + e.deltaY * 0.5, viewportH);
             } else {
                 const deltaFrames = (e.deltaX || e.deltaY) / TIMELINE_STATE.zoom;

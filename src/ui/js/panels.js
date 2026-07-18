@@ -242,7 +242,14 @@ export class PanelsManager {
             if (r) r.style.opacity = canRedo ? "1" : "0.4";
         });
 
-        STATE.on("timelineTracksChanged", () => this.renderTrackHeaders());
+        STATE.on("timelineTracksChanged", () => {
+            const slider = getActiveElement("track-height-slider");
+            if (slider && document.activeElement !== slider) {
+                slider.value = Math.round((TIMELINE_STATE.trackHeightScale || 1.0) * 100);
+            }
+            TIMELINE_STATE.clampScrollTop();
+            this.renderTrackHeaders();
+        });
         STATE.on("timelineVScrollChanged", () => this.syncTrackHeadersScroll());
         this.renderTrackHeaders();
 
@@ -2354,28 +2361,61 @@ export class PanelsManager {
                 row.style.position = "relative";
                 const resizeHandle = doc.createElement("div");
                 resizeHandle.className = "track-resize-handle";
-                resizeHandle.dataset.tooltip = "Arraste para ajustar a altura desta pista";
+                resizeHandle.dataset.tooltip = "Arraste para ajustar a altura desta pista (Clique duplo para resetar)";
+
+                let lastClickTime = 0;
+
+                const resetTrackHeight = (e) => {
+                    if (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                    delete track.heightPx;
+                    TIMELINE_STATE.clampScrollTop();
+                    STATE.emit("timelineTracksChanged", TIMELINE_STATE.tracks);
+                };
+
                 resizeHandle.addEventListener("mousedown", (e) => {
-                    e.preventDefault();
                     e.stopPropagation();
+                    const now = Date.now();
+                    if (now - lastClickTime < 380) {
+                        lastClickTime = 0;
+                        resetTrackHeight(e);
+                        return;
+                    }
+                    lastClickTime = now;
+
                     const startY = e.clientY;
                     const startH = TIMELINE_STATE.trackHeight(track);
-                    doc.body.classList.add("layout-resizing");
+                    const currentScale = TIMELINE_STATE.trackHeightScale || 1.0;
+                    let isDragging = false;
+
                     const onMove = (ev) => {
-                        const nh = Math.min(240, Math.max(22, startH + (ev.clientY - startY)));
-                        track.heightPx = nh;
+                        const delta = ev.clientY - startY;
+                        if (!isDragging && Math.abs(delta) < 3) return;
+                        isDragging = true;
+                        doc.body.classList.add("layout-resizing");
+                        const nh = Math.min(240, Math.max(22, startH + delta));
+                        track.heightPx = Math.round(nh / currentScale);
                         row.style.height = `${nh}px`;
+                        TIMELINE_STATE.clampScrollTop();
                         if (this.timelineRenderer) this.timelineRenderer.requestRedraw();
                     };
+
                     const onUp = () => {
                         doc.body.classList.remove("layout-resizing");
                         doc.removeEventListener("mousemove", onMove);
                         doc.removeEventListener("mouseup", onUp);
-                        STATE.emit("timelineTracksChanged", TIMELINE_STATE.tracks);
+                        if (isDragging) {
+                            TIMELINE_STATE.clampScrollTop();
+                            STATE.emit("timelineTracksChanged", TIMELINE_STATE.tracks);
+                        }
                     };
                     doc.addEventListener("mousemove", onMove);
                     doc.addEventListener("mouseup", onUp);
                 });
+
+                resizeHandle.addEventListener("dblclick", resetTrackHeight);
                 row.appendChild(resizeHandle);
             }
 
