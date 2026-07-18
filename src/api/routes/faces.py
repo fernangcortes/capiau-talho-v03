@@ -1388,18 +1388,18 @@ def delete_project_name(project_id: int, request: DeleteNameRequest):
         cursor.execute("""
             UPDATE face 
             SET name = NULL 
-            WHERE project_id = ? AND name = ?
+            WHERE project_id = ? AND name = ? COLLATE NOCASE
         """, (project_id, name))
         
         # 2. Resetar na tabela transcript (voltar para 'Desconhecido')
         cursor.execute("""
             UPDATE transcript 
             SET speaker_id = 'Desconhecido' 
-            WHERE speaker_id = ? AND video_id IN (SELECT id FROM video WHERE project_id = ?)
+            WHERE speaker_id = ? COLLATE NOCASE AND video_id IN (SELECT id FROM video WHERE project_id = ?)
         """, (name, project_id))
         
         # 3. Remover da tabela person e resetar reconhecimentos
-        cursor.execute("SELECT id FROM person WHERE project_id = ? AND name = ?", (project_id, name))
+        cursor.execute("SELECT id FROM person WHERE project_id = ? AND name = ? COLLATE NOCASE", (project_id, name))
         person_row = cursor.fetchone()
         if person_row:
             pid = person_row["id"]
@@ -1407,9 +1407,9 @@ def delete_project_name(project_id: int, request: DeleteNameRequest):
             cursor.execute("DELETE FROM person WHERE id = ?", (pid,))
             
         # 4. Remover da tabela entity e entity_mention
-        cursor.execute("SELECT id FROM entity WHERE project_id = ? AND name = ?", (project_id, name))
-        entity_row = cursor.fetchone()
-        if entity_row:
+        cursor.execute("SELECT id FROM entity WHERE project_id = ? AND name = ? COLLATE NOCASE", (project_id, name))
+        entity_rows = cursor.fetchall()
+        for entity_row in entity_rows:
             eid = entity_row["id"]
             cursor.execute("DELETE FROM entity_mention WHERE entity_id = ?", (eid,))
             cursor.execute("DELETE FROM entity WHERE id = ?", (eid,))

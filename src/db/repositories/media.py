@@ -213,7 +213,7 @@ class MediaRepository:
 
     @staticmethod
     def get_project_speakers_and_labeled_faces(conn: sqlite3.Connection, project_id: int) -> List[str]:
-        """Agrega e ordena uma lista única de falantes e rostos rotulados do projeto."""
+        """Agrega e ordena uma lista única de falantes, rostos rotulados e entidades do projeto."""
         cursor = conn.cursor()
         cursor.execute("""
             SELECT DISTINCT speaker_id 
@@ -226,12 +226,21 @@ class MediaRepository:
         cursor.execute("""
             SELECT DISTINCT name 
             FROM face 
-            WHERE project_id = ? AND name IS NOT NULL
+            WHERE project_id = ? AND name IS NOT NULL AND name != ''
             ORDER BY name
         """, (project_id,))
         faces = [r['name'] for r in cursor.fetchall()]
+
+        cursor.execute("""
+            SELECT DISTINCT name 
+            FROM entity 
+            WHERE project_id = ? AND name IS NOT NULL AND name != ''
+              AND name NOT IN ('Não Relevante', 'Não é Rosto')
+            ORDER BY name
+        """, (project_id,))
+        entities = [r['name'] for r in cursor.fetchall()]
         
-        return sorted(list(set(speakers + faces)))
+        return sorted(list(set(speakers + faces + entities)))
 
     @staticmethod
     def reset_stuck_tasks(conn: sqlite3.Connection) -> None:
