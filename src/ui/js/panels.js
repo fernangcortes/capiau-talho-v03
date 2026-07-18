@@ -20,6 +20,7 @@ export class PanelsManager {
         // Preferências da aba Tarefas (persistidas): miniaturas ON por padrão, compacto OFF
         this.tasksShowThumbs = localStorage.getItem("tasks-show-thumbs") !== "false";
         this.tasksCompact = localStorage.getItem("tasks-compact") === "true";
+        this.previousTimelineVideoIds = new Set();
         
         // Inicializa o novo renderizador Canvas e interações
         this.timelineRenderer = new CapiauTimelineRenderer();
@@ -43,7 +44,10 @@ export class PanelsManager {
         STATE.on("activeVideoChanged", (video) => this.onVideoChanged(video));
         STATE.on("transcriptUpdated", (dialogues) => this.renderTranscript(dialogues));
         STATE.on("visionFramesUpdated", (frames) => this.renderVision(frames));
-        STATE.on("timelineCutsUpdated", (cuts) => this.renderTimeline(cuts));
+        STATE.on("timelineCutsUpdated", (cuts) => {
+            this.renderTimeline(cuts);
+            this.syncTimelineVideoThumbnails(cuts);
+        });
         STATE.on("scissorsModeChanged", (active) => this.toggleScissorsUI(active));
         STATE.on("projectChanged", () => this.loadThemes());
         STATE.on("videoFacesUpdated", (videoId) => {
@@ -290,6 +294,57 @@ export class PanelsManager {
                 localStorage.setItem("tasks-compact", this.tasksCompact ? "true" : "false");
                 btnCompact.classList.toggle("toggle-on", this.tasksCompact);
                 this.renderTasks(this._lastTasks || {});
+            });
+        }
+
+        // Cancelar todas as miniaturas
+        const btnCancelAll = document.getElementById("btn-tasks-cancel-all-thumbs");
+        if (btnCancelAll) {
+            btnCancelAll.addEventListener("click", async () => {
+                const taskKeys = Object.keys(this._lastTasks || {});
+                let count = 0;
+                for (const key of taskKeys) {
+                    if (key.startsWith("thumbs-")) {
+                        const videoId = Number(key.split("thumbs-")[1]);
+                        try {
+                            await CapIAuAPI.cancelThumbnails(videoId);
+                            count++;
+                        } catch (e) {}
+                    }
+                }
+                if (window.logManager) {
+                    window.logManager.log("Tasks", `Canceladas todas as ${count} gerações de miniaturas`, "INFO");
+                }
+            });
+        }
+
+        // Reativar todas as miniaturas
+        const btnResumeAll = document.getElementById("btn-tasks-resume-all-thumbs");
+        if (btnResumeAll) {
+            btnResumeAll.addEventListener("click", async () => {
+                const videoIds = new Set();
+                (STATE.activeTimelineCuts || []).forEach(c => {
+                    if (c.video_id) videoIds.add(Number(c.video_id));
+                });
+                Object.keys(this._lastTasks || {}).forEach(key => {
+                    if (key.startsWith("thumbs-")) {
+                        videoIds.add(Number(key.split("thumbs-")[1]));
+                    }
+                });
+                if (videoIds.size === 0 && STATE.allVideos) {
+                    STATE.allVideos.forEach(v => videoIds.add(v.id));
+                }
+
+                let count = 0;
+                for (const videoId of videoIds) {
+                    try {
+                        await CapIAuAPI.resumeThumbnails(videoId);
+                        count++;
+                    } catch (e) {}
+                }
+                if (window.logManager) {
+                    window.logManager.log("Tasks", `Reativadas miniaturas para ${count} vídeos`, "INFO");
+                }
             });
         }
 
@@ -1753,11 +1808,33 @@ export class PanelsManager {
             const t = tasks[key];
             const isFinished = t.status === "finished";
             const isFailed = t.status === "failed";
-            const isCancellable = !isFinished && !isFailed && !isNaN(Number(key));
+            const isCancelled = t.status === "cancelled";
+            const isProxy = !isNaN(Number(key));
+            const isThumbs = key.startsWith("thumbs-");
+            
+            const isCancellable = !isFinished && !isFailed && !isCancelled && (isProxy || isThumbs);
+            const isPauseable = isThumbs && t.status === "running";
+            const isResumable = isThumbs && (t.status === "paused" || t.status === "cancelled" || t.status === "failed");
+            const isDismissable = isFinished || isCancelled || isFailed || isThumbs;
+
             const media = this._resolveTaskMedia(key, t);
             const typeHint = String(t.type || "proxy").toUpperCase();
             const pct = Math.round(Number(t.percent) || 0);
             const title = esc(media.title);
+
+            // Montagem das ações de forma sutil (Design System Flat - sem box e line icon)
+            let actionsHtml = "";
+            if (isPauseable) {
+                actionsHtml += `<button class="btn-task-action btn-pause-task" data-id="${key}" title="Pausar Geração de Miniaturas"><i class="fa-solid fa-pause"></i></button>`;
+            } else if (isResumable) {
+                actionsHtml += `<button class="btn-task-action btn-resume-task" data-id="${key}" title="Retomar Geração de Miniaturas"><i class="fa-solid fa-play"></i></button>`;
+            }
+            if (isCancellable) {
+                actionsHtml += `<button class="btn-task-action btn-cancel-task" data-id="${key}" title="Cancelar Tarefa"><i class="fa-solid fa-xmark"></i></button>`;
+            }
+            if (isDismissable) {
+                actionsHtml += `<button class="btn-task-action btn-dismiss-task" data-id="${key}" title="Remover da Lista de Tarefas"><i class="fa-solid fa-trash-can"></i></button>`;
+            }
 
             // Miniatura (img com fallback: se falhar ao carregar, some e mostra o ícone)
             const thumbFull = (showThumbs && media.thumbUrl)
@@ -1776,7 +1853,9 @@ export class PanelsManager {
                     <span class="task-row-title" title="${title} — ${typeHint} · ${esc(t.status)}">${title}</span>
                     <div class="task-row-bar"><div class="task-row-bar-fill" style="width:${pct}%"></div></div>
                     <span class="task-row-pct">${pct}%</span>
-                    ${isCancellable ? `<button class="btn-cancel-task" data-id="${key}" title="Cancelar" style="background:none;border:none;color:var(--color-rose);cursor:pointer;font-size:14px;line-height:1;padding:0 2px;">&times;</button>` : ""}
+                    <div class="task-row-actions" style="display: flex; gap: 4px; align-items: center; margin-left: 4px;">
+                        ${actionsHtml}
+                    </div>
                 `;
             } else {
                 item.className = "task-progress-card";
@@ -1791,18 +1870,85 @@ export class PanelsManager {
                     </div>
                     <div class="task-actions">
                         <span class="task-percent">${typeHint} · ${pct}%</span>
-                        ${isCancellable ? `<button class="btn-action btn-cancel-task" data-id="${key}">Cancelar</button>` : ""}
+                        <div class="task-card-actions" style="display: flex; gap: 6px; align-items: center;">
+                            ${actionsHtml}
+                        </div>
                     </div>
                 `;
             }
 
-            // Cancelar conversão de proxy
+            // Pausar geração de miniaturas
+            const pauseBtn = item.querySelector(".btn-pause-task");
+            if (pauseBtn) {
+                pauseBtn.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    const videoId = key.startsWith("thumbs-") ? Number(key.split("thumbs-")[1]) : Number(key);
+                    try {
+                        await CapIAuAPI.pauseThumbnails(videoId);
+                        if (window.logManager) {
+                            window.logManager.log("Tasks", `Solicitado pausa para miniaturas do vídeo ${videoId}`, "INFO");
+                        }
+                    } catch (err) {
+                        alert("Falha ao pausar geração de miniaturas.");
+                    }
+                });
+            }
+
+            // Retomar geração de miniaturas
+            const resumeBtn = item.querySelector(".btn-resume-task");
+            if (resumeBtn) {
+                resumeBtn.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    const videoId = key.startsWith("thumbs-") ? Number(key.split("thumbs-")[1]) : Number(key);
+                    try {
+                        await CapIAuAPI.resumeThumbnails(videoId);
+                        if (window.logManager) {
+                            window.logManager.log("Tasks", `Solicitado retomada para miniaturas do vídeo ${videoId}`, "INFO");
+                        }
+                    } catch (err) {
+                        alert("Falha ao retomar geração de miniaturas.");
+                    }
+                });
+            }
+
+            // Cancelar tarefa
             const cancelBtn = item.querySelector(".btn-cancel-task");
             if (cancelBtn) {
                 cancelBtn.addEventListener("click", async (e) => {
                     e.stopPropagation();
-                    if (confirm("Cancelar codificação de proxy desta mídia?")) {
-                        await CapIAuAPI.cancelConversion(Number(key));
+                    if (key.startsWith("thumbs-")) {
+                        if (confirm("Cancelar geração de miniaturas para este vídeo?")) {
+                            const videoId = Number(key.split("thumbs-")[1]);
+                            try {
+                                await CapIAuAPI.cancelThumbnails(videoId);
+                                if (window.logManager) {
+                                    window.logManager.log("Tasks", `Solicitado cancelamento de miniaturas do vídeo ${videoId}`, "INFO");
+                                }
+                            } catch (err) {
+                                alert("Falha ao cancelar geração de miniaturas.");
+                            }
+                        }
+                    } else {
+                        if (confirm("Cancelar codificação de proxy desta mídia?")) {
+                            await CapIAuAPI.cancelConversion(Number(key));
+                        }
+                    }
+                });
+            }
+
+            // Remover/ocultar tarefa da lista
+            const dismissBtn = item.querySelector(".btn-dismiss-task");
+            if (dismissBtn) {
+                dismissBtn.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    try {
+                        await CapIAuAPI.dismissTask(key);
+                        item.remove();
+                        if (window.logManager) {
+                            window.logManager.log("Tasks", `Tarefa ${key} removida da lista`, "INFO");
+                        }
+                    } catch (err) {
+                        alert("Falha ao remover tarefa da lista.");
                     }
                 });
             }
@@ -1825,6 +1971,41 @@ export class PanelsManager {
 
             feed.appendChild(item);
         });
+    }
+
+    /** Sincroniza a geração de miniaturas com a adição/remoção de vídeos na timeline */
+    syncTimelineVideoThumbnails(cuts) {
+        const currentVideoIds = new Set(
+            (cuts || [])
+                .map(c => c.video_id)
+                .filter(id => id !== null && id !== undefined)
+        );
+
+        if (!this.previousTimelineVideoIds) {
+            this.previousTimelineVideoIds = new Set();
+        }
+
+        // 1. Vídeos removidos da timeline -> Cancelar geração de miniaturas automaticamente
+        this.previousTimelineVideoIds.forEach(videoId => {
+            if (!currentVideoIds.has(videoId)) {
+                CapIAuAPI.cancelThumbnails(videoId).catch(() => {});
+                if (window.logManager) {
+                    window.logManager.log("Timeline", `Vídeo ID ${videoId} removido da timeline. Cancelando miniaturas.`, "INFO");
+                }
+            }
+        });
+
+        // 2. Vídeos adicionados à timeline -> Iniciar/Retomar geração de miniaturas automaticamente
+        currentVideoIds.forEach(videoId => {
+            if (!this.previousTimelineVideoIds.has(videoId)) {
+                CapIAuAPI.resumeThumbnails(videoId).catch(() => {});
+                if (window.logManager) {
+                    window.logManager.log("Timeline", `Vídeo ID ${videoId} adicionado à timeline. Retomando miniaturas.`, "INFO");
+                }
+            }
+        });
+
+        this.previousTimelineVideoIds = currentVideoIds;
     }
 
     /** Resolve a mídia de uma tarefa: título amigável, miniatura e tipo (video/photo/other). */

@@ -38,6 +38,7 @@ class TaskManager:
         self.progress: Dict[str, Dict[str, Any]] = {}
         self.active_clustering: set = set()
         self.cancelled_tasks: set = set()
+        self.paused_tasks: set = set()
         self._sink_path: Optional[Path] = None
         self._sink_last_write: float = 0.0
         self.last_user_activity: float = 0.0
@@ -133,6 +134,35 @@ class TaskManager:
         """Remove o progresso de uma tarefa finalizada."""
         with self._lock:
             self.progress.pop(task_key, None)
+            self.cancelled_tasks.discard(task_key)
+            self.paused_tasks.discard(task_key)
+        self._flush_sink(force=True)
+
+    def pause_task(self, task_key: str) -> None:
+        """Pausa uma tarefa em execução."""
+        with self._lock:
+            self.paused_tasks.add(task_key)
+            if task_key in self.progress:
+                self.progress[task_key]["status"] = "paused"
+        self._flush_sink(force=True)
+
+    def resume_task(self, task_key: str) -> None:
+        """Retoma uma tarefa pausada."""
+        with self._lock:
+            self.paused_tasks.discard(task_key)
+            if task_key in self.progress:
+                self.progress[task_key]["status"] = "running"
+        self._flush_sink(force=True)
+
+    def cancel_task(self, task_key: str) -> None:
+        """Cancela uma tarefa de segundo plano."""
+        with self._lock:
+            self.cancelled_tasks.add(task_key)
+            self.paused_tasks.discard(task_key)
+            if task_key in self.progress:
+                self.progress[task_key]["status"] = "cancelled"
+        self._flush_sink(force=True)
+
 
     def get_progress(self) -> Dict[str, Dict[str, Any]]:
         """Retorna uma cópia do dicionário de progresso de todas as tarefas."""

@@ -1936,6 +1936,56 @@ button {
     border: 1px solid rgba(244, 63, 94, 0.3);
 }
 
+.task-status.status-paused {
+    background: rgba(234, 179, 8, 0.15);
+    color: hsl(45, 95%, 55%);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.task-status.status-cancelled {
+    background: rgba(156, 163, 175, 0.15);
+    color: var(--text-muted);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
+/* Botões de ação flat sutil nas tarefas */
+.btn-task-action {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, color 0.2s ease, text-shadow 0.2s ease;
+}
+
+.btn-task-action:hover {
+    transform: scale(1.15);
+}
+
+.btn-task-action.btn-pause-task:hover {
+    color: var(--color-cyan);
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+
+.btn-task-action.btn-resume-task:hover {
+    color: var(--color-emerald);
+    text-shadow: 0 0 8px var(--color-emerald);
+}
+
+.btn-task-action.btn-cancel-task:hover {
+    color: var(--color-rose);
+    text-shadow: 0 0 8px var(--color-rose);
+}
+
+.btn-task-action.btn-dismiss-task:hover {
+    color: var(--color-rose);
+    text-shadow: 0 0 8px var(--color-rose);
+}
+
 .progress-bar-container {
     height: 6px;
     background: rgba(255, 255, 255, 0.1);

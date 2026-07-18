@@ -154,6 +154,22 @@ export class CapIAuAPI {
         return this.request(`/api/video/${videoId}/cancel-conversion`, { method: "POST" });
     }
 
+    static pauseThumbnails(videoId) {
+        return this.request(`/api/video/${videoId}/pause-thumbnails`, { method: "POST" });
+    }
+
+    static resumeThumbnails(videoId) {
+        return this.request(`/api/video/${videoId}/resume-thumbnails`, { method: "POST" });
+    }
+
+    static cancelThumbnails(videoId) {
+        return this.request(`/api/video/${videoId}/cancel-thumbnails`, { method: "POST" });
+    }
+
+    static dismissTask(taskKey) {
+        return this.request(`/api/task/${taskKey}`, { method: "DELETE" });
+    }
+
     static deleteVideoProxy(videoId) {
         return this.request(`/api/video/${videoId}/proxy`, { method: "DELETE" });
     }

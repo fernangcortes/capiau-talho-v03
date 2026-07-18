@@ -626,7 +626,7 @@ def get_video_thumbnail_at(video_id: int, time: float = Query(...), conn: sqlite
         else:
             raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado: {video_path}")
             
-    # Dispara a geração progressiva de miniaturas em segundo plano se ainda não foi iniciada
+    # Dispara a geração progressiva de miniaturas em segundo plano apenas se ainda não foi iniciada (não está no progresso)
     task_key = f"thumbs-{video_id}"
     if task_key not in TASK_MANAGER.get_progress():
         duration = video.get('duration') or 0.0
@@ -641,6 +641,65 @@ def get_video_thumbnail_at(video_id: int, time: float = Query(...), conn: sqlite
         return FileResponse(thumb_path)
         
     raise HTTPException(status_code=500, detail="Não foi possível gerar a miniatura do vídeo no tempo especificado.")
+
+
+@router.post("/api/video/{video_id}/pause-thumbnails")
+def pause_video_thumbnails(video_id: int):
+    """Pausa a geração progressiva de miniaturas de um vídeo."""
+    task_key = f"thumbs-{video_id}"
+    TASK_MANAGER.pause_task(task_key)
+    return {"status": "success", "message": f"Geração de miniaturas do vídeo ID {video_id} pausada."}
+
+
+@router.post("/api/video/{video_id}/resume-thumbnails")
+def resume_video_thumbnails(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Retoma a geração progressiva de miniaturas de um vídeo."""
+    video = MediaRepository.get_video(conn, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
+        
+    video_path = Path(video['filepath'])
+    if not video_path.exists():
+        proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+        if proxy_path.exists():
+            video_path = proxy_path
+            
+    task_key = f"thumbs-{video_id}"
+    with TASK_MANAGER._lock:
+        TASK_MANAGER.paused_tasks.discard(task_key)
+        TASK_MANAGER.cancelled_tasks.discard(task_key)
+        # Mantém o progresso existente para não zerar na barra de progresso do UI ao reiniciar
+        pct = 0.0
+        if task_key in TASK_MANAGER.progress:
+            pct = TASK_MANAGER.progress[task_key].get("percent", 0.0)
+        TASK_MANAGER.progress[task_key] = {
+            "percent": pct,
+            "status": "running",
+            "type": "thumbnails"
+        }
+        
+    duration = video.get('duration') or 0.0
+    if duration > 0:
+        TASK_MANAGER.executor.submit(
+            IngestService._generate_timeline_thumbnails_task,
+            video_id, video_path, duration
+        )
+    return {"status": "success", "message": f"Geração de miniaturas do vídeo ID {video_id} retomada."}
+
+
+@router.post("/api/video/{video_id}/cancel-thumbnails")
+def cancel_video_thumbnails(video_id: int):
+    """Cancela a geração progressiva de miniaturas de um vídeo."""
+    task_key = f"thumbs-{video_id}"
+    TASK_MANAGER.cancel_task(task_key)
+    return {"status": "success", "message": f"Geração de miniaturas do vídeo ID {video_id} cancelada."}
+
+
+@router.delete("/api/task/{task_key}")
+def dismiss_task(task_key: str):
+    """Remove a tarefa da lista de progresso/tarefas em segundo plano."""
+    TASK_MANAGER.remove_progress(task_key)
+    return {"status": "success", "message": f"Tarefa {task_key} removida."}
 
 
 @router.post("/api/editor/heartbeat")

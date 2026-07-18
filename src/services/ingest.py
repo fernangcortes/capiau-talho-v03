@@ -327,6 +327,17 @@ class IngestService:
         
         try:
             for idx, timestamp in enumerate(ordered_timestamps):
+                # Check for cancellation or pause (Option B: exit thread to release slot)
+                progress_pct = (successful_extractions / max(1, total_to_extract)) * 100.0
+                if task_key in TASK_MANAGER.cancelled_tasks:
+                    TASK_MANAGER.update_progress(task_key, round(progress_pct, 1), "cancelled", task_type="thumbnails")
+                    print(f"[IngestService] Geração de miniaturas para o vídeo ID {video_id} cancelada.")
+                    return
+                if task_key in TASK_MANAGER.paused_tasks:
+                    TASK_MANAGER.update_progress(task_key, round(progress_pct, 1), "paused", task_type="thumbnails")
+                    print(f"[IngestService] Geração de miniaturas para o vídeo ID {video_id} pausada (thread liberada).")
+                    return
+
                 # O nome do arquivo segue o padrão de índice baseado no tempo arredondado
                 # index = round(time / 1.0) + 1
                 file_idx = int(round(timestamp)) + 1
