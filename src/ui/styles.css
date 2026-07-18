@@ -6036,4 +6036,29 @@ select option, .nle-select option {
     gap: 5px;
 }
 
+/* ── VISUALIZADOR DE FOTOS - ZOOM E MINIMAPA ─────────────────── */
+#photo-viewer-viewport.space-mode {
+    cursor: grab !important;
+}
+#photo-viewer-viewport.space-mode * {
+    cursor: grab !important;
+}
+#photo-viewer-viewport.space-mode.is-panning,
+#photo-viewer-viewport.space-mode.is-panning * {
+    cursor: grabbing !important;
+}
+
+#photo-viewer-minimap {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    user-select: none;
+    border: 1px solid var(--border-glass) !important;
+}
+#photo-viewer-minimap:hover {
+    border-color: rgba(6, 182, 212, 0.6) !important;
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.3) !important;
+}
+#photo-viewer-minimap-rect {
+    box-sizing: border-box;
+    pointer-events: none;
+}
 

@@ -656,14 +656,16 @@ export class LibraryManager {
         if (this.btnNextPhoto) this.btnNextPhoto.addEventListener("click", () => this.navigatePhoto(1));
 
         if (this.btnZoomPhoto) {
-            this.btnZoomPhoto.addEventListener("click", () => this.toggleZoom());
+            this.btnZoomPhoto.addEventListener("click", (e) => this.toggleZoom(e));
         }
         if (this.lightboxImg) {
-            this.lightboxImg.addEventListener("click", () => this.toggleZoom());
+            this.lightboxImg.addEventListener("click", (e) => this.toggleZoom(e));
         }
         if (this.btnAnalyzePhoto) {
             this.btnAnalyzePhoto.addEventListener("click", () => this.analyzeCurrentPhoto());
         }
+
+        this.initPhotoZoomControls();
 
         const btnPhotoViewerSimilar = document.getElementById("btn-photo-viewer-similar");
         if (btnPhotoViewerSimilar) {
@@ -1694,6 +1696,9 @@ export class LibraryManager {
         this.currentLightboxPhoto = photo;
         this.lightbox.style.display = "flex";
         this.lightboxImg.src = photo.proxy_path ? photo.proxy_path : photo.filepath;
+        if (this.photoMinimapImg) {
+            this.photoMinimapImg.src = photo.proxy_path ? photo.proxy_path : photo.filepath;
+        }
         this.lightboxTitle.textContent = photo.filename;
         this.lightboxDesc.textContent = photo.description || "Sem descrição gerada por IA.";
         
@@ -1716,11 +1721,149 @@ export class LibraryManager {
         
         // Carrega Rostos Rotulados
         this.loadLightboxFaces(photo.id);
+
+        // Resetar Zoom para a nova foto
+        this.resetZoom();
     }
 
     closeLightbox() {
         if (this.lightbox) this.lightbox.style.display = "none";
         this.resetZoom();
+    }
+
+    initPhotoZoomControls() {
+        this.photoViewport = document.getElementById("photo-viewer-viewport");
+        this.photoWrapper = document.getElementById("photo-viewer-wrapper");
+        this.photoMinimap = document.getElementById("photo-viewer-minimap");
+        this.photoMinimapImg = document.getElementById("photo-viewer-minimap-img");
+        this.photoMinimapRect = document.getElementById("photo-viewer-minimap-rect");
+
+        this.photoScale = 1.0;
+        this.photoPanX = 0;
+        this.photoPanY = 0;
+        this.isSpacePressed = false;
+        this.isPhotoPanning = false;
+        this.panStartX = 0;
+        this.panStartY = 0;
+        this.panInitialX = 0;
+        this.panInitialY = 0;
+
+        // Roda do mouse no viewport para zoom focado no cursor (1.0x a 10.0x)
+        if (this.photoViewport) {
+            this.photoViewport.addEventListener("wheel", (e) => {
+                if (!this.lightbox || this.lightbox.style.display === "none") return;
+                e.preventDefault();
+                
+                const delta = -e.deltaY;
+                const factor = delta > 0 ? 1.25 : 0.8;
+                const targetScale = Math.min(10.0, Math.max(1.0, (this.photoScale || 1.0) * factor));
+                
+                if (targetScale <= 1.01) {
+                    this.resetZoom();
+                } else {
+                    this.zoomAtPoint(targetScale, e.clientX, e.clientY, false);
+                }
+            }, { passive: false });
+
+            // Iniciar Pan com Mouse Down
+            this.photoViewport.addEventListener("mousedown", (e) => {
+                if (!this.lightbox || this.lightbox.style.display === "none") return;
+                if (e.target.closest("#photo-viewer-minimap")) return;
+
+                const isLeftClick = e.button === 0;
+                const isMiddleClick = e.button === 1;
+
+                if (this.isSpacePressed || isMiddleClick || (this.photoScale > 1.05 && isLeftClick)) {
+                    this.isPhotoPanning = true;
+                    this.panStartX = e.clientX;
+                    this.panStartY = e.clientY;
+                    this.panInitialX = this.photoPanX;
+                    this.panInitialY = this.photoPanY;
+                    if (this.photoViewport) this.photoViewport.classList.add("is-panning");
+                    e.preventDefault();
+                }
+            });
+        }
+
+        // Window Mouse Move & Mouse Up para Arrastar (Pan)
+        window.addEventListener("mousemove", (e) => {
+            if (!this.isPhotoPanning) return;
+            const dx = e.clientX - this.panStartX;
+            const dy = e.clientY - this.panStartY;
+            this.photoPanX = this.panInitialX + dx;
+            this.photoPanY = this.panInitialY + dy;
+            this.updatePhotoTransform(false);
+        });
+
+        window.addEventListener("mouseup", () => {
+            if (this.isPhotoPanning) {
+                this.isPhotoPanning = false;
+                if (this.photoViewport) this.photoViewport.classList.remove("is-panning");
+            }
+        });
+
+        // Atalho de Teclado: Barra de Espaço para Modo Pan
+        window.addEventListener("keydown", (e) => {
+            if (!this.lightbox || this.lightbox.style.display === "none" || this.lightbox.style.display === "") return;
+            if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+            
+            if (e.code === "Space" && !this.isSpacePressed) {
+                this.isSpacePressed = true;
+                if (this.photoViewport) this.photoViewport.classList.add("space-mode");
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener("keyup", (e) => {
+            if (e.code === "Space") {
+                this.isSpacePressed = false;
+                this.isPhotoPanning = false;
+                if (this.photoViewport) {
+                    this.photoViewport.classList.remove("space-mode", "is-panning");
+                }
+            }
+        });
+
+        // Interação com o Minimapa / Miniatura
+        if (this.photoMinimap) {
+            const handleMinimapNav = (e) => {
+                if (!this.lightboxImg || !this.photoMinimap) return;
+                const mmRect = this.photoMinimap.getBoundingClientRect();
+                const clickX = e.clientX - mmRect.left;
+                const clickY = e.clientY - mmRect.top;
+
+                const normX = Math.min(1, Math.max(0, clickX / mmRect.width));
+                const normY = Math.min(1, Math.max(0, clickY / mmRect.height));
+
+                const imgW = this.lightboxImg.offsetWidth;
+                const imgH = this.lightboxImg.offsetHeight;
+
+                const targetOffsetX = (normX - 0.5) * imgW;
+                const targetOffsetY = (normY - 0.5) * imgH;
+
+                this.photoPanX = -targetOffsetX * (this.photoScale || 1.0);
+                this.photoPanY = -targetOffsetY * (this.photoScale || 1.0);
+                this.updatePhotoTransform(false);
+            };
+
+            let isMinimapDrag = false;
+            this.photoMinimap.addEventListener("mousedown", (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                isMinimapDrag = true;
+                handleMinimapNav(e);
+            });
+
+            window.addEventListener("mousemove", (e) => {
+                if (isMinimapDrag) {
+                    handleMinimapNav(e);
+                }
+            });
+
+            window.addEventListener("mouseup", () => {
+                isMinimapDrag = false;
+            });
+        }
     }
 
     async analyzeCurrentPhoto() {
@@ -1768,24 +1911,160 @@ export class LibraryManager {
         this.openLightbox(list[newIdx]);
     }
 
-    toggleZoom() {
+    toggleZoom(e) {
         if (!this.lightboxImg) return;
-        if (this.isPhotoZoomed) {
+        
+        // Se o usuário estava arrastando a foto (pan), ignora o clique de toggle zoom
+        if (this.panStartX && this.panStartY && e) {
+            const dist = Math.hypot(e.clientX - this.panStartX, e.clientY - this.panStartY);
+            if (dist > 5) return;
+        }
+
+        if (this.photoScale > 1.2) {
             this.resetZoom();
         } else {
-            this.isPhotoZoomed = true;
-            this.lightboxImg.style.transform = "scale(1.8)";
-            this.lightboxImg.style.cursor = "zoom-out";
-            if (this.btnZoomPhoto) this.btnZoomPhoto.innerHTML = '<i class="fa-solid fa-magnifying-glass-minus"></i>';
+            const targetScale = 4.0;
+            const mouseX = e ? e.clientX : null;
+            const mouseY = e ? e.clientY : null;
+            this.zoomAtPoint(targetScale, mouseX, mouseY, true);
         }
     }
 
     resetZoom() {
-        if (!this.lightboxImg) return;
+        this.photoScale = 1.0;
+        this.photoPanX = 0;
+        this.photoPanY = 0;
         this.isPhotoZoomed = false;
-        this.lightboxImg.style.transform = "scale(1)";
-        this.lightboxImg.style.cursor = "zoom-in";
-        if (this.btnZoomPhoto) this.btnZoomPhoto.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus"></i>';
+        this.updatePhotoTransform(true);
+        if (this.photoMinimap) this.photoMinimap.style.display = "none";
+    }
+
+    zoomAtPoint(targetScale, mouseX, mouseY, animate = true) {
+        if (!this.photoViewport || !this.photoWrapper || !this.lightboxImg) return;
+        
+        const clampedScale = Math.min(10.0, Math.max(1.0, targetScale));
+        const vpRect = this.photoViewport.getBoundingClientRect();
+
+        const mX = (mouseX !== null && mouseX !== undefined) ? mouseX : (vpRect.left + vpRect.width / 2);
+        const mY = (mouseY !== null && mouseY !== undefined) ? mouseY : (vpRect.top + vpRect.height / 2);
+
+        // Offset do mouse em relação ao centro do viewport
+        const relMouseX = mX - (vpRect.left + vpRect.width / 2);
+        const relMouseY = mY - (vpRect.top + vpRect.height / 2);
+
+        // Coordenadas da imagem sob o cursor antes da escala
+        const pointInImageX = (relMouseX - (this.photoPanX || 0)) / (this.photoScale || 1.0);
+        const pointInImageY = (relMouseY - (this.photoPanY || 0)) / (this.photoScale || 1.0);
+
+        // Novo pan para manter a mesma coordenada sob o cursor
+        let newPanX = relMouseX - pointInImageX * clampedScale;
+        let newPanY = relMouseY - pointInImageY * clampedScale;
+
+        if (clampedScale <= 1.01) {
+            newPanX = 0;
+            newPanY = 0;
+        }
+
+        this.photoScale = clampedScale;
+        this.photoPanX = newPanX;
+        this.photoPanY = newPanY;
+
+        this.updatePhotoTransform(animate);
+    }
+
+    updatePhotoTransform(animate = false) {
+        if (!this.photoWrapper) return;
+
+        if (animate) {
+            this.photoWrapper.style.transition = "transform 0.2s cubic-bezier(0.25, 1, 0.5, 1)";
+        } else {
+            this.photoWrapper.style.transition = "none";
+        }
+
+        this.photoWrapper.style.transform = `translate3d(${this.photoPanX}px, ${this.photoPanY}px, 0px) scale(${this.photoScale})`;
+        
+        const isZoomed = this.photoScale > 1.05;
+        this.isPhotoZoomed = isZoomed;
+
+        if (this.lightboxImg) {
+            this.lightboxImg.style.cursor = isZoomed ? "zoom-out" : "zoom-in";
+        }
+
+        if (this.btnZoomPhoto) {
+            this.btnZoomPhoto.innerHTML = isZoomed ? '<i class="fa-solid fa-magnifying-glass-minus"></i>' : '<i class="fa-solid fa-magnifying-glass-plus"></i>';
+        }
+
+        if (this.photoMinimap) {
+            if (isZoomed) {
+                this.photoMinimap.style.display = "block";
+                this.updateMinimap();
+            } else {
+                this.photoMinimap.style.display = "none";
+            }
+        }
+    }
+
+    updateMinimap() {
+        if (!this.photoMinimap || !this.photoMinimapRect || !this.lightboxImg || !this.photoViewport) return;
+
+        const imgW = this.lightboxImg.offsetWidth;
+        const imgH = this.lightboxImg.offsetHeight;
+        if (imgW === 0 || imgH === 0) return;
+
+        const vpRect = this.photoViewport.getBoundingClientRect();
+        const mmRect = this.photoMinimap.getBoundingClientRect();
+
+        const scaledW = imgW * (this.photoScale || 1.0);
+        const scaledH = imgH * (this.photoScale || 1.0);
+
+        // Dimensões visíveis do viewport sobre a imagem ampliada
+        const visW = Math.min(scaledW, vpRect.width);
+        const visH = Math.min(scaledH, vpRect.height);
+
+        // Fração visível
+        const visFracW = visW / scaledW;
+        const visFracH = visH / scaledH;
+
+        // Renderização da miniatura (object-fit: contain)
+        const imgAspect = imgW / imgH;
+        const mmAspect = mmRect.width / mmRect.height;
+
+        let mmImgW, mmImgH, mmImgX, mmImgY;
+        if (imgAspect > mmAspect) {
+            mmImgW = mmRect.width;
+            mmImgH = mmRect.width / imgAspect;
+            mmImgX = 0;
+            mmImgY = (mmRect.height - mmImgH) / 2;
+        } else {
+            mmImgH = mmRect.height;
+            mmImgW = mmRect.height * imgAspect;
+            mmImgX = (mmRect.width - mmImgW) / 2;
+            mmImgY = 0;
+        }
+
+        // Largura e altura do retângulo no minimapa
+        const rectW = Math.max(8, Math.min(mmImgW, visFracW * mmImgW));
+        const rectH = Math.max(8, Math.min(mmImgH, visFracH * mmImgH));
+
+        // Posição do centro visível em coordenadas relativas da imagem (0 no centro)
+        const centerX = -this.photoPanX / (this.photoScale || 1.0);
+        const centerY = -this.photoPanY / (this.photoScale || 1.0);
+
+        // Normalizado de 0 a 1 (onde 0.5 é o centro)
+        const normCenterX = 0.5 + (centerX / imgW);
+        const normCenterY = 0.5 + (centerY / imgH);
+
+        let rectX = mmImgX + normCenterX * mmImgW - rectW / 2;
+        let rectY = mmImgY + normCenterY * mmImgH - rectH / 2;
+
+        // Clamping dentro dos limites da imagem no minimapa
+        rectX = Math.max(mmImgX, Math.min(mmImgX + mmImgW - rectW, rectX));
+        rectY = Math.max(mmImgY, Math.min(mmImgY + mmImgH - rectH, rectY));
+
+        this.photoMinimapRect.style.left = `${rectX}px`;
+        this.photoMinimapRect.style.top = `${rectY}px`;
+        this.photoMinimapRect.style.width = `${rectW}px`;
+        this.photoMinimapRect.style.height = `${rectH}px`;
     }
 
     async loadLightboxFaces(photoId) {
