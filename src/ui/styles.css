@@ -3008,6 +3008,404 @@ mark.search-highlight {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* ============================================================
+   INSPETOR DE ROSTO — atalho 'a' (overlay flutuante, mídia limpa)
+   Substitui a mutação in-card. Segue o design system §IV.8:
+   a mídia ocupa 100% do palco; controles só surgem em hover,
+   com gradiente sutil (nunca competem com a imagem).
+   ============================================================ */
+#face-inspector-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(4, 5, 10, 0);
+    -webkit-backdrop-filter: blur(0px);
+    backdrop-filter: blur(0px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.26s ease, background 0.26s ease, backdrop-filter 0.26s ease;
+}
+#face-inspector-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+    background: rgba(4, 5, 10, 0.82);
+    -webkit-backdrop-filter: blur(7px);
+    backdrop-filter: blur(7px);
+}
+
+/* Palco: cresce a partir do card (efeito shared-element via transform no JS) */
+.fi-stage {
+    position: relative;
+    width: min(70vw, 1160px);
+    height: min(80vh, 780px);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #05070d;
+    border: 1px solid rgba(6, 182, 212, 0.35);
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.82), 0 0 60px rgba(6, 182, 212, 0.16);
+    transform-origin: center center;
+    transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Viewport de mídia (recorta) + wrapper transformado (zoom/pan) — modelo do
+   visualizador da Biblioteca: scroll = zoom no cursor, espaço+arraste = mover. */
+.fi-media {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    cursor: default;
+}
+.fi-media.zoomed { cursor: grab; }
+.fi-media.space-mode { cursor: grab; }
+.fi-media.space-mode.is-panning,
+.fi-media.is-panning { cursor: grabbing; }
+.fi-wrap {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform-origin: center center;
+    will-change: transform;
+}
+.fi-wrap img,
+.fi-wrap video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+    background: #05070d;
+}
+
+/* Minimapa — aparece ao ampliar; mostra onde estamos na foto */
+.fi-minimap {
+    position: absolute;
+    right: 14px;
+    bottom: 58px;
+    width: 168px;
+    height: 116px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(4, 6, 12, 0.7);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+    display: none;
+    z-index: 5;
+    cursor: crosshair;
+}
+.fi-minimap-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0.85;
+    pointer-events: none;
+}
+.fi-minimap-rect {
+    position: absolute;
+    border: 2px solid var(--color-cyan);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+/* Ações do Estado 3 (Refazer + RAW) — sempre clicáveis, canto superior direito */
+.fi-actions {
+    position: absolute;
+    top: 12px;
+    right: 52px;
+    z-index: 7;
+    display: none; /* flex no Estado 3 via JS */
+    align-items: center;
+    gap: 8px;
+    pointer-events: auto;
+}
+.fi-redo,
+.fi-raw {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 18px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+.fi-redo { color: #cdeef7; background: rgba(6, 182, 212, 0.18); border: 1px solid rgba(6, 182, 212, 0.45); }
+.fi-redo:hover { background: rgba(6, 182, 212, 0.34); transform: scale(1.04); }
+.fi-redo:active { transform: scale(0.97); }
+.fi-redo.busy, .fi-raw.busy { opacity: 0.7; pointer-events: none; }
+
+/* Toggle RAW: mostrado só para fotos RAW; destacado quando ativo */
+.fi-raw {
+    display: none;
+    color: #e9d8b0;
+    background: rgba(217, 164, 65, 0.16);
+    border: 1px solid rgba(217, 164, 65, 0.45);
+}
+.fi-raw:hover { background: rgba(217, 164, 65, 0.3); transform: scale(1.04); }
+.fi-raw.on { color: #1a1204; background: #d9a441; border-color: #d9a441; }
+
+/* Botão "Ajustes" (abre o painel de edição) */
+.fi-edit-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 28px;
+    border-radius: 16px;
+    font-size: 12px;
+    color: #cdd6e4;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+.fi-edit-toggle:hover { background: rgba(255, 255, 255, 0.2); transform: scale(1.05); }
+.fi-edit-toggle.on { color: #06121a; background: var(--color-cyan); border-color: var(--color-cyan); }
+
+/* Painel de ajustes básicos (exposição/contraste/saturação) */
+.fi-edit {
+    position: absolute;
+    top: 52px;
+    right: 12px;
+    z-index: 7;
+    display: none; /* flex quando aberto via JS */
+    flex-direction: column;
+    gap: 10px;
+    width: 200px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(8, 12, 20, 0.86);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+.fi-edit label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: rgba(226, 232, 240, 0.85);
+}
+.fi-edit input[type="range"] {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.18);
+    outline: none;
+    cursor: pointer;
+}
+.fi-edit input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-cyan);
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.7);
+    cursor: pointer;
+}
+.fi-edit input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: none;
+    border-radius: 50%;
+    background: var(--color-cyan);
+    cursor: pointer;
+}
+.fi-ed-reset {
+    margin-top: 2px;
+    padding: 5px 0;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #cdd6e4;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+.fi-ed-reset:hover { background: rgba(255, 255, 255, 0.16); }
+
+/* Selo de estado — sempre visível, discreto (canto superior) */
+.fi-badge {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: #e6f6fb;
+    background: rgba(8, 12, 20, 0.7);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+.fi-badge .fi-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-cyan);
+    box-shadow: 0 0 8px var(--color-cyan);
+}
+.fi-badge.is-hd .fi-dot { background: #10b981; box-shadow: 0 0 8px #10b981; }
+
+/* Barra inferior de controles — some por padrão, aparece em hover (§IV.8) */
+.fi-controls {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 32px 18px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.72), transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 3;
+}
+.fi-stage:hover .fi-controls { opacity: 1; pointer-events: auto; }
+
+/* Trilha de progresso dos 3 estados */
+.fi-steps {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.fi-steps .fi-step {
+    width: 22px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.22);
+    cursor: pointer;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+.fi-steps .fi-step.on { background: var(--color-cyan); box-shadow: 0 0 8px rgba(6, 182, 212, 0.7); }
+
+/* Dicas de teclado */
+.fi-hints {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 11px;
+    color: rgba(226, 232, 240, 0.82);
+    white-space: nowrap;
+}
+.fi-hints span { display: inline-flex; align-items: center; }
+.fi-hints kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    font-family: inherit;
+    font-size: 10px;
+    color: #fff;
+    margin-right: 5px;
+}
+
+/* Legenda de contexto (nome do arquivo / frame) */
+.fi-caption {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 4;
+    max-width: 60%;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 11px;
+    color: rgba(226, 232, 240, 0.9);
+    background: rgba(8, 12, 20, 0.6);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.fi-stage:hover .fi-caption { opacity: 1; }
+
+/* Spinner de aprimoramento (Estado 3) */
+.fi-loading {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    z-index: 5;
+    color: #cdeef7;
+    font-size: 12px;
+    background: rgba(4, 6, 12, 0.35);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+}
+.fi-loading.active { display: flex; }
+.fi-loading .fi-spin {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 3px solid rgba(6, 182, 212, 0.25);
+    border-top-color: var(--color-cyan);
+    animation: fiSpin 0.8s linear infinite;
+}
+@keyframes fiSpin { to { transform: rotate(360deg); } }
+
+/* Botão fechar */
+.fi-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 6;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(8, 12, 20, 0.6);
+    color: #cbd5e1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+.fi-stage:hover .fi-close { opacity: 1; }
+.fi-close:hover { background: rgba(239, 68, 68, 0.85); color: #fff; transform: scale(1.08); }
+
 /* Cards Grandes de Desambiguação Fullscreen */
 .fullscreen-face-card {
     display: flex;

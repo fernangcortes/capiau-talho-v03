@@ -571,15 +571,25 @@ def get_project_faces(
     return faces
 
 
+@router.post("/face/{face_id}/enhance", response_model=dict)
+def enhance_face(face_id: int, raw: bool = Query(False, description="Decodificar RAW em resolução total (CR2/NEF/…)")):
+    """Restaura/realça o rosto em alta definição para desambiguação (crop do rosto)."""
+    service = get_face_service()
+    res = service.enhance_face(face_id, use_raw=raw)
+    if res.get("status") == "error":
+        raise HTTPException(status_code=400, detail=res.get("message", "Erro no aprimoramento."))
+    return res
+
+
 @router.get("/face/{face_id}", response_model=dict)
 def get_face_detail(face_id: int):
     """Retorna detalhes completos de uma face com todos os reconhecimentos."""
     service = get_face_service()
     face = service.get_face_detail(face_id)
-    
+
     if not face:
         raise HTTPException(status_code=404, detail=f"Face {face_id} nao encontrada")
-    
+
     return face
 
 

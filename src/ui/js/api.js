@@ -81,6 +81,14 @@ export class CapIAuAPI {
         });
     }
 
+    static enhanceFace(faceId, raw = false) {
+        const q = raw ? "?raw=true" : "";
+        return this.request(`/api/faces/face/${faceId}/enhance${q}`, {
+            method: "POST"
+        });
+    }
+
+
     static rejectFace(faceId, name = "") {
         return this.request(`/api/faces/face/${faceId}/reject`, {
             method: "POST",

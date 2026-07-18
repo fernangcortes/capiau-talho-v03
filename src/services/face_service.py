@@ -495,7 +495,9 @@ class FaceService:
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT f.*, v.filename as video_filename, p.filename as photo_filename
+                SELECT f.*, 
+                       v.filename as video_filename, v.filepath as video_filepath,
+                       p.filename as photo_filename, p.filepath as photo_filepath
                 FROM face f
                 LEFT JOIN video v ON f.video_id = v.id
                 LEFT JOIN photo p ON f.photo_id = p.id
@@ -507,6 +509,11 @@ class FaceService:
                 return None
             
             face = dict(face_row)
+            if face.get("bounding_box") and isinstance(face["bounding_box"], str):
+                try:
+                    face["bounding_box"] = json.loads(face["bounding_box"])
+                except Exception:
+                    pass
             face["authoritative_recognition"] = self.get_authoritative_recognition(face_id)
             
             # Todos os reconhecimentos
@@ -520,6 +527,125 @@ class FaceService:
             face["all_recognitions"] = [dict(r) for r in cursor.fetchall()]
             
             return face
+
+
+    # Formatos RAW que o cv2 não lê e que exigem decodificação dedicada (rawpy)
+    RAW_EXT = {".arw", ".cr2", ".cr3", ".nef", ".dng", ".pef", ".raf", ".orf", ".rw2", ".raw"}
+    CV2_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+
+    def enhance_face(self, face_id: int, use_raw: bool = False) -> Dict[str, Any]:
+        """Extrai a mídia de origem do rosto e devolve um crop restaurado/realçado.
+
+        Foto → usa o original (formatos web) ou o proxy webp. Se ``use_raw`` e a foto
+        for RAW (CR2/NEF/…), decodifica o RAW em resolução total (mais lento, mais
+        nítido). Vídeo → extrai o frame no timestamp (com cache).
+        """
+        face = self.get_face_detail(face_id)
+        if not face:
+            return {"status": "error", "message": "Face não encontrada."}
+
+        image_path = None
+        with get_db() as conn:
+            cursor = conn.cursor()
+            if face.get("photo_id"):
+                cursor.execute("SELECT filepath FROM photo WHERE id = ?", (face["photo_id"],))
+                p = cursor.fetchone()
+                orig = p["filepath"] if p else None
+                proxy = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{face['photo_id']}.webp"
+                ext = Path(orig).suffix.lower() if orig else ""
+                if orig and Path(orig).exists() and ext in self.CV2_EXT:
+                    image_path = orig
+                elif use_raw and orig and Path(orig).exists() and ext in self.RAW_EXT:
+                    # Opt-in: decodifica o RAW em resolução total (melhor crop possível)
+                    image_path = self._decode_raw_photo(face["photo_id"], orig)
+                    if not image_path and proxy.exists():
+                        image_path = str(proxy)  # RAW falhou → cai no proxy
+                elif proxy.exists():
+                    image_path = str(proxy)
+                elif orig and Path(orig).exists():
+                    image_path = orig  # último recurso (pode falhar na leitura)
+            elif face.get("video_id"):
+                cursor.execute("SELECT filepath FROM video WHERE id = ?", (face["video_id"],))
+                v = cursor.fetchone()
+                image_path = self._extract_video_frame(
+                    face["video_id"], v["filepath"] if v else None, face.get("timestamp"))
+
+        if not image_path:
+            image_path = face.get("crop_path")
+
+        if not image_path or not Path(image_path).exists():
+            return {"status": "error", "message": "Mídia de origem do rosto não encontrada no disco."}
+
+        box = face.get("bounding_box")
+        if isinstance(box, str):
+            try:
+                box = json.loads(box)
+            except Exception:
+                box = None
+        if not isinstance(box, list):
+            box = None
+
+        from src.vision.face_enhancer import enhance_face_crop
+        return enhance_face_crop(image_path, box=box)
+
+    def _extract_video_frame(self, video_id: int, original_path: Optional[str],
+                             timestamp: Optional[float]) -> Optional[str]:
+        """Extrai (com cache) o frame do vídeo no timestamp; devolve o caminho do JPG ou None.
+
+        Prioriza o proxy mp4 (busca rápida/confiável via cv2 — evita o seek lento e
+        falho em .MTS/AVCHD). Para o original usa cv2 em formatos amigáveis e ffmpeg
+        para MTS. Assim o aprimoramento de rostos de vídeo fica rápido e robusto.
+        """
+        if timestamp is None:
+            return None
+        frame_dir = Path("data/cache/frames")
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame_path = frame_dir / f"frame_vid_{video_id}_{int(timestamp)}.jpg"
+        if frame_path.exists():
+            return str(frame_path)
+
+        # 1) Proxy mp4 — melhor opção quando existe (rápido e seekável)
+        proxy = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+        if proxy.exists() and self._cv2_grab_frame(str(proxy), timestamp, frame_path):
+            return str(frame_path)
+
+        # 2) Original — cv2 p/ formatos amigáveis, ffmpeg p/ MTS/AVCHD (seek confiável)
+        if original_path and Path(original_path).exists():
+            ext = Path(original_path).suffix.lower()
+            if ext not in (".mts", ".m2ts", ".ts") and self._cv2_grab_frame(original_path, timestamp, frame_path):
+                return str(frame_path)
+            try:
+                from src.media.ffmpeg import extract_thumbnail_frame
+                if extract_thumbnail_frame(Path(original_path), float(timestamp), frame_path, width=1600) and frame_path.exists():
+                    return str(frame_path)
+            except Exception as ex:
+                print(f"[FACE_SERVICE] ffmpeg frame falhou (vid {video_id} @ {timestamp}s): {ex}")
+        return None
+
+    def _decode_raw_photo(self, photo_id: int, raw_path: str) -> Optional[str]:
+        """Decodifica um RAW (CR2/NEF/…) em resolução total; devolve um JPEG (com cache)."""
+        from src.media.image_processing import decode_raw_to_jpeg
+        out = Path("data/cache/raw") / f"full_photo_{photo_id}.jpg"
+        if out.exists():
+            return str(out)
+        if decode_raw_to_jpeg(Path(raw_path), out):
+            return str(out)
+        return None
+
+    def _cv2_grab_frame(self, src: str, timestamp: float, out_path: Path) -> bool:
+        """Lê um frame no timestamp via cv2 e salva em out_path. True se ok."""
+        try:
+            cap = cv2.VideoCapture(src)
+            cap.set(cv2.CAP_PROP_POS_MSEC, float(timestamp) * 1000)
+            ret, frame = cap.read()
+            cap.release()
+            if ret and frame is not None:
+                imwrite_unicode(out_path, frame)
+                return True
+        except Exception as ex:
+            print(f"[FACE_SERVICE] cv2 frame falhou ({src}): {ex}")
+        return False
+
 
     def get_project_faces(self, project_id: int, media_type: str = None, media_id: int = None) -> List[Dict[str, Any]]:
         """Retorna todas as faces de um projeto com reconhecimento autoritativo."""

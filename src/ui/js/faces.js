@@ -41,16 +41,52 @@ export class FaceManager {
             btnSyncEnrich.addEventListener("click", () => this.triggerManualEnrichment());
         }
 
-        // Keyboard fast typing search
+        // Atalhos de teclado: busca rápida + Inspetor de Rosto (atalho 'a')
         document.addEventListener("keydown", (e) => {
-            const modal = document.getElementById("fullscreen-faces-disambiguation");
-            if (!modal || modal.style.display === "none") return;
-            
+            // Com o Inspetor aberto, ele captura a navegação — mesmo com foco num
+            // input e independente do estado dos modais atrás dele.
+            if (this.inspectorCard) {
+                if (e.key === "Escape") { e.preventDefault(); this.closeInspector(); return; }
+                if (e.key === "a" || e.key === "A") { e.preventDefault(); this.advanceInspector(); return; }
+                if (e.key === "s" || e.key === "S") { e.preventDefault(); this.regressInspector(); return; }
+                if (e.key === "ArrowLeft")  { e.preventDefault(); this.stepInspector(-1); return; }
+                if (e.key === "ArrowRight") { e.preventDefault(); this.stepInspector(1);  return; }
+                if (e.code === "Space" || e.key === " ") {
+                    // Segurar espaço = modo mover (arraste). keyup limpa o modo.
+                    e.preventDefault();
+                    if (!this.fiSpace) {
+                        this.fiSpace = true;
+                        this._inspectorEl.querySelector(".fi-media").classList.add("space-mode");
+                    }
+                    return;
+                }
+                return; // enquanto inspeciona, o Inspetor consome as demais teclas
+            }
+
+            const fsModal = document.getElementById("fullscreen-faces-disambiguation");
+            const diagModal = document.getElementById("face-disambiguation-modal");
+            const isFsOpen = fsModal && fsModal.style.display !== "none";
+            const isDiagOpen = diagModal && diagModal.style.display !== "none";
+
+            if (!isFsOpen && !isDiagOpen) return;
+
             // Ignore if typing in an input/textarea
             if (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA") return;
-            
+
+            // Card alvo: o que está sob o mouse ou selecionado
+            const targetCard = this.hoveredCard || document.querySelector(".fullscreen-face-card:hover, .disambiguation-item:hover, .fullscreen-face-card.selected, .disambiguation-item.selected");
+
+            // Atalho 'a' / 'A': abre o Inspetor de Rosto no card alvo
+            if (e.key === "a" || e.key === "A") {
+                if (targetCard) {
+                    e.preventDefault();
+                    this.openInspector(targetCard);
+                    return;
+                }
+            }
+
             const selected = document.querySelectorAll(".fullscreen-face-card.selected");
-            if (selected.length > 0 && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (selected.length > 0 && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && e.key !== "a" && e.key !== "A") {
                 const bulkInput = document.getElementById("bulk-face-input");
                 if (bulkInput) {
                     bulkInput.focus();
@@ -60,6 +96,8 @@ export class FaceManager {
                 }
             }
         });
+
+
 
         const btnFullscreen = document.getElementById("btn-fullscreen-faces");
         if (btnFullscreen) {
@@ -433,8 +471,12 @@ export class FaceManager {
                     item.classList.toggle("selected");
                 });
 
+                item.addEventListener("mouseenter", () => { FaceManager.hoveredCard = item; });
+                item.addEventListener("mouseleave", () => { if (FaceManager.hoveredCard === item) FaceManager.hoveredCard = null; });
+
                 grid.appendChild(item);
             });
+
 
             // Bind action buttons
             const btnFuseAll = document.getElementById("btn-disambiguation-fuse-all");
@@ -630,7 +672,11 @@ export class FaceManager {
                 </div>
             `;
 
+            card.addEventListener("mouseenter", () => { FaceManager.hoveredCard = card; });
+            card.addEventListener("mouseleave", () => { if (FaceManager.hoveredCard === card) FaceManager.hoveredCard = null; });
+
             const inputEl = card.querySelector(".fullscreen-face-input");
+
             const btnReject = card.querySelector(".btn-reject-face");
             
             let isChanging = false;
@@ -806,8 +852,11 @@ export class FaceManager {
                 const hoverDelay = selectEl ? parseInt(selectEl.value) : 2000;
                 
                 if (hoverDelay >= 999999) return; // Desativado
-                
+                // Não mostrar popover de hover enquanto o Inspetor ('a') estiver aberto
+                if (FaceManager.inspectorCard) return;
+
                 hoverTimeout = setTimeout(() => {
+                    if (FaceManager.inspectorCard) return;
                     FaceManager.showContextPreview(face, card);
                 }, hoverDelay);
             });
@@ -1741,4 +1790,655 @@ export class FaceManager {
             alert("Erro de comunicação ao excluir nome.");
         }
     }
+
+    // ======================================================================
+    //  INSPETOR DE ROSTO — atalho 'a'
+    //  Revela a face em 3 níveis: 1/3 Contexto · 2/3 Zoom · 3/3 Restauração HD.
+    //  Navegação igual ao visualizador da Biblioteca:
+    //    scroll = zoom no cursor · espaço+arraste = mover · minimapa
+    //    ← → = rosto anterior/próximo · a = avançar · Esc/clique-fora = fechar
+    // ======================================================================
+
+    static ensureInspector() {
+        let overlay = document.getElementById("face-inspector-overlay");
+        if (overlay) { this._inspectorEl = overlay; return overlay; }
+
+        overlay = document.createElement("div");
+        overlay.id = "face-inspector-overlay";
+        overlay.innerHTML = `
+            <div class="fi-stage">
+                <div class="fi-media"><div class="fi-wrap"></div></div>
+                <div class="fi-minimap"><img class="fi-minimap-img" alt=""><div class="fi-minimap-rect"></div></div>
+                <div class="fi-caption"></div>
+                <div class="fi-badge"><span class="fi-dot"></span><span class="fi-badge-text"></span></div>
+                <button class="fi-close" title="Fechar (Esc)"><i class="fa-solid fa-xmark"></i></button>
+                <div class="fi-actions">
+                    <button class="fi-edit-toggle" title="Ajustes de imagem (exposição, contraste, saturação)"><i class="fa-solid fa-sliders"></i></button>
+                    <button class="fi-raw" title="Ver o RAW em resolução total, sem tratamento"><i class="fa-solid fa-camera"></i> RAW</button>
+                    <button class="fi-redo" title="Gerar a restauração novamente"><i class="fa-solid fa-rotate"></i> Refazer</button>
+                </div>
+                <div class="fi-edit">
+                    <label>Exposição<input type="range" class="fi-ed" data-k="b" min="0.4" max="2.2" step="0.02" value="1"></label>
+                    <label>Contraste<input type="range" class="fi-ed" data-k="c" min="0.5" max="1.8" step="0.02" value="1"></label>
+                    <label>Saturação<input type="range" class="fi-ed" data-k="s" min="0" max="2" step="0.02" value="1"></label>
+                    <button class="fi-ed-reset" title="Restaurar ajustes">Reset</button>
+                </div>
+                <div class="fi-loading"><div class="fi-spin"></div><span>Restaurando rosto…</span></div>
+                <div class="fi-controls">
+                    <div class="fi-steps">
+                        <span class="fi-step" data-step="1" title="1/3 · Contexto"></span>
+                        <span class="fi-step" data-step="2" title="2/3 · Zoom no Rosto"></span>
+                        <span class="fi-step" data-step="3" title="3/3 · Restauração HD"></span>
+                    </div>
+                    <div class="fi-hints">
+                        <span><kbd>A</kbd>avançar</span>
+                        <span><kbd>S</kbd>voltar</span>
+                        <span><kbd>scroll</kbd>zoom</span>
+                        <span><kbd>espaço</kbd>+arraste mover</span>
+                        <span><kbd>←</kbd><kbd>→</kbd>trocar</span>
+                        <span><kbd>Esc</kbd>fechar</span>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        this._inspectorEl = overlay;
+        const media = overlay.querySelector(".fi-media");
+
+        // Clique nas pílulas de progresso para pular de estado
+        overlay.querySelectorAll(".fi-step").forEach(stepEl => {
+            stepEl.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const targetStep = parseInt(stepEl.dataset.step);
+                if (targetStep && targetStep !== this.inspectorState) {
+                    this.goToInspectorStep(targetStep);
+                }
+            });
+        });
+
+        // Fechar / refazer
+        overlay.addEventListener("click", (e) => { if (!e.target.closest(".fi-stage") && !e.target.closest(".fi-minimap")) this.closeInspector(); });
+        overlay.querySelector(".fi-close").addEventListener("click", (e) => { e.stopPropagation(); this.closeInspector(); });
+        overlay.querySelector(".fi-redo").addEventListener("click", (e) => { e.stopPropagation(); this.redoEnhance(); });
+        overlay.querySelector(".fi-raw").addEventListener("click", (e) => {
+            e.stopPropagation();
+            const on = !this._rawPref();
+            localStorage.setItem("fi_raw_full", on ? "1" : "0");
+            this._enhCache = {}; // preferência global mudou → invalida o cache de restaurações
+            overlay.querySelector(".fi-raw").classList.toggle("on", on);
+            if (this.inspectorState === 3) this.redoEnhance();      // re-restaura o crop
+            else if (this.inspectorState === 2) this._reapplyZoomSource(); // troca proxy↔RAW no zoom
+        });
+
+        // Ajustes de imagem (Exposição/Contraste/Saturação) — filtros CSS ao vivo
+        overlay.querySelector(".fi-edit-toggle").addEventListener("click", (e) => {
+            e.stopPropagation();
+            const panel = overlay.querySelector(".fi-edit");
+            const show = panel.style.display !== "flex";
+            panel.style.display = show ? "flex" : "none";
+            overlay.querySelector(".fi-edit-toggle").classList.toggle("on", show);
+            if (show) this._fiSyncEditSliders();
+        });
+        overlay.querySelectorAll(".fi-ed").forEach(sl => {
+            sl.addEventListener("input", (e) => {
+                e.stopPropagation();
+                this._fiEdits = this._fiEdits || this._fiLoadEdits();
+                this._fiEdits[sl.dataset.k] = parseFloat(sl.value);
+                this._fiSaveEdits();
+                this._fiApplyEdits();
+            });
+            sl.addEventListener("mousedown", (e) => e.stopPropagation());
+        });
+        overlay.querySelector(".fi-ed-reset").addEventListener("click", (e) => {
+            e.stopPropagation();
+            this._fiEdits = { b: 1, c: 1, s: 1 };
+            this._fiSaveEdits();
+            this._fiSyncEditSliders();
+            this._fiApplyEdits();
+        });
+
+        // Zoom com a roda do mouse, focado no cursor (1x–10x)
+        media.addEventListener("wheel", (e) => {
+            if (!this.inspectorCard) return;
+            e.preventDefault();
+            const factor = -e.deltaY > 0 ? 1.25 : 0.8;
+            const target = Math.min(10, Math.max(1, (this.fiScale || 1) * factor));
+            if (target <= 1.01) this._fiResetView(true);
+            else this._fiZoomAtPoint(target, e.clientX, e.clientY, false);
+        }, { passive: false });
+
+        // Pan com arraste (espaço pressionado, botão do meio, ou já ampliado)
+        media.addEventListener("mousedown", (e) => {
+            if (!this.inspectorCard || e.target.closest(".fi-minimap")) return;
+            const left = e.button === 0, mid = e.button === 1;
+            if (this.fiSpace || mid || ((this.fiScale || 1) > 1.05 && left)) {
+                this.fiPanning = true;
+                this._panSX = e.clientX; this._panSY = e.clientY;
+                this._panIX = this.fiPanX || 0; this._panIY = this.fiPanY || 0;
+                media.classList.add("is-panning");
+                e.preventDefault();
+            }
+        });
+        window.addEventListener("mousemove", (e) => {
+            if (!this.fiPanning) return;
+            this.fiPanX = this._panIX + (e.clientX - this._panSX);
+            this.fiPanY = this._panIY + (e.clientY - this._panSY);
+            this._fiUpdateTransform(false);
+        });
+        window.addEventListener("mouseup", () => {
+            if (this.fiPanning) { this.fiPanning = false; media.classList.remove("is-panning"); }
+        });
+        // Soltar espaço encerra o modo de arraste
+        window.addEventListener("keyup", (e) => {
+            if (e.code === "Space" || e.key === " ") {
+                this.fiSpace = false; this.fiPanning = false;
+                media.classList.remove("space-mode", "is-panning");
+            }
+        });
+
+        // Minimapa: clicar/arrastar para navegar
+        const mm = overlay.querySelector(".fi-minimap");
+        const navMinimap = (e) => {
+            const el = this._fiMediaEl();
+            if (!el) return;
+            const r = mm.getBoundingClientRect();
+            const nx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+            const ny = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+            this.fiPanX = -((nx - 0.5) * el.offsetWidth) * (this.fiScale || 1);
+            this.fiPanY = -((ny - 0.5) * el.offsetHeight) * (this.fiScale || 1);
+            this._fiUpdateTransform(false);
+        };
+        let mmDrag = false;
+        mm.addEventListener("mousedown", (e) => { e.stopPropagation(); e.preventDefault(); mmDrag = true; navMinimap(e); });
+        window.addEventListener("mousemove", (e) => { if (mmDrag) navMinimap(e); });
+        window.addEventListener("mouseup", () => { mmDrag = false; });
+
+        return overlay;
+    }
+
+    static async openInspector(card) {
+        if (!card) return;
+        const faceId = card.dataset.faceId;
+        if (!faceId) return;
+
+        this.hideContextPreview();
+        this.ensureInspector();
+
+        this.inspectorCard = card;
+        this.inspectorFaceId = faceId;
+        this.inspectorDetail = null;
+        this.inspectorState = 0;
+        this._fiResetView(false);
+
+        this._growStageFromCard(card);
+        this._inspectorEl.classList.add("visible");
+        await this.advanceInspector(); // Estado 1
+    }
+
+    // Anima o palco crescendo a partir do card (shared-element)
+    static _growStageFromCard(card) {
+        const stage = this._inspectorEl.querySelector(".fi-stage");
+        stage.style.transition = "none";
+        stage.style.transform = "none";
+        const sr = stage.getBoundingClientRect();
+        const cr = card.getBoundingClientRect();
+        if (sr.width && cr.width) {
+            const scale = Math.max(0.12, Math.min(0.6, cr.width / sr.width));
+            const dx = (cr.left + cr.width / 2) - (sr.left + sr.width / 2);
+            const dy = (cr.top + cr.height / 2) - (sr.top + sr.height / 2);
+            stage.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+            void stage.offsetWidth;
+            requestAnimationFrame(() => { stage.style.transition = ""; stage.style.transform = "none"; });
+        } else {
+            stage.style.transition = "";
+        }
+    }
+
+    static async goToInspectorStep(step) {
+        if (!this.inspectorCard) return;
+        if (step < 1 || step > 3) return;
+        
+        const prev = this.inspectorState;
+        this.inspectorState = step;
+        this._syncInspectorChrome();
+
+        if (step === 1) {
+            return this._renderContext();
+        } else if (step === 2) {
+            if (prev === 3) {
+                await this._renderContext();
+            }
+            return this._renderZoom();
+        } else if (step === 3) {
+            return this._renderEnhanced(false);
+        }
+    }
+
+    static async advanceInspector() {
+        if (!this.inspectorCard) return;
+        const next = (this.inspectorState || 0) + 1;
+        if (next > 3) { this.closeInspector(); return; }
+        return this.goToInspectorStep(next);
+    }
+
+    static async regressInspector() {
+        if (!this.inspectorCard) return;
+        const prev = (this.inspectorState || 1) - 1;
+        if (prev < 1) { this.closeInspector(); return; }
+        return this.goToInspectorStep(prev);
+    }
+
+    static _syncInspectorChrome() {
+        const overlay = this._inspectorEl;
+        if (!overlay) return;
+        const s = this.inspectorState;
+        overlay.querySelectorAll(".fi-step").forEach(el => el.classList.toggle("on", parseInt(el.dataset.step) <= s));
+        const labels = { 1: "1/3 · Contexto", 2: "2/3 · Zoom no rosto", 3: "3/3 · Restauração HD" };
+        overlay.querySelector(".fi-badge-text").textContent = labels[s] || "";
+        overlay.querySelector(".fi-badge").classList.toggle("is-hd", s === 3);
+
+        // Ações: aparecem ao inspecionar de perto (Estados 2 e 3)
+        const zoomed = (s === 2 || s === 3);
+        overlay.querySelector(".fi-actions").style.display = zoomed ? "flex" : "none";
+        overlay.querySelector(".fi-edit-toggle").style.display = zoomed ? "inline-flex" : "none";
+        // RAW: Estados 2 e 3, apenas fotos RAW
+        const rawBtn = overlay.querySelector(".fi-raw");
+        const showRaw = zoomed && this._isRawPhoto();
+        rawBtn.style.display = showRaw ? "inline-flex" : "none";
+        if (showRaw) rawBtn.classList.toggle("on", this._rawPref());
+        // Refazer: só no Estado 3 (é sobre o crop restaurado)
+        overlay.querySelector(".fi-redo").style.display = (s === 3) ? "inline-flex" : "none";
+        // Painel de ajustes some fora dos estados 2/3
+        if (!zoomed) {
+            overlay.querySelector(".fi-edit").style.display = "none";
+            overlay.querySelector(".fi-edit-toggle").classList.remove("on");
+        }
+    }
+
+    static _isRawPhoto() {
+        const d = this.inspectorDetail;
+        return !!(d && d.photo_id && d.photo_filename &&
+            /\.(arw|cr2|cr3|nef|dng|pef|raf|orf|rw2|raw)$/i.test(d.photo_filename));
+    }
+
+    static _rawPref() {
+        try { return localStorage.getItem("fi_raw_full") === "1"; } catch (e) { return false; }
+    }
+
+    // ---- Ajustes de imagem (filtros CSS ao vivo) -------------------------
+
+    static _fiLoadEdits() {
+        let e = { b: 1, c: 1, s: 1 };
+        try { const j = JSON.parse(localStorage.getItem("fi_edits") || "null"); if (j) e = { ...e, ...j }; } catch (_) {}
+        this._fiEdits = e;
+        return e;
+    }
+
+    static _fiSaveEdits() {
+        try { localStorage.setItem("fi_edits", JSON.stringify(this._fiEdits)); } catch (_) {}
+    }
+
+    static _fiApplyEdits() {
+        const el = this._fiMediaEl();
+        if (!el) return;
+        const e = this._fiEdits || this._fiLoadEdits();
+        el.style.filter = `brightness(${e.b}) contrast(${e.c}) saturate(${e.s})`;
+    }
+
+    static _fiSyncEditSliders() {
+        const e = this._fiEdits || this._fiLoadEdits();
+        this._inspectorEl.querySelectorAll(".fi-ed").forEach(sl => { sl.value = e[sl.dataset.k]; });
+    }
+
+    // Troca a fonte do zoom (Estado 2) entre proxy e RAW nativo em resolução total
+    static _reapplyZoomSource() {
+        const detail = this.inspectorDetail;
+        const el = this._fiMediaEl();
+        if (!detail || !detail.photo_id || !el || el.tagName !== "IMG") return;
+        if (this._rawPref() && this._isRawPhoto()) {
+            this._loadRawNative();
+        } else {
+            el.src = `/api/photo/${detail.photo_id}/file`;
+            el.dataset.raw = "0";
+        }
+    }
+
+    // Carrega o RAW nativo (resolução total, sem tratamento) mantendo o zoom atual
+    static _loadRawNative() {
+        const detail = this.inspectorDetail;
+        const el = this._fiMediaEl();
+        if (!detail || !detail.photo_id || !el || el.tagName !== "IMG") return;
+        if (el.dataset.raw === "1") return;
+        const badge = this._inspectorEl.querySelector(".fi-badge-text");
+        const prev = badge.textContent;
+        badge.textContent = "2/3 · Carregando RAW…";
+        const faceId = this.inspectorFaceId;
+        const rawUrl = `/api/photo/${detail.photo_id}/file?raw=true`;
+        const probe = new Image();  // pré-carrega p/ trocar sem piscar
+        probe.onload = () => {
+            if (this.inspectorFaceId !== faceId || this.inspectorState !== 2) return;
+            const cur = this._fiMediaEl();
+            if (cur && cur.tagName === "IMG") { cur.src = rawUrl; cur.dataset.raw = "1"; }
+            badge.textContent = "2/3 · Zoom no rosto (RAW)";
+        };
+        probe.onerror = () => { if (this.inspectorState === 2) badge.textContent = prev; };
+        probe.src = rawUrl;
+    }
+
+    // ---- Modelo de zoom/pan (igual ao visualizador da Biblioteca) --------
+
+    static _fiMediaEl() {
+        const w = this._inspectorEl && this._inspectorEl.querySelector(".fi-wrap");
+        return w ? w.querySelector("img, video") : null;
+    }
+
+    static _fiSetMedia(el, src) {
+        const wrap = this._inspectorEl.querySelector(".fi-wrap");
+        wrap.innerHTML = "";
+        wrap.appendChild(el);
+        // Minimapa reflete a mídia atual: imagem direta; vídeo via snapshot (lazy).
+        const mmImg = this._inspectorEl.querySelector(".fi-minimap-img");
+        if (el.tagName === "IMG") {
+            if (mmImg) mmImg.src = src || el.src;
+            this._fiMmReady = true;
+        } else {
+            if (mmImg) mmImg.removeAttribute("src");
+            this._fiMmReady = false; // captura sob demanda ao ampliar
+        }
+        this._fiApplyEdits(); // reaplica exposição/contraste/saturação na nova mídia
+    }
+
+    // Garante uma fonte para o minimapa (imagem direta, ou snapshot do frame do vídeo)
+    static _fiSyncMinimapSource() {
+        const el = this._fiMediaEl();
+        const mmImg = this._inspectorEl.querySelector(".fi-minimap-img");
+        if (!el || !mmImg) return;
+        if (el.tagName === "IMG") {
+            if (mmImg.getAttribute("src") !== el.src) mmImg.src = el.src;
+            this._fiMmReady = true;
+            return;
+        }
+        if (el.tagName === "VIDEO" && el.videoWidth) {
+            try {
+                const c = document.createElement("canvas");
+                c.width = el.videoWidth; c.height = el.videoHeight;
+                c.getContext("2d").drawImage(el, 0, 0);
+                mmImg.src = c.toDataURL("image/jpeg", 0.72);
+                this._fiMmReady = true;
+            } catch (e) { /* frame ainda indisponível */ }
+        }
+    }
+
+    static _fiResetView(animate) {
+        this.fiScale = 1; this.fiPanX = 0; this.fiPanY = 0;
+        this._fiUpdateTransform(animate);
+    }
+
+    static _fiUpdateTransform(animate, dur) {
+        const overlay = this._inspectorEl;
+        const wrap = overlay && overlay.querySelector(".fi-wrap");
+        if (!wrap) return;
+        wrap.style.transition = animate ? `transform ${dur || 0.22}s cubic-bezier(0.22, 1, 0.36, 1)` : "none";
+        wrap.style.transform = `translate3d(${this.fiPanX || 0}px, ${this.fiPanY || 0}px, 0) scale(${this.fiScale || 1})`;
+        const zoomed = (this.fiScale || 1) > 1.05;
+        overlay.querySelector(".fi-media").classList.toggle("zoomed", zoomed);
+        const mm = overlay.querySelector(".fi-minimap");
+        if (mm) {
+            if (zoomed) {
+                if (!this._fiMmReady) this._fiSyncMinimapSource();
+                const hasSrc = !!overlay.querySelector(".fi-minimap-img").getAttribute("src");
+                mm.style.display = hasSrc ? "block" : "none";
+                if (hasSrc) this._fiUpdateMinimap();
+            } else {
+                mm.style.display = "none";
+            }
+        }
+    }
+
+    static _fiZoomAtPoint(target, clientX, clientY, animate) {
+        const media = this._inspectorEl.querySelector(".fi-media");
+        const scale = Math.min(10, Math.max(1, target));
+        const r = media.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const mx = (clientX == null ? cx : clientX) - cx;
+        const my = (clientY == null ? cy : clientY) - cy;
+        const pX = (mx - (this.fiPanX || 0)) / (this.fiScale || 1);
+        const pY = (my - (this.fiPanY || 0)) / (this.fiScale || 1);
+        let nx = mx - pX * scale, ny = my - pY * scale;
+        if (scale <= 1.01) { nx = 0; ny = 0; }
+        this.fiScale = scale; this.fiPanX = nx; this.fiPanY = ny;
+        this._fiUpdateTransform(animate);
+    }
+
+    // Enquadra o rosto (box normalizado) com um punch-in mais lento p/ ver o caminho
+    static _fiFocusBox(box, tries) {
+        const el = this._fiMediaEl();
+        const media = this._inspectorEl.querySelector(".fi-media");
+        if (!el || !media) return;
+        const dispW = el.offsetWidth, dispH = el.offsetHeight;
+        if (!dispW || !dispH) {
+            // mídia ainda sem layout (ex.: vídeo sem metadados) — tenta de novo
+            if ((tries || 0) < 20) requestAnimationFrame(() => this._fiFocusBox(box, (tries || 0) + 1));
+            return;
+        }
+        const [bx, by, bw, bh] = box.map(Number);
+        const cx = bx + bw / 2, cy = by + bh / 2;
+        const Wv = media.clientWidth, Hv = media.clientHeight;
+        const zH = 0.55 * Hv / Math.max(bh * dispH, 1);
+        const zW = 0.80 * Wv / Math.max(bw * dispW, 1);
+        const scale = Math.max(1.6, Math.min(9, Math.min(zH, zW)));
+        this.fiScale = scale;
+        this.fiPanX = -((cx - 0.5) * dispW) * scale;
+        this.fiPanY = -((cy - 0.5) * dispH) * scale;
+        this._fiUpdateTransform(true, 0.7); // ~1,5x mais lento que antes
+    }
+
+    static _fiUpdateMinimap() {
+        const overlay = this._inspectorEl;
+        const mm = overlay.querySelector(".fi-minimap");
+        const rect = overlay.querySelector(".fi-minimap-rect");
+        const el = this._fiMediaEl();
+        const media = overlay.querySelector(".fi-media");
+        if (!mm || !rect || !el || !media) return;
+        const iw = el.offsetWidth, ih = el.offsetHeight;
+        if (!iw || !ih) return;
+        const vp = media.getBoundingClientRect();
+        const mmR = mm.getBoundingClientRect();
+        const scaledW = iw * this.fiScale, scaledH = ih * this.fiScale;
+        const visFracW = Math.min(scaledW, vp.width) / scaledW;
+        const visFracH = Math.min(scaledH, vp.height) / scaledH;
+        const imgAspect = iw / ih, mmAspect = mmR.width / mmR.height;
+        let mw, mh, mx, my;
+        if (imgAspect > mmAspect) { mw = mmR.width; mh = mmR.width / imgAspect; mx = 0; my = (mmR.height - mh) / 2; }
+        else { mh = mmR.height; mw = mmR.height * imgAspect; mx = (mmR.width - mw) / 2; my = 0; }
+        const rectW = Math.max(8, Math.min(mw, visFracW * mw));
+        const rectH = Math.max(8, Math.min(mh, visFracH * mh));
+        const cxFrac = 0.5 + (-this.fiPanX / this.fiScale) / iw;
+        const cyFrac = 0.5 + (-this.fiPanY / this.fiScale) / ih;
+        rect.style.width = rectW + "px";
+        rect.style.height = rectH + "px";
+        rect.style.left = Math.max(mx, Math.min(mx + mw - rectW, mx + cxFrac * mw - rectW / 2)) + "px";
+        rect.style.top = Math.max(my, Math.min(my + mh - rectH, my + cyFrac * mh - rectH / 2)) + "px";
+    }
+
+    // ---- Estados ---------------------------------------------------------
+
+    // ESTADO 1 — foto/vídeo completo, centralizado (contexto da cena)
+    static async _renderContext() {
+        const overlay = this._inspectorEl;
+        const caption = overlay.querySelector(".fi-caption");
+        const faceId = this.inspectorFaceId;
+
+        let detail = this.inspectorDetail;
+        if (!detail) {
+            try { detail = await CapIAuAPI.request(`/api/faces/face/${faceId}`); }
+            catch (e) { console.error("[Inspector] erro ao buscar detalhe:", e); return; }
+            if (this.inspectorFaceId !== faceId || !this.inspectorCard) return; // corrida
+            this.inspectorDetail = detail;
+        }
+
+        this._fiResetView(false);
+
+        if (detail.video_id) {
+            const video = document.createElement("video");
+            video.src = `/api/video/${detail.video_id}/stream`;
+            video.muted = true; video.playsInline = true; video.preload = "auto";
+            video.addEventListener("click", () => { if (video.paused) video.play().catch(() => {}); else video.pause(); });
+            this._fiSetMedia(video);
+            const ts = parseFloat(detail.timestamp) || 0;
+            video.addEventListener("loadedmetadata", () => { try { video.currentTime = ts; } catch (e) {} }, { once: true });
+            caption.textContent = `${detail.video_filename || "Vídeo"} · ${ts.toFixed(1)}s`;
+        } else if (detail.photo_id) {
+            const img = document.createElement("img");
+            img.src = `/api/photo/${detail.photo_id}/file`;
+            this._fiSetMedia(img, img.src);
+            caption.textContent = detail.photo_filename || "Foto";
+        } else {
+            caption.textContent = "Mídia de origem indisponível";
+        }
+    }
+
+    // ESTADO 2 — aproxima no rosto (punch-in lento) e libera zoom/pan livres
+    static async _renderZoom() {
+        const detail = this.inspectorDetail;
+        const el = this._fiMediaEl();
+        if (!el || !detail) return;
+        let box = detail.bounding_box;
+        if (typeof box === "string") { try { box = JSON.parse(box); } catch (e) {} }
+        if (!Array.isArray(box) || box.length < 4) return; // sem caixa: mantém o contexto
+        this._fiFocusBox(box, 0);
+        // Modo RAW: carrega o RAW nativo (resolução total, sem tratamento) sobre o zoom
+        if (this._isRawPhoto() && this._rawPref()) this._loadRawNative();
+    }
+
+    // ESTADO 3 — crop restaurado/realçado do rosto (elemento novo, sem zoom residual)
+    static async _renderEnhanced(force) {
+        const overlay = this._inspectorEl;
+        const caption = overlay.querySelector(".fi-caption");
+        const loading = overlay.querySelector(".fi-loading");
+        const badge = overlay.querySelector(".fi-badge-text");
+        const faceId = this.inspectorFaceId;
+
+        this._fiResetView(false);
+        this._enhCache = this._enhCache || {};
+
+        let entry = force ? null : this._enhCache[faceId];
+        if (!entry) {
+            loading.classList.add("active");
+            const useRaw = this._isRawPhoto() && this._rawPref();
+            badge.textContent = useRaw ? "3/3 · Restaurando RAW…" : "3/3 · Restaurando…";
+            try {
+                const res = await CapIAuAPI.enhanceFace(faceId, useRaw);
+                if (res && res.enhanced_url) {
+                    // Sempre com cache-busting: o browser nunca reexibe uma restauração antiga/errada.
+                    const u = `${res.enhanced_url}${res.enhanced_url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+                    entry = { url: u, method: res.method || "fast" };
+                    this._enhCache[faceId] = entry;
+                }
+            } catch (e) {
+                console.error("[Inspector] erro no aprimoramento:", e);
+            }
+            loading.classList.remove("active");
+        }
+
+        // corrida: fechou / trocou de rosto / recuou durante o await?
+        if (this.inspectorFaceId !== faceId || this.inspectorState !== 3 || !this.inspectorCard) return;
+
+        if (entry) {
+            const img = document.createElement("img");
+            img.src = entry.url;
+            this._fiSetMedia(img, entry.url);
+            badge.textContent = `3/3 · HD (${entry.method})`;
+            caption.textContent = "Rosto restaurado";
+        } else {
+            // Falha: NÃO volta ao passo 2 (senão 'a' reprocessa). Mantém 3/3 com aviso.
+            badge.textContent = "3/3 · HD (indisponível)";
+            caption.textContent = "Não foi possível restaurar (arquivo de origem ausente?)";
+        }
+    }
+
+    // Refazer restauração: regenera no servidor e recarrega sem cache
+    static redoEnhance() {
+        if (!this.inspectorCard) return;
+        const btn = this._inspectorEl.querySelector(".fi-redo");
+        if (btn && btn.classList.contains("busy")) return; // evita clique duplo
+        if (btn) btn.classList.add("busy");
+        if (this._enhCache) delete this._enhCache[this.inspectorFaceId];
+        this.inspectorState = 3;
+        this._syncInspectorChrome();
+        Promise.resolve(this._renderEnhanced(true)).finally(() => { if (btn) btn.classList.remove("busy"); });
+    }
+
+    // Setas ← → : troca o inspetor para o rosto anterior/próximo do grid
+    static stepInspector(dir) {
+        const card = this.inspectorCard;
+        if (!card) return;
+        const container = card.parentElement;
+        if (!container) return;
+        const cards = Array.from(container.querySelectorAll(".fullscreen-face-card, .disambiguation-item"));
+        const idx = cards.indexOf(card);
+        if (idx === -1) return;
+        let n = idx + dir;
+        if (n < 0) n = cards.length - 1;
+        if (n >= cards.length) n = 0;
+        const nextCard = cards[n];
+        if (!nextCard || nextCard === card) return;
+
+        try { nextCard.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {}
+
+        this.inspectorCard = nextCard;
+        this.inspectorFaceId = nextCard.dataset.faceId;
+        this.inspectorDetail = null;
+        this.inspectorState = 0;
+        this._fiResetView(false);
+        this._syncInspectorChrome();
+        this.advanceInspector();
+    }
+
+    static closeInspector() {
+        const overlay = this._inspectorEl;
+        const card = this.inspectorCard;
+        this.inspectorCard = null;
+        this.inspectorFaceId = null;
+        this.inspectorDetail = null;
+        this.inspectorState = 0;
+        this.fiSpace = false; this.fiPanning = false;
+        if (!overlay) return;
+
+        const stage = overlay.querySelector(".fi-stage");
+        const media = overlay.querySelector(".fi-media");
+        const video = overlay.querySelector(".fi-wrap video");
+        if (video) video.pause();
+        media.classList.remove("is-panning", "space-mode");
+        overlay.querySelector(".fi-loading").classList.remove("active");
+
+        // Encolhe o palco de volta ao card de origem
+        if (card && stage) {
+            const sr = stage.getBoundingClientRect();
+            const cr = card.getBoundingClientRect();
+            if (sr.width && cr.width) {
+                const scale = Math.max(0.12, Math.min(0.6, cr.width / sr.width));
+                const dx = (cr.left + cr.width / 2) - (sr.left + sr.width / 2);
+                const dy = (cr.top + cr.height / 2) - (sr.top + sr.height / 2);
+                stage.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+            }
+        }
+        overlay.classList.remove("visible");
+
+        // Limpa a mídia após o fade (só se ninguém reabriu nesse meio-tempo)
+        setTimeout(() => {
+            if (this.inspectorCard) return;
+            const wrap = overlay.querySelector(".fi-wrap");
+            if (wrap) wrap.innerHTML = "";
+            this._fiResetView(false);
+            overlay.querySelector(".fi-minimap").style.display = "none";
+            stage.style.transition = "none";
+            stage.style.transform = "none";
+            void stage.offsetWidth;
+            stage.style.transition = "";
+            overlay.querySelector(".fi-badge-text").textContent = "";
+            overlay.querySelector(".fi-caption").textContent = "";
+        }, 300);
+    }
 }
+
+

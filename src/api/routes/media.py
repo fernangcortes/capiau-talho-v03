@@ -536,6 +536,66 @@ def delete_photo(photo_id: int, conn: sqlite3.Connection = Depends(get_db_conn))
     return {"status": "success", "message": f"Foto ID {photo_id} removida."}
 
 
+@router.get("/api/video/{video_id}/stream")
+def stream_video(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Retorna o arquivo de vídeo original ou proxy para streaming no player/card."""
+    from fastapi.responses import FileResponse
+    video = MediaRepository.get_video(conn, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
+    
+    proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+    if proxy_path.exists():
+        return FileResponse(proxy_path, media_type="video/mp4")
+        
+    video_path = Path(video['filepath'])
+    if video_path.exists():
+        return FileResponse(video_path, media_type="video/mp4")
+        
+    raise HTTPException(status_code=404, detail="Arquivo de vídeo não encontrado no servidor.")
+
+
+@router.get("/api/photo/{photo_id}/file")
+def get_photo_file(photo_id: int, raw: bool = Query(False, description="RAW em resolução total (sem tratamento)"),
+                   conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Retorna uma imagem exibível no browser.
+
+    O original pode ser RAW/TIFF (ex.: .CR2), que o navegador não renderiza em <img>.
+    Por padrão serve o proxy .webp (rápido). Com ``raw=true``, para fotos RAW, serve a
+    decodificação em resolução total (sem tratamento) — usada no zoom nativo do inspetor.
+    Formatos web (jpg/png/webp) são servidos direto, em resolução total.
+    """
+    from fastapi.responses import FileResponse
+    from src.media.image_processing import decode_raw_to_jpeg, RAW_EXTENSIONS
+    cursor = conn.cursor()
+    cursor.execute("SELECT filepath FROM photo WHERE id = ?", (photo_id,))
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Foto não encontrada.")
+
+    WEB_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".avif"}
+    photo_path = Path(row["filepath"])
+    ext = photo_path.suffix.lower()
+
+    # RAW nativo em resolução total (opt-in) — decodifica com cache
+    if raw and ext in RAW_EXTENSIONS and photo_path.exists():
+        full = CONFIG.BASE_DIR / "data" / "cache" / "raw" / f"full_photo_{photo_id}.jpg"
+        if full.exists() or decode_raw_to_jpeg(photo_path, full):
+            return FileResponse(full, media_type="image/jpeg")
+
+    if photo_path.exists() and ext in WEB_EXT:
+        return FileResponse(photo_path)
+
+    # Não exibível no browser (RAW/TIFF/HEIC…) → proxy webp
+    proxy = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{photo_id}.webp"
+    if proxy.exists():
+        return FileResponse(proxy, media_type="image/webp")
+
+    if photo_path.exists():
+        return FileResponse(photo_path)  # último recurso
+    raise HTTPException(status_code=404, detail="Arquivo de foto não encontrado.")
+
+
 @router.get("/api/video/{video_id}/thumbnail")
 def get_video_thumbnail(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Retorna o thumbnail do vídeo. Se não existir, gera a partir de 10% da duração."""
@@ -639,8 +699,14 @@ def get_video_thumbnail_at(video_id: int, time: float = Query(...), conn: sqlite
     success = extract_thumbnail_frame(video_path, time, thumb_path, width=120)
     if success and thumb_path.exists():
         return FileResponse(thumb_path)
+
+    # Fallback para thumbnail genérica do vídeo se a extração no tempo falhar
+    main_thumb = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
+    if main_thumb.exists():
+        return FileResponse(main_thumb)
         
-    raise HTTPException(status_code=500, detail="Não foi possível gerar a miniatura do vídeo no tempo especificado.")
+    raise HTTPException(status_code=404, detail="Não foi possível gerar a miniatura do vídeo no tempo especificado.")
+
 
 
 @router.post("/api/video/{video_id}/pause-thumbnails")

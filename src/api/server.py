@@ -88,6 +88,11 @@ def on_shutdown_cleanup() -> None:
 app.mount("/proxies", StaticFiles(directory=str(CONFIG.PROXIES_DIR)), name="proxies")
 app.mount("/originals", StaticFiles(directory=str(CONFIG.ORIGINALS_DIR)), name="originals")
 
+cache_dir = CONFIG.BASE_DIR / "data/cache"
+cache_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/cache", StaticFiles(directory=str(cache_dir)), name="cache")
+
+
 # Interface Web na raiz do servidor
 frontend_dir = CONFIG.BASE_DIR / "src/ui"
 frontend_dir.mkdir(parents=True, exist_ok=True)

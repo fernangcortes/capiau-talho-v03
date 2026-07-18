@@ -1,6 +1,24 @@
 """Utilitários de processamento de imagem para conversão e compressão de fotos."""
 from pathlib import Path
 
+RAW_EXTENSIONS = {'.arw', '.cr2', '.cr3', '.nef', '.dng', '.pef', '.raf', '.orf', '.rw2', '.raw'}
+
+
+def decode_raw_to_jpeg(raw_path: Path, out_path: Path, quality: int = 92) -> bool:
+    """Decodifica um RAW (CR2/NEF/…) em resolução total e salva como JPEG (sem tratamento)."""
+    try:
+        import rawpy
+        from PIL import Image
+        with rawpy.imread(str(raw_path)) as raw:
+            rgb = raw.postprocess(use_camera_wb=True)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(rgb).save(str(out_path), 'JPEG', quality=quality)
+        return True
+    except Exception as e:
+        print(f"[ImageProc] Falha ao decodificar RAW {raw_path.name}: {e}")
+        return False
+
+
 def generate_photo_proxy(original_path: Path, proxy_path: Path, max_size: int = 1024) -> bool:
     """Gera um proxy leve WebP (1024px no maior eixo) a partir de fotos (incluindo formatos RAW)."""
     ext = original_path.suffix.lower()
