@@ -164,6 +164,31 @@ Cut**.
   IA (via OpenRouter) para gerar um relatório compreensível para humanos
   ou executar uma análise técnica estruturada de performance e exceções.
 
+- **🎚️ Controles Nativos de Pista & Interação Avançada de Timeline**: Botões
+  para mutar, soltar (*solo*) e ocultar/exibir pistas de vídeo (V1/V2) e
+  áudio (A1/A2) individualmente. Inclui pré-visualização ao passar o mouse
+  (*hover preview*) pela régua e clipes, miniaturas progressivas e suporte
+  a **duplo clique para resetar sliders** de ajustes (posição, escala,
+  rotação, crop e volume) para os valores padrão.
+
+- **🔍 Busca por Similaridade em Lote & Explicações Didáticas do RAG**: Permite
+  selecionar múltiplos cards para busca por similaridade em lote e exibe a
+  justificativa didática do motivo pelo qual a IA relacionou determinado
+  trecho à busca. Conta com painel de filtros em 2 linhas e filtro por ciclo
+  de status (*Todos*, *Analisados*, *Não Analisados*, *Erros*).
+
+- **🛡️ Resiliência de IA, Fallback Automático & Gestão de Tokens**: Seletor
+  de modelos de visão configurável na UI com fallback automático em cascata
+  (Nemotron 70B Vision → Gemini 2.5 Flash → Gemini 3.1 Flash Lite) em caso
+  de indisponibilidade, declaração explícita de `max_tokens` para evitar reservas
+  indevidas de saldo no OpenRouter e proteção anti-sobrescrita de análises
+  existentes.
+
+- **⚡ Gerenciador de Tarefas de Miniaturas & Lançador Desgrudado**: Painel
+  para pausar, cancelar, remover e sincronizar a geração de miniaturas. No
+  Windows, inclui o script `scripts/launch_detached.py` para rodar o backend
+  e workers totalmente desvinculados do console, evitando travamentos acidentais.
+
 ## 📊 Arquitetura Técnica do Sistema
 
 O fluxo do CapIAu-Talho opera de forma circular, sincronizando o banco
@@ -298,7 +323,16 @@ Timeline \--\>\|Exportar XML/OTIO/Kdenlive\| HD_Externo
 
 Inicie o servidor local (recomenda-se omitir `--reload` no Windows durante a conversão em lote para evitar travamentos e deadlocks de processos):
 
+```bash
 python -m uvicorn src.api.server:app
+```
+
+**Para execução resiliente no Windows (Sem Janela de Console):**
+Para evitar que o processo morra caso a janela do prompt de comando seja fechada (evitando exceções de `CTRL_CLOSE_EVENT` no runtime MKL/PyTorch), você pode iniciar o servidor desvinculado usando o lançador autônomo:
+
+```bash
+python scripts/launch_detached.py
+```
 
 Abra no seu navegador: 👉
 [**http://localhost:8000/**](http://localhost:8000/)

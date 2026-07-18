@@ -179,6 +179,16 @@ Timeline).
 | **Ctrl + Y ou         | **Refazer**           | Refaz o passo de      |
 | Ctrl+Shift+Z**        |                       | edição desfeito.      |
 +-----------------------+-----------------------+-----------------------+
+| **Duplo Clique (nos    | **Resetar Ajuste**    | Restaura o slider de  |
+| sliders / rótulos)**  |                       | ajuste selecionado    |
+|                       |                       | (escala, posição X/Y, |
+|                       |                       | rotação, crop, volume)|
+|                       |                       | ao seu valor padrão.  |
++-----------------------+-----------------------+-----------------------+
+| **Clique nos ícones   | **Mute / Solo /       | Silencia (M), isola   |
+| M / S / Olho nas      | Visibilidade**        | (S) ou oculta o vídeo |
+| pistas da Timeline**  |                       | da pista selecionada. |
++-----------------------+-----------------------+-----------------------+
 
 ## 📸 Navegação no Visualizador de Fotos (Lightbox)
 

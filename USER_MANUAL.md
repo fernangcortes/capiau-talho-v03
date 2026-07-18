@@ -168,6 +168,12 @@ direito. Clicar no resultado abre a mídia correspondente.
     barra de opções de busca à direita). Ambas as caixas de seleção
     permanecem sincronizadas.
 
+- **Busca por Similaridade em Lote (Batch Similarity):** Você pode selecionar múltiplos cards de mídias ou fotos na biblioteca e disparar a busca por similaridade visual em lote. O sistema processará os embeddings dos arquivos selecionados em paralelo no Qdrant local, listando todas as mídias visualmente congruentes no acervo.
+
+- **Explicações Didáticas do RAG:** Nos resultados da busca RAG ou recomendações da IA, o sistema exibe uma breve justificativa explicando *por que* aquele corte ou depoimento foi selecionado como relevante para o termo pesquisado.
+
+- **Filtro por Ciclo de Status (Status Cycle Filter):** Na barra de ferramentas da biblioteca, o botão de filtro de status permite alternar ciclicamente com cliques simples entre a exibição de *Todos os Arquivos*, *Apenas Analisados (IA)*, *Não Analisados (Pendentes)* e *Arquivos com Erro*, facilitando a auditagem rápida do acervo.
+
 ## 🤖 3. Assistente Conversacional de Edição (Chat-Agente) & Ghost Clips
 
 O painel de Chat agora funciona como um **Agente Editor Ativo** que pode
@@ -291,6 +297,12 @@ vinculadas aos clipes de vídeo (V1, V2\...).
   - Se o clipe de vídeo possuir um clipe de áudio vinculado (link_id), o
     corte é aplicado a ambos os clipes de forma sincronizada, mantendo
     as metades resultantes vinculadas individualmente.
+
+- **Controles Nativos de Pistas (Mute, Solo e Visibilidade):**
+  Cada cabeçalho de pista na timeline (V1/V2 para vídeos e A1/A2 para áudios) possui botões individuais de controle:
+  - **Mute (M):** Silencia o áudio da pista correspondente.
+  - **Solo (S):** Isola a pista ativa, silenciando/ocultando temporariamente todas as demais.
+  - **Visibilidade (Ícone de Olho):** Oculta a renderização de vídeo da pista selecionada no Program Player.
 
 ## 🔄 6. Carrossel de Alternativas da IA (Atalho A)
 
@@ -537,3 +549,38 @@ O CapIAu-Talho suporta o efeito nativo de **Recorte (Crop)** por clipe:
 - **Corte Relativo à Imagem:** O recorte é relativo ao conteúdo visível do clipe, o que significa que o ajuste de 10% na esquerda cortará 10% da imagem útil, e não a borda ou a faixa preta de preenchimento.
 - **Compatibilidade com Transformações:** O crop é aplicado no pipeline gráfico via CSS `clip-path` antes das rotações e posições do clipe, fazendo com que a área recortada acompanhe perfeitamente a escala, rotação e movimento definidos para o clipe.
 - **Preservação de Foco:** O painel de ajustes possui preservação automática de scroll, garantindo que o scroll não pule de volta ao topo quando você interage com os sliders de Crop localizados no rodapé do painel.
+
+### D. Reset de Ajustes por Duplo Clique
+Para agilizar o fluxo de edição sem a necessidade de digitar valores numéricos manualmente:
+- **Reset Rápido de Sliders:** Dê um **duplo clique** sobre o nome do parâmetro ou sobre qualquer controle deslizante (slider) no painel **Ajustes** (Posição X/Y, Rotação, Escala, Crop, Volume, Fades).
+- O parâmetro retornará instantaneamente ao seu valor padrão (ex.: Posição X/Y em 0, Escala em 100%, Rotação em 0°, Crop em 0%, Volume em 100%).
+- A alteração é registrada no histórico de edição e pode ser desfeita pressionando **Ctrl+Z**.
+
+---
+
+## 🤖 11. Resiliência de IA, Seleção de Modelos e Gestão de Tarefas
+
+### A. Seleção e Fallback Automático de Modelos de Visão
+No painel de Configurações de IA, você pode definir o modelo de visão utilizado para decodificar e descrever os frames do acervo:
+- **Seleção de Modelos Gratuitos e Pagos:** Escolha entre o **Nvidia Nemotron 70B Vision** (gratuito e de alto desempenho) ou os modelos **Gemini 2.5 Flash / 3.1 Flash Lite**.
+- **Mecanismo de Fallback em Cascata:** Em caso de indisponibilidade temporária da API escolhida (ex.: erro de cota ou instabilidade de rede), o sistema tenta automaticamente o modelo substituto em cascata (Nemotron → Gemini 2.5 Flash → Gemini 3.1 Flash Lite).
+- **Proteção Anti-Sobrescrita:** Se todas as chamadas de API falharem por algum motivo, o sistema preserva integralmente as descrições e categorias boas que já foram salvas anteriormente no banco de dados, evitando a perda de metadados.
+- **Gestão de Tokens (`max_tokens`):** As chamadas de IA utilizam um teto explícito de tokens de saída para evitar que o provedor de nuvem (OpenRouter) reserve créditos excessivos, garantindo máxima economia e evitando erros 402 ("requires more credits").
+
+### B. Gerenciador de Tarefas de Miniaturas
+No painel de monitoramento de tarefas e status da mídia:
+- **Controle Total de Miniaturas:** Visualize o progresso da geração de miniaturas progressivas.
+- **Ações Rápidas:** Botões dedicados para **Pausar**, **Cancelar**, **Remover** e **Sincronizar** a geração de miniaturas para liberar recursos do sistema quando necessário.
+
+---
+
+## 🖥️ 12. Execução Resiliente sem Janela de Console no Windows
+
+Para evitar que o servidor FastAPI ou os workers de background sejam encerrados por acidentes no Windows (como ao fechar a janela do prompt de comando, o que envia um sinal `CTRL_CLOSE_EVENT` que interrompe o runtime Fortran/MKL do PyTorch):
+
+1. **Utilize o Lançador Autônomo:**
+   No terminal na pasta do projeto, execute:
+   ```bash
+   python scripts/launch_detached.py
+   ```
+2. **Operação Desvinculada:** O lançador cria o processo do backend de forma totalmente desvinculada do console pai (`DETACHED_PROCESS`). O servidor continuará rodando de forma segura em background na porta 8000 mesmo se o terminal for fechado.

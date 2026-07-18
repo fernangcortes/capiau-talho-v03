@@ -147,9 +147,30 @@ que rodam 100% localmente via embeddings CLIP, sem custo de API.
 
 - **Resposta:** mesmo formato do endpoint de foto.
 
-## 6. Endpoints Relacionados a Projetos e Mídias
+### POST /api/media/batch-similar
+
+- **Descrição:** Executa a busca por similaridade visual em lote a partir de uma lista de IDs de fotos ou vídeos.
+
+- **Payload:** `{ "photo_ids": [1, 2], "video_ids": [5], "project_id": 1, "limit": 12 }`
+
+## 6. Tarefas de Miniaturas & Configurações de IA
+
+### POST /api/media/thumbnails/sync
+- **Descrição:** Sincroniza e força o re-processamento ou verificação da fila de miniaturas em background.
+
+### POST /api/media/thumbnails/task/{task_id}/cancel
+- **Descrição:** Cancela ou pausa a execução de uma tarefa individual de geração de miniatura.
+
+### GET /api/settings/vision-model
+- **Descrição:** Retorna o modelo de visão atualmente selecionado e a lista de provedores/modelos disponíveis (Nemotron 70B, Gemini 2.5 Flash, Gemini 3.1 Flash Lite).
+
+### POST /api/settings/vision-model
+- **Descrição:** Atualiza dinamicamente o modelo de visão ativo para triagem e descrição de keyframes.
+- **Payload:** `{ "model": "nvidia/nemotron-4-70b-vision" }`
+
+## 7. Documentação Interativa Swagger
 
 - Para documentações interativas completas das rotas HTTP, payloads e
   esquemas de dados, inicie a aplicação localmente e acesse a
   documentação gerada pelo FastAPI Swagger: 👉
-  [**[http://localhost:8000/docs]{.underline}**](http://localhost:8000/docs)
+  [**http://localhost:8000/docs**](http://localhost:8000/docs)
