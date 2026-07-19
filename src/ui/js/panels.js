@@ -2274,15 +2274,27 @@ export class PanelsManager {
             row.style.cssText = `height: ${h}px; border-bottom: 1px solid var(--border-glass); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding: 4px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); font-family: var(--font-heading); gap: 4px; overflow: hidden;`;
 
             if (track.kind === "ai") {
-                row.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: 9px;"></i> ${track.name}</span>
-                        <div style="display: flex; gap: 4px; align-items: center;">
+                if (h >= 40) {
+                    row.innerHTML = `
+                        <div style="display: flex; align-items: center; width: 100%;">
+                            <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: 9px;"></i> ${track.name}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px; margin-top: 2px;">
                             <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;"><i class="fa-solid fa-eye"></i></button>
                             <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else {
+                    row.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: 9px;"></i> ${track.name}</span>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;"><i class="fa-solid fa-eye"></i></button>
+                                <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                            </div>
+                        </div>
+                    `;
+                }
                 row.querySelector(".btn-track-visibility").addEventListener("click", () => TIMELINE_STATE.toggleTrackVisibility(track.id));
                 row.querySelector(".btn-track-ai-run").addEventListener("click", () => {
                     const selector = getActiveElement("select-ai-persona");
@@ -2314,20 +2326,39 @@ export class PanelsManager {
                 const volumeSlider = isAudio ? `<input type="range" class="slider-track-volume" min="0" max="1" step="0.1" value="${track.volume}" style="width: 100%; height: 3px; accent-color: var(--color-cyan); cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">` : "";
                 const thumbBtn = isAudio ? "" : `<button class="btn-track-thumbnails btn-track-action" title="${track.thumbnailsEnabled ? 'Desativar miniaturas na pista' : 'Ativar miniaturas na pista'}" style="font-size: 9px;">${thumbIcon}</button>`;
 
-                row.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px;">
-                        <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">${kindIcon}${track.id} ${track.name}</span>
-                        <div style="display: flex; gap: 4px; flex-shrink: 0;">
-                            ${thumbBtn}
-                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
-                            ${magnetBtn}
-                            <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
-                            ${muteBtn}
-                            <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
+                if (h >= 40) {
+                    row.innerHTML = `
+                        <div style="display: flex; align-items: center; width: 100%;">
+                            <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">${kindIcon}${track.id} ${track.name}</span>
                         </div>
-                    </div>
-                    ${volumeSlider}
-                `;
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 6px; margin-top: 2px;">
+                            <div style="display: flex; gap: 6px; flex-shrink: 0; align-items: center;">
+                                ${thumbBtn}
+                                <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
+                                ${magnetBtn}
+                                <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
+                                ${muteBtn}
+                            </div>
+                            ${volumeSlider ? `<div style="flex: 1; display: flex; align-items: center; margin-left: 8px;">${volumeSlider}</div>` : ''}
+                            <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px; flex-shrink: 0;"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    `;
+                } else {
+                    row.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px;">
+                            <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">${kindIcon}${track.id} ${track.name}</span>
+                            <div style="display: flex; gap: 4px; flex-shrink: 0;">
+                                ${thumbBtn}
+                                <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
+                                ${magnetBtn}
+                                <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
+                                ${muteBtn}
+                                <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                        </div>
+                        ${volumeSlider}
+                    `;
+                }
 
                 row.querySelector(".btn-track-visibility").addEventListener("click", () => TIMELINE_STATE.toggleTrackVisibility(track.id));
                 const btnThumb = row.querySelector(".btn-track-thumbnails");
@@ -2361,7 +2392,6 @@ export class PanelsManager {
                 row.style.position = "relative";
                 const resizeHandle = doc.createElement("div");
                 resizeHandle.className = "track-resize-handle";
-                resizeHandle.dataset.tooltip = "Arraste para ajustar a altura desta pista (Clique duplo para resetar)";
 
                 let lastClickTime = 0;
 
