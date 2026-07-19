@@ -798,35 +798,35 @@ export class CapiauTimelineInteraction {
                         <div class="adjustments-row">
                             <label>Posição X</label>
                             <div class="control-wrap">
-                                <input type="range" data-prop="x" min="-100" max="100" value="${roundVal(x)}">
+                                <input type="range" data-prop="x" min="-100" max="100" value="${roundVal(x)}" data-tooltip="Posição X: ${roundVal(x)}%">
                                 <span class="value-disp">${roundVal(x)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Posição Y</label>
                             <div class="control-wrap">
-                                <input type="range" data-prop="y" min="-100" max="100" value="${roundVal(y)}">
+                                <input type="range" data-prop="y" min="-100" max="100" value="${roundVal(y)}" data-tooltip="Posição Y: ${roundVal(y)}%">
                                 <span class="value-disp">${roundVal(y)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Escala</label>
                             <div class="control-wrap">
-                                <input type="range" data-prop="scale" min="50" max="300" value="${roundVal(scale * 100)}">
+                                <input type="range" data-prop="scale" min="50" max="300" value="${roundVal(scale * 100)}" data-tooltip="Escala: ${roundVal(scale * 100)}%">
                                 <span class="value-disp">${roundVal(scale * 100)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Rotação</label>
                             <div class="control-wrap">
-                                <input type="range" data-prop="rotation" min="-180" max="180" value="${roundVal(rotation)}">
+                                <input type="range" data-prop="rotation" min="-180" max="180" value="${roundVal(rotation)}" data-tooltip="Rotação: ${roundVal(rotation)}°">
                                 <span class="value-disp">${roundVal(rotation)}°</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Opacidade</label>
                             <div class="control-wrap">
-                                <input type="range" data-prop="opacity" min="0" max="100" value="${roundVal(opacity * 100)}">
+                                <input type="range" data-prop="opacity" min="0" max="100" value="${roundVal(opacity * 100)}" data-tooltip="Opacidade: ${roundVal(opacity * 100)}%">
                                 <span class="value-disp">${roundVal(opacity * 100)}%</span>
                             </div>
                         </div>
@@ -851,28 +851,28 @@ export class CapiauTimelineInteraction {
                         <div class="adjustments-row">
                             <label>Esquerda</label>
                             <div class="control-wrap">
-                                <input type="range" data-crop="left" min="0" max="100" value="${roundVal(cropLeft)}">
+                                <input type="range" data-crop="left" min="0" max="100" value="${roundVal(cropLeft)}" data-tooltip="Recorte Esquerda: ${roundVal(cropLeft)}%">
                                 <span class="value-disp">${roundVal(cropLeft)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Direita</label>
                             <div class="control-wrap">
-                                <input type="range" data-crop="right" min="0" max="100" value="${roundVal(cropRight)}">
+                                <input type="range" data-crop="right" min="0" max="100" value="${roundVal(cropRight)}" data-tooltip="Recorte Direita: ${roundVal(cropRight)}%">
                                 <span class="value-disp">${roundVal(cropRight)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Topo</label>
                             <div class="control-wrap">
-                                <input type="range" data-crop="top" min="0" max="100" value="${roundVal(cropTop)}">
+                                <input type="range" data-crop="top" min="0" max="100" value="${roundVal(cropTop)}" data-tooltip="Recorte Topo: ${roundVal(cropTop)}%">
                                 <span class="value-disp">${roundVal(cropTop)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Base</label>
                             <div class="control-wrap">
-                                <input type="range" data-crop="bottom" min="0" max="100" value="${roundVal(cropBottom)}">
+                                <input type="range" data-crop="bottom" min="0" max="100" value="${roundVal(cropBottom)}" data-tooltip="Recorte Base: ${roundVal(cropBottom)}%">
                                 <span class="value-disp">${roundVal(cropBottom)}%</span>
                             </div>
                         </div>
@@ -897,49 +897,49 @@ export class CapiauTimelineInteraction {
                         <div class="adjustments-row">
                             <label>Brilho</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="brightness" min="-100" max="100" value="${roundVal(brightness)}">
+                                <input type="range" data-color="brightness" min="-100" max="100" value="${roundVal(brightness)}" data-tooltip="Brilho: ${roundVal(brightness)}%">
                                 <span class="value-disp">${roundVal(brightness)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Contraste</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="contrast" min="-100" max="100" value="${roundVal(contrast)}">
+                                <input type="range" data-color="contrast" min="-100" max="100" value="${roundVal(contrast)}" data-tooltip="Contraste: ${roundVal(contrast)}%">
                                 <span class="value-disp">${roundVal(contrast)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Saturação</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="saturation" min="0" max="200" value="${roundVal(saturation)}">
+                                <input type="range" data-color="saturation" min="0" max="200" value="${roundVal(saturation)}" data-tooltip="Saturação: ${roundVal(saturation)}%">
                                 <span class="value-disp">${roundVal(saturation)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Matiz</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="hue" min="-180" max="180" value="${roundVal(hue)}">
+                                <input type="range" data-color="hue" min="-180" max="180" value="${roundVal(hue)}" data-tooltip="Matiz: ${roundVal(hue)}°">
                                 <span class="value-disp">${roundVal(hue)}°</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Sépia</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="sepia" min="0" max="100" value="${roundVal(sepia)}">
+                                <input type="range" data-color="sepia" min="0" max="100" value="${roundVal(sepia)}" data-tooltip="Sépia: ${roundVal(sepia)}%">
                                 <span class="value-disp">${roundVal(sepia)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Cinzas</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="grayscale" min="0" max="100" value="${roundVal(grayscale)}">
+                                <input type="range" data-color="grayscale" min="0" max="100" value="${roundVal(grayscale)}" data-tooltip="Cinzas: ${roundVal(grayscale)}%">
                                 <span class="value-disp">${roundVal(grayscale)}%</span>
                             </div>
                         </div>
                         <div class="adjustments-row">
                             <label>Desfoque</label>
                             <div class="control-wrap">
-                                <input type="range" data-color="blur" min="0" max="20" value="${roundVal(blur)}">
+                                <input type="range" data-color="blur" min="0" max="20" value="${roundVal(blur)}" data-tooltip="Desfoque: ${roundVal(blur)}px">
                                 <span class="value-disp">${roundVal(blur)}px</span>
                             </div>
                         </div>
@@ -969,9 +969,9 @@ export class CapiauTimelineInteraction {
                     <div class="adjustments-section-body" style="opacity:${volDisabled ? 0.4 : 1}; pointer-events:${volDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
                         <div class="adjustments-row">
                             <label>Nível</label>
-                            <div class="control-wrap">
-                                <input id="adj-volume-slider" type="range" min="0" max="200" value="${roundVal(level * 100)}">
-                                <span class="value-disp" style="min-width: 60px;">${roundVal(level * 100)}% (${dbVal} dB)</span>
+                            <div class="control-wrap" style="flex:1; width:100%; display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
+                                <input id="adj-volume-slider" type="range" min="0" max="200" value="${roundVal(level * 100)}" data-tooltip="Volume: ${roundVal(level * 100)}% (${dbVal} dB)" style="flex:1; min-width:50px;">
+                                <span class="value-disp" style="min-width: 55px; white-space: nowrap; flex-shrink: 0; font-size: 8.5px;">${roundVal(level * 100)}% (${dbVal} dB)</span>
                             </div>
                         </div>
                     </div>
@@ -985,7 +985,7 @@ export class CapiauTimelineInteraction {
             <div class="adjustments-section">
                 <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                     <span style="display:flex; gap:6px; align-items:center;">
-                        <i class="fa-solid fa-circle-half-stroke"></i> Transições (Dissolve)
+                        <i class="fa-solid fa-circle-half-stroke"></i> Transições
                     </span>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <button class="btn-adj-bypass" data-section="fades" title="${fadesDisabled ? 'Ativar transições' : 'Desativar transições'}" style="background:none; border:none; color:${fadesDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${fadesDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
@@ -993,21 +993,31 @@ export class CapiauTimelineInteraction {
                     </div>
                 </div>
                 <div class="adjustments-section-body" style="opacity:${fadesDisabled ? 0.4 : 1}; pointer-events:${fadesDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
-                    <div class="adjustments-row">
-                        <label>Fade In (s)</label>
-                        <div class="control-wrap">
-                            <input id="adj-fadein" type="number" min="0" step="0.1" value="${fadeInDur}">
+                        <div class="adjustments-row adjustments-row-fade">
+                            <label>Fade In</label>
+                            <div class="control-wrap" style="display:flex; align-items:center; gap:2px;">
+                                <input id="adj-fadein" type="number" class="nle-input-flat" min="0" step="0.1" value="${fadeInDur}" data-tooltip="Fade In: ${fadeInDur}s" style="background:transparent; border:none; outline:none; color:var(--color-cyan); font-size:11px; font-weight:600; text-align:right; width:34px; font-family:monospace; padding:0;">
+                                <span style="font-size:10px; color:var(--text-muted); user-select:none;">s</span>
+                                <div class="flat-number-stepper" style="display:flex; flex-direction:column; gap:1px; margin-left:3px;">
+                                    <button class="btn-fade-step" data-target="adj-fadein" data-dir="up" title="Aumentar (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-up"></i></button>
+                                    <button class="btn-fade-step" data-target="adj-fadein" data-dir="down" title="Diminuir (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-down"></i></button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="adjustments-row">
-                        <label>Fade Out (s)</label>
-                        <div class="control-wrap">
-                            <input id="adj-fadeout" type="number" min="0" step="0.1" value="${fadeOutDur}">
+                        <div class="adjustments-row adjustments-row-fade">
+                            <label>Fade Out</label>
+                            <div class="control-wrap" style="display:flex; align-items:center; gap:2px;">
+                                <input id="adj-fadeout" type="number" class="nle-input-flat" min="0" step="0.1" value="${fadeOutDur}" data-tooltip="Fade Out: ${fadeOutDur}s" style="background:transparent; border:none; outline:none; color:var(--color-cyan); font-size:11px; font-weight:600; text-align:right; width:34px; font-family:monospace; padding:0;">
+                                <span style="font-size:10px; color:var(--text-muted); user-select:none;">s</span>
+                                <div class="flat-number-stepper" style="display:flex; flex-direction:column; gap:1px; margin-left:3px;">
+                                    <button class="btn-fade-step" data-target="adj-fadeout" data-dir="up" title="Aumentar (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-up"></i></button>
+                                    <button class="btn-fade-step" data-target="adj-fadeout" data-dir="down" title="Diminuir (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-down"></i></button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
 
         const savedScrollTop = container.scrollTop;
         container.innerHTML = html;
@@ -1020,6 +1030,56 @@ export class CapiauTimelineInteraction {
     attachAdjustmentsListeners(container, clipId) {
         const clip = STATE.activeTimelineCuts.find(c => c.id === clipId);
         if (!clip) return;
+
+        // Fades
+        const fi = container.querySelector("#adj-fadein");
+        const fo = container.querySelector("#adj-fadeout");
+        if (fi) {
+            fi.oninput = () => {
+                const val = parseFloat(fi.value) || 0;
+                fi.setAttribute("data-tooltip", `Fade In: ${val}s`);
+            };
+            fi.onchange = () => {
+                const val = parseFloat(fi.value) || 0;
+                fi.setAttribute("data-tooltip", `Fade In: ${val}s`);
+                this.setClipFade(clipId, "in", val);
+            };
+        }
+        if (fo) {
+            fo.oninput = () => {
+                const val = parseFloat(fo.value) || 0;
+                fo.setAttribute("data-tooltip", `Fade Out: ${val}s`);
+            };
+            fo.onchange = () => {
+                const val = parseFloat(fo.value) || 0;
+                fo.setAttribute("data-tooltip", `Fade Out: ${val}s`);
+                this.setClipFade(clipId, "out", val);
+            };
+        }
+
+        // Stepper flat buttons para fades (apenas traços sem box depois do 's')
+        container.querySelectorAll(".btn-fade-step").forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const targetId = btn.dataset.target;
+                const dir = btn.dataset.dir;
+                const input = container.querySelector(`#${targetId}`);
+                if (!input) return;
+
+                let cur = parseFloat(input.value) || 0;
+                if (dir === "up") {
+                    cur = Math.round((cur + 0.1) * 10) / 10;
+                } else {
+                    cur = Math.max(0, Math.round((cur - 0.1) * 10) / 10);
+                }
+                input.value = cur;
+                const tooltipText = `${targetId === "adj-fadein" ? "Fade In" : "Fade Out"}: ${cur}s`;
+                input.setAttribute("data-tooltip", tooltipText);
+                
+                const side = targetId === "adj-fadein" ? "in" : "out";
+                this.setClipFade(clipId, side, cur);
+            };
+        });
 
         // Enquadramento (fit/fill)
         container.querySelectorAll(".nle-select-btn").forEach(btn => {
@@ -1041,6 +1101,7 @@ export class CapiauTimelineInteraction {
         }
 
         // Transformações (Geometria)
+        const propLabels = { x: "Posição X", y: "Posição Y", scale: "Escala", rotation: "Rotação", opacity: "Opacidade" };
         container.querySelectorAll("input[data-prop]").forEach(slider => {
             const prop = slider.dataset.prop;
             const disp = slider.nextElementSibling;
@@ -1052,8 +1113,15 @@ export class CapiauTimelineInteraction {
                 if (prop === "scale") val = val / 100;
                 else if (prop === "opacity") val = val / 100;
 
+                const dispText = slider.value + (prop === "rotation" ? "°" : "%");
                 if (disp) {
-                    disp.textContent = slider.value + (prop === "rotation" ? "°" : "%");
+                    disp.textContent = dispText;
+                }
+                const tooltipText = `${propLabels[prop] || prop}: ${dispText}`;
+                slider.setAttribute("data-tooltip", tooltipText);
+                const globalTooltip = document.getElementById("global-tooltip");
+                if (globalTooltip && globalTooltip.classList.contains("visible")) {
+                    globalTooltip.textContent = tooltipText;
                 }
 
                 // Mutação rápida sem Undo/Redo no meio do arrasto para feedback em tempo real
@@ -1082,9 +1150,11 @@ export class CapiauTimelineInteraction {
             slider.addEventListener("dblclick", () => {
                 const defVal = defaults[prop] !== undefined ? defaults[prop] : 0;
                 slider.value = defVal;
+                const dispText = defVal + (prop === "rotation" ? "°" : "%");
                 if (disp) {
-                    disp.textContent = defVal + (prop === "rotation" ? "°" : "%");
+                    disp.textContent = dispText;
                 }
+                slider.setAttribute("data-tooltip", `${propLabels[prop] || prop}: ${dispText}`);
                 let val = parseFloat(defVal);
                 if (prop === "scale") val = val / 100;
                 else if (prop === "opacity") val = val / 100;
@@ -1093,6 +1163,7 @@ export class CapiauTimelineInteraction {
         });
 
         // Recorte (Crop)
+        const cropLabels = { left: "Recorte Esquerda", right: "Recorte Direita", top: "Recorte Topo", bottom: "Recorte Base" };
         container.querySelectorAll("input[data-crop]").forEach(slider => {
             const prop = slider.dataset.crop;
             const disp = slider.nextElementSibling;
@@ -1101,8 +1172,15 @@ export class CapiauTimelineInteraction {
                 TIMELINE_HISTORY.begin();
                 const val = parseFloat(slider.value);
 
+                const dispText = slider.value + "%";
                 if (disp) {
-                    disp.textContent = slider.value + "%";
+                    disp.textContent = dispText;
+                }
+                const tooltipText = `${cropLabels[prop] || prop}: ${dispText}`;
+                slider.setAttribute("data-tooltip", tooltipText);
+                const globalTooltip = document.getElementById("global-tooltip");
+                if (globalTooltip && globalTooltip.classList.contains("visible")) {
+                    globalTooltip.textContent = tooltipText;
                 }
 
                 const cuts = [...STATE.activeTimelineCuts];
@@ -1131,11 +1209,13 @@ export class CapiauTimelineInteraction {
                 if (disp) {
                     disp.textContent = defVal + "%";
                 }
+                slider.setAttribute("data-tooltip", `${cropLabels[prop] || prop}: ${defVal}%`);
                 this.setClipCrop(clipId, prop, defVal);
             });
         });
 
         // Efeitos de Cor
+        const colorLabels = { brightness: "Brilho", contrast: "Contraste", saturation: "Saturação", hue: "Matiz", sepia: "Sépia", grayscale: "Cinzas", blur: "Desfoque" };
         container.querySelectorAll("input[data-color]").forEach(slider => {
             const prop = slider.dataset.color;
             const disp = slider.nextElementSibling;
@@ -1152,8 +1232,15 @@ export class CapiauTimelineInteraction {
             slider.oninput = () => {
                 TIMELINE_HISTORY.begin();
                 const val = parseFloat(slider.value);
+                const dispText = slider.value + (prop === "blur" ? "px" : prop === "hue" ? "°" : "%");
                 if (disp) {
-                    disp.textContent = slider.value + (prop === "blur" ? "px" : prop === "hue" ? "°" : "%");
+                    disp.textContent = dispText;
+                }
+                const tooltipText = `${colorLabels[prop] || prop}: ${dispText}`;
+                slider.setAttribute("data-tooltip", tooltipText);
+                const globalTooltip = document.getElementById("global-tooltip");
+                if (globalTooltip && globalTooltip.classList.contains("visible")) {
+                    globalTooltip.textContent = tooltipText;
                 }
 
                 const cuts = [...STATE.activeTimelineCuts];
@@ -1179,9 +1266,11 @@ export class CapiauTimelineInteraction {
             slider.addEventListener("dblclick", () => {
                 const defVal = colorDefaults[prop] !== undefined ? colorDefaults[prop] : 0;
                 slider.value = defVal;
+                const dispText = defVal + (prop === "blur" ? "px" : prop === "hue" ? "°" : "%");
                 if (disp) {
-                    disp.textContent = defVal + (prop === "blur" ? "px" : prop === "hue" ? "°" : "%");
+                    disp.textContent = dispText;
                 }
+                slider.setAttribute("data-tooltip", `${colorLabels[prop] || prop}: ${dispText}`);
                 this.setClipColor(clipId, prop, defVal);
             });
         });
@@ -1194,8 +1283,15 @@ export class CapiauTimelineInteraction {
                 TIMELINE_HISTORY.begin();
                 const val = parseFloat(volSlider.value) / 100;
                 const dbVal = val > 0 ? (20 * Math.log10(val)).toFixed(1) : "-inf";
+                const dispText = `${volSlider.value}% (${dbVal} dB)`;
                 if (disp) {
-                    disp.textContent = `${volSlider.value}% (${dbVal} dB)`;
+                    disp.textContent = dispText;
+                }
+                const tooltipText = `Volume: ${dispText}`;
+                volSlider.setAttribute("data-tooltip", tooltipText);
+                const globalTooltip = document.getElementById("global-tooltip");
+                if (globalTooltip && globalTooltip.classList.contains("visible")) {
+                    globalTooltip.textContent = tooltipText;
                 }
 
                 const isAudioTrack = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
@@ -1257,19 +1353,7 @@ export class CapiauTimelineInteraction {
             });
         }
 
-        // Fades
-        const fi = container.querySelector("#adj-fadein");
-        const fo = container.querySelector("#adj-fadeout");
-        if (fi) {
-            fi.onchange = () => {
-                this.setClipFade(clipId, "in", parseFloat(fi.value) || 0);
-            };
-        }
-        if (fo) {
-            fo.onchange = () => {
-                this.setClipFade(clipId, "out", parseFloat(fo.value) || 0);
-            };
-        }
+
 
         // Ouvintes de Bypass (Ativar/Desativar Efeito)
         container.querySelectorAll(".btn-adj-bypass").forEach(btn => {

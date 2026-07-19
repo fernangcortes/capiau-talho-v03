@@ -1522,6 +1522,14 @@ window.addEventListener("DOMContentLoaded", () => {
         const target = e.target.closest("[data-tooltip]");
         if (!target) return;
 
+        // Sliders de ajuste só exibem tooltip no estado mínimo (.sidebar-minimal), pois nos outros estados o nome já aparece à esquerda
+        const sidebarLeft = target.closest("#sidebar-left");
+        if (sidebarLeft && target.matches(".adjustments-row input[type='range']")) {
+            if (!sidebarLeft.classList.contains("sidebar-minimal")) {
+                return;
+            }
+        }
+
         const text = target.getAttribute("data-tooltip");
         if (!text) return;
 
@@ -1830,6 +1838,12 @@ window.addEventListener("DOMContentLoaded", () => {
             if (targetContent) {
                 targetContent.classList.add("active");
             }
+
+            const leftEl = doc.getElementById("sidebar-left");
+            if (leftEl) {
+                leftEl.setAttribute("data-active-tab", btn.dataset.tab);
+            }
+
             // Salva no localStorage
             localStorage.setItem("active-left-tab", btn.dataset.tab);
             STATE.emit("leftTabChanged", btn.dataset.tab);
@@ -1866,11 +1880,12 @@ window.addEventListener("DOMContentLoaded", () => {
     });
 
     // Restaurar abas do localStorage na inicialização
-    const savedLeftTab = localStorage.getItem("active-left-tab");
-    if (savedLeftTab) {
-        const btn = document.querySelector(`.sidebar-left .tab-btn[data-tab="${savedLeftTab}"]`);
-        if (btn && btn.style.display !== "none") btn.click();
+    const savedLeftTab = localStorage.getItem("active-left-tab") || "tab-videos";
+    if (sidebarLeft) {
+        sidebarLeft.setAttribute("data-active-tab", savedLeftTab);
     }
+    const btnLeft = document.querySelector(`.sidebar-left .tab-btn[data-tab="${savedLeftTab}"]`);
+    if (btnLeft && btnLeft.style.display !== "none") btnLeft.click();
     const savedRightTab = localStorage.getItem("active-right-tab");
     if (savedRightTab) {
         const btn = document.querySelector(`#right-tabs .tab-btn[data-right-tab="${savedRightTab}"]`);
