@@ -1,6 +1,6 @@
 ---
 name: capiau-nle-design-system
-description: Diretrizes do design system flat, layout sem espaços (seamless), sidebars adaptativas, selects premium e motor global de tooltips para a interface clássica NLE do CapIAu.
+description: Diretrizes do design system flat, layout sem espaços (seamless), sidebars adaptativas, selects premium, controles numéricos e motor global de tooltips para a interface clássica NLE do CapIAu.
 ---
 
 # Design System Flat & Seamless NLE - CapIAu
@@ -12,11 +12,12 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
 ## I. Estrutura de Layout e Workspace (Layout & Workspace)
 
 ### 1. Visual Sem Espaços (Seamless Layout)
-* **Objetivo:** Aproveitar 100% da área da tela eliminando gaps, paddings desnecessários e bordas duplicadas.
+* **Objetivo:** Aproveitar 100% da área da tela eliminando gaps, paddings desnecessários, rodapés estáticos e bordas duplicadas.
 * **Diretrizes:**
   * Painéis e seções contíguos na grade principal devem ter `border-radius: 0;` e `border: none;` (encostados uns nos outros).
   * A separação entre painéis deve ser feita unicamente por splitters sutis de redimensionamento (`.panel-splitter` de 4px) ou bordas de vidro discretas (`1px solid var(--border-glass)`).
   * O workspace principal (`.workspace`) deve usar `padding: 0; gap: 0;` e preencher toda a altura disponível.
+  * **Eliminação de Rodapés Inúteis:** Evitar barras de status estáticas ou avisos no rodapé (como "Pronto.") que consomem espaço vertical sem agregar valor funcional. O espaço inferior dos painéis deve ser inteiramente reservado ao conteúdo scrollável.
 
 ### 2. Linhas Restauradoras para Painéis Retráteis (Restore Lines)
 * **Objetivo:** Oferecer um mecanismo de reabertura não-invasivo, fino e integrado ao layout flex para qualquer painel, sidebar, aba ou janela que possua funcionalidade de show/hide (retração). A linha deve ser sempre visível e acessível sem sobrepor o conteúdo principal.
@@ -76,12 +77,28 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
 
 ## II. Diretrizes dos Menus Laterais (Sidebars)
 
-### 3. Layout Adaptativo de 3 Níveis (Sidebars)
-* **Objetivo:** Responder reativamente à largura horizontal das abas laterais e evitar quebras de texto em múltiplas linhas.
+### 3. Layout Adaptativo de 3 Níveis & Estabilidade Vertical
+* **Objetivo:** Responder reativamente à largura horizontal das abas laterais mantendo a estabilidade vertical absoluta e evitando quebras de texto em múltiplas linhas.
 * **Estados e Limites:**
-  1. **Normal (Largura $\ge 320\text{px}$):** Exibe ícones e textos lado a lado (com a ressalva de abas que ocultam o ícone no estado normal).
-  2. **Compacto ($320\text{px} >$ Largura $\ge 240\text{px}$):** Oculta os textos das abas (`display: none`), centralizando apenas os ícones de linha. Oculta o texto dos botões de ação no feed (ex: de "Clipe" para apenas o ícone).
-  3. **Mínimo (Largura $< 240\text{px}$):** Oculta os textos dos cabeçalhos dos painéis e compacta paddings e margens. Os labels de controle de IA (como "Modelo IA" e "Chave API") reduzem sua largura e ocultam texto, exibindo apenas o robozinho e a chave com suas tooltips.
+  1. **Normal (Largura $\ge 320\text{px}$):** Exibe ícones e textos lado a lado. Sliders expandem-se de forma ampla (`width: 180px - 240px`).
+  2. **Compacto ($320\text{px} >$ Largura $\ge 240\text{px}$):** Oculta textos de abas e botões secundários. Mantém rótulos dos efeitos visíveis à esquerda e ajusta sliders para tamanho médio (`width: 115px - 135px`).
+  3. **Mínimo (Largura $< 240\text{px}$):** Oculta os textos dos cabeçalhos dos painéis e rótulos de sliders padrão (centralizando os controles). As transições mantêm rótulos visíveis.
+* **Regra Crítica — Estabilidade Vertical (Anti-Vertical-Jump):**
+  * O padding/margin **vertical** dos cabeçalhos (`.sidebar-header`), abas (`.media-tabs`) e barras de ferramentas deve permanecer **rigorosamente congelado e idêntico** em todos os 3 estados (ex: padding vertical de 8px e margens verticais de 8px/6px).
+  * Ao redimensionar a sidebar horizontalmente, apenas as larguras e visibilidades horizontais se adaptam. Nenhum elemento ou linha deve "pular" ou mudar sua posição vertical.
+* **Scrollbars Invisíveis nas Sidebars:**
+  * As barras de rolagem visuais nas sidebars e painéis internos devem ser mantidas **invisíveis** para economizar espaço horizontal e garantir bordas limpas:
+    ```css
+    .sidebar-left, .sidebar-left .scrollable, .sidebar-left .tab-content {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+    }
+    .sidebar-left::-webkit-scrollbar, .sidebar-left .scrollable::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+    }
+    ```
+  * A funcionalidade de rolagem via wheel, trackpad e touch permanece 100% funcional.
 
 ### 4. Abas Customizáveis dos Menus Laterais (Sidebar Tabs)
 * **Objetivo:** Permitir ao usuário reordenar as abas livremente por arrasto (drag and drop) e controlar a visibilidade de cada uma (show/hide), mantendo a integridade da interface clássica de edição.
@@ -132,13 +149,36 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
   * **Prevenção de Colisões:**
     * **Vertical:** A tooltip se projeta acima do elemento por padrão. Caso passe do topo da janela (Y < 8px), ela se inverte automaticamente para baixo.
     * **Horizontal:** Caso atinja os cantos laterais esquerdo ou direito do navegador, o script limita seu valor horizontal em pixels para mantê-la visível na tela.
-  * **Injeção Dinâmica:** O `MutationObserver` em `main.js` intercepta qualquer injeção HTML dinâmica e converte automaticamente tags `title` em atributos `data-tooltip`, integrando-as no motor global.
+  * **Injeção Dinâmica & Feedback de Sliders:** O `MutationObserver` em `main.js` intercepta qualquer injeção HTML dinâmica e converte automaticamente tags `title` em atributos `data-tooltip`. Para sliders de controle (`input[type="range"]`), a tooltip deve ser exibida **exclusivamente no estado mínimo** (largura $< 240\text{px}$) onde os nomes dos efeitos são ocultados, incluindo o nome do parâmetro e o valor formatado (ex: `Brilho: +15%`). Nos estados normal e compacto (onde os rótulos permanecem visíveis à esquerda), a tooltip nos sliders é dispensada.
+
+### 8. Sliders de Controle Proporcionais (Range Inputs)
+* **Objetivo:** Oferecer precisão de ajuste proporcional à largura disponível do painel, garantindo responsividade sem sacrificar usabilidade.
+* **Diretrizes de Dimensionamento:**
+  * **Estado Normal ($\ge 320\text{px}$):** Sliders amplos com `width: 180px` a `240px` (`flex: 1`), aproveitando a largura expansiva do menu.
+  * **Estado Compacto ($240\text{px} >$ Largura $\ge 240\text{px}$):** Sliders médios com `width: 115px` a `135px`, mantendo os rótulos de efeito visíveis à esquerda.
+  * **Estado Mínimo (Largura $< 240\text{px}$):** Sliders compactos com `max-width: 120px` centralizados e rótulos ocultados.
+
+### 9. Entradas Numéricas Flat & Steppers Minimalistas (Number Inputs)
+* **Objetivo:** Eliminar caixas opacas e botões de incremento brancos do navegador, criando controles numéricos integrados ao tema dark.
+* **Diretrizes:**
+  * **Remoção de Spin-Buttons Nativos:** Ocultar obrigatoriamente os botões nativos dos navegadores:
+    ```css
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none !important;
+        margin: 0 !important;
+    }
+    input[type="number"] {
+        -moz-appearance: textfield !important;
+    }
+    ```
+  * **Padrão Visual:** Renderizar o valor numérico em texto flat ciano sem caixa (`background: transparent; border: none`), seguido da unidade (ex: `s`, `%`, `px`), e acompanhado de traços minimalistas de incremento/decremento (`.btn-fade-step` com ícones `fa-chevron-up`/`down` translúcidos) posicionados **após a unidade**.
 
 ---
 
 ## IV. Reprodutor de Vídeo (Video Player)
 
-### 8. Players Limpos com Controles em Hover
+### 10. Players Limpos com Controles em Hover
 * **Objetivo:** Sempre que um player de vídeo (`.player-panel`) for construído ou reaproveitado em um layout novo, ele deve priorizar a exibição do vídeo — cabeçalho e barra de controles não devem competir visualmente com a imagem quando o usuário não está interagindo com aquele player específico.
 * **Diretrizes:**
   * O contêiner do player (`.player-panel`) precisa de `position: relative;` para servir de referência aos overlays.
