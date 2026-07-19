@@ -394,8 +394,8 @@ export class CapiauTimelineRenderer {
             const photo = isPhoto ? STATE.allPhotos.find(p => p.id === cut.photo_id) : null;
 
             // Espaçamento interno vertical do clipe
-            const clipY = lane.top + 6;
-            const clipHeight = lane.height - 12;
+            const clipY = lane.top;
+            const clipHeight = lane.height;
 
             // Desenhar bloco do clipe
             ctx.fillStyle = style.clipBg;
@@ -616,9 +616,9 @@ export class CapiauTimelineRenderer {
                 if (lane) {
                     return {
                         x: (ghost.timelineStartFrame - scrollLeft) * zoom,
-                        y: lane.top + 6,
+                        y: lane.top,
                         w: duration * zoom,
-                        h: lane.height - 12
+                        h: lane.height
                     };
                 }
             }
@@ -629,9 +629,9 @@ export class CapiauTimelineRenderer {
         if (!lane) return null;
         return {
             x: (ghost.timelineStartFrame - scrollLeft) * zoom,
-            y: lane.top + 5,
+            y: lane.top,
             w: Math.max(duration * zoom, 20),
-            h: lane.height - 10
+            h: lane.height
         };
     }
 
