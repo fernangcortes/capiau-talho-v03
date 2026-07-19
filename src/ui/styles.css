@@ -479,7 +479,7 @@ button {
     display: flex;
     background: transparent;
     padding: 0;
-    margin: 12px 12px 6px 12px;
+    margin: 8px 12px 6px 12px;
     border: none;
     border-bottom: 1px solid var(--border-glass);
 }
@@ -4133,9 +4133,9 @@ body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline 
 /* ── ADAPTATIVE LAYOUT STATES FOR SIDEBARS ── */
 
 /* 1. COMPACT STATE (width < 320px) */
-/* Reduz fonte e espaçamento do cabeçalho */
+/* Reduz fonte do cabeçalho mantendo altura vertical constante (8px padding) */
 .sidebar-compact .sidebar-header {
-    padding: 6px 8px !important;
+    padding: 8px 8px !important;
 }
 .sidebar-compact .sidebar-header h2 {
     font-size: 13px !important;
@@ -4149,9 +4149,9 @@ body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline 
     gap: 4px !important;
 }
 
-/* Reduz o tamanho das abas e margens e esconde textos (apenas ícones) */
+/* Mantém altura vertical idêntica das abas (8px top, 6px bottom) */
 .sidebar-compact .media-tabs {
-    margin: 6px 6px 3px 6px !important;
+    margin: 8px 6px 6px 6px !important;
     gap: 2px !important;
 }
 .sidebar-compact .tab-btn .tab-text,
@@ -4180,7 +4180,7 @@ body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline 
     display: none !important;
 }
 .sidebar-left.sidebar-compact #library-filter-bar {
-    padding: 6px 8px !important;
+    padding: 8px 8px !important;
 }
 
 
@@ -4190,9 +4190,9 @@ body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline 
     display: none !important;
 }
 
-/* Cabeçalho ultra compacto */
+/* Cabeçalho mantendo altura vertical constante (8px padding) */
 .sidebar-minimal .sidebar-header {
-    padding: 4px 6px !important;
+    padding: 8px 6px !important;
 }
 .sidebar-minimal .sidebar-header h2 {
     gap: 3px !important;
@@ -4243,7 +4243,7 @@ body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline 
 /* Margem unificada para as abas da direita no estado compacto/minimal */
 .sidebar-compact #right-tabs,
 .sidebar-minimal #right-tabs {
-    margin: 6px 6px 3px 6px !important;
+    margin: 8px 6px 6px 6px !important;
     gap: 2px !important;
 }
 .transcription-actions #right-tabs {
@@ -6053,13 +6053,17 @@ select option, .nle-select option {
     display: flex;
     align-items: center;
     gap: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    line-height: 16px;
 }
 .adjustments-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 8px;
     margin-bottom: 6px;
+    min-height: 22px;
 }
 .adjustments-row label {
     font-size: 10.5px;
@@ -6067,15 +6071,22 @@ select option, .nle-select option {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex: 1;
+    flex: 0 0 auto;
+    max-width: 110px;
 }
 .adjustments-row .control-wrap {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex: 1;
+    justify-content: flex-end;
+    min-width: 0;
 }
+/* 1º Estado: Normal (largura >= 320px) - Sliders bem maiores */
 .adjustments-row input[type="range"] {
-    width: 100px;
+    width: 180px;
+    max-width: 240px;
+    flex: 1;
     height: 4px;
     cursor: pointer;
     accent-color: var(--color-cyan);
@@ -6094,6 +6105,7 @@ select option, .nle-select option {
     color: var(--text-muted);
     min-width: 38px;
     text-align: right;
+    flex-shrink: 0;
 }
 .adjustments-row input[type="number"] {
     width: 50px;
@@ -6110,18 +6122,102 @@ select option, .nle-select option {
     border-color: var(--color-cyan);
 }
 
-/* Modo Compacto e Mínimo da Sidebar */
-.sidebar-compact .adjustments-row label,
+/* Remover setinhas com box branco nativas dos navegadores */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+input[type="number"] {
+    -moz-appearance: textfield !important;
+}
+
+/* Botões de stepper flat (apenas traços sem box) */
+.btn-fade-step {
+    transition: color 0.15s ease, transform 0.15s ease;
+    opacity: 0.7;
+}
+.btn-fade-step:hover {
+    color: var(--color-cyan) !important;
+    opacity: 1;
+}
+
+/* 2º Estado: Modo Compacto (240px <= largura < 320px) - Sliders maiores que antes */
+.sidebar-compact .adjustments-row label {
+    display: flex !important;
+    flex: 0 0 auto;
+    max-width: 90px;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sidebar-compact .adjustments-row {
+    justify-content: space-between !important;
+    width: 100%;
+    min-height: 22px;
+}
+.sidebar-compact .adjustments-row input[type="range"] {
+    width: 115px;
+    max-width: 135px;
+    flex: 1;
+}
+
+/* 3º Estado: Modo Mínimo (largura < 240px) - Mantido o tamanho atual (menor) */
 .sidebar-minimal .adjustments-row label {
     display: none;
 }
-.sidebar-compact .adjustments-row input[type="range"],
-.sidebar-minimal .adjustments-row input[type="range"] {
-    width: 120px;
+.sidebar-minimal .adjustments-row-fade label {
+    display: flex !important;
+    flex: 1;
+    min-width: 0;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-.sidebar-compact .adjustments-row,
+.sidebar-minimal .adjustments-row input[type="range"] {
+    width: 100%;
+    max-width: 120px;
+    flex: none;
+}
 .sidebar-minimal .adjustments-row {
     justify-content: center;
+    width: 100%;
+    min-height: 22px;
+}
+.sidebar-minimal .adjustments-row-fade {
+    justify-content: space-between !important;
+    width: 100%;
+}
+
+/* Padronização de padding vertical constante no painel de ajustes (12px topo/base) */
+.sidebar-compact #adjustments-panel-content {
+    padding: 12px 8px !important;
+}
+.sidebar-minimal #adjustments-panel-content {
+    padding: 12px 6px !important;
+}
+
+/* Barra de rolagem invisível na sidebar esquerda (mantendo rolagem funcional) */
+.sidebar-left,
+.sidebar-left .scrollable,
+.sidebar-left .sidebar-content,
+.sidebar-left #adjustments-panel-content,
+.sidebar-left #inspector-tab-content-container,
+.sidebar-left .tab-content {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+.sidebar-left::-webkit-scrollbar,
+.sidebar-left .scrollable::-webkit-scrollbar,
+.sidebar-left .sidebar-content::-webkit-scrollbar,
+.sidebar-left #adjustments-panel-content::-webkit-scrollbar,
+.sidebar-left #inspector-tab-content-container::-webkit-scrollbar,
+.sidebar-left .tab-content::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
 #tab-adjustments {
@@ -6133,6 +6229,11 @@ select option, .nle-select option {
 }
 #tab-adjustments.active {
     display: flex;
+}
+
+/* Quando a aba de Ajustes estiver ativa, esconde totalmente a barra de busca e filtros da biblioteca */
+.sidebar-left[data-active-tab="tab-adjustments"] #library-filter-bar {
+    display: none !important;
 }
 
 /* ── VIEWPORT ESTÁVEL E MÁSCARA (FASE 1) ── */
@@ -6322,6 +6423,31 @@ select option, .nle-select option {
 }
 
 /* Responsividade da barra da biblioteca */
+.sidebar-compact #library-filter-bar,
+.sidebar-minimal #library-filter-bar {
+    padding: 8px 4px !important;
+}
+.sidebar-compact #library-filter-bar > div:first-child,
+.sidebar-minimal #library-filter-bar > div:first-child {
+    gap: 3px !important;
+}
+.sidebar-compact .library-search-area,
+.sidebar-minimal .library-search-area {
+    min-width: 0 !important;
+    flex: 1 1 0px !important;
+    padding: 0 4px !important;
+}
+.sidebar-compact .library-search-area input,
+.sidebar-minimal .library-search-area input {
+    min-width: 0 !important;
+    width: 100% !important;
+    text-overflow: ellipsis;
+}
+.sidebar-compact .lib-action-btn,
+.sidebar-minimal .lib-action-btn {
+    flex-shrink: 0 !important;
+    padding: 3px !important;
+}
 .sidebar-compact #library-filter-bar .zoom-container,
 .sidebar-minimal #library-filter-bar .zoom-container {
     display: none !important;
