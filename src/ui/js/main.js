@@ -1785,6 +1785,52 @@ window.addEventListener("DOMContentLoaded", () => {
                 TIMELINE_STATE.setGlobalThumbnailsInterval(parseFloat(e.target.value));
             });
         }
+
+        // Função para mudar a posição da barra de ferramentas da timeline
+        function setTimelineToolbarPosition(isTop) {
+            const toolbar = document.getElementById("timeline-actions-sidebar");
+            const reopen = document.getElementById("reopen-toolbar");
+            const tPanel = document.getElementById("timeline-panel");
+            const trackArea = tPanel ? tPanel.querySelector(".timeline-track-area") : null;
+            const canvasWrapper = tPanel ? tPanel.querySelector(".timeline-canvas-wrapper") : null;
+
+            if (!toolbar || !reopen || !tPanel) return;
+
+            if (isTop) {
+                // Mover para o topo do timeline-panel (antes de timeline-track-area)
+                if (trackArea) {
+                    tPanel.insertBefore(reopen, trackArea);
+                    tPanel.insertBefore(toolbar, trackArea);
+                } else {
+                    tPanel.appendChild(reopen);
+                    tPanel.appendChild(toolbar);
+                }
+                toolbar.classList.add("horizontal-toolbar");
+                reopen.classList.add("horizontal-restore-line");
+            } else {
+                // Mover de volta para dentro do timeline-canvas-wrapper (no início dele)
+                if (canvasWrapper) {
+                    canvasWrapper.insertBefore(reopen, canvasWrapper.firstChild);
+                    canvasWrapper.insertBefore(toolbar, canvasWrapper.firstChild);
+                }
+                toolbar.classList.remove("horizontal-toolbar");
+                reopen.classList.remove("horizontal-restore-line");
+            }
+            window.dispatchEvent(new Event("resize"));
+        }
+
+        const chkToolbarTop = document.getElementById("chk-timeline-toolbar-top");
+        if (chkToolbarTop) {
+            const isTopSaved = localStorage.getItem("capiau_timeline_toolbar_top") === "true";
+            chkToolbarTop.checked = isTopSaved;
+            setTimelineToolbarPosition(isTopSaved);
+
+            chkToolbarTop.addEventListener("change", (e) => {
+                const isChecked = e.target.checked;
+                localStorage.setItem("capiau_timeline_toolbar_top", isChecked);
+                setTimelineToolbarPosition(isChecked);
+            });
+        }
     }
 
     // Alternar filtros/abas da biblioteca de mídias (hide/show)

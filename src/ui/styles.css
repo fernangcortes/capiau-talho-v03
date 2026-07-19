@@ -4619,6 +4619,81 @@ select option, .nle-select option {
     transform: scale(1.2);
 }
 
+/* Barra de ferramentas em modo horizontal (no topo, entre timeline e players) */
+.timeline-actions-sidebar.horizontal-toolbar {
+    width: 100% !important;
+    height: 32px !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-glass) !important;
+    padding: 0 8px !important;
+    gap: 8px !important;
+    overflow: visible !important;
+}
+
+.timeline-actions-sidebar.horizontal-toolbar.collapsed {
+    height: 0px !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    border-bottom: none !important;
+}
+
+.timeline-actions-sidebar.horizontal-toolbar #btn-cycle-columns {
+    display: none !important;
+}
+
+.timeline-actions-sidebar.horizontal-toolbar #btn-toggle-toolbar i {
+    transform: rotate(90deg);
+}
+
+.timeline-actions-sidebar.horizontal-toolbar .toolbar-header {
+    width: auto !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 2px !important;
+}
+
+.timeline-actions-sidebar.horizontal-toolbar .toolbar-divider {
+    width: 1px !important;
+    height: 16px !important;
+    background: var(--border-glass) !important;
+    margin: 0 4px !important;
+    display: block !important;
+}
+
+.timeline-actions-sidebar.horizontal-toolbar .toolbar-spacer {
+    display: block !important;
+    flex: 1 !important;
+}
+
+.timeline-actions-sidebar.horizontal-toolbar .track-height-control {
+    width: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 !important;
+}
+
+.timeline-actions-sidebar.horizontal-toolbar .track-height-slider {
+    writing-mode: horizontal-tb !important;
+    direction: ltr !important;
+    width: 58px !important;
+    height: 16px !important;
+    cursor: ew-resize !important;
+}
+
+/* Restaura a barra de ferramentas em modo horizontal (linha finíssima de 4px) */
+.toolbar-restore-line.horizontal-restore-line {
+    width: 100% !important;
+    height: 4px !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.3) !important;
+}
+
 /* ── BOTÕES DE PISTA FLAT E GLOWS (NLE DESIGN SYSTEM) ────────────────── */
 .btn-track-action {
     background: transparent !important;
