@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Optional
 import numpy as np
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 
-from src.search.semantic import SemanticSearch
+from src.search.semantic import SemanticSearch, QdrantUnavailableError
 
 
 class ImageSearch:
@@ -36,6 +36,8 @@ class ImageSearch:
         self._init_collection()
 
     def _init_collection(self):
+        if self.client is None:
+            return
         try:
             collections = [c.name for c in self.client.get_collections().collections]
             if self.collection_name not in collections:
@@ -387,20 +389,31 @@ class ImageSearch:
         self, project_id: int, vector: np.ndarray, limit: int,
         extra_conditions: Optional[list] = None, with_vectors: bool = False,
     ) -> List[Dict[str, Any]]:
-        conditions = [FieldCondition(key="project_id", match=MatchValue(value=project_id))]
-        if extra_conditions:
-            conditions.extend(extra_conditions)
-        response = self.client.query_points(
-            collection_name=self.collection_name,
-            query=vector.tolist(),
-            query_filter=Filter(must=conditions),
-            limit=limit,
-            with_vectors=with_vectors,
-        )
-        out = []
-        for r in response.points:
-            hit = {"id": r.id, "score": r.score, "payload": r.payload}
-            if with_vectors:
-                hit["vector"] = r.vector
-            out.append(hit)
-        return out
+        sem = SemanticSearch.get_instance()
+        if not sem.is_available or self.client is None:
+            raise QdrantUnavailableError(sem.error_message or "Índice visual Qdrant indisponível.")
+
+        try:
+            conditions = [FieldCondition(key="project_id", match=MatchValue(value=project_id))]
+            if extra_conditions:
+                conditions.extend(extra_conditions)
+            response = self.client.query_points(
+                collection_name=self.collection_name,
+                query=vector.tolist(),
+                query_filter=Filter(must=conditions),
+                limit=limit,
+                with_vectors=with_vectors,
+            )
+            out = []
+            for r in response.points:
+                hit = {"id": r.id, "score": r.score, "payload": r.payload}
+                if with_vectors:
+                    hit["vector"] = r.vector
+                out.append(hit)
+            return out
+        except QdrantUnavailableError:
+            raise
+        except Exception as e:
+            sem.is_available = False
+            sem.error_message = str(e)
+            raise QdrantUnavailableError(f"Erro na consulta visual Qdrant: {e}") from e

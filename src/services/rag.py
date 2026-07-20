@@ -152,6 +152,8 @@ class RAGService:
         try:
             import numpy as np
             engine = SemanticSearch.get_instance()
+            if not engine.encoder:
+                return results
             texts = [str(r.get("payload", {}).get("text", ""))[:400] or " " for r in head]
             vecs = engine.encoder.encode([query] + texts, show_progress_bar=False)
             vecs = np.asarray(vecs, dtype=np.float32)
@@ -180,10 +182,16 @@ class RAGService:
             return results
 
     @staticmethod
-    def search_hybrid(project_id: int, query: str, media_type: Optional[str] = None, limit: int = 30, offset: int = 0) -> List[Dict[str, Any]]:
+    def search_hybrid(
+        project_id: int, query: str, media_type: Optional[str] = None,
+        limit: int = 30, offset: int = 0, return_meta: bool = False
+    ) -> Any:
         """Realiza busca híbrida: cruzando rostos/falantes no SQLite e vetores no Qdrant."""
+        from src.search.semantic import QdrantUnavailableError
         face_results = []
         speaker_results = []
+        index_status = "ok"
+        warning = None
         
         with get_db() as conn:
             cursor = conn.cursor()
@@ -309,7 +317,13 @@ class RAGService:
             search_engine = SemanticSearch.get_instance()
             qdrant_limit = max(200, offset * 5 + limit * 10)
             results = search_engine.search(project_id, query, media_type=media_type, limit=qdrant_limit)
+        except QdrantUnavailableError as qe:
+            index_status = "unavailable"
+            warning = f"Índice de busca indisponível — {qe}"
+            print(f"[RAGSearch] Qdrant indisponível: {qe}")
         except Exception as qdrant_err:
+            index_status = "unavailable"
+            warning = "Índice de busca indisponível — provavelmente há outra instância do app aberta (lock do Qdrant)."
             print(f"[RAGSearch] Erro ao pesquisar no Qdrant: {qdrant_err}")
 
         # 3b. Busca visual CLIP local — entra na fusão com peso configurável (E2.B3)
@@ -326,6 +340,11 @@ class RAGService:
                     vp.setdefault("text", "")
                     vp["match_source"] = "clip"
                     visual_results.append({"score": vh["score"] * img_weight, "payload": vp})
+        except QdrantUnavailableError as qe:
+            if index_status == "ok":
+                index_status = "unavailable"
+                warning = f"Índice visual indisponível — {qe}"
+            print(f"[RAGSearch] Busca visual indisponível: {qe}")
         except Exception as clip_err:
             print(f"[RAGSearch] Busca visual indisponível: {clip_err}")
 
@@ -448,10 +467,14 @@ class RAGService:
                 r["explanation"] = "Trecho do depoimento falado pelo personagem pesquisado."
             elif payload.get("match_source") == "clip":
                 r["explanation"] = f"Correspondência visual (CLIP) de {score_val*100:.0f}% com os termos da busca."
-            else:
-                r["explanation"] = f"Correspondência conceitual (Semântica) de {score_val*100:.0f}% no texto do trecho."
-
-        return final_results[offset : offset + limit]
+        sliced_results = final_results[offset : offset + limit]
+        if return_meta:
+            return {
+                "results": sliced_results,
+                "index_status": index_status,
+                "warning": warning
+            }
+        return sliced_results
 
     @staticmethod
     def categorize_results_with_llm(query: str, items: List[Dict[str, Any]], project_id: Optional[int] = None) -> Dict[str, Any]:

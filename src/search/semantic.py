@@ -7,6 +7,11 @@ from sentence_transformers import SentenceTransformer
 from src.config import CONFIG
 import uuid
 
+class QdrantUnavailableError(RuntimeError):
+    """Exceção disparada quando o banco vetorial local Qdrant está indisponível (ex: lock de arquivo)."""
+    pass
+
+
 class SemanticSearch:
     _instance = None
 
@@ -18,19 +23,41 @@ class SemanticSearch:
         return cls._instance
 
     def __init__(self):
-        # Inicializa o banco de dados Qdrant local baseado em arquivo no disco
-        db_file_path = CONFIG.QDRANT_DB_PATH
-        db_file_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        print(f"[QDRANT] Conectando ao banco local em: {db_file_path}")
-        self.client = QdrantClient(path=str(db_file_path))
-        
-        # Carrega o modelo leve de embeddings (MiniLM) que roda de forma super veloz na CPU
-        print("[QDRANT] Carregando modelo sentence-transformers local em CPU...")
-        self.encoder = SentenceTransformer(CONFIG.embedding_model, device="cpu")
-        
         self.collection_name = "capiau_making_of"
-        self._init_collection()
+        self.client = None
+        self.encoder = None
+        self.is_available = False
+        self.error_message = None
+
+        try:
+            db_file_path = CONFIG.QDRANT_DB_PATH
+            db_file_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            print(f"[QDRANT] Conectando ao banco local em: {db_file_path}")
+            self.client = QdrantClient(path=str(db_file_path))
+            
+            # Carrega o modelo leve de embeddings (MiniLM) que roda de forma super veloz na CPU
+            print("[QDRANT] Carregando modelo sentence-transformers local em CPU...")
+            self.encoder = SentenceTransformer(CONFIG.embedding_model, device="cpu")
+            
+            self._init_collection()
+            self.is_available = True
+        except Exception as e:
+            self.is_available = False
+            self.error_message = str(e)
+            print(f"[QDRANT] [AVISO] Falha ao inicializar o Qdrant: {e}")
+
+    def check_health(self) -> tuple:
+        """Retorna (is_available: bool, error_message: str | None)."""
+        if not self.is_available or self.client is None:
+            return False, self.error_message or "Cliente Qdrant não inicializado (lock de arquivo ou erro)."
+        try:
+            self.client.get_collections()
+            return True, None
+        except Exception as e:
+            self.is_available = False
+            self.error_message = str(e)
+            return False, str(e)
 
     def _init_collection(self):
         """Inicializa a coleção vetorial se ela não existir no arquivo local."""
@@ -47,6 +74,7 @@ class SemanticSearch:
                 print(f"[QDRANT] Coleção '{self.collection_name}' já existe.")
         except Exception as e:
             print(f"[QDRANT] Erro ao inicializar a coleção: {e}")
+            raise
 
     def index_transcript_chunks(self, project_id: int, video_id: int, dialogues: list, video_type: str = "interview") -> None:
         """Indexa os parágrafos de transcrição de depoimentos isolados por project_id.
@@ -171,52 +199,62 @@ class SemanticSearch:
         
         'media_type' pode ser 'interview', 'broll' ou 'photo' para filtrar resultados.
         """
-        query_vector = self.encoder.encode(query).tolist()
-        
-        # Filtro estrito por project_id
-        conditions = [
-            FieldCondition(
-                key="project_id",
-                match=MatchValue(value=project_id)
+        if not self.is_available or self.client is None:
+            raise QdrantUnavailableError(self.error_message or "Índice Qdrant indisponível.")
+
+        try:
+            query_vector = self.encoder.encode(query).tolist()
+            
+            # Filtro estrito por project_id
+            conditions = [
+                FieldCondition(
+                    key="project_id",
+                    match=MatchValue(value=project_id)
+                )
+            ]
+            
+            # Filtro adicional opcional por tipo de mídia
+            if media_type:
+                if media_type == "interview":
+                    conditions.append(
+                        FieldCondition(
+                            key="media_type",
+                            match=MatchAny(any=["interview", "video"])
+                        )
+                    )
+                else:
+                    conditions.append(
+                        FieldCondition(
+                            key="media_type",
+                            match=MatchValue(value=media_type)
+                        )
+                    )
+                
+            query_filter = Filter(must=conditions)
+                
+            response = self.client.query_points(
+                collection_name=self.collection_name,
+                query=query_vector,
+                query_filter=query_filter,
+                limit=limit
             )
-        ]
-        
-        # Filtro adicional opcional por tipo de mídia
-        if media_type:
-            if media_type == "interview":
-                conditions.append(
-                    FieldCondition(
-                        key="media_type",
-                        match=MatchAny(any=["interview", "video"])
-                    )
-                )
-            else:
-                conditions.append(
-                    FieldCondition(
-                        key="media_type",
-                        match=MatchValue(value=media_type)
-                    )
-                )
+            results = response.points
             
-        query_filter = Filter(must=conditions)
-            
-        response = self.client.query_points(
-            collection_name=self.collection_name,
-            query=query_vector,
-            query_filter=query_filter,
-            limit=limit
-        )
-        results = response.points
-        
-        formatted_results = []
-        for r in results:
-            formatted_results.append({
-                "id": r.id,
-                "score": r.score,
-                "payload": r.payload
-            })
-            
-        return formatted_results
+            formatted_results = []
+            for r in results:
+                formatted_results.append({
+                    "id": r.id,
+                    "score": r.score,
+                    "payload": r.payload
+                })
+                
+            return formatted_results
+        except QdrantUnavailableError:
+            raise
+        except Exception as e:
+            self.is_available = False
+            self.error_message = str(e)
+            raise QdrantUnavailableError(f"Erro ao pesquisar no Qdrant: {e}") from e
 
     def _batch_filter_conditions(self, project_id: int, media_type_filter: str = None) -> list:
         """Condições de filtro compartilhadas da busca em lote (mesma regra do search())."""
@@ -237,6 +275,8 @@ class SemanticSearch:
         Retorna {"results", "mode_used", "cohesion", "warnings"}; cada result carrega
         "best_source" e "matched_text" (trecho que casou, para a explicação didática).
         """
+        if not self.is_available or self.client is None:
+            raise QdrantUnavailableError(self.error_message or "Índice Qdrant indisponível.")
         import numpy as np
         from src.search.batch_utils import (
             best_source_for_vector, merge_union_hits, pick_mode,
