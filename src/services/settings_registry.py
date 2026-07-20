@@ -203,6 +203,20 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": True,
     },
     {
+        "key": "clip.shot_scale_enabled", "type": "bool", "default": True,
+        "label": "Escala de plano automática (CLIP)",
+        "help": "Classifica cada quadro/foto por escala de plano (close, plano médio, plano geral...) usando o CLIP local. Custo zero de API; vira filtro na busca.",
+        "help_tech": "ShotScaleClassifier (zero-shot, ensemble de prompts) chamado em ImageSearch.index_video_keyframe/index_photo; rótulo vai no payload Qdrant e em media_segment.shot_scale. Backfill: POST /api/project/{id}/facets/backfill-shot-scale.",
+        "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "triage.feedback_examples", "type": "int", "default": 6, "min": 0, "max": 12, "step": 1,
+        "label": "Triagem: exemplos de correções (few-shot)",
+        "help": "Quantas correções manuais recentes de categoria entram nos prompts de triagem como exemplos do que a IA errou neste projeto. 0 desliga.",
+        "help_tech": "_triage_feedback_block() em prompt_templates.py; consome triage_feedback (gravada pelo PATCH /api/{video|photo}/{id}/category do E2.C2). Vale para o prompt 'triage' (vídeos) e para o sufixo de triagem do get_photo_vision_prompt (fotos).",
+        "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
         "key": "triage.min_confidence", "type": "float", "default": 0.55, "min": 0.0, "max": 1.0, "step": 0.05,
         "label": "Triagem: confiança mínima",
         "help": "Confiança mínima da IA de triagem para definir automaticamente o tipo do vídeo (entrevista/b-roll) a partir da categoria detectada.",
@@ -257,6 +271,13 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
     },
 
     # ── Timeline & Sugestões ─────────────────────────────────────────────────
+    {
+        "key": "export.worker_python", "type": "string", "default": "",
+        "label": "Exportação: Python do worker OTIO",
+        "help": "Caminho do python.exe usado para exportar OTIO/XML/EDL quando o Python principal não tem o opentimelineio. Vazio = detectar automaticamente em data/venv312.",
+        "help_tech": "Override de _resolve_worker_python() em otio_export.py. O worker roda 'python -m src.export.otio_export' num venv 3.12 (o opentimelineio 0.18.1 não tem wheel cp314; verificado em 19/07/2026).",
+        "category": "timeline", "level": "pro", "scope": "global", "requires_reprocess": False,
+    },
     {
         "key": "timeline.max_suggestions", "type": "int", "default": 5, "min": 1, "max": 10, "step": 1,
         "label": "Nº máximo de sugestões",

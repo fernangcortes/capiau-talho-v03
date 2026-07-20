@@ -1,20 +1,31 @@
-"""Exportador de Timelines em formatos OpenTimelineIO, XML e EDL para editores profissionais."""
+"""Exportador de Timelines em formatos OpenTimelineIO, XML e EDL para editores profissionais.
+
+O 'opentimelineio' não tem wheel para o Python 3.14 (verificado em 19/07/2026, v0.18.1).
+Quando o import falha, a exportação é delegada por subprocesso a um venv Python 3.12
+dedicado ('data/venv312', criado via uv) que roda ESTE mesmo módulo como worker.
+"""
+import os
+import sys
 import sqlite3
 import json
+import subprocess
 from pathlib import Path
 
 # Import opcional: sem o pacote (ex.: Python sem wheel disponível), o app sobe
-# normalmente e apenas a exportação OTIO/XML/EDL fica indisponível com erro claro.
+# normalmente e a exportação passa a usar o worker 3.12 (se existir).
 try:
     import opentimelineio as otio
     OTIO_AVAILABLE = True
 except ImportError:
     otio = None
     OTIO_AVAILABLE = False
-    print("[EXPORT] Aviso: 'opentimelineio' não instalado — exportação de timeline desabilitada até instalar o pacote.")
+    print("[EXPORT] Aviso: 'opentimelineio' sem wheel neste Python; exportacao usara o worker do venv 3.12 (data/venv312) se ele existir.")
 
 from src.config import CONFIG
 from src.db.connection import get_db
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DEFAULT_WORKER_PYTHON = _REPO_ROOT / "data" / "venv312" / "Scripts" / "python.exe"
 
 def generate_otio_timeline(timeline_id: int) -> "otio.schema.Timeline":
     """Carrega os cortes salvos na tabela 'timeline' e monta uma timeline do OpenTimelineIO.
@@ -157,9 +168,69 @@ def generate_otio_timeline(timeline_id: int) -> "otio.schema.Timeline":
 
         return otio_timeline
 
+def _resolve_worker_python() -> "Path | None":
+    """Python do venv de exportação: override em settings ou o default data/venv312."""
+    try:
+        from src.services.settings_service import SettingsService
+        configured = str(SettingsService.get_settings(None).get("export.worker_python") or "").strip()
+        if configured:
+            p = Path(configured)
+            if p.exists():
+                return p
+            print(f"[EXPORT] Aviso: export.worker_python aponta para caminho inexistente: {configured}")
+    except Exception:
+        pass  # settings indisponiveis (ex.: worker standalone) -> usa default
+    if _DEFAULT_WORKER_PYTHON.exists():
+        return _DEFAULT_WORKER_PYTHON
+    return None
+
+
+def _export_via_worker(timeline_id: int, output_format: str) -> Path:
+    """Roda a exportação num subprocesso do venv 3.12 (que tem o opentimelineio)."""
+    worker_py = _resolve_worker_python()
+    if worker_py is None:
+        raise RuntimeError(
+            "Exportação indisponível: 'opentimelineio' não tem wheel neste Python e o venv de "
+            "exportação não foi encontrado. Crie-o com: uv venv data/venv312 --python 3.12 && "
+            "uv pip install --python data/venv312/Scripts/python.exe opentimelineio otio-fcp-adapter otio-cmx3600-adapter python-dotenv"
+        )
+
+    env = os.environ.copy()
+    env["CAPIAU_OTIO_WORKER"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+    # O worker herda os caminhos ativos (testes usam DB/exports temporarios)
+    env["CAPIAU_DB_PATH"] = str(CONFIG.DB_PATH)
+    env["CAPIAU_EXPORTS_DIR"] = str(CONFIG.EXPORTS_DIR)
+
+    proc = subprocess.run(
+        [str(worker_py), "-m", "src.export.otio_export", str(timeline_id), output_format],
+        cwd=str(_REPO_ROOT), capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=180, env=env,
+    )
+    if proc.returncode != 0:
+        tail = (proc.stderr or proc.stdout or "").strip()[-600:]
+        raise RuntimeError(f"Worker de exportacao (venv 3.12) falhou: {tail}")
+
+    for line in reversed((proc.stdout or "").strip().splitlines()):
+        line = line.strip()
+        if line.startswith("{"):
+            return Path(json.loads(line)["path"])
+    raise RuntimeError("Worker de exportacao nao devolveu o caminho do arquivo gerado.")
+
+
 def export_timeline_file(timeline_id: int, output_format: str = "otio") -> Path:
+    """Exporta a timeline para .otio, .xml ou .edl e retorna o caminho em data/exports/.
+
+    Com o otio importável, roda no próprio processo; sem ele, delega ao worker 3.12.
+    """
+    if not OTIO_AVAILABLE:
+        return _export_via_worker(timeline_id, output_format)
+    return _export_in_process(timeline_id, output_format)
+
+
+def _export_in_process(timeline_id: int, output_format: str = "otio") -> Path:
     """Exporta a timeline selecionada para o formato especificado (.otio, .xml ou .edl).
-    
+
     Salva o arquivo em data/exports/ e retorna o caminho.
     """
     otio_timeline = generate_otio_timeline(timeline_id)
@@ -188,5 +259,26 @@ def export_timeline_file(timeline_id: int, output_format: str = "otio") -> Path:
     print(f"[EXPORT] Exportando timeline {timeline_id} para {output_path.name}...")
     otio.adapters.write_to_file(otio_timeline, str(output_path), adapter_name=adapter_name)
     print("  [OK] Timeline salva com sucesso!")
-    
+
     return output_path
+
+
+if __name__ == "__main__":
+    # Modo worker: `python -m src.export.otio_export <timeline_id> <formato>`
+    # Executado pelo venv 3.12 quando o Python principal nao tem o opentimelineio.
+    if os.environ.get("CAPIAU_DB_PATH"):
+        CONFIG.DB_PATH = Path(os.environ["CAPIAU_DB_PATH"])
+    if os.environ.get("CAPIAU_EXPORTS_DIR"):
+        CONFIG.EXPORTS_DIR = Path(os.environ["CAPIAU_EXPORTS_DIR"])
+
+    if not OTIO_AVAILABLE:
+        # Nunca re-delegar daqui: worker sem otio e erro de configuracao, nao fallback.
+        print("[EXPORT-WORKER] Este Python tambem nao tem o opentimelineio instalado.", file=sys.stderr)
+        sys.exit(3)
+    if len(sys.argv) < 3:
+        print("Uso: python -m src.export.otio_export <timeline_id> <otio|xml|edl>", file=sys.stderr)
+        sys.exit(2)
+
+    _result_path = _export_in_process(int(sys.argv[1]), sys.argv[2])
+    # Ultima linha em JSON: contrato de saida lido pelo processo pai
+    print(json.dumps({"path": str(_result_path)}))
