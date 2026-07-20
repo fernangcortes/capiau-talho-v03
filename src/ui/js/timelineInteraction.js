@@ -31,8 +31,15 @@ export class CapiauTimelineInteraction {
         this.boundMouseDown = (e) => this.onMouseDown(e);
         this.boundMouseMove = (e) => this.onMouseMove(e);
         this.boundMouseUp = (e) => this.onMouseUp(e);
+        this.boundDblClick = (e) => this.onDblClick(e);
         this.boundWheel = (e) => this.onWheel(e);
-        this.boundMouseLeave = () => this.hideHoverPreview();
+        this.boundMouseLeave = () => {
+            if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                TIMELINE_STATE.hoveredMarkerId = null;
+                if (this.renderer) this.renderer.requestRedraw();
+            }
+            this.hideHoverPreview();
+        };
         this.boundKeyDown = (e) => this.onKeyDown(e);
         this.boundDragOver = (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; };
         this.boundDrop = (e) => this.onDrop(e);
@@ -47,6 +54,7 @@ export class CapiauTimelineInteraction {
         // Mouse Listeners
         this.canvas.addEventListener("mousedown", this.boundMouseDown);
         this.canvas.addEventListener("mousemove", this.boundMouseMove);
+        this.canvas.addEventListener("dblclick", this.boundDblClick);
         win.addEventListener("mouseup", this.boundMouseUp);
         this.canvas.addEventListener("wheel", this.boundWheel);
         const headersSidebar = this.canvas.ownerDocument.getElementById("timeline-headers-sidebar");
@@ -83,6 +91,7 @@ export class CapiauTimelineInteraction {
         const win = this.canvas.ownerDocument.defaultView || window;
         this.canvas.removeEventListener("mousedown", this.boundMouseDown);
         this.canvas.removeEventListener("mousemove", this.boundMouseMove);
+        this.canvas.removeEventListener("dblclick", this.boundDblClick);
         win.removeEventListener("mouseup", this.boundMouseUp);
         this.canvas.removeEventListener("wheel", this.boundWheel);
         this.canvas.removeEventListener("mouseleave", this.boundMouseLeave);
@@ -194,8 +203,17 @@ export class CapiauTimelineInteraction {
             this.mouseDownClip = null;
         }
         
-        // 1. Clique na régua de tempo (Scrubbing / Mover Playhead)
+        // 1. Clique na régua de tempo (Scrubbing / Drag de Marcador / Mover Playhead)
         if (y < this.renderer.rulerHeight) {
+            const tolerance = Math.max(3, Math.round(8 / TIMELINE_STATE.zoom));
+            const hitMarker = TIMELINE_STATE.getMarkerAtFrame(frame, tolerance);
+            if (hitMarker) {
+                this.dragState = "drag-marker";
+                this.draggedMarkerId = hitMarker.id;
+                TIMELINE_STATE.hoveredMarkerId = hitMarker.id;
+                this.updatePlayhead(hitMarker.frame);
+                return;
+            }
             this.dragState = "scrub";
             this.updatePlayhead(frame);
             return;
@@ -282,8 +300,33 @@ export class CapiauTimelineInteraction {
         this.mouseX = x;
         this.mouseY = y;
 
+        // Tooltip e Rótulo de hover na régua de tempo (Marcadores)
+        if (!this.dragState && y < this.renderer.rulerHeight) {
+            const tolerance = Math.max(3, Math.round(8 / TIMELINE_STATE.zoom));
+            const hoverMarker = TIMELINE_STATE.getMarkerAtFrame(frame, tolerance);
+            if (hoverMarker) {
+                this.canvas.style.cursor = "pointer";
+                const tc = framesToTimecode(hoverMarker.frame, TIMELINE_STATE.fps);
+                this.canvas.title = `[Marcador] ${hoverMarker.label} (${tc})${hoverMarker.comment ? ' — ' + hoverMarker.comment : ''}`;
+                if (TIMELINE_STATE.hoveredMarkerId !== hoverMarker.id) {
+                    TIMELINE_STATE.hoveredMarkerId = hoverMarker.id;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+            } else {
+                this.canvas.style.cursor = "default";
+                this.canvas.removeAttribute("title");
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+            }
+        }
         // Atualiza cursores dinâmicos de trim e tooltip com nome do arquivo
-        if (!this.dragState && track) {
+        else if (!this.dragState && track) {
+            if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                TIMELINE_STATE.hoveredMarkerId = null;
+                if (this.renderer) this.renderer.requestRedraw();
+            }
             const hit = this.findClipAt(frame, track);
             if (hit && hit.type === "clip") {
                 const edge = this.checkTrimZone(x, hit.data);
@@ -309,6 +352,10 @@ export class CapiauTimelineInteraction {
                 this.canvas.removeAttribute("title");
             }
         } else if (!this.dragState) {
+            if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                TIMELINE_STATE.hoveredMarkerId = null;
+                if (this.renderer) this.renderer.requestRedraw();
+            }
             this.canvas.removeAttribute("title");
         }
 
@@ -321,6 +368,12 @@ export class CapiauTimelineInteraction {
         if (this.dragState === "scrub") {
             this.updatePlayhead(frame);
         } 
+        else if (this.dragState === "drag-marker" && this.draggedMarkerId) {
+            TIMELINE_STATE.hoveredMarkerId = this.draggedMarkerId;
+            const snappedFrame = this.snapFrame(Math.max(0, Math.round(frame)));
+            TIMELINE_STATE.updateMarker(this.draggedMarkerId, { frame: snappedFrame });
+            this.updatePlayhead(snappedFrame);
+        }
         else if (this.dragState === "pan") {
             const dx = e.clientX - this.dragStartMouseX;
             const deltaFrames = dx / TIMELINE_STATE.zoom;
@@ -332,7 +385,6 @@ export class CapiauTimelineInteraction {
             const targetStart = Math.max(0, this.dragStartClipFrame + deltaFrames);
 
             // Trilha de destino: qualquer pista não travada sob o mouse
-            // (moveClip garante que o tipo da pista combina com o do clipe)
             let targetTrack = null;
             const trackObj = track ? TIMELINE_STATE.getTrack(track) : null;
             if (trackObj && trackObj.kind !== "ai" && !trackObj.locked) {
@@ -355,12 +407,41 @@ export class CapiauTimelineInteraction {
     }
 
     onMouseUp(e) {
+        if (this.dragState === "drag-marker") {
+            this.dragState = null;
+            this.draggedMarkerId = null;
+            TIMELINE_STATE.hoveredMarkerId = null;
+            if (this.canvas) this.canvas.style.cursor = "default";
+            if (this.renderer) this.renderer.requestRedraw();
+            return;
+        }
+        if (TIMELINE_STATE.hoveredMarkerId !== null) {
+            TIMELINE_STATE.hoveredMarkerId = null;
+            if (this.renderer) this.renderer.requestRedraw();
+        }
         // Fecha a transação do drag/trim (no-op se nada mudou)
         TIMELINE_HISTORY.commit();
         this.dragState = null;
         this.draggedClipId = null;
         this.mouseDownClip = null;
         if (this.canvas) this.canvas.style.cursor = "default";
+    }
+
+    /**
+     * Handler de clique duplo no canvas (abre edição de marcador ao clicar na régua).
+     */
+    onDblClick(e) {
+        const { x, y, frame } = this.getCoordinates(e.clientX, e.clientY);
+        if (y < this.renderer.rulerHeight) {
+            const tolerance = Math.max(3, Math.round(8 / TIMELINE_STATE.zoom));
+            const marker = TIMELINE_STATE.getMarkerAtFrame(frame, tolerance);
+            if (marker) {
+                this.openMarkerEditModal(marker);
+            } else {
+                const newMarker = TIMELINE_STATE.addMarker({ frame: Math.round(frame) });
+                this.openMarkerEditModal(newMarker);
+            }
+        }
     }
 
     /**
@@ -387,6 +468,90 @@ export class CapiauTimelineInteraction {
             const video = STATE.allVideos.find(v => v.id === payload.id);
             const dur = (video && video.duration) ? video.duration : 5.0;
             TIMELINE_STATE.addCut(payload.id, 0, dur, targetTrack, dropFrame);
+        }
+    }
+
+    /**
+     * Calcula se o frame alvo deve sofrer encaixe (snapping) em relação a playhead, marcadores ou bordas de clipes.
+     */
+    snapFrame(targetFrame, tolerancePx = 8) {
+        const zoom = TIMELINE_STATE.zoom || 0.5;
+        const toleranceFrames = tolerancePx / zoom;
+
+        let bestSnap = targetFrame;
+        let minDiff = toleranceFrames;
+
+        // 1. Encaixe na Playhead
+        const playheadDiff = Math.abs(TIMELINE_STATE.playheadFrame - targetFrame);
+        if (playheadDiff < minDiff) {
+            minDiff = playheadDiff;
+            bestSnap = TIMELINE_STATE.playheadFrame;
+        }
+
+        // 2. Encaixe nos Marcadores da Timeline
+        if (TIMELINE_STATE.markers) {
+            TIMELINE_STATE.markers.forEach(marker => {
+                if (marker.id === this.draggedMarkerId) return;
+                const diff = Math.abs(marker.frame - targetFrame);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    bestSnap = marker.frame;
+                }
+            });
+        }
+
+        // 3. Encaixe nas bordas dos cortes (início/fim de clipes)
+        if (STATE.activeTimelineCuts) {
+            STATE.activeTimelineCuts.forEach(cut => {
+                const startDiff = Math.abs(cut.timelineStartFrame - targetFrame);
+                if (startDiff < minDiff) {
+                    minDiff = startDiff;
+                    bestSnap = cut.timelineStartFrame;
+                }
+                const dur = (cut.outFrame - cut.inFrame);
+                const endDiff = Math.abs((cut.timelineStartFrame + dur) - targetFrame);
+                if (endDiff < minDiff) {
+                    minDiff = endDiff;
+                    bestSnap = cut.timelineStartFrame + dur;
+                }
+            });
+        }
+
+        return bestSnap;
+    }
+
+    /**
+     * Exibe o modal de edição de propriedades do marcador.
+     */
+    openMarkerEditModal(marker) {
+        if (!marker) return;
+        const doc = this.canvas ? this.canvas.ownerDocument : document;
+        const modal = doc.getElementById("modal-edit-marker");
+        if (!modal) return;
+
+        modal.dataset.markerId = marker.id;
+        const inputLabel = doc.getElementById("marker-edit-label");
+        const inputComment = doc.getElementById("marker-edit-comment");
+        const colorSwatches = modal.querySelectorAll(".marker-color-swatch");
+
+        if (inputLabel) inputLabel.value = marker.label || "";
+        if (inputComment) inputComment.value = marker.comment || "";
+
+        const currentColor = marker.color || "#06b6d4";
+        colorSwatches.forEach(swatch => {
+            if (swatch.dataset.color === currentColor) {
+                swatch.classList.add("selected");
+            } else {
+                swatch.classList.remove("selected");
+            }
+        });
+
+        modal.style.display = "flex";
+        if (inputLabel) {
+            setTimeout(() => {
+                inputLabel.focus();
+                inputLabel.select();
+            }, 50);
         }
     }
 
@@ -1496,6 +1661,41 @@ export class CapiauTimelineInteraction {
 
         const selectedId = TIMELINE_STATE.selectedClipId;
         const cuts = [...STATE.activeTimelineCuts];
+
+        // Atalhos de Marcadores da Timeline (M, Shift+M, Alt+M)
+        if (e.key.toLowerCase() === "m" && !e.ctrlKey && !e.metaKey) {
+            if (window.activeFocusedPlayer === "source") {
+                return;
+            }
+            e.preventDefault();
+            const playhead = TIMELINE_STATE.playheadFrame;
+
+            if (e.shiftKey) {
+                // Shift + M: Pula para o próximo marcador
+                const nextM = TIMELINE_STATE.getNextMarker(playhead);
+                if (nextM) {
+                    this.updatePlayhead(nextM.frame);
+                }
+                return;
+            } else if (e.altKey) {
+                // Alt + M: Pula para o marcador anterior
+                const prevM = TIMELINE_STATE.getPrevMarker(playhead);
+                if (prevM) {
+                    this.updatePlayhead(prevM.frame);
+                }
+                return;
+            }
+
+            // Tecla M simples: abre o modal de edição se já houver marcador no local ou cria novo
+            const existing = TIMELINE_STATE.getMarkerAtFrame(playhead, 3);
+            if (existing) {
+                this.openMarkerEditModal(existing);
+            } else {
+                const newMarker = TIMELINE_STATE.addMarker({ frame: playhead });
+                this.openMarkerEditModal(newMarker);
+            }
+            return;
+        }
 
         // Toggle do popup de alternativas com a tecla 'A'
         if (e.key.toLowerCase() === "a" && !e.ctrlKey && !e.metaKey && !e.altKey) {

@@ -125,6 +125,124 @@ export class CapiauTimelineState {
         this.ghostTrack = []; // Lista de sugestões da IA (Ghost Clips)
         this.selectedGhostClipId = null; // ID da sugestão de IA ativa
         this.aiAnalysisRunning = false; // Flag de análise de IA em andamento
+
+        this.markers = []; // Lista de marcadores na timeline [{ id, frame, label, color, comment }]
+        this.hoveredMarkerId = null; // ID do marcador sobre o qual o mouse está iterando (para mostrar rótulo no hover)
+    }
+
+    // ── MARCADORES DA TIMELINE ──────────────────────────────────────────
+
+    /**
+     * Retorna a lista de marcadores ordenada por frame.
+     */
+    getMarkersSorted() {
+        return [...this.markers].sort((a, b) => a.frame - b.frame);
+    }
+
+    /**
+     * Retorna um marcador existente próximo a um frame específico dentro da tolerância.
+     */
+    getMarkerAtFrame(frame, toleranceFrames = 3) {
+        return this.markers.find(m => Math.abs(m.frame - frame) <= toleranceFrames) || null;
+    }
+
+    /**
+     * Retorna o marcador por ID.
+     */
+    getMarker(id) {
+        return this.markers.find(m => m.id === id) || null;
+    }
+
+    /**
+     * Retorna o próximo marcador após o frame informado.
+     */
+    getNextMarker(currentFrame) {
+        const sorted = this.getMarkersSorted();
+        return sorted.find(m => m.frame > currentFrame) || null;
+    }
+
+    /**
+     * Retorna o marcador anterior ao frame informado.
+     */
+    getPrevMarker(currentFrame) {
+        const sorted = this.getMarkersSorted();
+        for (let i = sorted.length - 1; i >= 0; i--) {
+            if (sorted[i].frame < currentFrame) return sorted[i];
+        }
+        return null;
+    }
+
+    /**
+     * Adiciona um novo marcador na timeline.
+     */
+    addMarker({ frame = this.playheadFrame, label = "", color = "#06b6d4", comment = "" } = {}) {
+        const existing = this.getMarkerAtFrame(frame, 2);
+        if (existing) {
+            return existing;
+        }
+
+        const id = `marker_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        const markerCount = this.markers.length + 1;
+        const finalLabel = label || `Marcador ${markerCount}`;
+
+        const marker = {
+            id,
+            frame: Math.max(0, Math.round(frame)),
+            label: finalLabel,
+            color: color || "#06b6d4",
+            comment: comment || ""
+        };
+
+        this.markers.push(marker);
+        STATE.emit("timelineMarkersChanged", this.markers);
+        return marker;
+    }
+
+    /**
+     * Atualiza dados de um marcador existente.
+     */
+    updateMarker(id, updates = {}) {
+        const marker = this.getMarker(id);
+        if (!marker) return null;
+
+        if (updates.frame !== undefined) marker.frame = Math.max(0, Math.round(updates.frame));
+        if (updates.label !== undefined) marker.label = updates.label;
+        if (updates.color !== undefined) marker.color = updates.color;
+        if (updates.comment !== undefined) marker.comment = updates.comment;
+
+        STATE.emit("timelineMarkersChanged", this.markers);
+        return marker;
+    }
+
+    /**
+     * Remove um marcador pelo ID.
+     */
+    removeMarker(id) {
+        const idx = this.markers.findIndex(m => m.id === id);
+        if (idx !== -1) {
+            const removed = this.markers.splice(idx, 1)[0];
+            STATE.emit("timelineMarkersChanged", this.markers);
+            return removed;
+        }
+        return null;
+    }
+
+    /**
+     * Define todos os marcadores (usado ao restaurar/carregar projeto).
+     */
+    setMarkers(markers = []) {
+        if (!Array.isArray(markers)) {
+            this.markers = [];
+        } else {
+            this.markers = markers.map(m => ({
+                id: m.id || `marker_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                frame: Math.max(0, Math.round(m.frame || 0)),
+                label: m.label || "Marcador",
+                color: m.color || "#06b6d4",
+                comment: m.comment || ""
+            }));
+        }
+        STATE.emit("timelineMarkersChanged", this.markers);
     }
 
     // ── PISTAS ──────────────────────────────────────────────────────────

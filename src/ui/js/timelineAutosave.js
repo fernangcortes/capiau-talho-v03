@@ -43,7 +43,8 @@ function performAutosave() {
             fps: TIMELINE_STATE.fps,
             width: TIMELINE_STATE.width || 1920,
             height: TIMELINE_STATE.height || 1080,
-            previewZoom: TIMELINE_STATE.previewZoom || "fit"
+            previewZoom: TIMELINE_STATE.previewZoom || "fit",
+            markers: TIMELINE_STATE.markers
         };
         
         localStorage.setItem(`capiau_timeline_autosave_${projectId}`, JSON.stringify(data));
@@ -81,6 +82,7 @@ export function restoreAutosave(projectId) {
         isAutosaveSuspended = true;
         TIMELINE_HISTORY.clear();
         TIMELINE_STATE.ghostTrack = [];
+        TIMELINE_STATE.setMarkers([]);
         STATE.emit("timelineGhostUpdated", []);
         isAutosaveSuspended = false;
         return;
@@ -132,6 +134,9 @@ export function restoreAutosave(projectId) {
             TIMELINE_STATE.ghostTrack = data.ghosts;
             STATE.emit("timelineGhostUpdated", TIMELINE_STATE.ghostTrack);
         }
+
+        // 3.b Restaura marcadores da timeline
+        TIMELINE_STATE.setMarkers(data.markers || []);
 
         // 4. Restaura preferências de visualização (zoom, scrolls, playhead)
         if (data.zoom !== undefined) TIMELINE_STATE.setZoom(data.zoom);
@@ -198,7 +203,8 @@ export function initAutosave() {
         "timelinePlayheadChanged",
         "timelineZoomChanged",
         "timelineScrollChanged",
-        "timelineVScrollChanged"
+        "timelineVScrollChanged",
+        "timelineMarkersChanged"
     ];
 
     events.forEach(event => {

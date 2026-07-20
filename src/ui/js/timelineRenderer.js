@@ -164,6 +164,7 @@ export class CapiauTimelineRenderer {
         STATE.on("timelineScrollChanged", () => this.requestRedraw());
         STATE.on("timelineVScrollChanged", () => this.requestRedraw());
         STATE.on("timelinePlayheadChanged", () => this.requestRedraw());
+        STATE.on("timelineMarkersChanged", () => this.requestRedraw());
         STATE.on("activeVideoChanged", () => this.requestRedraw());
 
         // Inicia o render loop
@@ -228,6 +229,9 @@ export class CapiauTimelineRenderer {
 
         // Desenha a grade e a régua de tempo (por cima das pistas roladas)
         this.drawRuler();
+
+        // Desenha marcadores na timeline
+        this.drawMarkers();
 
         // Desenha o cursor do Playhead (currentTime)
         this.drawPlayhead();
@@ -355,6 +359,89 @@ export class CapiauTimelineRenderer {
                 ctx.fillText(displayTc, x + 4, this.rulerHeight - 16);
             }
         }
+    }
+
+    /**
+     * Desenha os marcadores da timeline (linhas guia verticais e bandeiras na régua).
+     */
+    drawMarkers() {
+        const ctx = this.ctx;
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+        const markers = TIMELINE_STATE.getMarkersSorted();
+
+        if (!markers || markers.length === 0) return;
+
+        markers.forEach(marker => {
+            const x = (marker.frame - scrollLeft) * zoom;
+            
+            // Só desenha se estiver dentro dos limites visíveis do canvas
+            if (x < -20 || x > this.width + 20) return;
+
+            const color = marker.color || "#06b6d4";
+
+            // 1. Linha vertical guia pelas pistas (Stem)
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.55;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 3]); // Linha pontilhada estilosa
+            ctx.beginPath();
+            ctx.moveTo(x, this.rulerHeight);
+            ctx.lineTo(x, this.height);
+            ctx.stroke();
+            ctx.restore();
+
+            // 2. Bandeira na Régua (Pentágono/Flag apontando para baixo)
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+            ctx.lineWidth = 1.5;
+
+            const flagWidth = 12;
+            const flagHeight = 16;
+            const topY = 2;
+            const bottomY = topY + flagHeight;
+
+            ctx.beginPath();
+            ctx.moveTo(x - flagWidth / 2, topY);
+            ctx.lineTo(x + flagWidth / 2, topY);
+            ctx.lineTo(x + flagWidth / 2, topY + 10);
+            ctx.lineTo(x, bottomY); // Ponta apontando para baixo na régua
+            ctx.lineTo(x - flagWidth / 2, topY + 10);
+            ctx.closePath();
+
+            ctx.fill();
+            ctx.stroke();
+
+            // O rótulo (título) é exibido apenas quando o marcador estiver em HOVER (ou sendo arrastado)
+            const isHovered = (TIMELINE_STATE.hoveredMarkerId === marker.id);
+            if (marker.label && isHovered) {
+                ctx.font = "bold 9px Inter, sans-serif";
+                const textMetrics = ctx.measureText(marker.label);
+                const textWidth = textMetrics.width;
+                const labelX = x + flagWidth / 2 + 3;
+                const labelY = topY + 1;
+
+                // Fundo glass da etiqueta
+                ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
+                ctx.beginPath();
+                ctx.roundRect(labelX, labelY, textWidth + 8, 14, 3);
+                ctx.fill();
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Texto do rótulo
+                ctx.fillStyle = "#ffffff";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "middle";
+                ctx.fillText(marker.label, labelX + 4, labelY + 7);
+            }
+
+            ctx.restore();
+        });
     }
 
     /**

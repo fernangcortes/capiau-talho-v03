@@ -147,6 +147,31 @@ export class CapIAuAPI {
         return this.request(`/api/photo/${photoId}/analyze-vision`, { method: "POST" });
     }
 
+    // -- Triagem (E2.C2): correção de categoria e fila de revisão
+    static updateVideoCategory(videoId, category, note = "") {
+        return this.request(`/api/video/${videoId}/category`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ category, note })
+        });
+    }
+
+    static updatePhotoCategory(photoId, category, note = "") {
+        return this.request(`/api/photo/${photoId}/category`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ category, note })
+        });
+    }
+
+    static fetchTriageReview(projectId) {
+        return this.request(`/api/project/${projectId}/triage/review`);
+    }
+
+    static fetchResolvedSettings(projectId) {
+        return this.request(`/api/settings?project_id=${projectId}`);
+    }
+
     static analyzeAllVision(projectId, force = false) {
         return this.request(`/api/project/${projectId}/analyze-all-vision?force=${force}`, { method: "POST" });
     }
