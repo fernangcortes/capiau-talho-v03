@@ -162,6 +162,7 @@ def replicate_to_members(project_id: int, group: BurstGroup) -> int:
                             project_id, member["id"],
                             photo_image_path(member["id"], member["filepath"]),
                             vector=member.get("clip_vector"),  # já calculado no agrupamento
+                            category=leader.get("category"),
                         )
                     except Exception as clip_err:
                         print(f"[Burst] Falha ao indexar CLIP da foto {member['id']}: {clip_err}")

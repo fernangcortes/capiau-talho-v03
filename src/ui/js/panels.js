@@ -242,6 +242,83 @@ export class PanelsManager {
             if (r) r.style.opacity = canRedo ? "1" : "0.4";
         });
 
+        // ── Marcadores da Timeline (Botão e Modal) ──
+        const btnAddMarker = document.getElementById("btn-add-marker");
+        if (btnAddMarker) {
+            btnAddMarker.addEventListener("click", () => {
+                const marker = TIMELINE_STATE.addMarker({ frame: TIMELINE_STATE.playheadFrame });
+                if (this.interaction) {
+                    this.interaction.openMarkerEditModal(marker);
+                }
+            });
+        }
+
+        const modalEditMarker = document.getElementById("modal-edit-marker");
+        if (modalEditMarker) {
+            const btnCloseModal = document.getElementById("btn-close-marker-modal");
+            const btnCancelModal = document.getElementById("btn-marker-cancel");
+            const btnSaveModal = document.getElementById("btn-marker-save");
+            const btnDeleteModal = document.getElementById("btn-marker-delete");
+            const inputLabel = document.getElementById("marker-edit-label");
+            const inputComment = document.getElementById("marker-edit-comment");
+            const colorSwatches = modalEditMarker.querySelectorAll(".marker-color-swatch");
+
+            const closeModal = () => {
+                modalEditMarker.style.display = "none";
+            };
+
+            if (btnCloseModal) btnCloseModal.addEventListener("click", closeModal);
+            if (btnCancelModal) btnCancelModal.addEventListener("click", closeModal);
+
+            // Seleção de cores
+            colorSwatches.forEach(swatch => {
+                swatch.addEventListener("click", () => {
+                    colorSwatches.forEach(s => s.classList.remove("selected"));
+                    swatch.classList.add("selected");
+                });
+            });
+
+            // Salvar marcador
+            if (btnSaveModal) {
+                btnSaveModal.addEventListener("click", () => {
+                    const markerId = modalEditMarker.dataset.markerId;
+                    if (!markerId) return closeModal();
+
+                    const selectedSwatch = modalEditMarker.querySelector(".marker-color-swatch.selected");
+                    const color = selectedSwatch ? selectedSwatch.dataset.color : "#06b6d4";
+                    const label = inputLabel ? inputLabel.value.trim() : "";
+                    const comment = inputComment ? inputComment.value.trim() : "";
+
+                    TIMELINE_STATE.updateMarker(markerId, { label, color, comment });
+                    closeModal();
+                });
+            }
+
+            // Excluir marcador
+            if (btnDeleteModal) {
+                btnDeleteModal.addEventListener("click", () => {
+                    const markerId = modalEditMarker.dataset.markerId;
+                    if (markerId) {
+                        TIMELINE_STATE.removeMarker(markerId);
+                    }
+                    closeModal();
+                });
+            }
+
+            // Teclas no input de rótulo (Enter salva, Escape fecha)
+            if (inputLabel) {
+                inputLabel.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (btnSaveModal) btnSaveModal.click();
+                    } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        closeModal();
+                    }
+                });
+            }
+        }
+
         STATE.on("timelineTracksChanged", () => {
             const slider = getActiveElement("track-height-slider");
             if (slider && document.activeElement !== slider) {

@@ -590,7 +590,8 @@ export class LibraryManager {
     init() {
         STATE.on("videosUpdated", (videos) => this.renderVideos(videos));
         STATE.on("photosUpdated", (photos) => this.renderPhotos(photos));
-        STATE.on("projectChanged", () => this.reloadData());
+        STATE.on("projectChanged", () => { this.reloadData(); this.loadTriageReviewThreshold(); });
+        this.loadTriageReviewThreshold();
         STATE.on("leftTabChanged", (tabId) => this.updateSearchPlaceholder(tabId));
         STATE.on("activeVideoChanged", (video) => {
             document.querySelectorAll(".media-card.tree-file-item").forEach(el => {
@@ -663,6 +664,36 @@ export class LibraryManager {
         }
         if (this.btnAnalyzePhoto) {
             this.btnAnalyzePhoto.addEventListener("click", () => this.analyzeCurrentPhoto());
+        }
+
+        // Correção de categoria da foto (E2.C2) — propaga para a rajada no backend
+        const photoCategorySelect = document.getElementById("photo-viewer-category");
+        if (photoCategorySelect) {
+            photoCategorySelect.addEventListener("change", async () => {
+                const photo = this.currentLightboxPhoto;
+                const newCategory = photoCategorySelect.value;
+                if (!photo || !newCategory) return;
+                try {
+                    const res = await CapIAuAPI.updatePhotoCategory(photo.id, newCategory);
+                    const group = photo.burst_group_id;
+                    (STATE.allPhotos || []).forEach(p => {
+                        if (p.id === photo.id || (group != null && p.burst_group_id === group)) {
+                            p.category = res.category;
+                            p.category_confidence = 1.0;
+                        }
+                    });
+                    const confEl = document.getElementById("photo-viewer-category-conf");
+                    if (confEl) {
+                        confEl.textContent = res.updated_count > 1
+                            ? `confirmada (${res.updated_count} fotos da rajada)`
+                            : "confirmada por você";
+                    }
+                    STATE.emit("photosUpdated", STATE.allPhotos);
+                } catch (e) {
+                    alert("Erro ao corrigir categoria: " + e.message);
+                    photoCategorySelect.value = photo.category || "";
+                }
+            });
         }
 
         this.initPhotoZoomControls();
@@ -1690,6 +1721,44 @@ export class LibraryManager {
         }
     }
 
+    // ── Triagem (E2.C2): limiar do filtro revisar:triagem e dropdowns de categoria ──
+
+    async loadTriageReviewThreshold() {
+        // Limiar usado por needsTriageReview() no searchParser (filtro revisar:triagem)
+        try {
+            const data = await CapIAuAPI.fetchResolvedSettings(STATE.currentProjectId || 1);
+            const entry = data && data.values && data.values["triage.min_confidence"];
+            if (entry && typeof entry.value === "number") {
+                window.TRIAGE_REVIEW_THRESHOLD = entry.value;
+            }
+        } catch (e) {
+            // Sem settings acessíveis, o filtro usa o default 0.55 espelhado no parser
+        }
+    }
+
+    fillCategorySelect(selectEl, currentCategory) {
+        if (!selectEl) return;
+        selectEl.innerHTML = "";
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "— sem categoria —";
+        placeholder.disabled = true;
+        selectEl.appendChild(placeholder);
+        Object.entries(CATEGORY_LABELS).forEach(([value, label]) => {
+            const opt = document.createElement("option");
+            opt.value = value;
+            opt.textContent = label;
+            selectEl.appendChild(opt);
+        });
+        selectEl.value = currentCategory && CATEGORY_LABELS[currentCategory] ? currentCategory : "";
+    }
+
+    categoryConfidenceLabel(item) {
+        if (!item || item.category == null || item.category_confidence == null) return "";
+        if (item.category_confidence >= 1.0) return "confirmada por você";
+        return `IA: ${Math.round(item.category_confidence * 100)}%`;
+    }
+
     // Lightbox / Visualizador de Fotos
     openLightbox(photo) {
         if (!this.lightbox) return;
@@ -1719,6 +1788,11 @@ export class LibraryManager {
             });
         }
         
+        // Categoria da triagem (E2.C2): dropdown de correção
+        this.fillCategorySelect(document.getElementById("photo-viewer-category"), photo.category);
+        const photoCatConf = document.getElementById("photo-viewer-category-conf");
+        if (photoCatConf) photoCatConf.textContent = this.categoryConfidenceLabel(photo);
+
         // Carrega Rostos Rotulados
         this.loadLightboxFaces(photo.id);
 
@@ -2236,6 +2310,28 @@ export class LibraryManager {
             });
         }
 
+        // Correção de categoria da triagem (E2.C2)
+        const selInspectorCategory = document.getElementById("sel-inspector-category");
+        if (selInspectorCategory) {
+            selInspectorCategory.addEventListener("change", async () => {
+                const video = STATE.activeVideo;
+                const newCategory = selInspectorCategory.value;
+                if (!video || !newCategory) return;
+                try {
+                    const res = await CapIAuAPI.updateVideoCategory(video.id, newCategory);
+                    video.category = res.category;
+                    video.category_confidence = 1.0;
+                    video.video_type = res.video_type;
+                    const catConfEl = document.getElementById("lbl-inspector-category-conf");
+                    if (catConfEl) catConfEl.textContent = "confirmada por você";
+                    STATE.emit("videosUpdated", STATE.allVideos);
+                } catch (e) {
+                    alert("Erro ao corrigir categoria: " + e.message);
+                    selInspectorCategory.value = video.category || "";
+                }
+            });
+        }
+
         const btnDetectFaces = document.getElementById("btn-inspector-ai-detect-faces");
         if (btnDetectFaces) {
             btnDetectFaces.addEventListener("click", async () => {
@@ -2547,6 +2643,11 @@ export class LibraryManager {
         if (summaryEl) {
             summaryEl.textContent = video.summary || video.description || "Nenhum resumo ou metadado gerado para esta mídia.";
         }
+
+        // Categoria da triagem (E2.C2): dropdown de correção
+        this.fillCategorySelect(document.getElementById("sel-inspector-category"), video.category);
+        const catConfEl = document.getElementById("lbl-inspector-category-conf");
+        if (catConfEl) catConfEl.textContent = this.categoryConfidenceLabel(video);
 
         this.inspectorMarkerIn = null;
         this.inspectorMarkerOut = null;

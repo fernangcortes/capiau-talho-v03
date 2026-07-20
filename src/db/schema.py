@@ -230,6 +230,21 @@ CREATE TABLE IF NOT EXISTS media_segment (
     end_time REAL NOT NULL,
     reason TEXT,
     motion_label TEXT,
+    shot_scale TEXT,        -- escala de plano zero-shot CLIP (E2.D1): detalhe|close|plano_medio|plano_americano|plano_geral|aereo
+    shot_scale_score REAL,  -- similaridade cosseno do rotulo vencedor (diagnostico/calibracao)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Correcoes humanas de triagem (E2.C2): registro do erro -> acerto.
+-- O E2.C3 consome as ultimas correcoes como few-shot no prompt de triagem.
+CREATE TABLE IF NOT EXISTS triage_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    media_kind TEXT CHECK(media_kind IN ('video', 'photo')) NOT NULL,
+    media_id INTEGER NOT NULL,
+    wrong_category TEXT,          -- categoria que a IA tinha dado (NULL = triagem falhou/sem categoria)
+    right_category TEXT NOT NULL, -- categoria corrigida pelo humano
+    note TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -270,6 +285,7 @@ CREATE INDEX IF NOT EXISTS idx_mention_video ON entity_mention(video_id, timesta
 CREATE INDEX IF NOT EXISTS idx_mention_photo ON entity_mention(photo_id);
 CREATE INDEX IF NOT EXISTS idx_theme_segment_theme ON theme_segment(theme_id);
 CREATE INDEX IF NOT EXISTS idx_theme_segment_video ON theme_segment(video_id);
+CREATE INDEX IF NOT EXISTS idx_triage_feedback_project ON triage_feedback(project_id, created_at);
 
 -- Configurações da IA: apenas OVERRIDES (ausência de linha = default do código).
 -- Resolução em camadas: default -> app_setting (global) -> project_setting (projeto).
@@ -382,6 +398,12 @@ def init_db(db_path: Path = None):
             cursor.execute("ALTER TABLE photo ADD COLUMN burst_group_id INTEGER")
             print("[MIGRATION] Coluna 'burst_group_id' adicionada a tabela photo.")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_photo_burst_group ON photo(project_id, burst_group_id)")
+        if "palette_temp" not in photo_cols:
+            cursor.execute("ALTER TABLE photo ADD COLUMN palette_temp TEXT")
+            print("[MIGRATION] Coluna 'palette_temp' adicionada a tabela photo.")
+        if "palette_hex" not in photo_cols:
+            cursor.execute("ALTER TABLE photo ADD COLUMN palette_hex TEXT")
+            print("[MIGRATION] Coluna 'palette_hex' adicionada a tabela photo.")
 
         # Migracoes para tabela theme (centroide de embedding e temas fixados pelo usuario)
         cursor.execute("PRAGMA table_info(theme)")
@@ -392,6 +414,16 @@ def init_db(db_path: Path = None):
         if "pinned" not in theme_cols:
             cursor.execute("ALTER TABLE theme ADD COLUMN pinned INTEGER DEFAULT 0")
             print("[MIGRATION] Coluna 'pinned' adicionada a tabela theme.")
+
+        # Migracoes para tabela media_segment (escala de plano zero-shot, E2.D1)
+        cursor.execute("PRAGMA table_info(media_segment)")
+        segment_cols = [row[1] for row in cursor.fetchall()]
+        if "shot_scale" not in segment_cols:
+            cursor.execute("ALTER TABLE media_segment ADD COLUMN shot_scale TEXT")
+            print("[MIGRATION] Coluna 'shot_scale' adicionada a tabela media_segment.")
+        if "shot_scale_score" not in segment_cols:
+            cursor.execute("ALTER TABLE media_segment ADD COLUMN shot_scale_score REAL")
+            print("[MIGRATION] Coluna 'shot_scale_score' adicionada a tabela media_segment.")
 
         conn.commit()
         

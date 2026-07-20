@@ -13,12 +13,14 @@ from fastapi.responses import JSONResponse
 from src.config import CONFIG
 from src.db.connection import get_db
 from src.api.dependencies import get_db_conn
-from src.api.schemas import ExternalPathIngest, LabelFacePayload, MergeClustersPayload, ReassignFacesPayload
+from src.api.schemas import CategoryUpdate, ExternalPathIngest, LabelFacePayload, MergeClustersPayload, ReassignFacesPayload
 from src.db.repositories.media import MediaRepository
 from src.core.tasks import TASK_MANAGER, read_worker_progress
 from src.services.ingest import IngestService
 from src.services.pipeline import PipelineService
 from src.services.burst_service import group_photo_bursts, replicate_to_members
+from src.services.settings_service import SettingsService
+from src.nlp.prompt_registry import TRIAGE_CATEGORIES
 from src.services.vision_batch import run_vision_batch
 from src.search.semantic import SemanticSearch
 
@@ -65,6 +67,140 @@ def list_photos(project_id: int = Query(1), conn: sqlite3.Connection = Depends(g
         except Exception:
             p['tags'] = []
     return photos
+
+# ── E2.C2: Fila de revisão de triagem + correção de categoria ────────────────
+
+def _record_triage_feedback(cursor, project_id: int, media_kind: str, media_id: int,
+                            wrong: Optional[str], right: str, note: str) -> None:
+    """Registra a correção humana. Alimenta o few-shot do prompt de triagem (E2.C3)."""
+    cursor.execute(
+        "INSERT INTO triage_feedback (project_id, media_kind, media_id, wrong_category, right_category, note) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (project_id, media_kind, media_id, wrong, right, note or None)
+    )
+
+@router.get("/api/project/{project_id}/triage/review")
+def triage_review_queue(project_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Mídias cuja triagem merece revisão humana: confiança abaixo de
+    `triage.min_confidence`, ou analisadas sem categoria (triagem falhou).
+    Entrevistas sem categoria ficam de fora — não passam por triagem de visão."""
+    S = SettingsService.get_settings(project_id)
+    min_conf = S.get("triage.min_confidence")
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """SELECT id, filename, title, category, category_confidence, video_type, duration, status
+           FROM video
+           WHERE project_id = ?
+             AND ((category IS NOT NULL AND category_confidence < ?)
+                  OR (category IS NULL AND video_type != 'interview'
+                      AND description IS NOT NULL AND description != ''))
+           ORDER BY category_confidence ASC""",
+        (project_id, min_conf)
+    )
+    videos = [dict(r) for r in cursor.fetchall()]
+
+    cursor.execute(
+        """SELECT id, filename, title, category, category_confidence, burst_group_id, status
+           FROM photo
+           WHERE project_id = ?
+             AND ((category IS NOT NULL AND category_confidence < ?)
+                  OR (category IS NULL AND description IS NOT NULL AND description != ''))
+           ORDER BY category_confidence ASC""",
+        (project_id, min_conf)
+    )
+    photos = [dict(r) for r in cursor.fetchall()]
+
+    return {
+        "status": "success",
+        "threshold": min_conf,
+        "videos": videos,
+        "photos": photos,
+        "total": len(videos) + len(photos),
+    }
+
+@router.patch("/api/video/{video_id}/category")
+def update_video_category(video_id: int, payload: CategoryUpdate, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Correção humana de categoria: persiste com confiança 1.0, registra o
+    feedback (few-shot do E2.C3) e re-deriva video_type quando aplicável."""
+    category = payload.category.strip().lower()
+    if category not in TRIAGE_CATEGORIES:
+        raise HTTPException(400, f"Categoria inválida '{category}'. Válidas: {', '.join(sorted(TRIAGE_CATEGORIES))}")
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT project_id, category, video_type FROM video WHERE id = ?", (video_id,))
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(404, "Vídeo não encontrado")
+
+    old_category = row["category"]
+    if old_category != category:
+        _record_triage_feedback(cursor, row["project_id"], "video", video_id, old_category, category, payload.note)
+
+    # 'depoimento' é fala dirigida à câmera -> interview; o resto -> broll.
+    derived_type = "interview" if category == "depoimento" else "broll"
+    cursor.execute(
+        "UPDATE video SET category = ?, category_confidence = 1.0, video_type = ? WHERE id = ?",
+        (category, derived_type, video_id)
+    )
+    conn.commit()
+
+    # Correção reflete na faceta 'category' do índice visual (E2.D3); falha não bloqueia
+    try:
+        from src.search.image_semantic import ImageSearch
+        ImageSearch.get_instance().sync_category_payload(row["project_id"], category, video_id=video_id)
+    except Exception as sync_err:
+        print(f"[Triage] Falha ao sincronizar faceta de categoria do video {video_id}: {sync_err}")
+
+    return {"status": "success", "id": video_id, "category": category,
+            "previous_category": old_category, "video_type": derived_type}
+
+@router.patch("/api/photo/{photo_id}/category")
+def update_photo_category(photo_id: int, payload: CategoryUpdate, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Correção humana de categoria da foto. Fotos de rajada compartilham a mesma
+    cena por construção (CLIP > limiar), então a correção propaga ao grupo inteiro."""
+    category = payload.category.strip().lower()
+    if category not in TRIAGE_CATEGORIES:
+        raise HTTPException(400, f"Categoria inválida '{category}'. Válidas: {', '.join(sorted(TRIAGE_CATEGORIES))}")
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT project_id, category, burst_group_id FROM photo WHERE id = ?", (photo_id,))
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(404, "Foto não encontrada")
+
+    old_category = row["category"]
+    if old_category != category:
+        _record_triage_feedback(cursor, row["project_id"], "photo", photo_id, old_category, category, payload.note)
+
+    if row["burst_group_id"] is not None:
+        cursor.execute(
+            "SELECT id FROM photo WHERE project_id = ? AND burst_group_id = ?",
+            (row["project_id"], row["burst_group_id"])
+        )
+        target_ids = [r["id"] for r in cursor.fetchall()]
+        cursor.execute(
+            "UPDATE photo SET category = ?, category_confidence = 1.0 WHERE project_id = ? AND burst_group_id = ?",
+            (category, row["project_id"], row["burst_group_id"])
+        )
+    else:
+        target_ids = [photo_id]
+        cursor.execute(
+            "UPDATE photo SET category = ?, category_confidence = 1.0 WHERE id = ?",
+            (category, photo_id)
+        )
+    updated_count = cursor.rowcount
+    conn.commit()
+
+    # Correção reflete na faceta 'category' do índice visual (E2.D3); falha não bloqueia
+    try:
+        from src.search.image_semantic import ImageSearch
+        ImageSearch.get_instance().sync_category_payload(row["project_id"], category, photo_ids=target_ids)
+    except Exception as sync_err:
+        print(f"[Triage] Falha ao sincronizar faceta de categoria das fotos {target_ids}: {sync_err}")
+
+    return {"status": "success", "id": photo_id, "category": category,
+            "previous_category": old_category, "updated_count": updated_count}
 
 def _enrich_image_hits(conn: sqlite3.Connection, hits: List[dict]) -> List[dict]:
     """Decora hits da coleção CLIP com metadados do banco (fotos ganham nome/proxy/título).

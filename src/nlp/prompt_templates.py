@@ -29,6 +29,57 @@ TIMELINE_PERSONAS = {
 }
 
 
+def _triage_feedback_block(project_id: Optional[int]) -> str:
+    """Últimas correções humanas de categoria viram exemplos no prompt (few-shot, E2.C3).
+
+    Lê a tabela triage_feedback (alimentada pelos PATCH /category do E2.C2).
+    Qualquer falha aqui degrada para prompt sem exemplos — nunca derruba a triagem.
+    """
+    if not project_id:
+        return ""
+    try:
+        from src.services.settings_service import SettingsService
+        limit = int(SettingsService.get_settings(project_id).get("triage.feedback_examples"))
+    except Exception:
+        limit = 6
+    if limit <= 0:
+        return ""
+
+    try:
+        from src.db.connection import get_db
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT f.media_kind, f.media_id, f.wrong_category, f.right_category, f.note,
+                          COALESCE(v.title, v.filename, p.title, p.filename) AS label
+                   FROM triage_feedback f
+                   LEFT JOIN video v ON f.media_kind = 'video' AND v.id = f.media_id
+                   LEFT JOIN photo p ON f.media_kind = 'photo' AND p.id = f.media_id
+                   WHERE f.project_id = ?
+                   ORDER BY f.id DESC LIMIT ?""",
+                (project_id, limit)
+            )
+            rows = cursor.fetchall()
+    except Exception:
+        return ""
+
+    if not rows:
+        return ""
+
+    lines = []
+    for r in rows:
+        label = r["label"] or f"{r['media_kind']} {r['media_id']}"
+        wrong = r["wrong_category"] or "sem categoria"
+        line = f'- "{label}": a IA classificou como \'{wrong}\' e o usuário corrigiu para \'{r["right_category"]}\''
+        if r["note"]:
+            line += f" (motivo: {r['note']})"
+        lines.append(line)
+    return (
+        "\nCORREÇÕES RECENTES DO USUÁRIO NESTE PROJETO (respeite estes padrões em casos parecidos; "
+        "a imagem continua mandando):\n" + "\n".join(lines) + "\n"
+    )
+
+
 def get_triage_prompt(filename: str = "", folder_hint: str = "", transcript_snippet: str = "", known_entities: list = None, project_id: Optional[int] = None) -> str:
     """Gera o prompt de triagem (categoria Eixo A + título) com o contexto barato disponível."""
     context_lines = []
@@ -45,6 +96,10 @@ def get_triage_prompt(filename: str = "", folder_hint: str = "", transcript_snip
     context_block = ""
     if context_lines:
         context_block = "\nCONTEXTO DISPONÍVEL (pistas, não verdades absolutas — a imagem manda):\n" + "\n".join(context_lines) + "\n"
+
+    # Few-shot com correções humanas (E2.C3) — entra pelo context_block para não
+    # exigir mudança em templates 'triage' customizados pelo usuário.
+    context_block += _triage_feedback_block(project_id)
 
     return get_prompt(
         "triage",
@@ -100,6 +155,7 @@ def get_photo_vision_prompt(known_entities: list = None, detected_people: list =
         '  "confianca": número de 0.0 a 1.0\n'
         '  "titulo": "título curto de 3 a 6 palavras específico desta foto"\n'
         "Definições das categorias:\n" + _triage_categories_block()
+        + _triage_feedback_block(project_id)
     )
     return base + suffix
 

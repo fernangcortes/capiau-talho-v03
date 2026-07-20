@@ -126,6 +126,26 @@ export function parseQuery(queryStr) {
     }
 }
 
+// E2.C2 — Item precisa de revisão de triagem? (categoria ausente em mídia analisada
+// ou confiança abaixo de triage.min_confidence; limiar carregado pela LibraryManager)
+export function needsTriageReview(item, tabId) {
+    if (!item) return false;
+    const threshold = (typeof window !== "undefined" && window.TRIAGE_REVIEW_THRESHOLD) || 0.55;
+    const lowConfidence = item.category != null && item.category_confidence != null
+        && item.category_confidence < threshold;
+    if (tabId === "tab-videos") {
+        // Entrevistas não passam por triagem de visão — sem categoria não é defeito
+        const analyzedNoCategory = !item.category && item.video_type !== "interview"
+            && !!(item.description || item.summary);
+        return lowConfidence || analyzedNoCategory;
+    }
+    if (tabId === "tab-photos") {
+        const analyzedNoCategory = !item.category && !!item.description;
+        return lowConfidence || analyzedNoCategory;
+    }
+    return false;
+}
+
 // Verifica se um termo simples bate com o item
 function matchTerm(item, tabId, term) {
     if (!item) return false;
@@ -173,7 +193,15 @@ function matchTerm(item, tabId, term) {
 // Verifica se um filtro chave-valor bate com o item
 function matchFilter(item, tabId, key, op, val) {
     const valLower = val.toLowerCase();
-    
+
+    // revisar:triagem — vale para vídeos e fotos
+    if (key === "revisar" || key === "review") {
+        if (valLower === "triagem" || valLower === "triage") {
+            return needsTriageReview(item, tabId);
+        }
+        return false;
+    }
+
     if (tabId === "tab-videos") {
         if (key === "tipo" || key === "type") {
             const t = (item.video_type || "").toLowerCase();
@@ -237,6 +265,13 @@ function matchFilter(item, tabId, key, op, val) {
             if (valLower === "processado" || valLower === "analisado" || valLower === "analyzed") return s === "analyzed" || s === "ingested";
             if (valLower === "erro" || valLower === "error") return s === "error";
             return s === valLower;
+        }
+        if (key === "categoria" || key === "cat") {
+            return (item.category || "").toLowerCase() === valLower;
+        }
+        if (key === "cor" || key === "paleta" || key === "temp") {
+            // Temperatura de cor da paleta (E2.D2): quente | neutro | frio
+            return (item.palette_temp || "").toLowerCase() === valLower;
         }
         if (key === "tag" || key === "tags") {
             try {
@@ -355,10 +390,15 @@ export function getAvailableSuggestions(items, tabId) {
             } else {
                 addEntry("tipo:bastidores", "Bastidores", "tipo:bastidores", "Tipo");
             }
-            
+
             // Categoria
             if (v.category) {
                 addEntry(`cat:${v.category}`, v.category, `cat:${v.category}`, "Categorias");
+            }
+
+            // Fila de revisão de triagem (E2.C2)
+            if (needsTriageReview(v, "tab-videos")) {
+                addEntry("revisar:triagem", "Revisar triagem", "revisar:triagem", "Triagem");
             }
             
             // Status
@@ -388,6 +428,22 @@ export function getAvailableSuggestions(items, tabId) {
                 if (p.status === "pending") addEntry("status:pendente", "Pendente", "status:pendente", "Status");
                 else if (p.status === "analyzed" || p.status === "ingested") addEntry("status:processado", "Processado", "status:processado", "Status");
                 else if (p.status === "error") addEntry("status:erro", "Erro", "status:erro", "Status");
+            }
+
+            // Fila de revisão de triagem (E2.C2)
+            if (needsTriageReview(p, "tab-photos")) {
+                addEntry("revisar:triagem", "Revisar triagem", "revisar:triagem", "Triagem");
+            }
+
+            // Categoria da triagem
+            if (p.category) {
+                addEntry(`cat:${p.category}`, p.category, `cat:${p.category}`, "Categorias");
+            }
+
+            // Temperatura de cor da paleta (E2.D2)
+            if (p.palette_temp) {
+                const corLabel = { quente: "Tons quentes", neutro: "Tons neutros", frio: "Tons frios" }[p.palette_temp] || p.palette_temp;
+                addEntry(`cor:${p.palette_temp}`, corLabel, `cor:${p.palette_temp}`, "Cor");
             }
             
             // Formato/Extensão

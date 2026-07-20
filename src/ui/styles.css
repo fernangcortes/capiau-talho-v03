@@ -6661,3 +6661,33 @@ input[type="number"] {
     pointer-events: none;
 }
 
+/* ── MARCADORES DA TIMELINE (TIMELINE MARKERS) ────────────────────────── */
+
+.marker-color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    outline: none;
+    padding: 0;
+}
+
+.marker-color-swatch:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 8px currentColor;
+}
+
+.marker-color-swatch.selected {
+    border-color: #ffffff !important;
+    transform: scale(1.18);
+    box-shadow: 0 0 10px currentColor;
+}
+
+#btn-add-marker:hover {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan);
+    transform: scale(1.1);
+}
+

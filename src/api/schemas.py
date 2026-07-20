@@ -19,6 +19,10 @@ class ExternalPathIngest(BaseModel):
     path: str
     project_id: int = 1
 
+class CategoryUpdate(BaseModel):
+    category: str
+    note: str = ""  # observação opcional do porquê (vira contexto few-shot no E2.C3)
+
 class CutItem(BaseModel):
     video_id: Optional[int] = None          # obrigatório para type='video'; None para fotos
     type: str = "video"                     # 'video' | 'photo' (discriminador de mídia)
