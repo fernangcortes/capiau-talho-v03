@@ -190,6 +190,42 @@ Timeline).
 | pistas da Timeline**  |                       | da pista selecionada. |
 +-----------------------+-----------------------+-----------------------+
 
+## 📍 Marcadores de Timeline e Clipe (Teclado-First)
+
+  -----------------------------------------------------------------------
+         **Tecla**        **Ação**                **Descrição**
+  ----------------------- ----------------------- -----------------------
+           **M**          **Criar / Editar        Adiciona um marcador
+                          Marcador**              compacto na playhead
+                                                  (auto-vincula ao clipe
+                                                  de vídeo sob a agulha ou
+                                                  na régua). Abre o box
+                                                  compacto sem pausar
+                                                  o vídeo.
+
+         **Tab**          **Alternar Campos**     Alterna o foco do
+                                                  teclado entre Nome,
+                                                  Descrição e Cores.
+
+    **Enter / Escape**    **Salvar e Fechar**     Salva o marcador e
+                                                  fecha o box flutuante
+                                                  instantaneamente.
+
+     **Shift + Click**    **Seleção Múltipla**    Seleciona múltiplos
+                                                  marcadores na timeline
+                                                  (borda branca de
+                                                  destaque).
+
+    **Shift + M / Alt + M** **Navegar Marcadores** Pula a agulha para o
+                                                  próximo (Shift+M) ou
+                                                  anterior (Alt+M)
+                                                  marcador.
+
+     **Delete / Backspace** **Exclusão em Lote**  Apaga todos os marcadores
+                                                  selecionados na timeline
+                                                  em uma única ação.
+  -----------------------------------------------------------------------
+
 ## 📸 Navegação no Visualizador de Fotos (Lightbox)
 
 Quando o modal visualizador de fotos de set estiver aberto, os seguintes

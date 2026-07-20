@@ -304,6 +304,20 @@ vinculadas aos clipes de vídeo (V1, V2\...).
   - **Solo (S):** Isola a pista ativa, silenciando/ocultando temporariamente todas as demais.
   - **Visibilidade (Ícone de Olho):** Oculta a renderização de vídeo da pista selecionada no Program Player.
 
+- **Marcadores de Timeline & Clipe de Vídeo (Teclado-First, Popover Compacto & Seleção em Lote):**
+  O sistema suporta dois tipos de marcadores visuais altamente integrados com a timeline:
+  - **Marcadores de Régua:** Ancorados à régua de tempo para notações globais de estrutura.
+  - **Marcadores Vinculados ao Clipe de Vídeo:** Se a agulha estiver sobre um clipe de vídeo na timeline (seja na pista V1 ou na pista B-Roll V2), o marcador é automaticamente fixado no retângulo do clipe de vídeo (`clipId`). Se o clipe for arrastado ou se a timeline for alterada, o marcador acompanha o vídeo perfeitamente. O marcador de clipe é desenhado exclusivamente dentro da pista do vídeo (sem stems verticais cruzando a tela).
+  - **Box de Edição Flutuante Compacto:** Pressionar a tecla **M** abre um cartão compacto de 310px no canto inferior direito da tela. O vídeo **continua reproduzindo sem pausa** enquanto o editor digita.
+  - **Fluxo Ultra-Rápido via Teclado:**
+    - Digite o nome do marcador.
+    - Pressione **Tab** para navegar para a Descrição.
+    - Pressione **Tab** para selecionar a Cor.
+    - Pressione **Enter** ou **Esc** para salvar e fechar o box.
+    - Pressione **M** novamente para salvar o atual e abrir o marcador no novo ponto da agulha.
+  - **Seleção Múltipla & Exclusão em Lote:** Segure **Shift + Clique** sobre múltiplos marcadores para selecioná-los (destacados com uma borda brilhante branca). Pressione a tecla **Delete** (ou **Backspace**) para excluir todos os marcadores selecionados de uma só vez.
+  - **Navegação Rápida entre Marcadores:** Pressione **Shift + M** para saltar para o próximo marcador ou **Alt + M** para retroceder ao marcador anterior.
+
 ## 🔄 6. Carrossel de Alternativas da IA (Atalho A)
 
 Sempre que a IA propuser e inserir um vídeo na timeline, ela indexará

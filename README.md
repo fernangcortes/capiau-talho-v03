@@ -171,6 +171,12 @@ Cut**.
   a **duplo clique para resetar sliders** de ajustes (posição, escala,
   rotação, crop e volume) para os valores padrão.
 
+- **📍 Marcadores de Timeline & Clipe Teclado-First (Box Compacto & Seleção em Lote)**:
+  Suporte a marcadores de régua e marcadores ancorados diretamente ao clipe de vídeo (V1 / V2 B-Roll).
+  Possui caixa flutuante compacta de edição (310px) operada sem pausar a reprodução do vídeo.
+  Navegação ultra-rápida via teclado (**M** cria/edita, **Tab** alterna campos de texto e cor, **Enter/Esc** salva e fecha),
+  seleção múltipla via **Shift + Clique** (borda de destaque branca) e exclusão em lote via **Delete/Backspace**.
+
 - **🔍 Busca por Similaridade em Lote & Explicações Didáticas do RAG**: Permite
   selecionar múltiplos cards para busca por similaridade em lote e exibe a
   justificativa didática do motivo pelo qual a IA relacionou determinado
