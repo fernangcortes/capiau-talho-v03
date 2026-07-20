@@ -67,6 +67,8 @@ const SEARCH_STATE = {
     hasMore: true,
     isLoading: false,
     loadedResults: [],
+    indexStatus: "ok",
+    indexWarning: null,
     activeMediaFilter: "",
     activeContextFilters: new Set(),
     aiCategories: null,
@@ -542,13 +544,36 @@ function applyFiltersAndRenderCards() {
         });
     }
     
-    if (filtered.length === 0) {
-        resultsList.innerHTML = `
-            <div class="empty-state">
-                <i class="fa-solid fa-filter-circle-xmark"></i>
-                <p>Nenhum resultado corresponde aos filtros selecionados.</p>
+    // Exibir alerta proeminente se o índice Qdrant estiver indisponível
+    if (SEARCH_STATE.indexStatus && SEARCH_STATE.indexStatus !== "ok") {
+        const banner = document.createElement("div");
+        banner.className = "index-warning-banner";
+        banner.style.background = "rgba(244, 63, 94, 0.15)";
+        banner.style.border = "1px solid var(--color-rose)";
+        banner.style.borderRadius = "6px";
+        banner.style.padding = "10px 12px";
+        banner.style.marginBottom = "12px";
+        banner.style.fontSize = "11px";
+        banner.style.color = "#fca5a5";
+        banner.style.lineHeight = "1.4";
+        banner.innerHTML = `
+            <div style="font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 6px; margin-bottom: 4px; color: var(--color-rose);">
+                <i class="fa-solid fa-triangle-exclamation"></i> Índice de Busca Indisponível
             </div>
+            <div>${escapeHtml(SEARCH_STATE.indexWarning || "Provavelmente há outra instância do app aberta (lock do Qdrant).")}</div>
         `;
+        resultsList.appendChild(banner);
+    }
+    
+    if (filtered.length === 0) {
+        if (!SEARCH_STATE.indexStatus || SEARCH_STATE.indexStatus === "ok") {
+            resultsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fa-solid fa-filter-circle-xmark"></i>
+                    <p>Nenhum resultado corresponde aos filtros selecionados.</p>
+                </div>
+            `;
+        }
         const controlsDiv = searchContainer.querySelector(".search-playlist-controls");
         if (controlsDiv) controlsDiv.style.display = "none";
         return;
@@ -1083,6 +1108,7 @@ async function runSemanticSearch() {
     }
     
     STATE.currentRightTab = "search";
+    if (window.expandRightPanel) window.expandRightPanel();
 
     SEARCH_STATE.query = query;
     SEARCH_STATE.similarBatchContext = null; // sai do modo lote: abas voltam à busca normal
@@ -1100,6 +1126,8 @@ async function runSemanticSearch() {
         const data = await CapIAuAPI.search(query, STATE.currentProjectId, filter, SEARCH_STATE.limit, SEARCH_STATE.offset);
         const results = data.results || [];
         SEARCH_STATE.loadedResults = results;
+        SEARCH_STATE.indexStatus = data.index_status || "ok";
+        SEARCH_STATE.indexWarning = data.warning || null;
         if (results.length < SEARCH_STATE.limit) {
             SEARCH_STATE.hasMore = false;
         }
@@ -1107,6 +1135,8 @@ async function runSemanticSearch() {
         renderSearchResults(query);
     } catch (err) {
         console.error("Erro na busca semântica:", err);
+        SEARCH_STATE.indexStatus = "unavailable";
+        SEARCH_STATE.indexWarning = err.message;
         if (searchContainer) {
             searchContainer.innerHTML = `<div class='error' style='padding: 15px;'>Erro na busca semântica: ${err.message}</div>`;
         }
@@ -1127,6 +1157,7 @@ async function showSimilarMedia(kind, id, opts = {}) {
         searchContainer.innerHTML = "<div class='loading' style='padding: 15px;'>Buscando mídias visualmente similares (CLIP local)...</div>";
     }
     STATE.currentRightTab = "search";
+    if (window.expandRightPanel) window.expandRightPanel();
 
     SEARCH_STATE.query = "";
     SEARCH_STATE.similarBatchContext = null; // sai do modo lote: abas voltam à busca normal
@@ -1134,6 +1165,8 @@ async function showSimilarMedia(kind, id, opts = {}) {
     SEARCH_STATE.hasMore = false; // resultado fechado: sem paginação/infinite scroll
     SEARCH_STATE.isLoading = false;
     SEARCH_STATE.loadedResults = [];
+    SEARCH_STATE.indexStatus = "ok";
+    SEARCH_STATE.indexWarning = null;
     SEARCH_STATE.activeMediaFilter = "";
     SEARCH_STATE.activeContextFilters.clear();
     SEARCH_STATE.aiCategories = null;
@@ -1145,9 +1178,13 @@ async function showSimilarMedia(kind, id, opts = {}) {
         if (kind === "video" && opts.timestamp != null) params.set("timestamp", opts.timestamp.toFixed(2));
         const data = await CapIAuAPI.request(`/api/media/${kind}/${id}/similar?${params}`);
         SEARCH_STATE.loadedResults = data.results || [];
+        SEARCH_STATE.indexStatus = data.index_status || "ok";
+        SEARCH_STATE.indexWarning = data.warning || null;
         renderSearchResults(opts.label ? `Similares a: ${opts.label}` : "Similares (visual)");
     } catch (err) {
         console.error("Erro na busca de similares:", err);
+        SEARCH_STATE.indexStatus = "unavailable";
+        SEARCH_STATE.indexWarning = err.message;
         if (searchContainer) {
             searchContainer.innerHTML = `<div class='error' style='padding: 15px;'>Erro ao buscar similares: ${err.message}</div>`;
         }
@@ -1364,16 +1401,50 @@ async function runSimilarBatch(mediaTypeFilter = null) {
         });
 
         SEARCH_STATE.loadedResults = data.results || [];
+        SEARCH_STATE.indexStatus = data.index_status || "ok";
+        SEARCH_STATE.indexWarning = data.warning || null;
         const criteriaName = ctx.searchType === "visual" ? "aparência visual" : "assunto em comum";
         renderSearchResults(`Similares (${criteriaName}) a ${ctx.items.length} ${ctx.items.length === 1 ? "item" : "itens"}`);
         injectSimilarRecipeHeader(data);
     } catch (err) {
         console.error("Erro na busca de similares em lote:", err);
+        SEARCH_STATE.indexStatus = "unavailable";
+        SEARCH_STATE.indexWarning = err.message;
         if (searchContainer) {
             searchContainer.innerHTML = `<div class='error' style='padding: 15px;'>Erro ao buscar similares: ${escapeHtml(err.message)}</div>`;
         }
     }
 }
+
+async function checkSystemHealth() {
+    try {
+        const health = await CapIAuAPI.fetchHealth();
+        const dot = document.getElementById("health-dot");
+        const label = document.getElementById("health-label");
+        const badge = document.getElementById("health-status-badge");
+        if (dot && label && badge) {
+            label.textContent = `:${health.port || 8000}`;
+            if (health.status === "ok") {
+                dot.style.background = "#22c55e";
+                dot.style.boxShadow = "0 0 6px #22c55e";
+                badge.setAttribute("data-tooltip", `Servidor Ativo na Porta ${health.port} | Banco: OK | Qdrant: OK`);
+            } else {
+                dot.style.background = "#f43f5e";
+                dot.style.boxShadow = "0 0 6px #f43f5e";
+                const errDetail = health.qdrant_error ? ` (${health.qdrant_error})` : "";
+                badge.setAttribute("data-tooltip", `⚠️ Servidor Degradado (Porta ${health.port}) | Qdrant: Indisponível${errDetail}`);
+            }
+        }
+    } catch (err) {
+        const dot = document.getElementById("health-dot");
+        const badge = document.getElementById("health-status-badge");
+        if (dot && badge) {
+            dot.style.background = "#f43f5e";
+            badge.setAttribute("data-tooltip", "⚠️ Servidor Desconectado / Inacessível");
+        }
+    }
+}
+window.checkSystemHealth = checkSystemHealth;
 
 /** Pré-sugere o critério conforme a seleção (só fotos -> visual; só entrevistas -> textual). */
 function applySimilarCriteriaSuggestion() {
@@ -1427,11 +1498,18 @@ window.searchSimilarMultiple = async function() {
     await runSimilarBatch(null);
 };
 
-// updateActionsRowVisibility removed as actions are now persistent inside each panel container
-
 // Inicialização da Aplicação
 window.addEventListener("DOMContentLoaded", () => {
     console.log("CapIAu-Talho: Inicializando os módulos...");
+
+    // Checagem inicial de saúde do servidor (porta e Qdrant)
+    checkSystemHealth();
+    setInterval(checkSystemHealth, 30000);
+
+    const healthBadge = document.getElementById("health-status-badge");
+    if (healthBadge) {
+        healthBadge.addEventListener("click", () => checkSystemHealth());
+    }
 
     // Event listeners para busca de similares em lote
     const searchSimilarBtn = document.getElementById("btn-search-similar-selected");
@@ -1661,6 +1739,10 @@ window.addEventListener("DOMContentLoaded", () => {
             window.dispatchEvent(new Event("resize"));
         }
     };
+
+    // Fluxos que entregam resultado no painel direito (busca, similares) precisam
+    // poder revelá-lo: resultado renderizado em painel recolhido = "não aconteceu nada".
+    window.expandRightPanel = () => expandSidebar("right");
 
     if (toggleLeft) toggleLeft.addEventListener("click", () => collapseSidebar("left"));
     if (toggleRight) toggleRight.addEventListener("click", () => collapseSidebar("right"));

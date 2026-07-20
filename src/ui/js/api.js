@@ -15,6 +15,11 @@ export class CapIAuAPI {
         }
     }
 
+    // -- Saúde & Diagnósticos
+    static fetchHealth() {
+        return this.request("/api/health");
+    }
+
     // -- Projetos & Documentos
     static fetchProjects() {
         return this.request("/api/projects");

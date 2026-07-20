@@ -66,6 +66,10 @@
             </div>
             
             <div class="actions-area">
+                <div id="health-status-badge" class="glassmorphism" data-tooltip="Status do Sistema: Verificando..." style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); margin-right: 4px;">
+                    <span id="health-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 6px #22c55e;"></span>
+                    <span id="health-label" style="color: var(--text-secondary);">:8000</span>
+                </div>
                 <button id="btn-scan" class="btn-outline" data-tooltip="Escanear a pasta watch/ para identificar e importar novos arquivos de mídia locais.">
                     <i class="fa-solid fa-arrows-rotate"></i>
                 </button>
