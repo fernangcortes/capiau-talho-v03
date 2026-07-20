@@ -14,6 +14,7 @@ from src.api.dependencies import get_db_conn
 from src.api.schemas import ProjectCreate, ProjectDriveLinkUpdate, ProjectExportOptions
 from src.db.repositories.projects import ProjectRepository
 from src.services.sync import SyncService
+from src.search.semantic import SemanticSearch
 
 router = APIRouter(tags=["Projects"])
 

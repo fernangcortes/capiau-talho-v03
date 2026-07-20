@@ -147,8 +147,13 @@ def search_media(
     offset: int = Query(0)
 ):
     """Busca híbrida inteligente cruzando metadados relacionais e Qdrant vetorial."""
-    results = RAGService.search_hybrid(project_id, query, media_type=media_type, limit=limit, offset=offset)
-    return {"query": query, "results": results}
+    data = RAGService.search_hybrid(project_id, query, media_type=media_type, limit=limit, offset=offset, return_meta=True)
+    return {
+        "query": query,
+        "results": data.get("results", []),
+        "index_status": data.get("index_status", "ok"),
+        "warning": data.get("warning")
+    }
 
 @router.get("/api/search/visual")
 def search_visual(
@@ -161,18 +166,35 @@ def search_visual(
     palette_temp: Optional[str] = Query(None, description="Faceta E2.D2: quente|neutro|frio"),
 ):
     """Busca visual pura por CLIP local (texto → imagem, sem custo de API), com facetas."""
-    from src.search.image_semantic import ImageSearch
-    results = ImageSearch.get_instance().search_text(
-        project_id, query, limit=limit,
-        shot_scale=shot_scale, category=category, camera_motion=camera_motion,
-        palette_temp=palette_temp,
-    )
-    for r in results:
-        r["explanation"] = f"Correspondência visual (CLIP) de {r['score']*100:.0f}% com os termos da busca."
-    return {"query": query, "results": results, "facets": {
-        "shot_scale": shot_scale, "category": category, "camera_motion": camera_motion,
-        "palette_temp": palette_temp,
-    }}
+    from src.search.image_semantic import ImageSearch, QdrantUnavailableError
+    index_status = "ok"
+    warning = None
+    results = []
+    try:
+        results = ImageSearch.get_instance().search_text(
+            project_id, query, limit=limit,
+            shot_scale=shot_scale, category=category, camera_motion=camera_motion,
+            palette_temp=palette_temp,
+        )
+        for r in results:
+            r["explanation"] = f"Correspondência visual (CLIP) de {r['score']*100:.0f}% com os termos da busca."
+    except QdrantUnavailableError as qe:
+        index_status = "unavailable"
+        warning = f"Índice de busca indisponível — {qe}"
+    except Exception as e:
+        index_status = "unavailable"
+        warning = "Índice de busca indisponível — provavelmente há outra instância do app aberta (lock do Qdrant)."
+
+    return {
+        "query": query,
+        "results": results,
+        "index_status": index_status,
+        "warning": warning,
+        "facets": {
+            "shot_scale": shot_scale, "category": category, "camera_motion": camera_motion,
+            "palette_temp": palette_temp,
+        }
+    }
 
 @router.post("/api/search/categorize")
 def categorize_search(payload: SearchCategorizePayload):

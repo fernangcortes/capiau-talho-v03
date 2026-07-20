@@ -78,6 +78,41 @@ app.include_router(faces.router)
 app.include_router(entities.router)
 app.include_router(settings.router)
 
+from fastapi import Request
+
+@app.get("/api/health")
+def get_health(request: Request):
+    """Retorna o status de saúde do backend: SQLite, Qdrant e porta em execução."""
+    db_ok = False
+    try:
+        with get_db() as conn:
+            conn.execute("SELECT 1")
+            db_ok = True
+    except Exception:
+        db_ok = False
+
+    qdrant_ok = False
+    qdrant_err = None
+    try:
+        from src.search.semantic import SemanticSearch
+        is_avail, err_msg = SemanticSearch.get_instance().check_health()
+        qdrant_ok = is_avail
+        qdrant_err = err_msg
+    except Exception as e:
+        qdrant_ok = False
+        qdrant_err = str(e)
+
+    port = request.url.port or 8000
+    status = "ok" if (db_ok and qdrant_ok) else "degraded"
+
+    return {
+        "status": status,
+        "db": "ok" if db_ok else "error",
+        "qdrant": "ok" if qdrant_ok else "unavailable",
+        "qdrant_error": qdrant_err,
+        "port": port
+    }
+
 @app.on_event("shutdown")
 def on_shutdown_cleanup() -> None:
     """Callback disparado no desligamento do servidor para matar processos orfaos."""

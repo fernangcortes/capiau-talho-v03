@@ -273,17 +273,19 @@ def similar_batch(payload: SimilarBatchRequest, conn: sqlite3.Connection = Depen
     items_list = [item.model_dump() for item in payload.items]
     media_filter = payload.media_type_filter if payload.media_type_filter not in (None, "all") else None
     labels = _source_labels(conn, payload.items)
-    results = []
+    index_status = "ok"
+    warning_msg = None
+    data = {}
 
     try:
         if payload.search_type == "textual":
-            from src.search.semantic import SemanticSearch
+            from src.search.semantic import SemanticSearch, QdrantUnavailableError
             data = SemanticSearch.get_instance().similar_to_multiple_items(
                 payload.project_id, items_list, media_type_filter=media_filter, limit=payload.limit
             )
 
             cursor = conn.cursor()
-            for h in data["results"]:
+            for h in data.get("results", []):
                 p = dict(h["payload"])
                 vid_id = p.get("video_id")
                 photo_id = p.get("photo_id")
@@ -325,17 +327,14 @@ def similar_batch(payload: SimilarBatchRequest, conn: sqlite3.Connection = Depen
                 })
 
         else:
-            from src.search.image_semantic import ImageSearch
-            # interview/broll: o Qdrant visual não distingue o tipo do vídeo — pede um
-            # lote maior e refina pelo SQLite abaixo, para não voltar menos que o limit
+            from src.search.image_semantic import ImageSearch, QdrantUnavailableError
             fetch_limit = payload.limit * 3 if media_filter in ("interview", "broll") else payload.limit
             data = ImageSearch.get_instance().similar_to_multiple_items(
                 payload.project_id, items_list, media_type_filter=media_filter, limit=fetch_limit
             )
 
-            # _enrich_image_hits reconstrói os hits: preserva best_source pela ordem
-            enriched_hits = _enrich_image_hits(conn, data["results"])
-            for enriched, original in zip(enriched_hits, data["results"]):
+            enriched_hits = _enrich_image_hits(conn, data.get("results", []))
+            for enriched, original in zip(enriched_hits, data.get("results", [])):
                 enriched["best_source"] = original.get("best_source")
 
             if media_filter in ("interview", "broll"):
@@ -363,34 +362,59 @@ def similar_batch(payload: SimilarBatchRequest, conn: sqlite3.Connection = Depen
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as qe:
+        index_status = "unavailable"
+        warning_msg = f"Índice de busca indisponível — {qe}"
 
     return {
         "results": results[:payload.limit],
         "mode_used": data.get("mode_used", "media"),
         "cohesion": data.get("cohesion", 0.0),
         "warnings": data.get("warnings", []),
+        "index_status": index_status,
+        "warning": warning_msg,
     }
 
 @router.get("/api/media/photo/{photo_id}/similar")
 def photo_similar(photo_id: int, project_id: int = Query(1), limit: int = Query(12), conn: sqlite3.Connection = Depends(get_db_conn)):
     """Fotos visualmente próximas via CLIP local (E2.B6)."""
-    from src.search.image_semantic import ImageSearch
-    hits = ImageSearch.get_instance().similar_to_photo(project_id, photo_id, limit=limit)
-    results = _enrich_image_hits(conn, hits)
-    for r in results:
-        r["explanation"] = "Aparência parecida com a foto de origem — composição, cores e enquadramento (CLIP local)."
-    return {"photo_id": photo_id, "results": results}
+    from src.search.image_semantic import ImageSearch, QdrantUnavailableError
+    index_status = "ok"
+    warning = None
+    results = []
+    try:
+        hits = ImageSearch.get_instance().similar_to_photo(project_id, photo_id, limit=limit)
+        results = _enrich_image_hits(conn, hits)
+        for r in results:
+            r["explanation"] = "Aparência parecida com a foto de origem — composição, cores e enquadramento (CLIP local)."
+    except QdrantUnavailableError as qe:
+        index_status = "unavailable"
+        warning = f"Índice de busca indisponível — {qe}"
+    except Exception as e:
+        index_status = "unavailable"
+        warning = "Índice de busca indisponível — provavelmente há outra instância do app aberta (lock do Qdrant)."
+    return {"photo_id": photo_id, "results": results, "index_status": index_status, "warning": warning}
 
 @router.get("/api/media/video/{video_id}/similar")
 def video_similar(video_id: int, project_id: int = Query(1), timestamp: float = Query(0.0), limit: int = Query(12), conn: sqlite3.Connection = Depends(get_db_conn)):
     """Trechos/fotos visualmente próximos do keyframe indexado mais perto do timestamp (E2.B6)."""
-    from src.search.image_semantic import ImageSearch
-    hits = ImageSearch.get_instance().similar_to_video_moment(project_id, video_id, timestamp=timestamp, limit=limit)
-    results = _enrich_image_hits(conn, hits)
-    moment = f"{int(timestamp // 60):02d}:{int(timestamp % 60):02d}"
-    for r in results:
-        r["explanation"] = f"Aparência parecida com o frame de {moment} do vídeo de origem — composição, cores e enquadramento (CLIP local)."
-    return {"video_id": video_id, "timestamp": timestamp, "results": results}
+    from src.search.image_semantic import ImageSearch, QdrantUnavailableError
+    index_status = "ok"
+    warning = None
+    results = []
+    try:
+        hits = ImageSearch.get_instance().similar_to_video_moment(project_id, video_id, timestamp=timestamp, limit=limit)
+        results = _enrich_image_hits(conn, hits)
+        moment = f"{int(timestamp // 60):02d}:{int(timestamp % 60):02d}"
+        for r in results:
+            r["explanation"] = f"Aparência parecida com o frame de {moment} do vídeo de origem — composição, cores e enquadramento (CLIP local)."
+    except QdrantUnavailableError as qe:
+        index_status = "unavailable"
+        warning = f"Índice de busca indisponível — {qe}"
+    except Exception as e:
+        index_status = "unavailable"
+        warning = "Índice de busca indisponível — provavelmente há outra instância do app aberta (lock do Qdrant)."
+    return {"video_id": video_id, "timestamp": timestamp, "results": results, "index_status": index_status, "warning": warning}
 
 @router.post("/api/ingest/select-folder")
 def select_folder_dialog():
