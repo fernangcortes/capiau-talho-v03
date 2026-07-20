@@ -586,6 +586,7 @@ class PipelineService:
                 t = (w_start + w_end) / 2.0
                 raw.append({"timestamp": min(t, cap_ts), "start": w_start, "end": w_end,
                             "segment_id": seg.get("id"),
+                            "motion_label": seg.get("motion_label"),
                             # A fatia central representa o trecho: é a última a ser
                             # cortada pelo teto, para nenhum shot/beat sumir da busca.
                             "_representa_trecho": (i == n // 2)})
@@ -816,11 +817,22 @@ class PipelineService:
                 if S.get("clip.enabled"):
                     try:
                         from src.search.image_semantic import ImageSearch
-                        ImageSearch.get_instance().index_video_keyframe(
+                        from src.vision.shot_scale import SHOT_SCALE_LABELS
+                        scale_label = ImageSearch.get_instance().index_video_keyframe(
                             project_id, video_id, frame_path,
                             start_time=job["start"], end_time=job["end"],
-                            segment_id=job.get("segment_id")
+                            segment_id=job.get("segment_id"),
+                            category=category,
+                            camera_motion=job.get("motion_label"),
                         )
+                        # Faceta de escala de plano (E2.D1) persiste no segmento
+                        if scale_label in SHOT_SCALE_LABELS and job.get("segment_id"):
+                            with get_db() as conn:
+                                conn.execute(
+                                    "UPDATE media_segment SET shot_scale = ? WHERE id = ?",
+                                    (scale_label, job["segment_id"])
+                                )
+                                conn.commit()
                     except Exception as clip_err:
                         print(f"[Vision] Falha na indexação CLIP do frame {timestamp:.1f}s: {clip_err}")
 
@@ -976,11 +988,28 @@ class PipelineService:
             search_engine = SemanticSearch.get_instance()
             search_engine.index_photo_description(project_id, photo_id, desc, tags)
 
+            # Paleta e temperatura de cor (E2.D2) — local; falha nunca bloqueia a análise
+            palette_temp = None
+            try:
+                from src.vision.palette import classify_palette_file
+                palette = classify_palette_file(target_path)
+                if palette:
+                    palette_temp = palette["palette_temp"]
+                    with get_db() as conn:
+                        conn.execute(
+                            "UPDATE photo SET palette_temp = ?, palette_hex = ? WHERE id = ?",
+                            (palette_temp, json.dumps(palette["palette_hex"]), photo_id)
+                        )
+                        conn.commit()
+            except Exception as pal_err:
+                print(f"[Vision] Falha na paleta da foto {photo_id}: {pal_err}")
+
             # Indexação visual CLIP da foto (local, sem custo de API)
             if SettingsService.get_settings(project_id).get("clip.enabled"):
                 try:
                     from src.search.image_semantic import ImageSearch
-                    ImageSearch.get_instance().index_photo(project_id, photo_id, target_path)
+                    ImageSearch.get_instance().index_photo(project_id, photo_id, target_path,
+                                                           category=category, palette_temp=palette_temp)
                 except Exception as clip_err:
                     print(f"[Vision] Falha na indexação CLIP da foto {photo_id}: {clip_err}")
 

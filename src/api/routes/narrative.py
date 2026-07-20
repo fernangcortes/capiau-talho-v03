@@ -154,14 +154,25 @@ def search_media(
 def search_visual(
     query: str = Query(..., min_length=1, alias="q"),
     project_id: int = Query(1),
-    limit: int = Query(20)
+    limit: int = Query(20),
+    shot_scale: Optional[str] = Query(None, description="Faceta E2.D3: detalhe|close|plano_medio|plano_americano|plano_geral|aereo"),
+    category: Optional[str] = Query(None, description="Faceta E2.D3: categoria da triagem (obra, processo...)"),
+    camera_motion: Optional[str] = Query(None, description="Faceta E2.D3: static|pan|tilt|walk|handheld|whip"),
+    palette_temp: Optional[str] = Query(None, description="Faceta E2.D2: quente|neutro|frio"),
 ):
-    """Busca visual pura por CLIP local (texto → imagem, sem custo de API)."""
+    """Busca visual pura por CLIP local (texto → imagem, sem custo de API), com facetas."""
     from src.search.image_semantic import ImageSearch
-    results = ImageSearch.get_instance().search_text(project_id, query, limit=limit)
+    results = ImageSearch.get_instance().search_text(
+        project_id, query, limit=limit,
+        shot_scale=shot_scale, category=category, camera_motion=camera_motion,
+        palette_temp=palette_temp,
+    )
     for r in results:
         r["explanation"] = f"Correspondência visual (CLIP) de {r['score']*100:.0f}% com os termos da busca."
-    return {"query": query, "results": results}
+    return {"query": query, "results": results, "facets": {
+        "shot_scale": shot_scale, "category": category, "camera_motion": camera_motion,
+        "palette_temp": palette_temp,
+    }}
 
 @router.post("/api/search/categorize")
 def categorize_search(payload: SearchCategorizePayload):
@@ -192,6 +203,152 @@ def reindex_embeddings(conn: sqlite3.Connection = Depends(get_db_conn)):
     return {
         "status": "success",
         "message": "Reindexação total iniciada em background (modelo: veja EMBEDDING_MODEL). Acompanhe na aba Tarefas."
+    }
+
+@router.post("/api/project/{project_id}/facets/backfill-shot-scale")
+def backfill_shot_scale(project_id: int):
+    """Backfill das facetas visuais (E2.D1/D3) para o acervo JÁ indexado.
+
+    Reusa os vetores CLIP gravados na coleção de imagens — não re-extrai nenhum
+    frame e não gasta API. Grava por ponto: shot_scale (zero-shot), category
+    (triagem no SQLite) e camera_motion (media_segment.motion_label); e persiste
+    shot_scale em media_segment (keyframes com segment_id).
+    """
+    import numpy as np
+    from qdrant_client.models import Filter, FieldCondition, MatchValue
+    from src.search.image_semantic import ImageSearch
+    from src.vision.shot_scale import ShotScaleClassifier
+    from src.db.connection import get_db
+
+    img = ImageSearch.get_instance()
+    classifier = ShotScaleClassifier.get_instance()
+
+    # Mapas de facetas vindas do SQLite (uma leitura, usada para todos os pontos)
+    with get_db() as conn:
+        video_cat = {r["id"]: r["category"] for r in conn.execute(
+            "SELECT id, category FROM video WHERE project_id = ? AND category IS NOT NULL", (project_id,))}
+        photo_cat = {r["id"]: r["category"] for r in conn.execute(
+            "SELECT id, category FROM photo WHERE project_id = ? AND category IS NOT NULL", (project_id,))}
+        seg_motion = {r["id"]: r["motion_label"] for r in conn.execute(
+            "SELECT id, motion_label FROM media_segment WHERE project_id = ? AND motion_label IS NOT NULL", (project_id,))}
+
+    total = 0
+    distribution: dict = {}
+    segment_updates: list = []
+    offset = None
+    while True:
+        points, offset = img.client.scroll(
+            collection_name=img.collection_name,
+            scroll_filter=Filter(must=[FieldCondition(key="project_id", match=MatchValue(value=project_id))]),
+            limit=256, with_vectors=True, with_payload=True, offset=offset,
+        )
+        if not points:
+            break
+        vecs = np.asarray([p.vector for p in points], dtype=np.float32)
+        labels = classifier.classify_batch(vecs)
+        # set_payload agrupado por conteúdo idêntico (poucos grupos: escala × categoria × movimento)
+        by_facets: dict = {}
+        for point, (label, score) in zip(points, labels):
+            payload = point.payload or {}
+            category = video_cat.get(payload.get("video_id")) if payload.get("video_id") is not None \
+                else photo_cat.get(payload.get("photo_id"))
+            motion = seg_motion.get(payload.get("segment_id"))
+            by_facets.setdefault((label, category, motion), []).append(point.id)
+            distribution[label] = distribution.get(label, 0) + 1
+            if payload.get("segment_id"):
+                segment_updates.append((label, round(score, 3), payload["segment_id"]))
+            total += 1
+        for (label, category, motion), ids in by_facets.items():
+            facet_payload = {"shot_scale": label}
+            if category:
+                facet_payload["category"] = category
+            if motion:
+                facet_payload["camera_motion"] = motion
+            img.client.set_payload(
+                collection_name=img.collection_name,
+                payload=facet_payload, points=ids,
+            )
+        if offset is None:
+            break
+
+    if segment_updates:
+        with get_db() as conn:
+            conn.executemany(
+                "UPDATE media_segment SET shot_scale = ?, shot_scale_score = ? WHERE id = ?",
+                segment_updates,
+            )
+            conn.commit()
+
+    return {
+        "status": "success",
+        "points_classified": total,
+        "segments_updated": len(segment_updates),
+        "distribution": dict(sorted(distribution.items(), key=lambda kv: -kv[1])),
+    }
+
+@router.post("/api/project/{project_id}/facets/backfill-palette")
+def backfill_palette(project_id: int):
+    """Backfill de paleta/temperatura de cor das FOTOS (E2.D2) a partir dos proxies locais.
+
+    OpenCV puro (k-means), custo zero de API. Grava palette_temp/palette_hex no
+    SQLite e a faceta palette_temp no payload Qdrant das fotos indexadas.
+    Vídeos ficam de fora: keyframes não são retidos em disco — a faceta deles
+    entra incrementalmente nas próximas análises.
+    """
+    import json as _json
+    from src.config import CONFIG as _CONFIG
+    from src.vision.palette import classify_palette_file
+    from src.search.image_semantic import ImageSearch
+    from src.db.connection import get_db
+    from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
+
+    with get_db() as conn:
+        photos = [dict(r) for r in conn.execute(
+            "SELECT id FROM photo WHERE project_id = ? ORDER BY id", (project_id,))]
+
+    updates = []
+    distribution: dict = {}
+    missing_proxy = 0
+    for p in photos:
+        proxy = _CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{p['id']}.webp"
+        if not proxy.exists():
+            missing_proxy += 1
+            continue
+        palette = classify_palette_file(proxy)
+        if not palette:
+            continue
+        updates.append((palette["palette_temp"], _json.dumps(palette["palette_hex"]), p["id"]))
+        distribution[palette["palette_temp"]] = distribution.get(palette["palette_temp"], 0) + 1
+
+    if updates:
+        with get_db() as conn:
+            conn.executemany(
+                "UPDATE photo SET palette_temp = ?, palette_hex = ? WHERE id = ?", updates)
+            conn.commit()
+
+        # Faceta no índice visual, agrupada por temperatura (3 chamadas)
+        img = ImageSearch.get_instance()
+        by_temp: dict = {}
+        for temp, _hex, pid in updates:
+            by_temp.setdefault(temp, []).append(pid)
+        for temp, pids in by_temp.items():
+            try:
+                img.client.set_payload(
+                    collection_name=img.collection_name,
+                    payload={"palette_temp": temp},
+                    points=Filter(must=[
+                        FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                        FieldCondition(key="photo_id", match=MatchAny(any=pids)),
+                    ]),
+                )
+            except Exception as e:
+                print(f"[Palette] Falha ao facetar '{temp}' no indice visual: {e}")
+
+    return {
+        "status": "success",
+        "photos_updated": len(updates),
+        "missing_proxy": missing_proxy,
+        "distribution": dict(sorted(distribution.items(), key=lambda kv: -kv[1])),
     }
 
 @router.post("/api/timeline")

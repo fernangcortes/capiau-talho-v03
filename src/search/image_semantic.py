@@ -81,42 +81,100 @@ class ImageSearch:
         return self.img_encoder.encode(Image.fromarray(rgb))
 
     # ── Indexação ────────────────────────────────────────────────────────────
+    @staticmethod
+    def _shot_scale_facet(vec: np.ndarray, project_id: int) -> tuple:
+        """(rotulo, score) da escala de plano, ou (None, None). Falha aqui NUNCA
+        pode derrubar a indexação (lição do E2.A5: acessório não quebra o principal)."""
+        try:
+            from src.services.settings_service import SettingsService
+            if not SettingsService.get_settings(project_id).get("clip.shot_scale_enabled"):
+                return None, None
+            from src.vision.shot_scale import ShotScaleClassifier
+            label, score = ShotScaleClassifier.get_instance().classify(vec)
+            return label, round(score, 3)
+        except Exception as e:
+            print(f"[ShotScale] Falha na classificacao de escala (indexacao segue sem faceta): {e}")
+            return None, None
+
     def index_video_keyframe(
         self, project_id: int, video_id: int, frame_path: Path,
         start_time: float, end_time: float, segment_id: Optional[int] = None,
-    ) -> bool:
+        category: Optional[str] = None, camera_motion: Optional[str] = None,
+    ) -> Optional[str]:
+        """Indexa o keyframe e retorna o rótulo de escala de plano (None se desativado/falha).
+
+        Retorno truthy = sucesso na indexação (compatível com o uso booleano antigo);
+        o rótulo permite ao chamador persistir a faceta em media_segment.
+        """
         vec = self.embed_image_file(frame_path)
         if vec is None:
-            return False
+            return None
+        shot_scale, scale_score = self._shot_scale_facet(vec, project_id)
+        payload = {
+            "project_id": project_id, "video_id": video_id,
+            "media_type": "broll",
+            "start_time": start_time, "end_time": end_time,
+            "segment_id": segment_id,
+        }
+        if shot_scale:
+            payload["shot_scale"] = shot_scale
+        if category:
+            payload["category"] = category
+        if camera_motion:
+            payload["camera_motion"] = camera_motion
         point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"img_proj_{project_id}_vid_{video_id}_seg_{start_time:.2f}"))
         self.client.upsert(
             collection_name=self.collection_name,
-            points=[PointStruct(id=point_id, vector=vec.tolist(), payload={
-                "project_id": project_id, "video_id": video_id,
-                "media_type": "broll",
-                "start_time": start_time, "end_time": end_time,
-                "segment_id": segment_id,
-            })],
+            points=[PointStruct(id=point_id, vector=vec.tolist(), payload=payload)],
         )
-        return True
+        return shot_scale or "indexed"
 
     def index_photo(
         self, project_id: int, photo_id: int, image_path: Path,
-        vector: Optional[np.ndarray] = None,
+        vector: Optional[np.ndarray] = None, category: Optional[str] = None,
+        palette_temp: Optional[str] = None,
     ) -> bool:
         """Indexa a foto. `vector` reaproveita um embedding já calculado (ex: agrupamento de rajadas)."""
         vec = vector if vector is not None else self.embed_image_file(image_path)
         if vec is None:
             return False
+        shot_scale, _ = self._shot_scale_facet(vec, project_id)
+        payload = {
+            "project_id": project_id, "photo_id": photo_id,
+            "media_type": "photo",
+        }
+        if shot_scale:
+            payload["shot_scale"] = shot_scale
+        if category:
+            payload["category"] = category
+        if palette_temp:
+            payload["palette_temp"] = palette_temp
         point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"img_proj_{project_id}_photo_{photo_id}"))
         self.client.upsert(
             collection_name=self.collection_name,
-            points=[PointStruct(id=point_id, vector=vec.tolist(), payload={
-                "project_id": project_id, "photo_id": photo_id,
-                "media_type": "photo",
-            })],
+            points=[PointStruct(id=point_id, vector=vec.tolist(), payload=payload)],
         )
         return True
+
+    def sync_category_payload(self, project_id: int, category: str,
+                              video_id: Optional[int] = None, photo_ids: Optional[list] = None) -> None:
+        """Atualiza a faceta 'category' dos pontos já indexados (correção humana do E2.C2)."""
+        from qdrant_client.models import MatchAny
+        try:
+            must = [FieldCondition(key="project_id", match=MatchValue(value=project_id))]
+            if video_id is not None:
+                must.append(FieldCondition(key="video_id", match=MatchValue(value=video_id)))
+            elif photo_ids:
+                must.append(FieldCondition(key="photo_id", match=MatchAny(any=list(photo_ids))))
+            else:
+                return
+            self.client.set_payload(
+                collection_name=self.collection_name,
+                payload={"category": category},
+                points=Filter(must=must),
+            )
+        except Exception as e:
+            print(f"[CLIP] Falha ao sincronizar categoria no indice visual: {e}")
 
     def delete_video_images(self, project_id: int, video_id: int) -> None:
         """Remove os keyframes visuais de um vídeo — evita órfãos ao reanalisar/re-segmentar."""
@@ -132,10 +190,22 @@ class ImageSearch:
             print(f"[CLIP] Erro ao limpar imagens do vídeo {video_id}: {e}")
 
     # ── Busca ────────────────────────────────────────────────────────────────
-    def search_text(self, project_id: int, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Busca visual por texto em português (espaço vetorial compartilhado)."""
+    def search_text(self, project_id: int, query: str, limit: int = 10,
+                    shot_scale: Optional[str] = None, category: Optional[str] = None,
+                    camera_motion: Optional[str] = None,
+                    palette_temp: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Busca visual por texto em português, com filtros de faceta opcionais (E2.D3)."""
         vec = self.txt_encoder.encode(query)
-        return self._query(project_id, vec, limit)
+        extra = []
+        if shot_scale:
+            extra.append(FieldCondition(key="shot_scale", match=MatchValue(value=shot_scale)))
+        if category:
+            extra.append(FieldCondition(key="category", match=MatchValue(value=category)))
+        if camera_motion:
+            extra.append(FieldCondition(key="camera_motion", match=MatchValue(value=camera_motion)))
+        if palette_temp:
+            extra.append(FieldCondition(key="palette_temp", match=MatchValue(value=palette_temp)))
+        return self._query(project_id, vec, limit, extra_conditions=extra or None)
 
     def similar_to_photo(self, project_id: int, photo_id: int, limit: int = 10) -> List[Dict[str, Any]]:
         """Imagens visualmente próximas de uma foto já indexada."""
