@@ -256,42 +256,96 @@ export class PanelsManager {
         const modalEditMarker = document.getElementById("modal-edit-marker");
         if (modalEditMarker) {
             const btnCloseModal = document.getElementById("btn-close-marker-modal");
-            const btnCancelModal = document.getElementById("btn-marker-cancel");
             const btnSaveModal = document.getElementById("btn-marker-save");
-            const btnDeleteModal = document.getElementById("btn-marker-delete");
+            const btnDeleteModal = document.getElementById("btn-delete-marker");
             const inputLabel = document.getElementById("marker-edit-label");
             const inputComment = document.getElementById("marker-edit-comment");
+            const colorPicker = document.getElementById("marker-color-picker");
             const colorSwatches = modalEditMarker.querySelectorAll(".marker-color-swatch");
+            const iconEl = document.getElementById("marker-edit-icon");
 
             const closeModal = () => {
                 modalEditMarker.style.display = "none";
             };
 
-            if (btnCloseModal) btnCloseModal.addEventListener("click", closeModal);
-            if (btnCancelModal) btnCancelModal.addEventListener("click", closeModal);
+            const typeBtns = modalEditMarker.querySelectorAll(".marker-type-btn");
+            typeBtns.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    typeBtns.forEach(b => {
+                        b.classList.remove("active");
+                        b.style.background = "transparent";
+                        b.style.color = "var(--text-secondary)";
+                        b.style.fontWeight = "500";
+                    });
+                    btn.classList.add("active");
+                    btn.style.background = "var(--color-cyan)";
+                    btn.style.color = "#000";
+                    btn.style.fontWeight = "700";
+                    modalEditMarker.dataset.userChoice = btn.dataset.type;
+                });
+            });
+
+            const saveMarker = () => {
+                const markerId = modalEditMarker.dataset.markerId;
+                if (!markerId) return closeModal();
+
+                const selectedSwatch = modalEditMarker.querySelector(".marker-color-swatch.selected");
+                const color = selectedSwatch ? selectedSwatch.dataset.color : "#06b6d4";
+                const label = inputLabel ? inputLabel.value.trim() : "";
+                const comment = inputComment ? inputComment.value.trim() : "";
+
+                const marker = TIMELINE_STATE.getMarker(markerId);
+                const userChoice = modalEditMarker.dataset.userChoice || "";
+
+                let clipId = marker ? marker.clipId : null;
+                let offsetFrame = marker ? marker.offsetFrame : null;
+
+                if (userChoice === "ruler") {
+                    clipId = null;
+                    offsetFrame = null;
+                } else {
+                    const cuts = STATE.activeTimelineCuts || [];
+                    const fps = TIMELINE_STATE.fps || 24;
+                    const curFrame = marker ? marker.frame : TIMELINE_STATE.playheadFrame;
+                    let cutUnder = clipId ? cuts.find(c => String(c.id) === String(clipId)) : null;
+                    if (!cutUnder) {
+                        const videoCuts = cuts.filter(c => c.type !== "audio" && (!c.track || !String(c.track).toLowerCase().startsWith("a")));
+                        const searchCuts = videoCuts.length > 0 ? videoCuts : cuts;
+                        cutUnder = searchCuts.find(c => {
+                            const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+                            const inF = c.inFrame !== undefined ? c.inFrame : Math.round((c.in || 0) * fps);
+                            const outF = c.outFrame !== undefined ? c.outFrame : Math.round((c.out || 0) * fps);
+                            const dur = Math.max(1, outF - inF);
+                            return curFrame >= start && curFrame <= start + dur;
+                        });
+                    }
+                    if (cutUnder) {
+                        const start = cutUnder.timelineStartFrame !== undefined ? cutUnder.timelineStartFrame : Math.round((cutUnder.timeline_start || 0) * fps);
+                        clipId = cutUnder.id;
+                        offsetFrame = Math.max(0, Math.round(curFrame - start));
+                    }
+                }
+
+                TIMELINE_STATE.updateMarker(markerId, { label, color, comment, clipId, offsetFrame });
+                closeModal();
+            };
+
+            if (btnCloseModal) btnCloseModal.addEventListener("click", saveMarker);
 
             // Seleção de cores
             colorSwatches.forEach(swatch => {
                 swatch.addEventListener("click", () => {
                     colorSwatches.forEach(s => s.classList.remove("selected"));
                     swatch.classList.add("selected");
+                    if (iconEl && swatch.dataset.color) {
+                        iconEl.style.color = swatch.dataset.color;
+                    }
                 });
             });
 
             // Salvar marcador
             if (btnSaveModal) {
-                btnSaveModal.addEventListener("click", () => {
-                    const markerId = modalEditMarker.dataset.markerId;
-                    if (!markerId) return closeModal();
-
-                    const selectedSwatch = modalEditMarker.querySelector(".marker-color-swatch.selected");
-                    const color = selectedSwatch ? selectedSwatch.dataset.color : "#06b6d4";
-                    const label = inputLabel ? inputLabel.value.trim() : "";
-                    const comment = inputComment ? inputComment.value.trim() : "";
-
-                    TIMELINE_STATE.updateMarker(markerId, { label, color, comment });
-                    closeModal();
-                });
+                btnSaveModal.addEventListener("click", saveMarker);
             }
 
             // Excluir marcador
@@ -305,15 +359,37 @@ export class PanelsManager {
                 });
             }
 
-            // Teclas no input de rótulo (Enter salva, Escape fecha)
-            if (inputLabel) {
-                inputLabel.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") {
+            // Teclas nos inputs (Enter salva, Escape salva e fecha)
+            const handleInputKey = (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    saveMarker();
+                } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    saveMarker();
+                }
+            };
+
+            if (inputLabel) inputLabel.addEventListener("keydown", handleInputKey);
+            if (inputComment) inputComment.addEventListener("keydown", handleInputKey);
+
+            // Navegação de cor via setas no colorPicker
+            if (colorPicker) {
+                colorPicker.addEventListener("keydown", (e) => {
+                    const swatches = Array.from(colorSwatches);
+                    const currentIndex = swatches.findIndex(s => s.classList.contains("selected"));
+
+                    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
                         e.preventDefault();
-                        if (btnSaveModal) btnSaveModal.click();
-                    } else if (e.key === "Escape") {
+                        const nextIndex = (currentIndex + 1) % swatches.length;
+                        swatches[nextIndex].click();
+                    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
                         e.preventDefault();
-                        closeModal();
+                        const prevIndex = (currentIndex - 1 + swatches.length) % swatches.length;
+                        swatches[prevIndex].click();
+                    } else if (e.key === "Enter" || e.key === "Escape") {
+                        e.preventDefault();
+                        saveMarker();
                     }
                 });
             }

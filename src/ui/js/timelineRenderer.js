@@ -82,9 +82,28 @@ export class CapiauTimelineRenderer {
         return lanes;
     }
 
-    /** Retorna a lane de uma pista pelo id (ou null). */
+    /** Retorna a lane de uma pista pelo id ou nome da pista (ou null). */
     getLane(trackId) {
-        return this.getTrackLanes().find(l => l.track.id === trackId) || null;
+        if (!trackId) return null;
+        const lanes = this.getTrackLanes();
+        const target = String(trackId).trim().toLowerCase();
+
+        let lane = lanes.find(l => String(l.track.id).toLowerCase() === target);
+        if (lane) return lane;
+
+        lane = lanes.find(l => l.track.name && String(l.track.name).toLowerCase() === target);
+        if (lane) return lane;
+
+        if (target.includes("broll") || target.includes("b-roll")) {
+            lane = lanes.find(l => String(l.track.id).toLowerCase() === "v2" || (l.track.name && l.track.name.toLowerCase().includes("b-roll")));
+            if (lane) return lane;
+        }
+        if (target.includes("fala") || target.includes("main")) {
+            lane = lanes.find(l => String(l.track.id).toLowerCase() === "v1" || (l.track.name && l.track.name.toLowerCase().includes("fala")));
+            if (lane) return lane;
+        }
+
+        return lanes.find(l => l.track.kind === "video") || lanes[0] || null;
     }
 
     /** Retorna a pista sob a coordenada Y do canvas (ou null se fora). */
@@ -370,78 +389,116 @@ export class CapiauTimelineRenderer {
         const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
         const markers = TIMELINE_STATE.getMarkersSorted();
 
-        if (!markers || markers.length === 0) return;
+        const cuts = STATE.activeTimelineCuts || [];
+        const lanes = this.getTrackLanes();
+        const laneMap = {};
+        lanes.forEach(l => { laneMap[l.track.id] = l; });
 
-        markers.forEach(marker => {
-            const x = (marker.frame - scrollLeft) * zoom;
-            
-            // Só desenha se estiver dentro dos limites visíveis do canvas
-            if (x < -20 || x > this.width + 20) return;
+        // 1. Separar marcadores de clipe e marcadores de régua
+        const clipMarkers = [];
+        const rulerMarkers = [];
 
-            const color = marker.color || "#06b6d4";
+        markers.forEach(m => {
+            if (m.clipId) clipMarkers.push(m);
+            else rulerMarkers.push(m);
+        });
 
-            // 1. Linha vertical guia pelas pistas (Stem)
+        // 2. Renderizar Marcadores de Clipe (estritamente recortados na área de pistas, abaixo da régua)
+        if (clipMarkers.length > 0) {
             ctx.save();
-            ctx.strokeStyle = color;
-            ctx.globalAlpha = 0.55;
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 3]); // Linha pontilhada estilosa
             ctx.beginPath();
-            ctx.moveTo(x, this.rulerHeight);
-            ctx.lineTo(x, this.height);
-            ctx.stroke();
-            ctx.restore();
+            ctx.rect(0, this.rulerHeight, this.width, Math.max(0, this.height - this.rulerHeight));
+            ctx.clip(); // Impede 100% qualquer vazamento para a régua da timeline!
 
-            // 2. Bandeira na Régua (Pentágono/Flag apontando para baixo)
-            ctx.save();
-            ctx.fillStyle = color;
-            ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
-            ctx.lineWidth = 1.5;
+            clipMarkers.forEach(marker => {
+                let cut = cuts.find(c => String(c.id) === String(marker.clipId));
+                if (!cut) {
+                    // Fallback se o ID do clipe foi re-gerado: localiza o clipe por intersecção de frame
+                    cut = cuts.find(c => marker.frame >= c.timelineStartFrame && marker.frame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
+                    if (cut) {
+                        marker.clipId = cut.id;
+                        marker.offsetFrame = Math.max(0, Math.round(marker.frame - cut.timelineStartFrame));
+                    }
+                }
+                if (!cut) return;
 
-            const flagWidth = 12;
-            const flagHeight = 16;
-            const topY = 2;
-            const bottomY = topY + flagHeight;
+                const lane = this.getLane(cut.track);
+                if (!lane || lane.track.hidden) return;
+                if (lane.top + lane.height < this.rulerHeight || lane.top > this.height) return;
 
-            ctx.beginPath();
-            ctx.moveTo(x - flagWidth / 2, topY);
-            ctx.lineTo(x + flagWidth / 2, topY);
-            ctx.lineTo(x + flagWidth / 2, topY + 10);
-            ctx.lineTo(x, bottomY); // Ponta apontando para baixo na régua
-            ctx.lineTo(x - flagWidth / 2, topY + 10);
-            ctx.closePath();
+                const x = (marker.frame - scrollLeft) * zoom;
+                if (x < -20 || x > this.width + 20) return;
 
-            ctx.fill();
-            ctx.stroke();
+                const clipX1 = (cut.timelineStartFrame - scrollLeft) * zoom;
+                const clipX2 = (cut.timelineStartFrame + (cut.outFrame - cut.inFrame) - scrollLeft) * zoom;
 
-            // O rótulo (título) é exibido apenas quando o marcador estiver em HOVER (ou sendo arrastado)
-            const isHovered = (TIMELINE_STATE.hoveredMarkerId === marker.id);
-            if (marker.label && isHovered) {
-                ctx.font = "bold 9px Inter, sans-serif";
-                const textMetrics = ctx.measureText(marker.label);
-                const textWidth = textMetrics.width;
-                const labelX = x + flagWidth / 2 + 3;
-                const labelY = topY + 1;
+                if (x >= clipX1 - 2 && x <= clipX2 + 2) {
+                    const color = marker.color || "#06b6d4";
+                    const isSelected = TIMELINE_STATE.selectedMarkerIds.has(marker.id);
+                    const topY = Math.max(lane.top + 2, this.rulerHeight + 2);
 
-                // Fundo glass da etiqueta
-                ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
+                    ctx.save();
+
+                    // Insígnia / Pin compacto no topo do clipe (Sem stem)
+                    ctx.fillStyle = color;
+                    ctx.strokeStyle = isSelected ? "#ffffff" : "rgba(0, 0, 0, 0.7)";
+                    ctx.lineWidth = isSelected ? 1.5 : 1;
+
+                    const pinWidth = 8;
+                    const pinHeight = 9;
+                    const pinY = topY + 1;
+
+                    ctx.beginPath();
+                    ctx.moveTo(x - pinWidth / 2, pinY);
+                    ctx.lineTo(x + pinWidth / 2, pinY);
+                    ctx.lineTo(x + pinWidth / 2, pinY + 5);
+                    ctx.lineTo(x, pinY + pinHeight);
+                    ctx.lineTo(x - pinWidth / 2, pinY + 5);
+                    ctx.closePath();
+
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.restore();
+                }
+            });
+
+            ctx.restore(); // Restaura região de clipping do canvas
+        }
+
+        // 3. Renderizar Marcadores de Régua (na régua da timeline)
+        if (rulerMarkers.length > 0) {
+            rulerMarkers.forEach(marker => {
+                const x = (marker.frame - scrollLeft) * zoom;
+                if (x < -20 || x > this.width + 20) return;
+
+                const color = marker.color || "#06b6d4";
+                const isSelected = TIMELINE_STATE.selectedMarkerIds.has(marker.id);
+
+                ctx.save();
+                ctx.fillStyle = color;
+                ctx.strokeStyle = isSelected ? "#ffffff" : "rgba(0, 0, 0, 0.6)";
+                ctx.lineWidth = isSelected ? 1.5 : 1;
+
+                const flagWidth = 8;
+                const flagHeight = 10;
+                const topY = 2;
+                const bottomY = topY + flagHeight;
+
                 ctx.beginPath();
-                ctx.roundRect(labelX, labelY, textWidth + 8, 14, 3);
-                ctx.fill();
+                ctx.moveTo(x - flagWidth / 2, topY);
+                ctx.lineTo(x + flagWidth / 2, topY);
+                ctx.lineTo(x + flagWidth / 2, topY + 6);
+                ctx.lineTo(x, bottomY);
+                ctx.lineTo(x - flagWidth / 2, topY + 6);
+                ctx.closePath();
 
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 1;
+                ctx.fill();
                 ctx.stroke();
 
-                // Texto do rótulo
-                ctx.fillStyle = "#ffffff";
-                ctx.textAlign = "left";
-                ctx.textBaseline = "middle";
-                ctx.fillText(marker.label, labelX + 4, labelY + 7);
-            }
-
-            ctx.restore();
-        });
+                ctx.restore();
+            });
+        }
     }
 
     /**

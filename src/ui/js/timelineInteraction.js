@@ -1,6 +1,6 @@
 // Controlador de Interatividade, Cliques e Atalhos da Timeline (CapIAu-Talho)
 import { STATE } from "./state.js";
-import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds, framesToTimecode } from "./timelineState.js";
 import { setTabVisibility } from "./tabsCustomization.js";
 
 export class CapiauTimelineInteraction {
@@ -34,11 +34,24 @@ export class CapiauTimelineInteraction {
         this.boundDblClick = (e) => this.onDblClick(e);
         this.boundWheel = (e) => this.onWheel(e);
         this.boundMouseLeave = () => {
+            this.hideMarkerTooltip();
             if (TIMELINE_STATE.hoveredMarkerId !== null) {
                 TIMELINE_STATE.hoveredMarkerId = null;
                 if (this.renderer) this.renderer.requestRedraw();
             }
             this.hideHoverPreview();
+        };
+        this.boundWindowMouseMove = (e) => {
+            if (this.isMarkerTooltipActive && !this.dragState && this.canvas) {
+                const rect = this.canvas.getBoundingClientRect();
+                if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+                    this.hideMarkerTooltip();
+                    if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                        TIMELINE_STATE.hoveredMarkerId = null;
+                        if (this.renderer) this.renderer.requestRedraw();
+                    }
+                }
+            }
         };
         this.boundKeyDown = (e) => this.onKeyDown(e);
         this.boundDragOver = (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; };
@@ -56,6 +69,7 @@ export class CapiauTimelineInteraction {
         this.canvas.addEventListener("mousemove", this.boundMouseMove);
         this.canvas.addEventListener("dblclick", this.boundDblClick);
         win.addEventListener("mouseup", this.boundMouseUp);
+        win.addEventListener("mousemove", this.boundWindowMouseMove);
         this.canvas.addEventListener("wheel", this.boundWheel);
         const headersSidebar = this.canvas.ownerDocument.getElementById("timeline-headers-sidebar");
         if (headersSidebar) {
@@ -93,6 +107,7 @@ export class CapiauTimelineInteraction {
         this.canvas.removeEventListener("mousemove", this.boundMouseMove);
         this.canvas.removeEventListener("dblclick", this.boundDblClick);
         win.removeEventListener("mouseup", this.boundMouseUp);
+        win.removeEventListener("mousemove", this.boundWindowMouseMove);
         this.canvas.removeEventListener("wheel", this.boundWheel);
         this.canvas.removeEventListener("mouseleave", this.boundMouseLeave);
         this.canvas.removeEventListener("dragover", this.boundDragOver);
@@ -203,20 +218,33 @@ export class CapiauTimelineInteraction {
             this.mouseDownClip = null;
         }
         
-        // 1. Clique na régua de tempo (Scrubbing / Drag de Marcador / Mover Playhead)
+        // 1. Clique na régua de tempo ou clipe (Scrubbing / Drag de Marcador / Mover Playhead)
         if (y < this.renderer.rulerHeight) {
-            const tolerance = Math.max(3, Math.round(8 / TIMELINE_STATE.zoom));
-            const hitMarker = TIMELINE_STATE.getMarkerAtFrame(frame, tolerance);
+            const hitMarker = this.getMarkerAtX(x, 14, y);
             if (hitMarker) {
+                TIMELINE_STATE.selectMarker(hitMarker.id, e.shiftKey || e.ctrlKey);
                 this.dragState = "drag-marker";
                 this.draggedMarkerId = hitMarker.id;
                 TIMELINE_STATE.hoveredMarkerId = hitMarker.id;
                 this.updatePlayhead(hitMarker.frame);
+                this.hideMarkerTooltip();
                 return;
+            }
+            if (!e.shiftKey && !e.ctrlKey) {
+                TIMELINE_STATE.clearSelectedMarkers();
             }
             this.dragState = "scrub";
             this.updatePlayhead(frame);
+            this.hideMarkerTooltip();
             return;
+        } else {
+            const hitClipMarker = this.getMarkerAtX(x, 14, y);
+            if (hitClipMarker) {
+                TIMELINE_STATE.selectMarker(hitClipMarker.id, e.shiftKey || e.ctrlKey);
+                this.updatePlayhead(hitClipMarker.frame);
+                this.hideMarkerTooltip();
+                if (this.renderer) this.renderer.requestRedraw();
+            }
         }
 
         // 2. Clique com botão do meio (Scroll/Pan) ou Barra de Espaço pressionada
@@ -299,30 +327,43 @@ export class CapiauTimelineInteraction {
         const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);
         this.mouseX = x;
         this.mouseY = y;
+        let isHoveringMarker = false;
 
-        // Tooltip e Rótulo de hover na régua de tempo (Marcadores)
-        if (!this.dragState && y < this.renderer.rulerHeight) {
-            const tolerance = Math.max(3, Math.round(8 / TIMELINE_STATE.zoom));
-            const hoverMarker = TIMELINE_STATE.getMarkerAtFrame(frame, tolerance);
+        // Tooltip e Rótulo de hover (Marcadores de Régua ou de Clipe)
+        if (!this.dragState) {
+            const hoverMarker = this.getMarkerAtX(x, 14, y);
             if (hoverMarker) {
+                isHoveringMarker = true;
                 this.canvas.style.cursor = "pointer";
-                const tc = framesToTimecode(hoverMarker.frame, TIMELINE_STATE.fps);
-                this.canvas.title = `[Marcador] ${hoverMarker.label} (${tc})${hoverMarker.comment ? ' — ' + hoverMarker.comment : ''}`;
+                this.canvas.removeAttribute("title");
+                this.canvas.removeAttribute("data-tooltip");
+                this.showMarkerTooltip(hoverMarker, e.clientX, e.clientY);
+                this.hideHoverPreview(); // Esconde a miniatura/preview do clipe ao focar no marcador
                 if (TIMELINE_STATE.hoveredMarkerId !== hoverMarker.id) {
                     TIMELINE_STATE.hoveredMarkerId = hoverMarker.id;
                     if (this.renderer) this.renderer.requestRedraw();
                 }
             } else {
                 this.canvas.style.cursor = "default";
-                this.canvas.removeAttribute("title");
+                this.hideMarkerTooltip();
                 if (TIMELINE_STATE.hoveredMarkerId !== null) {
                     TIMELINE_STATE.hoveredMarkerId = null;
                     if (this.renderer) this.renderer.requestRedraw();
                 }
             }
         }
+
+        if (!this.dragState && !isHoveringMarker) {
+            this.updateHoverPreview(e.clientX, e.clientY, frame, track);
+            return;
+        } else if (isHoveringMarker) {
+            this.hideHoverPreview();
+            return;
+        }
+
         // Atualiza cursores dinâmicos de trim e tooltip com nome do arquivo
-        else if (!this.dragState && track) {
+        if (!this.dragState && track) {
+            this.hideMarkerTooltip();
             if (TIMELINE_STATE.hoveredMarkerId !== null) {
                 TIMELINE_STATE.hoveredMarkerId = null;
                 if (this.renderer) this.renderer.requestRedraw();
@@ -331,27 +372,12 @@ export class CapiauTimelineInteraction {
             if (hit && hit.type === "clip") {
                 const edge = this.checkTrimZone(x, hit.data);
                 this.canvas.style.cursor = edge ? "w-resize" : "grab";
-                
-                // Exibe nome do arquivo original no hover
-                const cut = hit.data;
-                let hoverFilename = "";
-                if (cut.photo_id) {
-                    const photo = STATE.allPhotos.find(p => String(p.id) === String(cut.photo_id));
-                    if (photo) hoverFilename = photo.filename;
-                } else if (cut.video_id) {
-                    const video = STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
-                    if (video) hoverFilename = video.filename;
-                }
-                if (hoverFilename) {
-                    this.canvas.title = hoverFilename;
-                } else {
-                    this.canvas.removeAttribute("title");
-                }
             } else {
                 this.canvas.style.cursor = "default";
                 this.canvas.removeAttribute("title");
             }
         } else if (!this.dragState) {
+            this.hideMarkerTooltip();
             if (TIMELINE_STATE.hoveredMarkerId !== null) {
                 TIMELINE_STATE.hoveredMarkerId = null;
                 if (this.renderer) this.renderer.requestRedraw();
@@ -373,6 +399,11 @@ export class CapiauTimelineInteraction {
             const snappedFrame = this.snapFrame(Math.max(0, Math.round(frame)));
             TIMELINE_STATE.updateMarker(this.draggedMarkerId, { frame: snappedFrame });
             this.updatePlayhead(snappedFrame);
+
+            const activeMarker = TIMELINE_STATE.getMarker(this.draggedMarkerId);
+            if (activeMarker) {
+                this.showMarkerTooltip(activeMarker, e.clientX, e.clientY);
+            }
         }
         else if (this.dragState === "pan") {
             const dx = e.clientX - this.dragStartMouseX;
@@ -407,6 +438,7 @@ export class CapiauTimelineInteraction {
     }
 
     onMouseUp(e) {
+        this.hideMarkerTooltip();
         if (this.dragState === "drag-marker") {
             this.dragState = null;
             this.draggedMarkerId = null;
@@ -432,15 +464,16 @@ export class CapiauTimelineInteraction {
      */
     onDblClick(e) {
         const { x, y, frame } = this.getCoordinates(e.clientX, e.clientY);
+        const marker = this.getMarkerAtX(x, 14, y);
+        if (marker) {
+            this.openMarkerEditModal(marker);
+            this.hideMarkerTooltip();
+            return;
+        }
         if (y < this.renderer.rulerHeight) {
-            const tolerance = Math.max(3, Math.round(8 / TIMELINE_STATE.zoom));
-            const marker = TIMELINE_STATE.getMarkerAtFrame(frame, tolerance);
-            if (marker) {
-                this.openMarkerEditModal(marker);
-            } else {
-                const newMarker = TIMELINE_STATE.addMarker({ frame: Math.round(frame) });
-                this.openMarkerEditModal(newMarker);
-            }
+            const newMarker = TIMELINE_STATE.addMarker({ frame: Math.round(frame) });
+            this.openMarkerEditModal(newMarker);
+            this.hideMarkerTooltip();
         }
     }
 
@@ -521,6 +554,49 @@ export class CapiauTimelineInteraction {
     }
 
     /**
+     * Retorna um marcador cujas coordenadas visíveis em tela (em pixels) estejam próximas do cursor X.
+     */
+    getMarkerAtX(mouseX, tolerancePx = 14, mouseY = null) {
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+        const markers = TIMELINE_STATE.getMarkersSorted();
+        if (!markers || markers.length === 0) return null;
+
+        const cuts = STATE.activeTimelineCuts || [];
+
+        // Se mouseY for fornecido e estiver na área das pistas (ou se for buscar marcador de clipe)
+        if (mouseY !== null && mouseY >= (this.renderer ? this.renderer.rulerHeight : 30)) {
+            const laneObj = this.renderer ? this.renderer.getTrackAtY(mouseY) : null;
+            for (const m of markers) {
+                if (m.clipId) {
+                    let cut = cuts.find(c => String(c.id) === String(m.clipId));
+                    if (!cut) {
+                        cut = cuts.find(c => m.frame >= c.timelineStartFrame && m.frame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
+                    }
+                    if (cut && (!laneObj || cut.track === laneObj.id)) {
+                        const markerX = (m.frame - scrollLeft) * zoom;
+                        if (Math.abs(markerX - mouseX) <= tolerancePx) {
+                            return m;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Se hover/clique foi na régua (y < rulerHeight): busca APENAS marcadores de régua (sem clipId)
+        for (const m of markers) {
+            if (!m.clipId) {
+                const markerX = (m.frame - scrollLeft) * zoom;
+                if (Math.abs(markerX - mouseX) <= tolerancePx) {
+                    return m;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * Exibe o modal de edição de propriedades do marcador.
      */
     openMarkerEditModal(marker) {
@@ -530,14 +606,22 @@ export class CapiauTimelineInteraction {
         if (!modal) return;
 
         modal.dataset.markerId = marker.id;
+        modal.dataset.userChoice = "";
         const inputLabel = doc.getElementById("marker-edit-label");
         const inputComment = doc.getElementById("marker-edit-comment");
+        const timecodeEl = doc.getElementById("marker-edit-timecode");
+        const iconEl = doc.getElementById("marker-edit-icon");
         const colorSwatches = modal.querySelectorAll(".marker-color-swatch");
+        const typeBtns = modal.querySelectorAll(".marker-type-btn");
 
         if (inputLabel) inputLabel.value = marker.label || "";
         if (inputComment) inputComment.value = marker.comment || "";
+        if (timecodeEl) {
+            timecodeEl.textContent = framesToTimecode(marker.frame, TIMELINE_STATE.fps);
+        }
 
         const currentColor = marker.color || "#06b6d4";
+        if (iconEl) iconEl.style.color = currentColor;
         colorSwatches.forEach(swatch => {
             if (swatch.dataset.color === currentColor) {
                 swatch.classList.add("selected");
@@ -546,12 +630,86 @@ export class CapiauTimelineInteraction {
             }
         });
 
+        const activeType = marker.clipId ? "clip" : "ruler";
+        typeBtns.forEach(btn => {
+            if (btn.dataset.type === activeType) {
+                btn.classList.add("active");
+                btn.style.background = "var(--color-cyan)";
+                btn.style.color = "#000";
+                btn.style.fontWeight = "700";
+            } else {
+                btn.classList.remove("active");
+                btn.style.background = "transparent";
+                btn.style.color = "var(--text-secondary)";
+                btn.style.fontWeight = "500";
+            }
+        });
+
         modal.style.display = "flex";
         if (inputLabel) {
             setTimeout(() => {
                 inputLabel.focus();
                 inputLabel.select();
-            }, 50);
+            }, 20);
+        }
+    }
+
+    /**
+     * Exibe a tooltip flutuante estilizada sobre o marcador na régua de tempo.
+     */
+    showMarkerTooltip(marker, clientX, clientY) {
+        if (!marker) return;
+        const doc = this.canvas ? this.canvas.ownerDocument : document;
+        const tooltip = doc.getElementById("timeline-marker-tooltip");
+        if (!tooltip) return;
+
+        const titleEl = tooltip.querySelector(".marker-tooltip-title");
+        const commentEl = tooltip.querySelector(".marker-tooltip-comment");
+
+        const color = marker.color || "#06b6d4";
+
+        tooltip.style.borderColor = color;
+        if (titleEl) {
+            titleEl.style.color = color;
+            titleEl.innerHTML = `<i class="fa-solid fa-bookmark" style="font-size: 9px;"></i> ${marker.label || 'Marcador'}`;
+        }
+        if (commentEl) {
+            if (marker.comment && marker.comment.trim()) {
+                commentEl.textContent = marker.comment.trim();
+                commentEl.style.display = "block";
+            } else {
+                commentEl.style.display = "none";
+            }
+        }
+
+        tooltip.style.display = "flex";
+        this.isMarkerTooltipActive = true;
+
+        const tooltipRect = tooltip.getBoundingClientRect();
+        let top = clientY - tooltipRect.height - 8;
+        let left = clientX - tooltipRect.width / 2;
+
+        if (top < 8) top = clientY + 18;
+        const margin = 8;
+        const win = doc.defaultView || window;
+        if (left < margin) left = margin;
+        if (left + tooltipRect.width > win.innerWidth - margin) {
+            left = win.innerWidth - tooltipRect.width - margin;
+        }
+
+        tooltip.style.top = `${top}px`;
+        tooltip.style.left = `${left}px`;
+    }
+
+    /**
+     * Oculta a tooltip do marcador.
+     */
+    hideMarkerTooltip() {
+        const doc = this.canvas ? this.canvas.ownerDocument : document;
+        const tooltip = doc.getElementById("timeline-marker-tooltip");
+        if (tooltip) {
+            tooltip.style.display = "none";
+            this.isMarkerTooltipActive = false;
         }
     }
 
@@ -1686,7 +1844,14 @@ export class CapiauTimelineInteraction {
                 return;
             }
 
-            // Tecla M simples: abre o modal de edição se já houver marcador no local ou cria novo
+            // Se o popover de edição já estiver aberto, salva primeiro as edições antes de prosseguir
+            const modal = this.canvas ? this.canvas.ownerDocument.getElementById("modal-edit-marker") : document.getElementById("modal-edit-marker");
+            if (modal && modal.style.display !== "none") {
+                const btnSave = modal.querySelector("#btn-marker-save");
+                if (btnSave) btnSave.click();
+            }
+
+            // Tecla M simples: abre o popover de edição se já houver marcador no local ou cria novo
             const existing = TIMELINE_STATE.getMarkerAtFrame(playhead, 3);
             if (existing) {
                 this.openMarkerEditModal(existing);
@@ -1741,6 +1906,12 @@ export class CapiauTimelineInteraction {
         }
 
         if (e.key === "Delete" || e.key === "Backspace") {
+            if (TIMELINE_STATE.selectedMarkerIds.size > 0) {
+                TIMELINE_STATE.removeSelectedMarkers();
+                if (this.renderer) this.renderer.requestRedraw();
+                e.preventDefault();
+                return;
+            }
             if (selectedId) {
                 const idx = cuts.findIndex(c => c.id === selectedId);
                 if (idx !== -1) {

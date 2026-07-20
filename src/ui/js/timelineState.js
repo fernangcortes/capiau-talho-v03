@@ -128,22 +128,89 @@ export class CapiauTimelineState {
 
         this.markers = []; // Lista de marcadores na timeline [{ id, frame, label, color, comment }]
         this.hoveredMarkerId = null; // ID do marcador sobre o qual o mouse está iterando (para mostrar rótulo no hover)
+        this.selectedMarkerIds = new Set(); // Conjunto de IDs de marcadores selecionados na timeline
     }
 
     // ── MARCADORES DA TIMELINE ──────────────────────────────────────────
 
     /**
-     * Retorna a lista de marcadores ordenada por frame.
+     * Retorna a lista de marcadores ordenada por frame (atualizando posições de marcadores vinculados a clipes).
      */
     getMarkersSorted() {
+        const cuts = STATE.activeTimelineCuts || [];
+        const fps = this.fps || 24;
+        this.markers.forEach(m => {
+            if (m.clipId) {
+                let cut = cuts.find(c => String(c.id) === String(m.clipId));
+                if (!cut) {
+                    // Fallback se o ID do clipe foi re-gerado ao carregar: localiza o clipe por intersecção de frame
+                    cut = cuts.find(c => {
+                        const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+                        const inF = c.inFrame !== undefined ? c.inFrame : Math.round((c.in || 0) * fps);
+                        const outF = c.outFrame !== undefined ? c.outFrame : Math.round((c.out || 0) * fps);
+                        const dur = Math.max(1, outF - inF);
+                        return m.frame >= start && m.frame <= start + dur;
+                    });
+                    if (cut) {
+                        const start = cut.timelineStartFrame !== undefined ? cut.timelineStartFrame : Math.round((cut.timeline_start || 0) * fps);
+                        m.clipId = cut.id;
+                        m.offsetFrame = Math.max(0, Math.round(m.frame - start));
+                    }
+                }
+                if (cut) {
+                    const start = cut.timelineStartFrame !== undefined ? cut.timelineStartFrame : Math.round((cut.timeline_start || 0) * fps);
+                    m.frame = start + (m.offsetFrame || 0);
+                }
+            }
+        });
         return [...this.markers].sort((a, b) => a.frame - b.frame);
+    }
+
+    /**
+     * Seleciona ou deseleciona marcadores (suporta seleção única e múltipla com Shift).
+     */
+    selectMarker(id, multi = false) {
+        if (!multi) {
+            this.selectedMarkerIds.clear();
+        }
+        if (id) {
+            if (multi && this.selectedMarkerIds.has(id)) {
+                this.selectedMarkerIds.delete(id);
+            } else {
+                this.selectedMarkerIds.add(id);
+            }
+        }
+        STATE.emit("timelineMarkersChanged", this.markers);
+    }
+
+    /**
+     * Limpa a seleção de marcadores.
+     */
+    clearSelectedMarkers() {
+        if (this.selectedMarkerIds.size > 0) {
+            this.selectedMarkerIds.clear();
+            STATE.emit("timelineMarkersChanged", this.markers);
+        }
+    }
+
+    /**
+     * Remove todos os marcadores atualmente selecionados em lote.
+     */
+    removeSelectedMarkers() {
+        if (this.selectedMarkerIds.size === 0) return 0;
+        const count = this.selectedMarkerIds.size;
+        const idsToRemove = new Set(this.selectedMarkerIds);
+        this.markers = this.markers.filter(m => !idsToRemove.has(m.id));
+        this.selectedMarkerIds.clear();
+        STATE.emit("timelineMarkersChanged", this.markers);
+        return count;
     }
 
     /**
      * Retorna um marcador existente próximo a um frame específico dentro da tolerância.
      */
     getMarkerAtFrame(frame, toleranceFrames = 3) {
-        return this.markers.find(m => Math.abs(m.frame - frame) <= toleranceFrames) || null;
+        return this.getMarkersSorted().find(m => Math.abs(m.frame - frame) <= toleranceFrames) || null;
     }
 
     /**
@@ -173,11 +240,12 @@ export class CapiauTimelineState {
     }
 
     /**
-     * Adiciona um novo marcador na timeline.
+     * Adiciona um novo marcador na timeline (auto-vincula ao clipe sob o frame se houver).
      */
-    addMarker({ frame = this.playheadFrame, label = "", color = "#06b6d4", comment = "" } = {}) {
+    addMarker({ frame = this.playheadFrame, label = "", color = "#06b6d4", comment = "", clipId = undefined, offsetFrame = null } = {}) {
         const existing = this.getMarkerAtFrame(frame, 2);
         if (existing) {
+            this.selectMarker(existing.id, false);
             return existing;
         }
 
@@ -185,15 +253,46 @@ export class CapiauTimelineState {
         const markerCount = this.markers.length + 1;
         const finalLabel = label || `Marcador ${markerCount}`;
 
+        let finalClipId = clipId;
+        let finalOffset = offsetFrame;
+
+        // Se clipId não foi explicitamente passado, auto-vincula ao clipe sob o frame se houver
+        if (finalClipId === undefined) {
+            const cuts = STATE.activeTimelineCuts || [];
+            const fps = this.fps || 24;
+            const videoCuts = cuts.filter(c => c.type !== "audio" && (!c.track || !String(c.track).toLowerCase().startsWith("a")));
+            const searchCuts = videoCuts.length > 0 ? videoCuts : cuts;
+            
+            const cutUnder = searchCuts.find(c => {
+                const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+                const inF = c.inFrame !== undefined ? c.inFrame : Math.round((c.in || 0) * fps);
+                const outF = c.outFrame !== undefined ? c.outFrame : Math.round((c.out || 0) * fps);
+                const dur = Math.max(1, outF - inF);
+                return frame >= start && frame <= start + dur;
+            });
+
+            if (cutUnder) {
+                const start = cutUnder.timelineStartFrame !== undefined ? cutUnder.timelineStartFrame : Math.round((cutUnder.timeline_start || 0) * fps);
+                finalClipId = cutUnder.id;
+                finalOffset = Math.max(0, Math.round(frame - start));
+            } else {
+                finalClipId = null;
+                finalOffset = null;
+            }
+        }
+
         const marker = {
             id,
             frame: Math.max(0, Math.round(frame)),
             label: finalLabel,
             color: color || "#06b6d4",
-            comment: comment || ""
+            comment: comment || "",
+            clipId: finalClipId,
+            offsetFrame: finalOffset
         };
 
         this.markers.push(marker);
+        this.selectMarker(id, false);
         STATE.emit("timelineMarkersChanged", this.markers);
         return marker;
     }
@@ -205,10 +304,41 @@ export class CapiauTimelineState {
         const marker = this.getMarker(id);
         if (!marker) return null;
 
-        if (updates.frame !== undefined) marker.frame = Math.max(0, Math.round(updates.frame));
+        if (updates.frame !== undefined) {
+            marker.frame = Math.max(0, Math.round(updates.frame));
+            if (marker.clipId) {
+                const cuts = STATE.activeTimelineCuts || [];
+                let cut = cuts.find(c => String(c.id) === String(marker.clipId));
+                if (!cut) {
+                    cut = cuts.find(c => marker.frame >= c.timelineStartFrame && marker.frame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
+                    if (cut) marker.clipId = cut.id;
+                }
+                if (cut) {
+                    marker.offsetFrame = Math.max(0, Math.round(marker.frame - cut.timelineStartFrame));
+                }
+            }
+        }
         if (updates.label !== undefined) marker.label = updates.label;
         if (updates.color !== undefined) marker.color = updates.color;
         if (updates.comment !== undefined) marker.comment = updates.comment;
+
+        if (updates.clipId !== undefined) {
+            marker.clipId = updates.clipId;
+            if (updates.clipId) {
+                const cuts = STATE.activeTimelineCuts || [];
+                let cut = cuts.find(c => String(c.id) === String(updates.clipId));
+                if (!cut) {
+                    const searchFrame = updates.frame !== undefined ? updates.frame : marker.frame;
+                    cut = cuts.find(c => searchFrame >= c.timelineStartFrame && searchFrame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
+                    if (cut) marker.clipId = cut.id;
+                }
+                if (cut) {
+                    marker.offsetFrame = updates.offsetFrame !== undefined ? updates.offsetFrame : Math.max(0, Math.round((updates.frame !== undefined ? updates.frame : marker.frame) - cut.timelineStartFrame));
+                }
+            } else {
+                marker.offsetFrame = null;
+            }
+        }
 
         STATE.emit("timelineMarkersChanged", this.markers);
         return marker;
@@ -221,6 +351,7 @@ export class CapiauTimelineState {
         const idx = this.markers.findIndex(m => m.id === id);
         if (idx !== -1) {
             const removed = this.markers.splice(idx, 1)[0];
+            this.selectedMarkerIds.delete(id);
             STATE.emit("timelineMarkersChanged", this.markers);
             return removed;
         }
@@ -239,7 +370,9 @@ export class CapiauTimelineState {
                 frame: Math.max(0, Math.round(m.frame || 0)),
                 label: m.label || "Marcador",
                 color: m.color || "#06b6d4",
-                comment: m.comment || ""
+                comment: m.comment || "",
+                clipId: m.clipId || null,
+                offsetFrame: m.offsetFrame !== undefined ? m.offsetFrame : null
             }));
         }
         STATE.emit("timelineMarkersChanged", this.markers);
