@@ -47,7 +47,10 @@ Código pronto e verificado (servidor sobe, migração aplicada, testes passam).
   ✅ **(14/07) Corrigido: caminhos das 1.424 fotos estavam obsoletos no banco.** Apontavam para `D:\makinof-monstro\Fotos\` (o `D:` atual é o disco de sistema, sem essa pasta); os arquivos reais estão em `F:\Making Off - O Monstro\Fotos O MONSTRO\`. Conferido 1.424/1.424 por nome (zero duplicatas, `filename` = basename), backup do banco tirado antes (`data/capiau.db.pre_fix_paths_*.bak`), `UPDATE` aplicado, verificado 0 caminhos quebrados após. Efeito: o CLIP e a análise de foto já funcionavam antes (usam o proxy WebP local), mas o **`mtime` estava zerado para as 1.424** → a trava `burst.time_window_s` (30s) do dedupe de rajadas rodava inerte, sem a proteção contra falso agrupamento. Com os caminhos corrigidos os mtimes agora são reais e a trava está ativa — remedição abaixo.
 - [x] **E1.T6** Instalar `opentimelineio` quando houver solução para Python 3.14 (ou venv 3.12) para reativar exportação OTIO/XML/EDL.
   ✅ **(20/07) Resolvido pelo plano B — venv 3.12 dedicado + ponte por subprocesso.** O 0.18.1 continua sem wheel cp314 (verificado com `pip download --only-binary`); criado `data/venv312` via `uv` (CPython 3.12.12 standalone, sem tocar no Python do sistema) com `opentimelineio` + `otio-fcp-adapter` + `otio-cmx3600-adapter` (no 0.16+ os adaptadores XML/EDL saíram do core) + `python-dotenv`. `otio_export.py` agora delega por subprocesso quando o import falha (`_export_via_worker` → `python -m src.export.otio_export` no venv; caminho configurável em `export.worker_python`, default auto-detectado). Worker herda `DB_PATH`/`EXPORTS_DIR` por env var (testes usam banco temporário). **Validado ponta a ponta em 20/07: timeline real "teste jlcut" exportada nos 3 formatos pela API (HTTP 200), EDL com timecodes corretos.** 4 testes novos em `tests/test_f0b_export_bridge.py` (rodam no 3.14 sem otio; pulam se o venv não existir). ⚠️ O `tests/test_f0_otio_export.py` antigo importa `otio` no topo e não carrega no 3.14 — segue válido apenas dentro do venv.
-  ⚠️ **(20/07) Descoberto na validação: o `--reload` do uvicorn NÃO recarrega código nesta máquina** (endpoints adicionados horas antes continuavam fora do ar; provável incompatibilidade do watcher com o caminho não-ASCII `Programação`). **Toda mudança de backend exige reiniciar o servidor de verdade.** Havia ainda uma 2ª instância esquecida na :8001 disputando o lock do Qdrant (a causa clássica dos 500 de busca); ambas foram derrubadas e o servidor voltou como instância única desgrudada do console (`scripts/launch_detached.py`, log em `data/logs/server_20260720.*.log`), com busca verificada saudável após o restart.
+  ⚠️ **(20/07) Descoberto na validação: o `--reload` do uvicorn NÃO recarrega código nesta máquina.** Causa raiz capturada no log mais tarde na mesma madrugada: ao detectar mudança de arquivo, o reloader chama `os.kill(pid, CTRL_C_EVENT)` — sinal que **não existe para processo sem console** (o launcher desgrudado) → `OSError WinError 6` e **o servidor MORRE em vez de recarregar** (e no processo preso ao console, o reload também nunca funcionou). **Regra desta máquina: rodar SEM `--reload`; toda mudança de backend = reiniciar de verdade** (`scripts/launch_detached.py C:/Python314/python.exe -m uvicorn src.api.server:app --stdout ... --stderr ...`). Havia ainda uma 2ª instância esquecida na :8001 disputando o lock do Qdrant (a causa clássica dos 500 de busca); ambas foram derrubadas e o servidor voltou como instância única desgrudada do console, com busca verificada saudável após o restart.
+  **(20/07, madrugada) Dois defeitos reportados no teste do usuário, corrigidos e provados ponta a ponta:**
+  - **"Busca do cabeçalho não mostra nada":** ✅ **causa principal identificada pelo usuário em 20/07 — ele estava na PORTA 8001** (instância zumbi SEM o lock do Qdrant): as buscas falhavam **em silêncio**, devolvendo vazio sem nenhum aviso. Na 8000 tudo funciona. A instância 8001 foi derrubada (2x — ela reapareceu e foi morta de novo). Dois endurecimentos ficaram do diagnóstico: (a) a busca agora **revela o painel direito** se estiver recolhido (`window.expandRightPanel` em `runSemanticSearch`/`showSimilarMedia` — o inspetor invisível de 19/07 tinha deixado o painel recolhido); (b) **o silêncio do Qdrant virou o item P0 da próxima sessão** — falha de índice tem que aparecer como aviso na UI, nunca como resultado vazio.
+  - **"Upload de roteiro falha (pypdf)":** dois defeitos empilhados — (1) `pypdf` não estava instalado (instalado 6.14.2; o aviso de TXT com a mesma mensagem era o seletor de arquivo reenviando o mesmo .pdf — o caminho .txt nunca usa pypdf); (2) por baixo, `projects.py` usava `SemanticSearch` **sem importar** — o upload quebraria de qualquer jeito na indexação (e o commit acontece antes: as falhas deixavam docs órfãos no banco, já limpos). Import corrigido; upload de .txt e .pdf validados com arquivos reais no servidor no ar e removidos em seguida.
 
 ---
 
@@ -178,7 +181,7 @@ Código pronto e verificado (servidor sobe, migração aplicada, testes passam).
 
 - [x] Validar beats em 5 planos-sequência reais; comparar custo de visão antes/depois; aprovar ou ajustar limiares. *(14/07: beats validados em material real — `handcam (70)` e `MVI_3247`; custo medido e projetado nas tabelas acima; limiar de rajada decidido em 0.93. Filtros de faceta ficam de fora — dependem do E2.D, ainda não implementado.)*
 - [x] **Revalidar E2.A5/E2.A6 com material real.** *(14/07: revalidação ponta a ponta no vídeo 265 confirmou segmentação alimentando a visão de fato — 66 keyframes reais, zero fallback para relógio fixo.)*
-- [ ] **E2.E2 — Testar E2.C2 (usuário).** Requer **reiniciar o servidor** (endpoints novos; o :8000 não faz hot-reload) e F5 no navegador. Roteiro: (1) abrir um vídeo no inspetor → aba Índice → mudar a categoria no dropdown "Categoria (Triagem IA)" → conferir que o card/tooltip atualiza e que reabrir o vídeo mostra "confirmada por você"; (2) abrir uma foto de rajada no lightbox → mudar a categoria → conferir aviso "N fotos da rajada"; (3) digitar `revisar:triagem` na busca da biblioteca (aba Fotos) → devem aparecer ~3 fotos com confiança baixa; (4) marcar um vídeo `cotidiano` como `depoimento` e conferir que ele vira tipo "Fala" (interview) na biblioteca.
+- [x] **E2.E2 — Testar E2.C2 (usuário).** Requer **reiniciar o servidor** (endpoints novos; o :8000 não faz hot-reload) e F5 no navegador. Roteiro: (1) abrir um vídeo no inspetor → aba Índice → mudar a categoria no dropdown "Categoria (Triagem IA)" → conferir que o card/tooltip atualiza e que reabrir o vídeo mostra "confirmada por você"; (2) abrir uma foto de rajada no lightbox → mudar a categoria → conferir aviso "N fotos da rajada"; (3) digitar `revisar:triagem` na busca da biblioteca (aba Fotos) → devem aparecer ~3 fotos com confiança baixa; (4) marcar um vídeo `cotidiano` como `depoimento` e conferir que ele vira tipo "Fala" (interview) na biblioteca.
 
 **Etapa 2 — encerramento (14/07, atualizado 20/07):** E2.A, E2.B (exceto B5), E2.C1, **E2.C2, E2.C3, E2.D1, E2.D2-fotos e E2.D3-backend** concluídos. **Restam da etapa:** E2.B5 (adiado oficialmente para junto do E3.C — sem entidades object/location cadastradas), chips de faceta na UI da aba Busca (D3-UI), paleta retroativa de keyframes de vídeo (D2-vídeos, incremental nas próximas análises) e o roteiro de teste do usuário E2.E2. O E1.T5 **já foi executado** (ver E1.T5 acima).
 
@@ -269,6 +272,60 @@ Ganho isolado do **E2.C1: −15%** (C vs. B). Ganho isolado das **rajadas a 0.93
 
 ---
 
+## PRÓXIMA SESSÃO — prioridades preparadas (20/07)
+
+> Especificado com detalhe de execução para começar direto. Ordem pensada: P0 é dívida de confiabilidade que já custou horas de diagnóstico; P1–P3 antecipam o pedaço de **roteiro** da Etapa 3 (o roteiro real já está no banco e o usuário quer usá-lo na edição). Itens da Etapa 3 antecipados aqui saem da Etapa 3.
+
+### P0 — Aviso de "índice de busca indisponível" (fim do silêncio do Qdrant) ✅ implementado em 20/07/2026
+
+**Motivação real:** em 19–20/07 o usuário usou a instância da porta 8001 (sem o lock do Qdrant) e todas as buscas voltaram **vazias sem nenhum aviso** — horas de confusão que um banner teria evitado.
+
+- [ ] **P0.5** Teste: monkeypatch do client Qdrant levantando exceção (NUNCA subir 2ª instância real — lock).
+*Aceite:* com o Qdrant tomado por outra instância, a busca mostra o aviso (não vazio) e o health aponta o problema.
+
+### P1 — E3.C0 (novo): dedupe e versão de documentos no upload
+
+**Motivação real:** em 20/07 o mesmo roteiro entrou 2x (`.txt` id 3 com 133.547 chars e `.pdf` id 8 com 132.158) → chunks duplicados no RAG, respostas do chat puxando o mesmo trecho 2x. Não há nenhuma proteção hoje (`production_doc` nem tem hash; fotos/vídeos têm).
+
+- [ ] **P1.1** Migração: `byte_hash` (sha256 dos bytes) e `content_hash` (sha256 do texto extraído normalizado: minúsculas + espaços colapsados) em `production_doc`.
+- [ ] **P1.2** Upload: `byte_hash` idêntico → 409 "documento idêntico já existe"; `content_hash` idêntico → 409 "mesmo conteúdo em outro formato (id X)"; similaridade de texto > ~0.9 (difflib/embedding) → resposta "possível nova versão de X" com opção `replace_doc_id` que **apaga os chunks antigos do Qdrant** e o doc antigo antes de indexar o novo.
+- [ ] **P1.3** UI: diálogo no upload com as 3 situações (idêntico/mesmo conteúdo/nova versão).
+- [ ] **P1.4** Sessão: limpar a duplicata atual do usuário (decidir com ele: manter o `.txt` id 3, apagar o `.pdf` id 8 — o PDF perdeu ~1.400 chars na extração).
+*Aceite:* subir o mesmo roteiro em pdf e txt não cria dois docs; subir "v5" oferece substituir a "v4".
+
+### P2 — E3.C1 antecipado: extração estruturada do roteiro + bloco de contexto compacto
+
+**Este é o "sistema para diminuir tokens mantendo os dados": extrai UMA vez (estruturado, com cache), injeta sempre um bloco compacto — nunca o roteiro inteiro.**
+Números do acervo real: roteiro = 133.547 chars ≈ **~33k tokens**. Extração única em ~6 chunks de ~6k tokens no modelo de texto barato (DeepSeek) ≈ 40k entrada + ~5k saída = **centavos, uma vez por versão do roteiro** (cache por `content_hash` — P1). Depois disso, o que circula nos prompts é um bloco de **~1,5–2k tokens**.
+
+- [ ] **P2.1** Prompt `script_extract` no PROMPT_REGISTRY (com `label`/`category`/`variables`): entrada = chunk do roteiro; saída JSON = personagens (nome + 1 linha), cenas (número, heading, sinopse de 1 frase, personagens, props, locação), objetos-chave. Chunking com sobreposição de 1 cena; fusão dos resultados por número de cena.
+- [ ] **P2.2** Tabela `scene(project_id, doc_id, number, heading, synopsis, characters_json, props_json, location, created_at)` (migração segura) + entidades sugeridas em `entity` com `status='suggested'` (coluna nova; só `confirmed` entra em prompts — regra do E3.C3 original).
+- [ ] **P2.3** Cache: extração roda 1x por `content_hash`; re-upload da mesma versão reusa.
+- [ ] **P2.4** `script_context_block` compilado (~1,5–2k tokens: logline + personagens confirmados + locações + props) injetável em `triage`/`vision` via setting `context.script_block_enabled` (**default false** até validar em ~10 reanálises A/B — convenção anti-viés: o bloco descreve o UNIVERSO do filme, nunca afirma que o material É do filme).
+- [ ] **P2.5** UI mínima de curadoria (E3.C3 do plano): lista de personagens/cenas extraídos com aceitar/rejeitar em massa (aba Docs → botão "Extrair estrutura").
+*Aceite:* roteiro real extraído com cenas/personagens conferíveis pelo usuário; custo de extração logado; reanálise de 5 itens com o bloco ligado mostra nomes/termos do filme nas descrições sem inventar vínculo.
+
+### P3 — E3.C5 (novo): casamento cena ↔ material + relatório de cobertura
+
+**O uso do roteiro que ajuda a EDIÇÃO de verdade** (e só depende do P2):
+- [ ] **P3.1** Cada cena vira uma busca semântica pronta (sinopse + locação + personagens) contra vídeo+foto; sugestões gravadas em `scene_media(scene_id, media_kind, media_id, score, status 'sugerido'/'confirmado'/'rejeitado')`.
+- [ ] **P3.2** Relatório de cobertura: cenas sem material sugerido (buracos), material forte sem cena (sobras/b-roll livre).
+- [ ] **P3.3** UI: painel "Cenas" (lista com contadores de material por cena; clicar → resultados no painel de busca; confirmar/rejeitar vínculos).
+*Aceite:* "mostrar material da cena X" funciona; relatório aponta pelo menos os buracos óbvios (validar com o usuário).
+
+### Pendências que continuam na fila (sem mudança)
+
+- Chips de faceta na UI da aba Busca (E2.D3-UI) — backend pronto, falta só interface.
+- Fixtures do `test_f4_bursts` no limiar (chip de tarefa já criado em 20/07).
+- Roteiro de teste do usuário **E2.E2** (dropdowns de categoria, `revisar:triagem`, rajadas).
+- E2.D2-vídeos (paleta de keyframes) — incremental nas análises novas; backfill exigiria re-extração FFmpeg (lote de worker, se fizer falta).
+
+### Nota de formato de roteiro (referência para o usuário)
+
+Para ESTE pipeline: **`.fountain` ou `.txt` > `.fdx` > `.pdf`**. O Fountain/txt preserva estrutura em texto puro (headings `INT./EXT.` são âncoras de cena para o P2); o `.fdx` (Final Draft) já é parseado com tipos de parágrafo; o **PDF é o pior** — a extração de texto perde estrutura e conteúdo (medido no roteiro real: o `.pdf` chegou com ~1.400 chars a menos que o `.txt` do mesmo roteiro, além de quebras de linha no meio de frases que poluem o chunking do RAG).
+
+---
+
 ## ETAPA 3 — Sala de Projeto + Capability Manager
 
 **Objetivo:** contexto do projeto nasce de conversa/documentos e alimenta todas as análises; o programa conhece a máquina e escolhe/instala modelos.
@@ -290,7 +347,9 @@ Ganho isolado do **E2.C1: −15%** (C vs. B). Ganho isolado das **rajadas a 0.93
 
 ### E3.C — Extração de documentos estruturantes
 
-- [ ] **E3.C1 — Extração de roteiro** — Prompt `script_extract` (chunking p/ roteiros longos): personagens (nome+descrição), cenas (número, sinopse, personagens, props, locação), objetos-chave. Suporte a PDF/DOCX/TXT/Fountain (o upload de docs já existe).
+> ⚠️ **(20/07) Parcialmente antecipado para a seção "PRÓXIMA SESSÃO":** E3.C1 (extração) = P2, parte do E3.C3 (curadoria) = P2.5, e nasceram lá o E3.C0 (dedupe de docs = P1) e o E3.C5 (cena↔material = P3). Ao executar, marcar aqui também. O que fica exclusivo desta etapa: E3.C2 (vínculo entity↔scene completo), E3.C4 (ficha técnica → galeria facial) e a integração com o Cartão de Contexto (E3.A3).
+
+- [ ] **E3.C1 — Extração de roteiro** — Prompt `script_extract` (chunking p/ roteiros longos): personagens (nome+descrição), cenas (número, sinopse, personagens, props, locação), objetos-chave. Suporte a PDF/DOCX/TXT/Fountain (o upload de docs já existe). *(→ P2 da próxima sessão)*
 - [ ] **E3.C2 — Schema** — Tabela `scene(project_id, number, synopsis, characters_json, props_json, location, created_at)`; coluna `status ('suggested','confirmed','rejected')` em `entity` (migração); vínculo `entity ↔ scene` via JSON ou tabela `scene_entity`.
 - [ ] **E3.C3 — UI de curadoria** — Lista de sugestões extraídas com aceitar/rejeitar/editar em massa. Só entidades `confirmed` entram nos prompts de visão.
 - [ ] **E3.C4 — Ficha técnica → galeria facial** — Extração de pessoas+funções; upload de foto de referência por pessoa → embedding facial seed → matching prioritário contra seeds ANTES do DBSCAN (clusters nascem nomeados).

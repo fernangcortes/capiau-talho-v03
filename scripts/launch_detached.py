@@ -39,15 +39,16 @@ def main() -> None:
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
     stderr_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(stdout_path, "wb") as out, open(stderr_path, "wb") as err:
-        proc = subprocess.Popen(
-            cmd,
-            stdout=out,
-            stderr=err,
-            stdin=subprocess.DEVNULL,
-            creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
-            close_fds=True,
-        )
+    out = open(stdout_path, "ab")
+    err = open(stderr_path, "ab")
+    proc = subprocess.Popen(
+        cmd,
+        stdout=out,
+        stderr=err,
+        stdin=subprocess.DEVNULL,
+        creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
+        close_fds=True,
+    )
     print(f"PID: {proc.pid}")
 
 
