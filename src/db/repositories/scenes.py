@@ -17,10 +17,18 @@ class SceneRepository:
         """Substitui em bloco as cenas de um documento (re-extração é sempre integral).
 
         As cenas chegam já numeradas pela posição no documento (script_format.py), então
-        `number` é estável entre rodadas: reextrair o mesmo roteiro reescreve as mesmas
-        linhas em vez de duplicá-las.
+        `number` é estável entre rodadas — o que permite preservar a curadoria humana:
+        uma cena confirmada/rejeitada antes da re-extração mantém o status na cena de
+        mesmo número (melhor esforço: se a estratégia de detecção mudou entre rodadas,
+        os números podem ter mudado de significado, e aí o status recomeça).
         """
         cursor = conn.cursor()
+        cursor.execute(
+            "SELECT number, status FROM scene WHERE project_id = ? AND doc_id = ? AND status != 'suggested'",
+            (project_id, doc_id)
+        )
+        curated = {r["number"]: r["status"] for r in cursor.fetchall()}
+
         cursor.execute("DELETE FROM scene WHERE project_id = ? AND doc_id = ?", (project_id, doc_id))
 
         rows = []
@@ -28,19 +36,21 @@ class SceneRepository:
             number = s.get("number")
             if number is None:
                 continue
+            number = int(number)
             rows.append((
-                project_id, doc_id, int(number),
+                project_id, doc_id, number,
                 s.get("heading"), s.get("synopsis"),
                 json.dumps(s.get("characters") or [], ensure_ascii=False),
                 json.dumps(s.get("props") or [], ensure_ascii=False),
                 s.get("location"),
+                curated.get(number, "suggested"),
             ))
 
         if rows:
             cursor.executemany("""
                 INSERT INTO scene (project_id, doc_id, number, heading, synopsis,
-                                   characters_json, props_json, location)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                   characters_json, props_json, location, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, rows)
         return len(rows)
 

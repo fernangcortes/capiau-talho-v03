@@ -460,7 +460,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
     },
     {
         "key": "script.anchor_strategy", "type": "enum", "default": "auto",
-        "enum": ["auto", "fdx", "fountain_forced", "sluglines", "cena_numerada", "markdown", "prose"],
+        "enum": ["auto", "fdx", "fountain", "sluglines", "cena_numerada", "markdown", "prose"],
         "label": "Roteiro: como identificar o começo de cada cena",
         "help": "Deixe em 'auto' para o programa descobrir sozinho o formato do roteiro. Só mude se a detecção automática errar num roteiro de formatação incomum: 'sluglines' = cabeçalhos INT./EXT., 'cena_numerada' = CENA 1/CENA 2, 'fdx' = arquivo do Final Draft, 'prose' = documento sem cenas (tratamento, escaleta).",
         "help_tech": "Pula a cascata de detect_structure() em script_format.py e força um dos CANDIDATE_PATTERNS.",

@@ -84,13 +84,42 @@ class TestVariantesDeFormatacao(unittest.TestCase):
                            "14  INT. COZINHA - DIA                  14",
                            "15  EXT. VARANDA - DIA                  15"])
         self.assertEqual(r.scene_count, 4)
+        # O numero da margem direita nao pode sujar o texto do heading: ele vira
+        # scene.heading e alimenta as queries de busca do P3.
+        self.assertEqual(r.anchors[0]["heading"], "INT. CASA DO ENGEL - NOITE")
+
+    def test_margem_direita_nao_mutila_cena_numerada(self):
+        """O strip do numero de margem exige 2+ espacos antes -- 'CENA 12' fica intacto."""
+        r = self._detecta(["CENA 12", "CENA 13", "CENA 14", "CENA 15"])
+        self.assertEqual(r.strategy, "cena_numerada")
+        self.assertEqual(r.anchors[0]["heading"], "CENA 12")
 
     def test_fountain_heading_forcado(self):
         r = self._detecta([".DE VOLTA A COLINA", ".NA MANHA SEGUINTE",
                            ".TRES ANOS DEPOIS", ".O ULTIMO DIA"], filename="roteiro.fountain")
-        self.assertEqual(r.strategy, "fountain_forced")
+        self.assertEqual(r.strategy, "fountain")
         self.assertEqual(r.scene_count, 4)
         self.assertEqual(r.anchors[0]["heading"], "DE VOLTA A COLINA")
+
+    def test_fountain_misto_pega_sluglines_e_forcados(self):
+        """Um .fountain real MISTURA os dois estilos. Antes da correção, o padrão que só
+        via headings forçados pegava 3 de 12 cenas e o bônus de formato nativo fazia
+        essa detecção esparsa VENCER a de sluglines — buraco silencioso."""
+        headings = [f".FLASHBACK {i}" if i % 4 == 0 else f"INT. SALA {i} - DIA"
+                    for i in range(1, 13)]
+        r = self._detecta(headings, filename="roteiro.fountain")
+        self.assertEqual(r.strategy, "fountain")
+        self.assertEqual(r.scene_count, 12)
+        self.assertFalse(r.needs_review)
+
+    def test_ponto_no_inicio_em_txt_nao_e_fountain(self):
+        """Linha começando com ponto num .txt qualquer (ex: nomes de arquivo) não pode
+        virar cena: o candidato fountain só roda em arquivos .fountain."""
+        corpo_com_dots = CORPO + "\n.gitignore\n.env na raiz do projeto\n"
+        texto = "\n".join(f"INT. LOCACAO {i} - DIA\n\n{corpo_com_dots}" for i in range(1, 7))
+        r = detect_structure(texto, "roteiro.txt", allow_llm=False)
+        self.assertEqual(r.strategy, "sluglines")
+        self.assertEqual(r.scene_count, 6)
 
     def test_establishing_shot(self):
         r = self._detecta(["EST. A COLINA - AMANHECER", "INT. CASA - DIA",
@@ -225,11 +254,14 @@ class TestModoProsa(unittest.TestCase):
 class TestHeuristicaGenerica(unittest.TestCase):
     def test_caps_isolado_resolve_antes_de_gastar_llm(self):
         """Delimitador inventado, mas em maiusculas isoladas: o detector fraco de ultimo
-        recurso resolve sozinho e a camada 3 (paga) nem precisa entrar."""
+        recurso resolve sozinho e a camada 3 (paga) nem precisa entrar. Como e o
+        detector mais generico (casa tambem com nomes de personagem e transicoes),
+        SEMPRE pede conferencia humana, mesmo validando."""
         texto = "\n".join(f"<<< BLOCO {i} >>>\n\nAcao da cena numero {i}.\n" for i in range(1, 13))
         r = detect_structure(texto, "estranho.txt", allow_llm=False)
         self.assertEqual(r.strategy, "caps_isolado")
         self.assertEqual(r.scene_count, 12)
+        self.assertTrue(r.needs_review)
 
 
 class TestDeteccaoPorLLM(unittest.TestCase):

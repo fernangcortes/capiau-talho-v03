@@ -82,11 +82,19 @@ CANDIDATE_PATTERNS: List[Dict[str, Any]] = [
         "native": True,
     },
     {
-        # Fountain: heading forcado com ponto no inicio (".DE VOLTA A COLINA").
-        # Exige maiuscula depois do ponto para nao capturar "...reticencias".
-        "id": "fountain_forced",
-        "regex": re.compile(r"^\.(?P<heading>[^\s.].*)$"),
+        # Fountain: um arquivo .fountain real MISTURA sluglines (INT./EXT.) com headings
+        # forcados (".DE VOLTA A COLINA") -- um padrao que so pegue um dos dois deixa
+        # buracos, e o bonus de formato nativo faria a deteccao esparsa errada vencer
+        # (medido: 3 de 12 cenas num misto sintetico). Por isso o padrao e a UNIAO dos
+        # dois, e o candidato so roda em arquivos .fountain (linha comecando com ponto
+        # em .txt qualquer costuma ser outra coisa).
+        "id": "fountain",
+        "regex": re.compile(
+            rf"^(?:\.(?P<forced>[^\s.].*)|\s*{_NUM_PREFIX}(?P<slug>{_SLUG_WORDS}[\s.\-].*))$",
+            re.IGNORECASE,
+        ),
         "native": True,
+        "ext": ".fountain",
     },
     {
         # Sluglines classicas, multilingues, tolerando numero nas duas margens.
@@ -111,6 +119,11 @@ CANDIDATE_PATTERNS: List[Dict[str, Any]] = [
 _CAPS_LINE = re.compile(r"^\s*(?P<heading>[^a-z]{4,%d})\s*$" % MAX_HEADING_LEN)
 
 
+# Numero de cena repetido na margem DIREITA ("12  INT. CASA - NOITE          12"):
+# so e removido quando precedido de 2+ espacos, para nunca mutilar "CENA 12".
+_RIGHT_MARGIN_NUM = re.compile(r"\s{2,}\d{1,4}[A-Za-z]{0,2}$")
+
+
 def _extract_anchors(content: str, pattern: re.Pattern, require_caps: bool = False) -> List[Dict[str, Any]]:
     """Aplica um padrao ao documento e devolve as ancoras numeradas por posicao."""
     anchors: List[Dict[str, Any]] = []
@@ -120,7 +133,10 @@ def _extract_anchors(content: str, pattern: re.Pattern, require_caps: bool = Fal
         if stripped and len(stripped) <= MAX_HEADING_LEN:
             m = pattern.match(stripped)
             if m:
-                heading = (m.groupdict().get("heading") or stripped).strip()
+                # Primeiro grupo nomeado preenchido (padroes compostos, como o fountain,
+                # tem mais de um); sem grupo, a linha inteira e o heading.
+                heading = next((v for v in m.groupdict().values() if v), stripped).strip()
+                heading = _RIGHT_MARGIN_NUM.sub("", heading)
                 if not require_caps or heading == heading.upper():
                     anchors.append({
                         "number": len(anchors) + 1,
@@ -291,21 +307,21 @@ def detect_structure(
                 stats=stats, issues=issues, needs_review=not ok,
             )
 
-    # Camadas 0 e 1: todos os candidatos competem; o formato do arquivo so da preferencia.
+    # Camadas 0 e 1: os candidatos competem. Padroes com "ext" so rodam no formato
+    # certo (fountain); o fdx roda em qualquer arquivo porque o prefixo
+    # "SCENE HEADING:" e inequivoco venha de onde vier.
     results = []
     for pattern in CANDIDATE_PATTERNS:
+        required_ext = pattern.get("ext")
+        if required_ext and ext != required_ext:
+            continue
         anchors = _extract_anchors(content, pattern["regex"])
         if not anchors:
             continue
-        native = pattern["native"] and (
-            (pattern["id"] == "fdx" and ext == ".fdx")
-            or (pattern["id"] == "fountain_forced" and ext == ".fountain")
-            or pattern["id"] == "fdx"  # o prefixo SCENE HEADING: e inequivoco em qualquer extensao
-        )
         ok, issues, stats = validate_segmentation(anchors, content, min_coverage, max_median_chars, max_scene_ratio)
         results.append({
             "id": pattern["id"], "anchors": anchors, "ok": ok, "issues": issues,
-            "stats": stats, "score": _score(stats, native, ok),
+            "stats": stats, "score": _score(stats, pattern.get("native", False), ok),
         })
 
     caps = _extract_anchors(content, _CAPS_LINE, require_caps=True)
@@ -322,7 +338,11 @@ def detect_structure(
     if best and best["ok"]:
         return StructureReport(
             strategy=best["id"], anchors=best["anchors"], confidence=best["score"],
-            stats=best["stats"], issues=[], needs_review=False,
+            stats=best["stats"], issues=[],
+            # caps_isolado e o detector fraco de ultimo recurso (casa tambem com nomes
+            # de personagem e transicoes): mesmo validando, pede conferencia humana --
+            # mesma regra da camada de LLM.
+            needs_review=(best["id"] == "caps_isolado"),
         )
 
     # Camada 3: nenhuma heuristica convenceu -- perguntar ao LLM qual e a convencao.

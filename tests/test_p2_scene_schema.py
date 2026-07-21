@@ -153,6 +153,38 @@ class TestP2SceneSchema(unittest.TestCase):
         self.assertEqual(len(lidas), 1)
         self.assertEqual(lidas[0]["synopsis"], "v2")
 
+    def test_reextracao_preserva_curadoria_humana(self):
+        """Reextrair com force nao pode jogar fora confirmacoes/rejeicoes do usuario:
+        o numero e deterministico por posicao, entao o status e reaplicado por numero."""
+        doc_id = self._novo_doc("curadoria.txt")
+        cenas = [
+            {"number": 1, "heading": "INT. A - DIA", "synopsis": "x", "characters": [], "props": [], "location": "A"},
+            {"number": 2, "heading": "INT. B - DIA", "synopsis": "y", "characters": [], "props": [], "location": "B"},
+            {"number": 3, "heading": "INT. C - DIA", "synopsis": "z", "characters": [], "props": [], "location": "C"},
+        ]
+        with get_db() as conn:
+            SceneRepository.replace_scenes_for_doc(conn, self.project_id, doc_id, cenas)
+            conn.commit()
+            todas = SceneRepository.list_scenes(conn, self.project_id, doc_id=doc_id)
+            SceneRepository.set_scenes_status(conn, self.project_id,
+                                              [c["id"] for c in todas if c["number"] == 1], "confirmed")
+            SceneRepository.set_scenes_status(conn, self.project_id,
+                                              [c["id"] for c in todas if c["number"] == 2], "rejected")
+            conn.commit()
+
+            # Re-extracao (force): sinopses mudam, status por numero permanece
+            for c in cenas:
+                c["synopsis"] = c["synopsis"] + " reescrita"
+            SceneRepository.replace_scenes_for_doc(conn, self.project_id, doc_id, cenas)
+            conn.commit()
+            depois = {c["number"]: c for c in SceneRepository.list_scenes(
+                conn, self.project_id, doc_id=doc_id, include_rejected=True)}
+
+        self.assertEqual(depois[1]["status"], "confirmed")
+        self.assertEqual(depois[2]["status"], "rejected")
+        self.assertEqual(depois[3]["status"], "suggested")
+        self.assertEqual(depois[1]["synopsis"], "x reescrita")
+
     def test_cena_rejeitada_sai_da_listagem_padrao(self):
         doc_id = self._novo_doc("rejeita.txt")
         with get_db() as conn:
