@@ -47,6 +47,39 @@ export function framesToTimecode(totalFrames, fps = 24) {
 }
 
 /**
+ * Converte frames para timecode adaptativo de régua (omite horas zeradas e quadros quando distante).
+ * @param {number} totalFrames - Total de frames.
+ * @param {number} fps - Taxa de quadros.
+ * @param {boolean} showFrames - Se deve incluir o sufixo :FF de quadros.
+ * @param {boolean} forceHours - Se deve forçar o prefixo HH: de horas mesmo se 0.
+ * @returns {string} Timecode formatado para régua.
+ */
+export function formatRulerTimecode(totalFrames, fps = 24, showFrames = false, forceHours = false) {
+    if (isNaN(totalFrames) || totalFrames < 0) totalFrames = 0;
+
+    const totalSeconds = Math.floor(totalFrames / fps);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    const f = Math.round(totalFrames % fps);
+
+    const pad = (n) => String(n).padStart(2, '0');
+
+    let result = "";
+    if (h > 0 || forceHours) {
+        result += `${pad(h)}:${pad(m)}:${pad(s)}`;
+    } else {
+        result += `${pad(m)}:${pad(s)}`;
+    }
+
+    if (showFrames) {
+        result += `:${pad(f)}`;
+    }
+
+    return result;
+}
+
+/**
  * Converte um timecode formatado (HH:MM:SS:FF ou MM:SS) para frames.
  * @param {string} tc - String de timecode.
  * @param {number} fps - Taxa de quadros.

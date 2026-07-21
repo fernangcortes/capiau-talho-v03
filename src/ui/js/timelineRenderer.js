@@ -1,7 +1,7 @@
 // Renderizador de Alta Performance via Canvas (CapIAu-Talho)
 // v2: Multipista dinâmica com pista de IA, scroll vertical e cores por pista.
 import { STATE } from "./state.js";
-import { TIMELINE_STATE, framesToTimecode, framesToSeconds } from "./timelineState.js";
+import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode } from "./timelineState.js";
 
 // Paleta rotativa para pistas de vídeo adicionais
 const TRACK_PALETTE = [
@@ -308,13 +308,13 @@ export class CapiauTimelineRenderer {
     }
 
     /**
-     * Desenha a régua de tempo com marcas de subdivisão de frames/segundos.
+     * Desenha a régua de tempo adaptativa com marcas de subdivisão e timecode dinâmico.
      */
     drawRuler() {
         const ctx = this.ctx;
         const zoom = TIMELINE_STATE.zoom;
         const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
-        const fps = TIMELINE_STATE.fps;
+        const fps = TIMELINE_STATE.fps || 24;
 
         // Fundo da régua
         ctx.fillStyle = this.colors.rulerBg;
@@ -328,54 +328,89 @@ export class CapiauTimelineRenderer {
         ctx.lineTo(this.width, this.rulerHeight);
         ctx.stroke();
 
-        // Determinar intervalo de escala baseado no zoom
-        const framesPerSecond = fps;
-        let tickInterval = 5; // A cada 5 frames por padrão
-        let textInterval = framesPerSecond; // Texto a cada 1 segundo (24 frames)
+        // 1. Candidatos a intervalo de rótulo (em frames)
+        const rawCandidates = [
+            1,
+            2,
+            5,
+            Math.max(1, Math.round(fps / 4)),
+            Math.max(1, Math.round(fps / 2)),
+            fps * 1,
+            fps * 2,
+            fps * 5,
+            fps * 10,
+            fps * 15,
+            fps * 30,
+            fps * 60,
+            fps * 120,
+            fps * 300,
+            fps * 600,
+            fps * 900,
+            fps * 1800,
+            fps * 3600,
+            fps * 7200,
+            fps * 18000
+        ];
+        const candidates = [...new Set(rawCandidates.map(Math.round))].sort((a, b) => a - b);
 
-        const pixelsPerSecond = zoom * framesPerSecond;
-        if (pixelsPerSecond < 50) {
-            tickInterval = framesPerSecond; // Ticks a cada 1 segundo
-            textInterval = framesPerSecond * 5; // Texto a cada 5 segundos
-        }
-        if (pixelsPerSecond < 10) {
-            tickInterval = framesPerSecond * 5;
-            textInterval = framesPerSecond * 30; // Texto a cada 30 segundos
-        }
-        if (zoom > 1.0) {
-            tickInterval = 1; // Tick a cada frame individual
-            textInterval = 12; // Texto a cada meio segundo (12 frames)
+        // 2. Determinar textInterval para garantir espaçamento mínimo de ~90px entre textos (evita sobreposição)
+        const minTextPx = 90;
+        let textInterval = candidates[candidates.length - 1];
+        for (const c of candidates) {
+            if (c * zoom >= minTextPx) {
+                textInterval = c;
+                break;
+            }
         }
 
-        // Calcula frames visíveis
-        const startFrame = scrollLeft;
+        // 3. Determinar subTickInterval (divisores exatos de textInterval com pelo menos 8px entre ticks)
+        let subTickInterval = textInterval;
+        if (textInterval > 1) {
+            const divisors = [];
+            for (let d = textInterval; d >= 1; d--) {
+                if (textInterval % d === 0) {
+                    divisors.push(d);
+                }
+            }
+            for (const d of divisors) {
+                if (d * zoom >= 8) {
+                    subTickInterval = d;
+                }
+            }
+        }
+
+        // 4. Parâmetros de exibição do Timecode
+        const startFrame = Math.max(0, scrollLeft);
         const endFrame = startFrame + Math.ceil(this.width / zoom);
+        const showFrames = textInterval < fps;
+        const forceHours = endFrame >= 3600 * fps;
 
-        ctx.fillStyle = this.colors.rulerText;
-        ctx.font = "9px monospace";
+        ctx.font = "9px 'Outfit', 'Inter', monospace";
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
 
-        for (let f = Math.floor(startFrame / tickInterval) * tickInterval; f <= endFrame; f += tickInterval) {
-            const x = (f - startFrame) * zoom;
+        const firstTickFrame = Math.floor(startFrame / subTickInterval) * subTickInterval;
 
-            const isTextTick = f % textInterval === 0;
-            const tickSize = isTextTick ? 12 : 6;
+        for (let f = firstTickFrame; f <= endFrame; f += subTickInterval) {
+            const x = (f - startFrame) * zoom;
+            if (x < -15 || x > this.width + 15) continue;
+
+            const isTextTick = (f % textInterval === 0);
+            const tickSize = isTextTick ? 10 : 5;
 
             // Desenha tick
-            ctx.strokeStyle = this.colors.rulerTicks;
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = isTextTick ? "rgba(255, 255, 255, 0.4)" : "rgba(255, 255, 255, 0.15)";
+            ctx.lineWidth = isTextTick ? 1.5 : 1;
             ctx.beginPath();
             ctx.moveTo(x, this.rulerHeight - tickSize);
             ctx.lineTo(x, this.rulerHeight);
             ctx.stroke();
 
-            // Desenha texto
+            // Desenha texto do timecode
             if (isTextTick) {
-                const tc = framesToTimecode(f, fps);
-                // Exibe apenas MM:SS ou MM:SS:FF dependendo do zoom para visual limpo
-                const displayTc = tc.substring(3); // Remove o HH: inicial
-                ctx.fillText(displayTc, x + 4, this.rulerHeight - 16);
+                const label = formatRulerTimecode(f, fps, showFrames, forceHours);
+                ctx.fillStyle = this.colors.rulerText;
+                ctx.fillText(label, x + 4, this.rulerHeight - 16);
             }
         }
     }
