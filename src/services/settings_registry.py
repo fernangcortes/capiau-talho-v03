@@ -140,6 +140,20 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "vision", "level": "simple", "scope": "both", "requires_reprocess": True,
     },
     {
+        "key": "context.script_block_enabled", "type": "bool", "default": False,
+        "label": "Injetar universo do roteiro nas análises",
+        "help": "Inclui um resumo curto (logline + personagens/locações/objetos confirmados na curadoria do roteiro) nos prompts de triagem e visão, como referência de nomes — nunca afirma que o material É uma cena do filme. Desligado até você validar numa reanálise A/B que ajuda mais do que confunde.",
+        "help_tech": "_script_context_block() em prompt_templates.py, injetado via context_block em get_triage_prompt/get_vision_prompt (get_photo_vision_prompt herda via get_vision_prompt, sem duplicar).",
+        "category": "vision", "level": "simple", "scope": "both", "requires_reprocess": True,
+    },
+    {
+        "key": "context.script_block_max_chars", "type": "int", "default": 6000, "min": 1000, "max": 12000, "step": 500,
+        "label": "Roteiro: tamanho máximo do bloco de contexto",
+        "help": "Teto de caracteres do resumo do roteiro injetado nas análises (~1,5-2k tokens no valor padrão). Menor = mais barato por chamada, mas cita menos personagens/locações.",
+        "help_tech": "Corte por prioridade (mention_count) em _script_context_block(); corte duro final nunca corta no meio de uma linha.",
+        "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": True,
+    },
+    {
         "key": "vision.use_segments", "type": "bool", "default": True,
         "label": "Visão: usar segmentação real (shots/beats)",
         "help": "Analisa 1 frame por trecho detectado (corte ou mudança visual) em vez do relógio fixo. Menos chamadas de API e janelas de busca precisas.",

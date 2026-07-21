@@ -80,6 +80,83 @@ def _triage_feedback_block(project_id: Optional[int]) -> str:
     )
 
 
+def _script_context_block(project_id: Optional[int]) -> str:
+    """Bloco compacto do UNIVERSO do roteiro (P2.4): personagens/locações/objetos
+    CONFIRMADOS pela curadoria (entity.status='confirmed' ou NULL-legado), para dar
+    vocabulário de nomes às análises de visão/triagem — SEM nunca afirmar que o
+    material analisado é uma cena do filme (o roteiro é só fonte de vocabulário,
+    não um vínculo automático; convenção anti-viés do projeto).
+
+    Desligado por padrão (context.script_block_enabled) até o usuário validar num
+    A/B que o bloco melhora a especificidade sem inventar vínculo. Qualquer falha
+    aqui degrada para string vazia — nunca derruba a análise (mesma regra do
+    _triage_feedback_block).
+    """
+    if not project_id:
+        return ""
+    try:
+        from src.services.settings_service import SettingsService
+        S = SettingsService.get_settings(project_id)
+        if not S.get("context.script_block_enabled"):
+            return ""
+        max_chars = int(S.get("context.script_block_max_chars"))
+    except Exception:
+        return ""
+
+    try:
+        from src.db.connection import get_db
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT description FROM project WHERE id = ?", (project_id,))
+            proj_row = cursor.fetchone()
+            cursor.execute("""
+                SELECT e.entity_type, e.name, e.description, COUNT(m.id) as mention_count
+                FROM entity e
+                LEFT JOIN entity_mention m ON m.entity_id = e.id AND m.status != 'rejected'
+                WHERE e.project_id = ? AND (e.status IS NULL OR e.status = 'confirmed')
+                  AND e.entity_type IN ('person', 'location', 'object')
+                GROUP BY e.id
+                ORDER BY mention_count DESC, e.name
+            """, (project_id,))
+            rows = [dict(r) for r in cursor.fetchall()]
+    except Exception:
+        return ""
+
+    if not rows:
+        return ""
+
+    def _fmt(r):
+        return f"{r['name']} ({r['description']})" if r.get("description") else r["name"]
+
+    lines = []
+    if proj_row and proj_row["description"]:
+        first_sentence = proj_row["description"].strip().split(".")[0].strip()
+        if first_sentence:
+            lines.append(first_sentence + ".")
+
+    # Já ordenado por mention_count DESC (a prioridade do corte); o teto por item
+    # evita um elenco grande sozinho estourar o orçamento antes de somar o resto.
+    for label, etype, cap in (("Personagens", "person", 40), ("Locações", "location", 25), ("Objetos/props", "object", 25)):
+        names = [_fmt(r) for r in rows if r["entity_type"] == etype][:cap]
+        if names:
+            lines.append(f"{label}: " + ", ".join(names))
+
+    if not lines:
+        return ""
+
+    header = (
+        "\nUNIVERSO DO FILME (referência de nomes e termos do projeto — o material "
+        "analisado PODE OU NÃO ter relação com o filme; NÃO afirme que a imagem é uma "
+        "cena do filme; use estes nomes apenas quando a imagem os confirmar):\n"
+    )
+    block = header + "\n".join(lines) + "\n"
+
+    if len(block) > max_chars:
+        # Corte duro num limite de linha — nunca no meio de uma palavra.
+        block = block[:max_chars].rsplit("\n", 1)[0] + "\n"
+    return block
+
+
 def get_triage_prompt(filename: str = "", folder_hint: str = "", transcript_snippet: str = "", known_entities: list = None, project_id: Optional[int] = None) -> str:
     """Gera o prompt de triagem (categoria Eixo A + título) com o contexto barato disponível."""
     context_lines = []
@@ -100,6 +177,8 @@ def get_triage_prompt(filename: str = "", folder_hint: str = "", transcript_snip
     # Few-shot com correções humanas (E2.C3) — entra pelo context_block para não
     # exigir mudança em templates 'triage' customizados pelo usuário.
     context_block += _triage_feedback_block(project_id)
+    # Bloco compacto do roteiro (P2.4), mesma jogada — desligado por padrão.
+    context_block += _script_context_block(project_id)
 
     return get_prompt(
         "triage",
@@ -141,6 +220,12 @@ def get_vision_prompt(known_entities: list = None, detected_people: list = None,
             "\nCONTEXTO DO PROJETO (use os nomes exatos abaixo quando reconhecer as pessoas/objetos na imagem; "
             "NÃO invente nomes que não estejam na lista para pessoas que você não tem certeza):" + context_block + "\n"
         )
+
+    # Bloco compacto do roteiro (P2.4): tem cabeçalho anti-viés próprio, então entra
+    # FORA do wrapper acima (que é sobre reconhecimento facial/objetos, não sobre o
+    # universo do roteiro). get_photo_vision_prompt chama esta função para montar sua
+    # base — não repetir a injeção lá, senão duplica no prompt de foto.
+    context_block += _script_context_block(project_id)
 
     return get_prompt("vision", project_id=project_id, context_block=context_block)
 
