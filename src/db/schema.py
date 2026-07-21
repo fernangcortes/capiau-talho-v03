@@ -248,6 +248,42 @@ CREATE TABLE IF NOT EXISTS triage_feedback (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Cenas extraidas de um roteiro (P2). O numero NAO vem do LLM: e atribuido
+-- deterministicamente pela posicao da cena no documento (script_format.py), porque
+-- roteiros reais frequentemente nao tem numeracao no texto e headings se repetem.
+CREATE TABLE IF NOT EXISTS scene (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    doc_id INTEGER NOT NULL REFERENCES production_doc(id) ON DELETE CASCADE,
+    number INTEGER NOT NULL,
+    heading TEXT,
+    synopsis TEXT,
+    characters_json TEXT, -- JSON array de nomes
+    props_json TEXT,      -- JSON array de objetos manipulados na cena
+    location TEXT,
+    status TEXT CHECK(status IN ('suggested','confirmed','rejected')) DEFAULT 'suggested',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(doc_id, number)
+);
+
+-- Rodada de extracao de roteiro: serve de cache (por content_hash, P2.3) e de
+-- registro de custo (convencao "custo visivel" do plano).
+CREATE TABLE IF NOT EXISTS script_extraction (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    doc_id INTEGER NOT NULL REFERENCES production_doc(id) ON DELETE CASCADE,
+    content_hash TEXT NOT NULL,
+    status TEXT CHECK(status IN ('running','done','error')) DEFAULT 'running',
+    strategy TEXT,  -- qual detector segmentou o documento (auditoria)
+    model TEXT,
+    chunks INTEGER DEFAULT 0,
+    calls INTEGER DEFAULT 0,
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    error TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Grafo Relacional (Triplas RDF-like para matches, continuidades e tags)
 CREATE TABLE IF NOT EXISTS relation (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -286,6 +322,8 @@ CREATE INDEX IF NOT EXISTS idx_mention_photo ON entity_mention(photo_id);
 CREATE INDEX IF NOT EXISTS idx_theme_segment_theme ON theme_segment(theme_id);
 CREATE INDEX IF NOT EXISTS idx_theme_segment_video ON theme_segment(video_id);
 CREATE INDEX IF NOT EXISTS idx_triage_feedback_project ON triage_feedback(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_scene_project ON scene(project_id, doc_id, number);
+CREATE INDEX IF NOT EXISTS idx_script_extraction_cache ON script_extraction(doc_id, content_hash, status);
 
 -- Configurações da IA: apenas OVERRIDES (ausência de linha = default do código).
 -- Resolução em camadas: default -> app_setting (global) -> project_setting (projeto).
@@ -449,6 +487,16 @@ def init_db(db_path: Path = None):
                 print(f"[MIGRATION] content_hash calculado para {len(legacy_docs)} documento(s) existente(s) de production_doc.")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_production_doc_byte_hash ON production_doc(project_id, byte_hash)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_production_doc_content_hash ON production_doc(project_id, content_hash)")
+
+        # Migracao para tabela entity (curadoria de entidades sugeridas pelo roteiro, P2.2).
+        # Default 'confirmed' de proposito: as entidades que ja existem no banco vieram de
+        # auditoria humana e devem continuar entrando nos prompts de visao/triagem. Apenas
+        # o que o extrator de roteiro sugerir nasce como 'suggested'.
+        cursor.execute("PRAGMA table_info(entity)")
+        entity_cols = [row[1] for row in cursor.fetchall()]
+        if "status" not in entity_cols:
+            cursor.execute("ALTER TABLE entity ADD COLUMN status TEXT DEFAULT 'confirmed'")
+            print("[MIGRATION] Coluna 'status' adicionada a tabela entity.")
 
         conn.commit()
         

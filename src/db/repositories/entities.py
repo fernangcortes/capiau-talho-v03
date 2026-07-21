@@ -27,6 +27,52 @@ class EntityRepository:
         return cursor.lastrowid
 
     @staticmethod
+    def upsert_suggested_entity(
+        conn: sqlite3.Connection, project_id: int, name: str,
+        entity_type: str = "other", description: str = ""
+    ) -> Optional[int]:
+        """Cria a entidade como 'suggested' (extraida do roteiro, aguardando curadoria).
+
+        Se ja existir uma entidade com o mesmo nome, NAO mexe no status dela: uma
+        confirmada continua confirmada (nao volta para a fila de curadoria) e uma
+        rejeitada continua rejeitada (funciona como lapide contra re-sugestao a cada
+        re-extracao). Isso resolve o UNIQUE(project_id, name) sem alterar a constraint.
+        """
+        name = (name or "").strip()
+        if not name:
+            return None
+
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, entity_type FROM entity WHERE project_id = ? AND name = ? COLLATE NOCASE", (project_id, name))
+        row = cursor.fetchone()
+        if row:
+            if entity_type != "other" and row["entity_type"] == "other":
+                cursor.execute("UPDATE entity SET entity_type = ? WHERE id = ?", (entity_type, row["id"]))
+            return row["id"]
+
+        cursor.execute(
+            "INSERT INTO entity (project_id, entity_type, name, description, status) VALUES (?, ?, ?, ?, 'suggested')",
+            (project_id, entity_type, name, description)
+        )
+        return cursor.lastrowid
+
+    @staticmethod
+    def set_entities_status(conn: sqlite3.Connection, project_id: int, entity_ids: List[int], status: str) -> int:
+        """Aceita/rejeita entidades sugeridas em massa. Retorna quantas linhas mudaram."""
+        if status not in ("suggested", "confirmed", "rejected"):
+            raise ValueError(f"Status invalido para entidade: '{status}'")
+        if not entity_ids:
+            return 0
+
+        cursor = conn.cursor()
+        placeholders = ",".join("?" for _ in entity_ids)
+        cursor.execute(
+            f"UPDATE entity SET status = ? WHERE project_id = ? AND id IN ({placeholders})",
+            [status, project_id, *entity_ids]
+        )
+        return cursor.rowcount
+
+    @staticmethod
     def add_mention(
         conn: sqlite3.Connection,
         entity_id: int,
@@ -64,18 +110,31 @@ class EntityRepository:
         return cursor.lastrowid
 
     @staticmethod
-    def list_entities(conn: sqlite3.Connection, project_id: int) -> List[Dict[str, Any]]:
-        """Lista todas as entidades do projeto com contagem de menções."""
+    def list_entities(conn: sqlite3.Connection, project_id: int, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Lista as entidades do projeto com contagem de menções.
+
+        `status` filtra a fila de curadoria (ex.: 'suggested' para o painel do P2.5).
+        Linhas legadas tem status NULL e contam como confirmadas.
+        """
         cursor = conn.cursor()
-        cursor.execute("""
+        params: List[Any] = [project_id]
+        status_clause = ""
+        if status == "confirmed":
+            status_clause = "AND (e.status IS NULL OR e.status = 'confirmed')"
+        elif status:
+            status_clause = "AND e.status = ?"
+            params.append(status)
+
+        cursor.execute(f"""
             SELECT e.id, e.entity_type, e.name, e.aliases, e.description, e.created_at,
+                   IFNULL(e.status, 'confirmed') as status,
                    COUNT(m.id) as mention_count
             FROM entity e
             LEFT JOIN entity_mention m ON m.entity_id = e.id AND m.status != 'rejected'
-            WHERE e.project_id = ?
+            WHERE e.project_id = ? {status_clause}
             GROUP BY e.id
             ORDER BY mention_count DESC, e.name
-        """, (project_id,))
+        """, params)
         results = []
         for r in cursor.fetchall():
             d = dict(r)
@@ -88,10 +147,16 @@ class EntityRepository:
 
     @staticmethod
     def get_known_names(conn: sqlite3.Connection, project_id: int) -> List[Dict[str, str]]:
-        """Retorna nomes canônicos + tipos para injetar como contexto no prompt de visão."""
+        """Retorna nomes canônicos + tipos para injetar como contexto no prompt de visão.
+
+        Só entidades confirmadas entram (status NULL = linha legada, conta como
+        confirmada): o que o extrator de roteiro sugeriu precisa passar pela curadoria
+        do usuário antes de influenciar qualquer análise.
+        """
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT DISTINCT name, entity_type FROM entity WHERE project_id = ?
+            SELECT DISTINCT name, entity_type FROM entity
+            WHERE project_id = ? AND (status IS NULL OR status = 'confirmed')
             UNION
             SELECT DISTINCT name, 'person' as entity_type FROM person
             WHERE project_id = ? AND name IS NOT NULL AND name != ''
