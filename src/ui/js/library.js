@@ -158,8 +158,9 @@ function getCommonBasePath(paths) {
     return commonParts.join("/") + "/";
 }
 
-function buildTree(videos) {
-    const filepaths = videos.map(v => v.filepath.replace(/\\/g, "/"));
+function buildTree(items, mediaKey = "video") {
+    if (!items) return { name: "Biblioteca", type: "folder", path: "root", children: {}, isRoot: true, isOpen: true };
+    const filepaths = items.map(v => (v.filepath || v.filename || "").replace(/\\/g, "/"));
     const commonBase = getCommonBasePath(filepaths);
     
     const root = {
@@ -171,8 +172,8 @@ function buildTree(videos) {
         isOpen: true
     };
     
-    videos.forEach(v => {
-        const normalized = v.filepath.replace(/\\/g, "/");
+    items.forEach(v => {
+        const normalized = (v.filepath || v.filename || "").replace(/\\/g, "/");
         const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
         const parts = relative.split("/").filter(Boolean);
         
@@ -194,11 +195,12 @@ function buildTree(videos) {
         }
         
         const fileName = parts[parts.length - 1] || v.filename;
-        current.children[fileName] = {
+        const fileNode = {
             name: fileName,
-            type: "file",
-            video: v
+            type: "file"
         };
+        fileNode[mediaKey] = v;
+        current.children[fileName] = fileNode;
     });
     
     return root;
@@ -303,29 +305,47 @@ function renderTreeNode(node, container, depth = 0) {
                 }
                 return a.localeCompare(b);
             }
-            const vA = nodeA.video;
-            const vB = nodeB.video;
+            const itemA = nodeA.video || nodeA.photo;
+            const itemB = nodeB.video || nodeB.photo;
+            if (!itemA || !itemB) return a.localeCompare(b);
+
             if (sortBy === "name_asc") {
-                return (vA.filename || "").localeCompare(vB.filename || "");
+                const nameA = itemA.filename || itemA.title || "";
+                const nameB = itemB.filename || itemB.title || "";
+                return nameA.localeCompare(nameB);
             } else if (sortBy === "name_desc") {
-                return (vB.filename || "").localeCompare(vA.filename || "");
+                const nameA = itemA.filename || itemA.title || "";
+                const nameB = itemB.filename || itemB.title || "";
+                return nameB.localeCompare(nameA);
             } else if (sortBy === "type_interview") {
-                const typeA = vA.video_type === "interview" ? 0 : (vA.video_type === "broll" ? 1 : 2);
-                const typeB = vB.video_type === "interview" ? 0 : (vB.video_type === "broll" ? 1 : 2);
-                if (typeA !== typeB) return typeA - typeB;
-                return (vA.filename || "").localeCompare(vB.filename || "");
+                if (nodeA.video) {
+                    const typeA = itemA.video_type === "interview" ? 0 : (itemA.video_type === "broll" ? 1 : 2);
+                    const typeB = itemB.video_type === "interview" ? 0 : (itemB.video_type === "broll" ? 1 : 2);
+                    if (typeA !== typeB) return typeA - typeB;
+                } else if (nodeA.photo) {
+                    const catA = itemA.category || "";
+                    const catB = itemB.category || "";
+                    if (catA !== catB) return catA.localeCompare(catB);
+                }
+                return (itemA.filename || "").localeCompare(itemB.filename || "");
             } else if (sortBy === "type_broll") {
-                const typeA = vA.video_type === "broll" ? 0 : (vA.video_type === "interview" ? 1 : 2);
-                const typeB = vB.video_type === "broll" ? 0 : (vB.video_type === "interview" ? 1 : 2);
-                if (typeA !== typeB) return typeA - typeB;
-                return (vA.filename || "").localeCompare(vB.filename || "");
+                if (nodeA.video) {
+                    const typeA = itemA.video_type === "broll" ? 0 : (itemA.video_type === "interview" ? 1 : 2);
+                    const typeB = itemB.video_type === "broll" ? 0 : (itemB.video_type === "interview" ? 1 : 2);
+                    if (typeA !== typeB) return typeA - typeB;
+                } else if (nodeA.photo) {
+                    const catA = itemA.category || "";
+                    const catB = itemB.category || "";
+                    if (catA !== catB) return catA.localeCompare(catB);
+                }
+                return (itemA.filename || "").localeCompare(itemB.filename || "");
             } else if (sortBy === "duration_desc") {
-                const durA = vA.duration || 0;
-                const durB = vB.duration || 0;
+                const durA = itemA.duration || 0;
+                const durB = itemB.duration || 0;
                 if (durB !== durA) return durB - durA;
-                return (vA.filename || "").localeCompare(vB.filename || "");
+                return (itemB.id || 0) - (itemA.id || 0);
             } else if (sortBy === "date_desc") {
-                return (vB.id || 0) - (vA.id || 0);
+                return (itemB.id || 0) - (itemA.id || 0);
             }
             return a.localeCompare(b);
         });
@@ -335,7 +355,7 @@ function renderTreeNode(node, container, depth = 0) {
         });
         
         container.appendChild(folderDiv);
-    } else if (node.type === "file") {
+    } else if (node.type === "file" && node.video) {
         const v = node.video;
         
         // Verifica se corresponde ao filtro de busca
@@ -474,6 +494,156 @@ function renderTreeNode(node, container, depth = 0) {
         }
         
         container.appendChild(card);
+    } else if (node.type === "file" && node.photo) {
+        const p = node.photo;
+        const searchInput = document.getElementById("library-search-input");
+        const query = searchInput ? searchInput.value.trim() : "";
+        if (query) {
+            const ast = parseQuery(query);
+            if (ast && !evaluateAST(ast, p, "tab-photos")) {
+                return;
+            }
+        }
+        
+        const card = document.createElement("div");
+        card.className = "media-card tree-file-item photo-item";
+        card.setAttribute("data-photo-id", p.id);
+        card.style.paddingLeft = "6px";
+        if (STATE.activePhoto && STATE.activePhoto.id === p.id) card.classList.add("active");
+        
+        const src = p.proxy_path || (p.filepath && (p.filepath.startsWith('http') || p.filepath.startsWith('/')) ? p.filepath : `/originals/${p.filename}`);
+        const isRaw = p.filename.toLowerCase().match(/\.(arw|cr2|nef|dng|pef|raf|orf|rw2|raw)$/);
+        
+        let imgHtml = "";
+        let clickEnabled = true;
+        let statusBadge = "";
+        let statusGlow = "";
+        
+        if (p.status === 'pending') {
+            statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" title="Gerando Proxy..."></i>`;
+            imgHtml = `<div class="photo-placeholder-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>Proxy...</span></div>`;
+            if (isRaw) clickEnabled = false;
+        } else if (p.status === 'error') {
+            statusGlow = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);" title="Falha no Proxy"></i>`;
+            imgHtml = `<div class="photo-placeholder-error"><i class="fa-solid fa-triangle-exclamation"></i><span>Erro</span></div>`;
+            if (isRaw) clickEnabled = false;
+        } else {
+            if (isRaw && !p.proxy_path) {
+                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" title="Processando RAW..."></i>`;
+                imgHtml = `<div class="photo-placeholder-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>RAW...</span></div>`;
+                clickEnabled = false;
+            } else {
+                imgHtml = `<img src="${src}" alt="${p.filename}" loading="lazy">`;
+            }
+        }
+        
+        if (isRaw) {
+            statusBadge = `<span class="badge" style="color: var(--color-purple); border-color: rgba(168, 85, 247, 0.3);">RAW</span>`;
+        } else {
+            statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: rgba(6, 182, 212, 0.3);">FOTO</span>`;
+        }
+        
+        const friendlyTitle = p.title || p.description || p.filename;
+        const forceRealFilename = window.titleDisplayPreferences && window.titleDisplayPreferences[p.id] === "filename";
+        const currentTitle = forceRealFilename ? p.filename : friendlyTitle;
+        
+        const toggleTitleIcon = forceRealFilename ? "fa-file-signature" : "fa-font";
+        const toggleTitleTitle = forceRealFilename ? "Mostrar Título Contextual" : "Mostrar Nome do Arquivo Real";
+        const toggleBtnHtml = `<button class="btn-toggle-filename" title="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
+
+        const categoryLabel = p.category ? p.category : 'Foto';
+        const tooltip = `Título: ${friendlyTitle}\nArquivo: ${p.filename}\nCategoria: ${categoryLabel}\nDescrição: ${p.description || 'Sem decupagem'}`;
+        
+        card.innerHTML = `
+            <div class="media-thumbnail photo-thumb-container" style="position: relative;">
+                ${imgHtml}
+                <button class="btn-select-similar-item" title="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
+                    <i class="fa-regular fa-square"></i>
+                </button>
+            </div>
+            <div class="media-info">
+                <h4 title="${tooltip}">
+                    ${toggleBtnHtml}
+                    <span class="clip-title-text">${currentTitle}</span>
+                </h4>
+                <div class="media-meta-row">
+                    ${statusGlow}
+                    ${statusBadge}
+                    <span class="badge-tag tag-broll">${categoryLabel}</span>
+                    <button class="btn-photo-add-timeline btn-card-action" title="Adicionar à timeline (still)"><i class="fa-solid fa-plus"></i></button>
+                    <button class="btn-photo-similar btn-card-action" title="Encontrar similares"><i class="fa-solid fa-images"></i></button>
+                </div>
+            </div>
+        `;
+        
+        const selectBtn = card.querySelector(".btn-select-similar-item");
+        if (selectBtn) {
+            selectBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                window.toggleSelectSimilarItem("photo", p.id, p.title || p.filename, card);
+            });
+        }
+        
+        const isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => item.kind === "photo" && item.id === p.id);
+        if (isSelected) {
+            card.classList.add("selected-for-similar");
+            const selectIcon = selectBtn ? selectBtn.querySelector("i") : null;
+            if (selectIcon) {
+                selectIcon.className = "fa-solid fa-square-check";
+                selectIcon.style.color = "var(--color-cyan)";
+            }
+        }
+        
+        const toggleBtn = card.querySelector(".btn-toggle-filename");
+        if (toggleBtn) {
+            toggleBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (!window.titleDisplayPreferences) window.titleDisplayPreferences = {};
+                window.titleDisplayPreferences[p.id] = forceRealFilename ? "friendly" : "filename";
+                localStorage.setItem("titleDisplayPreferences", JSON.stringify(window.titleDisplayPreferences));
+                if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
+            });
+        }
+        
+        const addBtn = card.querySelector(".btn-photo-add-timeline");
+        if (addBtn) {
+            addBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (window.TIMELINE_STATE) window.TIMELINE_STATE.addPhotoCut(p.id, {});
+            });
+        }
+        
+        const similarBtn = card.querySelector(".btn-photo-similar");
+        if (similarBtn) {
+            similarBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (window.showSimilarMedia) window.showSimilarMedia("photo", p.id, { label: p.title || p.filename });
+            });
+        }
+        
+        if (clickEnabled) {
+            card.style.cursor = "pointer";
+            card.draggable = true;
+            card.addEventListener("dragstart", (e) => {
+                e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({ type: "photo", id: p.id }));
+                e.dataTransfer.effectAllowed = "copy";
+            });
+            card.addEventListener("click", () => {
+                if (STATE.openPhotosInPlayer) {
+                    STATE.activePhoto = p;
+                } else {
+                    const libInstance = window.libraryInstance || window.panelsManager?.library;
+                    STATE.currentPhotoList = STATE.allPhotos || [p];
+                    STATE.currentPhotoIndex = (STATE.currentPhotoList).indexOf(p);
+                    if (libInstance && typeof libInstance.openLightbox === 'function') {
+                        libInstance.openLightbox(p);
+                    }
+                }
+            });
+        }
+        
+        container.appendChild(card);
     }
 }
 
@@ -509,58 +679,70 @@ window.deleteDocument = async function(docId) {
 };
 
 window.globalExpandCollapseAll = function(expand) {
-    const filepaths = STATE.allVideos.map(v => v.filepath.replace(/\\/g, "/"));
-    const commonBase = getCommonBasePath(filepaths);
-    
-    STATE.allVideos.forEach(v => {
-        const normalized = v.filepath.replace(/\\/g, "/");
-        const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
-        const parts = relative.split("/").filter(Boolean);
+    function processItems(items) {
+        if (!items || items.length === 0) return;
+        const filepaths = items.map(item => (item.filepath || item.filename || "").replace(/\\/g, "/"));
+        const commonBase = getCommonBasePath(filepaths);
         
-        let currentPath = "root";
-        for (let i = 0; i < parts.length - 1; i++) {
-            currentPath = currentPath + "/" + parts[i];
-            if (expand) {
-                openFoldersSet.add(currentPath);
-            } else {
-                openFoldersSet.delete(currentPath);
+        items.forEach(item => {
+            const normalized = (item.filepath || item.filename || "").replace(/\\/g, "/");
+            const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
+            const parts = relative.split("/").filter(Boolean);
+            
+            let currentPath = "root";
+            for (let i = 0; i < parts.length - 1; i++) {
+                currentPath = currentPath + "/" + parts[i];
+                if (expand) {
+                    openFoldersSet.add(currentPath);
+                } else {
+                    openFoldersSet.delete(currentPath);
+                }
             }
-        }
-    });
-    STATE.emit("videosUpdated", STATE.allVideos);
+        });
+    }
+
+    processItems(STATE.allVideos);
+    processItems(STATE.allPhotos);
+
+    if (STATE.allVideos) STATE.emit("videosUpdated", STATE.allVideos);
+    if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
 };
 
 window.expandCollapseAllSubfolders = function(folderPath, expand) {
-    const filepaths = STATE.allVideos.map(v => v.filepath.replace(/\\/g, "/"));
-    const commonBase = getCommonBasePath(filepaths);
-    
-    const folderPaths = new Set();
-    STATE.allVideos.forEach(v => {
-        const normalized = v.filepath.replace(/\\/g, "/");
-        const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
-        const parts = relative.split("/").filter(Boolean);
+    function processItems(items) {
+        if (!items || items.length === 0) return;
+        const filepaths = items.map(item => (item.filepath || item.filename || "").replace(/\\/g, "/"));
+        const commonBase = getCommonBasePath(filepaths);
         
-        let currentPath = "root";
-        for (let i = 0; i < parts.length - 1; i++) {
-            currentPath = currentPath + "/" + parts[i];
-            folderPaths.add(currentPath);
-        }
-    });
-
-    folderPaths.forEach(path => {
-        if (path === folderPath || path.startsWith(folderPath + "/")) {
-            if (expand) {
-                openFoldersSet.add(path);
-            } else {
-                openFoldersSet.delete(path);
+        items.forEach(item => {
+            const normalized = (item.filepath || item.filename || "").replace(/\\/g, "/");
+            const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
+            const parts = relative.split("/").filter(Boolean);
+            
+            let currentPath = "root";
+            for (let i = 0; i < parts.length - 1; i++) {
+                currentPath = currentPath + "/" + parts[i];
+                if (currentPath === folderPath || currentPath.startsWith(folderPath + "/")) {
+                    if (expand) {
+                        openFoldersSet.add(currentPath);
+                    } else {
+                        openFoldersSet.delete(currentPath);
+                    }
+                }
             }
-        }
-    });
-    STATE.emit("videosUpdated", STATE.allVideos);
+        });
+    }
+
+    processItems(STATE.allVideos);
+    processItems(STATE.allPhotos);
+    
+    if (STATE.allVideos) STATE.emit("videosUpdated", STATE.allVideos);
+    if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
 };
 
 export class LibraryManager {
     constructor() {
+        window.libraryInstance = this;
         this.videoListEl = document.getElementById("video-list");
         this.photoListEl = document.getElementById("photo-list");
         this.docsListEl = document.getElementById("doc-list");
@@ -594,8 +776,17 @@ export class LibraryManager {
         this.loadTriageReviewThreshold();
         STATE.on("leftTabChanged", (tabId) => this.updateSearchPlaceholder(tabId));
         STATE.on("activeVideoChanged", (video) => {
-            document.querySelectorAll(".media-card.tree-file-item").forEach(el => {
+            document.querySelectorAll(".media-card.tree-file-item:not(.photo-item)").forEach(el => {
                 if (video && el.getAttribute("data-video-id") == video.id) {
+                    el.classList.add("active");
+                } else {
+                    el.classList.remove("active");
+                }
+            });
+        });
+        STATE.on("activePhotoChanged", (photo) => {
+            document.querySelectorAll("[data-photo-id]").forEach(el => {
+                if (photo && el.getAttribute("data-photo-id") == photo.id) {
                     el.classList.add("active");
                 } else {
                     el.classList.remove("active");
@@ -618,22 +809,49 @@ export class LibraryManager {
             docFileInput.addEventListener("change", async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                
+
                 const docType = docTypeSelector ? docTypeSelector.value : "other";
-                const formData = new FormData();
-                formData.append("file", file);
-                
+
+                const postDoc = (replaceDocId) => {
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    let url = `/api/project/${STATE.currentProjectId}/docs?doc_type=${docType}`;
+                    if (replaceDocId) url += `&replace_doc_id=${replaceDocId}`;
+                    return fetch(url, { method: "POST", body: formData });
+                };
+
+                // detail vem string (erros antigos: PDF sem pypdf, formato nao suportado...)
+                // ou objeto {reason, existing_id, existing_filename, message} nos 409 de dedupe (P1.2)
+                const errorMessage = (body) => {
+                    const d = body && body.detail;
+                    if (!d) return "Desconhecido";
+                    return typeof d === "string" ? d : (d.message || JSON.stringify(d));
+                };
+
                 try {
-                    const response = await fetch(`/api/project/${STATE.currentProjectId}/docs?doc_type=${docType}`, {
-                        method: "POST",
-                        body: formData
-                    });
+                    let response = await postDoc();
+                    let body = await response.json().catch(() => ({}));
+
+                    // Possível nova versão: só este caso oferece substituir (identical/same_content
+                    // caem no alerta genérico abaixo — não há o que substituir, já existe igual).
+                    if (response.status === 409 && body.detail && body.detail.reason === "near_version") {
+                        const info = body.detail;
+                        const pct = Math.round((info.similarity || 0) * 100);
+                        const wantsReplace = confirm(
+                            `Parece uma nova versão de "${info.existing_filename}" (${pct}% parecido).\n\n` +
+                            `Substituir? Os trechos antigos saem da busca e do chat.`
+                        );
+                        if (wantsReplace) {
+                            response = await postDoc(info.existing_id);
+                            body = await response.json().catch(() => ({}));
+                        }
+                    }
+
                     if (response.ok) {
                         alert("Documento importado e indexado no Qdrant com sucesso!");
                         this.loadDocuments();
                     } else {
-                        const err = await response.json();
-                        alert("Erro ao importar: " + (err.detail || "Desconhecido"));
+                        alert("Erro ao importar: " + errorMessage(body));
                     }
                 } catch(err) {
                     alert("Erro de rede ao importar documento.");
@@ -836,6 +1054,7 @@ export class LibraryManager {
         const chkStatus = document.getElementById("chk-show-status");
         
         const videoList = this.videoListEl || document.getElementById("video-list");
+        const photoList = this.photoListEl || document.getElementById("photo-list");
         
         function applyDisplayClasses() {
             if (!videoList) return;
@@ -870,17 +1089,23 @@ export class LibraryManager {
         const btnViewModeGrid = document.getElementById("btn-view-mode-grid");
         
         function setViewMode(mode) {
-            if (!videoList) return;
+            if (videoList) {
+                if (mode === "grid") videoList.classList.add("view-mode-grid");
+                else videoList.classList.remove("view-mode-grid");
+            }
+            if (photoList) {
+                if (mode === "grid") photoList.classList.add("view-mode-grid");
+                else photoList.classList.remove("view-mode-grid");
+            }
             if (mode === "grid") {
-                videoList.classList.add("view-mode-grid");
                 if (btnViewModeGrid) btnViewModeGrid.classList.add("active");
                 if (btnViewModeList) btnViewModeList.classList.remove("active");
             } else {
-                videoList.classList.remove("view-mode-grid");
                 if (btnViewModeList) btnViewModeList.classList.add("active");
                 if (btnViewModeGrid) btnViewModeGrid.classList.remove("active");
             }
             localStorage.setItem("lib-pref-view-mode", mode);
+            if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
         }
         
         if (btnViewModeList) {
@@ -895,9 +1120,14 @@ export class LibraryManager {
         const zoomLabel = document.getElementById("library-zoom-label");
         
         function setZoomValue(val) {
-            if (!videoList) return;
-            videoList.style.setProperty("--thumb-width", `${val}px`);
-            videoList.style.setProperty("--thumb-height", `${Math.round(val * 9 / 16)}px`);
+            if (videoList) {
+                videoList.style.setProperty("--thumb-width", `${val}px`);
+                videoList.style.setProperty("--thumb-height", `${Math.round(val * 9 / 16)}px`);
+            }
+            if (photoList) {
+                photoList.style.setProperty("--thumb-width", `${val}px`);
+                photoList.style.setProperty("--thumb-height", `${Math.round(val * 3 / 4)}px`);
+            }
             if (zoomLabel) zoomLabel.textContent = `${val}px`;
             if (zoomSlider) zoomSlider.value = val;
             localStorage.setItem("lib-pref-zoom", val);
@@ -1063,6 +1293,7 @@ export class LibraryManager {
                 const val = sortSelect.value;
                 localStorage.setItem("library_sort_by", val);
                 STATE.emit("videosUpdated", STATE.allVideos);
+                if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
             });
         }
 
@@ -1477,7 +1708,7 @@ export class LibraryManager {
         STATE.activePhoto = photo;
 
         requestAnimationFrame(() => {
-            const card = document.querySelector(`.photo-card[data-photo-id="${photoId}"]`);
+            const card = document.querySelector(`[data-photo-id="${photoId}"]`);
             if (card) {
                 card.scrollIntoView({ block: "center", behavior: "smooth" });
                 card.classList.remove("reveal-pulse");
@@ -1498,7 +1729,7 @@ export class LibraryManager {
             return;
         }
 
-        const tree = buildTree(videos);
+        const tree = buildTree(videos, "video");
         if (tree.isRoot && tree.name === "Biblioteca") {
             Object.keys(tree.children).forEach(key => {
                 renderTreeNode(tree.children[key], this.videoListEl, 0);
@@ -1534,126 +1765,35 @@ export class LibraryManager {
             return;
         }
 
-        filtered.forEach(p => {
-            const card = document.createElement("div");
-            card.className = "photo-card";
-            card.setAttribute("data-photo-id", p.id);
-            
-            const src = p.proxy_path || (p.filepath && (p.filepath.startsWith('http') || p.filepath.startsWith('/')) ? p.filepath : `/originals/${p.filename}`);
-            const isRaw = p.filename.toLowerCase().match(/\.(arw|cr2|nef|dng|pef|raf|orf|rw2|raw)$/);
-            
-            let imgHtml = "";
-            let clickEnabled = true;
-            
-            if (p.status === 'pending') {
-                imgHtml = `
-                    <div class="photo-placeholder-loading">
-                        <i class="fa-solid fa-spinner fa-spin"></i>
-                        <span>Gerando Proxy...</span>
-                    </div>
-                `;
-                if (isRaw) clickEnabled = false;
-            } else if (p.status === 'error') {
-                imgHtml = `
-                    <div class="photo-placeholder-error">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                        <span>Falha no Proxy</span>
-                    </div>
-                `;
-                if (isRaw) clickEnabled = false;
-            } else {
-                if (isRaw && !p.proxy_path) {
-                    imgHtml = `
-                        <div class="photo-placeholder-loading">
-                            <i class="fa-solid fa-spinner fa-spin"></i>
-                            <span>Processando RAW...</span>
-                        </div>
-                    `;
-                    clickEnabled = false;
-                } else {
-                    imgHtml = `<img src="${src}" alt="${p.filename}" loading="lazy">`;
-                }
+        // Apply sort
+        const savedSort = localStorage.getItem("library_sort_by") || "name_asc";
+        const sortSelect = document.getElementById("library-sort-by");
+        const sortBy = sortSelect?.value || savedSort;
+
+        filtered = [...filtered].sort((pA, pB) => {
+            if (sortBy === "name_asc") {
+                return (pA.title || pA.filename || "").localeCompare(pB.title || pB.filename || "");
+            } else if (sortBy === "name_desc") {
+                return (pB.title || pB.filename || "").localeCompare(pA.title || pA.filename || "");
+            } else if (sortBy === "type_interview" || sortBy === "type_broll") {
+                const catA = pA.category || "";
+                const catB = pB.category || "";
+                if (catA !== catB) return catA.localeCompare(catB);
+                return (pA.filename || "").localeCompare(pB.filename || "");
+            } else if (sortBy === "duration_desc" || sortBy === "date_desc") {
+                return (pB.id || 0) - (pA.id || 0);
             }
-            
-            card.innerHTML = `
-                <div class="photo-thumb-container" style="position: relative; width: 100%; height: 100%;">
-                    ${imgHtml}
-                    <button class="btn-select-similar-item" title="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
-                        <i class="fa-regular fa-square"></i>
-                    </button>
-                </div>
-                <button class="btn-photo-add-timeline" title="Adicionar à timeline (still)" style="position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:5px; border:none; background:rgba(6,182,212,0.9); color:#00141a; font-size:11px; cursor:pointer; z-index:3; display:none; align-items:center; justify-content:center;"><i class="fa-solid fa-plus"></i></button>
-                <button class="btn-photo-similar" title="Encontrar similares (busca visual local)" style="position:absolute; top:4px; right:30px; width:22px; height:22px; border-radius:5px; border:none; background:rgba(168,85,247,0.9); color:#fff; font-size:11px; cursor:pointer; z-index:3; display:none; align-items:center; justify-content:center;"><i class="fa-solid fa-images"></i></button>
-                <p title="${p.description || p.filename}">${p.title || p.description || p.filename}</p>
-            `;
-
-            const selectBtn = card.querySelector(".btn-select-similar-item");
-            if (selectBtn) {
-                selectBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    window.toggleSelectSimilarItem("photo", p.id, p.title || p.filename, card);
-                });
-            }
-
-            const isSelected = window.selectedSimilarItems && window.selectedSimilarItems.some(item => item.kind === "photo" && item.id === p.id);
-            if (isSelected) {
-                card.classList.add("selected-for-similar");
-                const selectIcon = selectBtn ? selectBtn.querySelector("i") : null;
-                if (selectIcon) {
-                    selectIcon.className = "fa-solid fa-square-check";
-                    selectIcon.style.color = "var(--color-cyan)";
-                }
-            }
-
-            if (clickEnabled) {
-                card.style.cursor = "pointer";
-                card.style.position = "relative";
-
-                // Arrastar-e-soltar da foto para a timeline
-                card.draggable = true;
-                card.addEventListener("dragstart", (e) => {
-                    e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({ type: "photo", id: p.id }));
-                    e.dataTransfer.effectAllowed = "copy";
-                });
-
-                // Botões flutuantes (aparecem no hover): "+" timeline e similares
-                const addBtn = card.querySelector(".btn-photo-add-timeline");
-                const similarBtn = card.querySelector(".btn-photo-similar");
-                const hoverBtns = [addBtn, similarBtn].filter(Boolean);
-                if (hoverBtns.length) {
-                    card.addEventListener("mouseenter", () => hoverBtns.forEach(b => { b.style.display = "flex"; }));
-                    card.addEventListener("mouseleave", () => hoverBtns.forEach(b => { b.style.display = "none"; }));
-                }
-                if (addBtn) {
-                    addBtn.addEventListener("click", (e) => {
-                        e.stopPropagation();
-                        if (window.TIMELINE_STATE) window.TIMELINE_STATE.addPhotoCut(p.id, {});
-                    });
-                }
-                if (similarBtn) {
-                    similarBtn.addEventListener("click", (e) => {
-                        e.stopPropagation();
-                        if (window.showSimilarMedia) window.showSimilarMedia("photo", p.id, { label: p.title || p.filename });
-                    });
-                }
-
-                card.addEventListener("click", () => {
-                    if (STATE.openPhotosInPlayer) {
-                        STATE.activePhoto = p;
-                    } else {
-                        STATE.currentPhotoList = photos;
-                        STATE.currentPhotoIndex = photos.indexOf(p);
-                        this.openLightbox(p);
-                    }
-                });
-            } else {
-                card.style.cursor = "not-allowed";
-                card.title = "Aguarde o processamento do arquivo RAW para visualizar.";
-            }
-            
-            this.photoListEl.appendChild(card);
+            return (pA.filename || "").localeCompare(pB.filename || "");
         });
+
+        const tree = buildTree(filtered, "photo");
+        if (tree.isRoot && tree.name === "Biblioteca") {
+            Object.keys(tree.children).forEach(key => {
+                renderTreeNode(tree.children[key], this.photoListEl, 0);
+            });
+        } else {
+            renderTreeNode(tree, this.photoListEl, 0);
+        }
     }
 
     async runWatchScan() {
