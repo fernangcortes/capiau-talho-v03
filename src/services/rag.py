@@ -532,8 +532,11 @@ class RAGService:
     def chat(project_id: int, message: str, history: List[Dict[str, str]]) -> Dict[str, Any]:
         """Processa a mensagem RAG gerando respostas contextualizadas com mídias citadas."""
         S = SettingsService.get_settings(project_id)
-        raw_results = RAGService.search_hybrid(project_id, message, limit=S.get("chat.search_limit"))
-        
+        search_meta = RAGService.search_hybrid(project_id, message, limit=S.get("chat.search_limit"), return_meta=True)
+        raw_results = search_meta["results"]
+        index_status = search_meta["index_status"]
+        index_warning = search_meta["warning"]
+
         context_items = []
         with get_db() as conn:
             cursor = conn.cursor()
@@ -566,8 +569,10 @@ class RAGService:
                     context_items.append(f'- [Documento ID {docid} | Arquivo: {fname}]: "{text}"')
 
         context_str = "\n".join(context_items)
+        if index_status != "ok":
+            context_str += f"\n\n[AVISO DE SISTEMA: o índice de busca do acervo está indisponível agora ({index_warning or 'motivo desconhecido'}). Informe o usuário, de forma breve, que esta resposta pode estar sem contexto de mídia até o índice voltar.]"
         system_prompt = get_chatbot_system_prompt(context_str, project_id=project_id)
-        
+
         messages = [{"role": "system", "content": system_prompt}]
         history_window = S.get("chat.history_window")
         for h in (history[-history_window:] if history_window > 0 else []):
@@ -576,14 +581,16 @@ class RAGService:
                 "content": h.get("content", "")
             })
         messages.append({"role": "user", "content": message})
-        
+
         api_key = S.api_key("openrouter")
         if not api_key or api_key == "your_openrouter_api_key_here":
             return {
                 "response": "Olá! Sou o assistente de edição do CapIAu-Talho. Configure a chave OpenRouter no painel de configurações da IA (engrenagem no topo) ou no `.env` para conversar.",
-                "context_used": []
+                "context_used": [],
+                "index_status": index_status,
+                "warning": index_warning
             }
-            
+
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -602,14 +609,20 @@ class RAGService:
                 ai_text = res_json['choices'][0]['message']['content'].strip()
                 return {
                     "response": ai_text,
-                    "context_used": context_items
+                    "context_used": context_items,
+                    "index_status": index_status,
+                    "warning": index_warning
                 }
             return {
                 "response": f"Erro de comunicação com LLM (Status {response.status_code}): {response.text}",
-                "context_used": []
+                "context_used": [],
+                "index_status": index_status,
+                "warning": index_warning
             }
         except Exception as e:
             return {
                 "response": f"Erro crítico de comunicação com chatbot: {str(e)}",
-                "context_used": []
+                "context_used": [],
+                "index_status": index_status,
+                "warning": index_warning
             }

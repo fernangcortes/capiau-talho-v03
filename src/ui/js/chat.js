@@ -270,6 +270,9 @@ export class ChatManager {
             
             // Adiciona resposta da IA ao histórico
             const aiMsg = { role: "assistant", content: response.response };
+            if (response.index_status && response.index_status !== "ok") {
+                aiMsg.indexWarning = response.warning || "Índice de busca do acervo indisponível.";
+            }
             STATE.chatHistory = [...STATE.chatHistory, aiMsg];
 
             // Trata as sugestões fantasma da IA (Preview)
@@ -368,7 +371,27 @@ export class ChatManager {
             meta.className = "bubble-meta";
             meta.innerHTML = `<span>${m.role === 'user' ? 'Você' : 'Assistente CapIAu-Talho'}</span>`;
             bubble.appendChild(meta);
-            
+
+            if (m.role === "assistant" && m.indexWarning) {
+                const warnEl = document.createElement("div");
+                warnEl.className = "index-warning-banner";
+                warnEl.style.background = "rgba(244, 63, 94, 0.15)";
+                warnEl.style.border = "1px solid var(--color-rose)";
+                warnEl.style.borderRadius = "6px";
+                warnEl.style.padding = "8px 10px";
+                warnEl.style.marginBottom = "6px";
+                warnEl.style.fontSize = "11px";
+                warnEl.style.color = "#fca5a5";
+                warnEl.style.lineHeight = "1.4";
+                warnEl.innerHTML = `
+                    <div style="font-weight: 700; font-size: 11px; display: flex; align-items: center; gap: 6px; margin-bottom: 2px; color: var(--color-rose);">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Índice de Busca Indisponível
+                    </div>
+                    <div>${window.escapeHtml ? window.escapeHtml(m.indexWarning) : m.indexWarning}</div>
+                `;
+                bubble.appendChild(warnEl);
+            }
+
             const textEl = document.createElement("div");
             textEl.className = "chat-bubble-text";
             let formatted = this.formatMarkdownLinks(m.content);

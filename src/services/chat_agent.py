@@ -721,8 +721,13 @@ class ChatAgentService:
         
         # Contexto de busca de RAG inicial
         context_items = []
+        index_status = "ok"
+        index_warning = None
         try:
-            raw_results = RAGService.search_hybrid(project_id, message, limit=10)
+            search_meta = RAGService.search_hybrid(project_id, message, limit=10, return_meta=True)
+            raw_results = search_meta["results"]
+            index_status = search_meta["index_status"]
+            index_warning = search_meta["warning"]
             with get_db() as conn:
                 cursor = conn.cursor()
                 for r in raw_results:
@@ -740,6 +745,8 @@ class ChatAgentService:
         except Exception:
             pass
         context_str = "\n".join(context_items)
+        if index_status != "ok":
+            context_str += f"\n\n[AVISO DE SISTEMA: o índice de busca do acervo está indisponível agora ({index_warning or 'motivo desconhecido'}). Informe o usuário, de forma breve, que sugestões de mídia podem estar limitadas até o índice voltar.]"
 
         system_prompt = get_agent_system_prompt(timeline_context, context_str, project_id=project_id)
 
@@ -785,7 +792,9 @@ class ChatAgentService:
                         "response": f"Erro de comunicação com OpenRouter (Status {response.status_code}): {response.text}",
                         "operations": [],
                         "final_cuts": clips,
-                        "final_tracks": tracks
+                        "final_tracks": tracks,
+                        "index_status": index_status,
+                        "warning": index_warning
                     }
                 
                 res_json = response.json()
@@ -833,22 +842,28 @@ class ChatAgentService:
                     elif func_name == "search_media":
                         q = args.get("query", "")
                         mtype = args.get("media_type")
-                        search_hits = RAGService.search_hybrid(project_id, q, media_type=mtype, limit=8)
-                        # Simplifica o retorno para economizar tokens
-                        simplified = []
-                        for h in search_hits:
-                            p = h.get("payload", {})
-                            m = p.get("media_type", "video")
-                            mid = p.get("photo_id") or p.get("video_id") or 0
-                            simplified.append({
-                                "media_type": m,
-                                "id": mid,
-                                "filename": p.get("filename"),
-                                "start_time": p.get("start_time", 0.0),
-                                "end_time": p.get("end_time", 5.0),
-                                "text": p.get("text", "")[:120]
-                            })
-                        tool_result = json.dumps(simplified)
+                        search_meta = RAGService.search_hybrid(project_id, q, media_type=mtype, limit=8, return_meta=True)
+                        if search_meta["index_status"] != "ok":
+                            tool_result = (
+                                f"Índice de busca indisponível agora ({search_meta['warning'] or 'motivo desconhecido'}). "
+                                "Nenhum resultado de mídia pode ser retornado neste momento — avise o usuário."
+                            )
+                        else:
+                            # Simplifica o retorno para economizar tokens
+                            simplified = []
+                            for h in search_meta["results"]:
+                                p = h.get("payload", {})
+                                m = p.get("media_type", "video")
+                                mid = p.get("photo_id") or p.get("video_id") or 0
+                                simplified.append({
+                                    "media_type": m,
+                                    "id": mid,
+                                    "filename": p.get("filename"),
+                                    "start_time": p.get("start_time", 0.0),
+                                    "end_time": p.get("end_time", 5.0),
+                                    "text": p.get("text", "")[:120]
+                                })
+                            tool_result = json.dumps(simplified)
 
                     elif func_name == "get_transcript":
                         vid = int(args.get("video_id", 0))
@@ -1110,7 +1125,9 @@ class ChatAgentService:
                     "response": f"Erro crítico durante o loop do agente: {str(e)}",
                     "operations": [],
                     "final_cuts": clips,
-                    "final_tracks": tracks
+                    "final_tracks": tracks,
+                    "index_status": index_status,
+                    "warning": index_warning
                 }
 
         # --- FIM DO LOOP: CLASSIFICAÇÃO DE RISCO ---
@@ -1200,5 +1217,7 @@ class ChatAgentService:
             "suggestions": suggestions_output,
             # Se for direct, o frontend pode apenas engolir final_cuts para atualizar tudo em sync
             "final_cuts": final_cuts_frontend if not is_preview else clips,
-            "final_tracks": final_tracks_frontend
+            "final_tracks": final_tracks_frontend,
+            "index_status": index_status,
+            "warning": index_warning
         }
