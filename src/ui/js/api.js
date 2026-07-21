@@ -53,6 +53,54 @@ export class CapIAuAPI {
         return this.request(`/api/docs/${docId}?project_id=${projectId}`, { method: "DELETE" });
     }
 
+    // -- Extração estruturada de roteiro (P2)
+    static fetchStructurePreview(docId, projectId, llm = false) {
+        return this.request(`/api/docs/${docId}/structure-preview?project_id=${projectId}&llm=${llm}`);
+    }
+
+    // Não usa o request() genérico: o chamador precisa distinguir 200/404/409
+    // (rodada já em andamento) sem que um 409 vire uma Error genérica — mesmo
+    // idioma de fetch cru já usado no upload de documento (dedupe, P1.3).
+    static async extractDocStructure(docId, projectId, force = false) {
+        const response = await fetch(`/api/docs/${docId}/extract-structure?project_id=${projectId}&force=${force}`, {
+            method: "POST"
+        });
+        const body = await response.json().catch(() => ({}));
+        return { ok: response.ok, status: response.status, body };
+    }
+
+    static fetchDocExtraction(docId) {
+        return this.request(`/api/docs/${docId}/extraction`);
+    }
+
+    static fetchScenes(projectId, docId = null, includeRejected = false) {
+        let url = `/api/project/${projectId}/scenes?include_rejected=${includeRejected}`;
+        if (docId) url += `&doc_id=${docId}`;
+        return this.request(url);
+    }
+
+    static bulkSceneStatus(projectId, sceneIds, status) {
+        return this.request(`/api/scenes/bulk-status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: projectId, scene_ids: sceneIds, status })
+        });
+    }
+
+    static fetchEntities(projectId, status = null) {
+        let url = `/api/entities/project/${projectId}`;
+        if (status) url += `?status=${status}`;
+        return this.request(url);
+    }
+
+    static bulkEntityStatus(projectId, entityIds, status) {
+        return this.request(`/api/entities/bulk-status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: projectId, entity_ids: entityIds, status })
+        });
+    }
+
     // -- Mídias (Vídeo, Foto, Rostos)
     static fetchVideos(projectId) {
         return this.request(`/api/videos?project_id=${projectId}`);

@@ -678,6 +678,129 @@ window.deleteDocument = async function(docId) {
     }
 };
 
+const SCRIPT_STRATEGY_LABELS = {
+    fdx: "estrutura do arquivo .fdx",
+    fountain: "Fountain (INT./EXT. e cabeçalhos forçados)",
+    sluglines: "cabeçalhos INT./EXT.",
+    cena_numerada: "cenas numeradas (CENA N)",
+    markdown: "títulos Markdown",
+    caps_isolado: "linhas em maiúsculas isoladas",
+    llm: "análise por IA",
+    prose: "nenhum padrão de cena (documento em prosa)",
+};
+
+/** Orquestra o preview (sem custo) → confirmação do usuário → disparo da extração.
+ * Nunca chama a extração de verdade sem o usuário ver antes o que foi detectado —
+ * um erro de detecção vira uma conferência de 5 segundos, não uma estrutura ruim
+ * gravada em silêncio. */
+window.startScriptExtraction = async function(docId, filename) {
+    const lib = window.libraryInstance;
+    if (!lib) return;
+    const projectId = STATE.currentProjectId;
+
+    let preview;
+    try {
+        preview = await CapIAuAPI.fetchStructurePreview(docId, projectId, false);
+    } catch (e) {
+        alert("Erro ao analisar o formato do roteiro: " + e.message);
+        return;
+    }
+
+    if (preview.needs_review || preview.strategy === "prose") {
+        const tryLLM = confirm(
+            `Não identifiquei com confiança um padrão de cenas em "${filename}" (${SCRIPT_STRATEGY_LABELS[preview.strategy] || preview.strategy}).\n\n` +
+            `Quer que a IA tente identificar o formato antes de decidir (1 chamada de custo baixo)?`
+        );
+        if (tryLLM) {
+            try {
+                preview = await CapIAuAPI.fetchStructurePreview(docId, projectId, true);
+            } catch (e) {
+                alert("Erro ao consultar a IA para identificar o formato: " + e.message);
+                return;
+            }
+        }
+    }
+
+    const strategyLabel = SCRIPT_STRATEGY_LABELS[preview.strategy] || preview.strategy;
+    let message;
+    if (preview.strategy === "prose" || preview.scene_count === 0) {
+        message = `"${filename}" não parece ter estrutura de cenas reconhecível (${strategyLabel}). ` +
+            `Nenhuma cena será extraída nesta rodada.\n\nContinuar mesmo assim?`;
+    } else {
+        const sample = (preview.sample || []).map(s => `  ${s.number}. ${s.heading || "(sem título)"}`).join("\n");
+        message = `Detectei ${preview.scene_count} cena(s) em "${filename}" pelo padrão de ${strategyLabel}` +
+            (preview.needs_review ? " (confiança baixa — vale conferir o resultado depois)" : "") + ".\n\n" +
+            (sample ? `Primeiras cenas:\n${sample}\n\n` : "") +
+            `Confirma a extração? Isso gasta algumas chamadas de IA (uma por trecho do roteiro; reaproveita o resultado se o texto não mudar).`;
+    }
+    if (!confirm(message)) return;
+
+    let result;
+    try {
+        result = await CapIAuAPI.extractDocStructure(docId, projectId, false);
+    } catch (e) {
+        alert("Erro de rede ao iniciar a extração.");
+        return;
+    }
+
+    if (result.status === 409) {
+        alert("Já existe uma extração deste roteiro em andamento — acompanhe na aba Tarefas.");
+        return;
+    }
+    if (!result.ok) {
+        const detail = result.body && result.body.detail;
+        alert("Erro ao iniciar a extração: " + (typeof detail === "string" ? detail : JSON.stringify(detail || result.body)));
+        return;
+    }
+
+    alert("Extração iniciada — acompanhe o progresso na aba Tarefas.");
+    lib.pollExtraction(docId, 30);
+};
+
+window.closeScriptStructure = function() {
+    const section = document.getElementById("script-structure");
+    if (section) {
+        section.style.display = "none";
+        section.innerHTML = "";
+    }
+};
+
+window.applyEntityCuration = async function(status, all = false) {
+    const section = document.getElementById("script-structure");
+    if (!section) return;
+    const checks = section.querySelectorAll(".curation-entity-check" + (all ? "" : ":checked"));
+    const ids = Array.from(checks).map(c => Number(c.dataset.entityId));
+    if (ids.length === 0) {
+        alert("Nenhuma entidade selecionada.");
+        return;
+    }
+    try {
+        await CapIAuAPI.bulkEntityStatus(STATE.currentProjectId, ids, status);
+        window.libraryInstance.showScriptStructure(Number(section.dataset.docId));
+    } catch (e) {
+        alert("Erro ao atualizar entidades: " + e.message);
+    }
+};
+
+window.applySceneCuration = async function(status, all = false) {
+    const section = document.getElementById("script-structure");
+    if (!section) return;
+    const checks = section.querySelectorAll(".curation-scene-check" + (all ? "" : ":checked"));
+    const ids = Array.from(checks).map(c => Number(c.dataset.sceneId));
+    if (ids.length === 0) {
+        alert("Nenhuma cena selecionada.");
+        return;
+    }
+    const docId = Number(section.dataset.docId);
+    try {
+        await CapIAuAPI.bulkSceneStatus(STATE.currentProjectId, ids, status);
+        window.libraryInstance.showScriptStructure(docId);
+        window.libraryInstance.refreshExtractionBadge(docId);
+    } catch (e) {
+        alert("Erro ao atualizar cenas: " + e.message);
+    }
+};
+
 window.globalExpandCollapseAll = function(expand) {
     function processItems(items) {
         if (!items || items.length === 0) return;
@@ -1636,20 +1759,153 @@ export class LibraryManager {
             if (doc.doc_type === "script") docIcon = "fa-scroll";
             else if (doc.doc_type === "outline") docIcon = "fa-list-ol";
             else if (doc.doc_type === "notes") docIcon = "fa-clipboard";
-            
+
+            const extractBtn = doc.doc_type === "script"
+                ? `<button class="btn-card-action doc-extract-btn" data-doc-id="${doc.id}" style="color:var(--color-violet); background:transparent; border:none; cursor:pointer;" onclick="window.startScriptExtraction(${doc.id}, '${doc.filename.replace(/'/g, "\\'")}')" title="Extrair estrutura (cenas e personagens)"><i class="fa-solid fa-diagram-project"></i></button>`
+                : "";
+            const extractBadge = doc.doc_type === "script"
+                ? `<span class="doc-extract-badge" data-doc-id="${doc.id}" style="font-size:9px; color:var(--color-violet);"></span>`
+                : "";
+
             card.innerHTML = `
                 <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
                     <i class="fa-solid ${docIcon}" style="color: var(--color-cyan); font-size: 14px;"></i>
                     <div style="display:flex; flex-direction:column; min-width:0; flex:1;">
                         <span style="font-size:12px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-primary);" title="${doc.filename}">${doc.filename}</span>
                         <span style="font-size:9px; color:var(--text-muted); text-transform:capitalize;">${doc.doc_type === 'script' ? 'Roteiro' : doc.doc_type}</span>
+                        ${extractBadge}
                     </div>
                 </div>
-                <button class="btn-card-action" style="color:var(--color-rose); background:transparent; border:none; cursor:pointer;" onclick="window.deleteDocument(${doc.id})" title="Deletar Documento"><i class="fa-solid fa-trash-can"></i></button>
+                <div style="display:flex; align-items:center; gap:2px; flex-shrink:0;">
+                    ${extractBtn}
+                    <button class="btn-card-action" style="color:var(--color-rose); background:transparent; border:none; cursor:pointer;" onclick="window.deleteDocument(${doc.id})" title="Deletar Documento"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
             `;
-            
+
             this.docsListEl.appendChild(card);
+
+            if (doc.doc_type === "script") {
+                this.refreshExtractionBadge(doc.id);
+            }
         });
+    }
+
+    /** Consulta a última rodada de extração do doc e atualiza o badge/título do
+     * botão sem bloquear a renderização inicial da lista de documentos. */
+    async refreshExtractionBadge(docId) {
+        try {
+            const ext = await CapIAuAPI.fetchDocExtraction(docId);
+            const badge = this.docsListEl.querySelector(`.doc-extract-badge[data-doc-id="${docId}"]`);
+            const btn = this.docsListEl.querySelector(`.doc-extract-btn[data-doc-id="${docId}"]`);
+            if (!badge || !btn) return;
+
+            if (ext.status === "done") {
+                const scenesResp = await CapIAuAPI.fetchScenes(STATE.currentProjectId, docId);
+                const n = scenesResp.scenes ? scenesResp.scenes.length : 0;
+                badge.textContent = n > 0 ? `${n} cenas extraídas — ver/curar` : "Sem cenas (documento em prosa)";
+                if (n > 0) {
+                    badge.style.cursor = "pointer";
+                    badge.style.textDecoration = "underline";
+                    badge.onclick = () => this.showScriptStructure(docId);
+                }
+                btn.title = "Reextrair estrutura";
+            } else if (ext.status === "error") {
+                badge.textContent = "Falha na última extração — tentar de novo";
+                badge.style.color = "var(--color-rose)";
+            } else if (ext.status === "running") {
+                badge.textContent = "Extraindo…";
+            }
+        } catch (e) {
+            // Falha silenciosa: o badge fica vazio, o botão continua funcional.
+        }
+    }
+
+    /** Reconsulta o status da rodada a cada 2s enquanto ela estiver 'running', para o
+     * badge acompanhar a extração sem o usuário precisar recarregar a aba. */
+    async pollExtraction(docId, attemptsLeft) {
+        if (attemptsLeft <= 0) return;
+        await this.refreshExtractionBadge(docId);
+        try {
+            const ext = await CapIAuAPI.fetchDocExtraction(docId);
+            if (ext.status === "running") {
+                setTimeout(() => this.pollExtraction(docId, attemptsLeft - 1), 2000);
+            }
+        } catch (e) {
+            // Para de tentar silenciosamente — o usuário ainda vê a aba Tarefas.
+        }
+    }
+
+    /** Busca cenas + entidades sugeridas do doc e renderiza a curadoria em massa. */
+    async showScriptStructure(docId) {
+        const section = document.getElementById("script-structure");
+        if (!section) return;
+
+        section.style.display = "flex";
+        section.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando estrutura…</div>`;
+
+        try {
+            const [scenesResp, entitiesResp] = await Promise.all([
+                CapIAuAPI.fetchScenes(STATE.currentProjectId, docId, true),
+                CapIAuAPI.fetchEntities(STATE.currentProjectId, "suggested"),
+            ]);
+            this.renderScriptStructureSection(docId, scenesResp.scenes || [], entitiesResp.entities || []);
+        } catch (e) {
+            section.innerHTML = `<div style="font-size:11px; color:var(--color-rose); padding:8px;">Erro ao carregar estrutura: ${e.message}</div>`;
+        }
+    }
+
+    renderScriptStructureSection(docId, scenes, entities) {
+        const section = document.getElementById("script-structure");
+        if (!section) return;
+        section.dataset.docId = docId;
+
+        const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const typeLabels = { person: "pessoa", object: "objeto", location: "locação" };
+
+        const entityRows = entities.map(e => `
+            <label style="display:flex; align-items:flex-start; gap:6px; font-size:11px; padding:4px 0; cursor:pointer;">
+                <input type="checkbox" class="curation-entity-check" data-entity-id="${e.id}" style="margin-top:2px;">
+                <span><strong>${esc(e.name)}</strong> <span style="color:var(--text-muted);">(${typeLabels[e.entity_type] || e.entity_type})</span>${e.description ? ` — ${esc(e.description)}` : ""}</span>
+            </label>
+        `).join("") || `<div style="font-size:11px; color:var(--text-muted); padding:4px 0;">Nenhuma entidade sugerida pendente.</div>`;
+
+        const visibleScenes = scenes.filter(s => s.status !== "rejected");
+        const sceneRows = visibleScenes.map(s => `
+            <label style="display:flex; align-items:flex-start; gap:6px; font-size:11px; padding:4px 0; cursor:pointer;">
+                <input type="checkbox" class="curation-scene-check" data-scene-id="${s.id}" style="margin-top:2px;">
+                <span>
+                    <strong>${s.number}. ${esc(s.heading || "(sem título)")}</strong>${s.status === "confirmed" ? ' <span style="color:var(--color-emerald);">✓ confirmada</span>' : ""}
+                    <br><span style="color:var(--text-muted);">${esc(s.synopsis || "")}</span>
+                </span>
+            </label>
+        `).join("") || `<div style="font-size:11px; color:var(--text-muted); padding:4px 0;">Nenhuma cena extraída.</div>`;
+
+        section.innerHTML = `
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+                <span style="font-size:11px; font-weight:700; color:var(--text-primary);"><i class="fa-solid fa-diagram-project"></i> Estrutura extraída</span>
+                <button onclick="window.closeScriptStructure()" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:12px;" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:2px;">
+                <div style="font-size:10px; font-weight:700; color:var(--color-violet); text-transform:uppercase;">Personagens / Locações / Objetos sugeridos</div>
+                <div style="max-height:140px; overflow-y:auto; border:1px solid var(--border-glass); border-radius:6px; padding:4px 8px;">${entityRows}</div>
+                <div style="display:flex; gap:6px; margin-top:4px;">
+                    <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applyEntityCuration('confirmed')">Aceitar selecionados</button>
+                    <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applyEntityCuration('rejected')">Rejeitar selecionados</button>
+                    <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applyEntityCuration('confirmed', true)">Aceitar todos</button>
+                </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:2px; margin-top:6px;">
+                <div style="font-size:10px; font-weight:700; color:var(--color-violet); text-transform:uppercase;">Cenas (${visibleScenes.length})</div>
+                <div style="max-height:180px; overflow-y:auto; border:1px solid var(--border-glass); border-radius:6px; padding:4px 8px;">${sceneRows}</div>
+                <div style="display:flex; gap:6px; margin-top:4px;">
+                    <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applySceneCuration('confirmed')">Aceitar selecionadas</button>
+                    <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applySceneCuration('rejected')">Rejeitar selecionadas</button>
+                    <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applySceneCuration('confirmed', true)">Aceitar todas</button>
+                </div>
+            </div>
+        `;
     }
 
     /**
