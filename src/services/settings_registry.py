@@ -452,6 +452,13 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "themes_search", "level": "pro", "scope": "both", "requires_reprocess": True,
     },
     {
+        "key": "docs.version_similarity_threshold", "type": "float", "default": 0.90, "min": 0.50, "max": 0.99, "step": 0.01,
+        "label": "Documentos: limiar de nova versão",
+        "help": "Quão parecido um documento novo precisa ser de um já cadastrado para o upload perguntar se é uma nova versão (em vez de cadastrar duplicado). Maior = só avisa quando é quase idêntico.",
+        "help_tech": "Razão de SequenceMatcher.quick_ratio() sobre o texto normalizado contra os docs existentes do projeto.",
+        "category": "themes_search", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
         "key": "search.image_weight", "type": "float", "default": 0.5, "min": 0.0, "max": 2.0, "step": 0.05,
         "label": "Busca: peso dos resultados visuais",
         "help": "Quanto os matches visuais (CLIP) pesam na fusão com os resultados de texto. 0 = ignora busca visual.",

@@ -425,6 +425,31 @@ def init_db(db_path: Path = None):
             cursor.execute("ALTER TABLE media_segment ADD COLUMN shot_scale_score REAL")
             print("[MIGRATION] Coluna 'shot_scale_score' adicionada a tabela media_segment.")
 
+        # Migracoes para tabela production_doc (dedupe/versao no upload, P1.1)
+        cursor.execute("PRAGMA table_info(production_doc)")
+        doc_cols = [row[1] for row in cursor.fetchall()]
+        if "byte_hash" not in doc_cols:
+            cursor.execute("ALTER TABLE production_doc ADD COLUMN byte_hash TEXT")
+            print("[MIGRATION] Coluna 'byte_hash' adicionada a tabela production_doc.")
+        if "content_hash" not in doc_cols:
+            cursor.execute("ALTER TABLE production_doc ADD COLUMN content_hash TEXT")
+            print("[MIGRATION] Coluna 'content_hash' adicionada a tabela production_doc.")
+            # Backfill: docs existentes ganham content_hash calculado agora a partir do texto
+            # ja persistido (os bytes originais nao foram guardados, entao byte_hash fica NULL
+            # para linhas legadas - so vale para uploads novos).
+            from src.db.repositories.projects import ProjectRepository
+            cursor.execute("SELECT id, content FROM production_doc WHERE content IS NOT NULL")
+            legacy_docs = cursor.fetchall()
+            for legacy_id, legacy_content in legacy_docs:
+                cursor.execute(
+                    "UPDATE production_doc SET content_hash = ? WHERE id = ?",
+                    (ProjectRepository.hash_doc_content(legacy_content), legacy_id)
+                )
+            if legacy_docs:
+                print(f"[MIGRATION] content_hash calculado para {len(legacy_docs)} documento(s) existente(s) de production_doc.")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_production_doc_byte_hash ON production_doc(project_id, byte_hash)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_production_doc_content_hash ON production_doc(project_id, content_hash)")
+
         conn.commit()
         
         # Limpeza automática de menções órfãs/stale de rostos que foram renomeados/mesclados no passado

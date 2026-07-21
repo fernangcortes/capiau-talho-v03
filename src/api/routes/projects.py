@@ -1,10 +1,13 @@
 """Roteador FastAPI para gerenciamento de Projetos e Documentos de Contexto."""
 import os
+import re
 import zipfile
 import shutil
 import tempfile
 import json
+from difflib import SequenceMatcher
 from pathlib import Path
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 import sqlite3
@@ -14,6 +17,7 @@ from src.api.dependencies import get_db_conn
 from src.api.schemas import ProjectCreate, ProjectDriveLinkUpdate, ProjectExportOptions
 from src.db.repositories.projects import ProjectRepository
 from src.services.sync import SyncService
+from src.services.settings_service import SettingsService
 from src.search.semantic import SemanticSearch
 
 router = APIRouter(tags=["Projects"])
@@ -149,8 +153,17 @@ async def import_project(file: UploadFile = File(...)):
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 @router.post("/api/project/{project_id}/docs")
-async def upload_document(project_id: int, doc_type: str = "other", file: UploadFile = File(...), conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Faz upload de um documento de roteiro/pauta e indexa no Qdrant."""
+async def upload_document(
+    project_id: int, doc_type: str = "other", replace_doc_id: Optional[int] = None,
+    file: UploadFile = File(...), conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Faz upload de um documento de roteiro/pauta e indexa no Qdrant.
+
+    Dedupe (P1.2): recusa com 409 se bytes ou conteúdo já existem no projeto; se o texto
+    é muito parecido (mas não idêntico) a um doc existente, sugere substituição — o
+    cliente reenvia com replace_doc_id para apagar a versão antiga (vetores + linha)
+    antes de indexar a nova.
+    """
     filename = file.filename
     file_bytes = await file.read()
     content = ""
@@ -198,14 +211,64 @@ async def upload_document(project_id: int, doc_type: str = "other", file: Upload
     if not content.strip():
         raise HTTPException(status_code=400, detail="O documento enviado está vazio.")
 
-    try:
-        doc_id = ProjectRepository.add_document(conn, project_id, filename, None, content, doc_type)
+    byte_hash = ProjectRepository.hash_doc_bytes(file_bytes)
+    content_hash = ProjectRepository.hash_doc_content(content)
+
+    if replace_doc_id is not None:
+        if not ProjectRepository.document_belongs_to_project(conn, project_id, replace_doc_id):
+            raise HTTPException(status_code=404, detail=f"Documento {replace_doc_id} não encontrado neste projeto.")
+        SemanticSearch.get_instance().delete_production_doc_vectors(project_id, replace_doc_id)
+        ProjectRepository.delete_document(conn, replace_doc_id)
         conn.commit()
-        
+    else:
+        existing_identical = ProjectRepository.find_document_by_byte_hash(conn, project_id, byte_hash)
+        if existing_identical:
+            raise HTTPException(status_code=409, detail={
+                "reason": "identical",
+                "existing_id": existing_identical["id"],
+                "existing_filename": existing_identical["filename"],
+                "message": f"Este arquivo já foi enviado (documento \"{existing_identical['filename']}\", id {existing_identical['id']}).",
+            })
+
+        existing_same_content = ProjectRepository.find_document_by_content_hash(conn, project_id, content_hash)
+        if existing_same_content:
+            raise HTTPException(status_code=409, detail={
+                "reason": "same_content",
+                "existing_id": existing_same_content["id"],
+                "existing_filename": existing_same_content["filename"],
+                "message": f"O mesmo conteúdo já está cadastrado em outro formato (documento \"{existing_same_content['filename']}\", id {existing_same_content['id']}).",
+            })
+
+        similarity_threshold = SettingsService.get_settings(project_id).get("docs.version_similarity_threshold")
+        normalized_new = re.sub(r"\s+", " ", content.lower()).strip()
+        best_match, best_ratio = None, 0.0
+        for other in ProjectRepository.list_documents_for_similarity(conn, project_id):
+            normalized_other = re.sub(r"\s+", " ", (other["content"] or "").lower()).strip()
+            if not normalized_other:
+                continue
+            ratio = SequenceMatcher(None, normalized_new, normalized_other).quick_ratio()
+            if ratio > best_ratio:
+                best_match, best_ratio = other, ratio
+        if best_match and best_ratio >= similarity_threshold:
+            raise HTTPException(status_code=409, detail={
+                "reason": "near_version",
+                "existing_id": best_match["id"],
+                "existing_filename": best_match["filename"],
+                "similarity": round(best_ratio, 3),
+                "message": f"Parece uma nova versão de \"{best_match['filename']}\" (id {best_match['id']}, {best_ratio*100:.0f}% parecido). Reenvie com replace_doc_id={best_match['id']} para substituir.",
+            })
+
+    try:
+        doc_id = ProjectRepository.add_document(
+            conn, project_id, filename, None, content, doc_type,
+            byte_hash=byte_hash, content_hash=content_hash
+        )
+        conn.commit()
+
         # Indexa conteúdo no Qdrant
         search_engine = SemanticSearch.get_instance()
         search_engine.index_production_doc(project_id, doc_id, filename, content)
-        
+
         return {"status": "success", "doc_id": doc_id, "filename": filename, "message": "Documento indexado com sucesso."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -32,13 +32,35 @@ class ProjectRepository:
         conn.execute("UPDATE project SET drive_link = ? WHERE id = ?", (link, project_id))
 
     @staticmethod
-    def add_document(conn: sqlite3.Connection, project_id: int, filename: str, filepath: Optional[str], content: str, doc_type: str = "other") -> int:
+    def hash_doc_bytes(data: bytes) -> str:
+        """SHA-256 completo dos bytes do arquivo enviado (dedupe de upload idêntico, P1.1).
+
+        Diferente de compute_hash() de ingest.py (parcial/truncado para mídia grande):
+        documentos de texto são pequenos, então o hash cobre o arquivo inteiro sem truncar.
+        """
+        import hashlib
+        return hashlib.sha256(data).hexdigest()
+
+    @staticmethod
+    def hash_doc_content(content: str) -> str:
+        """SHA-256 do texto normalizado (minúsculas + espaços colapsados) — reconhece o
+        mesmo conteúdo mesmo vindo de formatos diferentes (ex: .txt vs .pdf do mesmo roteiro)."""
+        import hashlib
+        import re
+        normalized = re.sub(r"\s+", " ", content.lower()).strip()
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def add_document(
+        conn: sqlite3.Connection, project_id: int, filename: str, filepath: Optional[str], content: str,
+        doc_type: str = "other", byte_hash: Optional[str] = None, content_hash: Optional[str] = None
+    ) -> int:
         """Insere um novo documento de contexto de produção no banco."""
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO production_doc (project_id, filename, filepath, content, doc_type)
-            VALUES (?, ?, ?, ?, ?)
-        """, (project_id, filename, filepath, content, doc_type))
+            INSERT INTO production_doc (project_id, filename, filepath, content, doc_type, byte_hash, content_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (project_id, filename, filepath, content, doc_type, byte_hash, content_hash))
         return cursor.lastrowid
 
     @staticmethod
@@ -46,11 +68,48 @@ class ProjectRepository:
         """Lista os documentos de contexto associados ao projeto."""
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, project_id, filename, filepath, content, doc_type, created_at 
-            FROM production_doc 
-            WHERE project_id = ? 
+            SELECT id, project_id, filename, filepath, content, doc_type, created_at
+            FROM production_doc
+            WHERE project_id = ?
             ORDER BY id DESC
         """, (project_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
+    @staticmethod
+    def find_document_by_byte_hash(conn: sqlite3.Connection, project_id: int, byte_hash: str) -> Optional[Dict[str, Any]]:
+        """Busca um doc do projeto com bytes idênticos (upload exato repetido)."""
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, filename FROM production_doc WHERE project_id = ? AND byte_hash = ?",
+            (project_id, byte_hash)
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    @staticmethod
+    def find_document_by_content_hash(conn: sqlite3.Connection, project_id: int, content_hash: str) -> Optional[Dict[str, Any]]:
+        """Busca um doc do projeto com o mesmo texto normalizado (mesmo conteúdo, outro formato)."""
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, filename FROM production_doc WHERE project_id = ? AND content_hash = ?",
+            (project_id, content_hash)
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    @staticmethod
+    def document_belongs_to_project(conn: sqlite3.Connection, project_id: int, doc_id: int) -> bool:
+        """Confere se um doc pertence ao projeto (usado antes de substituir uma versão, P1.2)."""
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM production_doc WHERE id = ? AND project_id = ?", (doc_id, project_id))
+        return cursor.fetchone() is not None
+
+    @staticmethod
+    def list_documents_for_similarity(conn: sqlite3.Connection, project_id: int) -> List[Dict[str, Any]]:
+        """Retorna id, filename, content de todos os docs do projeto — usado para checar
+        similaridade de texto contra versões existentes no upload (P1.2)."""
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, filename, content FROM production_doc WHERE project_id = ?", (project_id,))
         return [dict(r) for r in cursor.fetchall()]
 
     @staticmethod
