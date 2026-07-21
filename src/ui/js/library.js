@@ -1252,7 +1252,10 @@ export class LibraryManager {
                 photoList.style.setProperty("--thumb-height", `${Math.round(val * 3 / 4)}px`);
             }
             if (zoomLabel) zoomLabel.textContent = `${val}px`;
-            if (zoomSlider) zoomSlider.value = val;
+            if (zoomSlider) {
+                zoomSlider.value = val;
+                zoomSlider.setAttribute("data-tooltip", `Zoom Thumbs: ${val}px`);
+            }
             localStorage.setItem("lib-pref-zoom", val);
         }
         

@@ -1600,9 +1600,9 @@ window.addEventListener("DOMContentLoaded", () => {
         const target = e.target.closest("[data-tooltip]");
         if (!target) return;
 
-        // Sliders de ajuste só exibem tooltip no estado mínimo (.sidebar-minimal), pois nos outros estados o nome já aparece à esquerda
+        // Sliders de controle na sidebar esquerda só exibem tooltip no estado mínimo (.sidebar-minimal), pois nos outros estados os valores/rótulos já aparecem na tela
         const sidebarLeft = target.closest("#sidebar-left");
-        if (sidebarLeft && target.matches(".adjustments-row input[type='range']")) {
+        if (sidebarLeft && (target.matches(".adjustments-row input[type='range']") || target.matches("#library-zoom-slider"))) {
             if (!sidebarLeft.classList.contains("sidebar-minimal")) {
                 return;
             }

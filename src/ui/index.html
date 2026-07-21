@@ -215,22 +215,22 @@
 
                     <!-- Linha 2: Barra de Ferramentas / Ícones de Ação -->
                     <div style="display: flex; width: 100%; align-items: center; justify-content: space-between; height: 24px; margin-top: 2px;">
-                        <!-- Esquerda: Modo de Exibição e Zoom -->
-                        <div style="display: flex; align-items: center; gap: 6px;">
+                        <!-- Esquerda: Modo de Exibição e Zoom (Expande para preencher o espaço disponível) -->
+                        <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; margin-right: 8px;">
                             <button id="btn-view-mode-list" class="lib-action-btn active" title="Visualização em Árvore/Lista"><i class="fa-solid fa-list"></i></button>
                             <button id="btn-view-mode-grid" class="lib-action-btn" title="Visualização em Grade/Cards"><i class="fa-solid fa-table-cells-large"></i></button>
                             
-                            <div style="width: 1px; height: 10px; background: rgba(255,255,255,0.12); margin: 0 2px;"></div>
+                            <div style="width: 1px; height: 10px; background: rgba(255,255,255,0.12); margin: 0 2px; flex-shrink: 0;"></div>
                             
-                            <div class="zoom-container" style="display: flex; align-items: center; gap: 4px;">
-                                <i class="fa-solid fa-magnifying-glass" style="font-size: 8px; color: var(--text-muted);"></i>
-                                <input type="range" id="library-zoom-slider" min="30" max="300" value="45" style="width: 50px; height: 3px; cursor: pointer; accent-color: var(--color-cyan); margin: 0; padding: 0; background: rgba(255,255,255,0.1); border: none; outline: none;">
-                                <span id="library-zoom-label" style="font-size: 7px; color: var(--text-muted); font-family: monospace;">45px</span>
+                            <div class="zoom-container" style="display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0;">
+                                <i class="fa-solid fa-magnifying-glass" style="font-size: 8px; color: var(--text-muted); flex-shrink: 0;"></i>
+                                <input type="range" id="library-zoom-slider" class="library-zoom-input" min="30" max="300" value="45" data-tooltip="Zoom Thumbs: 45px" style="height: 4px; cursor: pointer; accent-color: var(--color-cyan); margin: 0; padding: 0; background: rgba(255,255,255,0.1); border: none; outline: none; flex: 1; min-width: 0;">
+                                <span id="library-zoom-label" style="font-size: 7px; color: var(--text-muted); font-family: monospace; flex-shrink: 0;">45px</span>
                             </div>
                         </div>
 
                         <!-- Direita: Expandir/Recolher, Fotos no Player, Ordenação Dropdown -->
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
                             <button id="btn-expand-all" class="lib-action-btn" title="Expandir todas as pastas" onclick="globalExpandCollapseAll(true)" style="color: var(--color-cyan);"><i class="fa-solid fa-angles-down"></i></button>
                             <button id="btn-collapse-all" class="lib-action-btn" title="Recolher todas as pastas" onclick="globalExpandCollapseAll(false)"><i class="fa-solid fa-angles-up"></i></button>
                             <button id="btn-library-photos-in-player" class="lib-action-btn" title="Abrir fotos no player de vídeo"><i class="fa-regular fa-circle-play"></i></button>

@@ -4313,10 +4313,6 @@ body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline 
     display: inline !important;
 }
 
-/* Esconde zoom na biblioteca */
-.sidebar-left.sidebar-compact #library-filter-bar div[style*="justify-content: space-between"] > div:first-child {
-    display: none !important;
-}
 .sidebar-left.sidebar-compact #library-filter-bar {
     padding: 8px 8px !important;
 }
@@ -4404,10 +4400,7 @@ body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline 
     padding: 0 3px !important;
     height: 20px !important;
 }
-/* Esconde botões de zoom e texto da terceira linha na biblioteca minimal */
-.sidebar-left.sidebar-minimal #library-filter-bar div[style*="justify-content: space-between"] {
-    display: none !important;
-}
+
 
 /* Estilos para os labels do painel de agentes */
 .agent-control-label {
@@ -6661,10 +6654,73 @@ input[type="number"] {
     flex-shrink: 0 !important;
     padding: 3px !important;
 }
-.sidebar-compact #library-filter-bar .zoom-container,
+/* Slider de zoom das miniaturas na biblioteca (Mídias e Fotos) - 3 Níveis Adaptativos */
+#library-filter-bar .zoom-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+#library-filter-bar #library-zoom-slider {
+    width: 100%;
+    min-width: 60px;
+    max-width: none;
+    flex: 1;
+    height: 4px;
+    cursor: pointer;
+    accent-color: var(--color-cyan);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    border: none;
+    outline: none;
+    transition: all 0.2s ease;
+}
+#library-filter-bar #library-zoom-slider:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+#library-filter-bar #library-zoom-label {
+    font-size: 7.5px;
+    color: var(--text-muted);
+    font-family: monospace;
+    flex-shrink: 0;
+    min-width: 24px;
+}
+
+/* 2º Estado: Modo Compacto (240px <= largura < 320px) */
+.sidebar-compact #library-filter-bar .zoom-container {
+    display: flex !important;
+    flex: 1;
+    min-width: 0;
+    gap: 3px;
+}
+.sidebar-compact #library-filter-bar #library-zoom-slider {
+    width: 100%;
+    min-width: 50px;
+    max-width: 135px;
+    flex: 1;
+}
+.sidebar-compact #library-filter-bar #library-zoom-label {
+    display: inline-block !important;
+    font-size: 7px;
+}
+
+/* 3º Estado: Modo Mínimo (largura < 240px) */
 .sidebar-minimal #library-filter-bar .zoom-container {
+    display: flex !important;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+}
+.sidebar-minimal #library-filter-bar #library-zoom-slider {
+    width: 100%;
+    max-width: 120px;
+    flex: 1;
+}
+.sidebar-minimal #library-filter-bar #library-zoom-label {
     display: none !important;
 }
+
 .sidebar-minimal #library-filter-bar #btn-library-photos-in-player {
     display: none !important;
 }
