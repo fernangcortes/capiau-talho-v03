@@ -145,6 +145,32 @@ GRUPOS DE CONTEÚDO:
 Responda estritamente em JSON puro (sem markdown), mapeando pelo id do grupo:
 {"clusters": [{"cluster_id": 0, "title": "...", "description": "..."}]}"""
     },
+    "script_format_detect": {
+        "label": "Roteiro: Detecção do Formato de Cena",
+        "category": "themes_search",
+        "variables": {
+            "sample": "Trecho inicial do documento (~6k caracteres) para o modelo inspecionar."
+        },
+        "default": """Você analisa a FORMATAÇÃO de um documento de roteiro — não o seu conteúdo.
+
+Abaixo está o início de um documento. Descubra qual convenção ele usa para marcar o INÍCIO DE UMA CENA NOVA (por exemplo cabeçalhos como "INT./EXT.", "CENA 12", "SEQUÊNCIA 3", títulos em maiúsculas, marcadores próprios do autor).
+
+TRECHO DO DOCUMENTO:
+---
+{sample}
+---
+
+Responda em JSON puro (sem markdown):
+{
+  "regex": "expressão regular Python que casa com UMA LINHA de cabeçalho de cena, ancorada com ^ e usando o grupo nomeado (?P<heading>...) para capturar o texto do cabeçalho",
+  "explanation": "uma frase dizendo qual é a convenção observada"
+}
+
+REGRAS:
+- A regex é aplicada linha a linha, já sem espaços nas pontas, com IGNORECASE.
+- Se o documento NÃO tiver estrutura de cenas (é um tratamento, sinopse, escaleta em prosa ou ficha técnica), devolva "regex": "" — não invente um padrão.
+- Não use recursos exóticos: apenas sintaxe padrão do módulo `re` do Python."""
+    },
     "interview_summary": {
         "label": "Sumário de Depoimentos",
         "category": "vision",
