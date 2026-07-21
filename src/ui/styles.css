@@ -3786,35 +3786,29 @@ mark.search-highlight {
 #timeline-preview-card {
     position: fixed;
     width: 200px;
-    height: 145px;
-    background: rgba(15, 23, 42, 0.95);
-    border: 1px solid var(--border-glass);
-    border-radius: 8px;
+    height: 112px;
+    background: #000;
+    border: none !important;
+    border-radius: 6px;
     overflow: hidden;
     pointer-events: none; /* Deixa cliques passarem por ele */
     z-index: 10000;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
     display: none;
     flex-direction: column;
-    backdrop-filter: blur(8px);
 }
 
-#timeline-preview-card video {
-    width: 100%;
-    height: 112px;
-    object-fit: cover;
+#timeline-preview-card video,
+#timeline-preview-card .preview-img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
     background: #000;
+    border-radius: 6px;
 }
 
 #timeline-preview-card .preview-info {
-    flex: 1;
-    font-size: 10px;
-    color: var(--text-secondary);
-    padding: 6px 8px;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    font-family: monospace;
+    display: none !important;
 }
 
 /* Maximizar / Ocultar Players no modo duplo */

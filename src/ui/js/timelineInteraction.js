@@ -2300,19 +2300,18 @@ export class CapiauTimelineInteraction {
             previewCard.style.cssText = `
                 position: fixed;
                 width: 200px;
-                height: 145px;
-                background: rgba(15, 23, 42, 0.95);
-                border: 1px solid var(--border-glass);
-                border-radius: 8px;
+                height: 112px;
+                background: #000;
+                border: none;
+                border-radius: 6px;
                 overflow: hidden;
-                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
                 z-index: 10000;
                 display: none;
                 flex-direction: column;
                 pointer-events: none;
-                backdrop-filter: blur(8px);
             `;
-            previewCard.innerHTML = `<video autoplay muted loop playsinline style="width: 100%; height: 112px; object-fit: cover; background: #000; display: none;"></video><img class="preview-img" style="width: 100%; height: 112px; object-fit: cover; background: #000; display: block;"><div class="preview-info" style="flex: 1; font-size: 10px; color: var(--text-secondary); padding: 6px 8px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-family: monospace;">00:00:00:00</div>`;
+            previewCard.innerHTML = `<video autoplay muted loop playsinline style="width: 100%; height: 100%; object-fit: cover; background: #000; display: none;"></video><img class="preview-img" style="width: 100%; height: 100%; object-fit: cover; background: #000; display: block;"><div class="preview-info" style="display: none;"></div>`;
             doc.body.appendChild(previewCard);
         }
 
@@ -2347,7 +2346,7 @@ export class CapiauTimelineInteraction {
                         imgEl.style.display = "block";
                     }
                     const durS = clip.out - clip.in;
-                    infoEl.textContent = `${photo.filename} (${durS.toFixed(1)}s)`;
+                    if (infoEl) infoEl.textContent = `${photo.filename} (${durS.toFixed(1)}s)`;
                     this._placeFixedPopup(previewCard, clientX, clientY, 15);
                     return;
                 }
@@ -2375,7 +2374,7 @@ export class CapiauTimelineInteraction {
                 }
 
                 const duration = clip.out - clip.in;
-                infoEl.textContent = `${video.filename} (${duration.toFixed(1)}s) @ ${hoverTime.toFixed(1)}s`;
+                if (infoEl) infoEl.textContent = `${video.filename} (${duration.toFixed(1)}s) @ ${hoverTime.toFixed(1)}s`;
 
                 // Reposiciona o popup
                 this._placeFixedPopup(previewCard, clientX, clientY, 15);
