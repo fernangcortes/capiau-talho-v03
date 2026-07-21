@@ -276,6 +276,7 @@ def similar_batch(payload: SimilarBatchRequest, conn: sqlite3.Connection = Depen
     index_status = "ok"
     warning_msg = None
     data = {}
+    results = []
 
     try:
         if payload.search_type == "textual":
@@ -362,9 +363,13 @@ def similar_batch(payload: SimilarBatchRequest, conn: sqlite3.Connection = Depen
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as qe:
+    except QdrantUnavailableError as qe:
         index_status = "unavailable"
         warning_msg = f"Índice de busca indisponível — {qe}"
+    except Exception as e:
+        index_status = "error"
+        warning_msg = f"Erro inesperado na busca de similares: {e}"
+        print(f"[SimilarBatch] Erro inesperado ({type(e).__name__}): {e}")
 
     return {
         "results": results[:payload.limit],
@@ -391,8 +396,9 @@ def photo_similar(photo_id: int, project_id: int = Query(1), limit: int = Query(
         index_status = "unavailable"
         warning = f"Índice de busca indisponível — {qe}"
     except Exception as e:
-        index_status = "unavailable"
-        warning = "Índice de busca indisponível — provavelmente há outra instância do app aberta (lock do Qdrant)."
+        index_status = "error"
+        warning = f"Erro inesperado ao buscar similares: {e}"
+        print(f"[PhotoSimilar] Erro inesperado ({type(e).__name__}): {e}")
     return {"photo_id": photo_id, "results": results, "index_status": index_status, "warning": warning}
 
 @router.get("/api/media/video/{video_id}/similar")
@@ -412,8 +418,9 @@ def video_similar(video_id: int, project_id: int = Query(1), timestamp: float = 
         index_status = "unavailable"
         warning = f"Índice de busca indisponível — {qe}"
     except Exception as e:
-        index_status = "unavailable"
-        warning = "Índice de busca indisponível — provavelmente há outra instância do app aberta (lock do Qdrant)."
+        index_status = "error"
+        warning = f"Erro inesperado ao buscar similares: {e}"
+        print(f"[VideoSimilar] Erro inesperado ({type(e).__name__}): {e}")
     return {"video_id": video_id, "timestamp": timestamp, "results": results, "index_status": index_status, "warning": warning}
 
 @router.post("/api/ingest/select-folder")

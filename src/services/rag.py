@@ -467,6 +467,8 @@ class RAGService:
                 r["explanation"] = "Trecho do depoimento falado pelo personagem pesquisado."
             elif payload.get("match_source") == "clip":
                 r["explanation"] = f"Correspondência visual (CLIP) de {score_val*100:.0f}% com os termos da busca."
+            else:
+                r["explanation"] = f"Correspondência conceitual (Semântica) de {score_val*100:.0f}% no texto do trecho."
         sliced_results = final_results[offset : offset + limit]
         if return_meta:
             return {

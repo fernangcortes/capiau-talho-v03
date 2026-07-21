@@ -28,12 +28,17 @@ class ImageSearch:
         return cls._instance
 
     def __init__(self):
-        # Reutiliza o cliente Qdrant já aberto (lock de arquivo do modo local)
-        self.client = SemanticSearch.get_instance().client
         self.collection_name = "capiau_images"
         self._img_encoder = None
         self._txt_encoder = None
         self._init_collection()
+
+    @property
+    def client(self):
+        # Sempre lido do singleton (nunca guardado) — se o SemanticSearch reconectar
+        # sozinho após uma queda (check_health), este client acompanha, em vez de
+        # ficar apontando para uma conexão morta.
+        return SemanticSearch.get_instance().client
 
     def _init_collection(self):
         if self.client is None:

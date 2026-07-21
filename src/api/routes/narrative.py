@@ -182,8 +182,9 @@ def search_visual(
         index_status = "unavailable"
         warning = f"Índice de busca indisponível — {qe}"
     except Exception as e:
-        index_status = "unavailable"
-        warning = "Índice de busca indisponível — provavelmente há outra instância do app aberta (lock do Qdrant)."
+        index_status = "error"
+        warning = f"Erro inesperado na busca visual: {e}"
+        print(f"[SearchVisual] Erro inesperado ({type(e).__name__}): {e}")
 
     return {
         "query": query,

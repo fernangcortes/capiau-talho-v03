@@ -28,36 +28,50 @@ class SemanticSearch:
         self.encoder = None
         self.is_available = False
         self.error_message = None
+        self._try_init()
 
+    def _try_init(self) -> None:
+        """(Re)conecta ao Qdrant local. Chamado no boot e por check_health() para
+        tentar sair sozinho de uma indisponibilidade (ex.: lock de outra instância
+        que já morreu) sem exigir restart manual do servidor."""
         try:
             db_file_path = CONFIG.QDRANT_DB_PATH
             db_file_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             print(f"[QDRANT] Conectando ao banco local em: {db_file_path}")
             self.client = QdrantClient(path=str(db_file_path))
-            
-            # Carrega o modelo leve de embeddings (MiniLM) que roda de forma super veloz na CPU
-            print("[QDRANT] Carregando modelo sentence-transformers local em CPU...")
-            self.encoder = SentenceTransformer(CONFIG.embedding_model, device="cpu")
-            
+
+            if self.encoder is None:
+                # Modelo leve de embeddings (MiniLM), roda rápido na CPU — só carrega 1x
+                print("[QDRANT] Carregando modelo sentence-transformers local em CPU...")
+                self.encoder = SentenceTransformer(CONFIG.embedding_model, device="cpu")
+
             self._init_collection()
             self.is_available = True
+            self.error_message = None
         except Exception as e:
             self.is_available = False
             self.error_message = str(e)
             print(f"[QDRANT] [AVISO] Falha ao inicializar o Qdrant: {e}")
 
     def check_health(self) -> tuple:
-        """Retorna (is_available: bool, error_message: str | None)."""
+        """Retorna (is_available: bool, error_message: str | None). Tenta reconectar
+        antes de reportar falha — cobre o caso de uma instância zumbi que segurava
+        o lock do Qdrant e já foi derrubada."""
         if not self.is_available or self.client is None:
-            return False, self.error_message or "Cliente Qdrant não inicializado (lock de arquivo ou erro)."
+            self._try_init()
+            return self.is_available, (None if self.is_available else self.error_message)
         try:
             self.client.get_collections()
             return True, None
         except Exception as e:
-            self.is_available = False
-            self.error_message = str(e)
-            return False, str(e)
+            try:
+                self.client.close()
+            except Exception:
+                pass
+            self.client = None
+            self._try_init()
+            return self.is_available, (None if self.is_available else self.error_message)
 
     def _init_collection(self):
         """Inicializa a coleção vetorial se ela não existir no arquivo local."""
