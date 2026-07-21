@@ -171,6 +171,51 @@ REGRAS:
 - Se o documento NÃO tiver estrutura de cenas (é um tratamento, sinopse, escaleta em prosa ou ficha técnica), devolva "regex": "" — não invente um padrão.
 - Não use recursos exóticos: apenas sintaxe padrão do módulo `re` do Python."""
     },
+    "script_extract": {
+        "label": "Roteiro: Extração Estruturada de Cenas",
+        "category": "themes_search",
+        "variables": {
+            "scene_block": "Trecho do roteiro com as cenas já numeradas pelo sistema (marcadores === CENA N ===).",
+            "target_numbers": "Os números de cena que devem ser extraídos neste trecho — os demais são só contexto."
+        },
+        "default": """Você extrai dados estruturados de um trecho de um ROTEIRO de cinema em Português.
+
+O texto abaixo contém cenas já numeradas pelo sistema (marcadores "=== CENA N ==="). Uma cena marcada como "=== CENA N [CONTEXTO] ===" serve só para você entender a continuidade — NÃO a extraia.
+
+Extraia SOMENTE as cenas de número: {target_numbers}
+
+TRECHO DO ROTEIRO:
+---
+{scene_block}
+---
+
+Responda estritamente em JSON puro (sem markdown, sem comentários):
+{
+  "personagens": [
+    {"nome": "NOME COMO APARECE NO ROTEIRO", "descricao": "uma linha sobre quem é"}
+  ],
+  "cenas": [
+    {
+      "numero": 12,
+      "heading": "cabeçalho da cena (copie como está)",
+      "sinopse": "uma frase concisa do que acontece nesta cena",
+      "personagens": ["NOME", "NOME"],
+      "props": ["objeto manipulado ou importante na cena"],
+      "locacao": "nome curto do local, ex: 'Cozinha da casa dos Degará'"
+    }
+  ],
+  "objetos_chave": [
+    {"nome": "objeto importante para a trama (não cenário genérico)", "descricao": "uma linha do porquê importa"}
+  ]
+}
+
+REGRAS:
+- Use exatamente os números de cena fornecidos acima — nunca invente nem renumere.
+- "sinopse" é UMA frase só, sem floreio.
+- "props" lista só objetos manipulados ou citados como relevantes, não cenário genérico (mesa, cadeira, parede).
+- Não invente cenas, personagens ou eventos que não estão no texto.
+- Se uma cena da lista de números não tiver personagens ou props claros, devolva listas vazias — não omita a cena."""
+    },
     "interview_summary": {
         "label": "Sumário de Depoimentos",
         "category": "vision",
