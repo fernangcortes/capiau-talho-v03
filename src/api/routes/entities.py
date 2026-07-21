@@ -28,10 +28,13 @@ class EntityUpdate(BaseModel):
 
 
 @router.get("/project/{project_id}")
-def list_project_entities(project_id: int):
-    """Lista todas as entidades do projeto com contagem de menções."""
+def list_project_entities(
+    project_id: int,
+    status: Optional[str] = Query(None, description="Filtra por status: 'suggested' (fila de curadoria do roteiro), 'confirmed' ou 'rejected'."),
+):
+    """Lista as entidades do projeto com contagem de menções."""
     with get_db() as conn:
-        return {"entities": EntityRepository.list_entities(conn, project_id)}
+        return {"entities": EntityRepository.list_entities(conn, project_id, status=status)}
 
 
 @router.post("")
@@ -82,6 +85,24 @@ def delete_entity(entity_id: int):
         EntityRepository.delete_entity(conn, entity_id)
         conn.commit()
     return {"status": "success"}
+
+
+class BulkEntityStatusPayload(BaseModel):
+    project_id: int
+    entity_ids: List[int]
+    status: str  # suggested | confirmed | rejected
+
+
+@router.post("/bulk-status")
+def bulk_entity_status(payload: BulkEntityStatusPayload):
+    """Aceita/rejeita entidades sugeridas pela extração de roteiro em massa (P2.5).
+    Só entidades 'confirmed' entram nos prompts de visão/triagem (get_known_names)."""
+    if payload.status not in ("suggested", "confirmed", "rejected"):
+        raise HTTPException(status_code=400, detail="Status inválido para entidade.")
+    with get_db() as conn:
+        n = EntityRepository.set_entities_status(conn, payload.project_id, payload.entity_ids, payload.status)
+        conn.commit()
+    return {"status": "success", "updated": n}
 
 
 @router.post("/project/{project_id}/enrich")

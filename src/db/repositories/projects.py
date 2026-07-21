@@ -64,6 +64,17 @@ class ProjectRepository:
         return cursor.lastrowid
 
     @staticmethod
+    def get_document(conn: sqlite3.Connection, doc_id: int) -> Optional[Dict[str, Any]]:
+        """Busca um documento completo pelo ID (usado pela extração estruturada de roteiro, P2)."""
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, project_id, filename, filepath, content, doc_type, content_hash, created_at
+            FROM production_doc WHERE id = ?
+        """, (doc_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    @staticmethod
     def list_documents(conn: sqlite3.Connection, project_id: int) -> List[Dict[str, Any]]:
         """Lista os documentos de contexto associados ao projeto."""
         cursor = conn.cursor()

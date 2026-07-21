@@ -1,6 +1,6 @@
-"""Chunking e fusao da extracao estruturada de roteiro (P2.1b).
+"""Extracao estruturada de roteiro: chunking, fusao e orquestracao (P2.1b/P2.1c/P2.3).
 
-Parte PURA deste modulo (sem chamada de LLM, testavel sem mock de rede):
+Parte PURA (sem chamada de LLM, testavel sem mock de rede):
 - build_chunks: particiona as ancoras de detect_structure() em chunks de ~N chars,
   cada um com a cena anterior como [CONTEXTO] para o LLM manter continuidade.
 - split_chunk: divide um chunk que falhou em duas metades. Existe porque RETRY NAO
@@ -9,11 +9,20 @@ Parte PURA deste modulo (sem chamada de LLM, testavel sem mock de rede):
   reduz o texto de entrada e a saida esperada, o que de fato muda o resultado.
 - merge_chunk_results: funde os JSONs de todos os chunks numa estrutura unica.
 
-A execucao (chamadas de LLM de verdade, cache, persistencia) fica em outro modulo,
-que orquestra estas funcoes chamando src/nlp/llm_text.py por chunk.
+Parte de EXECUCAO (chama LLM de verdade, le/grava banco, publica progresso):
+- run_script_extraction: orquestra as funcoes acima, chunk por chunk, com cache por
+  content_hash (P2.3) e persistencia so no sucesso completo da rodada.
 """
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+
+EXTRACTION_TASK_PREFIX = "extracao-roteiro-"
+
+
+def extraction_task_key(doc_id: int) -> str:
+    """Chave usada no TASK_MANAGER para esta rodada — a mesma chave serve de trava
+    contra disparo duplo (o endpoint confere o status antes de aceitar um novo POST)."""
+    return f"{EXTRACTION_TASK_PREFIX}{doc_id}"
 
 CONTEXT_MARKER = "[CONTEXTO]"
 
@@ -201,3 +210,198 @@ def merge_chunk_results(
         "characters": list(characters.values()),
         "key_objects": list(key_objects.values()),
     }
+
+
+# ── Execucao ──────────────────────────────────────────────────────────────────
+
+def _run_chunk(chunk: "ScriptChunk", project_id: Optional[int], max_tokens: int,
+               temperature: float, timeout: int, retries: int) -> Tuple[Optional[Dict[str, Any]], Dict[str, int]]:
+    from src.nlp.llm_text import call_text_llm
+    from src.nlp.prompt_registry import get_prompt
+
+    prompt = get_prompt(
+        "script_extract", project_id=project_id,
+        scene_block=chunk.text, target_numbers=", ".join(str(n) for n in chunk.target_numbers),
+    )
+    return call_text_llm(
+        prompt, project_id=project_id, log_prefix="ScriptExtract",
+        max_tokens=max_tokens, temperature=temperature, timeout=timeout, retries=retries,
+    )
+
+
+def run_script_extraction(project_id: int, doc_id: int, force: bool = False) -> None:
+    """Extrai a estrutura de um roteiro: detecta o formato, faz chunking por cena,
+    chama o LLM por chunk (com split de emergência em falha de truncamento) e
+    persiste cenas + entidades sugeridas. Publica progresso no TASK_MANAGER (chave
+    extraction_task_key(doc_id)) para a aba Tarefas acompanhar.
+
+    Cache por content_hash (P2.3): uma rodada 'done' para a mesma versão exata do
+    texto é reaproveitada sem gastar API, a menos que force=True.
+
+    Falha de qualquer chunk (após retries + split) aborta a rodada inteira: nada é
+    persistido parcialmente -- mesma regra de segurança do P1 (upload de doc), para
+    nunca deixar o catálogo de cenas pela metade.
+    """
+    from src.core.tasks import TASK_MANAGER
+    from src.db.connection import get_db
+    from src.db.repositories.entities import EntityRepository
+    from src.db.repositories.projects import ProjectRepository
+    from src.db.repositories.scenes import SceneRepository
+    from src.nlp.llm_text import used_model
+    from src.services.script_format import detect_structure_for_project
+    from src.services.settings_service import SettingsService
+
+    task_key = extraction_task_key(doc_id)
+
+    with get_db() as conn:
+        doc = ProjectRepository.get_document(conn, doc_id)
+    if not doc:
+        print(f"[ScriptExtract] Documento {doc_id} nao encontrado; abortando extracao.")
+        TASK_MANAGER.update_progress(task_key, 0.0, "failed", task_type="script_extract",
+                                     label="Documento nao encontrado")
+        return
+
+    content = doc["content"] or ""
+    content_hash = doc["content_hash"]
+    if not content_hash:
+        content_hash = ProjectRepository.hash_doc_content(content)
+        with get_db() as conn:
+            conn.execute("UPDATE production_doc SET content_hash = ? WHERE id = ?", (content_hash, doc_id))
+            conn.commit()
+
+    if not force:
+        with get_db() as conn:
+            cached = SceneRepository.find_extraction(conn, doc_id, content_hash)
+        if cached:
+            print(f"[ScriptExtract] Doc {doc_id}: rodada ja concluida para esta versao "
+                  f"(content_hash igual); usando cache, 0 chamadas.")
+            TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="script_extract",
+                                         label="Estrutura ja extraida (cache)")
+            return
+
+    S = SettingsService.get_settings(project_id)
+    chunk_chars = S.get("script_extract.chunk_chars")
+    max_tokens = S.get("script_extract.max_tokens")
+    temperature = S.get("script_extract.temperature")
+    timeout = S.get("script_extract.timeout")
+    max_retries = S.get("script_extract.max_retries")
+    model_name = used_model(project_id)
+
+    report = detect_structure_for_project(content, doc["filename"], project_id)
+    print(f"[ScriptExtract] Doc {doc_id}: estrategia={report.strategy}, "
+          f"{report.scene_count} cenas detectadas.")
+
+    with get_db() as conn:
+        extraction_id = SceneRepository.create_extraction(conn, project_id, doc_id, content_hash, report.strategy)
+        conn.commit()
+
+    if report.strategy == "prose":
+        # Documento sem estrutura de cena (tratamento, escaleta). DECISAO DE ESCOPO:
+        # nenhum documento real do projeto cai neste caminho hoje (o unico roteiro
+        # cadastrado detecta como 'sluglines'), e o prompt script_extract e desenhado
+        # em torno de numeros de cena -- reaproveita-lo as cegas para prosa produziria
+        # uma instrucao "extraia as cenas de numero: " vazia e sem sentido para o
+        # modelo. Em vez de arriscar uma extracao de baixa qualidade e nunca
+        # validada, a rodada fecha como 'done' sem chamar o prompt script_extract.
+        # Uma extracao de entidades dedicada a prosa (prompt e chunking proprios)
+        # fica para quando houver um documento real desse tipo para calibrar contra.
+        #
+        # NOTA DE CUSTO: detect_structure_for_project() (acima) ja pode ter gasto 1
+        # chamada barata tentando identificar um padrao de cena antes de concluir
+        # 'prose' (camada 3, controlada por script.llm_format_detection) -- essa
+        # chamada e da DETECCAO DE FORMATO, nao desta extracao; contabilizada por
+        # detect_structure, nao por script_extraction.calls.
+        print(f"[ScriptExtract] Doc {doc_id}: documento em prosa (sem estrutura de cena "
+              f"reconhecida) -- nenhuma cena ou entidade extraida nesta rodada.")
+        with get_db() as conn:
+            SceneRepository.finish_extraction(
+                conn, extraction_id, "done", strategy="prose", model=model_name, chunks=0, calls=0,
+            )
+            conn.commit()
+        TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="script_extract",
+                                     label="Documento sem estrutura de cena (prosa)")
+        return
+
+    chunks = build_chunks(content, report.anchors, chunk_chars)
+    total = len(chunks)
+    TASK_MANAGER.update_progress(task_key, 0.0, "running", task_type="script_extract",
+                                 label=f"Extraindo roteiro — 0 de {total} partes")
+
+    results: List[Tuple[ScriptChunk, Optional[Dict[str, Any]]]] = []
+    calls = 0
+    usage_total = {"prompt_tokens": 0, "completion_tokens": 0}
+    failed_chunk: Optional[ScriptChunk] = None
+
+    for idx, chunk in enumerate(chunks, start=1):
+        data, usage = _run_chunk(chunk, project_id, max_tokens, temperature, timeout, max_retries)
+        calls += 1
+        usage_total["prompt_tokens"] += usage.get("prompt_tokens", 0)
+        usage_total["completion_tokens"] += usage.get("completion_tokens", 0)
+
+        if data is None and chunk.target_count >= 2:
+            print(f"[ScriptExtract] Doc {doc_id}: chunk {idx}/{total} falhou apos retries; "
+                  f"dividindo em duas metades (truncamento nao se resolve repetindo).")
+            halves = split_chunk(content, report.anchors, chunk)
+            halves_ok = True
+            for half in halves:
+                half_data, half_usage = _run_chunk(half, project_id, max_tokens, temperature, timeout, retries=1)
+                calls += 1
+                usage_total["prompt_tokens"] += half_usage.get("prompt_tokens", 0)
+                usage_total["completion_tokens"] += half_usage.get("completion_tokens", 0)
+                if half_data is None:
+                    halves_ok = False
+                    break
+                results.append((half, half_data))
+            if not halves_ok:
+                failed_chunk = chunk
+                break
+        elif data is None:
+            failed_chunk = chunk
+            break
+        else:
+            results.append((chunk, data))
+
+        pct = (idx / total) * 100.0
+        TASK_MANAGER.update_progress(task_key, pct, "running", task_type="script_extract",
+                                     label=f"Extraindo roteiro — parte {idx} de {total}")
+
+    if failed_chunk is not None:
+        error_msg = f"Falha na extracao das cenas {failed_chunk.target_numbers} apos retries e split."
+        print(f"[ScriptExtract] Doc {doc_id}: {error_msg}")
+        with get_db() as conn:
+            SceneRepository.finish_extraction(
+                conn, extraction_id, "error", strategy=report.strategy, model=model_name,
+                chunks=total, calls=calls,
+                prompt_tokens=usage_total["prompt_tokens"], completion_tokens=usage_total["completion_tokens"],
+                error=error_msg,
+            )
+            conn.commit()
+        TASK_MANAGER.update_progress(task_key, 100.0, "failed", task_type="script_extract",
+                                     label="Falha na extracao do roteiro")
+        return
+
+    merged = merge_chunk_results(results, report.anchors)
+
+    with get_db() as conn:
+        SceneRepository.replace_scenes_for_doc(conn, project_id, doc_id, merged["scenes"])
+        for person in merged["characters"]:
+            EntityRepository.upsert_suggested_entity(conn, project_id, person["name"], "person", person["description"])
+        locations = sorted({s["location"] for s in merged["scenes"] if s.get("location")})
+        for loc in locations:
+            EntityRepository.upsert_suggested_entity(conn, project_id, loc, "location", "")
+        for obj in merged["key_objects"]:
+            EntityRepository.upsert_suggested_entity(conn, project_id, obj["name"], "object", obj["description"])
+        SceneRepository.finish_extraction(
+            conn, extraction_id, "done", strategy=report.strategy, model=model_name,
+            chunks=total, calls=calls,
+            prompt_tokens=usage_total["prompt_tokens"], completion_tokens=usage_total["completion_tokens"],
+        )
+        conn.commit()
+
+    print(f"[ScriptExtract] Doc {doc_id}: estrategia={report.strategy}, {calls} chamadas, "
+          f"{usage_total['prompt_tokens']} tokens de entrada, {usage_total['completion_tokens']} de saida, "
+          f"modelo {model_name}. {len(merged['scenes'])} cenas, {len(merged['characters'])} personagens, "
+          f"{len(locations)} locacoes, {len(merged['key_objects'])} objetos-chave.")
+
+    TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="script_extract",
+                                 label=f"Roteiro extraido — {len(merged['scenes'])} cenas")
