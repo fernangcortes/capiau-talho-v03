@@ -329,9 +329,10 @@ export class CapIAuAPI {
         return this.request(`/api/theme/${themeId}/segments`);
     }
 
-    static fetchEntities(projectId) {
-        return this.request(`/api/entities/project/${projectId}`);
-    }
+    // fetchEntities vive na secao de extracao de roteiro (P2), com filtro opcional de
+    // status. NAO redeclarar aqui: metodo estatico duplicado na mesma classe faz a
+    // segunda definicao sobrescrever a primeira em silencio -- foi exatamente o bug
+    // que mostrou a equipe inteira como "sugestao do roteiro" na curadoria (21/07).
 
     static enrichProject(projectId) {
         return this.request(`/api/entities/project/${projectId}/enrich`, { method: "POST" });
