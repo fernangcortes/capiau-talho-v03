@@ -25,6 +25,11 @@ class EntityCreate(BaseModel):
 class EntityUpdate(BaseModel):
     name: Optional[str] = None
     entity_type: Optional[str] = None
+    description: Optional[str] = None
+    role: Optional[str] = None
+    realm: Optional[str] = None
+    linked_entity_id: Optional[int] = None
+    aliases: Optional[List[str]] = None
 
 
 @router.get("/project/{project_id}")
@@ -52,7 +57,29 @@ def create_entity(payload: EntityCreate):
 
 @router.patch("/{entity_id}")
 def update_entity(entity_id: int, payload: EntityUpdate):
-    """Renomeia/reclassifica uma entidade e re-enriquece as mídias afetadas."""
+    """Edita uma entidade: nome/tipo/descrição/função/universo/vínculo/aliases.
+
+    Convenção de UI (E-B): renomear uma pessoa 'production' (equipe/elenco real)
+    deve ir por POST /api/faces/project/{id}/rename-name, não por aqui — aquela rota
+    sincroniza face+person+transcript+entity+Qdrant; esta só toca a entidade e
+    re-enriquece o texto. Esta rota é o caminho certo para: renomear entidades que
+    não têm rosto (objeto, locação, personagem 'story'), e para editar os campos
+    novos (description/role/realm/linked_entity_id/aliases) de qualquer entidade.
+
+    Só os campos ENVIADOS no payload são alterados — `linked_entity_id: null` é a
+    ação real de desvincular, distinta de omitir o campo (exclude_unset).
+    """
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="Nenhum campo para atualizar.")
+
+    if "entity_type" in updates and updates["entity_type"] not in ("person", "object", "location", "other"):
+        raise HTTPException(status_code=400, detail="entity_type inválido.")
+    if "realm" in updates and updates["realm"] not in ("production", "story"):
+        raise HTTPException(status_code=400, detail="realm inválido (use 'production' ou 'story').")
+    if updates.get("name") is not None and not updates["name"].strip():
+        raise HTTPException(status_code=400, detail="Nome não pode ser vazio.")
+
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, project_id FROM entity WHERE id = ?", (entity_id,))
@@ -61,20 +88,32 @@ def update_entity(entity_id: int, payload: EntityUpdate):
             raise HTTPException(status_code=404, detail="Entidade não encontrada.")
         project_id = row["project_id"]
 
-        if payload.name or payload.entity_type:
-            EntityRepository.rename_entity(conn, entity_id, payload.name or "", payload.entity_type)
-        affected = EntityRepository.get_affected_media(conn, entity_id)
+        if updates.get("linked_entity_id") is not None:
+            cursor.execute(
+                "SELECT 1 FROM entity WHERE id = ? AND project_id = ?",
+                (updates["linked_entity_id"], project_id)
+            )
+            if not cursor.fetchone():
+                raise HTTPException(status_code=400, detail="linked_entity_id não pertence a este projeto.")
+
+        EntityRepository.update_entity_fields(conn, entity_id, **updates)
+        # Nome/tipo influenciam o texto das descrições geradas; os demais campos novos
+        # (role/realm/linked_entity_id/aliases) não aparecem em nenhuma descrição, então
+        # não justificam re-enriquecer mídia.
+        affected = []
+        if "name" in updates or "entity_type" in updates:
+            affected = EntityRepository.get_affected_media(conn, entity_id)
         conn.commit()
 
-    # Reescreve as descrições onde a entidade aparece (nome novo entra no texto)
-    def _reenrich():
-        for media in affected:
-            if media.get("photo_id"):
-                enrich_photo(project_id, media["photo_id"])
-            elif media.get("video_id") and media.get("timestamp") is not None:
-                enrich_video_frames(project_id, media["video_id"], [media["timestamp"]])
+    if affected:
+        def _reenrich():
+            for media in affected:
+                if media.get("photo_id"):
+                    enrich_photo(project_id, media["photo_id"])
+                elif media.get("video_id") and media.get("timestamp") is not None:
+                    enrich_video_frames(project_id, media["video_id"], [media["timestamp"]])
 
-    enrich_in_background(_reenrich)
+        enrich_in_background(_reenrich)
     return {"status": "success", "affected_media": len(affected)}
 
 
@@ -103,6 +142,27 @@ def bulk_entity_status(payload: BulkEntityStatusPayload):
         n = EntityRepository.set_entities_status(conn, payload.project_id, payload.entity_ids, payload.status)
         conn.commit()
     return {"status": "success", "updated": n}
+
+
+class MergeEntitiesPayload(BaseModel):
+    project_id: int
+    source_id: int  # some (é apagada)
+    target_id: int  # sobrevive (recebe menções + alias)
+
+
+@router.post("/merge")
+def merge_entities_endpoint(payload: MergeEntitiesPayload):
+    """Funde duas entidades (E-A2): `source` some, `target` sobrevive com as menções
+    e o nome antigo como alias. Sem bloqueio de tipo/universo incompatível no backend
+    — o aviso é do frontend (ex: 'isto é um objeto sendo fundido com uma pessoa,
+    confirma?'), a decisão final é do usuário."""
+    with get_db() as conn:
+        try:
+            result = EntityRepository.merge_entities(conn, payload.project_id, payload.source_id, payload.target_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        conn.commit()
+    return {"status": "success", **result}
 
 
 @router.post("/project/{project_id}/enrich")

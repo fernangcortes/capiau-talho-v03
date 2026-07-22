@@ -137,9 +137,12 @@ class EntityRepository:
         cursor.execute(f"""
             SELECT e.id, e.entity_type, e.name, e.aliases, e.description, e.created_at,
                    IFNULL(e.status, 'confirmed') as status,
+                   IFNULL(e.realm, 'production') as realm, e.role, e.linked_entity_id,
+                   le.name as linked_entity_name,
                    COUNT(m.id) as mention_count
             FROM entity e
             LEFT JOIN entity_mention m ON m.entity_id = e.id AND m.status != 'rejected'
+            LEFT JOIN entity le ON le.id = e.linked_entity_id
             WHERE e.project_id = ? {status_clause}
             GROUP BY e.id
             ORDER BY mention_count DESC, e.name
@@ -278,3 +281,154 @@ class EntityRepository:
             FROM entity_mention WHERE entity_id = ? AND status != 'rejected'
         """, (entity_id,))
         return [dict(r) for r in cursor.fetchall()]
+
+    # ── Modelo estendido do E3.C (realm/role/vínculo/fusão) ─────────────────
+
+    UPDATABLE_FIELDS = ("name", "entity_type", "description", "role", "realm", "linked_entity_id", "aliases")
+
+    @staticmethod
+    def update_entity_fields(conn: sqlite3.Connection, entity_id: int, **fields: Any) -> None:
+        """Atualiza só os campos passados (uso com **payload.model_dump(exclude_unset=True)
+        no FastAPI, para 'campo não enviado' e 'campo enviado como null' terem efeitos
+        diferentes — essencial para `linked_entity_id`, onde null é a ação real de
+        desvincular um personagem do ator, não um valor "sem mudança")."""
+        cols, values = [], []
+        for key, value in fields.items():
+            if key not in EntityRepository.UPDATABLE_FIELDS:
+                continue
+            if key == "aliases":
+                value = json.dumps(value or [], ensure_ascii=False)
+            elif key == "name" and value is not None:
+                value = value.strip()
+            cols.append(f"{key} = ?")
+            values.append(value)
+        if not cols:
+            return
+        values.append(entity_id)
+        conn.execute(f"UPDATE entity SET {', '.join(cols)} WHERE id = ?", values)
+
+    @staticmethod
+    def _row_to_entity_dict(row: sqlite3.Row) -> Dict[str, Any]:
+        d = dict(row)
+        try:
+            d["aliases"] = json.loads(d["aliases"]) if d.get("aliases") else []
+        except Exception:
+            d["aliases"] = []
+        return d
+
+    @staticmethod
+    def find_entity_by_name(conn: sqlite3.Connection, project_id: int, name: str) -> Optional[Dict[str, Any]]:
+        """Resolve um nome para a entidade correspondente, por nome canônico OU por
+        alias (ambos case-insensitive). Usado pelo matching de documentos de produção
+        (E-C) e pela expansão personagem→ator na busca por cena (P3).
+
+        Varre aliases em Python (sem índice): catálogos de projeto são de centenas de
+        linhas no máximo, não milhares — não compensa a complexidade de indexar JSON.
+        """
+        name = (name or "").strip()
+        if not name:
+            return None
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM entity WHERE project_id = ? AND name = ? COLLATE NOCASE", (project_id, name))
+        row = cursor.fetchone()
+        if row:
+            return EntityRepository._row_to_entity_dict(row)
+
+        cursor.execute("SELECT * FROM entity WHERE project_id = ? AND aliases IS NOT NULL", (project_id,))
+        key = name.lower()
+        for r in cursor.fetchall():
+            try:
+                aliases = json.loads(r["aliases"]) if r["aliases"] else []
+            except Exception:
+                aliases = []
+            if any((a or "").strip().lower() == key for a in aliases):
+                return EntityRepository._row_to_entity_dict(r)
+        return None
+
+    @staticmethod
+    def merge_entities(conn: sqlite3.Connection, project_id: int, source_id: int, target_id: int) -> Dict[str, Any]:
+        """Funde `source` em `target`: menções migram sem duplicar, o nome (e os
+        aliases) da fundida viram alias da sobrevivente, vínculos de terceiros que
+        apontavam para a fundida são redirecionados, e a fundida é apagada.
+
+        Nunca roda automaticamente — só por ação explícita do usuário no painel (o
+        mesmo princípio anti-viés do resto do E3.C: fusão é decisão humana). Não
+        bloqueia por tipo/universo incompatível: o aviso é do frontend, a decisão é
+        do usuário. Não mexe no `status` de nenhuma das duas — fundir uma entidade
+        'suggested' numa 'rejected' não "ressuscita" nada; a sobrevivente mantém o
+        status que já tinha.
+        """
+        if source_id == target_id:
+            raise ValueError("Não é possível fundir uma entidade com ela mesma.")
+
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM entity WHERE id = ? AND project_id = ?", (source_id, project_id))
+        source = cursor.fetchone()
+        cursor.execute("SELECT * FROM entity WHERE id = ? AND project_id = ?", (target_id, project_id))
+        target = cursor.fetchone()
+        if not source or not target:
+            raise ValueError("Entidade de origem ou destino não encontrada neste projeto.")
+
+        # 1. Mencoes: migram sem duplicar (compara por midia+timestamp, mesma logica
+        # de dedupe do add_mention).
+        cursor.execute("SELECT * FROM entity_mention WHERE entity_id = ?", (source_id,))
+        source_mentions = cursor.fetchall()
+        moved = 0
+        deduped = 0
+        for m in source_mentions:
+            cursor.execute("""
+                SELECT id FROM entity_mention
+                WHERE entity_id = ?
+                  AND IFNULL(photo_id, -1) = IFNULL(?, -1)
+                  AND IFNULL(video_id, -1) = IFNULL(?, -1)
+                  AND IFNULL(timestamp, -1.0) = IFNULL(?, -1.0)
+            """, (target_id, m["photo_id"], m["video_id"], m["timestamp"]))
+            if cursor.fetchone():
+                cursor.execute("DELETE FROM entity_mention WHERE id = ?", (m["id"],))
+                deduped += 1
+            else:
+                cursor.execute("UPDATE entity_mention SET entity_id = ? WHERE id = ?", (target_id, m["id"]))
+                moved += 1
+
+        # 2. Nome + aliases da fundida viram aliases da sobrevivente (nada se perde
+        # para busca: um alias antigo continua resolvendo pela sobrevivente).
+        try:
+            target_aliases = json.loads(target["aliases"]) if target["aliases"] else []
+        except Exception:
+            target_aliases = []
+        try:
+            source_aliases = json.loads(source["aliases"]) if source["aliases"] else []
+        except Exception:
+            source_aliases = []
+
+        existing_lower = {a.strip().lower() for a in target_aliases if a} | {target["name"].strip().lower()}
+        added_aliases = []
+        for candidate in [source["name"]] + source_aliases:
+            candidate = (candidate or "").strip()
+            if candidate and candidate.lower() not in existing_lower:
+                target_aliases.append(candidate)
+                existing_lower.add(candidate.lower())
+                added_aliases.append(candidate)
+        cursor.execute(
+            "UPDATE entity SET aliases = ? WHERE id = ?",
+            (json.dumps(target_aliases, ensure_ascii=False), target_id)
+        )
+
+        # 3. Redireciona vinculos de terceiros (ex: outro personagem vinculado à
+        # fundida por engano) para a sobrevivente.
+        cursor.execute(
+            "UPDATE entity SET linked_entity_id = ? WHERE project_id = ? AND linked_entity_id = ?",
+            (target_id, project_id, source_id)
+        )
+        relinked = cursor.rowcount
+
+        # 4. Apaga a fundida.
+        cursor.execute("DELETE FROM entity WHERE id = ?", (source_id,))
+
+        return {
+            "target_id": target_id,
+            "mentions_moved": moved,
+            "mentions_deduped": deduped,
+            "aliases_added": added_aliases,
+            "relinked_from_others": relinked,
+        }
