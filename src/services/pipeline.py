@@ -742,7 +742,7 @@ class PipelineService:
                 percent = (idx / total_stamps) * 100.0
                 TASK_MANAGER.update_progress(str(video_id), percent, "running", task_type="vision")
                 frame_path = video_cache_dir / f"frame_{idx}_{int(timestamp)}s.jpg"
-                if not extract_frame(frame_source, timestamp, frame_path):
+                if not extract_frame(frame_source, timestamp, frame_path, proxy_fallback_path=proxy_path):
                     continue
                 frames_ok += 1
 
@@ -841,10 +841,9 @@ class PipelineService:
                 except Exception:
                     pass
 
-            if frames_ok == 0:
-                # Nenhum frame extraído (proxy e original ilegíveis) — não marca como
-                # 'analyzed' silenciosamente; sinaliza erro para o usuário reprocessar
-                err_msg = f"Nenhum frame pôde ser extraído de {frame_source.name} (proxy/original ilegíveis)."
+            if frames_ok == 0 or not descriptions_indexed:
+                # Nenhum frame processado com sucesso — sinaliza erro explícito
+                err_msg = f"Nenhum frame com informação visual pôde ser processado para {frame_source.name}."
                 print(f"[Vision] {err_msg}")
                 with get_db() as conn:
                     MediaRepository.update_video_status(conn, video_id, 'error', error_message=err_msg)
@@ -1234,3 +1233,59 @@ class PipelineService:
         except Exception as e:
             print(f"[Summary] Falha ao gerar sumário de vídeo: {e}")
             return False
+
+    @staticmethod
+    def get_failed_video_ids(project_id: Optional[int] = None) -> List[int]:
+        """Retorna IDs de todos os vídeos que falharam ou apresentam erro visual no sumário/descrição."""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            base_query = """
+                SELECT id FROM video 
+                WHERE status = 'error' 
+                   OR LOWER(summary) LIKE '%nenhum%'
+                   OR LOWER(summary) LIKE '%falha%'
+                   OR LOWER(summary) LIKE '%ausen%'
+                   OR LOWER(summary) LIKE '%indispon%'
+                   OR LOWER(summary) LIKE '%impossibilita%'
+                   OR LOWER(description) LIKE '%nenhum%'
+                   OR LOWER(description) LIKE '%falha%'
+                   OR LOWER(description) LIKE '%ausen%'
+                   OR LOWER(description) LIKE '%indispon%'
+                   OR LOWER(description) LIKE '%impossibilita%'
+                   OR LOWER(title) LIKE '%falha%'
+            """
+            if project_id:
+                proj_rows = cursor.execute(base_query + " AND project_id = ?", (project_id,)).fetchall()
+                if proj_rows:
+                    return [r['id'] for r in proj_rows]
+            
+            # Se não passou project_id ou se o project_id atual não tem falhas isoladas, busca no acervo total
+            all_rows = cursor.execute(base_query).fetchall()
+            return [r['id'] for r in all_rows]
+
+    @staticmethod
+    def reanalyze_failed_videos(project_id: Optional[int] = None) -> List[int]:
+        """Dispara reanálise em lote de todas as mídias afetadas por falha visual utilizando os proxies 720p."""
+        import threading
+        affected_ids = PipelineService.get_failed_video_ids(project_id)
+        print(f"[Vision] Iniciando reanálise em lote de {len(affected_ids)} vídeos afetados...")
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            for vid in affected_ids:
+                row = cursor.execute("SELECT id, filepath, duration FROM video WHERE id = ?", (vid,)).fetchone()
+                if not row:
+                    continue
+                v_path = Path(row["filepath"]) if row["filepath"] else Path(f"data/proxies/proxy_vid_{vid}.mp4")
+                v_dur = float(row["duration"] or 0.0)
+                
+                MediaRepository.update_video_status(conn, vid, 'pending', error_message=None)
+                
+                t = threading.Thread(
+                    target=PipelineService.analyze_video_vision,
+                    args=(vid, v_path, v_dur),
+                    daemon=True
+                )
+                t.start()
+                
+        return affected_ids

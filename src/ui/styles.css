@@ -6879,3 +6879,59 @@ input[type="number"] {
     transform: scale(1.1);
 }
 
+/* ── SINALIZAÇÃO DE ERRO/FALHA VISUAL EM CARDS DE MÍDIA ──────────────── */
+.video-card.has-vision-error {
+    border: 1px solid rgba(244, 63, 94, 0.3) !important;
+    background: rgba(244, 63, 94, 0.04) !important;
+}
+
+.video-card.has-vision-error:hover {
+    border-color: rgba(244, 63, 94, 0.6) !important;
+    box-shadow: 0 0 12px rgba(244, 63, 94, 0.25) !important;
+}
+
+.vision-error-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(244, 63, 94, 0.92);
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 10;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.video-card:hover .vision-error-badge {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.btn-rose-glow:hover {
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.5) !important;
+    background: rgba(244, 63, 94, 0.2) !important;
+}
+
+.btn-flat-rose {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-muted) !important;
+    transition: color 0.15s ease, transform 0.15s ease, text-shadow 0.15s ease !important;
+}
+
+.btn-flat-rose:hover {
+    color: var(--color-rose) !important;
+    text-shadow: 0 0 8px var(--color-rose) !important;
+    transform: scale(1.05) !important;
+}
+

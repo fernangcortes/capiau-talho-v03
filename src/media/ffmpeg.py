@@ -96,8 +96,45 @@ def extract_audio_mono(video_path: Path, output_path: Path) -> bool:
         print(f"[FFmpeg] Falha ao extrair áudio de {video_path.name}: {e}")
         return False
 
-def extract_frame(video_path: Path, timestamp: float, output_path: Path) -> bool:
-    """Extrai um único frame JPEG de alta qualidade a partir de um timestamp com fallback de busca lenta para MTS."""
+def is_solid_green_or_corrupted(image_path: Path) -> bool:
+    """Valida se o frame extraído é uma imagem válida e não uma tela verde de erro do FFmpeg ou imagem corrompida."""
+    try:
+        if not image_path.exists() or image_path.stat().st_size < 1000:
+            return True
+        from PIL import Image
+        import numpy as np
+        
+        with Image.open(image_path) as img:
+            img_rgb = img.convert('RGB')
+            img_small = img_rgb.resize((64, 64))
+            arr = np.array(img_small, dtype=np.float32)
+            
+            r_mean = np.mean(arr[:, :, 0])
+            g_mean = np.mean(arr[:, :, 1])
+            b_mean = np.mean(arr[:, :, 2])
+            
+            # Detecta tela verde do FFmpeg (YUV 0x00 / falta de I-frame)
+            if g_mean > 120 and r_mean < 70 and b_mean < 70:
+                return True
+                
+            # Detecta imagens de cor sólida / uniforme
+            std_dev = np.std(arr)
+            if std_dev < 3.0:
+                return True
+                
+            return False
+    except Exception as e:
+        print(f"[FFmpeg] Erro ao validar integridade do frame {image_path.name}: {e}")
+        return True
+
+def extract_frame(video_path: Path, timestamp: float, output_path: Path, proxy_fallback_path: Optional[Path] = None) -> bool:
+    """Extrai um único frame JPEG de alta qualidade a partir de um timestamp com validação visual e fallback para busca lenta / proxy."""
+    startupinfo = None
+    if os.name == 'nt':
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+    # Tentativa 1: Busca rápida (-ss antes de -i) no arquivo alvo
     cmd_fast = [
         'ffmpeg', '-y',
         '-ss', str(timestamp),
@@ -106,31 +143,52 @@ def extract_frame(video_path: Path, timestamp: float, output_path: Path) -> bool
         '-q:v', '2',
         str(output_path)
     ]
-    startupinfo = None
-    if os.name == 'nt':
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        
     try:
         subprocess.run(cmd_fast, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, check=True)
-        if output_path.exists():
+        if output_path.exists() and not is_solid_green_or_corrupted(output_path):
             return True
     except Exception:
-        # Fallback de busca lenta (-ss depois do -i) para arquivos .MTS com index corrompido
-        cmd_slow = [
+        pass
+
+    # Tentativa 2: Busca lenta (-ss depois de -i) no arquivo alvo (resolve H.264/MTS com busca rápida corrompida)
+    cmd_slow = [
+        'ffmpeg', '-y',
+        '-i', str(video_path),
+        '-ss', str(timestamp),
+        '-vframes', '1',
+        '-q:v', '2',
+        str(output_path)
+    ]
+    try:
+        subprocess.run(cmd_slow, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, check=True)
+        if output_path.exists() and not is_solid_green_or_corrupted(output_path):
+            return True
+    except Exception:
+        pass
+
+    # Tentativa 3: Se o vídeo original falhou e temos um proxy 720p disponível, extrai do proxy
+    if proxy_fallback_path and proxy_fallback_path.exists() and proxy_fallback_path != video_path:
+        cmd_proxy = [
             'ffmpeg', '-y',
-            '-i', str(video_path),
             '-ss', str(timestamp),
+            '-i', str(proxy_fallback_path),
             '-vframes', '1',
             '-q:v', '2',
             str(output_path)
         ]
         try:
-            subprocess.run(cmd_slow, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, check=True)
-            return output_path.exists()
-        except Exception as e:
-            print(f"[FFmpeg] Falha critica ao extrair frame a {timestamp}s do video {video_path.name} (busca rapida e lenta falharam): {e}")
-            return False
+            subprocess.run(cmd_proxy, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, check=True)
+            if output_path.exists() and not is_solid_green_or_corrupted(output_path):
+                return True
+        except Exception:
+            pass
+
+    print(f"[FFmpeg] Falha ao extrair frame válido a {timestamp:.1f}s de {video_path.name}")
+    if output_path.exists():
+        try:
+            output_path.unlink()
+        except Exception:
+            pass
     return False
 
 def generate_video_proxy(

@@ -148,6 +148,9 @@
                         <button id="btn-clear-similar-selected" title="Limpar seleção de similares" class="lib-action-btn" style="display: none;"><i class="fa-solid fa-xmark"></i></button>
                         <button id="btn-toggle-advanced-search" title="Busca Avançada & Filtros" class="lib-action-btn"><i class="fa-solid fa-sliders"></i></button>
                         <button id="btn-library-display-settings" title="Opções de Exibição" class="lib-action-btn"><i class="fa-solid fa-gear"></i></button>
+                        <button id="btn-reanalyze-failed" title="Reanalisar mídias com falha visual" class="lib-action-btn btn-flat-rose" style="display: none; align-items: center; gap: 4px; background: transparent !important; border: none !important; color: var(--text-muted); cursor: pointer; padding: 0 4px; font-size: 10px; flex-shrink: 0;">
+                            <i class="fa-solid fa-arrows-rotate"></i> Reanalisar Falhas <span id="failed-count-badge" class="badge" style="color: var(--color-rose); border-color: rgba(244,63,94,0.3); font-size: 9px; padding: 0 4px;">0</span>
+                        </button>
                     </div>
 
                     <!-- Popover de Busca por Similaridade em Lote -->
@@ -677,7 +680,7 @@
                                 <div class="toolbar-divider"></div>
 
                                 <!-- Altura vertical das pistas: slider global (arraste a borda de cada pista p/ ajuste individual) -->
-                                <div class="track-height-control" data-tooltip="Altura das pistas (global) — arraste a borda de cada pista para ajuste individual">
+                                <div class="track-height-control" data-tooltip="Altura das pistas (global) — Shift + Wheel do mouse ou arraste a borda para ajuste individual">
                                     <input type="range" id="track-height-slider" class="track-height-slider" min="50" max="170" step="5" value="100">
                                 </div>
 
@@ -1626,6 +1629,8 @@
                     <div>Trim do início / fim do clipe focado</div>
                     <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl + Roda Mouse</kbd></div>
                     <div>Zoom horizontal na agulha</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Shift + Roda Mouse</kbd></div>
+                    <div>Zoom vertical / altura das pistas</div>
                     <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Botão Meio Drag</kbd></div>
                     <div>Pan/Scroll horizontal pela timeline</div>
                 </div>

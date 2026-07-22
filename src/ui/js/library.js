@@ -373,8 +373,12 @@ function renderTreeNode(node, container, depth = 0) {
             }
         }
         
+        const vText = ((v.summary || '') + ' ' + (v.description || '') + ' ' + (v.title || '')).toLowerCase();
+        const errorKeys = ['nenhum', 'falha', 'ausen', 'indispon', 'impossibilita', 'erro de captura', 'não foi possível', 'não pde'];
+        const hasVisionError = v.status === "error" || errorKeys.some(k => vText.includes(k));
+
         const card = document.createElement("div");
-        card.className = "media-card tree-file-item";
+        card.className = "media-card tree-file-item" + (hasVisionError ? " has-vision-error" : "");
         card.setAttribute("data-video-id", v.id);
         card.style.paddingLeft = "6px";
         if (STATE.activeVideo && STATE.activeVideo.id === v.id) card.classList.add("active");
@@ -402,7 +406,11 @@ function renderTreeNode(node, container, depth = 0) {
             statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: rgba(6, 182, 212, 0.3);">ASR</span>`;
             actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         } else if (v.status === "analyzed") {
-            statusBadge = `<span class="badge" style="color: var(--color-violet); border-color: rgba(138, 92, 246, 0.3);">VISÃO</span>`;
+            if (hasVisionError) {
+                statusBadge = `<span class="badge" style="color: var(--color-rose); border-color: rgba(244, 63, 94, 0.4);">FALHA VISUAL</span>`;
+            } else {
+                statusBadge = `<span class="badge" style="color: var(--color-violet); border-color: rgba(138, 92, 246, 0.3);">VISÃO</span>`;
+            }
             actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         } else if (v.status === "ingested") {
             actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
@@ -415,7 +423,9 @@ function renderTreeNode(node, container, depth = 0) {
         const showRealThumb = !document.body.classList.contains("hide-thumbnails") && document.getElementById("chk-show-thumbnails")?.checked !== false;
         let thumbContent = `<i class="fa-solid ${v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film'}"></i>`;
         if (showRealThumb && v.status !== "pending" && v.status !== "error") {
-            thumbContent = `<img src="/api/video/${v.id}/thumbnail" alt="Thumb" onerror="this.style.display='none'">`;
+            const vVersion = v._thumbVersion || v.updated_at || "";
+            const qs = vVersion ? `?v=${vVersion}` : "";
+            thumbContent = `<img src="/api/video/${v.id}/thumbnail${qs}" alt="Thumb" onerror="this.style.display='none'">`;
         }
         
         // Toggle title display icon
@@ -427,9 +437,12 @@ function renderTreeNode(node, container, depth = 0) {
         const desc = v.description || v.summary || 'Sem decupagem';
         const tooltip = `${friendlyTitle}\n\n${desc}`;
 
+        const visionBadgeHtml = hasVisionError ? `<div class="vision-error-badge" data-tooltip="Falha visual detectada. Clique em Reanalisar Falhas no topo"><i class="fa-solid fa-triangle-exclamation"></i> Falha Visual</div>` : '';
+
         card.innerHTML = `
             <div class="media-thumbnail" style="position: relative;">
                 ${thumbContent}
+                ${visionBadgeHtml}
                 <button class="btn-select-similar-item" title="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
                     <i class="fa-regular fa-square"></i>
                 </button>
@@ -898,6 +911,7 @@ export class LibraryManager {
         STATE.on("photosUpdated", (photos) => this.renderPhotos(photos));
         STATE.on("projectChanged", () => { this.reloadData(); this.loadTriageReviewThreshold(); });
         this.loadTriageReviewThreshold();
+        this.reloadData();
         STATE.on("leftTabChanged", (tabId) => this.updateSearchPlaceholder(tabId));
         STATE.on("activeVideoChanged", (video) => {
             document.querySelectorAll(".media-card.tree-file-item:not(.photo-item)").forEach(el => {
@@ -923,6 +937,29 @@ export class LibraryManager {
         if (this.btnOpenProxies) this.btnOpenProxies.addEventListener("click", () => this.runOpenProxies());
         if (this.btnRetryFailed) this.btnRetryFailed.addEventListener("click", () => this.runRetryFailed());
         if (this.btnTranscribeAll) this.btnTranscribeAll.addEventListener("click", () => this.triggerTranscribeAll());
+
+        const triggerReanalyze = async () => {
+            const ok = confirm("Deseja reanalisar em lote todos os vídeos afetados por falha visual utilizando os proxies 720p?");
+            if (!ok) return;
+            try {
+                const res = await fetch(`/api/media/reanalyze-failed?project_id=${STATE.currentProjectId || ''}`, { method: "POST" });
+                const data = await res.json();
+                if (window.showToast) window.showToast(`Reanálise disparada para ${data.count} vídeos!`, "info");
+                else alert(`Reanálise disparada para ${data.count} vídeos!`);
+                this.checkFailedMediaCount();
+                this.reloadData();
+            } catch (err) {
+                alert("Erro ao disparar reanálise: " + err.message);
+            }
+        };
+
+        const btnReanalyzeFailed = document.getElementById("btn-reanalyze-failed");
+        if (btnReanalyzeFailed) btnReanalyzeFailed.addEventListener("click", triggerReanalyze);
+
+        const btnBannerReanalyze = document.getElementById("btn-reanalyze-failed-banner");
+        if (btnBannerReanalyze) btnBannerReanalyze.addEventListener("click", triggerReanalyze);
+
+        this.checkFailedMediaCount();
 
         // Document uploading
         const btnUploadDoc = document.getElementById("btn-upload-doc");
@@ -1704,8 +1741,34 @@ export class LibraryManager {
             const photos = await CapIAuAPI.fetchPhotos(STATE.currentProjectId);
             STATE.allPhotos = photos;
             await this.loadDocuments();
+            this.checkFailedMediaCount();
         } catch (e) {
             console.error("[LibraryManager] Falha ao recarregar mídias:", e);
+        }
+    }
+
+    async checkFailedMediaCount() {
+        try {
+            const res = await fetch(`/api/media/failed-count?project_id=${STATE.currentProjectId || ''}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            
+            const btn = document.getElementById("btn-reanalyze-failed");
+            const badge = document.getElementById("failed-count-badge");
+            const banner = document.getElementById("failed-media-banner");
+            const bannerCount = document.getElementById("banner-failed-count");
+
+            if (data.count > 0) {
+                if (badge) badge.textContent = data.count;
+                if (btn) btn.style.display = "inline-flex";
+                if (bannerCount) bannerCount.textContent = data.count;
+                if (banner) banner.style.display = "flex";
+            } else {
+                if (btn) btn.style.display = "none";
+                if (banner) banner.style.display = "none";
+            }
+        } catch (err) {
+            console.error("[LibraryManager] Erro ao checar contagem de falhas:", err);
         }
     }
 
@@ -2984,19 +3047,9 @@ export class LibraryManager {
         if (!sourceVideo) return;
         
         const timestamp = sourceVideo.currentTime;
-        try {
-            const response = await fetch(`/api/video/${video.id}/thumbnail?timestamp=${timestamp}`, {
-                method: "POST"
-            });
-            if (response.ok) {
-                alert("Miniatura física atualizada com sucesso!");
-                STATE.emit("videosUpdated", STATE.allVideos);
-            } else {
-                const err = await response.json();
-                alert("Erro ao definir miniatura: " + (err.detail || "Desconhecido"));
-            }
-        } catch (e) {
-            alert("Erro de rede ao salvar miniatura.");
+        const ok = await window.setVideoThumbnail(video.id, timestamp);
+        if (ok) {
+            alert("Miniatura física atualizada com sucesso!");
         }
     }
 
@@ -3425,4 +3478,38 @@ export class LibraryManager {
         }
     }
 }
+
+window.setVideoThumbnail = async function(videoId, timestamp) {
+    if (!videoId && videoId !== 0) return false;
+    try {
+        const response = await fetch(`/api/video/${videoId}/thumbnail?timestamp=${timestamp}`, {
+            method: "POST"
+        });
+        if (response.ok) {
+            const ver = Date.now();
+            if (STATE.activeVideo && STATE.activeVideo.id === videoId) {
+                STATE.activeVideo._thumbVersion = ver;
+            }
+            const target = (STATE.allVideos || []).find(v => v.id === videoId);
+            if (target) {
+                target._thumbVersion = ver;
+            }
+            const cardImgs = document.querySelectorAll(`.tree-file-item[data-video-id="${videoId}"] .media-thumbnail img`);
+            cardImgs.forEach(img => {
+                img.src = `/api/video/${videoId}/thumbnail?v=${ver}`;
+                img.style.display = "";
+            });
+            STATE.emit("videosUpdated", STATE.allVideos);
+            return true;
+        } else {
+            const err = await response.json().catch(() => ({}));
+            alert("Erro ao definir miniatura: " + (err.detail || "Desconhecido"));
+            return false;
+        }
+    } catch (e) {
+        console.error("Erro ao salvar miniatura:", e);
+        alert("Erro de rede ao salvar miniatura.");
+        return false;
+    }
+};
 

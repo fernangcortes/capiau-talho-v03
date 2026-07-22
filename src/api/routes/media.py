@@ -566,7 +566,7 @@ def trigger_all_vision(
     return {"status": "success", "message": "Análise visual em lote iniciada em background."}
 
 @router.get("/api/conversions")
-def get_all_conversions():
+async def get_all_conversions():
     """Retorna o progresso em tempo real das conversões de vídeo/foto em execução.
 
     Inclui o progresso do worker de lote, que roda FORA deste processo — sem essa
@@ -770,8 +770,9 @@ def get_video_thumbnail(video_id: int, conn: sqlite3.Connection = Depends(get_db
     from src.media.ffmpeg import extract_frame
     
     thumb_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
+    cache_headers = {"Cache-Control": "no-cache, max-age=0, must-revalidate"}
     if thumb_path.exists() and thumb_path.stat().st_size > 0:
-        return FileResponse(thumb_path)
+        return FileResponse(thumb_path, headers=cache_headers)
         
     # Se não existe, busca metadados do vídeo para gerar
     video = MediaRepository.get_video(conn, video_id)
@@ -794,7 +795,7 @@ def get_video_thumbnail(video_id: int, conn: sqlite3.Connection = Depends(get_db
     
     success = extract_frame(video_path, target_time, thumb_path)
     if success and thumb_path.exists():
-        return FileResponse(thumb_path)
+        return FileResponse(thumb_path, headers=cache_headers)
         
     raise HTTPException(status_code=500, detail="Não foi possível gerar a miniatura do vídeo.")
 
@@ -940,5 +941,21 @@ def editor_heartbeat():
     """Reporta atividade do usuário no editor para desacelerar tarefas de segundo plano."""
     TASK_MANAGER.report_user_activity()
     return {"status": "success", "user_active": TASK_MANAGER.is_user_active()}
+
+
+@router.get("/api/media/failed-count")
+def get_failed_media_count(project_id: Optional[int] = None):
+    """Retorna o número de vídeos afetados por falhas visuais ou status de erro."""
+    from src.services.pipeline import PipelineService
+    failed_ids = PipelineService.get_failed_video_ids(project_id)
+    return {"count": len(failed_ids), "ids": failed_ids}
+
+
+@router.post("/api/media/reanalyze-failed")
+def reanalyze_failed_media(project_id: Optional[int] = None):
+    """Dispara a reanálise em lote de todas as mídias afetadas por falha visual."""
+    from src.services.pipeline import PipelineService
+    reanalyzed = PipelineService.reanalyze_failed_videos(project_id)
+    return {"status": "success", "count": len(reanalyzed), "ids": reanalyzed}
 
 
