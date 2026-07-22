@@ -22,7 +22,8 @@ class EventEmitter {
 class AppState extends EventEmitter {
     constructor() {
         super();
-        this._currentProjectId = 1;
+        const savedProj = localStorage.getItem("activeProjectId");
+        this._currentProjectId = savedProj ? Number(savedProj) : 1;
         this._allProjects = [];
         this._activeVideo = null;
         this._activePhoto = null;
@@ -52,8 +53,10 @@ class AppState extends EventEmitter {
     // -- Getters e Setters com Emissão de Eventos de mudança
     get currentProjectId() { return this._currentProjectId; }
     set currentProjectId(val) {
-        if (this._currentProjectId !== val) {
-            this._currentProjectId = Number(val);
+        const numVal = Number(val);
+        if (this._currentProjectId !== numVal) {
+            this._currentProjectId = numVal;
+            localStorage.setItem("activeProjectId", String(numVal));
             this.emit("projectChanged", this._currentProjectId);
         }
     }

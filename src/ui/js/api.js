@@ -10,7 +10,11 @@ export class CapIAuAPI {
             }
             return await response.json();
         } catch (error) {
-            console.error(`[API Error] Request failed for ${endpoint}:`, error);
+            if (error.name === "AbortError") {
+                console.warn(`[API Timeout] Requisição para ${endpoint} excedeu o tempo limite.`);
+            } else {
+                console.error(`[API Error] Request failed for ${endpoint}:`, error);
+            }
             throw error;
         }
     }
