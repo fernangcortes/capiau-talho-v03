@@ -1,4 +1,5 @@
-"""Testes do bloco compacto de contexto do roteiro (P2.4, Commit 5).
+"""Testes do bloco compacto de contexto do roteiro (P2.4, Commit 5; realm e
+"interpretado por" no E3.C/E-A3, 21/07).
 
 Banco temporario isolado. Nenhum teste aqui toca Qdrant nem LLM -- estas funcoes so
 montam texto de prompt a partir do SQLite.
@@ -52,15 +53,35 @@ class TestP2ContextBlock(unittest.TestCase):
         SettingsService.invalidate(self.project_id)
 
     def _confirm(self, name, entity_type, description=""):
+        """Confirma uma entidade de realm='story' -- o bloco descreve o universo da
+        OBRA (E-A3); é isso que estas fixtures sempre representaram (um personagem/
+        locação/objeto extraído do roteiro e confirmado pelo usuário)."""
         with get_db() as conn:
-            EntityRepository.upsert_entity(conn, self.project_id, name, entity_type, description)
+            EntityRepository.upsert_entity(conn, self.project_id, name, entity_type, description, realm="story")
             conn.commit()
+        return self._id_of(name)
+
+    def _confirm_production(self, name, entity_type, description=""):
+        """Confirma uma entidade de realm='production' (pessoa/objeto/local REAL da
+        produção, ex: equipe vinda da desambiguação de rostos) -- usada só nos testes
+        que provam que ISSO fica de fora do bloco."""
+        with get_db() as conn:
+            EntityRepository.upsert_entity(conn, self.project_id, name, entity_type, description, realm="production")
+            conn.commit()
+        return self._id_of(name)
 
     def _suggest(self, name, entity_type, description=""):
         with get_db() as conn:
             eid = EntityRepository.upsert_suggested_entity(conn, self.project_id, name, entity_type, description)
             conn.commit()
         return eid
+
+    def _id_of(self, name):
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT id FROM entity WHERE project_id = ? AND name = ?", (self.project_id, name)
+            ).fetchone()
+        return row["id"] if row else None
 
     # ── Gate ─────────────────────────────────────────────────────────────────
 
@@ -101,7 +122,7 @@ class TestP2ContextBlock(unittest.TestCase):
         """Entidades criadas antes do P2.2 (status NULL) precisam continuar aparecendo."""
         self._enable_block()
         with get_db() as conn:
-            EntityRepository.upsert_entity(conn, self.project_id, "Legado", "person", "")
+            EntityRepository.upsert_entity(conn, self.project_id, "Legado", "person", "", realm="story")
             conn.execute("UPDATE entity SET status = NULL WHERE project_id = ? AND name = 'Legado'", (self.project_id,))
             conn.commit()
         block = _script_context_block(self.project_id)
@@ -127,6 +148,51 @@ class TestP2ContextBlock(unittest.TestCase):
 
         block = _script_context_block(self.project_id)
         self.assertNotIn("Sera Rejeitado", block)
+
+    # ── realm: producao real fica de fora (E-A3) ────────────────────────────
+
+    def test_production_entity_excluded_even_if_confirmed(self):
+        """Regressao critica: antes do E-A3, este bloco nao filtrava por realm --
+        confirmar a equipe/elenco real (desambiguacao de rostos) os listaria como
+        'personagens' do filme na secao UNIVERSO DO FILME. Isto NAO pode acontecer."""
+        self._enable_block()
+        self._confirm_production("Fernando", "person", "camera na mao")
+        self._confirm("Daniel", "person", "protagonista do romance")
+
+        block = _script_context_block(self.project_id)
+        self.assertNotIn("Fernando", block)
+        self.assertIn("Daniel", block)
+
+    def test_production_location_e_object_tambem_ficam_de_fora(self):
+        self._enable_block()
+        self._confirm_production("Estudio Real de Gravacao", "location")
+        self._confirm_production("Camera Sony Real", "object")
+        self._confirm("Casa da Colina", "location")
+
+        block = _script_context_block(self.project_id)
+        self.assertNotIn("Estudio Real de Gravacao", block)
+        self.assertNotIn("Camera Sony Real", block)
+        self.assertIn("Casa da Colina", block)
+
+    # ── vinculo personagem->ator (E-A3) ──────────────────────────────────────
+
+    def test_personagem_vinculado_mostra_interpretado_por(self):
+        self._enable_block()
+        ator_id = self._confirm_production("Daniel Ator", "person")
+        personagem_id = self._confirm("Daniel", "person", "protagonista")
+        with get_db() as conn:
+            EntityRepository.update_entity_fields(conn, personagem_id, linked_entity_id=ator_id)
+            conn.commit()
+
+        block = _script_context_block(self.project_id)
+        self.assertIn("Daniel (protagonista; interpretado por Daniel Ator)", block)
+
+    def test_personagem_sem_vinculo_nao_mostra_interpretado_por(self):
+        self._enable_block()
+        self._confirm("Engel", "person", "protagonista do romance dentro do filme")
+        block = _script_context_block(self.project_id)
+        self.assertIn("Engel", block)
+        self.assertNotIn("interpretado por", block)
 
     # ── Degradacao segura ────────────────────────────────────────────────────
 

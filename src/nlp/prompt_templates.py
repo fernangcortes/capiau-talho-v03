@@ -81,11 +81,22 @@ def _triage_feedback_block(project_id: Optional[int]) -> str:
 
 
 def _script_context_block(project_id: Optional[int]) -> str:
-    """Bloco compacto do UNIVERSO do roteiro (P2.4): personagens/locações/objetos
-    CONFIRMADOS pela curadoria (entity.status='confirmed' ou NULL-legado), para dar
-    vocabulário de nomes às análises de visão/triagem — SEM nunca afirmar que o
-    material analisado é uma cena do filme (o roteiro é só fonte de vocabulário,
-    não um vínculo automático; convenção anti-viés do projeto).
+    """Bloco compacto do UNIVERSO DA OBRA (P2.4/E3.C): personagens/locações/objetos
+    CONFIRMADOS e de realm='story' (E-A3), para dar vocabulário de nomes às análises
+    de visão/triagem — SEM nunca afirmar que o material analisado é uma cena do
+    filme (o roteiro é só fonte de vocabulário, não um vínculo automático; convenção
+    anti-viés do projeto).
+
+    O filtro realm='story' é essencial e não é opcional: sem ele, as ~44 pessoas
+    reais da equipe/elenco (realm='production', confirmadas pela desambiguação de
+    rostos) apareceriam listadas como "personagens" do filme — o próprio Fernando
+    segurando uma câmera virando "vocabulário da ficção". Objeto/locação de
+    realm='story' (props e cenários do roteiro) entram normalmente: representam o
+    universo narrativo, que é exatamente o que este bloco existe para descrever.
+
+    Personagem com `linked_entity_id` (vínculo humano feito no painel de curadoria)
+    ganha o sufixo "(interpretado por X)" — dá ao modelo de visão uma ponte honesta
+    entre o nome fictício e a pessoa real que pode aparecer de verdade na imagem.
 
     Desligado por padrão (context.script_block_enabled) até o usuário validar num
     A/B que o bloco melhora a especificidade sem inventar vínculo. Qualquer falha
@@ -110,10 +121,13 @@ def _script_context_block(project_id: Optional[int]) -> str:
             cursor.execute("SELECT description FROM project WHERE id = ?", (project_id,))
             proj_row = cursor.fetchone()
             cursor.execute("""
-                SELECT e.entity_type, e.name, e.description, COUNT(m.id) as mention_count
+                SELECT e.entity_type, e.name, e.description, COUNT(m.id) as mention_count,
+                       le.name as linked_entity_name
                 FROM entity e
                 LEFT JOIN entity_mention m ON m.entity_id = e.id AND m.status != 'rejected'
+                LEFT JOIN entity le ON le.id = e.linked_entity_id
                 WHERE e.project_id = ? AND (e.status IS NULL OR e.status = 'confirmed')
+                  AND e.realm = 'story'
                   AND e.entity_type IN ('person', 'location', 'object')
                 GROUP BY e.id
                 ORDER BY mention_count DESC, e.name
@@ -126,7 +140,14 @@ def _script_context_block(project_id: Optional[int]) -> str:
         return ""
 
     def _fmt(r):
-        return f"{r['name']} ({r['description']})" if r.get("description") else r["name"]
+        extras = []
+        if r.get("description"):
+            extras.append(r["description"])
+        if r.get("linked_entity_name"):
+            extras.append(f"interpretado por {r['linked_entity_name']}")
+        if extras:
+            return f"{r['name']} ({'; '.join(extras)})"
+        return r["name"]
 
     lines = []
     if proj_row and proj_row["description"]:

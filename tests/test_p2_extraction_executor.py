@@ -335,9 +335,12 @@ class TestP2ExtractionExecutor(unittest.TestCase):
         self.assertEqual(depois[ids[1]], "confirmed")
 
     def test_bulk_entity_status_promotes_to_known_names(self):
+        """Usa 'object' (nao 'person') de proposito: um personagem confirmado fica de
+        fora de get_known_names por uma regra diferente (E-A3, realm='story') -- este
+        teste isola o efeito do bulk-status sobre a porta suggested->confirmed."""
         with get_db() as conn:
             ent_id = EntityRepository.upsert_suggested_entity(
-                conn, self.project_id, "Personagem Bulk", "person", "extraido do roteiro"
+                conn, self.project_id, "Objeto Bulk", "object", "extraido do roteiro"
             )
             conn.commit()
 
@@ -348,7 +351,7 @@ class TestP2ExtractionExecutor(unittest.TestCase):
 
         with get_db() as conn:
             known = [e["name"] for e in EntityRepository.get_known_names(conn, self.project_id)]
-        self.assertIn("Personagem Bulk", known)
+        self.assertIn("Objeto Bulk", known)
 
     def test_bulk_status_rejects_invalid_status_value(self):
         resp = client.post("/api/scenes/bulk-status", json={

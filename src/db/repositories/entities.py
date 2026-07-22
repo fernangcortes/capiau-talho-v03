@@ -5,8 +5,18 @@ from typing import List, Dict, Any, Optional
 
 class EntityRepository:
     @staticmethod
-    def upsert_entity(conn: sqlite3.Connection, project_id: int, name: str, entity_type: str = "other", description: str = "") -> int:
-        """Cria a entidade se não existir (por nome canônico) e retorna seu ID."""
+    def upsert_entity(
+        conn: sqlite3.Connection, project_id: int, name: str,
+        entity_type: str = "other", description: str = "", realm: str = "production"
+    ) -> int:
+        """Cria a entidade se não existir (por nome canônico) e retorna seu ID.
+
+        `realm` default 'production': todo chamador existente (rostos confirmados,
+        criação manual pela UI, prop tagueado) representa algo real da produção — só
+        `upsert_suggested_entity` (extração de documento) cria com realm='story' por
+        default. Se já existe, o realm da entidade NÃO é tocado (mesmo princípio de
+        nunca sobrescrever curadoria em silêncio que já vale para status/entity_type).
+        """
         name = (name or "").strip()
         if not name:
             raise ValueError("Nome de entidade vazio.")
@@ -21,8 +31,8 @@ class EntityRepository:
             return row["id"]
 
         cursor.execute(
-            "INSERT INTO entity (project_id, entity_type, name, description) VALUES (?, ?, ?, ?)",
-            (project_id, entity_type, name, description)
+            "INSERT INTO entity (project_id, entity_type, name, description, realm) VALUES (?, ?, ?, ?, ?)",
+            (project_id, entity_type, name, description, realm)
         )
         return cursor.lastrowid
 
@@ -164,11 +174,19 @@ class EntityRepository:
         Só entidades confirmadas entram (status NULL = linha legada, conta como
         confirmada): o que o extrator de roteiro sugeriu precisa passar pela curadoria
         do usuário antes de influenciar qualquer análise.
+
+        Personagens de ficção (entity_type='person' AND realm='story') ficam de fora
+        (E3.C/E-A3): um personagem não existe fisicamente, então "reconhecer" o nome
+        dele numa imagem não faz sentido — quem aparece de verdade é o ATOR (na tabela
+        person, ou como entidade person/production vinculada). Já objeto/locação de
+        realm='story' (props e cenários do roteiro) ENTRAM: esses existem fisicamente
+        no set, então "reconhecer" faz sentido.
         """
         cursor = conn.cursor()
         cursor.execute("""
             SELECT DISTINCT name, entity_type FROM entity
             WHERE project_id = ? AND (status IS NULL OR status = 'confirmed')
+              AND NOT (entity_type = 'person' AND realm = 'story')
             UNION
             SELECT DISTINCT name, 'person' as entity_type FROM person
             WHERE project_id = ? AND name IS NOT NULL AND name != ''

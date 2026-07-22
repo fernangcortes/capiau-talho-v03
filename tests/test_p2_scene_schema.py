@@ -69,19 +69,21 @@ class TestP2SceneSchema(unittest.TestCase):
 
     def test_entidade_sugerida_nao_entra_nos_prompts(self):
         """Regra central do P2.2: o que o roteiro sugeriu so influencia analises depois
-        que o usuario confirmar."""
+        que o usuario confirmar. Usa 'location' (nao 'person') de proposito: um
+        personagem confirmado fica de fora de get_known_names por uma regra DIFERENTE
+        (E-A3, realm='story') -- este teste isola so a porta suggested->confirmed."""
         with get_db() as conn:
             ent_id = EntityRepository.upsert_suggested_entity(
-                conn, self.project_id, "Personagem Sugerido", "person", "extraido do roteiro"
+                conn, self.project_id, "Locacao Sugerida", "location", "extraido do roteiro"
             )
             conn.commit()
             nomes = [e["name"] for e in EntityRepository.get_known_names(conn, self.project_id)]
-            self.assertNotIn("Personagem Sugerido", nomes)
+            self.assertNotIn("Locacao Sugerida", nomes)
 
             EntityRepository.set_entities_status(conn, self.project_id, [ent_id], "confirmed")
             conn.commit()
             nomes_depois = [e["name"] for e in EntityRepository.get_known_names(conn, self.project_id)]
-            self.assertIn("Personagem Sugerido", nomes_depois)
+            self.assertIn("Locacao Sugerida", nomes_depois)
 
     def test_sugestao_nao_rebaixa_entidade_confirmada(self):
         """Re-extrair o roteiro nao pode devolver para a fila de curadoria um nome que o

@@ -486,5 +486,73 @@ class TestE3CEntityRoutesAPI(unittest.TestCase):
         self.assertEqual(entry["realm"], "production")
 
 
+class TestE3CGetKnownNames(unittest.TestCase):
+    """get_known_names (E-A3): personagem de ficcao nao existe fisicamente, entao
+    fica de fora do vocabulario de reconhecimento visual -- so o ATOR (realm=
+    production) pode ser "reconhecido" numa imagem. Objeto/locacao de realm='story'
+    (props e cenarios do roteiro) continuam entrando: esses existem no set."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.test_dir = Path(tempfile.mkdtemp(prefix="capiau_e3c_knownnames_"))
+        cls.original_db = CONFIG.DB_PATH
+        CONFIG.DB_PATH = cls.test_dir / "test_knownnames.db"
+        init_db(CONFIG.DB_PATH)
+        cls.project_id = add_project("Teste KnownNames", "", "")
+
+    @classmethod
+    def tearDownClass(cls):
+        CONFIG.DB_PATH = cls.original_db
+        shutil.rmtree(cls.test_dir, ignore_errors=True)
+
+    def test_personagem_story_confirmado_fica_de_fora(self):
+        with get_db() as conn:
+            EntityRepository.upsert_entity(conn, self.project_id, "Personagem Ficticio", "person", "", realm="story")
+            conn.commit()
+            names = [n["name"] for n in EntityRepository.get_known_names(conn, self.project_id)]
+        self.assertNotIn("Personagem Ficticio", names)
+
+    def test_pessoa_production_confirmada_entra(self):
+        with get_db() as conn:
+            EntityRepository.upsert_entity(conn, self.project_id, "Pessoa Real Equipe", "person", "", realm="production")
+            conn.commit()
+            names = [n["name"] for n in EntityRepository.get_known_names(conn, self.project_id)]
+        self.assertIn("Pessoa Real Equipe", names)
+
+    def test_locacao_e_objeto_story_confirmados_entram(self):
+        """Diferente de pessoa: prop e cenario existem fisicamente no set, entao
+        'reconhecer' visualmente faz sentido mesmo sendo realm=story."""
+        with get_db() as conn:
+            EntityRepository.upsert_entity(conn, self.project_id, "Envelope Do Roteiro", "object", "", realm="story")
+            EntityRepository.upsert_entity(conn, self.project_id, "Casa Do Roteiro", "location", "", realm="story")
+            conn.commit()
+            names = [n["name"] for n in EntityRepository.get_known_names(conn, self.project_id)]
+        self.assertIn("Envelope Do Roteiro", names)
+        self.assertIn("Casa Do Roteiro", names)
+
+    def test_cenario_real_daniel_convivendo_sem_colisao(self):
+        """O caso que motivou toda a mudanca: personagem 'Daniel' (story) fica fora
+        do vocabulario; 'Daniel Ator' (production, rosto real) entra normalmente."""
+        with get_db() as conn:
+            EntityRepository.upsert_entity(conn, self.project_id, "Daniel", "person", "", realm="story")
+            EntityRepository.upsert_entity(conn, self.project_id, "Daniel Ator", "person", "", realm="production")
+            conn.commit()
+            names = [n["name"] for n in EntityRepository.get_known_names(conn, self.project_id)]
+        self.assertNotIn("Daniel", names)
+        self.assertIn("Daniel Ator", names)
+
+    def test_face_gallery_person_nao_e_afetada_pelo_realm(self):
+        """A tabela person (galeria de rostos) nao tem conceito de realm -- sempre
+        representa gente real. Este branch da UNION continua intocado."""
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO person (project_id, name) VALUES (?, ?)",
+                (self.project_id, "Pessoa Da Galeria De Rostos")
+            )
+            conn.commit()
+            names = [n["name"] for n in EntityRepository.get_known_names(conn, self.project_id)]
+        self.assertIn("Pessoa Da Galeria De Rostos", names)
+
+
 if __name__ == "__main__":
     unittest.main()
