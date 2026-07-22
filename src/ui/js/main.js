@@ -1609,6 +1609,14 @@ window.addEventListener("DOMContentLoaded", () => {
             }
         }
 
+        // Abas da biblioteca/sidebar (.tab-btn): exibem tooltip apenas nos estágios compacto e mínimo (onde mostram apenas ícones de linha). No estágio normal (texto visível), a tooltip é dispensada.
+        if (target.matches(".tab-btn, .media-tabs .tab-btn")) {
+            const sidebar = target.closest("#sidebar-left, #sidebar-right, .sidebar-left, .sidebar-right");
+            if (sidebar && sidebar.classList.contains("sidebar-normal")) {
+                return;
+            }
+        }
+
         const text = target.getAttribute("data-tooltip");
         if (!text) return;
 
