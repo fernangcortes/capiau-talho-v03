@@ -129,35 +129,31 @@ export class SourcePlayer {
 
         const btnSetThumb = this.el("btn-source-set-thumbnail");
         if (btnSetThumb) {
-            btnSetThumb.addEventListener("click", async () => {
+            btnSetThumb.addEventListener("click", async (e) => {
                 if (!STATE.activeVideo) {
-                    alert("Nenhum vídeo ativo para definir miniatura.");
+                    if (window.showToast) window.showToast("Nenhum vídeo ativo para definir miniatura.", "error");
+                    else alert("Nenhum vídeo ativo para definir miniatura.");
                     return;
                 }
                 const vid = this.el("source-video");
                 if (!vid) return;
                 
-                const ok = await window.setVideoThumbnail(STATE.activeVideo.id, vid.currentTime);
-                if (ok) {
-                    alert("Miniatura atualizada com o frame atual!");
-                }
+                await window.setVideoThumbnail(STATE.activeVideo.id, vid.currentTime, e.currentTarget);
             });
         }
 
         const btnInterviewSetThumb = this.el("btn-interview-modal-set-thumb");
         if (btnInterviewSetThumb) {
-            btnInterviewSetThumb.addEventListener("click", async () => {
+            btnInterviewSetThumb.addEventListener("click", async (e) => {
                 if (!STATE.activeVideo) {
-                    alert("Nenhum vídeo ativo para definir miniatura.");
+                    if (window.showToast) window.showToast("Nenhum vídeo ativo para definir miniatura.", "error");
+                    else alert("Nenhum vídeo ativo para definir miniatura.");
                     return;
                 }
                 const vid = this.el("interview-modal-video");
                 if (!vid) return;
 
-                const ok = await window.setVideoThumbnail(STATE.activeVideo.id, vid.currentTime);
-                if (ok) {
-                    alert("Miniatura atualizada com o frame atual!");
-                }
+                await window.setVideoThumbnail(STATE.activeVideo.id, vid.currentTime, e.currentTarget);
             });
         }
 

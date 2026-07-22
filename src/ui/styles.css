@@ -6935,3 +6935,46 @@ input[type="number"] {
     transform: scale(1.05) !important;
 }
 
+/* ── ANIMAÇÃO DE CLIQUE E MOTOR DE TOAST NOTIFICATIONS ────────────────── */
+@keyframes thumbClickPulse {
+    0% { transform: scale(1); }
+    40% { transform: scale(0.82); }
+    100% { transform: scale(1); }
+}
+
+.btn-thumb-click-pulse {
+    animation: thumbClickPulse 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nle-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: rgba(18, 18, 24, 0.95);
+    color: #ffffff;
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 11px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 12px rgba(6, 182, 212, 0.25);
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 10000;
+    animation: nleToastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+}
+
+@keyframes nleToastIn {
+    from { transform: translateY(12px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes nleToastOut {
+    from { transform: translateY(0); opacity: 1; }
+    to { transform: translateY(12px); opacity: 0; }
+}
+

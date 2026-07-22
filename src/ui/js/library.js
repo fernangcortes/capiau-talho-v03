@@ -2678,8 +2678,8 @@ export class LibraryManager {
 
         const btnSetThumb = document.getElementById("btn-inspector-set-thumb");
         if (btnSetThumb) {
-            btnSetThumb.addEventListener("click", () => {
-                if (STATE.activeVideo) this.setInspectorThumbnail(STATE.activeVideo);
+            btnSetThumb.addEventListener("click", (e) => {
+                if (STATE.activeVideo) this.setInspectorThumbnail(STATE.activeVideo, e.currentTarget);
             });
         }
 
@@ -3041,16 +3041,13 @@ export class LibraryManager {
         this.updateInspectorMarkersUI();
     }
 
-    async setInspectorThumbnail(video) {
+    async setInspectorThumbnail(video, triggerBtn = null) {
         if (!video) return;
         const sourceVideo = document.getElementById("source-video");
         if (!sourceVideo) return;
         
         const timestamp = sourceVideo.currentTime;
-        const ok = await window.setVideoThumbnail(video.id, timestamp);
-        if (ok) {
-            alert("Miniatura física atualizada com sucesso!");
-        }
+        await window.setVideoThumbnail(video.id, timestamp, triggerBtn);
     }
 
     copyInspectorNotes(video) {
@@ -3479,8 +3476,44 @@ export class LibraryManager {
     }
 }
 
-window.setVideoThumbnail = async function(videoId, timestamp) {
+window.showToast = function(message, type = "info") {
+    let container = document.getElementById("nle-toast-container");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "nle-toast-container";
+        container.style.cssText = "position:fixed; bottom:24px; right:24px; z-index:10000; display:flex; flex-direction:column; gap:8px; pointer-events:none;";
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement("div");
+    toast.className = "nle-toast";
+    const iconMap = {
+        success: '<i class="fa-solid fa-circle-check" style="color: var(--color-cyan);"></i>',
+        error: '<i class="fa-solid fa-circle-xmark" style="color: var(--color-rose);"></i>',
+        info: '<i class="fa-solid fa-circle-info" style="color: var(--color-violet);"></i>'
+    };
+    const iconHtml = iconMap[type] || iconMap.info;
+    toast.innerHTML = `${iconHtml} <span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.animation = "nleToastOut 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards";
+        setTimeout(() => toast.remove(), 250);
+    }, 2200);
+};
+
+window.setVideoThumbnail = async function(videoId, timestamp, triggerBtn = null) {
     if (!videoId && videoId !== 0) return false;
+    
+    let origHtml = "";
+    if (triggerBtn) {
+        origHtml = triggerBtn.innerHTML;
+        triggerBtn.classList.remove("btn-thumb-click-pulse");
+        void triggerBtn.offsetWidth;
+        triggerBtn.classList.add("btn-thumb-click-pulse");
+        triggerBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+        triggerBtn.disabled = true;
+        triggerBtn.style.pointerEvents = "none";
+    }
+
     try {
         const response = await fetch(`/api/video/${videoId}/thumbnail?timestamp=${timestamp}`, {
             method: "POST"
@@ -3500,15 +3533,45 @@ window.setVideoThumbnail = async function(videoId, timestamp) {
                 img.style.display = "";
             });
             STATE.emit("videosUpdated", STATE.allVideos);
+            
+            if (triggerBtn) {
+                triggerBtn.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan);"></i>';
+            }
+            
+            window.showToast("Miniatura definida com sucesso!", "success");
+            
+            if (triggerBtn) {
+                setTimeout(() => {
+                    triggerBtn.innerHTML = origHtml;
+                    triggerBtn.disabled = false;
+                    triggerBtn.style.pointerEvents = "";
+                    triggerBtn.classList.remove("btn-thumb-click-pulse");
+                }, 1200);
+            }
             return true;
         } else {
             const err = await response.json().catch(() => ({}));
-            alert("Erro ao definir miniatura: " + (err.detail || "Desconhecido"));
+            const msg = err.detail || "Desconhecido";
+            window.showToast("Erro ao definir miniatura: " + msg, "error");
+            
+            if (triggerBtn) {
+                triggerBtn.innerHTML = origHtml;
+                triggerBtn.disabled = false;
+                triggerBtn.style.pointerEvents = "";
+                triggerBtn.classList.remove("btn-thumb-click-pulse");
+            }
             return false;
         }
     } catch (e) {
         console.error("Erro ao salvar miniatura:", e);
-        alert("Erro de rede ao salvar miniatura.");
+        window.showToast("Erro de rede ao salvar miniatura.", "error");
+        
+        if (triggerBtn) {
+            triggerBtn.innerHTML = origHtml;
+            triggerBtn.disabled = false;
+            triggerBtn.style.pointerEvents = "";
+            triggerBtn.classList.remove("btn-thumb-click-pulse");
+        }
         return false;
     }
 };
