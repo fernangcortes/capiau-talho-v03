@@ -2182,19 +2182,23 @@ export class PanelsManager {
         if (key !== "" && !isNaN(Number(key))) {
             const id = Number(key);
             const video = (STATE.allVideos || []).find(v => v.id === id);
+            const ver = video?._thumbVersion || video?.updated_at || "";
+            const qs = ver ? `?v=${ver}` : "";
             return {
                 kind: "video", id, icon: "fa-film",
                 title: video ? (video.title || video.filename || `Vídeo ${id}`) : `Vídeo ${id}`,
-                thumbUrl: `/api/video/${id}/thumbnail`,
+                thumbUrl: `/api/video/${id}/thumbnail${qs}`,
             };
         }
         if (key.startsWith("thumbs-")) {
             const id = Number(key.split("thumbs-")[1]);
             const video = (STATE.allVideos || []).find(v => v.id === id);
+            const ver = video?._thumbVersion || video?.updated_at || "";
+            const qs = ver ? `?v=${ver}` : "";
             return {
                 kind: "video", id, icon: "fa-images",
                 title: video ? `Miniaturas: ${video.title || video.filename}` : `Miniaturas Vídeo ${id}`,
-                thumbUrl: `/api/video/${id}/thumbnail`,
+                thumbUrl: `/api/video/${id}/thumbnail${qs}`,
             };
         }
         // Tarefas de projeto (sem mídia navegável). 'label' vem pronto de quem

@@ -137,21 +137,26 @@ export class SourcePlayer {
                 const vid = this.el("source-video");
                 if (!vid) return;
                 
-                const currentSeconds = vid.currentTime;
-                try {
-                    const response = await fetch(`/api/video/${STATE.activeVideo.id}/thumbnail?timestamp=${currentSeconds}`, {
-                        method: "POST"
-                    });
-                    if (response.ok) {
-                        alert("Miniatura atualizada com o frame atual!");
-                        // Força a atualização da lista na biblioteca
-                        STATE.emit("videosUpdated", STATE.allVideos);
-                    } else {
-                        const err = await response.json();
-                        alert("Erro ao definir miniatura: " + (err.detail || "Desconhecido"));
-                    }
-                } catch (e) {
-                    alert("Erro de rede ao salvar miniatura.");
+                const ok = await window.setVideoThumbnail(STATE.activeVideo.id, vid.currentTime);
+                if (ok) {
+                    alert("Miniatura atualizada com o frame atual!");
+                }
+            });
+        }
+
+        const btnInterviewSetThumb = this.el("btn-interview-modal-set-thumb");
+        if (btnInterviewSetThumb) {
+            btnInterviewSetThumb.addEventListener("click", async () => {
+                if (!STATE.activeVideo) {
+                    alert("Nenhum vídeo ativo para definir miniatura.");
+                    return;
+                }
+                const vid = this.el("interview-modal-video");
+                if (!vid) return;
+
+                const ok = await window.setVideoThumbnail(STATE.activeVideo.id, vid.currentTime);
+                if (ok) {
+                    alert("Miniatura atualizada com o frame atual!");
                 }
             });
         }
