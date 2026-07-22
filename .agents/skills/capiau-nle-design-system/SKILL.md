@@ -188,3 +188,62 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
   * Usar gradiente sutil por trás dos controles para garantir legibilidade sobre qualquer imagem, nunca um fundo opaco sólido: `linear-gradient(to bottom, rgba(0,0,0,.55), transparent)` no header e `linear-gradient(to top, rgba(0,0,0,.6), transparent)` nos controles.
   * Remover o cap de altura do vídeo (`max-height`) nesses contextos — o vídeo deve preencher todo o painel, já que não há mais cabeçalho/controles ocupando espaço fixo no fluxo.
 * **Referência de implementação:** ver o layout "Estúdio" (`body.studio .player-panel/.player-header/.player-controls` em `styles.css`), que reaproveita esse padrão para os monitores Source/Program empilhados.
+
+---
+
+## V. Animações de Botão, Spinners & Notificações (Animations & Feedback)
+
+### 11. Animação de Botões de Ação com Spinner em Linha & Toast NLE
+* **Objetivo:** Fornecer feedback visual tátil instantâneo durante operações assíncronas (como definir miniatura, exportar, reprocessar ou salvar), transformando ícones flat de linha em spinners com transições suaves e avisos em estilo glassmorphism.
+* **Diretrizes de Micro-Interação:**
+  1. **Animação de Clique (Pulse):** Ao clicar no botão, ele aplica imediatamente uma animação sutil de compressão e expansão (`transform: scale(0.85)` → `scale(1)` em 250ms) via classe `.btn-thumb-click-pulse`.
+  2. **Transformação do Ícone em Spinner:** O ícone original (ex: `<i class="fa-solid fa-camera"></i>`) é preservado na memória JS, o botão tem `disabled = true` e seu conteúdo interno é substituído pelo spinner em linha: `<i class="fa-solid fa-circle-notch fa-spin"></i>`.
+  3. **Transição de Sucesso (Checkmark):** Assim que a promessa resolve com sucesso, o ícone muda temporariamente para o checkmark ciano: `<i class="fa-solid fa-check" style="color: var(--color-cyan);"></i>`.
+  4. **Notificação Toast Glassmorphic (`window.showToast`):** Emite um toast flutuante no canto inferior direito com animação de slide-in, borda ciano/glass, efeito `backdrop-filter: blur(12px)` e auto-dismiss em 2.2s.
+  5. **Restauração Automática:** Após 1.2 segundos da conclusão, o ícone original é restaurado e o botão é reabilitado.
+* **CSS de Referência:**
+  ```css
+  @keyframes thumbClickPulse {
+      0% { transform: scale(1); }
+      40% { transform: scale(0.82); }
+      100% { transform: scale(1); }
+  }
+  .btn-thumb-click-pulse {
+      animation: thumbClickPulse 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .nle-toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      background: rgba(18, 18, 24, 0.95);
+      color: #ffffff;
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 11px;
+      font-family: 'Outfit', sans-serif;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      animation: nleToastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  ```
+* **JavaScript de Referência (Substituição de Ícone em Linha):**
+  ```javascript
+  const origHtml = triggerBtn.innerHTML;
+  triggerBtn.classList.add("btn-thumb-click-pulse");
+  triggerBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+  triggerBtn.disabled = true;
+
+  try {
+      const ok = await executaOperacao();
+      if (ok) {
+          triggerBtn.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan);"></i>';
+          window.showToast("Operação concluída com sucesso!", "success");
+      }
+  } finally {
+      setTimeout(() => {
+          triggerBtn.innerHTML = origHtml;
+          triggerBtn.disabled = false;
+          triggerBtn.classList.remove("btn-thumb-click-pulse");
+      }, 1200);
+  }
+  ```
