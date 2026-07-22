@@ -1950,7 +1950,7 @@ export class LibraryManager {
     }
 
     /**
-     * Revela um vídeo na biblioteca (aba Mídias): abre a aba de vídeos, expande as
+     * Revela um vídeo na biblioteca (aba Vídeos): abre a aba de vídeos, expande as
      * pastas ancestrais no tree, seleciona o card, rola até ele e dá um pulso visual.
      * Usado pelo clique numa tarefa. Retorna false se o vídeo não estiver na biblioteca.
      */

@@ -2116,7 +2116,7 @@ export class PanelsManager {
             // Clique revela a mídia em 'Mídias' (qualquer status; só para vídeo/foto)
             if (media.kind === "video" || media.kind === "photo") {
                 item.classList.add("task-card-clickable");
-                item.title = "Clique para mostrar em Mídias";
+                item.title = "Clique para mostrar na biblioteca";
                 item.addEventListener("click", () => {
                     const ok = media.kind === "photo"
                         ? (window.libraryManager && window.libraryManager.revealPhotoById(media.id))

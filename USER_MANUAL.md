@@ -50,12 +50,12 @@ ingestão:
     duplicatas), extrairá os metadados via FFprobe e iniciará a
     compressão do proxy H.264 em background no seu processador i7.
 
-4.  As mídias aparecerão na barra lateral esquerda nas abas **Mídias** e
+4.  As mídias aparecerão na barra lateral esquerda nas abas **Vídeos** e
     **Fotos**.
 
 ### Passo B: Transcrição (ASR) e Diarização de Entrevistas
 
-1.  Na aba **Mídias**, clique em uma entrevista carregada (ela começará
+1.  Na aba **Vídeos**, clique em uma entrevista carregada (ela começará
     a tocar no player).
 
 2.  No menu lateral direito, clique no botão **Transcrever Vídeo
