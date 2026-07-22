@@ -114,8 +114,13 @@ def is_solid_green_or_corrupted(image_path: Path) -> bool:
             b_mean = np.mean(arr[:, :, 2])
             
             # Detecta tela verde do FFmpeg (YUV 0x00 / falta de I-frame)
-            if g_mean > 120 and r_mean < 70 and b_mean < 70:
+            if g_mean > 110 and r_mean < 80 and b_mean < 80:
                 return True
+                
+            # Detecta ruído cinza/artefatos de decodificação YUV 0x80 sem cor (R ≈ G ≈ B com baixo desvio)
+            if abs(r_mean - g_mean) < 8 and abs(g_mean - b_mean) < 8:
+                if (r_mean > 90 and r_mean < 160) and np.std(arr) < 15.0:
+                    return True
                 
             # Detecta imagens de cor sólida / uniforme
             std_dev = np.std(arr)
