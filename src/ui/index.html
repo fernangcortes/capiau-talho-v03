@@ -310,6 +310,9 @@
                                         <option value="other">Outros Documentos</option>
                                     </select>
                                 </div>
+                                <button id="btn-open-entities-manager" class="btn-secondary" style="font-size: 11px; padding: 8px 12px; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                    <i class="fa-solid fa-address-card"></i> Entidades do Projeto
+                                </button>
                             </div>
                             <div class="document-list" id="doc-list" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
                                 <!-- Inserido dinamicamente via JS -->
@@ -1372,6 +1375,97 @@
                             </tr>
                         </thead>
                         <tbody id="names-manager-tbody">
+                            <!-- Preenchido dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Painel de Entidades do Projeto (E-B) -->
+    <div id="entities-manager-modal" class="modal-overlay" style="display: none; z-index: 2000; background: rgba(10, 8, 14, 0.95); backdrop-filter: blur(20px);">
+        <div class="modal-content glassmorphism" style="width: 92%; max-width: 1180px; height: 85vh; display: flex; flex-direction: column; padding: 25px; box-sizing: border-box; gap: 15px; border: 1px solid rgba(6, 182, 212, 0.3);">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <i class="fa-solid fa-address-card" style="color: var(--color-cyan); font-size: 20px;"></i>
+                    <div>
+                        <h3 style="margin: 0; font-size: 18px; font-weight: 700; font-family: 'Outfit', sans-serif;">Entidades do Projeto</h3>
+                        <span style="font-size: 12px; color: var(--text-muted);">Pessoas, objetos e locações — produção e obra, num só lugar</span>
+                    </div>
+                </div>
+                <button id="btn-close-entities-manager" class="btn-secondary" style="height: 32px; width: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="modal-body" style="flex: 1; display: flex; flex-direction: column; gap: 12px; overflow: hidden;">
+                <!-- Busca + filtros -->
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex-shrink:0;">
+                    <div style="position: relative; display: flex; align-items: center; flex: 1; min-width:180px;">
+                        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; color: var(--text-muted); font-size: 13px;"></i>
+                        <input type="text" id="entities-manager-search" placeholder="Buscar por nome ou alias..." style="width: 100%; padding: 8px 12px 8px 36px; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.2); color: #fff; font-size: 13px; outline: none;">
+                    </div>
+                    <select id="entities-filter-type" style="min-width:120px;">
+                        <option value="">Todos os tipos</option>
+                        <option value="person">Pessoa</option>
+                        <option value="object">Objeto</option>
+                        <option value="location">Locação</option>
+                        <option value="other">Outro</option>
+                    </select>
+                    <select id="entities-filter-realm" style="min-width:130px;">
+                        <option value="">Todos os universos</option>
+                        <option value="production">Produção</option>
+                        <option value="story">Obra</option>
+                    </select>
+                    <select id="entities-filter-status" style="min-width:120px;">
+                        <option value="">Todos os status</option>
+                        <option value="suggested">Sugerido</option>
+                        <option value="confirmed">Confirmado</option>
+                        <option value="rejected">Rejeitado</option>
+                    </select>
+                </div>
+
+                <!-- Barra de Ações em Massa (oculta por padrão) -->
+                <div id="entities-bulk-actions-bar" style="display: none; align-items: center; justify-content: space-between; background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); padding: 8px 12px; border-radius: 6px; font-size: 11px; flex-shrink: 0;">
+                    <span style="color: #fff;"><strong id="entities-bulk-select-count" style="color: var(--color-cyan);">0</strong> selecionadas</span>
+                    <div id="entities-bulk-actions-default" style="display: flex; gap: 8px; align-items: center;">
+                        <button id="btn-entities-bulk-confirm" style="border:1px solid rgba(16,185,129,0.4); color: var(--color-emerald); background: rgba(16,185,129,0.1); height: 26px; font-size: 11px; padding: 0 10px; cursor: pointer; border-radius: 4px;">
+                            <i class="fa-solid fa-check"></i> Confirmar
+                        </button>
+                        <button id="btn-entities-bulk-reject" style="border:1px solid rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); height: 26px; font-size: 11px; padding: 0 10px; cursor: pointer; border-radius: 4px;">
+                            <i class="fa-solid fa-xmark"></i> Rejeitar
+                        </button>
+                        <button id="btn-entities-bulk-merge" style="border:1px solid rgba(138, 92, 246, 0.4); color: var(--color-violet); background: rgba(138, 92, 246, 0.1); height: 26px; font-size: 11px; padding: 0 10px; cursor: pointer; border-radius: 4px;">
+                            <i class="fa-solid fa-code-merge"></i> Fundir
+                        </button>
+                    </div>
+                    <div id="entities-merge-panel" style="display:none; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <span style="color: var(--text-secondary);">Sobrevivente:</span>
+                        <select id="entities-merge-survivor-select" style="min-width:160px;"></select>
+                        <span id="entities-merge-warning" style="display:none; color: var(--color-rose); font-size:10px;"></span>
+                        <button id="btn-entities-confirm-merge" class="btn-primary" style="height: 26px; font-size: 11px; padding: 0 10px; cursor: pointer;">Confirmar Fusão</button>
+                        <button id="btn-entities-cancel-merge" class="btn-secondary" style="height: 26px; font-size: 11px; padding: 0 10px; cursor: pointer;">Cancelar</button>
+                    </div>
+                </div>
+
+                <div style="flex: 1; overflow: auto; border: 1px solid var(--border-glass); border-radius: 6px; background: rgba(0,0,0,0.15);">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11px;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); font-weight: 600; position:sticky; top:0; background:rgba(20,18,26,0.95); z-index:1;">
+                                <th style="padding: 8px 10px; width: 32px; text-align: center;"><input type="checkbox" id="chk-entities-select-all" style="cursor: pointer;"></th>
+                                <th style="padding: 8px 10px; width: 40px;"></th>
+                                <th style="padding: 8px 10px;">Nome</th>
+                                <th style="padding: 8px 10px;">Tipo</th>
+                                <th style="padding: 8px 10px;">Universo</th>
+                                <th style="padding: 8px 10px;">Função</th>
+                                <th style="padding: 8px 10px;">Vínculo</th>
+                                <th style="padding: 8px 10px; text-align:center;">Menções</th>
+                                <th style="padding: 8px 10px;">Status</th>
+                                <th style="padding: 8px 10px; text-align: right;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entities-manager-tbody">
                             <!-- Preenchido dinamicamente -->
                         </tbody>
                     </table>

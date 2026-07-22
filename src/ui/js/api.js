@@ -105,6 +105,23 @@ export class CapIAuAPI {
         });
     }
 
+    // -- Sala de Entidades (E-B): edição de campos e fusão
+    static updateEntity(entityId, fields) {
+        return this.request(`/api/entities/${entityId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(fields)
+        });
+    }
+
+    static mergeEntities(projectId, sourceId, targetId) {
+        return this.request(`/api/entities/merge`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: projectId, source_id: sourceId, target_id: targetId })
+        });
+    }
+
     // -- Mídias (Vídeo, Foto, Rostos)
     static fetchVideos(projectId) {
         return this.request(`/api/videos?project_id=${projectId}`);

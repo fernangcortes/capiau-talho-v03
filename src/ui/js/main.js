@@ -6,6 +6,7 @@ import { PanelsManager } from "./panels.js?v=2";
 import { ChatManager } from "./chat.js";
 import { ProjectsManager } from "./projects.js";
 import { FaceManager } from "./faces.js";
+import { EntityManager } from "./entities.js";
 import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
 import { SettingsPanelManager } from "./settingsPanel.js";
 import { initAutosave, triggerAutosave } from "./timelineAutosave.js";
@@ -1666,6 +1667,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const projects = new ProjectsManager();
     window.FaceManager = FaceManager;
     FaceManager.init();
+    window.EntityManager = EntityManager;
+    EntityManager.init();
     const settingsPanel = new SettingsPanelManager();
     window.settingsPanel = settingsPanel;
     

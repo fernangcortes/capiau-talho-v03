@@ -780,23 +780,6 @@ window.closeScriptStructure = function() {
     }
 };
 
-window.applyEntityCuration = async function(status, all = false) {
-    const section = document.getElementById("script-structure");
-    if (!section) return;
-    const checks = section.querySelectorAll(".curation-entity-check" + (all ? "" : ":checked"));
-    const ids = Array.from(checks).map(c => Number(c.dataset.entityId));
-    if (ids.length === 0) {
-        alert("Nenhuma entidade selecionada.");
-        return;
-    }
-    try {
-        await CapIAuAPI.bulkEntityStatus(STATE.currentProjectId, ids, status);
-        window.libraryInstance.showScriptStructure(Number(section.dataset.docId));
-    } catch (e) {
-        alert("Erro ao atualizar entidades: " + e.message);
-    }
-};
-
 window.applySceneCuration = async function(status, all = false) {
     const section = document.getElementById("script-structure");
     if (!section) return;
@@ -1874,7 +1857,12 @@ export class LibraryManager {
                 if (n > 0) {
                     badge.style.cursor = "pointer";
                     badge.style.textDecoration = "underline";
-                    badge.onclick = () => this.showScriptStructure(docId);
+                    // Cenas continuam curadas inline (#script-structure); entidades sugeridas
+                    // pela mesma extração migraram para o painel dedicado (E-B).
+                    badge.onclick = () => {
+                        this.showScriptStructure(docId);
+                        if (window.EntityManager) window.EntityManager.openEntitiesModal({ status: "suggested" });
+                    };
                 }
                 btn.title = "Reextrair estrutura";
             } else if (ext.status === "error") {
@@ -1903,7 +1891,9 @@ export class LibraryManager {
         }
     }
 
-    /** Busca cenas + entidades sugeridas do doc e renderiza a curadoria em massa. */
+    /** Busca as cenas do doc e renderiza a curadoria em massa. Entidades sugeridas
+     * pela mesma extração migraram para o painel dedicado "Entidades do Projeto"
+     * (E-B) — não têm mais UI própria aqui, evitando curadoria duplicada. */
     async showScriptStructure(docId) {
         const section = document.getElementById("script-structure");
         if (!section) return;
@@ -1912,30 +1902,19 @@ export class LibraryManager {
         section.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando estrutura…</div>`;
 
         try {
-            const [scenesResp, entitiesResp] = await Promise.all([
-                CapIAuAPI.fetchScenes(STATE.currentProjectId, docId, true),
-                CapIAuAPI.fetchEntities(STATE.currentProjectId, "suggested"),
-            ]);
-            this.renderScriptStructureSection(docId, scenesResp.scenes || [], entitiesResp.entities || []);
+            const scenesResp = await CapIAuAPI.fetchScenes(STATE.currentProjectId, docId, true);
+            this.renderScriptStructureSection(docId, scenesResp.scenes || []);
         } catch (e) {
             section.innerHTML = `<div style="font-size:11px; color:var(--color-rose); padding:8px;">Erro ao carregar estrutura: ${e.message}</div>`;
         }
     }
 
-    renderScriptStructureSection(docId, scenes, entities) {
+    renderScriptStructureSection(docId, scenes) {
         const section = document.getElementById("script-structure");
         if (!section) return;
         section.dataset.docId = docId;
 
         const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-        const typeLabels = { person: "pessoa", object: "objeto", location: "locação" };
-
-        const entityRows = entities.map(e => `
-            <label style="display:flex; align-items:flex-start; gap:6px; font-size:11px; padding:4px 0; cursor:pointer;">
-                <input type="checkbox" class="curation-entity-check" data-entity-id="${e.id}" style="margin-top:2px;">
-                <span><strong>${esc(e.name)}</strong> <span style="color:var(--text-muted);">(${typeLabels[e.entity_type] || e.entity_type})</span>${e.description ? ` — ${esc(e.description)}` : ""}</span>
-            </label>
-        `).join("") || `<div style="font-size:11px; color:var(--text-muted); padding:4px 0;">Nenhuma entidade sugerida pendente.</div>`;
 
         const visibleScenes = scenes.filter(s => s.status !== "rejected");
         const sceneRows = visibleScenes.map(s => `
@@ -1955,23 +1934,17 @@ export class LibraryManager {
             </div>
 
             <div style="display:flex; flex-direction:column; gap:2px;">
-                <div style="font-size:10px; font-weight:700; color:var(--color-violet); text-transform:uppercase;">Personagens / Locações / Objetos sugeridos</div>
-                <div style="max-height:140px; overflow-y:auto; border:1px solid var(--border-glass); border-radius:6px; padding:4px 8px;">${entityRows}</div>
-                <div style="display:flex; gap:6px; margin-top:4px;">
-                    <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applyEntityCuration('confirmed')">Aceitar selecionados</button>
-                    <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applyEntityCuration('rejected')">Rejeitar selecionados</button>
-                    <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applyEntityCuration('confirmed', true)">Aceitar todos</button>
-                </div>
-            </div>
-
-            <div style="display:flex; flex-direction:column; gap:2px; margin-top:6px;">
                 <div style="font-size:10px; font-weight:700; color:var(--color-violet); text-transform:uppercase;">Cenas (${visibleScenes.length})</div>
-                <div style="max-height:180px; overflow-y:auto; border:1px solid var(--border-glass); border-radius:6px; padding:4px 8px;">${sceneRows}</div>
+                <div style="max-height:220px; overflow-y:auto; border:1px solid var(--border-glass); border-radius:6px; padding:4px 8px;">${sceneRows}</div>
                 <div style="display:flex; gap:6px; margin-top:4px;">
                     <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applySceneCuration('confirmed')">Aceitar selecionadas</button>
                     <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applySceneCuration('rejected')">Rejeitar selecionadas</button>
                     <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.applySceneCuration('confirmed', true)">Aceitar todas</button>
                 </div>
+            </div>
+
+            <div style="margin-top:6px;">
+                <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="window.EntityManager.openEntitiesModal({status:'suggested'})"><i class="fa-solid fa-address-card"></i> Ver personagens / locações / objetos sugeridos</button>
             </div>
         `;
     }
