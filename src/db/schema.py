@@ -498,6 +498,34 @@ def init_db(db_path: Path = None):
             cursor.execute("ALTER TABLE entity ADD COLUMN status TEXT DEFAULT 'confirmed'")
             print("[MIGRATION] Coluna 'status' adicionada a tabela entity.")
 
+        # Migracao E3.C (21/07): universo (producao real x obra ficcional), funcao na
+        # producao e vinculo personagem->pessoa real. 'realm' e ortogonal a entity_type:
+        # vale para pessoa (equipe x personagem), objeto (equipamento x prop diegetico)
+        # e locacao (locacao fisica x cenario da obra) -- por isso e coluna propria, nao
+        # um entity_type novo (o CHECK existente nao aceitaria valor novo sem recriar
+        # a tabela).
+        cursor.execute("PRAGMA table_info(entity)")
+        entity_cols = [row[1] for row in cursor.fetchall()]
+        if "realm" not in entity_cols:
+            cursor.execute(
+                "ALTER TABLE entity ADD COLUMN realm TEXT CHECK(realm IN ('production','story')) DEFAULT 'production'"
+            )
+            print("[MIGRATION] Coluna 'realm' adicionada a tabela entity.")
+            # Backfill: toda entidade 'suggested' ate aqui veio do extrator de roteiro
+            # (unica fonte que grava suggested) e representa elemento da OBRA, nao da
+            # producao real. ALTER...DEFAULT preenche todas as linhas com 'production';
+            # este UPDATE promove as suggested para 'story'.
+            cursor.execute("UPDATE entity SET realm = 'story' WHERE status = 'suggested'")
+            promoted = cursor.rowcount
+            if promoted:
+                print(f"[MIGRATION] {promoted} entidade(s) 'suggested' promovida(s) para realm='story'.")
+        if "role" not in entity_cols:
+            cursor.execute("ALTER TABLE entity ADD COLUMN role TEXT")
+            print("[MIGRATION] Coluna 'role' adicionada a tabela entity.")
+        if "linked_entity_id" not in entity_cols:
+            cursor.execute("ALTER TABLE entity ADD COLUMN linked_entity_id INTEGER REFERENCES entity(id) ON DELETE SET NULL")
+            print("[MIGRATION] Coluna 'linked_entity_id' adicionada a tabela entity.")
+
         conn.commit()
         
         # Limpeza automática de menções órfãs/stale de rostos que foram renomeados/mesclados no passado

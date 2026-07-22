@@ -29,14 +29,23 @@ class EntityRepository:
     @staticmethod
     def upsert_suggested_entity(
         conn: sqlite3.Connection, project_id: int, name: str,
-        entity_type: str = "other", description: str = ""
+        entity_type: str = "other", description: str = "", realm: str = "story"
     ) -> Optional[int]:
-        """Cria a entidade como 'suggested' (extraida do roteiro, aguardando curadoria).
+        """Cria a entidade como 'suggested' (extraida de documento, aguardando curadoria).
 
-        Se ja existir uma entidade com o mesmo nome, NAO mexe no status dela: uma
-        confirmada continua confirmada (nao volta para a fila de curadoria) e uma
-        rejeitada continua rejeitada (funciona como lapide contra re-sugestao a cada
-        re-extracao). Isso resolve o UNIQUE(project_id, name) sem alterar a constraint.
+        `realm` distingue produção real ('production', ex: pessoa da equipe extraída de
+        uma ficha técnica) de obra ficcional ('story', ex: personagem/locação/prop
+        extraído do roteiro — é o default porque hoje só o extrator de roteiro chama
+        esta função). Só se aplica na CRIAÇÃO: se já existe uma entidade com o mesmo
+        nome, o realm dela NÃO é tocado — o mesmo princípio de nunca sobrescrever
+        curadoria em silêncio vale aqui (ex: "Daniel" já confirmado como pessoa da
+        equipe não pode virar 'story' só porque o roteiro também tem um personagem
+        chamado Daniel; ligar os dois é decisão humana, feita pelo vínculo no painel).
+
+        Se já existir uma entidade com o mesmo nome, também NÃO mexe no status dela: uma
+        confirmada continua confirmada (não volta para a fila de curadoria) e uma
+        rejeitada continua rejeitada (funciona como lápide contra re-sugestão a cada
+        re-extração). Isso resolve o UNIQUE(project_id, name) sem alterar a constraint.
         """
         name = (name or "").strip()
         if not name:
@@ -51,8 +60,8 @@ class EntityRepository:
             return row["id"]
 
         cursor.execute(
-            "INSERT INTO entity (project_id, entity_type, name, description, status) VALUES (?, ?, ?, ?, 'suggested')",
-            (project_id, entity_type, name, description)
+            "INSERT INTO entity (project_id, entity_type, name, description, status, realm) VALUES (?, ?, ?, ?, 'suggested', ?)",
+            (project_id, entity_type, name, description, realm)
         )
         return cursor.lastrowid
 

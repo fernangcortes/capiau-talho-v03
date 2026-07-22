@@ -383,14 +383,18 @@ def run_script_extraction(project_id: int, doc_id: int, force: bool = False) -> 
     merged = merge_chunk_results(results, report.anchors)
 
     with get_db() as conn:
+        # Tudo que sai do roteiro e obra ficcional (realm='story'), nunca producao real --
+        # explicito aqui em vez de depender do default de upsert_suggested_entity, para
+        # esta decisao nao mudar em silencio se o default do metodo mudar por causa de
+        # outro chamador (ex.: o futuro extrator de documentos de producao do E3.C).
         SceneRepository.replace_scenes_for_doc(conn, project_id, doc_id, merged["scenes"])
         for person in merged["characters"]:
-            EntityRepository.upsert_suggested_entity(conn, project_id, person["name"], "person", person["description"])
+            EntityRepository.upsert_suggested_entity(conn, project_id, person["name"], "person", person["description"], realm="story")
         locations = sorted({s["location"] for s in merged["scenes"] if s.get("location")})
         for loc in locations:
-            EntityRepository.upsert_suggested_entity(conn, project_id, loc, "location", "")
+            EntityRepository.upsert_suggested_entity(conn, project_id, loc, "location", "", realm="story")
         for obj in merged["key_objects"]:
-            EntityRepository.upsert_suggested_entity(conn, project_id, obj["name"], "object", obj["description"])
+            EntityRepository.upsert_suggested_entity(conn, project_id, obj["name"], "object", obj["description"], realm="story")
         SceneRepository.finish_extraction(
             conn, extraction_id, "done", strategy=report.strategy, model=model_name,
             chunks=total, calls=calls,
