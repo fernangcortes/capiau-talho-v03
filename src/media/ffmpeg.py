@@ -113,24 +113,19 @@ def is_solid_green_or_corrupted(image_path: Path) -> bool:
             g_mean = np.mean(arr[:, :, 1])
             b_mean = np.mean(arr[:, :, 2])
             
-            # Detecta tela verde do FFmpeg (YUV 0x00 / falta de I-frame)
-            if g_mean > 110 and r_mean < 80 and b_mean < 80:
+            # Detecta tela verde pura do FFmpeg (YUV 0x00 / falta de I-frame)
+            if g_mean > 135 and r_mean < 60 and b_mean < 60:
                 return True
                 
-            # Detecta ruído cinza/artefatos de decodificação YUV 0x80 sem cor (R ≈ G ≈ B com baixo desvio)
-            if abs(r_mean - g_mean) < 8 and abs(g_mean - b_mean) < 8:
-                if (r_mean > 90 and r_mean < 160) and np.std(arr) < 15.0:
-                    return True
-                
-            # Detecta imagens de cor sólida / uniforme
+            # Detecta imagens de cor sólida / totalmente uniformes
             std_dev = np.std(arr)
-            if std_dev < 3.0:
+            if std_dev < 1.0:
                 return True
                 
             return False
     except Exception as e:
         print(f"[FFmpeg] Erro ao validar integridade do frame {image_path.name}: {e}")
-        return True
+        return False
 
 def extract_frame(video_path: Path, timestamp: float, output_path: Path, proxy_fallback_path: Optional[Path] = None) -> bool:
     """Extrai um único frame JPEG de alta qualidade a partir de um timestamp com validação visual e fallback para busca lenta / proxy."""

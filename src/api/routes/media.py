@@ -8,7 +8,7 @@ import numpy as np
 from pathlib import Path
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 
 from src.config import CONFIG
 from src.db.connection import get_db
@@ -765,34 +765,26 @@ def get_photo_file(photo_id: int, raw: bool = Query(False, description="RAW em r
 
 @router.get("/api/video/{video_id}/thumbnail")
 def get_video_thumbnail(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
-    from src.media.ffmpeg import extract_frame, is_solid_green_or_corrupted
+    from src.media.ffmpeg import extract_frame
     
     thumb_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
     cache_headers = {"Cache-Control": "no-cache, max-age=0, must-revalidate"}
     if thumb_path.exists() and thumb_path.stat().st_size > 0:
-        if not is_solid_green_or_corrupted(thumb_path):
-            return FileResponse(thumb_path, headers=cache_headers)
-        else:
-            try:
-                thumb_path.unlink()
-            except Exception:
-                pass
+        return FileResponse(thumb_path, headers=cache_headers)
         
-    # Se não existe ou estava corrompida, busca metadados do vídeo para gerar
+    # Se não existe, busca metadados do vídeo para gerar a partir do proxy ou original
     video = MediaRepository.get_video(conn, video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
         
     video_path = Path(video['filepath'])
     proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
-    if not video_path.exists():
-        if proxy_path.exists():
-            video_path = proxy_path
-        else:
-            raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado: {video_path}")
+    if proxy_path.exists():
+        video_path = proxy_path
+    elif not video_path.exists():
+        raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado para o vídeo {video_id}")
         
     duration = video.get('duration') or 0.0
-    # Gera a 10% do tempo (ou a 1.0s de fallback)
     target_time = max(1.0, duration * 0.1)
     
     success = extract_frame(video_path, target_time, thumb_path, proxy_fallback_path=proxy_path)
@@ -813,11 +805,11 @@ def set_video_thumbnail(video_id: int, timestamp: float = Query(...), conn: sqli
         
     video_path = Path(video['filepath'])
     proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
-    if not video_path.exists():
-        if proxy_path.exists():
-            video_path = proxy_path
-        else:
-            raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado: {video_path}")
+    # Prefere o proxy 720p local se existir (busca 100x mais rápida e 100% confiável)
+    if proxy_path.exists():
+        video_path = proxy_path
+    elif not video_path.exists():
+        raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado: {video_path}")
         
     thumb_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
     success = extract_frame(video_path, timestamp, thumb_path, proxy_fallback_path=proxy_path)

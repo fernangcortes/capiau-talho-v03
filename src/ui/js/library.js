@@ -425,7 +425,8 @@ function renderTreeNode(node, container, depth = 0) {
         if (showRealThumb && v.status !== "pending" && v.status !== "error") {
             const vVersion = v._thumbVersion || v.updated_at || "";
             const qs = vVersion ? `?v=${vVersion}` : "";
-            thumbContent = `<img src="/api/video/${v.id}/thumbnail${qs}" alt="Thumb" onerror="this.style.display='none'">`;
+            const fallbackIcon = v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film';
+            thumbContent = `<img src="/api/video/${v.id}/thumbnail${qs}" alt="Thumb" onerror="this.onerror=null; this.style.display='none'; if(this.parentNode) this.parentNode.insertAdjacentHTML('beforeend', '<i class=\\'fa-solid ${fallbackIcon}\\'></i>');">`;
         }
         
         // Toggle title display icon
