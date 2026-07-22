@@ -1795,9 +1795,11 @@ export class CapiauTimelineInteraction {
             TIMELINE_STATE.setZoom(newZoom);
             TIMELINE_STATE.setScrollLeftFrame(newScrollLeft);
         } else if (e.shiftKey) {
-            // Shift + roda = scroll horizontal
-            const deltaFrames = (e.deltaY || e.deltaX) / TIMELINE_STATE.zoom;
-            TIMELINE_STATE.setScrollLeftFrame(TIMELINE_STATE.scrollLeftFrame + deltaFrames);
+            // Shift + roda = Zoom vertical das pistas (altura das pistas)
+            const currentScale = TIMELINE_STATE.trackHeightScale || 1.0;
+            const delta = e.deltaY < 0 ? 0.05 : -0.05;
+            const newScale = Math.min(1.7, Math.max(0.5, Math.round((currentScale + delta) * 100) / 100));
+            TIMELINE_STATE.setTrackHeightScale(newScale);
         } else {
             // Roda simples: scroll vertical das pistas quando excedem a área visível ou quando scrollTop > 0
             const viewportH = (this.renderer.height || 200) - (this.renderer.rulerHeight || 30);
