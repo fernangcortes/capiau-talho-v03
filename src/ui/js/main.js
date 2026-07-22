@@ -1611,7 +1611,15 @@ window.addEventListener("DOMContentLoaded", () => {
         const text = target.getAttribute("data-tooltip");
         if (!text) return;
 
-        globalTooltip.textContent = text;
+        if (text.includes("\n")) {
+            const parts = text.split("\n");
+            const titlePart = escapeHtml(parts[0]);
+            const descLines = parts.slice(1).filter((line, idx) => idx > 0 || line.trim() !== "");
+            const descPart = escapeHtml(descLines.join("\n").trim());
+            globalTooltip.innerHTML = `<div style="font-weight: 600; color: #ffffff; margin-bottom: 2px;">${titlePart}</div><div style="font-weight: 400; opacity: 0.88; white-space: pre-line;">${descPart}</div>`;
+        } else {
+            globalTooltip.textContent = text;
+        }
         globalTooltip.classList.add("visible");
 
         // Calcula a posição da tooltip

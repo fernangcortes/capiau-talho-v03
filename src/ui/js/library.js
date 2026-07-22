@@ -423,9 +423,9 @@ function renderTreeNode(node, container, depth = 0) {
         const toggleTitleTitle = forceRealFilename ? "Mostrar Título Contextual" : "Mostrar Nome do Arquivo Real";
         const toggleBtnHtml = `<button class="btn-toggle-filename" title="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
 
-        // Tooltip completa
-        const categoryLabel = v.category ? (CATEGORY_LABELS[v.category] || v.category) : (v.video_type === 'interview' ? 'Entrevista' : 'B-roll');
-        const tooltip = `Título: ${friendlyTitle}\nArquivo: ${v.filename}\nCategoria: ${categoryLabel}\nDescrição: ${v.description || v.summary || 'Sem decupagem'}`;
+        // Tooltip direta (Título e Descrição apenas)
+        const desc = v.description || v.summary || 'Sem decupagem';
+        const tooltip = `${friendlyTitle}\n\n${desc}`;
 
         card.innerHTML = `
             <div class="media-thumbnail" style="position: relative;">
@@ -552,7 +552,8 @@ function renderTreeNode(node, container, depth = 0) {
         const toggleBtnHtml = `<button class="btn-toggle-filename" title="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
 
         const categoryLabel = p.category ? p.category : 'Foto';
-        const tooltip = `Título: ${friendlyTitle}\nArquivo: ${p.filename}\nCategoria: ${categoryLabel}\nDescrição: ${p.description || 'Sem decupagem'}`;
+        const photoDesc = p.description || 'Sem decupagem';
+        const tooltip = `${friendlyTitle}\n\n${photoDesc}`;
         
         card.innerHTML = `
             <div class="media-thumbnail photo-thumb-container" style="position: relative;">
