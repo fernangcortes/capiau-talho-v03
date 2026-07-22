@@ -31,6 +31,13 @@ def list_videos(project_id: int = Query(1), conn: sqlite3.Connection = Depends(g
     """Lista todos os vídeos cadastrados no projeto."""
     videos = MediaRepository.list_videos(conn, project_id)
     for v in videos:
+        # Injeta a versão da miniatura (mtime do arquivo no disco) para invalidação de cache no navegador
+        thumb_file = CONFIG.THUMBNAILS_DIR / f"thumb_{v['id']}.jpg"
+        if thumb_file.exists():
+            v['thumb_version'] = int(thumb_file.stat().st_mtime)
+        else:
+            v['thumb_version'] = 0
+
         # Injeta caminho do proxy se existir
         proxy_rel = f"proxy_vid_{v['id']}.mp4"
         if (CONFIG.PROXIES_DIR / proxy_rel).exists():

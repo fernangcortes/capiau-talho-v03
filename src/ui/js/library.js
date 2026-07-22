@@ -423,7 +423,7 @@ function renderTreeNode(node, container, depth = 0) {
         const showRealThumb = !document.body.classList.contains("hide-thumbnails") && document.getElementById("chk-show-thumbnails")?.checked !== false;
         let thumbContent = `<i class="fa-solid ${v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film'}"></i>`;
         if (showRealThumb && v.status !== "pending" && v.status !== "error") {
-            const vVersion = v._thumbVersion || v.updated_at || "";
+            const vVersion = v._thumbVersion || v.thumb_version || v.updated_at || "";
             const qs = vVersion ? `?v=${vVersion}` : "";
             const fallbackIcon = v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film';
             thumbContent = `<img src="/api/video/${v.id}/thumbnail${qs}" alt="Thumb" onerror="this.onerror=null; this.style.display='none'; if(this.parentNode) this.parentNode.insertAdjacentHTML('beforeend', '<i class=\\'fa-solid ${fallbackIcon}\\'></i>');">`;
