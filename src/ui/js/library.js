@@ -1038,10 +1038,41 @@ export class LibraryManager {
         if (btnDeselectAllFailed) btnDeselectAllFailed.addEventListener("click", () => this.deselectAllFailedMedia());
 
         const btnExitFailedFilter = document.getElementById("btn-exit-failed-filter");
-        if (btnExitFailedFilter) btnExitFailedFilter.addEventListener("click", () => this.exitFailedFilter());
+        if (btnExitFailedFilter) btnExitFailedFilter.addEventListener("click", () => {
+            this.exitFailedFilter();
+            if (window.showToast) window.showToast("Filtro de falhas encerrado. Exibindo todas as mídias.", "info");
+        });
+
+        const btnCancelAllAnalyses = document.getElementById("btn-cancel-all-analyses");
+        if (btnCancelAllAnalyses) {
+            btnCancelAllAnalyses.addEventListener("click", async () => {
+                if (!confirm("Deseja cancelar todas as análises de visão em andamento neste projeto?")) return;
+                try {
+                    const res = await CapIAuAPI.cancelAllAnalyses(STATE.currentProjectId);
+                    if (window.showToast) window.showToast(`Cancelamento solicitado para ${res.count || 0} análises!`, "info");
+                    this.reloadData();
+                    if (window.panelsManager && window.panelsManager.refreshTasks) window.panelsManager.refreshTasks();
+                } catch (err) {
+                    if (window.showToast) window.showToast("Erro ao cancelar análises: " + err.message, "error");
+                }
+            });
+        }
 
         const btnBannerReanalyze = document.getElementById("btn-reanalyze-failed-banner");
         if (btnBannerReanalyze) btnBannerReanalyze.addEventListener("click", () => this.handleFailedButtonClick());
+
+        // Atalho de teclado: Esc ou Ctrl+Z para sair do modo de filtro de falhas
+        document.addEventListener("keydown", (e) => {
+            if (!this.isFailedFilterActive) return;
+            const tag = document.activeElement?.tagName;
+            if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+            if (e.key === "Escape" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z")) {
+                e.preventDefault();
+                this.exitFailedFilter();
+                if (window.showToast) window.showToast("Filtro de falhas encerrado. Exibindo todas as mídias.", "info");
+            }
+        });
 
         this.checkFailedMediaCount();
 
@@ -1869,13 +1900,13 @@ export class LibraryManager {
             }, 300);
 
             if (window.showToast) {
-                window.showToast(`Exibindo ${failedVideos.length} mídias com falha visual.`, "info");
+                window.showToast(`Exibindo ${failedVideos.length} mídias com falha. Clique em 'Voltar' ou pressione Esc / Ctrl+Z para sair.`, "info");
             }
         } else {
-            // Estágio 2 -> Estágio 3: Dispara reanálise dos selecionados com animação p/ MLD
+            // Estágio 2 -> Estágio 3: Dispara reanálise dos selecionados ou encerra filtro se nada selecionado
             if (this.selectedFailedIds.size === 0) {
-                if (window.showToast) window.showToast("Selecione pelo menos uma mídia para reanalisar!", "warning");
-                else alert("Selecione pelo menos uma mídia para reanalisar!");
+                this.exitFailedFilter();
+                if (window.showToast) window.showToast("Nenhuma mídia selecionada. Filtro de falhas encerrado (exibindo todas as mídias).", "info");
                 return;
             }
 
@@ -1941,6 +1972,13 @@ export class LibraryManager {
 
     async checkFailedMediaCount() {
         try {
+            const allVideos = STATE.allVideos || [];
+            const analyzingCount = allVideos.filter(v => v.status === "analyzing" || v.status === "processing" || v.status === "pending").length;
+            const btnCancelAnalyses = document.getElementById("btn-cancel-all-analyses");
+            if (btnCancelAnalyses) {
+                btnCancelAnalyses.style.display = (analyzingCount > 0) ? "inline-flex" : "none";
+            }
+
             const res = await fetch(`/api/media/failed-count?project_id=${STATE.currentProjectId || ''}`);
             if (!res.ok) return;
             const data = await res.json();
@@ -1962,7 +2000,7 @@ export class LibraryManager {
                     // Estado Amarelo (Filtrado / Selecionando)
                     if (btn) {
                         btn.className = "lib-action-btn state-filtering-failures";
-                        btn.setAttribute("data-tooltip", "Analisar selecionados");
+                        btn.setAttribute("data-tooltip", `Iniciar Reanálise (${this.selectedFailedIds.size} mídias)`);
                     }
                     if (badge) badge.textContent = this.selectedFailedIds.size;
                     if (btnSelectAll) btnSelectAll.style.display = "inline-flex";

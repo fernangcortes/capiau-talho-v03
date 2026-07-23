@@ -2101,8 +2101,15 @@ export class PanelsManager {
                             }
                         }
                     } else {
-                        if (confirm("Cancelar codificação de proxy desta mídia?")) {
-                            await CapIAuAPI.cancelConversion(Number(key));
+                        if (confirm("Cancelar a análise ou processamento desta mídia?")) {
+                            try {
+                                const videoId = Number(key.replace("vision-", "").replace("proxy-", ""));
+                                await CapIAuAPI.cancelConversion(videoId);
+                                if (window.showToast) window.showToast(`Análise do vídeo #${videoId} cancelada!`, "info");
+                                if (window.libraryInstance) window.libraryInstance.reloadData();
+                            } catch (err) {
+                                alert("Falha ao cancelar tarefa: " + err.message);
+                            }
                         }
                     }
                 });

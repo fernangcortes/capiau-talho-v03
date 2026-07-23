@@ -169,8 +169,15 @@
                             <span id="failed-count-badge" class="badge-failed-square">0</span>
                         </button>
                         <button id="btn-select-all-failed" data-tooltip="Selecionar todas as mídias com falha" class="lib-action-btn" style="display: none; color: var(--color-cyan);"><i class="fa-solid fa-square-check"></i></button>
-                        <button id="btn-deselect-all-failed" data-tooltip="Desmarcar todas" class="lib-action-btn" style="display: none; color: var(--text-muted);"><i class="fa-regular fa-square"></i></button>
-                        <button id="btn-exit-failed-filter" data-tooltip="Sair do filtro de falhas" class="lib-action-btn" style="display: none; color: var(--text-muted);"><i class="fa-solid fa-xmark"></i></button>
+                        <button id="btn-deselect-all-failed" data-tooltip="Desmarcar todas as mídias" class="lib-action-btn" style="display: none; color: var(--text-muted);"><i class="fa-regular fa-square"></i></button>
+                        <button id="btn-exit-failed-filter" data-tooltip="Voltar a ver todas as mídias (Esc ou Ctrl+Z)" class="lib-action-btn btn-exit-filter-active" style="display: none; align-items: center; gap: 4px; color: #f87171; background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.35); padding: 2px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; flex-shrink: 0;">
+                            <i class="fa-solid fa-arrow-left"></i>
+                            <span class="btn-exit-text">Voltar à Biblioteca</span>
+                        </button>
+                        <button id="btn-cancel-all-analyses" data-tooltip="Cancelar todas as análises em andamento" class="lib-action-btn btn-flat-rose" style="display: none; align-items: center; gap: 4px; color: #f87171; background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.35); padding: 2px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; flex-shrink: 0;">
+                            <i class="fa-solid fa-circle-stop"></i>
+                            <span>Cancelar Análises</span>
+                        </button>
                     </div>
 
                     <!-- Popover de Busca por Similaridade em Lote -->

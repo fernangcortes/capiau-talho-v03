@@ -994,3 +994,24 @@ def reanalyze_failed_media(req: Optional[ReanalyzeFailedRequest] = None, project
     return {"status": "success", "count": len(reanalyzed), "ids": reanalyzed}
 
 
+@router.post("/api/media/cancel-all-analyses")
+def cancel_all_analyses(project_id: Optional[int] = None):
+    """Cancela todas as análises de visão/reanálises em andamento no projeto ou globalmente."""
+    cancelled_ids = []
+    with get_db() as conn:
+        query = "SELECT id FROM video WHERE status IN ('analyzing', 'processing', 'pending')"
+        params = []
+        if project_id:
+            query += " AND project_id = ?"
+            params.append(project_id)
+        rows = conn.execute(query, params).fetchall()
+        for r in rows:
+            vid = r["id"]
+            TASK_MANAGER.cancel_process(vid)
+            TASK_MANAGER.cancel_task(str(vid))
+            MediaRepository.update_video_status(conn, vid, 'error', error_message="Análise cancelada pelo usuário")
+            cancelled_ids.append(vid)
+    return {"status": "success", "count": len(cancelled_ids), "ids": cancelled_ids}
+
+
+

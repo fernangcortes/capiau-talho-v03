@@ -261,6 +261,10 @@ export class CapIAuAPI {
         return this.request(`/api/video/${videoId}/cancel-conversion`, { method: "POST" });
     }
 
+    static cancelAllAnalyses(projectId) {
+        return this.request(`/api/media/cancel-all-analyses?project_id=${projectId || ''}`, { method: "POST" });
+    }
+
     static pauseThumbnails(videoId) {
         return this.request(`/api/video/${videoId}/pause-thumbnails`, { method: "POST" });
     }
