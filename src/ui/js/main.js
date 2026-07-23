@@ -1557,6 +1557,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     // Inicializa a customização de abas (Drag & Drop e Visibilidade)
     initTabsCustomization();
+    window.initTabsCustomization = initTabsCustomization;
 
     // Auto-converter de title para data-tooltip para tooltips premium unificadas
     const convertTitleToTooltip = (root = document) => {
@@ -1919,6 +1920,7 @@ window.addEventListener("DOMContentLoaded", () => {
             }
             window.dispatchEvent(new Event("resize"));
         }
+        window.setTimelineToolbarPosition = setTimelineToolbarPosition;
 
         const chkToolbarTop = document.getElementById("chk-timeline-toolbar-top");
         if (chkToolbarTop) {

@@ -269,6 +269,32 @@ body {
     box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
 }
 
+.header-save-line-icon {
+    position: absolute;
+    right: 25%;
+    top: -2px;
+    color: #c084fc;
+    font-size: 11px;
+    opacity: 0;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 105;
+    transition: opacity 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    padding: 2px 6px;
+    text-shadow: 0 0 6px rgba(192, 132, 252, 0.5);
+}
+
+.header-restore-line:hover .header-save-line-icon {
+    opacity: 0.75;
+}
+
+.header-save-line-icon:hover {
+    opacity: 1 !important;
+    color: #e9d5ff !important;
+    transform: scale(1.2);
+    text-shadow: 0 0 10px rgba(192, 132, 252, 0.9);
+}
+
 /* ── FLAT HEADER BUTTONS STYLING ── */
 .header button.btn-outline,
 .header button.btn-icon,

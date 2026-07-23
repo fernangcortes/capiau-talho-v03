@@ -198,11 +198,124 @@ export class WorkspaceManager {
             });
         }
 
+        const btnSaveWorkspace = document.getElementById("btn-save-workspace");
+        if (btnSaveWorkspace) {
+            btnSaveWorkspace.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.promptSaveWorkspace();
+            });
+        }
+
+        const btnSaveCollapsed = document.getElementById("btn-save-workspace-collapsed");
+        if (btnSaveCollapsed) {
+            btnSaveCollapsed.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.promptSaveWorkspace();
+            });
+        }
+
+        // Atalho de teclado global Ctrl + Shift + S para abrir a modal de salvamento de workspace de qualquer lugar
+        document.addEventListener("keydown", (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyS") {
+                e.preventDefault();
+                this.promptSaveWorkspace();
+            }
+        });
+
+        const btnRenameWorkspace = document.getElementById("btn-rename-workspace");
+        if (btnRenameWorkspace) {
+            btnRenameWorkspace.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (selectWorkspace && selectWorkspace.value) {
+                    this.renameCustomWorkspace(selectWorkspace.value);
+                }
+            });
+        }
+
+        const btnDeleteWorkspace = document.getElementById("btn-delete-workspace");
+        if (btnDeleteWorkspace) {
+            btnDeleteWorkspace.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (selectWorkspace && selectWorkspace.value) {
+                    this.deleteCustomWorkspace(selectWorkspace.value);
+                }
+            });
+        }
+
+        // Vincular controles do Modal de Salvamento / Sobrescrita
+        const modalCloseBtn = document.getElementById("btn-close-save-workspace-modal");
+        if (modalCloseBtn) {
+            modalCloseBtn.addEventListener("click", () => this.closeSaveWorkspaceModal());
+        }
+
+        const modalOverlay = document.getElementById("save-workspace-modal");
+        if (modalOverlay) {
+            modalOverlay.addEventListener("click", (e) => {
+                if (e.target === modalOverlay) this.closeSaveWorkspaceModal();
+            });
+        }
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && modalOverlay && modalOverlay.style.display === "flex") {
+                this.closeSaveWorkspaceModal();
+            }
+        });
+
+        const btnDoOverwrite = document.getElementById("btn-modal-do-overwrite");
+        if (btnDoOverwrite) {
+            btnDoOverwrite.addEventListener("click", () => {
+                const selectOverwrite = document.getElementById("modal-select-overwrite");
+                if (selectOverwrite && selectOverwrite.value) {
+                    const customWorkspaces = this.getCustomWorkspaces();
+                    const ws = customWorkspaces[selectOverwrite.value];
+                    if (ws) {
+                        this.saveCustomWorkspace(ws.name, ws.id);
+                        this.closeSaveWorkspaceModal();
+                    }
+                }
+            });
+        }
+
+        const btnDoSaveNew = document.getElementById("btn-modal-do-save-new");
+        const inputNewName = document.getElementById("modal-input-new-ws-name");
+        
+        const saveNewAction = () => {
+            if (inputNewName && inputNewName.value.trim()) {
+                const newId = `custom_${Date.now()}`;
+                this.saveCustomWorkspace(inputNewName.value.trim(), newId);
+                this.closeSaveWorkspaceModal();
+            } else {
+                alert("Por favor, digite um nome para a nova workspace.");
+            }
+        };
+
+        if (btnDoSaveNew) {
+            btnDoSaveNew.addEventListener("click", saveNewAction);
+        }
+        if (inputNewName) {
+            inputNewName.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") saveNewAction();
+            });
+        }
+
         // Inicializa os divisores de tela ajustáveis (Splitters) do layout padrão
         this.initDefaultSplitters();
 
         this.initMaximizeButtons();
         this.initSidebarObservers();
+
+        // Carrega opções e restaura a workspace ativa salva
+        this.updateWorkspaceSelectUI();
+        const savedActiveWs = localStorage.getItem("capiau_active_workspace");
+        if (savedActiveWs && selectWorkspace) {
+            const hasOption = Array.from(selectWorkspace.options).some(opt => opt.value === savedActiveWs);
+            if (hasOption) {
+                selectWorkspace.value = savedActiveWs;
+                if (savedActiveWs !== "default") {
+                    setTimeout(() => this.applyWorkspace(savedActiveWs), 150);
+                }
+            }
+        }
     }
 
     /**
@@ -404,10 +517,258 @@ export class WorkspaceManager {
         setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
     }
 
+    getCustomWorkspaces() {
+        try {
+            const data = localStorage.getItem("capiau_custom_workspaces");
+            return data ? JSON.parse(data) : {};
+        } catch (err) {
+            console.error("[WorkspaceManager] Erro ao ler capiau_custom_workspaces:", err);
+            return {};
+        }
+    }
+
+    saveCustomWorkspacesDict(dict) {
+        try {
+            localStorage.setItem("capiau_custom_workspaces", JSON.stringify(dict));
+        } catch (err) {
+            console.error("[WorkspaceManager] Erro ao gravar capiau_custom_workspaces:", err);
+        }
+    }
+
+    updateWorkspaceSelectUI() {
+        const selectWorkspace = document.getElementById("select-workspace");
+        const optgroupCustom = document.getElementById("optgroup-custom-workspaces");
+        if (!selectWorkspace) return;
+
+        const customWorkspaces = this.getCustomWorkspaces();
+
+        if (optgroupCustom) {
+            optgroupCustom.innerHTML = "";
+            const keys = Object.keys(customWorkspaces);
+            if (keys.length === 0) {
+                optgroupCustom.style.display = "none";
+            } else {
+                optgroupCustom.style.display = "";
+                keys.forEach(id => {
+                    const ws = customWorkspaces[id];
+                    const opt = document.createElement("option");
+                    opt.value = id;
+                    opt.textContent = `Workspace: ${ws.name}`;
+                    optgroupCustom.appendChild(opt);
+                });
+            }
+        }
+
+        const currentVal = selectWorkspace.value;
+        const btnRename = document.getElementById("btn-rename-workspace");
+        const btnDelete = document.getElementById("btn-delete-workspace");
+
+        if (currentVal && customWorkspaces[currentVal]) {
+            if (btnRename) btnRename.style.display = "inline-flex";
+            if (btnDelete) btnDelete.style.display = "inline-flex";
+        } else {
+            if (btnRename) btnRename.style.display = "none";
+            if (btnDelete) btnDelete.style.display = "none";
+        }
+    }
+
+    captureCurrentState() {
+        const isStudio = document.body.classList.contains("studio");
+
+        const sidebarLeft = document.getElementById("sidebar-left");
+        const sidebarRight = document.getElementById("sidebar-right");
+        const timelinePanel = document.getElementById("timeline-panel");
+        const sourcePanel = document.getElementById("source-player-panel");
+        const programPanel = document.getElementById("program-player-panel");
+        const appContainer = document.querySelector(".app-container");
+        const timelineActions = document.getElementById("timeline-actions-sidebar");
+        const timelineHeaders = document.getElementById("timeline-headers-sidebar");
+
+        const getDim = (key) => localStorage.getItem(key) || null;
+
+        // Capturar dados da timeline e pistas
+        let timelineData = null;
+        if (window.TIMELINE_STATE) {
+            const ts = window.TIMELINE_STATE;
+            timelineData = {
+                zoom: ts.zoom,
+                trackHeightScale: ts.trackHeightScale,
+                previewZoom: ts.previewZoom,
+                hoverPreviewEnabled: ts.hoverPreviewEnabled,
+                globalThumbnailsInterval: ts.globalThumbnailsInterval,
+                muteHiddenTracksPlayback: ts.muteHiddenTracksPlayback,
+                toolbarIsTop: localStorage.getItem("capiau_timeline_toolbar_top") === "true",
+                toolbarCols: timelineActions ? (timelineActions.classList.contains("cols-2") ? "cols-2" : "cols-1") : "cols-1",
+                tracks: (ts.tracks || []).map(t => ({
+                    id: t.id,
+                    heightPx: t.heightPx != null ? Number(t.heightPx) : null,
+                    hidden: !!t.hidden
+                }))
+            };
+        }
+
+        // Capturar ordenação e visibilidade customizada de abas das sidebars
+        const tabsCustomization = {
+            leftOrder: localStorage.getItem("left-tabs-order"),
+            leftVisibility: localStorage.getItem("left-tabs-visibility"),
+            rightOrder: localStorage.getItem("right-tabs-order"),
+            rightVisibility: localStorage.getItem("right-tabs-visibility")
+        };
+
+        return {
+            isStudio: isStudio,
+            splitters: {
+                "layout-dim-splitter-sidebar-left": getDim("layout-dim-splitter-sidebar-left"),
+                "layout-dim-splitter-sidebar-right": getDim("layout-dim-splitter-sidebar-right"),
+                "layout-dim-splitter-timeline": getDim("layout-dim-splitter-timeline"),
+                "layout-dim-splitter-players": getDim("layout-dim-splitter-players"),
+                "layout-dim-splitter-studio-lib": getDim("layout-dim-splitter-studio-lib"),
+                "layout-dim-splitter-studio-right": getDim("layout-dim-splitter-studio-right"),
+                "layout-dim-splitter-studio-timeline": getDim("layout-dim-splitter-studio-timeline"),
+                "layout-dim-splitter-studio-players": getDim("layout-dim-splitter-studio-players")
+            },
+            collapsed: {
+                sidebarLeft: sidebarLeft ? sidebarLeft.classList.contains("collapsed") : false,
+                sidebarRight: sidebarRight ? sidebarRight.classList.contains("collapsed") : false,
+                timelinePanel: timelinePanel ? timelinePanel.classList.contains("collapsed") : false,
+                header: appContainer ? appContainer.classList.contains("header-collapsed") : false,
+                timelineToolbar: timelineActions ? timelineActions.classList.contains("collapsed") : false,
+                timelineHeaders: timelineHeaders ? timelineHeaders.classList.contains("collapsed") : false,
+                libraryFilters: sidebarLeft ? sidebarLeft.classList.contains("filters-collapsed") : false
+            },
+            maximized: {
+                sourcePlayer: sourcePanel ? sourcePanel.classList.contains("maximized") : false,
+                programPlayer: programPanel ? programPanel.classList.contains("maximized") : false,
+                sidebarRight: sidebarRight ? sidebarRight.classList.contains("sidebar-maximized") : false
+            },
+            tabs: {
+                activeLeftTab: sidebarLeft ? (sidebarLeft.getAttribute("data-active-tab") || localStorage.getItem("active-left-tab")) : null,
+                activeRightTab: (typeof STATE !== "undefined" && STATE.currentRightTab) ? STATE.currentRightTab : localStorage.getItem("active-right-tab")
+            },
+            timelineData: timelineData,
+            tabsCustomization: tabsCustomization
+        };
+    }
+
+    openSaveWorkspaceModal() {
+        const modal = document.getElementById("save-workspace-modal");
+        const selectOverwrite = document.getElementById("modal-select-overwrite");
+        const overwriteContainer = document.getElementById("modal-overwrite-container");
+        const overwriteDivider = document.getElementById("modal-overwrite-divider");
+        const inputNewName = document.getElementById("modal-input-new-ws-name");
+
+        if (!modal) return;
+
+        const customWorkspaces = this.getCustomWorkspaces();
+        const keys = Object.keys(customWorkspaces);
+
+        if (selectOverwrite) {
+            selectOverwrite.innerHTML = "";
+            if (keys.length > 0) {
+                if (overwriteContainer) overwriteContainer.style.display = "flex";
+                if (overwriteDivider) overwriteDivider.style.display = "flex";
+
+                const currentVal = document.getElementById("select-workspace")?.value;
+                keys.forEach(id => {
+                    const ws = customWorkspaces[id];
+                    const opt = document.createElement("option");
+                    opt.value = id;
+                    opt.textContent = `Workspace: ${ws.name}`;
+                    if (id === currentVal) opt.selected = true;
+                    selectOverwrite.appendChild(opt);
+                });
+            } else {
+                if (overwriteContainer) overwriteContainer.style.display = "none";
+                if (overwriteDivider) overwriteDivider.style.display = "none";
+            }
+        }
+
+        if (inputNewName) inputNewName.value = "";
+        modal.style.display = "flex";
+        if (inputNewName) inputNewName.focus();
+    }
+
+    closeSaveWorkspaceModal() {
+        const modal = document.getElementById("save-workspace-modal");
+        if (modal) modal.style.display = "none";
+    }
+
+    promptSaveWorkspace() {
+        this.openSaveWorkspaceModal();
+    }
+
+    saveCustomWorkspace(name, wsId) {
+        if (!name || !wsId) return;
+        const customWorkspaces = this.getCustomWorkspaces();
+        const capturedState = this.captureCurrentState();
+
+        customWorkspaces[wsId] = {
+            id: wsId,
+            name: name,
+            created: customWorkspaces[wsId]?.created || Date.now(),
+            updated: Date.now(),
+            ...capturedState
+        };
+
+        this.saveCustomWorkspacesDict(customWorkspaces);
+        this.updateWorkspaceSelectUI();
+
+        const selectWorkspace = document.getElementById("select-workspace");
+        if (selectWorkspace) {
+            selectWorkspace.value = wsId;
+        }
+        localStorage.setItem("capiau_active_workspace", wsId);
+        this.updateWorkspaceSelectUI();
+
+        if (window.showToast) {
+            window.showToast(`Workspace "${name}" salva com sucesso!`, "success");
+        } else {
+            alert(`Workspace "${name}" salva com sucesso!`);
+        }
+    }
+
+    renameCustomWorkspace(wsId) {
+        const customWorkspaces = this.getCustomWorkspaces();
+        if (!customWorkspaces[wsId]) return;
+
+        const oldName = customWorkspaces[wsId].name;
+        const newName = prompt("Digite o novo nome para esta workspace customizada:", oldName);
+        if (newName && newName.trim() && newName.trim() !== oldName) {
+            customWorkspaces[wsId].name = newName.trim();
+            customWorkspaces[wsId].updated = Date.now();
+            this.saveCustomWorkspacesDict(customWorkspaces);
+            this.updateWorkspaceSelectUI();
+
+            const selectWorkspace = document.getElementById("select-workspace");
+            if (selectWorkspace) {
+                selectWorkspace.value = wsId;
+            }
+            if (window.showToast) {
+                window.showToast(`Workspace renomeada para "${newName.trim()}"!`, "success");
+            }
+        }
+    }
+
+    deleteCustomWorkspace(wsId) {
+        const customWorkspaces = this.getCustomWorkspaces();
+        if (!customWorkspaces[wsId]) return;
+
+        const name = customWorkspaces[wsId].name;
+        if (confirm(`Deseja realmente excluir a workspace customizada "${name}"?`)) {
+            delete customWorkspaces[wsId];
+            this.saveCustomWorkspacesDict(customWorkspaces);
+            this.applyWorkspace("default");
+
+            if (window.showToast) {
+                window.showToast(`Workspace "${name}" excluída.`, "success");
+            }
+        }
+    }
+
     applyWorkspace(ws) {
         console.log(`[WorkspaceManager] Aplicando Workspace Preset: ${ws}`);
         
-        // 1. Restaura todas as janelas primeiro para ter base limpa
+        // 1. Restaura todas as janelas popout primeiro para ter base limpa
         const activePopouts = { ...window.popoutWindows };
         for (const panelId in activePopouts) {
             if (activePopouts[panelId] && !activePopouts[panelId].closed) {
@@ -416,58 +777,293 @@ export class WorkspaceManager {
             this.restorePanel(panelId);
         }
 
-        // Trocar de preset sempre sai do layout Estúdio (reativado abaixo se aplicável)
-        if (ws !== "montagem") this.applyStudio(false);
+        const customWorkspaces = this.getCustomWorkspaces();
+        const customConfig = customWorkspaces[ws];
 
-        if (ws === "montagem") {
-            // Preset "Estúdio": biblioteca grande + players empilhados + timeline full-width
-            const left = document.getElementById("sidebar-left");
-            if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left").click();
-            const right = document.getElementById("sidebar-right");
-            if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right").click();
-            const timeline = document.getElementById("timeline-panel");
-            if (timeline && timeline.classList.contains("collapsed")) {
-                const reopen = document.getElementById("reopen-timeline");
-                if (reopen) reopen.click();
+        if (customConfig) {
+            // Preset Customizado
+            const wantStudio = !!customConfig.isStudio;
+            this.applyStudio(wantStudio);
+
+            // Restaura dimensões gravadas nos Splitters
+            if (customConfig.splitters) {
+                for (const key in customConfig.splitters) {
+                    const val = customConfig.splitters[key];
+                    if (val !== null && val !== undefined) {
+                        localStorage.setItem(key, val);
+                    }
+                }
             }
-            this.applyStudio(true);
-        }
-        else if (ws === "default") {
-            // Workspace Padrão: Tudo na janela principal
-            const left = document.getElementById("sidebar-left");
-            const right = document.getElementById("sidebar-right");
-            if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left").click();
-            if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right").click();
-            
+
+            // Aplica dimensões inline e flex
+            const sidebarLeft = document.getElementById("sidebar-left");
+            const sidebarRight = document.getElementById("sidebar-right");
+            const timelinePanel = document.getElementById("timeline-panel");
             const sourcePanel = document.getElementById("source-player-panel");
-            if (sourcePanel && sourcePanel.classList.contains("maximized")) {
-                document.getElementById("btn-expand-source").click();
+
+            if (sidebarLeft && customConfig.splitters["layout-dim-splitter-sidebar-left"]) {
+                const val = customConfig.splitters["layout-dim-splitter-sidebar-left"];
+                const valStr = typeof val === "number" ? `${val}px` : String(val);
+                sidebarLeft.style.width = valStr;
+                sidebarLeft.style.flex = `0 0 ${valStr}`;
             }
-            const programPanel = document.getElementById("program-player-panel");
-            if (programPanel && programPanel.classList.contains("maximized")) {
-                document.getElementById("btn-expand-program").click();
+            if (sidebarRight && customConfig.splitters["layout-dim-splitter-sidebar-right"]) {
+                const val = customConfig.splitters["layout-dim-splitter-sidebar-right"];
+                const valStr = typeof val === "number" ? `${val}px` : String(val);
+                sidebarRight.style.width = valStr;
+                sidebarRight.style.flex = `0 0 ${valStr}`;
             }
-        } 
-        else if (ws === "decupagem") {
-            // Workspace Decupagem: Foco no source player maximizado
-            const sourcePanel = document.getElementById("source-player-panel");
-            if (sourcePanel && !sourcePanel.classList.contains("maximized")) {
-                document.getElementById("btn-expand-source").click();
+            if (timelinePanel && customConfig.splitters["layout-dim-splitter-timeline"]) {
+                const val = customConfig.splitters["layout-dim-splitter-timeline"];
+                const valStr = typeof val === "number" ? `${val}px` : String(val);
+                timelinePanel.style.height = valStr;
+                timelinePanel.style.flex = `0 0 ${valStr}`;
             }
-            const left = document.getElementById("sidebar-left");
-            if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left").click();
-            const right = document.getElementById("sidebar-right");
-            if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right").click();
+            if (sourcePanel && customConfig.splitters["layout-dim-splitter-players"]) {
+                const val = customConfig.splitters["layout-dim-splitter-players"];
+                const valStr = typeof val === "number" ? `${val}%` : String(val);
+                sourcePanel.style.flex = `0 0 ${valStr}`;
+            }
+
+            // Re-inicializa divisores para escutar os tamanhos atualizados
+            this.removeAllSplitters();
+            if (wantStudio) {
+                this.initStudioSplitters();
+            } else {
+                this.initDefaultSplitters();
+            }
+
+            // Restaura colapso/expansão de painéis
+            if (customConfig.collapsed) {
+                const c = customConfig.collapsed;
+
+                const toggleLeft = document.getElementById("toggle-left");
+                const reopenLeft = document.getElementById("reopen-left");
+                if (sidebarLeft && reopenLeft) {
+                    const isCollapsed = sidebarLeft.classList.contains("collapsed");
+                    if (c.sidebarLeft && !isCollapsed) {
+                        if (toggleLeft) toggleLeft.click(); else sidebarLeft.classList.add("collapsed");
+                    } else if (!c.sidebarLeft && isCollapsed) {
+                        if (reopenLeft) reopenLeft.click(); else sidebarLeft.classList.remove("collapsed");
+                    }
+                }
+
+                const toggleRight = document.getElementById("toggle-right");
+                const reopenRight = document.getElementById("reopen-right");
+                if (sidebarRight && reopenRight) {
+                    const isCollapsed = sidebarRight.classList.contains("collapsed");
+                    if (c.sidebarRight && !isCollapsed) {
+                        if (toggleRight) toggleRight.click(); else sidebarRight.classList.add("collapsed");
+                    } else if (!c.sidebarRight && isCollapsed) {
+                        if (reopenRight) reopenRight.click(); else sidebarRight.classList.remove("collapsed");
+                    }
+                }
+
+                const toggleTimeline = document.getElementById("toggle-timeline");
+                const reopenTimeline = document.getElementById("reopen-timeline");
+                if (timelinePanel && reopenTimeline) {
+                    const isCollapsed = timelinePanel.classList.contains("collapsed");
+                    if (c.timelinePanel && !isCollapsed) {
+                        if (toggleTimeline) toggleTimeline.click(); else timelinePanel.classList.add("collapsed");
+                    } else if (!c.timelinePanel && isCollapsed) {
+                        if (reopenTimeline) reopenTimeline.click(); else timelinePanel.classList.remove("collapsed");
+                    }
+                }
+
+                const appContainer = document.querySelector(".app-container");
+                const btnCollapseHeader = document.getElementById("btn-collapse-header");
+                const headerRestoreTrigger = document.getElementById("header-restore-trigger");
+                if (appContainer && headerRestoreTrigger) {
+                    const isCollapsed = appContainer.classList.contains("header-collapsed");
+                    if (c.header && !isCollapsed) {
+                        if (btnCollapseHeader) btnCollapseHeader.click(); else appContainer.classList.add("header-collapsed");
+                    } else if (!c.header && isCollapsed) {
+                        if (headerRestoreTrigger) headerRestoreTrigger.click(); else appContainer.classList.remove("header-collapsed");
+                    }
+                }
+
+                const timelineActions = document.getElementById("timeline-actions-sidebar");
+                const btnToggleToolbar = document.getElementById("btn-toggle-toolbar");
+                const reopenToolbar = document.getElementById("reopen-toolbar");
+                if (timelineActions && reopenToolbar) {
+                    const isCollapsed = timelineActions.classList.contains("collapsed");
+                    if (c.timelineToolbar && !isCollapsed) {
+                        if (btnToggleToolbar) btnToggleToolbar.click(); else timelineActions.classList.add("collapsed");
+                    } else if (!c.timelineToolbar && isCollapsed) {
+                        if (reopenToolbar) reopenToolbar.click(); else timelineActions.classList.remove("collapsed");
+                    }
+                }
+
+                const timelineHeaders = document.getElementById("timeline-headers-sidebar");
+                const btnToggleHeaders = document.getElementById("btn-toggle-headers");
+                const reopenHeaders = document.getElementById("reopen-headers");
+                if (timelineHeaders && reopenHeaders) {
+                    const isCollapsed = timelineHeaders.classList.contains("collapsed");
+                    if (c.timelineHeaders && !isCollapsed) {
+                        if (btnToggleHeaders) btnToggleHeaders.click(); else timelineHeaders.classList.add("collapsed");
+                    } else if (!c.timelineHeaders && isCollapsed) {
+                        if (reopenHeaders) reopenHeaders.click(); else timelineHeaders.classList.remove("collapsed");
+                    }
+                }
+            }
+
+            // Restaura maximizações
+            if (customConfig.maximized) {
+                const m = customConfig.maximized;
+                const btnExpandSource = document.getElementById("btn-expand-source");
+                if (sourcePanel && btnExpandSource) {
+                    const isMax = sourcePanel.classList.contains("maximized");
+                    if (m.sourcePlayer !== isMax) btnExpandSource.click();
+                }
+
+                const btnExpandProgram = document.getElementById("btn-expand-program");
+                const programPanel = document.getElementById("program-player-panel");
+                if (programPanel && btnExpandProgram) {
+                    const isMax = programPanel.classList.contains("maximized");
+                    if (m.programPlayer !== isMax) btnExpandProgram.click();
+                }
+
+                const btnMaxRight = document.getElementById("btn-maximize-right");
+                if (sidebarRight && btnMaxRight) {
+                    const isMax = sidebarRight.classList.contains("sidebar-maximized");
+                    if (m.sidebarRight !== isMax) btnMaxRight.click();
+                }
+            }
+
+            // Restaura abas ativas
+            if (customConfig.tabs) {
+                if (customConfig.tabs.activeLeftTab) {
+                    const btnLeft = document.querySelector(`.sidebar-left .tab-btn[data-tab="${customConfig.tabs.activeLeftTab}"]`);
+                    if (btnLeft) btnLeft.click();
+                }
+                if (customConfig.tabs.activeRightTab) {
+                    const btnRight = document.querySelector(`#right-tabs .tab-btn[data-right-tab="${customConfig.tabs.activeRightTab}"]`);
+                    if (btnRight) btnRight.click();
+                }
+            }
+
+            // Restaura estado e alturas das pistas da timeline
+            if (customConfig.timelineData && window.TIMELINE_STATE) {
+                const td = customConfig.timelineData;
+                const ts = window.TIMELINE_STATE;
+
+                if (td.zoom !== undefined) ts.zoom = td.zoom;
+                if (td.previewZoom !== undefined) {
+                    ts.previewZoom = td.previewZoom;
+                    const pZoomSelect = document.getElementById("program-preview-zoom");
+                    if (pZoomSelect) pZoomSelect.value = String(td.previewZoom);
+                }
+                if (td.trackHeightScale !== undefined) {
+                    ts.setTrackHeightScale(td.trackHeightScale);
+                }
+                if (td.hoverPreviewEnabled !== undefined) {
+                    ts.toggleHoverPreview(td.hoverPreviewEnabled);
+                    const chkHover = document.getElementById("chk-timeline-hover-preview");
+                    if (chkHover) chkHover.checked = !!td.hoverPreviewEnabled;
+                }
+                if (td.globalThumbnailsInterval !== undefined) {
+                    ts.setGlobalThumbnailsInterval(td.globalThumbnailsInterval);
+                    const selDensity = document.getElementById("select-timeline-thumbs-density");
+                    if (selDensity) selDensity.value = String(td.globalThumbnailsInterval);
+                }
+                if (td.muteHiddenTracksPlayback !== undefined) {
+                    ts.setMuteHiddenTracksPlayback(td.muteHiddenTracksPlayback);
+                    const chkMute = document.getElementById("chk-timeline-mute-hidden");
+                    if (chkMute) chkMute.checked = !!td.muteHiddenTracksPlayback;
+                }
+                if (td.toolbarIsTop !== undefined) {
+                    localStorage.setItem("capiau_timeline_toolbar_top", String(td.toolbarIsTop));
+                    const chkTop = document.getElementById("chk-timeline-toolbar-top");
+                    if (chkTop) chkTop.checked = td.toolbarIsTop;
+                    if (typeof window.setTimelineToolbarPosition === "function") {
+                        window.setTimelineToolbarPosition(td.toolbarIsTop);
+                    }
+                }
+                if (td.toolbarCols !== undefined) {
+                    const timelineActions = document.getElementById("timeline-actions-sidebar");
+                    if (timelineActions) {
+                        timelineActions.classList.remove("cols-1", "cols-2");
+                        timelineActions.classList.add(td.toolbarCols);
+                    }
+                }
+                if (Array.isArray(td.tracks) && Array.isArray(ts.tracks)) {
+                    td.tracks.forEach(savedTrack => {
+                        const track = ts.tracks.find(t => String(t.id) === String(savedTrack.id));
+                        if (track) {
+                            if (savedTrack.heightPx !== undefined) track.heightPx = savedTrack.heightPx;
+                            if (savedTrack.hidden !== undefined) track.hidden = savedTrack.hidden;
+                        }
+                    });
+                    if (typeof STATE !== "undefined") {
+                        STATE.emit("timelineTracksChanged", ts.tracks);
+                    }
+                }
+            }
+
+            // Restaura customizações de abas (ordem e visibilidade)
+            if (customConfig.tabsCustomization) {
+                const tc = customConfig.tabsCustomization;
+                if (tc.leftOrder) localStorage.setItem("left-tabs-order", tc.leftOrder);
+                if (tc.leftVisibility) localStorage.setItem("left-tabs-visibility", tc.leftVisibility);
+                if (tc.rightOrder) localStorage.setItem("right-tabs-order", tc.rightOrder);
+                if (tc.rightVisibility) localStorage.setItem("right-tabs-visibility", tc.rightVisibility);
+                
+                if (typeof window.initTabsCustomization === "function") {
+                    window.initTabsCustomization();
+                }
+            }
+        } else {
+            // Presets Nativos / Estáticos
+            if (ws !== "montagem") this.applyStudio(false);
+
+            if (ws === "montagem") {
+                const left = document.getElementById("sidebar-left");
+                if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left")?.click();
+                const right = document.getElementById("sidebar-right");
+                if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right")?.click();
+                const timeline = document.getElementById("timeline-panel");
+                if (timeline && timeline.classList.contains("collapsed")) {
+                    const reopen = document.getElementById("reopen-timeline");
+                    if (reopen) reopen.click();
+                }
+                this.applyStudio(true);
+            }
+            else if (ws === "default") {
+                const left = document.getElementById("sidebar-left");
+                const right = document.getElementById("sidebar-right");
+                if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left")?.click();
+                if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right")?.click();
+                
+                const sourcePanel = document.getElementById("source-player-panel");
+                if (sourcePanel && sourcePanel.classList.contains("maximized")) {
+                    document.getElementById("btn-expand-source")?.click();
+                }
+                const programPanel = document.getElementById("program-player-panel");
+                if (programPanel && programPanel.classList.contains("maximized")) {
+                    document.getElementById("btn-expand-program")?.click();
+                }
+            } 
+            else if (ws === "decupagem") {
+                const sourcePanel = document.getElementById("source-player-panel");
+                if (sourcePanel && !sourcePanel.classList.contains("maximized")) {
+                    document.getElementById("btn-expand-source")?.click();
+                }
+                const left = document.getElementById("sidebar-left");
+                if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left")?.click();
+                const right = document.getElementById("sidebar-right");
+                if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right")?.click();
+            }
+            else if (ws === "multitela") {
+                alert("Workspace Multi-Tela: O sistema irá destacar a Linha do Tempo e o Player de Programa. Por favor, confirme a abertura das novas janelas e arraste-as para o segundo monitor físico.");
+                setTimeout(() => this.togglePopout("timeline-panel"), 100);
+                setTimeout(() => this.togglePopout("program-player-panel"), 500);
+            }
         }
-        else if (ws === "multitela") {
-            // Workspace Multi-Tela: Destaca a Timeline e o Player de Programa em outras abas
-            alert("Workspace Multi-Tela: O sistema irá destacar a Linha do Tempo e o Player de Programa. Por favor, confirme a abertura das novas janelas e arraste-as para o segundo monitor físico.");
-            
-            // Destaca a timeline
-            setTimeout(() => this.togglePopout("timeline-panel"), 100);
-            // Destaca o player de programa
-            setTimeout(() => this.togglePopout("program-player-panel"), 500);
-        }
+
+        // Armazena a workspace ativa e atualiza a UI
+        localStorage.setItem("capiau_active_workspace", ws);
+        this.updateWorkspaceSelectUI();
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
     }
 
     togglePopout(panelId) {
@@ -850,3 +1446,25 @@ export class SplitterHelper {
         });
     }
 }
+
+export function showToast(msg, type = "info") {
+    let toast = document.getElementById("global-nle-toast");
+    if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "global-nle-toast";
+        toast.className = "nle-toast";
+        document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.display = "block";
+    toast.style.borderColor = type === "success" ? "rgba(16, 185, 129, 0.6)" : "rgba(6, 182, 212, 0.6)";
+    toast.classList.add("visible");
+    setTimeout(() => {
+        toast.classList.remove("visible");
+        setTimeout(() => { toast.style.display = "none"; }, 300);
+    }, 2500);
+}
+if (!window.showToast) {
+    window.showToast = showToast;
+}
+
