@@ -628,7 +628,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "themes_search", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {
-        "key": "enrichment.max_tokens", "type": "int", "default": 700, "min": 100, "max": 2000, "step": 100,
+        "key": "enrichment.max_tokens", "type": "int", "default": 2000, "min": 100, "max": 4000, "step": 100,
         "label": "Enriquecimento: teto de tokens da resposta",
         "help": "Limite de tamanho da descrição reescrita. É só uma frase reescrita, cabe em poucas centenas de tokens.",
         "help_tech": "max_tokens do rewrite_description_llm. Mesma causa do vision.max_tokens: sem "
