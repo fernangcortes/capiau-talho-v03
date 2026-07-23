@@ -268,16 +268,25 @@ def dbscan_numpy(distances, eps, min_samples):
         
     return labels
 
-def cluster_faces_dbscan(project_id: int, eps: float = 0.38, min_samples: int = 2) -> dict:
+def cluster_faces_dbscan(project_id: int, eps: float = 0.38, min_samples: int = 2, lock_labeled: bool = True) -> dict:
     """Carrega embeddings do SQLite, agrupa via DBSCAN (similaridade cosseno NumPy) e salva os clusters."""
     try:
         with get_db() as conn:
             cursor = conn.cursor()
-            # Obter todas as faces do projeto que possuem embedding
-            cursor.execute("""
-                SELECT id, name, embedding FROM face 
-                WHERE project_id = ? AND embedding IS NOT NULL
-            """, (project_id,))
+            
+            # Se lock_labeled=True, seleciona apenas faces não rotuladas
+            if lock_labeled:
+                cursor.execute("""
+                    SELECT id, name, embedding FROM face 
+                    WHERE project_id = ? AND embedding IS NOT NULL
+                      AND (name IS NULL OR TRIM(name) = '' OR name LIKE 'Pessoa Desconhecida%' OR name IN ('Não Relevante', 'Não é Rosto'))
+                """, (project_id,))
+            else:
+                cursor.execute("""
+                    SELECT id, name, embedding FROM face 
+                    WHERE project_id = ? AND embedding IS NOT NULL
+                """, (project_id,))
+
             rows = cursor.fetchall()
             
             if not rows:
@@ -307,6 +316,13 @@ def cluster_faces_dbscan(project_id: int, eps: float = 0.38, min_samples: int = 
             # Rodar DBSCAN
             labels = dbscan_numpy(distances, eps, min_samples)
             
+            cid_offset = 0
+            if lock_labeled:
+                cursor.execute("SELECT MAX(cluster_id) as max_cid FROM face WHERE project_id = ? AND cluster_id IS NOT NULL AND cluster_id >= 0", (project_id,))
+                max_row = cursor.fetchone()
+                if max_row and max_row["max_cid"] is not None:
+                    cid_offset = max_row["max_cid"] + 1
+
             # Mapear faces por cluster_id
             clusters_map = {}
             for idx, label in enumerate(labels):
@@ -318,15 +334,17 @@ def cluster_faces_dbscan(project_id: int, eps: float = 0.38, min_samples: int = 
                     
             # Para cada cluster, verificar se já existe algum rosto nomeado pelo usuário
             for cluster_id, f_ids in clusters_map.items():
+                target_cluster_id = cluster_id + cid_offset if lock_labeled else cluster_id
+
                 cluster_name = None
                 for fid in f_ids:
-                    if fid in existing_names:
+                    if fid in existing_names and not existing_names[fid].startswith("Pessoa Desconhecida"):
                         cluster_name = existing_names[fid]
                         break
                         
                 # Se não há nome existente, definir nome provisório
                 if not cluster_name:
-                    cluster_name = f"Pessoa Desconhecida (Grupo {cluster_id + 1})"
+                    cluster_name = f"Pessoa Desconhecida (Grupo {target_cluster_id + 1})"
                     
                 # Atualizar faces do cluster
                 placeholders = ",".join("?" for _ in f_ids)
@@ -334,7 +352,7 @@ def cluster_faces_dbscan(project_id: int, eps: float = 0.38, min_samples: int = 
                     UPDATE face 
                     SET cluster_id = ?, name = ? 
                     WHERE id IN ({placeholders})
-                """, [cluster_id, cluster_name] + f_ids)
+                """, [target_cluster_id, cluster_name] + f_ids)
                 
             # Tratar ruído: cluster_id = -1
             noise_ids = [face_ids[idx] for idx, label in enumerate(labels) if int(label) == -1]

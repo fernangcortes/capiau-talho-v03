@@ -597,11 +597,12 @@ def get_face_detail(face_id: int):
 def cluster_faces(
     project_id: int,
     eps: float = Query(0.38, description="Distancia maxima DBSCAN"),
-    min_samples: int = Query(2, description="Minimo de amostras por cluster")
+    min_samples: int = Query(2, description="Minimo de amostras por cluster"),
+    lock_labeled: bool = Query(True, description="Travar grupos ja nomeados/desambiguados")
 ):
     """Clusteriza todas as faces do projeto usando DBSCAN."""
     service = get_face_service()
-    result = service.cluster_project_faces(project_id, eps=eps, min_samples=min_samples)
+    result = service.cluster_project_faces(project_id, eps=eps, min_samples=min_samples, lock_labeled=lock_labeled)
     return ClusterResult(
         total_faces=result["total"],
         clustered_faces=result["clustered"],

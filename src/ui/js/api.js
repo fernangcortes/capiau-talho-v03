@@ -461,8 +461,8 @@ export class CapIAuAPI {
         return this.request(`/api/faces/project/${projectId}/face-clusters`);
     }
 
-    static clusterFaces(projectId, eps = 0.38, minSamples = 3) {
-        return this.request(`/api/faces/project/${projectId}/faces/cluster?eps=${eps}&min_samples=${minSamples}`, {
+    static clusterFaces(projectId, eps = 0.38, minSamples = 3, lockLabeled = true) {
+        return this.request(`/api/faces/project/${projectId}/faces/cluster?eps=${eps}&min_samples=${minSamples}&lock_labeled=${lockLabeled}`, {
             method: "POST"
         });
     }

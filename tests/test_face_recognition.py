@@ -279,6 +279,17 @@ class TestFaceRecognitionAndClustering(unittest.TestCase):
             cursor.execute("SELECT name FROM face WHERE id = ?", (new_face_id,))
             self.assertEqual(cursor.fetchone()["name"], "Não Relevante")
 
+        # 9. Testar re-clusterização com lock_labeled=True
+        # Garantir que faces nomeadas (ex: "Maria") não são alteradas ao re-agrupar com maior tolerância
+        response = self.client.post(f"/api/faces/project/{project_id}/faces/cluster?eps=0.50&min_samples=2&lock_labeled=true")
+        self.assertEqual(response.status_code, 200)
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) as count FROM face WHERE name = 'Maria'")
+            # O nome "Maria" atribuído no passo 5 deve permanecer intacto (6 ocorrências)
+            self.assertEqual(cursor.fetchone()["count"], 6)
+
 
 if __name__ == "__main__":
     unittest.main()

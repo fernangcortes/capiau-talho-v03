@@ -217,16 +217,18 @@ export class FaceManager {
 
         const epsInput = document.getElementById("input-clustering-eps");
         const minSamplesInput = document.getElementById("input-clustering-min-samples");
+        const lockChk = document.getElementById("chk-clustering-lock-labeled");
 
         const eps = epsInput ? parseFloat(epsInput.value) : 0.38;
         const minSamples = minSamplesInput ? parseInt(minSamplesInput.value) : 3;
+        const lockLabeled = lockChk ? lockChk.checked : true;
 
         const originalText = btnCluster.innerHTML;
         btnCluster.disabled = true;
         btnCluster.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span class="btn-text">Agrupando...</span>';
 
         try {
-            const res = await CapIAuAPI.clusterFaces(STATE.currentProjectId, eps, minSamples);
+            const res = await CapIAuAPI.clusterFaces(STATE.currentProjectId, eps, minSamples, lockLabeled);
             console.log("[FaceManager] Clustering result:", res);
             alert(`Clustering concluído com sucesso!\nFaces total: ${res.total_faces}\nAgrupadas: ${res.clustered_faces}\nNovos grupos: ${res.clusters_created}\nRuídos: ${res.noise_faces}`);
             await this.loadFaceClusters();

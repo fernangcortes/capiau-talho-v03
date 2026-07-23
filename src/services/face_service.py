@@ -189,7 +189,7 @@ class FaceService:
 
     # ── Clustering ──
 
-    def cluster_project_faces(self, project_id: int, eps: Optional[float] = None, min_samples: Optional[int] = None) -> Dict[str, Any]:
+    def cluster_project_faces(self, project_id: int, eps: Optional[float] = None, min_samples: Optional[int] = None, lock_labeled: bool = True) -> Dict[str, Any]:
         """Clusteriza todas as faces do projeto usando DBSCAN nos embeddings.
         
         Usa os embeddings autoritativos (get_authoritative_recognition) para
@@ -295,6 +295,29 @@ class FaceService:
 
         faces_data = self._get_faces_with_embeddings(project_id)
         
+        if lock_labeled:
+            with get_db() as conn:
+                cursor = conn.cursor()
+                # Obter IDs de faces que estão travadas (possuem nome atribuído válido ou confirmação manual)
+                cursor.execute("""
+                    SELECT id FROM face
+                    WHERE project_id = ? 
+                      AND name IS NOT NULL AND TRIM(name) != ''
+                      AND name NOT LIKE 'Pessoa Desconhecida%'
+                      AND name NOT IN ('Não Relevante', 'Não é Rosto')
+                """, (project_id,))
+                locked_ids = {r["id"] for r in cursor.fetchall()}
+                
+                cursor.execute("""
+                    SELECT f.id FROM face f
+                    JOIN face_recognition fr ON f.id = fr.face_id
+                    WHERE f.project_id = ? AND fr.status = 'confirmed'
+                """, (project_id,))
+                for r in cursor.fetchall():
+                    locked_ids.add(r["id"])
+
+            faces_data = [f for f in faces_data if f["face_id"] not in locked_ids]
+        
         if not faces_data:
             return {"total": 0, "clustered": 0, "clusters": 0, "noise": 0}
         
@@ -307,6 +330,13 @@ class FaceService:
         # Atualizar cluster_id no banco
         with get_db() as conn:
             cursor = conn.cursor()
+
+            cid_offset = 0
+            if lock_labeled:
+                cursor.execute("SELECT MAX(cluster_id) as max_cid FROM face WHERE project_id = ? AND cluster_id IS NOT NULL AND cluster_id >= 0", (project_id,))
+                max_row = cursor.fetchone()
+                if max_row and max_row["max_cid"] is not None:
+                    cid_offset = max_row["max_cid"] + 1
             
             clusters_map = {}
             for i, label in enumerate(labels):
@@ -317,11 +347,13 @@ class FaceService:
             
             # Atualizar faces com cluster_id
             for cluster_id, f_ids in clusters_map.items():
+                target_cluster_id = cluster_id + cid_offset if lock_labeled else cluster_id
+
                 # Verificar se ja existe nome no cluster
-                cluster_name = self._get_cluster_suggested_name(conn, cluster_id, f_ids)
+                cluster_name = self._get_cluster_suggested_name(conn, target_cluster_id, f_ids)
 
                 # Se o cluster tem um nome real, tenta achar o cluster_id existente para esse nome no projeto
-                actual_cluster_id = cluster_id
+                actual_cluster_id = target_cluster_id
                 if not cluster_name.startswith("Pessoa Desconhecida") and cluster_name not in ("Não Relevante", "Não é Rosto"):
                     cursor.execute("""
                         SELECT DISTINCT cluster_id FROM face
