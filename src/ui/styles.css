@@ -2146,13 +2146,25 @@ button {
     border-radius: 3px;
     overflow: hidden;
     position: relative;
+    width: 100%;
+    transition: background 0.2s ease;
+}
+
+.progress-bar-container:hover,
+.task-row-bar:hover {
+    background: rgba(255, 255, 255, 0.18);
 }
 
 .progress-bar-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--color-violet), var(--color-cyan));
     border-radius: 3px;
-    transition: width 0.3s ease;
+    transition: width 0.3s ease, box-shadow 0.2s ease;
+}
+
+.task-progress-card:hover .progress-bar-fill,
+.task-row:hover .task-row-bar-fill {
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
 }
 
 .task-actions {
@@ -2180,7 +2192,7 @@ button {
 }
 .task-card-clickable { cursor: pointer; }
 
-/* ── Tarefas: modo compacto (uma linha) ── */
+/* ── Tarefas: modo compacto (uma linha) & responsivo ao MLD ── */
 .task-row {
     display: flex;
     align-items: center;
@@ -2189,6 +2201,8 @@ button {
     border-bottom: 1px solid var(--border-glass);
     font-size: 11px;
     color: var(--text-primary);
+    width: 100%;
+    box-sizing: border-box;
 }
 .task-row:hover { background: rgba(255, 255, 255, 0.04); }
 .task-row.task-card-clickable { cursor: pointer; }
@@ -2215,25 +2229,30 @@ button {
     font-size: 11px;
 }
 .task-row-title {
-    flex: 1;
+    flex: 0 1 auto;
+    max-width: 140px;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* A barra de progresso segue fluidamente o tamanho do MLD (como os sliders de mídia) */
 .task-row-bar {
-    width: 70px;
-    flex-shrink: 0;
-    height: 4px;
+    flex: 1;
+    min-width: 50px;
+    max-width: 240px;
+    height: 5px;
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 2px;
+    border-radius: 3px;
     overflow: hidden;
+    position: relative;
+    transition: background 0.2s ease, width 0.2s ease;
 }
 .task-row-bar-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--color-violet), var(--color-cyan));
-    border-radius: 2px;
-    transition: width 0.3s ease;
+    border-radius: 3px;
+    transition: width 0.3s ease, box-shadow 0.2s ease;
 }
 .task-row-pct {
     font-family: monospace;
@@ -2253,6 +2272,63 @@ button {
 .task-row-dot.status-finished { background: var(--color-emerald); }
 .task-row-dot.status-failed { background: var(--color-rose); }
 .task-row-dot.status-cancelled { background: var(--text-muted); }
+
+/* Adaptação das barras de tarefas aos 3 níveis de largura do MLD (#sidebar-right) */
+.sidebar-compact .task-row-bar {
+    flex: 1;
+    min-width: 45px;
+    max-width: 140px;
+    height: 5px;
+}
+.sidebar-compact .task-row-title {
+    max-width: 90px;
+    font-size: 10px;
+}
+.sidebar-compact .task-progress-card {
+    padding: 8px 10px;
+    gap: 6px;
+}
+.sidebar-compact .progress-bar-container {
+    height: 5px;
+}
+
+.sidebar-minimal .task-row {
+    gap: 5px;
+    padding: 4px 6px;
+}
+.sidebar-minimal .task-row-title {
+    display: none;
+}
+.sidebar-minimal .task-row-bar {
+    flex: 1;
+    min-width: 40px;
+    max-width: 120px;
+    height: 4px;
+}
+.sidebar-minimal .task-row-pct {
+    width: 28px;
+    font-size: 9px;
+}
+.sidebar-minimal .task-progress-card {
+    padding: 6px 8px;
+    gap: 4px;
+}
+.sidebar-minimal .task-info {
+    font-size: 10px;
+}
+.sidebar-minimal .task-info .task-title {
+    max-width: 95px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sidebar-minimal .task-status {
+    font-size: 8px;
+    padding: 1px 4px;
+}
+.sidebar-minimal .progress-bar-container {
+    height: 4px;
+}
 
 /* Botão de toggle ativo na toolbar de tarefas */
 .flat-sub-btn.toggle-on {

@@ -2023,7 +2023,7 @@ export class PanelsManager {
                 item.innerHTML = `
                     ${thumbCompact}
                     <span class="task-row-title" title="${title} — ${typeHint} · ${esc(t.status)}">${title}</span>
-                    <div class="task-row-bar"><div class="task-row-bar-fill" style="width:${pct}%"></div></div>
+                    <div class="task-row-bar" data-tooltip="Progresso: ${pct}% (${typeHint})"><div class="task-row-bar-fill" style="width:${pct}%"></div></div>
                     <span class="task-row-pct">${pct}%</span>
                     <div class="task-row-actions" style="display: flex; gap: 4px; align-items: center; margin-left: 4px;">
                         ${actionsHtml}
@@ -2037,7 +2037,7 @@ export class PanelsManager {
                         <span class="task-title" title="${title}">${title}</span>
                         <span class="task-status status-${t.status}">${t.status.toUpperCase()}</span>
                     </div>
-                    <div class="progress-bar-container">
+                    <div class="progress-bar-container" data-tooltip="Progresso: ${pct}% (${typeHint})">
                         <div class="progress-bar-fill" style="width: ${pct}%"></div>
                     </div>
                     <div class="task-actions">
