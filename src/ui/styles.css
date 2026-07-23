@@ -2230,17 +2230,15 @@ button {
 }
 .task-row-title {
     flex: 0 1 auto;
-    max-width: 140px;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-/* A barra de progresso segue fluidamente o tamanho do MLD (como os sliders de mídia) */
+/* A barra de progresso segue fluidamente o tamanho do MLD, expandindo após o nome completo do processo */
 .task-row-bar {
     flex: 1;
-    min-width: 50px;
-    max-width: 240px;
+    min-width: 40px;
     height: 5px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 3px;
@@ -2276,12 +2274,10 @@ button {
 /* Adaptação das barras de tarefas aos 3 níveis de largura do MLD (#sidebar-right) */
 .sidebar-compact .task-row-bar {
     flex: 1;
-    min-width: 45px;
-    max-width: 140px;
+    min-width: 35px;
     height: 5px;
 }
 .sidebar-compact .task-row-title {
-    max-width: 90px;
     font-size: 10px;
 }
 .sidebar-compact .task-progress-card {
