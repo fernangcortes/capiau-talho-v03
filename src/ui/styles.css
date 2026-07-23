@@ -6978,3 +6978,102 @@ input[type="number"] {
     to { transform: translateY(12px); opacity: 0; }
 }
 
+/* ── ESTILOS E ANIMAÇÕES DO FLUXO DE REANÁLISE DE FALHAS E MLD ── */
+.badge-failed-square {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    border-radius: 3px;
+    background: rgba(244, 63, 94, 0.2);
+    color: var(--color-rose);
+    border: 1px solid rgba(244, 63, 94, 0.45);
+    box-shadow: 0 0 6px rgba(244, 63, 94, 0.2);
+    transition: all 0.2s ease;
+}
+
+#btn-reanalyze-failed.state-has-failures {
+    color: var(--color-rose) !important;
+}
+
+#btn-reanalyze-failed.state-has-failures:hover i {
+    text-shadow: 0 0 8px var(--color-rose);
+    transform: scale(1.1);
+}
+
+#btn-reanalyze-failed.state-filtering-failures {
+    color: #facc15 !important;
+}
+
+#btn-reanalyze-failed.state-filtering-failures:hover i {
+    text-shadow: 0 0 8px #facc15;
+    transform: scale(1.1);
+}
+
+#btn-reanalyze-failed.state-filtering-failures .badge-failed-square {
+    background: rgba(250, 204, 21, 0.2);
+    color: #facc15;
+    border-color: rgba(250, 204, 21, 0.45);
+    box-shadow: 0 0 6px rgba(250, 204, 21, 0.25);
+}
+
+/* Partícula voadora em direção ao MLD (Tasks) */
+.fly-to-tasks-particle {
+    position: fixed;
+    z-index: 99999;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(20, 20, 30, 0.9);
+    border: 1px solid #facc15;
+    color: #facc15;
+    box-shadow: 0 0 16px rgba(250, 204, 21, 0.8), 0 0 24px rgba(6, 182, 212, 0.5);
+    backdrop-filter: blur(8px);
+    font-size: 13px;
+    will-change: transform, opacity;
+}
+
+/* Animação mágica de entrada escalonada dos cards de tarefas no MLD */
+@keyframes taskMagicalPopIn {
+    0% {
+        opacity: 0;
+        transform: translateY(16px) scale(0.94);
+        filter: blur(4px);
+    }
+    60% {
+        opacity: 1;
+        transform: translateY(-2px) scale(1.01);
+        filter: blur(0px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+    }
+}
+
+.task-magical-pop-in {
+    animation: taskMagicalPopIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Efeito de recepção / pulso na aba de tarefas do MLD */
+@keyframes tasksTabPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.25); color: #facc15; text-shadow: 0 0 12px #facc15; }
+    100% { transform: scale(1); }
+}
+
+.tasks-tab-pulse {
+    animation: tasksTabPulse 0.4s ease-out;
+}
+
+

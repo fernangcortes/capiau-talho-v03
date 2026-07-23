@@ -17,6 +17,7 @@ export class PanelsManager {
         this.tasksFeed = document.getElementById("tasks-feed-scroll");
         this.lastTasksState = {}; // Para monitoramento de mudança de estado de tarefas
         this._lastTasks = {};     // Último payload de tarefas (para re-render nos toggles)
+        this._renderedTaskKeys = new Set(); // Chaves que já executaram a animação mágica de entrada
         // Preferências da aba Tarefas (persistidas): miniaturas ON por padrão, compacto OFF
         this.tasksShowThumbs = localStorage.getItem("tasks-show-thumbs") !== "false";
         this.tasksCompact = localStorage.getItem("tasks-compact") === "true";
@@ -27,6 +28,7 @@ export class PanelsManager {
         this.timelineInteraction = new CapiauTimelineInteraction(this.timelineRenderer);
         
         // Expõe no window para sincronização com pop-outs (WorkspaceManager)
+        window.panelsManager = this;
         window.timelineRenderer = this.timelineRenderer;
         window.timelineInteraction = this.timelineInteraction;
         
@@ -1881,6 +1883,15 @@ export class PanelsManager {
         }
     }
 
+    async refreshTasks() {
+        if (this.tasksContainer) {
+            try {
+                const tasks = await CapIAuAPI.fetchConversions();
+                this.renderTasks(tasks);
+            } catch (e) {}
+        }
+    }
+
     // Fila de Conversão (Tasks Progress loop)
     startTasksProgressLoop() {
         // Agenda o próximo ciclo só depois que o anterior termina. Com setInterval,
@@ -1940,6 +1951,7 @@ export class PanelsManager {
         // Limpa tarefas que foram removidas
         Object.keys(this.lastTasksState).forEach(key => {
             if (!tasks[key]) {
+                if (this._renderedTaskKeys) this._renderedTaskKeys.delete(key);
                 const lastTask = this.lastTasksState[key];
                 if (lastTask.status !== "finished" && lastTask.status !== "failed") {
                     if (window.logManager) {
@@ -1964,7 +1976,7 @@ export class PanelsManager {
         const showThumbs = this.tasksShowThumbs;
         const compact = this.tasksCompact;
 
-        taskKeys.forEach(key => {
+        taskKeys.forEach((key, index) => {
             const t = tasks[key];
             const isFinished = t.status === "finished";
             const isFailed = t.status === "failed";
@@ -2127,6 +2139,13 @@ export class PanelsManager {
                             : "Vídeo correspondente não encontrado na biblioteca local.");
                     }
                 });
+            }
+
+            // Aplica a animação pop-in mágica apenas UMA VEZ na criação inicial da tarefa
+            if (!this._renderedTaskKeys.has(key)) {
+                item.classList.add("task-magical-pop-in");
+                item.style.animationDelay = `${index * 80}ms`;
+                this._renderedTaskKeys.add(key);
             }
 
             feed.appendChild(item);
@@ -2689,3 +2708,82 @@ export class PanelsManager {
         }
     }
 }
+
+// ── UTILITÁRIOS GLOBAIS DE ANIMAÇÃO FLY-TO-TASKS E EXPANSÃO DO MLD ──
+window.flyToTasksAnimation = function(sourceEl, onComplete) {
+    const startEl = sourceEl || document.getElementById("btn-reanalyze-failed");
+    const targetEl = document.getElementById("btn-tab-tasks") || document.getElementById("sidebar-right");
+    
+    if (!startEl || !targetEl) {
+        if (onComplete) onComplete();
+        return;
+    }
+
+    const startRect = startEl.getBoundingClientRect();
+    const targetRect = targetEl.getBoundingClientRect();
+
+    const particle = document.createElement("div");
+    particle.className = "fly-to-tasks-particle";
+    particle.innerHTML = '<i class="fa-solid fa-arrows-rotate fa-spin"></i>';
+    
+    const startX = startRect.left + startRect.width / 2 - 14;
+    const startY = startRect.top + startRect.height / 2 - 14;
+    const targetX = targetRect.left + targetRect.width / 2 - 14;
+    const targetY = targetRect.top + targetRect.height / 2 - 14;
+
+    particle.style.left = `${startX}px`;
+    particle.style.top = `${startY}px`;
+    document.body.appendChild(particle);
+
+    const midY = Math.min(startY, targetY) - 50;
+
+    const animation = particle.animate([
+        {
+            transform: `translate3d(0px, 0px, 0px) scale(1)`,
+            opacity: 1
+        },
+        {
+            transform: `translate3d(${(targetX - startX) * 0.5}px, ${midY - startY}px, 0px) scale(1.3)`,
+            opacity: 0.95
+        },
+        {
+            transform: `translate3d(${targetX - startX}px, ${targetY - startY}px, 0px) scale(0.3)`,
+            opacity: 0.1
+        }
+    ], {
+        duration: 550,
+        easing: "cubic-bezier(0.2, 0.8, 0.2, 1)"
+    });
+
+    animation.onfinish = () => {
+        particle.remove();
+        if (targetEl) {
+            targetEl.classList.add("tasks-tab-pulse");
+            setTimeout(() => targetEl.classList.remove("tasks-tab-pulse"), 400);
+        }
+        if (onComplete) onComplete();
+    };
+};
+
+window.openTasksDrawerAndSwitchTab = function() {
+    // 1. Se a sidebar da direita (MLD) estiver recolhida, abre
+    if (window.expandRightPanel) {
+        window.expandRightPanel();
+    } else {
+        const sidebarRight = document.getElementById("sidebar-right");
+        const reopenRight = document.getElementById("reopen-right");
+        if (sidebarRight && sidebarRight.classList.contains("collapsed")) {
+            sidebarRight.classList.remove("collapsed");
+            if (reopenRight) reopenRight.style.display = "none";
+            window.dispatchEvent(new Event("resize"));
+        }
+    }
+    // 2. Alterna para a aba de Tarefas
+    const btnTabTasks = document.getElementById("btn-tab-tasks");
+    if (btnTabTasks) {
+        btnTabTasks.click();
+    }
+    if (STATE && STATE.emit) {
+        STATE.emit("rightTabChanged", "tasks");
+    }
+};

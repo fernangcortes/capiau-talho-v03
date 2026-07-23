@@ -218,11 +218,28 @@ function formatTimecode(sec) {
     return `${pad(hrs)}:${pad(mins)}:${pad(secs)}:${pad(frames)}`;
 }
 
+function hasFailedChildren(node) {
+    if (node.type === "file") {
+        const v = node.video;
+        if (!v) return false;
+        return window.libraryInstance ? window.libraryInstance.isMediaFailed(v) : false;
+    }
+    if (node.type === "folder") {
+        return Object.values(node.children).some(child => hasFailedChildren(child));
+    }
+    return false;
+}
+
 function renderTreeNode(node, container, depth = 0) {
     if (node.type === "folder") {
         const query = document.getElementById("library-search-input")?.value.toLowerCase().trim() || "";
         if (query && !hasMatchingChildren(node, query)) {
             return;
+        }
+        if (window.libraryInstance && window.libraryInstance.isFailedFilterActive) {
+            if (!hasFailedChildren(node)) {
+                return;
+            }
         }
         const folderDiv = document.createElement("div");
         folderDiv.className = "tree-folder-container";
@@ -373,9 +390,11 @@ function renderTreeNode(node, container, depth = 0) {
             }
         }
         
-        const vText = ((v.summary || '') + ' ' + (v.description || '') + ' ' + (v.title || '')).toLowerCase();
-        const errorKeys = ['nenhum', 'falha', 'ausen', 'indispon', 'impossibilita', 'erro de captura', 'não foi possível', 'não pde'];
-        const hasVisionError = v.status === "error" || errorKeys.some(k => vText.includes(k));
+        const hasVisionError = window.libraryInstance ? window.libraryInstance.isMediaFailed(v) : (v.status === "error");
+
+        if (window.libraryInstance && window.libraryInstance.isFailedFilterActive) {
+            if (!hasVisionError) return;
+        }
 
         const card = document.createElement("div");
         card.className = "media-card tree-file-item" + (hasVisionError ? " has-vision-error" : "");
@@ -440,6 +459,10 @@ function renderTreeNode(node, container, depth = 0) {
 
         const visionBadgeHtml = hasVisionError ? `<div class="vision-error-badge" data-tooltip="Falha visual detectada. Clique em Reanalisar Falhas no topo"><i class="fa-solid fa-triangle-exclamation"></i> Falha Visual</div>` : '';
 
+        const overrideBtnHtml = hasVisionError
+            ? `<button class="btn-card-action btn-hover-only btn-quick-override-ok" style="background:transparent; border:none; color:var(--color-emerald); cursor:pointer; padding: 2px;" title="Marcar como Analisado (Ignorar Falha)"><i class="fa-solid fa-circle-check" style="font-size: 10px;"></i></button>`
+            : `<button class="btn-card-action btn-hover-only btn-quick-override-fail" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" title="Sinalizar Falha Visual (Mandar para Reanálise)"><i class="fa-solid fa-triangle-exclamation" style="font-size: 10px;"></i></button>`;
+
         card.innerHTML = `
             <div class="media-thumbnail" style="position: relative;">
                 ${thumbContent}
@@ -458,10 +481,37 @@ function renderTreeNode(node, container, depth = 0) {
                     ${statusGlow}
                     ${statusBadge}
                     <span class="badge-tag ${badgeClass}">${badgeLabel}</span>
+                    ${overrideBtnHtml}
                     ${actionBtn}
                 </div>
             </div>
         `;
+
+        const qOverrideOk = card.querySelector(".btn-quick-override-ok");
+        if (qOverrideOk) {
+            qOverrideOk.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                try {
+                    await CapIAuAPI.overrideVideoStatus(v.id, "analyzed");
+                    if (window.libraryInstance) await window.libraryInstance.reloadData();
+                } catch (err) {
+                    alert("Erro ao marcar como analisado: " + err.message);
+                }
+            });
+        }
+
+        const qOverrideFail = card.querySelector(".btn-quick-override-fail");
+        if (qOverrideFail) {
+            qOverrideFail.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                try {
+                    await CapIAuAPI.overrideVideoStatus(v.id, "error");
+                    if (window.libraryInstance) await window.libraryInstance.reloadData();
+                } catch (err) {
+                    alert("Erro ao sinalizar falha: " + err.message);
+                }
+            });
+        }
         
         const selectBtn = card.querySelector(".btn-select-similar-item");
         if (selectBtn) {
@@ -480,6 +530,58 @@ function renderTreeNode(node, container, depth = 0) {
                 selectIcon.className = "fa-solid fa-square-check";
                 selectIcon.style.color = "var(--color-cyan)";
             }
+        }
+
+        const isFailedFilter = window.libraryInstance && window.libraryInstance.isFailedFilterActive;
+        const isFailedSelected = isFailedFilter && window.libraryInstance.selectedFailedIds.has(v.id);
+
+        if (isFailedFilter) {
+            if (selectBtn) {
+                selectBtn.style.display = "flex";
+                const selectIcon = selectBtn.querySelector("i");
+                if (isFailedSelected) {
+                    card.classList.add("selected-for-similar");
+                    card.style.borderColor = "#facc15";
+                    if (selectIcon) {
+                        selectIcon.className = "fa-solid fa-square-check";
+                        selectIcon.style.color = "#facc15";
+                    }
+                } else {
+                    card.classList.remove("selected-for-similar");
+                    card.style.borderColor = "";
+                    if (selectIcon) {
+                        selectIcon.className = "fa-regular fa-square";
+                        selectIcon.style.color = "var(--text-muted)";
+                    }
+                }
+
+                selectBtn.replaceWith(selectBtn.cloneNode(true));
+                const newSelectBtn = card.querySelector(".btn-select-similar-item");
+                if (newSelectBtn) {
+                    newSelectBtn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        if (window.libraryInstance.selectedFailedIds.has(v.id)) {
+                            window.libraryInstance.selectedFailedIds.delete(v.id);
+                        } else {
+                            window.libraryInstance.selectedFailedIds.add(v.id);
+                        }
+                        window.libraryInstance.renderVideos(STATE.allVideos);
+                        window.libraryInstance.checkFailedMediaCount();
+                    });
+                }
+            }
+
+            card.addEventListener("click", (e) => {
+                if (e.target.closest(".btn-toggle-filename") || e.target.closest(".btn-card-action") || e.target.closest(".btn-select-similar-item")) return;
+                if (window.libraryInstance.selectedFailedIds.has(v.id)) {
+                    window.libraryInstance.selectedFailedIds.delete(v.id);
+                } else {
+                    window.libraryInstance.selectedFailedIds.add(v.id);
+                }
+                window.libraryInstance.renderVideos(STATE.allVideos);
+                window.libraryInstance.checkFailedMediaCount();
+            });
         }
         
         card.addEventListener("click", () => {
@@ -887,6 +989,10 @@ export class LibraryManager {
         this.btnAnalyzePhoto = document.getElementById("btn-analyze-photo-vision");
         this.isPhotoZoomed = false;
 
+        // Estado do Filtro de Falhas & Seleção
+        this.isFailedFilterActive = false;
+        this.selectedFailedIds = new Set();
+
         this.init();
     }
 
@@ -922,26 +1028,20 @@ export class LibraryManager {
         if (this.btnRetryFailed) this.btnRetryFailed.addEventListener("click", () => this.runRetryFailed());
         if (this.btnTranscribeAll) this.btnTranscribeAll.addEventListener("click", () => this.triggerTranscribeAll());
 
-        const triggerReanalyze = async () => {
-            const ok = confirm("Deseja reanalisar em lote todos os vídeos afetados por falha visual utilizando os proxies 720p?");
-            if (!ok) return;
-            try {
-                const res = await fetch(`/api/media/reanalyze-failed?project_id=${STATE.currentProjectId || ''}`, { method: "POST" });
-                const data = await res.json();
-                if (window.showToast) window.showToast(`Reanálise disparada para ${data.count} vídeos!`, "info");
-                else alert(`Reanálise disparada para ${data.count} vídeos!`);
-                this.checkFailedMediaCount();
-                this.reloadData();
-            } catch (err) {
-                alert("Erro ao disparar reanálise: " + err.message);
-            }
-        };
-
         const btnReanalyzeFailed = document.getElementById("btn-reanalyze-failed");
-        if (btnReanalyzeFailed) btnReanalyzeFailed.addEventListener("click", triggerReanalyze);
+        if (btnReanalyzeFailed) btnReanalyzeFailed.addEventListener("click", () => this.handleFailedButtonClick());
+
+        const btnSelectAllFailed = document.getElementById("btn-select-all-failed");
+        if (btnSelectAllFailed) btnSelectAllFailed.addEventListener("click", () => this.selectAllFailedMedia());
+
+        const btnDeselectAllFailed = document.getElementById("btn-deselect-all-failed");
+        if (btnDeselectAllFailed) btnDeselectAllFailed.addEventListener("click", () => this.deselectAllFailedMedia());
+
+        const btnExitFailedFilter = document.getElementById("btn-exit-failed-filter");
+        if (btnExitFailedFilter) btnExitFailedFilter.addEventListener("click", () => this.exitFailedFilter());
 
         const btnBannerReanalyze = document.getElementById("btn-reanalyze-failed-banner");
-        if (btnBannerReanalyze) btnBannerReanalyze.addEventListener("click", triggerReanalyze);
+        if (btnBannerReanalyze) btnBannerReanalyze.addEventListener("click", () => this.handleFailedButtonClick());
 
         this.checkFailedMediaCount();
 
@@ -1731,6 +1831,114 @@ export class LibraryManager {
         }
     }
 
+    isMediaFailed(v) {
+        if (!v) return false;
+        if (v.status === "analyzing" || v.status === "processing" || v.status === "transcribing" || v.status === "pending") {
+            return false;
+        }
+        const vText = ((v.summary || '') + ' ' + (v.description || '') + ' ' + (v.title || '')).toLowerCase();
+        const errorKeys = [
+            'análise visual falhou', 'análise falhou', 'sistema de análise', 'falha visual', 'erro de captura',
+            'não foi possível', 'chroma', 'croma', 'tela verde', 'artefato', 'distorção', 'distorcao', 'corrompido'
+        ];
+        return v.status === "error" || errorKeys.some(k => vText.includes(k));
+    }
+
+    async handleFailedButtonClick() {
+        const btn = document.getElementById("btn-reanalyze-failed");
+        if (!btn) return;
+
+        if (!this.isFailedFilterActive) {
+            // Estágio 1 -> Estágio 2: Efeito pulso + spinner + ativa filtro para mídias com falha
+            btn.classList.add("btn-thumb-click-pulse");
+            const iconEl = btn.querySelector("i");
+            if (iconEl) iconEl.className = "fa-solid fa-circle-notch fa-spin";
+
+            const allVideos = STATE.allVideos || [];
+            const failedVideos = allVideos.filter(v => this.isMediaFailed(v));
+
+            this.selectedFailedIds = new Set(failedVideos.map(v => v.id));
+            this.isFailedFilterActive = true;
+
+            this.renderVideos(allVideos);
+
+            setTimeout(() => {
+                if (iconEl) iconEl.className = "fa-solid fa-arrows-rotate";
+                btn.classList.remove("btn-thumb-click-pulse");
+                this.checkFailedMediaCount();
+            }, 300);
+
+            if (window.showToast) {
+                window.showToast(`Exibindo ${failedVideos.length} mídias com falha visual.`, "info");
+            }
+        } else {
+            // Estágio 2 -> Estágio 3: Dispara reanálise dos selecionados com animação p/ MLD
+            if (this.selectedFailedIds.size === 0) {
+                if (window.showToast) window.showToast("Selecione pelo menos uma mídia para reanalisar!", "warning");
+                else alert("Selecione pelo menos uma mídia para reanalisar!");
+                return;
+            }
+
+            const selectedIdsArray = Array.from(this.selectedFailedIds);
+
+            // Animação voadora p/ MLD (Tasks)
+            if (window.flyToTasksAnimation) {
+                window.flyToTasksAnimation(btn);
+            }
+
+            // Abre / expande MLD e alterna p/ Tarefas
+            if (window.openTasksDrawerAndSwitchTab) {
+                window.openTasksDrawerAndSwitchTab();
+            }
+
+            try {
+                const res = await fetch(`/api/media/reanalyze-failed?project_id=${STATE.currentProjectId || ''}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ media_ids: selectedIdsArray })
+                });
+                const data = await res.json();
+                if (window.showToast) window.showToast(`Reanálise iniciada para ${data.count || selectedIdsArray.length} vídeos!`, "info");
+
+                // Força atualização imediata do feed de tarefas no MLD
+                if (window.panelsManager && window.panelsManager.refreshTasks) {
+                    window.panelsManager.refreshTasks();
+                    setTimeout(() => window.panelsManager && window.panelsManager.refreshTasks(), 600);
+                    setTimeout(() => window.panelsManager && window.panelsManager.refreshTasks(), 1500);
+                }
+
+                this.exitFailedFilter();
+                this.reloadData();
+            } catch (err) {
+                console.error("Erro ao disparar reanálise selecionada:", err);
+                if (window.showToast) window.showToast("Erro ao disparar reanálise: " + err.message, "error");
+            }
+        }
+    }
+
+    selectAllFailedMedia() {
+        const allVideos = STATE.allVideos || [];
+        const failedVideos = allVideos.filter(v => this.isMediaFailed(v));
+        this.selectedFailedIds = new Set(failedVideos.map(v => v.id));
+        this.renderVideos(allVideos);
+        this.checkFailedMediaCount();
+    }
+
+    deselectAllFailedMedia() {
+        this.selectedFailedIds.clear();
+        const allVideos = STATE.allVideos || [];
+        this.renderVideos(allVideos);
+        this.checkFailedMediaCount();
+    }
+
+    exitFailedFilter() {
+        this.isFailedFilterActive = false;
+        this.selectedFailedIds.clear();
+        const allVideos = STATE.allVideos || [];
+        this.renderVideos(allVideos);
+        this.checkFailedMediaCount();
+    }
+
     async checkFailedMediaCount() {
         try {
             const res = await fetch(`/api/media/failed-count?project_id=${STATE.currentProjectId || ''}`);
@@ -1739,16 +1947,43 @@ export class LibraryManager {
             
             const btn = document.getElementById("btn-reanalyze-failed");
             const badge = document.getElementById("failed-count-badge");
+            const btnSelectAll = document.getElementById("btn-select-all-failed");
+            const btnDeselectAll = document.getElementById("btn-deselect-all-failed");
+            const btnExitFilter = document.getElementById("btn-exit-failed-filter");
             const banner = document.getElementById("failed-media-banner");
             const bannerCount = document.getElementById("banner-failed-count");
 
-            if (data.count > 0) {
-                if (badge) badge.textContent = data.count;
+            if (data.count > 0 || this.isFailedFilterActive) {
                 if (btn) btn.style.display = "inline-flex";
                 if (bannerCount) bannerCount.textContent = data.count;
                 if (banner) banner.style.display = "flex";
+
+                if (this.isFailedFilterActive) {
+                    // Estado Amarelo (Filtrado / Selecionando)
+                    if (btn) {
+                        btn.className = "lib-action-btn state-filtering-failures";
+                        btn.setAttribute("data-tooltip", "Analisar selecionados");
+                    }
+                    if (badge) badge.textContent = this.selectedFailedIds.size;
+                    if (btnSelectAll) btnSelectAll.style.display = "inline-flex";
+                    if (btnDeselectAll) btnDeselectAll.style.display = "inline-flex";
+                    if (btnExitFilter) btnExitFilter.style.display = "inline-flex";
+                } else {
+                    // Estado Vermelho (Visão com falha detectada)
+                    if (btn) {
+                        btn.className = "lib-action-btn btn-flat-rose state-has-failures";
+                        btn.setAttribute("data-tooltip", "Ver falhas na biblioteca");
+                    }
+                    if (badge) badge.textContent = data.count;
+                    if (btnSelectAll) btnSelectAll.style.display = "none";
+                    if (btnDeselectAll) btnDeselectAll.style.display = "none";
+                    if (btnExitFilter) btnExitFilter.style.display = "none";
+                }
             } else {
                 if (btn) btn.style.display = "none";
+                if (btnSelectAll) btnSelectAll.style.display = "none";
+                if (btnDeselectAll) btnDeselectAll.style.display = "none";
+                if (btnExitFilter) btnExitFilter.style.display = "none";
                 if (banner) banner.style.display = "none";
             }
         } catch (err) {
@@ -3066,6 +3301,54 @@ export class LibraryManager {
         }
         if (summaryEl) {
             summaryEl.textContent = video.summary || video.description || "Nenhum resumo ou metadado gerado para esta mídia.";
+        }
+
+        const warnBox = document.getElementById("inspector-warning-box");
+        const warnText = document.getElementById("inspector-warning-text");
+        if (warnBox && warnText) {
+            if (video.error_message) {
+                warnText.textContent = video.error_message;
+                warnBox.style.display = "flex";
+            } else {
+                warnBox.style.display = "none";
+            }
+        }
+
+        const btnMarkFailed = document.getElementById("btn-inspector-mark-failed");
+        const btnMarkAnalyzed = document.getElementById("btn-inspector-mark-analyzed");
+        
+        if (btnMarkFailed) {
+            btnMarkFailed.onclick = async () => {
+                try {
+                    await CapIAuAPI.overrideVideoStatus(video.id, "error");
+                    video.status = "error";
+                    video.error_message = "Marcado manualmente como falha visual pelo usuário.";
+                    alert(`Mídia "${getFriendlyTitle(video)}" sinalizada como falha visual para reanálise.`);
+                    if (window.libraryInstance) {
+                        await window.libraryInstance.reloadData();
+                    }
+                    this.loadMediaInspector(video);
+                } catch (e) {
+                    alert("Erro ao alterar status: " + e.message);
+                }
+            };
+        }
+
+        if (btnMarkAnalyzed) {
+            btnMarkAnalyzed.onclick = async () => {
+                try {
+                    await CapIAuAPI.overrideVideoStatus(video.id, "analyzed");
+                    video.status = "analyzed";
+                    video.error_message = null;
+                    alert(`Mídia "${getFriendlyTitle(video)}" marcada como analisada (falha ignorada).`);
+                    if (window.libraryInstance) {
+                        await window.libraryInstance.reloadData();
+                    }
+                    this.loadMediaInspector(video);
+                } catch (e) {
+                    alert("Erro ao alterar status: " + e.message);
+                }
+            };
         }
 
         // Categoria da triagem (E2.C2): dropdown de correção

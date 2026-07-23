@@ -163,6 +163,11 @@ class TaskManager:
                 self.progress[task_key]["status"] = "cancelled"
         self._flush_sink(force=True)
 
+    def is_cancelled(self, task_key: str) -> bool:
+        """Verifica se a tarefa foi cancelada pelo usuário."""
+        with self._lock:
+            return task_key in self.cancelled_tasks
+
 
     def get_progress(self) -> Dict[str, Dict[str, Any]]:
         """Retorna uma cópia do dicionário de progresso de todas as tarefas."""

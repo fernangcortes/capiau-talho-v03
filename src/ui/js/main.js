@@ -1,8 +1,8 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { VideoPlayer, formatTimecode } from "./player.js";
-import { LibraryManager } from "./library.js";
-import { PanelsManager } from "./panels.js?v=2";
+import { LibraryManager } from "./library.js?v=9";
+import { PanelsManager } from "./panels.js?v=9";
 import { ChatManager } from "./chat.js";
 import { ProjectsManager } from "./projects.js";
 import { FaceManager } from "./faces.js";
@@ -2023,6 +2023,7 @@ window.addEventListener("DOMContentLoaded", () => {
             STATE.currentRightTab = tab;
             // Salva no localStorage
             localStorage.setItem("active-right-tab", tab);
+            STATE.emit("rightTabChanged", tab);
         });
     });
 

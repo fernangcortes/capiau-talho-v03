@@ -593,9 +593,12 @@ export class CapIAuAPI {
         });
     }
 
-    static deletePromptOverride(promptId, scope = "global", projectId = null) {
-        const qs = scope === "project" ? `?scope=project&project_id=${projectId}` : "?scope=global";
-        return this.request(`/api/settings/prompts/${encodeURIComponent(promptId)}${qs}`, { method: "DELETE" });
+    static overrideVideoStatus(videoId, status) {
+        return this.request(`/api/video/${videoId}/override-status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status })
+        });
     }
 }
 

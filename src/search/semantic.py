@@ -132,6 +132,9 @@ class SemanticSearch:
         'descriptions' deve ser uma lista de dicionários contendo:
         {'timestamp': float, 'description': str, 'tags': list}
         """
+        if not self.is_available or not self.encoder or not self.client:
+            print(f"[QDRANT] Buscador vetorial indisponível no momento. Pulando indexação de broll do vídeo {video_id}.")
+            return
         points = []
         for idx, desc in enumerate(descriptions):
             text_to_embed = f"B-Roll frame {desc['timestamp']}s: {desc['description']}. Elementos: {', '.join(desc['tags'])}"
@@ -172,6 +175,8 @@ class SemanticSearch:
 
     def delete_video_broll_points(self, project_id: int, video_id: int) -> None:
         """Remove os pontos de B-roll (frames) de um vídeo — evita órfãos ao reanalisar."""
+        if not self.is_available or not self.client:
+            return
         try:
             self.client.delete(
                 collection_name=self.collection_name,

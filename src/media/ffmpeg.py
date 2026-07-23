@@ -129,6 +129,7 @@ def is_solid_green_or_corrupted(image_path: Path) -> bool:
 
 def extract_frame(video_path: Path, timestamp: float, output_path: Path, proxy_fallback_path: Optional[Path] = None) -> bool:
     """Extrai um único frame JPEG de alta qualidade a partir de um timestamp com validação visual e fallback para busca lenta / proxy."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     startupinfo = None
     if os.name == 'nt':
         startupinfo = subprocess.STARTUPINFO()
@@ -261,6 +262,7 @@ def generate_video_proxy(
 
 def extract_thumbnail_frame(video_path: Path, timestamp: float, output_path: Path, width: int = 120) -> bool:
     """Extrai um único frame JPEG em baixa resolução de forma rápida, com tratamento para MTS e busca lenta como fallback."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     is_mts = video_path.suffix.lower() == '.mts'
     
     cmd_fast = [

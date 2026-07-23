@@ -585,14 +585,41 @@ async def get_all_conversions():
 
 @router.post("/api/video/{video_id}/cancel-conversion")
 def cancel_conversion(video_id: int):
-    """Cancela o processo ativo de codificação de proxy de um vídeo."""
+    """Cancela o processo ativo de codificação ou análise visual de um vídeo."""
     success = TASK_MANAGER.cancel_process(video_id)
-    TASK_MANAGER.update_progress(str(video_id), 0.0, "cancelled")
+    TASK_MANAGER.cancel_task(str(video_id))
     with get_db() as conn:
         MediaRepository.update_video_status(conn, video_id, 'ingested')
-    if success:
-        return {"status": "success", "message": f"Conversão do vídeo ID {video_id} cancelada."}
-    raise HTTPException(status_code=400, detail="Nenhuma conversão ativa rodando para este vídeo.")
+    return {"status": "success", "message": f"Tarefa do vídeo ID {video_id} cancelada com sucesso."}
+
+class OverrideStatusRequest(BaseModel):
+    status: Optional[str] = None
+
+@router.api_route("/api/video/{video_id}/override-status", methods=["POST", "PUT"])
+def override_video_status(
+    video_id: int,
+    payload: Optional[OverrideStatusRequest] = None,
+    status: Optional[str] = Query(None),
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Permite ao usuário alternar manualmente o status de uma mídia entre 'error' e 'analyzed'."""
+    video = MediaRepository.get_video(conn, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
+    
+    raw_status = (payload.status if payload and payload.status else status) or ""
+    target_status = raw_status.lower().strip()
+    if target_status not in ("error", "analyzed"):
+        raise HTTPException(status_code=400, detail="O parâmetro status deve ser 'error' ou 'analyzed'.")
+        
+    if target_status == "error":
+        err_msg = "Marcado manualmente como falha visual pelo usuário."
+        MediaRepository.update_video_status(conn, video_id, 'error', error_message=err_msg)
+    else:
+        MediaRepository.update_video_status(conn, video_id, 'analyzed', error_message=None)
+        
+    updated = MediaRepository.get_video(conn, video_id)
+    return {"status": "success", "video": updated}
 
 @router.delete("/api/video/{video_id}/proxy")
 def delete_proxy(video_id: int):
@@ -798,7 +825,7 @@ def get_video_thumbnail(video_id: int, conn: sqlite3.Connection = Depends(get_db
     if success and thumb_path.exists():
         return FileResponse(thumb_path, headers=cache_headers)
         
-    raise HTTPException(status_code=500, detail="Não foi possível gerar a miniatura do vídeo.")
+    raise HTTPException(status_code=404, detail="Não foi possível gerar a miniatura do vídeo.")
 
 
 @router.post("/api/video/{video_id}/thumbnail")
@@ -955,11 +982,15 @@ def get_failed_media_count(project_id: Optional[int] = None):
     return {"count": len(failed_ids), "ids": failed_ids}
 
 
+class ReanalyzeFailedRequest(BaseModel):
+    media_ids: Optional[List[int]] = None
+
 @router.post("/api/media/reanalyze-failed")
-def reanalyze_failed_media(project_id: Optional[int] = None):
-    """Dispara a reanálise em lote de todas as mídias afetadas por falha visual."""
+def reanalyze_failed_media(req: Optional[ReanalyzeFailedRequest] = None, project_id: Optional[int] = None):
+    """Dispara a reanálise em lote das mídias afetadas por falha visual."""
     from src.services.pipeline import PipelineService
-    reanalyzed = PipelineService.reanalyze_failed_videos(project_id)
+    m_ids = req.media_ids if req else None
+    reanalyzed = PipelineService.reanalyze_failed_videos(project_id, media_ids=m_ids)
     return {"status": "success", "count": len(reanalyzed), "ids": reanalyzed}
 
 

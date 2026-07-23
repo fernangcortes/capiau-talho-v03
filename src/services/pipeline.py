@@ -738,6 +738,11 @@ class PipelineService:
             total_stamps = len(frame_jobs)
             frames_ok = 0
             for idx, job in enumerate(frame_jobs):
+                if TASK_MANAGER.is_cancelled(str(video_id)):
+                    print(f"[Vision] Análise do vídeo {video_id} foi cancelada pelo usuário. Encerrando thread.")
+                    with get_db() as conn:
+                        MediaRepository.update_video_status(conn, video_id, 'ingested')
+                    return False
                 timestamp = job["timestamp"]
                 percent = (idx / total_stamps) * 100.0
                 TASK_MANAGER.update_progress(str(video_id), percent, "running", task_type="vision")
@@ -841,18 +846,26 @@ class PipelineService:
                 except Exception:
                     pass
 
-            if frames_ok == 0 or not descriptions_indexed:
-                # Nenhum frame processado com sucesso — sinaliza erro explícito
-                err_msg = f"Nenhum frame com informação visual pôde ser processado para {frame_source.name}."
-                print(f"[Vision] {err_msg}")
+            total_jobs = len(frame_jobs)
+            successful_frames = len(descriptions_indexed)
+            failed_frames = total_jobs - successful_frames
+            failure_ratio = (failed_frames / total_jobs) if total_jobs > 0 else 1.0
+
+            if successful_frames == 0 or failure_ratio > 0.20:
+                # Mais de 20% dos frames falharam ou nenhum frame processado — sinaliza erro explícito
+                err_msg = f"Falha na análise visual: {failed_frames} de {total_jobs} quadros falharam (taxa de erro > 20%)."
+                print(f"[Vision] Vídeo {video_id}: {err_msg}")
                 with get_db() as conn:
                     MediaRepository.update_video_status(conn, video_id, 'error', error_message=err_msg)
                 TASK_MANAGER.update_progress(str(video_id), 0.0, "failed", task_type="vision")
                 return False
 
             if descriptions_indexed:
-                search_engine = SemanticSearch.get_instance()
-                search_engine.index_broll_descriptions(project_id, video_id, descriptions_indexed)
+                try:
+                    search_engine = SemanticSearch.get_instance()
+                    search_engine.index_broll_descriptions(project_id, video_id, descriptions_indexed)
+                except Exception as qdrant_err:
+                    print(f"[Vision] Falha na indexação vetorial Qdrant do vídeo {video_id}: {qdrant_err}")
 
                 try:
                     PipelineService.generate_video_summary(video_id, "broll", project_id, descriptions_indexed)
@@ -874,7 +887,8 @@ class PipelineService:
                     print(f"[Vision] Falha na atribuição incremental de temas: {theme_err}")
 
             with get_db() as conn:
-                MediaRepository.update_video_status(conn, video_id, 'analyzed')
+                warn_msg = f"Aviso: {failed_frames} de {total_jobs} quadros falharam na análise visual." if failed_frames > 0 else None
+                MediaRepository.update_video_status(conn, video_id, 'analyzed', error_message=warn_msg)
             TASK_MANAGER.update_progress(str(video_id), 100.0, "finished", task_type="vision")
             return True
         except Exception as e:
@@ -1241,18 +1255,29 @@ class PipelineService:
             cursor = conn.cursor()
             base_query = """
                 SELECT id FROM video 
-                WHERE status = 'error' 
-                   OR LOWER(summary) LIKE '%nenhum%'
-                   OR LOWER(summary) LIKE '%falha%'
-                   OR LOWER(summary) LIKE '%ausen%'
-                   OR LOWER(summary) LIKE '%indispon%'
-                   OR LOWER(summary) LIKE '%impossibilita%'
-                   OR LOWER(description) LIKE '%nenhum%'
-                   OR LOWER(description) LIKE '%falha%'
-                   OR LOWER(description) LIKE '%ausen%'
-                   OR LOWER(description) LIKE '%indispon%'
-                   OR LOWER(description) LIKE '%impossibilita%'
-                   OR LOWER(title) LIKE '%falha%'
+                WHERE (status = 'error' 
+                   OR LOWER(summary) LIKE '%análise visual falhou%'
+                   OR LOWER(summary) LIKE '%análise falhou%'
+                   OR LOWER(summary) LIKE '%sistema de análise%falhou%'
+                   OR LOWER(summary) LIKE '%chroma%'
+                   OR LOWER(summary) LIKE '%croma%'
+                   OR LOWER(summary) LIKE '%tela verde%'
+                   OR LOWER(summary) LIKE '%artefato%'
+                   OR LOWER(summary) LIKE '%distorção%'
+                   OR LOWER(summary) LIKE '%distorcao%'
+                   OR LOWER(summary) LIKE '%corrompido%'
+                   OR LOWER(description) LIKE '%análise visual falhou%'
+                   OR LOWER(description) LIKE '%análise falhou%'
+                   OR LOWER(description) LIKE '%sistema de análise%falhou%'
+                   OR LOWER(description) LIKE '%chroma%'
+                   OR LOWER(description) LIKE '%croma%'
+                   OR LOWER(description) LIKE '%tela verde%'
+                   OR LOWER(description) LIKE '%artefato%'
+                   OR LOWER(description) LIKE '%distorção%'
+                   OR LOWER(description) LIKE '%distorcao%'
+                   OR LOWER(description) LIKE '%corrompido%'
+                   OR LOWER(title) LIKE '%falha visual%')
+                  AND status NOT IN ('analyzing', 'processing', 'transcribing', 'pending')
             """
             if project_id:
                 proj_rows = cursor.execute(base_query + " AND project_id = ?", (project_id,)).fetchall()
@@ -1264,10 +1289,15 @@ class PipelineService:
             return [r['id'] for r in all_rows]
 
     @staticmethod
-    def reanalyze_failed_videos(project_id: Optional[int] = None) -> List[int]:
-        """Dispara reanálise em lote de todas as mídias afetadas por falha visual utilizando os proxies 720p."""
+    def reanalyze_failed_videos(project_id: Optional[int] = None, media_ids: Optional[List[int]] = None) -> List[int]:
+        """Dispara reanálise em lote das mídias afetadas por falha visual (ou apenas as selecionadas em media_ids)."""
         import threading
-        affected_ids = PipelineService.get_failed_video_ids(project_id)
+        from src.core.tasks import TASK_MANAGER
+        if media_ids:
+            affected_ids = list(media_ids)
+        else:
+            affected_ids = PipelineService.get_failed_video_ids(project_id)
+
         print(f"[Vision] Iniciando reanálise em lote de {len(affected_ids)} vídeos afetados...")
         
         with get_db() as conn:
@@ -1280,6 +1310,7 @@ class PipelineService:
                 v_dur = float(row["duration"] or 0.0)
                 
                 MediaRepository.update_video_status(conn, vid, 'pending', error_message=None)
+                TASK_MANAGER.update_progress(str(vid), 0.0, "running", task_type="vision")
                 
                 t = threading.Thread(
                     target=PipelineService.analyze_video_vision,
