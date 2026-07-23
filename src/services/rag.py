@@ -520,7 +520,11 @@ class RAGService:
             response = requests.post(url, headers=headers, json=payload, timeout=S.get("chat.categorize_timeout"))
             if response.status_code == 200:
                 res_json = response.json()
-                ai_text = res_json['choices'][0]['message']['content'].strip()
+                msg = res_json.get('choices', [{}])[0].get('message', {})
+                raw_content = msg.get('content')
+                if not isinstance(raw_content, str) or not raw_content.strip():
+                    return {"categories": []}
+                ai_text = raw_content.strip()
                 # Tentar decodificar o JSON retornado
                 return json.loads(ai_text)
             return {"categories": []}
@@ -606,7 +610,16 @@ class RAGService:
             response = requests.post(url, headers=headers, json=payload, timeout=S.get("chat.timeout"))
             if response.status_code == 200:
                 res_json = response.json()
-                ai_text = res_json['choices'][0]['message']['content'].strip()
+                msg = res_json.get('choices', [{}])[0].get('message', {})
+                raw_content = msg.get('content')
+                if not isinstance(raw_content, str) or not raw_content.strip():
+                    return {
+                        "response": "Não foi possível obter resposta válida do modelo de linguagem.",
+                        "context_used": context_items,
+                        "index_status": index_status,
+                        "warning": index_warning
+                    }
+                ai_text = raw_content.strip()
                 return {
                     "response": ai_text,
                     "context_used": context_items,

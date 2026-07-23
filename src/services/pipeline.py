@@ -97,13 +97,17 @@ class PipelineService:
                     print(f"[{log_prefix}] Falha na API de visão (modelo {model}, status {response.status_code}): {response.text[:300]}")
                     return None
                 res_json = response.json()
-                if "choices" not in res_json:
+                if "choices" not in res_json or not res_json["choices"]:
                     # status 200 com corpo de erro (ex.: "Upstream idle timeout
                     # exceeded") acontece de verdade com modelos ':free' sob carga.
                     print(f"[{log_prefix}] Resposta sem 'choices' do modelo {model}: {res_json.get('error', res_json)}")
                     return None
-                content = res_json["choices"][0]["message"]["content"].strip()
-                return extract_json_from_markdown(content)
+                msg = res_json["choices"][0].get("message", {})
+                raw_content = msg.get("content")
+                if not isinstance(raw_content, str) or not raw_content.strip():
+                    print(f"[{log_prefix}] Resposta sem conteúdo do modelo {model}: {res_json.get('error', res_json)}")
+                    return None
+                return extract_json_from_markdown(raw_content.strip())
             except Exception as e:
                 print(f"[{log_prefix}] Erro ao chamar {model}: {e}")
                 return None
@@ -1135,8 +1139,11 @@ class PipelineService:
             response = requests.post(url, headers=headers, json=payload, timeout=35)
             if response.status_code == 200:
                 res_json = response.json()
-                content = res_json['choices'][0]['message']['content'].strip()
-                data = extract_json_from_markdown(content)
+                msg = res_json.get('choices', [{}])[0].get('message', {})
+                raw_content = msg.get('content')
+                if not isinstance(raw_content, str) or not raw_content.strip():
+                    return {"themes": []}
+                data = extract_json_from_markdown(raw_content.strip())
                 
                 with get_db() as conn:
                     for t in data.get("themes", []):
@@ -1220,8 +1227,11 @@ class PipelineService:
             response = requests.post(url, headers=headers, json=payload, timeout=S.get("summary.timeout"))
             if response.status_code == 200:
                 res_json = response.json()
-                content = res_json['choices'][0]['message']['content'].strip()
-                data = extract_json_from_markdown(content)
+                msg = res_json.get('choices', [{}])[0].get('message', {})
+                raw_content = msg.get('content')
+                if not isinstance(raw_content, str) or not raw_content.strip():
+                    return False
+                data = extract_json_from_markdown(raw_content.strip())
 
                 desc = data.get("description", "")
                 if isinstance(desc, list):

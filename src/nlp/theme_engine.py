@@ -194,8 +194,12 @@ def _name_clusters_llm(clusters: Dict[int, List[Dict[str, Any]]], existing_title
             )
             if response.status_code != 200:
                 print(f"[THEME] Falha LLM na nomeação (status {response.status_code}) no lote {batch_start}")
+            res_json = response.json()
+            msg = res_json.get("choices", [{}])[0].get("message", {})
+            raw_content = msg.get("content")
+            if not isinstance(raw_content, str) or not raw_content.strip():
                 continue
-            content = response.json()["choices"][0]["message"]["content"].strip()
+            content = raw_content.strip()
             data = extract_json_from_markdown(content)
             for c in data.get("clusters", []):
                 try:

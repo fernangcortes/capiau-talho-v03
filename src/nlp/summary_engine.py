@@ -84,7 +84,11 @@ Responda estritamente em Português e em formato JSON com a seguinte estrutura (
         response = requests.post(url, headers=headers, json=payload, timeout=30)
         if response.status_code == 200:
             res_json = response.json()
-            content = res_json['choices'][0]['message']['content'].strip()
+            msg = res_json.get('choices', [{}])[0].get('message', {})
+            raw_content = msg.get('content')
+            if not isinstance(raw_content, str) or not raw_content.strip():
+                return False
+            content = raw_content.strip()
             
             # Limpar formatações markdown do JSON
             if "```json" in content:

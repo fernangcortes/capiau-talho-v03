@@ -9,6 +9,7 @@ import json
 import hashlib
 import threading
 import requests
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any, Optional
 
 from src.config import CONFIG
@@ -51,6 +52,20 @@ def rewrite_description_llm(
     primary = S.get("llm.text_model")
     fallback = S.get("llm.text_model_fallback")
     retries = max(1, S.get("enrichment.max_retries"))
+
+    # Cadeia encadeada de fallbacks: Primary -> Opção B (Gemini) -> Opção A (OpenRouter Free) -> Opção C (Llama 70B Free)
+    cascade = [
+        primary,
+        fallback,
+        "google/gemini-2.5-flash",
+        "openrouter/free",
+        "meta-llama/llama-3.3-70b-instruct:free"
+    ]
+    models_to_try = []
+    for m in cascade:
+        if m and isinstance(m, str) and m not in models_to_try:
+            models_to_try.append(m)
+
     base_payload = {
         "messages": [{"role": "user", "content": prompt}],
         "temperature": S.get("enrichment.temperature"),
@@ -71,10 +86,15 @@ def rewrite_description_llm(
                 print(f"[ENRICH] Falha LLM (modelo {model}, status {response.status_code}): {response.text[:200]}")
                 return None
             res_json = response.json()
-            if "choices" not in res_json:
+            if "choices" not in res_json or not res_json["choices"]:
                 print(f"[ENRICH] Resposta sem 'choices' do modelo {model}: {res_json.get('error', res_json)}")
                 return None
-            content = res_json["choices"][0]["message"]["content"].strip()
+            msg = res_json["choices"][0].get("message", {})
+            raw_content = msg.get("content")
+            if not isinstance(raw_content, str) or not raw_content.strip():
+                print(f"[ENRICH] Resposta sem conteúdo do modelo {model}: {res_json.get('error', res_json)}")
+                return None
+            content = raw_content.strip()
             data = extract_json_from_markdown(content)
             rewritten = data.get("descricao") or data.get("description")
             if isinstance(rewritten, str) and rewritten.strip():
@@ -84,17 +104,14 @@ def rewrite_description_llm(
             print(f"[ENRICH] Erro ao chamar {model}: {e}")
             return None
 
-    for attempt in range(1, retries + 1):
-        result = _attempt(primary)
-        if result is not None:
-            return result
-        print(f"[ENRICH] Tentativa {attempt}/{retries} falhou em {primary}.")
-
-    if fallback and fallback != primary:
-        print(f"[ENRICH] {retries} tentativa(s) esgotada(s) em {primary}; usando reserva {fallback}.")
-        result = _attempt(fallback)
-        if result is not None:
-            return result
+    for idx, model in enumerate(models_to_try):
+        if idx > 0:
+            print(f"[ENRICH] Alternando para modelo de reserva {model} (tentativa anterior indisponível).")
+        for attempt in range(1, retries + 1):
+            result = _attempt(model)
+            if result is not None:
+                return result
+            print(f"[ENRICH] Tentativa {attempt}/{retries} falhou em {model}.")
 
     return None
 
@@ -162,9 +179,9 @@ def enrich_video_frames(project_id: int, video_id: int, only_timestamps: Optiona
                 "key": key
             })
 
-    # 2. Executa as chamadas HTTP (OpenRouter) e indexação (Qdrant) fora de transações do SQLite
+    # 2. Executa as chamadas HTTP (OpenRouter) em paralelo com ThreadPoolExecutor
     updated = 0
-    for task in tasks:
+    def _process_task(task):
         raw_text = task["raw_text"]
         entities = task["entities"]
         replacements = task["replacements"]
@@ -174,17 +191,24 @@ def enrich_video_frames(project_id: int, video_id: int, only_timestamps: Optiona
 
         enriched = _rewrite_with_fallback(raw_text, entities, replacements, project_id=project_id)
         if not enriched or enriched == payload.get("text"):
-            continue
+            return False
 
         new_payload = dict(payload)
         new_payload["enrich_key"] = key
         new_payload["entity_names"] = [e["name"] for e in entities]
         try:
             search_engine.update_point_text(point.id, new_payload, enriched)
-            updated += 1
             print(f"[ENRICH] Vídeo {video_id} @ {payload.get('start_time', 0.0):.0f}s: \"{enriched[:80]}\"")
+            return True
         except Exception as e:
             print(f"[ENRICH] Falha ao reindexar frame {payload.get('start_time', 0.0)}s do vídeo {video_id}: {e}")
+            return False
+
+    if tasks:
+        max_w = min(len(tasks), 5)
+        with ThreadPoolExecutor(max_workers=max_w) as pool:
+            results = pool.map(_process_task, tasks)
+            updated = sum(1 for r in results if r)
 
     return updated
 
@@ -310,16 +334,18 @@ def enrich_project(project_id: int) -> Dict[str, int]:
         total_items = len(photo_ids) + len(video_ids)
         processed = 0
 
-        for pid in photo_ids:
+        def _worker_photo(pid):
             if task_key in getattr(TASK_MANAGER, "cancelled_tasks", set()):
-                print(f"[ENRICH] Cancelamento detectado para a tarefa {task_key}.")
-                TASK_MANAGER.update_progress(task_key, percent if 'percent' in locals() else 0.0, "failed", task_type="enrich")
-                return {"photos": photos_done, "frames": frames_done}
-            if enrich_photo(project_id, pid):
-                photos_done += 1
-            processed += 1
-            percent = round((processed / max(total_items, 1)) * 100.0, 1)
-            TASK_MANAGER.update_progress(task_key, percent, "running", task_type="enrich")
+                return False
+            return enrich_photo(project_id, pid)
+
+        if photo_ids:
+            with ThreadPoolExecutor(max_workers=min(len(photo_ids), 5)) as pool:
+                photo_results = pool.map(_worker_photo, photo_ids)
+                photos_done = sum(1 for r in photo_results if r)
+                processed += len(photo_ids)
+                percent = round((processed / max(total_items, 1)) * 100.0, 1)
+                TASK_MANAGER.update_progress(task_key, percent, "running", task_type="enrich")
 
         for vid in video_ids:
             if task_key in getattr(TASK_MANAGER, "cancelled_tasks", set()):

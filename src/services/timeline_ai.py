@@ -252,7 +252,12 @@ class TimelineAIService:
             if response.status_code != 200:
                 return {"suggestions": [], "error": f"Falha no LLM (status {response.status_code}): {response.text[:200]}"}
 
-            content = response.json()["choices"][0]["message"]["content"].strip()
+            res_json = response.json()
+            msg = res_json.get("choices", [{}])[0].get("message", {})
+            raw_content = msg.get("content")
+            if not isinstance(raw_content, str) or not raw_content.strip():
+                return {"suggestions": [], "error": f"LLM retornou resposta sem conteúdo (modelo {S.get('llm.text_model')})"}
+            content = raw_content.strip()
             data = extract_json_from_markdown(content)
             raw_suggestions = data.get("suggestions", [])
         except Exception as e:
