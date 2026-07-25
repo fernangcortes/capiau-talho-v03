@@ -598,10 +598,13 @@ def cluster_faces(
     project_id: int,
     eps: float = Query(0.38, description="Distancia maxima DBSCAN"),
     min_samples: int = Query(2, description="Minimo de amostras por cluster"),
-    lock_labeled: bool = Query(True, description="Travar grupos ja nomeados/desambiguados")
+    lock_labeled: bool = Query(True, description="Travar grupos ja nomeados/desambiguados"),
+    reset_unconfirmed: bool = Query(False, description="Resetar agrupamentos automaticos nao confirmados antes de re-clusterizar")
 ):
     """Clusteriza todas as faces do projeto usando DBSCAN."""
     service = get_face_service()
+    if reset_unconfirmed:
+        service.reset_unconfirmed_face_clusters(project_id)
     result = service.cluster_project_faces(project_id, eps=eps, min_samples=min_samples, lock_labeled=lock_labeled)
     return ClusterResult(
         total_faces=result["total"],
@@ -609,6 +612,14 @@ def cluster_faces(
         clusters_created=result["clusters"],
         noise_faces=result["noise"]
     )
+
+
+@router.post("/project/{project_id}/faces/reset-unconfirmed")
+def reset_unconfirmed_faces_endpoint(project_id: int):
+    """Reseta nomes e cluster_ids de faces nao confirmadas manualmente pelo usuario."""
+    service = get_face_service()
+    reset_count = service.reset_unconfirmed_face_clusters(project_id)
+    return {"status": "success", "reset_faces_count": reset_count}
 
 
 @router.post("/project/{project_id}/people", response_model=PersonResponse)
@@ -733,6 +744,22 @@ def reassign_project_faces(project_id: int, request: ReassignFacesRequest):
     pass
 
     return {"status": "success", "message": f"{len(request.face_ids)} faces reatribuídas com sucesso.", "target_cluster_id": target_cluster_id}
+
+
+class ConfirmClusterRequest(BaseModel):
+    project_id: int
+    cluster_id: int
+    target_name: Optional[str] = None
+
+
+@router.post("/confirm-cluster")
+def confirm_cluster_endpoint(request: ConfirmClusterRequest):
+    """Operador confirma manualmente TODOS os rostos de um grupo/cluster (Tier 4)."""
+    service = get_face_service()
+    res = service.confirm_cluster_faces(request.project_id, request.cluster_id, request.target_name)
+    if res.get("status") == "error":
+        raise HTTPException(status_code=400, detail=res.get("message", "Erro ao confirmar cluster"))
+    return res
 
 
 @router.post("/confirm-identity")

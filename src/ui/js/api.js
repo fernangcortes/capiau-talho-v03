@@ -191,6 +191,13 @@ export class CapIAuAPI {
         return this.request(`/api/project/${projectId}/speakers`);
     }
 
+    static confirmCluster(projectId, clusterId, targetName = null) {
+        return this.request("/api/faces/confirm-cluster", {
+            method: "POST",
+            body: JSON.stringify({ project_id: projectId, cluster_id: clusterId, target_name: targetName })
+        });
+    }
+
     // -- Ingestão e Processamento
     static selectFolder() {
         return this.request("/api/ingest/select-folder", { method: "POST" });
@@ -362,6 +369,15 @@ export class CapIAuAPI {
     static enrichProject(projectId) {
         return this.request(`/api/entities/project/${projectId}/enrich`, { method: "POST" });
     }
+
+    static cancelEnrichment(projectId) {
+        return this.request(`/api/entities/project/${projectId}/enrich/cancel`, { method: "POST" });
+    }
+
+    static cancelTask(taskKey) {
+        return this.request(`/api/task/${taskKey}/cancel`, { method: "POST" });
+    }
+
 
     static splitTranscript(videoId, startTime, newSpeakerId) {
         return this.request(`/api/video/${videoId}/split-transcript`, {

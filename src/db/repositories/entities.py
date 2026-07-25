@@ -232,6 +232,8 @@ class EntityRepository:
                 SELECT e.name, e.entity_type, m.text_to_replace
                 FROM entity_mention m JOIN entity e ON e.id = m.entity_id
                 WHERE m.photo_id = ? AND m.status != 'rejected'
+                  AND e.name NOT LIKE 'Pessoa Desconhecida%'
+                  AND e.name NOT LIKE 'Grupo %'
             """, (photo_id,))
         elif video_id is not None and timestamp is not None:
             cursor.execute("""
@@ -239,6 +241,8 @@ class EntityRepository:
                 FROM entity_mention m JOIN entity e ON e.id = m.entity_id
                 WHERE m.video_id = ? AND m.status != 'rejected'
                   AND m.timestamp IS NOT NULL AND ABS(m.timestamp - ?) <= ?
+                  AND e.name NOT LIKE 'Pessoa Desconhecida%'
+                  AND e.name NOT LIKE 'Grupo %'
             """, (video_id, timestamp, tolerance))
         else:
             cursor = None
@@ -249,20 +253,30 @@ class EntityRepository:
                     replacements[r["text_to_replace"]] = r["name"]
                 _push(r["name"], r["entity_type"])
 
-        # 2. Fonte legada: face.name (inclui o hack crop_path='text:...')
+        # 2. Fonte legada: face.name (apenas reconhecimentos CONFIRMADOS MANUALMENTE pelo operador)
         cursor = conn.cursor()
         if photo_id is not None:
             cursor.execute("""
-                SELECT DISTINCT name, crop_path FROM face
-                WHERE photo_id = ? AND name IS NOT NULL AND name != ''
-                  AND name NOT IN ('Não Relevante', 'Não é Rosto')
+                SELECT DISTINCT f.name, f.crop_path 
+                FROM face f
+                LEFT JOIN face_recognition fr ON fr.face_id = f.id AND fr.status = 'confirmed'
+                WHERE f.photo_id = ? AND f.name IS NOT NULL AND f.name != ''
+                  AND f.name NOT IN ('Não Relevante', 'Não é Rosto')
+                  AND f.name NOT LIKE 'Pessoa Desconhecida%'
+                  AND f.name NOT LIKE 'Grupo %'
+                  AND (fr.id IS NOT NULL OR f.crop_path LIKE 'text:%')
             """, (photo_id,))
         elif video_id is not None and timestamp is not None:
             cursor.execute("""
-                SELECT DISTINCT name, crop_path FROM face
-                WHERE video_id = ? AND ABS(timestamp - ?) <= ?
-                  AND name IS NOT NULL AND name != ''
-                  AND name NOT IN ('Não Relevante', 'Não é Rosto')
+                SELECT DISTINCT f.name, f.crop_path 
+                FROM face f
+                LEFT JOIN face_recognition fr ON fr.face_id = f.id AND fr.status = 'confirmed'
+                WHERE f.video_id = ? AND ABS(f.timestamp - ?) <= ?
+                  AND f.name IS NOT NULL AND f.name != ''
+                  AND f.name NOT IN ('Não Relevante', 'Não é Rosto')
+                  AND f.name NOT LIKE 'Pessoa Desconhecida%'
+                  AND f.name NOT LIKE 'Grupo %'
+                  AND (fr.id IS NOT NULL OR f.crop_path LIKE 'text:%')
             """, (video_id, timestamp, tolerance))
         else:
             cursor = None

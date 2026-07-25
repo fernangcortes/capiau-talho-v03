@@ -113,22 +113,52 @@ class TaskManager:
             print(f"[TaskManager] Erro ao encerrar processo FFmpeg do vídeo {video_id}: {e}")
             return False
 
+    def add_log(self, task_key: str, message: str, level: str = "INFO") -> None:
+        """Adiciona uma linha de log formatada com timestamp para a tarefa especificada e garante stdout no PowerShell."""
+        import datetime
+        now_str = datetime.datetime.now().strftime("%H:%M:%S")
+        formatted = f"[{now_str}] [{level}] {message}"
+        print(f"[TASK:{task_key}] {formatted}", flush=True)
+        with self._lock:
+            if task_key not in self.progress:
+                self.progress[task_key] = {
+                    "percent": 0.0,
+                    "status": "running",
+                    "type": "task",
+                    "logs": []
+                }
+            elif "logs" not in self.progress[task_key] or not isinstance(self.progress[task_key]["logs"], list):
+                self.progress[task_key]["logs"] = []
+
+            logs = self.progress[task_key]["logs"]
+            logs.append(formatted)
+            if len(logs) > 300:
+                self.progress[task_key]["logs"] = logs[-300:]
+        self._flush_sink()
+
     def update_progress(self, task_key: str, percent: float, status: str, task_type: str = "conversion",
-                        label: Optional[str] = None) -> None:
-        """Atualiza de forma thread-safe o progresso de uma tarefa de conversão ou análise.
+                        label: Optional[str] = None, log_message: Optional[str] = None) -> None:
+        """Atualiza de forma thread-safe o progresso de uma tarefa e preserva o histórico de logs.
 
         'label' é o texto que a tela mostra; sem ele a tela deduz o nome pela mídia.
         """
         with self._lock:
+            existing_logs = self.progress.get(task_key, {}).get("logs", [])
+            if not isinstance(existing_logs, list):
+                existing_logs = []
             entry: Dict[str, Any] = {
                 "percent": percent,
                 "status": status,
-                "type": task_type
+                "type": task_type,
+                "logs": existing_logs
             }
             if label:
                 entry["label"] = label
             self.progress[task_key] = entry
-        self._flush_sink()
+        if log_message:
+            self.add_log(task_key, log_message)
+        else:
+            self._flush_sink()
 
     def remove_progress(self, task_key: str) -> None:
         """Remove o progresso de uma tarefa finalizada."""
@@ -144,7 +174,7 @@ class TaskManager:
             self.paused_tasks.add(task_key)
             if task_key in self.progress:
                 self.progress[task_key]["status"] = "paused"
-        self._flush_sink(force=True)
+        self.add_log(task_key, "Tarefa pausada pelo usuário.", "WARN")
 
     def resume_task(self, task_key: str) -> None:
         """Retoma uma tarefa pausada."""
@@ -152,7 +182,7 @@ class TaskManager:
             self.paused_tasks.discard(task_key)
             if task_key in self.progress:
                 self.progress[task_key]["status"] = "running"
-        self._flush_sink(force=True)
+        self.add_log(task_key, "Tarefa retomada.", "INFO")
 
     def cancel_task(self, task_key: str) -> None:
         """Cancela uma tarefa de segundo plano."""
@@ -161,7 +191,7 @@ class TaskManager:
             self.paused_tasks.discard(task_key)
             if task_key in self.progress:
                 self.progress[task_key]["status"] = "cancelled"
-        self._flush_sink(force=True)
+        self.add_log(task_key, "Tarefa cancelada pelo usuário.", "WARN")
 
     def is_cancelled(self, task_key: str) -> bool:
         """Verifica se a tarefa foi cancelada pelo usuário."""

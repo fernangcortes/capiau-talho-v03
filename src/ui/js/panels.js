@@ -1963,6 +1963,23 @@ export class PanelsManager {
 
         this.lastTasksState = JSON.parse(JSON.stringify(tasks));
 
+        // Atualiza estado visual do botão de sincronização de descrições (btn-sync-enrich)
+        const hasActiveEnrich = taskKeys.some(k => (k.startsWith("enrich") || tasks[k].type === "enrich") && tasks[k].status === "running");
+        const btnSyncEnrich = document.getElementById("btn-sync-enrich");
+        if (btnSyncEnrich) {
+            if (hasActiveEnrich) {
+                btnSyncEnrich.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando... (Clique p/ Parar)';
+                btnSyncEnrich.style.background = 'linear-gradient(135deg, #e11d48, #be123c)';
+                btnSyncEnrich.title = 'Clique para cancelar a sincronização de descrições';
+                btnSyncEnrich.setAttribute('data-sync-active', 'true');
+            } else {
+                btnSyncEnrich.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Sincronizar Nomes nas Descrições';
+                btnSyncEnrich.style.background = 'linear-gradient(135deg, #06b6d4, #0891b2)';
+                btnSyncEnrich.title = '';
+                btnSyncEnrich.removeAttribute('data-sync-active');
+            }
+        }
+
         const feed = this.tasksFeed || this.tasksContainer;
         if (!feed) return;
         feed.innerHTML = "";
@@ -1976,6 +1993,10 @@ export class PanelsManager {
         const showThumbs = this.tasksShowThumbs;
         const compact = this.tasksCompact;
 
+        if (!this.expandedTaskKeys) {
+            this.expandedTaskKeys = new Set();
+        }
+
         taskKeys.forEach((key, index) => {
             const t = tasks[key];
             const isFinished = t.status === "finished";
@@ -1984,10 +2005,14 @@ export class PanelsManager {
             const isProxy = !isNaN(Number(key));
             const isThumbs = key.startsWith("thumbs-");
             
-            const isCancellable = !isFinished && !isFailed && !isCancelled && (isProxy || isThumbs);
+            const isCancellable = !isFinished && !isFailed && !isCancelled;
             const isPauseable = isThumbs && t.status === "running";
             const isResumable = isThumbs && (t.status === "paused" || t.status === "cancelled" || t.status === "failed");
             const isDismissable = isFinished || isCancelled || isFailed || isThumbs;
+
+            const logs = Array.isArray(t.logs) ? t.logs : [];
+            const isExpanded = this.expandedTaskKeys.has(key);
+            const logCountBadge = logs.length > 0 ? `<span class="task-log-badge">${logs.length}</span>` : "";
 
             const media = this._resolveTaskMedia(key, t);
             const typeHint = String(t.type || "proxy").toUpperCase();
@@ -1996,6 +2021,8 @@ export class PanelsManager {
 
             // Montagem das ações de forma sutil (Design System Flat - sem box e line icon)
             let actionsHtml = "";
+            actionsHtml += `<button class="btn-task-action btn-toggle-task-log ${isExpanded ? 'active' : ''}" data-id="${key}" title="Alternar Console Log (CMD)"><i class="fa-solid fa-terminal"></i>${logCountBadge}</button>`;
+
             if (isPauseable) {
                 actionsHtml += `<button class="btn-task-action btn-pause-task" data-id="${key}" title="Pausar Geração de Miniaturas"><i class="fa-solid fa-pause"></i></button>`;
             } else if (isResumable) {
@@ -2017,17 +2044,52 @@ export class PanelsManager {
                     : `<span class="task-row-icon"><i class="fa-solid ${media.icon}"></i></span>`)
                 : `<span class="task-row-dot status-${t.status}"></span>`;
 
+            // Formatação de linhas do log de terminal (CMD style)
+            const formatLogLines = (logArray) => {
+                if (!logArray || logArray.length === 0) {
+                    return `<div class="task-log-line" style="opacity: 0.45; font-style: italic;">[Aguardando registros de log em tempo real...]</div>`;
+                }
+                return logArray.map(line => {
+                    const escLine = esc(line);
+                    let cls = "task-log-line";
+                    if (line.includes("[ERROR]") || line.includes("[FAIL]")) cls += " task-log-line-error";
+                    else if (line.includes("[WARN]")) cls += " task-log-line-warn";
+                    else if (line.includes("[LLM]")) cls += " task-log-line-llm";
+                    else if (line.includes("[ENRICH]") || line.includes("[SUCCESS]") || line.includes("[FINISHED]")) cls += " task-log-line-success";
+                    else if (line.includes("[SCAN]") || line.includes("[PHOTO]") || line.includes("[VIDEO]")) cls += " task-log-line-scan";
+                    else if (line.includes("[INIT]")) cls += " task-log-line-init";
+                    else if (line.includes("[FRAME]")) cls += " task-log-line-frame";
+                    else cls += " task-log-line-info";
+                    return `<div class="${cls}">${escLine}</div>`;
+                }).join('');
+            };
+
+            const logDrawerHtml = `
+                <div class="task-log-drawer ${isExpanded ? 'expanded' : ''}" id="task-log-drawer-${key}">
+                    <div class="task-log-header">
+                        <span class="task-log-header-title"><i class="fa-solid fa-terminal"></i> CONSOLE LOG (${logs.length} linhas)</span>
+                        <span style="opacity: 0.6; font-size: 9px;">Estilo CMD · Tempo Real</span>
+                    </div>
+                    <pre class="task-log-box" id="task-log-box-${key}">${formatLogLines(logs)}</pre>
+                </div>
+            `;
+
             const item = document.createElement("div");
             if (compact) {
                 item.className = "task-row";
+                item.style.flexDirection = "column";
+                item.style.alignItems = "stretch";
                 item.innerHTML = `
-                    ${thumbCompact}
-                    <span class="task-row-title" title="${title} — ${typeHint} · ${esc(t.status)}">${title}</span>
-                    <div class="task-row-bar" data-tooltip="Progresso: ${pct}% (${typeHint})"><div class="task-row-bar-fill" style="width:${pct}%"></div></div>
-                    <span class="task-row-pct">${pct}%</span>
-                    <div class="task-row-actions" style="display: flex; gap: 4px; align-items: center; margin-left: 4px;">
-                        ${actionsHtml}
+                    <div style="display: flex; align-items: center; width: 100%;">
+                        ${thumbCompact}
+                        <span class="task-row-title" title="${title} — ${typeHint} · ${esc(t.status)}">${title}</span>
+                        <div class="task-row-bar" data-tooltip="Progresso: ${pct}% (${typeHint})"><div class="task-row-bar-fill" style="width:${pct}%"></div></div>
+                        <span class="task-row-pct">${pct}%</span>
+                        <div class="task-row-actions" style="display: flex; gap: 4px; align-items: center; margin-left: 4px;">
+                            ${actionsHtml}
+                        </div>
                     </div>
+                    ${logDrawerHtml}
                 `;
             } else {
                 item.className = "task-progress-card";
@@ -2046,7 +2108,31 @@ export class PanelsManager {
                             ${actionsHtml}
                         </div>
                     </div>
+                    ${logDrawerHtml}
                 `;
+            }
+
+            // Alternar visibilidade do Console Log (CMD)
+            const toggleLogBtn = item.querySelector(".btn-toggle-task-log");
+            if (toggleLogBtn) {
+                toggleLogBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    if (this.expandedTaskKeys.has(key)) {
+                        this.expandedTaskKeys.delete(key);
+                    } else {
+                        this.expandedTaskKeys.add(key);
+                    }
+                    const drawer = item.querySelector(`#task-log-drawer-${key}`);
+                    if (drawer) {
+                        const nowExpanded = this.expandedTaskKeys.has(key);
+                        drawer.classList.toggle("expanded", nowExpanded);
+                        toggleLogBtn.classList.toggle("active", nowExpanded);
+                        if (nowExpanded) {
+                            const box = drawer.querySelector(".task-log-box");
+                            if (box) box.scrollTop = box.scrollHeight;
+                        }
+                    }
+                });
             }
 
             // Pausar geração de miniaturas
@@ -2100,13 +2186,37 @@ export class PanelsManager {
                                 alert("Falha ao cancelar geração de miniaturas.");
                             }
                         }
-                    } else {
+                    } else if (key.startsWith("enrich") || t.type === "enrich") {
+                        if (confirm("Cancelar a sincronização de descrições?")) {
+                            try {
+                                await CapIAuAPI.cancelTask(key);
+                                if (window.showToast) window.showToast("Sincronização de descrições cancelada!", "info");
+                                if (window.logManager) {
+                                    window.logManager.log("Tasks", `Cancelada sincronização de descrições (${key})`, "WARN");
+                                }
+                            } catch (err) {
+                                alert("Falha ao cancelar sincronização de descrições: " + err.message);
+                            }
+                        }
+                    } else if (isProxy || key.startsWith("vision-") || key.startsWith("proxy-") || !isNaN(Number(key))) {
                         if (confirm("Cancelar a análise ou processamento desta mídia?")) {
                             try {
                                 const videoId = Number(key.replace("vision-", "").replace("proxy-", ""));
                                 await CapIAuAPI.cancelConversion(videoId);
                                 if (window.showToast) window.showToast(`Análise do vídeo #${videoId} cancelada!`, "info");
                                 if (window.libraryInstance) window.libraryInstance.reloadData();
+                            } catch (err) {
+                                alert("Falha ao cancelar tarefa: " + err.message);
+                            }
+                        }
+                    } else {
+                        if (confirm(`Cancelar a tarefa "${title}"?`)) {
+                            try {
+                                await CapIAuAPI.cancelTask(key);
+                                if (window.showToast) window.showToast(`Tarefa "${title}" cancelada!`, "info");
+                                if (window.logManager) {
+                                    window.logManager.log("Tasks", `Tarefa ${key} cancelada pelo usuário`, "WARN");
+                                }
                             } catch (err) {
                                 alert("Falha ao cancelar tarefa: " + err.message);
                             }
@@ -2136,7 +2246,8 @@ export class PanelsManager {
             if (media.kind === "video" || media.kind === "photo") {
                 item.classList.add("task-card-clickable");
                 item.title = "Clique para mostrar na biblioteca";
-                item.addEventListener("click", () => {
+                item.addEventListener("click", (e) => {
+                    if (e.target.closest(".btn-task-action") || e.target.closest(".task-log-drawer")) return;
                     const ok = media.kind === "photo"
                         ? (window.libraryManager && window.libraryManager.revealPhotoById(media.id))
                         : (window.libraryManager && window.libraryManager.revealVideoById(media.id));
@@ -2156,6 +2267,12 @@ export class PanelsManager {
             }
 
             feed.appendChild(item);
+
+            // Auto-scroll se o log estiver aberto
+            if (isExpanded) {
+                const box = item.querySelector(`#task-log-box-${key}`);
+                if (box) box.scrollTop = box.scrollHeight;
+            }
         });
     }
 

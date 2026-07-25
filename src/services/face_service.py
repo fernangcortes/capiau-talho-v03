@@ -298,23 +298,13 @@ class FaceService:
         if lock_labeled:
             with get_db() as conn:
                 cursor = conn.cursor()
-                # Obter IDs de faces que estão travadas (possuem nome atribuído válido ou confirmação manual)
-                cursor.execute("""
-                    SELECT id FROM face
-                    WHERE project_id = ? 
-                      AND name IS NOT NULL AND TRIM(name) != ''
-                      AND name NOT LIKE 'Pessoa Desconhecida%'
-                      AND name NOT IN ('Não Relevante', 'Não é Rosto')
-                """, (project_id,))
-                locked_ids = {r["id"] for r in cursor.fetchall()}
-                
+                # Obter IDs de faces que estão verdadeiramente travadas (possuem confirmação manual explícita pelo usuário)
                 cursor.execute("""
                     SELECT f.id FROM face f
                     JOIN face_recognition fr ON f.id = fr.face_id
                     WHERE f.project_id = ? AND fr.status = 'confirmed'
                 """, (project_id,))
-                for r in cursor.fetchall():
-                    locked_ids.add(r["id"])
+                locked_ids = {r["id"] for r in cursor.fetchall()}
 
             faces_data = [f for f in faces_data if f["face_id"] not in locked_ids]
         
@@ -457,6 +447,69 @@ class FaceService:
             
             conn.commit()
             return True
+
+    def confirm_cluster_faces(self, project_id: int, cluster_id: int, target_name: Optional[str] = None) -> Dict[str, Any]:
+        """Confirma manualmente TODOS os rostos pertencentes a um determinado cluster (Tier 4 / status='confirmed').
+
+        Usado pelo operador ao validar que o grupo inteiro de uma pessoa está correto.
+        """
+        with get_db() as conn:
+            cursor = conn.cursor()
+
+            # Buscar todas as faces do cluster
+            cursor.execute("""
+                SELECT id, name FROM face
+                WHERE project_id = ? AND cluster_id = ?
+            """, (project_id, cluster_id))
+            faces = cursor.fetchall()
+
+            if not faces:
+                return {"status": "error", "message": "Nenhum rosto encontrado no cluster", "confirmed_count": 0}
+
+            # Definir o nome canônico do grupo
+            name_to_use = target_name
+            if not name_to_use:
+                # Tenta pegar o primeiro nome válido que não seja placeholder
+                for f in faces:
+                    n = f["name"]
+                    if n and not n.startswith("Pessoa Desconhecida") and n not in ("Não Relevante", "Não é Rosto"):
+                        name_to_use = n
+                        break
+
+            if not name_to_use or name_to_use.startswith("Pessoa Desconhecida"):
+                return {"status": "error", "message": "Defina um nome válido para o grupo antes de confirmá-lo", "confirmed_count": 0}
+
+            # Encontrar ou criar o person_id correspondente
+            cursor.execute("SELECT id FROM person WHERE project_id = ? AND name = ?", (project_id, name_to_use))
+            p_row = cursor.fetchone()
+            if p_row:
+                person_id = p_row["id"]
+            else:
+                cursor.execute("""
+                    INSERT INTO person (project_id, name, aliases, bio)
+                    VALUES (?, ?, '[]', '')
+                """, (project_id, name_to_use))
+                person_id = cursor.lastrowid
+
+            confirmed_count = 0
+            for f in faces:
+                f_id = f["id"]
+                cursor.execute("UPDATE face_recognition SET status = 'superseded' WHERE face_id = ? AND status != 'superseded'", (f_id,))
+                cursor.execute("""
+                    INSERT INTO face_recognition 
+                    (face_id, tier, model, model_version, person_id, confidence, status, recognized_by, recognized_at)
+                    VALUES (?, 4, 'manual', 'v1.0', ?, 1.0, 'confirmed', 'user_cluster_confirm', datetime('now'))
+                """, (f_id, person_id))
+                cursor.execute("UPDATE face SET name = ? WHERE id = ?", (name_to_use, f_id))
+                confirmed_count += 1
+
+            conn.commit()
+            return {
+                "status": "success",
+                "confirmed_count": confirmed_count,
+                "cluster_id": cluster_id,
+                "name": name_to_use
+            }
 
     def create_person(self, project_id: int, name: str, aliases: List[str] = None, bio: str = "") -> int:
         """Cria uma nova pessoa no projeto."""
@@ -822,9 +875,11 @@ class FaceService:
         cursor = conn.cursor()
         placeholders = ",".join("?" for _ in face_ids)
         cursor.execute(f"""
-            SELECT name, COUNT(*) as cnt FROM face
-            WHERE id IN ({placeholders}) AND name IS NOT NULL AND name != ''
-            GROUP BY name ORDER BY cnt DESC
+            SELECT f.name, COUNT(*) as cnt 
+            FROM face f
+            JOIN face_recognition fr ON f.id = fr.face_id
+            WHERE f.id IN ({placeholders}) AND fr.status = 'confirmed' AND f.name IS NOT NULL AND f.name != ''
+            GROUP BY f.name ORDER BY cnt DESC
         """, face_ids)
 
         real_names = []
@@ -837,6 +892,25 @@ class FaceService:
         if real_names:
             return real_names[0]  # nome real mais frequente no cluster
         return f"Pessoa Desconhecida (Grupo {cluster_id + 1})"
+
+    def reset_unconfirmed_face_clusters(self, project_id: int) -> int:
+        """Limpa o nome e cluster_id de todas as faces do projeto que NÃO possuem confirmação manual explícita.
+        
+        Isso desata agrupamentos automáticos poluídos, liberando as faces para uma nova re-clusterização limpa.
+        """
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE face
+                SET name = NULL, cluster_id = NULL
+                WHERE project_id = ?
+                  AND id NOT IN (
+                      SELECT face_id FROM face_recognition WHERE status = 'confirmed'
+                  )
+            """, (project_id,))
+            affected = cursor.rowcount
+            conn.commit()
+            return affected
 
     def _clear_auto_detections(self, photo_id: Optional[int] = None, video_id: Optional[int] = None, timestamp: Optional[float] = None) -> None:
         """Limpa deteccoes automaticas anteriores (Tier 0 'auto') para evitar duplicatas."""

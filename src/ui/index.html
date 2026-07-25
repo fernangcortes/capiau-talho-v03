@@ -1538,9 +1538,14 @@
                     <div style="font-size: 13px; color: var(--text-secondary);">
                         Total de aparições cadastradas neste grupo: <strong id="group-manager-count-val" style="color: var(--color-cyan);">0</strong>
                     </div>
-                    <button id="btn-group-dissolve-all" class="btn-secondary" style="border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); height: 32px; font-size: 11px; padding: 0 12px; font-weight: 600; cursor: pointer; border-radius: 6px;">
-                        <i class="fa-solid fa-arrows-spin"></i> Dissolver Grupo (Tornar Todos Desconhecidos)
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="btn-group-confirm-all" class="btn-primary" style="border-color: rgba(16, 185, 129, 0.5); color: #10b981; background: rgba(16, 185, 129, 0.15); height: 32px; font-size: 11px; padding: 0 14px; font-weight: 600; cursor: pointer; border-radius: 6px;">
+                            <i class="fa-solid fa-circle-check"></i> Confirmar Grupo Inteiro (Tornar Todos Validados)
+                        </button>
+                        <button id="btn-group-dissolve-all" class="btn-secondary" style="border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); height: 32px; font-size: 11px; padding: 0 12px; font-weight: 600; cursor: pointer; border-radius: 6px;">
+                            <i class="fa-solid fa-arrows-spin"></i> Dissolver Grupo (Tornar Todos Desconhecidos)
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- Barra de Ações Rápidas para Selecionados (oculta por padrão) -->

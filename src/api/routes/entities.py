@@ -175,18 +175,63 @@ def trigger_project_enrichment(
     (LLM) e reindexa os embeddings no Qdrant. Sem parâmetros = projeto inteiro."""
     from src.core.tasks import TASK_MANAGER
     if video_id is not None:
-        TASK_MANAGER.executor.submit(enrich_video_frames, project_id, video_id)
+        task_key = f"enrich-video-{video_id}"
+        TASK_MANAGER.update_progress(
+            task_key, 0.0, "running", task_type="enrich",
+            label=f"Sincronização de Descrições (Vídeo #{video_id})",
+            log_message=f"[INIT] Disparado enriquecimento do vídeo #{video_id}..."
+        )
+        def _run_video():
+            try:
+                done = enrich_video_frames(project_id, video_id, task_key=task_key)
+                TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="enrich", log_message=f"[FINISHED] {done} frames re-enriquecidos e reindexados.")
+            except Exception as e:
+                TASK_MANAGER.update_progress(task_key, 0.0, "failed", task_type="enrich", log_message=f"[ERROR] Falha: {e}")
+        TASK_MANAGER.executor.submit(_run_video)
         scope = f"vídeo {video_id}"
     elif photo_id is not None:
-        TASK_MANAGER.executor.submit(enrich_photo, project_id, photo_id)
+        task_key = f"enrich-photo-{photo_id}"
+        TASK_MANAGER.update_progress(
+            task_key, 0.0, "running", task_type="enrich",
+            label=f"Sincronização de Descrições (Foto #{photo_id})",
+            log_message=f"[INIT] Disparado enriquecimento da foto #{photo_id}..."
+        )
+        def _run_photo():
+            try:
+                ok = enrich_photo(project_id, photo_id, task_key=task_key)
+                if ok:
+                    TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="enrich", log_message="[FINISHED] Foto reescrita e reindexada no Qdrant.")
+                else:
+                    TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="enrich", log_message="[FINISHED] Nenhuma entidade pendente de alteração.")
+            except Exception as e:
+                TASK_MANAGER.update_progress(task_key, 0.0, "failed", task_type="enrich", log_message=f"[ERROR] Falha: {e}")
+        TASK_MANAGER.executor.submit(_run_photo)
         scope = f"foto {photo_id}"
     else:
-        TASK_MANAGER.executor.submit(enrich_project, project_id)
+        task_key = f"enrich-project-{project_id}"
+        TASK_MANAGER.update_progress(
+            task_key, 0.0, "running", task_type="enrich",
+            label="Sincronização de Descrições (Projeto)",
+            log_message=f"[INIT] Disparado enriquecimento do projeto #{project_id}..."
+        )
+        TASK_MANAGER.executor.submit(enrich_project, project_id, task_key)
         scope = "projeto inteiro"
     return {
         "status": "success",
         "message": f"Enriquecimento iniciado em background ({scope}). As descrições serão reescritas com os nomes confirmados e reindexadas."
     }
+
+
+@router.api_route("/project/{project_id}/enrich/cancel", methods=["POST", "DELETE"])
+def cancel_project_enrichment(project_id: int):
+    """Cancela a sincronização de descrições ativa do projeto."""
+    from src.core.tasks import TASK_MANAGER
+    keys = [f"enrich-project-{project_id}", f"enrich-faces-{project_id}"]
+    for key in keys:
+        TASK_MANAGER.cancel_task(key)
+    return {"status": "success", "message": f"Sincronização de descrições do projeto #{project_id} cancelada com sucesso."}
+
+
 
 
 @router.post("/project/{project_id}/backfill-legacy")

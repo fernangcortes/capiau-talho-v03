@@ -126,6 +126,11 @@ export class FaceManager {
             btnGroupDissolveAll.addEventListener("click", () => this.dissolveGroup(this.activeGroupCluster));
         }
 
+        const btnGroupConfirmAll = document.getElementById("btn-group-confirm-all");
+        if (btnGroupConfirmAll) {
+            btnGroupConfirmAll.addEventListener("click", () => this.confirmGroup(this.activeGroupCluster));
+        }
+
         const btnGroupBulkDissociate = document.getElementById("btn-group-bulk-dissociate");
         if (btnGroupBulkDissociate) {
             btnGroupBulkDissociate.addEventListener("click", () => this.dissociateSelectedFaces(this.activeGroupCluster));
@@ -251,20 +256,32 @@ export class FaceManager {
             return;
         }
 
-        const originalText = btnSync.innerHTML;
-        btnSync.disabled = true;
-        btnSync.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando...';
+        const isSyncActive = btnSync.getAttribute("data-sync-active") === "true";
+        if (isSyncActive) {
+            if (confirm("Deseja cancelar a sincronização de descrições em andamento?")) {
+                try {
+                    btnSync.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cancelando...';
+                    await CapIAuAPI.cancelEnrichment(projectId);
+                    if (window.showToast) window.showToast("Solicitado cancelamento da sincronização.", "info");
+                } catch (e) {
+                    console.error("[FaceManager] Erro ao cancelar sincronização:", e);
+                    alert("Erro ao cancelar sincronização.");
+                }
+            }
+            return;
+        }
 
         try {
             const res = await CapIAuAPI.enrichProject(projectId);
             console.log("[FaceManager] Manual enrichment triggered:", res);
-            alert("Sincronização iniciada com sucesso! Você pode acompanhar o progresso das descrições na aba 'Tarefas'.");
+            if (window.showToast) {
+                window.showToast("Sincronização iniciada! Acompanhe o progresso na aba 'Tarefas'.", "success");
+            } else {
+                alert("Sincronização iniciada com sucesso! Você pode acompanhar o progresso das descrições na aba 'Tarefas'.");
+            }
         } catch (e) {
             console.error("[FaceManager] Error triggering manual enrichment:", e);
             alert("Erro ao disparar a sincronização.");
-        } finally {
-            btnSync.disabled = false;
-            btnSync.innerHTML = originalText;
         }
     }
 
@@ -1334,6 +1351,36 @@ export class FaceManager {
         } catch (e) {
             console.error("Erro ao dissolver grupo:", e);
             alert("Erro ao dissolver o grupo de rostos.");
+        }
+    }
+
+    static async confirmGroup(cluster) {
+        if (!cluster) return;
+        const clusterName = (cluster.name && !cluster.name.startsWith("Pessoa Desconhecida")) ? cluster.name : "";
+        let targetName = clusterName;
+        if (!targetName) {
+            targetName = prompt(`Digite o nome para validar todas as ${cluster.occurrences} fotos/rostos deste grupo:`);
+            if (!targetName || !targetName.trim()) return;
+            targetName = targetName.trim();
+        }
+
+        if (!confirm(`Deseja confirmar e validar TODOS os ${cluster.occurrences} rostos do grupo "${targetName}"? Todos passarão a ser reconhecimentos confirmados manualmente.`)) return;
+
+        try {
+            const res = await CapIAuAPI.confirmCluster(STATE.currentProjectId, cluster.cluster_id, targetName);
+            if (res && res.status === "success") {
+                alert(`Sucesso! ${res.confirmed_count} aparições de "${res.name}" foram confirmadas manualmente.`);
+                this.closeGroupManagerModal();
+                await this.loadFaceClusters();
+                if (STATE.activeVideo) {
+                    STATE.emit("videoFacesUpdated", STATE.activeVideo.id);
+                }
+            } else {
+                alert(res.message || "Erro ao confirmar grupo.");
+            }
+        } catch (e) {
+            console.error("Erro ao confirmar grupo inteiro:", e);
+            alert("Erro ao processar a confirmação do grupo inteiro.");
         }
     }
 

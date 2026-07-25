@@ -960,11 +960,30 @@ def cancel_video_thumbnails(video_id: int):
     return {"status": "success", "message": f"Geração de miniaturas do vídeo ID {video_id} cancelada."}
 
 
-@router.delete("/api/task/{task_key}")
-def dismiss_task(task_key: str):
-    """Remove a tarefa da lista de progresso/tarefas em segundo plano."""
+@router.api_route("/api/task/{task_key}/cancel", methods=["POST", "DELETE"])
+def cancel_task_generic(task_key: str):
+    """Cancela qualquer tarefa em segundo plano via seu task_key."""
+    TASK_MANAGER.cancel_task(task_key)
+    if task_key.isdigit():
+        TASK_MANAGER.cancel_process(int(task_key))
+    return {"status": "success", "message": f"Tarefa '{task_key}' cancelada com sucesso."}
+
+
+@router.api_route("/api/task/{task_key}", methods=["DELETE", "POST"])
+def dismiss_or_cancel_task(task_key: str):
+    """Remove ou cancela a tarefa da lista de progresso em segundo plano."""
+    if task_key.endswith("/cancel"):
+        clean_key = task_key[:-7]
+        TASK_MANAGER.cancel_task(clean_key)
+        if clean_key.isdigit():
+            TASK_MANAGER.cancel_process(int(clean_key))
+        return {"status": "success", "message": f"Tarefa '{clean_key}' cancelada com sucesso."}
+
+    TASK_MANAGER.cancel_task(task_key)
     TASK_MANAGER.remove_progress(task_key)
-    return {"status": "success", "message": f"Tarefa {task_key} removida."}
+    return {"status": "success", "message": f"Tarefa {task_key} removida/cancelada."}
+
+
 
 
 @router.post("/api/editor/heartbeat")

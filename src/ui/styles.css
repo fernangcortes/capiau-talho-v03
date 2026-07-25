@@ -2166,6 +2166,108 @@ button {
     text-shadow: 0 0 8px var(--color-rose);
 }
 
+.btn-task-action.btn-toggle-task-log {
+    gap: 3px;
+}
+
+.btn-task-action.btn-toggle-task-log:hover,
+.btn-task-action.btn-toggle-task-log.active {
+    color: var(--color-cyan);
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+
+.task-log-badge {
+    font-size: 8px;
+    font-weight: 700;
+    padding: 0 3px;
+    background: rgba(6, 182, 212, 0.2);
+    border-radius: 8px;
+    color: var(--color-cyan);
+}
+
+/* ── CMD / TERMINAL CONSOLE LOG BOX FOR TASKS ───────────────────────── */
+.task-log-drawer {
+    display: none;
+    margin-top: 8px;
+    background: #09090b;
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    border-radius: 6px;
+    overflow: hidden;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 10.5px;
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.8), 0 4px 14px rgba(0, 0, 0, 0.4);
+    animation: taskLogExpand 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.task-log-drawer.expanded {
+    display: flex;
+    flex-direction: column;
+}
+
+@keyframes taskLogExpand {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.task-log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 10px;
+    background: rgba(18, 18, 24, 0.95);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+    user-select: none;
+}
+
+.task-log-header-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-cyan);
+}
+
+.task-log-box {
+    margin: 0;
+    padding: 8px 10px;
+    max-height: 190px;
+    overflow-y: auto;
+    background: transparent;
+    color: #e2e8f0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.45;
+}
+
+.task-log-box::-webkit-scrollbar {
+    width: 5px;
+}
+
+.task-log-box::-webkit-scrollbar-thumb {
+    background: rgba(6, 182, 212, 0.3);
+    border-radius: 3px;
+}
+
+.task-log-box::-webkit-scrollbar-thumb:hover {
+    background: rgba(6, 182, 212, 0.6);
+}
+
+.task-log-line {
+    margin-bottom: 2px;
+    font-family: inherit;
+}
+
+.task-log-line-info { color: #38bdf8; }
+.task-log-line-llm { color: #c084fc; }
+.task-log-line-success { color: #34d399; }
+.task-log-line-warn { color: #facc15; }
+.task-log-line-error { color: #f87171; }
+.task-log-line-scan { color: #818cf8; }
+.task-log-line-init { color: #22d3ee; }
+.task-log-line-frame { color: #fb923c; }
+
 .progress-bar-container {
     height: 6px;
     background: rgba(255, 255, 255, 0.1);
