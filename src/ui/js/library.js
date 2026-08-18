@@ -453,9 +453,20 @@ function renderTreeNode(node, container, depth = 0) {
         const toggleTitleTitle = forceRealFilename ? "Mostrar Título Contextual" : "Mostrar Nome do Arquivo Real";
         const toggleBtnHtml = `<button class="btn-toggle-filename" title="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
 
-        // Tooltip direta (Título e Descrição apenas)
-        const desc = v.description || v.summary || 'Sem decupagem';
-        const tooltip = `${friendlyTitle}\n\n${desc}`;
+        // Tooltip direta (Título e Descrição sem duplicar)
+        const desc = v.description || v.summary || '';
+        let tooltip = "";
+        if (forceRealFilename) {
+            tooltip = (v.filename && desc && v.filename !== desc)
+                ? `${v.filename}\n\n${desc}`
+                : (v.filename || desc || 'Sem decupagem');
+        } else {
+            if (v.title && desc && v.title !== desc && !desc.startsWith(v.title)) {
+                tooltip = `${v.title}\n\n${desc}`;
+            } else {
+                tooltip = desc || v.title || v.filename || 'Sem decupagem';
+            }
+        }
 
         const visionBadgeHtml = hasVisionError ? `<div class="vision-error-badge" data-tooltip="Falha visual detectada. Clique em Reanalisar Falhas no topo"><i class="fa-solid fa-triangle-exclamation"></i> Falha Visual</div>` : '';
 
@@ -668,8 +679,19 @@ function renderTreeNode(node, container, depth = 0) {
         const toggleBtnHtml = `<button class="btn-toggle-filename" title="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
 
         const categoryLabel = p.category ? p.category : 'Foto';
-        const photoDesc = p.description || 'Sem decupagem';
-        const tooltip = `${friendlyTitle}\n\n${photoDesc}`;
+        const photoDesc = p.description || '';
+        let tooltip = "";
+        if (forceRealFilename) {
+            tooltip = (p.filename && photoDesc && p.filename !== photoDesc)
+                ? `${p.filename}\n\n${photoDesc}`
+                : (p.filename || photoDesc || 'Sem decupagem');
+        } else {
+            if (p.title && photoDesc && p.title !== photoDesc && !photoDesc.startsWith(p.title)) {
+                tooltip = `${p.title}\n\n${photoDesc}`;
+            } else {
+                tooltip = photoDesc || p.title || p.filename || 'Sem decupagem';
+            }
+        }
         
         card.innerHTML = `
             <div class="media-thumbnail photo-thumb-container" style="position: relative;">
