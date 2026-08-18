@@ -231,7 +231,7 @@ TRANSCRIÇÃO DO VÍDEO:
 
 Responda estritamente em Português e em formato JSON com a seguinte estrutura (não inclua marcações markdown adicionais de código como ```json, responda apenas o JSON puro):
 {
-  "titulo": "título curto de 3 a 6 palavras identificando quem fala e o assunto central (ex: 'Diretor sobre escolha da câmera')",
+  "titulo": "Título executivo curto e cinematográfico de 3 a 6 palavras identificando quem fala e o assunto central (ex: 'Diretor sobre escolha da câmera', 'Zé: Crítica ao primeiro corte'). PROIBIDO iniciar com 'Entrevista sobre', 'Vídeo de', 'Depoimento de', etc.",
   "description": "Uma frase concisa resumindo quem fala e o tema principal discutido",
   "summary": "Um resumo detalhado em tópicos (bullet points) destacando as principais ideias, reflexões ou histórias contadas, adequado para entender o conteúdo sem assistir todo o clipe",
   "tags": ["3 a 6 tags específicas sobre os ASSUNTOS tratados; PROIBIDO tags genéricas como 'entrevista', 'making of', 'bastidores', 'depoimento'"]
@@ -253,7 +253,7 @@ SEQUÊNCIA DE AÇÕES VISUAIS:
 
 Responda estritamente em Português e em formato JSON com a seguinte estrutura (não inclua marcações markdown adicionais de código como ```json, responda apenas o JSON puro):
 {
-  "titulo": "título curto de 3 a 6 palavras que diferencie este clipe dos demais (ex: 'Montagem da luz no galpão')",
+  "titulo": "Título executivo cinematográfico de 3 a 6 palavras focado na AÇÃO ou CENA CENTRAL (ex: 'Montagem da luz no galpão', 'Ensaio no camarim', 'Detalhe das mãos no vinil'). PROIBIDO iniciar com 'Este clipe mostra', 'Vídeo de', 'Sequência útil', 'Registro de', 'Mostrando', etc.",
   "description": "Uma frase concisa descrevendo o conteúdo visual e a ação geral ocorrendo neste vídeo",
   "summary": "Um resumo do desenrolar da ação ou cenário apresentado neste clipe, descrevendo sua utilidade e valor editorial/estético para a edição",
   "tags": ["3 a 6 tags específicas sobre a AÇÃO, o LOCAL e o CONTEXTO; PROIBIDO tags genéricas como 'making of', 'bastidores', 'set de filmagem', 'b-roll', 'vídeo'"]

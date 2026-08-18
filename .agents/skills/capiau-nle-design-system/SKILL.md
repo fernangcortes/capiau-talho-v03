@@ -247,3 +247,22 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
       }, 1200);
   }
   ```
+
+---
+
+## VI. Padrão Obrigatório de Tarefas em Segundo Plano & Feedback em Tempo Real (Background Tasks Standard)
+
+* **Princípio Fundamental:** Nenhuma operação assíncrona longa ou processamento em lote (geração de proxies, miniaturas, análise visual, transcrição ASR, geração/regeneração de títulos, enriquecimento semântico, clusterização) deve rodar de forma "invisível" para o usuário.
+* **Diretrizes Arquiteturais:**
+  1. **Registro no `TASK_MANAGER`:** Todo processo em lote no backend Python deve criar uma chave identificadora (ex: `f"titles_proj_{project_id}"`) e emitir progresso regular via `TASK_MANAGER.update_progress(task_key, percent, status, task_type, label, log_message)`.
+  2. **Logs em Linha Estruturados:** As mensagens de log devem utilizar tags padrão que estilizam o terminal CMD da aba Tarefas:
+     * `[INIT]` — Inicialização de processos (azul/ciano).
+     * `[LLM]` — Chamadas a modelos de linguagem e visão (violeta/rosa).
+     * `[SUCCESS]` ou `[FINISHED]` — Sucesso e conclusões de etapas (verde esmeralda).
+     * `[WARN]` — Avisos não-fatais (amarelo âmbar).
+     * `[ERROR]` ou `[FAIL]` — Falhas e erros de execução (vermelho rose).
+     * `[CANCEL]` — Interrupção solicitada pelo usuário.
+  3. **Cancelamento Responsivo:** Loops assíncronos no backend devem checar `TASK_MANAGER.is_cancelled(task_key)` a cada iteração para permitir que o editor cancele a tarefa pelo botão `X` da aba Tarefas a qualquer momento.
+  4. **Feedback e Redirecionamento na UI:** Ao acionar qualquer processo em lote a partir de menus ou botões, a interface deve:
+     * Emitir um toast com `window.showToast(...)`.
+     * Alternar automaticamente para a aba de Tarefas (`window.openTasksDrawerAndSwitchTab()`) para que o editor veja imediatamente a barra de progresso viva e o streaming de logs.

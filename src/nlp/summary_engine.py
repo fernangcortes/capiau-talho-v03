@@ -114,9 +114,11 @@ Responda estritamente em Português e em formato JSON com a seguinte estrutura (
             if not isinstance(tags, list):
                 tags = [str(tags)] if tags else []
                 
+            title = str(data.get("titulo", "") or data.get("title", "") or "").strip()
+
             # Salvar no SQLite
-            update_video_metadata(video_id, desc, summary, tags)
-            print(f"  [SUCCESS] Metadados salvos no SQLite! Descrição: \"{desc[:60]}...\" | {len(tags)} tags")
+            update_video_metadata(video_id, desc, summary, tags, title=title)
+            print(f"  [SUCCESS] Metadados salvos no SQLite! Título: '{title}' | Descrição: \"{desc[:60]}...\" | {len(tags)} tags")
             
             # Salvar relações de tags no grafo SQLite
             for tag in tags:

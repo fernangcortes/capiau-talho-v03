@@ -35,7 +35,16 @@ export class PanelsManager {
         this.btnCluster = document.getElementById("btn-cluster");
         this.btnSaveTimeline = document.getElementById("btn-save-timeline");
         this.btnExportTimeline = document.getElementById("btn-export-timeline");
-        
+
+        // Diálogo de exportação
+        this.exportModal = document.getElementById("export-timeline-modal");
+        this.exportListEl = document.getElementById("export-timeline-list");
+        this.exportFormatChoice = document.getElementById("export-format-choice");
+        this.exportFormatHint = document.getElementById("export-format-hint");
+        this.exportWarning = document.getElementById("export-warning");
+        this.btnConfirmExport = document.getElementById("btn-confirm-export");
+        this.exportTimelines = [];
+
         // Scissors Mode
         this.btnScissors = document.getElementById("btn-scissors");
         
@@ -170,7 +179,21 @@ export class PanelsManager {
 
         if (this.btnSaveTimeline) this.btnSaveTimeline.addEventListener("click", () => this.saveActiveTimeline());
         if (this.btnExportTimeline) {
-            this.btnExportTimeline.addEventListener("click", () => this.exportTimelinePrompt());
+            this.btnExportTimeline.addEventListener("click", () => this.exportTimeline());
+        }
+
+        // Diálogo de exportação: fechar, trocar formato e confirmar
+        const btnFecharExport = document.getElementById("btn-close-export-modal");
+        const btnCancelarExport = document.getElementById("btn-cancel-export");
+        if (btnFecharExport) btnFecharExport.addEventListener("click", () => this.closeExportModal());
+        if (btnCancelarExport) btnCancelarExport.addEventListener("click", () => this.closeExportModal());
+        if (this.btnConfirmExport) this.btnConfirmExport.addEventListener("click", () => this.confirmExport());
+        if (this.exportFormatChoice) this.exportFormatChoice.addEventListener("change", () => this.updateExportHint());
+        if (this.exportModal) {
+            // Clique fora do cartão fecha, igual aos outros modais
+            this.exportModal.addEventListener("click", (ev) => {
+                if (ev.target === this.exportModal) this.closeExportModal();
+            });
         }
         if (this.btnScissors) {
             this.btnScissors.addEventListener("click", () => {
@@ -1858,26 +1881,139 @@ export class PanelsManager {
         }
     }
 
-    async exportTimelinePrompt() {
-        const format = prompt("Selecione o formato de exportação ('xml', 'edl' ou 'otio'):", "xml");
-        if (!format) return;
-        
-        if (format !== "xml" && format !== "edl" && format !== "otio") {
-            alert("Formato inválido. Use 'xml', 'edl' ou 'otio'.");
+    // Dicas por formato, exibidas no diálogo. O EDL merece aviso próprio: o exportador
+    // achata multipista em trilha única, então J/L-cuts montados em V1/V2 se perdem.
+    static get EXPORT_FORMAT_HINTS() {
+        return {
+            otio: "O Kdenlive 25.04 ou mais recente abre este arquivo diretamente, sem conversão.",
+            xml:  "XML no padrão Final Cut Pro 7, importado por Premiere, Resolve e Final Cut.",
+            edl:  "⚠️ O EDL é achatado em pista única: timelines com V1/V2 ou A1/A2 perdem a separação de trilhas."
+        };
+    }
+
+    async exportTimeline() {
+        // Abre o diálogo em vez de exportar direto. Antes daqui saía um prompt() pedindo
+        // para DIGITAR o formato; depois passou a usar um <select> invisível (opacity: 0)
+        // na barra — nos dois casos o usuário não via qual timeline sairia, e exportar a
+        // errada era silencioso (relatado em 18/08: exportou uma antiga achando ser a da tela).
+        if (!this.exportModal) return;
+
+        this.exportTimelines = [];
+        this.exportListEl.innerHTML = '<p style="font-size:11px;color:var(--text-secondary);margin:0;">Carregando…</p>';
+        this.exportModal.classList.add("active");
+
+        try {
+            const timelines = await CapIAuAPI.fetchTimelines(STATE.currentProjectId);
+            this.exportTimelines = timelines || [];
+            this.renderExportTimelineList();
+        } catch (e) {
+            this.exportListEl.innerHTML = '<p style="font-size:11px;color:#ef4444;margin:0;">Falha ao carregar as timelines do projeto.</p>';
+            this.updateExportHint();
+        }
+    }
+
+    renderExportTimelineList() {
+        if (!this.exportListEl) return;
+
+        if (this.exportTimelines.length === 0) {
+            this.exportListEl.innerHTML =
+                '<p style="font-size:11px;color:var(--text-secondary);margin:0;">Nenhuma timeline salva neste projeto. Salve a timeline antes de exportar.</p>';
+            this.updateExportHint();
+            return;
+        }
+
+        this.exportListEl.innerHTML = "";
+        this.exportTimelines.forEach((tl, idx) => {
+            const clipes = Number(tl.clip_count || 0);
+            const data = (tl.created_at || "").slice(0, 16).replace("T", " ");
+
+            const linha = document.createElement("label");
+            linha.style.cssText =
+                "display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:5px;cursor:pointer;" +
+                "border:1px solid transparent;transition:background .15s;";
+            linha.addEventListener("mouseenter", () => { linha.style.background = "rgba(255,255,255,0.05)"; });
+            linha.addEventListener("mouseleave", () => { linha.style.background = "transparent"; });
+
+            const radio = document.createElement("input");
+            radio.type = "radio";
+            radio.name = "export-timeline-pick";
+            radio.value = String(tl.id);
+            radio.checked = idx === 0;
+            radio.style.cssText = "accent-color: var(--color-cyan); cursor: pointer;";
+            radio.addEventListener("change", () => this.updateExportHint());
+
+            const texto = document.createElement("div");
+            texto.style.cssText = "display:flex;flex-direction:column;gap:2px;min-width:0;";
+            texto.innerHTML =
+                `<span style="font-size:12px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(tl.name || "(sem nome)")}</span>` +
+                `<span style="font-size:10px;color:var(--text-secondary);">${clipes} clipe${clipes === 1 ? "" : "s"} &middot; criada em ${data}</span>`;
+
+            linha.appendChild(radio);
+            linha.appendChild(texto);
+            this.exportListEl.appendChild(linha);
+        });
+
+        this.updateExportHint();
+    }
+
+    escapeHtml(txt) {
+        const d = document.createElement("div");
+        d.textContent = String(txt);
+        return d.innerHTML;
+    }
+
+    getSelectedExportTimeline() {
+        const marcado = this.exportListEl
+            ? this.exportListEl.querySelector('input[name="export-timeline-pick"]:checked')
+            : null;
+        if (!marcado) return null;
+        return this.exportTimelines.find(t => String(t.id) === marcado.value) || null;
+    }
+
+    updateExportHint() {
+        const formato = this.exportFormatChoice ? this.exportFormatChoice.value : "otio";
+        if (this.exportFormatHint) {
+            this.exportFormatHint.textContent = PanelsManager.EXPORT_FORMAT_HINTS[formato] || "";
+        }
+
+        const tl = this.getSelectedExportTimeline();
+        const clipes = tl ? Number(tl.clip_count || 0) : 0;
+
+        if (this.exportWarning) {
+            if (tl && clipes === 0) {
+                this.exportWarning.textContent =
+                    `A timeline "${tl.name}" não tem nenhum clipe salvo. O arquivo exportado abrirá vazio no editor.`;
+                this.exportWarning.style.display = "block";
+            } else {
+                this.exportWarning.style.display = "none";
+            }
+        }
+
+        if (this.btnConfirmExport) {
+            this.btnConfirmExport.disabled = !tl;
+            this.btnConfirmExport.style.opacity = tl ? "1" : "0.5";
+            this.btnConfirmExport.style.cursor = tl ? "pointer" : "not-allowed";
+        }
+    }
+
+    closeExportModal() {
+        if (this.exportModal) this.exportModal.classList.remove("active");
+    }
+
+    confirmExport() {
+        const tl = this.getSelectedExportTimeline();
+        if (!tl) return;
+
+        const FORMATOS = ["otio", "xml", "edl"];
+        const formato = this.exportFormatChoice ? this.exportFormatChoice.value : "otio";
+        if (!FORMATOS.includes(formato)) {
+            alert("Formato de exportação inválido.");
             return;
         }
 
         try {
-            // Buscamos a última timeline salva do projeto
-            const timelines = await CapIAuAPI.fetchTimelines(STATE.currentProjectId);
-            if (timelines.length === 0) {
-                alert("Nenhuma timeline salva encontrada. Por favor, salve a timeline antes de exportar.");
-                return;
-            }
-            const lastTimelineId = timelines[0].id;
-            
-            // Dispara download direto do endpoint
-            window.open(`/api/timeline/${lastTimelineId}/export/${format}`, "_blank");
+            window.open(`/api/timeline/${tl.id}/export/${formato}`, "_blank");
+            this.closeExportModal();
         } catch (e) {
             alert("Falha ao exportar arquivo de timeline.");
         }
@@ -2353,6 +2489,7 @@ export class PanelsManager {
         else if (key.startsWith("cluster-")) { title = "Clusterização de Temas (Projeto)"; icon = "fa-diagram-project"; }
         else if (key.startsWith("reindex")) { title = "Reindexação de Embeddings"; icon = "fa-database"; }
         else if (t.type === "enrich" || key.startsWith("enrich")) { title = "Sincronização de Descrições (Projeto)"; icon = "fa-wand-magic-sparkles"; }
+        else if (t.type === "titles" || key.startsWith("titles")) { title = t.label || "Geração de Títulos IA (Projeto)"; icon = "fa-wand-magic-sparkles"; }
         return { kind: "other", id: null, title, icon, thumbUrl: null };
     }
 

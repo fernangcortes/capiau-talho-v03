@@ -1106,3 +1106,162 @@ Implementamos a fundação para controle preciso de enquadramento da timeline, p
     - Sliders dedicados no painel Ajustes para cortar bordas esquerda, direita, superior e inferior de 0% a 90%.
     - Recorte relativo ao conteúdo real da imagem, aplicado usando `clip-path: inset(...)` em pixels relativos ao *content rect*, acompanhando transformações e rotações perfeitamente.
 
+
+## 🔍 Fase 18: Busca em Lote, RAG Didático e Resiliência de IA (16–17/07/2026)
+
+Semana dominada por dois temas: dar ao usuário uma busca que **explica suas próprias respostas**, e blindar o pipeline de visão contra falhas de API que estavam custando dinheiro e apagando trabalho já feito.
+
+1.  **Busca por Similaridade em Lote e Explicações do RAG:**
+    - Seleção de múltiplos cards para disparar uma única busca por similaridade agregada (backend em `search`, UI na aba Busca).
+    - Cada resultado passou a exibir a **justificativa didática** do motivo pelo qual a IA relacionou aquele trecho à consulta — o RAG deixou de ser uma caixa preta.
+    - Painel de filtros reestruturado em duas linhas, com barra de busca avançada compacta.
+    - Filtro por **ciclo de status** (*Todos → Analisados → Não Analisados → Erros*), percorrido por cliques sucessivos no mesmo botão.
+    - Rolagem oculta e tooltips integrados ao layout de busca.
+
+2.  **Resiliência de IA — a lição dos 402:**
+    - **`max_tokens` declarado explicitamente** na chamada de visão. Sem essa declaração, a OpenRouter reservava saldo indevido e devolvia erro 402: **66 falhas de crédito** foram eliminadas por essa única linha.
+    - **Falha de API nunca mais sobrescreve descrição boa existente.** Antes, uma resposta vazia apagava uma análise válida — agora a escrita só acontece com conteúdo real.
+    - Retry + fallback automático implementado na visão e, em seguida, replicado no enriquecimento.
+    - Modelo de visão virou **dropdown na UI**, com as opções gratuitas selecionáveis.
+    - **Nemotron gratuito promovido a padrão e rebaixado no mesmo dia:** medido em produção, ~30% das chamadas batiam em `Upstream idle timeout exceeded` (504 do próprio gateway). A projeção era de ~5,7 dias só para as fotos restantes, contra poucas horas com o Gemini. Gemini voltou como padrão; o Nemotron seguiu selecionável e como reserva. Decisão registrada em comentário no `config.py`.
+
+3.  **Timeline e Miniaturas:**
+    - Pistas podem ser ocultadas individualmente; miniaturas passaram a carregar progressivamente.
+    - *Hover preview* inteligente na régua e nos clipes.
+    - **Gerenciador de tarefas de miniaturas**: pausar, cancelar, remover e sincronizar a fila.
+
+4.  **Interface e Operação:**
+    - **Duplo clique reseta sliders** de ajuste para o valor padrão.
+    - Valores visuais arredondados no painel Ajustes, evitando quebra de layout com decimais longos.
+    - Cabeçalho unificado, com títulos analisados exibidos no hover.
+    - **`scripts/launch_detached.py`**: lançador de processo verdadeiramente desgrudado do console no Windows, resposta ao incidente de 16/07 às 03:30, quando o fechamento de uma janela de terminal matou worker de visão e servidor juntos após ~36h de execução (`CTRL_CLOSE_EVENT` abortando o runtime Fortran/MKL do PyTorch).
+    - Zoom do visualizador de fotos com foco no mouse, minimapa e pan com a barra de espaço.
+    - Entidades incluídas no gerenciador de nomes, com remoção *nocase*.
+
+---
+
+## 👤 Fase 19: Inspetor de Rosto e Refinamento das Sidebars (18–19/07/2026)
+
+1.  **Inspetor de Rosto:**
+    - Tela dedicada com **aprimoramento HD** do recorte facial.
+    - Navegação bidirecional pelo teclado (`a` / `s`) para percorrer os rostos do grupo sem tirar as mãos do teclado.
+
+2.  **Timeline:**
+    - Corrigida a escala do zoom global de altura das pistas, com *clamp* automático da rolagem vertical.
+    - Cabeçalhos de pista passam a usar **duas linhas quando a altura ≥ 40px**; removido o tooltip de redimensionamento que atrapalhava o arrasto.
+    - Blocos de vídeo ocupam 100% da altura da pista.
+    - Opção para posicionar a barra de ferramentas da timeline no topo.
+
+3.  **Sidebars:**
+    - Dimensões verticais padronizadas e visual adaptativo aos três estágios da sidebar.
+    - Removido o rodapé de status estático do menu esquerdo.
+    - Diretrizes do *design system* `capiau-nle-design-system` atualizadas.
+
+---
+
+## 📤 Fase 20: Exportação Reativada, Triagem com Few-Shot e Facetas Visuais (20/07/2026)
+
+Dia de destravar três frentes que estavam paradas por dependência técnica.
+
+1.  **Exportação OTIO/XML/EDL reativada (E1.T6):**
+    - O `opentimelineio` seguia **sem wheel para Python 3.14** (confirmado com `pip download --only-binary`). Em vez de esperar, adotou-se o **plano B**: um venv 3.12 dedicado.
+    - `data/venv312` criado via `uv` (CPython 3.12.12 standalone, sem tocar no Python do sistema), com `opentimelineio` + `otio-fcp-adapter` + `otio-cmx3600-adapter` (a partir do 0.16 os adaptadores XML/EDL saíram do core) + `python-dotenv`.
+    - `otio_export.py` passou a **delegar por subprocesso** quando o import falha (`_export_via_worker`), com caminho configurável em `export.worker_python` e autodetecção por padrão. O worker herda `DB_PATH`/`EXPORTS_DIR` por variável de ambiente.
+    - **Validado ponta a ponta:** a timeline real *"teste jlcut"* exportada nos 3 formatos pela API (HTTP 200), com timecodes corretos no EDL.
+    - 4 testes novos em `tests/test_f0b_export_bridge.py` (rodam no 3.14 sem otio; pulam se o venv não existir).
+
+2.  **Triagem com Aprendizado Few-Shot (E2.C2/E2.C3):**
+    - Fila de revisão de triagem, com as correções do usuário realimentando o prompt como exemplos.
+    - Correção de categoria pela UI passou a **sincronizar a faceta no Qdrant na hora**, com propagação para a rajada inteira.
+
+3.  **Facetas Visuais (E2.D1–D3):**
+    - **Escala de plano zero-shot** (geral, americano, médio, close, detalhe, aéreo) e **paleta de cor** por segmento e por foto.
+    - Backfill no acervo real **sem re-extração e sem chamadas de API**, reusando os vetores já indexados: **7.042 pontos classificados**, **5.618 segmentos** com `shot_scale`. Distribuição: 44% plano médio, 19% detalhe, 17% geral, 12% americano, 6% close, 50 aéreos.
+    - Filtros `shot_scale`, `palette_temp`, `camera_motion` e `category` disponíveis no `/api/search/visual`.
+
+4.  **Marcadores de Timeline:**
+    - Suporte a marcadores de tempo na régua da timeline NLE.
+
+---
+
+## 📝 Fase 21: Roteiro Estruturado, Entidades e Universos (21–22/07/2026)
+
+1.  **Extração de Roteiro (E3.C / P2):**
+    - Extração em **background com cache e preview**, evitando reprocessar o mesmo documento.
+    - O plano original usava um **regex único de sluglines** para segmentar cenas. Testado contra variações reais de formatação, falhava em **7 de 10 casos** — e, pior, falhava **em silêncio**: um draft numerado caía de 111 para 7 cenas sem disparar alarme.
+    - Substituído por `src/services/script_format.py`, com **cascata de 5 camadas**: (0) estrutura nativa do formato (`.fdx`, `.fountain`), (1) biblioteca de padrões competindo por pontuação, (2) **validação do resultado** — a peça que faltava, usando a *mediana* do tamanho de cena como discriminador (610 chars segmentado certo vs. 10.810 quebrado; a dispersão sozinha não separa os casos), (3) o LLM identifica a convenção quando as heurísticas falham, (4) modo `prose` para documentos sem estrutura de cena.
+    - Numeração de cena sempre por **posição no documento**, nunca pelo LLM.
+    - `GET /api/docs/{id}/structure-preview` roda as camadas gratuitas antes de qualquer chamada paga.
+    - Validado no roteiro real: **111 cenas, 6 chunks, confiança 1.0**.
+    - Bloco compacto do roteiro disponível em triagem e visão, com *toggle*.
+    - Preview e curadoria da extração na aba Docs.
+
+2.  **Entidades e Universos (E3.C / E-A e E-B):**
+    - Modelo de dados ganhou **universo** (produção × obra), **função** e **vínculo** entre entidades.
+    - API de **fusão de entidades**, resolução por alias e `PATCH` ampliado.
+    - Consumos de entidade passaram a respeitar o `realm`.
+    - Painel **"Entidades do Projeto"** com fusão, vínculo e edição inline.
+
+3.  **Miniaturas — a caçada às thumbnails pretas:**
+    - Invalidação de cache e sincronização da miniatura na biblioteca.
+    - Fallback para **proxy 720p** na extração, com expurgo das miniaturas verdes/corrompidas.
+    - Removido o overhead do PIL em `get_video_thumbnail`.
+    - `thumb_version` com `mtime` em `list_videos`, encerrando definitivamente o cache velho no F5.
+
+4.  **Timeline e Interface:**
+    - **Régua de timecode adaptativa e precisa.**
+    - **Zoom vertical de pistas via `Shift` + roda do mouse.**
+    - Preview em hover simplificado (apenas o quadro, sem rodapé nem borda).
+    - Reanálise em lote de falhas visuais, com fallback para proxies 720p.
+    - Animação de clique com spinner em linha e *toast* ao definir miniatura.
+    - Persistência do projeto ativo e carregamento imediato das mídias no reload.
+    - Aba *Mídias* renomeada para *Vídeos*; tooltips ocultos no estágio normal.
+
+---
+
+## 🛡️ Fase 22: Fallbacks Triplos, Trava de Rostos e Workspaces Customizadas (23–25/07/2026)
+
+1.  **Cadeia Tripla de Fallbacks no Enriquecimento:**
+    - Suporte a **três modelos em cascata**, processamento **paralelo com 5 workers** e teto de **2000 tokens** por chamada.
+    - Tratativa de **respostas nulas/vazias do OpenRouter**, que vinham causando `AttributeError` em `.strip()` — falha silenciosa que derrubava lotes inteiros.
+
+2.  **Biometria Facial — protegendo o trabalho manual:**
+    - **Trava de grupos desambiguados na re-clusterização**: decisões manuais deixaram de ser sobrescritas pelo DBSCAN.
+    - Refinamento final (25/07): **apenas rótulos faciais confirmados** são travados; clusters não confirmados são resetados, evitando que um erro de rotulagem se propague para sempre.
+    - Botão de desambiguação melhorado.
+
+3.  **Workspaces Customizadas:**
+    - Suporte completo a **salvar, sobrescrever, renomear e restaurar** layouts de interface personalizados.
+
+4.  **Fluxo de Reanálise:**
+    - Atalhos `Esc` / `Ctrl+Z`, botão voltar e cancelamento no fluxo de reanálise de falhas visuais.
+    - Controle manual de status.
+
+5.  **Interface:**
+    - Botões de sub-ação padronizados como *line icons* na barra de tarefas e sidebars.
+    - Barra de progresso das tarefas responsiva ao tamanho do MLD, com prioridade de expansão para os nomes das tarefas.
+
+---
+
+## 📄 Fase 23: Licenciamento, Configuração e Documentação (18/08/2026)
+
+Após três semanas sem commits, uma rodada de saneamento do repositório e da documentação.
+
+1.  **Licenciamento e Onboarding:**
+    - Adicionada a **licença GPL-3.0** (`LICENSE`). O repositório era público sem licença — situação em que, juridicamente, ninguém pode usar, copiar ou contribuir.
+    - Criado o **`.env.example`** com as 18 variáveis que o código realmente lê, comentadas. O README documentava apenas 5.
+
+2.  **Configuração:**
+    - `TEXT_MODEL` padrão atualizado de `deepseek/deepseek-chat` para **`deepseek/deepseek-v4-flash`**, em `config.py` e `settings_registry.py`.
+    - O `settings_registry` passou a referenciar `CONFIG.TEXT_MODEL` em vez de repetir a string, eliminando a fonte dupla de verdade.
+    - *Observação:* o `.env` e o banco já apontavam para `v4-flash` desde 10/07, então a mudança não alterou o comportamento em execução — corrigiu apenas o padrão para instalações novas.
+
+3.  **README reescrito:**
+    - **Índice** com 34 links internos, todos verificados.
+    - **Arquitetura** refeita: tabela das 4 camadas, diagrama Mermaid funcional (antes o `graph TD` estava solto como texto cru, com resíduos de conversão de Word) e o percurso de uma mídia em 7 passos.
+    - Seção **"Como montar localmente"** com ambiente virtual, dependências de exportação e verificação do FFmpeg.
+    - Seção de **solução de problemas** cobrindo os incidentes reais: conflito `tokenizers`/`transformers`, FFmpeg fora do `PATH`, morte do servidor por `CTRL_CLOSE_EVENT`, índice de busca indisponível e timeouts de visão.
+    - **Correções de fatos**: os 6 links de documentação apontavam para `about:blank`; a cascata de fallback estava descrita ao contrário do código; o comando do `launch_detached.py` estava sem os argumentos obrigatórios; e o README prometia exportação nativa `.kdenlive`, **que nunca existiu no código** — os formatos reais são `.otio`, `.xml` e `.edl`.
+
+4.  **Interface:**
+    - Box de hover reposicionado para o início do texto; descrição de fotos deduplicada.

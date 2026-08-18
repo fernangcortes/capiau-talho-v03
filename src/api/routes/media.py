@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from src.config import CONFIG
 from src.db.connection import get_db
 from src.api.dependencies import get_db_conn
-from src.api.schemas import CategoryUpdate, ExternalPathIngest, LabelFacePayload, MergeClustersPayload, ReassignFacesPayload
+from src.api.schemas import CategoryUpdate, TitleUpdate, ExternalPathIngest, LabelFacePayload, MergeClustersPayload, ReassignFacesPayload
 from src.db.repositories.media import MediaRepository
 from src.core.tasks import TASK_MANAGER, read_worker_progress
 from src.services.ingest import IngestService
@@ -208,6 +208,61 @@ def update_photo_category(photo_id: int, payload: CategoryUpdate, conn: sqlite3.
 
     return {"status": "success", "id": photo_id, "category": category,
             "previous_category": old_category, "updated_count": updated_count}
+
+@router.patch("/api/video/{video_id}/title")
+def update_video_title(video_id: int, payload: TitleUpdate, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Atualização manual/humana do título executivo do vídeo."""
+    title = payload.title.strip()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, project_id, filename FROM video WHERE id = ?", (video_id,))
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(404, "Vídeo não encontrado")
+
+    MediaRepository.update_video_title(conn, video_id, title)
+    conn.commit()
+
+    return {"status": "success", "id": video_id, "title": title}
+
+@router.patch("/api/photo/{photo_id}/title")
+def update_photo_title(photo_id: int, payload: TitleUpdate, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Atualização manual/humana do título da foto."""
+    title = payload.title.strip()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, project_id, filename FROM photo WHERE id = ?", (photo_id,))
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(404, "Foto não encontrada")
+
+    MediaRepository.update_photo_title(conn, photo_id, title)
+    conn.commit()
+
+    return {"status": "success", "id": photo_id, "title": title}
+
+@router.api_route("/api/project/{project_id}/regenerate-titles", methods=["GET", "POST"])
+def regenerate_project_titles(project_id: int, background_tasks: BackgroundTasks, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Dispara a regeneração em lote dos títulos executivos curtos (3 a 6 palavras) via IA."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM video WHERE project_id = ?", (project_id,))
+    rows = cursor.fetchall()
+    video_ids = [r["id"] for r in rows]
+
+    # Se o project_id passado não tiver vídeos (ex: id 1 vs id 2), busca o projeto que possui os vídeos
+    if not video_ids:
+        cursor.execute("SELECT id, project_id FROM video LIMIT 1")
+        sample = cursor.fetchone()
+        if sample:
+            real_proj_id = sample["project_id"]
+            cursor.execute("SELECT id FROM video WHERE project_id = ?", (real_proj_id,))
+            rows = cursor.fetchall()
+            video_ids = [r["id"] for r in rows]
+            project_id = real_proj_id
+
+    if not video_ids:
+        return {"status": "success", "message": "Nenhum vídeo encontrado no banco de dados.", "count": 0}
+
+    background_tasks.add_task(PipelineService.regenerate_executive_titles, project_id, video_ids)
+    return {"status": "success", "message": f"Regenerando títulos executivos para {len(video_ids)} vídeos em segundo plano.", "count": len(video_ids)}
 
 def _enrich_image_hits(conn: sqlite3.Connection, hits: List[dict]) -> List[dict]:
     """Decora hits da coleção CLIP com metadados do banco (fotos ganham nome/proxy/título).
@@ -860,10 +915,21 @@ def set_video_thumbnail(video_id: int, timestamp: float = Query(...), conn: sqli
 
 @router.get("/api/video/{video_id}/thumbnail-at")
 def get_video_thumbnail_at(video_id: int, time: float = Query(...), conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Retorna o thumbnail do vídeo no timestamp fornecido (com cache progressivo)."""
+    """Retorna o thumbnail do vídeo no timestamp fornecido (com cache progressivo).
+
+    NUNCA extrai frame dentro da requisição. Rota síncrona roda no threadpool que o
+    FastAPI compartilha entre TODAS as rotas síncronas; chamar ffmpeg aqui fazia cada
+    miniatura faltante segurar uma thread por centenas de ms. Soltar um vídeo na
+    timeline dispara dezenas dessas de uma vez, o pool enchia e rotas sem relação
+    ficavam esperando — medido em 18/08: a exportação leva 13 ms, mas demorava
+    "muito" porque estava na fila atrás das miniaturas, não porque fosse lenta.
+
+    Cache miss agora devolve a miniatura genérica na hora e deixa a extração para a
+    fila de fundo (`_generate_timeline_thumbnails_task`), que já existia e preenche o
+    cache progressivamente. O front-end reconsulta e as miniaturas vão aparecendo.
+    """
     from fastapi.responses import FileResponse
-    from src.media.ffmpeg import extract_thumbnail_frame
-    
+
     # O nome do arquivo segue o padrão de índice baseado no tempo arredondado (1 frame por segundo)
     file_idx = int(round(time)) + 1
     thumb_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_{file_idx:04d}.jpg"
@@ -871,11 +937,11 @@ def get_video_thumbnail_at(video_id: int, time: float = Query(...), conn: sqlite
     if thumb_path.exists() and thumb_path.stat().st_size > 0:
         return FileResponse(thumb_path)
         
-    # Se não existir, extrai na hora
+    # Cache miss: identifica a mídia só para poder enfileirar a geração em segundo plano
     video = MediaRepository.get_video(conn, video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
-        
+
     video_path = Path(video['filepath'])
     if not video_path.exists():
         proxy_rel = f"proxy_vid_{video_id}.mp4"
@@ -884,22 +950,25 @@ def get_video_thumbnail_at(video_id: int, time: float = Query(...), conn: sqlite
             video_path = proxy_path
         else:
             raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado: {video_path}")
-            
-    # Dispara a geração progressiva de miniaturas em segundo plano apenas se ainda não foi iniciada (não está no progresso)
-    task_key = f"thumbs-{video_id}"
-    if task_key not in TASK_MANAGER.get_progress():
-        duration = video.get('duration') or 0.0
-        if duration > 0:
-            TASK_MANAGER.executor.submit(
-                IngestService._generate_timeline_thumbnails_task,
-                video_id, video_path, duration
-            )
-            
-    success = extract_thumbnail_frame(video_path, time, thumb_path, width=120)
-    if success and thumb_path.exists():
-        return FileResponse(thumb_path)
 
-    # Fallback para thumbnail genérica do vídeo se a extração no tempo falhar
+    # Dispara a geração progressiva de miniaturas em segundo plano apenas se ainda não foi iniciada (não está no progresso)
+    duration = video.get('duration') or 0.0
+    task_key = f"thumbs-{video_id}"
+    if task_key not in TASK_MANAGER.get_progress() and duration > 0:
+        TASK_MANAGER.executor.submit(
+            IngestService._generate_timeline_thumbnails_task,
+            video_id, video_path, duration
+        )
+
+    # Com a fila de fundo a caminho, responde 404 em vez da miniatura genérica: o
+    # timelineRenderer guarda a imagem em cache PARA SEMPRE por (vídeo, segundo), então
+    # entregar a genérica aqui congelaria o mesmo quadro ao longo do clipe inteiro até
+    # o F5. O 404 faz o front reagendar o pedido, e ele exibe a vizinha mais próxima
+    # enquanto espera (getClosestLoadedVideoThumb).
+    if duration > 0:
+        raise HTTPException(status_code=404, detail="Miniatura ainda em geração.")
+
+    # Sem duração não há geração progressiva possível: a genérica é o melhor que existe
     main_thumb = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
     if main_thumb.exists():
         return FileResponse(main_thumb)

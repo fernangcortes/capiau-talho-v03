@@ -1330,3 +1330,180 @@ class PipelineService:
                 t.start()
                 
         return affected_ids
+
+    @staticmethod
+    def regenerate_executive_titles(project_id: int = 1, video_ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
+        """Gera ou regenera títulos executivos (3 a 6 palavras) para vídeos existentes em micro-lotes (chunks de 20)."""
+        import json
+        from src.services.settings_service import SettingsService
+        import requests
+        from src.nlp.json_parser import extract_json_from_markdown
+        from src.core.tasks import TASK_MANAGER
+
+        task_key = f"titles_proj_{project_id}"
+
+        settings = SettingsService.get_settings(project_id)
+        api_key = settings.api_key("openrouter")
+        text_model = settings.get("llm.text_model")
+
+        if not api_key or api_key == "your_openrouter_api_key_here":
+            TASK_MANAGER.update_progress(task_key, 0.0, "failed", task_type="titles",
+                                         label="Geração de Títulos (Sem Chave API)",
+                                         log_message="[ERROR] Chave do OpenRouter não configurada.")
+            return []
+
+        with get_db() as conn:
+            cursor = conn.cursor()
+            if video_ids:
+                placeholders = ",".join("?" * len(video_ids))
+                query = f"SELECT id, filename, title, description, summary, video_type, category FROM video WHERE id IN ({placeholders}) AND project_id = ?"
+                rows = cursor.execute(query, (*video_ids, project_id)).fetchall()
+            else:
+                query = "SELECT id, filename, title, description, summary, video_type, category FROM video WHERE project_id = ?"
+                rows = cursor.execute(query, (project_id,)).fetchall()
+
+            videos = [dict(r) for r in rows]
+
+        total = len(videos)
+        if total == 0:
+            TASK_MANAGER.update_progress(task_key, 100.0, "finished", task_type="titles",
+                                         label="Nenhum vídeo pendente",
+                                         log_message="[FINISHED] Nenhum vídeo para processar no projeto.")
+            return []
+
+        TASK_MANAGER.update_progress(
+            task_key, 0.0, "running", task_type="titles",
+            label=f"Geração de Títulos IA ({total} vídeos)",
+            log_message=f"[INIT] Iniciando geração em micro-lotes (20 por lote) para {total} vídeos..."
+        )
+
+        updated = []
+        chunk_size = 20
+        processed_count = 0
+
+        for chunk_idx in range(0, total, chunk_size):
+            if TASK_MANAGER.is_cancelled(task_key):
+                TASK_MANAGER.update_progress(
+                    task_key, (processed_count / total) * 100.0, "cancelled", task_type="titles",
+                    label="Geração de Títulos Cancelada",
+                    log_message=f"[CANCEL] Geração cancelada pelo usuário após processar {processed_count} vídeos."
+                )
+                break
+
+            chunk = videos[chunk_idx:chunk_idx + chunk_size]
+            items_payload = []
+
+            for v in chunk:
+                vid = v["id"]
+                v_filename = v.get("filename", "") or f"Vídeo #{vid}"
+                v_type = v.get("video_type", "broll")
+                v_desc = v.get("description", "") or ""
+                v_sum = v.get("summary", "") or ""
+                v_cat = v.get("category", "") or ""
+
+                content_preview = ""
+                with get_db() as conn:
+                    if v_type == "interview":
+                        from src.db.operations import get_video_transcript
+                        dialogues = get_video_transcript(vid)
+                        if dialogues:
+                            content_preview = " ".join([d.get("text", "") for d in dialogues[:4]])
+                    else:
+                        frames = MediaRepository.get_keyframes_with_vectors(conn, vid) if hasattr(MediaRepository, 'get_keyframes_with_vectors') else []
+                        if frames:
+                            content_preview = " | ".join([f.get("description", "") for f in frames[:4] if f.get("description")])
+
+                if not content_preview:
+                    content_preview = f"{v_sum} {v_desc}".strip()
+
+                items_payload.append({
+                    "id": vid,
+                    "arquivo": v_filename,
+                    "tipo": v_type,
+                    "categoria": v_cat,
+                    "contexto": content_preview[:400]
+                })
+
+            prompt = f"""Você é um editor sênior de cinema e vídeo.
+Para cada clipe de vídeo da lista abaixo, gere um TÍTULO EXECUTIVO cinematográfico curto de 3 a 6 palavras.
+Este título servirá de nome para o clipe na ilha de edição e na timeline.
+
+REGRAS RÍGIDAS:
+1. Cada título DEVE ter estritamente entre 3 e 6 palavras.
+2. Seja direto, cinematográfico e específico sobre a AÇÃO ou CONVERSA CENTRAL (Exemplos: 'Ensaio do monólogo no camarim', 'Montagem da luz no galpão', 'Zé: Crítica ao primeiro corte', 'Detalhe das mãos no vinil').
+3. PROIBIDO usar introduções genéricas como 'Este clipe mostra', 'Vídeo de', 'Sequência útil', 'Registro', 'Mostrando', etc.
+4. Retorne OBRIGATORIAMENTE um array JSON contendo o objeto de cada clipe com as chaves 'id' e 'titulo'.
+
+LISTA DE CLIPES A NOMEAR:
+{json.dumps(items_payload, ensure_ascii=False, indent=2)}
+
+Responda em formato JSON puro:
+[
+  {{"id": 123, "titulo": "Título Executivo"}},
+  ...
+]
+"""
+            url = "https://openrouter.ai/api/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": text_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.2
+            }
+
+            try:
+                resp = requests.post(url, headers=headers, json=payload, timeout=40)
+                if resp.status_code == 200:
+                    res_data = resp.json()
+                    msg = res_data.get('choices', [{}])[0].get('message', {})
+                    raw_content = msg.get('content', '').strip()
+                    data = extract_json_from_markdown(raw_content)
+                    
+                    if isinstance(data, list):
+                        with get_db() as conn:
+                            for item in data:
+                                if isinstance(item, dict) and "id" in item:
+                                    item_id = int(item["id"])
+                                    new_title = str(item.get("titulo", "") or item.get("title", "") or "").strip()
+                                    if new_title:
+                                        MediaRepository.update_video_title(conn, item_id, new_title)
+                                        updated.append({"id": item_id, "title": new_title})
+                                        v_match = next((x for x in chunk if x["id"] == item_id), None)
+                                        f_name = v_match.get("filename", f"Vídeo #{item_id}") if v_match else f"Vídeo #{item_id}"
+                                        TASK_MANAGER.add_log(task_key, f"[SUCCESS] '{f_name}' -> '{new_title}'", "INFO")
+                            conn.commit()
+                    elif isinstance(data, dict):
+                        arr = data.get("titulos") or data.get("titles") or [data]
+                        if isinstance(arr, list):
+                            with get_db() as conn:
+                                for item in arr:
+                                    if isinstance(item, dict) and "id" in item:
+                                        item_id = int(item["id"])
+                                        new_title = str(item.get("titulo", "") or item.get("title", "") or "").strip()
+                                        if new_title:
+                                            MediaRepository.update_video_title(conn, item_id, new_title)
+                                            updated.append({"id": item_id, "title": new_title})
+                                            TASK_MANAGER.add_log(task_key, f"[SUCCESS] ID {item_id} -> '{new_title}'", "INFO")
+                                conn.commit()
+            except Exception as e:
+                TASK_MANAGER.add_log(task_key, f"[ERROR] Falha no micro-lote ({chunk_idx+1}-{chunk_idx+len(chunk)}): {e}", "WARN")
+
+            processed_count += len(chunk)
+            pct_done = min(100.0, (processed_count / total) * 100.0)
+            TASK_MANAGER.update_progress(
+                task_key, pct_done, "running", task_type="titles",
+                label=f"Geração de Títulos IA ({processed_count}/{total})",
+                log_message=f"[LLM] Micro-lote concluído ({processed_count}/{total} clipes processados)."
+            )
+
+        if not TASK_MANAGER.is_cancelled(task_key):
+            TASK_MANAGER.update_progress(
+                task_key, 100.0, "finished", task_type="titles",
+                label="Geração de Títulos Concluída",
+                log_message=f"[FINISHED] Processo finalizado! {len(updated)} de {total} títulos executivos gerados com sucesso."
+            )
+
+        return updated

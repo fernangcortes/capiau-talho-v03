@@ -62,6 +62,16 @@ class MediaRepository:
         """, (description, summary, json.dumps(tags), title or "", video_id))
 
     @staticmethod
+    def update_video_title(conn: sqlite3.Connection, video_id: int, title: str) -> None:
+        """Atualiza diretamente o título executivo do vídeo."""
+        conn.execute("UPDATE video SET title = ? WHERE id = ?", (title, video_id))
+
+    @staticmethod
+    def update_photo_title(conn: sqlite3.Connection, photo_id: int, title: str) -> None:
+        """Atualiza diretamente o título da foto."""
+        conn.execute("UPDATE photo SET title = ? WHERE id = ?", (title, photo_id))
+
+    @staticmethod
     def delete_video(conn: sqlite3.Connection, video_id: int) -> None:
         """Deleta o vídeo e suas dependências."""
         conn.execute("DELETE FROM video WHERE id = ?", (video_id,))
