@@ -1,403 +1,736 @@
-# 🎬 CapIAu-Talho --- Plataforma de IA & Decupagem Cinematográfica para Grandes Acervos e Documentários
+<div align="center">
 
-O **CapIAu-Talho** é uma ilha de pré-edição, logging e assistência
-inteligente baseada em IA, projetada sob medida para **documentaristas,
-editores de making-of e gestores de grandes acervos audiovisuais**. O
-sistema foi construído sobre uma **arquitetura híbrida otimizada para
-CPU local**, garantindo que tarefas críticas de privacidade e indexação
-(busca vetorial e biometria facial) rodem 100% localmente no seu
-computador (sem a necessidade de GPUs caras), enquanto tarefas
-linguísticas pesadas utilizam APIs de nuvem de forma econômica e
-cirúrgica.
+# 🎬 CapIAu-Talho
 
-Ao contrário das ferramentas tradicionais que tratam a IA de forma
-isolada, o CapIAu-Talho integra modelos de linguagem e visão diretamente
-a uma **timeline multipista de edição (NLE) em Canvas 2D**, permitindo o
-mapeamento de depoimentos palavra-a-palavra, buscas conceituais por
-imagem e a montagem semiautônoma de cortes narrativos exportáveis para
-softwares profissionais como o **Kdenlive, Premiere, Resolve e Final
-Cut**.
+**Ilha de pré-edição, decupagem e assistência por IA para grandes acervos e documentários**
 
-## 🎯 Por que usar o CapIAu-Talho?
+[![Licença: GPL v3](https://img.shields.io/badge/Licen%C3%A7a-GPL%20v3-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Status](https://img.shields.io/badge/Status-MVP%20em%20desenvolvimento-orange.svg)](docs/PLANO_IMPLEMENTACAO.md)
+[![Roda em CPU](https://img.shields.io/badge/GPU-n%C3%A3o%20necess%C3%A1ria-success.svg)](#arquitetura-do-sistema)
 
-### 🎞️ Para Documentaristas e Diretores de Making-Of
+</div>
 
-- **Edição por Texto:** Visualize depoimentos e entrevistas transcritos
-  palavra-a-palavra. Selecione frases ou parágrafos inteiros e insira-os
-  diretamente na timeline com o atalho Shift+E.
+<!-- IMAGEM: visão geral da interface com a timeline preenchida.
+     Solte o arquivo em docs/images/hero-timeline.png e descomente a linha abaixo. -->
+<!-- ![Interface do CapIAu-Talho](docs/images/hero-timeline.png) -->
 
-- **Relações de J/L-Cuts Nativos:** Monte diálogos de forma
-  cinematográfica e fluida, estendendo o áudio sob a imagem do
-  entrevistado ou inserindo B-rolls de cobertura antes da fala começar,
-  com suporte visual a trims independentes e compensação auditiva em
-  tempo real no player.
+O **CapIAu-Talho** é uma ilha de pré-edição, logging e assistência inteligente baseada em IA,
+projetada sob medida para **documentaristas, editores de making-of e gestores de grandes acervos
+audiovisuais**.
 
-- **Agrupamento Temático Automático:** Deixe que a IA analise dezenas de
-  horas de entrevistas e as organize em tópicos de assunto (ex:
-  \"Direção de Arte\", \"Problemas no Set\"), permitindo navegar por
+O sistema roda sobre uma **arquitetura híbrida otimizada para CPU local**: tarefas críticas de
+privacidade e indexação — busca vetorial e biometria facial — acontecem 100% na sua máquina, **sem
+GPU**. Só o trabalho linguístico pesado (transcrição e descrição de imagens) vai para APIs de nuvem,
+de forma econômica e cirúrgica.
+
+Ao contrário de ferramentas que tratam a IA como um acessório isolado, o CapIAu-Talho integra
+modelos de linguagem e visão diretamente a uma **timeline multipista (NLE) em Canvas 2D**. Isso
+permite mapear depoimentos palavra a palavra, buscar por conceito visual e montar cortes narrativos
+semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**.
+
+---
+
+## 📑 Índice
+
+- [🎯 Por que usar o CapIAu-Talho?](#por-que-usar-o-capiau-talho)
+  - [Para documentaristas e diretores de making-of](#para-documentaristas-e-diretores-de-making-of)
+  - [Para gestores de acervos e arquivistas](#para-gestores-de-acervos-e-arquivistas)
+  - [Para editores de montagem profissional](#para-editores-de-montagem-profissional)
+- [📸 Galeria](#galeria)
+- [🚀 Recursos principais](#recursos-principais)
+  - [🎞️ Decupagem e análise por IA](#decupagem-e-analise-por-ia)
+  - [✂️ Timeline e edição](#timeline-e-edicao)
+  - [👥 Rostos e personagens](#rostos-e-personagens)
+  - [🖥️ Interface e produtividade](#interface-e-produtividade)
+  - [🛡️ Resiliência e operação](#resiliencia-e-operacao)
+- [📊 Arquitetura do sistema](#arquitetura-do-sistema)
+  - [As quatro camadas](#as-quatro-camadas)
+  - [Diagrama de fluxo](#diagrama-de-fluxo)
+  - [O caminho de uma mídia, do disco à timeline](#o-caminho-de-uma-midia-do-disco-a-timeline)
+- [🛠️ Como montar localmente](#como-montar-localmente)
+  - [Requisitos](#requisitos)
+  - [Passo a passo](#passo-a-passo)
+  - [Executando](#executando)
+- [⚙️ Configuração (.env)](#configuracao-env)
+- [🩺 Solução de problemas](#solucao-de-problemas)
+- [🧪 Testes](#testes)
+- [🗺️ Roadmap](#roadmap)
+- [📁 Estrutura de pastas](#estrutura-de-pastas)
+- [📚 Documentação complementar](#documentacao-complementar)
+- [📄 Licença](#licenca)
+
+---
+
+## 🎯 Por que usar o CapIAu-Talho? <a id="por-que-usar-o-capiau-talho"></a>
+
+### Para documentaristas e diretores de making-of <a id="para-documentaristas-e-diretores-de-making-of"></a>
+
+- **Edição por texto.** Visualize depoimentos e entrevistas transcritos palavra a palavra.
+  Selecione frases ou parágrafos inteiros e insira-os direto na timeline com `Shift+E`.
+
+- **J/L-cuts nativos.** Monte diálogos de forma cinematográfica, estendendo o áudio sob a imagem do
+  entrevistado ou inserindo B-rolls de cobertura antes da fala começar — com trims independentes e
+  compensação auditiva em tempo real no player.
+
+- **Agrupamento temático automático.** Deixe a IA analisar dezenas de horas de entrevistas e
+  organizá-las em tópicos (ex.: *"Direção de Arte"*, *"Problemas no Set"*), para navegar por
   subtemas instantaneamente.
 
-### 💾 Para Gestores de Acervos e Arquivistas
+### Para gestores de acervos e arquivistas <a id="para-gestores-de-acervos-e-arquivistas"></a>
 
-- **Ingestão In-Place Sem Cópia:** Catalogar centenas de gigabytes de
-  arquivos mantendo-os em seus discos rígidos externos ou SSDs
-  originais, gerando proxies Web levíssimos em segundo plano sem sujar o
-  armazenamento interno.
+- **Ingestão in-place, sem cópia.** Catalogue centenas de gigabytes mantendo os arquivos nos discos
+  externos originais. Os proxies leves são gerados em segundo plano, sem sujar o armazenamento
+  interno.
 
-- **Busca Híbrida Semântica & Visual:** Pesquise seu material bruto
-  usando linguagem humana natural (ex: *\"diretor gesticulando em frente
-  à câmera sob iluminação quente\"*). O sistema localiza o trecho exato
-  de vídeo ou foto do set em menos de 5ms.
+- **Busca híbrida, semântica e visual.** Pesquise o material bruto em linguagem natural (ex.:
+  *"diretor gesticulando em frente à câmera sob iluminação quente"*). O sistema localiza o trecho
+  exato em menos de 5 ms.
 
-- **Biometria Facial Local:** Detecte, agrupe por proximidade
-  (Clustering DBSCAN) e identifique personagens e entrevistados de forma
-  100% local usando modelos ONNX otimizados para CPU.
+- **Biometria facial local.** Detecte, agrupe por proximidade (clustering DBSCAN) e identifique
+  personagens de forma 100% local, com modelos ONNX otimizados para CPU. Nenhum rosto sai da sua
+  máquina.
 
-### ✂️ Para Editores de Montagem Profissional
+### Para editores de montagem profissional <a id="para-editores-de-montagem-profissional"></a>
 
-- **Zero Aprisionamento Tecnológico (No Vendor Lock-in):** Faça toda a
-  triagem e rough cut no CapIAu-Talho e exporte sua timeline com
-  precisão de frames para arquivos XML, OpenTimelineIO (.otio), EDL ou
-  arquivos nativos do **Kdenlive 24/25** (.kdenlive).
+- **Sem aprisionamento tecnológico.** Faça a triagem e o rough cut no CapIAu-Talho e exporte a
+  timeline com precisão de frames em **OpenTimelineIO (`.otio`)**, **XML (Final Cut Pro 7)** ou
+  **EDL** — formatos que Kdenlive, Premiere, Resolve e Final Cut importam nativamente. O passo a
+  passo para o Kdenlive está em [`docs/kdenlive_workflow.md`](docs/kdenlive_workflow.md).
 
-- **Atalhos Profissionais (Scrubbing JKL):** Navegue pelas mídias com os
-  mesmos atalhos de reprodução acelerada e reversa (J, K, L) e marcação
-  de corte (I, O, E) usados no Premiere e DaVinci Resolve.
+- **Atalhos profissionais (scrubbing JKL).** Navegue com os mesmos atalhos de reprodução acelerada
+  e reversa (`J`, `K`, `L`) e marcação de corte (`I`, `O`, `E`) do Premiere e do DaVinci Resolve.
 
-## 🚀 Recursos Principais (Features)
+---
 
-- **🎬 Segmentação Real por Shots e Beats:** A decupagem visual não usa
-  mais um relógio fixo (1 frame a cada 10s). O vídeo é dividido em cortes
-  reais (PySceneDetect) e planos-sequência longos são subdivididos em
-  *beats* por deriva de conteúdo visual, com classificação automática do
-  movimento de câmera (estático, pan, tilt, caminhando, mão livre, whip).
-  Isso reduz o número de chamadas de IA e faz o player pular exatamente
-  para o trecho certo ao clicar num resultado de busca.
+## 📸 Galeria <a id="galeria"></a>
 
-- **🖼️ Busca Visual e "Encontrar Similares" (CLIP Local):** Todo keyframe
-  de vídeo e foto de set é embedado localmente por um modelo CLIP
-  multilíngue (sem custo de API). Isso habilita busca por conceito visual
-  em português (ex: *"contraluz na janela"*) mesmo sem palavra
-  correspondente na descrição, além de um botão "Encontrar Similares" no
-  card de foto, no visualizador (lightbox) e no inspetor de vídeo que
-  retorna instantaneamente as mídias visualmente mais parecidas.
+> As capturas de tela ficam em [`docs/images/`](docs/images/). Solte os arquivos com os nomes
+> indicados e descomente as linhas correspondentes.
 
-- **🤖 Agente Editor com Tools (IA Copiloto):** Um agente conversacional
-  que analisa o roteiro e a timeline ativa, propondo cortes e edições
-  diretamente na linha do tempo por meio de function-calling (loop de
-  ferramentas). As edições simples são aplicadas direto (com undo/redo),
-  enquanto edições complexas ou em lote viram rascunhos visuais (*ghost
-  clips*) para aprovação.
+<!-- ![Biblioteca em árvore](docs/images/biblioteca-arvore.png) -->
+<!-- *Biblioteca em árvore: acervos grandes organizados em pastas hierárquicas colapsáveis.* -->
 
-- **👥 Biometria Facial, Desambiguação em Massa e Autocura:** Tela
-  dedicada para catalogação de elenco e equipe técnica, permitindo
-  reatribuir, fundir grupos de rostos idênticos e rejeitar artefatos com
-  preview de vídeo de contexto em hover configurável. Conta com seleção
-  em lote via **Shift + Clique**, busca instantânea por digitação
-  rápida, paginação inteligente para navegação fluida, cacheamento local
-  de thumbnails e um mecanismo robusto de **autocura de dados** que
-  protege e reestabelece as suas decisões de auditoria manual contra
-  sobrescritas automáticas do DBSCAN.
+<!-- ![Busca visual](docs/images/busca-visual.png) -->
+<!-- *Busca por conceito visual em português, sem depender das palavras da descrição.* -->
 
-- **🔄 Modal de Alternativas da IA:** Todo clipe inserido pela IA
-  carrega candidatos semânticos sugeridos. Ao selecionar um clipe na
-  timeline e pressionar **A**, um modal centralizado exibe vídeos
-  tocando em loop silencioso de cada alternativa com a justificativa da
-  IA. Troque os clipes com um clique usando as ferramentas visuais
-  **Slot Fixo** (mantém duração) ou **Ripple** (desloca a timeline para
-  encaixar a duração ideal).
+<!-- ![Tela de rostos](docs/images/tela-rostos.png) -->
+<!-- *Catalogação de elenco e equipe, com desambiguação em massa.* -->
 
-- **🖥️ Janelas Destacáveis (Workspaces Multi-monitores):** Destaque a
-  Biblioteca, Timeline, Players ou Chatbot em janelas independentes.
-  Elas mantêm sincronia de playhead, seleções e comandos em tempo real
-  usando BroadcastChannel.
+<!-- ![Agente editor](docs/images/agente-chat.png) -->
+<!-- *O agente propõe cortes direto na timeline, como rascunhos aprováveis (ghost clips).* -->
 
-- **📂 Visualização em Árvore Inteligente:** Navegue por acervos
-  gigantes organizados dinamicamente em pastas e subpastas hierárquicas
-  colapsadas no estilo Explorer de arquivos, eliminando a poluição
-  visual na biblioteca.
+---
 
-- **📸 Suporte a Fotos Still & Efeitos Ken Burns:** Permite inserir
-  fotos do set (incluindo RAW) como stills na timeline com
-  arrastar-e-soltar. Possibilita animar movimentos suaves (Ken Burns),
-  ajustar enquadramento (Fit/Fill) e fades por meio do Inspetor de Foto
-  e compose no Program Player.
+## 🚀 Recursos principais <a id="recursos-principais"></a>
 
-- **📐 Viewport Estável, Transformação Interativa (Bounding Box) & Crop:** Viewport do player Program
-  com proporção física estável de sequência e máscara de transbordo escurecida pontilhada em ciano.
-  Permite selecionar clipes e interagir com uma caixa delimitadora (*bounding box*) diretamente no player
-  para mover (transladar), escalar (uniformemente pelas alças de canto) ou rotacionar em tempo real.
-  Adiciona suporte para efeito de recorte (*Crop*) relativo ao conteúdo da imagem com preservação de scroll
-  no painel e integração total com o histórico (Undo/Redo via Ctrl+Z).
+### 🎞️ Decupagem e análise por IA <a id="decupagem-e-analise-por-ia"></a>
 
-- **⚙️ Configurações da Sequência (Timeline) & Auto-Configuração:** Definição e persistência (local e backend)
-  de resolução e taxa de quadros (FPS) da timeline. O sistema autodetectará a resolução e o FPS do primeiro
-  vídeo inserido para configurar automaticamente uma timeline vazia. Alterar as configurações exibe avisos de
-  reescalagem, atualizando a representação em frames dos clipes de modo a preservar suas durações em segundos.
+- **Segmentação real por shots e beats.** A decupagem visual não usa mais um relógio fixo (1 frame
+  a cada 10 s). O vídeo é dividido em cortes reais (PySceneDetect), e planos-sequência longos são
+  subdivididos em *beats* por deriva de conteúdo visual, com classificação automática do movimento
+  de câmera (estático, pan, tilt, caminhando, mão livre, whip). Isso reduz o número de chamadas de
+  IA e faz o player pular exatamente para o trecho certo ao clicar num resultado de busca.
 
-- **🎛️ Layout Estúdio & Controle Flexível (Workspaces):** Preset de
-  interface robusto para decupagem que reposiciona a biblioteca
-  (maximizada) e empilha os players de Source/Program em formato limpo
-  (*controles apenas no hover*). Permite expandir a transcrição como
-  terceira coluna retrátil. Além disso, gerencie a altura vertical das
-  pistas de vídeo e áudio via slider global ou arraste individual pela
-  borda.
+- **Busca visual e "encontrar similares" (CLIP local).** Todo keyframe de vídeo e foto de set é
+  embedado localmente por um modelo CLIP multilíngue, sem custo de API. Habilita busca por conceito
+  visual em português (ex.: *"contraluz na janela"*) mesmo sem palavra correspondente na descrição,
+  além de um botão **Encontrar Similares** no card de foto, no lightbox e no inspetor de vídeo.
 
-- **🎤 Assistente de Diarização Inteligente:** Fluxo completo para
-  corrigir falantes na transcrição. Inclui uma gaveta de pistas globais
-  (silêncios longos, perguntas e discrepâncias faciais) e um inspetor de
-  balão avançado. O inspetor exibe uma *Waveform Interativa* de fala,
-  permitindo dividir depoimentos com dois cliques precisos, e oferece
-  desambiguação facial instantânea baseada em quem está na tela no
-  milissegundo correspondente.
+- **Busca por similaridade em lote e explicações didáticas do RAG.** Selecione múltiplos cards para
+  busca em lote e veja a justificativa de por que a IA relacionou determinado trecho à busca. Inclui
+  painel de filtros em duas linhas e filtro por ciclo de status (*Todos*, *Analisados*, *Não
+  Analisados*, *Erros*).
 
-- **💾 Auto-Salvamento & Histórico Resiliente (localStorage)**: Gravação
-  contínua em segundo plano com debounce de 1s de todo o estado da
-  timeline (cortes, pistas, ghost clips) e configurações de interface
-  (zoom, scrolls, playhead, seleções), além da retenção completa do
-  histórico de Undo/Redo contra F5 e Ctrl+F5 por ID de projeto.
+- **Assistente de diarização inteligente.** Fluxo completo para corrigir falantes na transcrição:
+  gaveta de pistas globais (silêncios longos, perguntas, discrepâncias faciais) e inspetor de balão
+  avançado. O inspetor exibe uma *waveform interativa* de fala, permite dividir depoimentos com dois
+  cliques precisos e oferece desambiguação facial baseada em quem está na tela no milissegundo
+  correspondente.
 
-- **💻 Painel de Logs Avançado com IA (Console do Desenvolvedor)**: Uma
-  nova aba lateral de Logs simulando um terminal escuro que intercepta o
-  console de desenvolvimento do sistema e registra as ações do usuário
-  em tempo real. Conta com exportação de texto rápida e dois botões de
-  IA (via OpenRouter) para gerar um relatório compreensível para humanos
-  ou executar uma análise técnica estruturada de performance e exceções.
+### ✂️ Timeline e edição <a id="timeline-e-edicao"></a>
 
-- **🎚️ Controles Nativos de Pista & Interação Avançada de Timeline**: Botões
-  para mutar, soltar (*solo*) e ocultar/exibir pistas de vídeo (V1/V2) e
-  áudio (A1/A2) individualmente. Inclui pré-visualização ao passar o mouse
-  (*hover preview*) pela régua e clipes, miniaturas progressivas e suporte
-  a **duplo clique para resetar sliders** de ajustes (posição, escala,
-  rotação, crop e volume) para os valores padrão.
+- **Agente editor com ferramentas (IA copiloto).** Um agente conversacional analisa o roteiro e a
+  timeline ativa e propõe cortes por *function-calling*. Edições simples são aplicadas direto (com
+  undo/redo); edições complexas ou em lote viram rascunhos visuais (*ghost clips*) para aprovação.
 
-- **📍 Marcadores de Timeline & Clipe Teclado-First (Box Compacto & Seleção em Lote)**:
-  Suporte a marcadores de régua e marcadores ancorados diretamente ao clipe de vídeo (V1 / V2 B-Roll).
-  Possui caixa flutuante compacta de edição (310px) operada sem pausar a reprodução do vídeo.
-  Navegação ultra-rápida via teclado (**M** cria/edita, **Tab** alterna campos de texto e cor, **Enter/Esc** salva e fecha),
-  seleção múltipla via **Shift + Clique** (borda de destaque branca) e exclusão em lote via **Delete/Backspace**.
+- **Modal de alternativas da IA.** Todo clipe inserido pela IA carrega candidatos semânticos.
+  Selecione um clipe e pressione **`A`**: um modal exibe cada alternativa tocando em loop silencioso,
+  com a justificativa da IA. Troque com um clique usando **Slot Fixo** (mantém a duração) ou
+  **Ripple** (desloca a timeline para encaixar a duração ideal).
 
-- **🔍 Busca por Similaridade em Lote & Explicações Didáticas do RAG**: Permite
-  selecionar múltiplos cards para busca por similaridade em lote e exibe a
-  justificativa didática do motivo pelo qual a IA relacionou determinado
-  trecho à busca. Conta com painel de filtros em 2 linhas e filtro por ciclo
-  de status (*Todos*, *Analisados*, *Não Analisados*, *Erros*).
+- **Fotos still e efeito Ken Burns.** Insira fotos do set (inclusive RAW) como stills por
+  arrastar-e-soltar. Anime movimentos suaves (Ken Burns), ajuste enquadramento (Fit/Fill) e fades
+  pelo Inspetor de Foto, com composição no Program Player.
 
-- **🛡️ Resiliência de IA, Fallback Automático & Gestão de Tokens**: Seletor
-  de modelos de visão configurável na UI com fallback automático em cascata
-  (Nemotron 70B Vision → Gemini 2.5 Flash → Gemini 3.1 Flash Lite) em caso
-  de indisponibilidade, declaração explícita de `max_tokens` para evitar reservas
-  indevidas de saldo no OpenRouter e proteção anti-sobrescrita de análises
-  existentes.
+- **Viewport estável, transformação interativa e crop.** O viewport do Program mantém proporção
+  física estável da sequência, com máscara de transbordo pontilhada em ciano. Selecione clipes e
+  manipule uma *bounding box* direto no player para mover, escalar (alças de canto) ou rotacionar em
+  tempo real. Inclui recorte (*crop*) relativo ao conteúdo, com preservação de scroll no painel e
+  integração total ao histórico (undo/redo via `Ctrl+Z`).
 
-- **⚡ Gerenciador de Tarefas de Miniaturas & Lançador Desgrudado**: Painel
-  para pausar, cancelar, remover e sincronizar a geração de miniaturas. No
-  Windows, inclui o script `scripts/launch_detached.py` para rodar o backend
-  e workers totalmente desvinculados do console, evitando travamentos acidentais.
+- **Configurações da sequência e autoconfiguração.** Resolução e taxa de quadros (FPS) da timeline
+  são definidas e persistidas (local e backend). O sistema autodetecta resolução e FPS do primeiro
+  vídeo inserido para configurar uma timeline vazia. Alterar as configurações exibe avisos de
+  reescalagem e atualiza a representação em frames preservando as durações em segundos.
 
-## 📊 Arquitetura Técnica do Sistema
+- **Controles nativos de pista e interação avançada.** Botões para mutar, solar e ocultar pistas de
+  vídeo (V1/V2) e áudio (A1/A2) individualmente. Inclui pré-visualização ao passar o mouse pela
+  régua e pelos clipes, miniaturas progressivas e **duplo clique para resetar sliders** (posição,
+  escala, rotação, crop e volume).
 
-O fluxo do CapIAu-Talho opera de forma circular, sincronizando o banco
-de dados de metadados, o banco vetorial vetorial e a timeline do editor:
+- **Marcadores teclado-first.** Marcadores de régua e marcadores ancorados ao clipe de vídeo
+  (V1 / V2 B-Roll), com caixa flutuante compacta (310 px) que opera sem pausar a reprodução.
+  Navegação rápida por teclado (**`M`** cria/edita, **`Tab`** alterna campos, **`Enter`/`Esc`** salva
+  e fecha), seleção múltipla via **`Shift` + clique** e exclusão em lote via **`Delete`/`Backspace`**.
 
+### 👥 Rostos e personagens <a id="rostos-e-personagens"></a>
+
+- **Biometria facial, desambiguação em massa e autocura.** Tela dedicada à catalogação de elenco e
+  equipe técnica: reatribua, funda grupos de rostos idênticos e rejeite artefatos, com preview de
+  vídeo de contexto no hover. Inclui seleção em lote via **`Shift` + clique**, busca instantânea por
+  digitação, paginação inteligente, cache local de miniaturas e um mecanismo de **autocura de dados**
+  que protege suas decisões de auditoria manual contra sobrescritas automáticas do DBSCAN.
+
+### 🖥️ Interface e produtividade <a id="interface-e-produtividade"></a>
+
+- **Janelas destacáveis (workspaces multi-monitor).** Destaque Biblioteca, Timeline, Players ou
+  Chatbot em janelas independentes, com sincronia de playhead, seleções e comandos em tempo real via
+  `BroadcastChannel`.
+
+- **Visualização em árvore inteligente.** Navegue por acervos gigantes organizados dinamicamente em
+  pastas e subpastas hierárquicas colapsadas, no estilo do Explorer.
+
+- **Layout Estúdio e workspaces flexíveis.** Preset de interface para decupagem que maximiza a
+  biblioteca e empilha os players Source/Program de forma limpa (*controles apenas no hover*), com a
+  transcrição como terceira coluna retrátil. Gerencie a altura das pistas por slider global ou
+  arraste individual pela borda. Workspaces customizadas podem ser salvas, sobrescritas, renomeadas
+  e restauradas.
+
+### 🛡️ Resiliência e operação <a id="resiliencia-e-operacao"></a>
+
+- **Autossalvamento e histórico resiliente.** Gravação contínua em segundo plano (debounce de 1 s)
+  de todo o estado da timeline (cortes, pistas, ghost clips) e da interface (zoom, scrolls, playhead,
+  seleções), além da retenção completa do histórico de undo/redo contra `F5` e `Ctrl+F5`, por ID de
+  projeto.
+
+- **Resiliência de IA e fallback automático.** Seletor de modelos de visão na interface com queda
+  automática para um modelo reserva quando o principal falha N vezes seguidas (veja
+  [Configuração](#configuracao-env)). Inclui declaração explícita de `max_tokens`, para evitar
+  reservas indevidas de saldo no OpenRouter, e proteção anti-sobrescrita de análises existentes.
+
+- **Painel de logs avançado com IA.** Aba lateral que simula um terminal escuro, intercepta o
+  console de desenvolvimento e registra as ações do usuário em tempo real. Conta com exportação
+  rápida em texto e dois botões de IA (via OpenRouter) para gerar um relatório legível por humanos
+  ou uma análise técnica estruturada de performance e exceções.
+
+- **Gerenciador de tarefas de miniaturas e lançador desgrudado.** Painel para pausar, cancelar,
+  remover e sincronizar a geração de miniaturas. No Windows, o script
+  [`scripts/launch_detached.py`](scripts/launch_detached.py) roda o backend desvinculado do console,
+  evitando travamentos acidentais (veja [Executando](#executando)).
+
+---
+
+## 📊 Arquitetura do sistema <a id="arquitetura-do-sistema"></a>
+
+### As quatro camadas <a id="as-quatro-camadas"></a>
+
+O CapIAu-Talho é dividido em quatro camadas. A decisão de projeto mais importante está na coluna
+**Onde roda**: tudo que é sensível ou repetitivo fica na sua máquina; a nuvem só é acionada para o
+que exige um modelo grande, uma vez por mídia.
+
+| Camada | Onde roda | O que faz | Custo |
+|---|---|---|---|
+| 💾 **Armazenamento** | HD externo / SSD | Guarda os arquivos originais, que **nunca são copiados** | — |
+| 🐍 **Backend** | Sua CPU, local | Ingestão, proxies, segmentação, embeddings, biometria facial, banco vetorial | Grátis |
+| ☁️ **Nuvem** | APIs externas | Transcrição com diarização e descrição de imagens | Pago, por uso |
+| 💻 **Frontend** | Navegador | Timeline em Canvas 2D, players duplos, biblioteca, chat do agente | — |
+
+### Diagrama de fluxo <a id="diagrama-de-fluxo"></a>
+
+```mermaid
 graph TD
+    subgraph HD["💾 Armazenamento do usuário"]
+        Originals["Vídeos e fotos originais<br/>.mp4 · .mov · .mxf · RAW"]
+    end
 
-subgraph HD_Externo\[\"💾 HD Externo / SSD\"\]
+    subgraph Backend["🐍 Backend FastAPI — 100% CPU local, sem GPU"]
+        Watcher["Ingestor<br/>varredura + SHA-256"]
+        FFmpeg["FFmpeg<br/>proxies 720p · MP3 16 kHz · recorte de rostos"]
+        Segmentation["PySceneDetect + OpenCV<br/>shots, beats e movimento de câmera"]
+        SQLite[("SQLite<br/>metadados · diálogos · projetos · timelines")]
+        MiniLM["Sentence-Transformers MiniLM<br/>embeddings de texto"]
+        CLIPEngine["CLIP multilíngue<br/>embeddings de imagem"]
+        FaceEngine["YuNet + SFace (ONNX)<br/>detecção e biometria facial"]
+        Qdrant[("Qdrant local<br/>busca vetorial &lt; 5 ms")]
+    end
 
-Originals\[\"Vídeos Originais (.mp4 / .mov / .mxf / Fotos RAW)\"\]
+    subgraph Cloud["☁️ APIs de nuvem — uso cirúrgico"]
+        AssemblyAI["AssemblyAI<br/>transcrição + diarização pt-BR"]
+        OpenRouter["OpenRouter<br/>DeepSeek V4-Flash · Gemini 2.5 Flash"]
+        S3["AWS S3 (opcional)<br/>armazenamento remoto"]
+    end
 
-end
+    subgraph Frontend["💻 Frontend web — NLE em Canvas 2D"]
+        Biblioteca["Biblioteca em árvore<br/>+ aba Rostos"]
+        Player["Players duplos<br/>Source / Program · JKL · I-O"]
+        Timeline["Timeline multipista<br/>V1/V2 · A1/A2 · undo/redo"]
+        Chat["Chat do agente editor<br/>+ modal de alternativas"]
+    end
 
-subgraph Backend\[\"🐍 FastAPI Backend (Python / CPU Local)\"\]
+    Originals --> Watcher
+    Watcher --> SQLite
+    Watcher --> FFmpeg
 
-Watcher\[\"Watcher / Ingestor (os.walk / SHA-256)\"\]
+    FFmpeg -->|proxy 720p/360p| Player
+    FFmpeg -->|proxy 720p| Segmentation
+    FFmpeg -->|mono MP3 16 kHz| AssemblyAI
+    FFmpeg -->|frames de set / B-roll| CLIPEngine
+    FFmpeg -->|recorte de rostos| FaceEngine
+    FFmpeg -.->|opcional| S3
 
-FFmpeg\[\"FFmpeg (Geração de Proxies, Áudios MP3 & Face Cropping)\"\]
+    AssemblyAI -->|diarização + timestamps| SQLite
+    AssemblyAI -->|texto para indexar| MiniLM
+    MiniLM -->|embeddings de texto| Qdrant
 
-SQLite\[\"SQLite (Metadados, Diálogos, Projetos, Effects &
-Timelines)\"\]
+    Segmentation -->|shots · beats · keyframes| SQLite
+    Segmentation -->|keyframes por segmento| OpenRouter
 
-SentenceTransformers\[\"Sentence-Transformers (MiniLM CPU Local)\"\]
+    CLIPEngine -->|embeddings de imagem| Qdrant
+    FaceEngine -->|embeddings e grupos de rostos| SQLite
 
-Segmentation\[\"PySceneDetect + OpenCV (Shots, Beats & Movimento de Câmera)\"\]
+    SQLite -->|contexto da timeline| OpenRouter
+    OpenRouter -->|operações e ghost clips| Timeline
+    OpenRouter -->|temas e descrições| SQLite
+    OpenRouter -->|descrições visuais| Qdrant
 
-CLIPEngine\[\"CLIP Multilíngue Local (Embeddings de Imagem/Texto CPU)\"\]
+    Qdrant -->|busca híbrida e similares| Biblioteca
+    Biblioteca --> Timeline
+    Chat --> Timeline
+    Timeline -->|exportar .otio / .xml / .edl| HD
+```
 
-Qdrant\[\"Qdrant Local (File-based CPU)\"\]
+### O caminho de uma mídia, do disco à timeline <a id="o-caminho-de-uma-midia-do-disco-a-timeline"></a>
 
-FaceEngine\[\"Detector Facial YuNet & SFace CPU (ONNX)\"\]
+1. **Ingestão.** O ingestor varre a pasta apontada, calcula um SHA-256 de cada arquivo (para nunca
+   catalogar o mesmo material duas vezes) e grava só o *caminho* no SQLite. O arquivo original não
+   sai do lugar.
+2. **Proxies.** O FFmpeg gera uma cópia leve em 720p para o player e um MP3 mono de 16 kHz para a
+   transcrição. Só o MP3 sobe para a nuvem — nunca o vídeo.
+3. **Segmentação.** O PySceneDetect quebra o vídeo nos cortes reais e subdivide planos longos em
+   *beats*, escolhendo um keyframe representativo de cada trecho.
+4. **Análise.** Os keyframes escolhidos (poucos, não um a cada 10 s) vão para o OpenRouter, que
+   devolve descrições visuais. O áudio vai para o AssemblyAI, que devolve a transcrição já separada
+   por falante.
+5. **Indexação.** Texto e imagem viram vetores — MiniLM para texto, CLIP para imagem — e são
+   gravados no Qdrant local. É isso que permite buscar *"contraluz na janela"* e achar o plano
+   mesmo sem essa palavra na descrição.
+6. **Rostos.** Em paralelo, o YuNet detecta rostos, o SFace os transforma em vetores e o DBSCAN os
+   agrupa. Suas correções manuais ficam travadas contra reagrupamentos futuros.
+7. **Edição e exportação.** Você monta na timeline em Canvas 2D e exporta em `.otio`, `.xml` ou
+   `.edl` para finalizar no seu NLE de preferência.
 
-end
+---
 
-subgraph APIs_Nuvem\[\"☁️ APIs na Nuvem (Econômicas)\"\]
+## 🛠️ Como montar localmente <a id="como-montar-localmente"></a>
 
-AssemblyAI\[\"AssemblyAI (ASR / Diarização pt-BR)\"\]
+### Requisitos <a id="requisitos"></a>
 
-OpenRouter\[\"OpenRouter (DeepSeek V4-Flash / Claude 3.5 / Gemini)\"\]
+| Item | Mínimo | Observações |
+|---|---|---|
+| **Python** | 3.10+ | Testado em 3.14 |
+| **FFmpeg** | qualquer versão recente | Precisa do `ffmpeg` **e** do `ffprobe`, ambos no `PATH` |
+| **RAM** | 8 GB | 16 GB recomendados para acervos grandes |
+| **Disco** | ~3 GB livres | Modelos de IA baixados sob demanda + proxies do acervo |
+| **GPU** | não é necessária | Todo o processamento local roda em CPU |
+| **Contas** | OpenRouter e AssemblyAI | Ambas pagas por uso — veja [custos](docs/costs_and_security.md) |
 
-end
+### Passo a passo <a id="passo-a-passo"></a>
 
-subgraph Frontend\[\"💻 Frontend Web (Glassmorphism NLE UI)\"\]
+**1. Clone o repositório**
 
-Player\[\"Players Duplos (JKL / I-O) + Face Box Overlay\"\]
+```bash
+git clone https://github.com/fernangcortes/capiau-talho-v03.git
+```
 
-Biblioteca\[\"Biblioteca em Árvore & Aba Rostos\"\]
+**2. Entre na pasta**
 
-Timeline\[\"Timeline Canvas 2D (V1/V2, A1/A2, Undo/Redo)\"\]
+```bash
+cd capiau-talho-v03
+```
 
-Chat\[\"Chat de Edição & Modal de Alternativas (Tecla A)\"\]
+**3. Crie um ambiente virtual**
 
-end
+Isso mantém as dependências do CapIAu-Talho separadas do resto do sistema, evitando que a
+atualização de outro projeto quebre este (veja [Solução de problemas](#solucao-de-problemas)).
 
-Originals \--\> Watcher
+```bash
+python -m venv .venv
+```
 
-Watcher \--\> SQLite
+**4. Ative o ambiente virtual**
 
-Watcher \--\> FFmpeg
+No Windows (PowerShell):
 
-FFmpeg \--\>\|Proxy 720p/360p\| Player
+```powershell
+.venv\Scripts\Activate.ps1
+```
 
-FFmpeg \--\>\|Mono MP3 16kHz\| AssemblyAI
+No Linux ou macOS:
 
-AssemblyAI \--\>\|Diarização + Timestamps\| SQLite
+```bash
+source .venv/bin/activate
+```
 
-AssemblyAI \--\>\|Indexar texto\| SentenceTransformers
+**5. Instale as dependências**
 
-SentenceTransformers \--\>\|Embeddings\| Qdrant
+```bash
+pip install -r requirements.txt
+```
 
-SQLite \--\>\|Contexto Timeline\| OpenRouter
+**6. Instale as dependências de exportação**
 
-OpenRouter \--\>\|Operations / Ghost Clips\| Timeline
+Elas não estão no `requirements.txt` porque a disponibilidade do `opentimelineio` varia conforme a
+versão do Python (veja a nota abaixo):
 
-OpenRouter \--\>\|Temas & Descrições Visuais\| SQLite
+```bash
+pip install opentimelineio otio-fcp-adapter otio-cmx3600-adapter
+```
 
-FFmpeg \--\>\|Proxy 720p\| Segmentation
-
-Segmentation \--\>\|Shots/Beats/Keyframes\| SQLite
-
-Segmentation \--\>\|Keyframes por Segmento\| OpenRouter
-
-OpenRouter \--\>\|Descrições Visuais\| Qdrant
-
-FFmpeg \--\>\|Frames de Set/B-Roll\| CLIPEngine
-
-CLIPEngine \--\>\|Embeddings de Imagem\| Qdrant
-
-Qdrant \--\>\|Busca Visual & Similares\| Biblioteca
-
-FFmpeg \--\>\|Cropping de Rostos\| FaceEngine
-
-FaceEngine \--\>\|Face Embeddings & Grupos\| SQLite
-
-Qdrant \--\>\|Busca Híbrida \< 5ms\| Biblioteca
-
-Timeline \--\>\|Exportar XML/OTIO/Kdenlive\| HD_Externo
-
-## ⚙️ Pré-requisitos & Execução Local
-
-### Pré-requisitos
-
-1.  **Python 3.10+** instalado.
-
-2.  **FFmpeg** instalado na máquina e configurado nas variáveis de
-    ambiente do sistema (PATH).
-
-### Instalação Rápida
-
-1.  Instale as dependências requeridas pelo backend (inclui PySceneDetect
-    para segmentação e Sentence-Transformers para embeddings CLIP,
-    baixados sob demanda na primeira busca visual):
-
-> pip install -r requirements.txt
-
-2.  Crie ou configure o arquivo `.env` na raiz do projeto contendo suas chaves:
-
-> OPENROUTER_API_KEY=sua_chave_do_openrouter
+> **Se o `opentimelineio` não instalar no seu Python.** O CapIAu-Talho tem um plano B embutido: ele
+> delega a exportação a um interpretador Python 3.12 separado. Crie-o com
+> [`uv`](https://github.com/astral-sh/uv):
 >
-> ASSEMBLYAI_API_KEY=sua_chave_da_assemblyai
+> ```bash
+> uv venv data/venv312 --python 3.12
+> ```
 >
-> # Configurações de Modelos (Padrão Híbrido Econômico)
+> ```bash
+> uv pip install --python data/venv312/Scripts/python.exe opentimelineio otio-fcp-adapter otio-cmx3600-adapter python-dotenv
+> ```
 >
-> TEXT_MODEL=deepseek/deepseek-chat
->
-> VISION_MODEL=google/gemini-2.5-flash
->
-> # Concorrência na conversão de proxies (ex: 6 para i7-10700)
-> MAX_CONVERSION_WORKERS=6
+> O sistema detecta esse ambiente sozinho e passa a usá-lo apenas para exportar. Todo o resto
+> continua no seu Python principal.
 
-### Executando a Aplicação
+**7. Confirme que o FFmpeg está acessível**
 
-Inicie o servidor local (recomenda-se omitir `--reload` no Windows durante a conversão em lote para evitar travamentos e deadlocks de processos):
+```bash
+ffmpeg -version
+```
+
+Se o comando não for reconhecido, adicione a pasta do FFmpeg ao `PATH` do sistema antes de seguir.
+Sem isso, a geração de proxies e a transcrição falham.
+
+**8. Crie o arquivo `.env`**
+
+Copie o modelo e preencha com suas chaves:
+
+```bash
+cp .env.example .env
+```
+
+Os campos disponíveis estão documentados em [Configuração](#configuracao-env).
+
+### Executando <a id="executando"></a>
+
+**Modo padrão:**
 
 ```bash
 python -m uvicorn src.api.server:app
 ```
 
-**Para execução resiliente no Windows (Sem Janela de Console):**
-Para evitar que o processo morra caso a janela do prompt de comando seja fechada (evitando exceções de `CTRL_CLOSE_EVENT` no runtime MKL/PyTorch), você pode iniciar o servidor desvinculado usando o lançador autônomo:
+> No Windows, evite `--reload` durante conversões em lote: o recarregador reinicia o processo no
+> meio da conversão e causa travamentos e deadlocks.
+
+**Modo resiliente no Windows (sem janela de console):**
+
+Se a janela do terminal for fechada, o Windows envia `CTRL_CLOSE_EVENT` a tudo que estiver preso a
+ela — e o runtime MKL/PyTorch aborta na hora, derrubando o servidor e os workers. O lançador abaixo
+cria o processo desvinculado de qualquer console, então não há janela para fechar:
 
 ```bash
-python scripts/launch_detached.py
+python scripts/launch_detached.py python -m uvicorn src.api.server:app --stdout logs/server.out --stderr logs/server.err
 ```
 
-Abra no seu navegador: 👉
-[**http://localhost:8000/**](http://localhost:8000/)
+> O script **exige** os argumentos `--stdout` e `--stderr`. Sem eles, ele apenas imprime as
+> instruções de uso e encerra.
 
-## 📁 Estrutura de Pastas Simplificada
+**Acesse:** 👉 **http://localhost:8000/**
 
-- /data - Bancos de dados locais (capiau.db, caches e diretórios de
-  dados Qdrant/fotos).
+---
 
-- /docs - Documentações complementares de APIs, custos e workflow com
-  NLEs externos.
+## ⚙️ Configuração (.env) <a id="configuracao-env"></a>
 
-- /src - Código fonte principal.
+Todas as chaves abaixo são lidas do arquivo `.env` na raiz do projeto. As marcadas como
+**ajustáveis na interface** também podem ser alteradas pelo painel de configurações, sem reiniciar —
+e o valor salvo no painel **tem prioridade sobre o `.env`**.
 
-  - /src/api - Controladores, rotas FastAPI e rotas de reconhecimento
-    facial (/faces).
+### Chaves de API (obrigatórias) <a id="chaves-de-api-obrigatorias"></a>
 
-  - /src/db - Schemas e persistência relacional SQLite.
+| Variável | Para que serve |
+|---|---|
+| `OPENROUTER_API_KEY` | Descrições visuais, temas, resumos e o agente de edição |
+| `ASSEMBLYAI_API_KEY` | Transcrição com diarização em pt-BR |
 
-  - /src/ingest - Varredura de diretórios, ingestão de fotos/vídeos e
-    conversão de proxies.
+### Modelos de IA <a id="modelos-de-ia"></a>
 
-  - /src/search - Mapeador e indexador de buscas semânticas híbridas no
-    Qdrant.
+| Variável | Padrão | Para que serve |
+|---|---|---|
+| `TEXT_MODEL` | `deepseek/deepseek-v4-flash` | Resumos, temas, sugestões de timeline e chat. `deepseek/deepseek-v4-pro` entrega melhor qualidade a um custo maior. *Ajustável na interface.* |
+| `VISION_MODEL` | `google/gemini-2.5-flash` | Descrição de frames e fotos. *Ajustável na interface.* |
+| `VISION_MODEL_FALLBACK` | `nvidia/nemotron-nano-12b-v2-vl:free` | Modelo reserva, acionado só depois que o principal falha. *Ajustável na interface.* |
+| `VISION_MAX_RETRIES` | `2` | Quantas tentativas no modelo principal antes de cair para a reserva |
+| `AGENT_MODEL` | `deepseek/deepseek-v4-flash` | Modelo do agente que edita a timeline por comandos de chat |
+| `EMBEDDING_MODEL` | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Embeddings de texto. Ao trocar, rode `POST /api/search/reindex` para reindexar o acervo |
 
-  - /src/vision - Motores locais de biometria facial (Haar Cascades,
-    YuNet, SFace).
+> **Sobre modelos gratuitos (`:free`).** O limite da OpenRouter é de 20 pedidos por minuto sempre, e
+> 1000 por dia apenas se a conta já acumulou US$ 10 em compras — caso contrário, 50 por dia. Em lotes
+> grandes eles também falham com timeout sob carga. Por isso o padrão de visão é pago e o gratuito
+> fica como reserva.
 
-  - /src/ui - Interface Web, estilos CSS e scripts interativos em JS
-    (/ui/js).
+### Desempenho <a id="desempenho"></a>
 
-- /tests - Suite de testes integrados automatizados.
+| Variável | Padrão | Para que serve |
+|---|---|---|
+| `MAX_CONVERSION_WORKERS` | `2` | Conversões de proxy em paralelo. Ex.: `6` para um i7-10700 |
 
-## 📚 Documentações Complementares
+### Caminhos locais (opcionais) <a id="caminhos-locais-opcionais"></a>
 
-Consulte a pasta [[/docs]{.underline}](about:blank) para acessar guias
-específicos:
+| Variável | Padrão | Para que serve |
+|---|---|---|
+| `CAPIAU_DB_PATH` | `data/capiau.db` | Banco SQLite |
+| `CAPIAU_EXPORTS_DIR` | `data/exports` | Destino das timelines exportadas |
 
-- 📖 **[[Manual do Usuário
-  (USER_MANUAL.md)]{.underline}](about:blank):** Manual completo de
-  operação das funcionalidades visuais da tela.
+### Armazenamento remoto (opcional) <a id="armazenamento-remoto-opcional"></a>
 
-- 🎬 **[[Fluxo de Trabalho com Kdenlive
-  (docs/kdenlive_workflow.md)]{.underline}](about:blank):** Guia
-  detalhado de sincronização e exportação direta do CapIAu-Talho para
-  edição offline no Kdenlive.
+| Variável | Para que serve |
+|---|---|
+| `USE_S3_STORAGE` | `true` para enviar proxies e miniaturas ao S3 em vez de manter só localmente |
+| `AWS_ACCESS_KEY_ID` | Credencial da AWS |
+| `AWS_SECRET_ACCESS_KEY` | Credencial da AWS |
+| `AWS_REGION` | Região do bucket (ex.: `us-east-1`) |
+| `AWS_S3_BUCKET` | Nome do bucket |
 
-- 🎹 **[[Cheat Sheet de Atalhos de Teclado
-  (docs/shortcuts.md)]{.underline}](about:blank):** Lista de atalhos e
-  mapa do teclado NLE.
+### Reconhecimento facial em nuvem (opcional) <a id="reconhecimento-facial-em-nuvem-opcional"></a>
 
-- 💰 **[[Custos & Segurança de APIs
-  (docs/costs_and_security.md)]{.underline}](about:blank):** Melhores
-  práticas para economizar na precificação do OpenRouter e AssemblyAI.
+| Variável | Para que serve |
+|---|---|
+| `AZURE_FACE_ENDPOINT` | Endpoint do Azure Face, alternativa ao motor local |
+| `AZURE_FACE_KEY` | Chave do Azure Face |
 
-- 🔌 **[[Referência de APIs
-  (docs/api_endpoints.md)]{.underline}](about:blank):** Relação de
-  chamadas HTTP internas para desenvolvedores.
+> ⚠️ O arquivo `.env` é ignorado pelo Git de propósito — ele contém segredos. **Nunca** faça commit
+> dele. Veja [`docs/costs_and_security.md`](docs/costs_and_security.md).
 
-- 🚀 **[[Histórico e Walkthrough de Desenvolvimento
-  (walkthrough.md)]{.underline}](about:blank):** Diário técnico e
-  progresso passo-a-passo do desenvolvimento deste MVP.
+---
+
+## 🩺 Solução de problemas <a id="solucao-de-problemas"></a>
+
+<details>
+<summary><strong>O servidor não abre e o erro fala em <code>tokenizers</code> ou <code>transformers</code></strong></summary>
+
+<br>
+
+Mensagem típica:
+
+```
+ImportError: tokenizers>=0.22.0,<=0.23.0 is required for a normal functioning
+of this module, but found tokenizers==0.23.1
+```
+
+Alguma instalação avulsa atualizou o `tokenizers` além do que o `transformers` aceita. Rebaixe para
+a versão compatível:
+
+```bash
+pip install "tokenizers==0.22.2"
+```
+
+> A versão `0.23.0` nunca foi publicada em formato final — o salto foi de `0.22.2` para `0.23.1`.
+> Por isso `0.22.2` é a maior que satisfaz o requisito.
+
+**Como evitar:** use um ambiente virtual dedicado (passo 3 da [montagem](#passo-a-passo)). Sem ele,
+qualquer projeto Python da máquina pode mexer nas dependências deste.
+
+</details>
+
+<details>
+<summary><strong><code>ffmpeg</code> não é reconhecido como comando</strong></summary>
+
+<br>
+
+O CapIAu-Talho chama o FFmpeg pelo nome, então ele precisa estar no `PATH` do sistema. Ter o
+`ffmpeg.exe` numa pasta qualquer do disco **não basta**.
+
+Confirme onde ele está:
+
+```powershell
+Get-Command ffmpeg
+```
+
+Se não aparecer nada, adicione a pasta que contém `ffmpeg.exe` e `ffprobe.exe` às variáveis de
+ambiente do Windows e abra um terminal novo.
+
+**Sintoma associado:** a ingestão até roda, mas nenhum proxy é gerado e a transcrição nunca começa.
+
+</details>
+
+<details>
+<summary><strong>O servidor morre sozinho depois de horas rodando</strong></summary>
+
+<br>
+
+Se a janela do terminal que iniciou o servidor for fechada, o Windows envia `CTRL_CLOSE_EVENT` e o
+runtime MKL/PyTorch aborta, derrubando servidor e workers juntos.
+
+Use o lançador desgrudado descrito em [Executando](#executando).
+
+</details>
+
+<details>
+<summary><strong>A busca não retorna nada, ou avisa que o índice está indisponível</strong></summary>
+
+<br>
+
+O banco vetorial (Qdrant) é gravado em `data/qdrant.db`. Se o acervo foi ingerido antes de uma troca
+de `EMBEDDING_MODEL`, os vetores antigos ficam incompatíveis com as buscas novas.
+
+Reindexe:
+
+```bash
+curl -X POST http://localhost:8000/api/search/reindex
+```
+
+</details>
+
+<details>
+<summary><strong>A exportação de timeline falha ou avisa sobre o worker de exportação</strong></summary>
+
+<br>
+
+Mensagem típica no console:
+
+```
+[EXPORT] Aviso: 'opentimelineio' sem wheel neste Python; exportacao usara o worker
+do venv 3.12 (data/venv312) se ele existir.
+```
+
+A exportação depende de três pacotes que **não estão no `requirements.txt`**, porque a
+disponibilidade do `opentimelineio` varia conforme a versão do Python. Instale-os:
+
+```bash
+pip install opentimelineio otio-fcp-adapter otio-cmx3600-adapter
+```
+
+Os dois adaptadores não são opcionais: sem `otio-fcp-adapter` não sai XML, e sem
+`otio-cmx3600-adapter` não sai EDL.
+
+Se o `opentimelineio` não instalar no seu Python, crie o interpretador auxiliar 3.12 descrito no
+[passo 6 da montagem](#passo-a-passo).
+
+</details>
+
+<details>
+<summary><strong>As análises de visão falham com timeout ou erro 504</strong></summary>
+
+<br>
+
+Costuma acontecer com modelos gratuitos (`:free`) sob carga — o gateway da OpenRouter fica esperando
+o modelo responder e desiste.
+
+Troque o `VISION_MODEL` para um modelo pago no painel de configurações e deixe o gratuito apenas
+como `VISION_MODEL_FALLBACK`. Essa é a configuração padrão justamente por isso.
+
+</details>
+
+---
+
+## 🧪 Testes <a id="testes"></a>
+
+A suíte cobre exportação OTIO, agente de chat, segmentação, paletas, entidades, triagem e o
+tratamento de respostas nulas da IA.
+
+O `pytest` é uma dependência só de desenvolvimento e **não vem no `requirements.txt`**. Instale-o
+antes da primeira execução:
+
+```bash
+pip install pytest
+```
+
+Rode a suíte completa:
+
+```bash
+python -m pytest tests/ -v
+```
+
+Ou um arquivo específico:
+
+```bash
+python -m pytest tests/test_f3_segmentation.py -v
+```
+
+---
+
+## 🗺️ Roadmap <a id="roadmap"></a>
+
+O plano completo, com decisões registradas e critérios de aceite, está em
+[`docs/PLANO_IMPLEMENTACAO.md`](docs/PLANO_IMPLEMENTACAO.md).
+
+| Etapa | Escopo | Situação |
+|---|---|---|
+| **1 — Sanear a base** | Limpeza do pipeline de análise | ✅ Concluída |
+| **2 — Segmentação e CLIP local** | Shots, beats, embeddings de imagem e análise condicional | ✅ Concluída |
+| **3 — Sala de Projeto** | Cartão de contexto, chat produtor, extração de roteiro, *capability manager* | 🔄 Em andamento |
+| **4 — Busca multi-vetor e agentes** | Busca em 3 passos, chat com ferramentas, servidor MCP, farm de GPUs | 📋 Planejada |
+
+---
+
+## 📁 Estrutura de pastas <a id="estrutura-de-pastas"></a>
+
+```
+capiau-talho/
+├── data/              Bancos locais (capiau.db, Qdrant, proxies, caches) — não versionado
+├── docs/              Documentação complementar
+│   └── images/        Capturas de tela do README
+├── scripts/           Utilitários (lançador desgrudado, retriagem)
+├── src/
+│   ├── api/           Rotas FastAPI e controladores
+│   │   └── routes/    entities · faces · media · narrative · projects · scenes · settings
+│   ├── core/          Modelos e tipos compartilhados
+│   ├── db/            Schema SQLite e repositórios de persistência
+│   ├── export/        Exportação de timeline (.otio, .xml, .edl)
+│   ├── ingest/        Varredura de diretórios e ingestão de mídias
+│   ├── media/         Wrappers de FFmpeg e manipulação de arquivos
+│   ├── nlp/           Temas, resumos, enriquecimento e chamadas de LLM
+│   ├── search/        Indexação e busca híbrida no Qdrant
+│   ├── services/      Regras de negócio (pipeline, agente, rostos, settings, S3)
+│   ├── transcription/ Motor de ASR e diarização
+│   ├── ui/            Interface web (HTML, CSS e JS em /ui/js)
+│   └── vision/        Biometria facial local e análise multimodal
+├── tests/             Suíte de testes automatizados
+└── watch/             Pasta observada para ingestão automática
+```
+
+---
+
+## 📚 Documentação complementar <a id="documentacao-complementar"></a>
+
+| Documento | Conteúdo |
+|---|---|
+| 📖 [**Manual do Usuário**](USER_MANUAL.md) | Operação completa das funcionalidades visuais da tela |
+| 🎬 [**Fluxo com o Kdenlive**](docs/kdenlive_workflow.md) | Sincronização e exportação para edição offline |
+| 🎹 [**Atalhos de teclado**](docs/shortcuts.md) | Lista de atalhos e mapa do teclado NLE |
+| 💰 [**Custos e segurança de APIs**](docs/costs_and_security.md) | Como economizar na precificação do OpenRouter e AssemblyAI |
+| ⚙️ [**Guia de configurações de IA**](docs/ai_settings_pro_guide.md) | Referência do painel de configurações, campo a campo |
+| 🔌 [**Referência de APIs**](docs/api_endpoints.md) | Chamadas HTTP internas, para desenvolvedores |
+| 🧭 [**Plano de implementação**](docs/PLANO_IMPLEMENTACAO.md) | Etapas, decisões fechadas e critérios de aceite |
+| 🚀 [**Walkthrough de desenvolvimento**](walkthrough.md) | Diário técnico e progresso passo a passo do MVP |
+
+---
+
+## 📄 Licença <a id="licenca"></a>
+
+Distribuído sob a **GNU General Public License v3.0**. Veja [`LICENSE`](LICENSE) para o texto
+completo.
+
+Em resumo: você pode usar, estudar, modificar e redistribuir este software livremente. Se
+distribuir uma versão modificada, ela também precisa ser publicada sob a GPL-3.0, com o código
+aberto.
