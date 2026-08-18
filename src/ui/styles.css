@@ -6660,10 +6660,31 @@ input[type="number"] {
     padding: 12px 6px !important;
 }
 
-/* Barra de rolagem invisível na sidebar esquerda (mantendo rolagem funcional) */
+/* Barra de rolagem sutil da Biblioteca (tons de cinza flat) */
+.sidebar-left .sidebar-content.scrollable {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(255, 255, 255, 0.10) transparent !important;
+}
+.sidebar-left .sidebar-content.scrollable::-webkit-scrollbar {
+    display: block !important;
+    width: 4px !important;
+    height: 4px !important;
+}
+.sidebar-left .sidebar-content.scrollable::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+.sidebar-left .sidebar-content.scrollable::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.10) !important;
+    border-radius: 2px !important;
+    transition: background 0.2s ease !important;
+}
+.sidebar-left .sidebar-content.scrollable::-webkit-scrollbar-thumb:hover,
+.sidebar-left .sidebar-content.scrollable:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.28) !important;
+}
+
+/* Outros painéis internos mantêm scrollbar invisível */
 .sidebar-left,
-.sidebar-left .scrollable,
-.sidebar-left .sidebar-content,
 .sidebar-left #adjustments-panel-content,
 .sidebar-left #inspector-tab-content-container,
 .sidebar-left .tab-content {
@@ -6671,14 +6692,212 @@ input[type="number"] {
     -ms-overflow-style: none !important;
 }
 .sidebar-left::-webkit-scrollbar,
-.sidebar-left .scrollable::-webkit-scrollbar,
-.sidebar-left .sidebar-content::-webkit-scrollbar,
 .sidebar-left #adjustments-panel-content::-webkit-scrollbar,
 .sidebar-left #inspector-tab-content-container::-webkit-scrollbar,
 .sidebar-left .tab-content::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
+}
+
+/* ── TOOLTIP DE ÍNDICE TEMÁTICO INTELIGENTE (SCROLL PEEKER) ── */
+#library-scroll-index-tooltip {
+    --scroll-thumb-width: 128px;
+    position: fixed;
+    z-index: 12000;
+    pointer-events: none;
+    display: none;
+    flex-direction: column;
+    width: calc(var(--scroll-thumb-width) + 160px);
+    min-width: 270px;
+    max-width: 440px;
+    background: rgba(14, 14, 18, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 0, 0, 0.5);
+    padding: 10px 12px;
+    color: #e2e8f0;
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    box-sizing: border-box;
+    transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity: 0;
+    transform: scale(0.96);
+}
+
+#library-scroll-index-tooltip.visible {
+    display: flex;
+    opacity: 1;
+    transform: scale(1);
+}
+
+.scroll-index-top {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+}
+
+.scroll-index-thumb-wrapper {
+    width: var(--scroll-thumb-width, 128px);
+    height: calc(var(--scroll-thumb-width, 128px) * 9 / 16);
+    border-radius: 5px;
+    overflow: hidden;
+    background: #000;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.scroll-index-thumb-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.scroll-index-thumb-wrapper i {
+    font-size: 20px;
+    color: var(--text-muted);
+}
+
+.scroll-index-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.scroll-index-folder {
+    font-size: 8.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.scroll-index-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #ffffff;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+}
+
+.scroll-index-sub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9px;
+    color: var(--text-secondary);
+}
+
+.scroll-index-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 8.5px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.scroll-index-badge.tag-interview {
+    background: rgba(6, 182, 212, 0.15);
+    border-color: rgba(6, 182, 212, 0.35);
+    color: var(--color-cyan);
+}
+
+.scroll-index-badge.tag-broll {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.35);
+    color: var(--color-violet);
+}
+
+.scroll-index-badge.tag-photo {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.35);
+    color: var(--color-emerald);
+}
+
+/* Área de Revelação Progressiva (Dwell Expand) */
+.scroll-index-details {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease, opacity 0.25s ease, margin-top 0.25s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 0;
+    border-top: 0px solid rgba(255, 255, 255, 0.08);
+}
+
+#library-scroll-index-tooltip.expanded .scroll-index-details {
+    max-height: 180px;
+    opacity: 1;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.scroll-index-summary {
+    font-size: 9.5px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.85);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+}
+
+.scroll-index-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.scroll-index-tag-chip {
+    font-size: 8px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.scroll-index-tag-chip.person {
+    color: var(--color-cyan);
+    background: rgba(6, 182, 212, 0.08);
+    border-color: rgba(6, 182, 212, 0.2);
+}
+
+.scroll-index-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8.5px;
+    color: var(--text-muted);
+    padding-top: 2px;
 }
 
 #tab-adjustments {

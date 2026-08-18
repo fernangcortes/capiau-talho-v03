@@ -22,10 +22,16 @@ export function cleanTitle(text) {
     
     // Lista de prefixos/introduções comuns gerados por IA para remover
     const prefixos = [
+        // Frases longas de abertura descritiva
+        /^(este\s+clipe\s+oferece\s+uma\s+visão\s+detalhada\s+(do|da|de|dos|das)?|oferece\s+uma\s+visão\s+detalhada\s+(do|da|de|dos|das)?|este\s+clipe\s+oferece|este\s+clipe|visão\s+detalhada\s+(do|da|de)?)\s*/i,
+        /^(que\s+captura\s+o\s+ambiente\s+de\s+produção\s+nos\s+bastidores|que\s+captura\s+o\s+ambiente\s+de\s+produção|que\s+captura\s+o\s+ambiente|que\s+captura|que\s+mostra|que\s+destaca)\s*/i,
+        /^(técnica\s+valiosa\s+para\s+edição,\s*mostrando\s+(o|a|os|as)?|técnica\s+valiosa\s+para\s+edição|técnica\s+valiosa)\s*/i,
+        /^(visual\s+abstrato\s+útil\s+para\s+transições\s+ou\s+como\s+plano|visual\s+abstrato\s+útil\s+para\s+transições|visual\s+abstrato\s+útil|visual\s+abstrato)\s*/i,
+        /^(documentar\s+a\s+dinâmica\s+entre|documentar\s+a|documentar\s+o|documentar)\s*/i,
         // Adjetivos ou qualificadores complexos iniciais
-        /^(valiosa|valioso|útil|importante|versátil|interessante|dinâmica|dinâmico|visualmente\s+rica|visualmente\s+rico|intimista\s+e\s+tranquila|intimista\s+e\s+tranquilo|rica\s+e\s+diversificada|rico\s+e\s+diversificado|excelente|ótima|ótimo)\s*(para\s+mostrar|para\s+documentários|para|que\s+capture|que\s+destaca|que\s+mostra|que)?\s*/i,
+        /^(valiosa|valioso|útil|importante|versátil|interessante|dinâmica|dinâmico|visualmente\s+rica|visualmente\s+rico|intimista\s+e\s+tranquila|intimista\s+e\s+tranquilo|rica\s+e\s+diversificada|rico\s+e\s+diversificado|excelente|ótima|ótimo)\s*(para\s+mostrar|para\s+documentários|para\s+transições|para|que\s+capture|que\s+destaca|que\s+mostra|que)?\s*/i,
         // Nomes de tipo de clipe e conectivos
-        /^(sequência|clipe|material|trecho|registro|vídeo|cena|aéreos|detalhes|registro|imagens|take|plano|gravação)\s*(que\s+destacam|que\s+mostram|de\s+bastidores|útil|valioso|importante|interessante|para|mostrando|de|com|do|da|em)?\s*/i,
+        /^(sequência\s+íntima\s+e\s+esteticamente\s+rica\s+que\s+captura|sequência\s+útil\s+para|sequência|clipe|material|trecho|registro|vídeo|cena|aéreos|detalhes|imagens|take|plano|gravação)\s*(que\s+destacam|que\s+mostram|que\s+captura|de\s+bastidores|útil|valioso|importante|interessante|para|mostrando|de|com|do|da|em)?\s*/i,
         // Verbos de ação no infinitivo/gerúndio no início
         /^(mostrar|exibir|capturar|apresentar|destacar|revelar|retratar|registrar|focar\s+em|focar|trazer|capturando|mostrando|registrando|focando|apresentando|destacando|revelando|retratando)\s+(a|o|os|as|um|uma)?\s*/i,
         // Conectivos iniciais de "A.", "O.", "A", "O", "Uma", "Um"
@@ -116,6 +122,73 @@ export function getFriendlyTitle(v) {
         return `Bastidores - ${v.filename}`;
     }
     return v.filename;
+}
+
+export function attachInlineTitleEditor(mediaType, item, titleSpan, currentTitle) {
+    if (!titleSpan) return;
+    titleSpan.style.cursor = "text";
+    titleSpan.title = "Duplo clique para renomear este clipe";
+
+    titleSpan.addEventListener("dblclick", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        if (titleSpan.querySelector("input")) return;
+
+        const originalTitle = item.title || currentTitle || item.filename || "";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "inline-title-input";
+        input.value = originalTitle;
+        input.style.cssText = "width: 100%; max-width: 100%; background: rgba(0,0,0,0.9); color: #fff; border: 1px solid var(--color-cyan); border-radius: 3px; padding: 1px 4px; font-size: 11px; font-family: inherit; outline: none; box-shadow: 0 0 8px rgba(6,182,212,0.4);";
+
+        titleSpan.innerHTML = "";
+        titleSpan.appendChild(input);
+        input.focus();
+        input.select();
+
+        let saved = false;
+        const commitTitle = async () => {
+            if (saved) return;
+            saved = true;
+            const newTitle = input.value.trim();
+            if (newTitle && newTitle !== originalTitle) {
+                try {
+                    const endpoint = mediaType === "video" ? `/api/video/${item.id}/title` : `/api/photo/${item.id}/title`;
+                    const res = await fetch(endpoint, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ title: newTitle })
+                    });
+                    if (res.ok) {
+                        item.title = newTitle;
+                        titleSpan.textContent = newTitle;
+                    } else {
+                        titleSpan.textContent = originalTitle;
+                    }
+                } catch(err) {
+                    console.error("Erro ao salvar título:", err);
+                    titleSpan.textContent = originalTitle;
+                }
+            } else {
+                titleSpan.textContent = originalTitle;
+            }
+        };
+
+        input.addEventListener("keydown", (eKey) => {
+            if (eKey.key === "Enter") {
+                eKey.preventDefault();
+                commitTitle();
+            } else if (eKey.key === "Escape") {
+                saved = true;
+                titleSpan.textContent = originalTitle;
+            }
+        });
+
+        input.addEventListener("blur", () => {
+            commitTitle();
+        });
+    });
 }
 
 function hasMatchingChildren(node, query, ast = null) {
@@ -612,14 +685,15 @@ function renderTreeNode(node, container, depth = 0) {
         if (toggleBtn) {
             toggleBtn.addEventListener("click", (e) => {
                 e.stopPropagation();
-                const wasReal = window.titleDisplayPreferences[v.id] === "filename";
-                window.titleDisplayPreferences[v.id] = wasReal ? "friendly" : "filename";
                 localStorage.setItem("titleDisplayPreferences", JSON.stringify(window.titleDisplayPreferences));
                 // Recarrega biblioteca inteira para re-renderizar
                 STATE.emit("videosUpdated", STATE.allVideos);
             });
         }
         
+        // Editor inline de título por duplo clique
+        attachInlineTitleEditor("video", v, card.querySelector(".clip-title-text"), currentTitle);
+
         container.appendChild(card);
     } else if (node.type === "file" && node.photo) {
         const p = node.photo;
@@ -781,6 +855,9 @@ function renderTreeNode(node, container, depth = 0) {
                 }
             });
         }
+        
+        // Editor inline de título por duplo clique
+        attachInlineTitleEditor("photo", p, card.querySelector(".clip-title-text"), currentTitle);
         
         container.appendChild(card);
     }
@@ -1024,7 +1101,11 @@ export class LibraryManager {
         STATE.on("projectChanged", () => { this.reloadData(); this.loadTriageReviewThreshold(); });
         this.loadTriageReviewThreshold();
         this.reloadData();
-        STATE.on("leftTabChanged", (tabId) => this.updateSearchPlaceholder(tabId));
+        this.scrollIndexTracker = new LibraryScrollIndexTracker();
+        STATE.on("leftTabChanged", (tabId) => {
+            this.updateSearchPlaceholder(tabId);
+            this.scrollIndexTracker?.hide();
+        });
         STATE.on("activeVideoChanged", (video) => {
             document.querySelectorAll(".media-card.tree-file-item:not(.photo-item)").forEach(el => {
                 if (video && el.getAttribute("data-video-id") == video.id) {
@@ -1259,6 +1340,34 @@ export class LibraryManager {
                     settingsDropdown.style.display = "none";
                 }
             });
+
+            const btnRegenTitles = document.getElementById("btn-regenerate-executive-titles");
+            if (btnRegenTitles) {
+                btnRegenTitles.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    if (!confirm("Deseja gerar títulos executivos inteligentes (3 a 6 palavras) para os vídeos da biblioteca via IA?")) return;
+                    btnRegenTitles.disabled = true;
+                    btnRegenTitles.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Gerando...`;
+                    try {
+                        const activeProjId = STATE.currentProjectId || Number(localStorage.getItem("activeProjectId")) || 2;
+                        const res = await fetch(`/api/project/${activeProjId}/regenerate-titles`, { method: "POST" });
+                        const data = await res.json();
+                        if (window.showToast) window.showToast(data.message || "Geração de títulos iniciada!");
+                        
+                        // Alterna imediatamente para a aba de Tarefas na sidebar direita
+                        if (window.openTasksDrawerAndSwitchTab) {
+                            window.openTasksDrawerAndSwitchTab();
+                        }
+
+                        btnRegenTitles.disabled = false;
+                        btnRegenTitles.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Títulos IA`;
+                    } catch(err) {
+                        alert("Erro ao disparar regeneração de títulos: " + err.message);
+                        btnRegenTitles.disabled = false;
+                        btnRegenTitles.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Títulos IA`;
+                    }
+                });
+            }
         }
         
         // Custom Sort Dropdown Popover Toggling and Logic
@@ -3892,4 +4001,484 @@ window.setVideoThumbnail = async function(videoId, timestamp, triggerBtn = null)
         return false;
     }
 };
+
+/**
+ * Motor de Índice Temático Inteligente e Pré-visualização ao passar o mouse na barra de rolagem (Scroll Peeker).
+ */
+export class LibraryScrollIndexTracker {
+    constructor() {
+        this.scrollContainer = null;
+        this.tooltipEl = null;
+        this.dom = null;
+        this.dwellTimer = null;
+        this.lastHoverEvent = null;
+        this.currentTargetItem = null;
+        this.isPointerDownOnGutter = false;
+        
+        this.isEnabled = localStorage.getItem("library_scroll_index_enabled") !== "false";
+        this.dwellDelay = parseInt(localStorage.getItem("library_scroll_index_dwell") || "1000", 10);
+        this.thumbWidth = parseInt(localStorage.getItem("library_scroll_preview_thumb_width") || "128", 10);
+        
+        this.init();
+    }
+
+    init() {
+        this.createTooltipElement();
+        this.bindEvents();
+        this.bindSettings();
+    }
+
+    getScrollContainer() {
+        if (!this.scrollContainer || !this.scrollContainer.isConnected) {
+            this.scrollContainer = document.querySelector("#sidebar-left .sidebar-content.scrollable");
+        }
+        return this.scrollContainer;
+    }
+
+    createTooltipElement() {
+        let el = document.getElementById("library-scroll-index-tooltip");
+        if (!el) {
+            el = document.createElement("div");
+            el.id = "library-scroll-index-tooltip";
+            document.body.appendChild(el);
+        }
+        el.style.setProperty("--scroll-thumb-width", `${this.thumbWidth}px`);
+        el.innerHTML = `
+            <div class="scroll-index-top">
+                <div class="scroll-index-thumb-wrapper">
+                    <img class="scroll-index-thumb" src="" alt="" style="display:none;">
+                    <i class="fa-solid fa-photo-film scroll-index-icon"></i>
+                </div>
+                <div class="scroll-index-meta">
+                    <div class="scroll-index-folder"><i class="fa-solid fa-folder"></i> <span>Biblioteca</span></div>
+                    <div class="scroll-index-title">Título da Mídia</div>
+                    <div class="scroll-index-sub">
+                        <span class="scroll-index-badge tag-interview">Fala</span>
+                        <span class="scroll-index-duration" style="font-family: monospace; font-size: 8.5px; color: var(--text-muted);"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="scroll-index-details">
+                <div class="scroll-index-summary"></div>
+                <div class="scroll-index-tags-row"></div>
+                <div class="scroll-index-footer">
+                    <span class="scroll-index-pos">Item 1 de 1</span>
+                    <span class="scroll-index-hint" style="color: var(--text-muted); opacity: 0.7;">Shift+Wheel: Zoom • Clique: Ir</span>
+                </div>
+            </div>
+        `;
+        this.tooltipEl = el;
+        this.dom = {
+            thumbImg: el.querySelector(".scroll-index-thumb"),
+            thumbIcon: el.querySelector(".scroll-index-icon"),
+            folderSpan: el.querySelector(".scroll-index-folder span"),
+            titleEl: el.querySelector(".scroll-index-title"),
+            badgeEl: el.querySelector(".scroll-index-badge"),
+            durationEl: el.querySelector(".scroll-index-duration"),
+            summaryEl: el.querySelector(".scroll-index-summary"),
+            tagsRow: el.querySelector(".scroll-index-tags-row"),
+            posEl: el.querySelector(".scroll-index-pos")
+        };
+    }
+
+    bindEvents() {
+        const onPointerMove = (e) => {
+            if (!this.isEnabled) {
+                this.hide();
+                return;
+            }
+
+            const container = this.getScrollContainer();
+            if (!container) {
+                this.hide();
+                return;
+            }
+
+            // Apenas ativo se estiver na aba de Vídeos ou Fotos
+            const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id;
+            if (activeTab !== "tab-videos" && activeTab !== "tab-photos") {
+                this.hide();
+                return;
+            }
+
+            // Verifica se a lista tem barra de rolagem (overflow)
+            if (container.scrollHeight <= container.clientHeight + 8) {
+                this.hide();
+                return;
+            }
+
+            const rect = container.getBoundingClientRect();
+            // Área da calha da barra (últimos 16px da borda direita da lista)
+            const isInsideGutter = (e.clientX >= rect.right - 16 && e.clientX <= rect.right + 4 && e.clientY >= rect.top && e.clientY <= rect.bottom);
+
+            if (!isInsideGutter) {
+                this.hide();
+                return;
+            }
+
+            this.lastHoverEvent = e;
+            const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+            this.updateAtRatio(ratio, e, activeTab);
+
+            if (this.isPointerDownOnGutter) {
+                if (this.currentTargetItem) {
+                    const itemRect = this.currentTargetItem.getBoundingClientRect();
+                    const targetScroll = (itemRect.top - rect.top) + container.scrollTop;
+                    container.scrollTop = Math.max(0, targetScroll - 4);
+                } else {
+                    const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
+                    container.scrollTop = targetScrollTop;
+                }
+            }
+        };
+
+        const onPointerLeave = () => {
+            this.isPointerDownOnGutter = false;
+            this.hide();
+        };
+
+        const onPointerDown = (e) => {
+            if (!this.isEnabled) return;
+            const container = this.getScrollContainer();
+            if (!container) return;
+
+            const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id;
+            if (activeTab !== "tab-videos" && activeTab !== "tab-photos") return;
+            
+            const rect = container.getBoundingClientRect();
+            const isInsideGutter = (e.clientX >= rect.right - 16 && e.clientX <= rect.right + 4 && e.clientY >= rect.top && e.clientY <= rect.bottom);
+            if (isInsideGutter) {
+                this.isPointerDownOnGutter = true;
+                const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+                this.updateAtRatio(ratio, e, activeTab);
+
+                if (this.currentTargetItem) {
+                    const itemRect = this.currentTargetItem.getBoundingClientRect();
+                    const targetScroll = (itemRect.top - rect.top) + container.scrollTop;
+                    container.scrollTo({ top: Math.max(0, targetScroll - 4), behavior: "smooth" });
+                } else {
+                    const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
+                    container.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+                }
+            }
+        };
+
+        const onPointerUp = () => {
+            this.isPointerDownOnGutter = false;
+        };
+
+        const onWheel = (e) => {
+            if (e.shiftKey && this.tooltipEl && this.tooltipEl.classList.contains("visible")) {
+                e.preventDefault();
+                e.stopPropagation();
+                const delta = e.deltaY < 0 ? 12 : -12;
+                this.thumbWidth = Math.max(80, Math.min(240, this.thumbWidth + delta));
+                this.tooltipEl.style.setProperty("--scroll-thumb-width", `${this.thumbWidth}px`);
+                localStorage.setItem("library_scroll_preview_thumb_width", this.thumbWidth);
+                if (this.lastHoverEvent) {
+                    const container = this.getScrollContainer();
+                    if (container) this.positionTooltip(this.lastHoverEvent, container.getBoundingClientRect());
+                }
+            }
+        };
+
+        document.addEventListener("pointermove", onPointerMove);
+        document.addEventListener("pointerleave", onPointerLeave);
+        document.addEventListener("pointerdown", onPointerDown);
+        window.addEventListener("pointerup", onPointerUp);
+        window.addEventListener("wheel", onWheel, { passive: false });
+        window.addEventListener("resize", () => this.hide());
+    }
+
+    bindSettings() {
+        const chkEnabled = document.getElementById("chk-scroll-index-enabled");
+        const selDwell = document.getElementById("sel-scroll-index-dwell");
+
+        if (chkEnabled) {
+            chkEnabled.checked = this.isEnabled;
+            chkEnabled.addEventListener("change", (e) => {
+                this.isEnabled = e.target.checked;
+                localStorage.setItem("library_scroll_index_enabled", this.isEnabled);
+                if (!this.isEnabled) this.hide();
+            });
+        }
+
+        if (selDwell) {
+            selDwell.value = String(this.dwellDelay);
+            selDwell.addEventListener("change", (e) => {
+                this.dwellDelay = parseInt(e.target.value, 10);
+                localStorage.setItem("library_scroll_index_dwell", this.dwellDelay);
+            });
+        }
+    }
+
+    updateAtRatio(ratio, mouseEvent, activeTabId) {
+        const container = this.getScrollContainer();
+        if (!container) return;
+
+        const activeTabEl = document.getElementById(activeTabId);
+        if (!activeTabEl) return;
+
+        // Apenas itens visíveis (ignora pastas recolhidas cujo offsetParent é null)
+        const items = Array.from(activeTabEl.querySelectorAll(".tree-folder-header, .tree-file-item, .media-card")).filter(el => el.offsetParent !== null);
+        if (items.length === 0) {
+            this.hide();
+            return;
+        }
+
+        const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
+        const containerRect = container.getBoundingClientRect();
+        const currentScrollTop = container.scrollTop;
+
+        // Encontra o item cuja posição vertical real no conteúdo é mais próxima da calculada
+        let bestItem = null;
+        let bestDist = Infinity;
+
+        for (const item of items) {
+            const itemRect = item.getBoundingClientRect();
+            const itemAbsoluteTop = (itemRect.top - containerRect.top) + currentScrollTop;
+            const dist = Math.abs(itemAbsoluteTop - targetScrollTop);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestItem = item;
+            }
+        }
+
+        if (!bestItem) {
+            bestItem = items[Math.min(items.length - 1, Math.floor(ratio * items.length))];
+        }
+
+        this.renderItemData(bestItem, items, activeTabId);
+        this.positionTooltip(mouseEvent, containerRect);
+
+        // Gerenciamento de Dwell Time (Expansão progressiva ao parar)
+        if (this.currentTargetItem !== bestItem) {
+            this.currentTargetItem = bestItem;
+            this.tooltipEl.classList.remove("expanded");
+            clearTimeout(this.dwellTimer);
+
+            if (this.dwellDelay > 0) {
+                this.dwellTimer = setTimeout(() => {
+                    this.tooltipEl.classList.add("expanded");
+                    if (this.lastHoverEvent) {
+                        const currentContainer = this.getScrollContainer();
+                        if (currentContainer) {
+                            this.positionTooltip(this.lastHoverEvent, currentContainer.getBoundingClientRect());
+                        }
+                    }
+                }, this.dwellDelay);
+            }
+        }
+    }
+
+    renderItemData(itemEl, allItems, activeTabId) {
+        if (!this.tooltipEl || !this.dom) return;
+
+        const { thumbImg, thumbIcon, folderSpan, titleEl, badgeEl, durationEl, summaryEl, tagsRow, posEl } = this.dom;
+
+        const isFolder = itemEl.classList.contains("tree-folder-header");
+        const cardIndex = allItems.indexOf(itemEl);
+        if (posEl) posEl.textContent = `Posição: ${cardIndex + 1} de ${allItems.length}`;
+
+        if (isFolder) {
+            const folderName = itemEl.querySelector(".folder-name")?.textContent || "Pasta";
+            if (folderSpan) folderSpan.textContent = "Diretório";
+            if (titleEl) titleEl.textContent = folderName;
+            if (badgeEl) {
+                badgeEl.className = "scroll-index-badge";
+                badgeEl.textContent = "Pasta";
+            }
+            if (durationEl) durationEl.textContent = "";
+            if (thumbImg) thumbImg.style.display = "none";
+            if (thumbIcon) {
+                thumbIcon.style.display = "block";
+                thumbIcon.className = "fa-solid fa-folder scroll-index-icon";
+                thumbIcon.style.color = "var(--color-violet)";
+            }
+
+            if (summaryEl) summaryEl.textContent = `Pasta contendo mídias organizadas.`;
+            if (tagsRow) tagsRow.innerHTML = "";
+        } else {
+            const isVideo = activeTabId === "tab-videos" || itemEl.hasAttribute("data-video-id");
+            const isPhoto = activeTabId === "tab-photos" || itemEl.hasAttribute("data-photo-id");
+            
+            const parentFolderName = itemEl.closest(".tree-folder-container")?.querySelector(".tree-folder-header .folder-name")?.textContent || "Biblioteca";
+            if (folderSpan) folderSpan.textContent = parentFolderName;
+
+            if (isVideo) {
+                const vidId = parseInt(itemEl.getAttribute("data-video-id"), 10);
+                const video = (STATE.allVideos || []).find(v => v.id === vidId);
+
+                if (video) {
+                    // Resumo executivo / título inteligente
+                    const executiveTitle = getFriendlyTitle(video);
+                    if (titleEl) titleEl.textContent = executiveTitle;
+
+                    const isInterview = video.video_type === "interview";
+                    if (badgeEl) {
+                        badgeEl.className = `scroll-index-badge ${isInterview ? 'tag-interview' : 'tag-broll'}`;
+                        badgeEl.textContent = isInterview ? "Fala" : "Bastidores";
+                    }
+
+                    if (durationEl) {
+                        if (video.duration) {
+                            const m = Math.floor(video.duration / 60);
+                            const s = Math.floor(video.duration % 60);
+                            durationEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+                        } else {
+                            durationEl.textContent = "";
+                        }
+                    }
+
+                    const vVersion = video._thumbVersion || video.thumb_version || video.updated_at || "";
+                    const qs = vVersion ? `?v=${vVersion}` : "";
+                    if (thumbImg) {
+                        thumbImg.src = `/api/video/${video.id}/thumbnail${qs}`;
+                        thumbImg.style.display = "block";
+                        thumbImg.onerror = () => {
+                            if (thumbImg) thumbImg.style.display = "none";
+                            if (thumbIcon) thumbIcon.style.display = "block";
+                        };
+                    }
+                    if (thumbIcon) {
+                        thumbIcon.style.display = "none";
+                        thumbIcon.className = (isInterview ? "fa-solid fa-microphone-lines" : "fa-solid fa-film") + " scroll-index-icon";
+                        thumbIcon.style.color = isInterview ? "var(--color-cyan)" : "var(--color-violet)";
+                    }
+
+                    if (summaryEl) summaryEl.textContent = video.summary || video.description || "Sem resumo narrativo gerado.";
+
+                    // Tags e Personagens
+                    if (tagsRow) {
+                        tagsRow.innerHTML = "";
+                        if (video.category) {
+                            const catLabel = CATEGORY_LABELS[video.category] || video.category;
+                            const chip = document.createElement("span");
+                            chip.className = "scroll-index-tag-chip";
+                            chip.textContent = `🏷️ ${catLabel}`;
+                            tagsRow.appendChild(chip);
+                        }
+                        if (video.tags) {
+                            try {
+                                const parsed = typeof video.tags === "string" ? JSON.parse(video.tags) : video.tags;
+                                if (Array.isArray(parsed)) {
+                                    parsed.slice(0, 4).forEach(t => {
+                                        const chip = document.createElement("span");
+                                        if (t.startsWith("Person:") || t.startsWith("Speaker:")) {
+                                            const pName = t.split(":")[1].trim();
+                                            chip.className = "scroll-index-tag-chip person";
+                                            chip.textContent = `👤 ${pName}`;
+                                        } else {
+                                            chip.className = "scroll-index-tag-chip";
+                                            chip.textContent = t;
+                                        }
+                                        tagsRow.appendChild(chip);
+                                    });
+                                }
+                            } catch(e) {}
+                        }
+                    }
+                } else {
+                    if (titleEl) titleEl.textContent = itemEl.querySelector("h4")?.textContent || "Vídeo";
+                    if (thumbImg) thumbImg.style.display = "none";
+                    if (thumbIcon) {
+                        thumbIcon.style.display = "block";
+                        thumbIcon.className = "fa-solid fa-film scroll-index-icon";
+                    }
+                }
+            } else if (isPhoto) {
+                const photoId = parseInt(itemEl.getAttribute("data-photo-id"), 10);
+                const photo = (STATE.allPhotos || []).find(p => p.id === photoId);
+
+                if (photo) {
+                    const friendlyPhotoTitle = photo.title || photo.description || photo.filename;
+                    if (titleEl) titleEl.textContent = cleanTitle(friendlyPhotoTitle);
+                    if (badgeEl) {
+                        badgeEl.className = "scroll-index-badge tag-photo";
+                        badgeEl.textContent = CATEGORY_LABELS[photo.category] || "Foto";
+                    }
+                    if (durationEl) durationEl.textContent = "";
+
+                    const src = photo.proxy_path || (photo.filepath && (photo.filepath.startsWith('http') || photo.filepath.startsWith('/')) ? photo.filepath : `/originals/${photo.filename}`);
+                    if (thumbImg) {
+                        thumbImg.src = src;
+                        thumbImg.style.display = "block";
+                        thumbImg.onerror = () => {
+                            if (thumbImg) thumbImg.style.display = "none";
+                            if (thumbIcon) thumbIcon.style.display = "block";
+                        };
+                    }
+                    if (thumbIcon) {
+                        thumbIcon.style.display = "none";
+                        thumbIcon.className = "fa-solid fa-camera scroll-index-icon";
+                        thumbIcon.style.color = "var(--color-emerald)";
+                    }
+
+                    if (summaryEl) summaryEl.textContent = photo.description || photo.caption || "Foto registrada de set/produção.";
+                    if (tagsRow) {
+                        tagsRow.innerHTML = "";
+                        if (photo.category) {
+                            const chip = document.createElement("span");
+                            chip.className = "scroll-index-tag-chip";
+                            chip.textContent = `🏷️ ${CATEGORY_LABELS[photo.category] || photo.category}`;
+                            tagsRow.appendChild(chip);
+                        }
+                        if (photo.tags) {
+                            try {
+                                const parsed = typeof photo.tags === "string" ? JSON.parse(photo.tags) : photo.tags;
+                                if (Array.isArray(parsed)) {
+                                    parsed.slice(0, 3).forEach(t => {
+                                        const chip = document.createElement("span");
+                                        chip.className = "scroll-index-tag-chip";
+                                        chip.textContent = t;
+                                        tagsRow.appendChild(chip);
+                                    });
+                                }
+                            } catch(e) {}
+                        }
+                    }
+                } else {
+                    if (titleEl) titleEl.textContent = itemEl.querySelector("h4")?.textContent || "Foto";
+                    if (thumbImg) thumbImg.style.display = "none";
+                    if (thumbIcon) {
+                        thumbIcon.style.display = "block";
+                        thumbIcon.className = "fa-solid fa-camera scroll-index-icon";
+                    }
+                }
+            }
+        }
+    }
+
+    positionTooltip(mouseEvent, containerRect) {
+        if (!this.tooltipEl) return;
+        this.tooltipEl.classList.add("visible");
+
+        const tooltipRect = this.tooltipEl.getBoundingClientRect();
+        const tooltipWidth = tooltipRect.width || (this.thumbWidth + 160);
+        const tooltipHeight = tooltipRect.height || 70;
+
+        let top = mouseEvent.clientY - (tooltipHeight / 2);
+        top = Math.max(10, Math.min(window.innerHeight - tooltipHeight - 10, top));
+
+        // Por padrão: à direita da barra para não cobrir a mídia da biblioteca
+        let left = containerRect.right + 6;
+
+        // Se passar da borda direita da janela ou estiver maximizado: inverte para a esquerda da barra
+        if (left + tooltipWidth > window.innerWidth - 10) {
+            left = containerRect.right - 16 - tooltipWidth - 6;
+        }
+        left = Math.max(10, left);
+
+        this.tooltipEl.style.top = `${Math.round(top)}px`;
+        this.tooltipEl.style.left = `${Math.round(left)}px`;
+    }
+
+    hide() {
+        if (this.tooltipEl) {
+            this.tooltipEl.classList.remove("visible", "expanded");
+        }
+        clearTimeout(this.dwellTimer);
+        this.currentTargetItem = null;
+    }
+}
 
