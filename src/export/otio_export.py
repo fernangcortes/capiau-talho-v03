@@ -27,7 +27,26 @@ from src.db.connection import get_db
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_WORKER_PYTHON = _REPO_ROOT / "data" / "venv312" / "Scripts" / "python.exe"
 
-def generate_otio_timeline(timeline_id: int) -> "otio.schema.Timeline":
+
+def _media_target_url(filepath: str, as_uri: bool) -> str:
+    """Endereço da mídia no arquivo exportado, no dialeto que o consumidor entende.
+
+    `as_uri=True` produz `file:///D:/.../V%C3%ADdeos/...` — o que o FCP7 XML espera em
+    `<pathurl>` e o que Premiere e Resolve leem.
+
+    `as_uri=False` produz `D:/.../Vídeos/...`, caminho absoluto simples com barras
+    normais. É o que o .otio precisa: medido em 18/08, o importador de OTIO do Kdenlive
+    (26.04.3) NÃO trata `target_url` como URI — ele concatena a pasta do projeto na
+    frente e não decodifica o percent-encoding, resultando em
+    `C:/Users/FGC/Downloads/file:///D:/.../V%C3%ADdeos/...` e falha ao abrir. Com
+    caminho absoluto simples ele reconhece o endereço e religa a mídia.
+    """
+    if as_uri:
+        return Path(filepath).as_uri()
+    return Path(filepath).as_posix()
+
+
+def generate_otio_timeline(timeline_id: int, as_uri: bool = True) -> "otio.schema.Timeline":
     """Carrega os cortes salvos na tabela 'timeline' e monta uma timeline do OpenTimelineIO.
 
     Suporta o formato v2 multipista (tracks nomeadas + posições absolutas com Gaps)
@@ -123,7 +142,7 @@ def generate_otio_timeline(timeline_id: int) -> "otio.schema.Timeline":
                     # Still congelado: source do 0 à duração do clipe na timeline.
                     dur_frames = max(1, int((out_s - in_s) * fps))
                     media_ref = otio.schema.ExternalReference(
-                        target_url=Path(filepath).as_uri(),
+                        target_url=_media_target_url(filepath, as_uri),
                         available_range=otio.opentime.TimeRange(
                             start_time=otio.opentime.RationalTime(0, fps),
                             duration=otio.opentime.RationalTime(dur_frames, fps)
@@ -145,7 +164,7 @@ def generate_otio_timeline(timeline_id: int) -> "otio.schema.Timeline":
                     playhead_s += (out_s - in_s)
                 else:
                     media_ref = otio.schema.ExternalReference(
-                        target_url=Path(filepath).as_uri(),
+                        target_url=_media_target_url(filepath, as_uri),
                         available_range=otio.opentime.TimeRange(
                             start_time=otio.opentime.RationalTime(0, fps),
                             duration=otio.opentime.RationalTime(int(out_s * fps), fps)
@@ -233,7 +252,9 @@ def _export_in_process(timeline_id: int, output_format: str = "otio") -> Path:
 
     Salva o arquivo em data/exports/ e retorna o caminho.
     """
-    otio_timeline = generate_otio_timeline(timeline_id)
+    # O .otio vai para o Kdenlive, que quer caminho absoluto simples; o .xml vai para
+    # Premiere/Resolve, que esperam URL em <pathurl>. Ver `_media_target_url`.
+    otio_timeline = generate_otio_timeline(timeline_id, as_uri=(output_format != "otio"))
 
     # EDL (CMX 3600) suporta apenas UMA trilha de vídeo: achata as pistas de VÍDEO
     # (clipe da pista mais alta prevalece, como na visualização do programa)

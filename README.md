@@ -95,8 +95,8 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
 
 - **Sem aprisionamento tecnológico.** Faça a triagem e o rough cut no CapIAu-Talho e exporte a
   timeline com precisão de frames em **OpenTimelineIO (`.otio`)**, **XML (Final Cut Pro 7)** ou
-  **EDL** — formatos que Kdenlive, Premiere, Resolve e Final Cut importam nativamente. O passo a
-  passo para o Kdenlive está em [`docs/kdenlive_workflow.md`](docs/kdenlive_workflow.md).
+  **EDL**. O **Kdenlive 25.04+ abre o `.otio` nativamente**; Premiere, Resolve e Final Cut importam
+  o `.xml`. O passo a passo está em [`docs/kdenlive_workflow.md`](docs/kdenlive_workflow.md).
 
 - **Atalhos profissionais (scrubbing JKL).** Navegue com os mesmos atalhos de reprodução acelerada
   e reversa (`J`, `K`, `L`) e marcação de corte (`I`, `O`, `E`) do Premiere e do DaVinci Resolve.

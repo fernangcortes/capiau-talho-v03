@@ -21,7 +21,8 @@ CapIAu-Talho apoia o workflow tradicional de cinema:
     os proxies leves e rápidos.
 
 3.  **Exportação da Timeline:** O CapIAu-Talho exporta a timeline de
-    cortes e ordenação usando o padrão da indústria XML ou EDL.
+    cortes e ordenação em **OpenTimelineIO (.otio)** — lido nativamente
+    pelo Kdenlive 25.04+ — ou nos padrões da indústria XML e EDL.
 
 4.  **Edição Fina e Finalização (Online):** O editor importa a timeline
     gerada para o Kdenlive, que faz a leitura dos clipes e monta a
@@ -30,57 +31,61 @@ CapIAu-Talho apoia o workflow tradicional de cinema:
 
 ## 2. Passo a Passo: Importando a Timeline do CapIAu-Talho no Kdenlive
 
-Embora o Kdenlive seja baseado no motor MLT, ele possui excelente
-suporte de importação e mapeamento de timelines através dos formatos
-exportados pelo CapIAu-Talho via **OpenTimelineIO (OTIO)**:
+O caminho recomendado depende da versão do Kdenlive.
 
-### Passo 1: Exportar no CapIAu-Talho
+### Kdenlive 25.04 ou mais recente — importação nativa de OTIO (recomendado)
 
-Na interface do CapIAu-Talho, conclua sua timeline de rascunho de making
-of e clique em **Exportar**. Selecione o formato **XML (Final Cut Pro 7
-/ Premiere)** ou **EDL (CMX 3600)**. O arquivo .xml ou .edl será gravado
-no diretório de exportações configurado.
+Desde a versão **25.04**, o Kdenlive lê arquivos **OpenTimelineIO** nativamente. Este é o caminho
+preferencial: preserva mais informação que XML ou EDL e não depende de adaptadores externos.
 
-### Passo 2: Importar no Kdenlive
+1.  No CapIAu-Talho, conclua sua timeline e **salve**. A exportação usa o que está gravado no
+    banco, não o que está na tela.
+2.  Clique em **Exportar**. O diálogo mostra as timelines salvas do projeto com nome, data e
+    quantidade de clipes — confira que está escolhendo a certa.
+3.  Selecione o formato **Kdenlive 25.04+ · OpenTimelineIO (.otio)** e confirme.
+4.  No Kdenlive, abra o arquivo `.otio` gerado. Ele lê os caminhos absolutos das mídias e religa
+    os originais automaticamente.
 
-1.  Abra o **Kdenlive**.
+> **Por que o `.otio` não usa URIs `file:///`.** O padrão OpenTimelineIO admite URI no
+> `target_url`, e era assim que exportávamos. Mas o importador do Kdenlive **não** trata esse
+> campo como URI: ele concatena a pasta do projeto na frente e não decodifica o percent-encoding.
+> Medido em 18/08/2026 no Kdenlive 26.04.3, uma mídia em `D:\makinof-monstro\Vídeos\...`
+> gravada como `file:///D:/makinof-monstro/V%C3%ADdeos/...` fazia o editor procurar por
+> `C:/Users/FGC/Downloads/file:///D:/makinof-monstro/V%C3%ADdeos/...` e falhar ao abrir o
+> projeto inteiro. Por isso o `.otio` passou a gravar caminho absoluto simples
+> (`D:/makinof-monstro/Vídeos/...`). O `.xml` continua com a URI, que é o que Premiere e Resolve
+> esperam em `<pathurl>`.
 
-2.  Vá em Projeto \> Adicionar Clipe ou Pasta ou clique em Arquivo \>
-    Importar \> Timeline (XML / EDL).
+### Kdenlive anterior à 25.04 — XML ou EDL
 
-3.  Escolha o arquivo gerado pelo CapIAu-Talho.
+1.  Exporte no formato **Premiere / Resolve / Final Cut (.xml)** ou **EDL · pista única (.edl)**.
+2.  No Kdenlive, vá em Arquivo > Importar > Timeline e escolha o arquivo.
+3.  Se solicitado, aponte a localização dos originais.
 
-4.  O Kdenlive lerá os metadados temporais e os caminhos dos arquivos.
-    Se solicitado, aponte a localização dos originais (ou deixe que o
-    Kdenlive faça o mapeamento automático).
+> ⚠️ O EDL é achatado em **pista única** na exportação. Timelines multipista (V1/V2, A1/A2) perdem
+> a separação de trilhas nesse formato — use `.otio` ou `.xml` quando a estrutura importar.
 
-## 3. Visão de Futuro: Geração Direta de Arquivos .kdenlive (XML MLT)
+## 3. Sobre a geração direta de arquivos .kdenlive
 
-A escolha do Kdenlive como NLE principal fundamenta-se na **facilidade
-de automação programática** do seu formato nativo de projeto:
+**Decisão (18/08/2026): não será implementada.** Esta seção descrevia antes um plano de gerar
+arquivos `.kdenlive` (XML MLT) diretamente. O plano foi descartado, e o motivo é bom: **o problema
+que ele resolveria deixou de existir.**
 
-- **O formato .kdenlive é na verdade um XML baseado no padrão MLT (Media
-  Lovin\' Toolkit).**
+- O Kdenlive passou a importar **OTIO nativamente na 25.04**. A integração nativa cobre mais
+  recursos e é mais confiável que qualquer geração externa do formato.
+- O adaptador da comunidade (`otio-kdenlive-adapter`) foi **descontinuado pelos próprios autores**,
+  que recomendam explicitamente a via nativa. A última versão publicada é a `0.0.3`.
+- Em teste (18/08/2026), esse adaptador ainda **corrompe caminhos no Windows**: um clipe em
+  `C:\Users\FGC\midia\clipeA.mp4` era gravado como `/C:/Users/FGC/midia/clipeA.mp4`, com uma barra
+  sobrando antes da letra do drive. O MLT não abre esse caminho — todas as mídias entrariam
+  desvinculadas. O adaptador `otio-mlt-adapter` grava a URI `file:///` crua, com o mesmo efeito.
 
-- Ao contrário dos formatos binários proprietários de outros NLEs
-  comerciais, um arquivo do Kdenlive pode ser aberto em qualquer editor
-  de texto e lido/manipulado facilmente por scripts em Python.
+As funcionalidades que motivavam o plano original continuam válidas como ideias, mas dependeriam
+de extensões do próprio OTIO (metadados por clipe), não de um formato de saída novo:
 
-- **Plano de Automação:** Nas próximas atualizações, o motor de
-  exportação do CapIAu-Talho implementará a geração direta de arquivos
-  .kdenlive nativos. Isso permitirá:
-
-  - Gerar timelines do Kdenlive com trilhas de áudio e vídeo
-    pré-nomeadas.
-
-  - Inserir marcadores coloridos e comentários com as transcrições da
-    AssemblyAI acopladas em cada bloco de vídeo na timeline.
-
-  - Adicionar tags de metadados do set e reconhecimento facial como
-    anotações direto na biblioteca do Kdenlive.
-
-  - Configurar transições básicas e overlays automatizados baseados em
-    regras geradas pelo chatbot RAG.
+- marcadores coloridos e comentários com as transcrições acopladas a cada bloco;
+- tags de metadados do set e de reconhecimento facial anotadas na biblioteca;
+- transições e overlays automatizados a partir de regras do chatbot RAG.
 
 ## 4. Dicas de Otimização e Mapeamento de Arquivos no Kdenlive
 

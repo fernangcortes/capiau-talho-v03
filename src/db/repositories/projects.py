@@ -167,15 +167,48 @@ class ProjectRepository:
 
     @staticmethod
     def list_timelines(conn: sqlite3.Connection, project_id: int) -> List[Dict[str, Any]]:
-        """Retorna todas as timelines cadastradas em um projeto."""
+        """Retorna todas as timelines cadastradas em um projeto.
+
+        Inclui `clip_count` para o diálogo de exportação poder mostrar o que sai em
+        cada arquivo — sem isso o usuário não tem como saber, antes de abrir no NLE,
+        se escolheu a timeline certa (a de 18/08: exportou uma antiga achando que era
+        a da tela, e só descobriu ao ver a linha do tempo vazia no Kdenlive).
+        """
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, name, description, created_at
+            SELECT id, name, description, created_at, sequence_json
             FROM timeline
             WHERE project_id = ?
             ORDER BY id DESC
         """, (project_id,))
-        return [dict(r) for r in cursor.fetchall()]
+
+        timelines = []
+        for row in cursor.fetchall():
+            item = dict(row)
+            raw = item.pop("sequence_json", None)
+            item["clip_count"] = ProjectRepository._count_clips(raw)
+            timelines.append(item)
+        return timelines
+
+    @staticmethod
+    def _count_clips(sequence_json: Optional[str]) -> int:
+        """Conta os clipes de um sequence_json em qualquer versão, sem nunca levantar.
+
+        v1 é uma lista simples de cortes; v2 é um dict com a lista em 'clips'. Contagem
+        é informação de tela: um JSON corrompido devolve 0 em vez de derrubar a listagem.
+        """
+        if not sequence_json:
+            return 0
+        try:
+            data = json.loads(sequence_json)
+        except (ValueError, TypeError):
+            return 0
+        if isinstance(data, dict):
+            clips = data.get("clips")
+            return len(clips) if isinstance(clips, list) else 0
+        if isinstance(data, list):
+            return len(data)
+        return 0
 
     @staticmethod
     def parse_sequence(sequence_json: str) -> Dict[str, Any]:

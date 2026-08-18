@@ -694,8 +694,25 @@ export class CapiauTimelineRenderer {
         if (cached) return cached.loaded ? cached.img : null;
 
         const img = new Image();
-        const entry = { img, loaded: false, timestamp };
+        const entry = { img, loaded: false, timestamp, tentativas: 0 };
         this.videoThumbCache[key] = entry;
+
+        // O servidor responde 404 enquanto a fila de fundo ainda não gerou este segundo
+        // (ele deixou de extrair o frame dentro da requisição, que era o que enchia o
+        // threadpool do FastAPI e travava rotas sem relação — a exportação entre elas).
+        // Sem reagendar, a entrada ficaria em cache como "falhou" para sempre e o clipe
+        // nunca ganharia suas miniaturas até um F5.
+        // Espera crescente até um teto: as miniaturas do FIM de um vídeo longo só ficam
+        // prontas minutos depois, então uma janela curta desistiria cedo demais. Assim
+        // são ~2 min de tentativas, com poucos pedidos.
+        const MAX_TENTATIVAS = 14;
+        const espera = (n) => Math.min(1000 * Math.pow(1.5, n - 1), 15000);
+
+        const pedir = () => {
+            entry.tentativas += 1;
+            // O sufixo evita que o navegador reaproveite o 404 anterior do cache dele
+            img.src = `/api/video/${videoId}/thumbnail-at?time=${timestamp.toFixed(1)}&tentativa=${entry.tentativas}`;
+        };
 
         img.onload = () => {
             entry.loaded = true;
@@ -703,8 +720,15 @@ export class CapiauTimelineRenderer {
         };
         img.onerror = () => {
             entry.loaded = false;
+            if (entry.tentativas < MAX_TENTATIVAS) {
+                setTimeout(pedir, espera(entry.tentativas));
+            } else {
+                // Desiste e libera a chave: uma tentativa futura (novo desenho) recomeça
+                delete this.videoThumbCache[key];
+            }
         };
-        img.src = `/api/video/${videoId}/thumbnail-at?time=${timestamp.toFixed(1)}`;
+
+        pedir();
         return null;
     }
 
