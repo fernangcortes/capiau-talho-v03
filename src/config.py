@@ -13,9 +13,9 @@ class Config:
     
     # ── Modelos OpenRouter (Customizáveis via .env) ─────────────
     # Modelos recomendados em 2026:
-    # Texto/Clustering: deepseek/deepseek-chat, minimax/minimax-m3, qwen/qwen-3.7-max, openai/gpt-5.5
+    # Texto/Clustering: deepseek/deepseek-v4-flash, deepseek/deepseek-v4-pro, minimax/minimax-m3, qwen/qwen-3.7-max, openai/gpt-5.5
     # Visão/Frames: google/gemini-2.5-flash, google/gemini-3.1-flash-lite, perceptron/perceptron-mk1
-    TEXT_MODEL = os.getenv("TEXT_MODEL", "deepseek/deepseek-chat")
+    TEXT_MODEL = os.getenv("TEXT_MODEL", "deepseek/deepseek-v4-flash")
     # Padrão pago e confiável, com um gratuito como reserva (ver VISION_MODEL_FALLBACK).
     # Testado ao vivo em 17/07/2026 com o Nemotron como principal: qualidade equivalente
     # ao Gemini em amostra pequena, mas em produção real ~30% das chamadas bateram em

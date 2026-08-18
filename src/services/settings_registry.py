@@ -49,9 +49,9 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
     },
     {
-        "key": "llm.text_model", "type": "string", "default": "deepseek/deepseek-chat",
+        "key": "llm.text_model", "type": "string", "default": CONFIG.TEXT_MODEL,
         "label": "Modelo de texto",
-        "help": "Modelo de IA usado para resumos, temas, sugestões de timeline e chat. Formato OpenRouter, ex.: deepseek/deepseek-chat.",
+        "help": "Modelo de IA usado para resumos, temas, sugestões de timeline e chat. Formato OpenRouter. Padrão: deepseek/deepseek-v4-flash (rápido e barato); deepseek/deepseek-v4-pro entrega melhor qualidade a um custo maior.",
         "help_tech": "Substitui CONFIG.TEXT_MODEL nas chamadas de rag, timeline_ai, summary, theme_engine e enrichment.",
         "category": "models_keys", "level": "simple", "scope": "both", "requires_reprocess": False,
     },
