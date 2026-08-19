@@ -33,7 +33,10 @@ def detect_shots(video_path: Path, threshold: float = 27.0) -> List[Dict[str, fl
             return []
 
         shots = [
-            {"start": start_tc.get_seconds(), "end": end_tc.get_seconds()}
+            {
+                "start": start_tc.seconds if hasattr(start_tc, "seconds") else start_tc.get_seconds(),
+                "end": end_tc.seconds if hasattr(end_tc, "seconds") else end_tc.get_seconds()
+            }
             for start_tc, end_tc in scene_list
         ]
         print(f"[Segmentation] Detectados {len(shots)} shots para: {video_path.name}")

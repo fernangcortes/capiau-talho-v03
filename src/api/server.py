@@ -6,6 +6,7 @@ import mimetypes
 mimetypes.add_type('image/jpeg', '.jpg')
 mimetypes.add_type('image/jpeg', '.jpeg')
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -34,10 +35,19 @@ with get_db() as conn:
     MediaRepository.reset_stuck_tasks(conn)
     conn.commit()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    print("[Shutdown] Limpando processos FFmpeg em execucao...")
+    TASK_MANAGER.cleanup()
+
+
 app = FastAPI(
     title="CapIAu-Talho — Motor de Inteligência Cinematográfica",
     description="Backend modularizado com FastAPI, SQLite, Qdrant, FFmpeg em CPU e Reconhecimento Facial em Cascata.",
-    version="3.1"
+    version="3.1",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -114,11 +124,6 @@ def get_health(request: Request):
         "port": port
     }
 
-@app.on_event("shutdown")
-def on_shutdown_cleanup() -> None:
-    """Callback disparado no desligamento do servidor para matar processos orfaos."""
-    print("[Shutdown] Limpando processos FFmpeg em execucao...")
-    TASK_MANAGER.cleanup()
 
 # Montagem de endpoints para arquivos estáticos locais (player/visualizacao)
 app.mount("/proxies", StaticFiles(directory=str(CONFIG.PROXIES_DIR)), name="proxies")

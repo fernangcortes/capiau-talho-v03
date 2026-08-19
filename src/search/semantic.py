@@ -7,6 +7,8 @@ from sentence_transformers import SentenceTransformer
 from src.config import CONFIG
 import uuid
 
+import threading
+
 class QdrantUnavailableError(RuntimeError):
     """Exceção disparada quando o banco vetorial local Qdrant está indisponível (ex: lock de arquivo)."""
     pass
@@ -23,6 +25,7 @@ class SemanticSearch:
         return cls._instance
 
     def __init__(self):
+        self._lock = threading.Lock()
         self.collection_name = "capiau_making_of"
         self.client = None
         self.encoder = None
@@ -34,25 +37,43 @@ class SemanticSearch:
         """(Re)conecta ao Qdrant local. Chamado no boot e por check_health() para
         tentar sair sozinho de uma indisponibilidade (ex.: lock de outra instância
         que já morreu) sem exigir restart manual do servidor."""
-        try:
-            db_file_path = CONFIG.QDRANT_DB_PATH
-            db_file_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._lock:
+            if self.is_available and self.client is not None:
+                return
 
-            print(f"[QDRANT] Conectando ao banco local em: {db_file_path}")
-            self.client = QdrantClient(path=str(db_file_path))
+            # Garante que qualquer cliente anterior que falhou seja fechado
+            if self.client is not None:
+                try:
+                    self.client.close()
+                except Exception:
+                    pass
+                self.client = None
 
-            if self.encoder is None:
-                # Modelo leve de embeddings (MiniLM), roda rápido na CPU — só carrega 1x
-                print("[QDRANT] Carregando modelo sentence-transformers local em CPU...")
-                self.encoder = SentenceTransformer(CONFIG.embedding_model, device="cpu")
+            try:
+                db_file_path = CONFIG.QDRANT_DB_PATH
+                db_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-            self._init_collection()
-            self.is_available = True
-            self.error_message = None
-        except Exception as e:
-            self.is_available = False
-            self.error_message = str(e)
-            print(f"[QDRANT] [AVISO] Falha ao inicializar o Qdrant: {e}")
+                if self.encoder is None:
+                    # Modelo leve de embeddings (MiniLM), roda rápido na CPU — só carrega 1x
+                    print("[QDRANT] Carregando modelo sentence-transformers local em CPU...")
+                    self.encoder = SentenceTransformer(CONFIG.embedding_model, device="cpu")
+
+                print(f"[QDRANT] Conectando ao banco local em: {db_file_path}")
+                self.client = QdrantClient(path=str(db_file_path))
+
+                self._init_collection()
+                self.is_available = True
+                self.error_message = None
+            except Exception as e:
+                self.is_available = False
+                self.error_message = str(e)
+                if self.client is not None:
+                    try:
+                        self.client.close()
+                    except Exception:
+                        pass
+                    self.client = None
+                print(f"[QDRANT] [AVISO] Falha ao inicializar o Qdrant: {e}")
 
     def check_health(self) -> tuple:
         """Retorna (is_available: bool, error_message: str | None). Tenta reconectar
