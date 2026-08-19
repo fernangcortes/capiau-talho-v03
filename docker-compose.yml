@@ -1,0 +1,23 @@
+services:
+  talho:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: capiau-talho
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8000
+    volumes:
+      # Montagem do código-fonte para recarregamento em tempo real (hot-reload)
+      - ./src:/app/src
+      # Montagem da pasta de dados persistentes (SQLite, Qdrant, proxies, miniaturas, modelos)
+      - ./data:/app/data
+      # Montagem da pasta monitorada de ingestão
+      - ./watch:/app/watch
+    command: uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload

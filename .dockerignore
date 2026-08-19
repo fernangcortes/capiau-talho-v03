@@ -1,0 +1,39 @@
+# Virtual environments
+.venv/
+venv*/
+data/venv*
+env/
+
+# Python cache & compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Git & IDEs
+.git/
+.gitignore
+.vscode/
+.idea/
+.cursor/
+.agents/
+.claude/
+
+# Logs & temp files
+logs/
+*.log
+scratch/
+tmp/
+temp/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local testing data
+data_test/
+data_test_*/
+
+# Data files that should be mounted via volume, not baked into the image
+# (data/ will be mounted dynamically via docker-compose)

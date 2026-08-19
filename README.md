@@ -142,6 +142,14 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   painel de filtros em duas linhas e filtro por ciclo de status (*Todos*, *Analisados*, *Não
   Analisados*, *Erros*).
 
+- **Títulos executivos gerados por IA.** Cada vídeo e foto recebe um título curto de 3 a 6
+  palavras que diz o que a mídia é, no lugar do nome de arquivo da câmera — *"Zé: Crítica ao
+  primeiro corte"*, *"Detalhe das mãos no vinil"*. O prompt proíbe explicitamente as aberturas
+  genéricas que tornam um acervo ilegível (*"Vídeo de"*, *"Depoimento de"*, *"Este clipe
+  mostra"*). A geração roda em lote pelo botão **Gerar Títulos IA**, em micro-lotes de 20, com
+  progresso e cancelamento na tela de Tarefas — e qualquer título pode ser corrigido com duplo
+  clique no card.
+
 - **Assistente de diarização inteligente.** Fluxo completo para corrigir falantes na transcrição:
   gaveta de pistas globais (silêncios longos, perguntas, discrepâncias faciais) e inspetor de balão
   avançado. O inspetor exibe uma *waveform interativa* de fala, permite dividir depoimentos com dois
@@ -200,6 +208,12 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
 
 - **Visualização em árvore inteligente.** Navegue por acervos gigantes organizados dinamicamente em
   pastas e subpastas hierárquicas colapsadas, no estilo do Explorer.
+
+- **Índice temático na barra de rolagem (Scroll Peeker).** Parar o mouse sobre a barra de
+  rolagem da biblioteca abre um cartão com a miniatura, o título executivo, o tipo, a duração e o
+  resumo do item naquela altura — sem rolar até ele. Arrastar salta com alinhamento ao topo do
+  card, e **`Shift` + roda** redimensiona a miniatura. Pensado para acervos em que rolar às cegas
+  custa minutos.
 
 - **Layout Estúdio e workspaces flexíveis.** Preset de interface para decupagem que maximiza a
   biblioteca e empilha os players Source/Program de forma limpa (*controles apenas no hover*), com a
@@ -332,128 +346,73 @@ graph TD
 
 ---
 
-## 🛠️ Como montar localmente <a id="como-montar-localmente"></a>
+## 🛠️ Como rodar o CapIAu-Talho <a id="como-montar-localmente"></a>
 
-### Requisitos <a id="requisitos"></a>
+Você pode rodar o CapIAu-Talho de duas formas:
+1. **Via Docker (Recomendado)**: Ambiente isolado e 100% reprodutível. Nunca quebra com atualizações do seu computador.
+2. **Localmente via Python Virtualenv**: Usando `.venv` com Python 3.12.
 
-| Item | Mínimo | Observações |
-|---|---|---|
-| **Python** | 3.10+ | Testado em 3.14 |
-| **FFmpeg** | qualquer versão recente | Precisa do `ffmpeg` **e** do `ffprobe`, ambos no `PATH` |
-| **RAM** | 8 GB | 16 GB recomendados para acervos grandes |
-| **Disco** | ~3 GB livres | Modelos de IA baixados sob demanda + proxies do acervo |
-| **GPU** | não é necessária | Todo o processamento local roda em CPU |
-| **Contas** | OpenRouter e AssemblyAI | Ambas pagas por uso — veja [custos](docs/costs_and_security.md) |
+---
 
-### Passo a passo <a id="passo-a-passo"></a>
+### 🐳 Opção 1: Rodando com Docker (Recomendado)
 
-**1. Clone o repositório**
+O container já inclui **Python 3.12**, **FFmpeg**, **PyTorch CPU**, **OpenCV**, **OpenTimelineIO** e todas as dependências pré-configuradas. Suas pastas de mídias (`watch/`), banco de dados e modelos (`data/`) são persistidas no seu disco físico, e o código em `src/` recarrega automaticamente ao ser editado.
 
-```bash
-git clone https://github.com/fernangcortes/capiau-talho-v03.git
-```
-
-**2. Entre na pasta**
-
-```bash
-cd capiau-talho-v03
-```
-
-**3. Crie um ambiente virtual**
-
-Isso mantém as dependências do CapIAu-Talho separadas do resto do sistema, evitando que a
-atualização de outro projeto quebre este (veja [Solução de problemas](#solucao-de-problemas)).
-
-```bash
-python -m venv .venv
-```
-
-**4. Ative o ambiente virtual**
-
-No Windows (PowerShell):
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-No Linux ou macOS:
-
-```bash
-source .venv/bin/activate
-```
-
-**5. Instale as dependências**
-
-```bash
-pip install -r requirements.txt
-```
-
-**6. Instale as dependências de exportação**
-
-Elas não estão no `requirements.txt` porque a disponibilidade do `opentimelineio` varia conforme a
-versão do Python (veja a nota abaixo):
-
-```bash
-pip install opentimelineio otio-fcp-adapter otio-cmx3600-adapter
-```
-
-> **Se o `opentimelineio` não instalar no seu Python.** O CapIAu-Talho tem um plano B embutido: ele
-> delega a exportação a um interpretador Python 3.12 separado. Crie-o com
-> [`uv`](https://github.com/astral-sh/uv):
->
-> ```bash
-> uv venv data/venv312 --python 3.12
-> ```
->
-> ```bash
-> uv pip install --python data/venv312/Scripts/python.exe opentimelineio otio-fcp-adapter otio-cmx3600-adapter python-dotenv
-> ```
->
-> O sistema detecta esse ambiente sozinho e passa a usá-lo apenas para exportar. Todo o resto
-> continua no seu Python principal.
-
-**7. Confirme que o FFmpeg está acessível**
-
-```bash
-ffmpeg -version
-```
-
-Se o comando não for reconhecido, adicione a pasta do FFmpeg ao `PATH` do sistema antes de seguir.
-Sem isso, a geração de proxies e a transcrição falham.
-
-**8. Crie o arquivo `.env`**
-
-Copie o modelo e preencha com suas chaves:
+**1. Configure o `.env` (se ainda não o fez):**
 
 ```bash
 cp .env.example .env
 ```
+Preencha suas chaves da OpenRouter e AssemblyAI no `.env`.
 
-Os campos disponíveis estão documentados em [Configuração](#configuracao-env).
+**2. Inicie o container:**
 
-### Executando <a id="executando"></a>
-
-**Modo padrão:**
-
+No Windows (PowerShell):
+```powershell
+.\scripts\run-docker.ps1
+```
+Ou com o comando padrão do Docker:
 ```bash
-python -m uvicorn src.api.server:app
+docker compose up --build
 ```
 
-> No Windows, evite `--reload` durante conversões em lote: o recarregador reinicia o processo no
-> meio da conversão e causa travamentos e deadlocks.
+**3. Acesse a interface:**
+Abra no navegador: [http://localhost:8000](http://localhost:8000)
 
-**Modo resiliente no Windows (sem janela de console):**
+---
 
-Se a janela do terminal for fechada, o Windows envia `CTRL_CLOSE_EVENT` a tudo que estiver preso a
-ela — e o runtime MKL/PyTorch aborta na hora, derrubando o servidor e os workers. O lançador abaixo
-cria o processo desvinculado de qualquer console, então não há janela para fechar:
+### 🐍 Opção 2: Rodando Localmente (.venv)
 
-```bash
-python scripts/launch_detached.py python -m uvicorn src.api.server:app --stdout logs/server.out --stderr logs/server.err
+### Requisitos
+
+| Item | Mínimo | Observações |
+|---|---|---|
+| **Python** | 3.12 (Recomendado) | 3.10+ compatível |
+| **FFmpeg** | qualquer versão recente | Precisa do `ffmpeg` **e** do `ffprobe`, ambos no `PATH` |
+| **RAM** | 8 GB | 16 GB recomendados para acervos grandes |
+| **GPU** | não é necessária | Todo o processamento local roda em CPU |
+
+**1. Inicie com o script automatizado:**
+
+No Windows (PowerShell):
+```powershell
+.\scripts\run-local.ps1
 ```
 
-> O script **exige** os argumentos `--stdout` e `--stderr`. Sem eles, ele apenas imprime as
-> instruções de uso e encerra.
+Ou execute manualmente:
+
+```powershell
+# Criação do ambiente virtual com Python 3.12
+uv venv .venv --python 3.12
+# ou: py -3.12 -m venv .venv
+
+# Instalação das dependências
+uv pip install -r requirements.txt
+# ou: .venv\Scripts\pip install -r requirements.txt
+
+# Inicialização do servidor
+.venv\Scripts\python -m uvicorn src.api.server:app --reload
+```
 
 **Acesse:** 👉 **http://localhost:8000/**
 
@@ -677,7 +636,7 @@ O plano completo, com decisões registradas e critérios de aceite, está em
 | Etapa | Escopo | Situação |
 |---|---|---|
 | **1 — Sanear a base** | Limpeza do pipeline de análise | ✅ Concluída |
-| **2 — Segmentação e CLIP local** | Shots, beats, embeddings de imagem e análise condicional | ✅ Concluída |
+| **2 — Segmentação e CLIP local** | Shots, beats, embeddings de imagem e análise condicional | ✅ Concluída (faltam chips de faceta na UI e o título no índice) |
 | **3 — Sala de Projeto** | Cartão de contexto, chat produtor, extração de roteiro, *capability manager* | 🔄 Em andamento |
 | **4 — Busca multi-vetor e agentes** | Busca em 3 passos, chat com ferramentas, servidor MCP, farm de GPUs | 📋 Planejada |
 
