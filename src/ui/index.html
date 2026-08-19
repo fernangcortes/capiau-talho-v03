@@ -234,12 +234,27 @@
                     </div>
 
                     <!-- Dropdown de Configurações de Exibição da Biblioteca (Retrátil) -->
-                    <div id="library-display-settings-dropdown" class="glassmorphism" style="display: none; flex-direction: column; gap: 8px; padding: 10px; border-radius: 6px; border: 1px solid rgba(6,182,212,0.3); background: rgba(20, 18, 25, 0.98); box-shadow: 0 4px 20px rgba(0,0,0,0.5); position: absolute; top: 100%; right: 12px; z-index: 1000; width: 165px;">
+                    <div id="library-display-settings-dropdown" class="glassmorphism" style="display: none; flex-direction: column; gap: 8px; padding: 10px; border-radius: 6px; border: 1px solid rgba(6,182,212,0.3); background: rgba(20, 18, 25, 0.98); box-shadow: 0 4px 20px rgba(0,0,0,0.5); position: absolute; top: 100%; right: 12px; z-index: 1000; width: 175px;">
+                        <div style="font-size: 9px; font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Visualização</div>
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
                             <input type="checkbox" id="chk-show-tags" checked style="cursor:pointer;"> Tags de Categoria
                         </label>
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
                             <input type="checkbox" id="chk-show-status" checked style="cursor:pointer;"> Status de IA
+                        </label>
+                        <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;"></div>
+                        <div style="font-size: 9px; font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Tooltip de Decupagem</div>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
+                            <input type="checkbox" id="chk-tooltip-category" style="cursor:pointer;"> Categoria
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
+                            <input type="checkbox" id="chk-tooltip-speaker" style="cursor:pointer;"> Falante / Entrevista
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
+                            <input type="checkbox" id="chk-tooltip-duration" style="cursor:pointer;"> Duração
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
+                            <input type="checkbox" id="chk-tooltip-tags" style="cursor:pointer;"> Tags Semânticas
                         </label>
                         <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;"></div>
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
@@ -440,14 +455,18 @@
 
                 <!-- ── DETAILED MEDIA INSPECTOR (TRIGGERED BY 'A') ── -->
                 <div id="library-inspector-view" style="display: none; flex-direction: column; height: 100%; width: 100%; overflow: hidden;">
-                    <div class="sidebar-header" style="border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
-                            <button class="btn-toggle-sidebar" id="btn-inspector-back" title="Voltar à Biblioteca" style="margin-right: 4px; padding: 4px; font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;">
+                    <div class="sidebar-header" style="border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1;">
+                            <button class="btn-toggle-sidebar" id="btn-inspector-back" title="Voltar à Biblioteca" style="margin-right: 2px; padding: 4px; font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; flex-shrink: 0;">
                                 <i class="fa-solid fa-chevron-left"></i>
                             </button>
-                            <h2 style="flex: 1; display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; color: #fff;" id="inspector-media-title">
-                                <i class="fa-solid fa-microphone-lines" style="color: var(--color-cyan);"></i> Painel de Mídia
+                            <h2 style="flex: 1; display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; color: #fff; min-width: 0;" id="inspector-media-title">
+                                <i id="inspector-media-title-icon" class="fa-solid fa-microphone-lines" style="color: var(--color-cyan); flex-shrink: 0;"></i>
+                                <span id="inspector-media-title-text" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Painel de Mídia</span>
                             </h2>
+                            <button id="btn-inspector-edit-title" class="btn-flat-action cyan" title="Renomear Título Executivo" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 4px; font-size: 11px; flex-shrink: 0; transition: color 0.15s, transform 0.15s;">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
                         </div>
                         <span id="inspector-media-status-badge" style="font-size: 8px; padding: 2px 6px; border-radius: 4px; font-weight: bold; background: rgba(6, 182, 212, 0.1); color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0;">Carregando</span>
                     </div>

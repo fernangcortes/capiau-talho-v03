@@ -16,6 +16,15 @@ if (!window.titleDisplayPreferences) {
     }
 }
 
+// Preferências de metadados no tooltip de decupagem
+if (!window.tooltipDisplayPreferences) {
+    try {
+        window.tooltipDisplayPreferences = JSON.parse(localStorage.getItem("tooltipDisplayPreferences") || "{}");
+    } catch(e) {
+        window.tooltipDisplayPreferences = {};
+    }
+}
+
 export function cleanTitle(text) {
     if (!text) return "";
     let clean = text.trim();
@@ -124,71 +133,87 @@ export function getFriendlyTitle(v) {
     return v.filename;
 }
 
-export function attachInlineTitleEditor(mediaType, item, titleSpan, currentTitle) {
-    if (!titleSpan) return;
-    titleSpan.style.cursor = "text";
-    titleSpan.title = "Duplo clique para renomear este clipe";
-
-    titleSpan.addEventListener("dblclick", (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-
-        if (titleSpan.querySelector("input")) return;
-
-        const originalTitle = item.title || currentTitle || item.filename || "";
-        const input = document.createElement("input");
-        input.type = "text";
-        input.className = "inline-title-input";
-        input.value = originalTitle;
-        input.style.cssText = "width: 100%; max-width: 100%; background: rgba(0,0,0,0.9); color: #fff; border: 1px solid var(--color-cyan); border-radius: 3px; padding: 1px 4px; font-size: 11px; font-family: inherit; outline: none; box-shadow: 0 0 8px rgba(6,182,212,0.4);";
-
-        titleSpan.innerHTML = "";
-        titleSpan.appendChild(input);
-        input.focus();
-        input.select();
-
-        let saved = false;
-        const commitTitle = async () => {
-            if (saved) return;
-            saved = true;
-            const newTitle = input.value.trim();
-            if (newTitle && newTitle !== originalTitle) {
-                try {
-                    const endpoint = mediaType === "video" ? `/api/video/${item.id}/title` : `/api/photo/${item.id}/title`;
-                    const res = await fetch(endpoint, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ title: newTitle })
-                    });
-                    if (res.ok) {
-                        item.title = newTitle;
-                        titleSpan.textContent = newTitle;
-                    } else {
-                        titleSpan.textContent = originalTitle;
-                    }
-                } catch(err) {
-                    console.error("Erro ao salvar título:", err);
-                    titleSpan.textContent = originalTitle;
+export function buildMediaTooltip(item, kind = "video", forceRealFilename = false) {
+    if (!item) return "Sem decupagem";
+    const prefs = window.tooltipDisplayPreferences || {};
+    const friendly = getFriendlyTitle(item);
+    const filename = item.filename || "";
+    const desc = (item.description || item.summary || "").trim();
+    
+    let parts = [];
+    
+    // 1. Título principal no topo
+    const mainTitle = forceRealFilename ? filename : (friendly || filename);
+    if (mainTitle) parts.push(mainTitle);
+    
+    // 2. Metadados opcionais configuráveis
+    let metaItems = [];
+    
+    if (prefs.category && item.category) {
+        const catLabel = CATEGORY_LABELS[item.category] || item.category;
+        metaItems.push(`Categoria: ${catLabel}`);
+    }
+    
+    if (prefs.duration && item.duration) {
+        metaItems.push(`Duração: ${formatTimecode(item.duration).substring(3, 11)}`);
+    }
+    
+    if (prefs.speaker && kind === "video") {
+        let speaker = "";
+        if (item.summary) {
+            const m = item.summary.match(/Entrevistado:\s*([^,\-\n\.]+)/i);
+            if (m) speaker = m[1].trim();
+        }
+        if (!speaker && item.description && item.description.includes("Entrevista com")) {
+            const m = item.description.match(/Entrevista com\s+([^,\-\n]+)/i);
+            if (m) speaker = m[1].trim();
+        }
+        if (!speaker && item.tags) {
+            try {
+                const parsed = typeof item.tags === "string" ? JSON.parse(item.tags) : item.tags;
+                if (Array.isArray(parsed)) {
+                    const sTag = parsed.find(t => t.startsWith("Speaker:") || t.startsWith("Person:"));
+                    if (sTag) speaker = sTag.split(":")[1].trim();
                 }
-            } else {
-                titleSpan.textContent = originalTitle;
+            } catch(e) {}
+        }
+        if (speaker) {
+            metaItems.push(`Falante: ${speaker}`);
+        }
+    }
+    
+    if (prefs.tags && item.tags) {
+        try {
+            const parsed = typeof item.tags === "string" ? JSON.parse(item.tags) : item.tags;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                const tagList = parsed.filter(t => !t.startsWith("Speaker:") && !t.startsWith("Person:"));
+                if (tagList.length > 0) {
+                    metaItems.push(`Tags: ${tagList.slice(0, 6).join(", ")}`);
+                }
             }
-        };
+        } catch(e) {}
+    }
+    
+    if (metaItems.length > 0) {
+        parts.push(metaItems.join(" • "));
+    }
+    
+    // 3. Sinopse / Descrição da decupagem
+    if (desc) {
+        if (desc !== mainTitle && !desc.startsWith(mainTitle)) {
+            parts.push(desc);
+        } else if (parts.length === 1 && desc === mainTitle) {
+            // Não duplica se for idêntico
+        }
+    }
+    
+    if (parts.length === 0) return "Sem decupagem";
+    return parts.join("\n\n");
+}
 
-        input.addEventListener("keydown", (eKey) => {
-            if (eKey.key === "Enter") {
-                eKey.preventDefault();
-                commitTitle();
-            } else if (eKey.key === "Escape") {
-                saved = true;
-                titleSpan.textContent = originalTitle;
-            }
-        });
-
-        input.addEventListener("blur", () => {
-            commitTitle();
-        });
-    });
+export function attachInlineTitleEditor(mediaType, item, titleSpan, currentTitle) {
+    // Descontinuado para não poluir o tooltip do card. A edição agora ocorre pelo painel de mídia (atalho A)
+    return;
 }
 
 function hasMatchingChildren(node, query, ast = null) {
@@ -526,20 +551,8 @@ function renderTreeNode(node, container, depth = 0) {
         const toggleTitleTitle = forceRealFilename ? "Mostrar Título Contextual" : "Mostrar Nome do Arquivo Real";
         const toggleBtnHtml = `<button class="btn-toggle-filename" title="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
 
-        // Tooltip direta (Título e Descrição sem duplicar)
-        const desc = v.description || v.summary || '';
-        let tooltip = "";
-        if (forceRealFilename) {
-            tooltip = (v.filename && desc && v.filename !== desc)
-                ? `${v.filename}\n\n${desc}`
-                : (v.filename || desc || 'Sem decupagem');
-        } else {
-            if (v.title && desc && v.title !== desc && !desc.startsWith(v.title)) {
-                tooltip = `${v.title}\n\n${desc}`;
-            } else {
-                tooltip = desc || v.title || v.filename || 'Sem decupagem';
-            }
-        }
+        // Tooltip rica e direta via buildMediaTooltip
+        const tooltip = buildMediaTooltip(v, "video", forceRealFilename);
 
         const visionBadgeHtml = hasVisionError ? `<div class="vision-error-badge" data-tooltip="Falha visual detectada. Clique em Reanalisar Falhas no topo"><i class="fa-solid fa-triangle-exclamation"></i> Falha Visual</div>` : '';
 
@@ -691,8 +704,30 @@ function renderTreeNode(node, container, depth = 0) {
             });
         }
         
-        // Editor inline de título por duplo clique
-        attachInlineTitleEditor("video", v, card.querySelector(".clip-title-text"), currentTitle);
+        // Duplo clique no card envia o vídeo (ou trecho marcado In/Out) diretamente para a timeline
+        card.addEventListener("dblclick", (e) => {
+            if (e.target.closest("button") || e.target.closest(".btn-card-action") || e.target.closest(".btn-toggle-filename") || e.target.closest(".btn-select-similar-item")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            
+            let inTime = 0.0;
+            let outTime = v.duration || 0.0;
+            
+            if (STATE.activeVideo && STATE.activeVideo.id === v.id) {
+                if (STATE.markerIn !== null) inTime = STATE.markerIn;
+                if (STATE.markerOut !== null) outTime = STATE.markerOut;
+            }
+            
+            if (window.TIMELINE_STATE) {
+                window.TIMELINE_STATE.addCut(v.id, inTime, outTime, null);
+                STATE.activeVideo = v;
+                window.activeFocusedPlayer = "source";
+                STATE.emit("statusChanged", { text: `Vídeo "${currentTitle}" adicionado à timeline (${formatTimecode(inTime).substring(3, 11)} - ${formatTimecode(outTime).substring(3, 11)}).`, active: true });
+                if (typeof window.showToast === "function") {
+                    window.showToast("Vídeo adicionado à timeline!", "success");
+                }
+            }
+        });
 
         container.appendChild(card);
     } else if (node.type === "file" && node.photo) {
@@ -753,19 +788,8 @@ function renderTreeNode(node, container, depth = 0) {
         const toggleBtnHtml = `<button class="btn-toggle-filename" title="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
 
         const categoryLabel = p.category ? p.category : 'Foto';
-        const photoDesc = p.description || '';
-        let tooltip = "";
-        if (forceRealFilename) {
-            tooltip = (p.filename && photoDesc && p.filename !== photoDesc)
-                ? `${p.filename}\n\n${photoDesc}`
-                : (p.filename || photoDesc || 'Sem decupagem');
-        } else {
-            if (p.title && photoDesc && p.title !== photoDesc && !photoDesc.startsWith(p.title)) {
-                tooltip = `${p.title}\n\n${photoDesc}`;
-            } else {
-                tooltip = photoDesc || p.title || p.filename || 'Sem decupagem';
-            }
-        }
+        // Tooltip rica e direta via buildMediaTooltip
+        const tooltip = buildMediaTooltip(p, "photo", forceRealFilename);
         
         card.innerHTML = `
             <div class="media-thumbnail photo-thumb-container" style="position: relative;">
@@ -856,8 +880,21 @@ function renderTreeNode(node, container, depth = 0) {
             });
         }
         
-        // Editor inline de título por duplo clique
-        attachInlineTitleEditor("photo", p, card.querySelector(".clip-title-text"), currentTitle);
+        // Duplo clique no card envia a foto diretamente para a timeline como still
+        card.addEventListener("dblclick", (e) => {
+            if (e.target.closest("button") || e.target.closest(".btn-card-action") || e.target.closest(".btn-toggle-filename") || e.target.closest(".btn-select-similar-item")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (window.TIMELINE_STATE) {
+                window.TIMELINE_STATE.addPhotoCut(p.id, {});
+                STATE.activePhoto = p;
+                STATE.emit("statusChanged", { text: `Foto "${currentTitle}" adicionada à timeline.`, active: true });
+                if (typeof window.showToast === "function") {
+                    window.showToast("Foto adicionada à timeline!", "success");
+                }
+            }
+        });
         
         container.appendChild(card);
     }
@@ -1485,6 +1522,36 @@ export class LibraryManager {
                     applyDisplayClasses();
                     // Re-renderiza para carregar imagens se Miniaturas foi ativado
                     STATE.emit("videosUpdated", STATE.allVideos);
+                });
+            }
+        });
+
+        // Checkboxes de metadados no Tooltip de Decupagem
+        const chkTooltipCat = document.getElementById("chk-tooltip-category");
+        const chkTooltipSpk = document.getElementById("chk-tooltip-speaker");
+        const chkTooltipDur = document.getElementById("chk-tooltip-duration");
+        const chkTooltipTags = document.getElementById("chk-tooltip-tags");
+        
+        const tooltipPrefsList = [
+            { el: chkTooltipCat, key: "category" },
+            { el: chkTooltipSpk, key: "speaker" },
+            { el: chkTooltipDur, key: "duration" },
+            { el: chkTooltipTags, key: "tags" }
+        ];
+
+        tooltipPrefsList.forEach(({ el, key }) => {
+            if (el) {
+                if (window.tooltipDisplayPreferences && window.tooltipDisplayPreferences[key] !== undefined) {
+                    el.checked = !!window.tooltipDisplayPreferences[key];
+                } else {
+                    el.checked = false;
+                }
+                el.addEventListener("change", () => {
+                    if (!window.tooltipDisplayPreferences) window.tooltipDisplayPreferences = {};
+                    window.tooltipDisplayPreferences[key] = el.checked;
+                    localStorage.setItem("tooltipDisplayPreferences", JSON.stringify(window.tooltipDisplayPreferences));
+                    if (STATE.allVideos) STATE.emit("videosUpdated", STATE.allVideos);
+                    if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
                 });
             }
         });
@@ -3459,11 +3526,90 @@ export class LibraryManager {
     }
 
     async loadMediaInspector(video) {
-        const titleEl = document.getElementById("inspector-media-title");
+        const titleIconEl = document.getElementById("inspector-media-title-icon");
+        const titleTextEl = document.getElementById("inspector-media-title-text");
+        const btnEditTitle = document.getElementById("btn-inspector-edit-title");
         const statusBadge = document.getElementById("inspector-media-status-badge");
         const summaryEl = document.getElementById("inspector-summary");
         
-        if (titleEl) titleEl.textContent = getFriendlyTitle(video);
+        if (titleIconEl) {
+            titleIconEl.className = `fa-solid ${video.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film'}`;
+        }
+        if (titleTextEl) {
+            titleTextEl.textContent = getFriendlyTitle(video);
+            titleTextEl.title = getFriendlyTitle(video);
+        }
+        
+        if (btnEditTitle) {
+            btnEditTitle.onclick = (e) => {
+                e.stopPropagation();
+                if (!titleTextEl) return;
+                if (titleTextEl.querySelector("input")) return;
+                
+                const currentVal = video.title || getFriendlyTitle(video) || video.filename || "";
+                const input = document.createElement("input");
+                input.type = "text";
+                input.className = "inline-inspector-title-input";
+                input.value = currentVal;
+                input.style.cssText = "width: 100%; max-width: 280px; background: rgba(0,0,0,0.85); color: #fff; border: 1px solid var(--color-cyan); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-family: inherit; outline: none; box-shadow: 0 0 10px rgba(6,182,212,0.4);";
+                
+                titleTextEl.innerHTML = "";
+                titleTextEl.appendChild(input);
+                input.focus();
+                input.select();
+                
+                let saved = false;
+                const commit = async () => {
+                    if (saved) return;
+                    saved = true;
+                    const newTitle = input.value.trim();
+                    if (newTitle && newTitle !== currentVal) {
+                        try {
+                            await CapIAuAPI.updateVideoTitle(video.id, newTitle);
+                            video.title = newTitle;
+                            titleTextEl.textContent = newTitle;
+                            titleTextEl.title = newTitle;
+                            
+                            // Atualiza os cards da biblioteca no DOM
+                            const cardTitle = document.querySelector(`.media-card[data-video-id="${video.id}"] .clip-title-text`);
+                            if (cardTitle) cardTitle.textContent = newTitle;
+                            
+                            // Atualiza tooltip no card
+                            const cardH4 = document.querySelector(`.media-card[data-video-id="${video.id}"] h4`);
+                            if (cardH4) {
+                                const newTooltip = buildMediaTooltip(video, "video", false);
+                                cardH4.setAttribute("data-tooltip", newTooltip);
+                            }
+                            
+                            if (typeof window.showToast === "function") {
+                                window.showToast("Título atualizado com sucesso!", "success");
+                            }
+                        } catch (err) {
+                            console.error("Erro ao salvar título:", err);
+                            titleTextEl.textContent = currentVal;
+                            alert("Erro ao salvar título: " + err.message);
+                        }
+                    } else {
+                        titleTextEl.textContent = currentVal;
+                    }
+                };
+                
+                input.addEventListener("keydown", (eKey) => {
+                    if (eKey.key === "Enter") {
+                        eKey.preventDefault();
+                        commit();
+                    } else if (eKey.key === "Escape") {
+                        saved = true;
+                        titleTextEl.textContent = currentVal;
+                    }
+                });
+                
+                input.addEventListener("blur", () => {
+                    commit();
+                });
+            };
+        }
+        
         if (statusBadge) {
             statusBadge.textContent = video.status || "Pendente";
             statusBadge.style.color = video.status === "analyzed" ? "var(--color-emerald)" : "var(--text-secondary)";

@@ -222,7 +222,7 @@ Siga os três passos rápidos abaixo para ver a mágica acontecer:
 ### Passo 1: Configurar suas Chaves no arquivo .env
 
 Abra o arquivo .env gerado na raiz do seu workspace: 👉
-[[.env]{.underline}](about:blank)
+`.env`
 
 Substitua os placeholders pelas suas chaves reais, e escolha o modelo de
 sua preferência (como o Gemini 3.1 Flash Lite de maio/2026):
@@ -250,7 +250,7 @@ física e localmente, assim como a base do Qdrant.
 ### Passo 3: Abrir no Navegador
 
 Acesse no seu navegador preferido: 👉
-[**[http://localhost:8000/]{.underline}**](http://localhost:8000/)
+**<http://localhost:8000/>**
 
 A interface premium carregará de forma imediata com o suporte a
 múltiplos projetos totalmente operacional. Você poderá criar um novo
@@ -326,7 +326,7 @@ completando o ciclo inteligente do CapIAu-Talho:
 
 1.  **Pipeline de Sumarização por IA (DeepSeek V3):**
 
-    - Criado [[summary_engine.py]{.underline}](about:blank) que se
+    - Criado [`summary_engine.py`](src/nlp/summary_engine.py) que se
       comunica com o OpenRouter (modelo deepseek/deepseek-chat) para
       analisar as transcrições das Entrevistas e a sequência temporal
       das descrições do B-roll.
@@ -336,12 +336,12 @@ completando o ciclo inteligente do CapIAu-Talho:
       narrativo/editorial do vídeo, e um conjunto de tags.
 
     - Integrado de forma assíncrona ao final dos pipelines de ASR
-      ([[asr_engine.py]{.underline}](about:blank)) e Visão Multimodal
-      ([[multimodal_engine.py]{.underline}](about:blank)).
+      ([`asr_engine.py`](src/transcription/asr_engine.py)) e Visão Multimodal
+      ([`multimodal_engine.py`](src/vision/multimodal_engine.py)).
 
 2.  **Endpoint Chatbot RAG Híbrido (/api/project/{project_id}/chat):**
 
-    - Criado no [[server.py]{.underline}](about:blank) o endpoint de
+    - Criado no [`server.py`](src/api/server.py) o endpoint de
       chat RAG.
 
     - Realiza busca semântica no banco de dados vetorial Qdrant para
@@ -355,9 +355,9 @@ completando o ciclo inteligente do CapIAu-Talho:
 3.  **Interface de Chat no Painel Lateral:**
 
     - Adicionada a aba **Chat IA** no painel lateral direito do frontend
-      ([[index.html]{.underline}](about:blank),
-      [[app.js]{.underline}](about:blank),
-      [[styles.css]{.underline}](about:blank)).
+      ([`index.html`](src/ui/index.html),
+      `app.js`,
+      [`styles.css`](src/ui/styles.css)).
 
     - Apresenta boas-vindas com sugestões de perguntas e renderiza
       bolhas de mensagens do usuário (alinhadas à direita em gradiente)
@@ -1265,3 +1265,30 @@ Após três semanas sem commits, uma rodada de saneamento do repositório e da d
 
 4.  **Interface:**
     - Box de hover reposicionado para o início do texto; descrição de fotos deduplicada.
+
+---
+
+## 🗂️ Fase 24: Exportação Confiável, Índice de Rolagem e Títulos Executivos (18/08/2026, noite)
+
+Três frentes na mesma noite: a exportação passou a funcionar de fato no Kdenlive, a biblioteca ganhou navegação por índice temático, e as mídias ganharam títulos que um humano consegue ler.
+
+1.  **Exportação confiável (`41c1220`):**
+    - **Diálogo de exportação.** Antes o botão exportava direto: primeiro via um `prompt()` pedindo para DIGITAR o formato, depois lendo um `<select>` com `opacity: 0` sobreposto a um ícone — invisível na prática. O usuário clicava no botão vizinho e o arquivo saía sem nenhuma escolha visível. Agora abre um diálogo com as timelines salvas do projeto (nome, data e **quantidade de clipes**), o seletor de formato com explicação de cada um, e aviso amarelo quando a timeline escolhida está vazia.
+    - **Qual timeline sai.** A exportação usa o que está gravado no banco, não o que está na tela — e mandava sempre `timelines[0]`, a de maior id. O usuário exportou uma timeline de julho achando ser a atual e só percebeu ao abrir no Kdenlive. O `clip_count` novo em `list_timelines` torna o erro visível antes de gerar o arquivo.
+    - **Caminho de mídia no `.otio` (o defeito que impedia abrir no Kdenlive).** Exportávamos `target_url` como URI (`file:///D:/.../V%C3%ADdeos/...`). O padrão OTIO admite, mas **o importador do Kdenlive não trata o campo como URI**: concatena a pasta do projeto na frente e não decodifica o percent-encoding. No Kdenlive 26.04.3 o resultado foi `Cannot open file C:/Users/FGC/Downloads/file:///D:/makinof-monstro/V%C3%ADdeos/...` e o projeto inteiro falhava. Novo helper `_media_target_url(filepath, as_uri)`: o **`.otio` grava caminho absoluto simples** (`D:/makinof-monstro/Vídeos/...`), o **`.xml` mantém a URI** que Premiere e Resolve esperam em `<pathurl>`. ⚠️ **Lição de método:** a validação anterior decodificava as URIs por conta própria e concluía "as mídias religam" — provava que o ARQUIVO estava correto pelo padrão, não que o CONSUMIDOR o entendia. Só o teste no editor real mostrou.
+    - **Miniatura deixou de bloquear o servidor.** `GET /api/video/{id}/thumbnail-at` era rota síncrona e, no cache miss, chamava ffmpeg **dentro da requisição**. Rotas síncronas dividem um threadpool no FastAPI: soltar um vídeo na timeline disparava dezenas de pedidos, o pool enchia e rotas sem relação ficavam esperando. Medido: a exportação leva **13 ms**, mas demorava "muito" por estar na fila atrás das miniaturas. Agora o cache miss enfileira na fila de fundo (que já existia) e responde 404; o `timelineRenderer` reagenda com espera crescente (~2 min de janela) e exibe a miniatura vizinha mais próxima enquanto espera. Sem o reagendamento a entrada ficaria em cache como "falhou" para sempre — o cache do renderer é permanente por (vídeo, segundo).
+    - 14 testes novos em `tests/test_f11_export.py`.
+
+2.  **Índice Temático de Rolagem — "Scroll Peeker" (`e5a604a`):**
+    - Nova classe `LibraryScrollIndexTracker` em `library.js`. Parar o mouse sobre a barra de rolagem da biblioteca abre um cartão de pré-visualização do item naquela altura, **sem precisar rolar até ele**.
+    - O cartão traz miniatura, pasta de origem, **título executivo**, selo de tipo (*Fala* / *Bastidores*), duração, resumo, tags e a posição (`Posição: N de M`). Pastas aparecem com ícone próprio e rótulo *Diretório*.
+    - **Tempo de parada configurável** (0,5s / 1,0s / 1,5s / desativada) no novo menu de exibição da biblioteca, junto com a chave liga-desliga do índice.
+    - **Fast-jump calibrado:** arrastar na barra não rola pela proporção crua — alinha o topo do item real sob o cursor, então o salto para no começo do card em vez de no meio dele.
+    - **`Shift` + roda do mouse** com o cartão aberto redimensiona a miniatura de 80 a 240 px, persistido em `localStorage`.
+
+3.  **Títulos Executivos Inteligentes (`51d52f0`):**
+    - **Prompt reescrito** em `prompt_registry.py`: os títulos passaram a ser explicitamente "executivos e cinematográficos" de 3 a 6 palavras, com **lista de aberturas proibidas** — nada de "Entrevista sobre", "Vídeo de", "Depoimento de", "Este clipe mostra", "Sequência útil", "Registro de", "Mostrando". Para depoimentos o foco é quem fala + assunto (`Zé: Crítica ao primeiro corte`); para B-roll é a ação ou cena central (`Detalhe das mãos no vinil`).
+    - **Geração em lote** com `PipelineService.regenerate_executive_titles`, em micro-lotes de 20 vídeos, integrada ao TaskManager: progresso, log e cancelamento na tela de Tarefas. Rota `GET|POST /api/project/{id}/regenerate-titles`, botão **Gerar Títulos IA** na biblioteca.
+    - **Renomeação inline:** duplo clique no título de um card abre um campo de edição no lugar; `Enter` grava, `Esc` cancela. Rotas `PATCH /api/video/{id}/title` e `PATCH /api/photo/{id}/title`.
+    - `getFriendlyTitle` dá prioridade ao título da IA, com queda para heurísticas sobre descrição/resumo e, por preferência do usuário por clipe, para o nome de arquivo real.
+    - 📌 **Pendência registrada:** o título **não entra no payload do Qdrant** hoje. Nem o índice visual (`image_semantic.py`: `project_id`, `video_id`, `media_type`, `start_time`, `end_time`, `segment_id`, `shot_scale`, `category`, `camera_motion`) nem o de texto (`semantic.py`: `text`, `raw_text`, `tags`, `people`) carregam esse campo. Por enquanto o ganho é de leitura na interface — biblioteca, cartão do índice de rolagem e timeline. Para o título influenciar a busca é preciso incluí-lo no payload e reindexar.

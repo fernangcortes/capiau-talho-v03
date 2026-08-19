@@ -245,6 +245,22 @@ export class CapIAuAPI {
         });
     }
 
+    static updateVideoTitle(videoId, title) {
+        return this.request(`/api/video/${videoId}/title`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title })
+        });
+    }
+
+    static updatePhotoTitle(photoId, title) {
+        return this.request(`/api/photo/${photoId}/title`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title })
+        });
+    }
+
     static fetchTriageReview(projectId) {
         return this.request(`/api/project/${projectId}/triage/review`);
     }

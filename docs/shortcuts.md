@@ -246,6 +246,25 @@ atalhos estarão ativos:
                                                   de set com segurança.
   -----------------------------------------------------------------------
 
+## 🗂️ Índice Temático de Rolagem da Biblioteca (Scroll Peeker)
+
+Ativos sobre a **barra de rolagem** da biblioteca, no painel esquerdo. Permitem
+inspecionar e saltar para qualquer ponto do acervo sem rolar até lá.
+
+| Gesto | Ação | Descrição |
+|---|---|---|
+| **Parar o mouse sobre a barra** | **Espiar o item** | Abre um cartão com miniatura, pasta de origem, título executivo, tipo (*Fala* / *Bastidores*), duração, resumo, tags e a posição (`N de M`). O tempo de parada é configurável em 0,5s / 1,0s / 1,5s, ou desativado, no menu de exibição da biblioteca. |
+| **Arrastar sobre a barra** | **Salto calibrado** | Rola continuamente alinhando o **topo do item real** sob o cursor, em vez da proporção crua — o salto para no começo do card, não no meio dele. |
+| **`Shift` + roda do mouse** | **Redimensionar a miniatura** | Com o cartão aberto, aumenta ou diminui a miniatura de 80 a 240 px. A escolha fica guardada entre sessões. |
+
+## ✏️ Renomeação de Mídias na Biblioteca
+
+| Gesto | Ação | Descrição |
+|---|---|---|
+| **Duplo clique no título** | **Editar no lugar** | Troca o título do card por um campo de edição, já com o texto selecionado. |
+| **`Enter`** | **Gravar** | Salva o novo título e volta à exibição normal. |
+| **`Esc`** | **Cancelar** | Descarta a edição e restaura o título anterior. |
+
 ## 🛡️ Prevenção Automática de Conflitos de Digitação
 
 - O sistema detecta de forma inteligente se o cursor do usuário está
