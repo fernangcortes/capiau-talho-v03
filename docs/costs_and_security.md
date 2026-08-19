@@ -12,11 +12,11 @@ recomendadas para o uso do sistema em produção:
 ### 🔑 Isolamento Absoluto de Chaves de API
 
 - Suas chaves (OPENROUTER_API_KEY e ASSEMBLYAI_API_KEY) devem residir
-  **exclusivamente** no arquivo local [[.env]{.underline}](about:blank).
+  **exclusivamente** no arquivo local `.env` (modelo em [`.env.example`](../.env.example)).
 
 - **NUNCA comite o arquivo .env para repositórios públicos ou privados
   do GitHub.** O arquivo está listado no seu
-  [[.gitignore]{.underline}](about:blank) para prevenção automática de
+  [`.gitignore`](../.gitignore) para prevenção automática de
   vazamento, mas certifique-se de não forçar a adição do arquivo por
   engano.
 
