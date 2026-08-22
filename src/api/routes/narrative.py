@@ -1,8 +1,10 @@
 """Roteador FastAPI para gerenciamento de Timelines, Transcrições, Temas e Chat RAG."""
+import shutil
 import sqlite3
+import tempfile
 from pathlib import Path
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, BackgroundTasks, UploadFile
 from fastapi.responses import FileResponse
 
 from src.api.dependencies import get_db_conn
@@ -24,6 +26,7 @@ from src.services.rag import RAGService
 from src.services.timeline_ai import TimelineAIService
 from src.search.semantic import SemanticSearch
 from src.export.otio_export import export_timeline_file
+from src.export.otio_import import SUPPORTED_EXTENSIONS, import_timeline_file
 
 router = APIRouter(tags=["Narratives & Search"])
 
@@ -445,11 +448,60 @@ def export_timeline(timeline_id: int, export_format: str):
         file_path = export_timeline_file(timeline_id, export_format)
         if not file_path.exists():
             raise HTTPException(status_code=500, detail="O arquivo de timeline não pôde ser gerado.")
-            
+
         media_type = "application/xml" if export_format == "xml" else "text/plain"
         return FileResponse(path=str(file_path), filename=file_path.name, media_type=media_type)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/timeline/import")
+async def import_timeline(
+    project_id: int = Form(...),
+    name: Optional[str] = Form(None),
+    file: UploadFile = File(...),
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Importa um arquivo de timeline (.otio/.xml/.edl) e recria a timeline no projeto.
+
+    É o caminho inverso do export: cada clipe é religado à mídia já ingerida
+    (por caminho; fallback por nome único de arquivo). Clipes cuja mídia não
+    existe no acervo voltam como `missing_media` — não quebram a importação.
+    """
+    original_name = Path(file.filename or "").name
+    ext = Path(original_name).suffix.lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Formato '{ext or '?'}' não suportado. Use um dos: {', '.join(SUPPORTED_EXTENSIONS)}."
+        )
+
+    proj = conn.execute("SELECT id FROM project WHERE id = ?", (project_id,)).fetchone()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+
+    tmp_path: Optional[Path] = None
+    try:
+        with tempfile.NamedTemporaryFile(prefix="capiau_import_", suffix=ext, delete=False) as buf:
+            shutil.copyfileobj(file.file, buf)
+            tmp_path = Path(buf.name)
+
+        summary = import_timeline_file(
+            conn, project_id, tmp_path,
+            name_override=name,
+            source_filename=original_name
+        )
+        conn.commit()
+        return summary
+    except (ValueError, RuntimeError) as e:
+        # Conteúdo inválido ou dependência de conversão ausente: erro do cliente.
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Falha ao importar timeline: {e}")
+    finally:
+        if tmp_path is not None:
+            Path(tmp_path).unlink(missing_ok=True)
 
 @router.post("/api/video/{video_id}/split-transcript")
 def split_transcript(video_id: int, payload: SplitTranscriptPayload, conn: sqlite3.Connection = Depends(get_db_conn)):

@@ -46,6 +46,10 @@ watch/*
 scratch/
 data_test_export/
 *.backup
+.tmp_test/
+
+# Planos de Implementação Locais (não versionados)
+docs/PLANO_*.md
 
 # Gráficos e Imagens da Documentação (Evita aumentar tamanho do repo)
 docs/graficos/
