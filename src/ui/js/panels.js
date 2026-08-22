@@ -45,6 +45,16 @@ export class PanelsManager {
         this.btnConfirmExport = document.getElementById("btn-confirm-export");
         this.exportTimelines = [];
 
+        // Diálogo de importação (caminho inverso do export)
+        this.btnImportTimeline = document.getElementById("btn-import-timeline");
+        this.importModal = document.getElementById("import-timeline-modal");
+        this.importFileInput = document.getElementById("import-timeline-file");
+        this.importFileLabel = document.getElementById("import-timeline-file-label");
+        this.importNameInput = document.getElementById("import-timeline-name");
+        this.importLoadAfter = document.getElementById("chk-import-load-after");
+        this.importResultEl = document.getElementById("import-result");
+        this.btnConfirmImport = document.getElementById("btn-confirm-import");
+
         // Scissors Mode
         this.btnScissors = document.getElementById("btn-scissors");
         
@@ -181,6 +191,9 @@ export class PanelsManager {
         if (this.btnExportTimeline) {
             this.btnExportTimeline.addEventListener("click", () => this.exportTimeline());
         }
+        if (this.btnImportTimeline) {
+            this.btnImportTimeline.addEventListener("click", () => this.openImportModal());
+        }
 
         // Diálogo de exportação: fechar, trocar formato e confirmar
         const btnFecharExport = document.getElementById("btn-close-export-modal");
@@ -194,6 +207,26 @@ export class PanelsManager {
             this.exportModal.addEventListener("click", (ev) => {
                 if (ev.target === this.exportModal) this.closeExportModal();
             });
+        }
+
+        // Diálogo de importação: fechar, escolher arquivo e confirmar
+        const btnFecharImport = document.getElementById("btn-close-import-modal");
+        const btnCancelarImport = document.getElementById("btn-cancel-import");
+        if (btnFecharImport) btnFecharImport.addEventListener("click", () => this.closeImportModal());
+        if (btnCancelarImport) btnCancelarImport.addEventListener("click", () => this.closeImportModal());
+        if (this.importModal) {
+            this.importModal.addEventListener("click", (ev) => {
+                if (ev.target === this.importModal) this.closeImportModal();
+            });
+        }
+        if (this.importFileInput) {
+            this.importFileInput.addEventListener("change", () => this.onImportFileChosen());
+        }
+        if (this.importNameInput) {
+            this.importNameInput.addEventListener("input", () => this.updateImportConfirmState());
+        }
+        if (this.btnConfirmImport) {
+            this.btnConfirmImport.addEventListener("click", () => this.confirmImport());
         }
         if (this.btnScissors) {
             this.btnScissors.addEventListener("click", () => {
@@ -2919,53 +2952,199 @@ export class PanelsManager {
             if (isNaN(timelineId)) return;
 
             const detail = await CapIAuAPI.fetchTimelineDetail(timelineId);
-            const sequence = detail.sequence || {};
+            this.applyTimelineDetailToScreen(detail);
 
-            // O carregamento é 1 passo de undo: Ctrl+Z restaura a timeline anterior
-            TIMELINE_HISTORY.record(() => {
-                // Restaura as pistas e as propriedades de tela
-                TIMELINE_STATE.setTracks(sequence.tracks || []);
-                const loadWidth = sequence.width || 1920;
-                const loadHeight = sequence.height || 1080;
-                const loadFps = sequence.fps || 24;
-                TIMELINE_STATE.setTimelineProperties({ width: loadWidth, height: loadHeight, fps: loadFps });
-
-                const fps = TIMELINE_STATE.fps || 24;
-                const cuts = (sequence.clips || []).map((c, idx) => ({
-                    id: c.id || `cut_loaded_${idx}_${Date.now()}`,
-                    type: c.type || "video",
-                    video_id: c.video_id ?? null,
-                    photo_id: c.photo_id ?? null,
-                    in: c.in,
-                    out: c.out,
-                    track: c.track || "V1",
-                    link_id: c.link_id || null,
-                    effects: c.effects || [],
-                    alternatives: c.alternatives || [],
-                    origin: c.origin || "user",
-                    timelineStartFrame: c.timeline_start !== undefined && c.timeline_start !== null
-                        ? secondsToFrames(c.timeline_start, fps)
-                        : undefined
-                }));
-
-                // Timelines antigas (sem pistas de áudio): cria pares A/V vinculados
-                STATE.activeTimelineCuts = TIMELINE_STATE.migrateCutsToAV(cuts);
-            });
-
-            const nameInput = getActiveElement("timeline-name-input");
-            if (nameInput) {
-                const newName = detail.name || `Timeline ${timelineId}`;
-                nameInput.value = newName;
-                const btnRename = getActiveElement("btn-rename-timeline");
-                if (btnRename) {
-                    btnRename.setAttribute("data-tooltip", `Renomear Timeline (Atual: ${newName})`);
-                }
-            }
-
-            console.log(`[Timeline] Timeline ${timelineId} carregada: ${cuts.length} clipes, ${TIMELINE_STATE.tracks.length} pistas.`);
+            console.log(`[Timeline] Timeline ${timelineId} carregada.`);
         } catch (e) {
             console.error("Erro ao carregar timeline:", e);
             alert("Erro ao carregar timeline: " + e.message);
+        }
+    }
+
+    /** Aplica uma timeline (detalhe da API) à tela: pistas, propriedades e cortes.
+     *  Caminho único usado pelo carregamento manual E pela importação de arquivos
+     *  (.otio/.xml/.edl) — garante comportamento idêntico nos dois fluxos. */
+    applyTimelineDetailToScreen(detail) {
+        const sequence = detail.sequence || {};
+
+        // O carregamento é 1 passo de undo: Ctrl+Z restaura o estado anterior da tela
+        TIMELINE_HISTORY.record(() => {
+            // Restaura as pistas e as propriedades de tela
+            TIMELINE_STATE.setTracks(sequence.tracks || []);
+            const loadWidth = sequence.width || 1920;
+            const loadHeight = sequence.height || 1080;
+            const loadFps = sequence.fps || 24;
+            TIMELINE_STATE.setTimelineProperties({ width: loadWidth, height: loadHeight, fps: loadFps });
+
+            const fps = TIMELINE_STATE.fps || 24;
+            const cuts = (sequence.clips || []).map((c, idx) => ({
+                id: c.id || `cut_loaded_${idx}_${Date.now()}`,
+                type: c.type || "video",
+                video_id: c.video_id ?? null,
+                photo_id: c.photo_id ?? null,
+                in: c.in,
+                out: c.out,
+                track: c.track || "V1",
+                link_id: c.link_id || null,
+                effects: c.effects || [],
+                alternatives: c.alternatives || [],
+                origin: c.origin || "user",
+                timelineStartFrame: c.timeline_start !== undefined && c.timeline_start !== null
+                    ? secondsToFrames(c.timeline_start, fps)
+                    : undefined
+            }));
+
+            // Timelines antigas (sem pistas de áudio): cria pares A/V vinculados
+            STATE.activeTimelineCuts = TIMELINE_STATE.migrateCutsToAV(cuts);
+        });
+
+        const nameInput = getActiveElement("timeline-name-input");
+        if (nameInput) {
+            const newName = detail.name || `Timeline ${detail.id || ""}`;
+            nameInput.value = newName;
+            const btnRename = getActiveElement("btn-rename-timeline");
+            if (btnRename) {
+                btnRename.setAttribute("data-tooltip", `Renomear Timeline (Atual: ${newName})`);
+            }
+        }
+
+        console.log(`[Timeline] Timeline aplicada à tela: ${(sequence.clips || []).length} clipes, ${(sequence.tracks || []).length} pistas.`);
+    }
+
+    // ── Importação de Timeline (.otio / .xml / .edl) ─────────────────────────
+
+    /** Abre o diálogo de importação zerado. */
+    openImportModal() {
+        if (!this.importModal) return;
+        if (this.importFileInput) this.importFileInput.value = "";
+        if (this.importFileLabel) this.importFileLabel.textContent = "Escolher arquivo \u00B7 .otio, .xml ou .edl";
+        if (this.importNameInput) this.importNameInput.value = "";
+        if (this.importResultEl) this.importResultEl.style.display = "none";
+        this.updateImportConfirmState();
+        this.importModal.classList.add("active");
+    }
+
+    closeImportModal() {
+        if (this.importModal) this.importModal.classList.remove("active");
+    }
+
+    /** Arquivo escolhido: mostra o nome, sugere título e habilita o botão. */
+    onImportFileChosen() {
+        const file = this.importFileInput && this.importFileInput.files ? this.importFileInput.files[0] : null;
+        if (this.importFileLabel) {
+            this.importFileLabel.textContent = file ? file.name : "Escolher arquivo \u00B7 .otio, .xml ou .edl";
+        }
+        if (file && this.importNameInput && !this.importNameInput.value.trim()) {
+            const base = file.name.replace(/\.[^.]+$/, "").trim();
+            if (base) this.importNameInput.value = base;
+        }
+        this.updateImportConfirmState();
+    }
+
+    updateImportConfirmState() {
+        const temArquivo = !!(this.importFileInput && this.importFileInput.files && this.importFileInput.files.length > 0);
+        if (this.btnConfirmImport) {
+            this.btnConfirmImport.disabled = !temArquivo;
+            this.btnConfirmImport.style.opacity = temArquivo ? "1" : "0.5";
+            this.btnConfirmImport.style.cursor = temArquivo ? "pointer" : "not-allowed";
+        }
+    }
+
+    /** Extrai a mensagem legível de erros da API (FastAPI devolve {"detail": "..."}). */
+    extractApiError(err) {
+        try {
+            const parsed = JSON.parse(err.message);
+            if (parsed && parsed.detail) {
+                return typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
+            }
+        } catch (_) { /* mensagem não é JSON */ }
+        return (err && err.message) || "Falha desconhecida na importação.";
+    }
+
+    /** Mostra dentro do diálogo o resultado da importação (contagens + mídia ausente). */
+    renderImportResult(summary) {
+        if (!this.importResultEl) return;
+        const faltantes = Array.isArray(summary.missing_media) ? summary.missing_media : [];
+
+        let html =
+            `<strong style="color:#34d399;">Timeline "${this.escapeHtml(summary.name)}" importada.</strong><br>` +
+            `${summary.clips_imported} clipe(s) em ${summary.tracks} pista(s)` +
+            `${summary.matched_basename > 0 ? ` &middot; ${summary.matched_basename} religado(s) por nome de arquivo` : ""}.`;
+
+        if (faltantes.length > 0) {
+            html += `<br><span style="color:#eab308;">${faltantes.length} clipe(s) sem mídia no acervo (viraram lacuna):</span>`;
+            const visiveis = faltantes.slice(0, 6);
+            html += visiveis.map(m =>
+                `<br>&nbsp;&nbsp;<i class="fa-solid fa-triangle-exclamation" style="color:#eab308;"></i> ${this.escapeHtml(m.name)}`
+            ).join("");
+            if (faltantes.length > visiveis.length) {
+                html += `<br>&nbsp;&nbsp;… e mais ${faltantes.length - visiveis.length} arquivo(s).`;
+            }
+        }
+
+        this.importResultEl.style.cssText =
+            "display:block; font-size:11px; line-height:1.55; margin:0; padding:8px 10px; border-radius:6px;" +
+            (faltantes.length > 0
+                ? "background:rgba(234,179,8,0.12); border:1px solid rgba(234,179,8,0.35); color:#d9d9e3;"
+                : "background:rgba(52,211,153,0.10); border:1px solid rgba(52,211,153,0.35); color:#d9d9e3;");
+        this.importResultEl.innerHTML = html;
+    }
+
+    /** Envia o arquivo ao backend e aplica o resultado (spinner/check conforme design system). */
+    async confirmImport() {
+        const file = this.importFileInput && this.importFileInput.files ? this.importFileInput.files[0] : null;
+        if (!file || !this.btnConfirmImport) return;
+
+        const origHtml = this.btnConfirmImport.innerHTML;
+        this.btnConfirmImport.classList.remove("btn-thumb-click-pulse");
+        void this.btnConfirmImport.offsetWidth;
+        this.btnConfirmImport.classList.add("btn-thumb-click-pulse");
+        this.btnConfirmImport.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+        this.btnConfirmImport.disabled = true;
+
+        try {
+            const summary = await CapIAuAPI.importTimelineFile(
+                STATE.currentProjectId,
+                file,
+                this.importNameInput ? this.importNameInput.value : null
+            );
+            this.btnConfirmImport.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan);"></i>';
+            if (window.showToast) {
+                window.showToast(`Timeline "${summary.name}" importada (${summary.clips_imported} clipes).`, "success");
+            }
+            if (window.logManager) {
+                window.logManager.log("Timeline", `Importação de ${file.name}: ${summary.clips_imported} clipe(s), ${summary.tracks} pista(s).`, "ACTION");
+            }
+
+            // Mídia ausente: mantém o diálogo aberto exibindo a lista religável.
+            const temFaltantes = Array.isArray(summary.missing_media) && summary.missing_media.length > 0;
+            if (temFaltantes) {
+                this.renderImportResult(summary);
+            }
+
+            if (this.importLoadAfter && this.importLoadAfter.checked && summary.timeline_id) {
+                const detail = await CapIAuAPI.fetchTimelineDetail(summary.timeline_id);
+                this.applyTimelineDetailToScreen(detail);
+            }
+
+            if (!temFaltantes) this.closeImportModal();
+        } catch (err) {
+            console.error("[Timeline] Erro ao importar timeline:", err);
+            const msg = this.extractApiError(err);
+            if (this.importResultEl) {
+                this.importResultEl.style.cssText =
+                    "display:block; font-size:11px; line-height:1.55; margin:0; padding:8px 10px; border-radius:6px;" +
+                    "background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.4); color:#fca5a5;";
+                this.importResultEl.textContent = msg;
+            }
+            if (window.showToast) window.showToast(msg, "error");
+        } finally {
+            setTimeout(() => {
+                if (!this.btnConfirmImport) return;
+                this.btnConfirmImport.innerHTML = origHtml;
+                this.btnConfirmImport.classList.remove("btn-thumb-click-pulse");
+                this.updateImportConfirmState();
+            }, 1200);
         }
     }
 }

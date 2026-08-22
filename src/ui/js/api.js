@@ -365,6 +365,15 @@ export class CapIAuAPI {
         return this.request(`/api/timeline/${timelineId}`);
     }
 
+    static importTimelineFile(projectId, file, name = null) {
+        // FormData sem header Content-Type: o navegador define o boundary do multipart.
+        const fd = new FormData();
+        fd.append("project_id", String(projectId));
+        if (name && String(name).trim()) fd.append("name", String(name).trim());
+        fd.append("file", file);
+        return this.request("/api/timeline/import", { method: "POST", body: fd });
+    }
+
     static aiSuggestTimeline(payload) {
         return this.request("/api/timeline/ai-suggest", {
             method: "POST",

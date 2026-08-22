@@ -806,6 +806,9 @@
                                 
                                 <!-- Exportar (formato e timeline são escolhidos no diálogo) -->
                                 <button id="btn-export-timeline" class="btn-toolbar-action" data-tooltip="Exportar Timeline"><i class="fa-solid fa-file-export"></i></button>
+
+                                <!-- Importar (.otio/.xml/.edl escolhidos no diálogo) -->
+                                <button id="btn-import-timeline" class="btn-toolbar-action" data-tooltip="Importar Timeline (&#111;.otio &#111;.xml &#111;.edl)"><i class="fa-solid fa-file-import"></i></button>
                                 
                                 <div class="toolbar-spacer" style="flex: 1; min-height: 10px; width: 100%;"></div>
                                 
@@ -1436,6 +1439,50 @@
             <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid var(--border-glass); gap: 10px; margin-top: 10px; justify-content: flex-end;">
                 <button id="btn-cancel-export" class="btn-secondary" style="height: 30px; font-size: 11px; padding: 0 12px;">Cancelar</button>
                 <button id="btn-confirm-export" class="btn-primary" style="height: 30px; font-size: 11px; padding: 0 12px;">Exportar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Importação de Timeline (caminho inverso do export) -->
+    <div id="import-timeline-modal" class="modal-overlay">
+        <div class="modal-content glassmorphism" style="max-width: 560px; width: 90%; padding: 20px; transition: all 0.3s ease;">
+            <div class="modal-header" style="padding-bottom: 10px; border-bottom: 1px solid var(--border-glass);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-file-import" style="color: #34d399;"></i>
+                    <h2 style="font-size: 14px; margin: 0; font-weight: 600;">Importar Timeline</h2>
+                </div>
+                <button class="btn-close-modal" id="btn-close-import-modal" style="font-size: 20px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body" style="margin-top: 15px; display: flex; flex-direction: column; gap: 14px;">
+
+                <div>
+                    <label style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); display: block; margin-bottom: 6px;">Arquivo da timeline</label>
+                    <label for="import-timeline-file" id="import-timeline-dropzone" style="display: flex; align-items: center; justify-content: center; gap: 8px; height: 64px; cursor: pointer; border: 1px dashed rgba(52, 211, 153, 0.35); border-radius: 6px; background: rgba(0,0,0,0.2); transition: background .15s, border-color .15s;">
+                        <i class="fa-solid fa-folder-open" style="color: #34d399; font-size: 14px;"></i>
+                        <span id="import-timeline-file-label" style="font-size: 12px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 85%;">Escolher arquivo &middot;.otio, .xml ou .edl</span>
+                    </label>
+                    <input type="file" id="import-timeline-file" accept=".otio,.xml,.edl" style="display: none;">
+                </div>
+
+                <div>
+                    <label for="import-timeline-name" style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); display: block; margin-bottom: 6px;">Nome da nova timeline</label>
+                    <input type="text" id="import-timeline-name" placeholder="Preenchido com o nome do arquivo" style="width: 100%; height: 32px; padding: 0 10px; font-size: 12px; border-radius: 5px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.25); color: #e2e8f0; outline: none; box-sizing: border-box; font-family: 'Outfit', sans-serif;">
+                </div>
+
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-secondary); cursor: pointer;">
+                    <input type="checkbox" id="chk-import-load-after" checked style="accent-color: #34d399;"> Carregar na tela após importar
+                </label>
+
+                <p style="font-size: 10px; color: var(--text-secondary); margin: 0; line-height: 1.5;">
+                    Os clipes são religados &agrave; m&iacute;dia j&aacute; ingerida neste projeto pelo caminho do arquivo (fallback: nome &uacute;nico). Arquivos ausentes viram lacunas reportadas &mdash; nada &eacute; copiado nem re-ingerido.
+                </p>
+
+                <p id="import-result" style="display: none; font-size: 11px; line-height: 1.55; margin: 0; padding: 8px 10px; border-radius: 6px;"></p>
+
+            </div>
+            <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid var(--border-glass); gap: 10px; margin-top: 10px; justify-content: flex-end;">
+                <button id="btn-cancel-import" class="btn-secondary" style="height: 30px; font-size: 11px; padding: 0 12px;">Cancelar</button>
+                <button id="btn-confirm-import" class="btn-primary" disabled style="height: 30px; font-size: 11px; padding: 0 12px; opacity: 0.5; cursor: not-allowed;">Importar</button>
             </div>
         </div>
     </div>

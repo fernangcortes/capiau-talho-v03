@@ -381,7 +381,38 @@ localStorage do seu navegador:
     arquivo estará pronto para ser importado no seu editor NLE
     profissional.
 
-### C. Painel de Logs Avançado com IA
+### C. Importação de Timelines (o caminho inverso)
+
+O CapIAu também importa timelines criadas em editores externos
+(Kdenlive, Premiere, Resolve, Final Cut) ou exportadas por ele mesmo:
+
+1.  Na barra de ferramentas da timeline, clique no ícone
+    **Importar Timeline** (ao lado do Exportar).
+
+2.  Escolha o arquivo: **.otio** (OpenTimelineIO), **.xml**
+    (Premiere/Resolve/FCP) ou **.edl**. O nome da nova timeline é
+    preenchido automaticamente com o nome do arquivo — ajuste se quiser.
+
+3.  Clique em **Importar**. Cada clipe é **religado à mídia já
+    ingerida** no projeto pelo caminho do arquivo (se o caminho mudou,
+    o sistema tenta casar pelo nome único do arquivo). Nada é copiado
+    nem re-ingerido.
+
+4.  Se algum arquivo não existir no acervo, o clipe vira uma **lacuna
+    na posição original** e o diálogo lista tudo o que ficou ausente
+    para você religar manualmente depois.
+
+5.  Com a opção **"Carregar na tela após importar"** marcada, a
+    timeline importada abre direto na linha do tempo, com pistas,
+    posições e lacunas preservadas.
+
+> **Dica:** o formato `.otio` abre sem nenhuma dependência extra. Já
+> `.xml` e `.edl` usam os mesmos adaptadores do export — se o Python do
+> sistema não tiver o pacote `opentimelineio`, converta a timeline para
+> `.otio` no editor de origem ou provisione o venv de exportação
+> (`data/venv312`).
+
+### D. Painel de Logs Avançado com IA
 
 Se você encontrar algum erro, quiser auditar as ações de sua edição ou
 queira gerar relatórios de forma assistida:
