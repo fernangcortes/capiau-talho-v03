@@ -723,8 +723,8 @@ export class CapiauTimelineRenderer {
             if (entry.tentativas < MAX_TENTATIVAS) {
                 setTimeout(pedir, espera(entry.tentativas));
             } else {
-                // Desiste e libera a chave: uma tentativa futura (novo desenho) recomeça
-                delete this.videoThumbCache[key];
+                // Desiste e mantém no cache como falha temporária para evitar loops infinitos de rede no canvas
+                entry.failed = true;
             }
         };
 

@@ -987,31 +987,37 @@ def get_video_thumbnail_at(video_id: int, time: float = Query(...), conn: sqlite
     """
     from fastapi.responses import FileResponse
 
+    # Cache miss: identifica a mídia só para poder enfileirar a geração em segundo plano
+    video = MediaRepository.get_video(conn, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
+
+    duration = video.get('duration') or 0.0
+    if duration > 0:
+        time = min(max(0.0, time), duration)
+
     # O nome do arquivo segue o padrão de índice baseado no tempo arredondado (1 frame por segundo)
     file_idx = int(round(time)) + 1
     thumb_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_{file_idx:04d}.jpg"
     
     if thumb_path.exists() and thumb_path.stat().st_size > 0:
         return FileResponse(thumb_path)
-        
-    # Cache miss: identifica a mídia só para poder enfileirar a geração em segundo plano
-    video = MediaRepository.get_video(conn, video_id)
-    if not video:
-        raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
 
-    video_path = Path(video['filepath'])
-    if not video_path.exists():
-        proxy_rel = f"proxy_vid_{video_id}.mp4"
-        proxy_path = CONFIG.PROXIES_DIR / proxy_rel
-        if proxy_path.exists():
-            video_path = proxy_path
-        else:
-            raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado: {video_path}")
+    # Prioriza o proxy 720p local para extração rápida via FFmpeg
+    proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+    if proxy_path.exists():
+        video_path = proxy_path
+    else:
+        video_path = Path(video['filepath'])
+        if not video_path.exists():
+            raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado para o vídeo {video_id}")
 
-    # Dispara a geração progressiva de miniaturas em segundo plano apenas se ainda não foi iniciada (não está no progresso)
+    # Dispara a geração progressiva de miniaturas em segundo plano se a tarefa não estiver rodando no momento
     duration = video.get('duration') or 0.0
     task_key = f"thumbs-{video_id}"
-    if task_key not in TASK_MANAGER.get_progress() and duration > 0:
+    task_info = TASK_MANAGER.get_progress().get(task_key)
+    is_running = task_info and task_info.get("status") == "running"
+    if not is_running and duration > 0:
         TASK_MANAGER.executor.submit(
             IngestService._generate_timeline_thumbnails_task,
             video_id, video_path, duration
@@ -1049,11 +1055,13 @@ def resume_video_thumbnails(video_id: int, conn: sqlite3.Connection = Depends(ge
     if not video:
         raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
         
-    video_path = Path(video['filepath'])
-    if not video_path.exists():
-        proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
-        if proxy_path.exists():
-            video_path = proxy_path
+    proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+    if proxy_path.exists():
+        video_path = proxy_path
+    else:
+        video_path = Path(video['filepath'])
+        if not video_path.exists():
+            raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado para o vídeo {video_id}")
             
     task_key = f"thumbs-{video_id}"
     with TASK_MANAGER._lock:

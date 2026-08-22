@@ -2371,6 +2371,16 @@ export class CapiauTimelineInteraction {
                 const thumbSrc = `/api/video/${video.id}/thumbnail-at?time=${roundedTime.toFixed(1)}`;
 
                 if (imgEl) {
+                    imgEl.onerror = () => {
+                        // Fallback: se a miniatura do segundo exato ainda não existe, usa a vizinha mais próxima ou a capa
+                        const closest = window.timelineRenderer?.getClosestLoadedVideoThumb(video.id, roundedTime);
+                        if (closest && closest.src && closest.src !== imgEl.src) {
+                            imgEl.src = closest.src;
+                        } else {
+                            const vVersion = video._thumbVersion || video.thumb_version || video.updated_at || "";
+                            imgEl.src = `/api/video/${video.id}/thumbnail?v=${vVersion}`;
+                        }
+                    };
                     if (imgEl.src.indexOf(thumbSrc) === -1) imgEl.src = thumbSrc;
                     imgEl.style.display = "block";
                 }

@@ -267,20 +267,11 @@ class IngestService:
         task_key = f"thumbs-{video_id}"
         TASK_MANAGER.update_progress(task_key, 0.0, "running", task_type="thumbnails")
         
-        # Faixa útil do vídeo (5% a 95%) para evitar as rebarbas
-        start_time = max(1.0, duration * 0.05)
-        end_time = min(duration - 1.0, duration * 0.95)
-        
-        if end_time <= start_time:
-            # Fallback para vídeos curtíssimos
-            start_time = 0.0
-            end_time = duration
-            
-        # Lista de timestamps desejados de 1 em 1 segundo
-        timestamps = list(range(int(start_time), int(end_time) + 1))
+        # Miniaturas cobrem 100% da duração do vídeo (do segundo 0 até o final da mídia)
+        max_sec = int(round(duration)) if duration > 0 else 0
+        timestamps = list(range(0, max_sec + 1))
         if not timestamps:
-            # Se ainda estiver vazia, usa o ponto médio
-            timestamps = [duration / 2.0]
+            timestamps = [0.0]
             
         n = len(timestamps)
         
@@ -347,7 +338,8 @@ class IngestService:
                 if out_path.exists() and out_path.stat().st_size > 0:
                     successful_extractions += 1
                 else:
-                    success = extract_thumbnail_frame(filepath, timestamp, out_path, width=120)
+                    target_timestamp = min(timestamp, max(0.0, duration - 0.05))
+                    success = extract_thumbnail_frame(filepath, target_timestamp, out_path, width=120)
                     if success:
                         successful_extractions += 1
                 
