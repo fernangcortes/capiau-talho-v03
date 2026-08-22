@@ -253,6 +253,17 @@ export class CapIAuAPI {
         });
     }
 
+    // -- Histórico de decupagem (título/descrição/resumo/tags)
+    static fetchVideoMetadataHistory(videoId) {
+        return this.request(`/api/video/${videoId}/metadata-history`);
+    }
+
+    static restoreVideoMetadataVersion(videoId, historyId) {
+        return this.request(`/api/video/${videoId}/metadata-history/${historyId}/restore`, {
+            method: "POST"
+        });
+    }
+
     static updatePhotoTitle(photoId, title) {
         return this.request(`/api/photo/${photoId}/title`, {
             method: "PATCH",

@@ -1,5 +1,16 @@
 # -*- coding: utf-8 -*-
 """
+APOSENTADO (Entrega A4 de docs/PLANO_HISTORICO_METADADOS_E_WORKER_ASR.md).
+
+O remendo virou funcionalidade: MediaRepository.update_video_metadata arquiva
+sozinho a versao anterior em `video_metadata_history` a cada sobrescrita, e a
+interface tem "ver versoes anteriores" com botao de restaurar. Ninguem precisa
+mais lembrar de rodar `salvar` antes do lote.
+
+Mantido so para ler snapshots antigos em data/backups/. Nao use em lote novo.
+
+---
+
 Protege a decupagem editorial dos videos antes de re-transcrever.
 
 Por que isso existe: ao final de cada transcricao o pipeline chama

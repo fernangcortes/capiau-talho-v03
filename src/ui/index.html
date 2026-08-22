@@ -520,6 +520,7 @@
                             <div class="glassmorphism" style="padding: 12px; border-radius: 6px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: 6px;">
                                 <div style="font-size: 9px; font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Resumo Executivo</div>
                                 <div id="inspector-summary" style="font-size: 11px; color: var(--text-secondary); line-height: 1.4; white-space: pre-line;">Carregando resumo...</div>
+                                <button id="btn-inspector-metadata-history" title="Título, descrição, resumo e tags que já valeram para esta mídia. Só a versão atual entra na busca." style="align-self: flex-start; background: none; border: none; padding: 0; margin-top: 2px; font-size: 10px; font-family: inherit; color: var(--color-cyan); cursor: pointer; display: none; align-items: center; gap: 5px;"><i class="fa-solid fa-clock-rotate-left"></i> <span id="lbl-inspector-metadata-history">ver versões anteriores</span></button>
                             </div>
                             <button id="btn-inspector-copy-notes" class="btn-secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; height: 28px; font-size: 11px; font-weight: 600; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-primary);"><i class="fa-regular fa-clipboard"></i> Copiar Notas de Decupagem</button>
                             
@@ -1222,6 +1223,27 @@
             <div class="modal-footer">
                 <button id="btn-cancel-import" class="btn-outline">Cancelar</button>
                 <button id="btn-submit-import" class="btn-primary">Importar em Modo Link</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Histórico de decupagem editorial: versões anteriores de título/descrição/resumo/tags -->
+    <div id="metadata-history-modal" class="modal-overlay">
+        <div class="modal-content glassmorphism" style="max-width: 720px; width: 92%; max-height: 82vh;">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-clock-rotate-left"></i> Versões anteriores da decupagem</h2>
+                <button class="btn-close-modal" id="btn-close-metadata-history">&times;</button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto; min-height: 0;">
+                <p style="font-size: 11px; color: var(--text-muted); margin: 0; line-height: 1.5;">
+                    Cada reprocessamento sobrescreve título, descrição, resumo e tags. Aqui ficam as versões
+                    substituídas. <b>Só a versão atual alimenta a busca</b> — restaurar troca a atual e guarda
+                    a que estava no ar, então dá para voltar atrás.
+                </p>
+                <div id="metadata-history-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-metadata-history" class="btn-outline">Fechar</button>
             </div>
         </div>
     </div>

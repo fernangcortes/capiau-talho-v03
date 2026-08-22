@@ -128,9 +128,9 @@ def delete_production_doc(doc_id: int) -> None:
         ProjectRepository.delete_document(conn, doc_id)
         conn.commit()
 
-def update_video_metadata(video_id: int, description: str, summary: str, tags: List[str], title: Optional[str] = None) -> None:
+def update_video_metadata(video_id: int, description: str, summary: str, tags: List[str], title: Optional[str] = None, origem: str = "ia") -> None:
     with get_db() as conn:
-        MediaRepository.update_video_metadata(conn, video_id, description, summary, tags, title=title)
+        MediaRepository.update_video_metadata(conn, video_id, description, summary, tags, title=title, origem=origem)
         conn.commit()
 
 def update_project_drive_link(project_id: int, link: str) -> None:

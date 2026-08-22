@@ -354,6 +354,22 @@ CREATE TABLE IF NOT EXISTS transcript_entity (
     end_time REAL,             -- em segundos
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Historico da decupagem editorial (titulo/descricao/resumo/tags) de cada video.
+-- Cada linha e uma versao ANTERIOR, arquivada automaticamente por
+-- MediaRepository antes de qualquer sobrescrita. So a versao corrente vive na
+-- tabela video -- e so ela alimenta a busca. Ver docs/PLANO_HISTORICO_METADADOS_E_WORKER_ASR.md
+CREATE TABLE IF NOT EXISTS video_metadata_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+    title TEXT,
+    description TEXT,
+    summary TEXT,
+    tags TEXT,                 -- JSON, mesmo formato de video.tags
+    origem TEXT CHECK(origem IN ('ia','humano','importado')) DEFAULT 'ia',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_vmh_video ON video_metadata_history(video_id, created_at DESC);
 """
 
 def init_db(db_path: Path = None):
@@ -430,6 +446,12 @@ def init_db(db_path: Path = None):
         if "category_confidence" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN category_confidence REAL")
             print("[MIGRATION] Coluna 'category_confidence' adicionada a tabela video.")
+        # Origem da decupagem CORRENTE ('ia' | 'humano' | 'importado'). Serve para
+        # que video_metadata_history registre corretamente quem escreveu a versao
+        # que esta sendo arquivada.
+        if "metadata_origem" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN metadata_origem TEXT DEFAULT 'ia'")
+            print("[MIGRATION] Coluna 'metadata_origem' adicionada a tabela video.")
 
         # Migracoes para tabela photo (descricao original preservada antes do enriquecimento)
         cursor.execute("PRAGMA table_info(photo)")

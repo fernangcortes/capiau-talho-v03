@@ -3671,6 +3671,25 @@ export class LibraryManager {
         const catConfEl = document.getElementById("lbl-inspector-category-conf");
         if (catConfEl) catConfEl.textContent = this.categoryConfidenceLabel(video);
 
+        // Histórico de decupagem: o link só aparece quando existe versão anterior guardada
+        const btnMetaHistory = document.getElementById("btn-inspector-metadata-history");
+        if (btnMetaHistory) {
+            btnMetaHistory.style.display = "none";
+            btnMetaHistory.dataset.videoId = String(video.id);
+            btnMetaHistory.onclick = () => this.openMetadataHistory(video);
+            CapIAuAPI.fetchVideoMetadataHistory(video.id)
+                .then(data => {
+                    // O inspetor pode já ter trocado de mídia enquanto a resposta vinha
+                    if (btnMetaHistory.dataset.videoId !== String(video.id)) return;
+                    const total = (data.versions || []).length;
+                    if (total === 0) return;
+                    const lbl = document.getElementById("lbl-inspector-metadata-history");
+                    if (lbl) lbl.textContent = total === 1 ? "ver 1 versão anterior" : `ver ${total} versões anteriores`;
+                    btnMetaHistory.style.display = "inline-flex";
+                })
+                .catch(err => console.warn("Histórico de decupagem indisponível:", err));
+        }
+
         this.inspectorMarkerIn = null;
         this.inspectorMarkerOut = null;
         this.updateInspectorMarkersUI();
@@ -3685,6 +3704,161 @@ export class LibraryManager {
         this.loadInspectorDialogue(video);
         this.loadInspectorThemes(video);
         this.loadInspectorFaces(video);
+    }
+
+    /** Data do SQLite (CURRENT_TIMESTAMP, em UTC) formatada no fuso do usuário. */
+    formatarDataHistorico(raw) {
+        if (!raw) return "data desconhecida";
+        const d = new Date(String(raw).replace(" ", "T") + (String(raw).endsWith("Z") ? "" : "Z"));
+        if (isNaN(d.getTime())) return String(raw);
+        return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+    }
+
+    /** Monta um cartão de versão. `versao` nula = a decupagem que está no ar agora. */
+    buildMetadataVersionCard(dados, { atual, video, onRestore }) {
+        const card = document.createElement("div");
+        card.style.cssText = "border: 1px solid " + (atual ? "rgba(6,182,212,0.45)" : "var(--border-glass)") +
+            "; border-radius: 8px; padding: 10px 12px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: 6px;";
+
+        const header = document.createElement("div");
+        header.style.cssText = "display: flex; align-items: center; gap: 8px; flex-wrap: wrap;";
+
+        const selo = document.createElement("span");
+        selo.style.cssText = "font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; " +
+            (atual ? "color: var(--color-cyan); background: rgba(6,182,212,0.12);"
+                   : "color: var(--text-muted); background: rgba(255,255,255,0.05);");
+        selo.textContent = atual ? "no ar agora" : this.formatarDataHistorico(dados.created_at);
+        header.appendChild(selo);
+
+        const origem = document.createElement("span");
+        const humano = dados.origem === "humano";
+        origem.style.cssText = "font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; " +
+            (humano ? "color: var(--color-emerald); background: rgba(16,185,129,0.12);"
+                    : "color: var(--color-violet); background: rgba(138,92,246,0.12);");
+        origem.textContent = humano ? "escrito à mão" : (dados.origem === "importado" ? "importado" : "gerado por IA");
+        header.appendChild(origem);
+        card.appendChild(header);
+
+        const linha = (rotulo, valor, negrito) => {
+            if (!valor) return;
+            const wrap = document.createElement("div");
+            wrap.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
+            const lbl = document.createElement("div");
+            lbl.style.cssText = "font-size: 9px; font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;";
+            lbl.textContent = rotulo;
+            const txt = document.createElement("div");
+            txt.style.cssText = "font-size: 11px; line-height: 1.45; white-space: pre-line; color: " +
+                (negrito ? "var(--text-primary); font-weight: 600;" : "var(--text-secondary);");
+            txt.textContent = valor;
+            wrap.appendChild(lbl);
+            wrap.appendChild(txt);
+            card.appendChild(wrap);
+        };
+
+        linha("Título", dados.title, true);
+        linha("Descrição", dados.description);
+        linha("Resumo", dados.summary);
+
+        const tags = Array.isArray(dados.tags) ? dados.tags : [];
+        if (tags.length > 0) linha("Tags", tags.join(" · "));
+
+        if (!dados.title && !dados.description && !dados.summary && tags.length === 0) {
+            linha("Conteúdo", "(versão vazia)");
+        }
+
+        if (!atual && typeof onRestore === "function") {
+            const btn = document.createElement("button");
+            btn.className = "btn-secondary";
+            btn.style.cssText = "align-self: flex-start; margin-top: 4px; height: 26px; padding: 0 12px; font-size: 11px; font-weight: 600; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-primary); display: flex; align-items: center; gap: 6px;";
+            btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Restaurar esta versão';
+            btn.onclick = () => onRestore(dados, btn);
+            card.appendChild(btn);
+        }
+
+        return card;
+    }
+
+    /** Abre o modal com as versões anteriores da decupagem editorial. */
+    async openMetadataHistory(video) {
+        const modal = document.getElementById("metadata-history-modal");
+        const list = document.getElementById("metadata-history-list");
+        if (!modal || !list) return;
+
+        if (!this._metadataHistoryBound) {
+            this._metadataHistoryBound = true;
+            const fechar = () => this.closeMetadataHistory();
+            const btnX = document.getElementById("btn-close-metadata-history");
+            const btnCancel = document.getElementById("btn-cancel-metadata-history");
+            if (btnX) btnX.addEventListener("click", fechar);
+            if (btnCancel) btnCancel.addEventListener("click", fechar);
+            modal.addEventListener("click", (ev) => { if (ev.target === modal) fechar(); });
+        }
+
+        list.innerHTML = `<div style="font-size:11px; color:var(--text-muted);">Carregando versões...</div>`;
+        modal.classList.add("active");
+
+        let data;
+        try {
+            data = await CapIAuAPI.fetchVideoMetadataHistory(video.id);
+        } catch (err) {
+            list.innerHTML = "";
+            const erro = document.createElement("div");
+            erro.style.cssText = "font-size:11px; color:var(--color-rose);";
+            erro.textContent = "Erro ao carregar o histórico: " + err.message;
+            list.appendChild(erro);
+            return;
+        }
+
+        const restaurar = async (versao, btn) => {
+            const quando = this.formatarDataHistorico(versao.created_at);
+            if (!confirm(`Restaurar a versão de ${quando}?\n\nA decupagem que está no ar agora vai para o histórico, então dá para voltar atrás.`)) return;
+            btn.disabled = true;
+            btn.style.opacity = "0.5";
+            try {
+                const res = await CapIAuAPI.restoreVideoMetadataVersion(video.id, versao.id);
+                if (res && res.video) {
+                    video.title = res.video.title;
+                    video.description = res.video.description;
+                    video.summary = res.video.summary;
+                    video.tags = res.video.tags;
+                }
+                if (window.logManager) {
+                    window.logManager.log("Decupagem", `Versão de ${quando} restaurada na mídia ${video.id}.`, "ACTION");
+                }
+                if (window.showToast) window.showToast("Versão restaurada.", "success");
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
+                this.loadMediaInspector(video);
+                await this.openMetadataHistory(video);
+            } catch (err) {
+                btn.disabled = false;
+                btn.style.opacity = "1";
+                if (window.showToast) window.showToast("Erro ao restaurar: " + err.message, "error");
+                else alert("Erro ao restaurar: " + err.message);
+            }
+        };
+
+        list.innerHTML = "";
+        if (data.atual) {
+            list.appendChild(this.buildMetadataVersionCard(data.atual, { atual: true, video }));
+        }
+
+        const versoes = data.versions || [];
+        if (versoes.length === 0) {
+            const vazio = document.createElement("div");
+            vazio.style.cssText = "font-size: 11px; color: var(--text-muted); font-style: italic;";
+            vazio.textContent = "Nenhuma versão anterior guardada ainda. A partir de agora, todo reprocessamento arquiva a decupagem que for substituída.";
+            list.appendChild(vazio);
+            return;
+        }
+
+        versoes.forEach(v => {
+            list.appendChild(this.buildMetadataVersionCard(v, { atual: false, video, onRestore: restaurar }));
+        });
+    }
+
+    closeMetadataHistory() {
+        const modal = document.getElementById("metadata-history-modal");
+        if (modal) modal.classList.remove("active");
     }
 
     async loadInspectorDialogue(video) {

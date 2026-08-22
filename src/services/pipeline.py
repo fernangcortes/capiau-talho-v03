@@ -1490,7 +1490,7 @@ Responda em formato JSON puro:
                                     item_id = int(item["id"])
                                     new_title = str(item.get("titulo", "") or item.get("title", "") or "").strip()
                                     if new_title:
-                                        MediaRepository.update_video_title(conn, item_id, new_title)
+                                        MediaRepository.update_video_title(conn, item_id, new_title, origem="ia")
                                         updated.append({"id": item_id, "title": new_title})
                                         v_match = next((x for x in chunk if x["id"] == item_id), None)
                                         f_name = v_match.get("filename", f"Vídeo #{item_id}") if v_match else f"Vídeo #{item_id}"
@@ -1505,7 +1505,7 @@ Responda em formato JSON puro:
                                         item_id = int(item["id"])
                                         new_title = str(item.get("titulo", "") or item.get("title", "") or "").strip()
                                         if new_title:
-                                            MediaRepository.update_video_title(conn, item_id, new_title)
+                                            MediaRepository.update_video_title(conn, item_id, new_title, origem="ia")
                                             updated.append({"id": item_id, "title": new_title})
                                             TASK_MANAGER.add_log(task_key, f"[SUCCESS] ID {item_id} -> '{new_title}'", "INFO")
                                 conn.commit()

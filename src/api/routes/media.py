@@ -224,6 +224,63 @@ def update_video_title(video_id: int, payload: TitleUpdate, conn: sqlite3.Connec
 
     return {"status": "success", "id": video_id, "title": title}
 
+@router.get("/api/video/{video_id}/metadata-history")
+def list_video_metadata_history(
+    video_id: int,
+    limit: int = Query(50, ge=1, le=200),
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Versões anteriores da decupagem editorial, mais recente primeiro.
+
+    Só a versão corrente (devolvida em `atual`) vive na tabela video e alimenta a
+    busca; o histórico existe para leitura e restauração pela interface."""
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, title, description, summary, tags, metadata_origem FROM video WHERE id = ?",
+        (video_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(404, "Vídeo não encontrado")
+
+    atual = dict(row)
+    atual["tags"] = MediaRepository._parse_tags(atual.get("tags"))
+    atual["origem"] = atual.pop("metadata_origem", None) or "ia"
+
+    return {
+        "video_id": video_id,
+        "atual": atual,
+        "versions": MediaRepository.list_metadata_history(conn, video_id, limit)
+    }
+
+@router.post("/api/video/{video_id}/metadata-history/{history_id}/restore")
+def restore_video_metadata_version(
+    video_id: int,
+    history_id: int,
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Restaura uma versão arquivada. A versão atual é arquivada antes, então dá para voltar."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM video WHERE id = ?", (video_id,))
+    if not cursor.fetchone():
+        raise HTTPException(404, "Vídeo não encontrado")
+
+    try:
+        MediaRepository.restore_metadata_version(conn, video_id, history_id)
+    except ValueError as err:
+        raise HTTPException(404, str(err))
+    conn.commit()
+
+    cursor.execute(
+        "SELECT id, title, description, summary, tags, metadata_origem FROM video WHERE id = ?",
+        (video_id,)
+    )
+    atual = dict(cursor.fetchone())
+    atual["tags"] = MediaRepository._parse_tags(atual.get("tags"))
+    atual["origem"] = atual.pop("metadata_origem", None) or "humano"
+
+    return {"status": "success", "id": video_id, "restored_from": history_id, "video": atual}
+
 @router.patch("/api/photo/{photo_id}/title")
 def update_photo_title(photo_id: int, payload: TitleUpdate, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Atualização manual/humana do título da foto."""

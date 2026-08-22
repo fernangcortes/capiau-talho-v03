@@ -51,20 +51,192 @@ class MediaRepository:
         """Atualiza o status de processamento e possíveis erros de conversão do vídeo."""
         conn.execute("UPDATE video SET status = ?, error_message = ? WHERE id = ?", (status, error_message, video_id))
 
+    # Quantas versões anteriores de decupagem manter por vídeo. Sem poda, um acervo
+    # reprocessado várias vezes cresce sem limite.
+    METADATA_HISTORY_KEEP = 20
+
     @staticmethod
-    def update_video_metadata(conn: sqlite3.Connection, video_id: int, description: str, summary: str, tags: List[str], title: Optional[str] = None) -> None:
-        """Atualiza a decupagem editorial, tags e título curto do vídeo."""
+    def _parse_tags(raw: Any) -> List[str]:
+        """Converte a coluna `tags` (JSON em texto) para lista, tolerando lixo."""
+        if isinstance(raw, list):
+            return raw
+        if not raw:
+            return []
+        try:
+            valor = json.loads(raw)
+            return valor if isinstance(valor, list) else []
+        except (ValueError, TypeError):
+            return []
+
+    @staticmethod
+    def _archive_metadata_version(
+        conn: sqlite3.Connection,
+        video_id: int,
+        title: Optional[str],
+        description: Optional[str],
+        summary: Optional[str],
+        tags_json: Optional[str],
+        title_vazio_mantem: bool = True
+    ) -> None:
+        """Arquiva a decupagem CORRENTE do vídeo antes de ela ser sobrescrita.
+
+        Os parâmetros são os valores que vão ENTRAR — servem só para decidir se
+        houve mudança.
+
+        `title_vazio_mantem` distingue os dois caminhos de escrita: em
+        update_video_metadata um título vazio preserva o atual (COALESCE/NULLIF),
+        enquanto update_video_title grava literalmente o que recebe — inclusive
+        vazio, e nesse caso a versão anterior precisa ser arquivada.
+
+        Duas regras de higiene: não arquiva versão totalmente vazia (evita lixo na
+        primeira gravação de cada mídia) e não arquiva quando nada mudou."""
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT title, description, summary, tags, metadata_origem FROM video WHERE id = ?",
+            (video_id,)
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return
+
+        atual_title, atual_desc, atual_summary, atual_tags, atual_origem = (
+            row[0], row[1], row[2], row[3], row[4]
+        )
+
+        if not any([atual_title, atual_desc, atual_summary, atual_tags]):
+            return  # nada de valor a preservar
+
+        efetivo_title = atual_title if (title_vazio_mantem and not title) else title
+        if (atual_title, atual_desc, atual_summary, atual_tags) == (
+            efetivo_title, description, summary, tags_json
+        ):
+            return  # nada mudou
+
+        cursor.execute("""
+            INSERT INTO video_metadata_history (video_id, title, description, summary, tags, origem)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (video_id, atual_title, atual_desc, atual_summary, atual_tags, atual_origem or "ia"))
+
+        cursor.execute("""
+            DELETE FROM video_metadata_history
+            WHERE video_id = ? AND id NOT IN (
+                SELECT id FROM video_metadata_history
+                WHERE video_id = ? ORDER BY id DESC LIMIT ?
+            )
+        """, (video_id, video_id, MediaRepository.METADATA_HISTORY_KEEP))
+
+    @staticmethod
+    def _try_archive(
+        conn: sqlite3.Connection,
+        video_id: int,
+        title: Optional[str],
+        description: Optional[str],
+        summary: Optional[str],
+        tags_json: Optional[str],
+        title_vazio_mantem: bool = True
+    ) -> None:
+        """Chama o arquivamento sem deixar que ele derrube a gravação.
+
+        Se o banco for antigo (sem a tabela/coluna de histórico), avisa alto no
+        console e segue — uma rodada de ASR paga não pode morrer por causa disso."""
+        try:
+            MediaRepository._archive_metadata_version(
+                conn, video_id, title, description, summary, tags_json, title_vazio_mantem
+            )
+        except sqlite3.OperationalError as err:
+            print(f"[HISTORICO] Nao foi possivel arquivar a decupagem do video {video_id}: {err}. "
+                  f"Rode init_db() para criar video_metadata_history.")
+
+    @staticmethod
+    def update_video_metadata(
+        conn: sqlite3.Connection,
+        video_id: int,
+        description: str,
+        summary: str,
+        tags: List[str],
+        title: Optional[str] = None,
+        origem: str = "ia"
+    ) -> None:
+        """Atualiza a decupagem editorial, tags e título curto do vídeo.
+
+        Toda gravação de decupagem passa por aqui — pipeline de ASR, análise de
+        visão ou edição manual —, então é aqui que a versão anterior é arquivada.
+        Nenhum chamador precisa saber que o histórico existe."""
+        tags_json = json.dumps(tags)
+        novo_title = (title or "").strip() or None
+        MediaRepository._try_archive(conn, video_id, novo_title, description, summary, tags_json)
         conn.execute("""
             UPDATE video
             SET description = ?, summary = ?, tags = ?,
-                title = COALESCE(NULLIF(?, ''), title)
+                title = COALESCE(NULLIF(?, ''), title),
+                metadata_origem = ?
             WHERE id = ?
-        """, (description, summary, json.dumps(tags), title or "", video_id))
+        """, (description, summary, tags_json, title or "", origem, video_id))
 
     @staticmethod
-    def update_video_title(conn: sqlite3.Connection, video_id: int, title: str) -> None:
-        """Atualiza diretamente o título executivo do vídeo."""
-        conn.execute("UPDATE video SET title = ? WHERE id = ?", (title, video_id))
+    def update_video_title(conn: sqlite3.Connection, video_id: int, title: str, origem: str = "humano") -> None:
+        """Atualiza diretamente o título executivo do vídeo.
+
+        Caminho de escrita separado de update_video_metadata (a edição inline do
+        inspetor cai aqui), por isso arquiva também."""
+        cursor = conn.cursor()
+        cursor.execute("SELECT description, summary, tags FROM video WHERE id = ?", (video_id,))
+        row = cursor.fetchone()
+        if row is not None:
+            MediaRepository._try_archive(
+                conn, video_id, title, row[0], row[1], row[2], title_vazio_mantem=False
+            )
+        conn.execute(
+            "UPDATE video SET title = ?, metadata_origem = ? WHERE id = ?",
+            (title, origem, video_id)
+        )
+
+    @staticmethod
+    def list_metadata_history(conn: sqlite3.Connection, video_id: int, limit: int = 50) -> List[Dict[str, Any]]:
+        """Lista as versões anteriores da decupagem, mais recente primeiro."""
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, video_id, title, description, summary, tags, origem, created_at
+            FROM video_metadata_history
+            WHERE video_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+        """, (video_id, limit))
+        versoes = []
+        for r in cursor.fetchall():
+            item = dict(r)
+            item["tags"] = MediaRepository._parse_tags(item.get("tags"))
+            versoes.append(item)
+        return versoes
+
+    @staticmethod
+    def get_metadata_history_entry(conn: sqlite3.Connection, history_id: int) -> Optional[Dict[str, Any]]:
+        """Retorna uma versão arquivada específica (tags ainda em JSON cru)."""
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM video_metadata_history WHERE id = ?", (history_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    @staticmethod
+    def restore_metadata_version(conn: sqlite3.Connection, video_id: int, history_id: int) -> Dict[str, Any]:
+        """Restaura uma versão arquivada como decupagem corrente do vídeo.
+
+        A restauração é ela mesma uma gravação: passa por update_video_metadata,
+        que arquiva a versão atual antes — ou seja, restaurar é reversível."""
+        versao = MediaRepository.get_metadata_history_entry(conn, history_id)
+        if versao is None or versao["video_id"] != video_id:
+            raise ValueError("Versão de histórico não pertence a este vídeo")
+
+        MediaRepository.update_video_metadata(
+            conn,
+            video_id,
+            description=versao.get("description") or "",
+            summary=versao.get("summary") or "",
+            tags=MediaRepository._parse_tags(versao.get("tags")),
+            title=versao.get("title"),
+            origem="humano"
+        )
+        return versao
 
     @staticmethod
     def update_photo_title(conn: sqlite3.Connection, photo_id: int, title: str) -> None:
