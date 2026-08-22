@@ -1127,6 +1127,11 @@ export class WorkspaceManager {
                             window.player.handleGlobalKeyboard(e);
                         }
                     });
+                    win.addEventListener("keyup", (e) => {
+                        if (e.code === "KeyK" && window.player) {
+                            window.player.isKeyKDown = false;
+                        }
+                    });
                 }
                 
                 if (panelId === "timeline-panel") {

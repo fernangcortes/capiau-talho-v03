@@ -30,11 +30,15 @@ export function formatTimecode(secs, fps = null) {
  */
 export class SourcePlayer {
     constructor() {
-        this.speedsForward = [1.0, 1.5, 2.0, 4.0, 8.0];
+        this.speedsForward = [1.0, 2.0, 4.0, 8.0];
         this.speedsReverse = [-1.0, -2.0, -4.0, -8.0];
         this.jklState = 'K';
         this.jklIndex = 0;
+        this.isReversing = false;
+        this.reverseRate = 1.0;
+        this.reverseRafId = null;
         this.reverseInterval = null;
+        this._osdTimeout = null;
         
         this.videoFaces = [];
         this.overlayContainer = null;
@@ -62,12 +66,7 @@ export class SourcePlayer {
 
         STATE.on("playerPlayed", (sender) => {
             if (sender !== "source") {
-                const vid = this.el("source-video");
-                if (vid && !vid.paused) {
-                    vid.pause();
-                }
-                this.stopReverse();
-                this.jklState = 'K';
+                this.pause();
             }
         });
 
@@ -77,7 +76,7 @@ export class SourcePlayer {
                     .then(faces => {
                         this.videoFaces = faces || [];
                         const video = this.el("source-video");
-                        if (video && video.paused) {
+                        if (video && video.paused && !this.isReversing) {
                             this.updateFacesOverlay();
                         }
                     })
@@ -94,15 +93,24 @@ export class SourcePlayer {
                 this.onPlayStateChange(true);
                 STATE.emit("playerPlayed", "source");
             });
-            video.addEventListener("pause", () => this.onPlayStateChange(false));
+            video.addEventListener("pause", () => {
+                if (!this.isReversing) {
+                    this.jklState = 'K';
+                    this.jklIndex = 0;
+                    this.onPlayStateChange(false);
+                }
+            });
+            video.addEventListener("ended", () => {
+                this.pause();
+            });
             video.addEventListener("seeked", () => {
                 const vid = this.el("source-video");
-                if (vid && vid.paused) this.updateFacesOverlay();
+                if (vid && vid.paused && !this.isReversing) this.updateFacesOverlay();
             });
 
             this.resizeObserver = new ResizeObserver(() => {
                 const vid = this.el("source-video");
-                if (vid && vid.paused) this.updateOverlaySize();
+                if (vid && vid.paused && !this.isReversing) this.updateOverlaySize();
             });
             this.resizeObserver.observe(video);
         }
@@ -344,31 +352,49 @@ export class SourcePlayer {
     onPlayStateChange(isPlaying) {
         const btnPlay = this.el("btn-source-play");
         if (btnPlay) {
-            btnPlay.innerHTML = isPlaying 
+            btnPlay.innerHTML = (isPlaying || this.isReversing) 
                 ? `<i class="fa-solid fa-pause"></i>`
                 : `<i class="fa-solid fa-play"></i>`;
         }
         this.updateFacesOverlay();
     }
 
+    play(speed = 1.0) {
+        const vid = this.el("source-video");
+        if (!vid || !vid.src) return;
+        this.stopReverse();
+        this.setSpeed(speed);
+        this.jklState = 'L';
+        vid.play().catch(() => {});
+        this.onPlayStateChange(true);
+    }
+
+    pause() {
+        this.stopReverse();
+        const vid = this.el("source-video");
+        if (vid && !vid.paused) {
+            vid.pause();
+        }
+        this.jklState = 'K';
+        this.jklIndex = 0;
+        this.onPlayStateChange(false);
+    }
+
     togglePlay() {
         const vid = this.el("source-video");
         if (!vid || !vid.src) return;
         
-        this.stopReverse();
-        if (vid.paused) {
-            vid.play();
-            this.jklState = 'L';
-            this.jklIndex = 0;
+        if (this.isReversing || (vid && !vid.paused)) {
+            this.pause();
         } else {
-            vid.pause();
-            this.jklState = 'K';
+            this.play(1.0);
         }
     }
 
     seek(seconds) {
         const vid = this.el("source-video");
         if (!vid) return;
+        this.stopReverse();
         vid.currentTime = Math.max(0, Math.min(seconds, vid.duration || 0));
     }
 
@@ -401,29 +427,119 @@ export class SourcePlayer {
         vid.playbackRate = Math.abs(speed);
     }
 
-    startReverse(rate) {
+    startReverse(rate = -1.0) {
         this.stopReverse();
         const vid = this.el("source-video");
-        if (!vid) return;
+        if (!vid || !vid.src) return;
 
+        this.isReversing = true;
+        this.reverseRate = Math.abs(rate);
+        this.jklState = 'J';
         vid.pause();
         STATE.emit("playerPlayed", "source");
-        const step = 0.04 * Math.abs(rate);
-        this.reverseInterval = setInterval(() => {
-            if (vid.currentTime <= 0) {
-                this.stopReverse();
-                this.jklState = 'K';
-            } else {
-                vid.currentTime -= step;
+        this.onPlayStateChange(true);
+
+        let lastTime = performance.now();
+        const step = () => {
+            if (!this.isReversing) return;
+            const now = performance.now();
+            const elapsedSecs = (now - lastTime) / 1000;
+            lastTime = now;
+
+            if (vid.currentTime <= 0.001) {
+                vid.currentTime = 0;
+                this.pause();
+                return;
             }
-        }, 40);
+
+            if (!vid.seeking) {
+                const stepSecs = elapsedSecs * this.reverseRate;
+                vid.currentTime = Math.max(0, vid.currentTime - stepSecs);
+            }
+            this.reverseRafId = requestAnimationFrame(step);
+        };
+        this.reverseRafId = requestAnimationFrame(step);
     }
 
     stopReverse() {
+        this.isReversing = false;
+        if (this.reverseRafId) {
+            cancelAnimationFrame(this.reverseRafId);
+            this.reverseRafId = null;
+        }
         if (this.reverseInterval) {
             clearInterval(this.reverseInterval);
             this.reverseInterval = null;
         }
+    }
+
+    shuttleForward() {
+        const vid = this.el("source-video");
+        if (!vid || !vid.src) return;
+        if (this.jklState === 'K' || (!this.isReversing && vid.paused)) {
+            this.jklState = 'L';
+            this.jklIndex = 0;
+            this.play(this.speedsForward[0]);
+        } else if (this.jklState === 'L') {
+            this.jklIndex = Math.min(this.jklIndex + 1, this.speedsForward.length - 1);
+            this.play(this.speedsForward[this.jklIndex]);
+        } else if (this.jklState === 'J') {
+            if (this.jklIndex > 0) {
+                this.jklIndex--;
+                this.startReverse(this.speedsReverse[this.jklIndex]);
+            } else {
+                this.jklState = 'L';
+                this.jklIndex = 0;
+                this.play(this.speedsForward[0]);
+            }
+        }
+        this.showShuttleOsd(this.jklState === 'L' ? `${this.speedsForward[this.jklIndex]}x` : `${this.speedsReverse[this.jklIndex]}x`);
+    }
+
+    shuttleReverse() {
+        const vid = this.el("source-video");
+        if (!vid || !vid.src) return;
+        if (this.jklState === 'K' || (!this.isReversing && vid.paused)) {
+            this.jklState = 'J';
+            this.jklIndex = 0;
+            this.startReverse(this.speedsReverse[0]);
+        } else if (this.jklState === 'J') {
+            this.jklIndex = Math.min(this.jklIndex + 1, this.speedsReverse.length - 1);
+            this.startReverse(this.speedsReverse[this.jklIndex]);
+        } else if (this.jklState === 'L') {
+            if (this.jklIndex > 0) {
+                this.jklIndex--;
+                this.play(this.speedsForward[this.jklIndex]);
+            } else {
+                this.jklState = 'J';
+                this.jklIndex = 0;
+                this.startReverse(this.speedsReverse[0]);
+            }
+        }
+        this.showShuttleOsd(this.jklState === 'J' ? `${this.speedsReverse[this.jklIndex]}x` : `${this.speedsForward[this.jklIndex]}x`);
+    }
+
+    shuttleStop() {
+        this.pause();
+        this.showShuttleOsd("Pausado");
+    }
+
+    showShuttleOsd(text) {
+        const panel = this.el("source-player-panel");
+        if (!panel) return;
+        let osd = panel.querySelector(".player-shuttle-osd");
+        if (!osd) {
+            osd = document.createElement("div");
+            osd.className = "player-shuttle-osd";
+            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:rgba(18,18,24,0.85); color:var(--color-cyan); padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700; font-family:'Outfit',sans-serif; letter-spacing:0.5px; border:1px solid rgba(6,182,212,0.4); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
+            panel.appendChild(osd);
+        }
+        osd.textContent = text;
+        osd.style.opacity = "1";
+        if (this._osdTimeout) clearTimeout(this._osdTimeout);
+        this._osdTimeout = setTimeout(() => {
+            if (osd) osd.style.opacity = "0";
+        }, 1200);
     }
 
     markIn() {
@@ -836,6 +952,12 @@ export class ProgramPlayer {
     constructor() {
         this.isPlaying = false;
         this.playRequest = null;
+        this.speedsForward = [1.0, 2.0, 4.0, 8.0];
+        this.speedsReverse = [-1.0, -2.0, -4.0, -8.0];
+        this.jklState = 'K';
+        this.jklIndex = 0;
+        this.playbackSpeed = 1.0;
+        this._osdTimeout = null;
         this.init();
     }
 
@@ -922,18 +1044,24 @@ export class ProgramPlayer {
         if (this.isPlaying) {
             this.pause();
         } else {
-            this.play();
+            this.play(1.0);
         }
     }
 
-    play() {
-        if (this.isPlaying) return;
+    play(speed = 1.0) {
+        this.playbackSpeed = speed;
+        this.jklState = speed >= 0 ? 'L' : 'J';
         this.isPlaying = true;
 
         STATE.emit("playerPlayed", "program");
 
         const btnPlay = this.el("btn-program-play");
         if (btnPlay) btnPlay.innerHTML = `<i class="fa-solid fa-pause"></i>`;
+
+        if (this.playRequest) {
+            cancelAnimationFrame(this.playRequest);
+            this.playRequest = null;
+        }
 
         let lastTime = performance.now();
         const step = () => {
@@ -943,14 +1071,25 @@ export class ProgramPlayer {
             lastTime = now;
 
             const maxDur = this.getDurationFrames();
-            if (TIMELINE_STATE.playheadFrame >= maxDur && maxDur > 0) {
-                this.pause();
-                TIMELINE_STATE.setPlayheadFrame(0);
-                return;
-            }
+            const fpsVal = TIMELINE_STATE?.fps || 24;
 
-            const elapsedFrames = elapsedSecs * (TIMELINE_STATE?.fps || 24); // assume timeline FPS
-            TIMELINE_STATE.setPlayheadFrame(TIMELINE_STATE.playheadFrame + elapsedFrames);
+            if (this.playbackSpeed > 0) {
+                if (TIMELINE_STATE.playheadFrame >= maxDur && maxDur > 0) {
+                    this.pause();
+                    TIMELINE_STATE.setPlayheadFrame(maxDur);
+                    return;
+                }
+                const elapsedFrames = elapsedSecs * fpsVal * this.playbackSpeed;
+                TIMELINE_STATE.setPlayheadFrame(Math.min(maxDur, TIMELINE_STATE.playheadFrame + elapsedFrames));
+            } else if (this.playbackSpeed < 0) {
+                if (TIMELINE_STATE.playheadFrame <= 0) {
+                    this.pause();
+                    TIMELINE_STATE.setPlayheadFrame(0);
+                    return;
+                }
+                const elapsedFrames = elapsedSecs * fpsVal * Math.abs(this.playbackSpeed);
+                TIMELINE_STATE.setPlayheadFrame(Math.max(0, TIMELINE_STATE.playheadFrame - elapsedFrames));
+            }
 
             // Heartbeat de atividade do editor para o backend
             if (!this.lastHeartbeatTime || now - this.lastHeartbeatTime > 2000) {
@@ -965,6 +1104,9 @@ export class ProgramPlayer {
 
     pause() {
         this.isPlaying = false;
+        this.playbackSpeed = 1.0;
+        this.jklState = 'K';
+        this.jklIndex = 0;
         if (this.playRequest) {
             cancelAnimationFrame(this.playRequest);
             this.playRequest = null;
@@ -975,13 +1117,80 @@ export class ProgramPlayer {
 
         const videoA = this.el("program-video-a");
         const videoB = this.el("program-video-b");
-        if (videoA) videoA.pause();
-        if (videoB) videoB.pause();
+        if (videoA && !videoA.paused) videoA.pause();
+        if (videoB && !videoB.paused) videoB.pause();
 
         // Pausa também as pistas de áudio dedicadas
         if (this.audioPool) {
-            Object.values(this.audioPool).forEach(el => el.pause());
+            Object.values(this.audioPool).forEach(el => {
+                if (!el.paused) el.pause();
+            });
         }
+    }
+
+    shuttleForward() {
+        if (!this.isPlaying || this.jklState === 'K') {
+            this.jklState = 'L';
+            this.jklIndex = 0;
+            this.play(this.speedsForward[0]);
+        } else if (this.jklState === 'L') {
+            this.jklIndex = Math.min(this.jklIndex + 1, this.speedsForward.length - 1);
+            this.play(this.speedsForward[this.jklIndex]);
+        } else if (this.jklState === 'J') {
+            if (this.jklIndex > 0) {
+                this.jklIndex--;
+                this.play(this.speedsReverse[this.jklIndex]);
+            } else {
+                this.jklState = 'L';
+                this.jklIndex = 0;
+                this.play(this.speedsForward[0]);
+            }
+        }
+        this.showShuttleOsd(this.jklState === 'L' ? `${this.speedsForward[this.jklIndex]}x` : `${this.speedsReverse[this.jklIndex]}x`);
+    }
+
+    shuttleReverse() {
+        if (!this.isPlaying || this.jklState === 'K') {
+            this.jklState = 'J';
+            this.jklIndex = 0;
+            this.play(this.speedsReverse[0]);
+        } else if (this.jklState === 'J') {
+            this.jklIndex = Math.min(this.jklIndex + 1, this.speedsReverse.length - 1);
+            this.play(this.speedsReverse[this.jklIndex]);
+        } else if (this.jklState === 'L') {
+            if (this.jklIndex > 0) {
+                this.jklIndex--;
+                this.play(this.speedsForward[this.jklIndex]);
+            } else {
+                this.jklState = 'J';
+                this.jklIndex = 0;
+                this.play(this.speedsReverse[0]);
+            }
+        }
+        this.showShuttleOsd(this.jklState === 'J' ? `${this.speedsReverse[this.jklIndex]}x` : `${this.speedsForward[this.jklIndex]}x`);
+    }
+
+    shuttleStop() {
+        this.pause();
+        this.showShuttleOsd("Pausado");
+    }
+
+    showShuttleOsd(text) {
+        const panel = this.el("program-player-panel");
+        if (!panel) return;
+        let osd = panel.querySelector(".player-shuttle-osd");
+        if (!osd) {
+            osd = document.createElement("div");
+            osd.className = "player-shuttle-osd";
+            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:rgba(18,18,24,0.85); color:#a855f7; padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700; font-family:'Outfit',sans-serif; letter-spacing:0.5px; border:1px solid rgba(168,85,247,0.4); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
+            panel.appendChild(osd);
+        }
+        osd.textContent = text;
+        osd.style.opacity = "1";
+        if (this._osdTimeout) clearTimeout(this._osdTimeout);
+        this._osdTimeout = setTimeout(() => {
+            if (osd) osd.style.opacity = "0";
+        }, 1200);
     }
 
     syncVideoToPlayhead() {
@@ -1083,17 +1292,25 @@ export class ProgramPlayer {
             // seek duro só em descontinuidade real (troca de clipe, scrub, deriva > 1s).
             if (srcChanged || clipChanged) {
                 el.currentTime = targetSeconds;
-                el.playbackRate = 1.0;
+                el.playbackRate = this.isPlaying && this.playbackSpeed > 0 ? Math.min(4.0, this.playbackSpeed) : 1.0;
             } else if (this.isPlaying) {
-                if (Math.abs(drift) > 1.0) {
-                    el.currentTime = targetSeconds;
-                    el.playbackRate = 1.0;
-                } else if (drift > 0.08) {
-                    el.playbackRate = 0.92; // vídeo adiantado: segura levemente
-                } else if (drift < -0.08) {
-                    el.playbackRate = 1.08; // vídeo atrasado: acelera levemente
-                } else if (el.playbackRate !== 1.0) {
-                    el.playbackRate = 1.0;
+                if (this.playbackSpeed > 0) {
+                    const baseRate = Math.min(4.0, this.playbackSpeed);
+                    if (Math.abs(drift) > 1.0) {
+                        el.currentTime = targetSeconds;
+                        el.playbackRate = baseRate;
+                    } else if (drift > 0.08) {
+                        el.playbackRate = baseRate * 0.92;
+                    } else if (drift < -0.08) {
+                        el.playbackRate = baseRate * 1.08;
+                    } else if (el.playbackRate !== baseRate) {
+                        el.playbackRate = baseRate;
+                    }
+                } else {
+                    // Reverse: mantenha o vídeo pausado e atualize currentTime suavemente
+                    if (!el.seeking && Math.abs(drift) > 0.03) {
+                        el.currentTime = targetSeconds;
+                    }
                 }
             } else {
                 // Pausado (scrub manual): seek preciso é o comportamento esperado
@@ -1105,9 +1322,9 @@ export class ProgramPlayer {
 
             // Pistas de vídeo são só imagem: o áudio vem das pistas de áudio dedicadas
             el.muted = true;
-            if (this.isPlaying && el.paused) {
+            if (this.isPlaying && this.playbackSpeed > 0 && el.paused) {
                 el.play().catch(() => {});
-            } else if (!this.isPlaying && !el.paused) {
+            } else if ((!this.isPlaying || this.playbackSpeed < 0) && !el.paused) {
                 el.pause();
             }
             if (el.style.display !== "block") el.style.display = "block";
@@ -1351,13 +1568,15 @@ export class ProgramPlayer {
 
             // Deriva no áudio: nudge de rate suave (3% não altera o pitch de forma audível)
             // e seek duro apenas em descontinuidade real — seeks frequentes geram clicks.
+            const isHighSpeedOrReverse = this.playbackSpeed > 2.0 || this.playbackSpeed < 0;
             if (srcChanged || clipChanged || Math.abs(drift) > 0.5) {
                 el.currentTime = Math.max(0, targetSeconds);
                 el.playbackRate = 1.0;
-            } else if (this.isPlaying) {
-                if (drift > 0.06) el.playbackRate = 0.97;
-                else if (drift < -0.06) el.playbackRate = 1.03;
-                else if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
+            } else if (this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse) {
+                const targetRate = Math.min(2.0, this.playbackSpeed);
+                if (drift > 0.06) el.playbackRate = targetRate * 0.97;
+                else if (drift < -0.06) el.playbackRate = targetRate * 1.03;
+                else if (el.playbackRate !== targetRate) el.playbackRate = targetRate;
             } else {
                 if (Math.abs(drift) > 0.06) el.currentTime = Math.max(0, targetSeconds);
                 if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
@@ -1381,10 +1600,10 @@ export class ProgramPlayer {
             });
 
             const vol = track.volume !== undefined ? track.volume : 1.0;
-            el.volume = track.muted ? 0 : Math.max(0, Math.min(1.0, vol * clipVol * fadeVol));
-            if (this.isPlaying && el.paused) {
+            el.volume = (track.muted || isHighSpeedOrReverse) ? 0 : Math.max(0, Math.min(1.0, vol * clipVol * fadeVol));
+            if (this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse && el.paused) {
                 el.play().catch(() => {});
-            } else if (!this.isPlaying && !el.paused) {
+            } else if ((!this.isPlaying || isHighSpeedOrReverse) && !el.paused) {
                 el.pause();
             }
         });
@@ -1655,15 +1874,42 @@ export class VideoPlayer {
     constructor() {
         this.sourcePlayer = new SourcePlayer();
         this.programPlayer = new ProgramPlayer();
+        this.isKeyKDown = false;
 
         // Escuta atalhos globais de teclado redirecionando para o player focado
         document.addEventListener("keydown", (e) => this.handleGlobalKeyboard(e));
+        document.addEventListener("keyup", (e) => {
+            if (e.code === "KeyK") {
+                this.isKeyKDown = false;
+            }
+        });
+        window.addEventListener("blur", () => {
+            this.isKeyKDown = false;
+        });
+    }
+
+    stepFrame(delta) {
+        const fps = TIMELINE_STATE?.fps || 24;
+        if (window.activeFocusedPlayer === "source") {
+            const vid = this.sourcePlayer.el("source-video");
+            if (vid) {
+                this.sourcePlayer.stopReverse();
+                this.sourcePlayer.seek(vid.currentTime + (delta / fps));
+            }
+        } else {
+            this.programPlayer.pause();
+            const maxDur = this.programPlayer.getDurationFrames();
+            const newFrame = delta > 0
+                ? Math.min(maxDur, TIMELINE_STATE.playheadFrame + delta)
+                : Math.max(0, TIMELINE_STATE.playheadFrame + delta);
+            TIMELINE_STATE.setPlayheadFrame(newFrame);
+        }
     }
 
     // Atalhos de teclado compartilhados
     handleGlobalKeyboard(e) {
         const activeTag = document.activeElement.tagName.toLowerCase();
-        if (activeTag === "input" || activeTag === "textarea") return;
+        if (activeTag === "input" || activeTag === "textarea" || document.activeElement.isContentEditable) return;
 
         // Se o modal de entrevista estiver aberto, ignora atalhos do player principal
         const interviewModal = document.getElementById("interview-modal");
@@ -1674,70 +1920,68 @@ export class VideoPlayer {
         const code = e.code;
         const activePlayer = window.activeFocusedPlayer === "source" ? this.sourcePlayer : this.programPlayer;
 
-        if (code === "Space" || code === "KeyK") {
+        if (code === "KeyK") {
+            e.preventDefault();
+            this.isKeyKDown = true;
+            activePlayer.shuttleStop();
+        } 
+        else if (code === "Space") {
             e.preventDefault();
             activePlayer.togglePlay();
-        } 
+        }
         else if (code === "KeyL") {
             e.preventDefault();
-            if (window.activeFocusedPlayer === "source") {
-                if (this.sourcePlayer.jklState === 'L') {
-                    this.sourcePlayer.jklIndex = Math.min(this.sourcePlayer.jklIndex + 1, this.sourcePlayer.speedsForward.length - 1);
-                } else {
-                    this.sourcePlayer.jklState = 'L';
-                    this.sourcePlayer.jklIndex = 0;
-                }
-                const speed = this.sourcePlayer.speedsForward[this.sourcePlayer.jklIndex];
-                this.sourcePlayer.setSpeed(speed);
-                const vid = this.sourcePlayer.el("source-video");
-                if (vid) vid.play();
+            if (this.isKeyKDown) {
+                // Combo K + L: Avança 1 frame
+                this.stepFrame(1);
             } else {
-                this.programPlayer.play();
+                activePlayer.shuttleForward();
             }
         } 
         else if (code === "KeyJ") {
             e.preventDefault();
-            if (window.activeFocusedPlayer === "source") {
-                if (this.sourcePlayer.jklState === 'J') {
-                    this.sourcePlayer.jklIndex = Math.min(this.sourcePlayer.jklIndex + 1, this.sourcePlayer.speedsReverse.length - 1);
-                } else {
-                    this.sourcePlayer.jklState = 'J';
-                    this.sourcePlayer.jklIndex = 0;
-                }
-                const speed = this.sourcePlayer.speedsReverse[this.sourcePlayer.jklIndex];
-                this.sourcePlayer.startReverse(speed);
+            if (this.isKeyKDown) {
+                // Combo K + J: Recua 1 frame
+                this.stepFrame(-1);
             } else {
-                // Apenas pausa a reprodução da timeline se tentar voltar atrás (simplificado)
-                this.programPlayer.pause();
-                TIMELINE_STATE.setPlayheadFrame(Math.max(0, TIMELINE_STATE.playheadFrame - 24));
+                activePlayer.shuttleReverse();
             }
         } 
         else if (code === "KeyI") {
-            this.sourcePlayer.markIn();
+            if (window.activeFocusedPlayer === "source") {
+                this.sourcePlayer.markIn();
+            }
         } 
         else if (code === "KeyO") {
-            this.sourcePlayer.markOut();
+            if (window.activeFocusedPlayer === "source") {
+                this.sourcePlayer.markOut();
+            }
         } 
         else if (code === "KeyE") {
-            this.sourcePlayer.appendToTimeline();
+            if (window.activeFocusedPlayer === "source") {
+                this.sourcePlayer.appendToTimeline();
+            }
         } 
         else if (code === "ArrowLeft") {
             e.preventDefault();
             if (window.activeFocusedPlayer === "source") {
                 const vid = this.sourcePlayer.el("source-video");
-                if (vid) this.sourcePlayer.seek(vid.currentTime - 0.04);
+                if (vid) this.sourcePlayer.seek(vid.currentTime - (1 / (TIMELINE_STATE?.fps || 24)));
             } else {
-                TIMELINE_STATE.setPlayheadFrame(Math.max(0, TIMELINE_STATE.playheadFrame - 1));
+                if (!TIMELINE_STATE.selectedClipId) {
+                    this.stepFrame(-1);
+                }
             }
         } 
         else if (code === "ArrowRight") {
             e.preventDefault();
             if (window.activeFocusedPlayer === "source") {
                 const vid = this.sourcePlayer.el("source-video");
-                if (vid) this.sourcePlayer.seek(vid.currentTime + 0.04);
+                if (vid) this.sourcePlayer.seek(vid.currentTime + (1 / (TIMELINE_STATE?.fps || 24)));
             } else {
-                const maxDur = this.programPlayer.getDurationFrames();
-                TIMELINE_STATE.setPlayheadFrame(Math.min(maxDur, TIMELINE_STATE.playheadFrame + 1));
+                if (!TIMELINE_STATE.selectedClipId) {
+                    this.stepFrame(1);
+                }
             }
         }
     }
