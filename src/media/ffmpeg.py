@@ -192,6 +192,71 @@ def extract_frame(video_path: Path, timestamp: float, output_path: Path, proxy_f
             pass
     return False
 
+_HW_ENCODERS_CACHE: Optional[Dict[str, bool]] = None
+
+def get_hardware_settings(project_id: Optional[int] = None) -> tuple:
+    """Retorna (encoder_pref, hwaccel_decode) com fallback gracioso se SettingsService não estiver disponível."""
+    try:
+        from src.services.settings_service import SettingsService
+        S = SettingsService.get_settings(project_id)
+        return S.get("hardware.video_encoder"), S.get("hardware.hwaccel_decode")
+    except Exception:
+        return "auto", "auto"
+
+def probe_hw_encoder(encoder_name: str) -> bool:
+    """Testa rapidamente se um encoder de hardware específico está funcional no sistema."""
+    startupinfo = None
+    if os.name == 'nt':
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    
+    cmd = [
+        'ffmpeg', '-y', '-f', 'lavfi', '-i', 'testsrc=duration=1:size=320x240:rate=15',
+        '-c:v', encoder_name, '-f', 'null', '-'
+    ]
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, timeout=4)
+        return res.returncode == 0
+    except Exception:
+        return False
+
+def get_available_hw_encoders() -> Dict[str, bool]:
+    """Retorna o mapa de encoders de hardware suportados (com cache em memória)."""
+    global _HW_ENCODERS_CACHE
+    if _HW_ENCODERS_CACHE is not None:
+        return _HW_ENCODERS_CACHE
+    
+    encoders = {}
+    for enc in ["h264_qsv", "h264_nvenc", "h264_amf"]:
+        encoders[enc] = probe_hw_encoder(enc)
+    _HW_ENCODERS_CACHE = encoders
+    active = [k for k, v in encoders.items() if v]
+    print(f"[FFmpeg] Aceleradores de vídeo por hardware detectados: {active if active else 'Nenhum (usando CPU libx264)'}")
+    return encoders
+
+def resolve_encoder_pipeline(encoder_pref: str = "auto") -> tuple:
+    """Resolve (encoder_name, extra_args, is_hardware)."""
+    if encoder_pref == "cpu":
+        return "libx264", ["-preset", "fast", "-crf", "23"], False
+        
+    avail = get_available_hw_encoders()
+    
+    if encoder_pref == "qsv" and avail.get("h264_qsv"):
+        return "h264_qsv", ["-global_quality", "25", "-preset", "medium"], True
+    elif encoder_pref == "amf" and avail.get("h264_amf"):
+        return "h264_amf", ["-quality", "speed", "-rc", "cqp", "-qp_i", "23", "-qp_p", "23"], True
+    elif encoder_pref == "nvenc" and avail.get("h264_nvenc"):
+        return "h264_nvenc", ["-preset", "p4", "-cq", "23"], True
+    elif encoder_pref == "auto":
+        if avail.get("h264_qsv"):
+            return "h264_qsv", ["-global_quality", "25", "-preset", "medium"], True
+        elif avail.get("h264_nvenc"):
+            return "h264_nvenc", ["-preset", "p4", "-cq", "23"], True
+        elif avail.get("h264_amf"):
+            return "h264_amf", ["-quality", "speed", "-rc", "cqp", "-qp_i", "23", "-qp_p", "23"], True
+
+    return "libx264", ["-preset", "fast", "-crf", "23"], False
+
 def generate_video_proxy(
     original_path: Path,
     proxy_path: Path,
@@ -200,32 +265,40 @@ def generate_video_proxy(
     preset: str = "fast",
     crf: int = 23,
     on_process_start: Optional[Callable[[subprocess.Popen], None]] = None,
-    on_progress: Optional[Callable[[float], None]] = None
+    on_progress: Optional[Callable[[float], None]] = None,
+    project_id: Optional[int] = None
 ) -> bool:
-    """Gera um proxy MP4 H.264 monitorando o progresso da conversão em tempo real."""
+    """Gera um proxy MP4 H.264 usando aceleração por hardware (GPU) com fallback automático e transparente para CPU."""
     res_width, res_height = resolution.split('x') if 'x' in resolution else ("1280", "720")
     
-    cmd = [
-        'ffmpeg', '-y', '-i', str(original_path),
-        '-progress', 'pipe:1',
-        '-vf', f'scale={res_width}:{res_height}:force_original_aspect_ratio=decrease,pad={res_width}:{res_height}:(ow-iw)/2:(oh-ih)/2',
-        '-c:v', 'libx264',
-        '-preset', preset,
-        '-crf', str(crf),
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-movflags', '+faststart',
-        str(proxy_path)
-    ]
+    enc_pref, _ = get_hardware_settings(project_id)
+    encoder_name, enc_args, is_hw = resolve_encoder_pipeline(enc_pref)
     
-    try:
+    scale_filter = f"scale={res_width}:{res_height}:force_original_aspect_ratio=decrease,pad={res_width}:{res_height}:(ow-iw)/2:(oh-ih)/2"
+    
+    def _build_cmd(codec: str, extra_args: list) -> list:
+        return [
+            'ffmpeg', '-y', '-i', str(original_path),
+            '-progress', 'pipe:1',
+            '-vf', scale_filter,
+            '-c:v', codec,
+            *extra_args,
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-movflags', '+faststart',
+            str(proxy_path)
+        ]
+
+    cmd = _build_cmd(encoder_name, enc_args)
+    
+    def _run_ffmpeg_process(exec_cmd: list) -> bool:
         startupinfo = None
         if os.name == 'nt':
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             
         process = subprocess.Popen(
-            cmd,
+            exec_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -255,8 +328,26 @@ def generate_video_proxy(
                 
         process.communicate()
         return process.returncode == 0
+
+    try:
+        ok = _run_ffmpeg_process(cmd)
+        if ok and proxy_path.exists() and proxy_path.stat().st_size > 0:
+            return True
+            
+        if is_hw:
+            print(f"[FFmpeg] Aceleração de hardware ({encoder_name}) falhou ao gerar proxy para {original_path.name}. Executando fallback para CPU (libx264)...")
+            fallback_cmd = _build_cmd('libx264', ['-preset', preset, '-crf', str(crf)])
+            return _run_ffmpeg_process(fallback_cmd)
+        return False
     except Exception as e:
-        print(f"[FFmpeg] Erro ao gerar proxy para {original_path.name}: {e}")
+        print(f"[FFmpeg] Erro na geração de proxy para {original_path.name}: {e}")
+        if is_hw:
+            try:
+                print(f"[FFmpeg] Tentando fallback para CPU (libx264)...")
+                fallback_cmd = _build_cmd('libx264', ['-preset', preset, '-crf', str(crf)])
+                return _run_ffmpeg_process(fallback_cmd)
+            except Exception as fe:
+                print(f"[FFmpeg] Fallback também falhou: {fe}")
         return False
 
 

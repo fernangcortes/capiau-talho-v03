@@ -367,6 +367,7 @@ class PipelineService:
             config = aai.TranscriptionConfig(
                 language_code=S.get("asr.language"),
                 speaker_labels=S.get("asr.speaker_labels"),
+                entity_detection=S.get("asr.entity_detection"),
                 punctuate=True,
                 format_text=True
             )
@@ -387,8 +388,28 @@ class PipelineService:
                     "confidence": getattr(word, "confidence", 1.0)
                 })
                 
+            # Entidades faladas (nomes, lugares, organizacoes) quando a deteccao esta ligada.
+            # A AssemblyAI entrega timestamps em milissegundos, igual as palavras.
+            entidades = []
+            for ent in (getattr(transcript, "entities", None) or []):
+                tipo = getattr(ent, "entity_type", None)
+                entidades.append({
+                    "entity_type": getattr(tipo, "value", None) or str(tipo),
+                    "text": getattr(ent, "text", ""),
+                    "start_time": (ent.start / 1000.0) if getattr(ent, "start", None) is not None else None,
+                    "end_time": (ent.end / 1000.0) if getattr(ent, "end", None) is not None else None,
+                })
+
             with get_db() as conn:
                 NarrativeRepository.save_transcript_words(conn, video_id, words)
+                conn.execute("DELETE FROM transcript_entity WHERE video_id = ?", (video_id,))
+                if entidades:
+                    conn.executemany(
+                        "INSERT INTO transcript_entity (video_id, entity_type, text, start_time, end_time) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        [(video_id, e["entity_type"], e["text"], e["start_time"], e["end_time"])
+                         for e in entidades],
+                    )
                 dialogues = NarrativeRepository.get_transcript_dialogues(conn, video_id)
                 
             # Indexação semântica no Qdrant

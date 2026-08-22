@@ -238,6 +238,18 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   rápida em texto e dois botões de IA (via OpenRouter) para gerar um relatório legível por humanos
   ou uma análise técnica estruturada de performance e exceções.
 
+- **Aceleração por Hardware (GPU) com fallback resiliente para CPU.** O motor de mídia do FFmpeg
+  e do OpenCV detecta e aproveita automaticamente aceleradores de hardware disponíveis no sistema
+  (Intel QuickSync `h264_qsv`, AMD AMF `h264_amf`, Nvidia NVENC `h264_nvenc`, Direct3D 11 / DXVA2 e
+  OpenCL). Em caso de sobrecarga da GPU, limites de sessões simultâneas ou incompatibilidade de
+  arquivo, o sistema executa um fallback automático e silencioso para a CPU (`libx264`), garantindo
+  máxima velocidade sem qualquer risco de travamento.
+
+- **Aba de Configurações de Hardware & GPU com Tooltips Didáticas.** Painel dedicado na interface
+  para gerenciar o codificador de vídeo de proxies, a decodificação por hardware, o uso de OpenCL no
+  OpenCV e a alocação de dispositivos para os modelos de IA, com explicações completas e tooltips
+  técnicas (ícone ⓘ) em cada opção.
+
 - **Gerenciador de tarefas de miniaturas e lançador desgrudado.** Painel para pausar, cancelar,
   remover e sincronizar a geração de miniaturas. No Windows, o script
   [`scripts/launch_detached.py`](scripts/launch_detached.py) roda o backend desvinculado do console,

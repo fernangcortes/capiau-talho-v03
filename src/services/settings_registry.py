@@ -23,6 +23,7 @@ CATEGORIES = [
     {"id": "agent_chat",    "label": "Agente & Chat",        "icon": "fa-robot"},
     {"id": "themes_search", "label": "Temas & Busca",        "icon": "fa-brain"},
     {"id": "faces",         "label": "Rostos",               "icon": "fa-user"},
+    {"id": "hardware",      "label": "Hardware & GPU",       "icon": "fa-microchip"},
     {"id": "prompts",       "label": "Prompts",              "icon": "fa-terminal", "pro_only": True},
 ]
 
@@ -107,6 +108,13 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "label": "Identificar falantes (diarização)",
         "help": "Separa automaticamente quem está falando (Falante A, Falante B...). Afeta apenas transcrições novas.",
         "help_tech": "speaker_labels do aai.TranscriptionConfig.",
+        "category": "transcription", "level": "pro", "scope": "both", "requires_reprocess": True,
+    },
+    {
+        "key": "asr.entity_detection", "type": "bool", "default": True,
+        "label": "Detectar nomes e lugares na fala",
+        "help": "Marca nomes de pessoas, lugares e organizacoes ditos na entrevista. Ajuda a conferir grafia de nome proprio, que a transcricao costuma errar. Custa +$0,08 por hora de audio. Afeta apenas transcricoes novas.",
+        "help_tech": "entity_detection do aai.TranscriptionConfig; resultado salvo em transcript_entity.",
         "category": "transcription", "level": "pro", "scope": "both", "requires_reprocess": True,
     },
     {
@@ -703,6 +711,39 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "help": "Quão parecido um rosto precisa ser de uma pessoa conhecida para ser reconhecido automaticamente.",
         "help_tech": "confidence_threshold do FacePipeline em cascata.",
         "category": "faces", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+
+    # ── Hardware & GPU ───────────────────────────────────────────────────────
+    {
+        "key": "hardware.video_encoder", "type": "enum", "default": "auto",
+        "enum": ["auto", "qsv", "amf", "nvenc", "cpu"],
+        "label": "Codificador de Vídeo (Proxies / Exportação)",
+        "help": "Define qual chip de aceleração gráfica processará a conversão de vídeos e criação de proxies. O modo 'Automático' (recomendado) identifica sua GPU automaticamente (Intel QuickSync, AMD AMF ou Nvidia NVENC). Se a sua GPU ficar sobrecarregada ou atingir o limite de conversões simultâneas, o sistema transfere o trabalho para a CPU (libx264) de forma transparente e sem travar.",
+        "help_tech": "Configura o encoder do FFmpeg (-c:v). 'auto' executa probe_hw_encoder() e seleciona h264_qsv, h264_amf ou h264_nvenc com fallback automático para libx264. O modo 'cpu' força codificação por software via x264.",
+        "category": "hardware", "level": "simple", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "hardware.hwaccel_decode", "type": "enum", "default": "auto",
+        "enum": ["auto", "d3d11va", "dxva2", "cuda", "off"],
+        "label": "Decodificação de Vídeo por Hardware",
+        "help": "Usa a placa de vídeo para descompactar e ler vídeos pesados (1080p, 4K, arquivos RAW) durante a extração de miniaturas e visualização de frames. Isso evita que o processador (CPU) trabalhe a 100% apenas para abrir o vídeo.",
+        "help_tech": "Controla o argumento -hwaccel no FFmpeg. 'auto' utiliza Direct3D 11 (d3d11va) ou DirectX 9 (dxva2) no Windows, delegando a decodificação para a GPU sem sobrecarregar barramentos de memória do sistema.",
+        "category": "hardware", "level": "simple", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "hardware.opencv_opencl", "type": "bool", "default": True,
+        "label": "Aceleração OpenCL no OpenCV",
+        "help": "Permite que cálculos pesados de imagem (como filtros de nitidez, realce de contraste CLAHE, detecção de cortes de cena e redimensionamentos) rodem nos núcleos paralelos da sua placa de vídeo sem consumir a memória de vídeo dedicada (VRAM).",
+        "help_tech": "Ativa cv2.ocl.setUseOpenCL(True) no OpenCV. Transfere operações de matrizes para o pipeline OpenCL da GPU (Intel HD/UHD ou AMD Radeon) com fallback automático para instruções SIMD AVX2 da CPU.",
+        "category": "hardware", "level": "pro", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "hardware.ai_device", "type": "enum", "default": "auto",
+        "enum": ["auto", "cpu", "directml", "cuda"],
+        "label": "Dispositivo para Modelos de IA (CLIP / Embeddings)",
+        "help": "Controla onde os modelos de busca semântica e visão local (CLIP para busca por texto de fotos e MiniLM para falas) serão carregados. No modo 'Automático', os modelos rodam na CPU para economizar os 2.0 GB de VRAM da GPU para a renderização de vídeo, garantindo estabilidade máxima sem riscos de estouro de memória.",
+        "help_tech": "Define a string de dispositivo enviada ao PyTorch / SentenceTransformer ('cpu', 'directml', 'cuda'). Com 2.0 GB de VRAM, a CPU preserva memória dedicada livre para o decodificador/codificador de hardware do FFmpeg.",
+        "category": "hardware", "level": "pro", "scope": "global", "requires_reprocess": False,
     },
 ]
 

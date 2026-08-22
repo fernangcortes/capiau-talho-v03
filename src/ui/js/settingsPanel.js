@@ -400,10 +400,10 @@ export class SettingsPanelManager {
         }
         label.appendChild(badge);
 
-        if (this.mode === "pro" && entry.help_tech) {
+        if (entry.help_tech) {
             const techIcon = document.createElement("i");
             techIcon.className = "fa-solid fa-circle-info";
-            techIcon.style.cssText = "color: var(--text-muted); font-size: 11px; cursor: help;";
+            techIcon.style.cssText = "color: var(--text-muted); font-size: 11px; cursor: help; margin-left: 6px;";
             techIcon.setAttribute("data-tooltip", entry.help_tech);
             label.appendChild(techIcon);
         }
@@ -583,6 +583,32 @@ export class SettingsPanelManager {
         }
         if (key === "llm.vision_model" && opt.endsWith(":free")) {
             return `${opt} (grátis — rate limit da OpenRouter se aplica)`;
+        }
+        if (key === "hardware.video_encoder") {
+            return {
+                auto: "Automático (Detectar GPU com fallback CPU)",
+                qsv: "Intel QuickSync Video (h264_qsv)",
+                amf: "AMD AMF (h264_amf)",
+                nvenc: "Nvidia NVENC (h264_nvenc)",
+                cpu: "Software CPU (libx264)"
+            }[opt] || opt;
+        }
+        if (key === "hardware.hwaccel_decode") {
+            return {
+                auto: "Automático (Direct3D 11 / DXVA2)",
+                d3d11va: "Direct3D 11 (d3d11va)",
+                dxva2: "DirectX 9 (dxva2)",
+                cuda: "Nvidia CUDA (cuda)",
+                off: "Desativado (Decodificação por CPU)"
+            }[opt] || opt;
+        }
+        if (key === "hardware.ai_device") {
+            return {
+                auto: "Automático (Seguro para economizar VRAM)",
+                cpu: "Processador CPU (Padrão 100% estável)",
+                directml: "DirectML (GPU DirectX 12)",
+                cuda: "Nvidia CUDA"
+            }[opt] || opt;
         }
         return opt;
     }

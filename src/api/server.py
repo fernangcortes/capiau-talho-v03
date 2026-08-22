@@ -36,6 +36,19 @@ with get_db() as conn:
     conn.commit()
 
 
+try:
+    import cv2
+    from src.services.settings_service import SettingsService
+    s_opencl = SettingsService.get_settings().get("hardware.opencv_opencl")
+    if s_opencl and cv2.ocl.haveOpenCL():
+        cv2.ocl.setUseOpenCL(True)
+        dev = cv2.ocl.Device.getDefault()
+        print(f"[Hardware] OpenCV OpenCL ativado na GPU: {dev.name()} ({dev.vendorName()})")
+    else:
+        cv2.ocl.setUseOpenCL(False)
+except Exception as e:
+    print(f"[Hardware] Aviso OpenCL: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
@@ -45,8 +58,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="CapIAu-Talho — Motor de Inteligência Cinematográfica",
-    description="Backend modularizado com FastAPI, SQLite, Qdrant, FFmpeg em CPU e Reconhecimento Facial em Cascata.",
-    version="3.1",
+    description="Backend modularizado com FastAPI, SQLite, Qdrant, FFmpeg Acelerado por GPU e Reconhecimento Facial em Cascata.",
+    version="3.2",
     lifespan=lifespan,
 )
 
@@ -93,7 +106,7 @@ from fastapi import Request
 
 @app.get("/api/health")
 def get_health(request: Request):
-    """Retorna o status de saúde do backend: SQLite, Qdrant e porta em execução."""
+    """Retorna o status de saúde do backend: SQLite, Qdrant, Hardware/GPU e porta em execução."""
     db_ok = False
     try:
         with get_db() as conn:
@@ -113,6 +126,23 @@ def get_health(request: Request):
         qdrant_ok = False
         qdrant_err = str(e)
 
+    # Diagnóstico de Hardware e GPU
+    hw_info = {
+        "opencl_available": False,
+        "opencl_device": None,
+        "hw_encoders": {}
+    }
+    try:
+        import cv2
+        hw_info["opencl_available"] = bool(cv2.ocl.haveOpenCL())
+        if cv2.ocl.haveOpenCL():
+            dev = cv2.ocl.Device.getDefault()
+            hw_info["opencl_device"] = f"{dev.name()} ({dev.vendorName()})"
+        from src.media.ffmpeg import get_available_hw_encoders
+        hw_info["hw_encoders"] = get_available_hw_encoders()
+    except Exception:
+        pass
+
     port = request.url.port or 8000
     status = "ok" if (db_ok and qdrant_ok) else "degraded"
 
@@ -121,6 +151,7 @@ def get_health(request: Request):
         "db": "ok" if db_ok else "error",
         "qdrant": "ok" if qdrant_ok else "unavailable",
         "qdrant_error": qdrant_err,
+        "hardware": hw_info,
         "port": port
     }
 

@@ -6,6 +6,32 @@ depoimentos, mapear imagens semanticamente, interagir com o agente de
 edição e realizar a pré-edição do seu documentário de forma
 profissional.
 
+---
+
+## 📑 Índice do Manual
+
+1. [📂 1. Estrutura de Pastas e Organização das Mídias](#1-estrutura-de-pastas-e-organização-das-mídias)
+2. [🎬 2. Fluxo de Trabalho Passo a Passo](#2-fluxo-de-trabalho-passo-a-passo)
+   - [Passo A: Ingestão de Mídias](#passo-a-ingestão-de-mídias)
+   - [Passo B: Transcrição (ASR), Diarização e Waveform](#passo-b-transcrição-asr-e-diarização-de-entrevistas)
+   - [Passo C: Decupagem Visual de B-Rolls e Fotos (CLIP Local)](#passo-c-decupagem-visual-de-b-rolls-e-fotos)
+   - [Passo D: Agrupamento em Temas (Clustering)](#passo-d-agrupamento-em-temas-clustering)
+   - [Passo E: Busca Semântica Híbrida e Playlist](#passo-e-busca-semântica-híbrida-e-controles-de-playlist)
+3. [🤖 3. Assistente Conversacional de Edição (Chat-Agente) & Ghost Clips](#3-assistente-conversacional-de-edição-chat-agente--ghost-clips)
+4. [👥 4. Mapeamento de Rostos, Objetos e Desambiguação Rápida](#4-mapeamento-de-rostos-objetos-e-desambiguação-rápida)
+5. [🎛️ 5. Pistas de Áudio Reais, J/L-Cuts e Marcadores de Timeline](#5-pistas-de-áudio-reais-e-jl-cuts-nativos)
+6. [🔄 6. Carrossel de Alternativas da IA (Atalho A)](#6-carrossel-de-alternativas-da-ia-atalho-a)
+7. [💾 7. Salvando, Auto-Salvamento, Exportação e Importação de Timelines (OTIO/XML/EDL)](#7-salvando-auto-salvamento--logs-com-ia)
+8. [🖥️ 8. Layout e Organização Avançada (Inspetor de Mídia, Players e Estúdio)](#8-layout-e-organização-avançada)
+9. [⚙️ 9. Configurações da Sequência, Auto-Configuração e Zoom do Preview](#9-configurações-da-sequência-auto-configuração-e-zoom-do-preview)
+10. [📐 10. Viewport Estável, Alças de Transformação e Recorte (Crop)](#10-viewport-estável-alças-de-transformação-e-recorte-crop)
+11. [🤖 11. Resiliência de IA, Seleção de Modelos e Gestão de Tarefas](#11-resiliência-de-ia-seleção-de-modelos-e-gestão-de-tarefas)
+12. [🖥️ 12. Execução Resiliente sem Janela de Console no Windows](#12-execução-resiliente-sem-janela-de-console-no-windows)
+13. [⚡ 13. Configurações de Hardware, Aceleração por GPU e Fallback Automático](#13-configurações-de-hardware-aceleração-por-gpu-e-fallback-automático)
+14. [🎹 14. Mapa de Atalhos de Teclado NLE](#14-mapa-de-atalhos-de-teclado-nle)
+
+---
+
 ## 📂 1. Estrutura de Pastas e Organização das Mídias
 
 Para processar seu material de forma limpa, o CapIAu-Talho utiliza a
@@ -629,3 +655,72 @@ Para evitar que o servidor FastAPI ou os workers de background sejam encerrados 
    python scripts/launch_detached.py
    ```
 2. **Operação Desvinculada:** O lançador cria o processo do backend de forma totalmente desvinculada do console pai (`DETACHED_PROCESS`). O servidor continuará rodando de forma segura em background na porta 8000 mesmo se o terminal for fechado.
+
+---
+
+## ⚡ 13. Configurações de Hardware, Aceleração por GPU e Fallback Automático
+
+O CapIAu-Talho inclui uma aba dedicada de **Hardware & GPU** no Painel de Configurações (ícone de engrenagem no cabeçalho), permitindo extrair o máximo de desempenho da sua placa gráfica (Intel QuickSync, AMD Radeon, Nvidia) enquanto protege o computador contra travamentos com **fallback automático para CPU**.
+
+### A. Opções Disponíveis na Aba Hardware & GPU
+
+1. **Codificador de Vídeo (Proxies / Exportação):**
+   - **Automático (Detectar GPU com fallback CPU)** *(Padrão recomendado)*: Detecta automaticamente o melhor acelerador de vídeo instalado no seu computador.
+   - **Intel QuickSync Video (`h264_qsv`)**: Utiliza o motor de codificação de vídeo integrado dos processadores Intel para gerar proxies ultrarrápidos com quase 0% de uso da CPU.
+   - **AMD Advanced Media Framework (`h264_amf`)**: Utiliza a GPU dedicada AMD Radeon para processamento de vídeo.
+   - **Nvidia NVENC (`h264_nvenc`)**: Utiliza os núcleos NVENC dedicados das placas Nvidia GeForce/RTX.
+   - **Software CPU (`libx264`)**: Codificação clássica por processador para compatibilidade universal.
+
+2. **Decodificação de Vídeo por Hardware:**
+   - **Automático (Direct3D 11 / DXVA2)** *(Padrão)*: Usa a GPU para descompactar vídeos 1080p/4K durante a extração de miniaturas e navegação de frames, reduzindo o aquecimento e o consumo da CPU.
+   - **Direct3D 11 (`d3d11va`)** / **DirectX 9 (`dxva2`)** / **Nvidia CUDA (`cuda`)** / **Desativado (CPU pura)**.
+
+3. **Aceleração OpenCL no OpenCV:**
+   - Ativa o processamento gráfico paralelo (`cv2.ocl.setUseOpenCL(True)`) para operações de matrizes, filtros de nitidez, realce de contraste CLAHE e redimensionamento de fotos, liberando a CPU sem gastar memória de vídeo dedicada (VRAM).
+
+4. **Dispositivo para Modelos de IA (CLIP / Embeddings):**
+   - **Automático (Seguro para economizar VRAM)** *(Padrão)*: Mantém os modelos de busca semântica (CLIP e MiniLM) operando de forma leve, preservando os 2.0 GB de VRAM dedicados da GPU para o trabalho pesado de decodificação e codificação de vídeo.
+   - **Opções de DirectML e CUDA**: Disponíveis para máquinas com GPUs de maior capacidade (4 GB+ de VRAM).
+
+### B. Como Funciona o Fallback Automático e Silencioso
+O sistema opera com tolerância total a falhas:
+- Se você importar dezenas de vídeos ao mesmo tempo e o chip de vídeo atingir o limite físico de sessões de codificação simultâneas, ou se um arquivo de vídeo com perfil exótico for rejeitado pela GPU, o FFmpeg avisa o backend.
+- O CapIAu-Talho realiza uma **transição instantânea para a CPU (`libx264`)** sem interromper a fila de tarefas, sem emitir erros na tela e garantindo que todos os proxies e miniaturas sejam gerados com sucesso.
+
+### C. Tooltips Didáticas e Técnicas (Ícone ⓘ)
+Ao lado de cada configuração no painel, passe o mouse sobre o ícone **ⓘ** para visualizar uma tooltip técnica aprofundada com os detalhes de codecs, flags internas do FFmpeg e gerenciamento de memória.
+
+---
+
+## 🎹 14. Mapa de Atalhos de Teclado NLE
+
+Para máxima agilidade na ilha de edição, utilize os atalhos de teclado profissionais suportados nativamente pelo CapIAu-Talho:
+
+| Categoria | Atalho | Ação |
+| :--- | :---: | :--- |
+| **Reprodução & Scrubbing** | **`Espaço`** | Play / Pause no player ativo |
+| | **`J`** | Retroceder reprodução (1x, 2x, 4x, 8x) |
+| | **`K`** | Parar reprodução |
+| | **`L`** | Avançar reprodução (1x, 2x, 4x, 8x) |
+| | **`←` / `→`** | Avançar / Retroceder 1 frame |
+| | **`Shift + ←` / `→`** | Saltar 1 segundo |
+| **Pontos de Corte** | **`I`** | Marcar ponto de Entrada (*IN*) |
+| | **`O`** | Marcar ponto de Saída (*OUT*) |
+| | **`Alt + X`** | Limpar pontos de In e Out |
+| | **`E`** | Inserir trecho selecionado na timeline |
+| | **`Shift + E`** | Inserir texto ou fala selecionada na timeline |
+| **Edição na Linha do Tempo** | **`Z`** | Dividir (*Split*) clipe na posição da agulha |
+| | **`U`** | Desvincular (*Unlink*) ou Vincular áudio e vídeo |
+| | **`Delete` / `Backspace`** | Excluir clipe(s) selecionado(s) |
+| | **`Ctrl + Z`** | Desfazer (*Undo*) |
+| | **`Ctrl + Y` / `Ctrl + Shift + Z`** | Refazer (*Redo*) |
+| **Marcadores** | **`M`** | Criar ou editar marcador na agulha |
+| | **`Shift + M`** | Saltar para o próximo marcador |
+| | **`Alt + M`** | Retroceder para o marcador anterior |
+| | **`Shift + Clique`** | Selecionar múltiplos marcadores para exclusão em lote |
+| **Inteligência Artificial & Players** | **`A`** | Carrossel de alternativas da IA / Abrir Inspetor de Mídia |
+| | **`Q`** | Alternar maximização entre Source Player e Program Player |
+| | **`Enter` / `Y`** | Aceitar sugestão da IA (*Ghost Clip*) selecionada |
+| | **`Esc`** | Fechar modais, desmarcar ou sair do Inspetor de Mídia |
+
+

@@ -340,6 +340,20 @@ CREATE TABLE IF NOT EXISTS project_setting (
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (project_id, key)
 );
+
+-- Entidades detectadas na FALA pelo ASR (AssemblyAI entity_detection).
+-- Separada de entity/entity_mention, que pertencem ao pipeline de visao/rostos
+-- e usam um vocabulario proprio de 4 tipos. Aqui guardamos o rotulo cru da
+-- AssemblyAI (50+ tipos) sem forcar traducao.
+CREATE TABLE IF NOT EXISTS transcript_entity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+    entity_type TEXT NOT NULL, -- rotulo cru da AssemblyAI (person_name, location, ...)
+    text TEXT NOT NULL,        -- trecho literal como foi falado
+    start_time REAL,           -- em segundos
+    end_time REAL,             -- em segundos
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 def init_db(db_path: Path = None):
