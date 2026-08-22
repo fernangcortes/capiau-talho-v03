@@ -696,9 +696,13 @@
                         
                         <div class="video-container" id="program-video-wrapper" style="flex: 1; background: #000; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;">
                             <div id="program-player-viewport" style="position: relative; overflow: visible; display: flex; align-items: center; justify-content: center;">
-                                <!-- Pool A/B de Vídeos para reprodução sequencial sem lag -->
-                                <video id="program-video-a" src="" preload="auto" style="position: absolute; inset: 0; width: 100%; height: 100%; display: block;"></video>
-                                <video id="program-video-b" src="" preload="auto" style="position: absolute; inset: 0; width: 100%; height: 100%; display: none;"></video>
+                                <!-- Pool de buffers de vídeo: 2 camadas no ar (base/sobreposição) + 2 buffers
+                                     de pré-carregamento do próximo clipe. Trocar de clipe = trocar de buffer,
+                                     nunca recarregar o <video> que está no ar (load() = tela preta). -->
+                                <video id="program-video-a" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; display: block;"></video>
+                                <video id="program-video-b" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; display: none;"></video>
+                                <video id="program-video-c" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; display: none;"></video>
+                                <video id="program-video-d" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; display: none;"></video>
                                 
                                 <!-- Camadas de foto (still) da timeline: A = base, B = sobreposição -->
                                 <img id="program-player-photo" style="display:none; position: absolute; inset: 0; width: 100%; height: 100%;" src="">

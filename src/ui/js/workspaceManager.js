@@ -166,7 +166,14 @@ export class WorkspaceManager {
                 
                 clickTimer = setTimeout(() => {
                     clickTimer = null;
-                    // Play/Pause
+                    // Play/Pause. Sem videoId (Program) o clique vai para o botão do painel:
+                    // o Program compõe a timeline num pool de buffers <video>, então não há
+                    // um elemento fixo para dar play — quem manda é o ProgramPlayer.
+                    if (!videoId) {
+                        const btnPlay = document.getElementById(btnPlayId);
+                        if (btnPlay) btnPlay.click();
+                        return;
+                    }
                     const vid = document.getElementById(videoId);
                     if (vid && vid.src) {
                         if (vid.paused) vid.play(); else vid.pause();
@@ -188,7 +195,7 @@ export class WorkspaceManager {
         };
 
         setupPlayerClickHandlers(sourceWrapper, "source-video", "btn-source-play", "btn-expand-source");
-        setupPlayerClickHandlers(programWrapper, "program-video-a", "btn-program-play", "btn-expand-program");
+        setupPlayerClickHandlers(programWrapper, null, "btn-program-play", "btn-expand-program");
 
         const selectWorkspace = document.getElementById("select-workspace");
         if (selectWorkspace) {

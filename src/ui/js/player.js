@@ -943,6 +943,11 @@ export function syncProgramViewport() {
     viewport.style.height = `${Math.round(th * scale)}px`;
 }
 
+// Tolerância (s) para considerar que um buffer já está no ponto certo da mídia e portanto
+// pode emendar no clipe seguinte sem seek. Precisa ser maior que a banda da correção de
+// deriva (0.08 s), senão toda emenda de razor cut viraria um seek e travaria o decoder.
+const BUFFER_CONTINUITY_TOLERANCE = 0.1;
+
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * 2. PROGRAM PLAYER - MONITOR DE PROGRAMA / TIMELINE (DIREITA)
@@ -1115,12 +1120,7 @@ export class ProgramPlayer {
         const btnPlay = this.el("btn-program-play");
         if (btnPlay) btnPlay.innerHTML = `<i class="fa-solid fa-play"></i>`;
 
-        const videoA = this.el("program-video-a");
-        const videoB = this.el("program-video-b");
-        if (videoA && !videoA.paused) videoA.pause();
-        if (videoB && !videoB.paused) videoB.pause();
-
-        // Pausa também as pistas de áudio dedicadas
+        this._videoPool().forEach(el => { if (!el.paused) el.pause(); });        // Pausa também as pistas de áudio dedicadas
         if (this.audioPool) {
             Object.values(this.audioPool).forEach(el => {
                 if (!el.paused) el.pause();
@@ -1222,8 +1222,8 @@ export class ProgramPlayer {
         const cuts = STATE.activeTimelineCuts;
 
         // ────────── COMPOSIÇÃO MULTIPISTA ──────────
-        // Base (videoA) = clipe da pista de vídeo MAIS BAIXA no playhead (geralmente falas).
-        // Sobreposição (videoB) = clipe da pista de vídeo MAIS ALTA acima da base (cobertura b-roll).
+        // Camada base = clipe da pista de vídeo MAIS BAIXA no playhead (geralmente falas).
+        // Camada de sobreposição = clipe da pista MAIS ALTA acima da base (cobertura b-roll).
         const videoTracks = TIMELINE_STATE.getVideoTracks().filter(t => !TIMELINE_STATE.muteHiddenTracksPlayback || !t.hidden); // ordem visual: topo → base
         const clipAtPlayhead = (trackId) => cuts.find(c =>
             c.track === trackId &&
@@ -1231,128 +1231,126 @@ export class ProgramPlayer {
             currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame))
         );
 
-        let baseCut = null, baseTrack = null;
+        let baseCut = null;
         for (let i = videoTracks.length - 1; i >= 0; i--) { // de baixo para cima
             const hit = clipAtPlayhead(videoTracks[i].id);
             if (hit) {
                 baseCut = hit;
-                baseTrack = videoTracks[i];
                 break;
             }
         }
 
-        let overlayCut = null, overlayTrack = null;
+        let overlayCut = null;
         for (let i = 0; i < videoTracks.length; i++) { // de cima para baixo
             const hit = clipAtPlayhead(videoTracks[i].id);
             if (hit && (!baseCut || hit.id !== baseCut.id)) {
                 overlayCut = hit;
-                overlayTrack = videoTracks[i];
                 break;
             }
         }
 
-        const applyCutToElement = (el, cut, track, zIndex) => {
-            if (!el) return;
-            if (!cut) {
-                if (!el.paused) el.pause();
-                if (el.style.display !== "none") el.style.display = "none";
-                el.dataset.activeClipId = "";
-                return;
-            }
-            const videoData = STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
-            if (!videoData) {
-                if (!el.paused) el.pause();
-                el.style.display = "none";
-                el.dataset.activeClipId = "";
-                return;
-            }
-            const rawSrc = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
-            const videoSrc = rawSrc.replace(/\\/g, "/");
-            const srcChanged = el.dataset.loadedSrc !== videoSrc;
-            if (srcChanged) {
-                el.src = videoSrc;
-                el.dataset.loadedSrc = videoSrc;
-                el.load();
-            }
+        // ────────── COMPOSIÇÃO EM BUFFERS (VIRADA DE CLIPE SEM PISCA) ──────────
+        // Cada camada (base / sobreposição) é servida por um buffer <video> do pool.
+        // Virar de clipe = revelar OUTRO buffer, que já está com o arquivo aberto e parado
+        // no primeiro frame do clipe. Dar src/load() no elemento que está no ar zera o
+        // decoder e o <video> pinta preto até o arquivo novo abrir — era essa a piscada.
+        const pool = this._videoPool();
+        const claimed = new Set();
+        const liveEls = new Set();
+        if (!this._layerShown) this._layerShown = { base: null, overlay: null };
 
-            // Calcula o tempo correspondente no arquivo
-            const offsetFrames = currentFrame - cut.timelineStartFrame;
-            const targetSeconds = cut.in + (offsetFrames / (TIMELINE_STATE?.fps || 24));
+        // Escolhe o buffer que vai exibir um clipe, nesta ordem:
+        // 1) o buffer que já contém o clipe (pré-carregado ou já no ar) — troca instantânea;
+        // 2) o buffer no ar da camada, quando o corte é contíguo no mesmo arquivo
+        //    (razor cut): continua rodando sem seek, emenda perfeita;
+        // 3) um buffer ocioso — preferindo um que já tenha o mesmo arquivo carregado.
+        const claimBuffer = (cut, layerKey) => {
+            const held = pool.find(e => e.dataset.activeClipId === String(cut.id));
+            if (held && !claimed.has(held)) { claimed.add(held); return held; }
 
-            const clipChanged = el.dataset.activeClipId !== String(cut.id);
-            if (clipChanged) el.dataset.activeClipId = String(cut.id);
+            const src = this._videoSrcForCut(cut);
+            const target = this._targetSecondsFor(cut, currentFrame);
 
-            const drift = el.currentTime - targetSeconds;
-
-            // SINCRONIA SEM SEEK-LOOP:
-            // Seek "duro" num vídeo em reprodução trava o decoder (~100-300ms), o que
-            // aumenta a deriva e dispara o próximo seek — loop infinito de pisca-trava,
-            // garantido com 2 vídeos sobrepostos decodificando juntos.
-            // Em reprodução, corrigimos a deriva suavemente via playbackRate (como NLEs);
-            // seek duro só em descontinuidade real (troca de clipe, scrub, deriva > 1s).
-            if (srcChanged || clipChanged) {
-                el.currentTime = targetSeconds;
-                el.playbackRate = this.isPlaying && this.playbackSpeed > 0 ? Math.min(4.0, this.playbackSpeed) : 1.0;
-            } else if (this.isPlaying) {
-                if (this.playbackSpeed > 0) {
-                    const baseRate = Math.min(4.0, this.playbackSpeed);
-                    if (Math.abs(drift) > 1.0) {
-                        el.currentTime = targetSeconds;
-                        el.playbackRate = baseRate;
-                    } else if (drift > 0.08) {
-                        el.playbackRate = baseRate * 0.92;
-                    } else if (drift < -0.08) {
-                        el.playbackRate = baseRate * 1.08;
-                    } else if (el.playbackRate !== baseRate) {
-                        el.playbackRate = baseRate;
-                    }
-                } else {
-                    // Reverse: mantenha o vídeo pausado e atualize currentTime suavemente
-                    if (!el.seeking && Math.abs(drift) > 0.03) {
-                        el.currentTime = targetSeconds;
-                    }
-                }
-            } else {
-                // Pausado (scrub manual): seek preciso é o comportamento esperado
-                if (Math.abs(drift) > 0.06) {
-                    el.currentTime = targetSeconds;
-                }
-                if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
+            // O buffer no ar já está com a imagem certa: emendar nele é sempre melhor que
+            // abrir o arquivo de novo.
+            const shown = this._layerShown[layerKey];
+            if (shown && !claimed.has(shown) && shown.getAttribute("src") &&
+                shown.dataset.loadedSrc === src &&
+                Math.abs(shown.currentTime - target) < BUFFER_CONTINUITY_TOLERANCE) {
+                claimed.add(shown);
+                return shown;
             }
 
-            // Pistas de vídeo são só imagem: o áudio vem das pistas de áudio dedicadas
-            el.muted = true;
-            if (this.isPlaying && this.playbackSpeed > 0 && el.paused) {
-                el.play().catch(() => {});
-            } else if ((!this.isPlaying || this.playbackSpeed < 0) && !el.paused) {
-                el.pause();
-            }
-            if (el.style.display !== "block") el.style.display = "block";
-            el.style.zIndex = String(zIndex);
-            this.applyMediaEffects(el, cut, currentFrame);
+            const otherShown = layerKey === "base" ? this._layerShown.overlay : this._layerShown.base;
+            const busy = new Set([this._layerShown.base, this._layerShown.overlay].filter(Boolean));
+            const idle = pool.filter(e => !claimed.has(e) && !busy.has(e));
+            const el = idle.find(e => e.dataset.loadedSrc === src)
+                || idle.find(e => !e.dataset.activeClipId)
+                || idle[0]
+                || pool.find(e => !claimed.has(e) && e !== otherShown)
+                || null;
+            if (el) claimed.add(el);
+            return el;
         };
 
-        const videoA = this.el("program-video-a");
-        const videoB = this.el("program-video-b");
+        // Prepara a camada e devolve o elemento que deve estar visível AGORA.
+        // Clipes de foto (still) não usam <video>: a imagem é composta nas camadas <img>.
+        const applyLayer = (cut, layerKey, zIndex) => {
+            if (!cut || !this._videoSrcForCut(cut)) {
+                this._layerShown[layerKey] = null;
+                return null;
+            }
 
-        // ESTABILIDADE DE PAPÉIS: se um clipe já está tocando num elemento, mantém nele.
-        // Sem isso, quando o clipe de baixo termina, o de cima "migraria" do elemento B
-        // para o A (recarga de src no meio da reprodução = flash preto).
-        let baseEl = videoA, overlayEl = videoB;
-        if (baseCut && !overlayCut && videoB && videoB.dataset.activeClipId === String(baseCut.id)) {
-            baseEl = videoB;
-            overlayEl = videoA;
-        } else if (baseCut && overlayCut && videoA && videoB &&
-                   videoA.dataset.activeClipId === String(overlayCut.id) &&
-                   videoB.dataset.activeClipId === String(baseCut.id)) {
-            baseEl = videoB;
-            overlayEl = videoA;
-        }
+            const el = claimBuffer(cut, layerKey);
+            if (!el) { this._layerShown[layerKey] = null; return null; }
+            liveEls.add(el);
 
-        // Clipes de foto (still) não vão para elementos <video> (video_id null ⇒ applyCutToElement
-        // apenas oculta o <video>); a imagem é composta nas camadas <img> dedicadas.
-        applyCutToElement(baseEl, baseCut, baseTrack, 1);
-        applyCutToElement(overlayEl, overlayCut, overlayTrack, 10);
+            // Buffer que já está no ar nesta camada não sai por "ainda não está pronto":
+            // no pior caso ele segura o quadro anterior por um instante, o que é sempre
+            // melhor que apagar a imagem. Só cai fora se o elemento realmente zerou.
+            const wasOnAir = this._layerShown[layerKey] === el && el.readyState > 0;
+            this._prepareBuffer(el, cut, currentFrame, true);
+            el.style.zIndex = String(zIndex);
+            this.applyMediaEffects(el, cut, currentFrame);
+
+            if (wasOnAir || this._bufferHasFrame(el, cut, currentFrame)) {
+                this._layerShown[layerKey] = el;
+                return el;
+            }
+
+            // Buffer ainda abrindo/posicionando (scrub longo, timeline recém-carregada):
+            // segura o último quadro no ar e revela quando houver imagem — nunca preto.
+            this._awaitBuffer(el);
+            const prev = this._layerShown[layerKey];
+            return (prev && prev !== el) ? prev : null;
+        };
+
+        const visibleBase = applyLayer(baseCut, "base", 1);
+        const visibleOverlay = applyLayer(overlayCut, "overlay", 10);
+
+        // Pré-carrega os próximos clipes nos buffers ociosos: quando o playhead chegar no
+        // corte, o arquivo já está aberto e parado no primeiro frame do clipe.
+        this._preloadUpcoming(cuts, currentFrame, videoTracks, pool, claimed);
+
+        pool.forEach(el => {
+            if (el === visibleBase || el === visibleOverlay) {
+                // No ar: z-index, opacidade e play/pause já vieram de applyLayer.
+                if (el.style.display !== "block") el.style.display = "block";
+                return;
+            }
+            if (claimed.has(el)) {
+                // Buffer reservado (pré-carga, ou camada ainda decodificando): segue
+                // renderizado e invisível para o compositor já ter o frame no corte.
+                if (el.style.display !== "block") el.style.display = "block";
+                el.style.opacity = "0";
+                el.style.zIndex = "0";
+                if (!liveEls.has(el) && !el.paused) el.pause();
+            } else {
+                if (el.style.display !== "none") el.style.display = "none";
+                if (!el.paused) el.pause();
+                el.dataset.activeClipId = "";
+            }
+        });
 
         // ────────── CAMADAS DE FOTO (STILL) ──────────
         // imgA = slot base (z-index 2, acima do vídeo base); imgB = slot overlay (z-index 11).
@@ -1366,6 +1364,221 @@ export class ProgramPlayer {
 
         // Atualiza overlay de transformação (Fase 4)
         this.syncTransformOverlay();
+    }
+
+    /**
+     * Pool de buffers <video> do Program: 2 camadas no ar (base + sobreposição) e 2 buffers
+     * livres para o pré-carregamento do próximo clipe de cada camada. Os buffers extras são
+     * criados sob demanda caso o HTML não os traga.
+     */
+    _videoPool() {
+        const ids = ["program-video-a", "program-video-b", "program-video-c", "program-video-d"];
+        const viewport = this.el("program-player-viewport");
+        const pool = [];
+
+        ids.forEach(id => {
+            let el = this.el(id);
+            if (!el && viewport) {
+                el = viewport.ownerDocument.createElement("video");
+                el.id = id;
+                el.preload = "auto";
+                el.muted = true;
+                el.playsInline = true;
+                el.style.cssText = "position:absolute; inset:0; width:100%; height:100%; display:none;";
+                viewport.appendChild(el);
+            }
+            if (!el) return;
+            // Ao restaurar um pop-out o workspace limpa o src de todos os <video> do painel:
+            // sem zerar o dataset o buffer ficaria "carregado" com um arquivo que saiu.
+            if (!el.getAttribute("src") && el.dataset.loadedSrc) {
+                el.dataset.loadedSrc = "";
+                el.dataset.activeClipId = "";
+            }
+            pool.push(el);
+        });
+
+        // Se um buffer que estava no ar saiu do DOM (pop-out/restauração), esquece a referência.
+        if (this._layerShown) {
+            ["base", "overlay"].forEach(k => {
+                if (this._layerShown[k] && !pool.includes(this._layerShown[k])) this._layerShown[k] = null;
+            });
+        }
+        return pool;
+    }
+
+    /** Caminho do arquivo de vídeo de um clipe (null para fotos ou mídia ausente). */
+    _videoSrcForCut(cut) {
+        if (!cut || cut.type === "photo") return null;
+        const videoData = STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
+        if (!videoData) return null;
+        const raw = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
+        return String(raw).replace(/\\/g, "/");
+    }
+
+    /** Instante do arquivo (em segundos) correspondente a um frame da timeline. */
+    _targetSecondsFor(cut, frame) {
+        const fps = TIMELINE_STATE?.fps || 24;
+        return cut.in + ((frame - cut.timelineStartFrame) / fps);
+    }
+
+    /** true quando o buffer já tem o quadro certo decodificado e pode ir ao ar sem piscar. */
+    _bufferHasFrame(el, cut, frame) {
+        if (!el || !cut) return false;
+        if (el.dataset.activeClipId !== String(cut.id)) return false;
+        if (el.readyState < 2 /* HAVE_CURRENT_DATA */ || el.seeking) return false;
+        return Math.abs(el.currentTime - this._targetSecondsFor(cut, frame)) < 0.5;
+    }
+
+    /**
+     * Recompõe assim que o buffer terminar de abrir/posicionar. Necessário com o player
+     * pausado (frame a frame / scrub), onde não há laço de animação para tentar de novo.
+     */
+    _awaitBuffer(el) {
+        if (!el || el._capiauAwaiting) return;
+        el._capiauAwaiting = true;
+        const onReady = () => {
+            el.removeEventListener("seeked", onReady);
+            el.removeEventListener("loadeddata", onReady);
+            el.removeEventListener("canplay", onReady);
+            el._capiauAwaiting = false;
+            this.syncVideoToPlayhead();
+        };
+        el.addEventListener("seeked", onReady);
+        el.addEventListener("loadeddata", onReady);
+        el.addEventListener("canplay", onReady);
+    }
+
+    /**
+     * Deixa um buffer com o arquivo certo, no instante certo.
+     * live=false ⇒ pré-carga: abre o arquivo, posiciona no primeiro frame do clipe e fica parado.
+     *
+     * SINCRONIA SEM SEEK-LOOP: seek "duro" num vídeo em reprodução trava o decoder
+     * (~100-300ms), o que aumenta a deriva e dispara o próximo seek. Em reprodução a deriva
+     * é corrigida via playbackRate (como nas NLEs); seek duro só em descontinuidade real.
+     */
+    _prepareBuffer(el, cut, frame, live) {
+        const src = this._videoSrcForCut(cut);
+        if (!el || !src) return;
+
+        const srcChanged = el.dataset.loadedSrc !== src || !el.getAttribute("src");
+        if (srcChanged) {
+            el.preload = "auto";
+            el.src = src;
+            el.dataset.loadedSrc = src;
+            el.load();
+        }
+
+        const target = this._targetSecondsFor(cut, frame);
+        const clipChanged = el.dataset.activeClipId !== String(cut.id);
+        if (clipChanged) el.dataset.activeClipId = String(cut.id);
+
+        const drift = el.currentTime - target;
+
+        // SINCRONIA COM VELOCIDADE (shuttle JKL) SEM SEEK-LOOP:
+        // Em reprodução, a deriva é corrigida suavemente via playbackRate em torno da
+        // velocidade corrente (baseRate); seek duro só em descontinuidade real.
+        // Em reverso, o buffer fica pausado e o currentTime acompanha a agulha.
+        const baseRate = (this.isPlaying && this.playbackSpeed > 0)
+            ? Math.min(4.0, this.playbackSpeed) : 1.0;
+
+        if (srcChanged || (clipChanged && Math.abs(drift) > BUFFER_CONTINUITY_TOLERANCE)) {
+            // Buffer entrando num clipe novo: posiciona antes de ir ao ar (está escondido).
+            el.currentTime = Math.max(0, target);
+            el.playbackRate = baseRate;
+        } else if (live && this.isPlaying && this.playbackSpeed > 0) {
+            if (Math.abs(drift) > 1.0) {
+                el.currentTime = Math.max(0, target);
+                el.playbackRate = baseRate;
+            } else if (drift > 0.08) {
+                el.playbackRate = baseRate * 0.92; // vídeo adiantado: segura levemente
+            } else if (drift < -0.08) {
+                el.playbackRate = baseRate * 1.08; // vídeo atrasado: acelera levemente
+            } else if (el.playbackRate !== baseRate) {
+                el.playbackRate = baseRate;
+            }
+        } else if (live && this.isPlaying && this.playbackSpeed < 0) {
+            // Reverse: mantenha o vídeo pausado e atualize currentTime suavemente
+            if (!el.seeking && Math.abs(drift) > 0.03) {
+                el.currentTime = Math.max(0, target);
+            }
+        } else if (live) {
+            // Pausado (scrub manual): seek preciso é o comportamento esperado
+            if (Math.abs(drift) > 0.06) el.currentTime = Math.max(0, target);
+            if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
+        }
+
+        // Pistas de vídeo são só imagem: o áudio vem das pistas de áudio dedicadas
+        el.muted = true;
+        if (live && this.isPlaying && this.playbackSpeed > 0) {
+            if (el.paused) el.play().catch(() => {});
+        } else if (!el.paused) {
+            el.pause();
+        }
+    }
+
+    /**
+     * true quando o clipe começa exatamente onde termina, no mesmo arquivo e sem salto de
+     * mídia, o clipe que já está no ar — caso em que a virada é só trocar o id do clipe.
+     */
+    _continuesOnAir(cut, cuts) {
+        if (!this._layerShown) return false;
+        const onAir = [this._layerShown.base, this._layerShown.overlay]
+            .filter(Boolean)
+            .map(e => e.dataset.activeClipId);
+        if (!onAir.length) return false;
+
+        const prev = cuts.find(c => c.track === cut.track &&
+            (c.timelineStartFrame + (c.outFrame - c.inFrame)) === cut.timelineStartFrame);
+        if (!prev || !onAir.includes(String(prev.id))) return false;
+
+        const src = this._videoSrcForCut(cut);
+        if (!src || this._videoSrcForCut(prev) !== src) return false;
+
+        const fps = TIMELINE_STATE?.fps || 24;
+        const prevOutSeconds = prev.in + ((prev.outFrame - prev.inFrame) / fps);
+        return Math.abs(prevOutSeconds - cut.in) <= 0.02;
+    }
+
+    /**
+     * Aquece os buffers ociosos com os próximos clipes das pistas de vídeo, dentro de uma
+     * janela de antecedência. É isso que faz o clipe seguinte aparecer já no primeiro frame:
+     * no instante do corte não há mais nada a carregar, só revelar o buffer.
+     */
+    _preloadUpcoming(cuts, currentFrame, videoTracks, pool, claimed) {
+        if (!this._layerShown) this._layerShown = { base: null, overlay: null };
+        const fps = TIMELINE_STATE?.fps || 24;
+        const lookaheadFrames = fps * 3; // ~3 s de antecedência para abrir e posicionar
+        const trackIds = new Set(videoTracks.map(t => t.id));
+        const busy = new Set([this._layerShown.base, this._layerShown.overlay].filter(Boolean));
+
+        const upcoming = cuts
+            .filter(c => trackIds.has(c.track) &&
+                         c.timelineStartFrame > currentFrame &&
+                         (c.timelineStartFrame - currentFrame) <= lookaheadFrames &&
+                         this._videoSrcForCut(c))
+            .sort((a, b) => a.timelineStartFrame - b.timelineStartFrame);
+
+        for (const cut of upcoming) {
+            // Já aquecido: reserva o buffer, senão a varredura final o daria como ocioso
+            // e o descartaria — os clipes ficariam se revezando no mesmo buffer.
+            const held = pool.find(e => e.dataset.activeClipId === String(cut.id));
+            if (held) { claimed.add(held); continue; }
+
+            // Emenda perfeita (razor cut): o clipe que está no ar é do mesmo arquivo e acaba
+            // exatamente onde este começa ⇒ o buffer no ar apenas continua rolando. Aquecer
+            // outro buffer só gastaria um decoder e cortaria a reprodução contínua da mídia.
+            if (this._continuesOnAir(cut, cuts)) continue;
+
+            const idle = pool.filter(e => !claimed.has(e) && !busy.has(e));
+            if (!idle.length) return;
+
+            const src = this._videoSrcForCut(cut);
+            const el = idle.find(e => e.dataset.loadedSrc === src)
+                || idle.find(e => !e.dataset.activeClipId)
+                || idle[0];
+            claimed.add(el);
+            this._prepareBuffer(el, cut, cut.timelineStartFrame, false);
+        }
     }
 
     /**
