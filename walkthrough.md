@@ -1292,3 +1292,25 @@ Três frentes na mesma noite: a exportação passou a funcionar de fato no Kdenl
     - **Renomeação inline:** duplo clique no título de um card abre um campo de edição no lugar; `Enter` grava, `Esc` cancela. Rotas `PATCH /api/video/{id}/title` e `PATCH /api/photo/{id}/title`.
     - `getFriendlyTitle` dá prioridade ao título da IA, com queda para heurísticas sobre descrição/resumo e, por preferência do usuário por clipe, para o nome de arquivo real.
     - 📌 **Pendência registrada:** o título **não entra no payload do Qdrant** hoje. Nem o índice visual (`image_semantic.py`: `project_id`, `video_id`, `media_type`, `start_time`, `end_time`, `segment_id`, `shot_scale`, `category`, `camera_motion`) nem o de texto (`semantic.py`: `text`, `raw_text`, `tags`, `people`) carregam esse campo. Por enquanto o ganho é de leitura na interface — biblioteca, cartão do índice de rolagem e timeline. Para o título influenciar a busca é preciso incluí-lo no payload e reindexar.
+
+---
+
+## 🎞️ Fase 25: Virada de Clipe sem Piscada no Program (22/08/2026)
+
+Passar de um clipe para o outro na timeline — em reprodução ou frame a frame — apagava a imagem por um instante. O Program pintava preto no corte e só então o próximo vídeo aparecia.
+
+1.  **A causa (`player.js`, `syncVideoToPlayhead`):**
+    - A composição tinha dois `<video>` fixos: `program-video-a` para a camada base e `program-video-b` para a cobertura. Ao entrar um clipe de outro arquivo, o código dava `el.src = ...; el.load()` **no elemento que estava no ar**.
+    - `load()` zera o elemento de mídia (`readyState` volta a `HAVE_NOTHING` e o quadro decodificado é descartado). Até o arquivo novo abrir e posicionar, o `<video>` pinta o próprio fundo — preto. Era a piscada.
+    - A "estabilidade de papéis" que existia só resolvia a migração entre as camadas base e cobertura; dois clipes seguidos **na mesma pista** caíam sempre no mesmo elemento, ou seja, no caminho do `load()`.
+
+2.  **A correção — pool de buffers com pré-carga:**
+    - O pool passou de 2 para **4 `<video>`** (`program-video-a` … `-d`): dois no ar (base e cobertura) e dois livres para aquecer o próximo clipe.
+    - `_preloadUpcoming` abre os clipes que começam dentro de **~3 s à frente** num buffer ocioso e os deixa **parados no primeiro frame do clipe**, escondidos (`opacity: 0`, mas renderizados, para o compositor já ter o quadro).
+    - Na hora do corte, `claimBuffer` acha o buffer que já contém aquele clipe e a virada é só revelar: nenhum `load()`, nenhum `seek`, nenhum quadro preto. O buffer que saiu é escondido e pausado no mesmo ciclo de pintura.
+    - **Emenda de razor cut:** quando o clipe seguinte é do mesmo arquivo e começa exatamente onde o anterior termina, o buffer que está no ar apenas continua rolando (troca só o id do clipe). Não gasta buffer de pré-carga nem trava o decoder com um seek — daí a constante `BUFFER_CONTINUITY_TOLERANCE`, folgada o bastante (0,1 s) para não brigar com a correção de deriva por `playbackRate` (banda de 0,08 s).
+    - **Nunca apagar a imagem:** se o buffer novo ainda não abriu (salto longo, rede lenta), o quadro anterior fica no ar e `_awaitBuffer` recompõe assim que houver imagem. Com o player pausado não há laço de animação para tentar de novo — daí o listener de `seeked`/`loadeddata`/`canplay`.
+    - Buracos da timeline continuam pretos, como em qualquer NLE.
+
+3.  **Efeito colateral corrigido (`workspaceManager.js`):**
+    - O clique no monitor do Program dava play direto em `program-video-a`. Com o pool não existe mais um elemento fixo no ar: o clique passou a acionar o botão de play do painel, que é quem fala com o `ProgramPlayer`.
