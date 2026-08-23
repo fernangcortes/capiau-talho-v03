@@ -13,13 +13,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from src.config import CONFIG
 
-# ── Categorias exibidas na navegação do painel ───────────────────────────────
+# -- Categorias exibidas na navegação do painel -------------------------------
 
 CATEGORIES = [
     {"id": "models_keys",   "label": "Modelos & Chaves",     "icon": "fa-key"},
     {"id": "transcription", "label": "Transcrição",          "icon": "fa-comment-dots"},
     {"id": "vision",        "label": "Visão & Resumos",      "icon": "fa-eye"},
     {"id": "timeline",      "label": "Timeline & Sugestões", "icon": "fa-film"},
+    {"id": "audio",         "label": "Áudio",                "icon": "fa-volume-high"},
     {"id": "agent_chat",    "label": "Agente & Chat",        "icon": "fa-robot"},
     {"id": "themes_search", "label": "Temas & Busca",        "icon": "fa-brain"},
     {"id": "faces",         "label": "Rostos",               "icon": "fa-user"},
@@ -27,14 +28,14 @@ CATEGORIES = [
     {"id": "prompts",       "label": "Prompts",              "icon": "fa-terminal", "pro_only": True},
 ]
 
-# ── Catálogo de configurações ────────────────────────────────────────────────
+# -- Catálogo de configurações ------------------------------------------------
 # Campos: key, type (int|float|bool|string|enum|secret), default, min/max/step,
 # enum (lista de opções, p/ type=enum), label, help (linguagem leiga),
 # help_tech (detalhe técnico p/ modo pro), category, level (simple|pro),
 # scope (both|global), requires_reprocess (True => só afeta novas análises).
 
 SETTINGS_REGISTRY: List[Dict[str, Any]] = [
-    # ── Modelos & Chaves ─────────────────────────────────────────────────────
+    # -- Modelos & Chaves -----------------------------------------------------
     {
         "key": "api.openrouter_key", "type": "secret", "default": "",
         "label": "Chave OpenRouter",
@@ -47,6 +48,13 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "label": "Chave AssemblyAI",
         "help": "Chave de API do serviço de transcrição de falas. Armazenada localmente; se vazia, usa a do arquivo .env.",
         "help_tech": "aai.settings.api_key no pipeline de transcrição.",
+        "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "api.auphonic_key", "type": "secret", "default": "",
+        "label": "Chave Auphonic",
+        "help": "Chave de API do serviço de nuvem Auphonic, que faz o que falta aqui dentro: tira reverb, equilibra o timbre e melhora voz de arquivo (plano gratuito de 2 h por mês). Fica guardada só neste computador; se ficar vazia, os recursos de nuvem ficam desligados.",
+        "help_tech": "Bearer token no POST https://auphonic.com/api/simple/productions.json (AuphonicProvider em src/services/audio_cloud.py). Mesma política das demais secrets: exibição via mask_secret e o valor real nunca volta ao cliente nem vira override por máscara.",
         "category": "models_keys", "level": "simple", "scope": "global", "requires_reprocess": False,
     },
     {
@@ -94,7 +102,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "models_keys", "level": "simple", "scope": "both", "requires_reprocess": False,
     },
 
-    # ── Transcrição ──────────────────────────────────────────────────────────
+    # -- Transcrição ----------------------------------------------------------
     {
         "key": "asr.language", "type": "enum", "default": "pt",
         "enum": ["pt", "en", "es"],
@@ -139,7 +147,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "transcription", "level": "pro", "scope": "both", "requires_reprocess": True,
     },
 
-    # ── Visão & Resumos ──────────────────────────────────────────────────────
+    # -- Visão & Resumos ------------------------------------------------------
     {
         "key": "vision.frame_interval", "type": "int", "default": 10, "min": 2, "max": 60, "step": 1,
         "label": "Intervalo entre frames analisados (s)",
@@ -292,7 +300,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "vision", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
-    # ── Timeline & Sugestões ─────────────────────────────────────────────────
+    # -- Timeline & Sugestões -------------------------------------------------
     {
         "key": "export.worker_python", "type": "string", "default": "",
         "label": "Exportação: Python do worker OTIO",
@@ -365,7 +373,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "timeline", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
-    # ── Agente & Chat ────────────────────────────────────────────────────────
+    # -- Agente & Chat --------------------------------------------------------
     {
         "key": "agent.max_steps", "type": "int", "default": 8, "min": 1, "max": 25, "step": 1,
         "label": "Agente: máx. de passos",
@@ -437,7 +445,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "agent_chat", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
-    # ── Temas & Busca ────────────────────────────────────────────────────────
+    # -- Temas & Busca --------------------------------------------------------
     {
         "key": "clip.enabled", "type": "bool", "default": True,
         "label": "Busca visual local (CLIP)",
@@ -669,7 +677,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "themes_search", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
-    # ── Rostos ───────────────────────────────────────────────────────────────
+    # -- Rostos ---------------------------------------------------------------
     {
         "key": "faces.detector_score", "type": "float", "default": 0.6, "min": 0.1, "max": 0.95, "step": 0.05,
         "label": "Confiança mínima de detecção",
@@ -713,7 +721,7 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "faces", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
-    # ── Hardware & GPU ───────────────────────────────────────────────────────
+    # -- Hardware & GPU -------------------------------------------------------
     {
         "key": "hardware.video_encoder", "type": "enum", "default": "auto",
         "enum": ["auto", "qsv", "amf", "nvenc", "cpu"],
@@ -745,9 +753,213 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "help_tech": "Define a string de dispositivo enviada ao PyTorch / SentenceTransformer ('cpu', 'directml', 'cuda'). Com 2.0 GB de VRAM, a CPU preserva memória dedicada livre para o decodificador/codificador de hardware do FFmpeg.",
         "category": "hardware", "level": "pro", "scope": "global", "requires_reprocess": False,
     },
+
+    # -- Áudio: limiares da pré-análise (docs/PLANO_AJUSTES_DE_AUDIO.md, seção 7) --
+    {
+        "key": "audio.analise.alvo_lufs", "type": "float", "default": -16.0, "min": -31.0, "max": -9.0, "step": 0.5,
+        "label": "Áudio: alvo de loudness (LUFS)",
+        "help": "Volume final desejado do áudio tratado. O padrão -16 LUFS é o uso comum na web; números menores deixam o som mais baixo, maiores mais alto.",
+        "help_tech": "Alvo do loudnorm de 2 passes e referência do diagnóstico: LUFS-I fora de +-1 LU desse alvo marca o clipe como fora de alvo.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.analise.teto_dbtp", "type": "float", "default": -1.5, "min": -6.0, "max": 0.0, "step": 0.1,
+        "label": "Áudio: teto de pico real (dBTP)",
+        "help": "Limite para os picos mais altos do áudio tratado. O padrão -1,5 dBTP evita distorção em qualquer aparelho, do fone de ouvido ao alto-falante da TV.",
+        "help_tech": "Teto do alimiter aplicado apos o loudnorm; true peak medido acima desse valor marca o clipe como ESTOUROU no diagnóstico.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.analise.clip_pct_grave", "type": "float", "default": 0.05, "min": 0.0, "max": 5.0, "step": 0.01,
+        "label": "Áudio: clipping grave (% das amostras)",
+        "help": "Porcentagem de amostras estouradas que já indica dano real na captação. Acima disso o diagnóstico recomenda reparar o clipping antes de qualquer outro ajuste.",
+        "help_tech": "clip_pct = 100 * peak_count / n_samples (astats); acima do limiar liga adeclip + adeclick no início da cadeia sugerida.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.analise.piso_ruido_alto", "type": "float", "default": -35.0, "min": -90.0, "max": 0.0, "step": 1.0,
+        "label": "Áudio: ruído de fundo alto (dB)",
+        "help": "Se o silêncio entre falas ficar acima desse volume, o local era barulhento e o diagnóstico recomenda redução de ruído forte.",
+        "help_tech": "noise_floor_db > X liga denoise IA com atenuação pedida = (piso_ruido_medio - noise_floor), limitada a 6-18 dB.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.analise.piso_ruido_medio", "type": "float", "default": -45.0, "min": -90.0, "max": 0.0, "step": 1.0,
+        "label": "Áudio: ruído de fundo moderado (dB)",
+        "help": "Faixa intermediária de barulho: entre esse valor e o limite de ruído alto, o diagnóstico sugere apenas uma limpeza leve e opcional, que preserva a ambiência do lugar.",
+        "help_tech": "noise_floor_db entre piso_ruido_medio e piso_ruido_alto sugere denoise leve (6 dB) como opcional.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.analise.lra_esmagado", "type": "float", "default": 5.0, "min": 1.0, "max": 20.0, "step": 0.5,
+        "label": "Áudio: dinâmica esmagada (LRA)",
+        "help": "Abaixo desse alcance dinâmico, o áudio já foi muito comprimido; o diagnóstico então evita comprimir de novo, porque isso piora o som.",
+        "help_tech": "LRA < X bloqueia speechnorm forte na cadeia sugerida.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.analise.lra_amplo", "type": "float", "default": 12.0, "min": 1.0, "max": 30.0, "step": 0.5,
+        "label": "Áudio: dinâmica ampla (LRA)",
+        "help": "Acima desse alcance dinâmico, a diferença entre falas baixas e altas fica grande demais; o diagnóstico sugere nivelar o volume da fala.",
+        "help_tech": "LRA > X liga speechnorm/leveler na cadeia sugerida.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.analise.correlacao_estereo", "type": "float", "default": 0.95, "min": 0.0, "max": 1.0, "step": 0.01,
+        "label": "Áudio: semelhança entre os canais estéreo",
+        "help": "Mede se os dois canais tocam a mesma coisa. Bem perto de 100% é mono gravado duas vezes (dá para somar num canal só); abaixo disso são duas fontes distintas e cada canal precisa ser tratado separadamente.",
+        "help_tech": "Correlação L/R < X => processar canais separados (modelo mono) e avisar 'duas fontes detectadas'.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.analise.teto_intervalo_s", "type": "float", "default": 2400.0, "min": 60.0, "max": 7200.0, "step": 60.0,
+        "label": "Áudio: trecho máximo que o diagnóstico aceita de uma vez (segundos)",
+        "help": "O diagnóstico roda na hora, enquanto você espera. Acima deste tamanho ele recusa e pede para analisar por partes. O padrão de 2400 s (40 min) cobre a entrevista mais longa do acervo com folga.",
+        "help_tech": "Teto do intervalo em GET /api/video/{id}/audio/analysis. Medido ~31x tempo real nesta maquina (90 s de audio em 2,9 s), entao 2400 s levam ~80 s de chamada sincrona. Acima do teto: HTTP 400.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+
+    # -- Áudio: denoise por IA local (docs/PLANO_AJUSTES_DE_AUDIO.md, Etapa 4) --
+    {
+        "key": "audio.denoise.motor", "type": "enum", "default": "dpdfnet",
+        "enum": ["dpdfnet", "gtcrn"],
+        "label": "Denoise IA: motor",
+        "help": "Qual inteligência artificial limpa o ruído de fundo. O padrão (DPDFNet) trabalha com o áudio em qualidade cheia e é o único indicado para a versão final. O GTCRN é bem mais rápido e serve para ouvir uma prévia do resultado e ajudar na transcrição — ele entrega o som com qualidade bem reduzida, então nunca use na entrega.",
+        "help_tech": "sherpa-onnx: dpdfnet2_48khz_hr.onnx (48 kHz, cadeia de entrega final) x GTCRN (saída 16 kHz => restrito a prévia e ASR, nunca na entrega; preset 'previa_rapida' usa GTCRN).",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.denoise.atenuacao_db", "type": "float", "default": 12.0, "min": 6.0, "max": 18.0, "step": 1.0,
+        "label": "Denoise IA: força da limpeza (dB)",
+        "help": "Quanto volume de barulho constante a IA tira do fundo (chiado, ventilador, rua). O padrão de 12 dB limpa bem sem estragar o som; perto do máximo ela já começa a engolir pedaços da ambiência e, em excesso, até da própria voz.",
+        "help_tech": "attenuation_limit_db passado ao denoise sherpa-onnx. O diagnóstico sugere o valor pela regra da seção 7 do plano (faixa operacional 6-18 dB); preset 'resgate_estourado' pede 12 dB.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.denoise.atenuacao_sem_limite", "type": "bool", "default": False,
+        "label": "Denoise IA: remover ruído sem limite",
+        "help": "RISCO SÉRIO: mantenha desligado. Ligado, a IA persegue o ruído sem nenhum teto e leva o fundo ao menos infinito: entre uma fala e outra sobra silêncio digital absoluto, morto, e a ambiência do lugar (a sala, a rua, o vento, o clima da gravação) é DESTRUÍDA sem volta. O limite de força existe exatamente para impedir isso; só ligue em caso extremo, sabendo que todo o som de fundo do lugar será sacrificado por completo.",
+        "help_tech": "Remove o teto attenuation_limit_db e deixa o denoise suprimir tudo abaixo da fala (piso de ruído => -inf dB). Tratado como risco no plano (seção Riscos): 'modo sem limite escondido atrás de aviso explícito'; presets automáticos nunca devem ligá-lo.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.denoise.por_canal_auto", "type": "bool", "default": True,
+        "label": "Denoise IA: tratar canais separados quando necessário",
+        "help": "Quando os dois lados do estéreo gravam coisas diferentes (duas pessoas, dois microfones), cada canal é limpo separadamente, para o tratamento de um lado não apagar o som do outro. Quando os dois lados tocam a mesma coisa, são tratados juntos, como se fossem um canal só.",
+        "help_tech": "Correlação L/R < audio.analise.correlacao_estereo => processar canais separados (modelo mono por canal) + aviso 'duas fontes detectadas'; caso contrário, processa mixado.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.denoise.rtf_medido", "type": "float", "default": 0.82, "min": 0.1, "max": 5.0, "step": 0.01,
+        "label": "Denoise IA: velocidade medida do motor",
+        "help": "Número usado só para estimar, antes de processar, quanto tempo a limpeza vai levar. Com o valor medido nesta máquina (0,82), a limpeza demora cerca de 20% a mais que a duração do áudio: um clipe de 10 minutos fica pronto em uns 12. Se trocar de computador, meça de novo e atualize aqui para a estimativa continuar honesta.",
+        "help_tech": "RTF medido nesta máquina (tempo de processo / duração): 0,82 => ~1,2x tempo real; alimenta a estimativa de tempo da UI (Etapa 4). Não afeta o áudio processado.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+
+    # -- Áudio: nuvem Auphonic (docs/PLANO_AJUSTES_DE_AUDIO.md, seção 8/Etapa 5) --
+    {
+        "key": "audio.nuvem.alvo_minutos_mes", "type": "float", "default": 120.0, "step": 10.0,
+        "label": "Nuvem (Auphonic): minutos grátis do mês",
+        "help": "O plano gratuito do serviço de nuvem processa 120 minutos (2 horas) por mês, de graça, renovando todo mês. Este número diz ao programa qual é essa cota, para ele controlar quanto já foi usado.",
+        "help_tech": "Free tier recorrente do Auphonic (2 h/mês, seção 8 do plano); base do controle de cota consultado antes de submeter produções à nuvem.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.nuvem.avisar_em_pct", "type": "float", "default": 80.0, "min": 50.0, "max": 100.0, "step": 1.0,
+        "label": "Nuvem: avisar quando a cota estiver acabando (%)",
+        "help": "Quando você consumir esta porcentagem dos minutos grátis do mês, o programa passa a avisar antes de mandar algo para a nuvem, para a cota não acabar sem você perceber.",
+        "help_tech": "Gatilho percentual do aviso de cota (uso/alvo_minutos_mes >= X) na submissão Auphonic; 80% deixa ~24 min de folga no free tier.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+
+    # -- Áudio: ponte com DAW (docs/PLANO_AJUSTES_DE_AUDIO.md, seção 9/Etapa 6) --
+    {
+        "key": "audio.daw.pasta_retorno", "type": "string", "default": "watch/audio_daw",
+        "label": "DAW: pasta de retorno dos arquivos tratados",
+        "help": "Pasta que o programa fica observando: você envia o áudio para tratar num programa de edição (Reaper, Audition etc.) e salva o resultado tratado nesta pasta, com o mesmo nome — ele volta sozinho para o projeto.",
+        "help_tech": "watch/audio_daw/ vigiada pelo watcher (src/ingest/watcher.py); match pelo mesmo nome-base cria {type:'audio_render', engine:'daw'} (plano, seção 9).",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.daw.formato_stem", "type": "enum", "default": "wav48_24",
+        "enum": ["wav48_24", "wav48_16"],
+        "label": "DAW: formato dos stems enviados",
+        "help": "Qualidade do WAV enviado para o programa de edição. O padrão (48 kHz, 24 bits) é o formato de estúdio recomendado; a opção de 16 bits gera arquivos mais leves, para quando a sua ferramenta preferir.",
+        "help_tech": "Stems WAV PCM 48 kHz com timecode preservado; 24 bits é o padrão da ponte com DAW (seção 9), 16 bits opcional para compatibilidade.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+
+    # -- Áudio: defaults do ajuste ao vivo no player (docs/PLANO_AJUSTES_DE_AUDIO.md,
+    #    contrato E4/Etapa 2). Estes valores são só o PONTO DE PARTIDA quando o usuário
+    #    liga o ajuste num clipe; o ajuste de cada clipe fica salvo no próprio clipe
+    #    (clip.effects), não aqui. Alterá-los não muda clipe já ajustado. --
+    {
+        "key": "audio.aovivo.hpf_hz", "type": "float", "default": 80.0, "min": 0.0, "max": 300.0, "step": 5.0,
+        "label": "Ajuste ao vivo: corte de graves (Hz)",
+        "help": "Corta a parte mais grave do som antes de você ouvir qualquer outra coisa. O padrão de 80 Hz tira ruído de mesa batendo, vento e passadas no chão sem afetar a voz, que mora bem acima disso. Zero desliga o corte.",
+        "help_tech": "Filtro highpass na entrada do grafo WebAudio (BiquadFilterNode type='highpass'); 0 = bypass. Valor default do campo hpf do efeito audio_eq (contrato E1); cada clipe guarda o seu valor em clip.effects.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.aovivo.eq_low_db", "type": "float", "default": 0.0, "min": -12.0, "max": 12.0, "step": 0.5,
+        "label": "Ajuste ao vivo: graves (dB)",
+        "help": "Engorda ou emagrece o corpo grave da voz ao vivo. Positivo dá mais encorpado; negativo tira o peso quando a voz soa 'de peito' demais. Este número é o padrão inicial ao ligar o ajuste no clipe; o valor de cada clipe fica salvo no próprio clipe.",
+        "help_tech": "Ganho do low shelf do EQ de 3 bandas (BiquadFilterNode type='lowshelf'), em dB, -12 a +12. Default do campo low do efeito audio_eq (contrato E1).",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.aovivo.eq_mid_db", "type": "float", "default": 0.0, "min": -12.0, "max": 12.0, "step": 0.5,
+        "label": "Ajuste ao vivo: médios (dB)",
+        "help": "Reforça ou atenua a região central da fala, onde fica a presença da voz. Negativo ajuda quando a fala soa abafada ou 'nariz tapado'; positivo devolve corpo a uma voz fina. É o padrão inicial de cada clipe novo com ajuste ligado.",
+        "help_tech": "Ganho do filtro peaking do EQ de 3 bandas, em dB, -12 a +12, centrado na frequência de audio.aovivo.eq_mid_hz. Default do campo mid do efeito audio_eq (contrato E1).",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.aovivo.eq_mid_hz", "type": "float", "default": 1000.0, "min": 200.0, "max": 6000.0, "step": 50.0,
+        "label": "Ajuste ao vivo: centro dos médios (Hz)",
+        "help": "Define qual região da voz o controle de 'médios' acima mexe. O padrão de 1000 Hz cobre o miolo da fala; números maiores chegam perto dos sons de 'sss' e 'tch'. Raramente precisa mudar.",
+        "help_tech": "Frequência central (frequency) do BiquadFilterNode type='peaking' do EQ ao vivo; 200 a 6000 Hz. Não é salva por clipe: o grafo usa este valor como centro fixo da banda de médios.",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.aovivo.eq_high_db", "type": "float", "default": 0.0, "min": -12.0, "max": 12.0, "step": 0.5,
+        "label": "Ajuste ao vivo: agudos (dB)",
+        "help": "Clareia ou suaviza a parte mais fina do som. Positivo tira o véu e dá definição à voz; negativo amortece chiados e sibilância excessiva. Padrão inicial ao ligar o ajuste no clipe; o valor de cada clipe fica salvo no próprio clipe.",
+        "help_tech": "Ganho do high shelf do EQ de 3 bandas (BiquadFilterNode type='highshelf'), em dB, -12 a +12. Default do campo high do efeito audio_eq (contrato E1).",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.aovivo.gate_db", "type": "float", "default": -45.0, "min": -90.0, "max": 0.0, "step": 1.0,
+        "label": "Ajuste ao vivo: portão de ruído (dB)",
+        "help": "Fecha o som automaticamente quando ninguém está falando, cortando o barulho de fundo entre uma frase e outra. Quanto mais perto de zero, mais agressivo (corta pedaços baixos da própria fala). -90 desliga o portão.",
+        "help_tech": "Limiar do gate implementado em AudioWorklet (audioGateWorklet.js), em dBFS; -90 = desligado. Se o AudioWorklet não carregar, o gate fica fora e a UI avisa. Default do campo gate_db do efeito audio_dynamics (contrato E1).",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.aovivo.comp_ratio", "type": "float", "default": 2.0, "min": 1.0, "max": 20.0, "step": 0.1,
+        "label": "Ajuste ao vivo: compressão (taxa)",
+        "help": "Nivela a diferença entre as partes baixas e altas da fala ao vivo: quem fala variando muito de volume soa mais uniforme. 1 = sem compressão; o padrão 2 é leve, para nivelar sem esmagar a naturalidade.",
+        "help_tech": "ratio do DynamicsCompressorNode do grafo WebAudio; 1 = bypass efetivo, até 20. Default do campo comp_ratio do efeito audio_dynamics (contrato E1).",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.aovivo.comp_thresh_db", "type": "float", "default": -18.0, "min": -60.0, "max": 0.0, "step": 1.0,
+        "label": "Ajuste ao vivo: compressão (limiar, dB)",
+        "help": "A partir de que volume a compressão começa a atuar. Perto de zero, ela pega só os picos mais altos da fala; bem negativo, ela comprime quase tudo (som mais constante e mais 'apertado').",
+        "help_tech": "threshold do DynamicsCompressorNode, em dBFS, -60 a 0. Default do campo comp_thresh_db do efeito audio_dynamics (contrato E1).",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "audio.aovivo.makeup_db", "type": "float", "default": 0.0, "min": -12.0, "max": 12.0, "step": 0.5,
+        "label": "Ajuste ao vivo: ganho de compensação (dB)",
+        "help": "Volume extra somado no final da cadeia, para devolver a força que o portão e a compressão tiraram (ou baixar o resultado se ficou alto demais). Padrão inicial ao ligar o ajuste no clipe; o valor de cada clipe fica salvo no próprio clipe.",
+        "help_tech": "GainNode após o compressor no grafo ao vivo; -12 a +12 dB. Default do campo makeup_db do efeito audio_dynamics (contrato E1).",
+        "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
 ]
 
-# ── Presets do modo simples ──────────────────────────────────────────────────
+# -- Presets do modo simples --------------------------------------------------
 # "equilibrado" = defaults do código: aplicá-lo equivale a remover os overrides
 # das chaves cobertas pelos demais presets.
 
@@ -795,7 +1007,42 @@ PRESETS = {
     },
 }
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# -- Catálogo dos presets de áudio (docs/PLANO_AJUSTES_DE_AUDIO.md, seção 7) --
+# Somente catálogo: nomes + cadeia de cada preset em texto, para as Etapas 3/4
+# consumirem (montagem da cadeia ffmpeg/IA). NAO entram no PRESETS acima porque
+# esse dicionario alimenta /api/settings/preset, que grava os "values" como
+# overrides reais — entradas sem chaves de configuração virariam botões que
+# apagam overrides alheios em vez de aplicar nada.
+
+AUDIO_PRESETS = {
+    "voz_limpa": {
+        "label": "Voz Limpa",
+        "description": "Entrevista já bem captada: corte de graves, denoise leve e nivelamento de loudness.",
+        "chain": ["hpf:80", "denoise:6", "loudnorm:-16"],
+    },
+    "resgate_estourado": {
+        "label": "Resgate de Captação Estourada",
+        "description": "Áudio clipado e barulhento: reparo de clipping, denoise forte (12-18 dB), nivelamento e teto de pico.",
+        "chain": ["adeclip", "adeclick", "denoise_ia:12", "speechnorm", "loudnorm:-16", "alimiter:-1.5"],
+    },
+    "ambiencia_preservada": {
+        "label": "Ambiência Preservada",
+        "description": "Plano de rua, feira, som direto: só uma limpeza leve; sem compressor de fala nem limitador.",
+        "chain": ["denoise:6"],
+    },
+    "so_entrega": {
+        "label": "Só Entrega",
+        "description": "Não toca no timbre: apenas normaliza loudness em 2 passes e aplica o teto de pico.",
+        "chain": ["loudnorm:-16", "alimiter:-1.5"],
+    },
+    "previa_rapida": {
+        "label": "Prévia Rápida",
+        "description": "Denoise leve com modelo pequeno + loudnorm, para ouvir o resultado em segundos antes do render completo.",
+        "chain": ["gtcrn", "loudnorm:-16"],
+    },
+}
+
+# -- Helpers ------------------------------------------------------------------
 
 _REGISTRY_MAP: Optional[Dict[str, Dict[str, Any]]] = None
 
