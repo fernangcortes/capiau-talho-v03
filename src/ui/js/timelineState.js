@@ -33,16 +33,15 @@ export function secondsToFrames(seconds, fps = 24) {
 export function framesToTimecode(totalFrames, fps = 24) {
     if (isNaN(totalFrames) || totalFrames < 0) return "00:00:00:00";
 
-    const h = Math.floor(totalFrames / (3600 * fps));
-    let remaining = totalFrames % (3600 * fps);
+    const fpsVal = Number(fps) > 0 ? Number(fps) : 24;
+    const totalIntFrames = Math.max(0, Math.round(Number(totalFrames) || 0));
+    const totalSeconds = Math.floor(totalIntFrames / fpsVal);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    const f = Math.min(Math.floor(fpsVal) - 1, Math.max(0, Math.floor(totalIntFrames % fpsVal)));
 
-    const m = Math.floor(remaining / (60 * fps));
-    remaining = remaining % (60 * fps);
-
-    const s = Math.floor(remaining / fps);
-    const f = Math.round(remaining % fps);
-
-    const pad = (n) => String(n).padStart(2, '0');
+    const pad = (n) => String(Math.floor(Math.abs(Number(n) || 0))).padStart(2, '0');
     return `${pad(h)}:${pad(m)}:${pad(s)}:${pad(f)}`;
 }
 
@@ -57,13 +56,15 @@ export function framesToTimecode(totalFrames, fps = 24) {
 export function formatRulerTimecode(totalFrames, fps = 24, showFrames = false, forceHours = false) {
     if (isNaN(totalFrames) || totalFrames < 0) totalFrames = 0;
 
-    const totalSeconds = Math.floor(totalFrames / fps);
+    const fpsVal = Number(fps) > 0 ? Number(fps) : 24;
+    const totalIntFrames = Math.max(0, Math.round(Number(totalFrames) || 0));
+    const totalSeconds = Math.floor(totalIntFrames / fpsVal);
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
-    const f = Math.round(totalFrames % fps);
+    const f = Math.min(Math.floor(fpsVal) - 1, Math.max(0, Math.floor(totalIntFrames % fpsVal)));
 
-    const pad = (n) => String(n).padStart(2, '0');
+    const pad = (n) => String(Math.floor(Math.abs(Number(n) || 0))).padStart(2, '0');
 
     let result = "";
     if (h > 0 || forceHours) {
@@ -104,6 +105,69 @@ export function timecodeToFrames(tc, fps = 24) {
         return (m * 60 + s) * fps;
     }
     return 0;
+}
+
+// --- CURVAS DE TRANSIÇÃO (FADES) ---
+
+export const FADE_CURVE_PRESETS = {
+    linear: { id: "linear", name: "Linear", label: "Linear" },
+    exponential: { id: "exponential", name: "Exponencial (Ease-In)", label: "Exponencial" },
+    logarithmic: { id: "logarithmic", name: "Logarítmica (Ease-Out)", label: "Logarítmica" },
+    s_curve: { id: "s_curve", name: "Curva em S (Suave)", label: "Curva em S" }
+};
+
+/**
+ * Avalia o valor de atenuação do fade [0.0 a 1.0] dado um progresso p [0.0 a 1.0].
+ * 0.0 = silêncio / preto total; 1.0 = ganho / opacidade plena.
+ * Suporta presets e ajuste paramétrico contínuo de tensão k [-1.0 a +1.0].
+ *
+ * @param {number} progress - Progresso normalizado [0..1]
+ * @param {string} [curveType="linear"] - Tipo de curva ("linear", "exponential", "logarithmic", "s_curve", "custom")
+ * @param {number} [tension=0.0] - Tensão da curva [-1..1] (0 = padrão da curva ou linear)
+ * @returns {number} Fator atenuado [0..1]
+ */
+export function evaluateFadeCurve(progress, curveType = "linear", tension = 0.0) {
+    const p = Math.max(0, Math.min(1, Number(progress) || 0));
+    const k = Math.max(-1, Math.min(1, Number(tension) || 0));
+
+    if (curveType === "s_curve") {
+        // Base Hermite Smoothstep: 3p^2 - 2p^3
+        const baseS = p * p * (3 - 2 * p);
+        if (Math.abs(k) < 0.01) return baseS;
+        // Modulação da curva em S pela tensão
+        if (k > 0) {
+            const exp = 1 + k * 1.5;
+            return Math.pow(baseS, 1 / exp);
+        } else {
+            const exp = 1 + Math.abs(k) * 1.5;
+            return Math.pow(baseS, exp);
+        }
+    }
+
+    if (curveType === "exponential") {
+        // Curva côncava (ease-in / subida íngreme no final)
+        const exp = 2.0 + Math.abs(k) * 2.0;
+        return Math.pow(p, exp);
+    }
+
+    if (curveType === "logarithmic") {
+        // Curva convexa (ease-out / resposta logarítmica de volume natural)
+        const exp = 2.0 + Math.abs(k) * 2.0;
+        return 1.0 - Math.pow(1.0 - p, exp);
+    }
+
+    // Linear ou custom baseado em tensão contínua
+    if (Math.abs(k) < 0.01) {
+        return p;
+    } else if (k > 0) {
+        // Tensão positiva: dobra para cima (convexa / logarítmica)
+        const exp = 1.0 / (1.0 + k * 2.5);
+        return Math.pow(p, exp);
+    } else {
+        // Tensão negativa: dobra para baixo (côncava / exponencial)
+        const exp = 1.0 + Math.abs(k) * 2.5;
+        return Math.pow(p, exp);
+    }
 }
 
 // --- MODELO DE PISTAS ---
@@ -162,6 +226,9 @@ export class CapiauTimelineState {
         this.markers = []; // Lista de marcadores na timeline [{ id, frame, label, color, comment }]
         this.hoveredMarkerId = null; // ID do marcador sobre o qual o mouse está iterando (para mostrar rótulo no hover)
         this.selectedMarkerIds = new Set(); // Conjunto de IDs de marcadores selecionados na timeline
+
+        // Manipulador de Fade ativo no hover ({ clipId, side: "in"|"out", type: "duration"|"curve" })
+        this.hoveredFadeHandle = null;
     }
 
     // ── MARCADORES DA TIMELINE ──────────────────────────────────────────
