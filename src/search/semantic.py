@@ -1,5 +1,6 @@
 """Banco de dados vetorial local Qdrant embutido (100% CPU, sem Docker)."""
 import os
+import time
 from pathlib import Path
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, MatchAny
@@ -16,12 +17,24 @@ class QdrantUnavailableError(RuntimeError):
 
 class SemanticSearch:
     _instance = None
+    # Sem esta trava, duas threads que chamem get_instance() ao mesmo tempo criam
+    # DUAS instancias: a segunda tenta abrir o mesmo arquivo do Qdrant e falha com
+    # "already accessed by another instance" -- o servidor disputando a trava com
+    # ele mesmo. Pior: quem suspende uma instancia nao afeta a outra.
+    _instance_lock = threading.Lock()
+
+    # Quanto tempo a suspensao se sustenta sozinha, sem PID de worker visivel.
+    # Cobre o arranque do worker (carga do modelo de embeddings antes de abrir o
+    # Qdrant). Passado esse prazo sem worker vivo, a busca volta sozinha.
+    WORKER_HANDOFF_GRACE_S = 120
 
     @classmethod
     def get_instance(cls):
         """Retorna uma única instância compartilhada do buscador (Singleton)."""
         if cls._instance is None:
-            cls._instance = cls()
+            with cls._instance_lock:
+                if cls._instance is None:  # outra thread pode ter criado enquanto esperávamos
+                    cls._instance = cls()
         return cls._instance
 
     def __init__(self):
@@ -31,6 +44,10 @@ class SemanticSearch:
         self.encoder = None
         self.is_available = False
         self.error_message = None
+        # Enquanto True, o servidor NAO tenta reabrir o Qdrant: a trava esta
+        # emprestada a um worker de lote. Ver suspend_for_worker().
+        self._suspended_for_worker = False
+        self._suspended_at = 0.0
         self._try_init()
 
     def _try_init(self) -> None:
@@ -40,6 +57,20 @@ class SemanticSearch:
         with self._lock:
             if self.is_available and self.client is not None:
                 return
+
+            # Trava emprestada a um worker de lote: nao disputar. Sem isso, uma
+            # busca feita nos segundos entre o lancamento e o worker subir faria o
+            # servidor retomar a trava e o worker perderia a indexacao.
+            #
+            # A carencia cobre o arranque: o worker gasta ~15s carregando o modelo
+            # de embeddings antes de sequer tentar abrir o Qdrant, e ate registrar
+            # o PID nao ha como ve-lo. Sem ela, um unico /api/health nesse intervalo
+            # devolvia a trava ao servidor (medido em 22/08).
+            if self._suspended_for_worker:
+                dentro_da_carencia = (time.time() - self._suspended_at) < self.WORKER_HANDOFF_GRACE_S
+                if dentro_da_carencia or self._worker_ainda_rodando():
+                    return
+                self._suspended_for_worker = False
 
             # Garante que qualquer cliente anterior que falhou seja fechado
             if self.client is not None:
@@ -74,6 +105,37 @@ class SemanticSearch:
                         pass
                     self.client = None
                 print(f"[QDRANT] [AVISO] Falha ao inicializar o Qdrant: {e}")
+
+    @staticmethod
+    def _worker_ainda_rodando() -> bool:
+        """Diz se algum worker de lote esta vivo (import tardio: evita ciclo)."""
+        try:
+            from src.core.tasks import worker_is_running
+            return any(worker_is_running(t) for t in ("asr", "vision"))
+        except Exception:
+            return False
+
+    def suspend_for_worker(self) -> None:
+        """Solta a trava de arquivo do Qdrant para um worker de lote poder abri-la.
+
+        O Qdrant embutido tem trava exclusiva: enquanto o servidor a segura, o
+        worker roda com client=None e nao indexa nada. A busca fica indisponivel
+        durante a rodada (decisao do usuario em 22/08) e volta sozinha depois --
+        _try_init() retoma assim que nenhum worker estiver mais vivo.
+        """
+        with self._lock:
+            self._suspended_for_worker = True
+            self._suspended_at = time.time()
+            if self.client is not None:
+                try:
+                    self.client.close()
+                except Exception:
+                    pass
+                self.client = None
+            self.is_available = False
+            self.error_message = ("Busca indisponivel: a trava do Qdrant esta emprestada "
+                                  "a um worker de lote. Volta sozinha ao fim da rodada.")
+        print("[QDRANT] Trava liberada para o worker de lote; a busca fica fora do ar ate o fim da rodada.")
 
     def check_health(self) -> tuple:
         """Retorna (is_available: bool, error_message: str | None). Tenta reconectar
@@ -117,6 +179,14 @@ class SemanticSearch:
         'dialogues' deve ser uma lista de dicionários contendo:
         {'speaker_id': str, 'start_time': float, 'end_time': float, 'text': str}
         """
+        # Mesma guarda de index_broll_descriptions. Sem ela, com o Qdrant travado
+        # por outro processo isto estourava AttributeError (client=None) e derrubava
+        # a transcricao INTEIRA para status='error' -- depois do ASR ja pago.
+        if not self.is_available or not self.encoder or not self.client:
+            print(f"[QDRANT] [AVISO] Buscador indisponivel: a transcricao do video {video_id} "
+                  f"foi salva, mas NAO entrou na busca semantica. Reindexe depois. "
+                  f"Motivo: {self.error_message or 'desconhecido'}")
+            return
         points = []
         for idx, dial in enumerate(dialogues):
             text_to_embed = f"{dial['speaker_id']}: \"{dial['text']}\""

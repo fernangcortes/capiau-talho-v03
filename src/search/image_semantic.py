@@ -5,6 +5,7 @@ em português sem custo de API.
 - Coleção Qdrant separada 'capiau_images' (cosine), no MESMO cliente do SemanticSearch
   (o Qdrant local em modo arquivo só permite um cliente por caminho).
 """
+import threading
 import uuid
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -17,6 +18,9 @@ from src.search.semantic import SemanticSearch, QdrantUnavailableError
 
 class ImageSearch:
     _instance = None
+    # Mesma armadilha de SemanticSearch: sem trava, duas threads criam duas
+    # instancias e o estado de uma delas fica invisivel para o resto do servidor.
+    _instance_lock = threading.Lock()
 
     IMAGE_MODEL = "clip-ViT-B-32"
     TEXT_MODEL = "sentence-transformers/clip-ViT-B-32-multilingual-v1"
@@ -24,7 +28,9 @@ class ImageSearch:
     @classmethod
     def get_instance(cls):
         if cls._instance is None:
-            cls._instance = cls()
+            with cls._instance_lock:
+                if cls._instance is None:  # outra thread pode ter criado enquanto esperávamos
+                    cls._instance = cls()
         return cls._instance
 
     def __init__(self):
