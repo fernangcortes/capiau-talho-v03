@@ -456,3 +456,8 @@ Para ESTE pipeline: **`.fountain` ou `.txt` > `.fdx` > `.pdf`**. O Fountain/txt 
 | E3 | `insightface` + `onnxruntime` | médio | manter SFace (Tier 0) até wheel sair |
 | E4 | `fastmcp` | baixo | SDK MCP oficial |
 | pendente | `opentimelineio` | **alto (já falhou)** | venv 3.12 só para exportação, ou aguardar wheel |
+
+> **Nota (2026-08-22) — Dúvida: ativar InsightFace Tier 3 nesta máquina?** GPU do usuário = AMD Radeon 535, 2 GB VRAM. Avaliado e **decidido: manter como está** (SFace Tier 0; Tier 3 segue indisponível).
+> Motivos: (1) `onnxruntime-gpu` é CUDA/NVIDIA-only — em AMD o provider de GPU nunca registra e o backend cai em CPU via fallback interno (`src/vision/backends/insightface_backend.py`, `_get_app`); (2) `insightface` 0.7.3 não tem wheel para o Python 3.14 da máquina — pip tentaria compilar (MSVC/Cython), costuma falhar no Windows; (3) os 2 GB de VRAM são disputados com playback/render do NLE (risco de OOM/thrash); (4) placa de entrada (~1 TFLOP) teria ganho modesto sobre CPU nesses modelos.
+> Efeito colateral se instalado: a checagem `is_available` inicializa `FaceAnalysis`, baixa `buffalo_l` (~300 MB) e carrega 5 modelos ONNX a cada boot do app.
+> Se revisitar depois, caminhos viáveis: **(a)** `onnxruntime-directml` + `providers=["DmlExecutionProvider"]` no `_get_app` (caminho AMD real no Windows; considerar `det_size` menor se faltar VRAM); **(b)** rodar CPU puro (`ctx_id=-1`) com `pip install insightface onnxruntime` num venv Python 3.11/3.12 — precisão máxima sem tocar na GPU; **(c)** aguardar wheel de 3.13/3.14 (decisão já registrada na tabela acima).

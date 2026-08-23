@@ -3,9 +3,12 @@ import json
 import time
 import random
 import copy
+import math
 import requests
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+
+from src.media import audio_analysis, audio_chain
 
 from src.config import CONFIG
 from src.db.connection import get_db
@@ -451,10 +454,190 @@ class TimelineShadowCopy:
             for c in self.clips
         ]
 
+    # -- Ferramentas de audio do agente (BRIEFING8): contrato E1 ---------------
+    # Formato EXATO que o painel usa para o ajuste ao vivo
+    # (timelineInteraction.js, _audioAoVivoDefaults/_construirEfeitoAudioAoVivo):
+    # um unico objeto por tipo dentro de clip.effects, campos chapados + disabled.
+    # Os limites sao os mesmos clamps dos sliders do painel; divergir aqui faria
+    # o efeito gravado pelo agente ser re-clampado (ou recusado) pela UI.
+    LIMITES_AUDIO_AO_VIVO = {
+        "hpf": (0.0, 300.0), "low": (-12.0, 12.0), "mid": (-12.0, 12.0),
+        "high": (-12.0, 12.0), "gate_db": (-90.0, -20.0), "comp_ratio": (1.0, 20.0),
+        "comp_thresh_db": (-60.0, 0.0), "makeup_db": (-12.0, 12.0),
+    }
+    CAMPOS_INTEIROS_AUDIO_AO_VIVO = frozenset(("hpf", "gate_db", "comp_thresh_db"))
+    DEFAULTS_AUDIO_EQ = {"type": "audio_eq", "hpf": 80, "low": 0, "mid": 0,
+                         "high": 0, "disabled": False}
+    DEFAULTS_AUDIO_DYNAMICS = {"type": "audio_dynamics", "gate_db": -45,
+                               "comp_ratio": 2.0, "comp_thresh_db": -18,
+                               "makeup_db": 0, "disabled": False}
+
+    def encontrar_clip(self, clip_id: str) -> Optional[Dict[str, Any]]:
+        """Clipe pelo id (ou None), mesmo criterio das mutacoes acima."""
+        return next((c for c in self.clips if c["id"] == clip_id), None)
+
+    @staticmethod
+    def _js_round(valor: float) -> float:
+        """Arredonda como o Math.round do slider do painel: metades sobem."""
+        return float(math.floor(float(valor) + 0.5))
+
+    @classmethod
+    def _clampar_audio_ao_vivo(cls, campo: str, bruto) -> Optional[float]:
+        """Clampa ao intervalo E1 e aplica o passo do slider (inteiro em Hz/dBFS;
+        0,5 em dB e na razao). Valor nao-numerico/NaN volta como None (ignorado)."""
+        try:
+            valor = float(bruto)
+        except (TypeError, ValueError):
+            return None
+        if valor != valor:  # NaN
+            return None
+        limite = cls.LIMITES_AUDIO_AO_VIVO.get(campo)
+        if not limite:
+            return None
+        valor = min(max(valor, limite[0]), limite[1])
+        if campo in cls.CAMPOS_INTEIROS_AUDIO_AO_VIVO:
+            return int(cls._js_round(valor))
+        return cls._js_round(valor * 2.0) / 2.0
+
+    def ajustar_audio_ao_vivo(self, clip_id: str, valores: Optional[Dict[str, Any]] = None,
+                              reverter: Optional[str] = None) -> str:
+        """Grava os efeitos audio_eq / audio_dynamics (contrato E1) no clipe.
+
+        Reversivel por construcao: efeito vive em clip.effects, nao gera arquivo,
+        nao renderiza nada e `reverter` remove. Quando o alvo e um clipe de video
+        vinculado, aplica no PARCEIRO DE AUDIO, exatamente como o painel faz
+        (timelineInteraction.js redireciona as secoes volume/eq/dinamica)."""
+        clip = self.encontrar_clip(clip_id)
+        if not clip:
+            return f"Erro: Clipe {clip_id} não encontrado."
+        if self.is_track_locked(clip["track"]):
+            return "Erro: Pista travada."
+
+        # Redireciona ao PARCEIRO DE AUDIO quando o alvo e um clipe de video
+        # vinculado - mesmo comportamento do painel (timelineInteraction.js,
+        # secoes volume/audio_eq/audio_dynamics), para o efeito valer no som.
+        if self.get_track_kind(clip["track"]) == "video" and clip["link_id"]:
+            parceiro = next((c for c in self.clips
+                             if c["link_id"] == clip["link_id"]
+                             and self.get_track_kind(c["track"]) == "audio"), None)
+            if parceiro:
+                clip = parceiro
+
+        destinos_reverter = {"eq": ("audio_eq",), "dinamica": ("audio_dynamics",),
+                             "todos": ("audio_eq", "audio_dynamics")}
+        if reverter:
+            tipos = destinos_reverter.get(reverter)
+            if not tipos:
+                return ("Erro: 'reverter' aceita apenas: "
+                        f"{', '.join(sorted(destinos_reverter))}.")
+            clip["effects"] = [e for e in clip.setdefault("effects", [])
+                               if not (isinstance(e, dict) and e.get("type") in tipos)]
+            return "success"
+
+        if not valores:
+            return ("Erro: informe ao menos um parametro de audio (hpf, low, mid, "
+                    "high, gate_db, comp_ratio, comp_thresh_db, makeup_db).")
+
+        alterados = 0
+        for campo, bruto in valores.items():
+            if campo not in self.LIMITES_AUDIO_AO_VIVO:
+                continue
+            pronto = self._clampar_audio_ao_vivo(campo, bruto)
+            if pronto is None:
+                continue
+            tipo = "audio_eq" if campo in ("hpf", "low", "mid", "high") else "audio_dynamics"
+            padrao = dict(self.DEFAULTS_AUDIO_EQ if tipo == "audio_eq"
+                          else self.DEFAULTS_AUDIO_DYNAMICS)
+            efeitos = clip.setdefault("effects", [])
+            i = next((k for k, e in enumerate(efeitos)
+                      if isinstance(e, dict) and e.get("type") == tipo), -1)
+            if i >= 0 and isinstance(efeitos[i], dict):
+                padrao.update(efeitos[i])
+            padrao[campo] = pronto
+            if i >= 0:
+                efeitos[i] = padrao
+            else:
+                efeitos.append(padrao)
+            alterados += 1
+
+        if not alterados:
+            return ("Erro: nenhum parametro valido recebido. Campos aceitos: "
+                    f"{', '.join(sorted(self.LIMITES_AUDIO_AO_VIVO))}.")
+        return "success"
+
 # --- SERVIÇO DO AGENTE DE CHAT ---
+
+# -- Ferramentas de audio do agente (BRIEFING8) --------------------------------
+# O agente conversava sobre audio mas nao enxergava nada: add_effect so tem
+# fades/volume/speed. Aqui ele passa a MEDIR (pre-analise da ETAPA 1), EXPLICAR
+# e PEDIR tratamento, com as travas que o dono exige:
+#   - previa de 15 s e o DEFAULT; render completo so com confirmacao explicita
+#     do usuario na conversa (confirmacao_usuario=true junto de previa=false);
+#   - motor Auphonic NUNCA parte do agente: gasta a cota gratuita de 2 h/mes.
+#     O agente recomenda e explica; quem aperta o botao e o usuario no painel;
+#   - corte automatico de silencio/hesitacao NAO existe nas cadeias desta casa
+#     (CADEIA_ORDEM nao tem passo de silencio) e nenhuma ferramenta aqui inventa.
+# Medicao e render NAO sao reimplementados: src/media/audio_analysis.py mede,
+# src/media/audio_chain.py monta/roda a cadeia, e o cache e a MESMA tabela
+# audio_render do painel, tocada pelos proprios helpers de src/api/routes/media.py
+# (import TARDIO dentro das funcoes: aquele modulo arrasta cv2/fastapi e seria
+# peso morto no import deste servico).
+
+# Teto padrao de janela para analise DENTRO do chat (segundos). E menor que o
+# teto do painel (2400 s la): aqui a analise roda presa ao turno da conversa e
+# o usuario fica olhando spinner. Configuravel em audio.analise.teto_agente_s;
+# cai neste default enquanto a chave nao existir no registro.
+AGENTE_ANALISE_TETO_S_PADRAO = 300.0
+# Velocidades medidas (plano secoes 5-6 e briefing), so para o TEXTO de custo;
+# nenhuma logica de controle depende delas.
+FFMPEG_VEZES_TEMPO_REAL_MIN = 31.0
+FFMPEG_VEZES_TEMPO_REAL_MAX = 44.0
+DENOISE_IA_VEZES_TEMPO_REAL = 0.7
+# Momentos de estouro que entram no retorno da analise (o total vai junto;
+# envelope/momentos completos ficam de fora: estouram a janela do LLM).
+AGENTE_MOMENTOS_EXEMPLO_MAX = 5
+
+
+def _duracao_legivel(segundos: float) -> str:
+    """Segundos -> texto humano pt-BR ('90 s' | '4,5 min'), sem unicode solto."""
+    segundos = max(0.0, float(segundos))
+    if segundos < 120.0:
+        return f"{segundos:.0f} s"
+    return f"{segundos / 60.0:.1f}".replace(".", ",") + " min"
+
+
+# Texto fixo por preset (mesma voz do glossario: linguagem simples primeiro).
+# Chave ausente => preset sem texto (nao deveria acontecer; PRESETS_CADEIA manda).
+AGENTE_TEXTO_PRESETS = {
+    "so_entrega": (
+        "preset 'so_entrega': ajusta o volume medio para o alvo da casa "
+        "(-16 LUFS, o quanto o som fica alto na media) e segura o pico em "
+        "-1,5 dBTP com limitador, sem mexer no timbre."
+    ),
+    "resgate_estourado": (
+        "preset 'resgate_estourado': repara o clipping (amostras cortadas no "
+        "topo da onda), tira ruido por FFT e entrega no alvo de volume com "
+        "limitador. E o caso da entrevista estourada."
+    ),
+    "ambiencia_preservada": (
+        "preset 'ambiencia_preservada': denoise leve de 6 dB (para nao matar o "
+        "som do lugar) e ajuste de volume; SEM compressor de fala e SEM "
+        "limitador. Para plano de rua/feira."
+    ),
+    "previa_rapida": (
+        "preset 'previa_rapida': so o ajuste de volume (loudnorm em 2 passes); "
+        "serve para ouvir rapidamente como fica a entrega."
+    ),
+}
 
 class ChatAgentService:
     """Orquestrador do loop de Agente de Edição com function-calling via OpenRouter."""
+
+    # Nomes das ferramentas de audio; o despacho do laco usa este conjunto.
+    FERRAMENTAS_AUDIO = frozenset((
+        "analisar_audio", "sugerir_tratamento_audio",
+        "aplicar_tratamento_audio", "ajustar_audio_ao_vivo",
+    ))
 
     # Definição das ferramentas OpenAI/OpenRouter
     TOOLS = [
@@ -667,8 +850,534 @@ class ChatAgentService:
                     "required": ["operations", "rationale"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "analisar_audio",
+                "description": (
+                    "Mede o audio REAL do trecho do clipe com ffmpeg (com cache na tabela "
+                    "audio_render) e devolve o diagnostico: loudness medio (LUFS), pico real "
+                    "(dBTP), clipping, piso de ruido, dinamica (LRA), correlacao entre canais, "
+                    "selos de severidade, preset sugerido e onde estourou. Somente medicao: "
+                    "nao altera nada no projeto."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "clip_id": {"type": "string", "description": "ID do clipe na timeline (ex: cut_...)."}
+                    },
+                    "required": ["clip_id"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "sugerir_tratamento_audio",
+                "description": (
+                    "A partir da medicao do trecho, explica em portugues simples o que o material "
+                    "tem de problema, qual preset resolve, quanto tempo custa (ffmpeg roda a 31-44x "
+                    "o tempo do trecho; denoise por IA a ~0,7x) e o que o tratamento NAO resolve. "
+                    "NAO aplica nada. Use antes de aplicar_tratamento_audio."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "clip_id": {"type": "string", "description": "ID do clipe na timeline (ex: cut_...)."}
+                    },
+                    "required": ["clip_id"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "aplicar_tratamento_audio",
+                "description": (
+                    "Dispara o tratamento de audio do trecho do clipe e gera um WAV tratado em "
+                    "data/audio_tratado (o original NUNCA e tocado; nada muda na timeline). REGRAS "
+                    "INEGOCIAVEIS: 1) previa de 15 s e o PADRAO e roda sincrona/barata; render "
+                    "completo so com confirmacao_usuario=true depois de pedido explicito do usuario. "
+                    "2) O motor de nuvem Auphonic NAO pode ser escolhido pelo agente (gasta a cota "
+                    "gratuita de 2 h/mes do dono): recomende e deixe o USUARIO acionar no painel. "
+                    "3) Nenhum preset corta silencio ou hesitacao."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "clip_id": {"type": "string", "description": "ID do clipe na timeline (ex: cut_...)."},
+                        "preset": {
+                            "type": "string",
+                            "enum": sorted(audio_chain.PRESETS_CADEIA),
+                            "description": ("Preset local de tratamento (fonte da verdade: "
+                                            "PRESETS_CADEIA em src/media/audio_chain.py). 'auphonic' "
+                                            "NAO e opcao aqui: recusa automatica.")
+                        },
+                        "previa": {
+                            "type": "boolean",
+                            "description": ("DEFAULT true: renderiza so 15 s a partir do inicio do "
+                                            "clipe (sincrono, custa segundos) para o usuario ouvir o A/B.")
+                        },
+                        "confirmacao_usuario": {
+                            "type": "boolean",
+                            "description": ("Deve vir true junto de previa=false SOMENTE depois que o "
+                                            "usuario pedir explicitamente o render completo na conversa. "
+                                            "Sem ela o render completo e recusado.")
+                        }
+                    },
+                    "required": ["clip_id", "preset"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "ajustar_audio_ao_vivo",
+                "description": (
+                    "Grava no clipe os efeitos AO VIVO e REVERSIVEIS do contrato E1: audio_eq "
+                    "(corte de graves/HPF e bandas de grave, medio e agudo) e audio_dynamics "
+                    "(gate, compressor, limiar e ganho/makeup). Nao gera arquivo e nao renderiza "
+                    "nada; o player aplica na hora e o usuario pode reverter no painel ou pedindo "
+                    "'reverter'. Nunca liga corte automatico de silencio ou hesitacao."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "clip_id": {"type": "string", "description": "ID do clipe na timeline (ex: cut_...)."},
+                        "hpf": {"type": "integer", "minimum": 0, "maximum": 300,
+                                "description": "Corte de graves em Hz (HPF); tira o rumble. 0 = desligado."},
+                        "low": {"type": "number", "minimum": -12, "maximum": 12,
+                                "description": "Ganho dos graves em dB (-12 a +12)."},
+                        "mid": {"type": "number", "minimum": -12, "maximum": 12,
+                                "description": "Ganho dos medios em dB (-12 a +12)."},
+                        "high": {"type": "number", "minimum": -12, "maximum": 12,
+                                 "description": "Ganho dos agudos em dB (-12 a +12)."},
+                        "gate_db": {"type": "integer", "minimum": -90, "maximum": -20,
+                                    "description": "Gate em dBFS: abaixo deste nivel o som muda. -90 = desligado."},
+                        "comp_ratio": {"type": "number", "minimum": 1, "maximum": 20,
+                                       "description": "Razao do compressor (ex: 2 = 2:1, suave)."},
+                        "comp_thresh_db": {"type": "integer", "minimum": -60, "maximum": 0,
+                                           "description": "Limiar do compressor em dBFS."},
+                        "makeup_db": {"type": "number", "minimum": -12, "maximum": 12,
+                                      "description": "Ganho de compensacao (makeup) apos comprimir, em dB."},
+                        "reverter": {
+                            "type": "string",
+                            "enum": ["eq", "dinamica", "todos"],
+                            "description": "Remove os efeitos gravados: 'eq', 'dinamica' ou 'todos'."
+                        }
+                    },
+                    "required": ["clip_id"]
+                }
+            }
         }
     ]
+
+    # ---- Implementacao das ferramentas de audio (BRIEFING8) ------------------
+
+    @staticmethod
+    def _contexto_clipe_audio(project_id: int, shadow_timeline: "TimelineShadowCopy",
+                              clip_id: Optional[str]) -> tuple:
+        """Resolve clipe + linha do video no banco. Devolve (ctx, None) ou (None, erro)."""
+        if not clip_id:
+            return None, "clip_id e obrigatorio."
+        clip = shadow_timeline.encontrar_clip(str(clip_id))
+        if not clip:
+            return None, f"Clipe {clip_id} nao encontrado na timeline atual."
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, filename, filepath, duration, project_id FROM video WHERE id = ?",
+                (int(clip["video_id"]),),
+            )
+            linha = cursor.fetchone()
+        if not linha:
+            return None, (f"O video {clip['video_id']} do clipe {clip_id} "
+                          "nao esta mais no banco do projeto.")
+        video = {chave: linha[chave] for chave in linha.keys()}
+        in_s = float(clip["in"])
+        out_s = float(clip["out"])
+        if out_s <= in_s:
+            return None, (f"Janela invalida no clipe {clip_id}: "
+                          f"fim ({out_s:g}s) <= inicio ({in_s:g}s).")
+        return {
+            "clip": clip, "video": video, "video_id": int(clip["video_id"]),
+            "in_s": in_s, "out_s": out_s,
+            "duracao_s": out_s - in_s,
+            # O video pode pertencer a outro projeto; settings seguem o DELE.
+            "project_id": video.get("project_id", project_id),
+        }, None
+
+    @staticmethod
+    def _teto_analise_agente(project_id: Optional[int]) -> float:
+        """Teto de janela para analise dentro do chat; chave ausente -> default."""
+        try:
+            return float(SettingsService.get_settings(project_id).get("audio.analise.teto_agente_s"))
+        except (KeyError, TypeError, ValueError):
+            return AGENTE_ANALISE_TETO_S_PADRAO
+
+    @staticmethod
+    def _medidas_compactas(diag: Dict[str, Any]) -> Dict[str, Any]:
+        """So as medicoes que interessam a conversa, com apelidos legiveis."""
+        chaves = (
+            ("lufs_i", "loudness_lufs"), ("true_peak_db", "pico_real_dbtp"),
+            ("lra", "dinamica_lra"), ("rms_db", "rms_db"), ("peak_db", "pico_amostra_db"),
+            ("noise_floor_db", "piso_ruido_db"), ("clip_pct", "clipping_pct"),
+            ("stereo_corr", "correlacao_canais"), ("crest_factor", "crest_factor"),
+        )
+        return {apelido: diag.get(chave) for chave, apelido in chaves}
+
+    @staticmethod
+    def _diagnostico_do_clipe(project_id: int, shadow_timeline: "TimelineShadowCopy",
+                              clip_id: Optional[str]) -> str:
+        """Mede (ou le do cache da audio_render) o trecho do clipe.
+
+        Reaproveita SEM reimplementar: analisar_intervalo/avaliar vem de
+        src/media/audio_analysis.py e o cache e tocado pelos helpers da rota
+        (mesmo hash 'analysis|...', mesma tabela). Retorna JSON compacto em uma
+        string - envelope/momentos completos ficam de fora (so contagens), porque
+        a serie inteira nao cabe na conversa."""
+        ctx, erro = ChatAgentService._contexto_clipe_audio(project_id, shadow_timeline, clip_id)
+        if erro:
+            return f"Erro: {erro}"
+        if ctx["duracao_s"] > ChatAgentService._teto_analise_agente(ctx["project_id"]):
+            teto = ChatAgentService._teto_analise_agente(ctx["project_id"])
+            return (
+                f"Erro: o trecho do clipe tem {_duracao_legivel(ctx['duracao_s'])} e a analise "
+                f"dentro do chat fica limitada a {_duracao_legivel(teto)} para nao travar a "
+                f"conversa (chave audio.analise.teto_agente_s). Sugira ao usuario medir um trecho "
+                f"representativo pelo painel de Ajustes de Audio, ou divida o clipe e analise "
+                f"uma parte."
+            )
+
+        from src.api.routes.media import (
+            ANALISE_AUDIO_CACHE_TETO_BYTES, _audio_cache_gravar, _audio_cache_obter,
+            _fonte_disponivel, _hash_analise_audio, _json_seguro_para_resposta,
+            _limiares_audio,
+        )
+
+        cached = False
+        with get_db() as conn:
+            chain_hash = _hash_analise_audio(ctx["video_id"], ctx["in_s"], ctx["out_s"])
+            linha = _audio_cache_obter(conn, ctx["video_id"], chain_hash)
+            diag = None
+            if linha and linha["analysis_json"]:
+                try:
+                    diag = json.loads(linha["analysis_json"])
+                    cached = True
+                except ValueError:
+                    diag = None  # cache corrompido: remeasure em vez de mentir
+            fonte = (diag or {}).get("fonte")
+            if diag is None:
+                fonte = _fonte_disponivel(ctx["video"], ctx["video_id"])
+                if fonte is None:
+                    return (
+                        f"Erro: nem o original ({ctx['video'].get('filepath')}) nem o proxy local "
+                        f"estao acessiveis para medir o clipe {ctx['clip']['id']}. Peca ao usuario "
+                        f"ligar o HD do acervo ou gerar o proxy do video."
+                    )
+                origem = (Path(ctx["video"]["filepath"]) if fonte == "original"
+                          else CONFIG.PROXIES_DIR / f"proxy_vid_{ctx['video_id']}.mp4")
+                diag_medido = audio_analysis.analisar_intervalo(origem, ctx["in_s"], ctx["out_s"])
+                if not diag_medido.get("ok"):
+                    return (f"Erro: a medicao falhou: "
+                            f"{diag_medido.get('erro') or 'ffmpeg nao devolveu dados de audio'}.")
+                diag_medido["fonte"] = fonte
+                analysis_json = json.dumps(diag_medido)
+                if len(analysis_json.encode("utf-8")) <= ANALISE_AUDIO_CACHE_TETO_BYTES:
+                    _audio_cache_gravar(conn, ctx["video_id"], ctx["in_s"], ctx["out_s"],
+                                        chain_hash, analysis_json)
+                diag = diag_medido
+
+        avaliacao = audio_analysis.avaliar(diag, _limiares_audio(ctx["project_id"]))
+        momentos_estouro = [m for m in (diag.get("momentos") or [])
+                            if isinstance(m, dict) and m.get("tipo") == "estouro"]
+        resposta = {
+            "ok": True,
+            "clipe": {"id": ctx["clip"]["id"], "video_id": ctx["video_id"],
+                      "filename": ctx["video"].get("filename"),
+                      "janela_s": [round(ctx["in_s"], 3), round(ctx["out_s"], 3)],
+                      "duracao_s": round(ctx["duracao_s"], 3)},
+            "fonte": fonte, "cached": cached,
+            "medidas": ChatAgentService._medidas_compactas(diag),
+            "avaliacao": {
+                "selos": [{"metrica": s.get("metrica"), "severidade": s.get("severidade"),
+                           "texto": s.get("texto")} for s in avaliacao.get("selos", [])],
+                "preset_sugerido": avaliacao.get("preset_sugerido"),
+                "cadeia_sugerida": avaliacao.get("cadeia_sugerida", []),
+            },
+            "estouros": {"total": len(momentos_estouro),
+                         "exemplos": momentos_estouro[:AGENTE_MOMENTOS_EXEMPLO_MAX]},
+        }
+        return json.dumps(_json_seguro_para_resposta(resposta), ensure_ascii=False)
+
+    @staticmethod
+    def _texto_custo_tempo(duracao_s: float, cadeia: List[str]) -> str:
+        """Custo humano em tempo, com os fatores medidos (so texto de custo)."""
+        partes = [
+            f"Tempo de processamento local: de {_duracao_legivel(duracao_s / FFMPEG_VEZES_TEMPO_REAL_MAX)} "
+            f"a {_duracao_legivel(duracao_s / FFMPEG_VEZES_TEMPO_REAL_MIN)} "
+            "(o ffmpeg roda a 31-44x o tempo do trecho)."
+        ]
+        if any(str(p).split(":")[0] == "denoise_ia" for p in cadeia):
+            partes.append(
+                f"A etapa de denoise por IA roda a ~0,7x o tempo real "
+                f"({_duracao_legivel(duracao_s / DENOISE_IA_VEZES_TEMPO_REAL)} so ela)."
+            )
+        return " ".join(partes)
+
+    @staticmethod
+    def _tool_sugerir_tratamento_audio(project_id: int, shadow_timeline: "TimelineShadowCopy",
+                                       clip_id: Optional[str]) -> str:
+        """Explica o diagnostico e o preset em portugues; NAO aplica nada."""
+        bruto = ChatAgentService._diagnostico_do_clipe(project_id, shadow_timeline, clip_id)
+        try:
+            dados = json.loads(bruto)
+        except ValueError:
+            return bruto  # era mensagem de erro, segue como veio
+        if not dados.get("ok"):
+            return bruto
+
+        av = dados["avaliacao"]
+        selos = av.get("selos", [])
+        graves = [s["texto"] for s in selos if s.get("severidade") == "grave"]
+        atencoes = [s["texto"] for s in selos if s.get("severidade") == "atencao"]
+        bons = [s["texto"] for s in selos if s.get("severidade") == "ok"]
+
+        linhas = []
+        if graves:
+            linhas.append("GRAVE no material: " + "; ".join(graves) + ".")
+        if atencoes:
+            linhas.append("Chama atencao: " + "; ".join(atencoes) + ".")
+        if bons and not graves and not atencoes:
+            linhas.append("Boa noticia: " + "; ".join(bons) + ". Nada urgente aqui.")
+
+        preset = av.get("preset_sugerido")
+        if preset:
+            linhas.append("O que resolve: " + AGENTE_TEXTO_PRESETS.get(
+                preset, f"preset '{preset}' (veja PRESETS_CADEIA)."))
+            linhas.append(ChatAgentService._texto_custo_tempo(
+                float(dados["clipe"]["duracao_s"]), av.get("cadeia_sugerida") or []))
+        else:
+            linhas.append(
+                "Nenhum tratamento necessario agora: o material ja esta dentro do alvo da casa "
+                "(-16 LUFS de loudness medio, pico abaixo de -1,5 dBTP). Se quiser conferir a "
+                "entrega mesmo assim, o 'previa_rapida' custa segundos.")
+
+        limites = []
+        medidas = dados.get("medidas", {})
+        if (medidas.get("clipping_pct") or 0.0) > 0 or (medidas.get("pico_real_dbtp") or -99) > 0:
+            limites.append(
+                "o reparo de clipping reconstrui as amostras cortadas, mas distorcao forte que ja "
+                "ficou gravada no arquivo nao volta 100% - ouca a previa antes de apostar nela")
+        if (medidas.get("piso_ruido_db") is not None
+                and medidas.get("piso_ruido_db") != float("-inf")
+                and medidas.get("piso_ruido_db", -99) > -35.0):
+            limites.append(
+                "o denoise classico segura cerca de 12 dB de ruido; ruido muito acima disso pede "
+                "denoise por IA (mais lento) ou nuvem")
+        if (medidas.get("dinamica_lra") is not None and medidas.get("dinamica_lra") < 5.0):
+            limites.append("dinamica esmagada nao se recria; o tratamento evita comprimir ainda mais")
+        if medidas.get("correlacao_canais") is not None and medidas.get("correlacao_canais") >= 0.95:
+            limites.append("canais identicos (mono duplicado) continuam mono; nada vira estereo verdadeiro")
+        if limites:
+            linhas.append("O que o tratamento NAO resolve: " + "; ".join(limites) + ".")
+        linhas.append(
+            "Regra da casa: nenhum tratamento corta silencio ou hesitacao automaticamente "
+            "(decisao editorial do documentario) - isso segue manual.")
+
+        if graves or preset == "resgate_estourado":
+            linhas.append(
+                "Para um caso assim existe tambem o motor de nuvem (Auphonic), que costuma se sair "
+                "melhor em captacao estourada/ruidosa. Mas ele gasta a cota gratuita do dono "
+                "(2 horas por mes), entao eu NAO aciono por conta propria: sugira ao usuario ligar "
+                "o radio 'Auphonic' no painel de Ajustes de Audio se quiser usar a nuvem.")
+
+        linhas.append(
+            "Decisao: peca-me 'aplica a previa' (15 s, custa segundos) para ouvir o A/B; o render "
+            "completo do trecho so roda com confirmacao explicita sua.")
+        return "\n".join(linhas)
+
+    @staticmethod
+    def _recusa_auphonic(preset_bruto: str) -> str:
+        """Mensagem fixa de recusa do motor de nuvem (regra do dono)."""
+        return (
+            f"Recusado: '{preset_bruto}' e o motor de NUVEM (Auphonic) e o agente NAO pode aciona-lo - "
+            "cada minuto enviado consome a cota gratuita do dono (2 horas por mes, que nao renovam "
+            "por uso). Recomendacao: para material estourado ou muito ruidoso o Auphonic costuma "
+            "ficar melhor que o ffmpeg local; explique isso ao usuario e peca que ELE ligue o radio "
+            "'Auphonic' no painel de Ajustes de Audio (Configuracoes > Modelos & Chaves guarda a "
+            "chave). Enquanto isso, ofereca um preset LOCAL (so_entrega, resgate_estourado, "
+            "ambiencia_preservada, previa_rapida) - nada foi enviado para a nuvem."
+        )
+
+    @staticmethod
+    def _tool_aplicar_tratamento_audio(project_id: int, shadow_timeline: "TimelineShadowCopy",
+                                       args: Dict[str, Any]) -> str:
+        """Dispara o tratamento via audio_chain + cache audio_render (contrato F2).
+
+        previa=true (DEFAULT) renderiza 15 s sincronos; render completo exige
+        confirmacao_usuario=true e entra na fila do TaskManager (nunca trava o
+        request). Auphonic recusado sempre."""
+        clip_id = args.get("clip_id")
+        ctx, erro = ChatAgentService._contexto_clipe_audio(project_id, shadow_timeline, clip_id)
+        if erro:
+            return f"Erro: {erro}"
+
+        preset_bruto = str(args.get("preset") or "").strip()
+        if preset_bruto.lower() in ("auphonic", "nuvem", "cloud"):
+            return ChatAgentService._recusa_auphonic(preset_bruto)
+        presets_validos = sorted(audio_chain.PRESETS_CADEIA)
+        if preset_bruto not in audio_chain.PRESETS_CADEIA:
+            return (
+                f"Erro: preset desconhecido '{preset_bruto}'. Validos (locais): "
+                f"{', '.join(presets_validos)}. O motor de nuvem (Auphonic) nao e opcao do agente: "
+                f"gasta a cota gratuita do dono - recomende e deixe o USUARIO acionar no painel."
+            )
+
+        previa = args.get("previa", True)
+        previa = True if previa is None else bool(previa)
+
+        from src.api.routes.media import (
+            PREVIA_AUDIO_S, _diag_antes_do_cache, _fonte_disponivel, _ref_audio_tratado,
+            _render_cache_gravar, _render_cache_obter, _task_key_render, _tarefa_render_audio,
+            _wav_do_render,
+        )
+
+        fonte = _fonte_disponivel(ctx["video"], ctx["video_id"])
+        if fonte is None:
+            return (
+                f"Erro: nem o original ({ctx['video'].get('filepath')}) nem o proxy local estao "
+                f"acessiveis para processar o clipe {ctx['clip']['id']}. Peca ao usuario ligar o HD "
+                f"do acervo ou gerar o proxy."
+            )
+        origem = (Path(ctx["video"]["filepath"]) if fonte == "original"
+                  else CONFIG.PROXIES_DIR / f"proxy_vid_{ctx['video_id']}.mp4")
+
+        try:
+            cadeia = audio_chain.normalizar_cadeia(dict(audio_chain.PRESETS_CADEIA[preset_bruto]))
+        except (KeyError, TypeError, ValueError) as err:
+            return f"Erro: o montador de cadeia recusou o preset '{preset_bruto}': {err}"
+
+        out_base = ctx["out_s"]
+        in_s = ctx["in_s"]
+        out_final = min(out_base, in_s + PREVIA_AUDIO_S) if previa else out_base
+
+        if not previa and not bool(args.get("confirmacao_usuario")):
+            duracao_total = out_base - in_s
+            return (
+                f"Confirmacao necessaria: o render completo de {_duracao_legivel(duracao_total)} ocupa "
+                f"a maquina por cerca de {_duracao_legivel(duracao_total / FFMPEG_VEZES_TEMPO_REAL_MAX)} "
+                f"a {_duracao_legivel(duracao_total / FFMPEG_VEZES_TEMPO_REAL_MIN)} "
+                "(ffmpeg a 31-44x o tempo do trecho). Nada foi iniciado. Se o usuario ja pediu o "
+                "render completo na conversa, reenvie com previa=false e confirmacao_usuario=true; "
+                "senao, ofereca primeiro a previa de 15 s."
+            )
+
+        chain_hash = audio_chain.hash_cadeia(ctx["video_id"], in_s, out_final, cadeia)
+        path_ref = _ref_audio_tratado(ctx["video_id"], chain_hash)
+
+        with get_db() as conn:
+            linha = _render_cache_obter(conn, ctx["video_id"], chain_hash)
+            if linha is not None and linha["status"] == "ready":
+                wav_ok = False
+                if linha["path"] == path_ref:
+                    try:
+                        wav_ok = _wav_do_render(ctx["video_id"], chain_hash).exists()
+                    except ValueError:
+                        wav_ok = False
+                if wav_ok:
+                    return (
+                        f"Ja estava pronto (cache): '{preset_bruto}' sobre "
+                        f"{_duracao_legivel(out_final - in_s)} do clipe {ctx['clip']['id']} -> "
+                        f"{path_ref}. Nada foi recalculado; o usuario pode ouvir o A/B pelo player."
+                    )
+            elif linha is not None and linha["status"] in ("pending", "running"):
+                return (
+                    f"Este render ('{preset_bruto}', hash {chain_hash[:12]}) ja esta em andamento "
+                    f"(status: {linha['status']}). Nao duplicuei a fila; acompanhe pela tela de Tarefas."
+                )
+
+        if previa:
+            dest = _wav_do_render(ctx["video_id"], chain_hash)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            resultado = audio_chain.renderizar(origem, dest, in_s, out_final, cadeia)
+            if not resultado.get("ok"):
+                erro_render = resultado.get("erro") or "ffmpeg terminou sem sucesso e sem mensagem."
+                with get_db() as conn:
+                    _render_cache_gravar(conn, ctx["video_id"], in_s, out_final, chain_hash,
+                                         cadeia, path_ref, "failed",
+                                         json.dumps({"antes": None, "depois": None,
+                                                     "erro": erro_render}))
+                return f"Erro: a previa falhou ({erro_render}). Nada foi aplicado ao projeto."
+
+            diag_depois = audio_analysis.analisar_intervalo(dest)
+            with get_db() as conn:
+                bloco = {
+                    "antes": _diag_antes_do_cache(conn, ctx["video_id"], in_s, out_final),
+                    "depois": diag_depois if diag_depois.get("ok") else None,
+                    "render": {"duracao_render_s": resultado.get("duracao_render_s"),
+                               "medidas_loudnorm": resultado.get("medidas_loudnorm")},
+                }
+                if not diag_depois.get("ok"):
+                    bloco["aviso_analise"] = diag_depois.get("erro")
+                _render_cache_gravar(conn, ctx["video_id"], in_s, out_final, chain_hash,
+                                     cadeia, path_ref, "ready", json.dumps(bloco))
+
+            antes = (bloco.get("antes") or {})
+            resumo_ab = ""
+            if antes.get("lufs_i") is not None and diag_depois.get("lufs_i") is not None:
+                resumo_ab = (f" A/B desta janela: loudness {antes['lufs_i']:g} LUFS -> "
+                             f"{diag_depois['lufs_i']:g} LUFS; pico real "
+                             f"{antes.get('true_peak_db', float('nan')):g} -> "
+                             f"{diag_depois.get('true_peak_db', float('nan')):g} dBTP.")
+            return (
+                f"Previa de 15 s pronta: preset '{preset_bruto}' sobre o inicio do clipe "
+                f"{ctx['clip']['id']} -> {path_ref}.{resumo_ab} O original nao foi tocado e a "
+                f"timeline nao mudou. Para o trecho inteiro, precisa do ok explicito do usuario "
+                f"(render completo) ou do botao do painel."
+            )
+
+        # Render completo: enfileira como o botao do painel faz (TaskManager),
+        # gravando ANTES a linha pending que o worker/tarefa consome.
+        task_key = _task_key_render(ctx["video_id"], chain_hash)
+        with get_db() as conn:
+            _render_cache_gravar(conn, ctx["video_id"], in_s, out_final, chain_hash,
+                                 cadeia, path_ref, "pending")
+        from src.core.tasks import TASK_MANAGER
+        TASK_MANAGER.executor.submit(_tarefa_render_audio, ctx["video_id"], origem,
+                                     in_s, out_final, cadeia, chain_hash, task_key)
+        return (
+            f"Render completo ENFILEIRADO: preset '{preset_bruto}' sobre "
+            f"{_duracao_legivel(out_final - in_s)} do clipe {ctx['clip']['id']} "
+            f"(tarefa {task_key}; estimativa de "
+            f"{_duracao_legivel((out_final - in_s) / FFMPEG_VEZES_TEMPO_REAL_MAX)} a "
+            f"{_duracao_legivel((out_final - in_s) / FFMPEG_VEZES_TEMPO_REAL_MIN)}). "
+            f"Acompanhe na tela de Tarefas; o WAV sai em {path_ref}."
+        )
+
+    @staticmethod
+    def _despachar_ferramenta_de_audio(func_name: str, project_id: int,
+                                       shadow_timeline: "TimelineShadowCopy",
+                                       args: Dict[str, Any]) -> str:
+        """Roteia UMA chamada de ferramenta de audio para sua implementacao.
+
+        Separado do laco gigante de proposito: assim o roteamento e testavel sem
+        LLM/rede (o autoteste chama este metodo diretamente com dubles)."""
+        if func_name == "analisar_audio":
+            return ChatAgentService._diagnostico_do_clipe(project_id, shadow_timeline,
+                                                          args.get("clip_id"))
+        if func_name == "sugerir_tratamento_audio":
+            return ChatAgentService._tool_sugerir_tratamento_audio(project_id, shadow_timeline,
+                                                                   args.get("clip_id"))
+        if func_name == "aplicar_tratamento_audio":
+            return ChatAgentService._tool_aplicar_tratamento_audio(project_id, shadow_timeline, args)
+        if func_name == "ajustar_audio_ao_vivo":
+            valores = {campo: args[campo]
+                       for campo in TimelineShadowCopy.LIMITES_AUDIO_AO_VIVO if campo in args}
+            return shadow_timeline.ajustar_audio_ao_vivo(args.get("clip_id"), valores=valores,
+                                                         reverter=args.get("reverter"))
+        return f"Erro: ferramenta de audio desconhecida: {func_name}"
 
     @staticmethod
     def chat_with_agent(
@@ -1106,6 +1815,11 @@ class ChatAgentService:
                                 " OPERAÇÕES REJEITADAS: " + "; ".join(op_errors) +
                                 ". Corrija os campos e reenvie SOMENTE as operações rejeitadas."
                             )
+
+                    elif func_name in ChatAgentService.FERRAMENTAS_AUDIO:
+                        tool_result = ChatAgentService._despachar_ferramenta_de_audio(
+                            func_name, project_id, shadow_timeline, args
+                        )
 
                     else:
                         tool_result = f"Erro: Ferramenta {func_name} desconhecida."

@@ -7556,4 +7556,180 @@ input[type="number"] {
     animation: tasksTabPulse 0.4s ease-out;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   EXPLICAÇÕES NA INTERFACE — ícone (i) + painel detalhado (.capiau-explica)
+   Bloco NOVO acrescentado na rodada de fecho de docs/PLANO_AJUSTES_DE_AUDIO
+   (BRIEFING8 / contrato N3). Pedido literal do dono: "tooltips em line icons
+   (i) bem sutis e pequenos que ficam sem muita opacidade quando nao em hover.
+   esses tooltips temos que clicar pra ver, ai vem uma explicacao bem
+   detalhada." Somente CSS visual; conteúdo vem do glossário de áudio via JS.
+   Vocabulário herdado: violeta/borda/blur do #global-tooltip, vidro escuro
+   (--bg-glass-active), títulos em 'Outfit', transições cubic-bezier da casa.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Ícone (i) de linha: discreto em repouso, evidente e clicável no hover */
+.capiau-explica {
+    appearance: none;
+    background: transparent;
+    border: none;
+    padding: 0 2px;
+    margin-left: 3px;
+    flex-shrink: 0;              /* nunca empurra o controle vizinho */
+    vertical-align: middle;
+    align-self: center;
+    line-height: 1;
+    font-size: 11px;             /* mesma escala dos tooltips globais */
+    color: var(--color-violet);
+    opacity: 0.35;               /* quase apagado em repouso */
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.2s ease, text-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.capiau-explica:hover,
+.capiau-explica:focus-visible {
+    opacity: 1;                  /* acende por completo ao passar o mouse */
+}
+
+.capiau-explica:hover {
+    text-shadow: 0 0 8px rgba(138, 92, 246, 0.6);  /* glow violeta da casa */
+    transform: scale(1.15);      /* só transform: não causa reflow/layout shift */
+}
+
+.capiau-explica:focus-visible {
+    outline: 1px solid rgba(138, 92, 246, 0.55);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+/* Estado aberto marcado no próprio ícone: mostra de onde o painel saiu */
+.capiau-explica.aberto {
+    opacity: 1;
+    text-shadow: 0 0 10px rgba(138, 92, 246, 0.9);
+}
+
+/* Painel detalhado que abre no CLIQUE (não é balão de hover) */
+.capiau-explica-painel {
+    display: none;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 4px 0 6px;
+    max-height: 280px;           /* cabe na sidebar estreita e rola sozinho */
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;  /* tom dos scrollbars premium */
+    background: var(--bg-glass-active);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(138, 92, 246, 0.45);  /* família do #global-tooltip */
+    border-radius: 6px;          /* igual ao .media-desc-tooltip */
+    padding: 10px 12px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);   /* sombra do #global-tooltip */
+}
+
+.capiau-explica-painel.aberto {
+    display: block;
+    animation: capiauExplicaAbre 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes capiauExplicaAbre {
+    from {
+        opacity: 0;
+        transform: translateY(4px) scale(0.98);  /* mesma entrada do #global-tooltip */
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Cabeçalho do painel: título à esquerda, fechar à direita */
+.capiau-explica-topo {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.capiau-explica-titulo {
+    font-family: var(--font-heading);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    color: var(--text-primary);
+}
+
+.capiau-explica-fechar {
+    appearance: none;
+    background: transparent;
+    border: none;
+    padding: 0 2px;
+    flex-shrink: 0;
+    font-size: 12px;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+
+.capiau-explica-fechar:hover,
+.capiau-explica-fechar:focus-visible {
+    color: var(--text-primary);
+    text-shadow: 0 0 8px rgba(138, 92, 246, 0.6);
+}
+
+/* Corpo: um ou mais parágrafos de explicação */
+.capiau-explica-painel p {
+    margin: 0 0 7px;
+    color: var(--text-secondary);
+}
+
+.capiau-explica-painel p:last-of-type {
+    margin-bottom: 0;
+}
+
+/* Bloco destacado "Na prática": exemplo com o material do usuário */
+.capiau-explica-pratica {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(138, 92, 246, 0.08);        /* tinta violeta translúcida */
+    border-left: 2px solid rgba(138, 92, 246, 0.55);
+    border-radius: 4px;
+}
+
+.capiau-explica-pratica-rotulo {
+    display: block;
+    font-size: 8.5px;            /* mesmo padrão de .scroll-index-folder */
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--color-violet);
+    margin-bottom: 4px;
+}
+
+.capiau-explica-pratica p {
+    margin: 0;
+}
+
+/* Respeito a reduced-motion: nenhuma animação/transição neste componente */
+@media (prefers-reduced-motion: reduce) {
+    .capiau-explica,
+    .capiau-explica-fechar {
+        transition: none;
+    }
+
+    .capiau-explica:hover {
+        transform: none;
+    }
+
+    .capiau-explica-painel.aberto {
+        animation: none;
+    }
+}
+
 

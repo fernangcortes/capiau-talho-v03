@@ -2,25 +2,24 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { FaceManager } from "./faces.js";
-import { TIMELINE_STATE, TIMELINE_HISTORY } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY, evaluateFadeCurve } from "./timelineState.js";
 import { getActiveElement } from "./workspaceManager.js";
 
 // Foco global do teclado para players: "source" ou "program"
 window.activeFocusedPlayer = "source";
 
 export function formatTimecode(secs, fps = null) {
-    if (isNaN(secs) || secs === null) return "00:00:00:00";
-    const currentFps = fps || TIMELINE_STATE?.fps || 24;
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = Math.floor(secs % 60);
-    const f = Math.floor((secs % 1) * currentFps);
-    return [
-        h.toString().padStart(2, '0'),
-        m.toString().padStart(2, '0'),
-        s.toString().padStart(2, '0'),
-        f.toString().padStart(2, '0')
-    ].join(':');
+    if (isNaN(secs) || secs === null || secs < 0) return "00:00:00:00";
+    const currentFps = Number(fps || TIMELINE_STATE?.fps) > 0 ? Number(fps || TIMELINE_STATE?.fps) : 24;
+    const totalIntFrames = Math.max(0, Math.round(Number(secs) * currentFps));
+    const totalSeconds = Math.floor(totalIntFrames / currentFps);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    const f = Math.min(Math.floor(currentFps) - 1, Math.max(0, Math.floor(totalIntFrames % currentFps)));
+
+    const pad = (n) => String(Math.floor(Math.abs(Number(n) || 0))).padStart(2, '0');
+    return `${pad(h)}:${pad(m)}:${pad(s)}:${pad(f)}`;
 }
 
 /**
@@ -1693,8 +1692,16 @@ export class ProgramPlayer {
         effects.filter(e => e.type === "crossfade").forEach(cf => {
             if (cf.disabled) return;
             const d = Math.max(0.05, cf.duration_s || 0.5);
-            if (cf.side === "in" && tIn < d) fadeOpacity = Math.min(fadeOpacity, Math.max(0, tIn / d));
-            if (cf.side === "out" && tOut < d) fadeOpacity = Math.min(fadeOpacity, Math.max(0, tOut / d));
+            if (cf.side === "in" && tIn < d) {
+                const p = Math.max(0, Math.min(1, tIn / d));
+                const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+                fadeOpacity = Math.min(fadeOpacity, factor);
+            }
+            if (cf.side === "out" && tOut < d) {
+                const p = Math.max(0, Math.min(1, tOut / d));
+                const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+                fadeOpacity = Math.min(fadeOpacity, factor);
+            }
         });
         
         el.style.opacity = String(baseOpacity * fadeOpacity);
@@ -1725,6 +1732,9 @@ export class ProgramPlayer {
             el.preload = "auto";
             el.dataset.trackId = trackId;
             document.body.appendChild(el);
+            // F4: WAV tratado que falhe (404, arquivo apagado, rede) precisa ser visivel
+            // e devolver o clipe ao original - nunca silencio.
+            el.addEventListener("error", () => this._aoErroElementoAudio(el));
             this.audioPool[trackId] = el;
         }
         return this.audioPool[trackId];
@@ -1763,17 +1773,39 @@ export class ProgramPlayer {
                 return;
             }
 
-            const rawSrc = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
-            const audioSrc = rawSrc.replace(/\\/g, "/");
+            // F4 - A/B do contrato: WAV tratado quando registrado para o clipe, original caso
+            // contrario. Com nenhum registro, src e fluxo são EXATAMENTE os de antes.
+            const alvo = this._fonteAudioEfetiva(cut, videoData);
+            const audioSrc = alvo.src;
+
+            // Troca suave que deixou de corresponder ao pedido atual (A/B reverteu,
+            // clipe mudou): aborta; uma nova é agendada abaixo se ainda houver troca.
+            const pendente = this._trocaAudioPendente(track.id);
+            if (pendente && (pendente.destino !== audioSrc || pendente.clipId !== String(cut.id))) {
+                this._cancelarTrocaAudio(track.id);
+            }
+
             const srcChanged = el.dataset.loadedSrc !== audioSrc;
             if (srcChanged) {
-                el.src = audioSrc;
-                el.dataset.loadedSrc = audioSrc;
-                el.load();
+                if (this._podeTrocarSuave(el)) {
+                    // Em reprodução NUNCA dar src/load() no elemento que está no ar (zera o
+                    // decoder e emudece): prepara o elemento par e corta quando estiver no
+                    // ponto certo — mesmo mecanismo dos buffers de vídeo (_awaitBuffer).
+                    this._iniciarTrocaSuave(track.id, el, alvo, cut);
+                } else {
+                    el.dataset.audioTratado = alvo.tratado ? "1" : "";
+                    el.src = audioSrc;
+                    el.dataset.loadedSrc = audioSrc;
+                    el.load();
+                }
             }
 
             const offsetFrames = currentFrame - cut.timelineStartFrame;
-            const targetSeconds = cut.in + (offsetFrames / (TIMELINE_STATE?.fps || 24));
+            // Base temporal da fonte EM USO: o WAV derivado cobre exatamente o trecho
+            // [in, out] da mesma fonte, então seu tempo 0 é o In do clipe (base 0); o
+            // arquivo original é a mídia completa (base = cut.in). Mapa direto, sem salto.
+            const baseFonte = el.dataset.audioTratado === "1" ? 0 : cut.in;
+            const targetSeconds = baseFonte + (offsetFrames / (TIMELINE_STATE?.fps || 24));
             const clipChanged = el.dataset.activeClipId !== String(cut.id);
             if (clipChanged) el.dataset.activeClipId = String(cut.id);
 
@@ -1808,17 +1840,36 @@ export class ProgramPlayer {
             effects.filter(e => e.type === "crossfade").forEach(cf => {
                 if (cf.disabled) return;
                 const d = Math.max(0.05, cf.duration_s || 0.5);
-                if (cf.side === "in" && tIn < d) fadeVol = Math.min(fadeVol, Math.max(0, tIn / d));
-                if (cf.side === "out" && tOut < d) fadeVol = Math.min(fadeVol, Math.max(0, tOut / d));
+                if (cf.side === "in" && tIn < d) {
+                    const p = Math.max(0, Math.min(1, tIn / d));
+                    const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+                    fadeVol = Math.min(fadeVol, factor);
+                }
+                if (cf.side === "out" && tOut < d) {
+                    const p = Math.max(0, Math.min(1, tOut / d));
+                    const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+                    fadeVol = Math.min(fadeVol, factor);
+                }
             });
 
             const vol = track.volume !== undefined ? track.volume : 1.0;
             el.volume = (track.muted || isHighSpeedOrReverse) ? 0 : Math.max(0, Math.min(1.0, vol * clipVol * fadeVol));
             if (this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse && el.paused) {
+                this._retomarContextoAudioAoVivo(); // AudioContext acorda no mesmo caminho do play
                 el.play().catch(() => {});
             } else if ((!this.isPlaying || isHighSpeedOrReverse) && !el.paused) {
                 el.pause();
             }
+
+            // Ajustes de áudio AO VIVO (Etapa 2): só roteia o elemento pelo grafo quando o
+            // clipe tem audio_eq ou audio_dynamics ATIVO; sem efeito, segue no caminho normal.
+            // O volume/fade/mute acima não muda: el.volume atua ANTES do grafo e não é duplicado.
+            if (this._efeitosAudioAoVivo(effects)) this.aplicarAudioAoVivo(el, effects);
+            else this.liberarAudioAoVivo(el);
+
+            // F4: conduz a troca tratado/original pendente — prepara o par e corta só
+            // quando ele está carregado e posicionado (sem salto de posição nem silêncio).
+            this._dirigirTrocaSuave(track.id, cut, currentFrame);
         });
 
         if (this.audioPool) {
@@ -1826,11 +1877,592 @@ export class ProgramPlayer {
                 if (!seen.has(tid)) {
                     const el = this.audioPool[tid];
                     el.pause();
+                    this.liberarAudioAoVivo(el); // solta o grafo antes de descartar o elemento
                     el.src = "";
                     el.remove();
                     delete this.audioPool[tid];
+                    // F4: descarta também o par de troca e qualquer troca pendente da pista.
+                    const par = this._paresAudio ? this._paresAudio[tid] : null;
+                    if (par) {
+                        [par.a, par.b].forEach(x => {
+                            if (x && x !== el) {
+                                x.pause();
+                                this.liberarAudioAoVivo(x);
+                                x.src = "";
+                                x.remove();
+                            }
+                        });
+                        delete this._paresAudio[tid];
+                    }
+                    if (this._trocasAudio) delete this._trocasAudio[tid];
                 }
             });
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // ÁUDIO AO VIVO (Etapa 2, Tipo A) - contrato E2.
+    // Grafo por elemento, criado UMA vez e reusado (WeakMap):
+    //   fonte -> HPF -> low shelf -> mid peaking -> high shelf -> gate (worklet)
+    //        -> compressor -> ganho de makeup -> destination.
+    // REGRA INEGOCIÁVEL: nenhum caminho de código pode terminar em silêncio. Se o
+    // AudioContext não existir, estiver suspenso, o worklet não carregar ou qualquer
+    // nó falhar ANTES de rotear, o elemento continua tocando pelo caminho normal do
+    // navegador - prefere-se não aplicar efeito a emudecer o material do usuário.
+    // Limitação da plataforma: depois do createMediaElementSource o som do elemento
+    // sai SÓ pelo grafo; "liberar" reconecta a fonte direto ao destino (passagem
+    // plana, sem processamento), que é auditivamente o caminho normal.
+    // Frequências fixas dos filtros (decisão própria, default eq_mid_hz do E4):
+    // low shelf 250 Hz, mid peaking 1000 Hz (Q 1.0), high shelf 3000 Hz.
+    // ─────────────────────────────────────────────────────────────────────────────
+    /* C1-INICIO */
+    /** false quando o navegador não suporta WebAudio; a UI avisa (contrato E2). */
+    audioAoVivoDisponivel() {
+        return typeof window !== "undefined" &&
+            (typeof window.AudioContext === "function" || typeof window.webkitAudioContext === "function");
+    }
+
+    /** true só quando o módulo do gate carregou; addModule falhou => sempre false (nunca finge que aplicou). */
+    gateAoVivoDisponivel() {
+        return !!this._estadoAudioAoVivo().gatePronto;
+    }
+
+    /** Estado preguiçoso do áudio ao vivo (nada é criado até o primeiro efeito real). */
+    _estadoAudioAoVivo() {
+        if (!this._audioAoVivo) {
+            this._audioAoVivo = {
+                ctx: null,
+                grafos: new WeakMap(),  // el -> grafo; a fonte NUNCA é criada duas vezes
+                ativos: new Set(),      // grafos roteados (para religar o gate quando o módulo chegar)
+                gatePronto: false,
+                gateFalhou: false,
+                gatePromessa: null,
+                retomadas: 0
+            };
+        }
+        return this._audioAoVivo;
+    }
+
+    _ctxAudioAoVivo() {
+        const est = this._estadoAudioAoVivo();
+        if (est.ctx) return est.ctx;
+        if (!this.audioAoVivoDisponivel()) return null;
+        try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            est.ctx = new AC({ latencyHint: "interactive" });
+        } catch (err) {
+            console.warn("[player] AudioContext indisponível; áudio ao vivo desligado:", err);
+            return null;
+        }
+        return est.ctx;
+    }
+
+    /** Retoma o contexto suspenso no mesmo caminho em que o player começa a tocar. */
+    _retomarContextoAudioAoVivo() {
+        const ctx = this._estadoAudioAoVivo().ctx;
+        if (ctx && ctx.state === "suspended") {
+            ctx.resume().catch(err => console.warn("[player] resume do AudioContext falhou:", err));
+        }
+    }
+
+    /** Carrega o worklet do gate uma única vez; falha fica registrada e visível. */
+    _carregarGateAoVivo(ctx) {
+        const est = this._estadoAudioAoVivo();
+        if (est.gatePronto || est.gateFalhou || !ctx.audioWorklet) {
+            return est.gatePromessa || Promise.resolve(false);
+        }
+        if (!est.gatePromessa) {
+            est.gatePromessa = ctx.audioWorklet.addModule("js/audioGateWorklet.js").then(() => {
+                est.gatePronto = true;
+                // O gate chegou depois de alguns grafos: religa os que pedavam por ele.
+                est.ativos.forEach(g => this._religarGrafo(g, g.p));
+                return true;
+            }).catch(err => {
+                est.gateFalhou = true; // consultável via gateAoVivoDisponivel()
+                console.warn("[player] AudioWorklet do gate não carregou; cadeia segue sem gate:", err);
+                return false;
+            });
+        }
+        return est.gatePromessa;
+    }
+
+    /**
+     * Normaliza clip.effects para os parâmetros do grafo. Retorna null quando não há
+     * efeito de áudio ativo (ausente ou "disabled": true): nesse caso nada é roteado.
+     * Efeito desligado = bloco fora da cadeia (bypass), nunca mudo.
+     */
+    _efeitosAudioAoVivo(efeitos) {
+        const lista = Array.isArray(efeitos) ? efeitos : [];
+        const num = (v, def) => (typeof v === "number" && isFinite(v)) ? v : def;
+        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        const eq = lista.find(e => e && e.type === "audio_eq") || null;
+        const dyn = lista.find(e => e && e.type === "audio_dynamics") || null;
+        const eqOn = !!(eq && !eq.disabled);
+        const dynOn = !!(dyn && !dyn.disabled);
+        if (!eqOn && !dynOn) return null;
+        return {
+            eqOn,
+            dynOn,
+            hpfHz: eqOn ? clamp(num(eq.hpf, 0), 0, 20000) : 0,
+            lowDb: eqOn ? clamp(num(eq.low, 0), -12, 12) : 0,
+            midDb: eqOn ? clamp(num(eq.mid, 0), -12, 12) : 0,
+            highDb: eqOn ? clamp(num(eq.high, 0), -12, 12) : 0,
+            gateDb: dynOn ? clamp(num(dyn.gate_db, -45), -90, 0) : -90,
+            compRatio: dynOn ? clamp(num(dyn.comp_ratio, 2.0), 1, 20) : 1,
+            compThreshDb: dynOn ? clamp(num(dyn.comp_thresh_db, -18), -60, 0) : 0,
+            makeupDb: dynOn ? clamp(num(dyn.makeup_db, 0), -12, 12) : 0
+        };
+    }
+
+    /**
+     * Cria o grafo do elemento UMA vez (createMediaElementSource duas vezes no mesmo
+     * elemento lança exceção). Os nós comuns são criados ANTES da fonte: se qualquer um
+     * falhar, o elemento ainda não foi roteado e segue no caminho normal.
+     */
+    _obterGrafo(el, ctx) {
+        const est = this._estadoAudioAoVivo();
+        let g = est.grafos.get(el);
+        if (g) return g;
+        const nos = {};
+        try {
+            nos.hpf = ctx.createBiquadFilter();
+            nos.hpf.type = "highpass";
+            nos.low = ctx.createBiquadFilter();
+            nos.low.type = "lowshelf";
+            nos.low.frequency.value = 250;
+            nos.mid = ctx.createBiquadFilter();
+            nos.mid.type = "peaking";
+            nos.mid.frequency.value = 1000;
+            nos.mid.Q.value = 1.0;
+            nos.high = ctx.createBiquadFilter();
+            nos.high.type = "highshelf";
+            nos.high.frequency.value = 3000;
+            nos.comp = ctx.createDynamicsCompressor();
+            nos.makeup = ctx.createGain();
+        } catch (err) {
+            console.warn("[player] nós de áudio ao vivo não criados; elemento segue no caminho normal:", err);
+            return null;
+        }
+        try {
+            nos.fonte = ctx.createMediaElementSource(el); // única chamada por elemento
+        } catch (err) {
+            console.warn("[player] createMediaElementSource falhou; elemento segue no caminho normal:", err);
+            return null;
+        }
+        g = { el, ctx, nos, gate: null, topologia: "", p: null };
+        est.grafos.set(el, g);
+        return g;
+    }
+
+    _desconectarInterno(g) {
+        const nos = [g.nos.fonte, g.nos.hpf, g.nos.low, g.nos.mid, g.nos.high, g.gate, g.nos.comp, g.nos.makeup];
+        nos.forEach(n => { try { if (n) n.disconnect(); } catch (_) { /* já estava solto */ } });
+    }
+
+    _aplicarParams(g, p) {
+        try {
+            if (p.eqOn && p.hpfHz > 0) g.nos.hpf.frequency.value = p.hpfHz;
+            if (p.eqOn) {
+                g.nos.low.gain.value = p.lowDb;
+                g.nos.mid.gain.value = p.midDb;
+                g.nos.high.gain.value = p.highDb;
+            }
+            if (g.gate) g.gate.parameters.get("threshold").value = p.gateDb;
+            if (p.dynOn && p.compRatio > 1) {
+                g.nos.comp.threshold.value = p.compThreshDb;
+                g.nos.comp.ratio.value = p.compRatio;
+            }
+            g.nos.makeup.gain.value = Math.pow(10, p.makeupDb / 20);
+        } catch (err) {
+            console.warn("[player] falha ao ajustar parâmetro de áudio ao vivo (som continua):", err);
+        }
+    }
+
+    /** Ordem fechada do contrato E2; blocos desligados simplesmente saem da lista. */
+    _topologiaAudioAoVivo(p, comGate) {
+        const t = ["fonte"];
+        if (p.eqOn && p.hpfHz > 0) t.push("hpf");       // hpf 0 = desligado
+        if (p.eqOn) t.push("low", "mid", "high");
+        if (comGate) t.push("gate");                    // gate_db -90 = desligado
+        if (p.dynOn && p.compRatio > 1) t.push("comp"); // ratio 1 = compressor transparente
+        t.push("makeup", "destino");
+        return t.join(">");
+    }
+
+    /**
+     * (Re)conecta o grafo conforme a topologia pedida. Se a reconexão falhar no meio,
+     * cai para fonte->destino direto: o som NUNCA morre por culpa do grafo.
+     */
+    _religarGrafo(g, p) {
+        if (!g || !p) return;
+        g.p = p;
+        // Gate sob demanda: só existe após o módulo carregar; sem ele a cadeia segue.
+        if (p.dynOn && p.gateDb > -90 && !g.gate &&
+            this._estadoAudioAoVivo().gatePronto && typeof AudioWorkletNode === "function") {
+            try {
+                g.gate = new AudioWorkletNode(g.ctx, "capiau-audio-gate");
+            } catch (err) {
+                g.gate = null;
+                console.warn("[player] nó do gate não criou; cadeia segue sem gate:", err);
+            }
+        }
+        const topo = this._topologiaAudioAoVivo(p, !!g.gate);
+        if (topo === g.topologia) {
+            this._aplicarParams(g, p); // só valores mudaram: barato, sem rewiring
+            return;
+        }
+        try {
+            this._desconectarInterno(g);
+            const mapa = { hpf: g.nos.hpf, low: g.nos.low, mid: g.nos.mid, high: g.nos.high,
+                           gate: g.gate, comp: g.nos.comp, makeup: g.nos.makeup };
+            const nomes = topo.split(">"); // nomes[0] é sempre "fonte"
+            let atual = g.nos.fonte;
+            for (let i = 1; i < nomes.length; i++) {
+                const prox = nomes[i] === "destino" ? g.ctx.destination : mapa[nomes[i]];
+                atual.connect(prox);
+                atual = prox;
+            }
+            g.topologia = topo;
+            this._estadoAudioAoVivo().ativos.add(g);
+        } catch (err) {
+            console.error("[player] falha na religação do grafo; caindo para passagem direta:", err);
+            try {
+                this._desconectarInterno(g);
+                g.nos.fonte.connect(g.ctx.destination);
+                g.topologia = "fonte>destino";
+            } catch (err2) {
+                console.error("[player] passagem direta também falhou; áudio pode ter sumido:", err2);
+            }
+        }
+        this._aplicarParams(g, p);
+    }
+
+    /**
+     * API pública E2: aplica os efeitos de áudio AO VIVO sobre o elemento.
+     * Cria/reusa o grafo e devolve true quando o elemento está roteado.
+     * Qualquer falha deixa o elemento tocando pelo caminho normal (retorno false).
+     */
+    aplicarAudioAoVivo(el, efeitos) {
+        const p = this._efeitosAudioAoVivo(efeitos);
+        if (!p || !el || typeof el !== "object") {
+            if (!p) this.liberarAudioAoVivo(el);
+            return false;
+        }
+        if (!this.audioAoVivoDisponivel()) return false;
+        const ctx = this._ctxAudioAoVivo();
+        if (!ctx) return false;
+        if (ctx.state !== "running") {
+            // Contexto suspenso NÃO pode ser roteado (o som sairia só pelo grafo mudo).
+            // Tenta acordar e reaplica quando rodar; enquanto isso o caminho é o normal.
+            const est = this._estadoAudioAoVivo();
+            if (est.retomadas > 5) {
+                console.warn("[player] AudioContext continua suspenso; áudio ao vivo adiado.");
+                return false;
+            }
+            est.retomadas++;
+            ctx.resume().then(() => {
+                est.retomadas = 0;
+                this.aplicarAudioAoVivo(el, efeitos);
+            }).catch(err => console.warn("[player] AudioContext suspenso; áudio ao vivo adiado:", err));
+            return false;
+        }
+        this._estadoAudioAoVivo().retomadas = 0;
+        if (p.dynOn && p.gateDb > -90) this._carregarGateAoVivo(ctx);
+        const g = this._obterGrafo(el, ctx);
+        if (!g) return false; // falhou criar: elemento intocado, som pelo caminho normal
+        this._religarGrafo(g, p);
+        return true;
+    }
+
+    /**
+     * API pública E2: devolve o elemento ao caminho "normal". Como a fonte WebAudio é
+     * permanente depois de criada, isso significa desconectar todos os blocos e ligar
+     * fonte->destino direto (passagem plana). Elemento nunca roteado = no-op.
+     */
+    liberarAudioAoVivo(el) {
+        const g = (el && typeof el === "object") ? this._estadoAudioAoVivo().grafos.get(el) : null;
+        if (!g) return;
+        this._estadoAudioAoVivo().ativos.delete(g);
+        try {
+            this._desconectarInterno(g);
+            g.nos.fonte.connect(g.ctx.destination);
+            g.topologia = "fonte>destino";
+            g.p = null;
+        } catch (err) {
+            console.error("[player] falha ao liberar grafo de áudio:", err);
+        }
+    }
+    /* C1-FIM */
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // FONTE DE ÁUDIO TRATADA (Etapa 3, Tipo B) - contrato F4.
+    // A/B por clipe: registrar uma URL manda o clipe tocar o WAV derivado
+    // (GET /api/audio/tratado/{video_id}/{chain_hash}.wav); registrar null volta ao
+    // original. Default SEM registro = comportamento atual (original).
+    // SINCRONIA: cada pista já tem seu <audio> dedicado e persistente; trocar de
+    // fonte NÃO dá src/load() no elemento no ar. Um elemento PAR do pool é preparado
+    // com o arquivo novo, posicionado no mesmo instante da timeline (o WAV cobre o
+    // MESMO trecho [in,out]: tempo 0 do WAV = In do clipe) e a virada é atômica —
+    // copia volume/mute/rate, preserva play/pause, pausa o antigo depois. É o mesmo
+    // mecanismo dos buffers de vídeo (_awaitBuffer): nunca fica sem som à espera.
+    // GRAFO (Etapa 2): os grafos WebAudio continuam POR ELEMENTO no WeakMap; cada
+    // elemento recebe createMediaElementSource UMA vez, e quem sai do ar é apenas
+    // religado em passagem plana — nenhum grafo ou ganho é duplicado na troca.
+    // FALHA: 404/arquivo apagado/rede registram a falha (consultável pela UI via
+    // erroFonteAudioTratada + evento "fonteAudioTratadaIndisponivel") e devolvem o
+    // clipe ao original automaticamente.
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * API pública F4: define a fonte tratada de um clipe. urlOuNull = URL servível,
+     * ref do efeito ("data/audio_tratado/<vid>/<hash>.wav"), hash puro, ou true para
+     * usar o ref do efeito audio_render "ready" do próprio clipe. null volta ao original.
+     */
+    definirFonteAudioTratada(clipId, urlOuNull) {
+        if (clipId === undefined || clipId === null) return;
+        if (!this._fontesAudioTratadas) this._fontesAudioTratadas = new Map();
+        const chave = String(clipId);
+        if (urlOuNull === null || urlOuNull === undefined || urlOuNull === "") {
+            this._fontesAudioTratadas.delete(chave);
+        } else {
+            this._fontesAudioTratadas.set(chave, urlOuNull);
+        }
+        // Pausado não há laço de playhead recompondo: aplica a troca agora.
+        if (this.audioPool && typeof TIMELINE_STATE !== "undefined" &&
+            Array.isArray(STATE.activeTimelineCuts)) {
+            this.syncAudioTracks(STATE.activeTimelineCuts, TIMELINE_STATE.playheadFrame);
+        }
+    }
+
+    /** API pública F4: URL servível atualmente registrada para o clipe, ou null. */
+    fonteAudioTratadaAtual(clipId) {
+        if (!this._fontesAudioTratadas || clipId === undefined || clipId === null) return null;
+        const bruto = this._fontesAudioTratadas.get(String(clipId));
+        if (bruto === undefined || bruto === null || bruto === "") return null;
+        const cuts = Array.isArray(STATE.activeTimelineCuts) ? STATE.activeTimelineCuts : [];
+        const cut = cuts.find(c => String(c.id) === String(clipId)) || null;
+        const videoId = cut && cut.video_id !== undefined ? cut.video_id : null;
+        return this._resolverUrlTratado(bruto, videoId, cut);
+    }
+
+    /** Consultável pela UI: último registro de falha da fonte tratada do clipe (ou null). */
+    erroFonteAudioTratada(clipId) {
+        if (!this._falhasFonteTratada || clipId === undefined || clipId === null) return null;
+        const chave = String(clipId);
+        let maisRecente = null;
+        this._falhasFonteTratada.forEach(registro => {
+            if (String(registro.clipId) === chave &&
+                (!maisRecente || registro.quando > maisRecente.quando)) {
+                maisRecente = registro;
+            }
+        });
+        return maisRecente;
+    }
+
+    /**
+     * Fonte efetiva do clipe: { src, tratado }. Sem registro (ou com a URL marcada como
+     * falha) devolve o caminho original — exatamente como antes deste bloco existir.
+     */
+    _fonteAudioEfetiva(cut, videoData) {
+        const rawSrc = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
+        const originalSrc = String(rawSrc).replace(/\\/g, "/");
+        if (!cut) return { src: originalSrc, tratado: false };
+        const bruto = this._fontesAudioTratadas
+            ? this._fontesAudioTratadas.get(String(cut.id)) : undefined;
+        if (bruto === undefined || bruto === null || bruto === "") {
+            return { src: originalSrc, tratado: false };
+        }
+        const url = this._resolverUrlTratado(bruto, videoData.id, cut);
+        if (!url || (this._falhasFonteTratada && this._falhasFonteTratada.has(url))) {
+            return { src: originalSrc, tratado: false }; // falhou antes: original, visivelmente
+        }
+        return { src: url, tratado: true };
+    }
+
+    /** Converte registro do A/B em URL servível; null quando não dá para servir. */
+    _resolverUrlTratado(valor, videoId, cut) {
+        if (valor === true) {
+            const ar = cut ? (cut.effects || []).find(e =>
+                e && e.type === "audio_render" && e.status === "ready" && e.ref) : null;
+            if (!ar) return null;
+            valor = ar.ref;
+        }
+        if (typeof valor !== "string" || !valor.trim()) return null;
+        const caminho = valor.trim().replace(/\\/g, "/");
+        if (/^https?:/i.test(caminho)) return caminho;
+        if (caminho.startsWith("/api/audio/tratado/")) return caminho;
+        const m = caminho.match(/data\/audio_tratado\/([^\/]+)\/([^\/]+\.wav)$/i);
+        if (m) return `/api/audio/tratado/${m[1]}/${m[2]}`;
+        if (/^[a-f0-9]{8,64}$/i.test(caminho) && videoId !== null && videoId !== undefined) {
+            const nome = caminho.toLowerCase().endsWith(".wav") ? caminho : `${caminho}.wav`;
+            return `/api/audio/tratado/${videoId}/${nome}`;
+        }
+        return null;
+    }
+
+    /** Registra falha de fonte tratada e reaplica (volta ao original) imediatamente. */
+    _registrarFalhaFonte(clipId, url, motivo) {
+        if (!url) return;
+        if (!this._falhasFonteTratada) this._falhasFonteTratada = new Map();
+        const registro = {
+            clipId: clipId || null,
+            url,
+            motivo: motivo || "falha ao carregar",
+            quando: new Date().toISOString()
+        };
+        this._falhasFonteTratada.set(url, registro);
+        console.warn("[Player] F4: fonte tratada indisponível; voltando ao original:",
+            registro.motivo, url);
+        if (typeof STATE !== "undefined" && typeof STATE.emit === "function") {
+            STATE.emit("fonteAudioTratadaIndisponivel", { ...registro });
+        }
+        if (this.audioPool && typeof TIMELINE_STATE !== "undefined" &&
+            Array.isArray(STATE.activeTimelineCuts)) {
+            this.syncAudioTracks(STATE.activeTimelineCuts, TIMELINE_STATE.playheadFrame);
+        }
+    }
+
+    /** Erro de mídia num elemento carregando/tocando WAV tratado (404, rede, decode). */
+    _aoErroElementoAudio(el) {
+        if (!el || el.dataset.audioTratado !== "1" || !el.error) return;
+        const codigos = {
+            1: "carregamento interrompido",
+            2: "erro de rede",
+            3: "falha de decodificação",
+            4: "fonte não encontrada ou formato não suportado"
+        };
+        this._registrarFalhaFonte(
+            el.dataset.activeClipId || null,
+            el.dataset.loadedSrc || el.currentSrc || "",
+            codigos[el.error.code] || ("erro " + el.error.code)
+        );
+    }
+
+    /** Troca suave só faz sentido com som no ar em velocidade normal; senão, troca dura. */
+    _podeTrocarSuave(el) {
+        return !!(el && this.isPlaying && !el.paused &&
+            this.playbackSpeed > 0 && this.playbackSpeed <= 2.0 &&
+            typeof document !== "undefined" && document.body);
+    }
+
+    _trocaAudioPendente(trackId) {
+        return this._trocasAudio ? (this._trocasAudio[trackId] || null) : null;
+    }
+
+    _cancelarTrocaAudio(trackId) {
+        if (this._trocasAudio) delete this._trocasAudio[trackId];
+    }
+
+    /** Elemento par da pista (criado sob demanda) usado como reserva da troca suave. */
+    _parReservaAudio(trackId, principal) {
+        if (!this._paresAudio) this._paresAudio = {};
+        let par = this._paresAudio[trackId];
+        if (!par || (par.a !== principal && par.b !== principal)) {
+            const novo = document.createElement("audio");
+            novo.preload = "auto";
+            novo.dataset.trackId = trackId;
+            document.body.appendChild(novo);
+            novo.addEventListener("error", () => this._aoErroElementoAudio(novo));
+            par = { a: principal, b: novo };
+            this._paresAudio[trackId] = par;
+        }
+        return par.a === principal ? par.b : par.a;
+    }
+
+    /**
+     * Agenda a virada para outro arquivo SEM tocar no elemento que está no ar.
+     * Devolve false quando não há reserva disponível (o chamador então faz a troca dura).
+     */
+    _iniciarTrocaSuave(trackId, principal, alvo, cut) {
+        const clipId = String(cut.id);
+        const emCurso = this._trocaAudioPendente(trackId);
+        if (emCurso && emCurso.destino === alvo.src && emCurso.clipId === clipId) return true;
+        const reserva = this._parReservaAudio(trackId, principal);
+        if (!reserva) return false;
+        if (!this._trocasAudio) this._trocasAudio = {};
+        this._trocasAudio[trackId] = {
+            clipId,
+            destino: alvo.src,
+            destinoTratado: !!alvo.tratado,
+            de: principal,
+            para: reserva,
+            // Ancora no agendamento: quando a reserva já tem o arquivo certo (reuso,
+            // ex. voltar ao original) nenhum reload ocorre e este é o único marco.
+            iniciadoEm: performance.now()
+        };
+        console.log("[Player] F4: troca de fonte de áudio agendada para o clipe", clipId,
+            alvo.tratado ? "(original -> tratado)" : "(tratado -> original)");
+        return true;
+    }
+
+    /**
+     * Prepara o elemento par (arquivo certo, instante certo, volume/mute acompanhando)
+     * e, quando ele está pronto e posicionado, executa a VIRADA ATÔMICA: pausa o que
+     * está no ar, promove o par, copia rate e estado de reprodução, roteia o grafo da
+     * Etapa 2 ANTES de tocar. Até lá o elemento atual segue tocando — zero silêncio.
+     */
+    _dirigirTrocaSuave(trackId, cut, currentFrame) {
+        const troca = this._trocasAudio ? this._trocasAudio[trackId] : null;
+        if (!troca) return;
+        const principal = this.audioPool ? this.audioPool[trackId] : null;
+        if (!principal || principal !== troca.de) { this._cancelarTrocaAudio(trackId); return; }
+        const reserva = troca.para;
+
+        if (reserva.dataset.loadedSrc !== troca.destino ||
+            (reserva.dataset.audioTratado === "1") !== troca.destinoTratado) {
+            reserva.dataset.audioTratado = troca.destinoTratado ? "1" : "";
+            reserva.dataset.loadedSrc = troca.destino;
+            reserva.dataset.activeClipId = String(cut.id);
+            reserva.src = troca.destino;
+            reserva.load();
+            troca.iniciadoEm = performance.now();
+        }
+
+        const fps = TIMELINE_STATE?.fps || 24;
+        const offsetSegundos = (currentFrame - cut.timelineStartFrame) / fps;
+        const alvoSegundos = Math.max(0, (troca.destinoTratado ? 0 : cut.in) + offsetSegundos);
+
+        // O par acompanha mute/volume do que está no ar enquanto prepara.
+        reserva.muted = principal.muted;
+        reserva.volume = principal.volume;
+
+        if (!reserva.seeking) {
+            const deriva = reserva.currentTime - alvoSegundos;
+            if (reserva.readyState < 2 || deriva > 0.06 || deriva < -0.06) {
+                reserva.currentTime = alvoSegundos;
+            }
+        }
+
+        // Rede/servidor preso não pode deixar o A/B eternamente pendente: registra a
+        // falha e volta ao original (consultável pela UI).
+        if (troca.iniciadoEm && performance.now() - troca.iniciadoEm > 12000) {
+            this._registrarFalhaFonte(troca.clipId, troca.destino,
+                "tempo esgotado carregando o WAV tratado");
+            this._cancelarTrocaAudio(trackId);
+            return;
+        }
+
+        const pronto = reserva.readyState >= 2 && !reserva.seeking &&
+            Math.abs(reserva.currentTime - alvoSegundos) <= 0.08 &&
+            !!troca.iniciadoEm && performance.now() - troca.iniciadoEm >= 50;
+        if (!pronto) return;
+
+        // VIRADA ATÔMICA: mesmo instante da timeline, mesmo estado de reprodução.
+        const estavaTocando = !principal.paused;
+        const rate = principal.playbackRate;
+        if (!principal.paused) principal.pause();
+        this.liberarAudioAoVivo(principal); // ex-principal volta à passagem plana, parado
+        this.audioPool[trackId] = reserva;
+        principal.dataset.activeClipId = "";
+        reserva.dataset.activeClipId = String(cut.id);
+        reserva.playbackRate = rate;
+        const effects = cut.effects || [];
+        if (this._efeitosAudioAoVivo(effects)) this.aplicarAudioAoVivo(reserva, effects);
+        else this.liberarAudioAoVivo(reserva);
+        this._cancelarTrocaAudio(trackId);
+        if (estavaTocando) {
+            this._retomarContextoAudioAoVivo();
+            reserva.play().catch(() => {});
         }
     }
 

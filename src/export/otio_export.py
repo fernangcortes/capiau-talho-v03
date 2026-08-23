@@ -46,6 +46,39 @@ def _media_target_url(filepath: str, as_uri: bool) -> str:
     return Path(filepath).as_posix()
 
 
+def _bloco_audio_tratado(cut: dict) -> "tuple[Path | None, str | None]":
+    """WAV tratado declarado no clipe, candidato a referencia de midia (contrato H1).
+
+    Procura em cut['effects'] o bloco do contrato F3 {"type":"audio_render",
+    "status":"ready","ref":...}. Atencao: o WAV tratado contem SOMENTE o trecho
+    [in_s, out_s] da fonte e comeca em ZERO - quem trocar a referencia precisa
+    zerar os dois ranges (ver o ramo de video/audio em generate_otio_timeline).
+
+    Retorna (caminho, None) quando ha render pronto E o arquivo existe no disco;
+    (None, motivo) quando declara pronto mas o arquivo sumiu - conformar apontando
+    para arquivo inexistente e pior que nao tratar, entao mantem-se o original e o
+    motivo fica registrado no metadado; (None, None) quando nao ha tratamento.
+    """
+    efeitos = cut.get('effects')
+    if not isinstance(efeitos, list):
+        return None, None
+    bloco = next((e for e in efeitos
+                  if isinstance(e, dict) and e.get("type") == "audio_render"), None)
+    if not isinstance(bloco, dict) or bloco.get("status") != "ready":
+        return None, None
+    ref = bloco.get("ref")
+    if not isinstance(ref, str) or not ref.strip():
+        return None, "audio_render pronto sem 'ref' no bloco de efeitos"
+    candidato = Path(ref)
+    if not candidato.is_absolute():
+        # Contrato F3: ref relativa ao BASE_DIR (ex.: data/audio_tratado/<id>/<hash>.wav).
+        # Funciona igual no processo principal e no worker do venv (mesmo modulo, mesmo CONFIG).
+        candidato = CONFIG.BASE_DIR / candidato
+    if not candidato.is_file():
+        return None, f"ref de audio tratado nao encontrada no disco: {ref}"
+    return candidato, None
+
+
 def generate_otio_timeline(timeline_id: int, as_uri: bool = True) -> "otio.schema.Timeline":
     """Carrega os cortes salvos na tabela 'timeline' e monta uma timeline do OpenTimelineIO.
 
@@ -159,28 +192,68 @@ def generate_otio_timeline(timeline_id: int, as_uri: bool = True) -> "otio.schem
                     )
                     # Enquadramento/Ken Burns preservados como metadados (best-effort;
                     # FCPXML/EDL não renderizam o movimento, mas mantêm posição+duração).
-                    clip.metadata["capiau"] = {"still": True, "effects": cut.get('effects') or []}
+                    # H2: metadado capiau completo nos DOIS ramos.
+                    clip.metadata["capiau"] = {
+                        "still": True,
+                        "effects": cut.get('effects') or [],
+                        "audio_tratado": False,
+                        "origem": filepath,
+                    }
                     track.append(clip)
                     playhead_s += (out_s - in_s)
                 else:
-                    media_ref = otio.schema.ExternalReference(
-                        target_url=_media_target_url(filepath, as_uri),
-                        available_range=otio.opentime.TimeRange(
-                            start_time=otio.opentime.RationalTime(0, fps),
-                            duration=otio.opentime.RationalTime(int(out_s * fps), fps)
+                    # Contrato H1 (secao 10 do plano): com audio_render ready e o
+                    # arquivo no disco, a referencia passa ao WAV TRATADO. O WAV
+                    # so conte o trecho [in_s, out_s] da fonte e comeca em ZERO,
+                    # entao available_range E source_range vao para start_time=0
+                    # com duracao (out_s - in_s) - manter o in_s antigo apontando
+                    # ao arquivo curto joga o audio fora de sincronia no Resolve.
+                    wav_tratado, motivo_ref = _bloco_audio_tratado(cut)
+                    if wav_tratado is not None:
+                        dur_frames = int((out_s - in_s) * fps)
+                        media_ref = otio.schema.ExternalReference(
+                            target_url=_media_target_url(str(wav_tratado), as_uri),
+                            available_range=otio.opentime.TimeRange(
+                                start_time=otio.opentime.RationalTime(0, fps),
+                                duration=otio.opentime.RationalTime(dur_frames, fps)
+                            )
                         )
-                    )
+                        clip_range = otio.opentime.TimeRange(
+                            start_time=otio.opentime.RationalTime(0, fps),
+                            duration=otio.opentime.RationalTime(dur_frames, fps)
+                        )
+                    else:
+                        # Sem tratamento (ou ref quebrada): original intacto, como sempre.
+                        media_ref = otio.schema.ExternalReference(
+                            target_url=_media_target_url(filepath, as_uri),
+                            available_range=otio.opentime.TimeRange(
+                                start_time=otio.opentime.RationalTime(0, fps),
+                                duration=otio.opentime.RationalTime(int(out_s * fps), fps)
+                            )
+                        )
 
-                    clip_range = otio.opentime.TimeRange(
-                        start_time=otio.opentime.RationalTime(int(in_s * fps), fps),
-                        duration=otio.opentime.RationalTime(int((out_s - in_s) * fps), fps)
-                    )
+                        clip_range = otio.opentime.TimeRange(
+                            start_time=otio.opentime.RationalTime(int(in_s * fps), fps),
+                            duration=otio.opentime.RationalTime(int((out_s - in_s) * fps), fps)
+                        )
 
                     clip = otio.schema.Clip(
                         name=clip_name,
                         media_reference=media_ref,
                         source_range=clip_range
                     )
+                    # Contrato H2: efeitos de Tipo A (audio_eq/audio_dynamics) NAO
+                    # atravessam FCPXML/EDL; declara-los no metadado e melhor que
+                    # fingir que atravessam. Ref quebrada registra o motivo aqui.
+                    capiau_meta = {
+                        "still": False,
+                        "effects": cut.get('effects') or [],
+                        "audio_tratado": wav_tratado is not None,
+                        "origem": filepath,
+                    }
+                    if motivo_ref:
+                        capiau_meta["audio_tratado_motivo"] = motivo_ref
+                    clip.metadata["capiau"] = capiau_meta
 
                     track.append(clip)
                     playhead_s += (out_s - in_s)

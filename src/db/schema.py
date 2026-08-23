@@ -370,6 +370,27 @@ CREATE TABLE IF NOT EXISTS video_metadata_history (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_vmh_video ON video_metadata_history(video_id, created_at DESC);
+
+-- Renderizacoes e analises de audio por intervalo de clipe
+-- (docs/PLANO_AJUSTES_DE_AUDIO.md, secao 3 e Etapa 1). Na ETAPA 1 a linha guarda
+-- so o diagnostico: chain_json='[]', status='ready' e
+-- chain_hash = sha256("analysis|<video_id>|<in>|<out>") em hexdigest.
+-- Da Etapa 3 em diante a mesma tabela passa a apontar o WAV tratado em path.
+-- O indice unico garante uma linha por (video, cadeia): reaplicar a mesma
+-- cadeia reusa o resultado em vez de reprocessar (mesma ideia dos proxies).
+CREATE TABLE IF NOT EXISTS audio_render (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id INTEGER NOT NULL REFERENCES video(id) ON DELETE CASCADE,
+    in_s REAL,                -- inicio do intervalo analisado/renderizado (s); NULL = arquivo inteiro
+    out_s REAL,               -- fim do intervalo (s)
+    chain_hash TEXT NOT NULL, -- sha256 hexdigest que identifica (video, intervalo, cadeia)
+    chain_json TEXT,          -- JSON array com a cadeia aplicada ('[]' na analise pura)
+    path TEXT,                -- caminho do WAV derivado quando houver renderizacao
+    status TEXT NOT NULL DEFAULT 'pending', -- pending|running|ready|failed
+    analysis_json TEXT,       -- JSON com o diagnostico (lufs_i, lra, true_peak_db, ...)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_audio_render_hash ON audio_render(video_id, chain_hash);
 """
 
 def init_db(db_path: Path = None):

@@ -1,0 +1,98 @@
+ffmpeg version 7.1.4-Jellyfin Copyright (c) 2000-2026 the FFmpeg developers
+  built with clang version 22.1.7 (https://github.com/msys2/MINGW-packages b8f306ad57e0c8f3f15aed0dc809d7e3e8e2eee9)
+  configuration: --cc=clang --pkg-config-flags=--static --extra-cflags=-I/clang64/ffbuild/include --extra-ldflags=-L/clang64/ffbuild/lib --prefix=/clang64/ffbuild/jellyfin-ffmpeg --extra-version=Jellyfin --disable-ffplay --disable-debug --disable-doc --disable-sdl2 --enable-lto=thin --enable-gpl --enable-version3 --enable-schannel --enable-iconv --enable-libxml2 --enable-zlib --enable-lzma --enable-gmp --enable-chromaprint --enable-libfreetype --enable-libfribidi --enable-libfontconfig --enable-libharfbuzz --enable-libass --enable-libbluray --enable-libmp3lame --enable-libopus --enable-libtheora --enable-libvorbis --enable-libopenmpt --enable-libwebp --enable-libvpx --enable-libzimg --enable-libx264 --enable-libx265 --enable-libsvtav1 --enable-libdav1d --enable-libfdk-aac --enable-opencl --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-amf --enable-libvpl --enable-ffnvcodec --enable-cuda --enable-cuda-llvm --enable-cuvid --enable-nvdec --enable-nvenc
+  libavutil      59. 39.100 / 59. 39.100
+  libavcodec     61. 19.101 / 61. 19.101
+  libavformat    61.  7.103 / 61.  7.103
+  libavdevice    61.  3.100 / 61.  3.100
+  libavfilter    10.  5.100 / 10.  5.100
+  libswscale      8.  3.100 /  8.  3.100
+  libswresample   5.  3.100 /  5.  3.100
+  libpostproc    58.  3.100 / 58.  3.100
+Input #0, lavfi, from 'sine=frequency=440:duration=1:sample_rate=48000':
+  Duration: N/A, start: 0.000000, bitrate: 768 kb/s
+  Stream #0:0: Audio: pcm_s16le, 48000 Hz, mono, s16, 768 kb/s
+Stream mapping:
+  Stream #0:0 -> #0:0 (pcm_s16le (native) -> pcm_s16le (native))
+Press [q] to stop, [?] for help
+[Parsed_ebur128_0 @ 0000022669999780] t: 0.0999792  TARGET:-23 LUFS    M:-120.7 S:-120.7     I: -70.0 LUFS       LRA:   0.0 LU  FTPK: -18.1 dBFS  TPK: -18.1 dBFS
+Output #0, null, to 'NUL':
+  Metadata:
+    encoder         : Lavf61.7.103
+  Stream #0:0: Audio: pcm_s16le, 48000 Hz, mono, s16, 768 kb/s
+      Metadata:
+        encoder         : Lavc61.19.101 pcm_s16le
+[Parsed_ebur128_0 @ 0000022669999780] t: 0.199979   TARGET:-23 LUFS    M:-120.7 S:-120.7     I: -70.0 LUFS       LRA:   0.0 LU  FTPK: -18.1 dBFS  TPK: -18.1 dBFS
+[Parsed_ebur128_0 @ 0000022669999780] t: 0.299979   TARGET:-23 LUFS    M:-120.7 S:-120.7     I: -70.0 LUFS       LRA:   0.0 LU  FTPK: -18.1 dBFS  TPK: -18.1 dBFS
+[Parsed_ebur128_0 @ 0000022669999780] t: 0.399979   TARGET:-23 LUFS    M: -21.8 S:-120.7     I: -21.8 LUFS       LRA:   0.0 LU  FTPK: -18.1 dBFS  TPK: -18.1 dBFS
+[Parsed_ebur128_0 @ 0000022669999780] t: 0.499979   TARGET:-23 LUFS    M: -21.8 S:-120.7     I: -21.8 LUFS       LRA:   0.0 LU  FTPK: -18.1 dBFS  TPK: -18.1 dBFS
+[Parsed_ebur128_0 @ 0000022669999780] t: 0.599979   TARGET:-23 LUFS    M: -21.8 S:-120.7     I: -21.8 LUFS       LRA:   0.0 LU  FTPK: -18.1 dBFS  TPK: -18.1 dBFS
+[Parsed_ebur128_0 @ 0000022669999780] t: 0.699979   TARGET:-23 LUFS    M: -21.8 S:-120.7     I: -21.8 LUFS       LRA:   0.0 LU  FTPK: -18.1 dBFS  TPK: -18.1 dBFS
+[Parsed_ebur128_0 @ 0000022669999780] t: 0.799979   TARGET:-23 LUFS    M: -21.8 S:-120.7     I: -21.8 LUFS       LRA:   0.0 LU  FTPK: -18.1 dBFS  TPK: -18.1 dBFS
+[Parsed_ebur128_0 @ 0000022669999780] t: 0.899979   TARGET:-23 LUFS    M: -21.8 S:-120.7     I: -21.8 LUFS       LRA:   0.0 LU  FTPK: -18.1 dBFS  TPK: -18.1 dBFS
+[Parsed_ebur128_0 @ 0000022669999780] t: 0.999979   TARGET:-23 LUFS    M: -21.8 S:-120.7     I: -21.8 LUFS       LRA:   0.0 LU  FTPK: -18.1 dBFS  TPK: -18.1 dBFS
+[Parsed_ebur128_0 @ 0000022669999780] Summary:
+
+  Integrated loudness:
+    I:         -21.8 LUFS
+    Threshold: -31.8 LUFS
+
+  Loudness range:
+    LRA:         0.0 LU
+    Threshold:   0.0 LUFS
+    LRA low:     0.0 LUFS
+    LRA high:    0.0 LUFS
+
+  True peak:
+    Peak:      -18.1 dBFS
+[Parsed_astats_1 @ 000002266999b640] Channel: 1
+[Parsed_astats_1 @ 000002266999b640] DC offset: -0.000000
+[Parsed_astats_1 @ 000002266999b640] Min level: -0.124969
+[Parsed_astats_1 @ 000002266999b640] Max level: 0.124969
+[Parsed_astats_1 @ 000002266999b640] Min difference: 0.000031
+[Parsed_astats_1 @ 000002266999b640] Max difference: 0.007233
+[Parsed_astats_1 @ 000002266999b640] Mean difference: 0.004582
+[Parsed_astats_1 @ 000002266999b640] RMS difference: 0.005089
+[Parsed_astats_1 @ 000002266999b640] Peak level dB: -18.063921
+[Parsed_astats_1 @ 000002266999b640] RMS level dB: -21.074024
+[Parsed_astats_1 @ 000002266999b640] RMS peak dB: -21.058324
+[Parsed_astats_1 @ 000002266999b640] RMS trough dB: -23.078286
+[Parsed_astats_1 @ 000002266999b640] Crest factor: 1.414181
+[Parsed_astats_1 @ 000002266999b640] Flat factor: 0.000000
+[Parsed_astats_1 @ 000002266999b640] Peak count: 560
+[Parsed_astats_1 @ 000002266999b640] Abs Peak count: 560
+[Parsed_astats_1 @ 000002266999b640] Noise floor dB: -18.063921
+[Parsed_astats_1 @ 000002266999b640] Noise floor count: 45601
+[Parsed_astats_1 @ 000002266999b640] Entropy: 0.633446
+[Parsed_astats_1 @ 000002266999b640] Bit depth: 12/16/16/16
+[Parsed_astats_1 @ 000002266999b640] Dynamic range: 51.821292
+[Parsed_astats_1 @ 000002266999b640] Zero crossings: 880
+[Parsed_astats_1 @ 000002266999b640] Zero crossings rate: 0.018333
+[Parsed_astats_1 @ 000002266999b640] Number of NaNs: 0
+[Parsed_astats_1 @ 000002266999b640] Number of Infs: 0
+[Parsed_astats_1 @ 000002266999b640] Number of denormals: 0
+[Parsed_astats_1 @ 000002266999b640] Overall
+[Parsed_astats_1 @ 000002266999b640] DC offset: -0.000000
+[Parsed_astats_1 @ 000002266999b640] Min level: -0.124969
+[Parsed_astats_1 @ 000002266999b640] Max level: 0.124969
+[Parsed_astats_1 @ 000002266999b640] Min difference: 0.000031
+[Parsed_astats_1 @ 000002266999b640] Max difference: 0.007233
+[Parsed_astats_1 @ 000002266999b640] Mean difference: 0.004582
+[Parsed_astats_1 @ 000002266999b640] RMS difference: 0.005089
+[Parsed_astats_1 @ 000002266999b640] Peak level dB: -18.063921
+[Parsed_astats_1 @ 000002266999b640] RMS level dB: -21.074024
+[Parsed_astats_1 @ 000002266999b640] RMS peak dB: -21.058324
+[Parsed_astats_1 @ 000002266999b640] RMS trough dB: -23.078286
+[Parsed_astats_1 @ 000002266999b640] Flat factor: 0.000000
+[Parsed_astats_1 @ 000002266999b640] Peak count: 560.000000
+[Parsed_astats_1 @ 000002266999b640] Abs Peak count: 560.000000
+[Parsed_astats_1 @ 000002266999b640] Noise floor dB: -18.063921
+[Parsed_astats_1 @ 000002266999b640] Noise floor count: 45601.000000
+[Parsed_astats_1 @ 000002266999b640] Entropy: 0.633446
+[Parsed_astats_1 @ 000002266999b640] Bit depth: 12/16/16/16
+[Parsed_astats_1 @ 000002266999b640] Number of samples: 48000
+[Parsed_astats_1 @ 000002266999b640] Number of NaNs: 0.000000
+[Parsed_astats_1 @ 000002266999b640] Number of Infs: 0.000000
+[Parsed_astats_1 @ 000002266999b640] Number of denormals: 0.000000
+[out#0/null @ 0000022669956880] video:0KiB audio:94KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+size=N/A time=00:00:01.00 bitrate=N/A speed=46.1x    

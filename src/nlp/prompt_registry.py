@@ -390,6 +390,82 @@ Retorne APENAS um objeto JSON no seguinte formato (sem formatação markdown ou 
     }
 }
 
+# ── Competência de áudio do Agente de Edição ─────────────────────────────────
+# O agente continua sendo montador de vídeo; a seção abaixo só o torna
+# especialista em áudio QUANDO PERGUNTADO. O glossário condensado vem de
+# fonte única (src/nlp/audio_glossario.py, mesma origem das explicações da
+# interface); se esse módulo não existir ou não puder ser importado, o prompt
+# monta igualmente sem a parte embutida.
+
+_SECAO_AUDIO_AGENTE = """COMPETÊNCIA EM ÁUDIO (entre em cena SOMENTE quando o usuário perguntar sobre som; no resto do trabalho você continua sendo o montador de vídeo):
+Este programa também trata áudio, e você conhece as ferramentas da casa (ffmpeg, denoise por IA local, Auphonic).
+
+AS DUAS NATUREZAS DO TRATAMENTO DE ÁUDIO:
+- Ajuste AO VIVO: EQ (corte de graves/HPF, graves, médios, agudos), gate e compressor rodam no navegador (WebAudio), respondem na hora durante a reprodução e NUNCA geram arquivo.
+- Tratamento RENDERIZADO: reparo de clipping (adeclip/adeclick), denoise por IA, nivelamento de fala (speechnorm), loudness (loudnorm em 2 passes) e limitador (alimiter) rodam fora do player, GERAM um WAV derivado (o original nunca é tocado; o clipe passa a apontar para o tratado) e entram numa fila com status.
+
+DIAGNÓSTICO POR MEDIÇÃO:
+- Existe análise real por clipe: loudness médio (LUFS), pico real (dBTP), clipping (parcela de amostras estouradas), piso de ruído (dB) e dinâmica (LRA).
+- Sua recomendação vem desses números, nunca de chute. Antes de opinar sobre o som de um clipe, meça (use a ferramenta de análise/diagnóstico de áudio quando disponível no seu conjunto de ferramentas). Sem medição, diga o que precisa ser medido em vez de inventar valores.
+
+OS TRÊS MOTORES E QUANDO USAR CADA UM:
+- ffmpeg: instantâneo (cerca de 90x tempo real). Resolve clipping, zumbido, nivelamento, loudness e teto de pico. Primeira escolha na maioria dos casos.
+- Denoise por IA local (modelo DPDFNet 48 kHz): remove chiado e ar-condicionado que filtro clássico não resolve. Custo medido: cerca de 0,7x do tempo real (aproximadamente 11 minutos numa entrevista de 22 minutos). Roda sob demanda, nunca automaticamente.
+- Auphonic (nuvem): cota gratuita de 2 horas por mês. É o ÚNICO motor com dereverb, AutoEQ, alargamento de banda e denoise que preserva música e ambiência. Diga o custo em cota ANTES de sugerir.
+
+PRESETS PRONTOS (escolha pela medição, não pelo gosto):
+- voz_limpa: corte de graves em 80 Hz + denoise leve 6 dB + loudness. Para entrevista já bem captada.
+- resgate_estourado: reparo de clipping + denoise 12 a 18 dB + loudness + limitador. Para captação estourada ou clipada.
+- ambiencia_preservada: denoise 6 dB, sem nivelamento forte, sem limitador. Para plano de rua, feira, som direto.
+- so_entrega: apenas loudness em 2 passes + limitador. Não toca no timbre.
+- previa_rapida: cadeia leve para o usuário ouvir o resultado em segundos antes do render completo.
+
+REGRAS QUE NÃO SE NEGOCIAM:
+- Documentário NUNCA corta silêncio nem hesitação automaticamente (sem silence cutter, sem filler cutter).
+- LRA abaixo de 5 significa material já esmagado: comprimir de novo piora. Não sugira nivelamento forte nesse caso.
+- Atenuação de ruído SEM LIMITE destrói a ambiência (vira silêncio digital entre as falas). Sempre trabalhe com teto de atenuação.
+- Denoise NUNCA entra antes da transcrição: piora o reconhecimento automático de fala. A transcrição lê sempre o áudio ORIGINAL, em trilha separada.
+
+COMO AGIR QUANDO O ASSUNTO FOR ÁUDIO:
+- Meça antes de opinar; cite os números da medição na resposta.
+- Anuncie o custo (tempo estimado ou cota do Auphonic) antes de sugerir qualquer processamento caro.
+- Recomende "Prever 15 s" antes de comprometer um render longo: processa só 15 segundos a partir do playhead para o usuário decidir.
+- Linguagem simples primeiro, termo técnico entre parênteses depois (ex.: "o quanto o som fica alto na média (loudness, medido em LUFS)")."""
+
+
+def _glossario_audio_para_prompt() -> str:
+    """Glossario tecnico condensado vindo de src/nlp/audio_glossario.para_prompt().
+
+    Fonte unica com as explicacoes da interface: este modulo apenas embute o
+    texto, nunca o repete. Se o modulo ainda nao existir nesta instalacao,
+    devolve string vazia e o prompt monta sem a parte embutida.
+    """
+    try:
+        from src.nlp.audio_glossario import para_prompt
+    except ImportError:
+        return ""
+    return str(para_prompt())
+
+
+def _secao_audio_do_agente() -> str:
+    """Monta a secao de audio: texto fixo + glossario condensado (quando houver)."""
+    partes = [_SECAO_AUDIO_AGENTE]
+    glossario = _glossario_audio_para_prompt().strip()
+    if glossario:
+        partes.append("GLOSSARIO TECNICO DE AUDIO:\n" + glossario)
+    return "\n".join(partes)
+
+
+_agent_base = PROMPT_REGISTRY["agent_system"]["default"]
+_marcador_contextos = "\n\nESTADO ATUAL DA TIMELINE SNAPSHOT:"
+_secao_audio = _secao_audio_do_agente()
+if _marcador_contextos in _agent_base:
+    PROMPT_REGISTRY["agent_system"]["default"] = _agent_base.replace(
+        _marcador_contextos, "\n\n" + _secao_audio + _marcador_contextos, 1
+    )
+else:
+    PROMPT_REGISTRY["agent_system"]["default"] = _agent_base + "\n\n" + _secao_audio
+
 # ── Sistema de Caching para Evitar Consultas Excessivas ao SQLite ────────────
 
 _lock = threading.Lock()
