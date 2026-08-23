@@ -67,7 +67,7 @@ modelos principais de processamento cognitivo.
       (rough cuts automáticos de B-roll), pois ele comete menos erros
       sintáticos em arrays JSON complexos.
 
-- **Chaves de API (OpenRouter/AssemblyAI)**
+- **Chaves de API (OpenRouter/AssemblyAI/Auphonic)**
 
   - *Mecânica de Máscara:* Ao serem salvas no banco SQLite
     (completamente local), o backend nunca as expõe de volta à
@@ -75,6 +75,11 @@ modelos principais de processamento cognitivo.
     mascarada (ex: sk-or-...-1234 ou ••••). Se o campo for limpo na UI,
     o backend volta a herdar a constante definida no arquivo .env
     físico.
+
+  - **api.auphonic_key (Chave Auphonic):** secret como as demais, mesma
+    política de máscara. Sem ela, os recursos de nuvem de áudio ficam
+    desligados. A cota mensal que ela desbloqueia é controlada pelas
+    chaves audio.nuvem.* do Módulo 6 — chave aqui, contabilidade lá.
 
 ## 3. Módulo 2: Otimização de Transcrição e Diarização (ASR & VAD)
 
@@ -252,7 +257,7 @@ grupos formados).
 
 - **themes.title_merge_threshold (Mesclagem por Título)**
 
-  - *Padrão:* 0.82
+  - *Padrão:* 0.71
 
   - *Impacto:* Durante a consolidação de temas redundantes (função
     merge_similar_themes), a IA gera embeddings locais para os títulos
@@ -379,7 +384,170 @@ Isso evita travamentos em background (erros silenciosos de Python do
 tipo KeyError ou falhas na chamada render_prompt), garantindo que o
 software continue funcionando mesmo se o usuário errar a edição.
 
-## 7. Caderno de Receitas da Vida Real (Playbook)
+## 7. Módulo 6: Tratamento de Áudio (Categoria Audio)
+
+A categoria **Audio** é a mais recente do painel e traz 26 chaves `audio.*`,
+todas em nível Profissional (a 27ª novidade, `api.auphonic_key`, mora no
+Módulo 1, como veremos). Ela cobre duas frentes que o painel separa à vista:
+o que é **renderizado** (reparo, denoise, loudness e limitador geram um WAV
+derivado em `data/audio_tratado/` e o clipe guarda só um ponteiro para ele) e o
+que é **ao vivo** (EQ, gate, compressor e ganho rodam no navegador via
+WebAudio, reversíveis, e nunca geram arquivo). Antes de mexer, decida de qual
+lado da fronteira você está.
+
+### A Régua do Diagnóstico (audio.analise.*)
+
+Estes oito limiares mais o teto de intervalo **não alteram nenhum som**: eles
+dizem ao diagnóstico de áudio (um passe de ffmpeg, ~3 s por clipe) quando
+acender cada selo de severidade e qual preset a cadeia sugerida deve montar.
+Mudar aqui muda o *julgamento* do acervo, não o áudio dele.
+
+- **audio.analise.alvo_lufs (Alvo de loudness)**
+
+  - *Padrão:* -16.0 LUFS (faixa de -31.0 a -9.0).
+
+  - *Ação física:* É o volume final desejado: referência do loudnorm de dois
+    passes e do diagnóstico — loudness fora de ±1 LU desse alvo marca o clipe
+    como "fora de alvo".
+
+  - *Calibração:* -16 LUFS é o uso comum na web. Baixar (ex: -23) deixa a
+    entrega mais baixa e "sobrando" headroom; subir além de -14 aproxima o som
+    do teto e faz o limitador trabalhar mais.
+
+- **audio.analise.teto_dbtp (Teto de pico real)**
+
+  - *Padrão:* -1.5 dBTP (faixa de -6.0 a 0.0).
+
+  - *Ação física:* Teto do alimiter aplicado após o loudnorm; pico real medido
+    acima disso faz o diagnóstico cravar o selo "ESTOUROU".
+
+  - *Calibração:* -1,5 dBTP evita distorção em qualquer aparelho. Só baixe
+    (ex: -3.0) se a cadeia de broadcast exigir margem maior.
+
+- **audio.analise.clip_pct_grave (Clipping grave)**
+
+  - *Padrão:* 0.05% das amostras (faixa de 0.0 a 5.0).
+
+  - *Ação física:* Percentual de amostras estouradas que já configura dano real
+    de captação. Acima disso, o reparo de clipping (adeclip + adeclick) entra
+    no INÍCIO da cadeia sugerida, antes de qualquer outro ajuste.
+
+- **audio.analise.piso_ruido_alto / piso_ruido_medio (Piso de ruído)**
+
+  - *Padrões:* -35.0 dB (alto) e -45.0 dB (moderado), ambos de -90.0 a 0.0.
+
+  - *Ação física:* São a régua de dois degraus do silêncio entre falas. Acima
+    de -35 dB, o local era barulhento e o diagnóstico recomenda denoise forte,
+    pedindo uma atenuação igual à distância até o piso moderado (limitada a
+    6–18 dB). Entre -45 e -35 dB, sugere apenas uma limpeza leve de 6 dB,
+    opcional, que preserva a ambiência.
+
+  - *Calibração:* Abrir a janela (ex: alto em -30) torna o diagnóstico mais
+    alarmista e sugere limpeza agressiva cedo demais; fechá-la demais deixa
+    gravações sujas passarem limpas.
+
+- **audio.analise.lra_esmagado / lra_amplo (Faixa de loudness, LRA)**
+
+  - *Padrões:* 5.0 (esmagado) e 12.0 (amplo), passos de 0.5.
+
+  - *Ação física:* LRA abaixo do piso significa áudio já muito comprimido — o
+    diagnóstico então BLOQUEIA speechnorm forte, porque recomprimir piora o
+    som. LRA acima do teto significa diferença grande demais entre falas baixas
+    e altas — e liga o leveler para nivelar.
+
+- **audio.analise.correlacao_estereo (Semelhança entre canais)**
+
+  - *Padrão:* 0.95 (faixa de 0.0 a 1.0).
+
+  - *Ação física:* Mede se os dois canais tocam a mesma coisa. Correlação abaixo
+    disso = duas fontes distintas (duas pessoas, dois microfones): o sistema
+    avisa "duas fontes detectadas" e trata cada canal separadamente. Acima =
+    mono gravado duas vezes, tratado mixado.
+
+- **audio.analise.teto_intervalo_s (Trecho máximo por análise)**
+
+  - *Padrão:* 2400 s = 40 min (faixa de 60 a 7200, passo de 60).
+
+  - *Ação física:* O diagnóstico roda sincronamente, enquanto você espera
+    (~31x tempo real nesta máquina: 90 s de áudio saem em ~2,9 s; o teto cheio
+    custa ~80 s de chamada). Intervalos maiores recebem HTTP 400 e o pedido de
+    analisar por partes.
+
+### Defaults do Ajuste ao Vivo (audio.aovivo.*)
+
+ATENÇÃO À FRONTEIRA: **o valor real de cada clipe vive no próprio clipe**
+(`clip.effects`), não aqui. Estas nove chaves são só o ponto de partida
+carregado quando você LIGA o ajuste num clipe novo; alterá-las não muda nenhum
+clipe já ajustado, e voltar ao padrão aqui não "desfaz" nada na timeline.
+
+- **audio.aovivo.hpf_hz (Corte de graves):** highpass na entrada do grafo;
+  padrão 80 Hz tira mesa batendo, vento e passadas sem tocar a voz; 0 desliga.
+- **audio.aovivo.eq_low_db / eq_mid_db / eq_high_db (Graves/Médios/Agudos):**
+  EQ de 3 bandas, -12 a +12 dB, todos nascendo em 0 dB (neutros). Negativos nos
+  médios resolvem fala "nariz tapado"; positivos nos agudos tiram o véu.
+- **audio.aovivo.eq_mid_hz (Centro dos médios):** padrão 1000 Hz. É centro FIXO
+  do grafo — não é salvo por clipe. Raramente precisa mudar.
+- **audio.aovivo.gate_db (Portão de ruído):** fecha o som entre frases; padrão
+  -45 dB, quanto mais perto de zero mais agressivo (engole pedaços da própria
+  fala); -90 desliga. Sem o AudioWorklet, o gate fica fora e a UI avisa.
+- **audio.aovivo.comp_ratio / comp_thresh_db (Compressão):** taxa padrão 2:1
+  (leve; 1 = sem compressão) com limiar em -18 dB. Taxas altas com limiar bem
+  negativo esmagam a naturalidade.
+- **audio.aovivo.makeup_db (Ganho de compensação):** +0 dB por padrão; devolve
+  a força que gate e compressor tiraram (ou baixa o resultado final).
+
+Consequência prática: tudo aqui é latência zero e reversível, mas o export
+declara EQ, gate e compressor num `<nome>_efeitos_audio.txt` — eles NÃO
+atravessam FCPXML nem EDL. Quem depende de conformação precisa do WAV tratado
+(renderizado), não do ajuste ao vivo.
+
+### Denoise por IA Local (audio.denoise.*)
+
+- **audio.denoise.motor:** `dpdfnet` (padrão; 48 kHz, qualidade cheia — o único
+  indicado para entrega final) ou `gtcrn` (muito mais rápido, mas devolve o som
+  em 16 kHz: restrito a prévia e ASR, nunca na entrega).
+- **audio.denoise.atenuacao_db (Força da limpeza):** padrão 12 dB, operação de
+  6 a 18. Perto do máximo, a IA já engolde pedaços da ambiência — e em excesso,
+  da própria voz. O diagnóstico sugere o valor dentro desta faixa.
+- **audio.denoise.atenuacao_sem_limite (Remover sem limite):** padrão
+  DESLIGADO, e deve continuar. Ligado, a IA persegue o ruído sem teto e leva o
+  fundo a silêncio digital absoluto: a ambiência do lugar (sala, rua, vento,
+  clima) é DESTRUÍDA sem volta. Presets automáticos nunca o ligam; é uma
+  válvula de escape para caso extremo, consciente.
+- **audio.denoise.por_canal_auto (Canais separados):** padrão ligado. Com
+  correlação L/R abaixo de `audio.analise.correlacao_estereo`, processa um
+  modelo mono POR CANAL, para a limpeza de um lado não apagar o som do outro.
+- **audio.denoise.rtf_medido (Velocidade medida):** padrão 0,71 — o RTF medido
+  nesta máquina, ou seja, a limpeza leva ~1,2x a duração do áudio (um clipe de
+  10 min fica pronto em uns 12). Serve só para a estimativa de tempo da UI ser
+  honesta antes de você comprometer o clipe; trocou de computador, meça de novo
+  e atualize.
+
+### Nuvem Auphonic (audio.nuvem.*)
+
+- **audio.nuvem.alvo_minutos_mes:** padrão 120.0 — o plano gratuito do Auphonic
+  dá 2 horas por mês, recorrentes. Este número é a cota que o programa controla.
+- **audio.nuvem.avisar_em_pct:** padrão 80% — ao consumir essa fração da cota,
+  o programa passa a avisar antes de cada submissão (com 80%, sobram ~24 min de
+  folga no free tier).
+
+A CHAVE em si não está nesta categoria: `api.auphonic_key` mora no **Módulo 1
+(Models & Keys)**, tipo secret, junto das demais — mascarada na leitura, nunca
+devolvida ao cliente. Sem chave ou sem cota, a rota de nuvem recusa ANTES de
+tocar na rede; e a prévia de 15 s na nuvem é recusada de propósito (gastaria
+cota para responder o que o motor local responde de graça).
+
+### Ponte com DAW (audio.daw.*)
+
+- **audio.daw.pasta_retorno:** padrão `watch/audio_daw`. Você manda o stem para
+  tratar no Reaper/Audition e salva o resultado DE VOLTA nesta pasta vigiada,
+  com o mesmo nome-base: o watcher reconhece o arquivo e o clipe ganha o
+  tratamento sozinho. Trocar a pasta aqui troca onde a ponte olha.
+- **audio.daw.formato_stem:** padrão `wav48_24` (WAV PCM 48 kHz, 24 bits, com
+  timecode preservado — formato de estúdio recomendado). `wav48_16` gera
+  arquivos mais leves para ferramentas menos exigentes.
+
+## 8. Caderno de Receitas da Vida Real (Playbook)
 
 ### Receita A: O Set Noturno / Fantasia (Iluminação Dramática e Sombras)
 

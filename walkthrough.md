@@ -1314,3 +1314,102 @@ Passar de um clipe para o outro na timeline — em reprodução ou frame a frame
 
 3.  **Efeito colateral corrigido (`workspaceManager.js`):**
     - O clique no monitor do Program dava play direto em `program-video-a`. Com o pool não existe mais um elemento fixo no ar: o clique passou a acionar o botão de play do painel, que é quem fala com o `ProgramPlayer`.
+
+---
+
+## 🎚️ Fase 26: Tratamento de Áudio no Painel de Ajustes (23/08/2026)
+
+Editores de vídeo não são, em geral, bons editores de áudio — e o programa
+falava com eles em LUFS, dBTP e LRA sem explicar nada. Esta fase implementa as
+seis etapas de `docs/PLANO_AJUSTES_DE_AUDIO.md` e o que a implementação revelou
+que faltava nele.
+
+1.  **O princípio que organiza tudo (seção 2 do plano):**
+    - **Ao vivo:** corte de graves, EQ de 3 bandas, gate e compressor rodam no
+      navegador via WebAudio, sobre o mesmo elemento que o player já usa.
+      Latência zero, reversível, **nunca gera arquivo**.
+    - **Renderizado:** reparo de clipping, denoise, loudness e limitador rodam
+      fora do processo do servidor, produzem um WAV derivado em
+      `data/audio_tratado/` e o clipe guarda um **ponteiro**. O arquivo original
+      nunca é tocado.
+    - O painel de Ajustes foi de 5 para 10 seções, e a fronteira entre "muda na
+      hora" e "entra numa fila" é visível na interface.
+
+2.  **Diagnóstico por medição, não por chute:**
+    - Um passe de `ebur128` + `astats` mede loudness, pico real, clipping, piso
+      de ruído, faixa de loudness e correlação entre canais; devolve selos de
+      severidade e sugere o preset.
+    - As linhas por quadro do `ebur128`, que eram descartadas, viram uma **faixa
+      sobre o clipe** mostrando onde estourou e uma **lista de momentos
+      clicáveis** que levam o playhead até lá.
+
+3.  **Os números medidos no acervo** (entrevista Julia + Virshna, 6:45–8:15):
+
+    | | original | ffmpeg | IA |
+    |---|---|---|---|
+    | loudness | −7,1 | −16,0 | −15,7 LUFS |
+    | pico real | +1,7 | −3,0 | −4,6 dBTP |
+    | piso de ruído | −26,7 | −36,4 | −49,4 dB |
+
+    Velocidades: cadeia de ffmpeg a **31×–44× tempo real** (entrevista de 22 min
+    em ~43 s); denoise por IA a **RTF 0,71** (a mesma entrevista em ~16 min,
+    cerca de 45 vezes mais lento). Daí o "Prever 15 s" ser obrigatório na prática
+    antes de comprometer um clipe inteiro.
+
+4.  **Cinco correções que a implementação impôs ao próprio plano:**
+    - O comando de análise da seção 5, com `-v error`, devolve stderr **vazio**:
+      os sumários saem em nível INFO. O correto é `-v info -nostats`.
+    - A fórmula de atenuação da seção 7 estava **invertida**; o correto é
+      `clamp(piso − (−45), 6, 18)`.
+    - Dois números da tabela da seção 1 **não se reproduzem**: o ffmpeg devolve
+      −7,4 LUFS e `Peak count 2`, não −10,4 e 669 amostras. 📌 **Pendência:** os
+      limiares da seção 7 derivam dessa tabela, então a medição precisa ser
+      refeita antes de eles valerem como verdade.
+    - O ffmpeg roda a 31×–44×, não aos ~90× estimados.
+    - Requisitos escritos na **prosa** das seções 8 e 10 nunca entraram em
+      checklist de etapa — por isso a integração da nuvem e a conformação do
+      áudio tratado quase ficaram órfãs.
+
+5.  **O que a verificação pegou** (seis defeitos que passaram nos testes de quem
+    os escreveu):
+    - A rota gravava o arquivo de PID **em nome do worker**, e o worker então
+      recusava a si mesmo ao subir. Todo despacho automático morria em silêncio,
+      deixando o trabalho em `pending` para sempre — tanto no denoise por IA
+      quanto na nuvem.
+    - `AudioContext.prototype.audioWorklet` é um *getter*: lê-lo no protótipo
+      lança `Illegal invocation` e derrubava `renderAdjustmentsPanel` inteiro,
+      em qualquer clipe.
+    - `parse_sequence` descartava `effects` e `link_id` ao migrar sequência v1
+      para v2, deixando o código do export correto e **inerte**.
+    - Os parâmetros numéricos do Auphonic são listas fechadas, não faixas
+      contínuas: mandávamos valores fora da grade em 55 de 210 pisos testados, e
+      `filtering` nunca era enviado.
+    - As tabelas de chave dos ícones de explicação usavam nomes que não existiam
+      no glossário — o ícone simplesmente não aparecia.
+
+6.  **O que NÃO foi feito, de propósito:**
+    - **VST via `pedalboard`**: opcional no plano, com bug conhecido de crash e
+      exigindo licença que não existe aqui. A ida e volta por arquivo, que o
+      plano recomenda, está pronta.
+    - **Detecção local de zumbido de rede**: tentada por filtro e por FFT. O
+      filtro falhou por física — biquad de 2ª ordem não separa 60 de 65 Hz — e a
+      FFT deu falso positivo no arquivo limpo **maior** que o sinal no arquivo
+      com zumbido injetado. Descartada; `dehum` vai em Auto e o detector do
+      Auphonic decide.
+
+7.  **Explicações e chat:** ícone (i) discreto que abre no clique uma explicação
+    detalhada, a partir de um glossário de 39 verbetes em
+    `src/nlp/audio_glossario.py`. É fonte **única**: o mesmo texto alimenta o
+    prompt do chat, que ganhou 4 ferramentas de áudio (16 no total). Três travas:
+    prévia de 15 s é o padrão dele, ele **não** pode acionar o Auphonic (gastaria
+    a cota do dono) e nunca liga corte automático de silêncio.
+
+8.  **Validação:** 237 testes de áudio verdes (61 análise + 45 cadeia + 52 nuvem
+    + 36 denoise + 20 stems + 23 glossário), autoteste do worker 39/39, e
+    verificação ponta a ponta contra o áudio real do acervo — inclusive um teste
+    de falsificação: a única janela de 2 s que o diagnóstico **não** apontou tem
+    zero quadros acima de −1,5 dBFS.
+
+    📌 **Falta teste manual:** os ajustes ao vivo nunca foram ouvidos, a
+    conformação nunca foi aberta num NLE, nenhuma produção real foi enviada à
+    nuvem e a ida e volta com a DAW nunca teve uma DAW de verdade.

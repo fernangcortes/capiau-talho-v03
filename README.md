@@ -42,6 +42,7 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   - [🎞️ Decupagem e análise por IA](#decupagem-e-analise-por-ia)
   - [✂️ Timeline e edição](#timeline-e-edicao)
   - [👥 Rostos e personagens](#rostos-e-personagens)
+  - [🔊 Diagnóstico e tratamento de áudio](#diagnostico-e-tratamento-de-audio)
   - [🖥️ Interface e produtividade](#interface-e-produtividade)
   - [🛡️ Resiliência e operação](#resiliencia-e-operacao)
 - [📊 Arquitetura do sistema](#arquitetura-do-sistema)
@@ -200,6 +201,49 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   digitação, paginação inteligente, cache local de miniaturas e um mecanismo de **autocura de dados**
   que protege suas decisões de auditoria manual contra sobrescritas automáticas do DBSCAN.
 
+### 🔊 Diagnóstico e tratamento de áudio <a id="diagnostico-e-tratamento-de-audio"></a>
+
+- **Medição antes de sugestão, sempre.** Editor de vídeo não é técnico de áudio — por isso nada aqui
+  parte de chute. Um passe de FFmpeg (~3 s por clipe) mede loudness (LUFS), pico real (dBTP),
+  clipping, piso de ruído, faixa de loudness (LRA) e correlação entre canais; dos números saem selos
+  de severidade e um preset sugerido. Uma faixa sobre o clipe mostra **onde** estourou, com momentos
+  clicáveis que levam o playhead direto ao problema.
+
+- **Duas frentes de ajuste, fronteira visível na interface.** *Ao vivo*: EQ, gate, compressor e ganho
+  rodam no navegador (WebAudio) sobre o mesmo elemento do player — latência zero, reversível, nunca
+  gera arquivo. *Renderizado*: reparo de clipping, denoise, loudness e limitador rodam fora do
+  servidor e produzem um WAV derivado em `data/audio_tratado/`, para o qual o clipe passa a apontar;
+  o original nunca é tocado. Cada WAV é 48 kHz 24 bits (~360 MB para uma entrevista de 22 min), com
+  cache por hash da cadeia para não reprocessar.
+
+- **Seis presets com velocidade medida nesta máquina.** De `so_entrega` (loudness + limitador) a
+  `resgate_ia` (reparo de clipping + denoise IA): a cadeia clássica de FFmpeg corre a 31x–44x tempo
+  real — uma entrevista de 22 min sai em ~43 s. O denoise por IA (DPDFNet, na CPU) tem RTF 0,71: a
+  mesma entrevista leva ~15 min, cerca de 45 vezes mais lento. O botão **Prever 15 s** responde antes
+  de comprometer o clipe inteiro.
+
+- **O ganho da IA é medido, não prometido.** Numa janela de teste do acervo (6:45–8:15), o filtro
+  clássico levou o piso de ruído de -26,7 dB a -36,4 dB; a IA, a -49,4 dB — 13 dB mais fundo, o que
+  justifica os minutos de espera. Nos dois caminhos a loudness chega ao alvo de -16 LUFS e o pico
+  fica abaixo do teto de -1,5 dBTP.
+
+- **Denoise por IA local, opcional e sob demanda.** sherpa-onnx + modelo DPDFNet 48 kHz rodam na sua
+  CPU, clipe a clipe, nunca no ingest. Não vem instalado — os dois comandos estão em
+  [Configuração](#configuracao-env). Sem o pacote, o programa avisa exatamente o que falta em vez de
+  fingir que processou.
+
+- **Auphonic, a única peça de nuvem, também opcional.** Faz o que o motor local não faz (dereverb,
+  AutoEQ, alargamento de banda, denoise preservando ambiência) num plano gratuito de 2 h/mês, com a
+  cota visível no painel e recusa antes de tocar na rede quando falta chave ou saldo. O corte
+  automático de silêncio e hesitação fica sempre desligado — regra de documentário, nem sobrescrita
+  muda isso.
+
+- **Explicações onde você está, chat especialista sob pedido.** Ícone ⓘ ao lado de cada métrica e
+  controle abre um verbete com bloco *"na prática"* — 39 verbetes em `src/nlp/audio_glossario.py`,
+  fonte única que alimenta o chat também. O agente ganhou 4 ferramentas de áudio (medir, sugerir,
+  aplicar, ajustar ao vivo), somando 16; ele não aciona o Auphonic (gastaria a sua cota — recomenda e
+  explica) e nunca liga corte automático.
+
 ### 🖥️ Interface e produtividade <a id="interface-e-produtividade"></a>
 
 - **Janelas destacáveis (workspaces multi-monitor).** Destaque Biblioteca, Timeline, Players ou
@@ -289,12 +333,15 @@ graph TD
         CLIPEngine["CLIP multilíngue<br/>embeddings de imagem"]
         FaceEngine["YuNet + SFace (ONNX)<br/>detecção e biometria facial"]
         Qdrant[("Qdrant local<br/>busca vetorial &lt; 5 ms")]
+        AudioFX["FFmpeg cadeias de áudio<br/>loudness · adeclip · afftdn · alimiter"]
+        DenoiseIA["DPDFNet via sherpa-onnx<br/>denoise por IA (opcional)"]
     end
 
     subgraph Cloud["☁️ APIs de nuvem — uso cirúrgico"]
         AssemblyAI["AssemblyAI<br/>transcrição + diarização pt-BR"]
         OpenRouter["OpenRouter<br/>DeepSeek V4-Flash · Gemini 2.5 Flash"]
         S3["AWS S3 (opcional)<br/>armazenamento remoto"]
+        Auphonic["Auphonic (opcional)<br/>dereverb · AutoEQ · alargamento de banda"]
     end
 
     subgraph Frontend["💻 Frontend web — NLE em Canvas 2D"]
@@ -325,6 +372,11 @@ graph TD
     CLIPEngine -->|embeddings de imagem| Qdrant
     FaceEngine -->|embeddings e grupos de rostos| SQLite
 
+    Timeline -->|medir e tratar áudio| AudioFX
+    DenoiseIA -->|ruído afundado| AudioFX
+    Auphonic -.->|nuvem, opcional| AudioFX
+    AudioFX -->|"WAV derivado em data/audio_tratado"| SQLite
+
     SQLite -->|contexto da timeline| OpenRouter
     OpenRouter -->|operações e ghost clips| Timeline
     OpenRouter -->|temas e descrições| SQLite
@@ -353,7 +405,11 @@ graph TD
    mesmo sem essa palavra na descrição.
 6. **Rostos.** Em paralelo, o YuNet detecta rostos, o SFace os transforma em vetores e o DBSCAN os
    agrupa. Suas correções manuais ficam travadas contra reagrupamentos futuros.
-7. **Edição e exportação.** Você monta na timeline em Canvas 2D e exporta em `.otio`, `.xml` ou
+7. **Tratamento de áudio (opcional, sob demanda).** Um passe de FFmpeg (~3 s) mede loudness, pico
+   real e piso de ruído e sugere um preset; renderizar grava um WAV derivado em
+   `data/audio_tratado/` e o clipe passa a apontar para ele — o original segue intocado. Ajustes como
+   EQ e compressor podem ficar apenas ao vivo no navegador, sem gerar arquivo algum.
+8. **Edição e exportação.** Você monta na timeline em Canvas 2D e exporta em `.otio`, `.xml` ou
    `.edl` para finalizar no seu NLE de preferência.
 
 ---
@@ -488,6 +544,24 @@ e o valor salvo no painel **tem prioridade sobre o `.env`**.
 |---|---|
 | `AZURE_FACE_ENDPOINT` | Endpoint do Azure Face, alternativa ao motor local |
 | `AZURE_FACE_KEY` | Chave do Azure Face |
+
+### Tratamento de áudio (opcional) <a id="tratamento-de-audio-opcional"></a>
+
+O programa mede e trata áudio inteiro na sua máquina, sem nuvem e sem pacote extra. As duas opções a
+seguir são opcionais — nenhuma delas é requisito para nada funcionar.
+
+- **Auphonic (`api.auphonic_key`).** Chave do tipo *secret*, definida em **Configurações › Modelos &
+  Chaves** (não fica no `.env`). Plano gratuito de 2 h/mês recorrentes; habilita dereverb, AutoEQ,
+  alargamento de banda e denoise preservando ambiência. Sem chave ou sem cota, a rota recusa antes de
+  tocar na rede.
+- **Denoise por IA local (DPDFNet).** Roda na CPU via sherpa-onnx e não vem instalado:
+
+```bash
+pip install sherpa-onnx soundfile
+python scripts/baixar_modelo_denoise.py
+```
+
+Sem qualquer uma das duas, o programa avisa exatamente o que falta em vez de fingir que processou.
 
 > ⚠️ O arquivo `.env` é ignorado pelo Git de propósito — ele contém segredos. **Nunca** faça commit
 > dele. Veja [`docs/costs_and_security.md`](docs/costs_and_security.md).

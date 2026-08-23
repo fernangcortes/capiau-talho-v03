@@ -1,7 +1,8 @@
-# 🔌 Detalhamento das APIs de Visão e Faces
+# 🔌 Detalhamento das APIs de Visão, Faces e Áudio
 
 Abaixo estão listadas as rotas do backend FastAPI que gerenciam o fluxo
-de detecções, desambiguação e anotações do CapIAu-Talho:
+de detecções, desambiguação, anotações e tratamento de áudio do
+CapIAu-Talho:
 
 ## 1. Rotulação e Resolução de Conflitos
 
@@ -167,6 +168,118 @@ que rodam 100% localmente via embeddings CLIP, sem custo de API.
 ### POST /api/settings/vision-model
 - **Descrição:** Atualiza dinamicamente o modelo de visão ativo para triagem e descrição de keyframes.
 - **Payload:** `{ "model": "nvidia/nemotron-4-70b-vision" }`
+
+## 8. Diagnóstico e Tratamento de Áudio
+
+Sete rotas que sustentam o painel de Ajustes de áudio. O princípio que as
+organiza: **o arquivo original nunca é tocado**. Todo tratamento gera um WAV
+derivado em `data/audio_tratado/{video_id}/{chain_hash}.wav` e o clipe guarda
+apenas um ponteiro.
+
+### GET /api/video/{video_id}/audio/analysis
+
+- **Descrição:** Mede o áudio do intervalo com um passe de ffmpeg
+  (`ebur128` + `astats`) e devolve loudness (LUFS), pico real (dBTP),
+  clipping, piso de ruído, faixa de loudness (LRA) e correlação entre os
+  canais, mais os selos de severidade e o preset sugerido. Devolve também o
+  envelope e a lista de momentos de estouro, com tempo absoluto na fonte.
+
+- **Query:** `in`, `out` (segundos), `refresh` (ignora o cache).
+
+- **Cache:** o resultado é gravado na tabela `audio_render`; a segunda
+  chamada do mesmo intervalo responde em milissegundos.
+
+- **Guarda:** intervalo acima de `audio.analise.teto_intervalo_s`
+  (padrão 2400 s) devolve **400** — a análise é síncrona e um pedido longo
+  demais prenderia o servidor.
+
+- **Origem:** prefere o arquivo original; se o acervo bruto estiver
+  inacessível cai para o proxy local e declara isso no campo `fonte`, porque
+  os números medidos no proxy podem diferir do bruto.
+
+### POST /api/video/{video_id}/audio/render
+
+- **Descrição:** Monta a cadeia de tratamento e produz o WAV derivado.
+
+- **Payload:**
+
+> {
+>
+> \"in\": float, \"out\": float,
+>
+> \"preset\": \"resgate_estourado\" \| \"cadeia\": \[\"adeclip\", \"loudnorm:-16:-1.5\"\],
+>
+> \"engine\": \"local\" \| \"auphonic\",
+>
+> \"previa\": bool,
+>
+> \"algorithms_override\": { campo: valor }
+>
+> }
+
+- **Prévia:** `previa: true` trata apenas 15 s a partir de `in`. É o caminho
+  recomendado antes de comprometer um clipe inteiro.
+
+- **Guardas:** `engine: auphonic` sem chave configurada ou sem cota devolve
+  **400 antes de qualquer requisição de rede** — produção recusada gastaria o
+  envio do mesmo jeito. Prévia na nuvem também é recusada: gastaria cota para
+  responder o que o motor local responde de graça. `algorithms_override` só
+  vale com o motor de nuvem e é validado contra a grade de valores aceitos.
+
+- **Fila:** cadeia que inclui o passo de denoise por IA não renderiza em
+  linha — vai para o worker (`fila: "worker_audio"`), que sabe parti-la. O
+  mesmo vale para a prévia com IA. Motor de IA não instalado devolve **400**
+  antes de enfileirar um trabalho que falharia minutos depois.
+
+### GET /api/video/{video_id}/audio/render/{chain_hash}
+
+- **Descrição:** Estado do tratamento: `pending`, `running`, `ready` ou
+  `failed`, com o caminho do arquivo, o progresso e as análises de antes e
+  depois.
+
+- **Correção de estado:** linha marcada `ready` cujo WAV sumiu do disco é
+  corrigida para `failed` em vez de mentir sobre o resultado.
+
+### GET /api/audio/tratado/{video_id}/{chain_hash}.wav
+
+- **Descrição:** Serve o WAV tratado para o A/B do player.
+
+- **Guarda:** o `chain_hash` precisa casar com `[0-9a-f]{64}` e o caminho
+  resolvido precisa cair dentro de `data/audio_tratado` — qualquer tentativa
+  de travessia devolve **400**, e hash válido sem linha correspondente
+  devolve **404**.
+
+### GET /api/audio/nuvem/cota
+
+- **Descrição:** Retrato da cota gratuita do Auphonic (2 h por mês,
+  recorrentes): `usados_min`, `total_min`, `restante_min`, `avisar` e `mes`.
+  É leitura local, sem tocar na rede.
+
+- **Sem chave:** devolve `ok: false` com o motivo legível, nunca **500** — a
+  interface usa esta rota para decidir se habilita o motor de nuvem.
+
+### GET /api/audio/nuvem/campos
+
+- **Descrição:** Grade viva dos 17 parâmetros do Auphonic que podem ser
+  sobrescritos à mão, com rótulo, ajuda e os valores aceitos. A interface
+  monta os controles a partir daqui e **nunca** com a grade escrita no
+  JavaScript — ela é do Auphonic e pode mudar.
+
+- **Query:** `video_id`, `in`, `out`. Com o clipe identificado, devolve
+  também `automatico`: o que a medição decidiu para aquele trecho, campo a
+  campo, para o usuário ver de onde discorda.
+
+- **Nunca ajustáveis:** o corte automático de silêncio e de hesitação não
+  aparece nesta lista. Documentário não corta sozinho, nem por sobrescrita.
+
+### GET /api/audio/glossario
+
+- **Descrição:** Os 39 verbetes que explicam áudio para quem monta vídeo,
+  cada um com resumo, explicação detalhada e um bloco "na prática". Alimenta
+  os ícones de explicação do painel e, pela mesma fonte, o prompt do chat.
+
+- **Query:** `secao` filtra por `diagnostico`, `aovivo`, `tratamento` ou
+  `nuvem`. Seção inválida devolve **400** listando as válidas.
 
 ## 7. Documentação Interativa Swagger
 

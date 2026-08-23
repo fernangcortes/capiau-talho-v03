@@ -20,15 +20,16 @@ profissional.
 3. [🤖 3. Assistente Conversacional de Edição (Chat-Agente) & Ghost Clips](#3-assistente-conversacional-de-edição-chat-agente--ghost-clips)
 4. [👥 4. Mapeamento de Rostos, Objetos e Desambiguação Rápida](#4-mapeamento-de-rostos-objetos-e-desambiguação-rápida)
 5. [🎛️ 5. Pistas de Áudio Reais, J/L-Cuts e Marcadores de Timeline](#5-pistas-de-áudio-reais-e-jl-cuts-nativos)
-6. [🔄 6. Carrossel de Alternativas da IA (Atalho A)](#6-carrossel-de-alternativas-da-ia-atalho-a)
-7. [💾 7. Salvando, Auto-Salvamento, Exportação e Importação de Timelines (OTIO/XML/EDL)](#7-salvando-auto-salvamento--logs-com-ia)
-8. [🖥️ 8. Layout e Organização Avançada (Inspetor de Mídia, Players e Estúdio)](#8-layout-e-organização-avançada)
-9. [⚙️ 9. Configurações da Sequência, Auto-Configuração e Zoom do Preview](#9-configurações-da-sequência-auto-configuração-e-zoom-do-preview)
-10. [📐 10. Viewport Estável, Alças de Transformação e Recorte (Crop)](#10-viewport-estável-alças-de-transformação-e-recorte-crop)
-11. [🤖 11. Resiliência de IA, Seleção de Modelos e Gestão de Tarefas](#11-resiliência-de-ia-seleção-de-modelos-e-gestão-de-tarefas)
-12. [🖥️ 12. Execução Resiliente sem Janela de Console no Windows](#12-execução-resiliente-sem-janela-de-console-no-windows)
-13. [⚡ 13. Configurações de Hardware, Aceleração por GPU e Fallback Automático](#13-configurações-de-hardware-aceleração-por-gpu-e-fallback-automático)
-14. [🎹 14. Mapa de Atalhos de Teclado NLE](#14-mapa-de-atalhos-de-teclado-nle)
+6. [🎚️ 6. Tratamento de Áudio: Diagnóstico, Presets e Comparação A/B](#6-tratamento-de-áudio-diagnóstico-presets-e-comparação-ab)
+7. [🔄 7. Carrossel de Alternativas da IA (Atalho A)](#7-carrossel-de-alternativas-da-ia-atalho-a)
+8. [💾 8. Salvando, Auto-Salvamento & Logs com IA](#8-salvando-auto-salvamento--logs-com-ia)
+9. [🖥️ 9. Layout e Organização Avançada (Inspetor de Mídia, Players e Estúdio)](#9-layout-e-organização-avançada)
+10. [⚙️ 10. Configurações da Sequência, Auto-Configuração e Zoom do Preview](#10-configurações-da-sequência-auto-configuração-e-zoom-do-preview)
+11. [📐 11. Viewport Estável, Alças de Transformação e Recorte (Crop)](#11-viewport-estável-alças-de-transformação-e-recorte-crop)
+12. [🤖 12. Resiliência de IA, Seleção de Modelos e Gestão de Tarefas](#12-resiliência-de-ia-seleção-de-modelos-e-gestão-de-tarefas)
+13. [🖥️ 13. Execução Resiliente sem Janela de Console no Windows](#13-execução-resiliente-sem-janela-de-console-no-windows)
+14. [⚡ 14. Configurações de Hardware, Aceleração por GPU e Fallback Automático](#14-configurações-de-hardware-aceleração-por-gpu-e-fallback-automático)
+15. [🎹 15. Mapa de Atalhos de Teclado NLE](#15-mapa-de-atalhos-de-teclado-nle)
 
 ---
 
@@ -229,6 +230,32 @@ B-rolls do set\"*).
     e pressione **Delete** (ou **Backspace**, ou clique no botão ✗ do
     popup correspondente).
 
+### 🎚️ O agente também entende de áudio
+
+Quando você pergunta sobre som, ele deixa de ser montador e vira técnico de
+áudio — mas continua montador no resto da conversa. A diferença em relação a um
+assistente genérico é que ele **mede antes de opinar**, em vez de responder por
+impressão.
+
+O que dá para pedir:
+
+- *"esse clipe está estourado?"* — ele roda a análise e responde com os números
+  medidos, não com um palpite.
+- *"o que você faria com esse áudio?"* — diz qual preset resolve, quanto custa
+  em tempo e o que aquele preset **não** resolve.
+- *"aplica aí"* — trata uma prévia de 15 s, não o clipe inteiro.
+- *"tira o chiado desse trecho"* — mexe nos ajustes ao vivo (EQ, gate,
+  compressor), que são reversíveis e não geram arquivo.
+
+Três coisas ele **não** faz sozinho, de propósito:
+
+1. **Não compromete um render longo** por iniciativa própria. Prévia de 15 s é o
+   padrão; para tratar o clipe inteiro ele pede a sua confirmação.
+2. **Não aciona o Auphonic.** Gastaria a sua cota mensal. Se o material pedir
+   nuvem, ele recomenda e explica — quem aperta o botão é você.
+3. **Não liga corte automático** de silêncio ou de hesitação. É a regra do
+   documentário, e não vira negociável só porque quem pediu foi a IA.
+
 ## 👥 4. Mapeamento de Rostos, Objetos e Desambiguação Rápida
 
 O CapIAu-Talho conta com uma interface completa de decupagem visual para
@@ -344,7 +371,134 @@ vinculadas aos clipes de vídeo (V1, V2\...).
   - **Seleção Múltipla & Exclusão em Lote:** Segure **Shift + Clique** sobre múltiplos marcadores para selecioná-los (destacados com uma borda brilhante branca). Pressione a tecla **Delete** (ou **Backspace**) para excluir todos os marcadores selecionados de uma só vez.
   - **Navegação Rápida entre Marcadores:** Pressione **Shift + M** para saltar para o próximo marcador ou **Alt + M** para retroceder ao marcador anterior.
 
-## 🔄 6. Carrossel de Alternativas da IA (Atalho A)
+## 🎚️ 6. Tratamento de Áudio: Diagnóstico, Presets e Comparação A/B
+
+Editar vídeo e editar áudio são ofícios diferentes. Esta seção existe para você
+não precisar do segundo: o programa **mede** o áudio do clipe e diz o que fazer,
+em vez de esperar que você reconheça o problema de ouvido.
+
+### A. As duas naturezas de ajuste (entenda antes de mexer)
+
+O painel **Ajustes** separa duas coisas que se comportam de formas opostas:
+
+- **Ao vivo** — Equalizador e Dinâmica. Muda na hora, enquanto o clipe toca, e
+  você desfaz quando quiser. **Não gera arquivo nenhum.** É o lugar de
+  experimentar.
+- **Renderizado** — a seção Tratamento. Gera um arquivo novo, demora, e entra
+  numa fila. O arquivo derivado fica em
+  `data/audio_tratado/{id_do_video}/{hash}.wav`; o nome é um código de 64
+  caracteres porque é ele que evita reprocessar quando você reaplica a mesma
+  receita. **O seu arquivo original nunca é tocado** — o clipe só passa a
+  apontar para o tratado.
+
+### B. Passo 1: diagnosticar
+
+1. Clique num clipe de áudio na timeline (ou num vídeo com áudio vinculado).
+2. Na seção **Diagnóstico de Áudio**, clique em **Analisar**. Leva ~3 segundos
+   num clipe de um minuto.
+3. Leia as cinco linhas. Cada uma vem com um selo: **verde** está bom, **âmbar**
+   pede atenção, **vermelho** é problema sério.
+
+| Linha | O que quer dizer | Quando incomoda |
+|---|---|---|
+| Loudness | volume médio do trecho | longe do alvo −16 LUFS, o clipe soa mais alto ou mais baixo que os vizinhos |
+| Pico real | o instante mais alto | acima de 0 dBTP é distorção; baixar o volume depois não desfaz |
+| Clipping | fração de amostras no talo | quase nunca acende neste acervo; confie no Pico real |
+| Ruído | som de fundo entre as falas | acima de −35 dB o chiado aparece na montagem |
+| Dinâmica | diferença entre o alto e o baixo | LRA abaixo de 5 já está esmagado: **não comprima de novo** |
+
+4. Se houver o ícone **(i)** ao lado de uma linha, clique nele: abre uma
+   explicação detalhada com um bloco **Na prática** dizendo o que fazer.
+5. Ao final aparece a **sugestão de preset**. Ela sai da medição, não de chute.
+
+### C. Passo 2: ver *onde* está o problema
+
+Depois de analisar, o clipe ganha uma **faixa fina na base** com marcas
+vermelhas onde o som estourou, e a seção lista os **piores momentos com
+timecode**. Clicar num momento leva o playhead até lá para você ouvir.
+
+> Quando o material estoura de ponta a ponta — captação ruim de verdade — a
+> faixa é quem informa; a lista fica cheia demais para servir. Em material com
+> estouro ocasional (uma pancada, uma risada), a lista é o atalho.
+
+### D. Passo 3: escolher o preset
+
+| Preset | Para quê | Espera (entrevista de 22 min) |
+|---|---|---|
+| **Só entrega** | áudio já limpo, só falta o volume certo | ~43 s |
+| **Resgate de captação estourada** | o caso comum: distorcido e barulhento | ~43 s |
+| **Ambiência preservada** | rua, feira, som direto — limpar sem matar o ambiente | ~43 s |
+| **Prévia rápida** | só normalizar para ouvir | ~43 s |
+| **Resgate com IA (lento)** | quando o filtro clássico deixou artefato | **~16 min** |
+| **Voz limpa com IA (lento)** | boa captação em que só o chiado incomoda | **~16 min** |
+
+Os dois de IA usam uma rede neural rodando no seu computador. Limpam bem melhor
+— o piso de ruído desce cerca de 13 dB a mais — mas são **cerca de 45 vezes mais
+lentos** que os outros. Precisam de instalação (veja o README) e o programa avisa
+se faltar.
+
+### E. Passo 4: prever antes de comprometer
+
+**Sempre clique em "Prever 15 s" primeiro.** Ele trata só 15 segundos a partir
+do ponto de entrada do clipe:
+
+- com preset clássico, responde em cerca de 1 segundo;
+- com preset de IA, em cerca de 10 segundos — contra os 16 minutos do clipe
+  inteiro.
+
+Ouça o A/B (**Tratado** × **Original**) e só então decida. É a diferença entre
+descobrir em 10 segundos que a receita não serve, ou em 16 minutos.
+
+### F. Passo 5: aplicar, comparar e descartar
+
+1. Clique em **Aplicar**. O tratamento entra numa fila e o painel mostra o
+   progresso; você continua montando.
+2. Quando ficar pronto, a seção **Resultado** mostra os números de antes e
+   depois lado a lado, e o caminho do arquivo gerado.
+3. Alterne **Tratado** × **Original** para comparar de ouvido.
+4. **Descartar** remove o tratamento do clipe. O arquivo continua no disco — se
+   você reaplicar a mesma receita, ele volta instantaneamente, sem reprocessar.
+
+### G. Ajustes ao vivo (Equalizador e Dinâmica)
+
+Estes você mexe **durante a reprodução** e ouve na hora:
+
+- **Corte de graves (HPF)** — 80 Hz elimina ruído de mesa, vento e pisada sem
+  tocar na voz. É o primeiro a tentar.
+- **Graves / Médios / Agudos** — correção de timbre.
+- **Gate** — silencia o fundo quando ninguém fala.
+- **Compressor** e **ganho de compensação** — emparelham os picos da fala.
+
+Cada seção tem o olho (**bypass**, para comparar com e sem) e a seta
+(**reset**). Os valores ficam salvos no clipe e vão junto na exportação — mas
+como EQ e compressor **não atravessam FCPXML nem EDL**, eles são declarados num
+arquivo `.txt` gerado ao lado do export, para o mixador reproduzir na DAW.
+
+### H. Se você tem conta no Auphonic (nuvem)
+
+Com a chave configurada em **Configurações › Modelos & Chaves**, o motor
+**Auphonic** fica disponível. Ele faz o que o processamento local não faz:
+remoção de reverberação, realce automático de voz e limpeza preservando a
+ambiência.
+
+O plano gratuito são **2 horas por mês**. O painel mostra quanto resta e avisa
+quando está acabando. Duas proteções: sem cota suficiente o programa recusa
+**antes** de enviar qualquer coisa, e a prévia de 15 s nunca vai para a nuvem —
+gastaria cota para responder o que o motor local responde de graça.
+
+> **Conta prática:** não mande a entrevista bruta. Mande o trecho que entra no
+> filme. Com o aproveitamento típico de um documentário, as suas horas de bruto
+> viram menos de uma hora de material usado — cabe no mês com folga.
+
+Em **Ajustes da nuvem** você vê o que a medição decidiu campo a campo e pode
+discordar de qualquer um. Só o que você alterar vai como manual; o resto
+continua automático. Uma coisa não é negociável nem ali: **corte automático de
+silêncio e de hesitação fica sempre desligado** — documentário não corta
+sozinho.
+
+---
+
+## 🔄 7. Carrossel de Alternativas da IA (Atalho A)
 
 Sempre que a IA propuser e inserir um vídeo na timeline, ela indexará
 trechos alternativos parecidos do acervo. Isso permite que você
@@ -373,7 +527,7 @@ substitua clipes de forma extremamente dinâmica:
 4.  **Desfazer:** Todas as trocas são salvas no histórico local e podem
     ser revertidas com Ctrl+Z.
 
-## 🎬 7. Salvando, Auto-Salvamento & Logs com IA
+## 🎬 8. Salvando, Auto-Salvamento & Logs com IA
 
 ### A. Auto-Salvamento Automático
 
@@ -463,7 +617,7 @@ queira gerar relatórios de forma assistida:
       logs formatados para área de transferência ou limpar o histórico
       atual.
 
-## 🎛️ 8. Layout e Organização Avançada
+## 🎛️ 9. Layout e Organização Avançada
 
 ### 📺 Inspetor de Mídia Integrado (Atalho A na Biblioteca)
 
@@ -570,7 +724,7 @@ controles intuitivos rápidos:
       imagem como still (duração padrão de 5s) na timeline no ponto da
       agulha.
 
-## ⚙️ 9. Configurações da Sequência, Auto-Configuração e Zoom do Preview
+## ⚙️ 10. Configurações da Sequência, Auto-Configuração e Zoom do Preview
 
 ### A. Auto-Configuração Inteligente da Timeline
 Para agilizar o início do trabalho e garantir a consistência técnica, o CapIAu-Talho conta com um sistema de **auto-configuração automática no primeiro clipe**.
@@ -595,7 +749,7 @@ No painel do Program Player, ao lado do seletor de resolução, há um seletor d
 
 ---
 
-## 📐 10. Viewport Estável, Alças de Transformação e Recorte (Crop)
+## 📐 11. Viewport Estável, Alças de Transformação e Recorte (Crop)
 
 ### A. Viewport Estável e Máscara de Transbordo
 A área de visualização da montagem no Program Player agora funciona dentro de um **Viewport Estável** (`#program-player-viewport`):
@@ -629,7 +783,7 @@ Para agilizar o fluxo de edição sem a necessidade de digitar valores numérico
 
 ---
 
-## 🤖 11. Resiliência de IA, Seleção de Modelos e Gestão de Tarefas
+## 🤖 12. Resiliência de IA, Seleção de Modelos e Gestão de Tarefas
 
 ### A. Seleção e Fallback Automático de Modelos de Visão
 No painel de Configurações de IA, você pode definir o modelo de visão utilizado para decodificar e descrever os frames do acervo:
@@ -645,7 +799,7 @@ No painel de monitoramento de tarefas e status da mídia:
 
 ---
 
-## 🖥️ 12. Execução Resiliente sem Janela de Console no Windows
+## 🖥️ 13. Execução Resiliente sem Janela de Console no Windows
 
 Para evitar que o servidor FastAPI ou os workers de background sejam encerrados por acidentes no Windows (como ao fechar a janela do prompt de comando, o que envia um sinal `CTRL_CLOSE_EVENT` que interrompe o runtime Fortran/MKL do PyTorch):
 
@@ -658,7 +812,7 @@ Para evitar que o servidor FastAPI ou os workers de background sejam encerrados 
 
 ---
 
-## ⚡ 13. Configurações de Hardware, Aceleração por GPU e Fallback Automático
+## ⚡ 14. Configurações de Hardware, Aceleração por GPU e Fallback Automático
 
 O CapIAu-Talho inclui uma aba dedicada de **Hardware & GPU** no Painel de Configurações (ícone de engrenagem no cabeçalho), permitindo extrair o máximo de desempenho da sua placa gráfica (Intel QuickSync, AMD Radeon, Nvidia) enquanto protege o computador contra travamentos com **fallback automático para CPU**.
 
@@ -692,7 +846,7 @@ Ao lado de cada configuração no painel, passe o mouse sobre o ícone **ⓘ** p
 
 ---
 
-## 🎹 14. Mapa de Atalhos de Teclado NLE
+## 🎹 15. Mapa de Atalhos de Teclado NLE
 
 Para máxima agilidade na ilha de edição, utilize os atalhos de teclado profissionais suportados nativamente pelo CapIAu-Talho:
 

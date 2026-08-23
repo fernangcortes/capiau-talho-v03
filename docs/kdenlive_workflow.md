@@ -96,3 +96,55 @@ de extensões do próprio OTIO (metadados por clipe), não de um formato de saí
 - Se os caminhos de mídias diferirem de máquina para máquina, o Kdenlive
   possui um gerenciador interativo de relink de arquivos em Projeto \>
   Localizar Clipes Desconectados.
+
+## 5. Áudio Tratado na Conformação (WAV Derivado) e a Ponte com a DAW
+
+Desde o plano de ajustes de áudio existe áudio **renderizado**: reparo de clipping, denoise,
+loudness e limitador produzem um WAV derivado em `data/audio_tratado/` e o clipe passa a guardar
+um ponteiro para ele. Na hora de exportar, isso muda a conformação de três maneiras — todas
+automáticas, sem passo manual no editor. O arquivo original **nunca é tocado**.
+
+### O clipe entra já com o áudio tratado
+
+Se o clipe tem tratamento pronto (`audio_render` com `status: ready`) e o WAV existe no disco,
+o export troca sozinho a referência de mídia para o WAV tratado. Como esse arquivo contém
+**apenas o trecho** `[in, out]` da fonte e **começa em zero**, os dois ranges vão zerados, com a
+duração do corte — manter o `in` antigo apontando para o arquivo curto joga o áudio fora de
+sincronia no Resolve. Vale para `.otio`, `.xml` e `.edl`.
+
+### Referência quebrada NÃO troca
+
+Se o clipe declara tratamento pronto mas o WAV sumiu do disco, o export mantém o original e
+grava o motivo no metadado `capiau` do clipe (`audio_tratado_motivo`, ex.: `ref de audio tratado
+nao encontrada no disco`; visível no `.otio`). Conformar apontando para arquivo inexistente seria
+pior do que não tratar: a conformação nunca fica quebrada por causa de um ponteiro órfão.
+
+> ⚠️ Se você mover ou apagar WAVs em `data/audio_tratado/`, os exports novos voltam a apontar
+> para o original silenciosamente (com o motivo anotado). Regenerar o tratamento recria o
+> caminho, e o próximo export volta a usá-lo.
+
+### Os efeitos "ao vivo" viajam como .txt, não dentro do arquivo
+
+EQ, gate e compressor são ajustes de tempo real no navegador e **não atravessam FCPXML nem EDL**
+(nem o OTIO). Fingir que atravessam seria pior do que declarar: junto de todo export cuja
+timeline tenha esses efeitos nasce um **`<nome>_efeitos_audio.txt`** na mesma pasta
+(`timeline_3.otio` → `timeline_3_efeitos_audio.txt`), listando clipe por clipe, com timecode de
+origem, posição na timeline e TODOS os parâmetros, nesta ordem, para reproduzir à mão na DAW.
+Efeitos desligados aparecem marcados como BYPASSADOS — omitir seria mentir sobre o estado.
+
+### A ida e volta pela pasta observada `watch/audio_daw/`
+
+Para levar o material cru à DAW, exporte os **stems**: um WAV 48 kHz / 24 bits **sem tratamento
+nenhum** por intervalo único, com o timecode carregado no nome —
+
+    stem_v<video_id>_<in_ms:09d>-<out_ms:09d>.wav   (ex.: stem_v17_000405500-000415500.wav)
+
+Os milissegundos são os pontos `in`/`out` **na mídia de origem** (não na timeline), e é esse nome
+que permite o retorno automático: trate o stem na sua DAW e solte o arquivo de volta na pasta
+observada `watch/audio_daw/` (config `audio.daw.pasta_retorno`) **com o mesmo nome-base**. O
+watcher reconhece o trio `(video_id, in, out)` e o clipe ganha o tratamento — que, a partir daí,
+sai dentro da conformação como descrito acima.
+
+> ⚠️ Não renomeie o arquivo devolvido: sem a convenção de nome, o retorno é ignorado.
+> Hospedagem de VST dentro do CapIAu-Talho não foi implementada (bug conhecido de crash, licença
+> ausente) — a mixagem fina continua sendo trabalho da DAW.

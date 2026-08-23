@@ -34,6 +34,13 @@ recomendadas para o uso do sistema em produção:
   de API a cada 6 meses ou imediatamente caso suspeite de vazamento de
   logs.
 
+- **A Chave do Auphonic Tem Casa Própria (*secret*):** A chave da nuvem
+  de áudio não vive no `.env`: ela é cadastrada em **Configurações \>
+  Modelos & Chaves** (chave `api.auphonic_key`, tipo *secret*, com
+  fallback na variável de ambiente `AUPHONIC_API_KEY`). Sendo *secret*,
+  aparece sempre mascarada no painel e o valor real nunca volta ao
+  cliente.
+
 ## 2. Estratégias de Economia e Custo-Benefício
 
 O CapIAu-Talho foi desenhado para processar 20 horas de vídeo por
@@ -97,6 +104,39 @@ máxima, siga as regras abaixo:
   o botão "Encontrar Similares" à vontade — o único custo é o
   processamento local de indexação (feito uma vez, durante a análise de
   visão).
+
+### ☁️ Tratamento de Áudio na Nuvem com Cota Fixa (Auphonic)
+
+- **O limite é conhecido: 2 h/mês, gratuitas e recorrentes.** O plano
+  free do Auphonic renova todo mês e a cota restante fica visível no
+  painel de tratamento (rota `/api/audio/nuvem/cota`).
+
+- **A economia nº 1: não se manda entrevista bruta para a nuvem.** Manda-se
+  o trecho selecionado. Com ~20% de aproveitamento típico, 3,5 h de bruto
+  viram ~45 min de material usado — o que cabe num mês inteiro de cota.
+
+- **Guardas contra gasto acidental:** sem chave configurada ou sem cota
+  suficiente para o trecho, a rota recusa **antes de tocar na rede** (a
+  leitura de cota é local, num JSON em `data/audio_cloud/` — nenhuma
+  requisição acontece na guarda). A prévia de 15 s na nuvem é recusada de
+  propósito: gastaria cota para responder o que o motor local responde de
+  graça. E o submit nunca é repetido automaticamente: o identificador da
+  produção fica gravado no banco e uma retomada (morte do worker, Ctrl+C)
+  reacompanha a produção existente — reenviar cobraria a cota duas vezes.
+
+### 🔊 O Custo de CPU e Disco do Tratamento Local
+
+- **CPU:** o denoise por IA local (DPDFNet) roda na CPU com RTF 0,71 —
+  uma entrevista de 22 min leva ~15 min de máquina, contra ~43 s da cadeia
+  clássica de ffmpeg (~45x mais lento). Use o botão "Prever 15 s" para
+  decidir antes de comprometer o clipe inteiro. O preço compra algo: o
+  piso de ruído desce ~13 dB mais fundo que o filtro clássico.
+
+- **Disco:** cada WAV tratado (48 kHz, 24 bits) ocupa ~360 MB por
+  entrevista de 22 min em `data/audio_tratado/`. O cache por hash da
+  cadeia evita reprocessar, mas não devolve espaço: se o disco apertar,
+  apague os WAVs das cadeias que abandonou — o original nunca é tocado e
+  o mesmo pedido recria o arquivo sob demanda.
 
 ### 📊 Limite de Custos e Alertas
 
