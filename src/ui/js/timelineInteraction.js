@@ -3,22 +3,22 @@ import { STATE } from "./state.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds, framesToTimecode, evaluateFadeCurve, FADE_CURVE_PRESETS } from "./timelineState.js";
 import { setTabVisibility } from "./tabsCustomization.js";
 
-// Velocidades de render MEDIDAS nesta máquina (NÃO estimadas), do benchmark da
-// casa com 22 min (= 1320 s) de áudio de entrevista:
-//   - cadeia ffmpeg .... 31 a 44x tempo real (22 min de áudio → ~30 s de render)
-//   - denoise por IA ... par medido 22 min de áudio → ~11 min de worker
-// A IA é ordem de grandeza DEZENAS de vezes mais lenta que a cadeia ffmpeg
-// (relatos pontuais de RTF variam — 0,7x/0,82 — mas nenhum se aproxima do
-// ffmpeg; adotamos o par medido do benchmark, que é o que o usuário vê na
-// parede). A estimativa usa o PISO da faixa ffmpeg para nunca prometer pressa.
+// Velocidades de render MEDIDAS nesta máquina (NÃO estimadas):
+//   - cadeia ffmpeg .... 31 a 44x tempo real (22 min de áudio → ~43 s de render)
+//   - denoise por IA ... RTF 0,71 (15,0 s de áudio em 10,7 s no worker)
+// A IA é cerca de 45 vezes mais lenta que a cadeia ffmpeg: uma entrevista de
+// 22 min sai em ~43 s pelo ffmpeg e leva ~16 min pela IA.
+// O par "22 min → 11 min" que circulou antes misturava DUAS entrevistas
+// diferentes (os 11 min eram de uma de 16 min) e subestimava a espera em ~30%.
+// A estimativa usa o PISO da faixa ffmpeg para nunca prometer pressa.
 // Espelho do custo documentado em PRESETS_CADEIA (src/media/audio_chain.py).
 const VELOCIDADE_RENDER_FFMPEG_X_TEMPO_REAL = 31;    // medido: faixa 31–44x tempo real; piso conservador
-// Medido em 23/08/2026 nesta máquina: 20,0 s de áudio processados em 13,6 s de
-// worker, ou seja RTF 0,68 -> o áudio sai a 1/0,68 = 1,47x o tempo real.
-// (Uma entrevista de 16 min leva ~11 min; uma de 22 min, ~15 min. O par
-// "22 min -> 11 min" que circulou antes misturava duas entrevistas diferentes e
-// subestimava a espera em cerca de 30%.)
-const VELOCIDADE_RENDER_DENOISE_IA_X_TEMPO_REAL = 1.47;
+// Medido em 23/08/2026 nesta máquina, no caminho ponta a ponta do worker:
+// 15,0 s de áudio em 10,7 s, ou seja RTF 0,71 -> o áudio sai a 1/0,71 = 1,41x
+// o tempo real. Mesmo valor do default de audio.denoise.rtf_medido, para a
+// estimativa da interface e a das configurações não divergirem.
+// (Entrevista de 16 min leva ~11 min; a de 22 min, ~16 min.)
+const VELOCIDADE_RENDER_DENOISE_IA_X_TEMPO_REAL = 1.41;
 
 export class CapiauTimelineInteraction {
     constructor(renderer) {

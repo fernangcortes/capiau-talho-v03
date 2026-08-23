@@ -850,10 +850,10 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
     {
-        "key": "audio.denoise.rtf_medido", "type": "float", "default": 0.82, "min": 0.1, "max": 5.0, "step": 0.01,
+        "key": "audio.denoise.rtf_medido", "type": "float", "default": 0.71, "min": 0.1, "max": 5.0, "step": 0.01,
         "label": "Denoise IA: velocidade medida do motor",
-        "help": "Número usado só para estimar, antes de processar, quanto tempo a limpeza vai levar. Com o valor medido nesta máquina (0,82), a limpeza demora cerca de 20% a mais que a duração do áudio: um clipe de 10 minutos fica pronto em uns 12. Se trocar de computador, meça de novo e atualize aqui para a estimativa continuar honesta.",
-        "help_tech": "RTF medido nesta máquina (tempo de processo / duração): 0,82 => ~1,2x tempo real; alimenta a estimativa de tempo da UI (Etapa 4). Não afeta o áudio processado.",
+        "help": "Número usado só para estimar, antes de processar, quanto tempo a limpeza vai levar. Medido nesta máquina em 23/08/2026: 0,71, ou seja a limpeza leva cerca de 70% da duração do áudio — uma entrevista de 22 minutos fica pronta em uns 16. Se trocar de computador, meça de novo e atualize aqui para a estimativa continuar honesta.",
+        "help_tech": "RTF medido nesta máquina (tempo de processo / duração): 0,71 no caminho ponta a ponta do worker (15,0 s de áudio em 10,7 s) e 0,68 na chamada direta. O 0,82 que constava antes vinha da tabela do plano e nunca foi medido aqui. Alimenta a estimativa de tempo da UI; não afeta o áudio processado.",
         "category": "audio", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
