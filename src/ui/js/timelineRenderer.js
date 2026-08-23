@@ -1,7 +1,7 @@
 // Renderizador de Alta Performance via Canvas (CapIAu-Talho)
 // v2: Multipista dinâmica com pista de IA, scroll vertical e cores por pista.
 import { STATE } from "./state.js";
-import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode } from "./timelineState.js";
+import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode, evaluateFadeCurve } from "./timelineState.js";
 
 // Paleta rotativa para pistas de vídeo adicionais
 const TRACK_PALETTE = [
@@ -25,6 +25,44 @@ const AUDIO_TRACK_STYLE = {
     border: "rgba(16, 185, 129, 0.6)",
     wave: "rgba(110, 231, 183, 0.55)"
 };
+
+// ── Diagnóstico de áudio (faixa fina na base do clipe) ──────────────────────
+// Rampa de cor do envelope: abaixo deste piso em dBFS o balde fica transparente
+// e esquenta até vermelho pleno em 0 dBFS. O teto_dbtp padrão é -1.5, então a
+// zona "quase/estouro" (> -1.5) já aparece bem quente na tira.
+const AUDIO_DIAG_PISO_DB = -12.0;
+const AUDIO_DIAG_ALPHA_MAX = 0.7;
+// Clipe mais estreito que isto na tela não ganha tira (não faria sentido ler).
+const AUDIO_DIAG_LARGURA_MIN_PX = 24;
+
+/**
+ * Fração [0..1] de um instante t (segundos ABSOLUTOS da fonte) dentro do trecho
+ * [inS, outS] exibido pelo clipe. Retorna null quando t está fora do trecho ou o
+ * trecho é inválido — nesses casos nada é desenhado.
+ */
+export function fracaoNoTrecho(t, inS, outS) {
+    const span = outS - inS;
+    if (!Number.isFinite(t) || !Number.isFinite(inS) || !Number.isFinite(outS) || span <= 0) return null;
+    if (t < inS || t > outS) return null;
+    return (t - inS) / span;
+}
+
+/**
+ * Janela horizontal de um balde [t0, t1] como frações do clipe, com clamp nas
+ * bordas (baldes que transpõem in/out entram parcialmente). Baldes totalmente
+ * fora do trecho voltam null — descarte cedo sem tocar no canvas.
+ */
+export function janelaBalde(t0, t1, inS, outS) {
+    const span = outS - inS;
+    if (!Number.isFinite(t0) || !Number.isFinite(t1) || !Number.isFinite(inS) || !Number.isFinite(outS) || span <= 0) return null;
+    const u0 = (t0 - inS) / span;
+    const u1 = (t1 - inS) / span;
+    if (u1 <= 0 || u0 >= 1) return null; // inteiramente antes/depois do trecho
+    return {
+        u0: Math.min(Math.max(u0, 0), 1),
+        u1: Math.min(Math.max(u1, 0), 1)
+    };
+}
 
 export class CapiauTimelineRenderer {
     constructor() {
@@ -59,6 +97,7 @@ export class CapiauTimelineRenderer {
         };
 
         this.isDirty = true; // Flag para solicitar redesenho reativo
+        this.audioDiagCount = -1; // Contagem de análises publicadas em STATE.audioDiag (-1 força 1º redraw)
         this.photoThumbCache = {}; // Cache de miniaturas (Image) de fotos por id
         this.videoThumbCache = {}; // Cache de miniaturas de vídeo: key "video_id_time" -> { img: Image, loaded: boolean, timestamp: float }
         this.init();
@@ -219,6 +258,14 @@ export class CapiauTimelineRenderer {
      * Render loop reativo baseado em requestAnimationFrame.
      */
     renderLoop() {
+        // O diagnóstico é publicado por chave DENTRO do mesmo objeto STATE.audioDiag
+        // (contrato D3), sem evento dedicado: comparar só a contagem de entradas é
+        // barato e pede um redesenho quando uma análise nova chega.
+        const diagCount = STATE.audioDiag ? Object.keys(STATE.audioDiag).length : 0;
+        if (diagCount !== this.audioDiagCount) {
+            this.audioDiagCount = diagCount;
+            this.isDirty = true;
+        }
         if (this.isDirty) {
             this.draw();
             this.isDirty = false;
@@ -642,7 +689,10 @@ export class CapiauTimelineRenderer {
 
             // Waveform apenas nos clipes das pistas de áudio (fotos não têm áudio)
             if (laneKind === "audio") {
-                this.drawWaveform(cut, startX, clipY, width, clipHeight, style.wave);
+                this.drawWaveform(cut, startX, clipY, width, clipHeight, style.wave, lane.track);
+                // Faixa de diagnóstico de áudio: só desenha algo depois que o
+                // usuário analisou este clipe (entrada publicada em STATE.audioDiag).
+                this.drawAudioDiagStrip(ctx, cut, startX, clipY, width, clipHeight);
             }
 
             // Rótulo do clipe
@@ -654,7 +704,12 @@ export class CapiauTimelineRenderer {
             } else {
                 const name = video ? (video.title || video.filename) : `Vídeo ${cut.video_id}`;
                 const prefix = laneKind === "audio" ? (cut.link_id ? "♪⇅" : "♪") : "#";
-                label = `${prefix} ${name} [${framesToTimecode(cut.inFrame, TIMELINE_STATE.fps).substring(6)} -> ${framesToTimecode(cut.outFrame, TIMELINE_STATE.fps).substring(6)}]`;
+                const fps = TIMELINE_STATE.fps || 24;
+                const maxFrame = Math.max(cut.inFrame || 0, cut.outFrame || 0);
+                const forceHours = maxFrame >= 3600 * fps;
+                const inTc = formatRulerTimecode(cut.inFrame || 0, fps, true, forceHours);
+                const outTc = formatRulerTimecode(cut.outFrame || 0, fps, true, forceHours);
+                label = `${prefix} ${name} [${inTc} → ${outTc}]`;
             }
 
             ctx.save();
@@ -666,6 +721,9 @@ export class CapiauTimelineRenderer {
             ctx.font = "bold 10px Inter, sans-serif";
             ctx.fillText(label, startX + 8, clipY + 14);
             ctx.restore();
+
+            // Desenho dos Fades In / Out, curvas e manipuladores
+            this.drawClipFades(cut, startX, clipY, width, clipHeight, laneKind);
         });
     }
 
@@ -762,23 +820,106 @@ export class CapiauTimelineRenderer {
     }
 
     /**
-     * Desenha waveforms de áudio realistas dentro dos clipes de fala.
+     * Calcula o fator de ganho efetivo para o desenho da waveform do clipe de áudio.
+     * Considera:
+     * 1. Volume e mute da trilha (lane.track ou TIMELINE_STATE.getTrack)
+     * 2. Volume do clipe ({ type: "volume", level, disabled })
+     * 3. Ganho de maquiagem da dinâmica ({ type: "audio_dynamics", makeup_db, disabled })
+     * 4. Tratamento de áudio ({ type: "audio_render", status: "ready", analysis_before, analysis_after, disabled }) quando em modo tratado
      */
-    drawWaveform(cut, startX, clipY, width, clipHeight, waveColor) {
+    getClipEffectiveAudioGain(cut, track) {
+        if (!track && typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.getTrack === "function") {
+            track = TIMELINE_STATE.getTrack(cut.track);
+        }
+
+        // 1. Mute ou volume da trilha
+        if (track) {
+            if (track.muted === true) {
+                return 0;
+            }
+            if (track.hidden === true && typeof TIMELINE_STATE !== "undefined" && TIMELINE_STATE.muteHiddenTracksPlayback) {
+                return 0;
+            }
+        }
+        const trackVol = (track && typeof track.volume === "number" && !isNaN(track.volume)) ? track.volume : 1.0;
+
+        // 2. Volume do clipe
+        const effects = Array.isArray(cut.effects) ? cut.effects : [];
+        const volEff = effects.find(e => e && e.type === "volume");
+        let clipVol = 1.0;
+        if (volEff && volEff.disabled !== true) {
+            clipVol = (typeof volEff.level === "number" && !isNaN(volEff.level)) ? volEff.level : 1.0;
+        }
+
+        // 3. Ganho da dinâmica (makeup_db)
+        const dynEff = effects.find(e => e && e.type === "audio_dynamics");
+        let dynGain = 1.0;
+        if (dynEff && dynEff.disabled !== true && typeof dynEff.makeup_db === "number" && !isNaN(dynEff.makeup_db) && dynEff.makeup_db !== 0) {
+            dynGain = Math.pow(10, dynEff.makeup_db / 20);
+        }
+
+        // 4. Tratamento de áudio (audio_render) se estiver ativo e conectado como tratado
+        let renderGain = 1.0;
+        const renderEff = effects.find(e => e && e.type === "audio_render");
+        if (renderEff && renderEff.status === "ready" && renderEff.disabled !== true) {
+            const pp = (typeof window !== "undefined" && window.player && window.player.programPlayer) ? window.player.programPlayer : null;
+            const usandoTratado = pp && typeof pp.fonteAudioTratadaAtual === "function" ? !!pp.fonteAudioTratadaAtual(cut.id) : true;
+            if (usandoTratado && renderEff.analysis_before && renderEff.analysis_after) {
+                const lufsBefore = Number(renderEff.analysis_before.lufs);
+                const lufsAfter = Number(renderEff.analysis_after.lufs);
+                if (Number.isFinite(lufsBefore) && Number.isFinite(lufsAfter)) {
+                    const deltaLufs = lufsAfter - lufsBefore;
+                    const clampedDelta = Math.max(-30, Math.min(30, deltaLufs));
+                    renderGain = Math.pow(10, clampedDelta / 20);
+                }
+            }
+        }
+
+        const totalGain = trackVol * clipVol * dynGain * renderGain;
+        return (typeof totalGain === "number" && !isNaN(totalGain)) ? Math.max(0, totalGain) : 1.0;
+    }
+
+    /**
+     * Desenha waveforms de áudio realistas dentro dos clipes de fala,
+     * adaptando a amplitude ao volume efetivo e indicando saturação/clipping sutilmente.
+     */
+    drawWaveform(cut, startX, clipY, width, clipHeight, waveColor, track) {
         const ctx = this.ctx;
-        ctx.strokeStyle = waveColor || "rgba(6, 182, 212, 0.4)";
-        ctx.lineWidth = 1.2;
+        const totalGain = this.getClipEffectiveAudioGain(cut, track);
 
         const centerY = clipY + clipHeight / 2;
-        const maxAmplitude = (clipHeight - 20) / 2;
+        const maxAmplitude = (clipHeight - 16) / 2; // Margem para respeitar bordas do clipe e rótulos
         if (maxAmplitude <= 2) return;
+
+        // Se o volume estiver mutado / zerado (silêncio total)
+        if (totalGain <= 0.001) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+            ctx.lineWidth = 1;
+            ctx.moveTo(startX + 2, centerY);
+            ctx.lineTo(startX + width - 2, centerY);
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
+
+        // Fades de áudio configurados no clipe
+        const fps = TIMELINE_STATE.fps || 24;
+        const durFrames = cut.outFrame - cut.inFrame;
+        const clipDurS = durFrames / fps;
+        const effects = cut.effects || [];
+        const fadeInEff = effects.find(e => e.type === "crossfade" && e.side === "in" && !e.disabled);
+        const fadeOutEff = effects.find(e => e.type === "crossfade" && e.side === "out" && !e.disabled);
+        const fadeInDur = fadeInEff ? Math.min(clipDurS, Math.max(0, fadeInEff.duration_s || 0)) : 0;
+        const fadeOutDur = fadeOutEff ? Math.min(clipDurS - fadeInDur, Math.max(0, fadeOutEff.duration_s || 0)) : 0;
 
         // Se o vídeo não possui waveform_data real, gera picos estáveis determinísticos baseados no id
         let peaks = [];
         const numPoints = Math.max(10, Math.floor(width / 3)); // 1 ponto a cada 3px
 
         // Simulação pseudo-aleatória estável baseada no ID do clipe
-        const seed = cut.video_id * 100 + cut.inFrame;
+        const seed = (cut.video_id || 0) * 100 + (cut.inFrame || 0);
         const random = (s) => {
             const x = Math.sin(s) * 10000;
             return x - Math.floor(x);
@@ -792,14 +933,337 @@ export class CapiauTimelineRenderer {
             peaks.push(val);
         }
 
+        const clippingPoints = [];
+
+        ctx.save();
         ctx.beginPath();
+        ctx.strokeStyle = waveColor || "rgba(6, 182, 212, 0.4)";
+        ctx.lineWidth = 1.2;
+
         for (let i = 0; i < numPoints; i++) {
             const px = startX + (i / numPoints) * width;
-            const amp = peaks[i] * maxAmplitude;
+            const tSample = (i / numPoints) * clipDurS;
+            let fadeGain = 1.0;
+            if (fadeInDur > 0 && tSample < fadeInDur) {
+                const p = tSample / fadeInDur;
+                fadeGain = Math.min(fadeGain, evaluateFadeCurve(p, fadeInEff.curve || "linear", fadeInEff.tension || 0));
+            }
+            if (fadeOutDur > 0 && (clipDurS - tSample) < fadeOutDur) {
+                const p = (clipDurS - tSample) / fadeOutDur;
+                fadeGain = Math.min(fadeGain, evaluateFadeCurve(p, fadeOutEff.curve || "linear", fadeOutEff.tension || 0));
+            }
+
+            const sampleGain = totalGain * fadeGain;
+            const rawAmp = peaks[i] * maxAmplitude * sampleGain;
+            const isClipped = rawAmp >= maxAmplitude;
+            const amp = Math.min(rawAmp, maxAmplitude);
+
             ctx.moveTo(px, centerY - amp);
             ctx.lineTo(px, centerY + amp);
+
+            if (isClipped) {
+                clippingPoints.push({ px, yTop: centerY - maxAmplitude, yBottom: centerY + maxAmplitude });
+            }
         }
         ctx.stroke();
+
+        // Destaque sutil de saturação (clipping) nos pontos onde estourou
+        if (clippingPoints.length > 0) {
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(244, 63, 94, 0.85)";
+            ctx.lineWidth = 1.6;
+            for (const pt of clippingPoints) {
+                // Pequenos traços horizontais no topo e base marcando o teto saturado
+                ctx.moveTo(pt.px - 1.2, pt.yTop);
+                ctx.lineTo(pt.px + 1.2, pt.yTop);
+                ctx.moveTo(pt.px - 1.2, pt.yBottom);
+                ctx.lineTo(pt.px + 1.2, pt.yBottom);
+            }
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    /**
+     * Desenha a representação gráfica de Fade In e Fade Out (rampas de sombreamento para vídeo/foto,
+     * linhas de ganho/curva para áudio, puxadores nos cantos superiores e pontos de tensão central).
+     */
+    drawClipFades(cut, startX, clipY, width, clipHeight, laneKind) {
+        const ctx = this.ctx;
+        const fps = TIMELINE_STATE.fps || 24;
+        const zoom = TIMELINE_STATE.zoom;
+        const durFrames = cut.outFrame - cut.inFrame;
+        const clipDurS = durFrames / fps;
+        if (clipDurS <= 0 || width <= 4) return;
+
+        const effects = cut.effects || [];
+        const fadeInEff = effects.find(e => e.type === "crossfade" && e.side === "in" && !e.disabled);
+        const fadeOutEff = effects.find(e => e.type === "crossfade" && e.side === "out" && !e.disabled);
+
+        const fadeInDur = fadeInEff ? Math.min(clipDurS, Math.max(0, fadeInEff.duration_s || 0)) : 0;
+        const fadeOutDur = fadeOutEff ? Math.min(clipDurS - fadeInDur, Math.max(0, fadeOutEff.duration_s || 0)) : 0;
+
+        const wIn = Math.min(width, fadeInDur * fps * zoom);
+        const wOut = Math.min(width - wIn, fadeOutDur * fps * zoom);
+
+        const hoveredHandle = TIMELINE_STATE.hoveredFadeHandle;
+        const isClipHovered = hoveredHandle && String(hoveredHandle.clipId) === String(cut.id);
+
+        const isAudio = laneKind === "audio";
+        const accentColor = isAudio ? "rgba(16, 185, 129, 0.9)" : "rgba(6, 182, 212, 0.9)";
+        const lineColor = isAudio ? "rgba(110, 231, 183, 0.85)" : "rgba(255, 255, 255, 0.8)";
+
+        // ── 1. FADE IN ──
+        if (fadeInDur > 0 && wIn > 1) {
+            const curveType = fadeInEff.curve || "linear";
+            const tension = fadeInEff.tension || 0;
+
+            // Para vídeo/foto: sombreamento de opacidade
+            if (!isAudio) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(startX, clipY);
+                const steps = Math.max(8, Math.min(60, Math.floor(wIn / 2)));
+                for (let i = 0; i <= steps; i++) {
+                    const progress = i / steps;
+                    const factor = evaluateFadeCurve(progress, curveType, tension);
+                    const px = startX + progress * wIn;
+                    const py = clipY + (1 - factor) * clipHeight;
+                    ctx.lineTo(px, py);
+                }
+                ctx.lineTo(startX, clipY + clipHeight);
+                ctx.closePath();
+                ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Linha da curva
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 1.5;
+            const steps = Math.max(8, Math.min(60, Math.floor(wIn / 2)));
+            for (let i = 0; i <= steps; i++) {
+                const progress = i / steps;
+                const factor = evaluateFadeCurve(progress, curveType, tension);
+                const px = startX + progress * wIn;
+                const py = clipY + (1 - factor) * (clipHeight - 4) + 2;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+            ctx.restore();
+
+            // Ponto de tensão central (se houver largura suficiente para manipular)
+            if (wIn >= 16) {
+                const factorMid = evaluateFadeCurve(0.5, curveType, tension);
+                const pxMid = startX + 0.5 * wIn;
+                const pyMid = clipY + (1 - factorMid) * (clipHeight - 4) + 2;
+                const isCurveHovered = isClipHovered && hoveredHandle.side === "in" && hoveredHandle.type === "curve";
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(pxMid, pyMid, isCurveHovered ? 4 : 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = isCurveHovered ? "#ffffff" : accentColor;
+                ctx.fill();
+                ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Puxador de duração do Fade In (no topo final da rampa)
+            const isDurHovered = isClipHovered && hoveredHandle.side === "in" && hoveredHandle.type === "duration";
+            ctx.save();
+            ctx.beginPath();
+            ctx.fillStyle = isDurHovered ? "#ffffff" : accentColor;
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+            ctx.lineWidth = 1;
+            const hx = startX + wIn;
+            const hy = clipY;
+            ctx.moveTo(hx, hy);
+            ctx.lineTo(hx - 5, hy);
+            ctx.lineTo(hx, hy + 7);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        } else {
+            // Affordance sutil no canto superior esquerdo (quando não há fade in)
+            const isCornerHovered = isClipHovered && hoveredHandle.side === "in" && hoveredHandle.type === "duration";
+            ctx.save();
+            ctx.beginPath();
+            ctx.fillStyle = isCornerHovered ? "rgba(255, 255, 255, 0.8)" : "rgba(255, 255, 255, 0.22)";
+            ctx.moveTo(startX, clipY);
+            ctx.lineTo(startX + 6, clipY);
+            ctx.lineTo(startX, clipY + 6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // ── 2. FADE OUT ──
+        if (fadeOutDur > 0 && wOut > 1) {
+            const curveType = fadeOutEff.curve || "linear";
+            const tension = fadeOutEff.tension || 0;
+            const startOutX = startX + width - wOut;
+
+            // Para vídeo/foto: sombreamento de opacidade
+            if (!isAudio) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(startOutX, clipY);
+                const steps = Math.max(8, Math.min(60, Math.floor(wOut / 2)));
+                for (let i = 0; i <= steps; i++) {
+                    const progress = i / steps; // 0 no início do fade-out, 1 no fim do clipe
+                    const factor = evaluateFadeCurve(1 - progress, curveType, tension);
+                    const px = startOutX + progress * wOut;
+                    const py = clipY + (1 - factor) * clipHeight;
+                    ctx.lineTo(px, py);
+                }
+                ctx.lineTo(startX + width, clipY);
+                ctx.closePath();
+                ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Linha da curva
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 1.5;
+            const steps = Math.max(8, Math.min(60, Math.floor(wOut / 2)));
+            for (let i = 0; i <= steps; i++) {
+                const progress = i / steps;
+                const factor = evaluateFadeCurve(1 - progress, curveType, tension);
+                const px = startOutX + progress * wOut;
+                const py = clipY + (1 - factor) * (clipHeight - 4) + 2;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+            ctx.restore();
+
+            // Ponto de tensão central
+            if (wOut >= 16) {
+                const factorMid = evaluateFadeCurve(0.5, curveType, tension);
+                const pxMid = startOutX + 0.5 * wOut;
+                const pyMid = clipY + (1 - factorMid) * (clipHeight - 4) + 2;
+                const isCurveHovered = isClipHovered && hoveredHandle.side === "out" && hoveredHandle.type === "curve";
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(pxMid, pyMid, isCurveHovered ? 4 : 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = isCurveHovered ? "#ffffff" : accentColor;
+                ctx.fill();
+                ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Puxador de duração do Fade Out (no topo de início da rampa)
+            const isDurHovered = isClipHovered && hoveredHandle.side === "out" && hoveredHandle.type === "duration";
+            ctx.save();
+            ctx.beginPath();
+            ctx.fillStyle = isDurHovered ? "#ffffff" : accentColor;
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+            ctx.lineWidth = 1;
+            const hx = startOutX;
+            const hy = clipY;
+            ctx.moveTo(hx, hy);
+            ctx.lineTo(hx + 5, hy);
+            ctx.lineTo(hx, hy + 7);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        } else {
+            // Affordance sutil no canto superior direito (quando não há fade out)
+            const isCornerHovered = isClipHovered && hoveredHandle.side === "out" && hoveredHandle.type === "duration";
+            ctx.save();
+            ctx.beginPath();
+            ctx.fillStyle = isCornerHovered ? "rgba(255, 255, 255, 0.8)" : "rgba(255, 255, 255, 0.22)";
+            ctx.moveTo(startX + width, clipY);
+            ctx.lineTo(startX + width - 6, clipY);
+            ctx.lineTo(startX + width, clipY + 6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    /**
+     * Diagnóstico publicado pelo painel de Ajustes para o trecho deste clipe
+     * (chave "video_id|in|out" com 3 casas), ou null se ainda não analisado.
+     */
+    getAudioDiag(cut) {
+        const store = STATE.audioDiag;
+        if (!store) return null;
+        const diag = store[`${cut.video_id}|${Number(cut.in).toFixed(3)}|${Number(cut.out).toFixed(3)}`];
+        if (!diag || !Array.isArray(diag.envelope)) return null;
+        return diag;
+    }
+
+    /**
+     * Faixa fina de diagnóstico na base do clipe de áudio: intensidade por balde
+     * (ftpk_max) do transparente ao vermelho + marcas verticais nos momentos
+     * problemáticos ("estouro" nítida, "quase" discreta). Os tempos vêm em segundos
+     * absolutos da fonte e o trecho exibido vai de cut.in a cut.out esticado na
+     * largura do retângulo — logo, x é proporcional a (t - in) / (out - in).
+     * A waveform ocupa o centro do clipe (±(altura-20)/2), então a margem inferior
+     * fica livre e a tira não compete com ela. Sem diagnóstico: não desenha nada.
+     */
+    drawAudioDiagStrip(ctx, cut, startX, clipY, width, clipHeight) {
+        if (!(width >= AUDIO_DIAG_LARGURA_MIN_PX)) return; // estreito demais na tela
+        const diag = this.getAudioDiag(cut);
+        if (!diag) return; // usuário ainda não analisou este clipe
+        const momentos = Array.isArray(diag.momentos) ? diag.momentos : [];
+        if (!Array.isArray(diag.envelope) || (diag.envelope.length === 0 && momentos.length === 0)) {
+            return; // análise sem quadros/problemáticos: nada a pintar, nem save/clip
+        }
+        const inS = Number(cut.in);
+        const outS = Number(cut.out);
+
+        const stripH = Math.max(3, Math.min(6, Math.floor(clipHeight * 0.14)));
+        const stripY = clipY + clipHeight - stripH - 2;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(startX, clipY, width, clipHeight);
+        ctx.clip(); // nada vaza para fora do bloco do clipe
+
+        // 1) Envelope por balde (<=600 baldes; baldes fora do trecho/viewport são descartados cedo)
+        for (const b of diag.envelope) {
+            const pk = Number(b && b.ftpk_max);
+            if (!Number.isFinite(pk)) continue;
+            const janela = janelaBalde(b.t0, b.t1, inS, outS);
+            if (!janela) continue;
+            const px0 = startX + janela.u0 * width;
+            const px1 = startX + janela.u1 * width;
+            if (px1 < 0 || px0 > this.width) continue; // fora da área visível (zoom/scroll)
+            const intensidade = Math.min(1, Math.max(0, (pk - AUDIO_DIAG_PISO_DB) / -AUDIO_DIAG_PISO_DB));
+            if (intensidade <= 0) continue; // silencioso: permanece transparente
+            ctx.fillStyle = `rgba(239, 68, 68, ${(intensidade * AUDIO_DIAG_ALPHA_MAX).toFixed(3)})`;
+            ctx.fillRect(px0, stripY, Math.max(px1 - px0, 1), stripH);
+        }
+
+        // 2) Marcas verticais dos momentos: "estouro" (grave) nítida em vermelho,
+        // subindo um pouco acima da tira; "quase" (atenção) discreta em âmbar.
+        for (const m of momentos) {
+            const frac = fracaoNoTrecho(m && m.inicio, inS, outS);
+            if (frac === null) continue; // momento fora do trecho do clipe
+            const x = Math.round(startX + frac * width);
+            if (x < 0 || x > this.width) continue; // fora do viewport
+            const grave = m.tipo === "estouro";
+            const wMarca = grave ? 2 : 1;
+            ctx.fillStyle = grave ? "#ef4444" : "rgba(245, 158, 11, 0.55)";
+            ctx.fillRect(x - Math.floor(wMarca / 2), grave ? stripY - 4 : stripY, wMarca, grave ? stripH + 4 : stripH);
+        }
+
+        ctx.restore();
     }
 
     /**
