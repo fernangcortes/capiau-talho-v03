@@ -234,7 +234,7 @@ class ProjectRepository:
             in_s = float(cut.get("in", 0.0))
             out_s = float(cut.get("out", 0.0))
             start = track_cursor.get(track, 0.0)
-            clips.append({
+            novo = {
                 "type": cut.get("type", "video"),
                 "video_id": cut.get("video_id"),
                 "photo_id": cut.get("photo_id"),
@@ -242,7 +242,17 @@ class ProjectRepository:
                 "out": out_s,
                 "track": track,
                 "timeline_start": start
-            })
+            }
+            # A migracao monta um dicionario NOVO, entao tudo que nao for copiado
+            # aqui e perdido em silencio. effects carrega os ajustes de audio e
+            # video do clipe (inclusive o ponteiro audio_render, que o export usa
+            # para trocar a referencia de midia); link_id e o que amarra o clipe de
+            # audio ao de video. Sem estas duas linhas, uma timeline v1 perde os
+            # dois na primeira leitura.
+            for chave in ("effects", "link_id", "id", "name"):
+                if cut.get(chave) is not None:
+                    novo[chave] = cut[chave]
+            clips.append(novo)
             track_cursor[track] = start + (out_s - in_s)
 
         return {
