@@ -305,14 +305,16 @@ function buildTree(items, mediaKey = "video") {
 }
 
 function formatTimecode(sec) {
-    if (isNaN(sec)) return "00:00:00:00";
-    const fpsVal = window.TIMELINE_STATE?.fps || 24;
-    const hrs = Math.floor(sec / 3600);
-    const mins = Math.floor((sec % 3600) / 60);
-    const secs = Math.floor(sec % 60);
-    const frames = Math.floor((sec % 1) * fpsVal);
+    if (isNaN(sec) || sec === null || sec < 0) return "00:00:00:00";
+    const fpsVal = Number(window.TIMELINE_STATE?.fps) > 0 ? Number(window.TIMELINE_STATE?.fps) : 24;
+    const totalIntFrames = Math.max(0, Math.round(Number(sec) * fpsVal));
+    const totalSeconds = Math.floor(totalIntFrames / fpsVal);
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    const frames = Math.min(Math.floor(fpsVal) - 1, Math.max(0, Math.floor(totalIntFrames % fpsVal)));
     
-    const pad = (n) => String(n).padStart(2, '0');
+    const pad = (n) => String(Math.floor(Math.abs(Number(n) || 0))).padStart(2, '0');
     return `${pad(hrs)}:${pad(mins)}:${pad(secs)}:${pad(frames)}`;
 }
 
