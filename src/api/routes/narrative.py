@@ -21,6 +21,8 @@ from src.api.schemas import (
 from src.db.repositories.projects import ProjectRepository
 from src.db.repositories.narrative import NarrativeRepository
 from src.db.repositories.media import MediaRepository
+from src.db.connection import get_db
+from src.export.audio_stems import TIPOS_EFEITO_TIPO_A, relatorio_efeitos
 from src.services.pipeline import PipelineService
 from src.services.rag import RAGService
 from src.services.timeline_ai import TimelineAIService
@@ -438,19 +440,79 @@ def timeline_ai_suggest(payload: TimelineAISuggestPayload):
     )
     return result
 
+def _carregar_sequencia_para_relatorio(timeline_id: int) -> dict:
+    """Le a MESMA sequencia que o export leu, pelo mesmo caminho.
+
+    Reproduz exatamente o acesso de `generate_otio_timeline` (SELECT em
+    timeline.sequence_json + ProjectRepository.parse_sequence), para o relatorio
+    de efeitos enxergar o que foi exportado. E uma segunda leitura leve de uma
+    unica linha porque `export_timeline_file` devolve apenas o Path do arquivo
+    gerado e nao pode ter sua assinatura alterada (propriedade do agente J1).
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT sequence_json FROM timeline WHERE id = ?", (timeline_id,))
+        row = cursor.fetchone()
+    if not row:
+        raise ValueError(f"Timeline com ID {timeline_id} não encontrada.")
+    return ProjectRepository.parse_sequence(row["sequence_json"])
+
+
+def _tem_efeito_tipo_a(sequencia: dict) -> bool:
+    """True se algum clipe FORA de pista de IA tem efeito de Tipo A.
+
+    Espelha o filtro do proprio `relatorio_efeitos` (pistas kind=ai ignoradas):
+    como ele grava arquivo mesmo sem nada a relatar, a rota consulta antes para
+    nao deixar .txt de acompanhamento numa pasta de export limpa.
+    """
+    trilhas_ia = {
+        str(t.get("id"))
+        for t in (sequencia.get("tracks") or [])
+        if str(t.get("kind") or "").lower() == "ai"
+    }
+    for cut in sequencia.get("clips") or []:
+        if not isinstance(cut, dict) or str(cut.get("track", "")) in trilhas_ia:
+            continue
+        for efeito in cut.get("effects") or []:
+            if isinstance(efeito, dict) and efeito.get("type") in TIPOS_EFEITO_TIPO_A:
+                return True
+    return False
+
+
 @router.get("/api/timeline/{timeline_id}/export/{export_format}")
 def export_timeline(timeline_id: int, export_format: str):
     """Exporta a timeline em formato XML/EDL/OTIO e retorna o arquivo para download."""
     if export_format not in ["otio", "xml", "edl"]:
         raise HTTPException(status_code=400, detail="Formato inválido. Use 'otio', 'xml' ou 'edl'.")
-        
+
     try:
         file_path = export_timeline_file(timeline_id, export_format)
         if not file_path.exists():
             raise HTTPException(status_code=500, detail="O arquivo de timeline não pôde ser gerado.")
 
+        # Acompanhante da secao 10 do plano: relatorio .txt dos efeitos de Tipo A
+        # na MESMA pasta do export, com nome derivado dele. O export e o principal:
+        # falha ESPERADA aqui (dado invalido, disco cheio, banco travado) vira log e
+        # a resposta segue intacta; bug inesperado sobe para o handler de 500.
+        relatorio_path: Optional[Path] = None
+        try:
+            sequencia = _carregar_sequencia_para_relatorio(timeline_id)
+            if _tem_efeito_tipo_a(sequencia):
+                relatorio_path = relatorio_efeitos(
+                    sequencia,
+                    file_path.parent,
+                    sobrescrever=True,
+                    fps=sequencia.get("fps"),
+                    nome_arquivo=f"{file_path.stem}_efeitos_audio.txt",
+                )
+        except (TypeError, ValueError, OSError, sqlite3.Error) as e:
+            print(f"[EXPORT] Aviso: relatorio de efeitos de audio nao gerado "
+                  f"({type(e).__name__}: {e})")
+
         media_type = "application/xml" if export_format == "xml" else "text/plain"
-        return FileResponse(path=str(file_path), filename=file_path.name, media_type=media_type)
+        headers = {"X-Capiau-Relatorio-Efeitos": relatorio_path.name} if relatorio_path else None
+        return FileResponse(path=str(file_path), filename=file_path.name,
+                            media_type=media_type, headers=headers)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
