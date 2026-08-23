@@ -35,7 +35,8 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
-from src.core.tasks import TASK_MANAGER, WORKER_PROGRESS_FILE
+from src.core.tasks import (TASK_MANAGER, worker_progress_file,
+                            write_worker_pid, clear_worker_pid)
 from src.db.connection import get_db
 from src.services.pipeline import PipelineService
 
@@ -60,6 +61,10 @@ def selecionar(project_id: int, ids: Optional[List[int]], force: bool) -> List[s
     if force:
         return list(linhas)
     return [r for r in linhas if r["status"] != CONCLUIDO]
+
+
+# Identifica este worker no arquivo de progresso e no de PID (B1/B2).
+WORKER_TYPE = "asr"
 
 
 def main() -> int:
@@ -102,42 +107,48 @@ def main() -> int:
 
     # Espelha o progresso em disco: e o unico jeito da tela de Tarefas do servidor
     # enxergar esta rodada, ja que ela acontece em outro processo.
-    TASK_MANAGER.enable_file_sink(WORKER_PROGRESS_FILE)
-    print(f"[Worker] Progresso espelhado em: {WORKER_PROGRESS_FILE}")
+    progresso = worker_progress_file(WORKER_TYPE)
+    TASK_MANAGER.enable_file_sink(progresso)
+    write_worker_pid(WORKER_TYPE)
+    print(f"[Worker] Progresso espelhado em: {progresso}")
     print()
 
     ok, falhas = 0, []
     inicio = time.time()
 
-    for pos, r in enumerate(fila, 1):
-        vid, nome = r["id"], r["filename"]
-        caminho = Path(r["filepath"])
-        print(f"[{pos}/{len(fila)}] id={vid} {nome}", flush=True)
+    try:
+        for pos, r in enumerate(fila, 1):
+            vid, nome = r["id"], r["filename"]
+            caminho = Path(r["filepath"])
+            print(f"[{pos}/{len(fila)}] id={vid} {nome}", flush=True)
 
-        if not caminho.exists():
-            print("        arquivo nao encontrado -- pulado", flush=True)
-            falhas.append((vid, "arquivo ausente"))
-            continue
+            if not caminho.exists():
+                print("        arquivo nao encontrado -- pulado", flush=True)
+                falhas.append((vid, "arquivo ausente"))
+                continue
 
-        try:
-            # Sequencial de proposito: uma gravacao por vez no SQLite.
-            PipelineService.transcribe_video(vid, caminho)
-        except Exception as e:  # noqa: BLE001 - um video ruim nao pode parar a fila
-            print(f"        ERRO: {e}", flush=True)
-            falhas.append((vid, str(e)))
-            continue
+            try:
+                # Sequencial de proposito: uma gravacao por vez no SQLite.
+                PipelineService.transcribe_video(vid, caminho)
+            except Exception as e:  # noqa: BLE001 - um video ruim nao pode parar a fila
+                print(f"        ERRO: {e}", flush=True)
+                falhas.append((vid, str(e)))
+                continue
 
-        with get_db() as conn:
-            st = conn.execute("select status, error_message from video where id=?", (vid,)).fetchone()
-            pal = conn.execute("select count(*) from transcript where video_id=?", (vid,)).fetchone()[0]
-            ent = conn.execute("select count(*) from transcript_entity where video_id=?", (vid,)).fetchone()[0]
+            with get_db() as conn:
+                st = conn.execute("select status, error_message from video where id=?", (vid,)).fetchone()
+                pal = conn.execute("select count(*) from transcript where video_id=?", (vid,)).fetchone()[0]
+                ent = conn.execute("select count(*) from transcript_entity where video_id=?", (vid,)).fetchone()[0]
 
-        if st["status"] == CONCLUIDO:
-            ok += 1
-            print(f"        {pal} palavras, {ent} entidades", flush=True)
-        else:
-            falhas.append((vid, st["error_message"] or f"status={st['status']}"))
-            print(f"        terminou em '{st['status']}': {st['error_message'] or 'sem mensagem'}", flush=True)
+            if st["status"] == CONCLUIDO:
+                ok += 1
+                print(f"        {pal} palavras, {ent} entidades", flush=True)
+            else:
+                falhas.append((vid, st["error_message"] or f"status={st['status']}"))
+                print(f"        terminou em '{st['status']}': {st['error_message'] or 'sem mensagem'}", flush=True)
+    finally:
+        # Libera a guarda de instancia unica mesmo se a rodada estourar no meio.
+        clear_worker_pid(WORKER_TYPE, only_if_owner=True)
 
     print()
     print(f"=== FIM === {ok} concluidos, {len(falhas)} com problema, "

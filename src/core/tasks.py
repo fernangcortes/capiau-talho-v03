@@ -8,13 +8,118 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 
-# Progresso espelhado em disco pelo worker de lote (src/worker_vision.py). Como ele
-# roda num processo separado do servidor, este arquivo e a unica forma da tela de
-# Tarefas enxergar o andamento da rodada. Some da tela quando fica velho demais.
-# Ancorado na raiz do projeto (nao no CWD): worker e servidor precisam apontar para
-# o MESMO arquivo, independente de onde cada um foi iniciado.
-WORKER_PROGRESS_FILE = Path(__file__).resolve().parents[2] / "data" / "logs" / "worker_progress.json"
+# Progresso espelhado em disco pelos workers de lote (src/worker_vision.py e
+# src/worker_transcricao.py). Como eles rodam em processos separados do servidor,
+# estes arquivos sao a unica forma da tela de Tarefas enxergar o andamento.
+# Somem da tela quando ficam velhos demais.
+# Ancorados na raiz do projeto (nao no CWD): worker e servidor precisam apontar
+# para os MESMOS arquivos, independente de onde cada um foi iniciado.
+#
+# UM ARQUIVO POR TIPO (B1): cada worker grava o snapshot INTEIRO do seu progresso.
+# Com um arquivo so, visao e transcricao rodando juntos apagavam as entradas um do
+# outro a cada gravacao. read_worker_progress() mescla os arquivos na leitura.
+WORKER_LOGS_DIR = Path(__file__).resolve().parents[2] / "data" / "logs"
+WORKER_PROGRESS_PREFIX = "worker_progress_"
 WORKER_PROGRESS_MAX_AGE_S = 600
+
+
+def worker_progress_file(worker_type: str) -> Path:
+    """Arquivo de progresso de um tipo de worker ('vision', 'asr')."""
+    return WORKER_LOGS_DIR / f"{WORKER_PROGRESS_PREFIX}{worker_type}.json"
+
+
+def worker_pid_file(worker_type: str) -> Path:
+    """Arquivo de PID do worker, base da guarda de instancia unica (B2)."""
+    return WORKER_LOGS_DIR / f"worker_{worker_type}.pid"
+
+
+def _process_alive(pid: int) -> bool:
+    """Diz se o PID esta vivo, sem depender de psutil (nao instalado aqui).
+
+    ATENCAO: no Windows, os.kill(pid, 0) NAO e uma consulta -- o CPython cai em
+    TerminateProcess e MATA o processo. Por isso a checagem usa OpenProcess.
+    """
+    if pid <= 0:
+        return False
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+    import ctypes
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    STILL_ACTIVE = 259
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return False
+    try:
+        codigo = ctypes.c_ulong()
+        if kernel32.GetExitCodeProcess(handle, ctypes.byref(codigo)):
+            return codigo.value == STILL_ACTIVE
+        return True
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def write_worker_pid(worker_type: str, pid: Optional[int] = None) -> Path:
+    """Registra o PID do worker. Chamado pelo proprio worker (cobre o lancamento
+    manual pelo terminal) e pela rota que o lanca (fecha a janela de corrida entre
+    o lancamento e o worker chegar a escrever)."""
+    caminho = worker_pid_file(worker_type)
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    dados = {"pid": pid if pid is not None else os.getpid(),
+             "tipo": worker_type,
+             "iniciado_em": time.time()}
+    caminho.write_text(json.dumps(dados), encoding="utf-8")
+    return caminho
+
+
+def clear_worker_pid(worker_type: str, only_if_owner: bool = False) -> None:
+    """Remove o registro ao fim da rodada. Falha aqui nao pode derrubar o worker.
+
+    `only_if_owner` protege contra apagar o registro de OUTRO processo: um
+    `--dry-run` rodando em paralelo a uma rodada real nao pode derrubar a guarda
+    de instancia unica dela.
+    """
+    caminho = worker_pid_file(worker_type)
+    try:
+        if only_if_owner:
+            if not caminho.exists():
+                return
+            dono = json.loads(caminho.read_text(encoding="utf-8")).get("pid")
+            if int(dono) != os.getpid():
+                return
+        caminho.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def worker_is_running(worker_type: str) -> Optional[Dict[str, Any]]:
+    """Retorna os dados do worker em execucao, ou None se nao houver.
+
+    Registro orfao (worker morto sem limpar) e apagado na hora, senao a guarda
+    recusaria lancamentos para sempre.
+    """
+    caminho = worker_pid_file(worker_type)
+    try:
+        if not caminho.exists():
+            return None
+        dados = json.loads(caminho.read_text(encoding="utf-8"))
+        pid = int(dados.get("pid", 0))
+    except Exception:
+        clear_worker_pid(worker_type)
+        return None
+
+    if not _process_alive(pid):
+        clear_worker_pid(worker_type)
+        return None
+
+    dados["pid"] = pid
+    dados["progress_file"] = str(worker_progress_file(worker_type))
+    return dados
 
 class TaskManager:
     _instance: Optional["TaskManager"] = None
@@ -143,9 +248,16 @@ class TaskManager:
         'label' é o texto que a tela mostra; sem ele a tela deduz o nome pela mídia.
         """
         with self._lock:
-            existing_logs = self.progress.get(task_key, {}).get("logs", [])
+            anterior = self.progress.get(task_key)
+            existing_logs = anterior.get("logs", []) if anterior else []
             if not isinstance(existing_logs, list):
                 existing_logs = []
+            # Tarefa nova ou que mudou de estado (running/finished/failed) nao pode
+            # ser engolida pela trava de 1s do espelho: e justamente o que a tela
+            # precisa ver. A transcricao passa minutos sem atualizar percentual --
+            # se a virada para 'running' se perdesse, a rodada inteira ficaria
+            # invisivel na tela de Tarefas.
+            estado_mudou = anterior is None or anterior.get("status") != status
             entry: Dict[str, Any] = {
                 "percent": percent,
                 "status": status,
@@ -158,7 +270,7 @@ class TaskManager:
         if log_message:
             self.add_log(task_key, log_message)
         else:
-            self._flush_sink()
+            self._flush_sink(force=estado_mudou)
 
     def remove_progress(self, task_key: str) -> None:
         """Remove o progresso de uma tarefa finalizada."""
@@ -234,19 +346,38 @@ class TaskManager:
 
 
 def read_worker_progress() -> Dict[str, Dict[str, Any]]:
-    """Le o progresso do worker de lote, que roda em processo separado.
+    """Mescla o progresso de todos os workers de lote, que rodam em outros processos.
 
-    Ignora arquivo velho: se o worker morreu ou terminou, a tela nao pode ficar
-    mostrando uma rodada fantasma para sempre.
+    Ignora arquivo velho, um por um: se um worker morreu ou terminou, a tela nao
+    pode ficar mostrando aquela rodada fantasma para sempre -- mas o outro, que
+    talvez ainda esteja rodando, continua aparecendo.
+
+    Colisao de chave: transcricao e visao usam str(video_id) como chave de
+    progresso (src/services/pipeline.py:349 e :649). Se o MESMO video estiver nos
+    dois workers ao mesmo tempo, o segundo entra como "<id>#<tipo>" em vez de
+    sumir. Perde a miniatura na tela de Tarefas, mas nao perde a tarefa.
     """
+    mesclado: Dict[str, Dict[str, Any]] = {}
+    agora = time.time()
     try:
-        if not WORKER_PROGRESS_FILE.exists():
-            return {}
-        if (time.time() - WORKER_PROGRESS_FILE.stat().st_mtime) > WORKER_PROGRESS_MAX_AGE_S:
-            return {}
-        return json.loads(WORKER_PROGRESS_FILE.read_text(encoding="utf-8"))
+        arquivos = sorted(WORKER_LOGS_DIR.glob(f"{WORKER_PROGRESS_PREFIX}*.json"))
     except Exception:
         return {}
+
+    for arquivo in arquivos:
+        tipo = arquivo.stem[len(WORKER_PROGRESS_PREFIX):] or "worker"
+        try:
+            if (agora - arquivo.stat().st_mtime) > WORKER_PROGRESS_MAX_AGE_S:
+                continue
+            dados = json.loads(arquivo.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(dados, dict):
+            continue
+        for chave, valor in dados.items():
+            mesclado[chave if chave not in mesclado else f"{chave}#{tipo}"] = valor
+
+    return mesclado
 
 
 # Instância global Singleton

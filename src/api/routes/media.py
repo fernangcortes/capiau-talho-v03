@@ -1,8 +1,11 @@
 """Roteador FastAPI para gerenciamento de Mídias, Ingestão, Conversões e Visão."""
 import os
 import json
+import re
 import sqlite3
 import subprocess
+import sys
+import time
 import cv2
 import numpy as np
 from pathlib import Path
@@ -15,7 +18,8 @@ from src.db.connection import get_db
 from src.api.dependencies import get_db_conn
 from src.api.schemas import CategoryUpdate, TitleUpdate, ExternalPathIngest, LabelFacePayload, MergeClustersPayload, ReassignFacesPayload
 from src.db.repositories.media import MediaRepository
-from src.core.tasks import TASK_MANAGER, read_worker_progress
+from src.core.tasks import (TASK_MANAGER, read_worker_progress, WORKER_LOGS_DIR,
+                            worker_is_running, write_worker_pid)
 from src.services.ingest import IngestService
 from src.services.pipeline import PipelineService
 from src.services.burst_service import group_photo_bursts, replicate_to_members
@@ -25,6 +29,11 @@ from src.services.vision_batch import run_vision_batch
 from src.search.semantic import SemanticSearch
 
 router = APIRouter(tags=["Media & Ingestion"])
+
+# Preco por hora da configuracao atual do AssemblyAI (Universal-3.5 Pro):
+# transcricao 0,21 + diarizacao 0,02 + entity_detection 0,08. Serve so para a
+# previa do botao -- ver docs/PLANO_HISTORICO_METADADOS_E_WORKER_ASR.md.
+ASR_PRECO_HORA_USD = 0.31
 
 @router.get("/api/videos")
 def list_videos(project_id: int = Query(1), conn: sqlite3.Connection = Depends(get_db_conn)):
@@ -614,6 +623,115 @@ def trigger_transcribe_all(project_id: int, background_tasks: BackgroundTasks, c
                 
     background_tasks.add_task(transcribe_all)
     return {"status": "success", "message": f"Transcrição em lote de {len(rows)} vídeos iniciada.", "count": len(rows)}
+
+@router.post("/api/project/{project_id}/transcribe-worker")
+def launch_transcription_worker(
+    project_id: int,
+    force: bool = Query(False, description="Reprocessa também os já transcritos."),
+    ids: Optional[str] = Query(None, description="IDs separados por vírgula. Sem isso, a fila inteira."),
+    dry_run: bool = Query(False, description="Só devolve o tamanho da fila e o custo; não lança nada."),
+):
+    """Lança o worker de transcrição em PROCESSO SEPARADO e devolve o PID.
+
+    Por que não usar /transcribe-all: aquela rota roda o lote dentro do servidor e
+    sufoca o event loop — a interface inteira para de responder (medido em 15/07 na
+    rodada de visão, mesma lição no cabeçalho de src/worker_vision.py).
+
+    Por que desgrudado: processo preso ao console morre junto quando o console
+    fecha. Ver o cabeçalho de scripts/launch_detached.py.
+    """
+    from src.worker_transcricao import selecionar, WORKER_TYPE
+
+    # Guarda 1: instância única. Dois workers do mesmo tipo levam de volta ao
+    # problema de concorrência no SQLite, só que por outro caminho.
+    # Em dry_run não checamos: a prévia é só leitura e deve funcionar sempre.
+    em_execucao = None if dry_run else worker_is_running(WORKER_TYPE)
+    if em_execucao:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"Já existe um worker de transcrição rodando (PID {em_execucao['pid']}). "
+                    f"Espere terminar, ou encerre o processo e apague "
+                    f"{Path(em_execucao.get('progress_file', '')).with_name(f'worker_{WORKER_TYPE}.pid')}.")
+        )
+
+    lista_ids = None
+    if ids:
+        try:
+            lista_ids = [int(x) for x in ids.split(",") if x.strip()]
+        except ValueError:
+            raise HTTPException(400, "O parâmetro 'ids' aceita apenas números separados por vírgula.")
+
+    fila = selecionar(project_id, lista_ids, force)
+    if not fila:
+        return {"status": "success", "count": 0,
+                "message": "Nenhum clipe elegível para transcrição."}
+
+    horas = sum((r["duration"] or 0) for r in fila) / 3600
+    custo = round(horas * ASR_PRECO_HORA_USD, 2)
+
+    if dry_run:
+        return {
+            "status": "success",
+            "dry_run": True,
+            "count": len(fila),
+            "horas": round(horas, 2),
+            "custo_estimado_usd": custo,
+            "message": f"{len(fila)} clipe(s), {horas:.2f} h de áudio, ~US$ {custo:.2f}.",
+        }
+
+    carimbo = time.strftime("%Y%m%d_%H%M%S")
+    log_out = WORKER_LOGS_DIR / f"worker_{WORKER_TYPE}_{carimbo}.out.log"
+    log_err = WORKER_LOGS_DIR / f"worker_{WORKER_TYPE}_{carimbo}.err.log"
+
+    comando = [sys.executable, "-m", "src.worker_transcricao", "--project", str(project_id)]
+    if lista_ids:
+        comando += ["--ids", ",".join(str(i) for i in lista_ids)]
+    if force:
+        comando.append("--force")
+
+    # Guarda 3: solta a trava do Qdrant ANTES de lancar. O Qdrant embutido e
+    # exclusivo e o servidor sempre a abriu primeiro; sem soltar, o worker
+    # transcreve mas nao indexa. A busca volta sozinha ao fim da rodada.
+    try:
+        SemanticSearch.get_instance().suspend_for_worker()
+    except Exception as err:
+        print(f"[Worker ASR] Aviso: falha ao liberar a trava do Qdrant: {err}")
+
+    lancador = [sys.executable, str(CONFIG.BASE_DIR / "scripts" / "launch_detached.py"),
+                *comando, "--stdout", str(log_out), "--stderr", str(log_err)]
+
+    try:
+        resultado = subprocess.run(lancador, capture_output=True, text=True, timeout=30)
+    except Exception as err:
+        raise HTTPException(500, f"Falha ao lançar o worker: {err}")
+
+    if resultado.returncode != 0:
+        raise HTTPException(500, f"O lançador falhou: {resultado.stderr.strip() or 'sem mensagem'}")
+
+    achado = re.search(r"PID:\s*(\d+)", resultado.stdout or "")
+    if not achado:
+        raise HTTPException(500, f"O lançador não devolveu PID: {resultado.stdout.strip()!r}")
+    pid = int(achado.group(1))
+
+    # Fecha a janela de corrida: o worker também grava o PID, mas leva segundos
+    # para subir, e nesse intervalo um segundo pedido passaria pela guarda.
+    write_worker_pid(WORKER_TYPE, pid)
+
+    return {
+        "status": "success",
+        "pid": pid,
+        "count": len(fila),
+        "horas": round(horas, 2),
+        "custo_estimado_usd": custo,
+        "log_stdout": str(log_out),
+        "log_stderr": str(log_err),
+        # Guarda 3: o Qdrant roda embutido, com trava de arquivo exclusiva.
+        "busca_indisponivel": True,
+        "aviso_busca": ("A busca semântica fica indisponível enquanto o worker roda "
+                        "(o Qdrant é embutido e tem trava exclusiva). O resto da "
+                        "interface continua funcionando."),
+        "message": f"Worker de transcrição iniciado (PID {pid}): {len(fila)} vídeo(s), {horas:.2f} h de áudio.",
+    }
 
 @router.post("/api/video/{video_id}/analyze-vision")
 def trigger_vision_video(

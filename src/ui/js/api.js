@@ -215,8 +215,21 @@ export class CapIAuAPI {
         return this.request(`/api/video/${videoId}/transcribe`, { method: "POST" });
     }
 
+    // Rota antiga: roda o lote DENTRO do servidor e sufoca a interface. Mantida
+    // só porque outras telas podem chamá-la; o botão "Tudo" usa a de baixo.
     static transcribeAll(projectId) {
         return this.request(`/api/project/${projectId}/transcribe-all`, { method: "POST" });
+    }
+
+    // Lança o worker de transcrição em processo separado (B2). Devolve PID,
+    // tamanho da fila e o aviso de que a busca sai do ar durante a rodada.
+    static launchTranscriptionWorker(projectId, { force = false, ids = null, dryRun = false } = {}) {
+        const params = new URLSearchParams();
+        if (force) params.set("force", "true");
+        if (dryRun) params.set("dry_run", "true");
+        if (ids && ids.length) params.set("ids", ids.join(","));
+        const qs = params.toString() ? `?${params}` : "";
+        return this.request(`/api/project/${projectId}/transcribe-worker${qs}`, { method: "POST" });
     }
 
     static analyzeVideoVision(videoId, beatEmbedder = null) {

@@ -22,8 +22,13 @@ nao ser pulada inteira.
 """
 import argparse
 
-from src.core.tasks import TASK_MANAGER, WORKER_PROGRESS_FILE
+from src.core.tasks import (TASK_MANAGER, worker_progress_file,
+                            write_worker_pid, clear_worker_pid)
 from src.services.vision_batch import run_vision_batch
+
+
+# Identifica este worker no arquivo de progresso e no de PID (B1/B2).
+WORKER_TYPE = "vision"
 
 
 def main() -> None:
@@ -43,14 +48,20 @@ def main() -> None:
 
     # Espelha o progresso em disco: e o unico jeito da tela de Tarefas do servidor
     # enxergar esta rodada, ja que ela acontece em outro processo.
-    TASK_MANAGER.enable_file_sink(WORKER_PROGRESS_FILE)
-    print(f"[Worker] Progresso espelhado em: {WORKER_PROGRESS_FILE}")
+    progresso = worker_progress_file(WORKER_TYPE)
+    TASK_MANAGER.enable_file_sink(progresso)
+    write_worker_pid(WORKER_TYPE)
+    print(f"[Worker] Progresso espelhado em: {progresso}")
 
-    run_vision_batch(
-        args.project,
-        force_videos=args.force_videos,
-        force_photos=args.force_photos,
-    )
+    try:
+        run_vision_batch(
+            args.project,
+            force_videos=args.force_videos,
+            force_photos=args.force_photos,
+        )
+    finally:
+        # Libera a guarda de instancia unica mesmo se a rodada estourar no meio.
+        clear_worker_pid(WORKER_TYPE, only_if_owner=True)
 
 
 if __name__ == "__main__":
