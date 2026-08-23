@@ -1265,7 +1265,20 @@ class PipelineService:
                 title = str(data.get("titulo", "") or "").strip()
                 tags = PipelineService.clean_tags(data.get("tags", []))
 
+                from src.nlp.name_fixer import carregar_regras, corrigir_decupagem, resumir_trocas
+
                 with get_db() as conn:
+                    # Corrige nome proprio ANTES de gravar: o ASR erra ("Baiar" por
+                    # Bayard) e o resumo herda o erro. Corrigir depois nao resolve --
+                    # o erro volta no proximo reprocessamento. As regras saem dos
+                    # aliases de entity/person; ver src/nlp/name_fixer.py.
+                    regras = carregar_regras(project_id, conn)
+                    title, desc, summary, tags, trocas = corrigir_decupagem(
+                        title, desc, summary, tags, regras
+                    )
+                    if trocas:
+                        print(f"[Nomes] Video {video_id}: {resumir_trocas(trocas)}")
+
                     MediaRepository.update_video_metadata(conn, video_id, desc, summary, tags, title=title)
 
                     for tag in tags:

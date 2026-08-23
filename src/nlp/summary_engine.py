@@ -116,6 +116,15 @@ Responda estritamente em Português e em formato JSON com a seguinte estrutura (
                 
             title = str(data.get("titulo", "") or data.get("title", "") or "").strip()
 
+            # Mesma correcao de nome proprio do PipelineService, antes de gravar
+            from src.nlp.name_fixer import carregar_regras, corrigir_decupagem, resumir_trocas
+            regras = carregar_regras(project_id)
+            title, desc, summary, tags, trocas = corrigir_decupagem(
+                title, desc, summary, tags, regras
+            )
+            if trocas:
+                print(f"  [Nomes] {resumir_trocas(trocas)}")
+
             # Salvar no SQLite
             update_video_metadata(video_id, desc, summary, tags, title=title)
             print(f"  [SUCCESS] Metadados salvos no SQLite! Título: '{title}' | Descrição: \"{desc[:60]}...\" | {len(tags)} tags")
