@@ -2612,20 +2612,85 @@ export class LibraryManager {
         }
     }
 
+    /** CapIAuAPI.request lança o corpo cru; no FastAPI ele vem como {"detail": ...}. */
+    extrairMensagemErro(err) {
+        const bruto = (err && err.message) || String(err);
+        try {
+            const corpo = JSON.parse(bruto);
+            if (corpo && corpo.detail) return corpo.detail;
+        } catch (_) { /* não era JSON: usa como veio */ }
+        return bruto;
+    }
+
     async triggerTranscribeAll() {
-        if (confirm("Disparar transcrição AssemblyAI para todas as mídias não transcritas do projeto ativo?")) {
-            try {
-                await CapIAuAPI.transcribeAll(STATE.currentProjectId);
-                if (window.logManager) {
-                    window.logManager.log("ASR", "Disparada transcrição em lote (todos os depoimentos) via AssemblyAI.", "ACTION");
-                }
-                alert("Transcrição em lote disparada.");
-            } catch (err) {
-                if (window.logManager) {
-                    window.logManager.log("ASR", `Falha ao disparar transcrição em lote: ${err.message}`, "ERROR");
-                }
-                alert("Erro ao disparar transcrição: " + err.message);
+        // B3: lança o worker em processo separado em vez de rodar o lote dentro do
+        // servidor. O lote interno sufocava o event loop e derrubava a interface
+        // inteira; aqui a tela continua respondendo durante a rodada.
+        //
+        // Prévia antes de qualquer gasto: a fila do projeto inclui todo B-roll ainda
+        // não transcrito e a conta passa fácil de US$ 4. Ninguém deve descobrir isso
+        // depois de clicar.
+        let previa;
+        try {
+            previa = await CapIAuAPI.launchTranscriptionWorker(STATE.currentProjectId, { dryRun: true });
+        } catch (err) {
+            const msg = this.extrairMensagemErro(err);
+            if (window.showToast) window.showToast("Erro ao consultar a fila: " + msg, "error");
+            else alert("Erro ao consultar a fila: " + msg);
+            return;
+        }
+
+        if (!previa.count) {
+            if (window.showToast) window.showToast("Nenhum clipe pendente de transcrição.", "info");
+            else alert("Nenhum clipe pendente de transcrição.");
+            return;
+        }
+
+        const aviso = `Transcrever ${previa.count} clipe(s) pendentes do projeto?\n\n` +
+            `Duração: ${previa.horas} h de áudio\n` +
+            `Custo estimado: US$ ${Number(previa.custo_estimado_usd).toFixed(2)} (AssemblyAI)\n\n` +
+            "A rodada acontece em um processo separado — a interface continua funcionando.\n\n" +
+            "ATENÇÃO: a BUSCA SEMÂNTICA fica indisponível até o fim da rodada " +
+            "(o banco vetorial é embutido e só aceita um processo por vez). " +
+            "Ela volta sozinha quando o worker terminar.";
+        if (!confirm(aviso)) return;
+
+        try {
+            const res = await CapIAuAPI.launchTranscriptionWorker(STATE.currentProjectId);
+
+            if (!res.count) {
+                if (window.showToast) window.showToast("Nenhum clipe pendente de transcrição.", "info");
+                else alert("Nenhum clipe pendente de transcrição.");
+                return;
             }
+
+            if (window.logManager) {
+                window.logManager.log(
+                    "ASR",
+                    `Worker de transcrição iniciado (PID ${res.pid}): ${res.count} clipe(s), ${res.horas} h de áudio. Log: ${res.log_stdout}`,
+                    "ACTION"
+                );
+                window.logManager.log("ASR", "Busca semântica indisponível até o fim da rodada.", "WARN");
+            }
+
+            if (window.showToast) {
+                window.showToast(`Transcrição iniciada: ${res.count} clipe(s), ${res.horas} h. A busca fica fora do ar até terminar.`, "success");
+            } else {
+                alert(res.message);
+            }
+
+            // O progresso do worker chega pela tela de Tarefas (arquivo espelho)
+            if (window.panelsManager && window.panelsManager.refreshTasks) {
+                window.panelsManager.refreshTasks();
+            }
+        } catch (err) {
+            // 409 = já existe um worker rodando; a mensagem do servidor explica o que fazer
+            const msg = this.extrairMensagemErro(err);
+            if (window.logManager) {
+                window.logManager.log("ASR", `Falha ao iniciar o worker de transcrição: ${msg}`, "ERROR");
+            }
+            if (window.showToast) window.showToast(msg, "error");
+            else alert("Erro ao iniciar a transcrição: " + msg);
         }
     }
 
@@ -4401,9 +4466,37 @@ export class LibraryScrollIndexTracker {
         };
     }
 
+    isAnyModalOpen() {
+        const activeModal = document.querySelector(`
+            .modal-overlay.active,
+            .modal-overlay[style*="display: flex"],
+            .modal-overlay[style*="display: flex;"],
+            .modal-overlay[style*="display: block"],
+            .modal-overlay[style*="display: block;"],
+            #timeline-alternatives-backdrop:not([style*="display: none"]):not([style*="display:none"]),
+            #timeline-alternatives-popup:not([style*="display: none"]):not([style*="display:none"]),
+            #modal-timeline-help:not([style*="display: none"]):not([style*="display:none"]),
+            #modal-edit-marker:not([style*="display: none"]):not([style*="display:none"]),
+            dialog[open]
+        `);
+        if (activeModal) {
+            const style = window.getComputedStyle(activeModal);
+            if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
+                return true;
+            }
+        }
+        return false;
+    }
+
     bindEvents() {
         const onPointerMove = (e) => {
             if (!this.isEnabled) {
+                this.hide();
+                return;
+            }
+
+            // Não exibe nem rastreia se qualquer modal ou overlay estiver aberto
+            if (this.isAnyModalOpen()) {
                 this.hide();
                 return;
             }
@@ -4436,6 +4529,18 @@ export class LibraryScrollIndexTracker {
                 return;
             }
 
+            // Verificação de hit-test no DOM: garante que o elemento sob o ponteiro pertence à barra de rolagem da biblioteca
+            // e não a um modal, backdrop, dropdown ou menu de contexto sobreposto
+            const hitEl = document.elementFromPoint(e.clientX, e.clientY);
+            if (!hitEl || (!container.contains(hitEl) && hitEl !== container && !hitEl.closest("#sidebar-left"))) {
+                this.hide();
+                return;
+            }
+            if (hitEl.closest(".modal-overlay, #timeline-alternatives-popup, #timeline-alternatives-backdrop, #modal-timeline-help, #modal-edit-marker, .custom-context-menu")) {
+                this.hide();
+                return;
+            }
+
             this.lastHoverEvent = e;
             const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
             this.updateAtRatio(ratio, e, activeTab);
@@ -4459,6 +4564,8 @@ export class LibraryScrollIndexTracker {
 
         const onPointerDown = (e) => {
             if (!this.isEnabled) return;
+            if (this.isAnyModalOpen()) return;
+
             const container = this.getScrollContainer();
             if (!container) return;
 
@@ -4468,6 +4575,14 @@ export class LibraryScrollIndexTracker {
             const rect = container.getBoundingClientRect();
             const isInsideGutter = (e.clientX >= rect.right - 16 && e.clientX <= rect.right + 4 && e.clientY >= rect.top && e.clientY <= rect.bottom);
             if (isInsideGutter) {
+                const hitEl = document.elementFromPoint(e.clientX, e.clientY);
+                if (!hitEl || (!container.contains(hitEl) && hitEl !== container && !hitEl.closest("#sidebar-left"))) {
+                    return;
+                }
+                if (hitEl.closest(".modal-overlay, #timeline-alternatives-popup, #timeline-alternatives-backdrop, #modal-timeline-help, #modal-edit-marker, .custom-context-menu")) {
+                    return;
+                }
+
                 this.isPointerDownOnGutter = true;
                 const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
                 this.updateAtRatio(ratio, e, activeTab);
@@ -4488,6 +4603,10 @@ export class LibraryScrollIndexTracker {
         };
 
         const onWheel = (e) => {
+            if (this.isAnyModalOpen()) {
+                this.hide();
+                return;
+            }
             if (e.shiftKey && this.tooltipEl && this.tooltipEl.classList.contains("visible")) {
                 e.preventDefault();
                 e.stopPropagation();

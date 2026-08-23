@@ -2308,7 +2308,7 @@ export class CapiauTimelineInteraction {
                 border-radius: 6px;
                 overflow: hidden;
                 box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
-                z-index: 10000;
+                z-index: 3500;
                 display: none;
                 flex-direction: column;
                 pointer-events: none;
@@ -2317,8 +2317,9 @@ export class CapiauTimelineInteraction {
             doc.body.appendChild(previewCard);
         }
 
-        // Se hover preview estiver desativado globalmente, esconde e sai
-        if (TIMELINE_STATE.hoverPreviewEnabled === false || this.dragState || !track || (track && track.hidden)) {
+        // Se hover preview estiver desativado globalmente ou se houver modal aberto, esconde e sai
+        const isModalOpen = !!doc.querySelector(".modal-overlay.active, .modal-overlay[style*='display: flex'], .modal-overlay[style*='display: block'], dialog[open]");
+        if (TIMELINE_STATE.hoverPreviewEnabled === false || isModalOpen || this.dragState || !track || (track && track.hidden)) {
             this.clearHoverTimer();
             previewCard.style.display = "none";
             const videoEl = previewCard.querySelector("video");
@@ -2480,7 +2481,7 @@ export class CapiauTimelineInteraction {
                 height: 100vh;
                 background: rgba(0, 0, 0, 0.7);
                 backdrop-filter: blur(5px);
-                z-index: 9999;
+                z-index: 10000;
                 display: none;
             `;
             backdrop.addEventListener("click", () => this.hideAlternativesPopup());
@@ -2505,7 +2506,7 @@ export class CapiauTimelineInteraction {
                 flex-direction: column;
                 gap: 15px;
                 box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
-                z-index: 10000;
+                z-index: 10001;
                 font-family: sans-serif;
                 width: 720px;
                 max-width: 90vw;

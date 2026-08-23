@@ -4019,7 +4019,7 @@ mark.search-highlight {
     border-radius: 6px;
     overflow: hidden;
     pointer-events: none; /* Deixa cliques passarem por ele */
-    z-index: 10000;
+    z-index: 3500;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
     display: none;
     flex-direction: column;
@@ -6704,7 +6704,7 @@ input[type="number"] {
 #library-scroll-index-tooltip {
     --scroll-thumb-width: 128px;
     position: fixed;
-    z-index: 12000;
+    z-index: 3500;
     pointer-events: none;
     display: none;
     flex-direction: column;
