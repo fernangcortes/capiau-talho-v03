@@ -1039,11 +1039,14 @@ async function exportar(kind) {
     }
 
     if (!resposta.ok || !resposta.data || !resposta.data.task_key) {
-        if (resposta.status === 404 || resposta.status === 503 || resposta.status === 0) {
-            _mostrarEngineIndisponivel(resposta.status, resposta.data);
+        _mostrarEngineIndisponivel(resposta.status, resposta.data);
+        const motivo = _resumirDetalhe(resposta.data);
+        if (resposta.status === 409) {
+            _toast("Já existe um render desta timeline em andamento. Veja na aba Tarefas.", "error");
+        } else if (resposta.status === 404 || resposta.status === 503 || resposta.status === 0) {
             _toast("Motor de render indisponível nesta versão.", "error");
         } else {
-            _toast(`O render não foi enfileirado (HTTP ${resposta.status}).`, "error");
+            _toast(motivo ? `Render recusado: ${motivo}` : `O render não foi enfileirado (HTTP ${resposta.status}).`, "error");
         }
         _reavaliarBotoes();
         return;
@@ -1298,6 +1301,11 @@ function _mostrarEngineIndisponivel(statusHttp, detalhe) {
             "<strong>O motor de render ainda não está instalado nesta versão.</strong><br>" +
             `O servidor respondeu HTTP ${_esc(String(statusHttp))}. ` +
             "A Exportar Timeline (.otio/.xml/.edl) continua funcionando normalmente.";
+    } else if (Number(statusHttp) === 409) {
+        html = '<i class="fa-solid fa-hourglass-half"></i> ' +
+            "<strong>Já existe um render desta timeline em andamento.</strong><br>" +
+            "A fila é sequencial: um render por timeline por vez. Acompanhe na aba " +
+            "Tarefas, ou cancele o atual antes de disparar outro.";
     } else if (recusado) {
         html = '<i class="fa-solid fa-triangle-exclamation"></i> ' +
             "<strong>O servidor recusou este pedido de exportação.</strong><br>" +
