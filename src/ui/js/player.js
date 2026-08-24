@@ -1372,19 +1372,19 @@ export class ProgramPlayer {
      */
     _videoPool() {
         const ids = ["program-video-a", "program-video-b", "program-video-c", "program-video-d"];
-        const viewport = this.el("program-player-viewport");
+        const mediaContainer = this.el("program-media-viewport") || this.el("program-player-viewport");
         const pool = [];
 
         ids.forEach(id => {
             let el = this.el(id);
-            if (!el && viewport) {
-                el = viewport.ownerDocument.createElement("video");
+            if (!el && mediaContainer) {
+                el = mediaContainer.ownerDocument.createElement("video");
                 el.id = id;
                 el.preload = "auto";
                 el.muted = true;
                 el.playsInline = true;
                 el.style.cssText = "position:absolute; inset:0; width:100%; height:100%; display:none;";
-                viewport.appendChild(el);
+                mediaContainer.appendChild(el);
             }
             if (!el) return;
             // Ao restaurar um pop-out o workspace limpa o src de todos os <video> do painel:

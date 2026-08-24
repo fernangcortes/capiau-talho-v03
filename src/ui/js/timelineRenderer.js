@@ -3,13 +3,13 @@
 import { STATE } from "./state.js";
 import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode, evaluateFadeCurve } from "./timelineState.js";
 
-// Paleta rotativa para pistas de vídeo adicionais
+// Paleta de cores para pistas de vídeo (V1 roxo/íris clássico NLE, V2 ciano B-roll, etc.)
 const TRACK_PALETTE = [
-    { bg: "rgba(6, 182, 212, 0.15)", clipBg: "rgba(6, 182, 212, 0.25)", border: "rgba(6, 182, 212, 0.7)", wave: "rgba(6, 182, 212, 0.4)" },   // ciano
-    { bg: "rgba(139, 92, 246, 0.15)", clipBg: "rgba(139, 92, 246, 0.25)", border: "rgba(139, 92, 246, 0.7)", wave: "rgba(139, 92, 246, 0.4)" }, // roxo
+    { bg: "rgba(139, 92, 246, 0.12)", clipBg: "rgba(139, 92, 246, 0.25)", border: "rgba(139, 92, 246, 0.7)", wave: "rgba(139, 92, 246, 0.4)" }, // roxo (V1)
+    { bg: "rgba(6, 182, 212, 0.12)", clipBg: "rgba(6, 182, 212, 0.25)", border: "rgba(6, 182, 212, 0.7)", wave: "rgba(6, 182, 212, 0.4)" },   // ciano (V2)
     { bg: "rgba(236, 72, 153, 0.12)", clipBg: "rgba(236, 72, 153, 0.22)", border: "rgba(236, 72, 153, 0.65)", wave: "rgba(236, 72, 153, 0.4)" }, // rosa
     { bg: "rgba(245, 158, 11, 0.10)", clipBg: "rgba(245, 158, 11, 0.20)", border: "rgba(245, 158, 11, 0.6)", wave: "rgba(245, 158, 11, 0.4)" },  // âmbar
-    { bg: "rgba(16, 185, 129, 0.10)", clipBg: "rgba(16, 185, 129, 0.20)", border: "rgba(16, 185, 129, 0.6)", wave: "rgba(16, 185, 129, 0.4)" }   // esmeralda
+    { bg: "rgba(59, 130, 246, 0.10)", clipBg: "rgba(59, 130, 246, 0.20)", border: "rgba(59, 130, 246, 0.6)", wave: "rgba(59, 130, 246, 0.4)" }   // azul
 ];
 
 const AI_TRACK_STYLE = {
@@ -154,13 +154,16 @@ export class CapiauTimelineRenderer {
         return null;
     }
 
-    /** Estilo visual de uma pista de vídeo pelo índice entre as pistas de vídeo. */
+    /** Estilo visual de uma pista de vídeo pelo identificador ou índice entre as pistas de vídeo. */
     getTrackStyle(track) {
         if (track.kind === "ai") return AI_TRACK_STYLE;
         if (track.kind === "audio") return AUDIO_TRACK_STYLE;
-        const videoTracks = TIMELINE_STATE.getVideoTracks();
-        const idx = videoTracks.findIndex(t => t.id === track.id);
-        return TRACK_PALETTE[((idx % TRACK_PALETTE.length) + TRACK_PALETTE.length) % TRACK_PALETTE.length];
+        if (track.id === "V1") return TRACK_PALETTE[0]; // roxo clássico NLE para pista principal
+        if (track.id === "V2") return TRACK_PALETTE[1]; // ciano para B-Roll
+        const otherVideoTracks = TIMELINE_STATE.getVideoTracks().filter(t => t.id !== "V1" && t.id !== "V2");
+        const idx = otherVideoTracks.findIndex(t => t.id === track.id);
+        const paletteIdx = idx >= 0 ? 2 + (idx % (TRACK_PALETTE.length - 2)) : 0;
+        return TRACK_PALETTE[paletteIdx];
     }
 
     // ── CICLO DE VIDA ───────────────────────────────────────────────────
