@@ -49,6 +49,33 @@ export class FaceManager {
                 if (e.key === "Escape") { e.preventDefault(); this.closeInspector(); return; }
                 if (e.key === "a" || e.key === "A") { e.preventDefault(); this.advanceInspector(); return; }
                 if (e.key === "s" || e.key === "S") { e.preventDefault(); this.regressInspector(); return; }
+                
+                // Na Fase 3 (Dinâmica Temporal)
+                if (this.inspectorState === 3 && this._temporalData) {
+                    if (this._temporalData.type === "photo") {
+                        if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+                            e.preventDefault();
+                            this.stepInspector(e.key === "ArrowLeft" ? -1 : 1);
+                            return;
+                        }
+                        if (e.key === "ArrowLeft") { e.preventDefault(); this.stepFilmstrip(-1); return; }
+                        if (e.key === "ArrowRight") { e.preventDefault(); this.stepFilmstrip(1); return; }
+                    } else if (this._temporalData.type === "video") {
+                        if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+                            e.preventDefault();
+                            this.stepInspector(e.key === "ArrowLeft" ? -1 : 1);
+                            return;
+                        }
+                        if (e.key === "ArrowLeft") { e.preventDefault(); this.scrubVideoDelta(-0.1); return; }
+                        if (e.key === "ArrowRight") { e.preventDefault(); this.scrubVideoDelta(0.1); return; }
+                        if (e.code === "Space" || e.key === " ") {
+                            e.preventDefault();
+                            this.toggleVideoLoop();
+                            return;
+                        }
+                    }
+                }
+
                 if (e.key === "ArrowLeft")  { e.preventDefault(); this.stepInspector(-1); return; }
                 if (e.key === "ArrowRight") { e.preventDefault(); this.stepInspector(1);  return; }
                 if (e.code === "Space" || e.key === " ") {
@@ -1857,6 +1884,16 @@ export class FaceManager {
         overlay.innerHTML = `
             <div class="fi-stage">
                 <div class="fi-media"><div class="fi-wrap"></div></div>
+                <div class="fi-split-view" style="display: none;">
+                    <div class="fi-split-panel fi-split-left">
+                        <div class="fi-split-title"><span>Âncora (Atual)</span></div>
+                        <div class="fi-split-media fi-split-media-left"></div>
+                    </div>
+                    <div class="fi-split-panel fi-split-right">
+                        <div class="fi-split-title"><span class="fi-split-right-title">Disparo Vizinho</span></div>
+                        <div class="fi-split-media fi-split-media-right"></div>
+                    </div>
+                </div>
                 <div class="fi-minimap"><img class="fi-minimap-img" alt=""><div class="fi-minimap-rect"></div></div>
                 <div class="fi-caption"></div>
                 <div class="fi-badge"><span class="fi-dot"></span><span class="fi-badge-text"></span></div>
@@ -1864,7 +1901,6 @@ export class FaceManager {
                 <div class="fi-actions">
                     <button class="fi-edit-toggle" title="Ajustes de imagem (exposição, contraste, saturação)"><i class="fa-solid fa-sliders"></i></button>
                     <button class="fi-raw" title="Ver o RAW em resolução total, sem tratamento"><i class="fa-solid fa-camera"></i> RAW</button>
-                    <button class="fi-redo" title="Gerar a restauração novamente"><i class="fa-solid fa-rotate"></i> Refazer</button>
                 </div>
                 <div class="fi-edit">
                     <label>Exposição<input type="range" class="fi-ed" data-k="b" min="0.4" max="2.2" step="0.02" value="1"></label>
@@ -1872,19 +1908,58 @@ export class FaceManager {
                     <label>Saturação<input type="range" class="fi-ed" data-k="s" min="0" max="2" step="0.02" value="1"></label>
                     <button class="fi-ed-reset" title="Restaurar ajustes">Reset</button>
                 </div>
-                <div class="fi-loading"><div class="fi-spin"></div><span>Restaurando rosto…</span></div>
+                <div class="fi-loading"><div class="fi-spin"></div><span>Carregando…</span></div>
+
+                <!-- Barra de Contexto Temporal (Passo 3): Filmstrip (Fotos) OU Scrubber (Vídeos) -->
+                <div class="fi-temporal-bar" style="display: none;">
+                    <!-- Para Fotos: Filmstrip de disparos do mesmo momento -->
+                    <div class="fi-filmstrip-wrap" style="display: none;">
+                        <div class="fi-filmstrip-label"><i class="fa-solid fa-camera-retro"></i> Disparos do mesmo momento:</div>
+                        <div class="fi-filmstrip-items"></div>
+                    </div>
+                    
+                    <!-- Para Vídeos: Jog-Scrubber de movimento com controle manual de janela -->
+                    <div class="fi-scrubber-wrap" style="display: none;">
+                        <div class="fi-scrubber-top">
+                            <div class="fi-scrubber-info">
+                                <button class="fi-btn-play-loop" title="Play/Pause no trecho (Espaço)"><i class="fa-solid fa-play"></i></button>
+                                <span class="fi-scrub-time-label">0.0s</span>
+                            </div>
+                            <div class="fi-scrubber-window-ctrl">
+                                <span class="fi-window-label">Janela:</span>
+                                <div class="fi-window-pills">
+                                    <button class="fi-win-btn" data-win="1.0">±1s</button>
+                                    <button class="fi-win-btn active" data-win="2.5">±2.5s</button>
+                                    <button class="fi-win-btn" data-win="5.0">±5s</button>
+                                    <button class="fi-win-btn" data-win="10.0">±10s</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="fi-scrubber-track-container">
+                            <div class="fi-scrub-track">
+                                <div class="fi-scrub-detect-marker" title="Momento da detecção"></div>
+                                <div class="fi-scrub-playhead"></div>
+                            </div>
+                            <div class="fi-scrub-ticks"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="fi-controls">
                     <div class="fi-steps">
-                        <span class="fi-step" data-step="1" title="1/3 · Contexto"></span>
-                        <span class="fi-step" data-step="2" title="2/3 · Zoom no Rosto"></span>
-                        <span class="fi-step" data-step="3" title="3/3 · Restauração HD"></span>
+                        <span class="fi-step" data-step="1" title="1/3 · Contexto Geral"></span>
+                        <span class="fi-step" data-step="2" title="2/3 · Foco no Rosto"></span>
+                        <span class="fi-step" data-step="3" title="3/3 · Dinâmica Temporal"></span>
                     </div>
                     <div class="fi-hints">
                         <span><kbd>A</kbd>avançar</span>
                         <span><kbd>S</kbd>voltar</span>
-                        <span><kbd>scroll</kbd>zoom</span>
-                        <span><kbd>espaço</kbd>+arraste mover</span>
-                        <span><kbd>←</kbd><kbd>→</kbd>trocar</span>
+                        <span class="fi-hint-step3-photo" style="display: none;"><kbd>←</kbd><kbd>→</kbd>foto vizinha</span>
+                        <span class="fi-hint-step3-video" style="display: none;"><kbd>scroll</kbd>/<kbd>←</kbd><kbd>→</kbd>scrub</span>
+                        <span class="fi-hint-step3-video-play" style="display: none;"><kbd>espaço</kbd>play/pause</span>
+                        <span class="fi-hint-general"><kbd>scroll</kbd>zoom</span>
+                        <span class="fi-hint-pan"><kbd>espaço</kbd>+arraste</span>
+                        <span class="fi-hint-step-card"><kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd>trocar rosto</span>
                         <span><kbd>Esc</kbd>fechar</span>
                     </div>
                 </div>
@@ -1904,18 +1979,17 @@ export class FaceManager {
             });
         });
 
-        // Fechar / refazer
+        // Fechar
         overlay.addEventListener("click", (e) => { if (!e.target.closest(".fi-stage") && !e.target.closest(".fi-minimap")) this.closeInspector(); });
         overlay.querySelector(".fi-close").addEventListener("click", (e) => { e.stopPropagation(); this.closeInspector(); });
-        overlay.querySelector(".fi-redo").addEventListener("click", (e) => { e.stopPropagation(); this.redoEnhance(); });
+        
+        // RAW
         overlay.querySelector(".fi-raw").addEventListener("click", (e) => {
             e.stopPropagation();
             const on = !this._rawPref();
             localStorage.setItem("fi_raw_full", on ? "1" : "0");
-            this._enhCache = {}; // preferência global mudou → invalida o cache de restaurações
             overlay.querySelector(".fi-raw").classList.toggle("on", on);
-            if (this.inspectorState === 3) this.redoEnhance();      // re-restaura o crop
-            else if (this.inspectorState === 2) this._reapplyZoomSource(); // troca proxy↔RAW no zoom
+            if (this.inspectorState === 2) this._reapplyZoomSource();
         });
 
         // Ajustes de imagem (Exposição/Contraste/Saturação) — filtros CSS ao vivo
@@ -1945,10 +2019,70 @@ export class FaceManager {
             this._fiApplyEdits();
         });
 
-        // Zoom com a roda do mouse, focado no cursor (1x–10x)
+        // Controle de janela temporal de vídeo (Pills ±1s, ±2.5s, ±5s, ±10s)
+        overlay.querySelectorAll(".fi-win-btn").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.setScrubWindow(btn.dataset.win);
+            });
+        });
+
+        // Botão Play/Pause de loop no trecho de vídeo
+        const btnPlayLoop = overlay.querySelector(".fi-btn-play-loop");
+        if (btnPlayLoop) {
+            btnPlayLoop.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.toggleVideoLoop();
+            });
+        }
+
+        // Clique/arraste na régua de scrubbing
+        const scrubTrackContainer = overlay.querySelector(".fi-scrubber-track-container");
+        if (scrubTrackContainer) {
+            const handleTrackScrub = (e) => {
+                if (!this._temporalData || this._temporalData.type !== "video") return;
+                const r = scrubTrackContainer.getBoundingClientRect();
+                const pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+                const res = this._temporalData;
+                const targetTs = res.window_start + pct * (res.window_end - res.window_start);
+                const video = this._fiMediaEl();
+                if (video && video.tagName === "VIDEO") {
+                    video.currentTime = targetTs;
+                }
+                const playhead = overlay.querySelector(".fi-scrub-playhead");
+                const timeLabel = overlay.querySelector(".fi-scrub-time-label");
+                if (playhead) playhead.style.left = `${pct * 100}%`;
+                if (timeLabel) {
+                    const diff = targetTs - res.current_timestamp;
+                    const diffStr = diff >= 0 ? `+${diff.toFixed(2)}s` : `${diff.toFixed(2)}s`;
+                    timeLabel.textContent = `${targetTs.toFixed(2)}s (${diffStr})`;
+                }
+            };
+
+            let isScrubbing = false;
+            scrubTrackContainer.addEventListener("mousedown", (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                isScrubbing = true;
+                handleTrackScrub(e);
+            });
+            window.addEventListener("mousemove", (e) => {
+                if (isScrubbing) handleTrackScrub(e);
+            });
+            window.addEventListener("mouseup", () => {
+                isScrubbing = false;
+            });
+        }
+
+        // Zoom com a roda do mouse (Fases 1 e 2) ou Scrubbing em vídeo (Fase 3)
         media.addEventListener("wheel", (e) => {
             if (!this.inspectorCard) return;
             e.preventDefault();
+            if (this.inspectorState === 3 && this._temporalData && this._temporalData.type === "video") {
+                const delta = e.deltaY > 0 ? 0.08 : -0.08;
+                this.scrubVideoDelta(delta);
+                return;
+            }
             const factor = -e.deltaY > 0 ? 1.25 : 0.8;
             const target = Math.min(10, Math.max(1, (this.fiScale || 1) * factor));
             if (target <= 1.01) this._fiResetView(true);
@@ -1957,7 +2091,7 @@ export class FaceManager {
 
         // Pan com arraste (espaço pressionado, botão do meio, ou já ampliado)
         media.addEventListener("mousedown", (e) => {
-            if (!this.inspectorCard || e.target.closest(".fi-minimap")) return;
+            if (!this.inspectorCard || e.target.closest(".fi-minimap") || this.inspectorState === 3) return;
             const left = e.button === 0, mid = e.button === 1;
             if (this.fiSpace || mid || ((this.fiScale || 1) > 1.05 && left)) {
                 this.fiPanning = true;
@@ -2016,6 +2150,7 @@ export class FaceManager {
         this.inspectorFaceId = faceId;
         this.inspectorDetail = null;
         this.inspectorState = 0;
+        this._temporalData = null;
         this._fiResetView(false);
 
         this._growStageFromCard(card);
@@ -2050,15 +2185,27 @@ export class FaceManager {
         this.inspectorState = step;
         this._syncInspectorChrome();
 
+        const overlay = this._inspectorEl;
+        const splitView = overlay.querySelector(".fi-split-view");
+        const mediaView = overlay.querySelector(".fi-media");
+        const tempBar = overlay.querySelector(".fi-temporal-bar");
+
         if (step === 1) {
+            splitView.style.display = "none";
+            tempBar.style.display = "none";
+            mediaView.style.display = "block";
             return this._renderContext();
         } else if (step === 2) {
+            splitView.style.display = "none";
+            tempBar.style.display = "none";
+            mediaView.style.display = "block";
             if (prev === 3) {
                 await this._renderContext();
             }
             return this._renderZoom();
         } else if (step === 3) {
-            return this._renderEnhanced(false);
+            overlay.querySelector(".fi-minimap").style.display = "none";
+            return this._renderTemporalContext();
         }
     }
 
@@ -2081,25 +2228,58 @@ export class FaceManager {
         if (!overlay) return;
         const s = this.inspectorState;
         overlay.querySelectorAll(".fi-step").forEach(el => el.classList.toggle("on", parseInt(el.dataset.step) <= s));
-        const labels = { 1: "1/3 · Contexto", 2: "2/3 · Zoom no rosto", 3: "3/3 · Restauração HD" };
+        
+        const isPhoto = !this.inspectorDetail || !this.inspectorDetail.video_id;
+        const labels = {
+            1: "1/3 · Contexto Geral",
+            2: "2/3 · Foco no Rosto",
+            3: isPhoto ? "3/3 · Disparos da Cena" : "3/3 · Movimento do Rosto"
+        };
         overlay.querySelector(".fi-badge-text").textContent = labels[s] || "";
         overlay.querySelector(".fi-badge").classList.toggle("is-hd", s === 3);
 
-        // Ações: aparecem ao inspecionar de perto (Estados 2 e 3)
+        // Ações: aparecem nos Estados 2 e 3
         const zoomed = (s === 2 || s === 3);
         overlay.querySelector(".fi-actions").style.display = zoomed ? "flex" : "none";
         overlay.querySelector(".fi-edit-toggle").style.display = zoomed ? "inline-flex" : "none";
-        // RAW: Estados 2 e 3, apenas fotos RAW
+        
+        // RAW: apenas fotos RAW
         const rawBtn = overlay.querySelector(".fi-raw");
         const showRaw = zoomed && this._isRawPhoto();
         rawBtn.style.display = showRaw ? "inline-flex" : "none";
         if (showRaw) rawBtn.classList.toggle("on", this._rawPref());
-        // Refazer: só no Estado 3 (é sobre o crop restaurado)
-        overlay.querySelector(".fi-redo").style.display = (s === 3) ? "inline-flex" : "none";
+
         // Painel de ajustes some fora dos estados 2/3
         if (!zoomed) {
             overlay.querySelector(".fi-edit").style.display = "none";
             overlay.querySelector(".fi-edit-toggle").classList.remove("on");
+        }
+
+        // Hints
+        const hintPhoto = overlay.querySelector(".fi-hint-step3-photo");
+        const hintVideo = overlay.querySelector(".fi-hint-step3-video");
+        const hintVideoPlay = overlay.querySelector(".fi-hint-step3-video-play");
+        const hintGeneral = overlay.querySelector(".fi-hint-general");
+        const hintPan = overlay.querySelector(".fi-hint-pan");
+
+        if (s === 3) {
+            if (isPhoto) {
+                if (hintPhoto) hintPhoto.style.display = "inline-flex";
+                if (hintVideo) hintVideo.style.display = "none";
+                if (hintVideoPlay) hintVideoPlay.style.display = "none";
+            } else {
+                if (hintPhoto) hintPhoto.style.display = "none";
+                if (hintVideo) hintVideo.style.display = "inline-flex";
+                if (hintVideoPlay) hintVideoPlay.style.display = "inline-flex";
+            }
+            if (hintGeneral) hintGeneral.style.display = "none";
+            if (hintPan) hintPan.style.display = "none";
+        } else {
+            if (hintPhoto) hintPhoto.style.display = "none";
+            if (hintVideo) hintVideo.style.display = "none";
+            if (hintVideoPlay) hintVideoPlay.style.display = "none";
+            if (hintGeneral) hintGeneral.style.display = "inline-flex";
+            if (hintPan) hintPan.style.display = "inline-flex";
         }
     }
 
@@ -2167,7 +2347,7 @@ export class FaceManager {
             if (this.inspectorFaceId !== faceId || this.inspectorState !== 2) return;
             const cur = this._fiMediaEl();
             if (cur && cur.tagName === "IMG") { cur.src = rawUrl; cur.dataset.raw = "1"; }
-            badge.textContent = "2/3 · Zoom no rosto (RAW)";
+            badge.textContent = "2/3 · Foco no Rosto (RAW)";
         };
         probe.onerror = () => { if (this.inspectorState === 2) badge.textContent = prev; };
         probe.src = rawUrl;
@@ -2265,7 +2445,6 @@ export class FaceManager {
         if (!el || !media) return;
         const dispW = el.offsetWidth, dispH = el.offsetHeight;
         if (!dispW || !dispH) {
-            // mídia ainda sem layout (ex.: vídeo sem metadados) — tenta de novo
             if ((tries || 0) < 20) requestAnimationFrame(() => this._fiFocusBox(box, (tries || 0) + 1));
             return;
         }
@@ -2278,7 +2457,32 @@ export class FaceManager {
         this.fiScale = scale;
         this.fiPanX = -((cx - 0.5) * dispW) * scale;
         this.fiPanY = -((cy - 0.5) * dispH) * scale;
-        this._fiUpdateTransform(true, 0.7); // ~1,5x mais lento que antes
+        this._fiUpdateTransform(true, 0.7);
+    }
+
+    // Enquadra um elemento de imagem dentro de um contêiner arbitrário (Split-Screen)
+    static _fiFocusElementBox(container, img, box, tries) {
+        if (!container || !img) return;
+        const dispW = img.offsetWidth, dispH = img.offsetHeight;
+        if (!dispW || !dispH) {
+            if ((tries || 0) < 20) requestAnimationFrame(() => this._fiFocusElementBox(container, img, box, (tries || 0) + 1));
+            return;
+        }
+        if (!box || !Array.isArray(box) || box.length < 4) {
+            img.style.transform = "scale(1)";
+            return;
+        }
+        const [bx, by, bw, bh] = box.map(Number);
+        const cx = bx + bw / 2, cy = by + bh / 2;
+        const Wv = container.clientWidth, Hv = container.clientHeight;
+        const zH = 0.65 * Hv / Math.max(bh * dispH, 1);
+        const zW = 0.85 * Wv / Math.max(bw * dispW, 1);
+        const scale = Math.max(1.3, Math.min(8, Math.min(zH, zW)));
+        const panX = -((cx - 0.5) * dispW) * scale;
+        const panY = -((cy - 0.5) * dispH) * scale;
+        img.style.transformOrigin = "center center";
+        img.style.transition = "transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)";
+        img.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${scale})`;
     }
 
     static _fiUpdateMinimap() {
@@ -2321,7 +2525,7 @@ export class FaceManager {
         if (!detail) {
             try { detail = await CapIAuAPI.request(`/api/faces/face/${faceId}`); }
             catch (e) { console.error("[Inspector] erro ao buscar detalhe:", e); return; }
-            if (this.inspectorFaceId !== faceId || !this.inspectorCard) return; // corrida
+            if (this.inspectorFaceId !== faceId || !this.inspectorCard) return;
             this.inspectorDetail = detail;
         }
 
@@ -2353,68 +2557,278 @@ export class FaceManager {
         if (!el || !detail) return;
         let box = detail.bounding_box;
         if (typeof box === "string") { try { box = JSON.parse(box); } catch (e) {} }
-        if (!Array.isArray(box) || box.length < 4) return; // sem caixa: mantém o contexto
+        if (!Array.isArray(box) || box.length < 4) return;
         this._fiFocusBox(box, 0);
-        // Modo RAW: carrega o RAW nativo (resolução total, sem tratamento) sobre o zoom
         if (this._isRawPhoto() && this._rawPref()) this._loadRawNative();
     }
 
-    // ESTADO 3 — crop restaurado/realçado do rosto (elemento novo, sem zoom residual)
-    static async _renderEnhanced(force) {
+    // ESTADO 3 — Dinâmica Temporal: Split Comparativo (Fotos) ou Jog-Scrubber (Vídeos)
+    static async _renderTemporalContext() {
         const overlay = this._inspectorEl;
         const caption = overlay.querySelector(".fi-caption");
         const loading = overlay.querySelector(".fi-loading");
         const badge = overlay.querySelector(".fi-badge-text");
         const faceId = this.inspectorFaceId;
 
-        this._fiResetView(false);
-        this._enhCache = this._enhCache || {};
+        const winSec = this._scrubWinSec || parseFloat(localStorage.getItem("fi_scrub_win") || "2.5");
+        this._scrubWinSec = winSec;
 
-        let entry = force ? null : this._enhCache[faceId];
-        if (!entry) {
-            loading.classList.add("active");
-            const useRaw = this._isRawPhoto() && this._rawPref();
-            badge.textContent = useRaw ? "3/3 · Restaurando RAW…" : "3/3 · Restaurando…";
-            try {
-                const res = await CapIAuAPI.enhanceFace(faceId, useRaw);
-                if (res && res.enhanced_url) {
-                    // Sempre com cache-busting: o browser nunca reexibe uma restauração antiga/errada.
-                    const u = `${res.enhanced_url}${res.enhanced_url.includes("?") ? "&" : "?"}t=${Date.now()}`;
-                    entry = { url: u, method: res.method || "fast" };
-                    this._enhCache[faceId] = entry;
-                }
-            } catch (e) {
-                console.error("[Inspector] erro no aprimoramento:", e);
-            }
-            loading.classList.remove("active");
+        loading.classList.add("active");
+        loading.querySelector("span").textContent = "Buscando contexto temporal…";
+        badge.textContent = "3/3 · Carregando…";
+
+        let res = null;
+        try {
+            res = await CapIAuAPI.fetchFaceContextMedia(faceId, winSec);
+        } catch (e) {
+            console.error("[Inspector] Erro ao buscar contexto temporal:", e);
         }
+        loading.classList.remove("active");
 
-        // corrida: fechou / trocou de rosto / recuou durante o await?
         if (this.inspectorFaceId !== faceId || this.inspectorState !== 3 || !this.inspectorCard) return;
 
-        if (entry) {
-            const img = document.createElement("img");
-            img.src = entry.url;
-            this._fiSetMedia(img, entry.url);
-            badge.textContent = `3/3 · HD (${entry.method})`;
-            caption.textContent = "Rosto restaurado";
-        } else {
-            // Falha: NÃO volta ao passo 2 (senão 'a' reprocessa). Mantém 3/3 com aviso.
-            badge.textContent = "3/3 · HD (indisponível)";
-            caption.textContent = "Não foi possível restaurar (arquivo de origem ausente?)";
+        if (!res || res.status !== "ok") {
+            badge.textContent = "3/3 · Contexto indisponível";
+            caption.textContent = res ? res.message : "Erro ao carregar contexto temporal.";
+            return;
+        }
+
+        this._temporalData = res;
+
+        const splitView = overlay.querySelector(".fi-split-view");
+        const mediaView = overlay.querySelector(".fi-media");
+        const tempBar = overlay.querySelector(".fi-temporal-bar");
+        const filmstripWrap = overlay.querySelector(".fi-filmstrip-wrap");
+        const scrubberWrap = overlay.querySelector(".fi-scrubber-wrap");
+
+        tempBar.style.display = "flex";
+
+        if (res.type === "photo") {
+            mediaView.style.display = "none";
+            splitView.style.display = "flex";
+            filmstripWrap.style.display = "flex";
+            scrubberWrap.style.display = "none";
+
+            this._syncInspectorChrome();
+            badge.textContent = `3/3 · Disparos da Cena (${res.photos.length} fotos)`;
+
+            // 1) Renderiza Âncora à esquerda
+            const leftWrap = overlay.querySelector(".fi-split-media-left");
+            leftWrap.innerHTML = "";
+            const curPhoto = res.photos.find(p => p.is_current) || res.photos[0];
+            if (curPhoto) {
+                const anchorImg = document.createElement("img");
+                anchorImg.src = curPhoto.file_url || curPhoto.proxy_url;
+                anchorImg.onload = () => {
+                    this._fiFocusElementBox(leftWrap, anchorImg, res.current_box);
+                };
+                leftWrap.appendChild(anchorImg);
+            }
+
+            // 2) Renderiza Filmstrip na base
+            const itemsContainer = overlay.querySelector(".fi-filmstrip-items");
+            itemsContainer.innerHTML = "";
+            
+            let initialNeighborId = null;
+            res.photos.forEach((p) => {
+                const item = document.createElement("div");
+                item.className = `fi-filmstrip-item ${p.is_current ? 'is-anchor' : ''}`;
+                item.dataset.photoId = p.id;
+                
+                const deltaLabel = p.is_current ? "★ Atual" : (p.delta_seconds > 0 ? `+${p.delta_seconds}s` : `${p.delta_seconds}s`);
+                item.innerHTML = `
+                    <img src="${p.proxy_url}" alt="${p.filename}" loading="lazy">
+                    <span class="fi-filmstrip-badge">${deltaLabel}</span>
+                `;
+                item.addEventListener("click", () => {
+                    this._selectSplitNeighbor(p.id);
+                });
+                itemsContainer.appendChild(item);
+
+                if (!p.is_current && initialNeighborId === null) {
+                    initialNeighborId = p.id;
+                }
+            });
+
+            if (initialNeighborId === null && res.photos.length > 0) {
+                initialNeighborId = res.photos[0].id;
+            }
+
+            if (initialNeighborId !== null) {
+                this._selectSplitNeighbor(initialNeighborId);
+            }
+
+        } else if (res.type === "video") {
+            mediaView.style.display = "block";
+            splitView.style.display = "none";
+            filmstripWrap.style.display = "none";
+            scrubberWrap.style.display = "flex";
+
+            this._syncInspectorChrome();
+            badge.textContent = `3/3 · Movimento do Rosto (±${res.window_seconds}s)`;
+
+            let video = mediaView.querySelector("video");
+            if (!video) {
+                video = document.createElement("video");
+                video.src = res.stream_url;
+                video.muted = true; video.playsInline = true; video.preload = "auto";
+                this._fiSetMedia(video);
+            }
+            
+            video.currentTime = res.current_timestamp;
+            caption.textContent = `${res.filename} · ${res.current_timestamp.toFixed(2)}s`;
+
+            this._setupVideoScrubber(res, video);
         }
     }
 
-    // Refazer restauração: regenera no servidor e recarrega sem cache
-    static redoEnhance() {
-        if (!this.inspectorCard) return;
-        const btn = this._inspectorEl.querySelector(".fi-redo");
-        if (btn && btn.classList.contains("busy")) return; // evita clique duplo
-        if (btn) btn.classList.add("busy");
-        if (this._enhCache) delete this._enhCache[this.inspectorFaceId];
-        this.inspectorState = 3;
-        this._syncInspectorChrome();
-        Promise.resolve(this._renderEnhanced(true)).finally(() => { if (btn) btn.classList.remove("busy"); });
+    static _selectSplitNeighbor(photoId) {
+        if (!this._temporalData || !this._temporalData.photos) return;
+        const overlay = this._inspectorEl;
+        const photo = this._temporalData.photos.find(p => p.id === photoId);
+        if (!photo) return;
+
+        this._selectedNeighborId = photoId;
+
+        overlay.querySelectorAll(".fi-filmstrip-item").forEach(el => {
+            el.classList.toggle("active", parseInt(el.dataset.photoId) === photoId);
+        });
+
+        const deltaLabel = photo.is_current ? "Disparo Atual" : (photo.delta_seconds >= 0 ? `Disparo +${photo.delta_seconds}s` : `Disparo ${photo.delta_seconds}s`);
+        const titleEl = overlay.querySelector(".fi-split-right-title");
+        if (titleEl) titleEl.textContent = `${deltaLabel} (${photo.filename})`;
+
+        const curPhoto = this._temporalData.photos.find(p => p.is_current);
+        overlay.querySelector(".fi-caption").textContent = `${curPhoto ? curPhoto.filename : ''}  ⟷  ${photo.filename}`;
+
+        const rightWrap = overlay.querySelector(".fi-split-media-right");
+        rightWrap.innerHTML = "";
+
+        const img = document.createElement("img");
+        img.src = photo.file_url || photo.proxy_url;
+
+        let targetBox = null;
+        if (photo.faces && photo.faces.length > 0) {
+            const matching = photo.faces.find(f => f.is_matching_cluster);
+            targetBox = matching ? matching.bounding_box : photo.faces[0].bounding_box;
+        }
+
+        img.onload = () => {
+            this._fiFocusElementBox(rightWrap, img, targetBox);
+        };
+        rightWrap.appendChild(img);
+    }
+
+    static stepFilmstrip(dir) {
+        if (!this._temporalData || !this._temporalData.photos || this._temporalData.photos.length <= 1) return;
+        const photos = this._temporalData.photos;
+        const curIdx = photos.findIndex(p => p.id === this._selectedNeighborId);
+        let nextIdx = (curIdx === -1 ? 0 : curIdx) + dir;
+        if (nextIdx < 0) nextIdx = photos.length - 1;
+        if (nextIdx >= photos.length) nextIdx = 0;
+        this._selectSplitNeighbor(photos[nextIdx].id);
+
+        const activeItem = this._inspectorEl.querySelector(`.fi-filmstrip-item[data-photo-id="${photos[nextIdx].id}"]`);
+        if (activeItem) {
+            try { activeItem.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" }); } catch (e) {}
+        }
+    }
+
+    static _setupVideoScrubber(res, video) {
+        const overlay = this._inspectorEl;
+        const playhead = overlay.querySelector(".fi-scrub-playhead");
+        const detectMarker = overlay.querySelector(".fi-scrub-detect-marker");
+        const timeLabel = overlay.querySelector(".fi-scrub-time-label");
+        const ticksContainer = overlay.querySelector(".fi-scrub-ticks");
+
+        overlay.querySelectorAll(".fi-win-btn").forEach(btn => {
+            btn.classList.toggle("active", parseFloat(btn.dataset.win) === res.window_seconds);
+        });
+
+        const wStart = res.window_start;
+        const wEnd = res.window_end;
+        const curTs = res.current_timestamp;
+        const wSec = res.window_seconds;
+
+        const detectPct = ((curTs - wStart) / Math.max(0.1, wEnd - wStart)) * 100;
+        detectMarker.style.left = `${Math.max(0, Math.min(100, detectPct))}%`;
+
+        ticksContainer.innerHTML = `
+            <span>-${wSec.toFixed(1)}s (${wStart.toFixed(1)}s)</span>
+            <span style="color: #f59e0b; font-weight:600;">★ Detecção (${curTs.toFixed(1)}s)</span>
+            <span>+${wSec.toFixed(1)}s (${wEnd.toFixed(1)}s)</span>
+        `;
+
+        const updatePlayhead = (ts) => {
+            const pct = ((ts - wStart) / Math.max(0.1, wEnd - wStart)) * 100;
+            playhead.style.left = `${Math.max(0, Math.min(100, pct))}%`;
+            const delta = ts - curTs;
+            const deltaStr = delta >= 0 ? `+${delta.toFixed(2)}s` : `${delta.toFixed(2)}s`;
+            timeLabel.textContent = `${ts.toFixed(2)}s (${deltaStr})`;
+        };
+
+        updatePlayhead(video.currentTime || curTs);
+
+        if (this._videoTimeUpdateHandler) {
+            video.removeEventListener("timeupdate", this._videoTimeUpdateHandler);
+        }
+        this._videoTimeUpdateHandler = () => {
+            if (this.inspectorState === 3 && this._temporalData && this._temporalData.type === "video") {
+                if (video.currentTime >= wEnd) {
+                    video.currentTime = wStart;
+                } else if (video.currentTime < wStart) {
+                    video.currentTime = wStart;
+                }
+                updatePlayhead(video.currentTime);
+            }
+        };
+        video.addEventListener("timeupdate", this._videoTimeUpdateHandler);
+    }
+
+    static scrubVideoDelta(delta) {
+        if (!this._temporalData || this._temporalData.type !== "video") return;
+        const video = this._fiMediaEl();
+        if (!video || video.tagName !== "VIDEO") return;
+        const res = this._temporalData;
+        const nextTime = Math.max(res.window_start, Math.min(res.window_end, (video.currentTime || res.current_timestamp) + delta));
+        video.currentTime = nextTime;
+        const timeLabel = this._inspectorEl.querySelector(".fi-scrub-time-label");
+        const playhead = this._inspectorEl.querySelector(".fi-scrub-playhead");
+        if (playhead) {
+            const pct = ((nextTime - res.window_start) / Math.max(0.1, res.window_end - res.window_start)) * 100;
+            playhead.style.left = `${Math.max(0, Math.min(100, pct))}%`;
+        }
+        if (timeLabel) {
+            const diff = nextTime - res.current_timestamp;
+            const diffStr = diff >= 0 ? `+${diff.toFixed(2)}s` : `${diff.toFixed(2)}s`;
+            timeLabel.textContent = `${nextTime.toFixed(2)}s (${diffStr})`;
+        }
+        this._inspectorEl.querySelector(".fi-caption").textContent = `${res.filename} · ${nextTime.toFixed(2)}s`;
+    }
+
+    static toggleVideoLoop() {
+        if (!this._temporalData || this._temporalData.type !== "video") return;
+        const video = this._fiMediaEl();
+        if (!video || video.tagName !== "VIDEO") return;
+        const playBtn = this._inspectorEl.querySelector(".fi-btn-play-loop");
+        if (video.paused) {
+            if (video.currentTime >= this._temporalData.window_end || video.currentTime < this._temporalData.window_start) {
+                video.currentTime = this._temporalData.window_start;
+            }
+            video.play().catch(() => {});
+            if (playBtn) playBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        } else {
+            video.pause();
+            if (playBtn) playBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+        }
+    }
+
+    static setScrubWindow(winSec) {
+        this._scrubWinSec = parseFloat(winSec);
+        try { localStorage.setItem("fi_scrub_win", String(this._scrubWinSec)); } catch (e) {}
+        if (this.inspectorState === 3 && this._temporalData && this._temporalData.type === "video") {
+            this._renderTemporalContext();
+        }
     }
 
     // Setas ← → : troca o inspetor para o rosto anterior/próximo do grid
@@ -2438,6 +2852,7 @@ export class FaceManager {
         this.inspectorFaceId = nextCard.dataset.faceId;
         this.inspectorDetail = null;
         this.inspectorState = 0;
+        this._temporalData = null;
         this._fiResetView(false);
         this._syncInspectorChrome();
         this.advanceInspector();
@@ -2450,15 +2865,30 @@ export class FaceManager {
         this.inspectorFaceId = null;
         this.inspectorDetail = null;
         this.inspectorState = 0;
+        this._temporalData = null;
         this.fiSpace = false; this.fiPanning = false;
         if (!overlay) return;
 
         const stage = overlay.querySelector(".fi-stage");
         const media = overlay.querySelector(".fi-media");
         const video = overlay.querySelector(".fi-wrap video");
-        if (video) video.pause();
+        if (video) {
+            video.pause();
+            if (this._videoTimeUpdateHandler) {
+                video.removeEventListener("timeupdate", this._videoTimeUpdateHandler);
+            }
+        }
         media.classList.remove("is-panning", "space-mode");
         overlay.querySelector(".fi-loading").classList.remove("active");
+
+        const splitView = overlay.querySelector(".fi-split-view");
+        const tempBar = overlay.querySelector(".fi-temporal-bar");
+        if (splitView) splitView.style.display = "none";
+        if (tempBar) tempBar.style.display = "none";
+        if (media) media.style.display = "block";
+
+        const playBtn = overlay.querySelector(".fi-btn-play-loop");
+        if (playBtn) playBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
 
         // Encolhe o palco de volta ao card de origem
         if (card && stage) {
