@@ -5346,33 +5346,129 @@ select option, .nle-select option {
     text-shadow: 0 0 8px var(--color-violet);
 }
 
-/* Menu de Contexto Customizado */
+/* Menu de Contexto Customizado Flat & Seamless */
 .custom-context-menu {
     position: fixed;
-    z-index: 10000;
+    z-index: 100000;
     background: rgba(18, 18, 24, 0.95);
     backdrop-filter: blur(15px);
     border: 1px solid var(--border-glass);
     border-radius: 6px;
     padding: 4px 0;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 10px rgba(139, 92, 246, 0.15);
-    width: 200px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 10px rgba(139, 92, 246, 0.15);
+    min-width: 220px;
     font-family: var(--font-body);
+    user-select: none;
 }
 .custom-context-menu .menu-item {
-    padding: 8px 12px;
+    padding: 7px 12px;
     font-size: 11px;
     color: var(--text-secondary);
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
     transition: background 0.15s, color 0.15s;
+    position: relative;
+}
+.custom-context-menu .menu-item i {
+    width: 14px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--color-cyan);
+    flex-shrink: 0;
+}
+.custom-context-menu .menu-item .menu-item-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.custom-context-menu .menu-item .menu-item-chevron {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-left: 6px;
+    flex-shrink: 0;
 }
 .custom-context-menu .menu-item:hover {
     background: rgba(139, 92, 246, 0.2);
     color: #fff;
     text-shadow: 0 0 5px rgba(139, 92, 246, 0.4);
+}
+.custom-context-menu .menu-item:hover i {
+    color: #fff;
+}
+.custom-context-menu .menu-separator {
+    height: 1px;
+    background: var(--border-glass);
+    margin: 4px 0;
+}
+.custom-context-menu .menu-item.menu-item-destructive {
+    color: var(--color-rose);
+}
+.custom-context-menu .menu-item.menu-item-destructive i {
+    color: var(--color-rose);
+}
+.custom-context-menu .menu-item.menu-item-destructive:hover {
+    background: rgba(244, 63, 94, 0.2);
+    color: #fff;
+    text-shadow: 0 0 6px rgba(244, 63, 94, 0.6);
+}
+.custom-context-menu .menu-item.menu-item-destructive:hover i {
+    color: #fff;
+}
+.custom-context-menu .menu-item-has-submenu {
+    position: relative;
+}
+.custom-context-menu .menu-submenu {
+    position: absolute;
+    left: 100%;
+    top: -4px;
+    background: rgba(18, 18, 24, 0.96);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--border-glass);
+    border-radius: 6px;
+    padding: 4px 0;
+    min-width: 150px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 10px rgba(139, 92, 246, 0.15);
+    display: none;
+    z-index: 100001;
+}
+.custom-context-menu .menu-submenu.submenu-left {
+    left: auto;
+    right: 100%;
+}
+.custom-context-menu .menu-item-has-submenu:hover > .menu-submenu {
+    display: block;
+}
+
+/* Previne que tooltips ou índice de rolagem apareçam quando o menu de contexto está aberto */
+body:has(.custom-context-menu) #library-scroll-index-tooltip,
+body:has(.custom-context-menu) #global-tooltip {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Edição de Título Inline nos Cards de Mídia */
+.nle-inline-rename-input {
+    background: rgba(18, 18, 24, 0.95);
+    color: var(--text-primary);
+    border: 1px solid var(--color-cyan);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-family: var(--font-body);
+    font-weight: 600;
+    width: calc(100% - 24px);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.3);
+    outline: none;
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+.nle-inline-rename-input:focus {
+    border-color: var(--color-violet);
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
 }
 
 /* Destaque para palavra selecionada para dividir */
@@ -5541,34 +5637,7 @@ select option, .nle-select option {
     text-shadow: 0 0 8px var(--color-violet);
 }
 
-/* Menu de Contexto Customizado */
-.custom-context-menu {
-    position: fixed;
-    z-index: 10000;
-    background: rgba(18, 18, 24, 0.95);
-    backdrop-filter: blur(15px);
-    border: 1px solid var(--border-glass);
-    border-radius: 6px;
-    padding: 4px 0;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 10px rgba(139, 92, 246, 0.15);
-    width: 200px;
-    font-family: var(--font-body);
-}
-.custom-context-menu .menu-item {
-    padding: 8px 12px;
-    font-size: 11px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: background 0.15s, color 0.15s;
-}
-.custom-context-menu .menu-item:hover {
-    background: rgba(139, 92, 246, 0.2);
-    color: #fff;
-    text-shadow: 0 0 5px rgba(139, 92, 246, 0.4);
-}
+
 
 /* Destaque para palavra selecionada para dividir */
 .word-span.to-split {

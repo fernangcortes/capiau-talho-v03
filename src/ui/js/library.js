@@ -211,10 +211,539 @@ export function buildMediaTooltip(item, kind = "video", forceRealFilename = fals
     return parts.join("\n\n");
 }
 
-export function attachInlineTitleEditor(mediaType, item, titleSpan, currentTitle) {
-    // Descontinuado para não poluir o tooltip do card. A edição agora ocorre pelo painel de mídia (atalho A)
-    return;
+export function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
+
+/**
+ * Inicia a edição de título inline no card de mídia (in-loco).
+ * Transforma temporariamente o span .clip-title-text em um input focado,
+ * permitindo salvar via Enter ou cancelar via Esc/blur, sem poluir o DOM com tooltips nativas.
+ */
+export function startInlineTitleEditing(cardEl, item, kind = "video") {
+    if (!cardEl) return;
+    const h4 = cardEl.querySelector("h4");
+    const titleSpan = cardEl.querySelector(".clip-title-text");
+    if (!h4 || !titleSpan) return;
+
+    // Se já estiver em modo de edição, apenas dá foco
+    const existingInput = h4.querySelector(".nle-inline-rename-input");
+    if (existingInput) {
+        existingInput.focus();
+        existingInput.select();
+        return;
+    }
+
+    // Salva o tooltip original e remove temporariamente para não abrir tooltip flutuante ao digitar
+    const savedTooltip = h4.getAttribute("data-tooltip") || "";
+    h4.removeAttribute("data-tooltip");
+    const globalTooltip = document.getElementById("global-tooltip");
+    if (globalTooltip) {
+        globalTooltip.style.display = "none";
+    }
+
+    const currentDisplayTitle = titleSpan.textContent.trim();
+    const originalSpanDisplay = titleSpan.style.display;
+    titleSpan.style.display = "none";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "nle-inline-rename-input";
+    input.value = item.title || currentDisplayTitle;
+    input.setAttribute("autocomplete", "off");
+    input.setAttribute("spellcheck", "false");
+
+    h4.appendChild(input);
+    input.focus();
+    input.select();
+
+    let isDone = false;
+
+    const cleanupAndRestore = (newTitleToDisplay) => {
+        if (isDone) return;
+        isDone = true;
+        input.remove();
+        titleSpan.style.display = originalSpanDisplay || "";
+        if (newTitleToDisplay !== undefined) {
+            titleSpan.textContent = newTitleToDisplay;
+        }
+        // Restaura tooltip rica atualizada
+        const forceRealFilename = window.titleDisplayPreferences && window.titleDisplayPreferences[item.id] === "filename";
+        const updatedTooltip = buildMediaTooltip(item, kind, forceRealFilename);
+        h4.setAttribute("data-tooltip", updatedTooltip);
+    };
+
+    const saveTitle = async () => {
+        const newTitle = input.value.trim();
+        if (isDone) return;
+
+        if (!newTitle || newTitle === item.title) {
+            cleanupAndRestore(titleSpan.textContent);
+            return;
+        }
+
+        try {
+            input.disabled = true;
+            input.style.opacity = "0.7";
+            if (kind === "video") {
+                await CapIAuAPI.updateVideoTitle(item.id, newTitle);
+                item.title = newTitle;
+                const inList = (STATE.allVideos || []).find(v => v.id === item.id);
+                if (inList) inList.title = newTitle;
+                if (STATE.activeVideo && STATE.activeVideo.id === item.id) {
+                    STATE.activeVideo.title = newTitle;
+                }
+            } else {
+                await CapIAuAPI.updatePhotoTitle(item.id, newTitle);
+                item.title = newTitle;
+                const inList = (STATE.allPhotos || []).find(p => p.id === item.id);
+                if (inList) inList.title = newTitle;
+                if (STATE.activePhoto && STATE.activePhoto.id === item.id) {
+                    STATE.activePhoto.title = newTitle;
+                }
+            }
+            cleanupAndRestore(newTitle);
+            if (typeof window.showToast === "function") {
+                window.showToast("Título atualizado com sucesso!", "success");
+            }
+        } catch (err) {
+            console.error("Erro ao atualizar título:", err);
+            if (typeof window.showToast === "function") {
+                window.showToast("Erro ao salvar título: " + err.message, "error");
+            } else {
+                alert("Erro ao salvar título: " + err.message);
+            }
+            cleanupAndRestore(currentDisplayTitle);
+        }
+    };
+
+    input.addEventListener("keydown", (e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") {
+            e.preventDefault();
+            saveTitle();
+        } else if (e.key === "Escape") {
+            e.preventDefault();
+            cleanupAndRestore(titleSpan.textContent);
+        }
+    });
+
+    input.addEventListener("click", (e) => e.stopPropagation());
+    input.addEventListener("dblclick", (e) => e.stopPropagation());
+    input.addEventListener("contextmenu", (e) => e.stopPropagation());
+
+    input.addEventListener("blur", () => {
+        if (!isDone) {
+            saveTitle();
+        }
+    });
+}
+window.startInlineTitleEditing = startInlineTitleEditing;
+
+/**
+ * Exibe o Super-Menu de Contexto para cards de mídia (vídeo ou foto)
+ * acionado pelo clique com o botão direito (contextmenu).
+ */
+export function showMediaContextMenu(e, item, kind, cardEl) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Fecha qualquer menu de contexto aberto anteriormente e oculta tooltips de rolagem
+    const oldMenus = document.querySelectorAll(".custom-context-menu");
+    oldMenus.forEach(m => m.remove());
+
+    const scrollTooltip = document.getElementById("library-scroll-index-tooltip");
+    if (scrollTooltip) {
+        scrollTooltip.classList.remove("visible", "expanded");
+    }
+    if (window.libraryScrollIndex) {
+        window.libraryScrollIndex.hide();
+    }
+
+    const menu = document.createElement("div");
+    menu.id = "custom-media-context-menu";
+    menu.className = "custom-context-menu media-context-menu";
+
+    const isVideo = kind === "video";
+    const forceRealFilename = window.titleDisplayPreferences && window.titleDisplayPreferences[item.id] === "filename";
+
+    // Item: Abrir no Player / Lightbox
+    const openItem = document.createElement("div");
+    openItem.className = "menu-item";
+    openItem.innerHTML = `<i class="fa-solid ${isVideo ? 'fa-play' : 'fa-expand'}"></i><span class="menu-item-text">${isVideo ? 'Abrir no Monitor Source' : 'Abrir no Visualizador (Lightbox)'}</span>`;
+    openItem.addEventListener("click", () => {
+        menu.remove();
+        if (isVideo) {
+            STATE.activeVideo = item;
+            window.activeFocusedPlayer = "source";
+        } else {
+            if (STATE.openPhotosInPlayer) {
+                STATE.activePhoto = item;
+            } else {
+                const lib = window.libraryInstance || window.panelsManager?.library;
+                STATE.currentPhotoList = STATE.allPhotos || [item];
+                STATE.currentPhotoIndex = (STATE.currentPhotoList).indexOf(item);
+                if (lib && typeof lib.openLightbox === 'function') {
+                    lib.openLightbox(item);
+                }
+            }
+        }
+    });
+    menu.appendChild(openItem);
+
+    // Item: Adicionar à Timeline
+    const addTlItem = document.createElement("div");
+    addTlItem.className = "menu-item";
+    addTlItem.innerHTML = `<i class="fa-solid fa-plus"></i><span class="menu-item-text">Adicionar à Timeline</span>`;
+    addTlItem.addEventListener("click", () => {
+        menu.remove();
+        if (isVideo) {
+            let inTime = 0.0;
+            let outTime = item.duration || 0.0;
+            if (STATE.activeVideo && STATE.activeVideo.id === item.id) {
+                if (STATE.markerIn !== null) inTime = STATE.markerIn;
+                if (STATE.markerOut !== null) outTime = STATE.markerOut;
+            }
+            if (window.TIMELINE_STATE) {
+                window.TIMELINE_STATE.addCut(item.id, inTime, outTime, null);
+                STATE.activeVideo = item;
+                window.activeFocusedPlayer = "source";
+                STATE.emit("statusChanged", { text: `Vídeo adicionado à timeline.`, active: true });
+                if (typeof window.showToast === "function") {
+                    window.showToast("Vídeo adicionado à timeline!", "success");
+                }
+            }
+        } else {
+            if (window.TIMELINE_STATE) {
+                window.TIMELINE_STATE.addPhotoCut(item.id, {});
+                STATE.activePhoto = item;
+                STATE.emit("statusChanged", { text: `Foto adicionada à timeline.`, active: true });
+                if (typeof window.showToast === "function") {
+                    window.showToast("Foto adicionada à timeline!", "success");
+                }
+            }
+        }
+    });
+    menu.appendChild(addTlItem);
+
+    // Separador
+    const sep1 = document.createElement("div");
+    sep1.className = "menu-separator";
+    menu.appendChild(sep1);
+
+    // Item: Renomear Título
+    const renameItem = document.createElement("div");
+    renameItem.className = "menu-item";
+    renameItem.innerHTML = `<i class="fa-solid fa-pen-to-square"></i><span class="menu-item-text">Renomear Título</span>`;
+    renameItem.addEventListener("click", () => {
+        menu.remove();
+        startInlineTitleEditing(cardEl, item, kind);
+    });
+    menu.appendChild(renameItem);
+
+    // Item: Alternar Exibição de Nome
+    const toggleTitleItem = document.createElement("div");
+    toggleTitleItem.className = "menu-item";
+    const toggleIcon = forceRealFilename ? "fa-file-signature" : "fa-font";
+    const toggleText = forceRealFilename ? "Mostrar Título Contextual" : "Mostrar Nome do Arquivo Real";
+    toggleTitleItem.innerHTML = `<i class="fa-solid ${toggleIcon}"></i><span class="menu-item-text">${toggleText}</span>`;
+    toggleTitleItem.addEventListener("click", () => {
+        menu.remove();
+        if (!window.titleDisplayPreferences) window.titleDisplayPreferences = {};
+        window.titleDisplayPreferences[item.id] = forceRealFilename ? "friendly" : "filename";
+        localStorage.setItem("titleDisplayPreferences", JSON.stringify(window.titleDisplayPreferences));
+        if (isVideo) {
+            STATE.emit("videosUpdated", STATE.allVideos);
+        } else {
+            STATE.emit("photosUpdated", STATE.allPhotos);
+        }
+    });
+    menu.appendChild(toggleTitleItem);
+
+    // Item: Buscar Mídias Similares
+    const similarItem = document.createElement("div");
+    similarItem.className = "menu-item";
+    similarItem.innerHTML = `<i class="fa-solid fa-images"></i><span class="menu-item-text">Buscar Mídias Similares</span>`;
+    similarItem.addEventListener("click", () => {
+        menu.remove();
+        if (typeof window.showSimilarMedia === "function") {
+            window.showSimilarMedia(kind, item.id, { label: item.title || item.filename });
+        }
+    });
+    menu.appendChild(similarItem);
+
+    // Item: Definir Frame Atual como Miniatura (Vídeo)
+    if (isVideo) {
+        const thumbItem = document.createElement("div");
+        thumbItem.className = "menu-item";
+        thumbItem.innerHTML = `<i class="fa-solid fa-camera"></i><span class="menu-item-text">Definir Frame Atual como Miniatura</span>`;
+        thumbItem.addEventListener("click", () => {
+            menu.remove();
+            let curTime = 0.0;
+            const sourceVideo = document.getElementById("source-video-player");
+            if (sourceVideo && !isNaN(sourceVideo.currentTime)) {
+                curTime = sourceVideo.currentTime;
+            } else if (STATE.activeVideo && STATE.activeVideo.id === item.id && STATE.currentTime !== undefined) {
+                curTime = STATE.currentTime;
+            }
+            if (typeof window.setCustomThumbnail === "function") {
+                window.setCustomThumbnail(item.id, curTime);
+            }
+        });
+        menu.appendChild(thumbItem);
+    }
+
+    // Item: Ver Metadados / Decupagem
+    const inspectItem = document.createElement("div");
+    inspectItem.className = "menu-item";
+    inspectItem.innerHTML = `<i class="fa-solid fa-circle-info"></i><span class="menu-item-text">Ver Metadados / Decupagem</span>`;
+    inspectItem.addEventListener("click", () => {
+        menu.remove();
+        if (isVideo) {
+            STATE.activeVideo = item;
+        } else {
+            STATE.activePhoto = item;
+        }
+        if (window.libraryInstance && typeof window.libraryInstance.openQuickInspector === 'function') {
+            window.libraryInstance.openQuickInspector(kind, item);
+        } else if (window.panelsManager && typeof window.panelsManager.openInspector === 'function') {
+            window.panelsManager.openInspector(item);
+        }
+    });
+    menu.appendChild(inspectItem);
+
+    // Separador
+    const sep2 = document.createElement("div");
+    sep2.className = "menu-separator";
+    menu.appendChild(sep2);
+
+    // Item: Reanalisar com IA (Visão / ASR)
+    const reanalyzeItem = document.createElement("div");
+    reanalyzeItem.className = "menu-item";
+    const aiLabel = isVideo
+        ? (item.video_type === "interview" ? "Re-transcrever Áudio (ASR)" : "Reanalisar Visão com IA")
+        : "Reanalisar Visão com IA";
+    reanalyzeItem.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i><span class="menu-item-text">${aiLabel}</span>`;
+    reanalyzeItem.addEventListener("click", async () => {
+        menu.remove();
+        try {
+            if (isVideo) {
+                if (item.video_type === "interview") {
+                    await CapIAuAPI.transcribeVideo(item.id);
+                    if (typeof window.showToast === "function") window.showToast("Transcrição ASR iniciada!", "success");
+                } else {
+                    await CapIAuAPI.analyzeVideoVision(item.id);
+                    if (typeof window.showToast === "function") window.showToast("Reanálise visual iniciada!", "success");
+                }
+            } else {
+                await CapIAuAPI.analyzePhotoVision(item.id);
+                if (typeof window.showToast === "function") window.showToast("Reanálise visual da foto concluída!", "success");
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
+            }
+        } catch (err) {
+            if (typeof window.showToast === "function") {
+                window.showToast("Erro na reanálise: " + err.message, "error");
+            } else {
+                alert("Erro na reanálise: " + err.message);
+            }
+        }
+    });
+    menu.appendChild(reanalyzeItem);
+
+    // Item: Alterar Categoria (com Submenu)
+    const catMenuItem = document.createElement("div");
+    catMenuItem.className = "menu-item menu-item-has-submenu";
+    catMenuItem.innerHTML = `
+        <i class="fa-solid fa-tag"></i>
+        <span class="menu-item-text">Alterar Categoria</span>
+        <i class="fa-solid fa-chevron-right menu-item-chevron"></i>
+        <div class="menu-submenu"></div>
+    `;
+    const submenu = catMenuItem.querySelector(".menu-submenu");
+    
+    Object.entries(CATEGORY_LABELS).forEach(([catKey, catName]) => {
+        const subItem = document.createElement("div");
+        subItem.className = "menu-item";
+        const isCurrent = (item.category || "").toLowerCase() === catKey.toLowerCase();
+        subItem.innerHTML = `
+            <span class="menu-item-text">${catName}</span>
+            ${isCurrent ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:10px; margin-left:auto; width:auto;"></i>' : ''}
+        `;
+        subItem.addEventListener("click", async (ev) => {
+            ev.stopPropagation();
+            menu.remove();
+            try {
+                if (isVideo) {
+                    await CapIAuAPI.updateVideoCategory(item.id, catKey);
+                    item.category = catKey;
+                    if (catKey === "depoimento") item.video_type = "interview";
+                    else item.video_type = "broll";
+                } else {
+                    await CapIAuAPI.updatePhotoCategory(item.id, catKey);
+                    item.category = catKey;
+                }
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Categoria alterada para "${catName}"!`, "success");
+                }
+            } catch (err) {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Erro ao mudar categoria: " + err.message, "error");
+                } else {
+                    alert("Erro ao mudar categoria: " + err.message);
+                }
+            }
+        });
+        submenu.appendChild(subItem);
+    });
+    menu.appendChild(catMenuItem);
+
+    // Separador
+    const sep3 = document.createElement("div");
+    sep3.className = "menu-separator";
+    menu.appendChild(sep3);
+
+    // Item: Copiar Caminho do Arquivo
+    const copyPathItem = document.createElement("div");
+    copyPathItem.className = "menu-item";
+    copyPathItem.innerHTML = `<i class="fa-solid fa-copy"></i><span class="menu-item-text">Copiar Caminho do Arquivo</span>`;
+    copyPathItem.addEventListener("click", () => {
+        menu.remove();
+        const filePath = item.filepath || item.filename || "";
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(filePath).then(() => {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Caminho copiado para a área de transferência!", "success");
+                }
+            }).catch(() => {
+                prompt("Caminho do arquivo:", filePath);
+            });
+        } else {
+            prompt("Caminho do arquivo:", filePath);
+        }
+    });
+    menu.appendChild(copyPathItem);
+
+    // Separador
+    const sep4 = document.createElement("div");
+    sep4.className = "menu-separator";
+    menu.appendChild(sep4);
+
+    // Item: Limpar Proxy Físico (Destrutivo com Confirmação)
+    const cleanProxyItem = document.createElement("div");
+    cleanProxyItem.className = "menu-item menu-item-destructive";
+    cleanProxyItem.innerHTML = `<i class="fa-solid fa-broom"></i><span class="menu-item-text">Deletar / Limpar Proxy</span>`;
+    cleanProxyItem.addEventListener("click", async () => {
+        menu.remove();
+        const msg = `Deseja realmente excluir o arquivo proxy físico de "${item.filename}"?\n\nO clipe permanecerá no projeto, mas precisará ser recodificado para exibição local suave.`;
+        if (!confirm(msg)) return;
+        try {
+            if (isVideo) {
+                await CapIAuAPI.deleteVideoProxy(item.id);
+            } else {
+                await CapIAuAPI.deletePhotoProxy(item.id);
+            }
+            if (typeof window.showToast === "function") {
+                window.showToast("Proxy físico removido com sucesso!", "success");
+            }
+            if (window.libraryInstance) await window.libraryInstance.reloadData();
+            else STATE.emit("projectChanged");
+        } catch (err) {
+            if (typeof window.showToast === "function") {
+                window.showToast("Erro ao excluir proxy: " + err.message, "error");
+            } else {
+                alert("Erro ao excluir proxy: " + err.message);
+            }
+        }
+    });
+    menu.appendChild(cleanProxyItem);
+
+    // Item: Remover Mídia do Projeto (Destrutivo com Confirmação)
+    const removeMediaItem = document.createElement("div");
+    removeMediaItem.className = "menu-item menu-item-destructive";
+    removeMediaItem.innerHTML = `<i class="fa-solid fa-trash-can"></i><span class="menu-item-text">Remover Mídia do Projeto</span>`;
+    removeMediaItem.addEventListener("click", async () => {
+        menu.remove();
+        const msg = `⚠️ ATENÇÃO: Deseja remover permanentemente "${item.filename}" do projeto?\n\nTodos os dados de decupagem, transcrição e indexação visual serão excluídos do banco de dados.`;
+        if (!confirm(msg)) return;
+        try {
+            if (isVideo) {
+                await CapIAuAPI.deleteVideo(item.id);
+            } else {
+                await CapIAuAPI.deletePhoto(item.id);
+            }
+            if (typeof window.showToast === "function") {
+                window.showToast("Mídia removida do projeto!", "info");
+            }
+            if (window.libraryInstance) await window.libraryInstance.reloadData();
+            else STATE.emit("projectChanged");
+        } catch (err) {
+            if (typeof window.showToast === "function") {
+                window.showToast("Erro ao remover mídia: " + err.message, "error");
+            } else {
+                alert("Erro ao remover mídia: " + err.message);
+            }
+        }
+    });
+    menu.appendChild(removeMediaItem);
+
+    document.body.appendChild(menu);
+
+    // Posicionamento inteligente anti-overflow
+    const menuRect = menu.getBoundingClientRect();
+    const menuWidth = menuRect.width || 230;
+    const menuHeight = menuRect.height || 380;
+
+    let posX = e.clientX;
+    let posY = e.clientY;
+
+    if (posX + menuWidth > window.innerWidth - 10) {
+        posX = window.innerWidth - menuWidth - 10;
+        if (submenu) submenu.classList.add("submenu-left");
+    }
+    if (posY + menuHeight > window.innerHeight - 10) {
+        posY = Math.max(10, window.innerHeight - menuHeight - 10);
+    }
+
+    menu.style.left = `${Math.max(10, posX)}px`;
+    menu.style.top = `${Math.max(10, posY)}px`;
+
+    const closeHandler = (ev) => {
+        if (!menu.contains(ev.target)) {
+            menu.remove();
+            cleanup();
+        }
+    };
+    const keyHandler = (ev) => {
+        if (ev.key === "Escape") {
+            menu.remove();
+            cleanup();
+        }
+    };
+    const scrollHandler = () => {
+        menu.remove();
+        cleanup();
+    };
+
+    const cleanup = () => {
+        document.removeEventListener("pointerdown", closeHandler, true);
+        document.removeEventListener("keydown", keyHandler, true);
+        window.removeEventListener("scroll", scrollHandler, true);
+    };
+
+    setTimeout(() => {
+        document.addEventListener("pointerdown", closeHandler, true);
+        document.addEventListener("keydown", keyHandler, true);
+        window.addEventListener("scroll", scrollHandler, true);
+    }, 10);
+}
+window.showMediaContextMenu = showMediaContextMenu;
 
 function hasMatchingChildren(node, query, ast = null) {
     if (!query) return true;
@@ -513,29 +1042,29 @@ function renderTreeNode(node, container, depth = 0) {
         
         if (v.status === "transcribing" || v.status === "processing") {
             if (isConverting) {
-                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" title="Convertendo..."></i>`;
-                actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" title="Cancelar Conversão"><i class="fa-solid fa-circle-stop" style="font-size:10px;"></i></button>`;
+                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" data-tooltip="Convertendo..."></i>`;
+                actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Conversão"><i class="fa-solid fa-circle-stop" style="font-size:10px;"></i></button>`;
             } else {
-                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" title="Transcrevendo..."></i>`;
+                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" data-tooltip="Transcrevendo..."></i>`;
             }
         } else if (v.status === "analyzing") {
-            statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-violet);" title="Analisando..."></i>`;
-            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" title="Cancelar Análise"><i class="fa-solid fa-circle-stop" style="font-size:10px;"></i></button>`;
+            statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-violet);" data-tooltip="Analisando..."></i>`;
+            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Análise"><i class="fa-solid fa-circle-stop" style="font-size:10px;"></i></button>`;
         } else if (v.status === "transcribed") {
             statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: rgba(6, 182, 212, 0.3);">ASR</span>`;
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         } else if (v.status === "analyzed") {
             if (hasVisionError) {
                 statusBadge = `<span class="badge" style="color: var(--color-rose); border-color: rgba(244, 63, 94, 0.4);">FALHA VISUAL</span>`;
             } else {
                 statusBadge = `<span class="badge" style="color: var(--color-violet); border-color: rgba(138, 92, 246, 0.3);">VISÃO</span>`;
             }
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         } else if (v.status === "ingested") {
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         } else if (v.status === "error") {
-            statusGlow = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);" title="Erro no processamento!"></i>`;
-            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" title="Limpar Vídeo/Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
+            statusGlow = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);" data-tooltip="Erro no processamento!"></i>`;
+            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Limpar Vídeo/Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         }
         
         // Thumbnail (Real ou Ícone)
@@ -551,7 +1080,7 @@ function renderTreeNode(node, container, depth = 0) {
         // Toggle title display icon
         const toggleTitleIcon = forceRealFilename ? "fa-file-signature" : "fa-font";
         const toggleTitleTitle = forceRealFilename ? "Mostrar Título Contextual" : "Mostrar Nome do Arquivo Real";
-        const toggleBtnHtml = `<button class="btn-toggle-filename" title="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
+        const toggleBtnHtml = `<button class="btn-toggle-filename" data-tooltip="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
 
         // Tooltip rica e direta via buildMediaTooltip
         const tooltip = buildMediaTooltip(v, "video", forceRealFilename);
@@ -559,21 +1088,21 @@ function renderTreeNode(node, container, depth = 0) {
         const visionBadgeHtml = hasVisionError ? `<div class="vision-error-badge" data-tooltip="Falha visual detectada. Clique em Reanalisar Falhas no topo"><i class="fa-solid fa-triangle-exclamation"></i> Falha Visual</div>` : '';
 
         const overrideBtnHtml = hasVisionError
-            ? `<button class="btn-card-action btn-hover-only btn-quick-override-ok" style="background:transparent; border:none; color:var(--color-emerald); cursor:pointer; padding: 2px;" title="Marcar como Analisado (Ignorar Falha)"><i class="fa-solid fa-circle-check" style="font-size: 10px;"></i></button>`
-            : `<button class="btn-card-action btn-hover-only btn-quick-override-fail" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" title="Sinalizar Falha Visual (Mandar para Reanálise)"><i class="fa-solid fa-triangle-exclamation" style="font-size: 10px;"></i></button>`;
+            ? `<button class="btn-card-action btn-hover-only btn-quick-override-ok" style="background:transparent; border:none; color:var(--color-emerald); cursor:pointer; padding: 2px;" data-tooltip="Marcar como Analisado (Ignorar Falha)"><i class="fa-solid fa-circle-check" style="font-size: 10px;"></i></button>`
+            : `<button class="btn-card-action btn-hover-only btn-quick-override-fail" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" data-tooltip="Sinalizar Falha Visual (Mandar para Reanálise)"><i class="fa-solid fa-triangle-exclamation" style="font-size: 10px;"></i></button>`;
 
         card.innerHTML = `
             <div class="media-thumbnail" style="position: relative;">
                 ${thumbContent}
                 ${visionBadgeHtml}
-                <button class="btn-select-similar-item" title="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
+                <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
                     <i class="fa-regular fa-square"></i>
                 </button>
             </div>
             <div class="media-info">
-                <h4 title="${tooltip}">
+                <h4 data-tooltip="${escapeHtml(tooltip)}">
                     ${toggleBtnHtml}
-                    <span class="clip-title-text">${currentTitle}</span>
+                    <span class="clip-title-text">${escapeHtml(currentTitle)}</span>
                 </h4>
                 <div class="media-meta-row">
                     <span class="media-duration">${v.duration ? formatTimecode(v.duration).substring(3, 11) : "00:00:00"}</span>
@@ -688,6 +1217,11 @@ function renderTreeNode(node, container, depth = 0) {
             window.activeFocusedPlayer = "source";
         });
 
+        // Clique direito aciona o Super-Menu de Contexto
+        card.addEventListener("contextmenu", (e) => {
+            showMediaContextMenu(e, v, "video", card);
+        });
+
         // Arrastar-e-soltar do vídeo para a timeline
         card.draggable = true;
         card.addEventListener("dragstart", (e) => {
@@ -700,6 +1234,8 @@ function renderTreeNode(node, container, depth = 0) {
         if (toggleBtn) {
             toggleBtn.addEventListener("click", (e) => {
                 e.stopPropagation();
+                if (!window.titleDisplayPreferences) window.titleDisplayPreferences = {};
+                window.titleDisplayPreferences[v.id] = forceRealFilename ? "friendly" : "filename";
                 localStorage.setItem("titleDisplayPreferences", JSON.stringify(window.titleDisplayPreferences));
                 // Recarrega biblioteca inteira para re-renderizar
                 STATE.emit("videosUpdated", STATE.allVideos);
@@ -758,16 +1294,16 @@ function renderTreeNode(node, container, depth = 0) {
         let statusGlow = "";
         
         if (p.status === 'pending') {
-            statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" title="Gerando Proxy..."></i>`;
+            statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" data-tooltip="Gerando Proxy..."></i>`;
             imgHtml = `<div class="photo-placeholder-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>Proxy...</span></div>`;
             if (isRaw) clickEnabled = false;
         } else if (p.status === 'error') {
-            statusGlow = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);" title="Falha no Proxy"></i>`;
+            statusGlow = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);" data-tooltip="Falha no Proxy"></i>`;
             imgHtml = `<div class="photo-placeholder-error"><i class="fa-solid fa-triangle-exclamation"></i><span>Erro</span></div>`;
             if (isRaw) clickEnabled = false;
         } else {
             if (isRaw && !p.proxy_path) {
-                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" title="Processando RAW..."></i>`;
+                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" data-tooltip="Processando RAW..."></i>`;
                 imgHtml = `<div class="photo-placeholder-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>RAW...</span></div>`;
                 clickEnabled = false;
             } else {
@@ -787,7 +1323,7 @@ function renderTreeNode(node, container, depth = 0) {
         
         const toggleTitleIcon = forceRealFilename ? "fa-file-signature" : "fa-font";
         const toggleTitleTitle = forceRealFilename ? "Mostrar Título Contextual" : "Mostrar Nome do Arquivo Real";
-        const toggleBtnHtml = `<button class="btn-toggle-filename" title="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
+        const toggleBtnHtml = `<button class="btn-toggle-filename" data-tooltip="${toggleTitleTitle}"><i class="fa-solid ${toggleTitleIcon}"></i></button>`;
 
         const categoryLabel = p.category ? p.category : 'Foto';
         // Tooltip rica e direta via buildMediaTooltip
@@ -796,21 +1332,21 @@ function renderTreeNode(node, container, depth = 0) {
         card.innerHTML = `
             <div class="media-thumbnail photo-thumb-container" style="position: relative;">
                 ${imgHtml}
-                <button class="btn-select-similar-item" title="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
+                <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
                     <i class="fa-regular fa-square"></i>
                 </button>
             </div>
             <div class="media-info">
-                <h4 title="${tooltip}">
+                <h4 data-tooltip="${escapeHtml(tooltip)}">
                     ${toggleBtnHtml}
-                    <span class="clip-title-text">${currentTitle}</span>
+                    <span class="clip-title-text">${escapeHtml(currentTitle)}</span>
                 </h4>
                 <div class="media-meta-row">
                     ${statusGlow}
                     ${statusBadge}
                     <span class="badge-tag tag-broll">${categoryLabel}</span>
-                    <button class="btn-photo-add-timeline btn-card-action" title="Adicionar à timeline (still)"><i class="fa-solid fa-plus"></i></button>
-                    <button class="btn-photo-similar btn-card-action" title="Encontrar similares"><i class="fa-solid fa-images"></i></button>
+                    <button class="btn-photo-add-timeline btn-card-action" data-tooltip="Adicionar à timeline (still)"><i class="fa-solid fa-plus"></i></button>
+                    <button class="btn-photo-similar btn-card-action" data-tooltip="Encontrar similares"><i class="fa-solid fa-images"></i></button>
                 </div>
             </div>
         `;
@@ -861,6 +1397,11 @@ function renderTreeNode(node, container, depth = 0) {
             });
         }
         
+        // Clique direito aciona o Super-Menu de Contexto
+        card.addEventListener("contextmenu", (e) => {
+            showMediaContextMenu(e, p, "photo", card);
+        });
+
         if (clickEnabled) {
             card.style.cursor = "pointer";
             card.draggable = true;
@@ -4528,7 +5069,7 @@ export class LibraryScrollIndexTracker {
 
     bindEvents() {
         const onPointerMove = (e) => {
-            if (!this.isEnabled) {
+            if (!this.isEnabled || document.querySelector(".custom-context-menu")) {
                 this.hide();
                 return;
             }
@@ -4602,8 +5143,7 @@ export class LibraryScrollIndexTracker {
 
         const onPointerDown = (e) => {
             if (!this.isEnabled) return;
-            if (this.isAnyModalOpen()) return;
-
+            if (this.isAnyModalOpen() || document.querySelector(".custom-context-menu")) return;
             const container = this.getScrollContainer();
             if (!container) return;
 
@@ -4690,6 +5230,11 @@ export class LibraryScrollIndexTracker {
     }
 
     updateAtRatio(ratio, mouseEvent, activeTabId) {
+        if (!this.isEnabled || document.querySelector(".custom-context-menu")) {
+            this.hide();
+            return;
+        }
+
         const container = this.getScrollContainer();
         if (!container) return;
 
