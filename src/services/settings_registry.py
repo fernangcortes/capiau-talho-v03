@@ -373,6 +373,82 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "category": "timeline", "level": "pro", "scope": "both", "requires_reprocess": False,
     },
 
+    # -- Timeline: motor de render de vídeo (docs/PLANO_EXPORTACAO_VIDEO.md,
+    #    seção 9; dono = pacote D). Defaults = comportamento acordado no plano;
+    #    os pacotes A/B/C leem estas chaves via SettingsService em vez de
+    #    hardcode -- mesma disciplina das chaves de áudio. requires_reprocess
+    #    é False em todas: afetam só renders futuros, nunca análise existente.
+    {
+        "key": "render.output_dir", "type": "string", "default": "data/exports/renders",
+        "label": "Render de vídeo: pasta de destino",
+        "help": "Onde ficam os vídeos exportados da timeline (rascunhos e finais). Você pode escolher outra pasta em cada exportação; esta aqui é a padrão, já selecionada ao abrir a janela.",
+        "help_tech": "Pasta relativa é ancorada na raiz do app (CONFIG.BASE_DIR), como as demais de data/. O preflight devolve o caminho resolvido e o nome sugerido <timeline>_<aaaa-mm-dd_hhmm>.<ext>; a mesma pasta abriga o registro .ultimo_<timeline_id>.json lido por GET .../render/ultimo. Escopo global de propósito: é caminho desta máquina.",
+        "category": "timeline", "level": "simple", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "render.threads", "type": "int", "default": 0, "min": 0, "max": 64, "step": 1,
+        "label": "Render: núcleos usados pelo ffmpeg",
+        "help": "Quantos núcleos do processador o ffmpeg pode gastar durante um render de vídeo. Em 0 (padrão) ele usa o que houver e termina mais rápido; um número menor deixa a máquina mais livre para você continuar trabalhando enquanto renderiza.",
+        "help_tech": "Vira -threads na linha do ffmpeg montada por comando.py/execucao.py (pacote C); 0 omite a flag (comportamento atual: o próprio ffmpeg distribui por frame-threading).",
+        "category": "timeline", "level": "pro", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "render.segment_max_clips", "type": "int", "default": 40, "min": 5, "max": 1000, "step": 5,
+        "label": "Render: dividir em pedaços a partir de (clipes)",
+        "help": "Timelines muito longas são renderizadas em pedaços e depois emendados num arquivo só, para uma falha no fim não perder tudo que já foi renderizado. Este é o número de clipes a partir do qual isso acontece.",
+        "help_tech": "Primeiro gatilho da segmentação do §4.2 do plano: acima disso o filter_complex é fatiado e os segmentos emendados com -f concat -c copy (parâmetros idênticos tornam a cópia segura). Um filter_complex cresce ~8 nós por clipe.",
+        "category": "timeline", "level": "pro", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "render.segment_max_seconds", "type": "float", "default": 90.0, "min": 10.0, "max": 3600.0, "step": 10.0,
+        "label": "Render: dividir em pedaços a partir de (segundos)",
+        "help": "O mesmo critério do ajuste acima, medido em duração: trechos mais longos que isto viram mais de um pedaço no render. Vale o primeiro gatilho que acontecer (clipes OU segundos).",
+        "help_tech": "Segundo gatilho (OU) da segmentação do §4.2; mede a duração efetiva da faixa pedida (full ou IN-OUT após resolver contra a duração da sequência).",
+        "category": "timeline", "level": "pro", "scope": "global", "requires_reprocess": False,
+    },
+    {
+        "key": "render.draft_height", "type": "int", "default": 540, "min": 144, "max": 2160, "step": 1,
+        "label": "Rascunho: altura do vídeo (pixels)",
+        "help": "Tamanho dos vídeos de prévia (rascunho). O padrão de 540 linhas é leve e rápido — bom para conferir cortes, cor e som antes de mandar o master, que ignora este ajuste e sai na resolução da timeline.",
+        "help_tech": "Altura alvo do scale no rascunho; largura derivada preservando o aspecto width/height do sequence_json. O master não lê esta chave (§2 do plano: rascunho pelo mesmo grafo, parâmetros mais baratos).",
+        "category": "timeline", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "render.draft_crf", "type": "int", "default": 30, "min": 0, "max": 51, "step": 1,
+        "label": "Rascunho: qualidade (CRF)",
+        "help": "Qualidade do vídeo de prévia. Número menor = melhor imagem e arquivo maior. Rascunho é para conferir, não para entregar: 30 já mostra tudo com arquivos pequenos e rápidos de gerar.",
+        "help_tech": "-crf passado ao encoder H.264 no rascunho (pacote C); o grafo de filtros é o mesmo do master, muda apenas resolução e bitrate.",
+        "category": "timeline", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "render.master_crf", "type": "int", "default": 18, "min": 0, "max": 51, "step": 1,
+        "label": "Master: qualidade final (CRF)",
+        "help": "Qualidade do arquivo final. Número menor = melhor imagem e arquivo maior. 18 é praticamente indistinguível do original; se precisar de arquivos menores, 23 reduz bastante o tamanho com perda quase invisível.",
+        "help_tech": "-crf do encoder H.264 no master (libx264 ou equivalente por hardware quando resolve_encoder_pipeline escolher caminho HW); consumido pelo comando.py/execucao.py do pacote C.",
+        "category": "timeline", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "render.audio_bitrate", "type": "int", "default": 192, "min": 64, "max": 512, "step": 32,
+        "label": "Master: qualidade do som (kbps)",
+        "help": "Qualidade do som no arquivo final, em kilobits por segundo. O padrão de 192 kbps já é transparência prática para voz e música; números maiores ocupam mais espaço sem diferença que se ouça.",
+        "help_tech": "-b:a do AAC no mux final do render; lido pelo pacote C (comando/execucao). O mute_audio do pedido zera a faixa de áudio independentemente deste valor.",
+        "category": "timeline", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "render.supersample_kenburns", "type": "int", "default": 2, "min": 1, "max": 4, "step": 1,
+        "label": "Ken Burns: suavização do zoom (superamostragem)",
+        "help": "Panorâmicas sobre fotos podem tremer quando o zoom é lento. Este fator desenha a foto maior antes de animar a janela de corte, tirando o tremor. 2 é o equilíbrio padrão; 1 desliga (mais rápido, pode tremer); valores maiores custam mais memória.",
+        "help_tech": "Fator de supersampling antes do crop com expressões em t (§3.4 do plano): escala interna W*f x H*f para eliminar a quantização em pixel inteiro do zoompan/crop direto. Só afeta clipes type=photo com ken_burns ativo (regra P6).",
+        "category": "timeline", "level": "pro", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "render.allow_proxy_fallback", "type": "bool", "default": False,
+        "label": "Permitir master usando proxy quando o original não estiver acessível",
+        "help": "Se o HD dos arquivos originais estiver desconectado na hora de exportar o master, permite usar as versões leves (proxies) em vez de recusar. A saída vem com aviso e marca no nome do arquivo. Deixe desligado para garantir que o master saia sempre dos originais.",
+        "help_tech": "Default do allow_proxy_fallback do POST .../render. false = preflight lista os órfãos e a rota recusa com 400 (decisão do plano: nunca cair calado para proxy); true = segue em proxy com marca no nome e aviso explícito. O checkbox do modal autoriza por export sem alterar este default.",
+        "category": "timeline", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+
     # -- Agente & Chat --------------------------------------------------------
     {
         "key": "agent.max_steps", "type": "int", "default": 8, "min": 1, "max": 25, "step": 1,

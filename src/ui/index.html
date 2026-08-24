@@ -862,6 +862,9 @@
                                 <!-- Exportar (formato e timeline são escolhidos no diálogo) -->
                                 <button id="btn-export-timeline" class="btn-toolbar-action" data-tooltip="Exportar Timeline"><i class="fa-solid fa-file-export"></i></button>
 
+                                <!-- Exportar Vídeo (render MP4 no backend; painel próprio, auto-ligado em js/exportVideo.js) -->
+                                <button id="btn-export-video" class="btn-toolbar-action" data-tooltip="Exportar Vídeo"><i class="fa-solid fa-film"></i></button>
+
                                 <!-- Importar (.otio/.xml/.edl escolhidos no diálogo) -->
                                 <button id="btn-import-timeline" class="btn-toolbar-action" data-tooltip="Importar Timeline (&#111;.otio &#111;.xml &#111;.edl)"><i class="fa-solid fa-file-import"></i></button>
                                 
@@ -968,6 +971,9 @@
                                     </button>
                                     <button id="btn-transcribe-all" class="flat-sub-btn violet-btn" data-tooltip="Transcrever todos os depoimentos pendentes em um processo separado. A interface continua respondendo; a busca semântica fica fora do ar até o fim da rodada.">
                                         <i class="fa-solid fa-layer-group"></i> <span class="btn-text">Tudo</span>
+                                    </button>
+                                    <button id="btn-generate-waveforms" class="flat-sub-btn" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7;" data-tooltip="Gerar formas de onda (waveforms) reais de áudio para todos os vídeos deste projeto">
+                                        <i class="fa-solid fa-chart-simple"></i> <span class="btn-text">Ondas</span>
                                     </button>
                                 </div>
                             </div>
@@ -1515,6 +1521,274 @@
             <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid var(--border-glass); gap: 10px; margin-top: 10px; justify-content: flex-end;">
                 <button id="btn-cancel-export" class="btn-secondary" style="height: 30px; font-size: 11px; padding: 0 12px;">Cancelar</button>
                 <button id="btn-confirm-export" class="btn-primary" style="height: 30px; font-size: 11px; padding: 0 12px;">Exportar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Exportação de Vídeo (render MP4 no backend — comportamento todo em js/exportVideo.js) -->
+    <div id="export-video-modal" class="modal-overlay" data-ev-polling="ocioso">
+        <div class="modal-content glassmorphism export-video-content">
+            <div class="modal-header ev-header">
+                <div class="ev-header-titulo">
+                    <i class="fa-solid fa-film" style="color: #34d399;"></i>
+                    <div class="ev-header-textos">
+                        <h2 style="font-size: 14px; margin: 0; font-weight: 600;">Exportar Vídeo <span id="ev-selo-demo" class="ev-selo-demo" style="display: none;" data-tooltip="Dados falsos de preflight/progresso para testar o painel sem o motor de render">MODO DEMONSTRAÇÃO</span></h2>
+                        <div class="ev-header-info">
+                            <span id="ev-info-nome" class="ev-info-nome">—</span>
+                            <span class="ev-info-sep">·</span><span id="ev-info-duracao" data-tooltip="Duração total informada pelo preflight">—</span>
+                            <span class="ev-info-sep">·</span><span id="ev-info-fps" data-tooltip="FPS da timeline">—</span>
+                            <span class="ev-info-sep">·</span><span id="ev-info-res" data-tooltip="Resolução da timeline">—</span>
+                            <span class="ev-info-sep">·</span><span id="ev-info-clipes" data-tooltip="Total de clipes no escopo atual">—</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="ev-header-direita">
+                    <select id="export-video-timeline-select" class="nle-select" data-tooltip="Qual timeline SALVA será renderizada (o que sai é o banco, não a tela)"></select>
+                    <button class="btn-close-modal" id="btn-close-export-video" data-tooltip="Fechar (o render continua mesmo com o painel fechado)" style="font-size: 20px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;">&times;</button>
+                </div>
+            </div>
+
+            <div class="modal-body ev-body">
+
+                <!-- Degradação elegante: rota ausente/servidor fora -->
+                <div id="ev-engine-indisponivel" class="ev-engine-off" style="display: none;"></div>
+
+                <!-- 2. Presets -->
+                <section class="ev-secao">
+                    <label class="ev-label-secao">Preset</label>
+                    <div id="ev-presets" class="ev-presets">
+                        <label class="ev-preset" data-tooltip="Resolução da sequência, qualidade máxima.">
+                            <input type="radio" name="ev-preset" value="master_1080" checked>
+                            <i class="fa-solid fa-crown"></i><span>Master 1080p</span>
+                        </label>
+                        <label class="ev-preset" data-tooltip="1080p H.264 + AAC, pronto para upload.">
+                            <input type="radio" name="ev-preset" value="youtube_1080">
+                            <i class="fa-solid fa-circle-play"></i><span>YouTube</span>
+                        </label>
+                        <label class="ev-preset" data-tooltip="Vertical 1080x1920 para redes sociais.">
+                            <input type="radio" name="ev-preset" value="reels_916">
+                            <i class="fa-solid fa-mobile-screen"></i><span>Reels/TikTok 9:16</span>
+                        </label>
+                        <label class="ev-preset" data-tooltip="Arquivo pequeno para aprovação no celular.">
+                            <input type="radio" name="ev-preset" value="whatsapp_leve">
+                            <i class="fa-solid fa-comment"></i><span>WhatsApp leve</span>
+                        </label>
+                    </div>
+                </section>
+
+                <!-- 3. Avançado (recolhível) -->
+                <section class="adjustments-section ev-avancado">
+                    <div class="adjustments-section-header" data-ev-toggle="avancado" data-tooltip="Resolução, fps, container, codec, qualidade e áudio">
+                        <div class="adj-header-left">
+                            <i class="fa-solid fa-chevron-right adj-collapse-chevron"></i>
+                            <span class="adj-title-text"><i class="fa-solid fa-sliders"></i> Avançado</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-section-body" style="display: none;">
+                        <div class="ev-grid-avancado">
+                            <label class="ev-campo">
+                                <span>Resolução</span>
+                                <select id="ev-ov-resolution" class="nle-select" data-tooltip="Vazio = usa a resolução da própria timeline">
+                                    <option value="">Padrão da timeline</option>
+                                    <option value="1920x1080">1920×1080</option>
+                                    <option value="1280x720">1280×720</option>
+                                    <option value="1080x1920">1080×1920 (vertical)</option>
+                                    <option value="3840x2160">3840×2160</option>
+                                </select>
+                            </label>
+                            <label class="ev-campo">
+                                <span>FPS</span>
+                                <span class="ev-num-wrap" data-tooltip="Vazio = usa o fps da timeline">
+                                    <input id="ev-ov-fps" class="ev-num" type="number" min="1" max="120" step="1" placeholder="auto">
+                                    <span class="ev-steps">
+                                        <button type="button" class="ev-step" data-target="ev-ov-fps" data-delta="1" data-tooltip="+1 fps"><i class="fa-solid fa-chevron-up"></i></button>
+                                        <button type="button" class="ev-step" data-target="ev-ov-fps" data-delta="-1" data-tooltip="-1 fps"><i class="fa-solid fa-chevron-down"></i></button>
+                                    </span>
+                                </span>
+                            </label>
+                            <label class="ev-campo">
+                                <span>Container</span>
+                                <select id="ev-ov-container" class="nle-select" data-tooltip="Formato do arquivo de saída">
+                                    <option value="mp4" selected>MP4</option>
+                                    <option value="mov">MOV</option>
+                                    <option value="mkv">MKV</option>
+                                </select>
+                            </label>
+                            <label class="ev-campo">
+                                <span>Codec</span>
+                                <select id="ev-ov-codec" class="nle-select" data-tooltip="Codificador de vídeo (o encoder por hardware é resolvido no servidor)">
+                                    <option value="h264" selected>H.264</option>
+                                    <option value="hevc">H.265/HEVC</option>
+                                </select>
+                            </label>
+                            <label class="ev-campo">
+                                <span>Qualidade (CRF)</span>
+                                <span class="ev-num-wrap" data-tooltip="Menor = melhor qualidade/arquivo maior. Vazio = padrão do preset">
+                                    <input id="ev-ov-crf" class="ev-num" type="number" min="0" max="51" step="1" placeholder="preset">
+                                    <span class="ev-steps">
+                                        <button type="button" class="ev-step" data-target="ev-ov-crf" data-delta="-1" data-tooltip="Melhor qualidade (-1 CRF)"><i class="fa-solid fa-chevron-up"></i></button>
+                                        <button type="button" class="ev-step" data-target="ev-ov-crf" data-delta="1" data-tooltip="Menor qualidade (+1 CRF)"><i class="fa-solid fa-chevron-down"></i></button>
+                                    </span>
+                                </span>
+                            </label>
+                            <label class="ev-campo">
+                                <span>Bitrate AAC</span>
+                                <span class="ev-num-wrap" data-tooltip="Bitrate do áudio em kbps">
+                                    <input id="ev-ov-audio-bitrate" class="ev-num" type="number" min="64" max="512" step="32" placeholder="192">
+                                    <span class="ev-unidade">kbps</span>
+                                    <span class="ev-steps">
+                                        <button type="button" class="ev-step" data-target="ev-ov-audio-bitrate" data-delta="32" data-tooltip="+32 kbps"><i class="fa-solid fa-chevron-up"></i></button>
+                                        <button type="button" class="ev-step" data-target="ev-ov-audio-bitrate" data-delta="-32" data-tooltip="-32 kbps"><i class="fa-solid fa-chevron-down"></i></button>
+                                    </span>
+                                </span>
+                            </label>
+                            <label class="ev-check ev-check-mute" data-tooltip="Renderiza sem nenhuma pista de áudio">
+                                <input type="checkbox" id="ev-ov-mute">
+                                <span>Mute global do áudio</span>
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. Faixa -->
+                <section class="ev-secao">
+                    <label class="ev-label-secao">Faixa</label>
+                    <div class="ev-range-linhas">
+                        <label class="ev-check" data-tooltip="Do primeiro ao último clipe">
+                            <input type="radio" name="ev-range" id="ev-range-full" value="full" checked>
+                            <span>Timeline inteira</span>
+                        </label>
+                        <label class="ev-check" data-tooltip="Somente o intervalo IN–OUT abaixo (em segundos)">
+                            <input type="radio" name="ev-range" id="ev-range-inout" value="in_out">
+                            <span>IN–OUT</span>
+                        </label>
+                        <span id="ev-range-campos" class="ev-range-campos" style="display: none;">
+                            <span class="ev-num-wrap" data-tooltip="Início do intervalo, em segundos">
+                                <input id="ev-range-ini" class="ev-num" type="number" min="0" step="0.5" value="0">
+                                <span class="ev-unidade">s</span>
+                                <span class="ev-steps">
+                                    <button type="button" class="ev-step" data-target="ev-range-ini" data-delta="0.5" data-tooltip="+0,5 s"><i class="fa-solid fa-chevron-up"></i></button>
+                                    <button type="button" class="ev-step" data-target="ev-range-ini" data-delta="-0.5" data-tooltip="-0,5 s"><i class="fa-solid fa-chevron-down"></i></button>
+                                </span>
+                            </span>
+                            <i class="fa-solid fa-arrow-right-long ev-range-seta"></i>
+                            <span class="ev-num-wrap" data-tooltip="Fim do intervalo, em segundos">
+                                <input id="ev-range-fim" class="ev-num" type="number" min="0" step="0.5" value="0">
+                                <span class="ev-unidade">s</span>
+                                <span class="ev-steps">
+                                    <button type="button" class="ev-step" data-target="ev-range-fim" data-delta="0.5" data-tooltip="+0,5 s"><i class="fa-solid fa-chevron-up"></i></button>
+                                    <button type="button" class="ev-step" data-target="ev-range-fim" data-delta="-0.5" data-tooltip="-0,5 s"><i class="fa-solid fa-chevron-down"></i></button>
+                                </span>
+                            </span>
+                        </span>
+                    </div>
+                    <span id="ev-range-resumo" class="ev-range-resumo" style="display: none;"></span>
+                </section>
+
+                <!-- 5. Incluir no render (recolhível, tudo marcado por padrão) -->
+                <section class="adjustments-section">
+                    <div class="adjustments-section-header" data-ev-toggle="escopo" data-tooltip="Escolha do editor: desligar aqui NÃO gera aviso, é só escopo">
+                        <div class="adj-header-left">
+                            <i class="fa-solid fa-chevron-right adj-collapse-chevron open"></i>
+                            <span class="adj-title-text"><i class="fa-solid fa-layer-group"></i> Incluir no render</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-section-body">
+                        <div class="ev-categorias">
+                            <label class="ev-check" data-tooltip="Cor, blur e filtros dos clipes">
+                                <input type="checkbox" id="ev-cat-color" checked><span>Cor</span>
+                            </label>
+                            <label class="ev-check" data-tooltip="Crossfades e fades de opacidade">
+                                <input type="checkbox" id="ev-cat-transitions" checked><span>Transições</span>
+                            </label>
+                            <label class="ev-check" data-tooltip="Escala, posição, rotação, crop e Ken Burns">
+                                <input type="checkbox" id="ev-cat-motion" checked><span>Movimento e enquadramento</span>
+                            </label>
+                            <label class="ev-check" data-tooltip="EQ, gate, compressor e volume dos clipes">
+                                <input type="checkbox" id="ev-cat-audio_fx" checked><span>Ajustes de áudio</span>
+                            </label>
+                        </div>
+                        <div class="ev-tracks-subtitulo">Pistas <span class="ev-tracks-dica">(uma linha por pista real da timeline)</span></div>
+                        <div id="ev-tracks-list" class="ev-tracks-list"><!-- montado pelo preflight --></div>
+                        <div id="ev-proxy-fallback-wrap" style="display: none;">
+                            <label class="ev-check ev-proxy-fallback" data-tooltip="Master segue com mídia de proxy quando o original estiver indisponível; o nome ganha sufixo _proxy">
+                                <input type="checkbox" id="ev-proxy-fallback">
+                                <span>Aceitar fallback para proxy se o original estiver indisponível</span>
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 6. Banner de fidelidade (condicional, âmbar) -->
+                <div id="ev-banner-fidelidade" class="ev-banner" style="display: none;"></div>
+
+                <!-- 7. Destino -->
+                <section class="ev-secao ev-destino">
+                    <label class="ev-label-secao"><i class="fa-solid fa-folder-open ev-destino-icone"></i> Destino</label>
+                    <label class="ev-campo-linha" data-tooltip="Editável apenas para este export; o padrão vem das Configurações">
+                        <span>Pasta</span>
+                        <input type="text" id="ev-out-dir" spellcheck="false" placeholder="pasta padrão das Configurações">
+                    </label>
+                    <label class="ev-campo-linha" data-tooltip="Nome sugerido pelo preflight; pode ser trocado só neste export">
+                        <span>Arquivo</span>
+                        <input type="text" id="ev-out-nome" spellcheck="false" placeholder="nome_sugerido.mp4">
+                    </label>
+                    <span id="ev-ultimo-hint" class="ev-ultimo-hint" style="display: none;"></span>
+                </section>
+
+                <!-- 8. Pós-conclusão (persistido em localStorage POR TIMELINE) -->
+                <section class="ev-secao">
+                    <label class="ev-label-secao">Após concluir</label>
+                    <div class="ev-post-grid">
+                        <label class="ev-check" data-tooltip="Abre a pasta do arquivo no Explorer ao terminar">
+                            <input type="checkbox" id="ev-post-abrir" checked><span>Abrir pasta</span>
+                        </label>
+                        <label class="ev-check" data-tooltip="Copia o caminho completo do MP4 para a área de transferência">
+                            <input type="checkbox" id="ev-post-copiar"><span>Copiar caminho</span>
+                        </label>
+                        <label class="ev-check" data-tooltip="Diálogo Salvar como… para escolher outro destino">
+                            <input type="checkbox" id="ev-post-salvar"><span>Salvar como…</span>
+                        </label>
+                        <label class="ev-check" data-tooltip="Ingerir o MP4 gerado na biblioteca do projeto">
+                            <input type="checkbox" id="ev-post-ingerir"><span>Ingerir na biblioteca</span>
+                        </label>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- 9. Rodapé: dois estados — idle (exportar) e job (progresso/cancelar) -->
+            <div class="modal-footer ev-footer">
+                <div id="ev-footer-idle" class="ev-footer-idle">
+                    <button id="ev-btn-rascunho" class="btn-secondary ev-btn-export" data-tooltip="Prévia rápida pelo mesmo grafo do master (proxy, CRF alto)">
+                        <i class="fa-solid fa-feather"></i> <span class="ev-btn-rotulo">Exportar Rascunho</span>
+                    </button>
+                    <button id="ev-btn-master" class="btn-primary ev-btn-export ev-btn-master" data-tooltip="Render final com os originais e paridade total com o preview">
+                        <i class="fa-solid fa-clapperboard"></i> <span class="ev-btn-rotulo">Exportar Master</span>
+                    </button>
+                </div>
+                <div id="ev-footer-job" class="ev-footer-job" style="display: none;">
+                    <div class="ev-progress-linha">
+                        <div class="ev-progress-trilho"><div id="ev-progress-fill" class="ev-progress-fill" style="width: 0%;"></div></div>
+                        <span id="ev-progress-pct" class="ev-progress-pct">0%</span>
+                    </div>
+                    <div class="ev-job-meta">
+                        <span id="ev-progress-etapa" class="ev-progress-etapa">Na fila…</span>
+                        <span class="ev-job-eta">ETA <span id="ev-progress-eta">--:--</span></span>
+                    </div>
+                    <div class="ev-job-botoes">
+                        <button id="ev-btn-ver-tarefas" class="btn-secondary ev-btn-mini" data-tooltip="Abrir a aba Tarefas com o log completo do ffmpeg">
+                            <i class="fa-solid fa-list-check"></i> Ver na aba Tarefas
+                        </button>
+                        <button id="ev-btn-cancelar" class="btn-secondary ev-btn-mini ev-btn-cancelar" data-tooltip="Cancelamento cooperativo: o ffmpeg é encerrado e o parcial descartado">
+                            <i class="fa-solid fa-xmark"></i> Cancelar
+                        </button>
+                        <button id="ev-btn-voltar" class="btn-secondary ev-btn-mini" style="display: none;" data-tooltip="Voltar ao modo de edição para disparar outro export">
+                            Novo export
+                        </button>
+                    </div>
+                    <span id="ev-job-status-linha" class="ev-job-status-linha" style="display: none;"></span>
+                </div>
             </div>
         </div>
     </div>
