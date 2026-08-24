@@ -2,6 +2,7 @@
 // v2: Multipista dinâmica com pista de IA, scroll vertical e cores por pista.
 import { STATE } from "./state.js";
 import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode, evaluateFadeCurve } from "./timelineState.js";
+import { WaveformManager } from "./waveformManager.js";
 
 // Paleta de cores para pistas de vídeo (V1 roxo/íris clássico NLE, V2 ciano B-roll, etc.)
 const TRACK_PALETTE = [
@@ -217,7 +218,10 @@ export class CapiauTimelineRenderer {
         }
 
         // Ouvintes de evento do estado para redesenho reativo
-        STATE.on("timelineCutsUpdated", () => this.requestRedraw());
+        STATE.on("timelineCutsUpdated", (cuts) => {
+            WaveformManager.preloadForClips(TIMELINE_STATE.cuts);
+            this.requestRedraw();
+        });
         STATE.on("timelineGhostUpdated", () => this.requestRedraw());
         STATE.on("timelineTracksChanged", () => this.requestRedraw());
         STATE.on("timelineFpsChanged", () => this.requestRedraw());
@@ -227,6 +231,8 @@ export class CapiauTimelineRenderer {
         STATE.on("timelinePlayheadChanged", () => this.requestRedraw());
         STATE.on("timelineMarkersChanged", () => this.requestRedraw());
         STATE.on("activeVideoChanged", () => this.requestRedraw());
+        STATE.on("waveformLoaded", () => this.requestRedraw());
+        WaveformManager.addListener(() => this.requestRedraw());
 
         // Inicia o render loop
         this.renderLoop();
@@ -883,8 +889,8 @@ export class CapiauTimelineRenderer {
     }
 
     /**
-     * Desenha waveforms de áudio realistas dentro dos clipes de fala,
-     * adaptando a amplitude ao volume efetivo e indicando saturação/clipping sutilmente.
+     * Desenha waveforms de áudio fidedignas e reais dentro dos clipes da timeline,
+     * adaptando a amplitude ao volume efetivo, respeitando fades e indicando saturação/clipping sutilmente.
      */
     drawWaveform(cut, startX, clipY, width, clipHeight, waveColor, track) {
         const ctx = this.ctx;
@@ -894,7 +900,7 @@ export class CapiauTimelineRenderer {
         const maxAmplitude = (clipHeight - 16) / 2; // Margem para respeitar bordas do clipe e rótulos
         if (maxAmplitude <= 2) return;
 
-        // Se o volume estiver mutado / zerado (silêncio total)
+        // Se o volume estiver mutado / zerado (silêncio total configurado)
         if (totalGain <= 0.001) {
             ctx.save();
             ctx.beginPath();
@@ -911,69 +917,83 @@ export class CapiauTimelineRenderer {
         const fps = TIMELINE_STATE.fps || 24;
         const durFrames = cut.outFrame - cut.inFrame;
         const clipDurS = durFrames / fps;
+        const inSec = (cut.inFrame || 0) / fps;
+        const outSec = (cut.outFrame || 0) / fps;
         const effects = cut.effects || [];
         const fadeInEff = effects.find(e => e.type === "crossfade" && e.side === "in" && !e.disabled);
         const fadeOutEff = effects.find(e => e.type === "crossfade" && e.side === "out" && !e.disabled);
         const fadeInDur = fadeInEff ? Math.min(clipDurS, Math.max(0, fadeInEff.duration_s || 0)) : 0;
         const fadeOutDur = fadeOutEff ? Math.min(clipDurS - fadeInDur, Math.max(0, fadeOutEff.duration_s || 0)) : 0;
 
-        // Se o vídeo não possui waveform_data real, gera picos estáveis determinísticos baseados no id
-        let peaks = [];
-        const numPoints = Math.max(10, Math.floor(width / 3)); // 1 ponto a cada 3px
+        // 1 ponto a cada 2 pixels para desenho suave e detalhado
+        const numPoints = Math.max(10, Math.floor(width / 2));
 
-        // Simulação pseudo-aleatória estável baseada no ID do clipe
-        const seed = (cut.video_id || 0) * 100 + (cut.inFrame || 0);
-        const random = (s) => {
-            const x = Math.sin(s) * 10000;
-            return x - Math.floor(x);
-        };
-
-        for (let i = 0; i < numPoints; i++) {
-            const phase = (i / numPoints) * Math.PI * 8;
-            // Cria um sinal complexo de fala (altos e baixos, pausas de silêncio)
-            let val = Math.abs(Math.sin(phase) * 0.4 + random(seed + i) * 0.3);
-            if (i % 15 < 3) val = 0.02; // Simula silêncio/pausa entre palavras
-            peaks.push(val);
-        }
+        // Busca picos reais no WaveformManager
+        const sampled = WaveformManager.getSampledEnvelope(cut.video_id, inSec, outSec, numPoints);
 
         const clippingPoints = [];
 
         ctx.save();
         ctx.beginPath();
-        ctx.strokeStyle = waveColor || "rgba(6, 182, 212, 0.4)";
-        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = waveColor || "rgba(110, 231, 183, 0.65)";
+        ctx.lineWidth = 1.3;
 
-        for (let i = 0; i < numPoints; i++) {
-            const px = startX + (i / numPoints) * width;
-            const tSample = (i / numPoints) * clipDurS;
-            let fadeGain = 1.0;
-            if (fadeInDur > 0 && tSample < fadeInDur) {
-                const p = tSample / fadeInDur;
-                fadeGain = Math.min(fadeGain, evaluateFadeCurve(p, fadeInEff.curve || "linear", fadeInEff.tension || 0));
+        if (sampled && sampled.hasData && sampled.peaks.length > 0) {
+            const peaks = sampled.peaks;
+            const count = peaks.length;
+
+            for (let i = 0; i < count; i++) {
+                const px = startX + (i / count) * width;
+                const tSample = (i / count) * clipDurS;
+                let fadeGain = 1.0;
+                if (fadeInDur > 0 && tSample < fadeInDur) {
+                    const p = tSample / fadeInDur;
+                    fadeGain = Math.min(fadeGain, evaluateFadeCurve(p, fadeInEff.curve || "linear", fadeInEff.tension || 0));
+                }
+                if (fadeOutDur > 0 && (clipDurS - tSample) < fadeOutDur) {
+                    const p = (clipDurS - tSample) / fadeOutDur;
+                    fadeGain = Math.min(fadeGain, evaluateFadeCurve(p, fadeOutEff.curve || "linear", fadeOutEff.tension || 0));
+                }
+
+                const sampleGain = totalGain * fadeGain;
+                const pMin = peaks[i].min; // amplitude mínima real (negativa, ex: -0.6)
+                const pMax = peaks[i].max; // amplitude máxima real (positiva, ex: +0.7)
+
+                const rawAmpPos = Math.abs(pMax) * maxAmplitude * sampleGain;
+                const rawAmpNeg = Math.abs(pMin) * maxAmplitude * sampleGain;
+
+                const isClipped = rawAmpPos >= maxAmplitude || rawAmpNeg >= maxAmplitude;
+                const ampTop = Math.min(rawAmpPos, maxAmplitude);
+                const ampBottom = Math.min(rawAmpNeg, maxAmplitude);
+
+                if (ampTop <= 0.5 && ampBottom <= 0.5) {
+                    // Silêncio real: linha reta fina no centro
+                    ctx.moveTo(px, centerY - 0.5);
+                    ctx.lineTo(px, centerY + 0.5);
+                } else {
+                    // Onda real bipolar espelhada
+                    ctx.moveTo(px, centerY - ampTop);
+                    ctx.lineTo(px, centerY + ampBottom);
+                }
+
+                if (isClipped) {
+                    clippingPoints.push({ px, yTop: centerY - maxAmplitude, yBottom: centerY + maxAmplitude });
+                }
             }
-            if (fadeOutDur > 0 && (clipDurS - tSample) < fadeOutDur) {
-                const p = (clipDurS - tSample) / fadeOutDur;
-                fadeGain = Math.min(fadeGain, evaluateFadeCurve(p, fadeOutEff.curve || "linear", fadeOutEff.tension || 0));
-            }
-
-            const sampleGain = totalGain * fadeGain;
-            const rawAmp = peaks[i] * maxAmplitude * sampleGain;
-            const isClipped = rawAmp >= maxAmplitude;
-            const amp = Math.min(rawAmp, maxAmplitude);
-
-            ctx.moveTo(px, centerY - amp);
-            ctx.lineTo(px, centerY + amp);
-
-            if (isClipped) {
-                clippingPoints.push({ px, yTop: centerY - maxAmplitude, yBottom: centerY + maxAmplitude });
-            }
+            ctx.stroke();
+        } else {
+            // Enquanto o arquivo de picos está sendo buscado pela primeira vez, exibe linha de base sutil
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.lineWidth = 1.0;
+            ctx.moveTo(startX + 2, centerY);
+            ctx.lineTo(startX + width - 2, centerY);
+            ctx.stroke();
         }
-        ctx.stroke();
 
         // Destaque sutil de saturação (clipping) nos pontos onde estourou
         if (clippingPoints.length > 0) {
             ctx.beginPath();
-            ctx.strokeStyle = "rgba(244, 63, 94, 0.85)";
+            ctx.strokeStyle = "rgba(244, 63, 94, 0.9)";
             ctx.lineWidth = 1.6;
             for (const pt of clippingPoints) {
                 // Pequenos traços horizontais no topo e base marcando o teto saturado

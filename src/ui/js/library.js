@@ -1170,6 +1170,9 @@ export class LibraryManager {
         if (this.btnRetryFailed) this.btnRetryFailed.addEventListener("click", () => this.runRetryFailed());
         if (this.btnTranscribeAll) this.btnTranscribeAll.addEventListener("click", () => this.triggerTranscribeAll());
 
+        const btnGenWaves = document.getElementById("btn-generate-waveforms");
+        if (btnGenWaves) btnGenWaves.addEventListener("click", () => this.triggerGenerateWaveforms());
+
         const btnReanalyzeFailed = document.getElementById("btn-reanalyze-failed");
         if (btnReanalyzeFailed) btnReanalyzeFailed.addEventListener("click", () => this.handleFailedButtonClick());
 
@@ -2693,6 +2696,39 @@ export class LibraryManager {
             }
             if (window.showToast) window.showToast(msg, "error");
             else alert("Erro ao iniciar a transcrição: " + msg);
+        }
+    }
+
+    async triggerGenerateWaveforms() {
+        const btn = document.getElementById("btn-generate-waveforms");
+        try {
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span class="btn-text">Gerando...</span>`;
+            }
+            STATE.emit("statusChanged", { text: "Extraindo formas de onda reais para o projeto...", active: true });
+            
+            const res = await CapIAuAPI.generateProjectWaveforms(STATE.currentProjectId || 1);
+            
+            const msg = `Waveforms prontas: ${res.generated} novas geradas, ${res.skipped} existentes em cache.`;
+            STATE.emit("statusChanged", { text: msg, active: true });
+            if (window.showToast) window.showToast(msg, "success");
+
+            // Pré-carrega na memória e redesenha a timeline
+            const { WaveformManager } = await import("./waveformManager.js");
+            const { TIMELINE_STATE } = await import("./timelineState.js");
+            WaveformManager.preloadForClips(TIMELINE_STATE.cuts);
+            if (window.timelineRenderer) window.timelineRenderer.requestRedraw();
+        } catch (err) {
+            console.error("[Waveforms] Erro ao gerar em lote:", err);
+            const msg = this.extrairMensagemErro(err);
+            STATE.emit("statusChanged", { text: `Erro na geração de waveforms: ${msg}`, active: true });
+            if (window.showToast) window.showToast(`Erro na geração de waveforms: ${msg}`, "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-chart-simple"></i> <span class="btn-text">Ondas</span>`;
+            }
         }
     }
 

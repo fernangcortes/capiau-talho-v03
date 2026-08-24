@@ -2687,4 +2687,43 @@ def glossario_audio(secao: Optional[str] = None):
     return {"ok": True, "total": len(entradas), "entradas": entradas}
 
 
+# -- Waveforms de Áudio Reais (Picos Min/Max para NLE Timeline & Inspetor) ----
 
+@router.get("/api/videos/{video_id}/waveform")
+def get_video_waveform(
+    video_id: int,
+    force: bool = Query(False, description="Força a regeneração do cache"),
+    sample_rate: int = Query(100, description="Picos por segundo (ex: 100 = 10ms por balde)"),
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """
+    Retorna os picos Min/Max normalizados (-1.0 a 1.0) do arquivo de áudio/vídeo.
+    Lê do cache em disco ou gera instantaneamente caso ainda não exista.
+    """
+    from src.media.audio_waveform import get_or_generate_waveform
+    data = get_or_generate_waveform(video_id, conn=conn, force=force, sample_rate=sample_rate)
+    if data.get("error") and not data.get("peaks"):
+        # Se for vídeo inexistente, retorna 404
+        if "não encontrado" in str(data.get("error")):
+            raise HTTPException(status_code=404, detail=data["error"])
+    return data
+
+
+@router.post("/api/projects/{project_id}/generate-waveforms")
+def generate_project_waveforms(
+    project_id: int,
+    force: bool = Query(False, description="Força a regeneração de todos os vídeos"),
+    sample_rate: int = Query(100, description="Picos por segundo"),
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """
+    Gera waveforms para todos os vídeos cadastrados no projeto que ainda não possuem cache.
+    """
+    from src.media.audio_waveform import batch_generate_project_waveforms
+    result = batch_generate_project_waveforms(
+        project_id=project_id,
+        conn=conn,
+        force=force,
+        sample_rate=sample_rate
+    )
+    return {"ok": True, **result}
