@@ -184,7 +184,12 @@ class RenderOverridesPayload(BaseModel):
     container: str = "mp4"
     codec: str = "h264"
     crf: Optional[int] = None
-    audio_bitrate: int = 192
+    # Optional, como os vizinhos: o painel manda `null` quando o campo avancado
+    # esta vazio, que e o caso NORMAL e significa "usa o do preset". Tipado como
+    # int puro, todo preflight de campo vazio voltava 422 -- e o painel traduzia
+    # 422 como "motor nao instalado", mandando o usuario procurar defeito no
+    # lugar errado. O default de 192 vive em comando.parametros_saida.
+    audio_bitrate: Optional[int] = None
     mute_audio: bool = False
 
 class RenderScopePayload(BaseModel):

@@ -690,7 +690,7 @@ async function executarPreflight() {
 
     if (!resposta.ok || !resposta.data) {
         // 404/503/rede-caída: mensagem clara, painel segue de pé, zero exceção.
-        _mostrarEngineIndisponivel(resposta.status);
+        _mostrarEngineIndisponivel(resposta.status, resposta.data);
         _setRotuloBotoes("Motor indisponível");
         _setBotaoExport(null, true, null, true);
         return;
@@ -1023,7 +1023,7 @@ async function exportar(kind) {
 
     if (!resposta.ok || !resposta.data || !resposta.data.task_key) {
         if (resposta.status === 404 || resposta.status === 503 || resposta.status === 0) {
-            _mostrarEngineIndisponivel(resposta.status);
+            _mostrarEngineIndisponivel(resposta.status, resposta.data);
             _toast("Motor de render indisponível nesta versão.", "error");
         } else {
             _toast(`O render não foi enfileirado (HTTP ${resposta.status}).`, "error");
@@ -1230,19 +1230,63 @@ function _trocarFooter(modo) {
 
 // ── DEGRADAÇÃO ELEGANTE (rota ausente / servidor fora) ───────────────────────
 
-function _mostrarEngineIndisponivel(statusHttp) {
+/**
+ * Mensagem de falha do preflight/render — separando MOTOR AUSENTE de PEDIDO RECUSADO.
+ *
+ * Antes, qualquer status não-ok virava "o motor não está instalado". Um 422
+ * (corpo rejeitado pelo schema) aparecia com essa cara e mandava o usuário
+ * procurar defeito na instalação, quando o defeito estava no pedido — aconteceu
+ * de verdade em 24/08/2026, com `overrides.audio_bitrate: null`. Diagnóstico
+ * errado é pior que diagnóstico nenhum: manda consertar a coisa errada.
+ *
+ * 404/501/503 => o motor realmente não está nesta versão.
+ * 400/422     => o motor existe e recusou ESTE pedido; mostra o detalhe do servidor.
+ * 0           => nem chegou ao servidor.
+ */
+function _mostrarEngineIndisponivel(statusHttp, detalhe) {
     if (!_el.engineMsg) return;
     if (statusHttp === null || statusHttp === undefined) {
         _el.engineMsg.style.display = "none";
         return;
     }
-    const causa = statusHttp === 0
-        ? "Não consegui falar com o servidor."
-        : `O servidor respondeu HTTP ${statusHttp}.`;
-    _el.engineMsg.innerHTML =
-        '<i class="fa-solid fa-plug-circle-xmark"></i> ' +
-        "<strong>O motor de render ainda não está instalado nesta versão.</strong><br>" +
-        `${_esc(causa)} Instale a atualização com o pacote de render para exportar vídeo. ` +
-        "A Exportar Timeline (.otio/.xml/.edl) continua funcionando normalmente.";
+
+    const ausente = [404, 501, 503].indexOf(Number(statusHttp)) >= 0;
+    const recusado = [400, 422].indexOf(Number(statusHttp)) >= 0;
+
+    let html;
+    if (statusHttp === 0) {
+        html = '<i class="fa-solid fa-plug-circle-xmark"></i> ' +
+            "<strong>Não consegui falar com o servidor.</strong><br>" +
+            "Verifique se o CapIAu está rodando e tente de novo.";
+    } else if (ausente) {
+        html = '<i class="fa-solid fa-plug-circle-xmark"></i> ' +
+            "<strong>O motor de render ainda não está instalado nesta versão.</strong><br>" +
+            `O servidor respondeu HTTP ${_esc(String(statusHttp))}. ` +
+            "A Exportar Timeline (.otio/.xml/.edl) continua funcionando normalmente.";
+    } else if (recusado) {
+        html = '<i class="fa-solid fa-triangle-exclamation"></i> ' +
+            "<strong>O servidor recusou este pedido de exportação.</strong><br>" +
+            `HTTP ${_esc(String(statusHttp))}. O motor está instalado; o problema é o ` +
+            "pedido em si — normalmente um campo da seção Avançado." +
+            (detalhe ? `<br><code>${_esc(_resumirDetalhe(detalhe))}</code>` : "");
+    } else {
+        html = '<i class="fa-solid fa-triangle-exclamation"></i> ' +
+            `<strong>Falha na exportação (HTTP ${_esc(String(statusHttp))}).</strong>` +
+            (detalhe ? `<br><code>${_esc(_resumirDetalhe(detalhe))}</code>` : "");
+    }
+    _el.engineMsg.innerHTML = html;
     _el.engineMsg.style.display = "";
+}
+
+/** Detalhe do FastAPI (string ou lista de erros de validação) em uma linha legível. */
+function _resumirDetalhe(detalhe) {
+    const d = (detalhe && detalhe.detail !== undefined) ? detalhe.detail : detalhe;
+    if (typeof d === "string") return d.slice(0, 300);
+    if (Array.isArray(d)) {
+        return d.slice(0, 3).map(e => {
+            const campo = Array.isArray(e.loc) ? e.loc.filter(x => x !== "body").join(".") : "";
+            return `${campo}: ${e.msg || ""}`.trim();
+        }).join(" · ").slice(0, 300);
+    }
+    try { return JSON.stringify(d).slice(0, 300); } catch (_) { return ""; }
 }
