@@ -19,7 +19,7 @@
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Customizados -->
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
     <div class="app-container">
@@ -623,14 +623,14 @@
                     <!-- Monitor de Origem (Source - Esquerda) -->
                     <section class="player-panel glassmorphism" id="source-player-panel" style="flex: 1; display: flex; flex-direction: column; position: relative;">
                         <div class="player-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-glass);">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="font-size: 11px; font-weight: 800; color: var(--color-cyan); background: rgba(6, 182, 212, 0.1); padding: 2px 6px; border-radius: 4px;">SOURCE</span>
-                                <div class="current-media-title" id="source-player-title" style="font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width: 180px;">Nenhum clipe carregado</div>
+                            <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                                <div class="current-media-title" id="source-player-title" style="font-size: 11px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width: 200px;"></div>
                             </div>
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 <button id="btn-swap-to-program" class="btn-control btn-swap-player" title="Alternar para Program (Q)" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px; display: none;"><i class="fa-solid fa-right-left"></i></button>
                                 <button id="btn-popout-source" class="btn-control" title="Destacar Player" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-up-right-from-square"></i></button>
                                 <button id="btn-expand-source" class="btn-control" title="Maximizar" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-expand"></i></button>
+                                <span id="source-tally-dot" class="player-tally-dot source" title="Monitor de Origem (Source)" data-tooltip="Monitor de Origem (Source)"></span>
                             </div>
                         </div>
                         
@@ -674,46 +674,59 @@
 
                     <!-- Monitor de Programa (Program - Direita) -->
                     <section class="player-panel glassmorphism" id="program-player-panel" style="flex: 1; display: flex; flex-direction: column; position: relative;">
-                        <div class="player-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-glass);">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="font-size: 11px; font-weight: 800; color: #a855f7; background: rgba(168, 85, 247, 0.1); padding: 2px 6px; border-radius: 4px;">PROGRAM</span>
-                                <div class="current-media-title" id="program-player-title" style="font-size: 12px; font-weight: 600; color: #fff;">Timeline Ativa</div>
-                            </div>
+                        <div class="player-header" style="display: flex; justify-content: flex-end; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-glass);">
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 <button id="btn-swap-to-source" class="btn-control btn-swap-player" title="Alternar para Source (Q)" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px; display: none;"><i class="fa-solid fa-right-left"></i></button>
                                 <select id="program-preview-zoom" title="Zoom do Preview" style="font-size: 10px; height: 20px; padding: 0 4px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; border-radius: 4px; outline: none; cursor: pointer;">
                                     <option value="fit">Ajustar</option>
+                                    <option value="0.1">10%</option>
                                     <option value="0.25">25%</option>
                                     <option value="0.5">50%</option>
                                     <option value="0.75">75%</option>
                                     <option value="1">100%</option>
+                                    <option value="1.5">150%</option>
                                     <option value="2">200%</option>
                                 </select>
                                 <button id="btn-seq-settings-program" class="btn-control" title="Configurações da Sequência" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-gear"></i></button>
                                 <button id="btn-popout-program" class="btn-control" title="Destacar Player" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-up-right-from-square"></i></button>
                                 <button id="btn-expand-program" class="btn-control" title="Maximizar" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-expand"></i></button>
+                                <span id="program-tally-dot" class="player-tally-dot program" title="Monitor de Programa (Timeline Ativa)" data-tooltip="Monitor de Programa (Timeline Ativa)"></span>
                             </div>
                         </div>
                         
-                        <div class="video-container" id="program-video-wrapper" style="flex: 1; background: #000; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                            <div id="program-player-viewport" style="position: relative; overflow: visible; display: flex; align-items: center; justify-content: center; background: #000;">
+                        <div class="video-container" id="program-video-wrapper" style="flex: 1; background: #000; position: relative; overflow: hidden;">
+                            <div id="program-player-viewport" style="position: absolute; left: 50%; top: 50%; overflow: visible; background: #000;">
                                 <!-- Contêiner de mídia com corte estrito no quadro 16:9 (0% de transbordo por padrão) -->
                                 <div id="program-media-viewport" style="position: absolute; inset: 0; overflow: hidden; width: 100%; height: 100%; background: #000;">
                                     <!-- Pool de buffers de vídeo: 2 camadas no ar (base/sobreposição) + 2 buffers
                                          de pré-carregamento do próximo clipe. Trocar de clipe = trocar de buffer,
                                          nunca recarregar o <video> que está no ar (load() = tela preta). -->
-                                    <video id="program-video-a" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; display: block;"></video>
-                                    <video id="program-video-b" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; display: none;"></video>
-                                    <video id="program-video-c" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; display: none;"></video>
-                                    <video id="program-video-d" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; display: none;"></video>
+                                    <video id="program-video-a" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; display: block;"></video>
+                                    <video id="program-video-b" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; display: none;"></video>
+                                    <video id="program-video-c" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; display: none;"></video>
+                                    <video id="program-video-d" src="" preload="auto" playsinline muted style="position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; display: none;"></video>
                                     
                                     <!-- Camadas de foto (still) da timeline: A = base, B = sobreposição -->
-                                    <img id="program-player-photo" style="display:none; position: absolute; inset: 0; width: 100%; height: 100%;" src="">
-                                    <img id="program-player-photo-b" style="display:none; position: absolute; inset: 0; width: 100%; height: 100%;" src="">
+                                    <img id="program-player-photo" style="display:none; position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;" src="">
+                                    <img id="program-player-photo-b" style="display:none; position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;" src="">
                                 </div>
 
                                 <!-- Overlay de transformação (Fase 4) - alças acessíveis sem tingimento de cor -->
                                 <div id="program-transform-overlay"></div>
+                            </div>
+
+                            <!-- Minimapa de Navegação do Program (Fase Zoom Livre) -->
+                            <div id="program-player-minimap" class="program-minimap" style="display: none; position: absolute; top: 12px; left: 12px; width: 140px; height: 80px; border: 1px solid var(--border-glass); border-radius: 6px; background: rgba(10, 8, 14, 0.85); overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.7); z-index: 70; pointer-events: auto; cursor: crosshair; backdrop-filter: blur(8px);">
+                                <canvas id="program-minimap-canvas" width="140" height="80" style="width: 100%; height: 100%; object-fit: contain; display: block; opacity: 0.9; pointer-events: none;"></canvas>
+                                <div id="program-minimap-rect" style="position: absolute; border: 2px solid var(--color-cyan); background: rgba(6, 182, 212, 0.25); border-radius: 2px; pointer-events: none; box-sizing: border-box; box-shadow: 0 0 8px rgba(6, 182, 212, 0.4);"></div>
+                            </div>
+
+                            <!-- Indicadores de Rolagem Sutis -->
+                            <div id="program-scrollbar-v" class="program-scrollbar v" style="display: none; position: absolute; right: 4px; top: 8px; bottom: 8px; width: 4px; border-radius: 2px; background: rgba(255,255,255,0.06); z-index: 65; pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
+                                <div id="program-scrollbar-v-thumb" style="width: 100%; height: 20%; background: rgba(6, 182, 212, 0.6); border-radius: 2px;"></div>
+                            </div>
+                            <div id="program-scrollbar-h" class="program-scrollbar h" style="display: none; position: absolute; bottom: 4px; left: 8px; right: 8px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.06); z-index: 65; pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
+                                <div id="program-scrollbar-h-thumb" style="height: 100%; width: 20%; background: rgba(6, 182, 212, 0.6); border-radius: 2px;"></div>
                             </div>
                         </div>
                         
@@ -2097,7 +2110,7 @@
     </div>
 
     <!-- Lógica da Aplicação -->
-    <script type="module" src="js/main.js?v=9"></script>
+    <script type="module" src="js/main.js?v=13"></script>
 </body>
 </html>
 

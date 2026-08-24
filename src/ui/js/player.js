@@ -910,36 +910,252 @@ export class SourcePlayer {
 
 let _observedWrapper = null;
 let _viewportResizeObserver = null;
+let _scrollbarFadeTimeout = null;
+
+export function showProgramScrollbarsTemporarily() {
+    const scrollbarV = getActiveElement("program-scrollbar-v");
+    const scrollbarH = getActiveElement("program-scrollbar-h");
+    if (scrollbarV) scrollbarV.classList.add("visible");
+    if (scrollbarH) scrollbarH.classList.add("visible");
+
+    if (_scrollbarFadeTimeout) clearTimeout(_scrollbarFadeTimeout);
+    _scrollbarFadeTimeout = setTimeout(() => {
+        if (scrollbarV) scrollbarV.classList.remove("visible");
+        if (scrollbarH) scrollbarH.classList.remove("visible");
+    }, 1200);
+}
+
+export function updateProgramScrollbars() {
+    const wrapper = getActiveElement("program-video-wrapper");
+    const scrollbarV = getActiveElement("program-scrollbar-v");
+    const scrollbarH = getActiveElement("program-scrollbar-h");
+    const thumbV = getActiveElement("program-scrollbar-v-thumb");
+    const thumbH = getActiveElement("program-scrollbar-h-thumb");
+    if (!wrapper || !scrollbarV || !scrollbarH || !thumbV || !thumbH) return;
+
+    const tw = TIMELINE_STATE?.width || 1920;
+    const th = TIMELINE_STATE?.height || 1080;
+    const PAD = 16;
+
+    const availW = Math.max(0, wrapper.clientWidth - PAD * 2);
+    const availH = Math.max(0, wrapper.clientHeight - PAD * 2);
+    const fitScale = (availW > 0 && availH > 0) ? Math.min(availW / tw, availH / th) : 0.5;
+
+    const zoom = TIMELINE_STATE?.previewZoom || "fit";
+    const scale = (zoom === "fit") ? fitScale : Number(zoom);
+
+    const vW = Math.round(tw * scale);
+    const vH = Math.round(th * scale);
+    const wW = wrapper.clientWidth;
+    const wH = wrapper.clientHeight;
+
+    const overflowX = vW > wW + 2;
+    const overflowY = vH > wH + 2;
+
+    scrollbarV.style.display = overflowY ? "block" : "none";
+    scrollbarH.style.display = overflowX ? "block" : "none";
+
+    scrollbarV.classList.toggle("active", overflowY);
+    scrollbarH.classList.toggle("active", overflowX);
+
+    const panX = TIMELINE_STATE?.previewPanX || 0;
+    const panY = TIMELINE_STATE?.previewPanY || 0;
+
+    if (overflowY) {
+        const maxPanY = (vH - wH) / 2;
+        const normY = maxPanY > 0 ? (panY + maxPanY) / (2 * maxPanY) : 0.5;
+        const thumbFracH = Math.max(0.15, Math.min(1, wH / vH));
+        const trackH = scrollbarV.clientHeight || wH;
+        const thumbH_px = Math.max(16, Math.round(trackH * thumbFracH));
+        const top_px = Math.round((1 - normY) * (trackH - thumbH_px));
+        thumbV.style.height = `${thumbH_px}px`;
+        thumbV.style.transform = `translateY(${top_px}px)`;
+    }
+
+    if (overflowX) {
+        const maxPanX = (vW - wW) / 2;
+        const normX = maxPanX > 0 ? (panX + maxPanX) / (2 * maxPanX) : 0.5;
+        const thumbFracW = Math.max(0.15, Math.min(1, wW / vW));
+        const trackW = scrollbarH.clientWidth || wW;
+        const thumbW_px = Math.max(16, Math.round(trackW * thumbFracW));
+        const left_px = Math.round((1 - normX) * (trackW - thumbW_px));
+        thumbH.style.width = `${thumbW_px}px`;
+        thumbH.style.transform = `translateX(${left_px}px)`;
+    }
+}
+
+export function updateProgramMinimap() {
+    const wrapper = getActiveElement("program-video-wrapper");
+    const minimap = getActiveElement("program-player-minimap");
+    const canvas = getActiveElement("program-minimap-canvas");
+    const rectEl = getActiveElement("program-minimap-rect");
+    if (!wrapper || !minimap || !canvas || !rectEl) return;
+
+    const tw = TIMELINE_STATE?.width || 1920;
+    const th = TIMELINE_STATE?.height || 1080;
+    const PAD = 16;
+
+    const availW = Math.max(0, wrapper.clientWidth - PAD * 2);
+    const availH = Math.max(0, wrapper.clientHeight - PAD * 2);
+    const fitScale = (availW > 0 && availH > 0) ? Math.min(availW / tw, availH / th) : 0.5;
+
+    const zoom = TIMELINE_STATE?.previewZoom || "fit";
+    const scale = (zoom === "fit") ? fitScale : Number(zoom);
+
+    const vW = Math.round(tw * scale);
+    const vH = Math.round(th * scale);
+    const wW = wrapper.clientWidth;
+    const wH = wrapper.clientHeight;
+
+    const hasOverflow = (vW > wW + 2) || (vH > wH + 2);
+
+    if (!hasOverflow) {
+        minimap.style.display = "none";
+        return;
+    }
+
+    minimap.style.display = "block";
+
+    // Renderiza quadro no canvas do minimapa
+    const ctx = canvas.getContext ? canvas.getContext("2d") : null;
+    if (ctx) {
+        const mw = canvas.width;
+        const mh = canvas.height;
+        ctx.fillStyle = "#0a080e";
+        ctx.fillRect(0, 0, mw, mh);
+
+        const aspect = tw / th;
+        const mAspect = mw / mh;
+        let dw, dh, dx, dy;
+        if (aspect > mAspect) {
+            dw = mw;
+            dh = mw / aspect;
+            dx = 0;
+            dy = (mh - dh) / 2;
+        } else {
+            dh = mh;
+            dw = mh * aspect;
+            dx = (mw - dw) / 2;
+            dy = 0;
+        }
+
+        let frameDrawn = false;
+        const photoA = getActiveElement("program-player-photo");
+        const photoB = getActiveElement("program-player-photo-b");
+        const activePhoto = (photoA && photoA.style.display !== "none" && photoA.complete && photoA.naturalWidth > 0) ? photoA :
+                           ((photoB && photoB.style.display !== "none" && photoB.complete && photoB.naturalWidth > 0) ? photoB : null);
+
+        if (activePhoto) {
+            try {
+                ctx.drawImage(activePhoto, dx, dy, dw, dh);
+                frameDrawn = true;
+            } catch (_) {}
+        }
+
+        if (!frameDrawn) {
+            const vids = ["program-video-a", "program-video-b", "program-video-c", "program-video-d"]
+                .map(id => getActiveElement(id))
+                .filter(v => v && v.style.display !== "none" && v.readyState >= 2);
+
+            const activeVid = vids[0];
+            if (activeVid) {
+                try {
+                    ctx.drawImage(activeVid, dx, dy, dw, dh);
+                    frameDrawn = true;
+                } catch (_) {}
+            }
+        }
+
+        if (!frameDrawn) {
+            ctx.fillStyle = "#16121f";
+            ctx.fillRect(dx, dy, dw, dh);
+            ctx.strokeStyle = "rgba(168, 85, 247, 0.4)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(dx + 0.5, dy + 0.5, dw - 1, dh - 1);
+        }
+
+        // Posiciona e dimensiona o retângulo indicador de enquadramento
+        const panX = TIMELINE_STATE?.previewPanX || 0;
+        const panY = TIMELINE_STATE?.previewPanY || 0;
+
+        const visFracW = Math.min(1, wW / vW);
+        const visFracH = Math.min(1, wH / vH);
+
+        const rectW = Math.max(6, Math.min(dw, visFracW * dw));
+        const rectH = Math.max(6, Math.min(dh, visFracH * dh));
+
+        const normCenterX = 0.5 - (panX / (tw * scale));
+        const normCenterY = 0.5 - (panY / (th * scale));
+
+        let rectLeft = dx + (normCenterX * dw) - (rectW / 2);
+        let rectTop = dy + (normCenterY * dh) - (rectH / 2);
+
+        rectLeft = Math.max(dx, Math.min(dx + dw - rectW, rectLeft));
+        rectTop = Math.max(dy, Math.min(dy + dh - rectH, rectTop));
+
+        rectEl.style.left = `${Math.round(rectLeft)}px`;
+        rectEl.style.top = `${Math.round(rectTop)}px`;
+        rectEl.style.width = `${Math.round(rectW)}px`;
+        rectEl.style.height = `${Math.round(rectH)}px`;
+    }
+}
 
 export function syncProgramViewport() {
     const wrapper = getActiveElement("program-video-wrapper");
     const viewport = getActiveElement("program-player-viewport");
     if (!wrapper || !viewport) return;
 
-    if (_observedWrapper !== wrapper) {
-        if (_viewportResizeObserver) {
-            _viewportResizeObserver.disconnect();
+    if (typeof ResizeObserver !== "undefined") {
+        if (_observedWrapper !== wrapper) {
+            if (_viewportResizeObserver) {
+                _viewportResizeObserver.disconnect();
+            }
+            _observedWrapper = wrapper;
+            _viewportResizeObserver = new ResizeObserver(() => {
+                syncProgramViewport();
+            });
+            _viewportResizeObserver.observe(wrapper);
         }
-        _observedWrapper = wrapper;
-        _viewportResizeObserver = new ResizeObserver(() => {
-            syncProgramViewport();
-        });
-        _viewportResizeObserver.observe(wrapper);
     }
 
-    const tw = TIMELINE_STATE.width || 1920;
-    const th = TIMELINE_STATE.height || 1080;
+    const tw = TIMELINE_STATE?.width || 1920;
+    const th = TIMELINE_STATE?.height || 1080;
     const PAD = 16;
 
     const availW = Math.max(0, wrapper.clientWidth - PAD * 2);
     const availH = Math.max(0, wrapper.clientHeight - PAD * 2);
-    const fitScale = Math.min(availW / tw, availH / th);
+    const fitScale = (availW > 0 && availH > 0) ? Math.min(availW / tw, availH / th) : 0.5;
 
-    const zoom = TIMELINE_STATE.previewZoom || "fit";
-    const scale = (zoom === "fit") ? fitScale : zoom;
+    const zoom = TIMELINE_STATE?.previewZoom || "fit";
+    const scale = (zoom === "fit") ? fitScale : Number(zoom);
 
-    viewport.style.width = `${Math.round(tw * scale)}px`;
-    viewport.style.height = `${Math.round(th * scale)}px`;
+    const vW = Math.round(tw * scale);
+    const vH = Math.round(th * scale);
+
+    viewport.style.width = `${vW}px`;
+    viewport.style.height = `${vH}px`;
+
+    // Limites e translação de pan
+    const wW = wrapper.clientWidth;
+    const wH = wrapper.clientHeight;
+    const maxPanX = Math.max(0, (vW - wW) / 2);
+    const maxPanY = Math.max(0, (vH - wH) / 2);
+
+    let panX = TIMELINE_STATE?.previewPanX || 0;
+    let panY = TIMELINE_STATE?.previewPanY || 0;
+
+    if (vW <= wW) panX = 0; else panX = Math.max(-maxPanX, Math.min(maxPanX, panX));
+    if (vH <= wH) panY = 0; else panY = Math.max(-maxPanY, Math.min(maxPanY, panY));
+
+    if (TIMELINE_STATE) {
+        TIMELINE_STATE.previewPanX = panX;
+        TIMELINE_STATE.previewPanY = panY;
+    }
+
+    viewport.style.transform = `translate(-50%, -50%) translate3d(${panX}px, ${panY}px, 0px)`;
+
+    updateProgramMinimap();
+    updateProgramScrollbars();
 }
 
 // Tolerância (s) para considerar que um buffer já está no ponto certo da mídia e portanto
@@ -1032,6 +1248,331 @@ export class ProgramPlayer {
                 this.pause();
             }
         });
+
+        // Inicializa controle de zoom livre, pan/scroll e minimapa
+        this.initProgramZoomAndPan();
+    }
+
+    initProgramZoomAndPan() {
+        const wrapper = this.el("program-video-wrapper");
+        const minimap = this.el("program-player-minimap");
+        if (!wrapper) return;
+
+        let isSpacePressed = false;
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        let initialPanX = 0;
+        let initialPanY = 0;
+
+        // 1. Zoom livre com Shift + Wheel e Pan/Scroll com Wheel comum
+        wrapper.addEventListener("wheel", (e) => {
+            const tw = TIMELINE_STATE?.width || 1920;
+            const th = TIMELINE_STATE?.height || 1080;
+            const PAD = 16;
+            const availW = Math.max(0, wrapper.clientWidth - PAD * 2);
+            const availH = Math.max(0, wrapper.clientHeight - PAD * 2);
+            const fitScale = (availW > 0 && availH > 0) ? Math.min(availW / tw, availH / th) : 0.5;
+            const zoom = TIMELINE_STATE?.previewZoom || "fit";
+            let scale = (zoom === "fit") ? fitScale : Number(zoom);
+            if (isNaN(scale) || scale <= 0) scale = fitScale;
+
+            if (e.shiftKey) {
+                // ZOOM LIVRE (Focalizado na posição do cursor)
+                e.preventDefault();
+                e.stopPropagation();
+
+                const delta = -e.deltaY;
+                const factor = delta > 0 ? 1.15 : (1 / 1.15);
+                let targetScale = scale * factor;
+
+                // Limita zoom entre 10% (0.10) e 1000% (10.0)
+                targetScale = Math.max(0.10, Math.min(10.0, targetScale));
+
+                const rect = wrapper.getBoundingClientRect();
+                const mouseOffsetX = e.clientX - (rect.left + rect.width / 2);
+                const mouseOffsetY = e.clientY - (rect.top + rect.height / 2);
+
+                const curPanX = TIMELINE_STATE?.previewPanX || 0;
+                const curPanY = TIMELINE_STATE?.previewPanY || 0;
+
+                // Ponto na imagem antes do zoom
+                const pointX = (mouseOffsetX - curPanX) / scale;
+                const pointY = (mouseOffsetY - curPanY) / scale;
+
+                // Novo pan para manter o mesmo ponto sob o cursor
+                let newPanX = mouseOffsetX - pointX * targetScale;
+                let newPanY = mouseOffsetY - pointY * targetScale;
+
+                const newVW = Math.round(tw * targetScale);
+                const newVH = Math.round(th * targetScale);
+                const maxPanX = Math.max(0, (newVW - wrapper.clientWidth) / 2);
+                const maxPanY = Math.max(0, (newVH - wrapper.clientHeight) / 2);
+
+                newPanX = Math.max(-maxPanX, Math.min(maxPanX, newPanX));
+                newPanY = Math.max(-maxPanY, Math.min(maxPanY, newPanY));
+
+                if (newVW <= wrapper.clientWidth) newPanX = 0;
+                if (newVH <= wrapper.clientHeight) newPanY = 0;
+
+                if (TIMELINE_STATE) {
+                    TIMELINE_STATE.previewZoom = parseFloat(targetScale.toFixed(3));
+                    TIMELINE_STATE.previewPanX = newPanX;
+                    TIMELINE_STATE.previewPanY = newPanY;
+                }
+
+                STATE.emit("previewZoomChanged", TIMELINE_STATE.previewZoom);
+                syncProgramViewport();
+                showProgramScrollbarsTemporarily();
+                if (window.triggerAutosave) window.triggerAutosave();
+            } else {
+                // PAN / SCROLL COM WHEEL COMUM
+                const vW = Math.round(tw * scale);
+                const vH = Math.round(th * scale);
+                const wW = wrapper.clientWidth;
+                const wH = wrapper.clientHeight;
+
+                const overflowX = vW > wW + 2;
+                const overflowY = vH > wH + 2;
+
+                if (overflowX || overflowY) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    let curPanX = TIMELINE_STATE?.previewPanX || 0;
+                    let curPanY = TIMELINE_STATE?.previewPanY || 0;
+
+                    const maxPanX = overflowX ? Math.max(0, (vW - wW) / 2) : 0;
+                    const maxPanY = overflowY ? Math.max(0, (vH - wH) / 2) : 0;
+
+                    if (e.altKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                        // Rolagem Horizontal
+                        const dx = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+                        curPanX -= dx * 0.8;
+                    } else {
+                        // Rolagem Vertical
+                        if (overflowY) {
+                            curPanY -= e.deltaY * 0.8;
+                        } else if (overflowX) {
+                            // Se só houver transbordo horizontal, roda vertical rola em X
+                            curPanX -= e.deltaY * 0.8;
+                        }
+                    }
+
+                    curPanX = Math.max(-maxPanX, Math.min(maxPanX, curPanX));
+                    curPanY = Math.max(-maxPanY, Math.min(maxPanY, curPanY));
+
+                    if (TIMELINE_STATE) {
+                        TIMELINE_STATE.previewPanX = curPanX;
+                        TIMELINE_STATE.previewPanY = curPanY;
+                    }
+
+                    syncProgramViewport();
+                    showProgramScrollbarsTemporarily();
+                }
+            }
+        }, { passive: false });
+
+        // 2. Pan por Arraste (Botão do meio, Espaço+Drag, ou Drag quando ampliado)
+        wrapper.addEventListener("mousedown", (e) => {
+            if (e.target.closest("#program-player-minimap")) return;
+            if (e.target.closest(".transform-handle") || e.target.closest(".transform-handle-rot")) {
+                if (!isSpacePressed && e.button !== 1) return;
+            }
+
+            const isMiddle = e.button === 1;
+            const isLeft = e.button === 0;
+
+            const tw = TIMELINE_STATE?.width || 1920;
+            const th = TIMELINE_STATE?.height || 1080;
+            const PAD = 16;
+            const availW = Math.max(0, wrapper.clientWidth - PAD * 2);
+            const availH = Math.max(0, wrapper.clientHeight - PAD * 2);
+            const fitScale = (availW > 0 && availH > 0) ? Math.min(availW / tw, availH / th) : 0.5;
+            const zoom = TIMELINE_STATE?.previewZoom || "fit";
+            const scale = (zoom === "fit") ? fitScale : Number(zoom);
+            const vW = Math.round(tw * scale);
+            const vH = Math.round(th * scale);
+            const isHandle = e.target.closest(".transform-handle") || e.target.closest(".transform-handle-rot");
+            if (isMiddle || (isLeft && (isSpacePressed || (hasOverflow && !isHandle)))) {
+                isPanning = true;
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+                initialPanX = TIMELINE_STATE?.previewPanX || 0;
+                initialPanY = TIMELINE_STATE?.previewPanY || 0;
+                wrapper.classList.add("is-panning");
+                showProgramScrollbarsTemporarily();
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
+        if (typeof window !== "undefined") {
+            window.addEventListener("mousemove", (e) => {
+                if (!isPanning) return;
+                const tw = TIMELINE_STATE?.width || 1920;
+                const th = TIMELINE_STATE?.height || 1080;
+                const PAD = 16;
+                const availW = Math.max(0, wrapper.clientWidth - PAD * 2);
+                const availH = Math.max(0, wrapper.clientHeight - PAD * 2);
+                const fitScale = (availW > 0 && availH > 0) ? Math.min(availW / tw, availH / th) : 0.5;
+                const zoom = TIMELINE_STATE?.previewZoom || "fit";
+                const scale = (zoom === "fit") ? fitScale : Number(zoom);
+                const vW = Math.round(tw * scale);
+                const vH = Math.round(th * scale);
+
+                const maxPanX = Math.max(0, (vW - wrapper.clientWidth) / 2);
+                const maxPanY = Math.max(0, (vH - wrapper.clientHeight) / 2);
+
+                const dx = e.clientX - panStartX;
+                const dy = e.clientY - panStartY;
+
+                let newPanX = initialPanX + dx;
+                let newPanY = initialPanY + dy;
+
+                newPanX = Math.max(-maxPanX, Math.min(maxPanX, newPanX));
+                newPanY = Math.max(-maxPanY, Math.min(maxPanY, newPanY));
+
+                if (TIMELINE_STATE) {
+                    TIMELINE_STATE.previewPanX = newPanX;
+                    TIMELINE_STATE.previewPanY = newPanY;
+                }
+
+                syncProgramViewport();
+                showProgramScrollbarsTemporarily();
+            });
+
+            window.addEventListener("mouseup", () => {
+                if (isPanning) {
+                    isPanning = false;
+                    wrapper.classList.remove("is-panning");
+                    if (window.triggerAutosave) window.triggerAutosave();
+                }
+            });
+
+            // 3. Teclado: Espaço para Pan
+            window.addEventListener("keydown", (e) => {
+                if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+                if (e.code === "Space" && !isSpacePressed && !e.repeat) {
+                    if (window.activeFocusedPlayer === "program" || wrapper.matches(":hover")) {
+                        isSpacePressed = true;
+                        wrapper.classList.add("space-mode");
+                    }
+                }
+            });
+
+            window.addEventListener("keyup", (e) => {
+                if (e.code === "Space") {
+                    isSpacePressed = false;
+                    wrapper.classList.remove("space-mode");
+                }
+            });
+        }
+
+        // 4. Interatividade do Minimapa (Clique e Arraste)
+        if (minimap) {
+            let isMinimapDragging = false;
+
+            const handleMinimapNavigation = (e) => {
+                const canvas = getActiveElement("program-minimap-canvas");
+                if (!canvas) return;
+
+                const mmRect = minimap.getBoundingClientRect();
+                const clickX = e.clientX - mmRect.left;
+                const clickY = e.clientY - mmRect.top;
+
+                const tw = TIMELINE_STATE?.width || 1920;
+                const th = TIMELINE_STATE?.height || 1080;
+                const PAD = 16;
+                const availW = Math.max(0, wrapper.clientWidth - PAD * 2);
+                const availH = Math.max(0, wrapper.clientHeight - PAD * 2);
+                const fitScale = (availW > 0 && availH > 0) ? Math.min(availW / tw, availH / th) : 0.5;
+                const zoom = TIMELINE_STATE?.previewZoom || "fit";
+                const scale = (zoom === "fit") ? fitScale : Number(zoom);
+
+                const mw = canvas.width;
+                const mh = canvas.height;
+                const aspect = tw / th;
+                const mAspect = mw / mh;
+                let dw, dh, dx, dy;
+                if (aspect > mAspect) {
+                    dw = mw;
+                    dh = mw / aspect;
+                    dx = 0;
+                    dy = (mh - dh) / 2;
+                } else {
+                    dh = mh;
+                    dw = mh * aspect;
+                    dx = (mw - dw) / 2;
+                    dy = 0;
+                }
+
+                // Normalizado de 0 a 1 dentro do enquadramento no minimapa
+                const normX = Math.max(0, Math.min(1, (clickX - dx) / dw));
+                const normY = Math.max(0, Math.min(1, (clickY - dy) / dh));
+
+                // Alvo no pan
+                const vW = Math.round(tw * scale);
+                const vH = Math.round(th * scale);
+                const maxPanX = Math.max(0, (vW - wrapper.clientWidth) / 2);
+                const maxPanY = Math.max(0, (vH - wrapper.clientHeight) / 2);
+
+                let targetPanX = -(normX - 0.5) * tw * scale;
+                let targetPanY = -(normY - 0.5) * th * scale;
+
+                targetPanX = Math.max(-maxPanX, Math.min(maxPanX, targetPanX));
+                targetPanY = Math.max(-maxPanY, Math.min(maxPanY, targetPanY));
+
+                if (TIMELINE_STATE) {
+                    TIMELINE_STATE.previewPanX = targetPanX;
+                    TIMELINE_STATE.previewPanY = targetPanY;
+                }
+
+                syncProgramViewport();
+                showProgramScrollbarsTemporarily();
+            };
+
+            minimap.addEventListener("mousedown", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                isMinimapDragging = true;
+                handleMinimapNavigation(e);
+            });
+
+            minimap.addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+
+            minimap.addEventListener("mouseup", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+
+            minimap.addEventListener("dblclick", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+
+            if (typeof window !== "undefined") {
+                window.addEventListener("mousemove", (e) => {
+                    if (isMinimapDragging) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleMinimapNavigation(e);
+                    }
+                });
+
+                window.addEventListener("mouseup", (e) => {
+                    if (isMinimapDragging) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        isMinimapDragging = false;
+                        if (window.triggerAutosave) window.triggerAutosave();
+                    }
+                }, true);
+            }
+        }
     }
 
     getDurationFrames() {
@@ -2577,6 +3118,24 @@ export class ProgramPlayer {
         };
 
         const onClick = (e) => {
+            const target = e.target;
+            const handleType = target?.dataset?.handle;
+            const wrapper = this.el("program-video-wrapper");
+            const tw = TIMELINE_STATE?.width || 1920;
+            const th = TIMELINE_STATE?.height || 1080;
+            const PAD = 16;
+            const availW = wrapper ? Math.max(0, wrapper.clientWidth - PAD * 2) : 0;
+            const availH = wrapper ? Math.max(0, wrapper.clientHeight - PAD * 2) : 0;
+            const fitScale = (availW > 0 && availH > 0) ? Math.min(availW / tw, availH / th) : 0.5;
+            const zoom = TIMELINE_STATE?.previewZoom || "fit";
+            const scale = (zoom === "fit") ? fitScale : Number(zoom);
+            const vW = Math.round(tw * scale);
+            const vH = Math.round(th * scale);
+            const hasOverflow = wrapper ? ((vW > wrapper.clientWidth + 2) || (vH > wrapper.clientHeight + 2)) : false;
+
+            if (!handleType && hasOverflow) {
+                return;
+            }
             e.preventDefault();
             e.stopPropagation();
         };
@@ -2587,11 +3146,30 @@ export class ProgramPlayer {
             const clip = STATE.activeTimelineCuts.find(c => c.id === clipId);
             if (!clip) return;
 
+            const target = e.target;
+            const handleType = target?.dataset?.handle; // "tl", "tc", "tr", "ml", "mr", "bl", "bc", "br", "rot" ou undefined (corpo)
+
+            const wrapper = this.el("program-video-wrapper");
+            const tw = TIMELINE_STATE?.width || 1920;
+            const th = TIMELINE_STATE?.height || 1080;
+            const PAD = 16;
+            const availW = wrapper ? Math.max(0, wrapper.clientWidth - PAD * 2) : 0;
+            const availH = wrapper ? Math.max(0, wrapper.clientHeight - PAD * 2) : 0;
+            const fitScale = (availW > 0 && availH > 0) ? Math.min(availW / tw, availH / th) : 0.5;
+            const zoom = TIMELINE_STATE?.previewZoom || "fit";
+            const scale = (zoom === "fit") ? fitScale : Number(zoom);
+            const scaledVW = Math.round(tw * scale);
+            const scaledVH = Math.round(th * scale);
+            const hasOverflow = wrapper ? ((scaledVW > wrapper.clientWidth + 2) || (scaledVH > wrapper.clientHeight + 2)) : false;
+
+            // Se for clique no corpo do overlay durante visualização com zoom (overflow) ou botão do meio:
+            // NÃO intercepta como drag de clipe: deixa o evento subir para o wrapper para realizar o pan do viewport!
+            if (!handleType && (hasOverflow || e.button === 1)) {
+                return;
+            }
+
             e.preventDefault();
             e.stopPropagation();
-
-            const target = e.target;
-            const handleType = target.dataset.handle; // "tl", "tc", "tr", "ml", "mr", "bl", "bc", "br", "rot" ou undefined (corpo)
 
             const startX = e.clientX;
             const startY = e.clientY;
@@ -2671,13 +3249,14 @@ export class ProgramPlayer {
                 }
             };
 
-            const onMouseUp = () => {
+            const onMouseUp = (upEv) => {
                 document.removeEventListener("mousemove", onMouseMove);
                 document.removeEventListener("mouseup", onMouseUp);
                 TIMELINE_HISTORY.commit();
 
-                // Se clicou rápido no corpo sem arrastar, alterna play/pause
-                if (!moved && !handleType) {
+                const isMinimap = upEv && upEv.target && upEv.target.closest && upEv.target.closest("#program-player-minimap");
+                // Se clicou rápido no corpo sem arrastar (e não foi no minimapa), alterna play/pause
+                if (!moved && !handleType && !isMinimap) {
                     this.togglePlay();
                 }
             };

@@ -601,6 +601,8 @@ export class WorkspaceManager {
                 zoom: ts.zoom,
                 trackHeightScale: ts.trackHeightScale,
                 previewZoom: ts.previewZoom,
+                previewPanX: ts.previewPanX,
+                previewPanY: ts.previewPanY,
                 hoverPreviewEnabled: ts.hoverPreviewEnabled,
                 globalThumbnailsInterval: ts.globalThumbnailsInterval,
                 muteHiddenTracksPlayback: ts.muteHiddenTracksPlayback,
@@ -957,6 +959,8 @@ export class WorkspaceManager {
                 if (td.zoom !== undefined) ts.zoom = td.zoom;
                 if (td.previewZoom !== undefined) {
                     ts.previewZoom = td.previewZoom;
+                    ts.previewPanX = td.previewPanX || 0;
+                    ts.previewPanY = td.previewPanY || 0;
                     const pZoomSelect = document.getElementById("program-preview-zoom");
                     if (pZoomSelect) pZoomSelect.value = String(td.previewZoom);
                 }

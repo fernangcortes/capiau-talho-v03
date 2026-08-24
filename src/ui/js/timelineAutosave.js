@@ -44,6 +44,8 @@ function performAutosave() {
             width: TIMELINE_STATE.width || 1920,
             height: TIMELINE_STATE.height || 1080,
             previewZoom: TIMELINE_STATE.previewZoom || "fit",
+            previewPanX: TIMELINE_STATE.previewPanX || 0,
+            previewPanY: TIMELINE_STATE.previewPanY || 0,
             markers: TIMELINE_STATE.markers
         };
         
@@ -118,6 +120,8 @@ export function restoreAutosave(projectId) {
 
         if (data.previewZoom !== undefined) {
             TIMELINE_STATE.previewZoom = data.previewZoom;
+            TIMELINE_STATE.previewPanX = data.previewPanX || 0;
+            TIMELINE_STATE.previewPanY = data.previewPanY || 0;
             STATE.emit("previewZoomChanged", TIMELINE_STATE.previewZoom);
         }
 

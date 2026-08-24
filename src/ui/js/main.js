@@ -2318,17 +2318,59 @@ window.addEventListener("DOMContentLoaded", () => {
             const val = previewZoomSelect.value;
             const parsedZoom = val === "fit" ? "fit" : parseFloat(val);
             TIMELINE_STATE.previewZoom = parsedZoom;
+            if (parsedZoom === "fit") {
+                TIMELINE_STATE.previewPanX = 0;
+                TIMELINE_STATE.previewPanY = 0;
+            }
             STATE.emit("previewZoomChanged", parsedZoom);
             triggerAutosave();
         });
 
+        const syncSelectToZoom = (newZoom) => {
+            if (newZoom === "fit" || newZoom === undefined) {
+                previewZoomSelect.value = "fit";
+                const customOpt = previewZoomSelect.querySelector("#program-preview-zoom-custom");
+                if (customOpt) customOpt.remove();
+                return;
+            }
+
+            const numZoom = Number(newZoom);
+            let matchedOption = null;
+            for (let i = 0; i < previewZoomSelect.options.length; i++) {
+                const opt = previewZoomSelect.options[i];
+                if (opt.value !== "fit" && opt.id !== "program-preview-zoom-custom") {
+                    const optVal = parseFloat(opt.value);
+                    if (Math.abs(optVal - numZoom) < 0.005) {
+                        matchedOption = opt;
+                        break;
+                    }
+                }
+            }
+
+            if (matchedOption) {
+                previewZoomSelect.value = matchedOption.value;
+                const customOpt = previewZoomSelect.querySelector("#program-preview-zoom-custom");
+                if (customOpt) customOpt.remove();
+            } else {
+                let customOpt = previewZoomSelect.querySelector("#program-preview-zoom-custom");
+                if (!customOpt) {
+                    customOpt = document.createElement("option");
+                    customOpt.id = "program-preview-zoom-custom";
+                    previewZoomSelect.appendChild(customOpt);
+                }
+                const pct = Math.round(numZoom * 100);
+                customOpt.value = String(numZoom);
+                customOpt.textContent = `${pct}%`;
+                previewZoomSelect.value = String(numZoom);
+            }
+        };
+
         STATE.on("previewZoomChanged", (newZoom) => {
-            const selectVal = newZoom === "fit" ? "fit" : String(newZoom);
-            previewZoomSelect.value = selectVal;
+            syncSelectToZoom(newZoom);
         });
 
         if (TIMELINE_STATE.previewZoom !== undefined) {
-            previewZoomSelect.value = TIMELINE_STATE.previewZoom === "fit" ? "fit" : String(TIMELINE_STATE.previewZoom);
+            syncSelectToZoom(TIMELINE_STATE.previewZoom);
         }
     }
 

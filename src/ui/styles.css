@@ -6917,27 +6917,110 @@ input[type="number"] {
 }
 
 /* ── VIEWPORT ESTÁVEL E MÁSCARA (FASE 1) ── */
-#program-player-viewport {
+#program-video-wrapper {
     position: relative;
-    overflow: visible;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    overflow: hidden;
     background: #000;
+    width: 100%;
+    height: 100%;
+}
+
+#program-player-viewport {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    overflow: visible;
+    background: #000;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    will-change: transform, width, height;
 }
 
 #program-media-viewport {
-    position: absolute;
-    inset: 0;
+    position: absolute !important;
+    inset: 0 !important;
     overflow: hidden;
-    width: 100%;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
     background: #000;
+}
+
+#program-media-viewport video,
+#program-media-viewport img {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
 }
 
 #program-viewport-shade {
     display: none !important;
 }
+
+/* ── TALLY DOTS DOS MONITORES (SOURCE VERDE / PROGRAM VERMELHO) ── */
+.player-tally-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+    margin-left: 4px;
+    pointer-events: auto;
+    cursor: default;
+    transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+.player-tally-dot.source {
+    background: #22c55e;
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.75);
+}
+.player-tally-dot.program {
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.75);
+}
+.player-tally-dot:hover {
+    transform: scale(1.35);
+}
+
+/* ── MODOS DE PAN E CURSOR DO PROGRAM ── */
+#program-video-wrapper.space-mode,
+#program-video-wrapper.space-mode * {
+    cursor: grab !important;
+}
+#program-video-wrapper.is-panning,
+#program-video-wrapper.is-panning * {
+    cursor: grabbing !important;
+}
+
+/* ── MINIMAPA DO PROGRAM PLAYER ── */
+#program-player-minimap {
+    transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    user-select: none;
+    border: 1px solid var(--border-glass) !important;
+}
+#program-player-minimap:hover {
+    border-color: rgba(6, 182, 212, 0.6) !important;
+    box-shadow: 0 0 16px rgba(6, 182, 212, 0.35) !important;
+}
+#program-minimap-rect {
+    box-sizing: border-box;
+    pointer-events: none;
+    transition: none;
+}
+
+/* ── BARRAS DE ROLAGEM SUTIS DO PROGRAM PLAYER ── */
+.program-scrollbar {
+    pointer-events: none;
+    user-select: none;
+}
+.program-scrollbar.visible {
+    opacity: 1 !important;
+}
+#program-video-wrapper:hover .program-scrollbar.active {
+    opacity: 1 !important;
+}
+
 
 /* ── OVERLAY DE TRANSFORMAÇÃO E ALÇAS (FASE 4) ── */
 #program-transform-overlay {

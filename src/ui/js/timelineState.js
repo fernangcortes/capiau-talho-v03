@@ -211,6 +211,8 @@ export class CapiauTimelineState {
         this.width = 1920; // Largura padrão da sequência (Fase 1)
         this.height = 1080; // Altura padrão da sequência (Fase 1)
         this.previewZoom = "fit"; // Zoom de visualização (Fase 1)
+        this.previewPanX = 0; // Posição horizontal de pan do preview
+        this.previewPanY = 0; // Posição vertical de pan do preview
 
         this.tracks = defaultTracks(); // Lista dinâmica de pistas (ordem visual)
         this.trackHeightScale = 1.0; // Fator de escala vertical das pistas (compacto ↔ alto)
