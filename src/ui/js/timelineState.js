@@ -233,6 +233,11 @@ export class CapiauTimelineState {
         this.hoveredFadeHandle = null;
     }
 
+    /** Atalho reativo para a lista ativa de cortes na timeline. */
+    get cuts() {
+        return (STATE && STATE.activeTimelineCuts) || [];
+    }
+
     // ── MARCADORES DA TIMELINE ──────────────────────────────────────────
 
     /**

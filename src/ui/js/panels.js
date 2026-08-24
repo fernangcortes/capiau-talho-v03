@@ -1342,14 +1342,20 @@ export class PanelsManager {
             }
             ctx.restore();
         } else {
-            // Linha suave de espera enquanto a waveform carrega
+            const isLoading = WaveformManager && typeof WaveformManager.isLoading === "function" && WaveformManager.isLoading(videoId);
             ctx.save();
             ctx.beginPath();
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.strokeStyle = isLoading ? "rgba(6, 182, 212, 0.4)" : "rgba(255, 255, 255, 0.2)";
             ctx.lineWidth = 1.0;
+            if (isLoading) ctx.setLineDash([4, 4]);
             ctx.moveTo(2, centerY);
             ctx.lineTo(width - 2, centerY);
             ctx.stroke();
+            if (isLoading && width >= 80) {
+                ctx.fillStyle = "rgba(6, 182, 212, 0.75)";
+                ctx.font = "italic 9px Inter, sans-serif";
+                ctx.fillText("∿ extraindo áudio...", 8, centerY - 6);
+            }
             ctx.restore();
         }
 
@@ -2615,6 +2621,17 @@ export class PanelsManager {
                 thumbUrl: `/api/video/${id}/thumbnail${qs}`,
             };
         }
+        if (key.startsWith("waveform-")) {
+            const id = Number(key.split("waveform-")[1]);
+            const video = (STATE.allVideos || []).find(v => v.id === id);
+            const ver = video?._thumbVersion || video?.updated_at || "";
+            const qs = ver ? `?v=${ver}` : "";
+            return {
+                kind: "video", id, icon: "fa-chart-simple",
+                title: video ? `Waveform: ${video.title || video.filename}` : `Waveform Vídeo ${id}`,
+                thumbUrl: `/api/video/${id}/thumbnail${qs}`,
+            };
+        }
         // Tarefas de projeto (sem mídia navegável). 'label' vem pronto de quem
         // publicou a tarefa (ex.: o worker de lote manda o nome do arquivo da vez).
         let title = t.label || `Tarefa (${t.type || "proxy"})`;
@@ -2625,6 +2642,7 @@ export class PanelsManager {
         else if (key.startsWith("reindex")) { title = "Reindexação de Embeddings"; icon = "fa-database"; }
         else if (t.type === "enrich" || key.startsWith("enrich")) { title = "Sincronização de Descrições (Projeto)"; icon = "fa-wand-magic-sparkles"; }
         else if (t.type === "titles" || key.startsWith("titles")) { title = t.label || "Geração de Títulos IA (Projeto)"; icon = "fa-wand-magic-sparkles"; }
+        else if (t.type === "waveforms" || key.startsWith("waveforms_proj_")) { title = t.label || "Geração de Waveforms (Projeto)"; icon = "fa-chart-simple"; }
         return { kind: "other", id: null, title, icon, thumbUrl: null };
     }
 

@@ -219,7 +219,7 @@ export class CapiauTimelineRenderer {
 
         // Ouvintes de evento do estado para redesenho reativo
         STATE.on("timelineCutsUpdated", (cuts) => {
-            WaveformManager.preloadForClips(TIMELINE_STATE.cuts);
+            WaveformManager.preloadForClips(cuts || TIMELINE_STATE.cuts);
             this.requestRedraw();
         });
         STATE.on("timelineGhostUpdated", () => this.requestRedraw());
@@ -273,6 +273,10 @@ export class CapiauTimelineRenderer {
         const diagCount = STATE.audioDiag ? Object.keys(STATE.audioDiag).length : 0;
         if (diagCount !== this.audioDiagCount) {
             this.audioDiagCount = diagCount;
+            this.isDirty = true;
+        }
+        // Animação contínua sutil enquanto houver extração de waveforms em voo
+        if (WaveformManager && typeof WaveformManager.hasInFlight === "function" && WaveformManager.hasInFlight()) {
             this.isDirty = true;
         }
         if (this.isDirty) {
@@ -982,12 +986,53 @@ export class CapiauTimelineRenderer {
             }
             ctx.stroke();
         } else {
-            // Enquanto o arquivo de picos está sendo buscado pela primeira vez, exibe linha de base sutil
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-            ctx.lineWidth = 1.0;
-            ctx.moveTo(startX + 2, centerY);
-            ctx.lineTo(startX + width - 2, centerY);
-            ctx.stroke();
+            const isLoading = WaveformManager && typeof WaveformManager.isLoading === "function" && WaveformManager.isLoading(cut.video_id);
+            if (isLoading) {
+                // Animação sutil e elegante de onda pulsante / extração de áudio em tempo real
+                const time = performance.now() / 350;
+                const waveHeight = Math.min(5, Math.max(2, maxAmplitude * 0.35));
+
+                ctx.save();
+                // Linha de base suave
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(110, 231, 183, 0.2)";
+                ctx.lineWidth = 1.0;
+                ctx.moveTo(startX + 2, centerY);
+                ctx.lineTo(startX + width - 2, centerY);
+                ctx.stroke();
+
+                // Onda senoidal sutil pontilhada em movimento (shimmer)
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(110, 231, 183, 0.6)";
+                ctx.lineWidth = 1.3;
+                ctx.setLineDash([4, 4]);
+                ctx.lineDashOffset = -time * 8;
+
+                const step = 4;
+                ctx.moveTo(startX + 2, centerY);
+                for (let x = startX + 2; x <= startX + width - 2; x += step) {
+                    const phase = ((x - startX) / 16) + time;
+                    const y = centerY + Math.sin(phase) * waveHeight;
+                    ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Rótulo discreto de status se houver espaço no clipe
+                if (width >= 80 && clipHeight >= 28) {
+                    ctx.fillStyle = "rgba(110, 231, 183, 0.75)";
+                    ctx.font = "italic 9px Inter, sans-serif";
+                    ctx.fillText("∿ gerando onda...", startX + 8, centerY + 14);
+                }
+                ctx.restore();
+            } else {
+                // Enquanto o arquivo de picos não existe ou está em repouso, exibe linha de base sutil
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+                ctx.lineWidth = 1.0;
+                ctx.moveTo(startX + 2, centerY);
+                ctx.lineTo(startX + width - 2, centerY);
+                ctx.stroke();
+            }
         }
 
         // Destaque sutil de saturação (clipping) nos pontos onde estourou

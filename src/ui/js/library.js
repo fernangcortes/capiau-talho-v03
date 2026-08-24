@@ -661,6 +661,47 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     });
     menu.appendChild(copyPathItem);
 
+    // Item: Relincar Arquivo Original
+    const relinkItem = document.createElement("div");
+    relinkItem.className = "menu-item";
+    relinkItem.innerHTML = `<i class="fa-solid fa-link"></i><span class="menu-item-text">Relincar Arquivo Original...</span>`;
+    relinkItem.addEventListener("click", async () => {
+        menu.remove();
+        const currentPath = item.filepath || "";
+        const newPath = prompt(`Informe o novo caminho completo do arquivo para "${item.filename}":`, currentPath);
+        if (!newPath || newPath.trim() === "" || newPath.trim() === currentPath) return;
+
+        try {
+            if (isVideo) {
+                const res = await CapIAuAPI.relinkVideo(item.id, newPath.trim());
+                item.filepath = newPath.trim();
+                item.status = "ingested";
+
+                // Invalida cache de waveform e força extração imediata
+                const { WaveformManager } = await import("./waveformManager.js");
+                WaveformManager.clearCache(item.id);
+                WaveformManager.getWaveform(item.id, true);
+
+                if (window.timelineRenderer) window.timelineRenderer.requestRedraw();
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
+                if (typeof window.showToast === "function") {
+                    window.showToast("Vídeo relincado com sucesso!", "success");
+                }
+            } else {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Relink de foto em desenvolvimento", "info");
+                }
+            }
+        } catch (err) {
+            if (typeof window.showToast === "function") {
+                window.showToast("Erro ao relincar arquivo: " + err.message, "error");
+            } else {
+                alert("Erro ao relincar: " + err.message);
+            }
+        }
+    });
+    menu.appendChild(relinkItem);
+
     // Separador
     const sep4 = document.createElement("div");
     sep4.className = "menu-separator";
@@ -3286,15 +3327,20 @@ export class LibraryManager {
         try {
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span class="btn-text">Gerando...</span>`;
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span class="btn-text">Iniciando...</span>`;
             }
-            STATE.emit("statusChanged", { text: "Extraindo formas de onda reais para o projeto...", active: true });
+            STATE.emit("statusChanged", { text: "Iniciando extração de waveforms para o projeto...", active: true });
             
             const res = await CapIAuAPI.generateProjectWaveforms(STATE.currentProjectId || 1);
             
-            const msg = `Waveforms prontas: ${res.generated} novas geradas, ${res.skipped} existentes em cache.`;
+            const msg = res.message || "Extração de waveforms em lote iniciada em background.";
             STATE.emit("statusChanged", { text: msg, active: true });
-            if (window.showToast) window.showToast(msg, "success");
+            if (window.showToast) window.showToast(msg, "info");
+
+            // Abre a gaveta de Tarefas se disponível (padrão de tarefas em lote)
+            if (typeof window.openTasksDrawerAndSwitchTab === "function") {
+                window.openTasksDrawerAndSwitchTab();
+            }
 
             // Pré-carrega na memória e redesenha a timeline
             const { WaveformManager } = await import("./waveformManager.js");
@@ -3302,7 +3348,7 @@ export class LibraryManager {
             WaveformManager.preloadForClips(TIMELINE_STATE.cuts);
             if (window.timelineRenderer) window.timelineRenderer.requestRedraw();
         } catch (err) {
-            console.error("[Waveforms] Erro ao gerar em lote:", err);
+            console.error("[Waveforms] Erro ao disparar lote:", err);
             const msg = this.extrairMensagemErro(err);
             STATE.emit("statusChanged", { text: `Erro na geração de waveforms: ${msg}`, active: true });
             if (window.showToast) window.showToast(`Erro na geração de waveforms: ${msg}`, "error");
@@ -3311,6 +3357,28 @@ export class LibraryManager {
                 btn.disabled = false;
                 btn.innerHTML = `<i class="fa-solid fa-chart-simple"></i> <span class="btn-text">Ondas</span>`;
             }
+        }
+    }
+
+    async promptRelinkProjectMedia() {
+        const searchDir = prompt("Informe a pasta para buscar e reconectar automaticamente os arquivos originais perdidos:", "D:\\makinof-monstro\\");
+        if (!searchDir || !searchDir.trim()) return;
+
+        try {
+            STATE.emit("statusChanged", { text: "Buscando arquivos para relincar...", active: true });
+            const res = await CapIAuAPI.relinkProject(STATE.currentProjectId || 1, searchDir.trim());
+            const msg = `Relink concluído: ${res.total_relinked} mídia(s) reconectada(s) com sucesso.`;
+            STATE.emit("statusChanged", { text: msg, active: true });
+            if (window.showToast) window.showToast(msg, res.total_relinked > 0 ? "success" : "info");
+
+            const { WaveformManager } = await import("./waveformManager.js");
+            WaveformManager.clearCache();
+            if (window.timelineRenderer) window.timelineRenderer.requestRedraw();
+            if (window.libraryInstance) await window.libraryInstance.reloadData();
+        } catch (err) {
+            console.error("[Relink] Erro ao relincar:", err);
+            const msg = this.extrairMensagemErro(err);
+            if (window.showToast) window.showToast("Erro ao relincar mídias: " + msg, "error");
         }
     }
 

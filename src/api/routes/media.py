@@ -2718,28 +2718,142 @@ def get_video_waveform(
     """
     from src.media.audio_waveform import get_or_generate_waveform
     data = get_or_generate_waveform(video_id, conn=conn, force=force, sample_rate=sample_rate)
-    if data.get("error") and not data.get("peaks"):
-        # Se for vídeo inexistente, retorna 404
-        if "não encontrado" in str(data.get("error")):
-            raise HTTPException(status_code=404, detail=data["error"])
+    if data.get("error") and "não encontrado no banco" in str(data.get("error")):
+        raise HTTPException(status_code=404, detail=data["error"])
     return data
 
 
 @router.post("/api/projects/{project_id}/generate-waveforms")
 def generate_project_waveforms(
     project_id: int,
+    background_tasks: BackgroundTasks,
     force: bool = Query(False, description="Força a regeneração de todos os vídeos"),
-    sample_rate: int = Query(100, description="Picos por segundo"),
+    sample_rate: int = Query(100, description="Picos por segundo")
+):
+    """
+    Gera waveforms em background para todos os vídeos cadastrados no projeto.
+    Acompanhe o progresso em tempo real na aba Tarefas (GET /api/conversions).
+    """
+    from src.media.audio_waveform import batch_generate_project_waveforms
+    task_key = f"waveforms_proj_{project_id}"
+    TASK_MANAGER.update_progress(
+        task_key=task_key,
+        percent=0.0,
+        status="running",
+        task_type="waveforms",
+        label=f"Waveforms do Projeto (Iniciando...)",
+        log_message=f"[INIT] Solicitação de extração de waveforms para o projeto {project_id}."
+    )
+    background_tasks.add_task(batch_generate_project_waveforms, project_id, None, force, sample_rate)
+    return {"ok": True, "task_key": task_key, "message": "Geração de waveforms do projeto iniciada em background."}
+
+
+class RelinkVideoPayload(BaseModel):
+    new_filepath: str
+
+
+class RelinkProjectPayload(BaseModel):
+    search_dir: str
+
+
+@router.post("/api/video/{video_id}/relink")
+def relink_video_file(
+    video_id: int,
+    payload: RelinkVideoPayload,
     conn: sqlite3.Connection = Depends(get_db_conn)
 ):
     """
-    Gera waveforms para todos os vídeos cadastrados no projeto que ainda não possuem cache.
+    Relinca o caminho do arquivo de vídeo original com um novo arquivo no disco.
     """
-    from src.media.audio_waveform import batch_generate_project_waveforms
-    result = batch_generate_project_waveforms(
-        project_id=project_id,
-        conn=conn,
-        force=force,
-        sample_rate=sample_rate
+    new_path = Path(payload.new_filepath)
+    if not new_path.exists():
+        raise HTTPException(status_code=400, detail=f"O caminho especificado não existe: {payload.new_filepath}")
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, filename FROM video WHERE id = ?", (video_id,))
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
+
+    cursor.execute(
+        "UPDATE video SET filepath = ?, status = 'ingested', error_message = NULL WHERE id = ?",
+        (str(new_path), video_id)
     )
-    return {"ok": True, **result}
+
+    # Invalida o cache de waveform para regenerar do novo arquivo
+    from src.media.audio_waveform import get_waveform_cache_path
+    cache_file = get_waveform_cache_path(video_id)
+    if cache_file.exists():
+        try:
+            cache_file.unlink()
+        except Exception:
+            pass
+
+    return {"ok": True, "video_id": video_id, "filepath": str(new_path), "message": "Vídeo relincado com sucesso."}
+
+
+@router.post("/api/projects/{project_id}/relink")
+def relink_project_media(
+    project_id: int,
+    payload: RelinkProjectPayload,
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """
+    Varre um diretório recursivamente buscando arquivos originais para reconectar
+    mídias desconectadas do projeto pelo nome de arquivo (filename).
+    """
+    search_path = Path(payload.search_dir)
+    if not search_path.exists() or not search_path.is_dir():
+        raise HTTPException(status_code=400, detail=f"Diretório de busca inválido ou inexistente: {payload.search_dir}")
+
+    found_files = {}
+    for root, _, files in os.walk(search_path):
+        for f in files:
+            found_files[f.lower()] = Path(root) / f
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, filename, filepath FROM video WHERE project_id = ?", (project_id,))
+    videos = cursor.fetchall()
+
+    relinked_videos = []
+    for v in videos:
+        cur_path = Path(v["filepath"]) if v["filepath"] else Path("")
+        if not cur_path.exists():
+            fn = (v["filename"] or "").lower()
+            if fn in found_files:
+                new_fpath = str(found_files[fn])
+                cursor.execute(
+                    "UPDATE video SET filepath = ?, status = 'ingested', error_message = NULL WHERE id = ?",
+                    (new_fpath, v["id"])
+                )
+                relinked_videos.append({"id": v["id"], "filename": v["filename"], "new_filepath": new_fpath})
+                from src.media.audio_waveform import get_waveform_cache_path
+                cw = get_waveform_cache_path(v["id"])
+                if cw.exists():
+                    cw.unlink(missing_ok=True)
+
+    cursor.execute("SELECT id, filename, filepath FROM photo WHERE project_id = ?", (project_id,))
+    photos = cursor.fetchall()
+    relinked_photos = []
+    for p in photos:
+        cur_path = Path(p["filepath"]) if p["filepath"] else Path("")
+        if not cur_path.exists():
+            fn = (p["filename"] or "").lower()
+            if fn in found_files:
+                new_fpath = str(found_files[fn])
+                cursor.execute(
+                    "UPDATE photo SET filepath = ?, status = 'ingested', error_message = NULL WHERE id = ?",
+                    (new_fpath, p["id"])
+                )
+                relinked_photos.append({"id": p["id"], "filename": p["filename"], "new_filepath": new_fpath})
+
+    return {
+        "ok": True,
+        "project_id": project_id,
+        "search_dir": str(search_path),
+        "relinked_videos_count": len(relinked_videos),
+        "relinked_photos_count": len(relinked_photos),
+        "total_relinked": len(relinked_videos) + len(relinked_photos),
+        "relinked_videos": relinked_videos,
+        "relinked_photos": relinked_photos
+    }

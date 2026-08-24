@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
 from src.config import CONFIG
+from src.core.tasks import TASK_MANAGER
 from src.db.connection import get_db
 from src.media.ffmpeg import has_audio_stream
 
@@ -186,6 +187,53 @@ def extract_waveform_peaks(
         }
 
 
+def resolve_media_path(video_id: int, filepath_str: str, filename_str: str) -> Optional[Path]:
+    """
+    Localiza o arquivo de mídia original ou seus proxies correspondentes em cascata:
+    1. filepath registrado no banco
+    2. data/originals / filename
+    3. data/proxies / proxy_vid_{video_id}.mp4 (padrão principal de proxy HD de vídeo)
+    4. data/proxies / proxy_{video_id}.mp4
+    5. data/proxies / {stem}.mp4
+    6. data/proxies / filename
+    """
+    if filepath_str:
+        p = Path(filepath_str)
+        if p.exists():
+            return p
+
+    if filename_str:
+        # Fallback 1: data/originals
+        orig = CONFIG.ORIGINALS_DIR / filename_str
+        if orig.exists():
+            return orig
+
+        # Fallback 2: data/proxies com prefixo padrão de vídeo
+        p_std = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+        if p_std.exists():
+            return p_std
+
+        # Fallback 3: data/proxies com prefixo alternativo
+        p_alt = CONFIG.PROXIES_DIR / f"proxy_{video_id}.mp4"
+        if p_alt.exists():
+            return p_alt
+
+        # Fallback 4: data/proxies com nome base da mídia
+        p_stem = CONFIG.PROXIES_DIR / f"{Path(filename_str).stem}.mp4"
+        if p_stem.exists():
+            return p_stem
+
+        p_direct = CONFIG.PROXIES_DIR / filename_str
+        if p_direct.exists():
+            return p_direct
+    else:
+        p_std = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+        if p_std.exists():
+            return p_std
+
+    return None
+
+
 def get_or_generate_waveform(
     video_id: int,
     conn=None,
@@ -194,6 +242,7 @@ def get_or_generate_waveform(
 ) -> Dict[str, Any]:
     """
     Recupera a waveform do cache ou gera no momento da requisição se ainda não existir.
+    Registra progresso e logs na tela de Tarefas (TASK_MANAGER).
     """
     cache_path = get_waveform_cache_path(video_id)
     
@@ -202,52 +251,93 @@ def get_or_generate_waveform(
             with open(cache_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 data["video_id"] = video_id
+                data["ok"] = True
                 return data
         except Exception:
             pass  # Se o cache estiver corrompido, regenera
 
-    # Busca o caminho do arquivo no banco
-    close_conn = False
     if conn is None:
-        db_gen = get_db()
-        conn = next(db_gen)
-        close_conn = True
+        with get_db() as db_conn:
+            return get_or_generate_waveform(video_id, conn=db_conn, force=force, sample_rate=sample_rate)
 
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT filepath, filename FROM video WHERE id = ?", (video_id,))
-        row = cursor.fetchone()
-        if not row:
-            return {
-                "video_id": video_id,
-                "sample_rate": sample_rate,
-                "duration": 0.0,
-                "peaks": [],
-                "error": f"Vídeo com ID {video_id} não encontrado no banco"
-            }
+    cursor = conn.cursor()
+    cursor.execute("SELECT filepath, filename, title FROM video WHERE id = ?", (video_id,))
+    row = cursor.fetchone()
+    if not row:
+        return {
+            "ok": False,
+            "video_id": video_id,
+            "sample_rate": sample_rate,
+            "duration": 0.0,
+            "peaks": [],
+            "error": f"Vídeo com ID {video_id} não encontrado no banco"
+        }
 
-        filepath_str = row[0] or ""
-        media_path = Path(filepath_str)
-        if not media_path.exists():
-            # Fallback para data/originals se filepath for relativo ou mudou de pasta
-            alt_path = CONFIG.ORIGINALS_DIR / row[1]
-            if alt_path.exists():
-                media_path = alt_path
+    filepath_str = row[0] or ""
+    filename_str = row[1] or ""
+    title_str = (row[2] if len(row) > 2 and row[2] else "") or filename_str or f"Vídeo {video_id}"
 
-        waveform_data = extract_waveform_peaks(
-            media_path=media_path,
-            output_path=cache_path,
-            sample_rate=sample_rate
+    task_key = f"waveform-{video_id}"
+    TASK_MANAGER.update_progress(
+        task_key=task_key,
+        percent=10.0,
+        status="running",
+        task_type="waveform",
+        label=f"Waveform: {title_str}",
+        log_message=f"[INIT] Extraindo waveform de áudio para '{title_str}' (ID {video_id})."
+    )
+
+    media_path = resolve_media_path(video_id, filepath_str, filename_str)
+
+    if not media_path or not media_path.exists():
+        err_msg = f"Arquivo de mídia original e proxy não encontrados: {filename_str}"
+        TASK_MANAGER.update_progress(
+            task_key=task_key,
+            percent=100.0,
+            status="failed",
+            task_type="waveform",
+            label=f"Waveform: {title_str}",
+            log_message=f"[ERROR] {err_msg}"
         )
-        waveform_data["video_id"] = video_id
-        return waveform_data
+        return {
+            "ok": False,
+            "video_id": video_id,
+            "sample_rate": sample_rate,
+            "duration": 0.0,
+            "peaks": [],
+            "error": err_msg
+        }
 
-    finally:
-        if close_conn:
-            try:
-                conn.close()
-            except Exception:
-                pass
+    waveform_data = extract_waveform_peaks(
+        media_path=media_path,
+        output_path=cache_path,
+        sample_rate=sample_rate
+    )
+    waveform_data["video_id"] = video_id
+    waveform_data["ok"] = not bool(waveform_data.get("error"))
+
+    if waveform_data.get("error"):
+        TASK_MANAGER.update_progress(
+            task_key=task_key,
+            percent=100.0,
+            status="failed",
+            task_type="waveform",
+            label=f"Waveform: {title_str}",
+            log_message=f"[ERROR] Falha ao extrair waveform para '{title_str}': {waveform_data['error']}"
+        )
+    else:
+        dur = waveform_data.get("duration", 0.0)
+        p_count = len(waveform_data.get("peaks", [])) // 2
+        TASK_MANAGER.update_progress(
+            task_key=task_key,
+            percent=100.0,
+            status="finished",
+            task_type="waveform",
+            label=f"Waveform: {title_str}",
+            log_message=f"[FINISHED] Waveform de áudio extraída ({dur:.1f}s, {p_count} picos)."
+        )
+
+    return waveform_data
 
 
 def batch_generate_project_waveforms(
@@ -258,56 +348,127 @@ def batch_generate_project_waveforms(
 ) -> Dict[str, Any]:
     """
     Gera waveforms para todos os vídeos de um projeto que ainda não possuem cache.
+    Permite acompanhamento em tempo real e cancelamento responsivo pelo TASK_MANAGER.
     """
-    close_conn = False
     if conn is None:
-        db_gen = get_db()
-        conn = next(db_gen)
-        close_conn = True
+        with get_db() as db_conn:
+            return batch_generate_project_waveforms(
+                project_id=project_id,
+                conn=db_conn,
+                force=force,
+                sample_rate=sample_rate
+            )
 
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, filepath, filename FROM video WHERE project_id = ?", (project_id,))
-        videos = cursor.fetchall()
+    task_key = f"waveforms_proj_{project_id}"
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, filepath, filename, title FROM video WHERE project_id = ?", (project_id,))
+    videos = cursor.fetchall()
 
-        total = len(videos)
-        generated = 0
-        skipped = 0
-        errors = []
+    total = len(videos)
+    generated = 0
+    skipped = 0
+    errors = []
 
-        for vid_id, filepath_str, filename in videos:
-            cache_path = get_waveform_cache_path(vid_id)
-            if not force and cache_path.exists() and cache_path.stat().st_size > 10:
-                skipped += 1
-                continue
+    TASK_MANAGER.update_progress(
+        task_key=task_key,
+        percent=0.0,
+        status="running",
+        task_type="waveforms",
+        label=f"Waveforms do Projeto ({total} vídeos)",
+        log_message=f"[INIT] Iniciando extração de waveforms para {total} vídeos do projeto {project_id}."
+    )
 
-            media_path = Path(filepath_str) if filepath_str else Path("")
-            if not media_path.exists():
-                alt_path = CONFIG.ORIGINALS_DIR / filename
-                if alt_path.exists():
-                    media_path = alt_path
+    for idx, row in enumerate(videos):
+        if TASK_MANAGER.is_cancelled(task_key):
+            TASK_MANAGER.update_progress(
+                task_key=task_key,
+                percent=round((idx / max(total, 1)) * 100, 1),
+                status="cancelled",
+                task_type="waveforms",
+                label=f"Waveforms do Projeto (Cancelada)",
+                log_message=f"[CANCEL] Extração de waveforms interrompida pelo usuário após {generated} novas geradas."
+            )
+            break
 
-            if not media_path.exists():
-                errors.append({"video_id": vid_id, "error": f"Arquivo não encontrado: {filename}"})
-                continue
+        vid_id = row[0]
+        filepath_str = row[1] or ""
+        filename = row[2] or ""
+        title = (row[3] if len(row) > 3 and row[3] else "") or filename
+        pct = round((idx / max(total, 1)) * 100, 1)
 
-            res = extract_waveform_peaks(media_path, output_path=cache_path, sample_rate=sample_rate)
-            if res.get("error"):
-                errors.append({"video_id": vid_id, "error": res["error"]})
-            else:
-                generated += 1
+        cache_path = get_waveform_cache_path(vid_id)
+        if not force and cache_path.exists() and cache_path.stat().st_size > 10:
+            skipped += 1
+            TASK_MANAGER.update_progress(
+                task_key=task_key,
+                percent=pct,
+                status="running",
+                task_type="waveforms",
+                label=f"Waveforms ({idx+1}/{total})",
+                log_message=f"[SKIP] ({idx+1}/{total}) Cache existente para '{title}'."
+            )
+            continue
 
-        return {
-            "project_id": project_id,
-            "total_videos": total,
-            "generated": generated,
-            "skipped": skipped,
-            "errors": errors
-        }
+        TASK_MANAGER.update_progress(
+            task_key=task_key,
+            percent=pct,
+            status="running",
+            task_type="waveforms",
+            label=f"Waveforms ({idx+1}/{total}): {title}",
+            log_message=f"[PROCESSING] ({idx+1}/{total}) Extraindo áudio PCM de '{title}'..."
+        )
 
-    finally:
-        if close_conn:
-            try:
-                conn.close()
-            except Exception:
-                pass
+        media_path = resolve_media_path(vid_id, filepath_str, filename)
+
+        if not media_path or not media_path.exists():
+            err_txt = f"Arquivo de mídia original e proxy não encontrados: {filename}"
+            errors.append({"video_id": vid_id, "error": err_txt})
+            TASK_MANAGER.update_progress(
+                task_key=task_key,
+                percent=pct,
+                status="running",
+                task_type="waveforms",
+                label=f"Waveforms ({idx+1}/{total})",
+                log_message=f"[WARN] ({idx+1}/{total}) {err_txt}"
+            )
+            continue
+
+        res = extract_waveform_peaks(media_path, output_path=cache_path, sample_rate=sample_rate)
+        if res.get("error"):
+            errors.append({"video_id": vid_id, "error": res["error"]})
+            TASK_MANAGER.update_progress(
+                task_key=task_key,
+                percent=pct,
+                status="running",
+                task_type="waveforms",
+                label=f"Waveforms ({idx+1}/{total})",
+                log_message=f"[ERROR] ({idx+1}/{total}) Falha em '{title}': {res['error']}"
+            )
+        else:
+            generated += 1
+            TASK_MANAGER.update_progress(
+                task_key=task_key,
+                percent=round(((idx + 1) / max(total, 1)) * 100, 1),
+                status="running",
+                task_type="waveforms",
+                label=f"Waveforms ({idx+1}/{total})",
+                log_message=f"[SUCCESS] ({idx+1}/{total}) Waveform de '{title}' extraída com sucesso."
+            )
+
+    if not TASK_MANAGER.is_cancelled(task_key):
+        TASK_MANAGER.update_progress(
+            task_key=task_key,
+            percent=100.0,
+            status="finished",
+            task_type="waveforms",
+            label="Waveforms do Projeto (Concluído)",
+            log_message=f"[FINISHED] Processamento de waveforms concluído: {generated} novas geradas, {skipped} em cache."
+        )
+
+    return {
+        "project_id": project_id,
+        "total_videos": total,
+        "generated": generated,
+        "skipped": skipped,
+        "errors": errors
+    }

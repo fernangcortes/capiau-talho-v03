@@ -446,6 +446,22 @@ export class CapIAuAPI {
         return this.request(`/api/task/${taskKey}/cancel`, { method: "POST" });
     }
 
+    static relinkVideo(videoId, newFilepath) {
+        return this.request(`/api/video/${videoId}/relink`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ new_filepath: newFilepath })
+        });
+    }
+
+    static relinkProject(projectId, searchDir) {
+        return this.request(`/api/projects/${projectId}/relink`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ search_dir: searchDir })
+        });
+    }
+
 
     static splitTranscript(videoId, startTime, newSpeakerId) {
         return this.request(`/api/video/${videoId}/split-transcript`, {

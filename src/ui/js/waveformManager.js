@@ -45,10 +45,44 @@ class WaveformManagerClass {
     }
 
     /**
+     * Indica se a waveform deste vídeo está atualmente sendo gerada/carregada em background.
+     * @param {number|string} videoId 
+     * @returns {boolean}
+     */
+    isLoading(videoId) {
+        if (!videoId) return false;
+        const id = Number(videoId);
+        return this.inFlight.has(id);
+    }
+
+    /**
+     * Indica se existe qualquer waveform sendo extraída no momento.
+     * @returns {boolean}
+     */
+    hasInFlight() {
+        return this.inFlight.size > 0;
+    }
+
+    /**
+     * Limpa o cache em memória (geral ou de um vídeo específico).
+     * @param {number|string|null} videoId 
+     */
+    clearCache(videoId = null) {
+        if (videoId) {
+            const id = Number(videoId);
+            this.cache.delete(id);
+            this.inFlight.delete(id);
+        } else {
+            this.cache.clear();
+            this.inFlight.clear();
+        }
+    }
+
+    /**
      * Obtém a waveform do vídeo. Se não estiver em cache, dispara a requisição e retorna uma Promise.
      * @param {number|string} videoId 
      * @param {boolean} force 
-     * @returns {Promise<{ sampleRate: number, duration: number, peaks: Float32Array } | null>}
+     * @returns {Promise<{ sampleRate: number, duration: number, peaks: Float32Array, failed?: boolean } | null>}
      */
     async getWaveform(videoId, force = false) {
         if (!videoId) return null;
@@ -65,21 +99,44 @@ class WaveformManagerClass {
         const promise = (async () => {
             try {
                 const res = await CapIAuAPI.fetchVideoWaveform(id, force);
-                if (res && Array.isArray(res.peaks)) {
+                if (res && Array.isArray(res.peaks) && res.peaks.length > 0) {
                     const waveformData = {
                         videoId: id,
                         sampleRate: res.sample_rate || 100,
                         duration: res.duration || 0.0,
-                        peaks: new Float32Array(res.peaks)
+                        peaks: new Float32Array(res.peaks),
+                        failed: false
                     };
                     this.cache.set(id, waveformData);
                     this._notify(id, waveformData);
                     return waveformData;
+                } else {
+                    // Armazena estado de falha para não refazer requisição infinitamente
+                    const failedData = {
+                        videoId: id,
+                        sampleRate: 100,
+                        duration: 0.0,
+                        peaks: new Float32Array(0),
+                        failed: true,
+                        error: res?.error || "Waveform sem dados"
+                    };
+                    this.cache.set(id, failedData);
+                    this._notify(id, failedData);
+                    return failedData;
                 }
-                return null;
             } catch (err) {
                 console.warn(`[WaveformManager] Falha ao carregar waveform do vídeo ${id}:`, err);
-                return null;
+                const failedData = {
+                    videoId: id,
+                    sampleRate: 100,
+                    duration: 0.0,
+                    peaks: new Float32Array(0),
+                    failed: true,
+                    error: err.message
+                };
+                this.cache.set(id, failedData);
+                this._notify(id, failedData);
+                return failedData;
             } finally {
                 this.inFlight.delete(id);
             }
@@ -113,14 +170,18 @@ class WaveformManagerClass {
      * @param {number} startTime - Em segundos
      * @param {number} endTime - Em segundos
      * @param {number} targetPoints - Quantidade aproximada de pontos horizontais desejada
-     * @returns {{ hasData: boolean, peaks: Array<{ min: number, max: number }>, sampleRate: number }}
+     * @returns {{ hasData: boolean, failed?: boolean, peaks: Array<{ min: number, max: number }>, sampleRate: number }}
      */
     getSampledEnvelope(videoId, startTime, endTime, targetPoints = 100) {
         const cached = this.getCached(videoId);
-        if (!cached || !cached.peaks || cached.peaks.length === 0) {
-            // Dispara carregamento em background para quando estiver pronto
+        if (!cached) {
+            // Dispara carregamento em background uma única vez
             this.getWaveform(videoId);
-            return { hasData: false, peaks: [], sampleRate: 100 };
+            return { hasData: false, failed: false, peaks: [], sampleRate: 100 };
+        }
+
+        if (cached.failed || !cached.peaks || cached.peaks.length === 0) {
+            return { hasData: false, failed: true, peaks: [], sampleRate: 100 };
         }
 
         const sampleRate = cached.sampleRate || 100;
