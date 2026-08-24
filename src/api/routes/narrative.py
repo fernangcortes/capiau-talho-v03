@@ -1192,8 +1192,30 @@ def render_timeline_video(timeline_id: int,
 
     # Um render por timeline por vez (a fila é sequencial): duplicar entrada só
     # criaria dois trabalhos disputando a mesma chave e a mesma saída.
-    progresso_atual = TASK_MANAGER.get_progress().get(pedido.chave_tarefa)
-    if progresso_atual and progresso_atual.get("status") in ("running", "pending"):
+    # A pergunta "já tem render rodando?" vai para a FILA DO MOTOR, não para o
+    # painel de tarefas compartilhado.
+    #
+    # Motivo (medido em 24/08/2026): `TASK_MANAGER.add_log`, ao receber uma chave
+    # desconhecida, CRIA a entrada com status "running" e 0%. E `cancel_task`
+    # chama add_log — inclusive quando cancela uma tarefa que nunca existiu, coisa
+    # que a rota genérica /api/task/{key}/cancel aceita sem conferir. Resultado:
+    # um cancelamento inócuo inventava um render fantasma "rodando", e a partir
+    # dali TODO render daquela timeline levava 409, sem nenhum ffmpeg vivo.
+    # O motor sabe a verdade — quem está na fila e quem está executando são
+    # dicionários dele, que nada de fora escreve.
+    em_andamento = False
+    try:
+        fila = _modulo_motor("execucao").estado_fila()
+        chaves = set(fila.get("executando") or [])
+        chaves.update(i.get("task_key") for i in (fila.get("aguardando") or []))
+        em_andamento = pedido.chave_tarefa in chaves
+    except (HTTPException, AttributeError, TypeError):
+        # Motor ausente ou sem estado_fila: cai no painel de tarefas, que é
+        # falível mas melhor que deixar dois renders disputarem o mesmo arquivo.
+        progresso_atual = TASK_MANAGER.get_progress().get(pedido.chave_tarefa)
+        em_andamento = bool(progresso_atual
+                            and progresso_atual.get("status") in ("running", "pending"))
+    if em_andamento:
         raise HTTPException(
             status_code=409,
             detail=(f"Já existe um render desta timeline em andamento "
