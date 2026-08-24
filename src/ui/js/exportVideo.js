@@ -1078,11 +1078,14 @@ function pararPolling(motivo) {
 }
 
 async function _buscarTarefas() {
-    // O contrato diz GET /api/tasks; a rota viva hoje é /api/conversions com o
-    // mesmo payload. Tentamos a do contrato e caímos para a existente em 404 —
-    // quando o Pacote D publicar a primeira, o fallback simplesmente para de ocorrer.
-    let r = await _pedir(ROTAS.tasks());
-    if (r.status === 404) r = await _pedir(ROTAS.tasksFallback());
+    // A rota VIVA é /api/conversions; /api/tasks nunca existiu neste app. Tentar
+    // a inexistente primeiro custava um 404 por segundo, enchendo o console do
+    // usuário de vermelho durante todo o render — e foi exatamente esse ruído
+    // que fez o log de uma exportação BEM-SUCEDIDA parecer um desastre.
+    // A ordem está invertida de propósito: se um dia /api/tasks existir, ela
+    // entra como fallback e a troca é de uma linha.
+    let r = await _pedir(ROTAS.tasksFallback());
+    if (r.status === 404) r = await _pedir(ROTAS.tasks());
     return (r.ok && r.data && typeof r.data === "object") ? r.data : {};
 }
 
@@ -1126,7 +1129,12 @@ function _aplicarProgresso(tarefa) {
         ? null
         : Math.max(0, Math.min(100, Number(tarefa.percent)));
 
-    if (_el.progEtapa) _el.progEtapa.textContent = tarefa.label || "Renderizando…";
+    if (_el.progEtapa) {
+        _el.progEtapa.textContent = tarefa.label
+            || (status === "queued" || status === "pending"
+                ? "Na fila — a exportação começa assim que a anterior terminar."
+                : "Renderizando…");
+    }
     if (_el.progPct) _el.progPct.textContent = pct === null ? "—" : `${Math.round(pct)}%`;
     if (_el.progBar) _el.progBar.style.width = `${pct === null ? 0 : pct}%`;
 
@@ -1141,7 +1149,13 @@ function _aplicarProgresso(tarefa) {
         _el.progEta.textContent = etaTxt;
     }
 
-    if (status === "running" || status === "paused" || status === "") {
+    // Estados NAO-terminais. "queued" e publicado por execucao.py enquanto o job
+    // espera a vez na fila sequencial, e ficava de fora desta lista: caia no
+    // ramo terminal, nao casava com "finished"/"cancelled" e virava FALHA. O
+    // render seguia rodando e terminava bem, mas o painel ja tinha anunciado
+    // fracasso e parado o relogio. "pending" entra junto porque e o status que o
+    // POST /render devolve no corpo, e um dia pode chegar aqui tambem.
+    if (["running", "paused", "queued", "pending", ""].includes(status)) {
         if (_estado.faseJob !== "rodando") {
             _estado.faseJob = "rodando";
             _reavaliarBotoes(); // trava os botões de export enquanto roda
