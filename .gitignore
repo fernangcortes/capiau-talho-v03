@@ -48,8 +48,9 @@ data_test_export/
 *.backup
 .tmp_test/
 
-# Planos de Implementação Locais (não versionados)
+# Planos de Implementação e Pesquisas Locais (não versionados)
 docs/PLANO_*.md
+docs/Pesquisas/
 
 # Gráficos e Imagens da Documentação (Evita aumentar tamanho do repo)
 docs/graficos/
