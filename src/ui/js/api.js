@@ -343,6 +343,10 @@ export class CapIAuAPI {
         return this.request(`/api/video/${videoId}/proxy`, { method: "DELETE" });
     }
 
+    static deletePhotoProxy(photoId) {
+        return this.request(`/api/photo/${photoId}/proxy`, { method: "DELETE" });
+    }
+
     static retryFailedConversions(projectId) {
         return this.request(`/api/project/${projectId}/retry-failed`, { method: "POST" });
     }

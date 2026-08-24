@@ -961,6 +961,22 @@ def retry_photo_proxy(photo_id: int, conn: sqlite3.Connection = Depends(get_db_c
     )
     return {"status": "success", "message": "Geração do proxy da foto reiniciada."}
 
+@router.delete("/api/photo/{photo_id}/proxy")
+def delete_photo_proxy(photo_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Cancela tarefas e apaga o arquivo proxy WebP físico da foto no disco."""
+    TASK_MANAGER.cancel_process(photo_id)
+    proxy_path = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{photo_id}.webp"
+    if proxy_path.exists():
+        try:
+            proxy_path.unlink()
+        except Exception:
+            pass
+            
+    cursor = conn.cursor()
+    cursor.execute("UPDATE photo SET status = 'pending' WHERE id = ?", (photo_id,))
+    conn.commit()
+    return {"status": "success", "message": "Proxy físico da foto removido."}
+
 @router.delete("/api/photo/{photo_id}")
 def delete_photo(photo_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Exclui a foto do banco e remove o proxy físico WebP."""
