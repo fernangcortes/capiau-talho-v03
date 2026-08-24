@@ -450,12 +450,23 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
 
         param = comando.parametros_saida(pedido, cfg)
 
+        # `parametros_saida` NAO traz 'encoder': quem resolve o encoder e
+        # `montar_comando`, que so roda no laco abaixo. Ler param['encoder'] aqui
+        # levantava KeyError e derrubava o render inteiro no log de abertura --
+        # falhar ao ESCREVER que comecou e o jeito mais bobo de nao comecar.
+        # Resolve-se aqui pelo mesmo caminho (com cache em memoria), e um
+        # tropeco na deteccao vira texto, nunca excecao.
+        try:
+            nome_encoder = comando._resolver_encoder(param, getattr(sequencia, "project_id", None))[0]
+        except Exception as err:
+            nome_encoder = f"(indeterminado: {type(err).__name__})"
+
         TASK_MANAGER.add_log(
             chave,
             f"[INIT] Render {'rascunho' if pedido.e_rascunho else 'master'} "
             f"'{sequencia.nome or timeline_id}' ({desc}): {len(em_cena)} clipes, "
             f"{duracao_total:.1f}s, {param['largura']}x{param['altura']}, "
-            f"encoder={param['encoder']}, saida={destino_final}")
+            f"encoder={nome_encoder}, saida={destino_final}")
 
         resultado_cmd: Dict[str, Any] = {}
         fracao_feita = 0.0

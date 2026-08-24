@@ -48,7 +48,7 @@ import { TIMELINE_STATE, framesToTimecode } from "./timelineState.js";
 // ── CONSTANTES DE MÓDULO ─────────────────────────────────────────────────────
 
 /** Ligue/desligue o modo de demonstração (instruções no cabeçalho deste arquivo). */
-const MODO_DEMONSTRACAO = true;
+const MODO_DEMONSTRACAO = false;
 
 const ROTAS = {
     timelines: (projectId) => `/api/timeline?project_id=${Number(projectId) || 1}`,

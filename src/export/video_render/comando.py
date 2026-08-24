@@ -641,11 +641,16 @@ def montar_comando(seq, pedido, destino, *, rel_midia=None,
     # PRESET. Reels 9:16 reenquadra com letterbox preto; quando as dims batem a
     # cadeia e passatempo minimo, mas fica SEMPRE presente para todos os
     # segmentos sairem com parametros identicos (concat -c copy exige isso).
+    # `rotulo_video` ja vem entre colchetes do grafo ("[vout]"): re-envolver
+    # produzia "[[vout]]" e o ffmpeg recusava o filterchain inteiro.
     fim_v = rotulo_video.strip("[]")
     cadeia_final = (
-        f"[{rotulo_video}]"
+        f"[{fim_v}]"
         f"scale={param['largura']}:{param['altura']}:force_original_aspect_ratio=decrease,"
-        f"pad={param['largura']}:{param['altura']}:(ow-iw)/2:(oh-ih)/2:black,"
+        # `color=` explicito: `pad=w:h:x:y:black` passa "black" na posicao do
+        # parametro `color`, mas a forma posicional so vale ate `y` em algumas
+        # builds -- nomear a opcao remove a ambiguidade.
+        f"pad={param['largura']}:{param['altura']}:(ow-iw)/2:(oh-ih)/2:color=black,"
         f"fps={_fmt(fps_saida)}"
         + (",format=yuv420p" if param["yuv420p"] else "")
         + f"[{fim_v}_final]"

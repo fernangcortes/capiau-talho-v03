@@ -1055,7 +1055,7 @@ def _resolver_saida(pedido: "modelo_render.Pedido", nome_timeline: str) -> dict:
 
 
 def _contexto_preflight(timeline_id: int, payload: RenderPedidoPayload,
-                        conn: sqlite3.Connection) -> Tuple[dict, "modelo_render.Pedido"]:
+                        conn: sqlite3.Connection) -> Tuple[dict, "modelo_render.Pedido", Any]:
     """Tudo que o preflight responde, compartilhado com a rota de render.
 
     Barato de propósito: SELECT no banco, normalização em memória e checagens
@@ -1118,7 +1118,12 @@ def _contexto_preflight(timeline_id: int, payload: RenderPedidoPayload,
         "saida": _resolver_saida(pedido, dados["nome"]),
         "motor_disponivel": _motor_presente("execucao"),
     }
-    return resposta, pedido
+    # A sequencia normalizada volta junto porque `execucao.enfileirar(pedido,
+    # sequencia)` precisa dela: o pedido sozinho so diz O QUE renderizar, nao O
+    # QUE ESTA na timeline. Recarregar do banco na rota de render seria um
+    # segundo SELECT e, pior, uma janela para renderizar versao diferente da que
+    # o preflight aprovou.
+    return resposta, pedido, seq
 
 
 @router.post("/api/timeline/{timeline_id}/render/preflight")
@@ -1135,7 +1140,7 @@ def render_preflight(timeline_id: int,
     bloqueios de nível 'block' e a saída sugerida.
     """
     payload = payload or RenderPedidoPayload(kind=modelo_render.TIPO_MASTER)
-    contexto, _pedido = _contexto_preflight(timeline_id, payload, conn)
+    contexto, _pedido, _seq = _contexto_preflight(timeline_id, payload, conn)
     return contexto
 
 
@@ -1152,7 +1157,7 @@ def render_timeline_video(timeline_id: int,
     saída prevista. O cliente acompanha pelo TASK_MANAGER (GET /api/tasks) e
     cancela pela genérica POST /api/task/{task_key}/cancel.
     """
-    contexto, pedido = _contexto_preflight(timeline_id, payload, conn)
+    contexto, pedido, seq = _contexto_preflight(timeline_id, payload, conn)
 
     if contexto["clipes_no_render"] == 0:
         raise HTTPException(
@@ -1184,17 +1189,24 @@ def render_timeline_video(timeline_id: int,
         raise HTTPException(
             status_code=503,
             detail=("Módulo 'execucao' presente mas sem a função esperada "
-                    "enfileirar(pedido) -> {'task_key', 'saida_prevista'}. Sem "
+                    "enfileirar(pedido, sequencia) -> {'task_key', 'saida_prevista'}. Sem "
                     "adaptação silenciosa: conciliar a interface com o pacote C."))
-    despacho = enfileirar(pedido)
+    despacho = enfileirar(pedido, seq)
     task_key = (despacho or {}).get("task_key")
-    saida_prevista = (despacho or {}).get("saida_prevista")
+    # `saida_prevista` é opcional no retorno do pacote C: quem RESOLVE o destino
+    # é esta rota (`_resolver_saida`), e é esse mesmo caminho que o preflight já
+    # mostrou ao usuário. Cair nele não é adaptação silenciosa — é usar a fonte
+    # da verdade em vez de exigir que o executor a repita. Só o task_key é
+    # obrigatório: sem ele o cliente não teria como acompanhar nem cancelar.
+    saida_prevista = ((despacho or {}).get("saida_prevista")
+                      or (contexto.get("saida") or {}).get("caminho_previsto"))
     if not task_key or not saida_prevista:
         raise HTTPException(
             status_code=503,
-            detail=(f"'execucao.enfileirar' devolveu {despacho!r}; o contrato combina "
-                    "em {'task_key': str, 'saida_prevista': str}. Sem adaptação "
-                    "silenciosa: conciliar com o pacote C."))
+            detail=(f"'execucao.enfileirar' devolveu {despacho!r} e o destino não pôde "
+                    "ser resolvido; o contrato combina em {'task_key': str} mais o "
+                    "caminho de saída. Sem adaptação silenciosa: conciliar com o "
+                    "pacote C."))
 
     aviso_registro = _gravar_registro_ultimo(pedido, task_key, saida_prevista)
 
