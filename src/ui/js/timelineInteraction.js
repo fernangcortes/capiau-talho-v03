@@ -1870,11 +1870,36 @@ export class CapiauTimelineInteraction {
         const isPhoto = clip && clip.type === "photo";
         const mediaType = !clip ? "sequence" : (isPhoto ? "photo" : (isAudioTrack ? "audio" : "video"));
         
-        const sections = container.querySelectorAll(".adjustments-section[draggable='true']");
+        const sections = container.querySelectorAll(".adjustments-section[data-section-id]");
         let draggedSectionId = null;
 
+        const clearAllDraggable = () => {
+            sections.forEach(s => {
+                if (!s.classList.contains("dragging")) {
+                    s.removeAttribute("draggable");
+                }
+            });
+        };
+
         sections.forEach(section => {
+            const handle = section.querySelector(".adj-drag-handle");
+            if (handle) {
+                handle.onmousedown = () => {
+                    section.setAttribute("draggable", "true");
+                    const doc = section.ownerDocument || document;
+                    const onWinMouseUp = () => {
+                        clearAllDraggable();
+                        doc.removeEventListener("mouseup", onWinMouseUp);
+                    };
+                    doc.addEventListener("mouseup", onWinMouseUp);
+                };
+            }
+
             section.ondragstart = (e) => {
+                if (!section.hasAttribute("draggable")) {
+                    e.preventDefault();
+                    return false;
+                }
                 draggedSectionId = section.dataset.sectionId;
                 section.classList.add("dragging");
                 if (e.dataTransfer) {
@@ -1884,8 +1909,13 @@ export class CapiauTimelineInteraction {
             };
 
             section.ondragend = () => {
+                clearAllDraggable();
+                section.removeAttribute("draggable");
                 section.classList.remove("dragging");
-                sections.forEach(s => s.classList.remove("drop-target-above", "drop-target-below"));
+                sections.forEach(s => {
+                    s.removeAttribute("draggable");
+                    s.classList.remove("drop-target-above", "drop-target-below");
+                });
             };
 
             section.ondragover = (e) => {
@@ -2341,7 +2371,7 @@ export class CapiauTimelineInteraction {
             const isDiagOpen = states["audio_diag"] !== false;
             const isDiagMod = this._isSectionModified(clip, "audio_diag");
             audioDiagHTML = `
-                <div class="adjustments-section" data-section-id="audio_diag" draggable="true">
+                <div class="adjustments-section" data-section-id="audio_diag">
                     <div class="adjustments-section-header" data-section-toggle="audio_diag">
                         <div class="adj-header-left">
                             <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
@@ -2379,7 +2409,7 @@ export class CapiauTimelineInteraction {
             const isEqOpen = states["audio_eq"] !== false;
             const isEqMod = this._isSectionModified(clip, "audio_eq");
             audioEqHTML = `
-                <div class="adjustments-section" data-section-id="audio_eq" draggable="true">
+                <div class="adjustments-section" data-section-id="audio_eq">
                     <div class="adjustments-section-header" data-section-toggle="audio_eq">
                         <div class="adj-header-left">
                             <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
@@ -2396,7 +2426,7 @@ export class CapiauTimelineInteraction {
             const isDynOpen = states["audio_dynamics"] !== false;
             const isDynMod = this._isSectionModified(clip, "audio_dynamics");
             audioDynamicsHTML = `
-                <div class="adjustments-section" data-section-id="audio_dynamics" draggable="true">
+                <div class="adjustments-section" data-section-id="audio_dynamics">
                     <div class="adjustments-section-header" data-section-toggle="audio_dynamics">
                         <div class="adj-header-left">
                             <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
@@ -2428,7 +2458,7 @@ export class CapiauTimelineInteraction {
             const selEstilo = "height:20px; font-size:10px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px; padding:0 2px;";
 
             audioRenderHTML = `
-                <div class="adjustments-section" data-section-id="audio_render" draggable="true">
+                <div class="adjustments-section" data-section-id="audio_render">
                     <div class="adjustments-section-header" data-section-toggle="audio_render">
                         <div class="adj-header-left">
                             <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
@@ -2502,7 +2532,7 @@ export class CapiauTimelineInteraction {
             const isResOpen = states["audio_render_resultado"] !== false;
             const isResMod = this._isSectionModified(clip, "audio_render_resultado");
             audioResultadoHTML = `
-                <div class="adjustments-section" data-section-id="audio_render_resultado" draggable="true">
+                <div class="adjustments-section" data-section-id="audio_render_resultado">
                     <div class="adjustments-section-header" data-section-toggle="audio_render_resultado">
                         <div class="adj-header-left">
                             <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
@@ -2521,7 +2551,7 @@ export class CapiauTimelineInteraction {
             const isVolOpen = states["volume"] !== false;
             const isVolMod = this._isSectionModified(clip, "volume");
             volumeHTML = `
-                <div class="adjustments-section" data-section-id="volume" draggable="true">
+                <div class="adjustments-section" data-section-id="volume">
                     <div class="adjustments-section-header" data-section-toggle="volume">
                         <div class="adj-header-left">
                             <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
@@ -2551,7 +2581,7 @@ export class CapiauTimelineInteraction {
         const isTfOpen = states["transform"] !== false;
         const isTfMod = this._isSectionModified(clip, "transform");
         const transformHTML = `
-            <div class="adjustments-section" data-section-id="transform" draggable="true">
+            <div class="adjustments-section" data-section-id="transform">
                 <div class="adjustments-section-header" data-section-toggle="transform">
                     <div class="adj-header-left">
                         <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
@@ -2608,7 +2638,7 @@ export class CapiauTimelineInteraction {
         const isCropOpen = states["crop"] !== false;
         const isCropMod = this._isSectionModified(clip, "crop");
         const cropHTML = `
-            <div class="adjustments-section" data-section-id="crop" draggable="true">
+            <div class="adjustments-section" data-section-id="crop">
                 <div class="adjustments-section-header" data-section-toggle="crop">
                     <div class="adj-header-left">
                         <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
@@ -2658,7 +2688,7 @@ export class CapiauTimelineInteraction {
         const isKbOpen = states["ken_burns"] !== false;
         const isKbMod = this._isSectionModified(clip, "ken_burns");
         const kbHTML = `
-            <div class="adjustments-section" data-section-id="ken_burns" draggable="true">
+            <div class="adjustments-section" data-section-id="ken_burns">
                 <div class="adjustments-section-header" data-section-toggle="ken_burns">
                     <div class="adj-header-left">
                         <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
@@ -2685,7 +2715,7 @@ export class CapiauTimelineInteraction {
         const isColOpen = states["color"] !== false;
         const isColMod = this._isSectionModified(clip, "color");
         const colorHTML = `
-            <div class="adjustments-section" data-section-id="color" draggable="true">
+            <div class="adjustments-section" data-section-id="color">
                 <div class="adjustments-section-header" data-section-toggle="color">
                     <div class="adj-header-left">
                         <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
@@ -2756,7 +2786,7 @@ export class CapiauTimelineInteraction {
         const isFadesOpen = states["fades"] !== false;
         const isFadesMod = this._isSectionModified(clip, "fades");
         const fadesHTML = `
-            <div class="adjustments-section" data-section-id="fades" draggable="true">
+            <div class="adjustments-section" data-section-id="fades">
                 <div class="adjustments-section-header" data-section-toggle="fades">
                     <div class="adj-header-left">
                         <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
