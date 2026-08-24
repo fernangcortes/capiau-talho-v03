@@ -10,6 +10,7 @@ import { EntityManager } from "./entities.js";
 import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
 import { SettingsPanelManager } from "./settingsPanel.js";
 import { initAutosave, triggerAutosave } from "./timelineAutosave.js";
+import { initExportVideoPanel } from "./exportVideo.js";
 import { LOG_MANAGER } from "./logManager.js";
 import { initTabsCustomization, setTabVisibility } from "./tabsCustomization.js";
 
@@ -1742,6 +1743,9 @@ window.addEventListener("DOMContentLoaded", () => {
     
     // Inicializa o sistema de auto-salvamento local
     initAutosave();
+
+    // Painel de Exportação de Vídeo: auto-ligado ao #btn-export-video (js/exportVideo.js)
+    initExportVideoPanel();
 
     // -- Open Photos in Player Configuration --
     const btnLibrary = document.getElementById("btn-library-photos-in-player");

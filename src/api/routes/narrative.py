@@ -1,13 +1,22 @@
 """Roteador FastAPI para gerenciamento de Timelines, Transcrições, Temas e Chat RAG."""
+import importlib
+import json
+import os
+import subprocess
+import sys
+import re
 import shutil
 import sqlite3
 import tempfile
+from datetime import datetime
 from pathlib import Path
-from typing import Optional, List
+from typing import Any, Optional, List, Tuple
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, BackgroundTasks, UploadFile
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from src.api.dependencies import get_db_conn
+from src.config import CONFIG
 from src.api.schemas import (
     TimelineCreate,
     TimelineAISuggestPayload,
@@ -16,8 +25,12 @@ from src.api.schemas import (
     SearchCategorizePayload,
     RenameSpeakerPayload,
     EditDialoguePayload,
-    AddThemeSegmentPayload
+    AddThemeSegmentPayload,
+    RenderPedidoPayload,
+    pedido_render_do_payload
 )
+from src.core.tasks import TASK_MANAGER
+from src.export.video_render import modelo as modelo_render
 from src.db.repositories.projects import ProjectRepository
 from src.db.repositories.narrative import NarrativeRepository
 from src.db.repositories.media import MediaRepository
@@ -788,3 +801,648 @@ def get_agent_models():
         "models": CONFIG.AGENT_MODELS,
         "default": CONFIG.AGENT_MODEL
     }
+
+
+# ===========================================================================
+# Render de vídeo da timeline (docs/PLANO_EXPORTACAO_VIDEO.md, seções 5 e 6;
+# pacote D). Três rotas:
+#   POST .../render/preflight  -> o que o modal chama AO ABRIR (barato: só banco
+#                                 e metadado, nada de abrir mídia nem ffmpeg).
+#   POST .../render            -> valida, recusa em bloqueio e ENFILEIRA sem
+#                                 segurar o request (padrão da rota de áudio).
+#   GET  .../render/ultimo     -> estado do último render para reabrir o modal.
+# O trabalho pesado é do pacote C (src/export/video_render/{midia,fidelidade,
+# execucao}.py), que está sendo escrito EM PARALELO. Nada aqui pode impedir o
+# servidor de subir: os imports desses módulos ficam dentro dos handlers sob
+# guarda de ImportError com HTTP 503 legível -- mesma doutrina da rota de
+# áudio, que importa src/media/audio_chain.py (contrato F1) dentro do handler.
+# Cancelamento NÃO tem rota própria de propósito: já existe a genérica
+# POST /api/task/{task_key}/cancel (media.py), usada por todo o app.
+# ===========================================================================
+
+def _modulo_motor(nome: str):
+    """Importa um módulo do motor (pacote C) sob guarda, ou 503 com motivo claro.
+
+    Por que 503 e não 500: o módulo ausente é estado ESPERADO desta instalação
+    enquanto o pacote C não chega ao disco -- a rota existe, o motor é quem
+    ainda não está disponível. A mensagem nomeia o arquivo exato para o
+    revisor conciliar sem caçar o erro no traceback.
+    """
+    caminho = f"src.export.video_render.{nome}"
+    try:
+        return importlib.import_module(caminho)
+    except (ImportError, SyntaxError) as err:
+        # SyntaxError junto do ImportError: os modulos do motor sao escritos em
+        # paralelo e um arquivo pego EM MEIO A ESCRITA quebra na compilacao -- e
+        # o mesmo estado esperado de "ainda nao disponivel", com o erro real
+        # ecoado na mensagem em vez de escondido.
+        raise HTTPException(
+            status_code=503,
+            detail=(f"O motor de render de vídeo ainda não está disponível nesta "
+                    f"instalação (módulo '{caminho}' ausente ou com erro de "
+                    f"importação: {err}). O servidor segue no ar; só esta rota "
+                    f"fica fora até o módulo do pacote C existir."))
+
+
+def _motor_presente(nome: str) -> bool:
+    """True se o módulo do motor pode ser importado, SEM importá-lo.
+
+    find_spec não executa o módulo: serve para o preflight avisar 'motor
+    instalado/não instalado' de graça, sem risco de disparar efeito colateral.
+    """
+    import importlib.util
+    try:
+        return importlib.util.find_spec(f"src.export.video_render.{nome}") is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _carregar_timeline_render(timeline_id: int, conn: sqlite3.Connection) -> dict:
+    """(nome, sequence_json normalizado v2) da timeline, ou 404.
+
+    Leitura única e leve: SELECT de uma linha + parse_sequence (json.loads puro,
+    sem tocar disco/mídia). É o mesmo acesso do export OTIO, então preflight e
+    render enxergam exatamente a sequência que seria exportada.
+    """
+    row = conn.execute(
+        "SELECT id, name, sequence_json FROM timeline WHERE id = ?", (timeline_id,)
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404,
+                            detail=f"Timeline {timeline_id} não encontrada.")
+    try:
+        sequencia = ProjectRepository.parse_sequence(row["sequence_json"])
+    except Exception as err:
+        raise HTTPException(
+            status_code=500,
+            detail=f"sequence_json da timeline {timeline_id} está corrompido: {err}")
+    return {"nome": str(row["name"] or ""), "sequencia": sequencia}
+
+
+def _montar_seq_e_pedido(timeline_id: int, payload: RenderPedidoPayload,
+                         dados: dict) -> Tuple["modelo_render.Sequencia", "modelo_render.Pedido"]:
+    """Normaliza a sequência e converte o corpo em Pedido; ValueError vira 400.
+
+    A conversão mora em schemas.pedido_render_do_payload (ponto único); aqui só
+    traduzimos os erros dela e o clamp da faixa contra a duração real.
+    """
+    seq = modelo_render.normalizar(dados["sequencia"], nome=dados["nome"],
+                                   timeline_id=timeline_id)
+    try:
+        pedido = pedido_render_do_payload(timeline_id, payload)
+        # Validação antecipada da faixa contra a duração REAL (in_out vazio ou
+        # além do fim): falhar aqui é barato, falhar no worker custa uma fila.
+        pedido.faixa.resolver(seq.duracao_s())
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+    return seq, pedido
+
+
+def _chamar_midia(seq: "modelo_render.Sequencia",
+                  pedido: "modelo_render.Pedido"):
+    """Chama o resolver de fontes do pacote C. -> (bruto | None, erro | None).
+
+    Exatamente UM dos dois volta preenchido: o relatório bruto quando o módulo
+    respondeu (vai cru para o fidelidade, que o contrato manda ele receber);
+    ou uma resposta degrada LEGÍVEL (disponivel=false + motivo) para o cliente,
+    enquanto src/export/video_render/midia.py não existir nesta instalação.
+    Módulo presente sem a função combinada NÃO é adaptado em silêncio -- vira
+    motivo explícito para o pacote C/revisor conciliarem o nome. Exceção DENTRO
+    do resolver não é engolida: bug de motor tem de aparecer como 500.
+    """
+    try:
+        from src.export.video_render import midia
+    except (ImportError, SyntaxError) as err:
+        # SyntaxError: modulo do motor pego em meio a escrita (mesmo tratamento
+        # de _modulo_motor -- estado esperado, erro real ecoado).
+        return None, {"disponivel": False,
+                      "motivo": ("Módulo 'src/export/video_render/midia.py' ainda não "
+                                 f"está utilizável nesta instalação ({err}). O relatório "
+                                 "de mídia fica em branco -- isto NÃO significa que não "
+                                 "falta nada; significa que ainda não dá para saber.")}
+    resolver = getattr(midia, "resolver_fontes", None)
+    if not callable(resolver):
+        return None, {"disponivel": False,
+                      "motivo": ("Módulo 'midia' presente mas sem a função esperada "
+                                 "resolver_fontes(seq, pedido). Sem adaptação "
+                                 "silenciosa: o pacote C publica este nome (ou relata "
+                                 "a mudança) e o revisor concilia este ponto.")}
+    return resolver(seq, pedido), None
+
+
+def _empacotar_relatorio_motor(bruto) -> dict:
+    """Resposta do motor em formato JSON-serializável, SEM inventar campo.
+
+    dict -> como veio; dataclass -> fields + properties públicas (o RelatorioMidia
+    entregue pelo pacote C em 24/08 expõe 'recusado' como PROPERTY, que asdict()
+    não traz); qualquer outra coisa -> repr marcado, nunca silêncio.
+    """
+    import dataclasses
+    if isinstance(bruto, dict):
+        return {"disponivel": True, **bruto}
+    if dataclasses.is_dataclass(bruto) and not isinstance(bruto, type):
+        corpo = dataclasses.asdict(bruto)
+        for nome in dir(bruto):
+            if nome.startswith("_") or nome in corpo:
+                continue
+            atributo = getattr(bruto, nome)
+            if callable(atributo):
+                continue
+            corpo[nome] = atributo
+        return {"disponivel": True, **corpo}
+    return {"disponivel": True, "relatorio": repr(bruto)}
+
+
+def _chamar_fidelidade(seq: "modelo_render.Sequencia",
+                       pedido: "modelo_render.Pedido",
+                       relatorio_midia_bruto) -> dict:
+    """Banner âmbar do pacote C (limitações do motor para ESTE pedido).
+
+    Recebe o relatório de mídia BRUTO porque o contrato combinado é
+    relatorio(seq, pedido, relatorio_midia). Mesma disciplina da mídia:
+    ausência degrada com motivo legível; divergência de interface fica
+    explícita; exceção real sobe como 500.
+    """
+    try:
+        from src.export.video_render import fidelidade
+    except (ImportError, SyntaxError) as err:
+        # Mesmo tratamento de _chamar_midia: arquivo em meio a escrita e estado
+        # esperado, com o erro real na mensagem.
+        return {"disponivel": False,
+                "motivo": ("Módulo 'src/export/video_render/fidelidade.py' ainda não "
+                           f"está utilizável nesta instalação ({err}). O banner de "
+                           "fidelidade fica em branco -- nenhuma limitação foi "
+                           "verificada.")}
+    gerar = getattr(fidelidade, "relatorio", None)
+    if not callable(gerar):
+        return {"disponivel": False,
+                "motivo": ("Módulo 'fidelidade' presente mas sem a função esperada "
+                           "relatorio(seq, pedido, relatorio_midia). Sem adaptação "
+                           "silenciosa: conciliar nome com o pacote C.")}
+    return _empacotar_relatorio_motor(gerar(seq, pedido, relatorio_midia_bruto))
+
+
+def _bloqueios_de_midia(resposta_midia) -> list:
+    """Bloqueios no formato QUE O PACOTE C ENTREGOU (midia.py, 24/08).
+
+    Lá a recusa é sinalizada pelo agregado 'recusas' (lista de textos humanos;
+    'recusado' é a property que resume). Cada texto vira um item de nível
+    'block' na resposta do preflight e na guarda da rota de render.
+    """
+    if not isinstance(resposta_midia, dict) or not resposta_midia.get("disponivel"):
+        return []
+    recusas = resposta_midia.get("recusas")
+    if not isinstance(recusas, list):
+        return bool(resposta_midia.get("recusado")) and \
+            [{"origem": "midia", "nivel": "block",
+              "mensagem": "O relatório de mídia marcou recusa sem listar os motivos."}] or []
+    return [{"origem": "midia", "nivel": "block", "mensagem": str(r)}
+            for r in recusas if r]
+
+
+def _avisos_bloqueantes(relatorio) -> list:
+    """Extrai avisos de nível 'block' do formato contratado do fidelidade
+    ('dict com avisos'; severidade em 'nivel', com 'level' aceito também POR
+    ENQUANTO enquanto o módulo não chega ao disco -- quando chegar, o revisor
+    concilia e isto aqui fica de uma forma só).
+
+    Qualquer outra forma (sem lista 'avisos', sem severidade) NÃO bloqueia:
+    recusar render por um campo que não sabemos ler seria pior que deixar
+    passar com o aviso visível no preflight.
+    """
+    if not isinstance(relatorio, dict):
+        return []
+    avisos = relatorio.get("avisos")
+    if not isinstance(avisos, list):
+        return []
+    bloqueios = []
+    for aviso in avisos:
+        if not isinstance(aviso, dict):
+            continue
+        nivel = str(aviso.get("nivel") or aviso.get("level") or "").strip().lower()
+        if nivel == "block":
+            bloqueios.append(aviso)
+    return bloqueios
+
+
+_SLUG_SEGURO = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
+
+
+def _resolver_saida(pedido: "modelo_render.Pedido", nome_timeline: str) -> dict:
+    """Pasta resolvida + nome sugerido, na ordem: override do pedido > Configurações.
+
+    Pasta relativa nas configurações é ancorada na raiz do app (CONFIG.BASE_DIR),
+    igual às demais pastas de data/. Extensão sai do container do override (o
+    plano trava MP4 nesta rodada, mas o campo já aceita mov/mkv/webm sem mentir
+    na sugestão).
+    """
+    from src.config import CONFIG
+    from src.services.settings_service import SettingsService
+
+    pasta = pedido.saida.diretorio or str(
+        SettingsService.get_settings().get("render.output_dir") or "data/exports/renders")
+    caminho = Path(pasta)
+    if not caminho.is_absolute():
+        caminho = CONFIG.BASE_DIR / caminho
+
+    ext = str(pedido.overrides.get("container") or "mp4").lower().lstrip(".")
+    slug = _SLUG_SEGURO.sub("_", (nome_timeline or "").strip()).strip(" .") \
+        or f"timeline_{pedido.timeline_id}"
+    carimbo = datetime.now().strftime("%Y-%m-%d_%H%M")
+    nome = pedido.saida.nome_arquivo or f"{slug}_{carimbo}.{ext}"
+    if "." not in Path(nome).name:
+        nome = f"{nome}.{ext}"
+    return {
+        "diretorio": str(caminho),
+        "nome_arquivo_sugerido": Path(nome).name,
+        "caminho_previsto": str(caminho / Path(nome).name),
+    }
+
+
+def _contexto_preflight(timeline_id: int, payload: RenderPedidoPayload,
+                        conn: sqlite3.Connection) -> Tuple[dict, "modelo_render.Pedido", Any]:
+    """Tudo que o preflight responde, compartilhado com a rota de render.
+
+    Barato de propósito: SELECT no banco, normalização em memória e checagens
+    de existência feitas pelo próprio pacote C quando ele estiver presente.
+    Nenhum ffprobe, nenhum decode, nenhum ffmpeg neste caminho.
+    """
+    dados = _carregar_timeline_render(timeline_id, conn)
+    seq, pedido = _montar_seq_e_pedido(timeline_id, payload, dados)
+
+    duracao = seq.duracao_s()
+    ids_ia = {p.id for p in seq.pistas if p.e_ia}          # P1: pista IA nunca renderiza
+    clipes_no_render = [c for c in seq.clipes if c.track not in ids_ia]
+
+    por_pista: dict = {}
+    for clipe in seq.clipes:
+        por_pista[clipe.track] = por_pista.get(clipe.track, 0) + 1
+
+    pistas = [{
+        "id": p.id, "nome": p.nome, "kind": p.kind,
+        "muted": p.muted, "hidden": p.hidden, "locked": p.locked,
+        # P7/P8: hidden inicializa o toggle do escopo; locked é só edição.
+        "incluida_no_escopo": pedido.escopo.pista_ligada(p.id),
+        # P1: pista de IA NUNCA entra no render -- explícito aqui para o modal
+        # não montar um toggle que promete o que o motor não faz.
+        "entra_no_render": not p.e_ia,
+        "clipes": por_pista.get(p.id, 0),
+    } for p in sorted(seq.pistas, key=lambda p: p.ordem)]
+
+    ini_s, fim_s = pedido.faixa.resolver(duracao)
+
+    midia_bruto, midia_erro = _chamar_midia(seq, pedido)
+    midia_resp = midia_erro if midia_erro is not None \
+        else _empacotar_relatorio_motor(midia_bruto)
+    fidelidade_resp = _chamar_fidelidade(seq, pedido, midia_bruto)
+    # Cada fonte de bloqueio e lida COMO ELA E: a midia entregue pelo pacote C
+    # recusa pelo agregado 'recusas'/'recusado'; o fidelidade (contrato do
+    # pacote D) por avisos de nivel 'block'. Nenhum e forcado no formato do outro.
+    bloqueios = _bloqueios_de_midia(midia_resp) + _avisos_bloqueantes(fidelidade_resp)
+
+    resposta = {
+        "ok": True,
+        "timeline_id": timeline_id,
+        "nome": dados["nome"],
+        "kind": pedido.kind,
+        "duracao_s": round(duracao, 3),
+        "fps": seq.fps,
+        "resolucao": {"largura": seq.largura, "altura": seq.altura},
+        "clipes_total": len(seq.clipes),
+        "clipes_no_render": len(clipes_no_render),
+        "clipes_por_pista": por_pista,
+        "faixa": {"modo": pedido.faixa.modo,
+                  "inicio_s": round(ini_s, 3), "fim_s": round(fim_s, 3)},
+        # As pistas REAIS, dinâmicas -- o modal NUNCA assume V1/V2/A1/A2.
+        "pistas": pistas,
+        "categorias_escopo": {c: pedido.escopo.categoria_ligada(c)
+                              for c in modelo_render.CATEGORIAS},
+        "midia": midia_resp,
+        "fidelidade": fidelidade_resp,
+        "bloqueios": bloqueios,
+        "saida": _resolver_saida(pedido, dados["nome"]),
+        "motor_disponivel": _motor_presente("execucao"),
+        # Assinatura da versao SALVA, para o painel comparar com o que esta na
+        # tela. O autosave da timeline grava em localStorage, nao no banco: quem
+        # ajusta cor/transform e exporta sem salvar renderiza a versao ANTERIOR,
+        # e ate 24/08/2026 isso acontecia em silencio absoluto. Grosseira de
+        # proposito (contagens e soma de duracoes, arredondadas duro): tem de dar
+        # o MESMO numero calculado em JavaScript, e formatacao de float e onde
+        # comparacoes entre linguagens costumam divergir.
+        "assinatura": {
+            "clipes": len(clipes_no_render),
+            "efeitos": sum(len(c.effects or []) for c in clipes_no_render),
+            "duracao_total_s": round(sum(c.duracao_s for c in clipes_no_render), 2),
+        },
+    }
+    # A sequencia normalizada volta junto porque `execucao.enfileirar(pedido,
+    # sequencia)` precisa dela: o pedido sozinho so diz O QUE renderizar, nao O
+    # QUE ESTA na timeline. Recarregar do banco na rota de render seria um
+    # segundo SELECT e, pior, uma janela para renderizar versao diferente da que
+    # o preflight aprovou.
+    return resposta, pedido, seq
+
+
+@router.post("/api/timeline/{timeline_id}/render/preflight")
+def render_preflight(timeline_id: int,
+                     payload: Optional[RenderPedidoPayload] = None,
+                     conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Diagnóstico do modal de exportação: NÃO renderiza nada.
+
+    Chamado ao ABRIR o modal com o mesmo corpo do render (preflight depende do
+    kind e do escopo escolhidos). Corpo ausente vale master/full/tudo-ligado,
+    para a primeira abertura funcionar antes de qualquer interação. Devolve
+    duração/contagens/fps/resolução, as pistas REAIS para montar os toggles de
+    escopo, o relatório de mídia, os avisos de fidelidade (banner âmbar), os
+    bloqueios de nível 'block' e a saída sugerida.
+    """
+    payload = payload or RenderPedidoPayload(kind=modelo_render.TIPO_MASTER)
+    contexto, _pedido, _seq = _contexto_preflight(timeline_id, payload, conn)
+    return contexto
+
+
+@router.post("/api/timeline/{timeline_id}/render")
+def render_timeline_video(timeline_id: int,
+                          payload: RenderPedidoPayload,
+                          conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Valida, recusa em bloqueio e ENFILEIRA o render -- nunca segura o request.
+
+    Guardas ANTES de qualquer custo (espírito da rota de áudio): timeline
+    existe? tem clipe fora da pista de IA? faixa IN-OUT é válida? há aviso de
+    nível 'block'? já não há render desta timeline na fila? Só depois disso o
+    pacote C entra, via execucao.enfileirar(pedido), que devolve task_key e a
+    saída prevista. O cliente acompanha pelo TASK_MANAGER (GET /api/tasks) e
+    cancela pela genérica POST /api/task/{task_key}/cancel.
+    """
+    contexto, pedido, seq = _contexto_preflight(timeline_id, payload, conn)
+
+    if contexto["clipes_no_render"] == 0:
+        raise HTTPException(
+            status_code=400,
+            detail=("Esta timeline não tem clipe nenhum fora da pista de IA; "
+                    "não há o que renderizar."))
+
+    if contexto["bloqueios"]:
+        raise HTTPException(
+            status_code=400,
+            detail=("Render recusado pelo preflight (midia ausente/indisponivel ou "
+                    "aviso de nivel 'block'): "
+                    + json.dumps(contexto["bloqueios"], ensure_ascii=False,
+                                 default=str)[:1500]))
+
+    # Um render por timeline por vez (a fila é sequencial): duplicar entrada só
+    # criaria dois trabalhos disputando a mesma chave e a mesma saída.
+    # A pergunta "já tem render rodando?" vai para a FILA DO MOTOR, não para o
+    # painel de tarefas compartilhado.
+    #
+    # Motivo (medido em 24/08/2026): `TASK_MANAGER.add_log`, ao receber uma chave
+    # desconhecida, CRIA a entrada com status "running" e 0%. E `cancel_task`
+    # chama add_log — inclusive quando cancela uma tarefa que nunca existiu, coisa
+    # que a rota genérica /api/task/{key}/cancel aceita sem conferir. Resultado:
+    # um cancelamento inócuo inventava um render fantasma "rodando", e a partir
+    # dali TODO render daquela timeline levava 409, sem nenhum ffmpeg vivo.
+    # O motor sabe a verdade — quem está na fila e quem está executando são
+    # dicionários dele, que nada de fora escreve.
+    em_andamento = False
+    try:
+        fila = _modulo_motor("execucao").estado_fila()
+        chaves = set(fila.get("executando") or [])
+        chaves.update(i.get("task_key") for i in (fila.get("aguardando") or []))
+        em_andamento = pedido.chave_tarefa in chaves
+    except (HTTPException, AttributeError, TypeError):
+        # Motor ausente ou sem estado_fila: cai no painel de tarefas, que é
+        # falível mas melhor que deixar dois renders disputarem o mesmo arquivo.
+        progresso_atual = TASK_MANAGER.get_progress().get(pedido.chave_tarefa)
+        em_andamento = bool(progresso_atual
+                            and progresso_atual.get("status") in ("running", "pending"))
+    if em_andamento:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"Já existe um render desta timeline em andamento "
+                    f"({pedido.chave_tarefa}). Acompanhe na aba Tarefas ou cancele "
+                    f"por POST /api/task/{pedido.chave_tarefa}/cancel."))
+
+    modulo_execucao = _modulo_motor("execucao")   # 503 legível se o pacote C não chegou
+    enfileirar = getattr(modulo_execucao, "enfileirar", None)
+    if not callable(enfileirar):
+        raise HTTPException(
+            status_code=503,
+            detail=("Módulo 'execucao' presente mas sem a função esperada "
+                    "enfileirar(pedido, sequencia) -> {'task_key', 'saida_prevista'}. Sem "
+                    "adaptação silenciosa: conciliar a interface com o pacote C."))
+    despacho = enfileirar(pedido, seq)
+    task_key = (despacho or {}).get("task_key")
+    # `saida_prevista` é opcional no retorno do pacote C: quem RESOLVE o destino
+    # é esta rota (`_resolver_saida`), e é esse mesmo caminho que o preflight já
+    # mostrou ao usuário. Cair nele não é adaptação silenciosa — é usar a fonte
+    # da verdade em vez de exigir que o executor a repita. Só o task_key é
+    # obrigatório: sem ele o cliente não teria como acompanhar nem cancelar.
+    saida_prevista = ((despacho or {}).get("saida_prevista")
+                      or (contexto.get("saida") or {}).get("caminho_previsto"))
+    if not task_key or not saida_prevista:
+        raise HTTPException(
+            status_code=503,
+            detail=(f"'execucao.enfileirar' devolveu {despacho!r} e o destino não pôde "
+                    "ser resolvido; o contrato combina em {'task_key': str} mais o "
+                    "caminho de saída. Sem adaptação silenciosa: conciliar com o "
+                    "pacote C."))
+
+    aviso_registro = _gravar_registro_ultimo(pedido, task_key, saida_prevista)
+
+    resposta = {"ok": True, "status": "pending",
+                "task_key": task_key, "saida_prevista": saida_prevista,
+                # Alias do §6 do plano (output_path_previsto) para consumidores
+                # que seguiram o plano à letra; mesmo valor de saida_prevista.
+                "output_path_previsto": saida_prevista,
+                "chave_tarefa": pedido.chave_tarefa,
+                "acompanhamento": "GET /api/tasks (aba Tarefas) ou GET .../render/ultimo",
+                "cancelamento": f"POST /api/task/{task_key}/cancel"}
+    if aviso_registro:
+        resposta["aviso_registro"] = aviso_registro
+    return resposta
+
+
+def _caminho_registro_ultimo(timeline_id: int) -> "Path":
+    """Arquivo .ultimo_<id>.json na MESMA pasta configurada como destino.
+
+    JSON simples de propósito (decisão da tarefa): resultado de último render
+    não merece tabela nova no banco. Enquanto o pacote C não persiste resultado
+    próprio, este registro guarda o último ENFILEIRAMENTO (parâmetros + task_key
+    + saída prevista); o estado vivo vem do TASK_MANAGER na leitura.
+    """
+    from src.config import CONFIG
+    from src.services.settings_service import SettingsService
+    pasta = Path(str(SettingsService.get_settings().get("render.output_dir")
+                     or "data/exports/renders"))
+    if not pasta.is_absolute():
+        pasta = CONFIG.BASE_DIR / pasta
+    return pasta / f".ultimo_{int(timeline_id)}.json"
+
+
+def _gravar_registro_ultimo(pedido: "modelo_render.Pedido", task_key: str,
+                            saida_prevista: str) -> Optional[str]:
+    """Grava o registro do enfileiramento. Falha de disco NÃO derruba o render:
+    o trabalho já está na fila; devolve o aviso para a resposta em vez de 500.
+    """
+    registro = {
+        "timeline_id": pedido.timeline_id,
+        "task_key": task_key,
+        "saida_prevista": saida_prevista,
+        "kind": pedido.kind,
+        "preset": pedido.preset,
+        "faixa": {"modo": pedido.faixa.modo,
+                  "inicio_s": pedido.faixa.inicio_s,
+                  "fim_s": pedido.faixa.fim_s},
+        "escopo": {"categorias": pedido.escopo.categorias,
+                   "pistas": pedido.escopo.pistas},
+        "overrides": pedido.overrides,
+        "allow_proxy_fallback": pedido.permitir_fallback_proxy,
+        "pos": {"abrir_pasta": pedido.pos.abrir_pasta,
+                "copiar_caminho": pedido.pos.copiar_caminho,
+                "salvar_como": pedido.pos.salvar_como,
+                "ingerir": pedido.pos.ingerir},
+        "enfileirado_em": datetime.now().isoformat(timespec="seconds"),
+        "fonte": "pacote-d",
+    }
+    try:
+        caminho = _caminho_registro_ultimo(pedido.timeline_id)
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+        caminho.write_text(json.dumps(registro, ensure_ascii=False, indent=2),
+                           encoding="utf-8")
+    except OSError as err:
+        print(f"[RenderVideo] Aviso: registro .ultimo_{pedido.timeline_id}.json nao "
+              f"gravado ({type(err).__name__}: {err})")
+        return f"Registro local não gravado ({err}); o render continua normalmente."
+    return None
+
+
+@router.get("/api/timeline/{timeline_id}/render/ultimo")
+def ultimo_render_timeline(timeline_id: int):
+    """Resultado do último render, para o modal reabrir com estado.
+
+    Combina três fontes, sem tabela nova no banco:
+      1. registro local .ultimo_<id>.json (parâmetros do último enfileiramento);
+      2. estado vivo do TASK_MANAGER pela chave render_timeline_<id> (morre ao
+         reiniciar o servidor);
+      3. stat do arquivo previsto (existência, tamanho, data), que sobrevive.
+    404 só quando NENHUMA das três sabe algo desta timeline.
+    """
+    registro = None
+    try:
+        caminho = _caminho_registro_ultimo(timeline_id)
+        if caminho.exists():
+            registro = json.loads(caminho.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as err:
+        print(f"[RenderVideo] Aviso: registro .ultimo_{timeline_id}.json ilegivel "
+              f"({type(err).__name__}: {err})")
+
+    task_key = (registro or {}).get("task_key") or f"render_timeline_{timeline_id}"
+    progresso = TASK_MANAGER.get_progress().get(task_key)
+
+    arquivo = None
+    previsto = (registro or {}).get("saida_prevista")
+    if previsto:
+        previsto_path = Path(previsto)
+        arquivo = {"path": previsto, "existe": previsto_path.exists()}
+        if arquivo["existe"]:
+            try:
+                stat = previsto_path.stat()
+                arquivo["tamanho_bytes"] = stat.st_size
+                arquivo["modificado_em"] = datetime.fromtimestamp(
+                    stat.st_mtime).isoformat(timespec="seconds")
+            except OSError as err:
+                arquivo["erro_stat"] = str(err)
+
+    if registro is None and progresso is None and not (arquivo and arquivo["existe"]):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Nenhum render encontrado para a timeline {timeline_id} "
+                   "(sem registro local, sem tarefa viva e sem arquivo na saída prevista).")
+
+    if progresso:
+        estado = progresso.get("status")
+    elif arquivo and arquivo.get("existe"):
+        # Servidor reiniciou entre o render e esta consulta: o TASK_MANAGER não
+        # lembra mais, mas o arquivo está lá. Não afirmamos 'finished' -- só o
+        # que a evidência permite.
+        estado = "arquivo_presente_sem_registro_de_tarefa"
+    else:
+        estado = "desconhecido"
+
+    return {
+        "ok": True,
+        "timeline_id": timeline_id,
+        "estado": estado,
+        "registro": registro,
+        "tarefa": progresso,
+        "arquivo": arquivo,
+        "fonte": "registro_local(.ultimo_.json) + TASK_MANAGER + stat do arquivo",
+    }
+
+
+class RevelarRenderPayload(BaseModel):
+    """Caminho de um arquivo renderizado a revelar no gerenciador de arquivos."""
+    caminho: str
+
+
+@router.post("/api/render/revelar")
+def revelar_render(payload: RevelarRenderPayload):
+    """Abre o gerenciador de arquivos com o arquivo renderizado SELECIONADO.
+
+    Existe porque o navegador nao pode abrir pasta do sistema, e o checkbox
+    "abrir pasta" do painel de exportacao nao tinha ninguem do outro lado: ficava
+    marcado e nao acontecia nada.
+
+    GUARDA DE CAMINHO: so revela arquivo dentro da pasta de renders configurada
+    (render.output_dir) ou de EXPORTS_DIR. Sem isso a rota viraria um "abra
+    qualquer caminho desta maquina" acessivel por HTTP -- o pedido chega do
+    navegador e nao ha por que confiar nele.
+    """
+    alvo = Path(str(payload.caminho or "")).expanduser()
+    try:
+        alvo = alvo.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise HTTPException(status_code=404, detail="Arquivo nao encontrado.")
+    if not alvo.is_file():
+        raise HTTPException(status_code=404, detail="O caminho nao e um arquivo.")
+
+    permitidas = []
+    for base in (_dir_renders_configurado(), CONFIG.EXPORTS_DIR):
+        if not base:
+            continue
+        try:
+            permitidas.append(Path(base).expanduser().resolve())
+        except (OSError, RuntimeError):
+            continue
+    if not any(alvo == raiz or raiz in alvo.parents for raiz in permitidas):
+        raise HTTPException(
+            status_code=403,
+            detail=("Fora das pastas de exportacao permitidas. Esta rota so revela "
+                    "arquivos gerados pelo proprio render."))
+
+    try:
+        if os.name == "nt":
+            # /select, deixa o arquivo JA destacado na janela; abrir so a pasta
+            # obrigaria o usuario a cacar o arquivo no meio dos outros renders.
+            subprocess.Popen(["explorer", "/select,", str(alvo)])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", str(alvo)])
+        else:
+            subprocess.Popen(["xdg-open", str(alvo.parent)])
+    except OSError as e:
+        raise HTTPException(status_code=500,
+                            detail=f"Nao consegui abrir o gerenciador de arquivos: {e}")
+    return {"status": "ok", "revelado": str(alvo)}
+
+
+def _dir_renders_configurado():
+    """Pasta de saida dos renders (configuracao), tolerante a ausencia do motor."""
+    try:
+        from src.services.settings_service import SettingsService
+        valor = SettingsService.get_settings(None).get("render.output_dir")
+        if valor:
+            bruto = Path(str(valor))
+            return bruto if bruto.is_absolute() else (CONFIG.BASE_DIR / bruto)
+    except Exception:
+        pass
+    return CONFIG.EXPORTS_DIR / "renders"
