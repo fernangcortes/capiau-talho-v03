@@ -1,8 +1,8 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { VideoPlayer, formatTimecode } from "./player.js";
-import { LibraryManager } from "./library.js?v=9";
-import { PanelsManager } from "./panels.js?v=9";
+import { LibraryManager } from "./library.js?v=10";
+import { PanelsManager } from "./panels.js?v=10";
 import { ChatManager } from "./chat.js";
 import { ProjectsManager } from "./projects.js";
 import { FaceManager } from "./faces.js";

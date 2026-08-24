@@ -5271,7 +5271,25 @@ export class CapiauTimelineInteraction {
 
     onKeyDown(e) {
         // Ignora atalhos se o usuário estiver digitando em campos de formulário
-        if (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA") {
+        const activeTag = document.activeElement?.tagName;
+        if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT" || document.activeElement?.isContentEditable) {
+            return;
+        }
+
+        // Se houver modal aberto na aplicação, ignora atalhos da timeline
+        if (window.isAnyModalOpen && window.isAnyModalOpen()) {
+            const popup = this.canvas ? this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup") : document.querySelector("#timeline-alternatives-popup");
+            if (e.key === "Escape" && popup && popup.style.display === "flex") {
+                this.hideAlternativesPopup();
+                e.preventDefault();
+                return;
+            }
+            const modalMarker = this.canvas ? this.canvas.ownerDocument.getElementById("modal-edit-marker") : document.getElementById("modal-edit-marker");
+            if (e.key === "Escape" && modalMarker && modalMarker.style.display !== "none") {
+                modalMarker.style.display = "none";
+                e.preventDefault();
+                return;
+            }
             return;
         }
 

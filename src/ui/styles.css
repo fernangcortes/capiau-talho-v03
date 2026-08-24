@@ -3379,10 +3379,14 @@ mark.search-highlight {
    a mídia ocupa 100% do palco; controles só surgem em hover,
    com gradiente sutil (nunca competem com a imagem).
    ============================================================ */
+#face-disambiguation-modal {
+    z-index: 15000;
+}
+
 #face-inspector-overlay {
     position: fixed;
     inset: 0;
-    z-index: 3000;
+    z-index: 20000;
     display: flex;
     align-items: center;
     justify-content: center;

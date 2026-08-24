@@ -92,19 +92,52 @@ export class FaceManager {
 
             const fsModal = document.getElementById("fullscreen-faces-disambiguation");
             const diagModal = document.getElementById("face-disambiguation-modal");
+            const groupModal = document.getElementById("face-group-manager-modal");
+            const namesModal = document.getElementById("names-manager-modal");
+            const entitiesModal = document.getElementById("entities-manager-modal");
             const isFsOpen = fsModal && fsModal.style.display !== "none";
             const isDiagOpen = diagModal && diagModal.style.display !== "none";
+            const isGroupOpen = groupModal && groupModal.style.display !== "none";
+            const isNamesOpen = namesModal && namesModal.style.display !== "none";
+            const isEntitiesOpen = entitiesModal && entitiesModal.style.display !== "none";
 
-            if (!isFsOpen && !isDiagOpen) return;
+            // Se o usuário pressionar Escape em algum dos modais de rostos / entidades:
+            if (e.key === "Escape") {
+                if (isGroupOpen) { e.preventDefault(); this.closeGroupManagerModal(); return; }
+                if (isNamesOpen) { e.preventDefault(); this.closeNamesManagerModal(); return; }
+                if (isEntitiesOpen) { e.preventDefault(); if (window.EntityManager) window.EntityManager.closeEntitiesModal(); return; }
+                if (isFsOpen) { e.preventDefault(); this.closeFullscreenDisambiguation(); return; }
+                if (isDiagOpen) { e.preventDefault(); this.closeDisambiguationModal(); return; }
+            }
 
-            // Ignore if typing in an input/textarea
-            if (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA") return;
+            if (!isFsOpen && !isDiagOpen && !isGroupOpen && !isNamesOpen && !isEntitiesOpen) return;
+
+            // Ignore if typing in an input/textarea/select
+            const activeTag = document.activeElement?.tagName;
+            if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT" || document.activeElement?.isContentEditable) return;
+
+            // Ctrl+A / Cmd+A no gerenciador de grupo de rostos: seleciona / desseleciona todos
+            if (isGroupOpen && (e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+                e.preventDefault();
+                const cards = Array.from(document.querySelectorAll("#group-manager-faces-grid .group-manager-face-card"));
+                if (cards.length > 0) {
+                    const allSelected = cards.every(c => c.classList.contains("selected"));
+                    const targetState = !allSelected;
+                    cards.forEach(c => {
+                        c.classList.toggle("selected", targetState);
+                        const badge = c.querySelector(".group-manager-face-select-badge i");
+                        if (badge) badge.style.display = targetState ? "block" : "none";
+                    });
+                    this.updateGroupManagerBulkBar();
+                }
+                return;
+            }
 
             // Card alvo: o que está sob o mouse ou selecionado
-            const targetCard = this.hoveredCard || document.querySelector(".fullscreen-face-card:hover, .disambiguation-item:hover, .fullscreen-face-card.selected, .disambiguation-item.selected");
+            const targetCard = this.hoveredCard || document.querySelector(".fullscreen-face-card:hover, .disambiguation-item:hover, .group-manager-face-card:hover, .fullscreen-face-card.selected, .disambiguation-item.selected, .group-manager-face-card.selected");
 
-            // Atalho 'a' / 'A': abre o Inspetor de Rosto no card alvo
-            if (e.key === "a" || e.key === "A") {
+            // Atalho 'a' / 'A': abre o Inspetor de Rosto no card alvo (apenas sem modificadores)
+            if ((e.key === "a" || e.key === "A") && !e.ctrlKey && !e.metaKey && !e.altKey) {
                 if (targetCard) {
                     e.preventDefault();
                     this.openInspector(targetCard);
@@ -1105,7 +1138,7 @@ export class FaceManager {
             popover = document.createElement("div");
             popover.id = "fullscreen-face-context-popover";
             popover.style.position = "fixed";
-            popover.style.zIndex = "10010";
+            popover.style.zIndex = "25000";
             popover.style.background = "rgba(10, 8, 14, 0.95)";
             popover.style.border = "1px solid rgba(6, 182, 212, 0.5)";
             popover.style.borderRadius = "12px";

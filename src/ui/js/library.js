@@ -25,6 +25,37 @@ if (!window.tooltipDisplayPreferences) {
     }
 }
 
+export function isAnyModalOpen(doc = document) {
+    if (!doc) return false;
+    const candidateModals = doc.querySelectorAll(`
+        .modal-overlay,
+        #modal-timeline-help,
+        #modal-edit-marker,
+        #timeline-alternatives-popup,
+        #timeline-alternatives-backdrop,
+        .face-inspector-overlay,
+        #face-inspector-overlay,
+        dialog[open]
+    `);
+    for (let i = 0; i < candidateModals.length; i++) {
+        const el = candidateModals[i];
+        if (el.classList.contains("active")) return true;
+        const inlineDisplay = el.style.display;
+        if (inlineDisplay && inlineDisplay !== "none") return true;
+        const style = window.getComputedStyle(el);
+        if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
+            return true;
+        }
+    }
+    if (window.FaceManager && window.FaceManager.inspectorCard) {
+        return true;
+    }
+    return false;
+}
+if (typeof window !== "undefined") {
+    window.isAnyModalOpen = isAnyModalOpen;
+}
+
 export function cleanTitle(text) {
     if (!text) return "";
     let clean = text.trim();
@@ -2223,14 +2254,24 @@ export class LibraryManager {
 
         // Atalho 'a' ou 'A' para abrir o Inspetor de Mídia no lugar do modal
         document.addEventListener("keydown", (e) => {
-            const activeTag = document.activeElement.tagName;
-            if (activeTag === "INPUT" || activeTag === "TEXTAREA" || document.activeElement.isContentEditable) {
+            const activeTag = document.activeElement?.tagName;
+            if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT" || document.activeElement?.isContentEditable) {
                 return; // Ignora se o usuário estiver em um input
             }
             
-            if (e.key.toLowerCase() === 'a') {
+            // Só responde a 'a' ou 'A' puro (sem Ctrl, Cmd, Alt)
+            if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                if (window.isAnyModalOpen && window.isAnyModalOpen()) {
+                    return; // Ignora se qualquer modal/overlay estiver aberto
+                }
                 if (window.activeFocusedPlayer === "program") {
                     return; // Let the timeline handle it
+                }
+                // Só ativa o Inspetor de Mídia se estiver nas abas de Mídia (Vídeos/Fotos) ou se o Source Player estiver focado
+                const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id;
+                const isMediaTab = activeTab === "tab-videos" || activeTab === "tab-photos" || this.mediaInspectorActive;
+                if (!isMediaTab && window.activeFocusedPlayer !== "source") {
+                    return;
                 }
                 if (STATE.activeVideo) {
                     e.preventDefault();
@@ -3901,10 +3942,12 @@ export class LibraryManager {
         // Keyboard navigation I, O, E inside inspector
         document.addEventListener("keydown", (e) => {
             if (!this.mediaInspectorActive) return;
-            const activeTag = document.activeElement.tagName.toLowerCase();
-            if (activeTag === "input" || activeTag === "textarea" || document.activeElement.isContentEditable) {
+            if (window.isAnyModalOpen && window.isAnyModalOpen()) return;
+            const activeTag = document.activeElement?.tagName?.toLowerCase();
+            if (activeTag === "input" || activeTag === "textarea" || activeTag === "select" || document.activeElement?.isContentEditable) {
                 return;
             }
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
             const key = e.key.toLowerCase();
             if (key === 'i') {
                 e.preventDefault();
@@ -5046,25 +5089,7 @@ export class LibraryScrollIndexTracker {
     }
 
     isAnyModalOpen() {
-        const activeModal = document.querySelector(`
-            .modal-overlay.active,
-            .modal-overlay[style*="display: flex"],
-            .modal-overlay[style*="display: flex;"],
-            .modal-overlay[style*="display: block"],
-            .modal-overlay[style*="display: block;"],
-            #timeline-alternatives-backdrop:not([style*="display: none"]):not([style*="display:none"]),
-            #timeline-alternatives-popup:not([style*="display: none"]):not([style*="display:none"]),
-            #modal-timeline-help:not([style*="display: none"]):not([style*="display:none"]),
-            #modal-edit-marker:not([style*="display: none"]):not([style*="display:none"]),
-            dialog[open]
-        `);
-        if (activeModal) {
-            const style = window.getComputedStyle(activeModal);
-            if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
-                return true;
-            }
-        }
-        return false;
+        return isAnyModalOpen();
     }
 
     bindEvents() {

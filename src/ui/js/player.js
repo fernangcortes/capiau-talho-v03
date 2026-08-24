@@ -3332,12 +3332,11 @@ export class VideoPlayer {
 
     // Atalhos de teclado compartilhados
     handleGlobalKeyboard(e) {
-        const activeTag = document.activeElement.tagName.toLowerCase();
-        if (activeTag === "input" || activeTag === "textarea" || document.activeElement.isContentEditable) return;
+        const activeTag = document.activeElement?.tagName?.toLowerCase();
+        if (activeTag === "input" || activeTag === "textarea" || activeTag === "select" || document.activeElement?.isContentEditable) return;
 
-        // Se o modal de entrevista estiver aberto, ignora atalhos do player principal
-        const interviewModal = document.getElementById("interview-modal");
-        if (interviewModal && interviewModal.style.display === "flex") {
+        // Se houver qualquer modal aberto, ignora atalhos globais do player principal
+        if (window.isAnyModalOpen && window.isAnyModalOpen()) {
             return;
         }
 
