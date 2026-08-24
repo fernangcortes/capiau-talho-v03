@@ -1411,11 +1411,30 @@ async function salvarTimelineDaTela() {
         const base = (_estado.timelines.find(t => Number(t.id) === Number(_estado.timelineId)) || {}).name
             || (TIMELINE_STATE && TIMELINE_STATE.nome) || "Timeline";
         const carimbo = new Date().toISOString().slice(0, 16).replace("T", " ");
+        // A rota espera o formato do SCHEMA (in_time/out_time, timeline_start em
+        // segundos), nao o formato de tela (in/out + timelineStartFrame). Mesmo
+        // mapeamento do botao "Salvar timeline" em panels.js:1995 -- passar os
+        // cortes crus devolve 422 com "Field required: in_time" para cada clipe.
+        const fps = Number(TIMELINE_STATE.fps) || 24;
+        const cortes = (STATE.activeTimelineCuts || []).map(c => ({
+            id: String(c.id),
+            type: c.type || "video",
+            video_id: c.video_id ?? null,
+            photo_id: c.photo_id ?? null,
+            in_time: c.in,
+            out_time: c.out,
+            track: c.track,
+            timeline_start: (c.timelineStartFrame || 0) / fps,
+            link_id: c.link_id || null,
+            effects: c.effects || [],
+            alternatives: c.alternatives || [],
+            origin: c.origin || "user"
+        }));
         const r = await CapIAuAPI.saveTimeline(
             STATE.currentProjectId, `${base} (export ${carimbo})`,
             "Versão salva pelo painel de exportação",
-            STATE.activeTimelineCuts, TIMELINE_STATE.tracks,
-            TIMELINE_STATE.fps, TIMELINE_STATE.width || 1920, TIMELINE_STATE.height || 1080
+            cortes, TIMELINE_STATE.serializeTracks(),
+            fps, TIMELINE_STATE.width || 1920, TIMELINE_STATE.height || 1080
         );
         const novoId = r && (r.timeline_id || r.id);
         if (!novoId) throw new Error("o servidor não devolveu o id da timeline salva");
