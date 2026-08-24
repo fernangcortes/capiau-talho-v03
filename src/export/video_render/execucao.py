@@ -193,6 +193,22 @@ def enfileirar(pedido, sequencia) -> Dict[str, Any]:
                 "quando": datetime.datetime.now()}
         _EM_ESPERA[chave] = item
         posicao = len(_EM_ESPERA) + (1 if _EXECUTANDO else 0)
+
+    # ARMADILHA DA MARCA VELHA (medida em 24/08/2026).
+    # `TASK_MANAGER.cancel_task` poe a chave num set `cancelled_tasks` que NADA
+    # limpa sozinho -- so `remove_progress`. Como a chave do render e
+    # deterministica ("render_timeline_<id>"), cancelar um render da timeline 9
+    # deixava a marca colada nessa chave PARA SEMPRE: o proximo render da mesma
+    # timeline via `is_cancelled` verdadeiro e morria na largada. Medido: 1,5 s
+    # em vez de 56 s, com "[CANCEL] cancelado pelo usuario" num cancelamento que
+    # ninguem fez. A rota generica /api/task/{key}/cancel piora, porque aceita
+    # cancelar tarefa inexistente e marca a chave do mesmo jeito.
+    # Aqui e o lugar certo de limpar: um pedido NOVO acaba de entrar na fila,
+    # entao qualquer cancelamento anterior e, por definicao, de outro job. Limpar
+    # no INICIO do job seria tarde -- apagaria um cancelamento legitimo feito
+    # enquanto ele esperava a vez.
+    TASK_MANAGER.remove_progress(chave)
+
     _FILA.put(item)
     _garantir_worker()
     TASK_MANAGER.update_progress(chave, 0.0, "queued", "render",
