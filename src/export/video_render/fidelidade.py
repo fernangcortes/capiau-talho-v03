@@ -39,11 +39,17 @@ KINDS_PISTA_CONHECIDOS = frozenset({"video", "audio", "ai"})
 # audio; quando o numero chegar, atualize AQUI e so aqui.
 # ---------------------------------------------------------------------------
 
+# Medido em 24/08/2026 (senoide de fundo de escala, varredura de -36 a 0 dBFS,
+# limiar -18 dB, razao 4:1, curva estatica conferida contra o ffmpeg real):
+# a maior diferenca de ganho entre as duas curvas e 2,06 dB, no limiar. Nos
+# extremos elas convergem (0,00 dB acima de -4 e abaixo de -32 dBFS). O que muda
+# nao e a compressao no pico, e ONDE ela comeca: 11 dB antes na tela.
 TEXTO_JOELHO_COMPRESSOR = (
-    "O joelho (knee) do compressor WebAudio do navegador e 30 dB e o do filtro "
-    "acompressor do ffmpeg aceita no maximo 8 dB. Um clipe com compressao forte "
-    "pode soar mais duro no arquivo que na tela. O pacote de audio esta medindo "
-    "a diferenca real; este texto sera substituido pelo numero medido."
+    "O compressor da tela (WebAudio) tem joelho de 30 dB; o do ffmpeg vai ate 8. "
+    "Medido: a diferenca maxima de ganho e de 2,1 dB, bem em cima do limiar, e "
+    "cai a zero nos extremos. Na pratica o arquivo comeca a comprimir mais tarde "
+    "e solta mais cedo: a compressao age de -22 a -14 dBFS, contra -33 a -3 na "
+    "tela. Em voz com dinamica larga isso soa como um pouco menos de 'cola'."
 )
 
 TEXTO_DETECTOR_GATE = (
