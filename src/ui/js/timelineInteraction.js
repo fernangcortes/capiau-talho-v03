@@ -2417,7 +2417,7 @@ export class CapiauTimelineInteraction {
                             <span class="adj-title-text"><i class="fa-solid fa-sliders"></i> Equalizador</span>
                             ${isEqMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                         </div>
-                        ${aoVivoOk ? `<div class="adj-header-actions" onclick="event.stopPropagation()"><button class="btn-adj-bypass" data-section="audio_eq" style="color:${eqDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${eqDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button><button class="btn-adj-reset" data-section="audio_eq"><i class="fa-solid fa-arrow-rotate-left"></i></button></div>` : ''}
+                        ${aoVivoOk ? `<div class="adj-header-actions" onclick="event.stopPropagation()"><button class="btn-adj-bypass" data-section="audio_eq" data-tooltip="${eqDisabled ? 'Ativar equalizador' : 'Desativar equalizador'}" style="color:${eqDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${eqDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button><button class="btn-adj-reset" data-section="audio_eq" data-tooltip="Resetar equalizador"><i class="fa-solid fa-arrow-rotate-left"></i></button></div>` : ''}
                     </div>
                     <div class="adjustments-section-body" style="${isEqOpen ? '' : 'display:none;'} opacity:${aoVivoOk && eqDisabled ? 0.4 : 1};">${aoVivoOk ? (linhaAoVivo("data-aeq", "hpf", "HPF", 0, 300, 10, Math.round(eqVals.hpf)) + linhaAoVivo("data-aeq", "low", "Graves", -12, 12, 0.5, Number(eqVals.low)) + linhaAoVivo("data-aeq", "mid", "Médios", -12, 12, 0.5, Number(eqVals.mid)) + linhaAoVivo("data-aeq", "high", "Agudos", -12, 12, 0.5, Number(eqVals.high))) : avisoSemWebAudio}</div>
                 </div>
@@ -2434,7 +2434,7 @@ export class CapiauTimelineInteraction {
                             <span class="adj-title-text"><i class="fa-solid fa-compress"></i> Dinâmica</span>
                             ${isDynMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                         </div>
-                        ${aoVivoOk ? `<div class="adj-header-actions" onclick="event.stopPropagation()"><button class="btn-adj-bypass" data-section="audio_dynamics" style="color:${dynDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${dynDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button><button class="btn-adj-reset" data-section="audio_dynamics"><i class="fa-solid fa-arrow-rotate-left"></i></button></div>` : ''}
+                        ${aoVivoOk ? `<div class="adj-header-actions" onclick="event.stopPropagation()"><button class="btn-adj-bypass" data-section="audio_dynamics" data-tooltip="${dynDisabled ? 'Ativar dinâmica' : 'Desativar dinâmica'}" style="color:${dynDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${dynDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button><button class="btn-adj-reset" data-section="audio_dynamics" data-tooltip="Resetar dinâmica"><i class="fa-solid fa-arrow-rotate-left"></i></button></div>` : ''}
                     </div>
                     <div class="adjustments-section-body" style="${isDynOpen ? '' : 'display:none;'} opacity:${aoVivoOk && dynDisabled ? 0.4 : 1};">${aoVivoOk ? ((gatePossivel ? linhaAoVivo("data-adyn", "gate_db", "Gate", -90, -20, 1, Math.round(dynVals.gate_db)) + (gatePronto ? '' : gateNota) : gateAviso) + linhaAoVivo("data-adyn", "comp_ratio", "Razão", 1, 20, 0.5, Number(dynVals.comp_ratio)) + linhaAoVivo("data-adyn", "comp_thresh_db", "Limiar", -60, 0, 1, Math.round(dynVals.comp_thresh_db)) + linhaAoVivo("data-adyn", "makeup_db", "Ganho", -12, 12, 0.5, Number(dynVals.makeup_db))) : avisoSemWebAudio}</div>
                 </div>
@@ -2560,8 +2560,8 @@ export class CapiauTimelineInteraction {
                             ${isVolMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                         </div>
                         <div class="adj-header-actions" onclick="event.stopPropagation()">
-                            <button class="btn-adj-bypass" data-section="volume" title="${volDisabled ? 'Ativar volume' : 'Desativar volume'}" style="color:${volDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${volDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                            <button class="btn-adj-reset" data-section="volume" title="Resetar padrão"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                            <button class="btn-adj-bypass" data-section="volume" data-tooltip="${volDisabled ? 'Ativar volume' : 'Desativar volume'}" style="color:${volDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${volDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                            <button class="btn-adj-reset" data-section="volume" data-tooltip="Resetar volume"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                         </div>
                     </div>
                     <div class="adjustments-section-body" style="${isVolOpen ? '' : 'display:none;'} opacity:${volDisabled ? 0.4 : 1}; pointer-events:${volDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
@@ -2590,8 +2590,8 @@ export class CapiauTimelineInteraction {
                         ${isTfMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                     </div>
                     <div class="adj-header-actions" onclick="event.stopPropagation()">
-                        <button class="btn-adj-bypass" data-section="transform" title="${tfDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="color:${tfDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${tfDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                        <button class="btn-adj-reset" data-section="transform" title="Resetar padrão"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                        <button class="btn-adj-bypass" data-section="transform" data-tooltip="${tfDisabled ? 'Ativar transformações' : 'Desativar transformações'}" style="color:${tfDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${tfDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-reset" data-section="transform" data-tooltip="Resetar transformações"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                     </div>
                 </div>
                 <div class="adjustments-section-body" style="${isTfOpen ? '' : 'display:none;'} opacity:${tfDisabled ? 0.4 : 1}; pointer-events:${tfDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
@@ -2647,8 +2647,8 @@ export class CapiauTimelineInteraction {
                         ${isCropMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                     </div>
                     <div class="adj-header-actions" onclick="event.stopPropagation()">
-                        <button class="btn-adj-bypass" data-section="crop" title="${cropDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="color:${cropDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${cropDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                        <button class="btn-adj-reset" data-section="crop" title="Resetar padrão"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                        <button class="btn-adj-bypass" data-section="crop" data-tooltip="${cropDisabled ? 'Ativar recorte' : 'Desativar recorte'}" style="color:${cropDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${cropDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-reset" data-section="crop" data-tooltip="Resetar recorte"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                     </div>
                 </div>
                 <div class="adjustments-section-body" style="${isCropOpen ? '' : 'display:none;'} opacity:${cropDisabled ? 0.4 : 1}; pointer-events:${cropDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
@@ -2724,8 +2724,8 @@ export class CapiauTimelineInteraction {
                         ${isColMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                     </div>
                     <div class="adj-header-actions" onclick="event.stopPropagation()">
-                        <button class="btn-adj-bypass" data-section="color" title="${colDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="color:${colDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${colDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                        <button class="btn-adj-reset" data-section="color" title="Resetar padrão"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                        <button class="btn-adj-bypass" data-section="color" data-tooltip="${colDisabled ? 'Ativar efeitos de cor' : 'Desativar efeitos de cor'}" style="color:${colDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${colDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-reset" data-section="color" data-tooltip="Resetar efeitos de cor"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                     </div>
                 </div>
                 <div class="adjustments-section-body" style="${isColOpen ? '' : 'display:none;'} opacity:${colDisabled ? 0.4 : 1}; pointer-events:${colDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
@@ -2795,8 +2795,8 @@ export class CapiauTimelineInteraction {
                         ${isFadesMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                     </div>
                     <div class="adj-header-actions" onclick="event.stopPropagation()">
-                        <button class="btn-adj-bypass" data-section="fades" title="${fadesDisabled ? 'Ativar transições' : 'Desativar transições'}" style="color:${fadesDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${fadesDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                        <button class="btn-adj-reset" data-section="fades" title="Resetar padrão"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                        <button class="btn-adj-bypass" data-section="fades" data-tooltip="${fadesDisabled ? 'Ativar transições' : 'Desativar transições'}" style="color:${fadesDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${fadesDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-reset" data-section="fades" data-tooltip="Resetar transições"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                     </div>
                 </div>
                 <div class="adjustments-section-body" style="${isFadesOpen ? '' : 'display:none;'} opacity:${fadesDisabled ? 0.4 : 1}; pointer-events:${fadesDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
