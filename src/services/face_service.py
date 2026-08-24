@@ -673,6 +673,191 @@ class FaceService:
         from src.vision.face_enhancer import enhance_face_crop
         return enhance_face_crop(image_path, box=box)
 
+    def get_context_media(self, face_id: int, window_seconds: float = 2.5) -> Dict[str, Any]:
+        """Retorna mídias de contexto temporal para a fase 3 da desambiguação rápida.
+        
+        Foto: Retorna fotos vizinhas da mesma rajada (burst_group_id) ou da vizinhança temporal/ID,
+              com as bounding_boxes de rostos já detectados nessas fotos.
+        Vídeo: Retorna a janela de tempo (window_seconds ao redor do timestamp), stream_url, duração
+               e rostos no trecho.
+        """
+        face = self.get_face_detail(face_id)
+        if not face:
+            return {"status": "error", "message": f"Face {face_id} não encontrada."}
+
+        project_id = face["project_id"]
+
+        with get_db() as conn:
+            cursor = conn.cursor()
+
+            if face.get("photo_id"):
+                photo_id = face["photo_id"]
+                cursor.execute("SELECT * FROM photo WHERE id = ?", (photo_id,))
+                cur_photo = cursor.fetchone()
+                if not cur_photo:
+                    return {"status": "error", "message": f"Foto {photo_id} não encontrada."}
+
+                burst_id = cur_photo["burst_group_id"]
+                related_photos_rows = []
+
+                if burst_id is not None:
+                    # Todas as fotos da mesma rajada
+                    cursor.execute("""
+                        SELECT id, filename, filepath, burst_group_id, created_at
+                        FROM photo
+                        WHERE project_id = ? AND (burst_group_id = ? OR id = ?)
+                        ORDER BY id ASC
+                    """, (project_id, burst_id, burst_id))
+                    related_photos_rows = cursor.fetchall()
+
+                # Se não tem rajada ou tem apenas 1 foto na rajada, busca fotos vizinhas por ID / pasta
+                if len(related_photos_rows) <= 1:
+                    cursor.execute("""
+                        SELECT id, filename, filepath, burst_group_id, created_at
+                        FROM photo
+                        WHERE project_id = ? AND id BETWEEN ? AND ?
+                        ORDER BY id ASC
+                    """, (project_id, max(1, photo_id - 6), photo_id + 6))
+                    related_photos_rows = cursor.fetchall()
+
+                # Se ainda tiver poucas, pega as mais próximas em ordem
+                if len(related_photos_rows) <= 1:
+                    cursor.execute("""
+                        SELECT id, filename, filepath, burst_group_id, created_at
+                        FROM photo
+                        WHERE project_id = ?
+                        ORDER BY id ASC
+                        LIMIT 12
+                    """, (project_id,))
+                    related_photos_rows = cursor.fetchall()
+
+                # Para cada foto, busca os rostos detectados
+                photos_data = []
+                cur_mtime = None
+                cur_path = Path(cur_photo["filepath"]) if cur_photo["filepath"] else None
+                if cur_path and cur_path.exists():
+                    try:
+                        cur_mtime = cur_path.stat().st_mtime
+                    except Exception:
+                        pass
+
+                for pr in related_photos_rows:
+                    pid = pr["id"]
+                    cursor.execute("""
+                        SELECT id, bounding_box, cluster_id, name, quality_score
+                        FROM face
+                        WHERE photo_id = ?
+                    """, (pid,))
+                    face_rows = cursor.fetchall()
+                    faces_in_photo = []
+                    for fr in face_rows:
+                        f_box = fr["bounding_box"]
+                        if isinstance(f_box, str):
+                            try:
+                                f_box = json.loads(f_box)
+                            except Exception:
+                                f_box = None
+                        faces_in_photo.append({
+                            "id": fr["id"],
+                            "bounding_box": f_box,
+                            "cluster_id": fr["cluster_id"],
+                            "name": fr["name"],
+                            "quality_score": fr["quality_score"],
+                            "is_matching_cluster": (fr["cluster_id"] == face.get("cluster_id") if face.get("cluster_id") is not None else False)
+                        })
+
+                    # Delta de tempo relativo em segundos
+                    delta_sec = 0.0
+                    p_path = Path(pr["filepath"]) if pr["filepath"] else None
+                    if p_path and p_path.exists() and cur_mtime is not None:
+                        try:
+                            delta_sec = p_path.stat().st_mtime - cur_mtime
+                        except Exception:
+                            pass
+
+                    # Proxy URL
+                    proxy_file = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{pid}.webp"
+                    proxy_url = f"/proxies/photos/proxy_photo_{pid}.webp" if proxy_file.exists() else f"/api/photo/{pid}/file"
+
+                    photos_data.append({
+                        "id": pid,
+                        "filename": pr["filename"],
+                        "is_current": (pid == photo_id),
+                        "file_url": f"/api/photo/{pid}/file",
+                        "proxy_url": proxy_url,
+                        "delta_seconds": round(delta_sec, 1),
+                        "faces": faces_in_photo
+                    })
+
+                return {
+                    "status": "ok",
+                    "type": "photo",
+                    "face_id": face_id,
+                    "current_photo_id": photo_id,
+                    "current_box": face.get("bounding_box"),
+                    "photos": photos_data
+                }
+
+            elif face.get("video_id"):
+                video_id = face["video_id"]
+                cursor.execute("SELECT * FROM video WHERE id = ?", (video_id,))
+                video = cursor.fetchone()
+                if not video:
+                    return {"status": "error", "message": f"Vídeo {video_id} não encontrado."}
+
+                ts = float(face.get("timestamp") or 0.0)
+                dur = float(video["duration"] or 100.0)
+                w_sec = float(window_seconds)
+
+                win_start = max(0.0, ts - w_sec)
+                win_end = min(dur, ts + w_sec)
+
+                # Busca outros rostos detectados nesse vídeo dentro da janela
+                cursor.execute("""
+                    SELECT id, bounding_box, timestamp, cluster_id, name, quality_score
+                    FROM face
+                    WHERE video_id = ? AND timestamp BETWEEN ? AND ?
+                    ORDER BY timestamp ASC
+                """, (video_id, win_start, win_end))
+                nearby_faces = []
+                for fr in cursor.fetchall():
+                    f_box = fr["bounding_box"]
+                    if isinstance(f_box, str):
+                        try:
+                            f_box = json.loads(f_box)
+                        except Exception:
+                            f_box = None
+                    nearby_faces.append({
+                        "id": fr["id"],
+                        "bounding_box": f_box,
+                        "timestamp": float(fr["timestamp"] or 0.0),
+                        "cluster_id": fr["cluster_id"],
+                        "name": fr["name"],
+                        "is_current": (fr["id"] == face_id)
+                    })
+
+                proxy_rel = f"proxy_vid_{video_id}.mp4"
+                stream_url = f"/proxies/{proxy_rel}" if (CONFIG.PROXIES_DIR / proxy_rel).exists() else f"/api/video/{video_id}/stream"
+
+                return {
+                    "status": "ok",
+                    "type": "video",
+                    "face_id": face_id,
+                    "video_id": video_id,
+                    "filename": video["filename"],
+                    "stream_url": stream_url,
+                    "current_timestamp": ts,
+                    "window_seconds": w_sec,
+                    "window_start": round(win_start, 2),
+                    "window_end": round(win_end, 2),
+                    "duration": dur,
+                    "fps": float(video["fps"] or 30.0),
+                    "current_box": face.get("bounding_box"),
+                    "faces": nearby_faces
+                }
+
+        return {"status": "error", "message": "Face não associada a foto ou vídeo."}
+
     def _extract_video_frame(self, video_id: int, original_path: Optional[str],
                              timestamp: Optional[float]) -> Optional[str]:
         """Extrai (com cache) o frame do vídeo no timestamp; devolve o caminho do JPG ou None.

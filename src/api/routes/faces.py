@@ -581,6 +581,19 @@ def enhance_face(face_id: int, raw: bool = Query(False, description="Decodificar
     return res
 
 
+@router.get("/face/{face_id}/context-media", response_model=dict)
+def get_face_context_media(
+    face_id: int,
+    window_seconds: float = Query(2.5, ge=0.5, le=30.0, description="Janela de tempo em segundos para vídeos (±s)")
+):
+    """Retorna mídias de contexto temporal (fotos da mesma rajada/momento ou janela temporal de vídeo)."""
+    service = get_face_service()
+    res = service.get_context_media(face_id, window_seconds=window_seconds)
+    if res.get("status") == "error":
+        raise HTTPException(status_code=400, detail=res.get("message", "Erro ao buscar contexto de mídia."))
+    return res
+
+
 @router.get("/face/{face_id}", response_model=dict)
 def get_face_detail(face_id: int):
     """Retorna detalhes completos de uma face com todos os reconhecimentos."""
@@ -809,23 +822,22 @@ def list_project_face_clusters(project_id: int):
 
 @router.get("/project/{project_id}/unlabeled-faces")
 def list_unlabeled_faces(project_id: int):
-    """Retorna rostos nao rotulados (ou placeholders) para desambiguacao rapida."""
+    """Retorna rostos nao rotulados (ou placeholders) para desambiguacao rapida, ordenados cronologicamente."""
     try:
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT f.id, f.bounding_box, f.photo_id, f.video_id, f.timestamp, f.name, f.cluster_id,
-                       p.filename as photo_filename, p.filepath as photo_filepath,
-                       v.filename as video_filename, v.filepath as video_filepath
+                       p.filename as photo_filename, p.filepath as photo_filepath, p.created_at as photo_created_at,
+                       v.filename as video_filename, v.filepath as video_filepath, v.created_at as video_created_at
                 FROM face f
                 LEFT JOIN photo p ON f.photo_id = p.id
                 LEFT JOIN video v ON f.video_id = v.id
                 WHERE f.project_id = ? AND (f.name IS NULL OR TRIM(f.name) = '' OR f.name LIKE 'Pessoa Desconhecida%')
-                ORDER BY f.cluster_id DESC, f.id DESC
-                LIMIT 1000
             """, (project_id,))
             rows = cursor.fetchall()
             
+            mtime_cache = {}
             res = []
             for r in rows:
                 row_dict = dict(r)
@@ -853,8 +865,45 @@ def list_unlabeled_faces(project_id: int):
                         row_dict["photo_proxy_path"] = None
                 else:
                     row_dict["photo_proxy_path"] = None
-                    
+
+                # Determina o timestamp cronológico real de captura / mtime
+                fpath = row_dict.get("photo_filepath") or row_dict.get("video_filepath")
+                mtime = None
+                if fpath:
+                    if fpath in mtime_cache:
+                        mtime = mtime_cache[fpath]
+                    else:
+                        try:
+                            fp = Path(fpath)
+                            mtime = fp.stat().st_mtime if fp.exists() else None
+                        except Exception:
+                            mtime = None
+                        mtime_cache[fpath] = mtime
+
+                if mtime is None:
+                    # Fallback para created_at do banco
+                    db_time = row_dict.get("photo_created_at") or row_dict.get("video_created_at")
+                    if db_time:
+                        try:
+                            from datetime import datetime
+                            dt = datetime.fromisoformat(str(db_time).replace("Z", "+00:00"))
+                            mtime = dt.timestamp()
+                        except Exception:
+                            mtime = float(row_dict["id"])
+                    else:
+                        mtime = float(row_dict["id"])
+
+                # Se for vídeo, soma o timestamp interno do frame
+                if row_dict.get("video_id") is not None and row_dict.get("timestamp") is not None:
+                    sort_time = mtime + float(row_dict["timestamp"])
+                else:
+                    sort_time = mtime
+
+                row_dict["capture_timestamp"] = sort_time
                 res.append(row_dict)
+
+            # Ordena por data/hora cronológica (intercalando fotos e vídeos de forma natural)
+            res.sort(key=lambda item: item.get("capture_timestamp", 0.0))
             return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

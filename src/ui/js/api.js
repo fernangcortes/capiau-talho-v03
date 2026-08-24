@@ -187,6 +187,10 @@ export class CapIAuAPI {
         return this.request(`/api/faces/photo/${photoId}/faces`);
     }
 
+    static fetchFaceContextMedia(faceId, windowSeconds = 2.5) {
+        return this.request(`/api/faces/face/${faceId}/context-media?window_seconds=${windowSeconds}`);
+    }
+
     // -- Waveforms de Áudio Reais
     static fetchVideoWaveform(videoId, force = false, sampleRate = 100) {
         return this.request(`/api/videos/${videoId}/waveform?force=${force}&sample_rate=${sampleRate}`);
