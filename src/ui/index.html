@@ -1552,6 +1552,18 @@
 
                 <!-- Degradação elegante: rota ausente/servidor fora -->
                 <div id="ev-engine-indisponivel" class="ev-engine-off" style="display: none;"></div>
+                <!-- A exportacao le a versao SALVA no banco; o autosave da timeline grava
+                     em localStorage. Quem ajusta e exporta sem salvar renderiza a versao
+                     anterior. Esta faixa avisa e oferece o salvamento na hora. -->
+                <div id="ev-desatualizada" class="ev-desatualizada" style="display: none;">
+                    <div class="ev-desatualizada-txt">
+                        <strong>O que está na tela não é o que vai ser exportado.</strong><br>
+                        <span id="ev-desatualizada-detalhe"></span>
+                    </div>
+                    <button id="ev-btn-salvar-timeline" class="btn-primary ev-btn-mini" data-tooltip="Salva a timeline da tela como uma nova versão e passa a exportar ela">
+                        <i class="fa-solid fa-floppy-disk"></i> Salvar e usar esta versão
+                    </button>
+                </div>
 
                 <!-- 2. Presets -->
                 <section class="ev-secao">
@@ -1782,6 +1794,12 @@
                         </button>
                         <button id="ev-btn-cancelar" class="btn-secondary ev-btn-mini ev-btn-cancelar" data-tooltip="Cancelamento cooperativo: o ffmpeg é encerrado e o parcial descartado">
                             <i class="fa-solid fa-xmark"></i> Cancelar
+                        </button>
+                        <button id="ev-btn-abrir-pasta" class="btn-secondary ev-btn-mini" style="display: none;" data-tooltip="Abrir a pasta com o arquivo renderizado já selecionado">
+                            <i class="fa-solid fa-folder-open"></i> Abrir pasta
+                        </button>
+                        <button id="ev-btn-copiar-caminho" class="btn-secondary ev-btn-mini" style="display: none;" data-tooltip="Copiar o caminho completo do arquivo para a área de transferência">
+                            <i class="fa-solid fa-copy"></i> Copiar caminho
                         </button>
                         <button id="ev-btn-voltar" class="btn-secondary ev-btn-mini" style="display: none;" data-tooltip="Voltar ao modo de edição para disparar outro export">
                             Novo export

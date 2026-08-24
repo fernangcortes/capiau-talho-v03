@@ -8607,3 +8607,23 @@ input[type="number"] {
 }
 
 
+
+/* Faixa "a tela nao e o que sera exportado" (painel de exportacao de video).
+   Ambar = aviso de fidelidade, mesma familia do banner do motor. Nao e erro:
+   o render vai funcionar, so nao com o que o editor esta vendo. */
+.ev-desatualizada {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-radius: 6px;
+    background: rgba(234, 179, 8, 0.12);
+    border: 1px solid rgba(234, 179, 8, 0.35);
+    color: #eab308;
+    font-size: 11px;
+    line-height: 1.5;
+}
+.ev-desatualizada-txt { flex: 1; min-width: 0; }
+.ev-desatualizada strong { color: #fbbf24; }
+.ev-desatualizada .ev-btn-mini { flex-shrink: 0; }

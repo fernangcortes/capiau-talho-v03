@@ -1,17 +1,22 @@
 """Roteador FastAPI para gerenciamento de Timelines, Transcrições, Temas e Chat RAG."""
 import importlib
 import json
+import os
+import subprocess
+import sys
 import re
 import shutil
 import sqlite3
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Tuple
+from typing import Any, Optional, List, Tuple
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, BackgroundTasks, UploadFile
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from src.api.dependencies import get_db_conn
+from src.config import CONFIG
 from src.api.schemas import (
     TimelineCreate,
     TimelineAISuggestPayload,
@@ -1117,6 +1122,18 @@ def _contexto_preflight(timeline_id: int, payload: RenderPedidoPayload,
         "bloqueios": bloqueios,
         "saida": _resolver_saida(pedido, dados["nome"]),
         "motor_disponivel": _motor_presente("execucao"),
+        # Assinatura da versao SALVA, para o painel comparar com o que esta na
+        # tela. O autosave da timeline grava em localStorage, nao no banco: quem
+        # ajusta cor/transform e exporta sem salvar renderiza a versao ANTERIOR,
+        # e ate 24/08/2026 isso acontecia em silencio absoluto. Grosseira de
+        # proposito (contagens e soma de duracoes, arredondadas duro): tem de dar
+        # o MESMO numero calculado em JavaScript, e formatacao de float e onde
+        # comparacoes entre linguagens costumam divergir.
+        "assinatura": {
+            "clipes": len(clipes_no_render),
+            "efeitos": sum(len(c.effects or []) for c in clipes_no_render),
+            "duracao_total_s": round(sum(c.duracao_s for c in clipes_no_render), 2),
+        },
     }
     # A sequencia normalizada volta junto porque `execucao.enfileirar(pedido,
     # sequencia)` precisa dela: o pedido sozinho so diz O QUE renderizar, nao O
@@ -1339,3 +1356,71 @@ def ultimo_render_timeline(timeline_id: int):
         "arquivo": arquivo,
         "fonte": "registro_local(.ultimo_.json) + TASK_MANAGER + stat do arquivo",
     }
+
+
+class RevelarRenderPayload(BaseModel):
+    """Caminho de um arquivo renderizado a revelar no gerenciador de arquivos."""
+    caminho: str
+
+
+@router.post("/api/render/revelar")
+def revelar_render(payload: RevelarRenderPayload):
+    """Abre o gerenciador de arquivos com o arquivo renderizado SELECIONADO.
+
+    Existe porque o navegador nao pode abrir pasta do sistema, e o checkbox
+    "abrir pasta" do painel de exportacao nao tinha ninguem do outro lado: ficava
+    marcado e nao acontecia nada.
+
+    GUARDA DE CAMINHO: so revela arquivo dentro da pasta de renders configurada
+    (render.output_dir) ou de EXPORTS_DIR. Sem isso a rota viraria um "abra
+    qualquer caminho desta maquina" acessivel por HTTP -- o pedido chega do
+    navegador e nao ha por que confiar nele.
+    """
+    alvo = Path(str(payload.caminho or "")).expanduser()
+    try:
+        alvo = alvo.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise HTTPException(status_code=404, detail="Arquivo nao encontrado.")
+    if not alvo.is_file():
+        raise HTTPException(status_code=404, detail="O caminho nao e um arquivo.")
+
+    permitidas = []
+    for base in (_dir_renders_configurado(), CONFIG.EXPORTS_DIR):
+        if not base:
+            continue
+        try:
+            permitidas.append(Path(base).expanduser().resolve())
+        except (OSError, RuntimeError):
+            continue
+    if not any(alvo == raiz or raiz in alvo.parents for raiz in permitidas):
+        raise HTTPException(
+            status_code=403,
+            detail=("Fora das pastas de exportacao permitidas. Esta rota so revela "
+                    "arquivos gerados pelo proprio render."))
+
+    try:
+        if os.name == "nt":
+            # /select, deixa o arquivo JA destacado na janela; abrir so a pasta
+            # obrigaria o usuario a cacar o arquivo no meio dos outros renders.
+            subprocess.Popen(["explorer", "/select,", str(alvo)])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", str(alvo)])
+        else:
+            subprocess.Popen(["xdg-open", str(alvo.parent)])
+    except OSError as e:
+        raise HTTPException(status_code=500,
+                            detail=f"Nao consegui abrir o gerenciador de arquivos: {e}")
+    return {"status": "ok", "revelado": str(alvo)}
+
+
+def _dir_renders_configurado():
+    """Pasta de saida dos renders (configuracao), tolerante a ausencia do motor."""
+    try:
+        from src.services.settings_service import SettingsService
+        valor = SettingsService.get_settings(None).get("render.output_dir")
+        if valor:
+            bruto = Path(str(valor))
+            return bruto if bruto.is_absolute() else (CONFIG.BASE_DIR / bruto)
+    except Exception:
+        pass
+    return CONFIG.EXPORTS_DIR / "renders"

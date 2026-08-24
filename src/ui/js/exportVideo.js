@@ -415,8 +415,15 @@ export function initExportVideoPanel() {
     });
 
     if (_el.btnVerTarefas) _el.btnVerTarefas.addEventListener("click", () => {
+        // Fecha ANTES de abrir a aba: o modal e overlay e cobria justamente o
+        // painel que o usuario pediu para ver. Fechar nao cancela o job (regra
+        // 8 do plano) -- ele segue na fila e o progresso continua na aba.
+        fecharModal();
         if (window.openTasksDrawerAndSwitchTab) window.openTasksDrawerAndSwitchTab();
     });
+    if (_el.btnAbrirPasta) _el.btnAbrirPasta.addEventListener("click", () => _abrirPastaDoRender(true));
+    if (_el.btnCopiarCaminho) _el.btnCopiarCaminho.addEventListener("click", () => _copiarCaminhoDoRender(true));
+    if (_el.btnSalvarTimeline) _el.btnSalvarTimeline.addEventListener("click", salvarTimelineDaTela);
     if (_el.btnCancelJob) _el.btnCancelJob.addEventListener("click", cancelarJob);
     if (_el.btnVoltarIdle) _el.btnVoltarIdle.addEventListener("click", _voltarAoIdle);
     if (_el.btnRascunho) _el.btnRascunho.addEventListener("click", () => exportar("draft"));
@@ -514,6 +521,11 @@ function _mapearElementos() {
         progEta: _q("ev-progress-eta"),
         btnCancelJob: _q("ev-btn-cancelar"),
         btnVerTarefas: _q("ev-btn-ver-tarefas"),
+        btnAbrirPasta: _q("ev-btn-abrir-pasta"),
+        btnCopiarCaminho: _q("ev-btn-copiar-caminho"),
+        desatualizada: _q("ev-desatualizada"),
+        desatualizadaDetalhe: _q("ev-desatualizada-detalhe"),
+        btnSalvarTimeline: _q("ev-btn-salvar-timeline"),
         btnVoltarIdle: _q("ev-btn-voltar"),
         jobStatusLinha: _q("ev-job-status-linha")
     };
@@ -577,6 +589,8 @@ function fecharModal() {
 }
 
 function _voltarAoIdle() {
+    if (_el.btnAbrirPasta) _el.btnAbrirPasta.style.display = "none";
+    if (_el.btnCopiarCaminho) _el.btnCopiarCaminho.style.display = "none";
     // Após Concluído/Falha/Cancelado: volta o rodapé ao modo de edição sem fechar
     // o painel, permitindo disparar outro export (ex.: master depois do rascunho).
     _estado.taskKey = null;
@@ -754,6 +768,9 @@ function aplicarPreflight(pfBruto) {
     // 4. Fallback de proxy só aparece quando há original indisponível.
     const precisaFallback = Array.isArray(pf.midia && pf.midia.sem_original) && pf.midia.sem_original.length > 0;
     if (_el.proxyFallbackWrap) _el.proxyFallbackWrap.style.display = precisaFallback ? "" : "none";
+
+    // 4b. Tela x banco: avisa quando o que esta na tela nao e o que sera exportado.
+    _avaliarDesatualizacao(pf);
 
     // 5. Banner de fidelidade + habilitação dos botões.
     _renderizarBanner(pf.avisos || []);
@@ -1033,6 +1050,9 @@ async function exportar(kind) {
     }
 
     _estado.taskKey = resposta.data.task_key;
+    // Caminho do arquivo, para as acoes de pos-conclusao e os botoes de abrir/copiar.
+    _estado.saidaPrevista = resposta.data.saida_prevista
+        || resposta.data.output_path_previsto || null;
     _estado.kindAtivo = kind;
     _estado.faseJob = "enfileirado";
     _estado.inicioJobMs = Date.now();
@@ -1179,6 +1199,7 @@ function _aplicarProgresso(tarefa) {
         if (_el.progPct) _el.progPct.textContent = "100%";
         if (_el.progEtapa) _el.progEtapa.textContent = "Concluído — arquivo gravado no destino.";
         _toast("Render de vídeo concluído!", "success");
+        _executarPosConclusao();   // abre pasta / copia caminho conforme os checkboxes
     } else if (_estado.faseJob === "cancelado") {
         if (_el.progEtapa) _el.progEtapa.textContent = "Cancelado — parcial descartado.";
         _toast("Render cancelado.", "info");
@@ -1303,4 +1324,170 @@ function _resumirDetalhe(detalhe) {
         }).join(" · ").slice(0, 300);
     }
     try { return JSON.stringify(d).slice(0, 300); } catch (_) { return ""; }
+}
+
+// ── VERSÃO DA TELA × VERSÃO SALVA ────────────────────────────────────────────
+//
+// A exportação lê a timeline do BANCO. O autosave da timeline grava em
+// localStorage (timelineAutosave.js) — só o "Salvar timeline" manda para o banco.
+// Quem ajusta cor/transform e exporta sem salvar renderiza a versão ANTERIOR, e
+// até 24/08/2026 isso acontecia em silêncio absoluto: o arquivo saía certo do
+// ponto de vista do motor e errado do ponto de vista do editor.
+
+/** Assinatura da timeline que está NA TELA, no mesmo formato do preflight. */
+function _assinaturaDaTela() {
+    const cortes = (STATE && STATE.activeTimelineCuts) || [];
+    if (!Array.isArray(cortes) || !cortes.length) return null;
+    const idsIA = new Set(
+        ((TIMELINE_STATE && TIMELINE_STATE.tracks) || [])
+            .filter(t => String(t.kind || "").toLowerCase() === "ai")
+            .map(t => String(t.id))
+    );
+    const fps = Number((TIMELINE_STATE && TIMELINE_STATE.fps) || 24) || 24;
+    let clipes = 0, efeitos = 0, duracao = 0;
+    cortes.forEach(c => {
+        if (idsIA.has(String(c.track))) return;         // P1: pista de IA nunca renderiza
+        clipes += 1;
+        efeitos += Array.isArray(c.effects) ? c.effects.length : 0;
+        const dur = (c.outFrame !== undefined && c.inFrame !== undefined)
+            ? (c.outFrame - c.inFrame) / fps
+            : (Number(c.out) || 0) - (Number(c.in) || 0);
+        duracao += Math.max(0, dur);
+    });
+    return { clipes, efeitos, duracao_total_s: Math.round(duracao * 100) / 100 };
+}
+
+/**
+ * Compara tela × banco e mostra a faixa de aviso. Só compara quando a timeline
+ * escolhida no modal é a MESMA que está aberta na tela — exportar uma versão
+ * antiga de propósito é uso legítimo e não merece alarme.
+ */
+function _avaliarDesatualizacao(pf) {
+    if (!_el.desatualizada) return;
+    const salva = pf && pf.assinatura;
+    const tela = _assinaturaDaTela();
+    // O app nao registra em lugar nenhum QUAL timeline esta aberta na tela, entao
+    // a comparacao e sempre contra a versao SELECIONADA no modal. Se o usuario
+    // escolheu outra versao de proposito, o aviso continua verdadeiro: a tela tem
+    // conteudo diferente do que vai ser exportado -- que e exatamente o fato que
+    // ele precisa saber antes de apertar Exportar.
+    if (!salva || !tela) {
+        _el.desatualizada.style.display = "none";
+        return;
+    }
+
+    const difs = [];
+    if (tela.clipes !== salva.clipes) {
+        difs.push(`${tela.clipes} clipe(s) na tela contra ${salva.clipes} salvo(s)`);
+    }
+    if (tela.efeitos !== salva.efeitos) {
+        difs.push(`${tela.efeitos} ajuste(s) na tela contra ${salva.efeitos} salvo(s)`);
+    }
+    if (Math.abs(tela.duracao_total_s - salva.duracao_total_s) > 0.05) {
+        difs.push(`${tela.duracao_total_s}s na tela contra ${salva.duracao_total_s}s salvos`);
+    }
+
+    if (!difs.length) {
+        _el.desatualizada.style.display = "none";
+        return;
+    }
+    if (_el.desatualizadaDetalhe) {
+        _el.desatualizadaDetalhe.textContent =
+            `A exportação usa a versão salva no banco: ${difs.join(" · ")}. ` +
+            "Salve antes de exportar, ou o arquivo sai sem as alterações recentes.";
+    }
+    _el.desatualizada.style.display = "";
+}
+
+/** Salva a timeline da tela como nova versão e passa a exportar ela. */
+async function salvarTimelineDaTela() {
+    const btn = _el.btnSalvarTimeline;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Salvando…';
+    }
+    try {
+        const { CapIAuAPI } = await import("./api.js");
+        const base = (_estado.timelines.find(t => Number(t.id) === Number(_estado.timelineId)) || {}).name
+            || (TIMELINE_STATE && TIMELINE_STATE.nome) || "Timeline";
+        const carimbo = new Date().toISOString().slice(0, 16).replace("T", " ");
+        const r = await CapIAuAPI.saveTimeline(
+            STATE.currentProjectId, `${base} (export ${carimbo})`,
+            "Versão salva pelo painel de exportação",
+            STATE.activeTimelineCuts, TIMELINE_STATE.tracks,
+            TIMELINE_STATE.fps, TIMELINE_STATE.width || 1920, TIMELINE_STATE.height || 1080
+        );
+        const novoId = r && (r.timeline_id || r.id);
+        if (!novoId) throw new Error("o servidor não devolveu o id da timeline salva");
+        _toast("Timeline salva. A exportação vai usar esta versão.", "success");
+        // Recarrega a lista e seleciona a nova versão: o usuário pediu para
+        // exportar o que está na tela, e agora ela existe no banco.
+        await _carregarTimelines();
+        _estado.timelineId = Number(novoId);
+        if (_el.timelineSelect) _el.timelineSelect.value = String(novoId);
+        await _aposTrocaDeTimeline();
+    } catch (err) {
+        _toast(`Não consegui salvar a timeline: ${err && err.message ? err.message : err}`, "error");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Salvar e usar esta versão';
+        }
+    }
+}
+
+// ── AÇÕES PÓS-RENDER ─────────────────────────────────────────────────────────
+//
+// Os checkboxes de "Após concluir" eram coletados, enviados no corpo do pedido e
+// ignorados pelos dois lados — ficavam marcados e nada acontecia. Agora quem
+// executa é o painel, que é quem sabe o momento exato em que o arquivo ficou
+// pronto.
+
+/** Caminho do arquivo do render corrente (o previsto pelo POST, ou o do log). */
+function _caminhoDoRender() {
+    return _estado.saidaPrevista || null;
+}
+
+async function _abrirPastaDoRender(avisar) {
+    const caminho = _caminhoDoRender();
+    if (!caminho) {
+        if (avisar) _toast("Ainda não sei o caminho do arquivo renderizado.", "error");
+        return;
+    }
+    const r = await _postJson("/api/render/revelar", { caminho });
+    if (r.ok) {
+        if (avisar) _toast("Pasta aberta com o arquivo selecionado.", "success");
+    } else if (avisar) {
+        const det = (r.data && (r.data.detail || r.data.message)) || `HTTP ${r.status}`;
+        _toast(`Não consegui abrir a pasta: ${_resumirDetalhe(det)}`, "error");
+    }
+}
+
+async function _copiarCaminhoDoRender(avisar) {
+    const caminho = _caminhoDoRender();
+    if (!caminho) {
+        if (avisar) _toast("Ainda não sei o caminho do arquivo renderizado.", "error");
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(caminho);
+        if (avisar) _toast("Caminho copiado.", "success");
+    } catch (_) {
+        // clipboard bloqueado (contexto não seguro): seleciona num campo temporário
+        const ta = document.createElement("textarea");
+        ta.value = caminho;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); if (avisar) _toast("Caminho copiado.", "success"); }
+        catch (_e) { if (avisar) _toast("Não consegui copiar; o caminho está no log da aba Tarefas.", "error"); }
+        document.body.removeChild(ta);
+    }
+}
+
+/** Executa as preferências marcadas em "Após concluir". */
+async function _executarPosConclusao() {
+    if (_el.btnAbrirPasta) _el.btnAbrirPasta.style.display = "";
+    if (_el.btnCopiarCaminho) _el.btnCopiarCaminho.style.display = "";
+    if (_el.postAbrir && _el.postAbrir.checked) await _abrirPastaDoRender(false);
+    if (_el.postCopiar && _el.postCopiar.checked) await _copiarCaminhoDoRender(false);
 }
