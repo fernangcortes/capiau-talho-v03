@@ -187,6 +187,17 @@ export class CapIAuAPI {
         return this.request(`/api/faces/photo/${photoId}/faces`);
     }
 
+    // -- Waveforms de Áudio Reais
+    static fetchVideoWaveform(videoId, force = false, sampleRate = 100) {
+        return this.request(`/api/videos/${videoId}/waveform?force=${force}&sample_rate=${sampleRate}`);
+    }
+
+    static generateProjectWaveforms(projectId = 1, force = false, sampleRate = 100) {
+        return this.request(`/api/projects/${projectId}/generate-waveforms?force=${force}&sample_rate=${sampleRate}`, {
+            method: "POST"
+        });
+    }
+
     static fetchProjectSpeakers(projectId) {
         return this.request(`/api/project/${projectId}/speakers`);
     }

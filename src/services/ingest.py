@@ -201,6 +201,12 @@ class IngestService:
                         IngestService._generate_timeline_thumbnails_task,
                         video_id, proxy_path, duration
                     )
+
+                    # Dispara a extração de waveform de áudio real em segundo plano
+                    TASK_MANAGER.executor.submit(
+                        IngestService._generate_waveform_task,
+                        video_id, original_path
+                    )
                     
                     # S3 Upload in background
                     try:
@@ -358,4 +364,15 @@ class IngestService:
         except Exception as e:
             print(f"[IngestService] Erro ao gerar miniaturas para o vídeo ID {video_id}: {e}")
             TASK_MANAGER.update_progress(task_key, 0.0, "failed", task_type="thumbnails")
+
+    @staticmethod
+    def _generate_waveform_task(video_id: int, original_path: Path) -> None:
+        """Extrai e armazena em cache a waveform de áudio real do vídeo."""
+        try:
+            from src.media.audio_waveform import get_or_generate_waveform
+            get_or_generate_waveform(video_id, force=True)
+            print(f"[IngestService] Waveform de áudio gerada com sucesso para o vídeo ID {video_id}.")
+        except Exception as ex:
+            print(f"[IngestService] Erro ao extrair waveform para o vídeo ID {video_id}: {ex}")
+
 

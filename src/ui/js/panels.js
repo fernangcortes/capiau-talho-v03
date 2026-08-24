@@ -7,6 +7,7 @@ import { CapiauTimelineRenderer } from "./timelineRenderer.js";
 import { CapiauTimelineInteraction } from "./timelineInteraction.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames } from "./timelineState.js";
 import { getActiveElement, getActiveQuerySelector } from "./workspaceManager.js";
+import { WaveformManager } from "./waveformManager.js";
 
 export class PanelsManager {
     constructor() {
@@ -22,10 +23,21 @@ export class PanelsManager {
         this.tasksShowThumbs = localStorage.getItem("tasks-show-thumbs") !== "false";
         this.tasksCompact = localStorage.getItem("tasks-compact") === "true";
         this.previousTimelineVideoIds = new Set();
+        this.inspectorShowWords = localStorage.getItem("inspector-show-words") !== "false";
+        this.currentInspectedDialogue = null;
         
         // Inicializa o novo renderizador Canvas e interações
         this.timelineRenderer = new CapiauTimelineRenderer();
         this.timelineInteraction = new CapiauTimelineInteraction(this.timelineRenderer);
+
+        WaveformManager.addListener((vidId) => {
+            if (this.currentInspectedDialogue) {
+                const curVid = this.currentInspectedDialogue.video_id || (STATE.activeVideo ? STATE.activeVideo.id : null);
+                if (Number(vidId) === Number(curVid)) {
+                    this.renderInspectorWaveform(this.currentInspectedDialogue);
+                }
+            }
+        });
         
         // Expõe no window para sincronização com pop-outs (WorkspaceManager)
         window.panelsManager = this;
@@ -1084,18 +1096,37 @@ export class PanelsManager {
         `;
         body.appendChild(secText);
         
+        this.currentInspectedDialogue = d;
+
         // Seção 2: Waveform Canvas
         const secWave = document.createElement("div");
         secWave.innerHTML = `
-            <div class="inspector-section-title"><i class="fa-solid fa-chart-simple" style="color:var(--color-rose);"></i> Waveform de Fala & Silêncio</div>
+            <div class="inspector-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+                <span><i class="fa-solid fa-chart-simple" style="color:var(--color-rose);"></i> Waveform de Fala & Silêncio</span>
+                <button id="btn-toggle-inspector-words" class="btn-flat-action" style="font-size:10px; padding:2px 8px; border-radius:4px; cursor:pointer; background:${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.06)'}; color:${this.inspectorShowWords ? '#22d3ee' : '#94a3b8'}; border:1px solid ${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.4)' : 'rgba(255,255,255,0.08)'};" title="Mostrar/Esconder marcação de palavras sobre a onda">
+                    <i class="fa-solid fa-font"></i> Palavras
+                </button>
+            </div>
             <div class="waveform-container">
                 <canvas id="inspector-waveform" class="waveform-canvas"></canvas>
             </div>
             <div style="font-size:9px; color:var(--text-muted); margin-top:4px; text-align:center;">
-                Clique para navegar. Tracejado rosa indica pausa/corte sugerido.
+                Clique para navegar. Duplo clique para adicionar corte.
             </div>
         `;
         body.appendChild(secWave);
+
+        const btnToggleWords = secWave.querySelector("#btn-toggle-inspector-words");
+        if (btnToggleWords) {
+            btnToggleWords.addEventListener("click", () => {
+                this.inspectorShowWords = !this.inspectorShowWords;
+                localStorage.setItem("inspector-show-words", String(this.inspectorShowWords));
+                btnToggleWords.style.background = this.inspectorShowWords ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.06)';
+                btnToggleWords.style.color = this.inspectorShowWords ? '#22d3ee' : '#94a3b8';
+                btnToggleWords.style.borderColor = this.inspectorShowWords ? 'rgba(6, 182, 212, 0.4)' : 'rgba(255,255,255,0.08)';
+                this.renderInspectorWaveform(d);
+            });
+        }
         
         // Seção 3: Atribuição de Falante
         const secSpeaker = document.createElement("div");
@@ -1248,102 +1279,173 @@ export class PanelsManager {
         ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
         ctx.fillRect(0, 0, width, height);
         
-        let bubbleWords = [];
-        if (STATE.activeTranscriptWords && STATE.activeTranscriptWords.length > 0) {
-            bubbleWords = STATE.activeTranscriptWords.filter(w => w.start_time >= d.start_time && w.start_time <= d.end_time);
-        }
-        
         const duration = d.end_time - d.start_time;
         if (duration <= 0) return;
         
         const timeToX = (t) => ((t - d.start_time) / duration) * width;
         const xToTime = (x) => d.start_time + (x / width) * duration;
         
-        ctx.strokeStyle = "rgba(6, 182, 212, 0.6)";
-        ctx.lineWidth = 1.5;
+        const videoId = d.video_id || (STATE.activeVideo ? STATE.activeVideo.id : null);
+        const sampled = WaveformManager.getSampledEnvelope(videoId, d.start_time, d.end_time, Math.max(20, Math.floor(width)));
         
-        if (bubbleWords.length > 0) {
-            bubbleWords.forEach(w => {
-                const xStart = timeToX(w.start_time);
-                const xEnd = timeToX(w.end_time);
-                const wWidth = Math.max(1, xEnd - xStart);
-                
+        // 1. Renderiza a onda de áudio contínua real (espelhada bipolar)
+        const maxAmp = centerY - 8;
+        const clippingPoints = [];
+
+        if (sampled && sampled.hasData && sampled.peaks.length > 0) {
+            const peaks = sampled.peaks;
+            const count = peaks.length;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(6, 182, 212, 0.75)";
+            ctx.lineWidth = 1.3;
+
+            for (let i = 0; i < count; i++) {
+                const px = (i / count) * width;
+                const pMin = peaks[i].min; // negativo
+                const pMax = peaks[i].max; // positivo
+
+                const rawAmpPos = Math.abs(pMax) * maxAmp;
+                const rawAmpNeg = Math.abs(pMin) * maxAmp;
+
+                const isClipped = rawAmpPos >= maxAmp || rawAmpNeg >= maxAmp;
+                const ampTop = Math.min(rawAmpPos, maxAmp);
+                const ampBottom = Math.min(rawAmpNeg, maxAmp);
+
+                if (ampTop <= 0.5 && ampBottom <= 0.5) {
+                    ctx.moveTo(px, centerY - 0.5);
+                    ctx.lineTo(px, centerY + 0.5);
+                } else {
+                    ctx.moveTo(px, centerY - ampTop);
+                    ctx.lineTo(px, centerY + ampBottom);
+                }
+
+                if (isClipped) {
+                    clippingPoints.push({ px, yTop: centerY - maxAmp, yBottom: centerY + maxAmp });
+                }
+            }
+            ctx.stroke();
+
+            // Realce de clipping nos picos saturados
+            if (clippingPoints.length > 0) {
                 ctx.beginPath();
-                const points = Math.max(5, Math.floor(wWidth / 2));
-                for (let i = 0; i <= points; i++) {
-                    const px = xStart + (i / points) * wWidth;
-                    const amp = Math.sin((i / points) * Math.PI) * (centerY - 8) * (0.6 + Math.random() * 0.4);
-                    ctx.moveTo(px, centerY - amp);
-                    ctx.lineTo(px, centerY + amp);
+                ctx.strokeStyle = "rgba(244, 63, 94, 0.9)";
+                ctx.lineWidth = 1.5;
+                for (const pt of clippingPoints) {
+                    ctx.moveTo(pt.px - 1, pt.yTop);
+                    ctx.lineTo(pt.px + 1, pt.yTop);
+                    ctx.moveTo(pt.px - 1, pt.yBottom);
+                    ctx.lineTo(pt.px + 1, pt.yBottom);
                 }
                 ctx.stroke();
+            }
+            ctx.restore();
+        } else {
+            // Linha suave de espera enquanto a waveform carrega
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.lineWidth = 1.0;
+            ctx.moveTo(2, centerY);
+            ctx.lineTo(width - 2, centerY);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 2. Sobreposição sutil de palavras da transcrição (se ativada)
+        let bubbleWords = [];
+        if (STATE.activeTranscriptWords && STATE.activeTranscriptWords.length > 0) {
+            bubbleWords = STATE.activeTranscriptWords.filter(w => w.start_time >= d.start_time && w.start_time <= d.end_time);
+        }
+
+        if (this.inspectorShowWords && bubbleWords.length > 0) {
+            ctx.save();
+            bubbleWords.forEach(w => {
+                const xStart = Math.max(0, timeToX(w.start_time));
+                const xEnd = Math.min(width, timeToX(w.end_time));
+                const wWidth = Math.max(4, xEnd - xStart);
+
+                // Caixa de marcação de palavra (sutil e translúcida)
+                ctx.fillStyle = "rgba(6, 182, 212, 0.08)";
+                ctx.fillRect(xStart, 3, wWidth, height - 6);
+
+                ctx.strokeStyle = "rgba(6, 182, 212, 0.35)";
+                ctx.lineWidth = 1.0;
+                ctx.strokeRect(xStart, 3, wWidth, height - 6);
+
+                // Rótulo da palavra
+                const wordText = w.text || w.word || "";
+                if (wWidth >= 14 && wordText) {
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+                    ctx.font = "9px Inter, system-ui, sans-serif";
+                    ctx.fillText(wordText, xStart + 3, 13, wWidth - 4);
+                }
+            });
+            ctx.restore();
+        }
+
+        // 3. Linhas de corte sugerido em pausas longas
+        const silenceThreshold = parseFloat(document.getElementById("num-silence-threshold")?.value) || 1.2;
+        if (bubbleWords.length > 1) {
+            ctx.save();
+            for (let i = 0; i < bubbleWords.length - 1; i++) {
+                const gap = bubbleWords[i+1].start_time - bubbleWords[i].end_time;
+                if (gap >= silenceThreshold) {
+                    const cutTime = (bubbleWords[i].end_time + bubbleWords[i+1].start_time) / 2;
+                    const cx = timeToX(cutTime);
+                    ctx.strokeStyle = "var(--color-rose)";
+                    ctx.lineWidth = 1.0;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(cx, 0);
+                    ctx.lineTo(cx, height);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+            ctx.restore();
+        }
+        
+        // 4. Ouvintes de navegação e corte
+        if (!canvas._hasInspectorListeners) {
+            canvas._hasInspectorListeners = true;
+            
+            canvas.addEventListener("click", (e) => {
+                const curDiag = this.currentInspectedDialogue;
+                if (!curDiag) return;
+                const rectC = canvas.getBoundingClientRect();
+                const clickX = e.clientX - rectC.left;
+                const curDur = curDiag.end_time - curDiag.start_time;
+                const targetTime = curDiag.start_time + (clickX / rectC.width) * curDur;
+                const player = document.getElementById("source-video");
+                if (player) {
+                    player.currentTime = targetTime;
+                    player.play();
+                }
             });
             
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-            ctx.lineWidth = 1.0;
-            ctx.beginPath();
-            for (let i = 0; i < bubbleWords.length - 1; i++) {
-                const xEndPrev = timeToX(bubbleWords[i].end_time);
-                const xStartNext = timeToX(bubbleWords[i+1].start_time);
-                if (xStartNext > xEndPrev) {
-                    ctx.moveTo(xEndPrev, centerY);
-                    ctx.lineTo(xStartNext, centerY);
+            canvas.addEventListener("dblclick", async (e) => {
+                const curDiag = this.currentInspectedDialogue;
+                if (!curDiag) return;
+                const rectC = canvas.getBoundingClientRect();
+                const clickX = e.clientX - rectC.left;
+                const curDur = curDiag.end_time - curDiag.start_time;
+                const targetTime = curDiag.start_time + (clickX / rectC.width) * curDur;
+                const formattedTime = formatTimecode(targetTime);
+                
+                const newSpeaker = prompt(`Deseja dividir a fala em ${formattedTime}? Digite o nome do novo falante:`, (curDiag.speaker_id || "speaker") + "_2");
+                if (newSpeaker && newSpeaker.trim()) {
+                    try {
+                        await CapIAuAPI.splitTranscript(STATE.activeVideo.id, targetTime, newSpeaker.trim());
+                        this.onVideoChanged(STATE.activeVideo);
+                        this.closeBubbleInspector();
+                    } catch (err) {
+                        alert(`Falha ao dividir fala: ${err.message}`);
+                    }
                 }
-            }
-            ctx.stroke();
-        } else {
-            ctx.beginPath();
-            for (let x = 0; x < width; x++) {
-                const amp = Math.sin((x / width) * Math.PI * 15) * (centerY - 10) * Math.random();
-                ctx.moveTo(x, centerY - amp);
-                ctx.lineTo(x, centerY + amp);
-            }
-            ctx.stroke();
+            });
         }
-        
-        const silenceThreshold = parseFloat(document.getElementById("num-silence-threshold").value) || 1.2;
-        for (let i = 0; i < bubbleWords.length - 1; i++) {
-            const gap = bubbleWords[i+1].start_time - bubbleWords[i].end_time;
-            if (gap >= silenceThreshold) {
-                const cutTime = (bubbleWords[i].end_time + bubbleWords[i+1].start_time) / 2;
-                const cx = timeToX(cutTime);
-                ctx.strokeStyle = "var(--color-rose)";
-                ctx.lineWidth = 1.0;
-                ctx.setLineDash([4, 4]);
-                ctx.beginPath();
-                ctx.moveTo(cx, 0);
-                ctx.lineTo(cx, height);
-                ctx.stroke();
-                ctx.setLineDash([]);
-            }
-        }
-        
-        canvas.addEventListener("click", (e) => {
-            const clickX = e.offsetX;
-            const targetTime = xToTime(clickX);
-            const player = document.getElementById("source-video");
-            if (player) {
-                player.currentTime = targetTime;
-                player.play();
-            }
-        });
-        
-        canvas.addEventListener("dblclick", async (e) => {
-            const clickX = e.offsetX;
-            const targetTime = xToTime(clickX);
-            const formattedTime = formatTimecode(targetTime);
-            
-            const newSpeaker = prompt(`Deseja dividir a fala em ${formattedTime}? Digite o nome do novo falante:`, d.speaker_id + "_2");
-            if (newSpeaker && newSpeaker.trim()) {
-                try {
-                    await CapIAuAPI.splitTranscript(STATE.activeVideo.id, targetTime, newSpeaker.trim());
-                    this.onVideoChanged(STATE.activeVideo);
-                    this.closeBubbleInspector();
-                } catch (err) {
-                    alert(`Falha ao dividir fala: ${err.message}`);
-                }
-            }
-        });
     }
 
     renderLocalSilences(d) {

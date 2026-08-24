@@ -59,6 +59,7 @@ class Config:
     ORIGINALS_DIR = BASE_DIR / os.getenv("capiau_ORIGINALS", "data/originals")
     PROXIES_DIR = BASE_DIR / os.getenv("capiau_PROXIES", "data/proxies")
     CACHE_DIR = BASE_DIR / os.getenv("capiau_CACHE", "data/cache")
+    WAVEFORMS_DIR = CACHE_DIR / "waveforms"
     EXPORTS_DIR = BASE_DIR / os.getenv("capiau_EXPORTS", "data/exports")
     QDRANT_DB_PATH = BASE_DIR / os.getenv("capiau_QDRANT_DB", "data/qdrant.db")
     THUMBNAILS_DIR = PROXIES_DIR / "thumbnails"
@@ -85,6 +86,7 @@ class Config:
             self.PROXIES_DIR / "photos",
             self.THUMBNAILS_DIR,
             self.CACHE_DIR,
+            self.WAVEFORMS_DIR,
             self.EXPORTS_DIR,
             self.QDRANT_DB_PATH.parent,
             self.DB_PATH.parent
