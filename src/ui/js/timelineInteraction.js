@@ -175,6 +175,9 @@ export class CapiauTimelineInteraction {
                 this.renderer.requestRedraw();
             }
         });
+
+        // Inicializa a barra de ferramentas e pesquisa semântica da aba de Ajustes
+        this.initAdjustmentsToolbar();
     }
 
     removeListeners() {
@@ -1461,6 +1464,631 @@ export class CapiauTimelineInteraction {
         });
     }
 
+    // ==================== ABA DE AJUSTES RETRÁTIL, REORDENÁVEL & BUSCA SEMÂNTICA ====================
+
+    _normalizeSearchText(str) {
+        return String(str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    }
+
+    _getAdjustmentAccordionStates() {
+        try {
+            const stored = localStorage.getItem("capiau_adj_accordion_states");
+            if (stored) return JSON.parse(stored);
+        } catch (e) {}
+        return {
+            sequence_settings: true,
+            transform: true,
+            crop: false,
+            ken_burns: true,
+            color: true,
+            fades: true,
+            volume: true,
+            audio_eq: true,
+            audio_dynamics: false,
+            audio_diag: false,
+            audio_render: false,
+            audio_render_resultado: true,
+        };
+    }
+
+    _setAdjustmentAccordionState(sectionId, isOpen) {
+        try {
+            const states = this._getAdjustmentAccordionStates();
+            states[sectionId] = !!isOpen;
+            localStorage.setItem("capiau_adj_accordion_states", JSON.stringify(states));
+        } catch (e) {}
+    }
+
+    _setAllAdjustmentAccordionStates(isOpen) {
+        try {
+            const states = this._getAdjustmentAccordionStates();
+            for (const k of Object.keys(states)) {
+                states[k] = !!isOpen;
+            }
+            localStorage.setItem("capiau_adj_accordion_states", JSON.stringify(states));
+        } catch (e) {}
+    }
+
+    _defaultAdjustmentOrder(mediaType) {
+        if (mediaType === "photo") {
+            return ["transform", "crop", "ken_burns", "color", "fades"];
+        } else if (mediaType === "audio") {
+            return ["volume", "fades", "audio_eq", "audio_dynamics", "audio_diag", "audio_render", "audio_render_resultado"];
+        } else if (mediaType === "video") {
+            return ["transform", "crop", "color", "fades", "volume", "audio_eq", "audio_dynamics", "audio_diag", "audio_render", "audio_render_resultado"];
+        }
+        return ["sequence_settings"];
+    }
+
+    _getAdjustmentSectionOrder(mediaType) {
+        const defaults = this._defaultAdjustmentOrder(mediaType);
+        try {
+            const key = `capiau_adj_order_${mediaType}`;
+            const stored = localStorage.getItem(key);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    const merged = parsed.filter(id => defaults.includes(id));
+                    defaults.forEach(id => {
+                        if (!merged.includes(id)) merged.push(id);
+                    });
+                    return merged;
+                }
+            }
+        } catch (e) {}
+        return defaults;
+    }
+
+    _setAdjustmentSectionOrder(mediaType, orderArray) {
+        try {
+            const key = `capiau_adj_order_${mediaType}`;
+            localStorage.setItem(key, JSON.stringify(orderArray));
+        } catch (e) {}
+    }
+
+    _resetAdjustmentSectionOrder(mediaType) {
+        try {
+            const key = `capiau_adj_order_${mediaType}`;
+            localStorage.removeItem(key);
+        } catch (e) {}
+    }
+
+    _isSectionModified(clip, sectionId) {
+        if (!clip) return false;
+        const effects = clip.effects || [];
+        const isAudioTrack = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+        let partnerAudioClip = null;
+        if (!isAudioTrack && clip.type === "video" && clip.link_id) {
+            partnerAudioClip = STATE.activeTimelineCuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
+        }
+        const audioTarget = isAudioTrack ? clip : partnerAudioClip;
+        const audioEffects = audioTarget ? (audioTarget.effects || []) : [];
+
+        switch (sectionId) {
+            case "transform": {
+                const tf = effects.find(e => e.type === "transform");
+                if (!tf) return false;
+                return (tf.x !== undefined && tf.x !== 0) ||
+                       (tf.y !== undefined && tf.y !== 0) ||
+                       (tf.scale !== undefined && tf.scale !== 1.0) ||
+                       (tf.rotation !== undefined && tf.rotation !== 0) ||
+                       (tf.opacity !== undefined && tf.opacity !== 1.0) ||
+                       tf.disabled === true;
+            }
+            case "crop": {
+                const crop = effects.find(e => e.type === "crop");
+                if (!crop) return false;
+                return (crop.left !== undefined && crop.left > 0) ||
+                       (crop.right !== undefined && crop.right > 0) ||
+                       (crop.top !== undefined && crop.top > 0) ||
+                       (crop.bottom !== undefined && crop.bottom > 0) ||
+                       crop.disabled === true;
+            }
+            case "color": {
+                const col = effects.find(e => e.type === "color");
+                if (!col) return false;
+                return (col.brightness !== undefined && col.brightness !== 0) ||
+                       (col.contrast !== undefined && col.contrast !== 0) ||
+                       (col.saturation !== undefined && col.saturation !== 100) ||
+                       (col.hue !== undefined && col.hue !== 0) ||
+                       (col.sepia !== undefined && col.sepia > 0) ||
+                       (col.grayscale !== undefined && col.grayscale > 0) ||
+                       (col.blur !== undefined && col.blur > 0) ||
+                       col.disabled === true;
+            }
+            case "ken_burns": {
+                const kb = effects.find(e => e.type === "ken_burns");
+                return kb && kb.preset && kb.preset !== "none";
+            }
+            case "fades": {
+                const fi = effects.find(e => e.type === "crossfade" && e.side === "in");
+                const fo = effects.find(e => e.type === "crossfade" && e.side === "out");
+                return (fi && fi.duration_s > 0) || (fo && fo.duration_s > 0);
+            }
+            case "volume": {
+                const vol = audioEffects.find(e => e.type === "volume");
+                return vol && ((vol.level !== undefined && vol.level !== 1.0) || vol.disabled === true);
+            }
+            case "audio_eq": {
+                const eq = audioEffects.find(e => e.type === "audio_eq");
+                if (!eq) return false;
+                return (eq.hpf !== undefined && eq.hpf > 0) ||
+                       (eq.low !== undefined && eq.low !== 0) ||
+                       (eq.mid !== undefined && eq.mid !== 0) ||
+                       (eq.high !== undefined && eq.high !== 0) ||
+                       eq.disabled === true;
+            }
+            case "audio_dynamics": {
+                const dyn = audioEffects.find(e => e.type === "audio_dynamics");
+                if (!dyn) return false;
+                return (dyn.gate_db !== undefined && dyn.gate_db !== -90) ||
+                       (dyn.comp_ratio !== undefined && dyn.comp_ratio !== 1.0) ||
+                       (dyn.comp_thresh_db !== undefined && dyn.comp_thresh_db !== 0) ||
+                       (dyn.makeup_db !== undefined && dyn.makeup_db !== 0) ||
+                       dyn.disabled === true;
+            }
+            case "audio_render":
+            case "audio_render_resultado": {
+                const ar = audioEffects.find(e => e.type === "audio_render");
+                return ar && ar.status === "ready";
+            }
+            default:
+                return false;
+        }
+    }
+
+    _filterAdjustmentsBySearch(query) {
+        const doc = (this.canvas && this.canvas.ownerDocument) || document;
+        const container = doc.getElementById("adjustments-panel-content");
+        if (!container) return;
+
+        const cleanQuery = this._normalizeSearchText(query);
+        const states = this._getAdjustmentAccordionStates();
+
+        const map = {
+            transform: {
+                keywords: ["transformacao", "geometria", "posicao", "tamanho", "escala", "rotacao", "opacidade", "movimento", "transform", "pos", "angulo", "redimensionar"],
+                controls: {
+                    x: ["posicao x", "horizontal", "esquerda", "direita", "mover lado", "pan", "deslocar", "eixo x", "largura"],
+                    y: ["posicao y", "vertical", "cima", "baixo", "subir", "descer", "tilt", "eixo y", "altura"],
+                    scale: ["escala", "zoom", "aproximar", "afastar", "tamanho", "crescer", "diminuir", "ampliar", "scale", "resize", "redimensionar", "grande", "pequeno"],
+                    rotation: ["rotacao", "girar", "rodar", "angulo", "inclinacao", "torto", "desentortar", "virar", "rotate", "graus"],
+                    opacity: ["opacidade", "transparencia", "alpha", "invisivel", "sumir", "fantasma", "translucido", "opacity", "desaparecer"]
+                }
+            },
+            crop: {
+                keywords: ["recorte", "crop", "cortar borda", "letterbox", "faixa preta", "enquadramento", "margem", "tirar borda", "corte", "borda"],
+                controls: {
+                    left: ["esquerda", "left", "cortar esquerda", "lateral esquerda"],
+                    right: ["direita", "right", "cortar direita", "lateral direita"],
+                    top: ["topo", "top", "cima", "cortar cima", "cabeca"],
+                    bottom: ["base", "bottom", "baixo", "cortar baixo", "rodape"]
+                }
+            },
+            ken_burns: {
+                keywords: ["movimento", "ken burns", "animacao foto", "pan", "zoom foto", "animar imagem", "slide foto", "zoom in", "zoom out", "dinamica foto", "deslizar"],
+                controls: {
+                    kb_preset: ["preset", "zoom in", "zoom out", "pan direita", "pan esquerda", "animacao", "movimento"]
+                }
+            },
+            color: {
+                keywords: ["cor", "cores", "color", "grading", "correcao de cor", "filtros", "imagem", "visual", "tonalidade", "look", "ajuste visual"],
+                controls: {
+                    brightness: ["brilho", "clarear", "escurecer", "luz", "iluminacao", "exposicao", "brightness", "exposure", "claro", "escuro", "sol", "iluminar"],
+                    contrast: ["contraste", "punch", "vivido", "contrast", "diferenca tons", "sombra", "profundidade", "dinamica"],
+                    saturation: ["saturacao", "cor", "cores vivas", "dessaturar", "vibratilidade", "saturation", "cinza", "colorido", "vibrante", "cor forte"],
+                    hue: ["matiz", "tom", "trocar cor", "hue", "color shift", "temperatura", "coloracao", "pigmento"],
+                    sepia: ["sepia", "vintage", "antigo", "envelhecido", "retro", "amarelado", "nostalgia", "foto velha"],
+                    grayscale: ["cinzas", "preto e branco", "pb", "p&b", "monocromatico", "grayscale", "sem cor", "black and white", "noir"],
+                    blur: ["desfoque", "blur", "borrar", "desfocado", "suavizar", "bokeh", "foco", "embacado", "esconder", "censurar"]
+                }
+            },
+            fades: {
+                keywords: ["transicao", "transicoes", "fade", "fades", "dissolver", "corte suave", "fusao", "fade in", "fade out", "curva fade", "suavizar", "abertura", "fechamento"],
+                controls: {
+                    fadein: ["fade in", "fade de entrada", "inicio", "clarear entrada", "suavizar entrada", "aparecer", "abertura", "entrada"],
+                    fadeout: ["fade out", "fade de saida", "final", "escurecer final", "suavizar final", "sumir", "fechamento", "apagar", "saida"]
+                }
+            },
+            volume: {
+                keywords: ["volume", "som", "audio", "ganho", "altura som", "mudo", "aumentar volume", "diminuir volume", "decibeis", "db", "level", "potencia som", "ouvir"],
+                controls: {
+                    vol_level: ["volume", "som", "ganho", "decibeis", "db", "mudo", "mute", "aumentar", "diminuir", "loudness", "nivel"]
+                }
+            },
+            audio_eq: {
+                keywords: ["equalizador", "equalizacao", "eq", "timbre", "frequencia", "graves", "medios", "agudos", "hpf", "filtro", "voz", "tom", "som abafado"],
+                controls: {
+                    hpf: ["corte de graves", "hpf", "high pass", "filtro passa alta", "vento", "limpar vento", "rumble", "microfone bateu", "baque", "subgrave", "estalo"],
+                    low: ["graves", "grave", "baixo", "peso", "corpo", "bass", "low", "boom", "batida"],
+                    mid: ["medios", "medio", "voz", "presenca", "clareza fala", "mid", "mids", "nasal", "corpo voz", "entrevistado", "fala"],
+                    high: ["agudos", "agudo", "ar", "brilho som", "sibilancia", "treble", "high", "abafado", "clarear som", "sopro", "definicao"]
+                }
+            },
+            audio_dynamics: {
+                keywords: ["dinamica", "gate", "compressor", "antirruido", "chiado", "ruido", "limpar audio", "limiar", "threshold", "razao", "ratio", "makeup", "ganho", "respiracao", "fundo"],
+                controls: {
+                    gate_db: ["gate", "antirruido", "ruido de fundo", "chiado", "respiracao", "silenciar pausas", "noise gate", "silencio", "vazamento", "limpar ruido"],
+                    comp_ratio: ["razao", "ratio", "compressao", "compressor", "nivelar som", "controlar picos"],
+                    comp_thresh_db: ["limiar", "threshold", "ponto de atuacao", "compressor"],
+                    makeup_db: ["ganho", "makeup", "compensacao", "volume pos", "aumentar compressor"]
+                }
+            },
+            audio_diag: {
+                keywords: ["diagnostico", "analise audio", "medicao", "loudness", "lufs", "pico", "pico real", "true peak", "clipping", "estouro", "distorcao", "ruido", "lra", "ebur128", "astats", "avaliar som"],
+                controls: {
+                    diag_run: ["analisar", "medir", "verificar", "escanear", "teste de audio", "estourou", "onde estourou"]
+                }
+            },
+            audio_render: {
+                keywords: ["tratamento", "render audio", "auphonic", "ia", "resgate", "resgate estourado", "reparo clipping", "nivelar fala", "speechnorm", "loudnorm", "normalizar", "nuvem", "wav tratado", "restauracao", "limpeza pesada"],
+                controls: {
+                    ar_preset: ["preset", "resgate estourado", "so entrega", "ambiencia", "previa rapida", "ia", "voz limpa"],
+                    ar_reparo: ["clipping", "reparo", "declip", "declick", "estalos", "distorcao digital"],
+                    ar_fala: ["nivelar fala", "speechnorm", "locutor", "entrevista", "volume uniforme"],
+                    ar_loudnorm: ["loudness", "lufs", "normalizacao", "-16 lufs", "-14 lufs", "broadcast", "padrao streaming"],
+                    ar_motor: ["motor", "local", "auphonic", "nuvem", "daw"]
+                }
+            },
+            audio_render_resultado: {
+                keywords: ["resultado", "comparativo", "antes depois", "ab", "original", "tratado", "wav", "descartar", "caminho arquivo"],
+                controls: {
+                    ar_ab: ["comparar", "ab", "original", "tratado", "ouvir diferenca"]
+                }
+            },
+            sequence_settings: {
+                keywords: ["sequencia", "projeto", "resolucao", "fps", "frames", "quadros", "proporcao", "aspect ratio", "formato", "16:9", "9:16", "reels", "tiktok", "youtube", "4k", "full hd", "widescreen", "vertical", "quadrado", "dimensoes"],
+                controls: {
+                    seq_preset: ["formato", "preset", "horizontal", "vertical", "4k", "reels", "tiktok", "shorts", "stories", "instagram", "16:9", "9:16", "1:1"],
+                    seq_dims: ["resolucao", "largura", "altura", "1920x1080", "1080x1920", "3840x2160", "dimensoes", "pixels", "tamanho video"],
+                    seq_fps: ["fps", "taxa de quadros", "quadros por segundo", "framerate", "24 fps", "30 fps", "60 fps", "velocidade"]
+                }
+            }
+        };
+
+        let noResultsEl = doc.getElementById("adjustments-no-results");
+        if (cleanQuery === "") {
+            if (noResultsEl) noResultsEl.remove();
+            container.querySelectorAll(".adjustments-section").forEach(section => {
+                section.style.display = "";
+                const sectionId = section.dataset.sectionId;
+                const isOpen = states[sectionId] !== false;
+                const body = section.querySelector(".adjustments-section-body");
+                if (body) body.style.display = isOpen ? "" : "none";
+                const chev = section.querySelector(".adj-collapse-chevron");
+                if (chev) {
+                    if (isOpen) chev.classList.add("open");
+                    else chev.classList.remove("open");
+                }
+                section.querySelectorAll(".adjustments-row").forEach(row => {
+                    row.style.display = "";
+                    row.classList.remove("adj-search-match");
+                });
+            });
+            return;
+        }
+
+        let totalMatchedSections = 0;
+        container.querySelectorAll(".adjustments-section").forEach(section => {
+            const sectionId = section.dataset.sectionId;
+            const entry = map[sectionId];
+            if (!entry) {
+                section.style.display = "";
+                return;
+            }
+
+            const sectionKeywords = entry.keywords || [];
+            const sectionMatches = sectionKeywords.some(kw => {
+                const nKw = this._normalizeSearchText(kw);
+                return nKw.includes(cleanQuery) || cleanQuery.includes(nKw);
+            });
+
+            let matchedRowsCount = 0;
+            const rows = section.querySelectorAll(".adjustments-row");
+            rows.forEach(row => {
+                const ctrlId = row.dataset.controlId || row.id || "";
+                const rowLabel = row.querySelector("label") ? row.querySelector("label").textContent : "";
+                const nRowLabel = this._normalizeSearchText(rowLabel);
+
+                let rowMatches = sectionMatches;
+                if (!rowMatches && nRowLabel.includes(cleanQuery)) {
+                    rowMatches = true;
+                }
+
+                if (!rowMatches && entry.controls && entry.controls[ctrlId]) {
+                    const ctrlKeywords = entry.controls[ctrlId];
+                    rowMatches = ctrlKeywords.some(kw => {
+                        const nKw = this._normalizeSearchText(kw);
+                        return nKw.includes(cleanQuery) || cleanQuery.includes(nKw);
+                    });
+                }
+
+                if (rowMatches) {
+                    row.style.display = "";
+                    row.classList.add("adj-search-match");
+                    matchedRowsCount++;
+                } else {
+                    row.style.display = "none";
+                    row.classList.remove("adj-search-match");
+                }
+            });
+
+            if (sectionMatches || matchedRowsCount > 0 || (rows.length === 0 && sectionMatches)) {
+                section.style.display = "";
+                const body = section.querySelector(".adjustments-section-body");
+                if (body) body.style.display = "";
+                const chev = section.querySelector(".adj-collapse-chevron");
+                if (chev) chev.classList.add("open");
+                totalMatchedSections++;
+            } else {
+                section.style.display = "none";
+            }
+        });
+
+        if (totalMatchedSections === 0) {
+            if (!noResultsEl) {
+                noResultsEl = doc.createElement("div");
+                noResultsEl.id = "adjustments-no-results";
+                container.appendChild(noResultsEl);
+            }
+            noResultsEl.innerHTML = `
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span>Nenhuma ferramenta encontrada para "<strong>${this._audioDiagEsc(query)}</strong>"</span>
+                <span style="font-size: 9.5px; opacity: 0.7;">Tente buscar por função como <em>clarear, chiado, cortar borda, zoom, girar, lufs</em></span>
+            `;
+            noResultsEl.style.display = "flex";
+        } else {
+            if (noResultsEl) noResultsEl.remove();
+        }
+    }
+
+    _bindAdjustmentAccordionToggles(container) {
+        container.querySelectorAll(".adjustments-section-header[data-section-toggle]").forEach(header => {
+            header.onclick = (e) => {
+                const sectionId = header.dataset.sectionToggle;
+                const section = header.closest(".adjustments-section");
+                if (!section) return;
+                const body = section.querySelector(".adjustments-section-body");
+                const chevron = header.querySelector(".adj-collapse-chevron");
+                if (!body) return;
+
+                const isCurrentlyOpen = body.style.display !== "none";
+                const willBeOpen = !isCurrentlyOpen;
+
+                body.style.display = willBeOpen ? "" : "none";
+                if (chevron) {
+                    if (willBeOpen) chevron.classList.add("open");
+                    else chevron.classList.remove("open");
+                }
+                this._setAdjustmentAccordionState(sectionId, willBeOpen);
+            };
+        });
+    }
+
+    _bindAdjustmentsDragAndDrop(container, clip) {
+        const isAudioTrack = clip && TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+        const isPhoto = clip && clip.type === "photo";
+        const mediaType = !clip ? "sequence" : (isPhoto ? "photo" : (isAudioTrack ? "audio" : "video"));
+        
+        const sections = container.querySelectorAll(".adjustments-section[draggable='true']");
+        let draggedSectionId = null;
+
+        sections.forEach(section => {
+            section.ondragstart = (e) => {
+                draggedSectionId = section.dataset.sectionId;
+                section.classList.add("dragging");
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", draggedSectionId);
+                }
+            };
+
+            section.ondragend = () => {
+                section.classList.remove("dragging");
+                sections.forEach(s => s.classList.remove("drop-target-above", "drop-target-below"));
+            };
+
+            section.ondragover = (e) => {
+                e.preventDefault();
+                if (!draggedSectionId || draggedSectionId === section.dataset.sectionId) return;
+                if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+                
+                const rect = section.getBoundingClientRect();
+                const midpoint = rect.top + rect.height / 2;
+                if (e.clientY < midpoint) {
+                    section.classList.add("drop-target-above");
+                    section.classList.remove("drop-target-below");
+                } else {
+                    section.classList.add("drop-target-below");
+                    section.classList.remove("drop-target-above");
+                }
+            };
+
+            section.ondragleave = () => {
+                section.classList.remove("drop-target-above", "drop-target-below");
+            };
+
+            section.ondrop = (e) => {
+                e.preventDefault();
+                const sourceId = (e.dataTransfer && e.dataTransfer.getData("text/plain")) || draggedSectionId;
+                const targetId = section.dataset.sectionId;
+                section.classList.remove("drop-target-above", "drop-target-below");
+
+                if (!sourceId || !targetId || sourceId === targetId) return;
+
+                const rect = section.getBoundingClientRect();
+                const insertBefore = e.clientY < (rect.top + rect.height / 2);
+
+                const currentOrder = this._getAdjustmentSectionOrder(mediaType);
+                const sourceIndex = currentOrder.indexOf(sourceId);
+                if (sourceIndex < 0) return;
+
+                currentOrder.splice(sourceIndex, 1);
+                const targetIndex = currentOrder.indexOf(targetId);
+                if (targetIndex < 0) {
+                    currentOrder.push(sourceId);
+                } else if (insertBefore) {
+                    currentOrder.splice(targetIndex, 0, sourceId);
+                } else {
+                    currentOrder.splice(targetIndex + 1, 0, sourceId);
+                }
+
+                this._setAdjustmentSectionOrder(mediaType, currentOrder);
+                this.renderAdjustmentsPanel(clip);
+            };
+        });
+    }
+
+    expandAllAdjustmentsSections() {
+        const doc = (this.canvas && this.canvas.ownerDocument) || document;
+        const container = doc.getElementById("adjustments-panel-content");
+        if (!container) return;
+
+        this._setAllAdjustmentAccordionStates(true);
+        container.querySelectorAll(".adjustments-section").forEach(section => {
+            const body = section.querySelector(".adjustments-section-body");
+            const chevron = section.querySelector(".adj-collapse-chevron");
+            if (body) body.style.display = "";
+            if (chevron) chevron.classList.add("open");
+        });
+    }
+
+    collapseAllAdjustmentsSections() {
+        const doc = (this.canvas && this.canvas.ownerDocument) || document;
+        const container = doc.getElementById("adjustments-panel-content");
+        if (!container) return;
+
+        this._setAllAdjustmentAccordionStates(false);
+        container.querySelectorAll(".adjustments-section").forEach(section => {
+            const body = section.querySelector(".adjustments-section-body");
+            const chevron = section.querySelector(".adj-collapse-chevron");
+            if (body) body.style.display = "none";
+            if (chevron) chevron.classList.remove("open");
+        });
+    }
+
+    resetAllClipAdjustments(clipId) {
+        const clip = STATE.activeTimelineCuts.find(c => c.id === clipId);
+        if (!clip) return;
+
+        TIMELINE_HISTORY.begin();
+
+        const isAudio = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+        let targetClipId = clipId;
+        let partnerClipId = null;
+        if (!isAudio && clip.type === "video" && clip.link_id) {
+            const partner = STATE.activeTimelineCuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
+            if (partner) partnerClipId = partner.id;
+        }
+
+        const cuts = [...STATE.activeTimelineCuts];
+        const targetClip = cuts.find(c => c.id === targetClipId);
+        if (targetClip) {
+            targetClip.effects = [];
+        }
+        if (partnerClipId) {
+            const partnerClip = cuts.find(c => c.id === partnerClipId);
+            if (partnerClip) {
+                partnerClip.effects = [];
+            }
+        }
+
+        STATE.activeTimelineCuts = cuts;
+        if (partnerClipId) {
+            const partnerClip = cuts.find(c => c.id === partnerClipId);
+            if (partnerClip) this._notificarPlayerAudioAoVivo(partnerClip);
+        } else if (isAudio && targetClip) {
+            this._notificarPlayerAudioAoVivo(targetClip);
+        }
+
+        TIMELINE_HISTORY.commit();
+        this.renderAdjustmentsPanel(targetClip || clip);
+        if (this.renderer) this.renderer.requestRedraw();
+        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+            window.showToast("Todos os ajustes do clipe foram restaurados para o padrão.", "info");
+        }
+    }
+
+    initAdjustmentsToolbar() {
+        const doc = (this.canvas && this.canvas.ownerDocument) || document;
+        const searchInput = doc.getElementById("adjustments-search-input");
+        const clearBtn = doc.getElementById("btn-clear-adj-search");
+        const expandAllBtn = doc.getElementById("btn-adj-expand-all");
+        const collapseAllBtn = doc.getElementById("btn-adj-collapse-all");
+        const resetAllBtn = doc.getElementById("btn-adj-reset-all");
+        const resetOrderBtn = doc.getElementById("btn-adj-reset-order");
+
+        if (searchInput && !searchInput.__capiauAdjSearchBound) {
+            searchInput.__capiauAdjSearchBound = true;
+            searchInput.oninput = () => {
+                const query = searchInput.value;
+                if (clearBtn) clearBtn.style.display = query ? "block" : "none";
+                this._filterAdjustmentsBySearch(query);
+            };
+            searchInput.onkeydown = (e) => {
+                if (e.key === "Escape") {
+                    searchInput.value = "";
+                    if (clearBtn) clearBtn.style.display = "none";
+                    this._filterAdjustmentsBySearch("");
+                }
+            };
+        }
+
+        if (clearBtn && !clearBtn.__capiauClearBound) {
+            clearBtn.__capiauClearBound = true;
+            clearBtn.onclick = () => {
+                if (searchInput) {
+                    searchInput.value = "";
+                    clearBtn.style.display = "none";
+                    searchInput.focus();
+                }
+                this._filterAdjustmentsBySearch("");
+            };
+        }
+
+        if (expandAllBtn && !expandAllBtn.__capiauExpandBound) {
+            expandAllBtn.__capiauExpandBound = true;
+            expandAllBtn.onclick = () => {
+                this.expandAllAdjustmentsSections();
+            };
+        }
+
+        if (collapseAllBtn && !collapseAllBtn.__capiauCollapseBound) {
+            collapseAllBtn.__capiauCollapseBound = true;
+            collapseAllBtn.onclick = () => {
+                this.collapseAllAdjustmentsSections();
+            };
+        }
+
+        if (resetOrderBtn && !resetOrderBtn.__capiauResetOrderBound) {
+            resetOrderBtn.__capiauResetOrderBound = true;
+            resetOrderBtn.onclick = () => {
+                const clip = STATE.activeTimelineCuts.find(c => c.id === TIMELINE_STATE.selectedClipId);
+                const isAudioTrack = clip && TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+                const isPhoto = clip && clip.type === "photo";
+                const mediaType = !clip ? "sequence" : (isPhoto ? "photo" : (isAudioTrack ? "audio" : "video"));
+                this._resetAdjustmentSectionOrder(mediaType);
+                this.renderAdjustmentsPanel(clip || null);
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("Ordem padrão das seções restaurada.", "info");
+                }
+            };
+        }
+
+        if (resetAllBtn && !resetAllBtn.__capiauResetAllBound) {
+            resetAllBtn.__capiauResetAllBound = true;
+            resetAllBtn.onclick = () => {
+                if (TIMELINE_STATE.selectedClipId) {
+                    this.resetAllClipAdjustments(TIMELINE_STATE.selectedClipId);
+                } else {
+                    if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                        window.showToast("Selecione um clipe na timeline para resetar seus ajustes.", "info");
+                    }
+                }
+            };
+        }
+    }
+
     renderAdjustmentsPanel(clip) {
         const container = this.canvas.ownerDocument.getElementById("adjustments-panel-content");
         if (!container) return;
@@ -1470,6 +2098,8 @@ export class CapiauTimelineInteraction {
             const r = Math.round(v);
             return r === 0 ? 0 : r;
         };
+
+        const states = this._getAdjustmentAccordionStates();
 
         if (!clip) {
             const currentRes = `${TIMELINE_STATE.width}x${TIMELINE_STATE.height}`;
@@ -1489,72 +2119,69 @@ export class CapiauTimelineInteraction {
                 return `${rw}:${rh}`;
             };
 
+            const isOpen = states["sequence_settings"] !== false;
+
             const html = `
-                <div class="adjustments-section" style="padding: 16px;">
-                    <div style="font-size:11px; font-weight:bold; color:var(--color-cyan); display:flex; gap: 6px; align-items:center; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; margin-bottom: 12px;">
-                        <i class="fa-solid fa-gear"></i>
-                        <span>Configurações da Sequência</span>
-                    </div>
-
-                    <!-- Preset Selection -->
-                    <div class="adjustments-row" style="margin-bottom: 12px;">
-                        <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Formato</label>
-                        <div class="control-wrap" style="flex:1;">
-                            <select id="seq-preset" class="nle-select" style="width:100%; height:24px; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px; padding:0 4px;">
-                                <option value="1920x1080">Horizontal (1920×1080 - 16:9)</option>
-                                <option value="1080x1920">Vertical (1080×1920 - 9:16)</option>
-                                <option value="3840x2160">Ultra HD (3840×2160 - 4K)</option>
-                                <option value="1080x1080">Quadrado (1080×1080 - 1:1)</option>
-                                <option value="custom">Personalizado</option>
-                            </select>
+                <div class="adjustments-section" data-section-id="sequence_settings" style="padding: 4px 0;">
+                    <div class="adjustments-section-header" data-section-toggle="sequence_settings">
+                        <div class="adj-header-left">
+                            <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isOpen ? 'open' : ''}"></i>
+                            <span class="adj-title-text"><i class="fa-solid fa-gear"></i> Configurações da Sequência</span>
                         </div>
                     </div>
-
-                    <!-- Dimensions -->
-                    <div class="adjustments-row" id="seq-dims-row" style="margin-bottom: 12px;">
-                        <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Resolução</label>
-                        <div class="control-wrap" style="flex:1; display:flex; gap:6px; align-items:center;">
-                            <input id="seq-width" type="number" class="nle-input" style="width:65px; height:24px; text-align:center; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px;" min="2" step="2" value="${TIMELINE_STATE.width}">
-                            <span style="color:var(--text-muted); font-size:10px;">×</span>
-                            <input id="seq-height" type="number" class="nle-input" style="width:65px; height:24px; text-align:center; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px;" min="2" step="2" value="${TIMELINE_STATE.height}">
+                    <div class="adjustments-section-body" style="${isOpen ? '' : 'display:none;'} padding: 8px 4px;">
+                        <div class="adjustments-row" data-control-id="seq_preset" style="margin-bottom: 12px;">
+                            <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Formato</label>
+                            <div class="control-wrap" style="flex:1;">
+                                <select id="seq-preset" class="nle-select" style="width:100%; height:24px; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px; padding:0 4px;">
+                                    <option value="1920x1080">Horizontal (1920×1080 - 16:9)</option>
+                                    <option value="1080x1920">Vertical (1080×1920 - 9:16)</option>
+                                    <option value="3840x2160">Ultra HD (3840×2160 - 4K)</option>
+                                    <option value="1080x1080">Quadrado (1080×1080 - 1:1)</option>
+                                    <option value="custom">Personalizado</option>
+                                </select>
+                            </div>
                         </div>
+                        <div class="adjustments-row" id="seq-dims-row" data-control-id="seq_dims" style="margin-bottom: 12px;">
+                            <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Resolução</label>
+                            <div class="control-wrap" style="flex:1; display:flex; gap:6px; align-items:center;">
+                                <input id="seq-width" type="number" class="nle-input" style="width:65px; height:24px; text-align:center; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px;" min="2" step="2" value="${TIMELINE_STATE.width}">
+                                <span style="color:var(--text-muted); font-size:10px;">×</span>
+                                <input id="seq-height" type="number" class="nle-input" style="width:65px; height:24px; text-align:center; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px;" min="2" step="2" value="${TIMELINE_STATE.height}">
+                            </div>
+                        </div>
+                        <div class="adjustments-row" style="margin-bottom: 12px;">
+                            <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Proporção</label>
+                            <div class="control-wrap" style="flex:1;">
+                                <span id="seq-aspect-ratio" style="color:var(--text-secondary); font-size:11px; font-weight:bold;">${getAspectRatioText(TIMELINE_STATE.width, TIMELINE_STATE.height)}</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row" data-control-id="seq_fps" style="margin-bottom: 12px;">
+                            <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Taxa (FPS)</label>
+                            <div class="control-wrap" style="flex:1;">
+                                <select id="seq-fps" class="nle-select" style="width:100%; height:24px; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px; padding:0 4px;">
+                                    <option value="23.976">23.976 fps</option>
+                                    <option value="24">24 fps</option>
+                                    <option value="25">25 fps</option>
+                                    <option value="29.97">29.97 fps</option>
+                                    <option value="30">30 fps</option>
+                                    <option value="50">50 fps</option>
+                                    <option value="60">60 fps</option>
+                                </select>
+                            </div>
+                        </div>
+                        ${STATE.activeTimelineCuts.length > 0 ? `
+                            <div id="seq-warning" style="margin-top:16px; padding:10px; border-radius:6px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:10px; line-height:1.4; display:flex; gap:6px;">
+                                <i class="fa-solid fa-triangle-exclamation" style="font-size:12px; margin-top:2px;"></i>
+                                <span><strong>Aviso:</strong> A timeline possui clipes. Alterar o FPS irá reescalar os frames físicos para manter a sincronia em segundos.</span>
+                            </div>
+                        ` : ''}
                     </div>
-
-                    <!-- Aspect Ratio display -->
-                    <div class="adjustments-row" style="margin-bottom: 12px;">
-                        <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Proporção</label>
-                        <div class="control-wrap" style="flex:1;">
-                            <span id="seq-aspect-ratio" style="color:var(--text-secondary); font-size:11px; font-weight:bold;">${getAspectRatioText(TIMELINE_STATE.width, TIMELINE_STATE.height)}</span>
-                        </div>
-                    </div>
-
-                    <!-- FPS Selection -->
-                    <div class="adjustments-row" style="margin-bottom: 12px;">
-                        <label style="font-size:10px; text-transform:uppercase; color:var(--text-muted); width: 80px;">Taxa (FPS)</label>
-                        <div class="control-wrap" style="flex:1;">
-                            <select id="seq-fps" class="nle-select" style="width:100%; height:24px; font-size:11px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px; padding:0 4px;">
-                                <option value="23.976">23.976 fps</option>
-                                <option value="24">24 fps</option>
-                                <option value="25">25 fps</option>
-                                <option value="29.97">29.97 fps</option>
-                                <option value="30">30 fps</option>
-                                <option value="50">50 fps</option>
-                                <option value="60">60 fps</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Warning message when clips exist -->
-                    ${STATE.activeTimelineCuts.length > 0 ? `
-                        <div id="seq-warning" style="margin-top:16px; padding:10px; border-radius:6px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:10px; line-height:1.4; display:flex; gap:6px;">
-                            <i class="fa-solid fa-triangle-exclamation" style="font-size:12px; margin-top:2px;"></i>
-                            <span><strong>Aviso:</strong> A timeline possui clipes. Alterar o FPS irá reescalar os frames físicos para manter a sincronia em segundos.</span>
-                        </div>
-                    ` : ''}
                 </div>
             `;
 
             container.innerHTML = html;
+            this._bindAdjustmentAccordionToggles(container);
 
             const presetSelect = container.querySelector("#seq-preset");
             if (presetSelect) presetSelect.value = presetVal;
@@ -1573,7 +2200,6 @@ export class CapiauTimelineInteraction {
 
             const widthInput = container.querySelector("#seq-width");
             const heightInput = container.querySelector("#seq-height");
-
             const updateDimInputsState = () => {
                 if (presetSelect.value === "custom") {
                     widthInput.removeAttribute("disabled");
@@ -1590,36 +2216,25 @@ export class CapiauTimelineInteraction {
                     heightInput.value = h;
                 }
             };
-            
             updateDimInputsState();
-
             const applySettings = () => {
                 let wVal = parseInt(widthInput.value) || 1920;
                 let hVal = parseInt(heightInput.value) || 1080;
-                
                 const w = wVal % 2 === 0 ? wVal : wVal + 1;
                 const h = hVal % 2 === 0 ? hVal : hVal + 1;
-                
                 if (w !== wVal) widthInput.value = w;
                 if (h !== hVal) heightInput.value = h;
-
                 const fps = parseFloat(fpsSelect.value) || 24;
-
                 TIMELINE_STATE.setTimelineProperties({ width: w, height: h, fps });
-
                 const aspectSpan = container.querySelector("#seq-aspect-ratio");
                 if (aspectSpan) aspectSpan.textContent = getAspectRatioText(w, h);
             };
-
-            presetSelect.onchange = () => {
-                updateDimInputsState();
-                applySettings();
-            };
-
+            presetSelect.onchange = () => { updateDimInputsState(); applySettings(); };
             widthInput.onchange = applySettings;
             heightInput.onchange = applySettings;
             fpsSelect.onchange = applySettings;
-
+            const searchInput = this.canvas.ownerDocument.getElementById("adjustments-search-input");
+            if (searchInput && searchInput.value) { this._filterAdjustmentsBySearch(searchInput.value); }
             return;
         }
 
@@ -1635,32 +2250,18 @@ export class CapiauTimelineInteraction {
         let realFilename = "";
         if (isPhoto) {
             const photoData = STATE.allPhotos.find(p => String(p.id) === String(clip.photo_id));
-            if (photoData) {
-                displayTitle = photoData.title || photoData.filename;
-                realFilename = photoData.filename;
-            } else {
-                displayTitle = "Foto";
-                realFilename = "";
-            }
+            if (photoData) { displayTitle = photoData.title || photoData.filename; realFilename = photoData.filename; }
         } else {
             const videoData = STATE.allVideos.find(v => String(v.id) === String(clip.video_id));
             if (videoData) {
-                if (isAudioTrack) {
-                    displayTitle = videoData.title ? `${videoData.title} (Áudio)` : `${videoData.filename} (Áudio)`;
-                } else {
-                    displayTitle = videoData.title || videoData.filename;
-                }
+                if (isAudioTrack) displayTitle = videoData.title ? `${videoData.title} (Áudio)` : `${videoData.filename} (Áudio)`;
+                else displayTitle = videoData.title || videoData.filename;
                 realFilename = videoData.filename;
-            } else {
-                displayTitle = isAudioTrack ? "Áudio" : "Vídeo";
-                realFilename = "";
             }
         }
 
-        // Obter valores de efeito
         const fit = effects.find(e => e.type === "fit");
         const fitMode = fit ? fit.mode : "fill";
-
         const kb = effects.find(e => e.type === "ken_burns");
         const kbPreset = kb ? (kb.preset || "none") : "none";
 
@@ -1670,6 +2271,7 @@ export class CapiauTimelineInteraction {
         const y = tf.y !== undefined ? tf.y : 0;
         const rotation = tf.rotation !== undefined ? tf.rotation : 0;
         const opacity = tf.opacity !== undefined ? tf.opacity : 1.0;
+        const tfDisabled = tf.disabled === true;
 
         const col = effects.find(e => e.type === "color") || {};
         const brightness = col.brightness !== undefined ? col.brightness : 0;
@@ -1679,21 +2281,26 @@ export class CapiauTimelineInteraction {
         const sepia = col.sepia !== undefined ? col.sepia : 0;
         const grayscale = col.grayscale !== undefined ? col.grayscale : 0;
         const blur = col.blur !== undefined ? col.blur : 0;
+        const colDisabled = col.disabled === true;
 
         const cropEffect = effects.find(e => e.type === "crop") || {};
         const cropTop = cropEffect.top !== undefined ? cropEffect.top : 0;
         const cropRight = cropEffect.right !== undefined ? cropEffect.right : 0;
         const cropBottom = cropEffect.bottom !== undefined ? cropEffect.bottom : 0;
         const cropLeft = cropEffect.left !== undefined ? cropEffect.left : 0;
+        const cropDisabled = cropEffect.disabled === true;
 
         let level = 1.0;
+        let volDisabled = false;
         if (isAudioTrack) {
             const vol = effects.find(e => e.type === "volume") || {};
             level = vol.level !== undefined ? vol.level : 1.0;
+            volDisabled = vol.disabled === true;
         } else if (partnerAudioClip) {
             const partnerEffects = partnerAudioClip.effects || [];
             const vol = partnerEffects.find(e => e.type === "volume") || {};
             level = vol.level !== undefined ? vol.level : 1.0;
+            volDisabled = vol.disabled === true;
         }
 
         const fadeIn = effects.find(e => e.type === "crossfade" && e.side === "in");
@@ -1702,8 +2309,8 @@ export class CapiauTimelineInteraction {
         const fadeOutDur = fadeOut ? (fadeOut.duration_s || 0) : 0;
         const fadeInCurve = (fadeIn && fadeIn.curve) || "linear";
         const fadeOutCurve = (fadeOut && fadeOut.curve) || "linear";
+        const fadesDisabled = (fadeIn && fadeIn.disabled === true) || (fadeOut && fadeOut.disabled === true);
 
-        // Renderizar seções
         let html = `
             <div style="font-size:11px; font-weight:bold; color:var(--color-cyan); display:flex; gap: 6px; align-items:center; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; margin-bottom: 4px;">
                 <i class="fa-solid fa-sliders"></i>
@@ -1718,159 +2325,120 @@ export class CapiauTimelineInteraction {
             </div>
         `;
 
-        // -- SEÇÃO: DIAGNÓSTICO DE ÁUDIO (somente leitura: sem bypass/reset, não cria efeito, não dispara autosave) --
+        const mediaType = isPhoto ? "photo" : (isAudioTrack ? "audio" : "video");
+        const sectionOrder = this._getAdjustmentSectionOrder(mediaType);
+        let audioDiagHTML = "", audioEqHTML = "", audioDynamicsHTML = "", audioRenderHTML = "", audioResultadoHTML = "", volumeHTML = "";
+
         if (isAudioTrack || partnerAudioClip) {
             this.audioDiagCache = this.audioDiagCache || {};
-            const diagVideoId = (clip.video_id !== undefined && clip.video_id !== null)
-                ? clip.video_id
-                : (partnerAudioClip ? partnerAudioClip.video_id : null);
+            const diagVideoId = (clip.video_id !== undefined && clip.video_id !== null) ? clip.video_id : (partnerAudioClip ? partnerAudioClip.video_id : null);
             const diagIn = Number(clip.in);
             const diagOut = Number(clip.out);
-            const diagKey = (diagVideoId !== null && isFinite(diagIn) && isFinite(diagOut))
-                ? `${diagVideoId}|${diagIn.toFixed(3)}|${diagOut.toFixed(3)}`
-                : null;
+            const diagKey = (diagVideoId !== null && isFinite(diagIn) && isFinite(diagOut)) ? `${diagVideoId}|${diagIn.toFixed(3)}|${diagOut.toFixed(3)}` : null;
             const cachedDiag = (diagKey && this.audioDiagCache[diagKey]) ? this.audioDiagCache[diagKey] : null;
 
-            const diagEmptyInner = `
-                <div style="font-size:10px; color:var(--text-muted); padding:6px 0; line-height:1.5;">
-                    Ainda não analisado. Use "Analisar" para medir loudness, pico real, clipping, ruído e dinâmica do trecho (in/out do clipe).
+            const diagEmptyInner = `<div style="font-size:10px; color:var(--text-muted); padding:6px 0; line-height:1.5;">Ainda não analisado. Use "Analisar" para medir loudness, pico real, clipping, ruído e dinâmica.</div>`;
+            const isDiagOpen = states["audio_diag"] !== false;
+            const isDiagMod = this._isSectionModified(clip, "audio_diag");
+            audioDiagHTML = `
+                <div class="adjustments-section" data-section-id="audio_diag" draggable="true">
+                    <div class="adjustments-section-header" data-section-toggle="audio_diag">
+                        <div class="adj-header-left">
+                            <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                            <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isDiagOpen ? 'open' : ''}"></i>
+                            <span class="adj-title-text"><i class="fa-solid fa-stethoscope"></i> Diagnóstico de Áudio</span>
+                            ${isDiagMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
+                        </div>
+                        <div class="adj-header-actions" onclick="event.stopPropagation()">
+                            <button id="adj-audio-diag-run" title="Analisar" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; font-size:10px; display:flex; gap:4px; align-items:center;"><i class="fa-solid fa-wave-square"></i> Analisar</button>
+                        </div>
+                    </div>
+                    <div id="adj-audio-diag-body" class="adjustments-section-body" style="${isDiagOpen ? '' : 'display:none;'}">${cachedDiag ? this._audioDiagResultInner(cachedDiag) : diagEmptyInner}</div>
                 </div>
             `;
 
-            html += `
-                <div class="adjustments-section" data-section="audio_diag">
-                    <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                        <span style="display:flex; gap:6px; align-items:center;">
-                            <i class="fa-solid fa-stethoscope"></i> Diagnóstico de Áudio
-                        </span>
-                        <button id="adj-audio-diag-run" title="Analisar o trecho com ffmpeg (ebur128 + astats)" style="background:none; border:none; color:var(--color-cyan); cursor:pointer; font-size:10px; display:flex; gap:4px; align-items:center;"><i class="fa-solid fa-wave-square"></i> Analisar</button>
-                    </div>
-                    <div id="adj-audio-diag-body" class="adjustments-section-body">
-                        ${cachedDiag ? this._audioDiagResultInner(cachedDiag) : diagEmptyInner}
-                    </div>
-                </div>
-            `;
-        }
-
-        // -- SEÇÕES: EQUALIZADOR E DINÂMICA DE ÁUDIO AO VIVO (Etapa 2, contrato E3) --
-        // Mesma condição de exibição do diagnóstico (clipe de áudio ou vídeo com áudio
-        // vinculado) e mesmo alvo da seção de volume: os efeitos moram no CLIPE DE ÁUDIO.
-        if (isAudioTrack || partnerAudioClip) {
             const alvoAoVivo = isAudioTrack ? clip : partnerAudioClip;
             const efeitosAlvo = (alvoAoVivo && Array.isArray(alvoAoVivo.effects)) ? alvoAoVivo.effects : [];
             const eqVals = Object.assign({}, this._audioAoVivoDefaults("audio_eq"), efeitosAlvo.find(e => e.type === "audio_eq") || {});
             const dynVals = Object.assign({}, this._audioAoVivoDefaults("audio_dynamics"), efeitosAlvo.find(e => e.type === "audio_dynamics") || {});
             const eqDisabled = eqVals.disabled === true;
             const dynDisabled = dynVals.disabled === true;
-
             const ppAoVivo = this._playerAudioAoVivo();
-            const aoVivoOk = !!ppAoVivo; // sem player/WebAudio: avisa NO LUGAR do controle (nunca controle morto)
+            const aoVivoOk = !!ppAoVivo;
             const gatePossivel = aoVivoOk && this._suportaAudioWorklet();
             const gatePronto = gatePossivel && typeof ppAoVivo.gateAoVivoDisponivel === "function" && ppAoVivo.gateAoVivoDisponivel() === true;
+            const avisoSemWebAudio = `<div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:10px;">Ajustes de áudio ao vivo indisponíveis (WebAudio ausente).</div>`;
+            const gateAviso = `<div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:10px;">Gate indisponível (AudioWorklet ausente).</div>`;
+            const gateNota = `<div style="font-size:9px; color:var(--text-muted); padding:2px 0 4px;">Gate ainda não carregou.</div>`;
 
-            const avisoSemWebAudio = `
-                        <div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:10px; line-height:1.4; display:flex; gap:6px;">
-                            <i class="fa-solid fa-triangle-exclamation" style="font-size:11px; margin-top:1px;"></i>
-                            <span>Ajustes de áudio ao vivo indisponíveis neste navegador (WebAudio ausente).</span>
-                        </div>
-            `;
-            const gateAviso = `
-                        <div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:10px; line-height:1.4; display:flex; gap:6px;">
-                            <i class="fa-solid fa-triangle-exclamation" style="font-size:11px; margin-top:1px;"></i>
-                            <span>Gate indisponível neste navegador (AudioWorklet ausente). O compressor segue funcionando.</span>
-                        </div>
-            `;
-            const gateNota = `
-                        <div style="font-size:9px; color:var(--text-muted); padding:2px 0 4px;">Módulo do gate ainda não carregou; o valor já fica salvo e entra em ação quando carregar.</div>
-            `;
-
-            // Mesma anatomia das linhas de cor/crop: label + range + value-disp.
             const linhaAoVivo = (attr, prop, rotulo, min, max, step, val) => {
                 const disp = this._formatarValorAudioAoVivo(prop, val);
-                return `
-                        <div class="adjustments-row">
-                            <label>${rotulo}${this._slotExplica(this._chaveExplicaControle(prop))}</label>
-                            <div class="control-wrap">
-                                <input type="range" ${attr}="${prop}" min="${min}" max="${max}" step="${step}" value="${val}" data-tooltip="${rotulo}: ${disp}">
-                                <span class="value-disp">${disp}</span>
-                            </div>
-                        </div>
-                `;
+                return `<div class="adjustments-row" data-control-id="${prop}"><label>${rotulo}${this._slotExplica(this._chaveExplicaControle(prop))}</label><div class="control-wrap"><input type="range" ${attr}="${prop}" min="${min}" max="${max}" step="${step}" value="${val}" data-tooltip="${rotulo}: ${disp}"><span class="value-disp">${disp}</span></div></div>`;
             };
 
-            html += `
-                <div class="adjustments-section" data-section="audio_eq">
-                    <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                        <span style="display:flex; gap:6px; align-items:center;">
-                            <i class="fa-solid fa-sliders"></i> Equalizador
-                        </span>
-                        ${aoVivoOk ? `
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <button class="btn-adj-bypass" data-section="audio_eq" title="${eqDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="background:none; border:none; color:${eqDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${eqDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                            <button class="btn-adj-reset" data-section="audio_eq" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+            const isEqOpen = states["audio_eq"] !== false;
+            const isEqMod = this._isSectionModified(clip, "audio_eq");
+            audioEqHTML = `
+                <div class="adjustments-section" data-section-id="audio_eq" draggable="true">
+                    <div class="adjustments-section-header" data-section-toggle="audio_eq">
+                        <div class="adj-header-left">
+                            <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                            <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isEqOpen ? 'open' : ''}"></i>
+                            <span class="adj-title-text"><i class="fa-solid fa-sliders"></i> Equalizador</span>
+                            ${isEqMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
                         </div>
-                        ` : ''}
+                        ${aoVivoOk ? `<div class="adj-header-actions" onclick="event.stopPropagation()"><button class="btn-adj-bypass" data-section="audio_eq" style="color:${eqDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${eqDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button><button class="btn-adj-reset" data-section="audio_eq"><i class="fa-solid fa-arrow-rotate-left"></i></button></div>` : ''}
                     </div>
-                    <div class="adjustments-section-body" style="opacity:${aoVivoOk && eqDisabled ? 0.4 : 1}; pointer-events:${aoVivoOk && eqDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
-                        ${aoVivoOk ? (
-                            linhaAoVivo("data-aeq", "hpf", "Corte de Graves (HPF)", 0, 300, 10, Math.round(eqVals.hpf)) +
-                            linhaAoVivo("data-aeq", "low", "Graves", -12, 12, 0.5, Number(eqVals.low)) +
-                            linhaAoVivo("data-aeq", "mid", "Médios", -12, 12, 0.5, Number(eqVals.mid)) +
-                            linhaAoVivo("data-aeq", "high", "Agudos", -12, 12, 0.5, Number(eqVals.high))
-                        ) : avisoSemWebAudio}
-                    </div>
-                </div>
-
-                <div class="adjustments-section" data-section="audio_dynamics">
-                    <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                        <span style="display:flex; gap:6px; align-items:center;">
-                            <i class="fa-solid fa-compress"></i> Dinâmica (Gate &amp; Compressor)
-                        </span>
-                        ${aoVivoOk ? `
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <button class="btn-adj-bypass" data-section="audio_dynamics" title="${dynDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="background:none; border:none; color:${dynDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${dynDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                            <button class="btn-adj-reset" data-section="audio_dynamics" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
-                        </div>
-                        ` : ''}
-                    </div>
-                    <div class="adjustments-section-body" style="opacity:${aoVivoOk && dynDisabled ? 0.4 : 1}; pointer-events:${aoVivoOk && dynDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
-                        ${aoVivoOk ? (
-                            (gatePossivel
-                                ? linhaAoVivo("data-adyn", "gate_db", "Gate", -90, -20, 1, Math.round(dynVals.gate_db)) + (gatePronto ? '' : gateNota)
-                                : gateAviso) +
-                            linhaAoVivo("data-adyn", "comp_ratio", "Razão", 1, 20, 0.5, Number(dynVals.comp_ratio)) +
-                            linhaAoVivo("data-adyn", "comp_thresh_db", "Limiar", -60, 0, 1, Math.round(dynVals.comp_thresh_db)) +
-                            linhaAoVivo("data-adyn", "makeup_db", "Ganho (Makeup)", -12, 12, 0.5, Number(dynVals.makeup_db))
-                        ) : avisoSemWebAudio}
-                    </div>
+                    <div class="adjustments-section-body" style="${isEqOpen ? '' : 'display:none;'} opacity:${aoVivoOk && eqDisabled ? 0.4 : 1};">${aoVivoOk ? (linhaAoVivo("data-aeq", "hpf", "HPF", 0, 300, 10, Math.round(eqVals.hpf)) + linhaAoVivo("data-aeq", "low", "Graves", -12, 12, 0.5, Number(eqVals.low)) + linhaAoVivo("data-aeq", "mid", "Médios", -12, 12, 0.5, Number(eqVals.mid)) + linhaAoVivo("data-aeq", "high", "Agudos", -12, 12, 0.5, Number(eqVals.high))) : avisoSemWebAudio}</div>
                 </div>
             `;
-        }
 
-        // -- SEÇÕES: TRATAMENTO (gera arquivo) + RESULTADO (Etapa 3, Tipo B; contratos F1-F4) --
-        // Mesma condição das seções ao vivo: clipe de áudio ou vídeo com áudio vinculado.
-        // O efeito audio_render mora no CLIPE DE ÁUDIO (mesmo alvo do EQ/dinâmica).
-        if (isAudioTrack || partnerAudioClip) {
+            const isDynOpen = states["audio_dynamics"] !== false;
+            const isDynMod = this._isSectionModified(clip, "audio_dynamics");
+            audioDynamicsHTML = `
+                <div class="adjustments-section" data-section-id="audio_dynamics" draggable="true">
+                    <div class="adjustments-section-header" data-section-toggle="audio_dynamics">
+                        <div class="adj-header-left">
+                            <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                            <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isDynOpen ? 'open' : ''}"></i>
+                            <span class="adj-title-text"><i class="fa-solid fa-compress"></i> Dinâmica</span>
+                            ${isDynMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
+                        </div>
+                        ${aoVivoOk ? `<div class="adj-header-actions" onclick="event.stopPropagation()"><button class="btn-adj-bypass" data-section="audio_dynamics" style="color:${dynDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${dynDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button><button class="btn-adj-reset" data-section="audio_dynamics"><i class="fa-solid fa-arrow-rotate-left"></i></button></div>` : ''}
+                    </div>
+                    <div class="adjustments-section-body" style="${isDynOpen ? '' : 'display:none;'} opacity:${aoVivoOk && dynDisabled ? 0.4 : 1};">${aoVivoOk ? ((gatePossivel ? linhaAoVivo("data-adyn", "gate_db", "Gate", -90, -20, 1, Math.round(dynVals.gate_db)) + (gatePronto ? '' : gateNota) : gateAviso) + linhaAoVivo("data-adyn", "comp_ratio", "Razão", 1, 20, 0.5, Number(dynVals.comp_ratio)) + linhaAoVivo("data-adyn", "comp_thresh_db", "Limiar", -60, 0, 1, Math.round(dynVals.comp_thresh_db)) + linhaAoVivo("data-adyn", "makeup_db", "Ganho", -12, 12, 0.5, Number(dynVals.makeup_db))) : avisoSemWebAudio}</div>
+                </div>
+            `;
+
             const alvoRender = isAudioTrack ? clip : partnerAudioClip;
-            const efeitosRender = Array.isArray(alvoRender.effects) ? alvoRender.effects : [];
-            const efeitoRender = efeitosRender.find(e => e && e.type === "audio_render") || null;
+            const efeitoRender = (Array.isArray(alvoRender.effects) ? alvoRender.effects : []).find(e => e && e.type === "audio_render") || null;
             const opcoesIniciais = this._opcoesDeEfeitoAudioRender(efeitoRender);
             const presetInicial = this._presetDeOpcoesAudioRender(opcoesIniciais) || "custom";
-
+            const isArOpen = states["audio_render"] !== false;
+            const isArMod = this._isSectionModified(clip, "audio_render");
             const optSel = (valor, rotulo, atual) => `<option value="${valor}"${String(atual) === String(valor) ? " selected" : ""}>${rotulo}</option>`;
-            const caixaPasso = (id, rotulo, marcado, explicaChaves) => `
-                        <label style="display:flex; gap:6px; align-items:center; padding:2px 0; font-size:10px; color:var(--text-secondary); cursor:pointer;">
-                            <input id="${id}" type="checkbox" ${marcado ? "checked" : ""} style="accent-color: var(--color-cyan); margin:0; cursor:pointer;">
-                            <span>${rotulo}${this._slotExplica(explicaChaves)}</span>
-                        </label>
+            const caixaPasso = (id, rotulo, marcado, explicaChaves, ctrlId) => `
+                <div class="adjustments-row" data-control-id="${ctrlId || id}">
+                    <label style="display:flex; gap:6px; align-items:center; padding:2px 0; font-size:10px; color:var(--text-secondary); cursor:pointer; width:100%; max-width:none;">
+                        <input id="${id}" type="checkbox" ${marcado ? "checked" : ""} style="accent-color: var(--color-cyan); margin:0; cursor:pointer;">
+                        <span>${rotulo}${this._slotExplica(explicaChaves)}</span>
+                    </label>
+                </div>
             `;
             const selEstilo = "height:20px; font-size:10px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; border-radius:4px; padding:0 2px;";
 
-            html += `
-                <div class="adjustments-section" data-section="audio_render">
-                    <div class="adjustments-section-title"><i class="fa-solid fa-file-audio"></i> Tratamento (gera arquivo)</div>
-                    <div class="adjustments-section-body">
-                        <div class="adjustments-row">
+            audioRenderHTML = `
+                <div class="adjustments-section" data-section-id="audio_render" draggable="true">
+                    <div class="adjustments-section-header" data-section-toggle="audio_render">
+                        <div class="adj-header-left">
+                            <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                            <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isArOpen ? 'open' : ''}"></i>
+                            <span class="adj-title-text"><i class="fa-solid fa-file-audio"></i> Tratamento (gera arquivo)</span>
+                            ${isArMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
+                        </div>
+                    </div>
+                    <div class="adjustments-section-body" style="${isArOpen ? '' : 'display:none;'}">
+                        <div class="adjustments-row" data-control-id="ar_preset">
                             <label>Preset${this._slotExplica("presets resgate_estourado")}</label>
                             <div class="control-wrap">
                                 <select id="adj-ar-preset" class="nle-select" style="${selEstilo} width:100%;">
@@ -1884,9 +2452,9 @@ export class CapiauTimelineInteraction {
                                 </select>
                             </div>
                         </div>
-                        ${caixaPasso("adj-ar-reparo", "Reparo de clipping (adeclip + adeclick)", opcoesIniciais.reparo, "reparo_clipping adeclip adeclick")}
-                        ${caixaPasso("adj-ar-fala", "Nivelar fala (speechnorm)", opcoesIniciais.fala, "speechnorm nivelar_fala")}
-                        <div class="adjustments-row">
+                        ${caixaPasso("adj-ar-reparo", "Reparo de clipping (adeclip + adeclick)", opcoesIniciais.reparo, "reparo_clipping adeclip adeclick", "ar_reparo")}
+                        ${caixaPasso("adj-ar-fala", "Nivelar fala (speechnorm)", opcoesIniciais.fala, "speechnorm nivelar_fala", "ar_fala")}
+                        <div class="adjustments-row" data-control-id="ar_loudnorm">
                             <label></label>
                             <div class="control-wrap" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                                 <input id="adj-ar-loudnorm" type="checkbox" ${opcoesIniciais.loudnorm ? "checked" : ""} style="accent-color: var(--color-cyan); margin:0; cursor:pointer;">
@@ -1904,8 +2472,8 @@ export class CapiauTimelineInteraction {
                                 </select>
                             </div>
                         </div>
-                        ${caixaPasso("adj-ar-limitador", "Teto de pico (alimiter)", opcoesIniciais.limitador, "alimiter limitador")}
-                        <div class="adjustments-row" style="margin-top:6px;">
+                        ${caixaPasso("adj-ar-limitador", "Teto de pico (alimiter)", opcoesIniciais.limitador, "alimiter limitador", "ar_limitador")}
+                        <div class="adjustments-row" data-control-id="ar_motor" style="margin-top:6px;">
                             <label>Motor</label>
                             <div class="control-wrap" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:10px; color:var(--text-secondary);">
                                 <label style="display:flex; gap:4px; align-items:center; cursor:pointer;"><input type="radio" name="adj-ar-motor" value="local" checked style="accent-color: var(--color-cyan); cursor:pointer;"> Local</label>
@@ -1929,223 +2497,45 @@ export class CapiauTimelineInteraction {
                         <div style="font-size:9px; color:var(--text-muted); padding-top:2px;">Diferente dos ajustes ao vivo (mudam na hora), o Aplicar entra numa fila: os números "depois" só aparecem quando o render termina.</div>
                     </div>
                 </div>
+            `;
 
-                <div class="adjustments-section" data-section="audio_render_resultado">
-                    <div class="adjustments-section-title"><i class="fa-solid fa-chart-column"></i> Resultado</div>
-                    <div id="adj-ar-resultado-body" data-alvo="${alvoRender.id}" class="adjustments-section-body">
+            const isResOpen = states["audio_render_resultado"] !== false;
+            const isResMod = this._isSectionModified(clip, "audio_render_resultado");
+            audioResultadoHTML = `
+                <div class="adjustments-section" data-section-id="audio_render_resultado" draggable="true">
+                    <div class="adjustments-section-header" data-section-toggle="audio_render_resultado">
+                        <div class="adj-header-left">
+                            <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                            <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isResOpen ? 'open' : ''}"></i>
+                            <span class="adj-title-text"><i class="fa-solid fa-chart-column"></i> Resultado</span>
+                            ${isResMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
+                        </div>
+                    </div>
+                    <div id="adj-ar-resultado-body" data-alvo="${alvoRender.id}" class="adjustments-section-body" style="${isResOpen ? '' : 'display:none;'}">
                         ${this._audioResultadoInner(efeitoRender, alvoRender.id)}
                     </div>
                 </div>
             `;
-        }
 
-        if (!isAudioTrack) {
-
-            // -- SEÇÃO: MOVIMENTO (KEN BURNS) --
-            if (isPhoto) {
-                html += `
-                    <div class="adjustments-section">
-                        <div class="adjustments-section-title"><i class="fa-solid fa-circle-nodes"></i> Movimento (Ken Burns)</div>
-                        <div class="adjustments-row" style="margin-bottom:0;">
-                            <select id="adj-kb-preset" class="nle-select" style="width:100%;">
-                                <option value="none" ${kbPreset === 'none' ? 'selected' : ''}>Nenhum</option>
-                                <option value="zoomIn" ${kbPreset === 'zoomIn' ? 'selected' : ''}>Zoom In</option>
-                                <option value="zoomOut" ${kbPreset === 'zoomOut' ? 'selected' : ''}>Zoom Out</option>
-                                <option value="panRight" ${kbPreset === 'panRight' ? 'selected' : ''}>Pan Direita →</option>
-                                <option value="panLeft" ${kbPreset === 'panLeft' ? 'selected' : ''}>Pan Esquerda ←</option>
-                            </select>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // -- SEÇÃO: GEOMETRIA --
-            const tfDisabled = tf.disabled === true;
-            html += `
-                <div class="adjustments-section">
-                    <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                        <span style="display:flex; gap:6px; align-items:center;">
-                            <i class="fa-solid fa-arrows-up-down-left-right"></i> Transformações
-                        </span>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <button class="btn-adj-bypass" data-section="transform" title="${tfDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="background:none; border:none; color:${tfDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${tfDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                            <button class="btn-adj-reset" data-section="transform" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
-                        </div>
-                    </div>
-                    <div class="adjustments-section-body" style="opacity:${tfDisabled ? 0.4 : 1}; pointer-events:${tfDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
-                        <div class="adjustments-row">
-                            <label>Posição X</label>
-                            <div class="control-wrap">
-                                <input type="range" data-prop="x" min="-100" max="100" value="${roundVal(x)}" data-tooltip="Posição X: ${roundVal(x)}%">
-                                <span class="value-disp">${roundVal(x)}%</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Posição Y</label>
-                            <div class="control-wrap">
-                                <input type="range" data-prop="y" min="-100" max="100" value="${roundVal(y)}" data-tooltip="Posição Y: ${roundVal(y)}%">
-                                <span class="value-disp">${roundVal(y)}%</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Escala</label>
-                            <div class="control-wrap">
-                                <input type="range" data-prop="scale" min="50" max="300" value="${roundVal(scale * 100)}" data-tooltip="Escala: ${roundVal(scale * 100)}%">
-                                <span class="value-disp">${roundVal(scale * 100)}%</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Rotação</label>
-                            <div class="control-wrap">
-                                <input type="range" data-prop="rotation" min="-180" max="180" value="${roundVal(rotation)}" data-tooltip="Rotação: ${roundVal(rotation)}°">
-                                <span class="value-disp">${roundVal(rotation)}°</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Opacidade</label>
-                            <div class="control-wrap">
-                                <input type="range" data-prop="opacity" min="0" max="100" value="${roundVal(opacity * 100)}" data-tooltip="Opacidade: ${roundVal(opacity * 100)}%">
-                                <span class="value-disp">${roundVal(opacity * 100)}%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // -- SEÇÃO: CORTE (CROP) --
-            const cropDisabled = cropEffect.disabled === true;
-            html += `
-                <div class="adjustments-section">
-                    <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                        <span style="display:flex; gap:6px; align-items:center;">
-                            <i class="fa-solid fa-scissors"></i> Recorte (Crop)
-                        </span>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <button class="btn-adj-bypass" data-section="crop" title="${cropDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="background:none; border:none; color:${cropDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${cropDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                            <button class="btn-adj-reset" data-section="crop" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
-                        </div>
-                    </div>
-                    <div class="adjustments-section-body" style="opacity:${cropDisabled ? 0.4 : 1}; pointer-events:${cropDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
-                        <div class="adjustments-row">
-                            <label>Esquerda</label>
-                            <div class="control-wrap">
-                                <input type="range" data-crop="left" min="0" max="100" value="${roundVal(cropLeft)}" data-tooltip="Recorte Esquerda: ${roundVal(cropLeft)}%">
-                                <span class="value-disp">${roundVal(cropLeft)}%</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Direita</label>
-                            <div class="control-wrap">
-                                <input type="range" data-crop="right" min="0" max="100" value="${roundVal(cropRight)}" data-tooltip="Recorte Direita: ${roundVal(cropRight)}%">
-                                <span class="value-disp">${roundVal(cropRight)}%</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Topo</label>
-                            <div class="control-wrap">
-                                <input type="range" data-crop="top" min="0" max="100" value="${roundVal(cropTop)}" data-tooltip="Recorte Topo: ${roundVal(cropTop)}%">
-                                <span class="value-disp">${roundVal(cropTop)}%</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Base</label>
-                            <div class="control-wrap">
-                                <input type="range" data-crop="bottom" min="0" max="100" value="${roundVal(cropBottom)}" data-tooltip="Recorte Base: ${roundVal(cropBottom)}%">
-                                <span class="value-disp">${roundVal(cropBottom)}%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // -- SEÇÃO: CORES & FILTROS --
-            const colDisabled = col.disabled === true;
-            html += `
-                <div class="adjustments-section">
-                    <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                        <span style="display:flex; gap:6px; align-items:center;">
-                            <i class="fa-solid fa-palette"></i> Efeitos de Cor
-                        </span>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <button class="btn-adj-bypass" data-section="color" title="${colDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="background:none; border:none; color:${colDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${colDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                            <button class="btn-adj-reset" data-section="color" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
-                        </div>
-                    </div>
-                    <div class="adjustments-section-body" style="opacity:${colDisabled ? 0.4 : 1}; pointer-events:${colDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
-                        <div class="adjustments-row">
-                            <label>Brilho</label>
-                            <div class="control-wrap">
-                                <input type="range" data-color="brightness" min="-100" max="100" value="${roundVal(brightness)}" data-tooltip="Brilho: ${roundVal(brightness)}%">
-                                <span class="value-disp">${roundVal(brightness)}%</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Contraste</label>
-                            <div class="control-wrap">
-                                <input type="range" data-color="contrast" min="-100" max="100" value="${roundVal(contrast)}" data-tooltip="Contraste: ${roundVal(contrast)}%">
-                                <span class="value-disp">${roundVal(contrast)}%</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Saturação</label>
-                            <div class="control-wrap">
-                                <input type="range" data-color="saturation" min="0" max="200" value="${roundVal(saturation)}" data-tooltip="Saturação: ${roundVal(saturation)}%">
-                                <span class="value-disp">${roundVal(saturation)}%</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Matiz</label>
-                            <div class="control-wrap">
-                                <input type="range" data-color="hue" min="-180" max="180" value="${roundVal(hue)}" data-tooltip="Matiz: ${roundVal(hue)}°">
-                                <span class="value-disp">${roundVal(hue)}°</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Sépia</label>
-                            <div class="control-wrap">
-                                <input type="range" data-color="sepia" min="0" max="100" value="${roundVal(sepia)}" data-tooltip="Sépia: ${roundVal(sepia)}%">
-                                <span class="value-disp">${roundVal(sepia)}%</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Cinzas</label>
-                            <div class="control-wrap">
-                                <input type="range" data-color="grayscale" min="0" max="100" value="${roundVal(grayscale)}" data-tooltip="Cinzas: ${roundVal(grayscale)}%">
-                                <span class="value-disp">${roundVal(grayscale)}%</span>
-                            </div>
-                        </div>
-                        <div class="adjustments-row">
-                            <label>Desfoque</label>
-                            <div class="control-wrap">
-                                <input type="range" data-color="blur" min="0" max="20" value="${roundVal(blur)}" data-tooltip="Desfoque: ${roundVal(blur)}px">
-                                <span class="value-disp">${roundVal(blur)}px</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // -- SEÇÃO: VOLUME DE ÁUDIO --
-        if (isAudioTrack || partnerAudioClip) {
             const dbVal = level > 0 ? (20 * Math.log10(level)).toFixed(1) : "-inf";
-            const targetVolClip = isAudioTrack ? clip : partnerAudioClip;
-            const volEffect = targetVolClip ? (targetVolClip.effects || []).find(e => e.type === "volume") : null;
-            const volDisabled = volEffect ? volEffect.disabled === true : false;
-
-            html += `
-                <div class="adjustments-section">
-                    <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                        <span style="display:flex; gap:6px; align-items:center;">
-                            <i class="fa-solid fa-volume-high"></i> Áudio / Volume
-                        </span>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <button class="btn-adj-bypass" data-section="volume" title="${volDisabled ? 'Ativar volume' : 'Desativar volume'}" style="background:none; border:none; color:${volDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${volDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                            <button class="btn-adj-reset" data-section="volume" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+            const isVolOpen = states["volume"] !== false;
+            const isVolMod = this._isSectionModified(clip, "volume");
+            volumeHTML = `
+                <div class="adjustments-section" data-section-id="volume" draggable="true">
+                    <div class="adjustments-section-header" data-section-toggle="volume">
+                        <div class="adj-header-left">
+                            <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                            <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isVolOpen ? 'open' : ''}"></i>
+                            <span class="adj-title-text"><i class="fa-solid fa-volume-high"></i> Áudio / Volume</span>
+                            ${isVolMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
+                        </div>
+                        <div class="adj-header-actions" onclick="event.stopPropagation()">
+                            <button class="btn-adj-bypass" data-section="volume" title="${volDisabled ? 'Ativar volume' : 'Desativar volume'}" style="color:${volDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${volDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                            <button class="btn-adj-reset" data-section="volume" title="Resetar padrão"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                         </div>
                     </div>
-                    <div class="adjustments-section-body" style="opacity:${volDisabled ? 0.4 : 1}; pointer-events:${volDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
-                        <div class="adjustments-row">
+                    <div class="adjustments-section-body" style="${isVolOpen ? '' : 'display:none;'} opacity:${volDisabled ? 0.4 : 1}; pointer-events:${volDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
+                        <div class="adjustments-row" data-control-id="vol_level">
                             <label>Nível</label>
                             <div class="control-wrap" style="flex:1; width:100%; display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
                                 <input id="adj-volume-slider" type="range" min="0" max="200" value="${roundVal(level * 100)}" data-tooltip="Volume: ${roundVal(level * 100)}% (${dbVal} dB)" style="flex:1; min-width:50px;">
@@ -2157,76 +2547,308 @@ export class CapiauTimelineInteraction {
             `;
         }
 
-        // -- SEÇÃO: TRANSIÇÕES (FADES) --
-        const fadesDisabled = (fadeIn && fadeIn.disabled === true) || (fadeOut && fadeOut.disabled === true);
-        html += `
-            <div class="adjustments-section">
-                <div class="adjustments-section-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                    <span style="display:flex; gap:6px; align-items:center;">
-                        <i class="fa-solid fa-circle-half-stroke"></i> Transições
-                    </span>
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <button class="btn-adj-bypass" data-section="fades" title="${fadesDisabled ? 'Ativar transições' : 'Desativar transições'}" style="background:none; border:none; color:${fadesDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'}; cursor:pointer; font-size:10px;"><i class="fa-solid ${fadesDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                        <button class="btn-adj-reset" data-section="fades" title="Resetar padrão" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px;"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+        // Seção Transformação
+        const isTfOpen = states["transform"] !== false;
+        const isTfMod = this._isSectionModified(clip, "transform");
+        const transformHTML = `
+            <div class="adjustments-section" data-section-id="transform" draggable="true">
+                <div class="adjustments-section-header" data-section-toggle="transform">
+                    <div class="adj-header-left">
+                        <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                        <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isTfOpen ? 'open' : ''}"></i>
+                        <span class="adj-title-text"><i class="fa-solid fa-arrows-up-down-left-right"></i> Transformações</span>
+                        ${isTfMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
+                    </div>
+                    <div class="adj-header-actions" onclick="event.stopPropagation()">
+                        <button class="btn-adj-bypass" data-section="transform" title="${tfDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="color:${tfDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${tfDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-reset" data-section="transform" title="Resetar padrão"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                     </div>
                 </div>
-                <div class="adjustments-section-body" style="opacity:${fadesDisabled ? 0.4 : 1}; pointer-events:${fadesDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
-                        <div class="adjustments-row adjustments-row-fade" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <label style="font-size:11px; color:var(--text-secondary);">Fade In</label>
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <div class="control-wrap" style="display:flex; align-items:center; gap:2px;">
-                                    <input id="adj-fadein" type="number" class="nle-input-flat" min="0" step="0.1" value="${fadeInDur}" data-tooltip="Fade In: ${fadeInDur}s" style="background:transparent; border:none; outline:none; color:var(--color-cyan); font-size:11px; font-weight:600; text-align:right; width:34px; font-family:monospace; padding:0;">
-                                    <span style="font-size:10px; color:var(--text-muted); user-select:none;">s</span>
-                                    <div class="flat-number-stepper" style="display:flex; flex-direction:column; gap:1px; margin-left:3px;">
-                                        <button class="btn-fade-step" data-target="adj-fadein" data-dir="up" title="Aumentar (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-up"></i></button>
-                                        <button class="btn-fade-step" data-target="adj-fadein" data-dir="down" title="Diminuir (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-down"></i></button>
-                                    </div>
-                                </div>
-                                <select id="adj-fadein-curve" class="nle-select" style="font-size:10px; padding:2px 4px; height:22px; width:95px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); border-radius:4px; color:var(--text-secondary);">
-                                    <option value="linear" ${fadeInCurve === 'linear' ? 'selected' : ''}>Linear</option>
-                                    <option value="exponential" ${fadeInCurve === 'exponential' ? 'selected' : ''}>Exponencial</option>
-                                    <option value="logarithmic" ${fadeInCurve === 'logarithmic' ? 'selected' : ''}>Logarítmica</option>
-                                    <option value="s_curve" ${fadeInCurve === 's_curve' ? 'selected' : ''}>Curva em S</option>
-                                    <option value="custom" ${fadeInCurve === 'custom' ? 'selected' : ''}>Customizada</option>
-                                </select>
-                            </div>
+                <div class="adjustments-section-body" style="${isTfOpen ? '' : 'display:none;'} opacity:${tfDisabled ? 0.4 : 1}; pointer-events:${tfDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
+                    <div class="adjustments-row" data-control-id="x">
+                        <label>Posição X</label>
+                        <div class="control-wrap">
+                            <input type="range" data-prop="x" min="-100" max="100" value="${roundVal(x)}" data-tooltip="Posição X: ${roundVal(x)}%">
+                            <span class="value-disp">${roundVal(x)}%</span>
                         </div>
-                        <div class="adjustments-row adjustments-row-fade" style="display:flex; justify-content:space-between; align-items:center;">
-                            <label style="font-size:11px; color:var(--text-secondary);">Fade Out</label>
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <div class="control-wrap" style="display:flex; align-items:center; gap:2px;">
-                                    <input id="adj-fadeout" type="number" class="nle-input-flat" min="0" step="0.1" value="${fadeOutDur}" data-tooltip="Fade Out: ${fadeOutDur}s" style="background:transparent; border:none; outline:none; color:var(--color-cyan); font-size:11px; font-weight:600; text-align:right; width:34px; font-family:monospace; padding:0;">
-                                    <span style="font-size:10px; color:var(--text-muted); user-select:none;">s</span>
-                                    <div class="flat-number-stepper" style="display:flex; flex-direction:column; gap:1px; margin-left:3px;">
-                                        <button class="btn-fade-step" data-target="adj-fadeout" data-dir="up" title="Aumentar (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-up"></i></button>
-                                        <button class="btn-fade-step" data-target="adj-fadeout" data-dir="down" title="Diminuir (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-down"></i></button>
-                                    </div>
-                                </div>
-                                <select id="adj-fadeout-curve" class="nle-select" style="font-size:10px; padding:2px 4px; height:22px; width:95px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); border-radius:4px; color:var(--text-secondary);">
-                                    <option value="linear" ${fadeOutCurve === 'linear' ? 'selected' : ''}>Linear</option>
-                                    <option value="exponential" ${fadeOutCurve === 'exponential' ? 'selected' : ''}>Exponencial</option>
-                                    <option value="logarithmic" ${fadeOutCurve === 'logarithmic' ? 'selected' : ''}>Logarítmica</option>
-                                    <option value="s_curve" ${fadeOutCurve === 's_curve' ? 'selected' : ''}>Curva em S</option>
-                                    <option value="custom" ${fadeOutCurve === 'custom' ? 'selected' : ''}>Customizada</option>
-                                </select>
-                            </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="y">
+                        <label>Posição Y</label>
+                        <div class="control-wrap">
+                            <input type="range" data-prop="y" min="-100" max="100" value="${roundVal(y)}" data-tooltip="Posição Y: ${roundVal(y)}%">
+                            <span class="value-disp">${roundVal(y)}%</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="scale">
+                        <label>Escala</label>
+                        <div class="control-wrap">
+                            <input type="range" data-prop="scale" min="50" max="300" value="${roundVal(scale * 100)}" data-tooltip="Escala: ${roundVal(scale * 100)}%">
+                            <span class="value-disp">${roundVal(scale * 100)}%</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="rotation">
+                        <label>Rotação</label>
+                        <div class="control-wrap">
+                            <input type="range" data-prop="rotation" min="-180" max="180" value="${roundVal(rotation)}" data-tooltip="Rotação: ${roundVal(rotation)}°">
+                            <span class="value-disp">${roundVal(rotation)}°</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="opacity">
+                        <label>Opacidade</label>
+                        <div class="control-wrap">
+                            <input type="range" data-prop="opacity" min="0" max="100" value="${roundVal(opacity * 100)}" data-tooltip="Opacidade: ${roundVal(opacity * 100)}%">
+                            <span class="value-disp">${roundVal(opacity * 100)}%</span>
                         </div>
                     </div>
                 </div>
-            `;
+            </div>
+        `;
+
+        // Seção Recorte (Crop)
+        const isCropOpen = states["crop"] !== false;
+        const isCropMod = this._isSectionModified(clip, "crop");
+        const cropHTML = `
+            <div class="adjustments-section" data-section-id="crop" draggable="true">
+                <div class="adjustments-section-header" data-section-toggle="crop">
+                    <div class="adj-header-left">
+                        <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                        <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isCropOpen ? 'open' : ''}"></i>
+                        <span class="adj-title-text"><i class="fa-solid fa-scissors"></i> Recorte (Crop)</span>
+                        ${isCropMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
+                    </div>
+                    <div class="adj-header-actions" onclick="event.stopPropagation()">
+                        <button class="btn-adj-bypass" data-section="crop" title="${cropDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="color:${cropDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${cropDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-reset" data-section="crop" title="Resetar padrão"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                    </div>
+                </div>
+                <div class="adjustments-section-body" style="${isCropOpen ? '' : 'display:none;'} opacity:${cropDisabled ? 0.4 : 1}; pointer-events:${cropDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
+                    <div class="adjustments-row" data-control-id="left">
+                        <label>Esquerda</label>
+                        <div class="control-wrap">
+                            <input type="range" data-crop="left" min="0" max="100" value="${roundVal(cropLeft)}" data-tooltip="Recorte Esquerda: ${roundVal(cropLeft)}%">
+                            <span class="value-disp">${roundVal(cropLeft)}%</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="right">
+                        <label>Direita</label>
+                        <div class="control-wrap">
+                            <input type="range" data-crop="right" min="0" max="100" value="${roundVal(cropRight)}" data-tooltip="Recorte Direita: ${roundVal(cropRight)}%">
+                            <span class="value-disp">${roundVal(cropRight)}%</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="top">
+                        <label>Topo</label>
+                        <div class="control-wrap">
+                            <input type="range" data-crop="top" min="0" max="100" value="${roundVal(cropTop)}" data-tooltip="Recorte Topo: ${roundVal(cropTop)}%">
+                            <span class="value-disp">${roundVal(cropTop)}%</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="bottom">
+                        <label>Base</label>
+                        <div class="control-wrap">
+                            <input type="range" data-crop="bottom" min="0" max="100" value="${roundVal(cropBottom)}" data-tooltip="Recorte Base: ${roundVal(cropBottom)}%">
+                            <span class="value-disp">${roundVal(cropBottom)}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Seção Movimento (Ken Burns para fotos)
+        const isKbOpen = states["ken_burns"] !== false;
+        const isKbMod = this._isSectionModified(clip, "ken_burns");
+        const kbHTML = `
+            <div class="adjustments-section" data-section-id="ken_burns" draggable="true">
+                <div class="adjustments-section-header" data-section-toggle="ken_burns">
+                    <div class="adj-header-left">
+                        <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                        <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isKbOpen ? 'open' : ''}"></i>
+                        <span class="adj-title-text"><i class="fa-solid fa-circle-nodes"></i> Movimento (Ken Burns)</span>
+                        ${isKbMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
+                    </div>
+                </div>
+                <div class="adjustments-section-body" style="${isKbOpen ? '' : 'display:none;'}">
+                    <div class="adjustments-row" data-control-id="kb_preset" style="margin-bottom:0;">
+                        <select id="adj-kb-preset" class="nle-select" style="width:100%;">
+                            <option value="none" ${kbPreset === 'none' ? 'selected' : ''}>Nenhum</option>
+                            <option value="zoomIn" ${kbPreset === 'zoomIn' ? 'selected' : ''}>Zoom In</option>
+                            <option value="zoomOut" ${kbPreset === 'zoomOut' ? 'selected' : ''}>Zoom Out</option>
+                            <option value="panRight" ${kbPreset === 'panRight' ? 'selected' : ''}>Pan Direita →</option>
+                            <option value="panLeft" ${kbPreset === 'panLeft' ? 'selected' : ''}>Pan Esquerda ←</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Seção Cores & Filtros
+        const isColOpen = states["color"] !== false;
+        const isColMod = this._isSectionModified(clip, "color");
+        const colorHTML = `
+            <div class="adjustments-section" data-section-id="color" draggable="true">
+                <div class="adjustments-section-header" data-section-toggle="color">
+                    <div class="adj-header-left">
+                        <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                        <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isColOpen ? 'open' : ''}"></i>
+                        <span class="adj-title-text"><i class="fa-solid fa-palette"></i> Efeitos de Cor</span>
+                        ${isColMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
+                    </div>
+                    <div class="adj-header-actions" onclick="event.stopPropagation()">
+                        <button class="btn-adj-bypass" data-section="color" title="${colDisabled ? 'Ativar efeito' : 'Desativar efeito'}" style="color:${colDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${colDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-reset" data-section="color" title="Resetar padrão"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                    </div>
+                </div>
+                <div class="adjustments-section-body" style="${isColOpen ? '' : 'display:none;'} opacity:${colDisabled ? 0.4 : 1}; pointer-events:${colDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
+                    <div class="adjustments-row" data-control-id="brightness">
+                        <label>Brilho</label>
+                        <div class="control-wrap">
+                            <input type="range" data-color="brightness" min="-100" max="100" value="${roundVal(brightness)}" data-tooltip="Brilho: ${roundVal(brightness)}%">
+                            <span class="value-disp">${roundVal(brightness)}%</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="contrast">
+                        <label>Contraste</label>
+                        <div class="control-wrap">
+                            <input type="range" data-color="contrast" min="-100" max="100" value="${roundVal(contrast)}" data-tooltip="Contraste: ${roundVal(contrast)}%">
+                            <span class="value-disp">${roundVal(contrast)}%</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="saturation">
+                        <label>Saturação</label>
+                        <div class="control-wrap">
+                            <input type="range" data-color="saturation" min="0" max="200" value="${roundVal(saturation)}" data-tooltip="Saturação: ${roundVal(saturation)}%">
+                            <span class="value-disp">${roundVal(saturation)}%</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="hue">
+                        <label>Matiz</label>
+                        <div class="control-wrap">
+                            <input type="range" data-color="hue" min="-180" max="180" value="${roundVal(hue)}" data-tooltip="Matiz: ${roundVal(hue)}°">
+                            <span class="value-disp">${roundVal(hue)}°</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="sepia">
+                        <label>Sépia</label>
+                        <div class="control-wrap">
+                            <input type="range" data-color="sepia" min="0" max="100" value="${roundVal(sepia)}" data-tooltip="Sépia: ${roundVal(sepia)}%">
+                            <span class="value-disp">${roundVal(sepia)}%</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="grayscale">
+                        <label>Cinzas</label>
+                        <div class="control-wrap">
+                            <input type="range" data-color="grayscale" min="0" max="100" value="${roundVal(grayscale)}" data-tooltip="Cinzas: ${roundVal(grayscale)}%">
+                            <span class="value-disp">${roundVal(grayscale)}%</span>
+                        </div>
+                    </div>
+                    <div class="adjustments-row" data-control-id="blur">
+                        <label>Desfoque</label>
+                        <div class="control-wrap">
+                            <input type="range" data-color="blur" min="0" max="20" value="${roundVal(blur)}" data-tooltip="Desfoque: ${roundVal(blur)}px">
+                            <span class="value-disp">${roundVal(blur)}px</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Seção Transições (Fades)
+        const isFadesOpen = states["fades"] !== false;
+        const isFadesMod = this._isSectionModified(clip, "fades");
+        const fadesHTML = `
+            <div class="adjustments-section" data-section-id="fades" draggable="true">
+                <div class="adjustments-section-header" data-section-toggle="fades">
+                    <div class="adj-header-left">
+                        <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                        <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isFadesOpen ? 'open' : ''}"></i>
+                        <span class="adj-title-text"><i class="fa-solid fa-circle-half-stroke"></i> Transições</span>
+                        ${isFadesMod ? '<span class="adj-modified-dot" title="Ajustes modificados"></span>' : ''}
+                    </div>
+                    <div class="adj-header-actions" onclick="event.stopPropagation()">
+                        <button class="btn-adj-bypass" data-section="fades" title="${fadesDisabled ? 'Ativar transições' : 'Desativar transições'}" style="color:${fadesDisabled ? 'var(--text-muted)' : 'var(--color-cyan)'};"><i class="fa-solid ${fadesDisabled ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                        <button class="btn-adj-reset" data-section="fades" title="Resetar padrão"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                    </div>
+                </div>
+                <div class="adjustments-section-body" style="${isFadesOpen ? '' : 'display:none;'} opacity:${fadesDisabled ? 0.4 : 1}; pointer-events:${fadesDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
+                    <div class="adjustments-row adjustments-row-fade" data-control-id="fadein" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <label style="font-size:11px; color:var(--text-secondary);">Fade In</label>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <div class="control-wrap" style="display:flex; align-items:center; gap:2px;">
+                                <input id="adj-fadein" type="number" class="nle-input-flat" min="0" step="0.1" value="${fadeInDur}" data-tooltip="Fade In: ${fadeInDur}s" style="background:transparent; border:none; outline:none; color:var(--color-cyan); font-size:11px; font-weight:600; text-align:right; width:34px; font-family:monospace; padding:0;">
+                                <span style="font-size:10px; color:var(--text-muted); user-select:none;">s</span>
+                                <div class="flat-number-stepper" style="display:flex; flex-direction:column; gap:1px; margin-left:3px;">
+                                    <button class="btn-fade-step" data-target="adj-fadein" data-dir="up" title="Aumentar (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-up"></i></button>
+                                    <button class="btn-fade-step" data-target="adj-fadein" data-dir="down" title="Diminuir (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-down"></i></button>
+                                </div>
+                            </div>
+                            <select id="adj-fadein-curve" class="nle-select" style="font-size:10px; padding:2px 4px; height:22px; width:95px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); border-radius:4px; color:var(--text-secondary);">
+                                <option value="linear" ${fadeInCurve === 'linear' ? 'selected' : ''}>Linear</option>
+                                <option value="exponential" ${fadeInCurve === 'exponential' ? 'selected' : ''}>Exponencial</option>
+                                <option value="logarithmic" ${fadeInCurve === 'logarithmic' ? 'selected' : ''}>Logarítmica</option>
+                                <option value="s_curve" ${fadeInCurve === 's_curve' ? 'selected' : ''}>Curva em S</option>
+                                <option value="custom" ${fadeInCurve === 'custom' ? 'selected' : ''}>Customizada</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="adjustments-row adjustments-row-fade" data-control-id="fadeout" style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="font-size:11px; color:var(--text-secondary);">Fade Out</label>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <div class="control-wrap" style="display:flex; align-items:center; gap:2px;">
+                                <input id="adj-fadeout" type="number" class="nle-input-flat" min="0" step="0.1" value="${fadeOutDur}" data-tooltip="Fade Out: ${fadeOutDur}s" style="background:transparent; border:none; outline:none; color:var(--color-cyan); font-size:11px; font-weight:600; text-align:right; width:34px; font-family:monospace; padding:0;">
+                                <span style="font-size:10px; color:var(--text-muted); user-select:none;">s</span>
+                                <div class="flat-number-stepper" style="display:flex; flex-direction:column; gap:1px; margin-left:3px;">
+                                    <button class="btn-fade-step" data-target="adj-fadeout" data-dir="up" title="Aumentar (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-up"></i></button>
+                                    <button class="btn-fade-step" data-target="adj-fadeout" data-dir="down" title="Diminuir (0.1s)" style="background:transparent; border:none; padding:0; margin:0; color:var(--text-muted); font-size:7px; height:6px; line-height:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-down"></i></button>
+                                </div>
+                            </div>
+                            <select id="adj-fadeout-curve" class="nle-select" style="font-size:10px; padding:2px 4px; height:22px; width:95px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); border-radius:4px; color:var(--text-secondary);">
+                                <option value="linear" ${fadeOutCurve === 'linear' ? 'selected' : ''}>Linear</option>
+                                <option value="exponential" ${fadeOutCurve === 'exponential' ? 'selected' : ''}>Exponencial</option>
+                                <option value="logarithmic" ${fadeOutCurve === 'logarithmic' ? 'selected' : ''}>Logarítmica</option>
+                                <option value="s_curve" ${fadeOutCurve === 's_curve' ? 'selected' : ''}>Curva em S</option>
+                                <option value="custom" ${fadeOutCurve === 'custom' ? 'selected' : ''}>Customizada</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Renderiza as seções na ordem definida pelo usuário
+        sectionOrder.forEach(secId => {
+            if (secId === "transform" && !isAudioTrack) html += transformHTML;
+            else if (secId === "crop" && !isAudioTrack) html += cropHTML;
+            else if (secId === "ken_burns" && isPhoto) html += kbHTML;
+            else if (secId === "color" && !isAudioTrack) html += colorHTML;
+            else if (secId === "fades") html += fadesHTML;
+            else if (secId === "volume" && volumeHTML) html += volumeHTML;
+            else if (secId === "audio_eq" && audioEqHTML) html += audioEqHTML;
+            else if (secId === "audio_dynamics" && audioDynamicsHTML) html += audioDynamicsHTML;
+            else if (secId === "audio_diag" && audioDiagHTML) html += audioDiagHTML;
+            else if (secId === "audio_render" && audioRenderHTML) html += audioRenderHTML;
+            else if (secId === "audio_render_resultado" && audioResultadoHTML) html += audioResultadoHTML;
+        });
 
         const savedScrollTop = container.scrollTop;
         container.innerHTML = html;
         container.scrollTop = savedScrollTop;
 
-        // Acoplar listeners
+        // Acoplar toggles dos accordions e drag & drop
+        this._bindAdjustmentAccordionToggles(container);
+        this._bindAdjustmentsDragAndDrop(container, clip);
+
+        // Acoplar listeners funcionais dos controles
         this.attachAdjustmentsListeners(container, clip.id);
 
-        // N2: os ícones (i) entram POR FORA, quando o glossário chegar do servidor;
-        // até lá as âncoras ficam vazias e nada aparece (painel inteiro e usável).
+        // N2: montar ícones de explicação do glossário
         this._montarIconesExplica(container).catch((err) => console.error("[timeline] falha ao montar os ícones de explicação:", err));
-    }
 
+        // Re-aplica busca se houver termo no input
+        const searchInput = this.canvas.ownerDocument.getElementById("adjustments-search-input");
+        if (searchInput && searchInput.value) {
+            this._filterAdjustmentsBySearch(searchInput.value);
+        }
+    }
     _audioDiagEsc(s) {
         return String(s === undefined || s === null ? "" : s)
             .replace(/&/g, "&amp;")

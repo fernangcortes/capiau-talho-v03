@@ -454,7 +454,36 @@
                     
                     <!-- Tab: Ajustes de Mídia -->
                     <div class="tab-content" id="tab-adjustments">
-                        <div id="adjustments-panel-content" style="padding: 12px; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow-y: auto;">
+                        <div class="adjustments-toolbar" id="adjustments-toolbar" style="padding: 8px 12px; border-bottom: 1px solid var(--border-glass); display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.15); flex-shrink: 0;">
+                            <!-- Linha 1: Campo de Busca Funcional -->
+                            <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+                                <div class="search-area glassmorphism" style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 26px; width: 100%; padding: 0 8px;">
+                                    <i class="fa-solid fa-magnifying-glass search-icon" style="color: var(--text-muted); font-size: 10px;"></i>
+                                    <input type="text" id="adjustments-search-input" placeholder="Buscar ferramenta ou função..." style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; font-size: 10px; color: #fff;">
+                                    <button id="btn-clear-adj-search" title="Limpar busca" style="display: none; background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 0 4px; font-size: 10px;"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            </div>
+                            <!-- Linha 2: Ações Rápidas Globais -->
+                            <div style="display: flex; width: 100%; align-items: center; justify-content: space-between; height: 22px;">
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <button id="btn-adj-expand-all" class="lib-action-btn" data-tooltip="Expandir todas as seções" style="display: flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 9px; color: var(--text-secondary);">
+                                        <i class="fa-solid fa-angles-down" style="color: var(--color-cyan);"></i> <span>Expandir</span>
+                                    </button>
+                                    <button id="btn-adj-collapse-all" class="lib-action-btn" data-tooltip="Recolher todas as seções" style="display: flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 9px; color: var(--text-secondary);">
+                                        <i class="fa-solid fa-angles-up"></i> <span>Recolher</span>
+                                    </button>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <button id="btn-adj-reset-order" class="lib-action-btn" data-tooltip="Restaurar ordem padrão das seções" style="display: flex; align-items: center; gap: 3px; padding: 2px 4px; font-size: 9px; color: var(--text-muted);">
+                                        <i class="fa-solid fa-arrows-rotate"></i>
+                                    </button>
+                                    <button id="btn-adj-reset-all" class="lib-action-btn" data-tooltip="Resetar todos os ajustes do clipe selecionado" style="display: flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 9px; color: var(--text-muted);">
+                                        <i class="fa-solid fa-arrow-rotate-left"></i> <span>Resetar Tudo</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="adjustments-panel-content" style="padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto;">
                             <!-- Dinâmico via JS -->
                         </div>
                     </div>
