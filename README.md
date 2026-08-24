@@ -43,6 +43,7 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   - [✂️ Timeline e edição](#timeline-e-edicao)
   - [👥 Rostos e personagens](#rostos-e-personagens)
   - [🔊 Diagnóstico e tratamento de áudio](#diagnostico-e-tratamento-de-audio)
+  - [🎬 Render de vídeo e exportação](#render-de-video-e-exportacao)
   - [🖥️ Interface e produtividade](#interface-e-produtividade)
   - [🛡️ Resiliência e operação](#resiliencia-e-operacao)
 - [📊 Arquitetura do sistema](#arquitetura-do-sistema)
@@ -193,6 +194,13 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   Navegação rápida por teclado (**`M`** cria/edita, **`Tab`** alterna campos, **`Enter`/`Esc`** salva
   e fecha), seleção múltipla via **`Shift` + clique** e exclusão em lote via **`Delete`/`Backspace`**.
 
+- **Formas de onda reais, não decorativas.** Os picos vêm do stream PCM do arquivo, extraídos por
+  FFmpeg em resolução de 10 ms (100 picos por segundo), guardados em cache no disco e em memória.
+  O desenho preserva **mínimo e máximo** de cada balde em vez de tirar média: um estalo, uma
+  plosiva ou um clique de microfone continuam visíveis com a timeline toda afastada — com média
+  aritmética eles desapareceriam justamente no zoom em que você procura por eles. O botão **Ondas**
+  gera as formas de todo o projeto de uma vez.
+
 ### 👥 Rostos e personagens <a id="rostos-e-personagens"></a>
 
 - **Biometria facial, desambiguação em massa e autocura.** Tela dedicada à catalogação de elenco e
@@ -243,6 +251,34 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   fonte única que alimenta o chat também. O agente ganhou 4 ferramentas de áudio (medir, sugerir,
   aplicar, ajustar ao vivo), somando 16; ele não aciona o Auphonic (gastaria a sua cota — recomenda e
   explica) e nunca liga corte automático.
+
+### 🎬 Render de vídeo e exportação <a id="render-de-video-e-exportacao"></a>
+
+- **O alvo é paridade com o que você vê, não "um MP4 qualquer".** O motor traduz a timeline em um
+  grafo de FFmpeg reproduzindo o monitor de Programa efeito por efeito, e na ordem em que o
+  navegador aplica: enquadramento → cor → borrão → opacidade → recorte → transformação → composição.
+  Trocar duas dessas etapas de lugar já muda a imagem — por isso a ordem é contrato, não detalhe.
+
+- **A cor é matemática do CSS, não aproximação.** `brightness`/`contrast` viram dois estágios de
+  `lutrgb` encadeados (dois, porque o CSS satura entre uma função e outra — compor num só clareia
+  demais), e `saturate`/`hue-rotate`/`sepia`/`grayscale` viram matrizes `colorchannelmixer` na
+  ordem, pulando as neutras. Conferido contra conta feita à mão: um pixel RGB(200,100,50) com
+  saturação zero sai em 117, contra 117,7 do cálculo.
+
+- **Fades com a curva que você desenhou.** As curvas da casa têm tensão contínua, e nenhuma do
+  catálogo do FFmpeg reproduz isso — então viram expressão avaliada quadro a quadro. Divergência
+  medida contra o binário real: 1,97e-5, toda de quantização de 16 bits.
+
+- **Nada é degradado em silêncio.** Antes de começar, um *preflight* diz o que existe e o que falta:
+  mídia ausente e master sem o HD dos originais **bloqueiam** a exportação em vez de renderizar
+  preto; limitação conhecida do motor (o joelho do compressor vai a 8 dB contra 30 dB do navegador,
+  diferença medida de 2,1 dB no limiar) vira aviso âmbar com a lista dos clipes afetados. E se o que
+  está na tela não for o que está salvo no banco, o painel avisa e oferece salvar antes.
+
+- **Rascunho e master pelo mesmo grafo.** O rascunho usa os proxies e parâmetros mais baratos; o
+  master sai dos originais. A fidelidade é idêntica — muda só o custo. Fila sequencial, progresso
+  real vindo do `-progress` do FFmpeg, cancelamento que encerra o processo e descarta o parcial, e
+  encoder por hardware (NVENC/QSV/AMF) detectado automaticamente.
 
 ### 🖥️ Interface e produtividade <a id="interface-e-produtividade"></a>
 

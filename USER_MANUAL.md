@@ -30,6 +30,8 @@ profissional.
 13. [🖥️ 13. Execução Resiliente sem Janela de Console no Windows](#13-execução-resiliente-sem-janela-de-console-no-windows)
 14. [⚡ 14. Configurações de Hardware, Aceleração por GPU e Fallback Automático](#14-configurações-de-hardware-aceleração-por-gpu-e-fallback-automático)
 15. [🎹 15. Mapa de Atalhos de Teclado NLE](#15-mapa-de-atalhos-de-teclado-nle)
+16. [🌊 16. Formas de Onda Reais (Waveforms)](#16-formas-de-onda-reais-waveforms)
+17. [🎬 17. Exportar Vídeo: Render da Timeline em MP4](#17-exportar-vídeo-render-da-timeline-em-mp4)
 
 ---
 
@@ -877,4 +879,126 @@ Para máxima agilidade na ilha de edição, utilize os atalhos de teclado profis
 | | **`Enter` / `Y`** | Aceitar sugestão da IA (*Ghost Clip*) selecionada |
 | | **`Esc`** | Fechar modais, desmarcar ou sair do Inspetor de Mídia |
 
+---
 
+## 🌊 16. Formas de Onda Reais (Waveforms)
+
+A forma de onda desenhada nos clipes de áudio **não é enfeite**: são os picos verdadeiros do
+arquivo. Isso muda o que você consegue fazer com os olhos — achar a respiração antes da fala, o
+estalo do microfone, o ponto exato onde a frase começa — sem precisar dar play.
+
+### Como as ondas são geradas
+
+O FFmpeg decodifica o áudio e entrega os valores brutos; o motor guarda, para cada fatia de **10 ms**
+(100 fatias por segundo), o **menor** e o **maior** valor daquele trecho. O resultado vira um arquivo
+de cache em `data/waveforms/waveform_<id>.json`, gerado uma vez e reaproveitado para sempre.
+
+**Botão "Ondas"** (verde, na barra da Biblioteca): gera as formas de onda de **todos** os vídeos do
+projeto de uma vez. Vídeo sem trilha de áudio é detectado e pulado, sem erro.
+
+### Por que min/máx e não média — a decisão que importa
+
+Este é o ponto que separa uma forma de onda utilizável de uma bonita.
+
+Quando a timeline está afastada, uma tela de 1000 pixels precisa representar talvez 30 minutos de
+áudio: milhares de fatias por pixel. Há duas maneiras de resolver:
+
+| Método | O que acontece com um estalo de 20 ms |
+|---|---|
+| **Média** dos valores | Some. Ele é um pico curto no meio de milhares de amostras baixas — a média o dilui até virar nada |
+| **Mínimo e máximo** (o daqui) | Sobrevive. O balde inteiro é representado pelo seu extremo, então o pico continua desenhado |
+
+O efeito prático: você enxerga o problema com a timeline inteira na tela, dá zoom **no lugar certo**
+e conserta. Com média, o defeito só aparece depois que você já ampliou — e para ampliar, precisaria
+saber onde ele está.
+
+### Funções avançadas
+
+Estas são as peças que fazem a onda parecer instantânea mesmo em acervo grande:
+
+- **Reamostragem por resolução de tela (`getSampledEnvelope`).** A onda não é desenhada "inteira e
+  depois encolhida". O motor recebe quantos pontos horizontais cabem na tela naquele zoom e
+  reagrupa os picos exatamente nessa quantidade, preservando min/máx de cada grupo. Um clipe de 8
+  segundos numa faixa de 200 px e o mesmo clipe ocupando 2000 px produzem desenhos com a mesma
+  fidelidade — muda a densidade, não a verdade.
+
+- **Cache em dois andares.** Disco (JSON, sobrevive a reinício) e memória (`Float32Array`, acesso
+  imediato). O desenho da timeline lê da memória, sem tocar em rede nem disco.
+
+- **Deduplicação de requisições em voo.** Se dez clipes do mesmo vídeo aparecem na tela ao mesmo
+  tempo, sai **uma** requisição, não dez. As outras nove esperam a mesma promessa.
+
+- **Pré-carga pelos clipes da timeline (`preloadForClips`).** Ao abrir uma timeline, o motor já
+  busca as ondas das mídias que ela usa, antes de você rolar até elas.
+
+- **Aviso por evento, sem varredura.** Quando uma onda termina de carregar, os componentes
+  interessados são avisados (`waveformLoaded`) e se redesenham sozinhos. Ninguém fica perguntando
+  "já chegou?" em laço.
+
+---
+
+## 🎬 17. Exportar Vídeo: Render da Timeline em MP4
+
+O botão de claquete na barra da timeline abre o painel de exportação. Ele transforma a sua montagem
+num arquivo — com o compromisso declarado de que o arquivo seja **igual ao que o monitor de Programa
+mostra**, e de nunca degradar nada em silêncio.
+
+### Antes de exportar: salve
+
+> ⚠️ **A exportação usa a versão SALVA no banco, não a que está na tela.**
+
+O auto-salvamento da timeline grava no navegador (`localStorage`), não no banco. Quem ajusta cor ou
+enquadramento e exporta sem salvar renderiza a versão **anterior**. O painel compara as duas e, se
+diferirem, mostra uma faixa âmbar dizendo exatamente o que muda — com o botão **"Salvar e usar esta
+versão"**, que salva a montagem da tela e já passa a exportar ela.
+
+### O painel, de cima para baixo
+
+1. **Timeline** — qual versão salva exportar (a mais recente vem selecionada).
+2. **Preset** — `Master 1080p`, `YouTube`, `Reels/TikTok 9:16`, `WhatsApp leve`.
+3. **Avançado** — resolução, fps, container, codec, qualidade (CRF), bitrate de áudio. Campo em
+   branco significa "usa o do preset".
+4. **Faixa** — timeline inteira ou apenas o intervalo IN–OUT.
+5. **Incluir no render** — por categoria (cor, transições, movimento, ajustes de áudio) e **por
+   pista**, montado a partir das pistas reais da sua timeline. Desmarcar aqui é escolha sua e não
+   gera aviso.
+6. **Banner de fidelidade** (âmbar) — o que o motor ainda não reproduz igual, com a lista de clipes.
+7. **Destino** — pasta e nome do arquivo.
+8. **Após concluir** — abrir pasta, copiar caminho, salvar como, ingerir na biblioteca.
+9. **Exportar Rascunho** ou **Exportar Master**.
+
+### Rascunho x Master
+
+| | Rascunho | Master |
+|---|---|---|
+| Mídia | Proxies locais | **Originais** (HD externo) |
+| Altura | 540p | Resolução da sequência |
+| Qualidade | CRF alto, encode rápido | CRF baixo |
+| Serve para | Conferir montagem e efeitos | Entrega |
+
+**Os dois usam o mesmo grafo de efeitos.** O rascunho não é menos fiel — é mais barato.
+
+Se o HD dos originais estiver desconectado, o master **não cai calado para o proxy**: ou recusa
+listando os clipes órfãos, ou (com a permissão explícita) segue em proxy, avisa e marca `_proxy` no
+nome do arquivo.
+
+### Enquanto roda, e depois
+
+A fila é **sequencial**: um render por timeline por vez. O progresso aparece no rodapé do painel e na
+aba Tarefas, com percentual real e ETA. **Fechar o modal não cancela** — o trabalho continua.
+Cancelar encerra o FFmpeg e apaga o arquivo parcial (um MP4 truncado que parece pronto é pior que
+nenhum).
+
+Terminado, aparecem **Abrir pasta** (abre o explorador com o arquivo já selecionado) e **Copiar
+caminho**.
+
+### Quando algo dá errado
+
+O painel distingue os casos em vez de dar um diagnóstico genérico:
+
+| Situação | O que aparece |
+|---|---|
+| Motor não instalado (404/503) | "O motor de render ainda não está instalado nesta versão" |
+| Pedido recusado (400/422) | Qual campo foi recusado e por quê |
+| Já tem render dessa timeline (409) | Explica a fila sequencial e o que fazer |
+| Sem falar com o servidor | "Não consegui falar com o servidor" |

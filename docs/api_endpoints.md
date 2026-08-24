@@ -281,6 +281,96 @@ apenas um ponteiro.
 - **Query:** `secao` filtra por `diagnostico`, `aovivo`, `tratamento` ou
   `nuvem`. Seção inválida devolve **400** listando as válidas.
 
+## 9. Formas de Onda de Áudio (Waveforms)
+
+### GET /api/videos/{video_id}/waveform
+Picos Min/Max reais extraídos do stream PCM. Gera na primeira chamada e serve do cache depois.
+
+**Query:** `sample_rate` (padrão 100 = um par de picos a cada 10 ms) · `force=true` regenera.
+
+```jsonc
+{
+  "video_id": 247,
+  "sample_rate": 100,
+  "duration": 451.2,
+  "peaks": [-0.12, 0.14, -0.31, 0.29, ...]   // plano: [min0, max0, min1, max1, ...]
+}
+```
+
+Vídeo sem trilha de áudio devolve `peaks: []` e o motivo em `error` — não é erro HTTP: a ausência de
+áudio é um fato sobre a mídia, não uma falha do pedido.
+
+### POST /api/projects/{project_id}/generate-waveforms
+Gera as formas de onda de todo o projeto (botão **Ondas** da Biblioteca). Roda em segundo plano e
+publica progresso no TASK_MANAGER.
+
+---
+
+## 10. Render de Vídeo da Timeline
+
+### POST /api/timeline/{timeline_id}/render/preflight
+**Não renderiza nada.** É o que o painel chama ao abrir. Barato de propósito: só banco e metadado,
+nenhum ffprobe, nenhum decode.
+
+**Corpo:** o mesmo do render (o resultado depende do escopo e do tipo).
+
+```jsonc
+{
+  "ok": true, "nome": "7v3", "duracao_s": 47.85, "fps": 59.94,
+  "resolucao": { "largura": 1920, "altura": 1080 },
+  "clipes_total": 6, "clipes_no_render": 6,
+  "pistas": [ { "id": "V2", "kind": "video", "clipes": 3, "muted": false, "hidden": false } ],
+  "midia": { "ausentes": [], "originais_indisponiveis": [], "usa_proxy_fallback": false },
+  "fidelidade": { "pode_renderizar": true, "avisos": [
+      { "nivel": "warn", "codigo": "JOELHO_COMPRESSOR", "titulo": "...", "clipes": ["cut_1"] } ] },
+  "bloqueios": [],
+  "assinatura": { "clipes": 6, "efeitos": 0, "duracao_total_s": 47.85 },
+  "saida": { "diretorio": "...", "nome_arquivo_sugerido": "7v3_2026-08-24_1112.mp4" }
+}
+```
+
+`assinatura` existe para o painel comparar a versão salva com a que está na tela: o auto-salvamento
+grava em `localStorage`, então exportar sem salvar renderizaria a montagem anterior.
+
+Avisos de nível `block` (mídia ausente, master sem original) **impedem** o render; `warn` só avisa.
+
+### POST /api/timeline/{timeline_id}/render
+Valida, recusa em bloqueio e **enfileira** — nunca segura o request.
+
+```jsonc
+{ "kind": "draft",                       // draft | master
+  "range": { "mode": "full" },           // ou { "mode":"in_out", "start_s":12.4, "end_s":95.0 }
+  "preset": "master_1080",
+  "overrides": { "resolution": null, "fps": null, "container": "mp4", "codec": "h264",
+                 "crf": null, "audio_bitrate": null, "mute_audio": false },
+  "scope": { "categories": { "color": true }, "tracks": { "V1": true } },
+  "output": { "dir": null, "filename": null },
+  "post": { "open_folder": true, "copy_path": false, "save_as": false, "ingest": false },
+  "allow_proxy_fallback": false }
+```
+
+> Chave **ausente** em `categories`/`tracks` significa **ligado**. Campo `null` em `overrides`
+> significa "usa o do preset" — não é erro.
+
+**Resposta:** `{ "task_key": "render_timeline_9", "saida_prevista": "..." }`.
+**409** quando já há render daquela timeline na fila (a fila é sequencial, uma por timeline).
+
+### GET /api/timeline/{timeline_id}/render/ultimo
+Último render daquela timeline: caminho, tamanho, parâmetros e se o arquivo ainda está no disco.
+
+### POST /api/render/revelar
+Abre o explorador de arquivos com o arquivo **selecionado**. Corpo: `{ "caminho": "..." }`.
+
+Guarda de caminho: só revela arquivos dentro das pastas de exportação. Fora delas responde **403** —
+sem isso a rota seria um "abra qualquer caminho desta máquina" exposto por HTTP.
+
+### Progresso e cancelamento
+Não há rota própria: o render usa as genéricas da casa.
+`GET /api/conversions` traz o progresso (procure a chave `render_timeline_<id>`) e
+`POST /api/task/{task_key}/cancel` cancela.
+
+---
+
 ## 7. Documentação Interativa Swagger
 
 - Para documentações interativas completas das rotas HTTP, payloads e
