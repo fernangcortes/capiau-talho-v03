@@ -25,6 +25,62 @@ if (!window.tooltipDisplayPreferences) {
     }
 }
 
+export function getActiveProjectId() {
+    return window.STATE?.currentProjectId || window.STATE?.currentProject?.id || Number(localStorage.getItem("activeProjectId")) || 2;
+}
+
+// ── ESTADO DOS BINS VIRTUAIS & CUSTOMIZAÇÃO DE PASTAS ───────────────
+export let virtualFolderMap = {}; // itemId -> virtualFolderPath (ex: "root/Entrevistas")
+export let virtualEmptyFolders = new Set(); // Set de folderPaths de subpastas vazias
+export let virtualFolderColors = {}; // folderPath -> hex/css cor
+export let virtualDeletedFolders = new Set(); // Set de folderPaths removidos da biblioteca
+export const libraryUndoStack = []; // Pilha de histórico de ações para Ctrl+Z
+
+export function loadVirtualFoldersState(projectId = null) {
+    if (!projectId) projectId = getActiveProjectId();
+    try {
+        virtualFolderMap = JSON.parse(localStorage.getItem(`capiau_virtual_folders_${projectId}`) || "{}");
+        virtualEmptyFolders = new Set(JSON.parse(localStorage.getItem(`capiau_empty_folders_${projectId}`) || "[]"));
+        virtualFolderColors = JSON.parse(localStorage.getItem(`capiau_folder_colors_${projectId}`) || "{}");
+        virtualDeletedFolders = new Set(JSON.parse(localStorage.getItem(`capiau_deleted_folders_${projectId}`) || "[]"));
+    } catch (e) {
+        console.error("Erro ao carregar estado de bins virtuais:", e);
+    }
+}
+
+export function saveVirtualFoldersState(projectId = null) {
+    if (!projectId) projectId = getActiveProjectId();
+    try {
+        localStorage.setItem(`capiau_virtual_folders_${projectId}`, JSON.stringify(virtualFolderMap));
+        localStorage.setItem(`capiau_empty_folders_${projectId}`, JSON.stringify(Array.from(virtualEmptyFolders)));
+        localStorage.setItem(`capiau_folder_colors_${projectId}`, JSON.stringify(virtualFolderColors));
+        localStorage.setItem(`capiau_deleted_folders_${projectId}`, JSON.stringify(Array.from(virtualDeletedFolders)));
+    } catch (e) {
+        console.error("Erro ao salvar estado de bins virtuais:", e);
+    }
+}
+
+export function handleLibraryUndo() {
+    if (libraryUndoStack.length === 0) return false;
+    const action = libraryUndoStack.pop();
+    const projectId = getActiveProjectId();
+
+    if (action.type === "delete_folder") {
+        virtualDeletedFolders = action.previousDeletedFolders;
+        virtualEmptyFolders = action.previousEmptyFolders;
+        virtualFolderMap = action.previousFolderMap;
+        virtualFolderColors = action.previousFolderColors;
+        saveVirtualFoldersState(projectId);
+        if (window.libraryInstance) window.libraryInstance.reloadData();
+        if (typeof window.showToast === "function") {
+            window.showToast(`Pasta "${action.folderName}" restaurada à biblioteca!`, "success");
+        }
+        return true;
+    }
+    return false;
+}
+window.handleLibraryUndo = handleLibraryUndo;
+
 export function isAnyModalOpen(doc = document) {
     if (!doc) return false;
     const candidateModals = doc.querySelectorAll(`
@@ -554,38 +610,150 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     sep2.className = "menu-separator";
     menu.appendChild(sep2);
 
-    // Item: Reanalisar com IA (Visão / ASR)
-    const reanalyzeItem = document.createElement("div");
-    reanalyzeItem.className = "menu-item";
-    const aiLabel = isVideo
-        ? (item.video_type === "interview" ? "Re-transcrever Áudio (ASR)" : "Reanalisar Visão com IA")
-        : "Reanalisar Visão com IA";
-    reanalyzeItem.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i><span class="menu-item-text">${aiLabel}</span>`;
-    reanalyzeItem.addEventListener("click", async () => {
+    // Submenu de Camadas de IA & Decupagem Completa
+    const aiLayersMenuItem = document.createElement("div");
+    aiLayersMenuItem.className = "menu-item menu-item-has-submenu";
+    aiLayersMenuItem.innerHTML = `
+        <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--color-cyan);"></i>
+        <span class="menu-item-text" style="font-weight:600;">Camadas de IA & Decupagem</span>
+        <i class="fa-solid fa-chevron-right menu-item-chevron"></i>
+        <div class="menu-submenu" style="min-width: 250px;"></div>
+    `;
+    const aiSubmenu = aiLayersMenuItem.querySelector(".menu-submenu");
+
+    // Ação Principal: ⚡ Executar Todas as Camadas de IA
+    const runAllItem = document.createElement("div");
+    runAllItem.className = "menu-item";
+    runAllItem.style.background = "rgba(6, 182, 212, 0.12)";
+    runAllItem.style.borderBottom = "1px solid rgba(255, 255, 255, 0.08)";
+    runAllItem.style.marginBottom = "4px";
+    runAllItem.innerHTML = `
+        <i class="fa-solid fa-bolt" style="color:var(--color-cyan);"></i>
+        <span class="menu-item-text" style="color:var(--color-cyan); font-weight:600;">Executar Todas as Camadas de IA</span>
+    `;
+    runAllItem.addEventListener("click", async () => {
         menu.remove();
         try {
             if (isVideo) {
-                if (item.video_type === "interview") {
-                    await CapIAuAPI.transcribeVideo(item.id);
-                    if (typeof window.showToast === "function") window.showToast("Transcrição ASR iniciada!", "success");
-                } else {
-                    await CapIAuAPI.analyzeVideoVision(item.id);
-                    if (typeof window.showToast === "function") window.showToast("Reanálise visual iniciada!", "success");
-                }
+                await CapIAuAPI.analyzeVideoAll(item.id);
             } else {
-                await CapIAuAPI.analyzePhotoVision(item.id);
-                if (typeof window.showToast === "function") window.showToast("Reanálise visual da foto concluída!", "success");
-                if (window.libraryInstance) await window.libraryInstance.reloadData();
+                await CapIAuAPI.analyzePhotoAll(item.id);
+            }
+            if (typeof window.showToast === "function") {
+                window.showToast(`Análise completa de IA iniciada para "${item.filename || 'mídia'}"!`, "success");
+            }
+            if (typeof window.openTasksDrawerAndSwitchTab === "function") {
+                window.openTasksDrawerAndSwitchTab();
             }
         } catch (err) {
             if (typeof window.showToast === "function") {
-                window.showToast("Erro na reanálise: " + err.message, "error");
-            } else {
-                alert("Erro na reanálise: " + err.message);
+                window.showToast("Erro ao iniciar análise: " + err.message, "error");
             }
         }
     });
-    menu.appendChild(reanalyzeItem);
+    aiSubmenu.appendChild(runAllItem);
+
+    // Camada 4: Transcrição ASR (Vídeos)
+    if (isVideo) {
+        const isTranscribed = item.status === "transcribed" || (item.transcription && item.transcription.length > 0);
+        const asrItem = document.createElement("div");
+        asrItem.className = "menu-item";
+        asrItem.innerHTML = `
+            <i class="fa-solid fa-microphone-lines" style="color:${isTranscribed ? 'var(--color-emerald)' : 'var(--text-muted)'};"></i>
+            <span class="menu-item-text">Camada 4: Transcrição ASR</span>
+            <span class="ai-layer-badge ${isTranscribed ? 'done' : 'pending'}">${isTranscribed ? '<i class="fa-solid fa-check"></i> Feita' : 'Pendente'}</span>
+        `;
+        asrItem.addEventListener("click", async () => {
+            menu.remove();
+            try {
+                await CapIAuAPI.transcribeVideo(item.id);
+                if (typeof window.showToast === "function") window.showToast("Transcrição ASR iniciada!", "success");
+                if (typeof window.openTasksDrawerAndSwitchTab === "function") window.openTasksDrawerAndSwitchTab();
+            } catch (err) {
+                if (typeof window.showToast === "function") window.showToast("Erro na transcrição: " + err.message, "error");
+            }
+        });
+        aiSubmenu.appendChild(asrItem);
+    }
+
+    // Camada 5: Visão Multimodal (Vídeos e Fotos)
+    const isVisionDone = Boolean(item.description || (item.tags && item.tags.length > 0) || item.status === "analyzed");
+    const visionItem = document.createElement("div");
+    visionItem.className = "menu-item";
+    visionItem.innerHTML = `
+        <i class="fa-solid fa-eye" style="color:${isVisionDone ? 'var(--color-emerald)' : 'var(--text-muted)'};"></i>
+        <span class="menu-item-text">Camada 5: Visão Multimodal</span>
+        <span class="ai-layer-badge ${isVisionDone ? 'done' : 'pending'}">${isVisionDone ? '<i class="fa-solid fa-check"></i> Feita' : 'Pendente'}</span>
+    `;
+    visionItem.addEventListener("click", async () => {
+        menu.remove();
+        try {
+            if (isVideo) {
+                await CapIAuAPI.analyzeVideoVision(item.id);
+                if (typeof window.showToast === "function") window.showToast("Análise visual do vídeo iniciada!", "success");
+            } else {
+                await CapIAuAPI.analyzePhotoVision(item.id);
+                if (typeof window.showToast === "function") window.showToast("Análise visual da foto concluída!", "success");
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
+            }
+            if (typeof window.openTasksDrawerAndSwitchTab === "function") window.openTasksDrawerAndSwitchTab();
+        } catch (err) {
+            if (typeof window.showToast === "function") window.showToast("Erro na visão: " + err.message, "error");
+        }
+    });
+    aiSubmenu.appendChild(visionItem);
+
+    // Camada 6: Detecção Facial (InsightFace)
+    const isFacesDone = Boolean(item.face_count > 0 || item.faces_detected > 0);
+    const facesItem = document.createElement("div");
+    facesItem.className = "menu-item";
+    facesItem.innerHTML = `
+        <i class="fa-solid fa-user-tag" style="color:${isFacesDone ? 'var(--color-emerald)' : 'var(--text-muted)'};"></i>
+        <span class="menu-item-text">Camada 6: Detecção Facial</span>
+        <span class="ai-layer-badge ${isFacesDone ? 'done' : 'pending'}">${isFacesDone ? '<i class="fa-solid fa-check"></i> Feita' : 'Pendente'}</span>
+    `;
+    facesItem.addEventListener("click", async () => {
+        menu.remove();
+        try {
+            const projectId = getActiveProjectId();
+            if (isVideo) {
+                await CapIAuAPI.analyzeVideoAll(item.id);
+            } else {
+                await CapIAuAPI.request(`/api/faces/photo/${item.id}/detect?project_id=${projectId}&image_path=${encodeURIComponent(item.filepath || '')}`, { method: "POST" });
+            }
+            if (typeof window.showToast === "function") window.showToast("Detecção facial concluída!", "success");
+            if (window.libraryInstance) await window.libraryInstance.reloadData();
+        } catch (err) {
+            if (typeof window.showToast === "function") window.showToast("Erro na detecção facial: " + err.message, "error");
+        }
+    });
+    aiSubmenu.appendChild(facesItem);
+
+    // Camada 7: Indexação Vetorial (Qdrant)
+    const isIndexDone = Boolean(item.status === "transcribed" || item.status === "analyzed" || isVisionDone);
+    const indexItem = document.createElement("div");
+    indexItem.className = "menu-item";
+    indexItem.innerHTML = `
+        <i class="fa-solid fa-database" style="color:${isIndexDone ? 'var(--color-emerald)' : 'var(--text-muted)'};"></i>
+        <span class="menu-item-text">Camada 7: Indexação Vetorial</span>
+        <span class="ai-layer-badge ${isIndexDone ? 'done' : 'pending'}">${isIndexDone ? '<i class="fa-solid fa-check"></i> Feita' : 'Pendente'}</span>
+    `;
+    indexItem.addEventListener("click", async () => {
+        menu.remove();
+        try {
+            if (isVideo) {
+                await CapIAuAPI.analyzeVideoVision(item.id);
+            } else {
+                await CapIAuAPI.analyzePhotoVision(item.id);
+            }
+            if (typeof window.showToast === "function") window.showToast("Indexação vetorial sincronizada no Qdrant!", "success");
+        } catch (err) {
+            if (typeof window.showToast === "function") window.showToast("Erro na indexação: " + err.message, "error");
+        }
+    });
+    aiSubmenu.appendChild(indexItem);
+
+    menu.appendChild(aiLayersMenuItem);
 
     // Item: Alterar Categoria (com Submenu)
     const catMenuItem = document.createElement("div");
@@ -817,13 +985,633 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
 }
 window.showMediaContextMenu = showMediaContextMenu;
 
+// ── MENU DE CONTEXTO E GESTÃO DE BINS VIRTUAIS ───────────────────────
+
+export function showImportChoicesMenu(anchorEl, targetFolderPath = "root") {
+    const oldMenus = document.querySelectorAll(".custom-context-menu");
+    oldMenus.forEach(m => m.remove());
+
+    const menu = document.createElement("div");
+    menu.id = "custom-import-choices-menu";
+    menu.className = "custom-context-menu";
+    menu.style.zIndex = "999999";
+
+    // Opção 1: Importar Pasta Inteira
+    const folderItem = document.createElement("div");
+    folderItem.className = "menu-item";
+    folderItem.innerHTML = `<i class="fa-solid fa-folder-open" style="color:var(--color-cyan);"></i><span class="menu-item-text">Importar Pasta Inteira (HD/Externo)...</span>`;
+    folderItem.addEventListener("click", async () => {
+        menu.remove();
+        try {
+            if (typeof window.showToast === "function") window.showToast("Abrindo seletor de pasta...", "info");
+            const response = await CapIAuAPI.selectFolder();
+            if (response && response.status === "success" && response.path) {
+                const projectId = getActiveProjectId();
+                await CapIAuAPI.triggerExternalIngest(response.path, projectId);
+                if (targetFolderPath && targetFolderPath !== "root") {
+                    virtualDeletedFolders.delete(targetFolderPath);
+                    virtualEmptyFolders.add(targetFolderPath);
+                    saveVirtualFoldersState(projectId);
+                }
+                if (typeof window.showToast === "function") {
+                    window.showToast("Importação da pasta iniciada em background!", "success");
+                }
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
+                if (typeof window.openTasksDrawerAndSwitchTab === "function") {
+                    window.openTasksDrawerAndSwitchTab();
+                }
+            }
+        } catch (err) {
+            if (typeof window.showToast === "function") window.showToast("Erro ao importar pasta: " + err.message, "error");
+        }
+    });
+    menu.appendChild(folderItem);
+
+    // Opção 2: Importar Arquivos Individuais
+    const filesItem = document.createElement("div");
+    filesItem.className = "menu-item";
+    filesItem.innerHTML = `<i class="fa-solid fa-film" style="color:var(--color-violet);"></i><span class="menu-item-text">Importar Arquivos de Mídia...</span>`;
+    filesItem.addEventListener("click", async () => {
+        menu.remove();
+        try {
+            if (typeof window.showToast === "function") window.showToast("Abrindo seletor de arquivos...", "info");
+            const response = await CapIAuAPI.selectFiles();
+            if (response && response.status === "success" && response.paths && response.paths.length > 0) {
+                const projectId = getActiveProjectId();
+                await CapIAuAPI.triggerExternalFilesIngest(response.paths, projectId);
+                if (targetFolderPath && targetFolderPath !== "root") {
+                    virtualDeletedFolders.delete(targetFolderPath);
+                    virtualEmptyFolders.add(targetFolderPath);
+                    saveVirtualFoldersState(projectId);
+                }
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Importação de ${response.paths.length} arquivo(s) iniciada!`, "success");
+                }
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
+                if (typeof window.openTasksDrawerAndSwitchTab === "function") {
+                    window.openTasksDrawerAndSwitchTab();
+                }
+            }
+        } catch (err) {
+            if (typeof window.showToast === "function") window.showToast("Erro ao importar arquivos: " + err.message, "error");
+        }
+    });
+    menu.appendChild(filesItem);
+
+    document.body.appendChild(menu);
+
+    if (anchorEl && typeof anchorEl.getBoundingClientRect === "function") {
+        const rect = anchorEl.getBoundingClientRect();
+        let left = rect.left;
+        let top = rect.bottom + 4;
+        if (left + 260 > window.innerWidth) left = window.innerWidth - 270;
+        if (top + 100 > window.innerHeight) top = rect.top - 100;
+        menu.style.left = `${Math.max(10, left)}px`;
+        menu.style.top = `${Math.max(10, top)}px`;
+    } else {
+        menu.style.left = "50%";
+        menu.style.top = "50%";
+        menu.style.transform = "translate(-50%, -50%)";
+    }
+
+    const closeHandler = (ev) => {
+        if (!menu.contains(ev.target) && (!anchorEl || !anchorEl.contains(ev.target))) {
+            menu.remove();
+            document.removeEventListener("pointerdown", closeHandler, true);
+        }
+    };
+    setTimeout(() => document.addEventListener("pointerdown", closeHandler, true), 10);
+}
+window.showImportChoicesMenu = showImportChoicesMenu;
+
+export async function handleHeaderImportClick(anchorEl) {
+    const btn = anchorEl || document.getElementById("btn-add-media");
+    showImportChoicesMenu(btn, "root");
+}
+window.handleHeaderImportClick = handleHeaderImportClick;
+
+export async function handleImportToFolder(targetFolderPath, anchorEl) {
+    showImportChoicesMenu(anchorEl, targetFolderPath);
+}
+window.handleImportToFolder = handleImportToFolder;
+
+export function promptCreateSubfolder(parentFolderPath) {
+    const modal = document.createElement("div");
+    modal.className = "modal-overlay";
+    modal.style.display = "flex";
+    modal.innerHTML = `
+        <div class="modal-content glassmorphism" style="max-width: 380px; padding: 18px;">
+            <div class="modal-header" style="margin-bottom: 12px;">
+                <h2 style="font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-folder-plus" style="color: var(--color-violet);"></i> Nova Subpasta
+                </h2>
+                <button class="btn-close-modal" id="btn-close-subfolder">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; display: block;">Nome da Pasta:</label>
+                <input type="text" id="subfolder-name-input" placeholder="Ex: Entrevistas Principais" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 7px 10px; border-radius: 4px; color: #fff; font-size: 12px;">
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+                <button id="btn-cancel-subfolder" class="btn-outline">Cancelar</button>
+                <button id="btn-confirm-subfolder" class="btn-primary">Criar Pasta</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const input = modal.querySelector("#subfolder-name-input");
+    setTimeout(() => input?.focus(), 50);
+
+    const close = () => modal.remove();
+    modal.querySelector("#btn-close-subfolder").onclick = close;
+    modal.querySelector("#btn-cancel-subfolder").onclick = close;
+
+    const submit = () => {
+        const val = input.value.trim();
+        if (!val) return;
+        close();
+        const projectId = getActiveProjectId();
+        const newPath = parentFolderPath === "root" ? `root/${val}` : `${parentFolderPath}/${val}`;
+        virtualDeletedFolders.delete(newPath);
+        virtualEmptyFolders.add(newPath);
+        openFoldersSet.add(parentFolderPath);
+        openFoldersSet.add(newPath);
+        saveVirtualFoldersState(projectId);
+        if (window.libraryInstance) window.libraryInstance.reloadData();
+        if (typeof window.showToast === "function") {
+            window.showToast(`Subpasta "${val}" criada!`, "success");
+        }
+    };
+
+    modal.querySelector("#btn-confirm-subfolder").onclick = submit;
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+        } else if (e.key === "Escape") {
+            e.preventDefault();
+            close();
+        }
+    });
+}
+
+export function promptRenameFolder(folderPath, currentName) {
+    const modal = document.createElement("div");
+    modal.className = "modal-overlay";
+    modal.style.display = "flex";
+    modal.innerHTML = `
+        <div class="modal-content glassmorphism" style="max-width: 380px; padding: 18px;">
+            <div class="modal-header" style="margin-bottom: 12px;">
+                <h2 style="font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-pen-to-square" style="color: var(--color-cyan);"></i> Renomear Pasta
+                </h2>
+                <button class="btn-close-modal" id="btn-close-rename-folder">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; display: block;">Novo Nome:</label>
+                <input type="text" id="rename-folder-input" value="${escapeHtml(currentName)}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 7px 10px; border-radius: 4px; color: #fff; font-size: 12px;">
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+                <button id="btn-cancel-rename-folder" class="btn-outline">Cancelar</button>
+                <button id="btn-confirm-rename-folder" class="btn-primary">Salvar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const input = modal.querySelector("#rename-folder-input");
+    setTimeout(() => {
+        input?.focus();
+        input?.select();
+    }, 50);
+
+    const close = () => modal.remove();
+    modal.querySelector("#btn-close-rename-folder").onclick = close;
+    modal.querySelector("#btn-cancel-rename-folder").onclick = close;
+
+    const submit = () => {
+        const val = input.value.trim();
+        if (!val || val === currentName) {
+            close();
+            return;
+        }
+        close();
+        const projectId = getActiveProjectId();
+        const parentParts = folderPath.split("/");
+        parentParts.pop();
+        const newPath = [...parentParts, val].join("/");
+
+        if (virtualEmptyFolders.has(folderPath)) {
+            virtualEmptyFolders.delete(folderPath);
+            virtualEmptyFolders.add(newPath);
+        }
+        virtualDeletedFolders.delete(newPath);
+        if (virtualFolderColors[folderPath]) {
+            virtualFolderColors[newPath] = virtualFolderColors[folderPath];
+            delete virtualFolderColors[folderPath];
+        }
+        Object.keys(virtualFolderMap).forEach(id => {
+            if (virtualFolderMap[id] === folderPath || virtualFolderMap[id].startsWith(folderPath + "/")) {
+                virtualFolderMap[id] = virtualFolderMap[id].replace(folderPath, newPath);
+            }
+        });
+        saveVirtualFoldersState(projectId);
+        if (window.libraryInstance) window.libraryInstance.reloadData();
+        if (typeof window.showToast === "function") {
+            window.showToast(`Pasta renomeada para "${val}"!`, "success");
+        }
+    };
+
+    modal.querySelector("#btn-confirm-rename-folder").onclick = submit;
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+        } else if (e.key === "Escape") {
+            e.preventDefault();
+            close();
+        }
+    });
+}
+
+export function setBinColor(folderPath, hexColor) {
+    const projectId = getActiveProjectId();
+    virtualFolderColors[folderPath] = hexColor;
+    saveVirtualFoldersState(projectId);
+    if (window.libraryInstance) window.libraryInstance.reloadData();
+    if (typeof window.showToast === "function") {
+        window.showToast("Cor do bin definida com sucesso!", "success");
+    }
+}
+
+export function confirmDeleteVirtualFolder(folderPath, folderName) {
+    const modal = document.createElement("div");
+    modal.className = "modal-overlay";
+    modal.style.display = "flex";
+    modal.innerHTML = `
+        <div class="modal-content glassmorphism" style="max-width: 440px; padding: 20px;">
+            <div class="modal-header" style="margin-bottom: 12px;">
+                <h2 style="font-size: 15px; color: var(--color-rose); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Excluir Pasta da Biblioteca
+                </h2>
+                <button class="btn-close-modal" id="btn-close-del-bin">&times;</button>
+            </div>
+            <div class="modal-body" style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                <p>Tem certeza de que deseja remover a pasta <b>"${escapeHtml(folderName)}"</b> da sua biblioteca?</p>
+                <p style="font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 8px; border-radius: 4px; border-left: 2px solid var(--color-cyan); margin-top: 10px;">
+                    <i class="fa-solid fa-circle-info" style="color: var(--color-cyan);"></i> Esta ação remove apenas a pasta virtual do projeto. <b>Nenhum arquivo físico original no seu disco rígido será apagado.</b> Você pode desfazer a qualquer momento com <b>Ctrl + Z</b>.
+                </p>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+                <button id="btn-cancel-del-bin" class="btn-outline">Cancelar</button>
+                <button id="btn-confirm-del-bin" class="btn-primary" style="background: var(--color-rose); border-color: var(--color-rose);">Remover Pasta</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const close = () => modal.remove();
+    modal.querySelector("#btn-close-del-bin").onclick = close;
+    modal.querySelector("#btn-cancel-del-bin").onclick = close;
+    modal.querySelector("#btn-confirm-del-bin").onclick = () => {
+        close();
+        executeDeleteFolder(folderPath, folderName);
+    };
+}
+
+export function executeDeleteFolder(folderPath, folderName) {
+    const projectId = getActiveProjectId();
+    libraryUndoStack.push({
+        type: "delete_folder",
+        folderPath,
+        folderName,
+        previousDeletedFolders: new Set(virtualDeletedFolders),
+        previousEmptyFolders: new Set(virtualEmptyFolders),
+        previousFolderMap: { ...virtualFolderMap },
+        previousFolderColors: { ...virtualFolderColors }
+    });
+
+    virtualDeletedFolders.add(folderPath);
+    virtualEmptyFolders.delete(folderPath);
+    saveVirtualFoldersState(projectId);
+
+    // Imediatamente atualiza a visualização local em 0ms sem esperar network
+    if (window.STATE?.allVideos) window.STATE.emit("videosUpdated", window.STATE.allVideos);
+    if (window.STATE?.allPhotos) window.STATE.emit("photosUpdated", window.STATE.allPhotos);
+
+    if (typeof window.showToast === "function") {
+        window.showToast(`Pasta "${folderName}" removida da biblioteca. Pressione Ctrl+Z para desfazer.`, "info");
+    }
+}
+
+export function showFolderContextMenu(e, node, folderHeader) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const oldMenus = document.querySelectorAll(".custom-context-menu");
+    oldMenus.forEach(m => m.remove());
+
+    const menu = document.createElement("div");
+    menu.id = "custom-folder-context-menu";
+    menu.className = "custom-context-menu folder-context-menu";
+
+    // 1. Importar Mídias para esta Pasta
+    const importItem = document.createElement("div");
+    importItem.className = "menu-item";
+    importItem.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" style="color:var(--color-cyan);"></i><span class="menu-item-text">Importar Mídias para esta Pasta...</span>`;
+    importItem.addEventListener("click", async () => {
+        menu.remove();
+        showImportChoicesMenu(folderHeader, node.path);
+    });
+    menu.appendChild(importItem);
+
+    // 2. Nova Subpasta
+    const newSubfolderItem = document.createElement("div");
+    newSubfolderItem.className = "menu-item";
+    newSubfolderItem.innerHTML = `<i class="fa-solid fa-folder-plus" style="color:var(--color-violet);"></i><span class="menu-item-text">Nova Subpasta</span>`;
+    newSubfolderItem.addEventListener("click", () => {
+        menu.remove();
+        promptCreateSubfolder(node.path);
+    });
+    menu.appendChild(newSubfolderItem);
+
+    // 3. Abrir no Windows Explorer
+    const explorerItem = document.createElement("div");
+    explorerItem.className = "menu-item";
+    explorerItem.innerHTML = `<i class="fa-solid fa-folder-open"></i><span class="menu-item-text">Abrir no Windows Explorer</span>`;
+    explorerItem.addEventListener("click", async () => {
+        menu.remove();
+        try {
+            await CapIAuAPI.openFolderInExplorer(node.path);
+            if (typeof window.showToast === "function") window.showToast("Pasta aberta no Windows Explorer", "info");
+        } catch (err) {
+            if (typeof window.showToast === "function") window.showToast("Erro ao abrir Explorer: " + err.message, "error");
+        }
+    });
+    menu.appendChild(explorerItem);
+
+    // Separador
+    const sep = document.createElement("div");
+    sep.className = "menu-separator";
+    menu.appendChild(sep);
+
+    // 4. Definir Cor do Bin (Submenu)
+    const colorMenuItem = document.createElement("div");
+    colorMenuItem.className = "menu-item menu-item-has-submenu";
+    colorMenuItem.innerHTML = `
+        <i class="fa-solid fa-palette"></i>
+        <span class="menu-item-text">Definir Cor do Bin</span>
+        <i class="fa-solid fa-chevron-right menu-item-chevron"></i>
+        <div class="menu-submenu"></div>
+    `;
+    const colorSubmenu = colorMenuItem.querySelector(".menu-submenu");
+    const BIN_COLORS = [
+        { name: "Padrão (Violeta)", hex: "#8b5cf6" },
+        { name: "Ciano", hex: "#06b6d4" },
+        { name: "Esmeralda", hex: "#10b981" },
+        { name: "Âmbar / Amarelo", hex: "#f59e0b" },
+        { name: "Rosa / Rose", hex: "#f43f5e" },
+        { name: "Azul Céu", hex: "#38bdf8" },
+        { name: "Cinza Neutro", hex: "#94a3b8" },
+    ];
+    BIN_COLORS.forEach(c => {
+        const sub = document.createElement("div");
+        sub.className = "menu-item";
+        sub.innerHTML = `
+            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${c.hex}; margin-right:8px;"></span>
+            <span class="menu-item-text">${c.name}</span>
+        `;
+        sub.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            menu.remove();
+            setBinColor(node.path, c.hex);
+        });
+        colorSubmenu.appendChild(sub);
+    });
+    menu.appendChild(colorMenuItem);
+
+    // 5. Renomear Pasta
+    if (node.path !== "root") {
+        const renameFolderItem = document.createElement("div");
+        renameFolderItem.className = "menu-item";
+        renameFolderItem.innerHTML = `<i class="fa-solid fa-pen-to-square"></i><span class="menu-item-text">Renomear Pasta</span>`;
+        renameFolderItem.addEventListener("click", () => {
+            menu.remove();
+            promptRenameFolder(node.path, node.name);
+        });
+        menu.appendChild(renameFolderItem);
+
+        // Separador
+        const sep2 = document.createElement("div");
+        sep2.className = "menu-separator";
+        menu.appendChild(sep2);
+
+        // 6. Excluir Pasta da Biblioteca
+        const deleteFolderItem = document.createElement("div");
+        deleteFolderItem.className = "menu-item menu-item-destructive";
+        deleteFolderItem.innerHTML = `<i class="fa-solid fa-trash"></i><span class="menu-item-text">Excluir Pasta da Biblioteca</span>`;
+        deleteFolderItem.addEventListener("click", () => {
+            menu.remove();
+            confirmDeleteVirtualFolder(node.path, node.name);
+        });
+        menu.appendChild(deleteFolderItem);
+    }
+
+    document.body.appendChild(menu);
+
+    // Posicionamento
+    const menuRect = menu.getBoundingClientRect();
+    const menuWidth = menuRect.width || 220;
+    const menuHeight = menuRect.height || 260;
+
+    let posX = e.clientX;
+    let posY = e.clientY;
+
+    if (posX + menuWidth > window.innerWidth - 10) {
+        posX = window.innerWidth - menuWidth - 10;
+        if (colorSubmenu) colorSubmenu.classList.add("submenu-left");
+    }
+    if (posY + menuHeight > window.innerHeight - 10) {
+        posY = Math.max(10, window.innerHeight - menuHeight - 10);
+    }
+
+    menu.style.left = `${Math.max(10, posX)}px`;
+    menu.style.top = `${Math.max(10, posY)}px`;
+
+    const closeHandler = (ev) => {
+        if (!menu.contains(ev.target)) {
+            menu.remove();
+            cleanup();
+        }
+    };
+    const keyHandler = (ev) => {
+        if (ev.key === "Escape") {
+            menu.remove();
+            cleanup();
+        }
+    };
+    const cleanup = () => {
+        document.removeEventListener("pointerdown", closeHandler, true);
+        document.removeEventListener("keydown", keyHandler, true);
+    };
+    setTimeout(() => {
+        document.addEventListener("pointerdown", closeHandler, true);
+        document.addEventListener("keydown", keyHandler, true);
+    }, 10);
+}
+window.showFolderContextMenu = showFolderContextMenu;
+
+export async function handleDropToFolder(e, targetFolderPath) {
+    const dataCapiau = e.dataTransfer.getData("application/x-capiau-media");
+    const projectId = getActiveProjectId();
+
+    // 1. Mover item existente internamente na biblioteca
+    if (dataCapiau) {
+        try {
+            const parsed = JSON.parse(dataCapiau);
+            if (parsed && parsed.id) {
+                virtualDeletedFolders.delete(targetFolderPath);
+                virtualFolderMap[parsed.id] = targetFolderPath;
+                saveVirtualFoldersState(projectId);
+                if (window.STATE?.allVideos) window.STATE.emit("videosUpdated", window.STATE.allVideos);
+                if (window.STATE?.allPhotos) window.STATE.emit("photosUpdated", window.STATE.allPhotos);
+                if (window.libraryInstance) window.libraryInstance.reloadData();
+                if (typeof window.showToast === "function") {
+                    window.showToast("Mídia movida para a pasta.", "success");
+                }
+                return;
+            }
+        } catch (err) {}
+    }
+
+    // 2. Arquivos físicos soltos do Windows Explorer
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+        // Verifica se temos caminhos de disco direto (ex: Electron ou navegadores com file.path)
+        const directPaths = [];
+        for (let i = 0; i < files.length; i++) {
+            if (files[i].path) {
+                directPaths.push(files[i].path.replace(/\\/g, "/"));
+            }
+        }
+
+        if (directPaths.length > 0 && directPaths.length === files.length) {
+            try {
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Importando ${directPaths.length} mídia(s) in-place...`, "info");
+                }
+                const res = await CapIAuAPI.triggerExternalFilesIngest(directPaths, projectId);
+                if (res && res.status === "success") {
+                    if (targetFolderPath && targetFolderPath !== "root") {
+                        virtualDeletedFolders.delete(targetFolderPath);
+                        virtualEmptyFolders.add(targetFolderPath);
+                        saveVirtualFoldersState(projectId);
+                    }
+                    if (typeof window.showToast === "function") {
+                        window.showToast(`${directPaths.length} mídia(s) vinculada(s) com sucesso!`, "success");
+                    }
+                    if (window.libraryInstance) await window.libraryInstance.reloadData();
+                    if (typeof window.openTasksDrawerAndSwitchTab === "function") {
+                        window.openTasksDrawerAndSwitchTab();
+                    }
+                }
+                return;
+            } catch (err) {
+                console.error("[DragDrop] Ingestão in-place falhou:", err);
+            }
+        }
+
+        const formData = new FormData();
+        formData.append("project_id", projectId);
+        let validFileCount = 0;
+        for (let i = 0; i < files.length; i++) {
+            formData.append("files", files[i]);
+            validFileCount++;
+        }
+
+        if (validFileCount > 0) {
+            try {
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Importando ${validFileCount} arquivo(s)...`, "info");
+                }
+                const res = await fetch("/api/ingest/upload-files", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.status === "success") {
+                    if (targetFolderPath && targetFolderPath !== "root") {
+                        virtualDeletedFolders.delete(targetFolderPath);
+                        virtualEmptyFolders.add(targetFolderPath);
+                        saveVirtualFoldersState(projectId);
+                    }
+                    if (typeof window.showToast === "function") {
+                        window.showToast(`${data.count || validFileCount} arquivo(s) importado(s) com sucesso!`, "success");
+                    }
+                    if (window.libraryInstance) await window.libraryInstance.reloadData();
+                    if (typeof window.openTasksDrawerAndSwitchTab === "function") {
+                        window.openTasksDrawerAndSwitchTab();
+                    }
+                }
+            } catch (err) {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Erro ao importar arquivos arrastados: " + err.message, "error");
+                }
+            }
+            return;
+        }
+    }
+
+    // 3. Pastas virtuais arrastadas
+    const items = e.dataTransfer.items;
+    if (items && items.length > 0) {
+        let folderCount = 0;
+        for (let i = 0; i < items.length; i++) {
+            const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+            if (entry && entry.isDirectory) {
+                const subfolderPath = targetFolderPath === "root" ? `root/${entry.name}` : `${targetFolderPath}/${entry.name}`;
+                virtualDeletedFolders.delete(subfolderPath);
+                virtualEmptyFolders.add(subfolderPath);
+                folderCount++;
+            }
+        }
+        if (folderCount > 0) {
+            saveVirtualFoldersState(projectId);
+            if (window.libraryInstance) window.libraryInstance.reloadData();
+            if (typeof window.showToast === "function") {
+                window.showToast(`${folderCount} pasta(s) vinculada(s) à biblioteca!`, "success");
+            }
+        }
+    }
+}
+
+export function initLibraryDragAndDrop(libInstance) {
+    const libraryContainer = document.getElementById("sidebar-left");
+    if (!libraryContainer) return;
+
+    libraryContainer.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+    });
+
+    libraryContainer.addEventListener("drop", async (e) => {
+        if (e.target.closest(".tree-folder-header")) return; // Já tratado pelo listener da pasta
+        e.preventDefault();
+        e.stopPropagation();
+        await handleDropToFolder(e, "root");
+    });
+}
+
+
 function hasMatchingChildren(node, query, ast = null) {
     if (!query) return true;
     if (!ast) ast = parseQuery(query);
     if (!ast) return true;
     
     if (node.type === "file") {
-        return evaluateAST(ast, node.video, "tab-videos");
+        const item = node.video || node.photo;
+        const tab = node.video ? "tab-videos" : "tab-photos";
+        return evaluateAST(ast, item, tab);
     }
     if (node.type === "folder") {
         return Object.values(node.children).some(child => hasMatchingChildren(child, query, ast));
@@ -858,7 +1646,12 @@ function getCommonBasePath(paths) {
 }
 
 function buildTree(items, mediaKey = "video") {
-    if (!items) return { name: "Biblioteca", type: "folder", path: "root", children: {}, isRoot: true, isOpen: true };
+    const projectId = getActiveProjectId();
+    loadVirtualFoldersState(projectId);
+
+    if (!items || items.length === 0) {
+        return { name: "Biblioteca", type: "folder", path: "root", children: {}, isRoot: true, isOpen: true };
+    }
     const filepaths = items.map(v => (v.filepath || v.filename || "").replace(/\\/g, "/"));
     const commonBase = getCommonBasePath(filepaths);
     
@@ -870,17 +1663,52 @@ function buildTree(items, mediaKey = "video") {
         isRoot: true,
         isOpen: true
     };
+
+    // 1. Inserir subpastas vazias virtuais criadas pelo usuário
+    virtualEmptyFolders.forEach(folderPath => {
+        if (virtualDeletedFolders.has(folderPath)) return;
+        const relativeParts = folderPath.replace(/^root\/?/, "").split("/").filter(Boolean);
+        let curr = root;
+        let cPath = "root";
+        for (let p of relativeParts) {
+            cPath = cPath + "/" + p;
+            if (!curr.children[p]) {
+                curr.children[p] = {
+                    name: p,
+                    type: "folder",
+                    path: cPath,
+                    children: {},
+                    isOpen: openFoldersSet.has(cPath)
+                };
+            }
+            curr = curr.children[p];
+        }
+    });
     
+    // 2. Inserir itens de mídia respeitando bins virtuais
     items.forEach(v => {
-        const normalized = (v.filepath || v.filename || "").replace(/\\/g, "/");
-        const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
-        const parts = relative.split("/").filter(Boolean);
+        const vPath = virtualFolderMap[v.id];
+        let folderParts = [];
+        let actualFileName = "";
+
+        if (vPath) {
+            if (virtualDeletedFolders.has(vPath)) return;
+            folderParts = vPath.replace(/^root\/?/, "").split("/").filter(Boolean);
+            actualFileName = v.filename || (v.filepath ? v.filepath.replace(/\\/g, "/").split("/").pop() : `Item #${v.id}`);
+        } else {
+            const normalized = (v.filepath || v.filename || "").replace(/\\/g, "/");
+            const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
+            const diskParts = relative.split("/").filter(Boolean);
+            folderParts = diskParts.slice(0, -1);
+            actualFileName = diskParts[diskParts.length - 1] || v.filename || `Item #${v.id}`;
+        }
         
         let current = root;
         let currentPath = "root";
-        for (let i = 0; i < parts.length - 1; i++) {
-            const folderName = parts[i];
+        for (let i = 0; i < folderParts.length; i++) {
+            const folderName = folderParts[i];
             currentPath = currentPath + "/" + folderName;
+            if (virtualDeletedFolders.has(currentPath)) return;
             if (!current.children[folderName]) {
                 current.children[folderName] = {
                     name: folderName,
@@ -893,13 +1721,13 @@ function buildTree(items, mediaKey = "video") {
             current = current.children[folderName];
         }
         
-        const fileName = parts[parts.length - 1] || v.filename;
         const fileNode = {
-            name: fileName,
+            name: actualFileName,
             type: "file"
         };
         fileNode[mediaKey] = v;
-        current.children[fileName] = fileNode;
+        const fileKey = `${mediaKey}_${v.id}_${actualFileName}`;
+        current.children[fileKey] = fileNode;
     });
     
     return root;
@@ -951,14 +1779,18 @@ function renderTreeNode(node, container, depth = 0) {
         
         const icon = node.isOpen ? "fa-folder-open" : "fa-folder";
         const chevron = node.isOpen ? "fa-chevron-down" : "fa-chevron-right";
+        const folderColor = virtualFolderColors[node.path] || "var(--color-violet)";
         
         folderHeader.innerHTML = `
             <div style="display: flex; align-items: center; flex: 1; min-width: 0;">
                 <i class="fa-solid ${chevron} chevron-icon" style="font-size:9px; margin-right:6px; color:var(--text-muted);"></i>
-                <i class="fa-solid ${icon} folder-icon" style="color:var(--color-violet); margin-right:8px;"></i>
+                <i class="fa-solid ${icon} folder-icon" style="color:${folderColor}; margin-right:8px;"></i>
                 <span class="folder-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${node.name}</span>
             </div>
             <div class="folder-actions" style="display: flex; gap: 4px; margin-right: 6px;">
+                <button class="btn-folder-action" data-action="add-media" title="Importar mídias para esta pasta" style="background: none; border: none; padding: 2px 4px; color: var(--color-cyan); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
                 <button class="btn-folder-action" data-action="expand" title="Expandir todas as subpastas" style="background: none; border: none; padding: 2px 4px; color: var(--color-cyan); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;">
                     <i class="fa-solid fa-angles-down"></i>
                 </button>
@@ -973,15 +1805,25 @@ function renderTreeNode(node, container, depth = 0) {
         folderChildren.className = "tree-folder-children";
         if (!node.isOpen) {
             folderChildren.style.display = "none";
+            folderChildren.setAttribute("hidden", "true");
         }
         
         folderHeader.addEventListener("click", (e) => {
             e.stopPropagation();
             
+            // Marca a pasta selecionada
+            window.selectedLibraryFolder = node;
+            document.querySelectorAll(".tree-folder-header.selected-folder").forEach(el => el.classList.remove("selected-folder"));
+            folderHeader.classList.add("selected-folder");
+
             const actionBtn = e.target.closest(".btn-folder-action");
             if (actionBtn) {
                 const action = actionBtn.dataset.action;
                 const path = folderHeader.dataset.folderPath;
+                if (action === "add-media") {
+                    handleImportToFolder(path, actionBtn);
+                    return;
+                }
                 window.expandCollapseAllSubfolders(path, action === "expand");
                 return;
             }
@@ -994,12 +1836,39 @@ function renderTreeNode(node, container, depth = 0) {
             folderHeader.querySelector(".folder-icon").className = `fa-solid ${newIcon} folder-icon`;
             
             folderChildren.style.display = node.isOpen ? "block" : "none";
+            if (node.isOpen) {
+                folderChildren.removeAttribute("hidden");
+            } else {
+                folderChildren.setAttribute("hidden", "true");
+            }
             
             if (node.isOpen) {
                 openFoldersSet.add(node.path);
             } else {
                 openFoldersSet.delete(node.path);
             }
+        });
+
+        // Clique direito sobre a pasta abre o Menu de Contexto de Bins
+        folderHeader.addEventListener("contextmenu", (e) => {
+            showFolderContextMenu(e, node, folderHeader);
+        });
+
+        // Drag & drop específico sobre a pasta
+        folderHeader.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "copy";
+            folderHeader.classList.add("folder-drag-over");
+        });
+        folderHeader.addEventListener("dragleave", (e) => {
+            folderHeader.classList.remove("folder-drag-over");
+        });
+        folderHeader.addEventListener("drop", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            folderHeader.classList.remove("folder-drag-over");
+            await handleDropToFolder(e, node.path);
         });
         
         folderDiv.appendChild(folderHeader);
@@ -1112,15 +1981,17 @@ function renderTreeNode(node, container, depth = 0) {
         
         const isConverting = STATE.activeConversions && STATE.activeConversions[v.id];
         
-        if (v.status === "transcribing" || v.status === "processing") {
+        if (v.status === "pending") {
+            statusGlow = `<i class="fa-solid fa-circle-notch fa-spin proxy-spin-icon" style="color: var(--color-cyan);" data-tooltip="Gerando proxy..."></i>`;
+        } else if (v.status === "transcribing" || v.status === "processing") {
             if (isConverting) {
-                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" data-tooltip="Convertendo..."></i>`;
+                statusGlow = `<i class="fa-solid fa-circle-notch fa-spin proxy-spin-icon" style="color: var(--color-cyan);" data-tooltip="Convertendo..."></i>`;
                 actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Conversão"><i class="fa-solid fa-circle-stop" style="font-size:10px;"></i></button>`;
             } else {
-                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" data-tooltip="Transcrevendo..."></i>`;
+                statusGlow = `<span class="waveform-anim-icon" data-tooltip="Processando áudio / ASR..."><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span></span>`;
             }
         } else if (v.status === "analyzing") {
-            statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-violet);" data-tooltip="Analisando..."></i>`;
+            statusGlow = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-violet);" data-tooltip="Analisando visão com IA..."></i>`;
             actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Análise"><i class="fa-solid fa-circle-stop" style="font-size:10px;"></i></button>`;
         } else if (v.status === "transcribed") {
             statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: rgba(6, 182, 212, 0.3);">ASR</span>`;
@@ -1366,8 +2237,8 @@ function renderTreeNode(node, container, depth = 0) {
         let statusGlow = "";
         
         if (p.status === 'pending') {
-            statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" data-tooltip="Gerando Proxy..."></i>`;
-            imgHtml = `<div class="photo-placeholder-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>Proxy...</span></div>`;
+            statusGlow = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-cyan);" data-tooltip="Gerando Proxy..."></i>`;
+            imgHtml = `<div class="photo-placeholder-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Proxy...</span></div>`;
             if (isRaw) clickEnabled = false;
         } else if (p.status === 'error') {
             statusGlow = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);" data-tooltip="Falha no Proxy"></i>`;
@@ -1375,8 +2246,8 @@ function renderTreeNode(node, container, depth = 0) {
             if (isRaw) clickEnabled = false;
         } else {
             if (isRaw && !p.proxy_path) {
-                statusGlow = `<i class="fa-solid fa-spinner fa-spin" style="color: var(--color-cyan);" data-tooltip="Processando RAW..."></i>`;
-                imgHtml = `<div class="photo-placeholder-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>RAW...</span></div>`;
+                statusGlow = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-cyan);" data-tooltip="Processando RAW..."></i>`;
+                imgHtml = `<div class="photo-placeholder-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>RAW...</span></div>`;
                 clickEnabled = false;
             } else {
                 imgHtml = `<img src="${src}" alt="${p.filename}" loading="lazy">`;
@@ -1678,6 +2549,11 @@ window.globalExpandCollapseAll = function(expand) {
     processItems(STATE.allVideos);
     processItems(STATE.allPhotos);
 
+    virtualEmptyFolders.forEach(fp => {
+        if (expand) openFoldersSet.add(fp);
+        else openFoldersSet.delete(fp);
+    });
+
     if (STATE.allVideos) STATE.emit("videosUpdated", STATE.allVideos);
     if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
 };
@@ -1709,6 +2585,13 @@ window.expandCollapseAllSubfolders = function(folderPath, expand) {
 
     processItems(STATE.allVideos);
     processItems(STATE.allPhotos);
+
+    virtualEmptyFolders.forEach(fp => {
+        if (fp === folderPath || fp.startsWith(folderPath + "/")) {
+            if (expand) openFoldersSet.add(fp);
+            else openFoldersSet.delete(fp);
+        }
+    });
     
     if (STATE.allVideos) STATE.emit("videosUpdated", STATE.allVideos);
     if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
@@ -1819,13 +2702,37 @@ export class LibraryManager {
         const btnBannerReanalyze = document.getElementById("btn-reanalyze-failed-banner");
         if (btnBannerReanalyze) btnBannerReanalyze.addEventListener("click", () => this.handleFailedButtonClick());
 
-        // Atalho de teclado: Esc ou Ctrl+Z para sair do modo de filtro de falhas
-        document.addEventListener("keydown", (e) => {
-            if (!this.isFailedFilterActive) return;
-            const tag = document.activeElement?.tagName;
-            if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        const btnAddMedia = document.getElementById("btn-add-media");
+        if (btnAddMedia) {
+            btnAddMedia.addEventListener("click", (e) => handleHeaderImportClick(btnAddMedia));
+        }
 
-            if (e.key === "Escape" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z")) {
+        initLibraryDragAndDrop(this);
+
+        // Atalho de teclado global para Desfazer (Ctrl+Z) e Excluir (Delete) ações de biblioteca
+        document.addEventListener("keydown", (e) => {
+            const tag = document.activeElement?.tagName;
+            if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || document.activeElement?.isContentEditable) return;
+
+            // Atalho Delete para excluir a pasta de biblioteca selecionada
+            if (e.key === "Delete" || e.key === "Del") {
+                if (window.selectedLibraryFolder && window.selectedLibraryFolder.path && window.selectedLibraryFolder.path !== "root") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    confirmDeleteVirtualFolder(window.selectedLibraryFolder.path, window.selectedLibraryFolder.name);
+                    return;
+                }
+            }
+
+            if ((e.ctrlKey || e.metaKey) && e.key && e.key.toLowerCase() === "z" && !e.shiftKey) {
+                if (handleLibraryUndo()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+            }
+
+            if (this.isFailedFilterActive && (e.key === "Escape" || ((e.ctrlKey || e.metaKey) && e.key && e.key.toLowerCase() === "z"))) {
                 e.preventDefault();
                 this.exitFailedFilter();
                 if (window.showToast) window.showToast("Filtro de falhas encerrado. Exibindo todas as mídias.", "info");
@@ -2197,6 +3104,7 @@ export class LibraryManager {
                 if (btnViewModeGrid) btnViewModeGrid.classList.remove("active");
             }
             localStorage.setItem("lib-pref-view-mode", mode);
+            if (STATE.allVideos) STATE.emit("videosUpdated", STATE.allVideos);
             if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
         }
         
