@@ -1823,8 +1823,9 @@ window.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // Fluxos que entregam resultado no painel direito (busca, similares) precisam
-    // poder revelá-lo: resultado renderizado em painel recolhido = "não aconteceu nada".
+    // Fluxos que entregam resultado nos painéis laterais precisam
+    // poder revelá-los: resultado renderizado em painel recolhido = "não aconteceu nada".
+    window.expandLeftPanel = () => expandSidebar("left");
     window.expandRightPanel = () => expandSidebar("right");
 
     if (toggleLeft) toggleLeft.addEventListener("click", () => collapseSidebar("left"));
@@ -2288,21 +2289,24 @@ window.addEventListener("DOMContentLoaded", () => {
         const timelineState = window.TIMELINE_STATE;
         if (!timelineState) return;
 
+        // Deseleciona clipe para focar o inspetor na sequência global
         timelineState.selectedClipId = null;
 
-        if (window.workspaceManager && window.workspaceManager.timelinePanel && window.workspaceManager.timelinePanel.timelineInteraction) {
-            const interaction = window.workspaceManager.timelinePanel.timelineInteraction;
+        const interaction = window.timelineInteraction || window.panelsManager?.timelineInteraction;
+        if (interaction) {
             interaction.refreshClipInspector();
+        }
 
-            const tabBtn = document.querySelector('.sidebar-left .tab-btn[data-tab="tab-adjustments"]');
-            if (tabBtn) {
-                if (tabBtn.style.display === "none") {
-                    setTabVisibility("tab-adjustments", true);
-                }
-                if (!tabBtn.classList.contains("active")) {
-                    tabBtn.click();
-                }
+        // Garante que o painel lateral esquerdo seja aberto/expandido se estiver recolhido
+        expandSidebar("left");
+
+        // Localiza o botão da aba Ajustes, garante visibilidade e ativa
+        const tabBtn = document.querySelector('.tab-btn[data-tab="tab-adjustments"]');
+        if (tabBtn) {
+            if (tabBtn.style.display === "none") {
+                setTabVisibility("tab-adjustments", true);
             }
+            tabBtn.click();
         }
     };
 

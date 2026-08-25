@@ -127,8 +127,8 @@ export class WorkspaceManager {
 
         // Atalho Q para alternar entre Source e Program maximizado
         document.addEventListener("keydown", (e) => {
-            if (e.key.toLowerCase() === "q" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                const tag = document.activeElement.tagName;
+            if (e.key && e.key.toLowerCase() === "q" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                const tag = document.activeElement ? document.activeElement.tagName : "";
                 if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement.isContentEditable) return;
                 const src = document.getElementById("source-player-panel");
                 const prg = document.getElementById("program-player-panel");
