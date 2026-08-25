@@ -215,14 +215,11 @@ export class SourcePlayer {
 
         this.hidePhoto();
 
-        let videoSrc = video.filepath || "";
-        videoSrc = videoSrc.replace(/\\/g, "/");
-        const isRemote = videoSrc.startsWith("http") || videoSrc.startsWith("/proxies/") || videoSrc.startsWith("/");
-        
-        if (video.proxy_path) {
-            videoSrc = video.proxy_path.replace(/\\/g, "/");
-        } else if (!isRemote) {
-            videoSrc = `/originals/${video.filename}`;
+        let videoSrc = "";
+        if (video.proxy_path && (video.proxy_path.startsWith("/") || video.proxy_path.startsWith("http"))) {
+            videoSrc = video.proxy_path;
+        } else {
+            videoSrc = `/api/video/${video.id}/stream`;
         }
         
         vid.style.zIndex = "1";
@@ -276,7 +273,9 @@ export class SourcePlayer {
         const imgEl = this.el("source-player-photo");
         if (!imgEl) return;
         
-        const src = photo.proxy_path || (photo.filepath && (photo.filepath.startsWith('http') || photo.filepath.startsWith('/')) ? photo.filepath : `/originals/${photo.filename}`);
+        const src = (photo.proxy_path && (photo.proxy_path.startsWith("/") || photo.proxy_path.startsWith("http")))
+            ? photo.proxy_path 
+            : `/api/photo/${photo.id}/file`;
         imgEl.src = src;
         imgEl.style.display = "block";
         
@@ -1393,6 +1392,7 @@ export class ProgramPlayer {
             const scale = (zoom === "fit") ? fitScale : Number(zoom);
             const vW = Math.round(tw * scale);
             const vH = Math.round(th * scale);
+            const hasOverflow = (vW > wrapper.clientWidth || vH > wrapper.clientHeight);
             const isHandle = e.target.closest(".transform-handle") || e.target.closest(".transform-handle-rot");
             if (isMiddle || (isLeft && (isSpacePressed || (hasOverflow && !isHandle)))) {
                 isPanning = true;
@@ -1853,7 +1853,8 @@ export class ProgramPlayer {
             el.style.zIndex = String(zIndex);
             this.applyMediaEffects(el, cut, currentFrame);
 
-            if (wasOnAir || this._bufferHasFrame(el, cut, currentFrame)) {
+            const prev = this._layerShown[layerKey];
+            if (wasOnAir || this._bufferHasFrame(el, cut, currentFrame) || !prev || el.readyState >= 1) {
                 this._layerShown[layerKey] = el;
                 return el;
             }
@@ -1861,8 +1862,7 @@ export class ProgramPlayer {
             // Buffer ainda abrindo/posicionando (scrub longo, timeline recém-carregada):
             // segura o último quadro no ar e revela quando houver imagem — nunca preto.
             this._awaitBuffer(el);
-            const prev = this._layerShown[layerKey];
-            return (prev && prev !== el) ? prev : null;
+            return (prev && prev !== el) ? prev : el;
         };
 
         const visibleBase = applyLayer(baseCut, "base", 1);
@@ -1951,8 +1951,10 @@ export class ProgramPlayer {
         if (!cut || cut.type === "photo") return null;
         const videoData = STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
         if (!videoData) return null;
-        const raw = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
-        return String(raw).replace(/\\/g, "/");
+        if (videoData.proxy_path && (videoData.proxy_path.startsWith("/") || videoData.proxy_path.startsWith("http"))) {
+            return videoData.proxy_path;
+        }
+        return `/api/video/${videoData.id}/stream`;
     }
 
     /** Instante do arquivo (em segundos) correspondente a um frame da timeline. */
@@ -2138,8 +2140,9 @@ export class ProgramPlayer {
             imgEl.dataset.activeClipId = "";
             return;
         }
-        const rawSrc = photo.proxy_path || photo.filepath || `/originals/${photo.filename}`;
-        const src = String(rawSrc).replace(/\\/g, "/");
+        const src = (photo.proxy_path && (photo.proxy_path.startsWith('/') || photo.proxy_path.startsWith('http')))
+            ? photo.proxy_path 
+            : `/api/photo/${photo.id}/file`;
         if (imgEl.dataset.loadedSrc !== src) {
             imgEl.src = src;
             imgEl.dataset.loadedSrc = src;
@@ -3106,6 +3109,142 @@ export class ProgramPlayer {
         }
     }
 
+    /**
+     * Calcula o magnetismo/encaixe (snapping) da posição X/Y e Escala do clipe em relação às bordas
+     * e centro do quadro do Program.
+     * Retorna { x, y, guides: string[] }
+     */
+    calculateTransformSnap(rawX, rawY, scale = 1.0, cropEffect = null, vW = 1920, vH = 1080) {
+        let cropLeft = 0, cropRight = 0, cropTop = 0, cropBottom = 0;
+        if (cropEffect && !cropEffect.disabled) {
+            cropLeft = (cropEffect.left || 0);
+            cropRight = (cropEffect.right || 0);
+            cropTop = (cropEffect.top || 0);
+            cropBottom = (cropEffect.bottom || 0);
+        }
+
+        const activeGuides = [];
+        let snappedX = rawX;
+        let snappedY = rawY;
+
+        // Tolerância em porcentagem baseada em pixels do viewport (~8-10px)
+        const tolPx = 9;
+        const tolX = Math.max(1.2, Math.min(2.5, vW ? (tolPx / vW) * 100 : 1.5));
+        const tolY = Math.max(1.2, Math.min(2.5, vH ? (tolPx / vH) * 100 : 1.5));
+
+        // ── PONTOS DE ENCAIXE HORIZONTAIS (X) ──
+        const snapTargetsX = [
+            {
+                guide: "center-x",
+                target: -(cropLeft - cropRight) * (scale / 2)
+            },
+            {
+                guide: "left",
+                target: 50 * (scale - 1) - (cropLeft * scale)
+            },
+            {
+                guide: "right",
+                target: 50 * (1 - scale) + (cropRight * scale)
+            }
+        ];
+
+        let bestDistX = Infinity;
+        let bestTargetX = null;
+        for (const st of snapTargetsX) {
+            const dist = Math.abs(rawX - st.target);
+            if (dist <= tolX && dist < bestDistX) {
+                bestDistX = dist;
+                bestTargetX = st;
+            }
+        }
+
+        if (bestTargetX) {
+            snappedX = Math.round(bestTargetX.target * 10) / 10;
+            if (Object.is(snappedX, -0) || snappedX === 0) snappedX = 0;
+            activeGuides.push(bestTargetX.guide);
+            if (Math.abs(scale - 1.0) < 0.01 && Math.abs(snappedX) < 0.1 && cropLeft === 0 && cropRight === 0) {
+                if (!activeGuides.includes("left")) activeGuides.push("left");
+                if (!activeGuides.includes("right")) activeGuides.push("right");
+            }
+        }
+
+        // ── PONTOS DE ENCAIXE VERTICAIS (Y) ──
+        const snapTargetsY = [
+            {
+                guide: "center-y",
+                target: -(cropTop - cropBottom) * (scale / 2)
+            },
+            {
+                guide: "top",
+                target: 50 * (scale - 1) - (cropTop * scale)
+            },
+            {
+                guide: "bottom",
+                target: 50 * (1 - scale) + (cropBottom * scale)
+            }
+        ];
+
+        let bestDistY = Infinity;
+        let bestTargetY = null;
+        for (const st of snapTargetsY) {
+            const dist = Math.abs(rawY - st.target);
+            if (dist <= tolY && dist < bestDistY) {
+                bestDistY = dist;
+                bestTargetY = st;
+            }
+        }
+
+        if (bestTargetY) {
+            snappedY = Math.round(bestTargetY.target * 10) / 10;
+            if (Object.is(snappedY, -0) || snappedY === 0) snappedY = 0;
+            activeGuides.push(bestTargetY.guide);
+            if (Math.abs(scale - 1.0) < 0.01 && Math.abs(snappedY) < 0.1 && cropTop === 0 && cropBottom === 0) {
+                if (!activeGuides.includes("top")) activeGuides.push("top");
+                if (!activeGuides.includes("bottom")) activeGuides.push("bottom");
+            }
+        }
+
+        return {
+            x: snappedX,
+            y: snappedY,
+            guides: activeGuides
+        };
+    }
+
+    /**
+     * Exibe e anima de forma sutil e breve as linhas magnéticas de encaixe no Program.
+     * @param {string[]} guides - Array com identificadores como 'left', 'right', 'top', 'bottom', 'center-x', 'center-y'
+     */
+    showSnapGuides(guides = []) {
+        const container = this.el("program-snap-guides");
+        if (!container) return;
+
+        const allLines = container.querySelectorAll(".snap-guide-line");
+        allLines.forEach(line => {
+            const g = line.dataset.guide;
+            if (guides && guides.includes(g)) {
+                if (!line.classList.contains("snap-active")) {
+                    line.classList.remove("snap-active");
+                    void line.offsetWidth;
+                    line.classList.add("snap-active");
+                }
+            } else {
+                line.classList.remove("snap-active");
+            }
+        });
+    }
+
+    /**
+     * Oculta todas as guias de encaixe magnético.
+     */
+    hideSnapGuides() {
+        const container = this.el("program-snap-guides");
+        if (!container) return;
+        container.querySelectorAll(".snap-guide-line").forEach(line => {
+            line.classList.remove("snap-active");
+        });
+    }
+
     attachOverlayDragListeners(overlay, clipId) {
         if (overlay._dragCleanups) {
             overlay._dragCleanups();
@@ -3212,12 +3351,19 @@ export class ProgramPlayer {
                     targetClip.effects.push(localTf);
                 }
 
+                const cropEffect = targetClip.effects.find(e => e.type === "crop") || {};
+
                 if (!handleType) {
-                    // ARRASHAR O CLIPE (TRADUÇÃO X, Y)
+                    // ARRASTAR O CLIPE (TRADUÇÃO X, Y) COM MAGNETISMO
                     const pctX = (deltaX / vW) * 100;
                     const pctY = (deltaY / vH) * 100;
-                    localTf.x = initialX + pctX;
-                    localTf.y = initialY + pctY;
+                    const rawX = initialX + pctX;
+                    const rawY = initialY + pctY;
+
+                    const snap = this.calculateTransformSnap(rawX, rawY, localTf.scale || 1.0, cropEffect, vW, vH);
+                    localTf.x = snap.x;
+                    localTf.y = snap.y;
+                    this.showSnapGuides(snap.guides);
                 } else if (handleType === "rot") {
                     // ROTAÇÃO
                     const rect = viewport.getBoundingClientRect();
@@ -3226,7 +3372,16 @@ export class ProgramPlayer {
                     const startAngle = Math.atan2(startY - centerY, startX - centerX) * 180 / Math.PI;
                     const currentAngle = Math.atan2(moveEv.clientY - centerY, moveEv.clientX - centerX) * 180 / Math.PI;
                     let newRot = initialRot + (currentAngle - startAngle);
-                    localTf.rotation = Math.round(newRot);
+                    let roundedRot = Math.round(newRot);
+                    const snapAngles = [0, 90, 180, 270, -90, -180, -270, 360, -360];
+                    const snapAngle = snapAngles.find(a => Math.abs(roundedRot - a) <= 3);
+                    if (snapAngle !== undefined) {
+                        roundedRot = snapAngle;
+                        this.showSnapGuides(["center-x", "center-y"]);
+                    } else {
+                        this.showSnapGuides([]);
+                    }
+                    localTf.rotation = roundedRot;
                 } else {
                     // ESCALA
                     const rect = viewport.getBoundingClientRect();
@@ -3237,21 +3392,31 @@ export class ProgramPlayer {
                     const currentDist = Math.hypot(moveEv.clientX - centerX, moveEv.clientY - centerY);
                     if (startDist > 0) {
                         const ratio = currentDist / startDist;
-                        localTf.scale = Math.max(0.1, Math.min(10.0, parseFloat((initialScale * ratio).toFixed(3))));
+                        let rawScale = initialScale * ratio;
+                        // Magnetismo de escala em 100% (1.0)
+                        if (Math.abs(rawScale - 1.0) <= 0.025) {
+                            rawScale = 1.0;
+                            this.showSnapGuides(["left", "right", "top", "bottom"]);
+                        } else {
+                            this.showSnapGuides([]);
+                        }
+                        localTf.scale = Math.max(0.1, Math.min(10.0, parseFloat(rawScale.toFixed(3))));
                     }
                 }
 
                 STATE.activeTimelineCuts = cuts;
                 this.syncVideoToPlayhead();
 
-                if (window.workspaceManager && window.workspaceManager.timelinePanel && window.workspaceManager.timelinePanel.timelineInteraction) {
-                    window.workspaceManager.timelinePanel.timelineInteraction.refreshClipInspector();
+                const interaction = window.timelineInteraction || window.panelsManager?.timelineInteraction;
+                if (interaction) {
+                    interaction.refreshClipInspector();
                 }
             };
 
             const onMouseUp = (upEv) => {
                 document.removeEventListener("mousemove", onMouseMove);
                 document.removeEventListener("mouseup", onMouseUp);
+                this.hideSnapGuides();
                 TIMELINE_HISTORY.commit();
 
                 const isMinimap = upEv && upEv.target && upEv.target.closest && upEv.target.closest("#program-player-minimap");

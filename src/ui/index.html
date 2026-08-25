@@ -716,7 +716,7 @@
                                     <option value="1.5">150%</option>
                                     <option value="2">200%</option>
                                 </select>
-                                <button id="btn-seq-settings-program" class="btn-control" title="Configurações da Sequência" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-gear"></i></button>
+                                <button id="btn-seq-settings-program" class="btn-control" data-tooltip="Configurações da Sequência (Resolução/FPS)" title="Configurações da Sequência" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-gear"></i></button>
                                 <button id="btn-popout-program" class="btn-control" title="Destacar Player" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-up-right-from-square"></i></button>
                                 <button id="btn-expand-program" class="btn-control" title="Maximizar" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-expand"></i></button>
                                 <span id="program-tally-dot" class="player-tally-dot program" title="Monitor de Programa (Timeline Ativa)" data-tooltip="Monitor de Programa (Timeline Ativa)"></span>
@@ -738,6 +738,16 @@
                                     <!-- Camadas de foto (still) da timeline: A = base, B = sobreposição -->
                                     <img id="program-player-photo" style="display:none; position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;" src="">
                                     <img id="program-player-photo-b" style="display:none; position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;" src="">
+                                </div>
+
+                                <!-- Guias magnéticas de encaixe de borda e centro -->
+                                <div id="program-snap-guides" class="program-snap-guides">
+                                    <div class="snap-guide-line snap-guide-left" data-guide="left"></div>
+                                    <div class="snap-guide-line snap-guide-right" data-guide="right"></div>
+                                    <div class="snap-guide-line snap-guide-top" data-guide="top"></div>
+                                    <div class="snap-guide-line snap-guide-bottom" data-guide="bottom"></div>
+                                    <div class="snap-guide-line snap-guide-center-x" data-guide="center-x"></div>
+                                    <div class="snap-guide-line snap-guide-center-y" data-guide="center-y"></div>
                                 </div>
 
                                 <!-- Overlay de transformação (Fase 4) - alças acessíveis sem tingimento de cor -->

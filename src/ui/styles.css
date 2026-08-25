@@ -832,8 +832,8 @@ button {
 .hide-status .media-card.tree-file-item .badge { display: none !important; }
 
 /* ── MODO GRADE / CARDS (VIEW-MODE-GRID) ─────────────────────────── */
-#video-list.view-mode-grid .tree-folder-children,
-#photo-list.view-mode-grid .tree-folder-children,
+#video-list.view-mode-grid .tree-folder-children:not([hidden]):not([style*="display: none"]),
+#photo-list.view-mode-grid .tree-folder-children:not([hidden]):not([style*="display: none"]),
 #video-list.view-mode-grid:not(:has(.tree-folder-container)),
 #photo-list.view-mode-grid:not(:has(.tree-folder-container)) {
     display: grid !important;
@@ -841,6 +841,17 @@ button {
     gap: 10px !important;
     padding: 6px 0 10px 0 !important;
     align-items: start !important; /* Evita que os cards estiquem na vertical de forma desigual */
+}
+
+/* Força display: none em subpastas recolhidas mesmo em modo grade */
+#video-list.view-mode-grid .tree-folder-children[hidden],
+#photo-list.view-mode-grid .tree-folder-children[hidden],
+#video-list.view-mode-grid .tree-folder-children[style*="display: none"],
+#photo-list.view-mode-grid .tree-folder-children[style*="display: none"],
+#video-list .tree-folder-children[style*="display: none"],
+#photo-list .tree-folder-children[style*="display: none"],
+.tree-folder-children.collapsed {
+    display: none !important;
 }
 
 /* Ocupação inteira das subpastas na grade */
@@ -2777,6 +2788,16 @@ button {
 
 .tree-folder-header:hover {
     background: rgba(255, 255, 255, 0.04);
+}
+
+.tree-folder-header.selected-folder {
+    background: rgba(139, 92, 246, 0.15) !important;
+    border: 1px solid rgba(139, 92, 246, 0.4) !important;
+}
+
+.tree-folder-header.selected-folder .folder-actions {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .tree-folder-header .folder-actions {
@@ -5729,6 +5750,61 @@ body:has(.custom-context-menu) #global-tooltip {
     pointer-events: none !important;
 }
 
+/* Badges de Status das Camadas de IA no Menu de Contexto */
+.ai-layer-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 500;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    letter-spacing: 0.2px;
+}
+.ai-layer-badge.done {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--color-emerald);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+.ai-layer-badge.pending {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Efeito visual de Drag & Drop sobre pastas */
+.tree-folder-header.folder-drag-over {
+    background: rgba(6, 182, 212, 0.15) !important;
+    outline: 1px dashed var(--color-cyan) !important;
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.3) !important;
+}
+
+/* Indicador animado e sutil de geração de Waveform */
+.waveform-anim-icon {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 10px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.waveform-anim-bar {
+    width: 2px;
+    height: 100%;
+    background: var(--color-cyan);
+    border-radius: 1px;
+    animation: wavePulse 1.2s ease-in-out infinite alternate;
+}
+.waveform-anim-bar:nth-child(2) { animation-delay: 0.2s; height: 70%; }
+.waveform-anim-bar:nth-child(3) { animation-delay: 0.4s; height: 40%; }
+.waveform-anim-bar:nth-child(4) { animation-delay: 0.6s; height: 85%; }
+@keyframes wavePulse {
+    0% { transform: scaleY(0.3); opacity: 0.4; }
+    100% { transform: scaleY(1.1); opacity: 1; }
+}
+
+
 /* Edição de Título Inline nos Cards de Mídia */
 .nle-inline-rename-input {
     background: rgba(18, 18, 24, 0.95);
@@ -7524,6 +7600,110 @@ input[type="number"] {
     opacity: 1 !important;
 }
 
+
+/* ── GUIAS MAGNÉTICAS DE ENCAIXE (PROGRAM SNAP GUIDES) ── */
+.program-snap-guides {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 55;                 /* acima da mídia (50), abaixo das alças do overlay (60) */
+    overflow: visible;
+}
+
+.snap-guide-line {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease-out;
+}
+
+/* Bordas externas do quadro */
+.snap-guide-line.snap-guide-left {
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-cyan);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.8), 0 0 2px #fff;
+}
+
+.snap-guide-line.snap-guide-right {
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-cyan);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.8), 0 0 2px #fff;
+}
+
+.snap-guide-line.snap-guide-top {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--color-cyan);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.8), 0 0 2px #fff;
+}
+
+.snap-guide-line.snap-guide-bottom {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--color-cyan);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.8), 0 0 2px #fff;
+}
+
+/* Linhas centrais */
+.snap-guide-line.snap-guide-center-x {
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    transform: translateX(-50%);
+    background: repeating-linear-gradient(
+        to bottom,
+        var(--color-cyan) 0,
+        var(--color-cyan) 4px,
+        transparent 4px,
+        transparent 8px
+    );
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.6);
+}
+
+.snap-guide-line.snap-guide-center-y {
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    transform: translateY(-50%);
+    background: repeating-linear-gradient(
+        to right,
+        var(--color-cyan) 0,
+        var(--color-cyan) 4px,
+        transparent 4px,
+        transparent 8px
+    );
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.6);
+}
+
+/* Animação sutil e breve de encaixe com fade e baixa opacidade */
+@keyframes snapGuidePulse {
+    0% {
+        opacity: 0;
+    }
+    18% {
+        opacity: 0.8;
+    }
+    100% {
+        opacity: 0.28;
+    }
+}
+
+.snap-guide-line.snap-active {
+    opacity: 0.28;
+    animation: snapGuidePulse 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 
 /* ── OVERLAY DE TRANSFORMAÇÃO E ALÇAS (FASE 4) ── */
 #program-transform-overlay {
