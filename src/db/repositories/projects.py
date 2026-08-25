@@ -130,11 +130,11 @@ class ProjectRepository:
 
     # Trilhas padrão para timelines legadas (v1) e novas sem definição explícita
     DEFAULT_TRACKS = [
-        {"id": "AI", "name": "IA — Sugestões", "kind": "ai", "order": 0, "volume": 1.0, "muted": False, "locked": True, "magnetic": False},
-        {"id": "V2", "name": "B-Roll", "kind": "video", "order": 1, "volume": 1.0, "muted": False, "locked": False, "magnetic": False},
-        {"id": "V1", "name": "Falas", "kind": "video", "order": 2, "volume": 1.0, "muted": False, "locked": False, "magnetic": True},
-        {"id": "A1", "name": "Áudio Falas", "kind": "audio", "order": 3, "volume": 1.0, "muted": False, "locked": False, "magnetic": False},
-        {"id": "A2", "name": "Áudio B-Roll", "kind": "audio", "order": 4, "volume": 1.0, "muted": False, "locked": False, "magnetic": False},
+        {"id": "AI", "name": "IA — Sugestões", "kind": "ai", "order": 0, "volume": 1.0, "muted": False, "locked": True, "sync_locked": False, "magnetic": False},
+        {"id": "V2", "name": "B-Roll", "kind": "video", "order": 1, "volume": 1.0, "muted": False, "locked": False, "sync_locked": True, "magnetic": False},
+        {"id": "V1", "name": "Falas", "kind": "video", "order": 2, "volume": 1.0, "muted": False, "locked": False, "sync_locked": True, "magnetic": True},
+        {"id": "A1", "name": "Áudio Falas", "kind": "audio", "order": 3, "volume": 1.0, "muted": False, "locked": False, "sync_locked": True, "magnetic": False},
+        {"id": "A2", "name": "Áudio B-Roll", "kind": "audio", "order": 4, "volume": 1.0, "muted": False, "locked": False, "sync_locked": True, "magnetic": False},
     ]
 
     @staticmethod

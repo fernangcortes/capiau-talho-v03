@@ -137,17 +137,7 @@ class AppState extends EventEmitter {
     set activeTimelineCuts(val) {
         const fps = this._projectFps || 24;
 
-        // Configuração dinâmica de pistas (via global para evitar ciclo de import).
-        // Pistas "magnéticas" (ripple) recalculam posições sequencialmente;
-        // as demais preservam o posicionamento livre do usuário.
         const timelineState = window.TIMELINE_STATE || null;
-        const isMagnetic = (trackId) => {
-            if (timelineState) {
-                const t = timelineState.getTrack(trackId);
-                if (t) return !!t.magnetic;
-            }
-            return trackId === "V1"; // fallback: comportamento legado
-        };
         const kindOf = (trackId) => {
             if (timelineState) {
                 const t = timelineState.getTrack(trackId);
@@ -156,7 +146,7 @@ class AppState extends EventEmitter {
             return "video";
         };
 
-        const trackCursors = {}; // posição corrente por pista (para layout sequencial/append)
+        const trackCursors = {}; // posição corrente por pista (para append quando sem posição)
 
         // Frames SEMPRE em fps da timeline (nunca do vídeo fonte) — ver conformCuts
         const timelineFps = (timelineState && timelineState.fps) ? timelineState.fps : fps;
@@ -164,7 +154,7 @@ class AppState extends EventEmitter {
         this._activeTimelineCuts = (val || []).map((cut, index) => {
             const inFrame = cut.inFrame !== undefined ? cut.inFrame : Math.round(cut.in * timelineFps);
             const outFrame = cut.outFrame !== undefined ? cut.outFrame : Math.round(cut.out * timelineFps);
-            const duration = outFrame - inFrame;
+            const duration = Math.max(1, outFrame - inFrame);
 
             const track = cut.track || "V1";
             let timelineStartFrame = cut.timelineStartFrame;
@@ -177,17 +167,14 @@ class AppState extends EventEmitter {
 
             if (trackCursors[track] === undefined) trackCursors[track] = 0;
 
-            if (isMagnetic(track)) {
-                // Layout sequencial: cada clipe gruda no anterior da mesma pista
+            // Se ainda não tem posição definida (ex: clipe novo adicionado sem coordenadas de drop),
+            // entra logo após o último clipe da pista
+            if (timelineStartFrame === undefined || timelineStartFrame === null) {
                 timelineStartFrame = trackCursors[track];
-                trackCursors[track] += duration;
-            } else {
-                if (timelineStartFrame === undefined || timelineStartFrame === null) {
-                    // Sem posição definida: entra após o último clipe da pista
-                    timelineStartFrame = trackCursors[track];
-                }
-                trackCursors[track] = Math.max(trackCursors[track], timelineStartFrame + duration);
             }
+
+            // Atualiza o cursor do fim da pista
+            trackCursors[track] = Math.max(trackCursors[track], timelineStartFrame + duration);
 
             return {
                 ...cut,
@@ -200,9 +187,9 @@ class AppState extends EventEmitter {
                 in: cut.in !== undefined ? cut.in : inFrame / timelineFps,
                 out: cut.out !== undefined ? cut.out : outFrame / timelineFps,
                 track: track,
-                timelineStartFrame: Math.round(timelineStartFrame),
+                timelineStartFrame: Math.max(0, Math.round(timelineStartFrame)),
                 // Mantém a chave em segundos sincronizada (evita valor obsoleto após drags)
-                timeline_start: Math.round(timelineStartFrame) / timelineFps,
+                timeline_start: Math.max(0, Math.round(timelineStartFrame)) / timelineFps,
                 link_id: cut.link_id || null
             };
         });

@@ -187,11 +187,11 @@ export const PHOTO_DEFAULT_DURATION = 5;
  */
 function defaultTracks() {
     return [
-        { id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, magnetic: false, hidden: false, thumbnailsEnabled: false },
-        { id: "V2", name: "B-Roll", kind: "video", volume: 1.0, muted: false, locked: false, magnetic: false, hidden: false, thumbnailsEnabled: true },
-        { id: "V1", name: "Falas", kind: "video", volume: 1.0, muted: false, locked: false, magnetic: true, hidden: false, thumbnailsEnabled: true },
-        { id: "A1", name: "Áudio Falas", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false, hidden: false, thumbnailsEnabled: false },
-        { id: "A2", name: "Áudio B-Roll", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false, hidden: false, thumbnailsEnabled: false }
+        { id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, syncLocked: false, hidden: false, thumbnailsEnabled: false },
+        { id: "V2", name: "B-Roll", kind: "video", volume: 1.0, muted: false, locked: false, syncLocked: true, hidden: false, thumbnailsEnabled: true },
+        { id: "V1", name: "Falas", kind: "video", volume: 1.0, muted: false, locked: false, syncLocked: true, hidden: false, thumbnailsEnabled: true },
+        { id: "A1", name: "Áudio Falas", kind: "audio", volume: 1.0, muted: false, locked: false, syncLocked: true, hidden: false, thumbnailsEnabled: false },
+        { id: "A2", name: "Áudio B-Roll", kind: "audio", volume: 1.0, muted: false, locked: false, syncLocked: true, hidden: false, thumbnailsEnabled: false }
     ];
 }
 
@@ -207,6 +207,8 @@ export class CapiauTimelineState {
 
         this.selectedClipId = null; // ID do clipe comum selecionado
         this.selectedTrack = "V1"; // Track focada ativa
+        this.selectedGap = null; // Gap selecionado: { trackId, startFrame, endFrame, durationFrames }
+        this.snappingEnabled = true; // Encaixe magnético global ativo por padrão
 
         this.width = 1920; // Largura padrão da sequência (Fase 1)
         this.height = 1080; // Altura padrão da sequência (Fase 1)
@@ -583,13 +585,14 @@ export class CapiauTimelineState {
                 volume: t.volume !== undefined ? Number(t.volume) : 1.0,
                 muted: !!t.muted,
                 locked: !!t.locked,
+                syncLocked: t.syncLocked !== undefined ? !!t.syncLocked : (t.sync_locked !== undefined ? !!t.sync_locked : (t.kind !== "ai")),
                 magnetic: !!t.magnetic,
                 heightPx: t.heightPx != null ? Number(t.heightPx) : null,
                 hidden: !!t.hidden,
                 thumbnailsEnabled: t.thumbnailsEnabled !== undefined ? !!t.thumbnailsEnabled : (t.kind === "video" || !t.kind)
             }));
             if (!this.tracks.some(t => t.kind === "ai")) {
-                this.tracks.unshift({ id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, magnetic: false, hidden: false, thumbnailsEnabled: false });
+                this.tracks.unshift({ id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, syncLocked: false, hidden: false, thumbnailsEnabled: false });
             }
         }
         STATE.emit("timelineTracksChanged", this.tracks);
@@ -606,6 +609,7 @@ export class CapiauTimelineState {
             volume: 1.0,
             muted: false,
             locked: false,
+            syncLocked: true,
             magnetic: false,
             hidden: false,
             thumbnailsEnabled: true
@@ -630,6 +634,7 @@ export class CapiauTimelineState {
             volume: 1.0,
             muted: false,
             locked: false,
+            syncLocked: true,
             magnetic: false,
             hidden: false,
             thumbnailsEnabled: false
@@ -742,15 +747,24 @@ export class CapiauTimelineState {
         STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
     }
 
-    toggleTrackMagnetic(trackId) {
+    toggleTrackSyncLock(trackId) {
         const track = this.getTrack(trackId);
-        if (!track || track.kind !== "video") return; // ripple magnético só em pistas de vídeo
+        if (!track || track.kind === "ai") return;
         TIMELINE_HISTORY.record(() => {
-            track.magnetic = !track.magnetic;
+            track.syncLocked = track.syncLocked !== undefined ? !track.syncLocked : false;
             STATE.emit("timelineTracksChanged", this.tracks);
-            // Reaplica o layout (o setter recalcula posições das pistas magnéticas)
-            STATE.activeTimelineCuts = [...STATE.activeTimelineCuts];
         });
+    }
+
+    toggleTrackMagnetic(trackId) {
+        // Redireciona para sync lock
+        return this.toggleTrackSyncLock(trackId);
+    }
+
+    toggleSnapping(enabled) {
+        this.snappingEnabled = enabled !== undefined ? !!enabled : !this.snappingEnabled;
+        STATE.emit("timelineSnappingChanged", this.snappingEnabled);
+        return this.snappingEnabled;
     }
 
     /** Serializa as pistas para persistência/API. */
@@ -763,10 +777,222 @@ export class CapiauTimelineState {
             volume: t.volume,
             muted: t.muted,
             locked: t.locked,
-            magnetic: t.magnetic,
+            syncLocked: t.syncLocked !== undefined ? !!t.syncLocked : (t.kind !== "ai"),
+            sync_locked: t.syncLocked !== undefined ? !!t.syncLocked : (t.kind !== "ai"),
+            magnetic: !!t.magnetic,
             hidden: !!t.hidden,
             thumbnailsEnabled: !!t.thumbnailsEnabled
         }));
+    }
+
+    // ── GAPS E CONTROLE DE RIPPLE / SYNC LOCK ────────────────────────────
+
+    /**
+     * Retorna a lista ordenada de gaps (espaços vazios) em uma pista.
+     * @param {string} trackId - ID da pista.
+     * @returns {Array<{ trackId: string, startFrame: number, endFrame: number, durationFrames: number }>}
+     */
+    getTrackGaps(trackId) {
+        const cuts = (STATE.activeTimelineCuts || [])
+            .filter(c => c.track === trackId)
+            .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+
+        if (!cuts.length) return [];
+        const gaps = [];
+
+        // Gap inicial (se o primeiro clipe não começa no frame 0)
+        const firstStart = cuts[0].timelineStartFrame || 0;
+        if (firstStart > 0) {
+            gaps.push({
+                trackId,
+                startFrame: 0,
+                endFrame: firstStart,
+                durationFrames: firstStart
+            });
+        }
+
+        // Gaps intermediários entre clipes da pista
+        for (let i = 0; i < cuts.length - 1; i++) {
+            const current = cuts[i];
+            const next = cuts[i + 1];
+            const currentEnd = (current.timelineStartFrame || 0) + (current.outFrame - current.inFrame);
+            const nextStart = next.timelineStartFrame || 0;
+
+            if (nextStart > currentEnd) {
+                gaps.push({
+                    trackId,
+                    startFrame: currentEnd,
+                    endFrame: nextStart,
+                    durationFrames: nextStart - currentEnd
+                });
+            }
+        }
+
+        return gaps;
+    }
+
+    /**
+     * Retorna o gap sob determinado frame em uma pista (ou null se for ocupado por clipe).
+     */
+    getGapAt(frame, trackId) {
+        if (!trackId) return null;
+        const gaps = this.getTrackGaps(trackId);
+        return gaps.find(g => frame >= g.startFrame && frame < g.endFrame) || null;
+    }
+
+    selectGap(gap) {
+        this.selectedGap = gap;
+        if (gap) {
+            this.selectedClipId = null;
+            this.selectedGhostClipId = null;
+        }
+        STATE.emit("timelineGapSelected", this.selectedGap);
+    }
+
+    clearSelectedGap() {
+        if (this.selectedGap) {
+            this.selectedGap = null;
+            STATE.emit("timelineGapSelected", null);
+        }
+    }
+
+    /**
+     * Retorna os IDs das pistas que estão com Sync Lock ativo e não travadas.
+     */
+    getSyncLockedTrackIds() {
+        return this.tracks
+            .filter(t => t.kind !== "ai" && !t.locked && (t.syncLocked !== undefined ? t.syncLocked : true))
+            .map(t => t.id);
+    }
+
+    /**
+     * Ripple Delete de um Gap: fecha o espaço vazio puxando os clipes posteriores nas pistas sincronizadas.
+     */
+    rippleDeleteGap(trackId, startFrame, durationFrames) {
+        if (!durationFrames || durationFrames <= 0) return;
+        TIMELINE_HISTORY.record(() => {
+            const cuts = [...STATE.activeTimelineCuts];
+            const syncTracks = this.getSyncLockedTrackIds();
+            const targetTracks = Array.from(new Set([...syncTracks, trackId]));
+
+            cuts.forEach(c => {
+                if (targetTracks.includes(c.track) && (c.timelineStartFrame || 0) >= startFrame + durationFrames - 1) {
+                    c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) - durationFrames);
+                    c.timeline_start = c.timelineStartFrame / this.fps;
+                }
+            });
+
+            this.clearSelectedGap();
+            STATE.activeTimelineCuts = cuts;
+        });
+    }
+
+    /**
+     * Lift Delete de um clipe: apaga o clipe (e áudio vinculado) deixando o espaço vazio intacto.
+     */
+    liftDeleteClip(clipId) {
+        const cuts = [...STATE.activeTimelineCuts];
+        const idx = cuts.findIndex(c => c.id === clipId);
+        if (idx === -1) return false;
+
+        TIMELINE_HISTORY.record(() => {
+            const clip = cuts[idx];
+            const linkId = clip.link_id;
+            if (linkId) {
+                for (let i = cuts.length - 1; i >= 0; i--) {
+                    if (cuts[i].link_id === linkId) cuts.splice(i, 1);
+                }
+            } else {
+                cuts.splice(idx, 1);
+            }
+            if (this.selectedClipId === clipId) this.selectedClipId = null;
+            STATE.activeTimelineCuts = cuts;
+        });
+        return true;
+    }
+
+    /**
+     * Ripple Delete de um clipe: apaga o clipe e fecha o buraco em todas as pistas com Sync Lock.
+     */
+    rippleDeleteClip(clipId) {
+        const cuts = [...STATE.activeTimelineCuts];
+        const clip = cuts.find(c => c.id === clipId);
+        if (!clip) return false;
+
+        TIMELINE_HISTORY.record(() => {
+            const startFrame = clip.timelineStartFrame || 0;
+            const durationFrames = clip.outFrame - clip.inFrame;
+            const linkId = clip.link_id;
+            const syncTracks = this.getSyncLockedTrackIds();
+
+            if (linkId) {
+                for (let i = cuts.length - 1; i >= 0; i--) {
+                    if (cuts[i].link_id === linkId) cuts.splice(i, 1);
+                }
+            } else {
+                const idx = cuts.findIndex(c => c.id === clipId);
+                if (idx !== -1) cuts.splice(idx, 1);
+            }
+
+            // Puxa os clipes posteriores nas pistas sincronizadas
+            cuts.forEach(c => {
+                if (syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= startFrame + durationFrames - 1) {
+                    c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) - durationFrames);
+                    c.timeline_start = c.timelineStartFrame / this.fps;
+                }
+            });
+
+            if (this.selectedClipId === clipId) this.selectedClipId = null;
+            STATE.activeTimelineCuts = cuts;
+        });
+        return true;
+    }
+
+    /**
+     * Inserção com Ripple: insere um clipe abrindo espaço nas pistas sincronizadas.
+     */
+    insertClipWithRipple(clipData, targetFrame, targetTrackId) {
+        TIMELINE_HISTORY.record(() => {
+            const cuts = this.conformCuts(STATE.activeTimelineCuts);
+            const durationFrames = clipData.outFrame - clipData.inFrame;
+            const syncTracks = this.getSyncLockedTrackIds();
+
+            // 1. Desloca clipes posteriores
+            cuts.forEach(c => {
+                if (syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= targetFrame) {
+                    c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) + durationFrames);
+                    c.timeline_start = c.timelineStartFrame / this.fps;
+                }
+            });
+
+            // 2. Insere clipe de vídeo e áudio vinculado
+            const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            const audioTrackId = this.pairedAudioTrackId(targetTrackId);
+            const linkId = audioTrackId ? `link_${stamp}` : null;
+
+            const newClip = {
+                ...clipData,
+                id: clipData.id || `cut_${stamp}`,
+                track: targetTrackId,
+                timelineStartFrame: targetFrame,
+                timeline_start: targetFrame / this.fps,
+                link_id: linkId
+            };
+            cuts.push(newClip);
+
+            if (audioTrackId && clipData.type !== "photo") {
+                cuts.push({
+                    ...clipData,
+                    id: `cut_${stamp}_a`,
+                    track: audioTrackId,
+                    timelineStartFrame: targetFrame,
+                    timeline_start: targetFrame / this.fps,
+                    link_id: linkId
+                });
+            }
+
+            STATE.activeTimelineCuts = cuts;
+        });
     }
 
     // ── SETTERS REATIVOS BÁSICOS ────────────────────────────────────────
@@ -869,20 +1095,18 @@ export class CapiauTimelineState {
         // Pista inexistente/travada vira roteamento automático
         if (track) {
             const t = this.getTrack(track);
-            if (!t || t.kind !== "video") track = null;
+            if (!t || t.kind !== "video" || t.locked) track = null;
         }
 
-        // Sem pista definida: entrevistas vão para a pista magnética (falas);
-        // b-rolls para a pista livre mais próxima da base (ex: V2, não uma V3 recém-criada no topo)
+        // Sem pista definida: entrevistas vão para V1 (falas); b-rolls para V2
         if (!track) {
-            const videoTracks = this.getVideoTracks();
-            const magnetic = videoTracks.find(t => t.magnetic);
-            const freeTracks = videoTracks.filter(t => !t.magnetic && !t.locked);
-            const free = freeTracks.length ? freeTracks[freeTracks.length - 1] : null;
-            if (video && video.video_type === "broll" && free) {
-                track = free.id;
+            const videoTracks = this.getVideoTracks().filter(t => !t.locked);
+            const v2 = videoTracks.find(t => t.id === "V2");
+            const v1 = videoTracks.find(t => t.id === "V1");
+            if (video && video.video_type === "broll" && v2) {
+                track = v2.id;
             } else {
-                track = (magnetic || videoTracks[videoTracks.length - 1] || { id: "V1" }).id;
+                track = (v1 || videoTracks[0] || { id: "V1" }).id;
             }
         }
         // Auto-configuração no primeiro clipe de vídeo (Fase 2.3)
@@ -913,6 +1137,13 @@ export class CapiauTimelineState {
         const audioTrackId = this.pairedAudioTrackId(track);
         const linkId = audioTrackId ? `link_${stamp}` : null;
 
+        // Se timelineStartFrame não foi passado, anexa ao final dos clipes existentes na pista
+        let startFrame = timelineStartFrame;
+        if (startFrame === null || startFrame === undefined) {
+            const trackCuts = (STATE.activeTimelineCuts || []).filter(c => c.track === track);
+            startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+        }
+
         const newCut = {
             id: `cut_${stamp}`,
             type: "video",
@@ -922,14 +1153,10 @@ export class CapiauTimelineState {
             in: inSec,
             out: outSec,
             track: track,
+            timelineStartFrame: Math.max(0, Math.round(startFrame)),
+            timeline_start: Math.max(0, Math.round(startFrame)) / this.fps,
             link_id: linkId
         };
-        // Posição explícita (ex: drop) só vale em pista livre; a magnética faz ripple.
-        const targetTrackObj = this.getTrack(track);
-        if (timelineStartFrame !== null && timelineStartFrame !== undefined &&
-            targetTrackObj && !targetTrackObj.magnetic) {
-            newCut.timelineStartFrame = Math.max(0, Math.round(timelineStartFrame));
-        }
 
         TIMELINE_HISTORY.record(() => {
             const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
@@ -944,6 +1171,8 @@ export class CapiauTimelineState {
                     in: inSec,
                     out: outSec,
                     track: audioTrackId,
+                    timelineStartFrame: Math.max(0, Math.round(startFrame)),
+                    timeline_start: Math.max(0, Math.round(startFrame)) / this.fps,
                     link_id: linkId
                 });
             }
@@ -960,21 +1189,27 @@ export class CapiauTimelineState {
      * (ajustável depois pelo trim). Enquadramento default = "fill" (editável por clipe).
      */
     addPhotoCut(photoId, { durationSec = PHOTO_DEFAULT_DURATION, track = null, timelineStartFrame = null } = {}) {
-        // Roteamento: fotos vão para uma pista de vídeo LIVRE (como B-roll); fallback = magnética/última
+        // Roteamento: fotos vão para uma pista de vídeo LIVRE (como B-roll V2); fallback = V1
         if (track) {
             const t = this.getTrack(track);
-            if (!t || t.kind !== "video") track = null;
+            if (!t || t.kind !== "video" || t.locked) track = null;
         }
         if (!track) {
-            const videoTracks = this.getVideoTracks();
-            const freeTracks = videoTracks.filter(t => !t.magnetic && !t.locked);
-            const free = freeTracks.length ? freeTracks[freeTracks.length - 1] : null;
-            track = (free || videoTracks.find(t => t.magnetic) || videoTracks[videoTracks.length - 1] || { id: "V1" }).id;
+            const videoTracks = this.getVideoTracks().filter(t => !t.locked);
+            const v2 = videoTracks.find(t => t.id === "V2");
+            const v1 = videoTracks.find(t => t.id === "V1");
+            track = (v2 || v1 || videoTracks[0] || { id: "V1" }).id;
         }
 
         const dur = Math.max(0.1, Number(durationSec) || PHOTO_DEFAULT_DURATION);
         const outFrame = secondsToFrames(dur, this.fps);
         const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        let startFrame = timelineStartFrame;
+        if (startFrame === null || startFrame === undefined) {
+            const trackCuts = (STATE.activeTimelineCuts || []).filter(c => c.track === track);
+            startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+        }
 
         const newCut = {
             id: `cut_${stamp}`,
@@ -986,14 +1221,11 @@ export class CapiauTimelineState {
             in: 0,
             out: dur,
             track: track,
+            timelineStartFrame: Math.max(0, Math.round(startFrame)),
+            timeline_start: Math.max(0, Math.round(startFrame)) / this.fps,
             link_id: null,
             effects: [{ type: "fit", mode: "fill" }]
         };
-        const targetTrackObj = this.getTrack(track);
-        if (timelineStartFrame !== null && timelineStartFrame !== undefined &&
-            targetTrackObj && !targetTrackObj.magnetic) {
-            newCut.timelineStartFrame = Math.max(0, Math.round(timelineStartFrame));
-        }
 
         TIMELINE_HISTORY.record(() => {
             const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
@@ -1010,8 +1242,8 @@ export class CapiauTimelineState {
     migrateCutsToAV(cuts) {
         if (!this.getAudioTracks().length) {
             this.tracks.push(
-                { id: "A1", name: "Áudio Falas", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false },
-                { id: "A2", name: "Áudio B-Roll", kind: "audio", volume: 1.0, muted: false, locked: false, magnetic: false }
+                { id: "A1", name: "Áudio Falas", kind: "audio", volume: 1.0, muted: false, locked: false, syncLocked: true, magnetic: false },
+                { id: "A2", name: "Áudio B-Roll", kind: "audio", volume: 1.0, muted: false, locked: false, syncLocked: true, magnetic: false }
             );
             STATE.emit("timelineTracksChanged", this.tracks);
         }
@@ -1258,24 +1490,19 @@ export class CapiauTimelineState {
                 audioPartner.outFrame = Math.round(newOut * this.fps);
             }
 
-            // Se for alteração de duração com ripple, empurra clipes seguintes da mesma trilha
-            // (posições sempre derivadas de timelineStartFrame — timeline_start em segundos
-            // pode estar obsoleto/ausente em clipes movidos manualmente)
+            // Se for alteração de duração com ripple, empurra clipes seguintes nas pistas sincronizadas (Sync Lock)
             if (delta !== 0) {
-                const trackId = targetVideoClip.track;
-                const isMagnetic = this.getTrack(trackId)?.magnetic || false;
+                const deltaFrames = Math.round(delta * this.fps);
+                const targetEndFrame = (targetVideoClip.timelineStartFrame || 0) + Math.round(oldDuration * this.fps);
+                const syncTracks = this.getSyncLockedTrackIds();
 
-                if (!isMagnetic) {
-                    const deltaFrames = Math.round(delta * this.fps);
-                    const targetEndFrame = (targetVideoClip.timelineStartFrame || 0) + Math.round(oldDuration * this.fps);
-                    currentCuts.forEach(c => {
-                        if (c.track === trackId && c.id !== targetVideoClip.id &&
-                            (c.timelineStartFrame || 0) >= targetEndFrame - 1) {
-                            c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) + deltaFrames);
-                            c.timeline_start = c.timelineStartFrame / this.fps;
-                        }
-                    });
-                }
+                currentCuts.forEach(c => {
+                    if (c.id !== targetVideoClip.id && (!targetVideoClip.link_id || c.link_id !== targetVideoClip.link_id) &&
+                        syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= targetEndFrame - 1) {
+                        c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) + deltaFrames);
+                        c.timeline_start = c.timelineStartFrame / this.fps;
+                    }
+                });
             }
 
             // Ordena os cortes por início na timeline para que a inserção na pista magnética respeite a ordem cronológica

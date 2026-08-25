@@ -230,9 +230,16 @@ export class CapiauTimelineRenderer {
         STATE.on("timelineVScrollChanged", () => this.requestRedraw());
         STATE.on("timelinePlayheadChanged", () => this.requestRedraw());
         STATE.on("timelineMarkersChanged", () => this.requestRedraw());
+        STATE.on("timelineGapSelected", () => this.requestRedraw());
+        STATE.on("timelineSnappingChanged", () => this.requestRedraw());
         STATE.on("activeVideoChanged", () => this.requestRedraw());
         STATE.on("waveformLoaded", () => this.requestRedraw());
         WaveformManager.addListener(() => this.requestRedraw());
+
+        // Guias de interação e drop
+        this.activeSnapFrame = null;
+        this.dropIndicator = null;
+        this.hoveredGap = null;
 
         // Inicia o render loop
         this.renderLoop();
@@ -300,11 +307,17 @@ export class CapiauTimelineRenderer {
         // Desenha trilhas de fundo
         this.drawTracksBackground();
 
+        // Desenha os gaps (espaços vazios selecionados / hover)
+        this.drawGaps();
+
         // Desenha os clipes salvos
         this.drawClips();
 
         // Desenha as sugestões fantasma da IA (Ghost Clips)
         this.drawGhostClips();
+
+        // Desenha guias de snapping e indicador de inserção/drop
+        this.drawDropAndSnapGuides();
 
         // Desenha a grade e a régua de tempo (por cima das pistas roladas)
         this.drawRuler();
@@ -314,6 +327,155 @@ export class CapiauTimelineRenderer {
 
         // Desenha o cursor do Playhead (currentTime)
         this.drawPlayhead();
+    }
+
+    /**
+     * Desenha a seleção e destaque de gaps (espaços vazios entre clipes).
+     */
+    drawGaps() {
+        const ctx = this.ctx;
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+        const selectedGap = TIMELINE_STATE.selectedGap;
+        const hoveredGap = this.hoveredGap;
+
+        if (!selectedGap && !hoveredGap) return;
+
+        const gapsToDraw = [];
+        if (hoveredGap && (!selectedGap || selectedGap.trackId !== hoveredGap.trackId || selectedGap.startFrame !== hoveredGap.startFrame)) {
+            gapsToDraw.push({ gap: hoveredGap, isSelected: false });
+        }
+        if (selectedGap) {
+            gapsToDraw.push({ gap: selectedGap, isSelected: true });
+        }
+
+        gapsToDraw.forEach(({ gap, isSelected }) => {
+            const lane = this.getLane(gap.trackId);
+            if (!lane || lane.track.hidden) return;
+            if (lane.top + lane.height < this.rulerHeight || lane.top > this.height) return;
+
+            const startX = (gap.startFrame - scrollLeft) * zoom;
+            const width = gap.durationFrames * zoom;
+
+            if (startX + width < 0 || startX > this.width) return;
+
+            const clipY = lane.top;
+            const clipHeight = lane.height;
+
+            ctx.save();
+            if (isSelected) {
+                ctx.fillStyle = "rgba(6, 182, 212, 0.15)";
+                ctx.fillRect(startX, clipY, width, clipHeight);
+
+                ctx.strokeStyle = "rgba(6, 182, 212, 0.85)";
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                ctx.strokeRect(startX + 1, clipY + 1, Math.max(1, width - 2), clipHeight - 2);
+                ctx.setLineDash([]);
+
+                // Badge de timecode do gap se couber na tela
+                if (width >= 40) {
+                    const badgeText = `Vazio: ${framesToTimecode(gap.durationFrames, TIMELINE_STATE.fps)}`;
+                    ctx.font = "bold 9px Outfit, sans-serif";
+                    const tw = ctx.measureText(badgeText).width;
+                    const bx = startX + (width - tw) / 2;
+                    const by = clipY + clipHeight / 2 + 3;
+
+                    ctx.fillStyle = "rgba(18, 18, 24, 0.8)";
+                    ctx.fillRect(bx - 4, by - 11, tw + 8, 14);
+                    ctx.fillStyle = "#06b6d4";
+                    ctx.fillText(badgeText, bx, by);
+                }
+            } else {
+                ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+                ctx.fillRect(startX, clipY, width, clipHeight);
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 4]);
+                ctx.strokeRect(startX, clipY, width, clipHeight);
+                ctx.setLineDash([]);
+            }
+            ctx.restore();
+        });
+    }
+
+    /**
+     * Desenha guias visuais verticais de Snapping e indicadores de Inserção (Ripple Drop) / Overwrite.
+     */
+    drawDropAndSnapGuides() {
+        const ctx = this.ctx;
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+
+        // 1. Linha vertical de Snapping
+        if (this.activeSnapFrame !== null && this.activeSnapFrame !== undefined) {
+            const snapX = (this.activeSnapFrame - scrollLeft) * zoom;
+            if (snapX >= 0 && snapX <= this.width) {
+                ctx.save();
+                ctx.strokeStyle = "rgba(6, 182, 212, 0.9)";
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(snapX, this.rulerHeight);
+                ctx.lineTo(snapX, this.height);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+            }
+        }
+
+        // 2. Indicador de Inserção (Ripple Drop Line) ou Overwrite Ghost
+        if (this.dropIndicator) {
+            const { type, frame, trackId, durationFrames } = this.dropIndicator;
+            const startX = (frame - scrollLeft) * zoom;
+
+            if (type === "insert") {
+                // Barra vertical com setas nas extremidades
+                const lane = this.getLane(trackId);
+                const topY = lane ? lane.top : this.rulerHeight;
+                const botY = lane ? lane.top + lane.height : this.height;
+
+                ctx.save();
+                ctx.strokeStyle = "#8b5cf6"; // Violeta vibrante
+                ctx.fillStyle = "#8b5cf6";
+                ctx.lineWidth = 2;
+
+                ctx.beginPath();
+                ctx.moveTo(startX, topY);
+                ctx.lineTo(startX, botY);
+                ctx.stroke();
+
+                // Triângulo superior
+                ctx.beginPath();
+                ctx.moveTo(startX - 5, topY);
+                ctx.lineTo(startX + 5, topY);
+                ctx.lineTo(startX, topY + 7);
+                ctx.closePath();
+                ctx.fill();
+
+                // Triângulo inferior
+                ctx.beginPath();
+                ctx.moveTo(startX - 5, botY);
+                ctx.lineTo(startX + 5, botY);
+                ctx.lineTo(startX, botY - 7);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.restore();
+            } else if (type === "overwrite") {
+                const lane = this.getLane(trackId);
+                if (lane && durationFrames > 0) {
+                    const width = durationFrames * zoom;
+                    ctx.save();
+                    ctx.fillStyle = "rgba(139, 92, 246, 0.2)";
+                    ctx.fillRect(startX, lane.top, width, lane.height);
+                    ctx.strokeStyle = "rgba(139, 92, 246, 0.8)";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(startX, lane.top, width, lane.height);
+                    ctx.restore();
+                }
+            }
+        }
     }
 
     /**

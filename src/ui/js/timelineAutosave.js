@@ -160,8 +160,10 @@ export function restoreAutosave(projectId) {
         TIMELINE_HISTORY._notify();
 
         // Redesenha timeline
-        if (window.workspaceManager && window.workspaceManager.timelinePanel) {
-            window.workspaceManager.timelinePanel.renderTimeline();
+        if (window.panelsManager) {
+            window.panelsManager.renderTimeline();
+        } else if (window.timelineRenderer) {
+            window.timelineRenderer.render();
         }
 
         setTimeout(() => {
@@ -208,7 +210,8 @@ export function initAutosave() {
         "timelineZoomChanged",
         "timelineScrollChanged",
         "timelineVScrollChanged",
-        "timelineMarkersChanged"
+        "timelineMarkersChanged",
+        "timelinePropertiesChanged"
     ];
 
     events.forEach(event => {

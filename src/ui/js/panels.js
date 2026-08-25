@@ -2259,12 +2259,21 @@ export class PanelsManager {
 
         const feed = this.tasksFeed || this.tasksContainer;
         if (!feed) return;
-        feed.innerHTML = "";
 
         if (taskKeys.length === 0) {
-            feed.innerHTML = `<div class="empty-state-text">Nenhuma conversão de proxy ou análise ativa no momento.</div>`;
+            if (!feed.querySelector(".empty-state-text")) {
+                feed.innerHTML = `<div class="empty-state-text">Nenhuma conversão de proxy ou análise ativa no momento.</div>`;
+            }
             return;
         }
+
+        const empty = feed.querySelector(".empty-state-text");
+        if (empty) empty.remove();
+
+        // Remove cards de tarefas que não existem mais
+        feed.querySelectorAll("[data-task-key]").forEach(el => {
+            if (!tasks[el.dataset.taskKey]) el.remove();
+        });
 
         const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
         const showThumbs = this.tasksShowThumbs;
@@ -2273,6 +2282,28 @@ export class PanelsManager {
         if (!this.expandedTaskKeys) {
             this.expandedTaskKeys = new Set();
         }
+        if (!this._renderedTaskKeys) {
+            this._renderedTaskKeys = new Set();
+        }
+
+        const formatLogLines = (logArray) => {
+            if (!logArray || logArray.length === 0) {
+                return `<div class="task-log-line" style="opacity: 0.45; font-style: italic;">[Aguardando registros de log em tempo real...]</div>`;
+            }
+            return logArray.map(line => {
+                const escLine = esc(line);
+                let cls = "task-log-line";
+                if (line.includes("[ERROR]") || line.includes("[FAIL]")) cls += " task-log-line-error";
+                else if (line.includes("[WARN]")) cls += " task-log-line-warn";
+                else if (line.includes("[LLM]")) cls += " task-log-line-llm";
+                else if (line.includes("[ENRICH]") || line.includes("[SUCCESS]") || line.includes("[FINISHED]")) cls += " task-log-line-success";
+                else if (line.includes("[SCAN]") || line.includes("[PHOTO]") || line.includes("[VIDEO]")) cls += " task-log-line-scan";
+                else if (line.includes("[INIT]")) cls += " task-log-line-init";
+                else if (line.includes("[FRAME]")) cls += " task-log-line-frame";
+                else cls += " task-log-line-info";
+                return `<div class="${cls}">${escLine}</div>`;
+            }).join('');
+        };
 
         taskKeys.forEach((key, index) => {
             const t = tasks[key];
@@ -2295,6 +2326,40 @@ export class PanelsManager {
             const typeHint = String(t.type || "proxy").toUpperCase();
             const pct = Math.round(Number(t.percent) || 0);
             const title = esc(media.title);
+
+            let existingItem = feed.querySelector(`[data-task-key="${key}"]`);
+            if (existingItem) {
+                // Atualização in-place suave sem recriar o DOM
+                const fill = existingItem.querySelector(".progress-bar-fill") || existingItem.querySelector(".task-row-bar-fill");
+                if (fill) fill.style.width = `${pct}%`;
+
+                const pctSpan = existingItem.querySelector(".task-percent");
+                if (pctSpan) pctSpan.textContent = `${typeHint} · ${pct}%`;
+                const rowPctSpan = existingItem.querySelector(".task-row-pct");
+                if (rowPctSpan) rowPctSpan.textContent = `${pct}%`;
+
+                const statusBadge = existingItem.querySelector(".task-status");
+                if (statusBadge) {
+                    statusBadge.className = `task-status status-${t.status}`;
+                    statusBadge.textContent = t.status.toUpperCase();
+                }
+                const dot = existingItem.querySelector(".task-row-dot");
+                if (dot) dot.className = `task-row-dot status-${t.status}`;
+
+                const badge = existingItem.querySelector(".task-log-badge");
+                if (badge && logs.length > 0) badge.textContent = logs.length;
+
+                const logBox = existingItem.querySelector(`#task-log-box-${key}`);
+                if (logBox && logs.length > 0) {
+                    const formatted = formatLogLines(logs);
+                    if (logBox.dataset.lastLogCount !== String(logs.length)) {
+                        logBox.innerHTML = formatted;
+                        logBox.dataset.lastLogCount = String(logs.length);
+                        if (isExpanded) logBox.scrollTop = logBox.scrollHeight;
+                    }
+                }
+                return;
+            }
 
             // Montagem das ações de forma sutil (Design System Flat - sem box e line icon)
             let actionsHtml = "";
@@ -2321,26 +2386,6 @@ export class PanelsManager {
                     : `<span class="task-row-icon"><i class="fa-solid ${media.icon}"></i></span>`)
                 : `<span class="task-row-dot status-${t.status}"></span>`;
 
-            // Formatação de linhas do log de terminal (CMD style)
-            const formatLogLines = (logArray) => {
-                if (!logArray || logArray.length === 0) {
-                    return `<div class="task-log-line" style="opacity: 0.45; font-style: italic;">[Aguardando registros de log em tempo real...]</div>`;
-                }
-                return logArray.map(line => {
-                    const escLine = esc(line);
-                    let cls = "task-log-line";
-                    if (line.includes("[ERROR]") || line.includes("[FAIL]")) cls += " task-log-line-error";
-                    else if (line.includes("[WARN]")) cls += " task-log-line-warn";
-                    else if (line.includes("[LLM]")) cls += " task-log-line-llm";
-                    else if (line.includes("[ENRICH]") || line.includes("[SUCCESS]") || line.includes("[FINISHED]")) cls += " task-log-line-success";
-                    else if (line.includes("[SCAN]") || line.includes("[PHOTO]") || line.includes("[VIDEO]")) cls += " task-log-line-scan";
-                    else if (line.includes("[INIT]")) cls += " task-log-line-init";
-                    else if (line.includes("[FRAME]")) cls += " task-log-line-frame";
-                    else cls += " task-log-line-info";
-                    return `<div class="${cls}">${escLine}</div>`;
-                }).join('');
-            };
-
             const logDrawerHtml = `
                 <div class="task-log-drawer ${isExpanded ? 'expanded' : ''}" id="task-log-drawer-${key}">
                     <div class="task-log-header">
@@ -2352,6 +2397,7 @@ export class PanelsManager {
             `;
 
             const item = document.createElement("div");
+            item.dataset.taskKey = key;
             if (compact) {
                 item.className = "task-row";
                 item.style.flexDirection = "column";
@@ -2899,7 +2945,9 @@ export class PanelsManager {
                 const lockIcon = track.locked
                     ? `<i class="fa-solid fa-lock" style="color: var(--color-rose);"></i>`
                     : `<i class="fa-solid fa-lock-open"></i>`;
-                const magnetColor = track.magnetic ? "var(--color-cyan)" : "var(--text-muted)";
+                const isSyncLocked = track.syncLocked !== undefined ? !!track.syncLocked : true;
+                const syncColor = isSyncLocked ? "var(--color-cyan)" : "var(--text-muted)";
+                const syncBtn = `<button class="btn-track-sync-lock btn-track-action" title="${isSyncLocked ? 'Sync Lock ativado: esta pista acompanha operações de Ripple e Inserção' : 'Sync Lock desativado: esta pista permanece fixa no tempo'}" style="color: ${syncColor}; font-size: 9px;"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>`;
 
                 // Ícones de visibilidade e miniaturas
                 const visibilityIcon = `<i class="fa-solid fa-eye"></i>`;
@@ -2907,11 +2955,10 @@ export class PanelsManager {
                     ? `<i class="fa-solid fa-image" style="color: var(--color-cyan);"></i>`
                     : `<i class="fa-regular fa-image" style="color: var(--text-secondary); opacity: 0.5;"></i>`;
 
-                // Vídeo é só imagem (magnet, sem volume); áudio tem volume/mute (sem magnet)
+                // Vídeo é só imagem; áudio tem volume/mute
                 const kindIcon = isAudio
                     ? `<i class="fa-solid fa-music" style="font-size: 8px; color: var(--color-emerald, #10b981);"></i> `
                     : "";
-                const magnetBtn = isAudio ? "" : `<button class="btn-track-magnet btn-track-action" title="${track.magnetic ? 'Pista magnética (ripple): clipes ficam grudados em sequência' : 'Pista livre: posicionamento manual'}" style="color: ${magnetColor}; font-size: 9px;"><i class="fa-solid fa-magnet"></i></button>`;
                 const muteBtn = isAudio ? `<button class="btn-track-mute btn-track-action" title="Mutar Trilha" style="color: var(--text-secondary); font-size: 10px;">${muteIcon}</button>` : "";
                 const volumeSlider = isAudio ? `<input type="range" class="slider-track-volume" min="0" max="1" step="0.1" value="${track.volume}" style="width: 100%; height: 3px; accent-color: var(--color-cyan); cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">` : "";
                 const thumbBtn = isAudio ? "" : `<button class="btn-track-thumbnails btn-track-action" title="${track.thumbnailsEnabled ? 'Desativar miniaturas na pista' : 'Ativar miniaturas na pista'}" style="font-size: 9px;">${thumbIcon}</button>`;
@@ -2925,7 +2972,7 @@ export class PanelsManager {
                             <div style="display: flex; gap: 6px; flex-shrink: 0; align-items: center;">
                                 ${thumbBtn}
                                 <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
-                                ${magnetBtn}
+                                ${syncBtn}
                                 <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
                                 ${muteBtn}
                             </div>
@@ -2940,7 +2987,7 @@ export class PanelsManager {
                             <div style="display: flex; gap: 4px; flex-shrink: 0;">
                                 ${thumbBtn}
                                 <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
-                                ${magnetBtn}
+                                ${syncBtn}
                                 <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
                                 ${muteBtn}
                                 <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
@@ -2956,8 +3003,8 @@ export class PanelsManager {
                 const muteEl = row.querySelector(".btn-track-mute");
                 if (muteEl) muteEl.addEventListener("click", () => TIMELINE_STATE.toggleTrackMute(track.id));
                 row.querySelector(".btn-track-lock").addEventListener("click", () => TIMELINE_STATE.toggleTrackLock(track.id));
-                const magnetEl = row.querySelector(".btn-track-magnet");
-                if (magnetEl) magnetEl.addEventListener("click", () => TIMELINE_STATE.toggleTrackMagnetic(track.id));
+                const syncEl = row.querySelector(".btn-track-sync-lock");
+                if (syncEl) syncEl.addEventListener("click", () => TIMELINE_STATE.toggleTrackSyncLock(track.id));
                 row.querySelector(".btn-track-remove").addEventListener("click", () => {
                     if (confirm(`Remover a pista "${track.id} ${track.name}"? Os clipes dela serão movidos para outra pista do mesmo tipo.`)) {
                         if (!TIMELINE_STATE.removeTrack(track.id)) {

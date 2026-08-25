@@ -65,19 +65,8 @@ class TimelineShadowCopy:
         return audio_tracks[0]["id"]
 
     def recalculate_timeline(self):
-        """Re-aplica as posições nas pistas magnéticas (ripple) e sincroniza os pares A/V."""
-        # 1. Pistas Magnéticas
-        for track in self.tracks:
-            if track.get("magnetic"):
-                track_clips = [c for c in self.clips if c["track"] == track["id"]]
-                # Ordena pelo timeline_start atual
-                track_clips.sort(key=lambda c: c["timeline_start"])
-                cursor = 0.0
-                for c in track_clips:
-                    c["timeline_start"] = cursor
-                    cursor += (c["out"] - c["in"])
-
-        # 2. Sincronia A/V (invariante: timeline_start_a = timeline_start_v - in_v + in_a)
+        """Sincroniza os pares A/V e respeita as posições absolutas da timeline."""
+        # Sincronia A/V (invariante: timeline_start_a = timeline_start_v - in_v + in_a)
         video_clips_by_link = {
             c["link_id"]: c for c in self.clips 
             if c["link_id"] and self.get_track_kind(c["track"]) == "video"
@@ -129,12 +118,9 @@ class TimelineShadowCopy:
         duration = out_s - in_s
         
         if timeline_start is None:
-            if t_obj.get("magnetic"):
-                # Insere ao final por padrão
-                track_clips = [c for c in self.clips if c["track"] == track]
-                timeline_start = sum((c["out"] - c["in"]) for c in track_clips)
-            else:
-                timeline_start = 0.0
+            # Insere ao final dos clipes existentes na pista alvo
+            track_clips = [c for c in self.clips if c["track"] == track]
+            timeline_start = max([c["timeline_start"] + (c["out"] - c["in"]) for c in track_clips], default=0.0)
         else:
             timeline_start = max(0.0, float(timeline_start))
 
@@ -178,11 +164,17 @@ class TimelineShadowCopy:
         }
 
         # Tratar o ripple edit (mode = 'insert') ou sobreposição (mode = 'overwrite')
-        if mode == "insert" and not t_obj.get("magnetic"):
-            # Empurra os clipes à direita na pista de vídeo
+        if mode == "insert":
+            # Empurra os clipes à direita nas pistas com Sync Lock ativo
+            sync_tracks = [t["id"] for t in self.tracks if t.get("sync_locked", True) and not t.get("locked")]
             for c in self.clips:
-                if c["track"] == track and c["timeline_start"] >= timeline_start - 0.01:
+                if c["track"] in sync_tracks and c["timeline_start"] >= timeline_start - 0.01:
                     c["timeline_start"] += duration
+        elif mode == "overwrite":
+            # Deletar/recortar clipes que sobrepõem na pista de vídeo
+            self._overwrite_range(track, timeline_start, timeline_start + duration)
+            if paired_audio:
+                self._overwrite_range(paired_audio, timeline_start, timeline_start + duration)
         elif mode == "overwrite":
             # Deletar/recortar clipes que sobrepõem na pista de vídeo
             self._overwrite_range(track, timeline_start, timeline_start + duration)
@@ -312,10 +304,7 @@ class TimelineShadowCopy:
             if new_in >= clip["out"] - 0.5:
                 return "Erro: Trim inválido, o clipe precisa ter ao menos 0.5s."
             clip["in"] = new_in
-            # Trims livres deslocam o início da timeline
-            t_obj = self.get_track(clip["track"])
-            if t_obj and not t_obj.get("magnetic"):
-                clip["timeline_start"] = max(0.0, clip["timeline_start"] + delta_s)
+            clip["timeline_start"] = max(0.0, clip["timeline_start"] + delta_s)
         else: # right
             new_out = min(max_duration, clip["out"] + delta_s)
             if new_out <= clip["in"] + 0.5:

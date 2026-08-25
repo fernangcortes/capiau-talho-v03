@@ -19,6 +19,13 @@ class ExternalPathIngest(BaseModel):
     path: str
     project_id: int = 1
 
+class ExternalFilesIngest(BaseModel):
+    paths: List[str]
+    project_id: int = 1
+
+class OpenFolderPayload(BaseModel):
+    path: str
+
 class CategoryUpdate(BaseModel):
     category: str
     note: str = ""  # observação opcional do porquê (vira contexto few-shot no E2.C3)
@@ -48,7 +55,8 @@ class TrackItem(BaseModel):
     volume: float = 1.0
     muted: bool = False
     locked: bool = False
-    magnetic: bool = False
+    sync_locked: bool = True
+    magnetic: Optional[bool] = False
 
 class TimelineCreate(BaseModel):
     name: str
