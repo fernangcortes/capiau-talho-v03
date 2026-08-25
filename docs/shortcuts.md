@@ -114,12 +114,42 @@ Timeline).
 |                       |                       | alternativas da IA    |
 |                       |                       | caso estejam abertos. |
 +-----------------------+-----------------------+-----------------------+
-| **Delete /            | **Deletar Clipe /     | Apaga o clipe         |
-| Backspace**           | Rejeitar Ghost**      | selecionado na        |
-|                       |                       | timeline. Se for um   |
-|                       |                       | clipe fantasma        |
-|                       |                       | (*ghost clip*),       |
-|                       |                       | rejeita a sugestão.   |
+| **Delete /            | **Lift Delete /       | **Em clipe:** Apaga o |
+| Backspace**           | Deletar Gap / Ghost**  | clipe mantendo o      |
+|                       |                       | espaço vazio (Gap).   |
+|                       |                       |                       |
+|                       |                       | **Em Gap:** Executa o |
+|                       |                       | Ripple Delete do Gap, |
+|                       |                       | fechando o espaço nas |
+|                       |                       | pistas com Sync Lock. |
+|                       |                       |                       |
+|                       |                       | **Em Ghost:** Rejeita |
+|                       |                       | a sugestão da IA.     |
++-----------------------+-----------------------+-----------------------+
+| **Shift + Delete**    | **Ripple Delete de    | Apaga o clipe         |
+|                       | Clipe**               | selecionado e fecha o |
+|                       |                       | buraco puxando todos  |
+|                       |                       | os clipes posteriores |
+|                       |                       | nas pistas com Sync   |
+|                       |                       | Lock ativo.           |
++-----------------------+-----------------------+-----------------------+
+| **S**                 | **Alternar Snapping   | Alterna o encaixe     |
+|                       | Magnético**           | magnético global da   |
+|                       |                       | timeline e exibe      |
+|                       |                       | guias verticais em    |
+|                       |                       | tempo real no Canvas. |
++-----------------------+-----------------------+-----------------------+
+| **Ctrl + Arraste      | **Ripple Insert**     | Insere clipe ou mídia |
+| (ou Drop)**           |                       | abrindo espaço e      |
+|                       |                       | empurrando os cortes  |
+|                       |                       | à direita nas pistas  |
+|                       |                       | sincronizadas.        |
++-----------------------+-----------------------+-----------------------+
+| **Ctrl + Trim**       | **Ripple Trim**       | Ajusta as bordas de   |
+|                       |                       | entrada/saída de um   |
+|                       |                       | clipe compensando o   |
+|                       |                       | tempo nas pistas com  |
+|                       |                       | Sync Lock ativo.      |
 +-----------------------+-----------------------+-----------------------+
 | **Enter / Y**         | **Aceitar Sugestão da | Aceita e consolida o  |
 |                       | IA**                  | clipe fantasma        |
@@ -179,11 +209,16 @@ Timeline).
 | **Ctrl + Y ou         | **Refazer**           | Refaz o passo de      |
 | Ctrl+Shift+Z**        |                       | edição desfeito.      |
 +-----------------------+-----------------------+-----------------------+
-| **Duplo Clique (nos    | **Resetar Ajuste**    | Restaura o slider de  |
+| **Duplo Clique (nos   | **Resetar Ajuste**    | Restaura o slider de  |
 | sliders / rótulos)**  |                       | ajuste selecionado    |
 |                       |                       | (escala, posição X/Y, |
 |                       |                       | rotação, crop, volume)|
 |                       |                       | ao seu valor padrão.  |
++-----------------------+-----------------------+-----------------------+
+| **Botão Sync Lock     | **Sync Lock por       | Ativa/desativa o      |
+| (cabeçalho de pista)**| Pista**               | sincronismo de        |
+|                       |                       | operações de ripple   |
+|                       |                       | para aquela pista.    |
 +-----------------------+-----------------------+-----------------------+
 | **Clique nos ícones   | **Mute / Solo /       | Silencia (M), isola   |
 | M / S / Olho nas      | Visibilidade**        | (S) ou oculta o vídeo |

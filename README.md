@@ -158,7 +158,27 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   cliques precisos e oferece desambiguação facial baseada em quem está na tela no milissegundo
   correspondente.
 
+- **Gerenciamento de Cor & Perfis (OCIO - Fase 0).** Detecção automática de metadados cruas de cor
+  via FFprobe (`color_range`, `color_space`, `color_transfer`, `color_primaries`, `pix_fmt`),
+  classificação heurística em perfis conhecidos (sRGB, Rec.709, V-Log, S-Log, D-Log, HLG, etc.),
+  persistência protegida contra sobrescrita de auditoria humana e ferramenta de auditoria de acervo
+  (`scripts/auditar_cor.py`), preparando a pipeline para transformações OCIO.
+
 ### ✂️ Timeline e edição <a id="timeline-e-edicao"></a>
+
+- **Arquitetura Track-Based clássica de NLE.** A timeline opera no padrão multipista profissional
+  (estilo Premiere / DaVinci Resolve), com posições temporais absolutas e total liberdade de montagem:
+  - **Gaps como entidades de primeira classe:** Clique no espaço vazio entre clipes para selecionar o Gap
+    (com badge de duração precisa, ex: `Vazio: 00:00:03:00`) e pressione **`Delete`** ou **`Backspace`**
+    para executar o *Ripple Delete* do buraco.
+  - **Dupla camada de inserção:** Arraste normal para posicionamento livre / *Overwrite*; segure **`Ctrl`**
+    (ou **`Cmd`**) ao arrastar ou soltar para executar *Ripple Insert* (com linha guia roxa e setas).
+  - **Sync Lock granular por pista:** Botões dedicados nos cabeçalhos de V1, V2, A1 e A2 para
+    habilitar ou desabilitar se a pista deve acompanhar operações de ripple (gaps, deletes e trims).
+  - **Snapping Magnético global (`S`):** Atalho rápido para ligar/desligar o encaixe magnético, com
+    linhas guias verticais ciano projetadas em tempo real através de todas as pistas.
+  - **Lift Delete (`Delete`) vs. Ripple Delete (`Shift + Delete`):** Escolha se a exclusão de um clipe
+    deve preservar o buraco intacto ou fechar a timeline puxando os cortes seguintes.
 
 - **Agente editor com ferramentas (IA copiloto).** Um agente conversacional analisa o roteiro e a
   timeline ativa e propõe cortes por *function-calling*. Edições simples são aplicadas direto (com
@@ -173,21 +193,22 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   arrastar-e-soltar. Anime movimentos suaves (Ken Burns), ajuste enquadramento (Fit/Fill) e fades
   pelo Inspetor de Foto, com composição no Program Player.
 
-- **Viewport estável, transformação interativa e crop.** O viewport do Program mantém proporção
-  física estável da sequência, com máscara de transbordo pontilhada em ciano. Selecione clipes e
-  manipule uma *bounding box* direto no player para mover, escalar (alças de canto) ou rotacionar em
-  tempo real. Inclui recorte (*crop*) relativo ao conteúdo, com preservação de scroll no painel e
-  integração total ao histórico (undo/redo via `Ctrl+Z`).
+- **Viewport estável, transformação interativa, crop e guias magnéticas.** O viewport do Program
+  mantém proporção física estável da sequência, com máscara de transbordo pontilhada em ciano.
+  Selecione clipes e manipule uma *bounding box* direto no player para mover, escalar (alças de canto)
+  ou rotacionar em tempo real — agora com **guias de alinhamento magnético automáticas** (linhas ciano
+  nas bordas, centro X/Y, ângulos retos de 90° e escala 100%). Inclui recorte (*crop*) relativo ao
+  conteúdo e histórico total de undo/redo (`Ctrl+Z`).
 
 - **Configurações da sequência e autoconfiguração.** Resolução e taxa de quadros (FPS) da timeline
   são definidas e persistidas (local e backend). O sistema autodetecta resolução e FPS do primeiro
   vídeo inserido para configurar uma timeline vazia. Alterar as configurações exibe avisos de
   reescalagem e atualiza a representação em frames preservando as durações em segundos.
 
-- **Controles nativos de pista e interação avançada.** Botões para mutar, solar e ocultar pistas de
-  vídeo (V1/V2) e áudio (A1/A2) individualmente. Inclui pré-visualização ao passar o mouse pela
-  régua e pelos clipes, miniaturas progressivas e **duplo clique para resetar sliders** (posição,
-  escala, rotação, crop e volume).
+- **Controles nativos de pista e interação avançada.** Botões para mutar, solar, sincronizar (Sync Lock)
+  e ocultar pistas de vídeo (V1/V2) e áudio (A1/A2) individualmente. Inclui pré-visualização ao passar o
+  mouse pela régua e pelos clipes, miniaturas progressivas e **duplo clique para resetar sliders**
+  (posição, escala, rotação, crop e volume).
 
 - **Marcadores teclado-first.** Marcadores de régua e marcadores ancorados ao clipe de vídeo
   (V1 / V2 B-Roll), com caixa flutuante compacta (310 px) que opera sem pausar a reprodução.
@@ -286,8 +307,13 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   Chatbot em janelas independentes, com sincronia de playhead, seleções e comandos em tempo real via
   `BroadcastChannel`.
 
-- **Visualização em árvore inteligente.** Navegue por acervos gigantes organizados dinamicamente em
-  pastas e subpastas hierárquicas colapsadas, no estilo do Explorer.
+- **Visualização em árvore hierárquica e ações de mídia.** Navegue por acervos gigantes organizados
+  dinamicamente em pastas e subpastas recursivas colapsadas no estilo do Explorer, com:
+  - Expansão e colapso global ou por ramificação.
+  - Menus contextuais completos: reanálise completa de IA individual, relink de caminhos quebrados e
+    abertura direta no **Windows Explorer nativo**.
+  - **Miniaturas instantâneas:** detecção e exibição imediata a partir de frames sequenciais já gerados
+    (`thumb_vid_seq_0001`), evitando tempos de espera e chamadas redundantes.
 
 - **Índice temático na barra de rolagem (Scroll Peeker).** Parar o mouse sobre a barra de
   rolagem da biblioteca abre um cartão com a miniatura, o título executivo, o tipo, a duração e o

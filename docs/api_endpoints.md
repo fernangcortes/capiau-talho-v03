@@ -371,7 +371,29 @@ Não há rota própria: o render usa as genéricas da casa.
 
 ---
 
-## 7. Documentação Interativa Swagger
+## 7. Ingestão Direta, Análise Individual e Integração com Sistema
+
+### POST /api/project/{project_id}/upload-direct
+- **Descrição:** Ingestão multipart/form-data direta de múltiplos arquivos para a pasta `watch/` com disparo automático de ingestão em segundo plano.
+- **Payload:** `files: List[UploadFile]`
+
+### POST /api/video/{video_id}/analyze-all
+- **Descrição:** Dispara a análise completa de IA (ASR + Visão por segmentos + Rostos + Indexação Vetorial) para um único vídeo específico.
+
+### POST /api/photo/{photo_id}/analyze-all
+- **Descrição:** Dispara a análise completa de IA (Visão + Rostos + Indexação Vetorial) para uma única foto específica.
+
+### POST /api/project/open-folder-in-explorer
+- **Descrição:** Abre o diretório de arquivos originais ou a pasta do arquivo selecionado diretamente no explorador nativo do sistema operacional (Windows Explorer).
+- **Payload:** `{ "path": "caminho_do_arquivo_ou_pasta" }`
+
+### POST /api/ingest/external-files
+- **Descrição:** Registra e ingere uma lista de caminhos de arquivos externos in-place no projeto sem duplicação de dados no disco.
+- **Payload:** `{ "paths": ["/caminho/video1.mp4", "/caminho/video2.mp4"], "project_id": 1 }`
+
+---
+
+## 8. Documentação Interativa Swagger
 
 - Para documentações interativas completas das rotas HTTP, payloads e
   esquemas de dados, inicie a aplicação localmente e acesse a

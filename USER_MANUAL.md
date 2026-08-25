@@ -19,7 +19,7 @@ profissional.
    - [Passo E: Busca Semântica Híbrida e Playlist](#passo-e-busca-semântica-híbrida-e-controles-de-playlist)
 3. [🤖 3. Assistente Conversacional de Edição (Chat-Agente) & Ghost Clips](#3-assistente-conversacional-de-edição-chat-agente--ghost-clips)
 4. [👥 4. Mapeamento de Rostos, Objetos e Desambiguação Rápida](#4-mapeamento-de-rostos-objetos-e-desambiguação-rápida)
-5. [🎛️ 5. Pistas de Áudio Reais, J/L-Cuts e Marcadores de Timeline](#5-pistas-de-áudio-reais-e-jl-cuts-nativos)
+5. [🎛️ 5. Arquitetura Track-Based NLE, Gaps, Sync Lock e J/L-Cuts Nativos](#5-arquitetura-track-based-nle-gaps-sync-lock-e-jl-cuts-nativos)
 6. [🎚️ 6. Tratamento de Áudio: Diagnóstico, Presets e Comparação A/B](#6-tratamento-de-áudio-diagnóstico-presets-e-comparação-ab)
 7. [🔄 7. Carrossel de Alternativas da IA (Atalho A)](#7-carrossel-de-alternativas-da-ia-atalho-a)
 8. [💾 8. Salvando, Auto-Salvamento & Logs com IA](#8-salvando-auto-salvamento--logs-com-ia)
@@ -320,58 +320,63 @@ ainda sem nome ou não validadas do seu projeto:
   - Clique em **Descartar** para rejeitar todas as marcações
     selecionadas de uma vez.
 
-## 🎛️ 5. Pistas de Áudio Reais e J/L-Cuts Nativos
+## 🎛️ 5. Arquitetura Track-Based NLE, Gaps, Sync Lock e J/L-Cuts Nativos
 
-O CapIAu-Talho suporta trilhas de áudio independentes (A1, A2\...)
-vinculadas aos clipes de vídeo (V1, V2\...).
+O CapIAu-Talho adota a **arquitetura clássica track-based de NLEs profissionais** (similar ao Premiere Pro e DaVinci Resolve), com suporte a múltiplas pistas de vídeo (V1, V2...) e áudio (A1, A2...) independentes.
 
-- **Vínculo de Clipes (Link A/V):** Por padrão, os clipes de vídeo e
-  seus respectivos áudios são importados de forma acoplada (link_id). Ao
-  arrastar o vídeo na timeline, o áudio correspondente o acompanha de
-  forma sincronizada.
+### A. Posicionamento Absoluto e Livre (Sem Magnetismo Forçado)
+- **Liberdade de Montagem:** Cada clipe possui posição temporal absoluta (`timelineStartFrame`). Arrastar um vídeo ou foto para a timeline coloca o clipe exatamente no frame onde você soltou, permitindo criar pausas e espaçamentos naturais sem que os clipes sejam forçados para o frame zero.
+- **Camadas Transparentes:** Vídeos secundários (B-Roll) ou fotos posicionados em V2 sobrepõem visualmente o material de V1 nos trechos correspondentes.
 
-- **Edição de J-Cuts e L-Cuts (Trims Independentes):**
+### B. Gaps como Entidades de Primeira Classe & Ripple Delete
+- **Seleção de Gaps:** Dê um clique simples em qualquer espaço vazio entre clipes na timeline. O Gap será destacado com um retângulo tracejado ciano e uma etiqueta centralizada com sua duração exata (ex: `Vazio: 00:00:03:12`).
+- **Ripple Delete de Gap:** Com o Gap selecionado, pressione **`Delete`** ou **`Backspace`**. O espaço vazio é imediatamente eliminado, e os clipes subsequentes nas pistas com Sync Lock ativo avançam para fechar o buraco.
 
-  - Para desvincular o par de áudio e vídeo e fazer edições
-    independentes (por exemplo, estender o áudio de uma fala sobre a
-    cena do B-roll seguinte, ou fazer o áudio do B-roll entrar 1s antes
-    do corte do vídeo), selecione o clipe e pressione a tecla **U**
-    (Desvincular).
+### C. Dupla Camada: Overwrite vs. Ripple Insert
+- **Arraste Padrão (Modo Overwrite / Livre):** Mover clipes na timeline ou soltar da biblioteca posiciona o elemento livremente na coordenada do cursor, respeitando o snapping magnético e sem empurrar clipes à direita.
+- **Modo Inserção (`Ctrl` + Arraste ou Drop):** Ao segurar **`Ctrl`** (ou **`Cmd`** no Mac) enquanto arrasta um clipe ou solta uma mídia da biblioteca, o cursor exibe uma linha guia vertical roxa com setas direcionais. Ao soltar, a timeline executa um **Ripple Insert**, abrindo espaço e empurrando automaticamente os clipes posteriores nas pistas com Sync Lock ativo.
 
-  - Após desvincular, você pode mover ou ajustar as bordas (*trim*) de
-    cada faixa de forma independente na timeline.
+### D. Controle de Sync Lock por Pista
+- **Sincronismo Granular:** Cada cabeçalho de pista possui o botão de **Sync Lock** (`btn-track-sync-lock`). Pistas com Sync Lock ativo (cor ciano) acompanham todas as operações de ripple (fechamento de gaps, ripple delete e ripple insert). Pistas desativadas (cor cinza) permanecem travadas no tempo, garantindo que trilhas musicais ou efeitos sonoros não percam sincronia indesejada.
 
-  - O player do programa interpretará a sobreposição, reproduzindo o
-    vídeo de uma faixa e o áudio da outra simultaneamente em tempo real.
+### E. Snapping Magnético (`S`) e Guias Visuais
+- **Atalho `S`:** Pressione a tecla **`S`** para ativar ou desativar o encaixe magnético global.
+- **Linhas Guias:** Durante o arrasto de clipes, marcadores ou playhead, uma linha guia vertical tracejada ciano é projetada através de todas as pistas no instante em que as bordas se alinham perfeitamente.
 
-- **Dividir Clipe (Split - Tecla Z):**
+### F. Lift Delete vs. Ripple Delete de Clipes
+- **Lift Delete (`Delete` ou `Backspace`):** Remove o clipe selecionado deixando um espaço vazio (Gap) no seu lugar, sem alterar a posição dos demais clipes.
+- **Ripple Delete (`Shift + Delete`):** Remove o clipe selecionado e puxa todos os clipes à direita nas pistas sincronizadas, fechando o intervalo deixado pelo corte.
 
-  - Selecione qualquer clipe na timeline e pressione a tecla **Z** para
-    cortá-lo ao meio exatamente na posição da agulha (playhead).
+### G. Vínculo de Clipes (Link A/V) e Edição de J/L-Cuts (Tecla U)
+- **Vínculo Automático:** Por padrão, os clipes de vídeo e seus respectivos áudios são importados de forma acoplada (`link_id`). Ao arrastar o vídeo na timeline, o áudio correspondente o acompanha de forma sincronizada.
+- **Edição de J-Cuts e L-Cuts:** Para desvincular o par de áudio e vídeo e fazer edições independentes (por exemplo, estender o áudio de uma fala sobre a cena do B-roll seguinte), selecione o clipe e pressione a tecla **`U`** (Desvincular). Após desvincular, você pode mover ou ajustar as bordas (*trim*) de cada faixa de forma independente na timeline.
+- **Ripple Trim (`Ctrl` + Trim):** Arrastar a borda de corte segurando **`Ctrl`** ajusta a duração do clipe enquanto puxa ou empurra os clipes seguintes nas pistas com Sync Lock.
 
-  - Se o clipe de vídeo possuir um clipe de áudio vinculado (link_id), o
-    corte é aplicado a ambos os clipes de forma sincronizada, mantendo
-    as metades resultantes vinculadas individualmente.
+### H. Dividir Clipe (Split - Tecla Z)
+- Selecione qualquer clipe na timeline e pressione a tecla **`Z`** para cortá-lo ao meio exatamente na posição da agulha (playhead). Se o clipe de vídeo possuir um clipe de áudio vinculado (`link_id`), o corte é aplicado a ambos os clipes de forma sincronizada.
 
-- **Controles Nativos de Pistas (Mute, Solo e Visibilidade):**
-  Cada cabeçalho de pista na timeline (V1/V2 para vídeos e A1/A2 para áudios) possui botões individuais de controle:
-  - **Mute (M):** Silencia o áudio da pista correspondente.
-  - **Solo (S):** Isola a pista ativa, silenciando/ocultando temporariamente todas as demais.
-  - **Visibilidade (Ícone de Olho):** Oculta a renderização de vídeo da pista selecionada no Program Player.
+### I. Controles Nativos de Pistas (Mute, Solo, Sync Lock e Visibilidade)
+Cada cabeçalho de pista na timeline (V1/V2 para vídeos e A1/A2 para áudios) possui botões individuais de controle:
+- **Mute (M):** Silencia o áudio da pista correspondente.
+- **Solo (S):** Isola a pista ativa, silenciando/ocultando temporariamente todas as demais.
+- **Sync Lock:** Alterna se a pista deve acompanhar operações de ripple.
+- **Visibilidade (Ícone de Olho):** Oculta a renderização de vídeo da pista selecionada no Program Player.
 
-- **Marcadores de Timeline & Clipe de Vídeo (Teclado-First, Popover Compacto & Seleção em Lote):**
-  O sistema suporta dois tipos de marcadores visuais altamente integrados com a timeline:
-  - **Marcadores de Régua:** Ancorados à régua de tempo para notações globais de estrutura.
-  - **Marcadores Vinculados ao Clipe de Vídeo:** Se a agulha estiver sobre um clipe de vídeo na timeline (seja na pista V1 ou na pista B-Roll V2), o marcador é automaticamente fixado no retângulo do clipe de vídeo (`clipId`). Se o clipe for arrastado ou se a timeline for alterada, o marcador acompanha o vídeo perfeitamente. O marcador de clipe é desenhado exclusivamente dentro da pista do vídeo (sem stems verticais cruzando a tela).
-  - **Box de Edição Flutuante Compacto:** Pressionar a tecla **M** abre um cartão compacto de 310px no canto inferior direito da tela. O vídeo **continua reproduzindo sem pausa** enquanto o editor digita.
-  - **Fluxo Ultra-Rápido via Teclado:**
-    - Digite o nome do marcador.
-    - Pressione **Tab** para navegar para a Descrição.
-    - Pressione **Tab** para selecionar a Cor.
-    - Pressione **Enter** ou **Esc** para salvar e fechar o box.
-    - Pressione **M** novamente para salvar o atual e abrir o marcador no novo ponto da agulha.
-  - **Seleção Múltipla & Exclusão em Lote:** Segure **Shift + Clique** sobre múltiplos marcadores para selecioná-los (destacados com uma borda brilhante branca). Pressione a tecla **Delete** (ou **Backspace**) para excluir todos os marcadores selecionados de uma só vez.
-  - **Navegação Rápida entre Marcadores:** Pressione **Shift + M** para saltar para o próximo marcador ou **Alt + M** para retroceder ao marcador anterior.
+### J. Marcadores de Timeline & Clipe de Vídeo (Teclado-First, Popover Compacto & Seleção em Lote)
+O sistema suporta dois tipos de marcadores visuais altamente integrados com a timeline:
+- **Marcadores de Régua:** Ancorados à régua de tempo para notações globais de estrutura.
+- **Marcadores Vinculados ao Clipe de Vídeo:** Se a agulha estiver sobre um clipe de vídeo na timeline (seja na pista V1 ou na pista B-Roll V2), o marcador é automaticamente fixado no retângulo do clipe de vídeo (`clipId`). Se o clipe for arrastado ou se a timeline for alterada, o marcador acompanha o vídeo perfeitamente. O marcador de clipe é desenhado exclusivamente dentro da pista do vídeo (sem stems verticais cruzando a tela).
+- **Box de Edição Flutuante Compacto:** Pressionar a tecla **M** abre um cartão compacto de 310px no canto inferior direito da tela. O vídeo **continua reproduzindo sem pausa** enquanto o editor digita.
+- **Fluxo Ultra-Rápido via Teclado:**
+  - Digite o nome do marcador.
+  - Pressione **Tab** para navegar para a Descrição.
+  - Pressione **Tab** para selecionar a Cor.
+  - Pressione **Enter** ou **Esc** para salvar e fechar o box.
+  - Pressione **M** novamente para salvar o atual e abrir o marcador no novo ponto da agulha.
+- **Seleção Múltipla & Exclusão em Lote:** Segure **Shift + Clique** sobre múltiplos marcadores para selecioná-los (destacados com uma borda brilhante branca). Pressione a tecla **Delete** (ou **Backspace**) para excluir todos os marcadores selecionados de uma só vez.
+- **Navegação Rápida entre Marcadores:** Pressione **Shift + M** para saltar para o próximo marcador ou **Alt + M** para retroceder ao marcador anterior.
+
+---
 
 ## 🎚️ 6. Tratamento de Áudio: Diagnóstico, Presets e Comparação A/B
 
