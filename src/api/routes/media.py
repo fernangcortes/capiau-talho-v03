@@ -12,13 +12,13 @@ import cv2
 import numpy as np
 from pathlib import Path
 from typing import Any, Dict, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, File, UploadFile, Form
 from fastapi.responses import JSONResponse, FileResponse
 
 from src.config import CONFIG
 from src.db.connection import get_db
 from src.api.dependencies import get_db_conn
-from src.api.schemas import CategoryUpdate, TitleUpdate, ExternalPathIngest, LabelFacePayload, MergeClustersPayload, ReassignFacesPayload
+from src.api.schemas import CategoryUpdate, TitleUpdate, ExternalPathIngest, ExternalFilesIngest, OpenFolderPayload, LabelFacePayload, MergeClustersPayload, ReassignFacesPayload
 from src.db.repositories.media import MediaRepository
 from src.core.tasks import (TASK_MANAGER, read_worker_progress, WORKER_LOGS_DIR,
                             worker_is_running, write_worker_pid)
@@ -565,18 +565,48 @@ def video_similar(video_id: int, project_id: int = Query(1), timestamp: float = 
 def select_folder_dialog():
     """Abre uma caixa de diálogo nativa do Windows para seleção de diretório."""
     try:
-        import tkinter as tk
-        from tkinter import filedialog
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        folder_path = filedialog.askdirectory(parent=root, title="Selecione a Pasta de Mídias (HD/Pasta Externa)")
-        root.destroy()
+        ps_script = (
+            "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; "
+            "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
+            "$f.Description = 'Selecione a Pasta de Mídias (HD/Pasta Externa)'; "
+            "$f.ShowNewFolderButton = $true; "
+            "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { "
+            "    Write-Output $f.SelectedPath "
+            "}"
+        )
+        cmd = ["powershell.exe", "-NoProfile", "-STA", "-Command", ps_script]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        folder_path = proc.stdout.strip()
         if folder_path:
             return {"status": "success", "path": folder_path.replace('\\', '/')}
         return {"status": "cancelled", "path": ""}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao abrir seletor: {str(e)}")
+        print(f"[select_folder_dialog] Erro: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao abrir seletor de pasta: {str(e)}")
+
+@router.post("/api/ingest/select-files")
+def select_files_dialog():
+    """Abre uma caixa de diálogo nativa do Windows para seleção múltipla de arquivos de mídia."""
+    try:
+        ps_script = (
+            "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; "
+            "$f = New-Object System.Windows.Forms.OpenFileDialog; "
+            "$f.Title = 'Selecione os Arquivos de Mídia'; "
+            "$f.Multiselect = $true; "
+            "$f.Filter = 'Arquivos de Mídia (*.mp4;*.mov;*.mxf;*.mts;*.mkv;*.avi;*.wav;*.mp3;*.jpg;*.png;*.arw;*.cr2;*.dng)|*.mp4;*.mov;*.mxf;*.mts;*.mkv;*.avi;*.wav;*.mp3;*.jpg;*.png;*.arw;*.cr2;*.dng|Todos os Arquivos (*.*)|*.*'; "
+            "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { "
+            "    $f.FileNames | ForEach-Object { Write-Output $_ } "
+            "}"
+        )
+        cmd = ["powershell.exe", "-NoProfile", "-STA", "-Command", ps_script]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        paths = [p.strip().replace('\\', '/') for p in proc.stdout.splitlines() if p.strip()]
+        if paths:
+            return {"status": "success", "paths": paths}
+        return {"status": "cancelled", "paths": []}
+    except Exception as e:
+        print(f"[select_files_dialog] Erro: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao abrir seletor de arquivos: {str(e)}")
 
 @router.post("/api/ingest/external")
 def trigger_external_ingest(payload: ExternalPathIngest, background_tasks: BackgroundTasks):
@@ -591,6 +621,58 @@ def trigger_external_ingest(payload: ExternalPathIngest, background_tasks: Backg
         
     background_tasks.add_task(bg_task)
     return {"status": "success", "message": f"Ingestão externa iniciada para projeto {payload.project_id}."}
+
+@router.post("/api/ingest/external-files")
+def trigger_external_files_ingest(payload: ExternalFilesIngest, background_tasks: BackgroundTasks):
+    """Ingere múltiplos arquivos externos in-place em background."""
+    def bg_task():
+        print(f"[API] Ingestão externa in-place de {len(payload.paths)} arquivos para projeto {payload.project_id}")
+        for p in payload.paths:
+            try:
+                path_obj = Path(p)
+                if path_obj.exists() and path_obj.is_file():
+                    IngestService.ingest_file(path_obj, payload.project_id, copy_original=False)
+            except Exception as ex:
+                print(f"[IngestService] Erro ao ingerir {p}: {ex}")
+    background_tasks.add_task(bg_task)
+    return {"status": "success", "count": len(payload.paths)}
+
+@router.post("/api/ingest/upload-files")
+async def upload_files_for_ingest(
+    background_tasks: BackgroundTasks,
+    project_id: int = Form(1),
+    files: List[UploadFile] = File(...)
+):
+    """Recebe arquivos enviados via drag & drop e salva na pasta originals/ para ingestão."""
+    saved_paths = []
+    upload_dir = CONFIG.ORIGINALS_DIR
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    
+    for upload in files:
+        if not upload.filename:
+            continue
+        dest_path = upload_dir / upload.filename
+        counter = 1
+        stem = Path(upload.filename).stem
+        ext = Path(upload.filename).suffix
+        while dest_path.exists():
+            dest_path = upload_dir / f"{stem}_{counter}{ext}"
+            counter += 1
+            
+        with open(dest_path, "wb") as buffer:
+            content = await upload.read()
+            buffer.write(content)
+        saved_paths.append(dest_path)
+        
+    def bg_task():
+        for p in saved_paths:
+            try:
+                IngestService.ingest_file(p, project_id, copy_original=False)
+            except Exception as ex:
+                print(f"[UploadIngest] Erro ao ingerir {p.name}: {ex}")
+                
+    background_tasks.add_task(bg_task)
+    return {"status": "success", "count": len(saved_paths)}
 
 @router.post("/api/project/{project_id}/scan-watch")
 def trigger_scan_watch(project_id: int, background_tasks: BackgroundTasks):
@@ -794,6 +876,41 @@ def trigger_vision_photo(photo_id: int, conn: sqlite3.Connection = Depends(get_d
             updated['tags'] = []
             
     return {"status": "success", "photo": updated}
+
+@router.post("/api/video/{video_id}/analyze-all")
+def trigger_analyze_all_video(video_id: int, background_tasks: BackgroundTasks):
+    """Executa o pipeline completo de IA (ASR + Visão + Rostos + Indexação Vetorial) para um único vídeo."""
+    background_tasks.add_task(PipelineService.analyze_video_all, video_id)
+    return {"status": "success", "message": f"Análise completa de IA iniciada para o vídeo #{video_id}."}
+
+@router.post("/api/photo/{photo_id}/analyze-all")
+def trigger_analyze_all_photo(photo_id: int, background_tasks: BackgroundTasks):
+    """Executa o pipeline completo de IA (Visão + Rostos + Indexação Vetorial) para uma única foto."""
+    background_tasks.add_task(PipelineService.analyze_photo_all, photo_id)
+    return {"status": "success", "message": f"Análise completa de IA iniciada para a foto #{photo_id}."}
+
+@router.post("/api/project/open-folder-in-explorer")
+def open_folder_in_explorer(payload: OpenFolderPayload):
+    """Abre um diretório ou a pasta do arquivo no Windows Explorer nativo."""
+    try:
+        raw_path = payload.path.strip()
+        p = Path(raw_path) if raw_path else CONFIG.ORIGINALS_DIR
+        if not p.exists():
+            # Tenta verificar se é um caminho relativo no diretório de trabalho ou originals
+            candidate = Path(CONFIG.ORIGINALS_DIR) / raw_path
+            if candidate.exists():
+                p = candidate
+            else:
+                p = CONFIG.ORIGINALS_DIR
+
+        target = str(p if p.is_dir() else p.parent)
+        # Normaliza barras para o Windows Explorer
+        target_win = target.replace('/', '\\')
+        subprocess.Popen(['explorer', target_win])
+        return {"status": "success", "message": f"Explorer aberto em: {target_win}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao abrir Explorer: {str(e)}")
+
 
 @router.post("/api/project/{project_id}/analyze-all-vision")
 def trigger_all_vision(
@@ -1007,7 +1124,15 @@ def stream_video(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn))
         
     video_path = Path(video['filepath'])
     if video_path.exists():
-        return FileResponse(video_path, media_type="video/mp4")
+        ext = video_path.suffix.lower()
+        media_type = "video/quicktime" if ext == ".mov" else "video/mp4"
+        return FileResponse(video_path, media_type=media_type)
+        
+    local_orig = CONFIG.ORIGINALS_DIR / video['filename']
+    if local_orig.exists():
+        ext = local_orig.suffix.lower()
+        media_type = "video/quicktime" if ext == ".mov" else "video/mp4"
+        return FileResponse(local_orig, media_type=media_type)
         
     raise HTTPException(status_code=404, detail="Arquivo de vídeo não encontrado no servidor.")
 
@@ -1015,13 +1140,7 @@ def stream_video(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn))
 @router.get("/api/photo/{photo_id}/file")
 def get_photo_file(photo_id: int, raw: bool = Query(False, description="RAW em resolução total (sem tratamento)"),
                    conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Retorna uma imagem exibível no browser.
-
-    O original pode ser RAW/TIFF (ex.: .CR2), que o navegador não renderiza em <img>.
-    Por padrão serve o proxy .webp (rápido). Com ``raw=true``, para fotos RAW, serve a
-    decodificação em resolução total (sem tratamento) — usada no zoom nativo do inspetor.
-    Formatos web (jpg/png/webp) são servidos direto, em resolução total.
-    """
+    """Retorna uma imagem exibível no browser."""
     from fastapi.responses import FileResponse
     from src.media.image_processing import decode_raw_to_jpeg, RAW_EXTENSIONS
     cursor = conn.cursor()
@@ -1034,7 +1153,6 @@ def get_photo_file(photo_id: int, raw: bool = Query(False, description="RAW em r
     photo_path = Path(row["filepath"])
     ext = photo_path.suffix.lower()
 
-    # RAW nativo em resolução total (opt-in) — decodifica com cache
     if raw and ext in RAW_EXTENSIONS and photo_path.exists():
         full = CONFIG.BASE_DIR / "data" / "cache" / "raw" / f"full_photo_{photo_id}.jpg"
         if full.exists() or decode_raw_to_jpeg(photo_path, full):
@@ -1043,41 +1161,57 @@ def get_photo_file(photo_id: int, raw: bool = Query(False, description="RAW em r
     if photo_path.exists() and ext in WEB_EXT:
         return FileResponse(photo_path)
 
-    # Não exibível no browser (RAW/TIFF/HEIC…) -> proxy webp
     proxy = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{photo_id}.webp"
     if proxy.exists():
         return FileResponse(proxy, media_type="image/webp")
 
     if photo_path.exists():
-        return FileResponse(photo_path)  # último recurso
+        return FileResponse(photo_path)
     raise HTTPException(status_code=404, detail="Arquivo de foto não encontrado.")
 
 
 @router.get("/api/video/{video_id}/thumbnail")
 def get_video_thumbnail(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
     from src.media.ffmpeg import extract_frame
+    import shutil
     
     thumb_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
     cache_headers = {"Cache-Control": "no-cache, max-age=0, must-revalidate"}
     if thumb_path.exists() and thumb_path.stat().st_size > 0:
         return FileResponse(thumb_path, headers=cache_headers)
         
+    # Se já temos frames da timeline gerados, usa o primeiro frame como capa imediatamente!
+    seq_0001 = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_0001.jpg"
+    if seq_0001.exists() and seq_0001.stat().st_size > 0:
+        try:
+            shutil.copy2(seq_0001, thumb_path)
+            return FileResponse(thumb_path, headers=cache_headers)
+        except Exception:
+            return FileResponse(seq_0001, headers=cache_headers)
+
     # Se não existe, busca metadados do vídeo para gerar a partir do proxy ou original
     video = MediaRepository.get_video(conn, video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
         
-    video_path = Path(video['filepath'])
     proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
     if proxy_path.exists():
         video_path = proxy_path
-    elif not video_path.exists():
-        raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado para o vídeo {video_id}")
+    else:
+        video_path = Path(video['filepath'])
+        if not video_path.exists():
+            local_orig = CONFIG.ORIGINALS_DIR / video['filename']
+            if local_orig.exists():
+                video_path = local_orig
+            else:
+                raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado para o vídeo {video_id}")
         
     duration = video.get('duration') or 0.0
     target_time = max(1.0, duration * 0.1)
     
     success = extract_frame(video_path, target_time, thumb_path, proxy_fallback_path=proxy_path)
+    if not success or not thumb_path.exists():
+        success = extract_frame(video_path, 0.0, thumb_path, proxy_fallback_path=proxy_path)
     if success and thumb_path.exists():
         return FileResponse(thumb_path, headers=cache_headers)
         

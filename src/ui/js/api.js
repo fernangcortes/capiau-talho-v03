@@ -218,11 +218,23 @@ export class CapIAuAPI {
         return this.request("/api/ingest/select-folder", { method: "POST" });
     }
 
+    static selectFiles() {
+        return this.request("/api/ingest/select-files", { method: "POST" });
+    }
+
     static triggerExternalIngest(path, projectId) {
         return this.request("/api/ingest/external", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ path, project_id: projectId })
+        });
+    }
+
+    static triggerExternalFilesIngest(paths, projectId) {
+        return this.request("/api/ingest/external-files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paths, project_id: projectId })
         });
     }
 
@@ -254,6 +266,22 @@ export class CapIAuAPI {
 
     static analyzePhotoVision(photoId) {
         return this.request(`/api/photo/${photoId}/analyze-vision`, { method: "POST" });
+    }
+
+    static analyzeVideoAll(videoId) {
+        return this.request(`/api/video/${videoId}/analyze-all`, { method: "POST" });
+    }
+
+    static analyzePhotoAll(photoId) {
+        return this.request(`/api/photo/${photoId}/analyze-all`, { method: "POST" });
+    }
+
+    static openFolderInExplorer(path) {
+        return this.request(`/api/project/open-folder-in-explorer`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: path || "" })
+        });
     }
 
     // -- Triagem (E2.C2): correção de categoria e fila de revisão
