@@ -1696,7 +1696,9 @@ export class CapiauTimelineInteraction {
             }
             case "volume": {
                 const vol = audioEffects.find(e => e.type === "volume");
-                return vol && ((vol.level !== undefined && vol.level !== 1.0) || vol.disabled === true);
+                if (!vol) return false;
+                const v = vol.level !== undefined ? vol.level : (vol.gain !== undefined ? vol.gain : 1.0);
+                return (v !== 1.0) || vol.disabled === true;
             }
             case "audio_eq": {
                 const eq = audioEffects.find(e => e.type === "audio_eq");
@@ -2413,12 +2415,12 @@ export class CapiauTimelineInteraction {
         let volDisabled = false;
         if (isAudioTrack) {
             const vol = effects.find(e => e.type === "volume") || {};
-            level = vol.level !== undefined ? vol.level : 1.0;
+            level = vol.level !== undefined ? vol.level : (vol.gain !== undefined ? vol.gain : 1.0);
             volDisabled = vol.disabled === true;
         } else if (partnerAudioClip) {
             const partnerEffects = partnerAudioClip.effects || [];
             const vol = partnerEffects.find(e => e.type === "volume") || {};
-            level = vol.level !== undefined ? vol.level : 1.0;
+            level = vol.level !== undefined ? vol.level : (vol.gain !== undefined ? vol.gain : 1.0);
             volDisabled = vol.disabled === true;
         }
 

@@ -29,7 +29,8 @@ function getClipEffectiveAudioGain(cut, track, customState = {}) {
     const volEff = effects.find(e => e && e.type === "volume");
     let clipVol = 1.0;
     if (volEff && volEff.disabled !== true) {
-        clipVol = (typeof volEff.level === "number" && !isNaN(volEff.level)) ? volEff.level : 1.0;
+        const rawVol = volEff.level !== undefined ? volEff.level : (volEff.gain !== undefined ? volEff.gain : 1.0);
+        clipVol = (typeof rawVol === "number" && Number.isFinite(rawVol)) ? rawVol : 1.0;
     }
 
     // 3. Ganho da dinâmica (makeup_db)
@@ -194,4 +195,13 @@ console.log("--- Executando autoteste de waveform gain & clipping ---");
     console.log(`OK 8: Tratamento de áudio (+8 LUFS) -> Ganho linear ${gain.toFixed(3)}`);
 }
 
-console.log("\nTodos os 8 testes unitários de modulação de waveform passaram com sucesso!");
+// Teste 9: Volume com atributo gain (ex: IA / sequence_makingof com gain: 0.18)
+{
+    const cut = { id: "c9", track: "A2", effects: [{ type: "volume", gain: 0.18 }] };
+    const track = { id: "A2", volume: 1.0, muted: false };
+    const gain = getClipEffectiveAudioGain(cut, track);
+    assert.strictEqual(gain, 0.18, "Volume com gain: 0.18 deve resultar em ganho 0.18");
+    console.log("OK 9: Volume via 'gain: 0.18' (IA / Kdenlive sequence) -> Ganho 0.18");
+}
+
+console.log("\nTodos os 9 testes unitários de modulação de waveform passaram com sucesso!");

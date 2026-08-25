@@ -542,9 +542,15 @@ export class PanelsManager {
                         } catch (e) {}
                     }
                 }
+                if (count > 0) {
+                    if (window.showToast) window.showToast(`Canceladas ${count} gerações de miniaturas.`, "info");
+                } else {
+                    if (window.showToast) window.showToast("Nenhuma geração de miniaturas em andamento.", "info");
+                }
                 if (window.logManager) {
                     window.logManager.log("Tasks", `Canceladas todas as ${count} gerações de miniaturas`, "INFO");
                 }
+                await this.refreshTasks();
             });
         }
 
@@ -572,9 +578,15 @@ export class PanelsManager {
                         count++;
                     } catch (e) {}
                 }
+                if (count > 0) {
+                    if (window.showToast) window.showToast(`Iniciadas miniaturas para ${count} vídeo(s).`, "info");
+                } else {
+                    if (window.showToast) window.showToast("Nenhum vídeo encontrado para gerar miniaturas.", "info");
+                }
                 if (window.logManager) {
                     window.logManager.log("Tasks", `Reativadas miniaturas para ${count} vídeos`, "INFO");
                 }
+                await this.refreshTasks();
             });
         }
 
@@ -2327,40 +2339,6 @@ export class PanelsManager {
             const pct = Math.round(Number(t.percent) || 0);
             const title = esc(media.title);
 
-            let existingItem = feed.querySelector(`[data-task-key="${key}"]`);
-            if (existingItem) {
-                // Atualização in-place suave sem recriar o DOM
-                const fill = existingItem.querySelector(".progress-bar-fill") || existingItem.querySelector(".task-row-bar-fill");
-                if (fill) fill.style.width = `${pct}%`;
-
-                const pctSpan = existingItem.querySelector(".task-percent");
-                if (pctSpan) pctSpan.textContent = `${typeHint} · ${pct}%`;
-                const rowPctSpan = existingItem.querySelector(".task-row-pct");
-                if (rowPctSpan) rowPctSpan.textContent = `${pct}%`;
-
-                const statusBadge = existingItem.querySelector(".task-status");
-                if (statusBadge) {
-                    statusBadge.className = `task-status status-${t.status}`;
-                    statusBadge.textContent = t.status.toUpperCase();
-                }
-                const dot = existingItem.querySelector(".task-row-dot");
-                if (dot) dot.className = `task-row-dot status-${t.status}`;
-
-                const badge = existingItem.querySelector(".task-log-badge");
-                if (badge && logs.length > 0) badge.textContent = logs.length;
-
-                const logBox = existingItem.querySelector(`#task-log-box-${key}`);
-                if (logBox && logs.length > 0) {
-                    const formatted = formatLogLines(logs);
-                    if (logBox.dataset.lastLogCount !== String(logs.length)) {
-                        logBox.innerHTML = formatted;
-                        logBox.dataset.lastLogCount = String(logs.length);
-                        if (isExpanded) logBox.scrollTop = logBox.scrollHeight;
-                    }
-                }
-                return;
-            }
-
             // Montagem das ações de forma sutil (Design System Flat - sem box e line icon)
             let actionsHtml = "";
             actionsHtml += `<button class="btn-task-action btn-toggle-task-log ${isExpanded ? 'active' : ''}" data-id="${key}" title="Alternar Console Log (CMD)"><i class="fa-solid fa-terminal"></i>${logCountBadge}</button>`;
@@ -2375,6 +2353,63 @@ export class PanelsManager {
             }
             if (isDismissable) {
                 actionsHtml += `<button class="btn-task-action btn-dismiss-task" data-id="${key}" title="Remover da Lista de Tarefas"><i class="fa-solid fa-trash-can"></i></button>`;
+            }
+
+            let existingItem = feed.querySelector(`[data-task-key="${key}"]`);
+
+            // Verifica se o item existente está em conformidade com o layout (compacto vs cartão) e miniaturas atuais
+            const isRowLayout = existingItem && existingItem.classList.contains("task-row");
+            const isCardLayout = existingItem && existingItem.classList.contains("task-progress-card");
+            const layoutMatches = compact ? isRowLayout : isCardLayout;
+
+            const hasThumb = existingItem && (compact
+                ? !!existingItem.querySelector(".task-row-thumb, .task-row-icon")
+                : !!existingItem.querySelector(".task-thumb"));
+            const expectedThumb = compact ? showThumbs : (showThumbs && !!media.thumbUrl);
+            const thumbMatches = (hasThumb === expectedThumb);
+
+            if (existingItem && layoutMatches && thumbMatches) {
+                // Atualização in-place suave sem recriar o DOM
+                const fill = existingItem.querySelector(".progress-bar-fill") || existingItem.querySelector(".task-row-bar-fill");
+                if (fill) fill.style.width = `${pct}%`;
+
+                const pctSpan = existingItem.querySelector(".task-percent");
+                if (pctSpan) pctSpan.textContent = `${typeHint} · ${pct}%`;
+                const rowPctSpan = existingItem.querySelector(".task-row-pct");
+                if (rowPctSpan) rowPctSpan.textContent = `${pct}%`;
+
+                const barContainer = existingItem.querySelector(".progress-bar-container") || existingItem.querySelector(".task-row-bar");
+                if (barContainer) barContainer.setAttribute("data-tooltip", `Progresso: ${pct}% (${typeHint})`);
+
+                const statusBadge = existingItem.querySelector(".task-status");
+                if (statusBadge) {
+                    statusBadge.className = `task-status status-${t.status}`;
+                    statusBadge.textContent = t.status.toUpperCase();
+                }
+                const dot = existingItem.querySelector(".task-row-dot");
+                if (dot) dot.className = `task-row-dot status-${t.status}`;
+
+                // Atualiza botões de ação se o status da tarefa mudou
+                const actionsContainer = existingItem.querySelector(".task-card-actions") || existingItem.querySelector(".task-row-actions");
+                if (actionsContainer && actionsContainer.dataset.lastStatus !== t.status) {
+                    actionsContainer.dataset.lastStatus = t.status;
+                    actionsContainer.innerHTML = actionsHtml;
+                    this._bindTaskEvents(existingItem, key, t, media, title);
+                }
+
+                const badge = existingItem.querySelector(".task-log-badge");
+                if (badge && logs.length > 0) badge.textContent = logs.length;
+
+                const logBox = existingItem.querySelector(`#task-log-box-${key}`);
+                if (logBox && logs.length > 0) {
+                    const formatted = formatLogLines(logs);
+                    if (logBox.dataset.lastLogCount !== String(logs.length)) {
+                        logBox.innerHTML = formatted;
+                        logBox.dataset.lastLogCount = String(logs.length);
+                        if (isExpanded) logBox.scrollTop = logBox.scrollHeight;
+                    }
+                }
+                return;
             }
 
             // Miniatura (img com fallback: se falhar ao carregar, some e mostra o ícone)
@@ -2408,7 +2443,7 @@ export class PanelsManager {
                         <span class="task-row-title" title="${title} — ${typeHint} · ${esc(t.status)}">${title}</span>
                         <div class="task-row-bar" data-tooltip="Progresso: ${pct}% (${typeHint})"><div class="task-row-bar-fill" style="width:${pct}%"></div></div>
                         <span class="task-row-pct">${pct}%</span>
-                        <div class="task-row-actions" style="display: flex; gap: 4px; align-items: center; margin-left: 4px;">
+                        <div class="task-row-actions" data-last-status="${t.status}" style="display: flex; gap: 4px; align-items: center; margin-left: 4px;">
                             ${actionsHtml}
                         </div>
                     </div>
@@ -2427,7 +2462,7 @@ export class PanelsManager {
                     </div>
                     <div class="task-actions">
                         <span class="task-percent">${typeHint} · ${pct}%</span>
-                        <div class="task-card-actions" style="display: flex; gap: 6px; align-items: center;">
+                        <div class="task-card-actions" data-last-status="${t.status}" style="display: flex; gap: 6px; align-items: center;">
                             ${actionsHtml}
                         </div>
                     </div>
@@ -2435,161 +2470,19 @@ export class PanelsManager {
                 `;
             }
 
-            // Alternar visibilidade do Console Log (CMD)
-            const toggleLogBtn = item.querySelector(".btn-toggle-task-log");
-            if (toggleLogBtn) {
-                toggleLogBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    if (this.expandedTaskKeys.has(key)) {
-                        this.expandedTaskKeys.delete(key);
-                    } else {
-                        this.expandedTaskKeys.add(key);
-                    }
-                    const drawer = item.querySelector(`#task-log-drawer-${key}`);
-                    if (drawer) {
-                        const nowExpanded = this.expandedTaskKeys.has(key);
-                        drawer.classList.toggle("expanded", nowExpanded);
-                        toggleLogBtn.classList.toggle("active", nowExpanded);
-                        if (nowExpanded) {
-                            const box = drawer.querySelector(".task-log-box");
-                            if (box) box.scrollTop = box.scrollHeight;
-                        }
-                    }
-                });
-            }
+            this._bindTaskEvents(item, key, t, media, title);
 
-            // Pausar geração de miniaturas
-            const pauseBtn = item.querySelector(".btn-pause-task");
-            if (pauseBtn) {
-                pauseBtn.addEventListener("click", async (e) => {
-                    e.stopPropagation();
-                    const videoId = key.startsWith("thumbs-") ? Number(key.split("thumbs-")[1]) : Number(key);
-                    try {
-                        await CapIAuAPI.pauseThumbnails(videoId);
-                        if (window.logManager) {
-                            window.logManager.log("Tasks", `Solicitado pausa para miniaturas do vídeo ${videoId}`, "INFO");
-                        }
-                    } catch (err) {
-                        alert("Falha ao pausar geração de miniaturas.");
-                    }
-                });
+            if (existingItem) {
+                existingItem.replaceWith(item);
+            } else {
+                // Aplica a animação pop-in mágica apenas UMA VEZ na criação inicial da tarefa
+                if (!this._renderedTaskKeys.has(key)) {
+                    item.classList.add("task-magical-pop-in");
+                    item.style.animationDelay = `${index * 80}ms`;
+                    this._renderedTaskKeys.add(key);
+                }
+                feed.appendChild(item);
             }
-
-            // Retomar geração de miniaturas
-            const resumeBtn = item.querySelector(".btn-resume-task");
-            if (resumeBtn) {
-                resumeBtn.addEventListener("click", async (e) => {
-                    e.stopPropagation();
-                    const videoId = key.startsWith("thumbs-") ? Number(key.split("thumbs-")[1]) : Number(key);
-                    try {
-                        await CapIAuAPI.resumeThumbnails(videoId);
-                        if (window.logManager) {
-                            window.logManager.log("Tasks", `Solicitado retomada para miniaturas do vídeo ${videoId}`, "INFO");
-                        }
-                    } catch (err) {
-                        alert("Falha ao retomar geração de miniaturas.");
-                    }
-                });
-            }
-
-            // Cancelar tarefa
-            const cancelBtn = item.querySelector(".btn-cancel-task");
-            if (cancelBtn) {
-                cancelBtn.addEventListener("click", async (e) => {
-                    e.stopPropagation();
-                    if (key.startsWith("thumbs-")) {
-                        if (confirm("Cancelar geração de miniaturas para este vídeo?")) {
-                            const videoId = Number(key.split("thumbs-")[1]);
-                            try {
-                                await CapIAuAPI.cancelThumbnails(videoId);
-                                if (window.logManager) {
-                                    window.logManager.log("Tasks", `Solicitado cancelamento de miniaturas do vídeo ${videoId}`, "INFO");
-                                }
-                            } catch (err) {
-                                alert("Falha ao cancelar geração de miniaturas.");
-                            }
-                        }
-                    } else if (key.startsWith("enrich") || t.type === "enrich") {
-                        if (confirm("Cancelar a sincronização de descrições?")) {
-                            try {
-                                await CapIAuAPI.cancelTask(key);
-                                if (window.showToast) window.showToast("Sincronização de descrições cancelada!", "info");
-                                if (window.logManager) {
-                                    window.logManager.log("Tasks", `Cancelada sincronização de descrições (${key})`, "WARN");
-                                }
-                            } catch (err) {
-                                alert("Falha ao cancelar sincronização de descrições: " + err.message);
-                            }
-                        }
-                    } else if (isProxy || key.startsWith("vision-") || key.startsWith("proxy-") || !isNaN(Number(key))) {
-                        if (confirm("Cancelar a análise ou processamento desta mídia?")) {
-                            try {
-                                const videoId = Number(key.replace("vision-", "").replace("proxy-", ""));
-                                await CapIAuAPI.cancelConversion(videoId);
-                                if (window.showToast) window.showToast(`Análise do vídeo #${videoId} cancelada!`, "info");
-                                if (window.libraryInstance) window.libraryInstance.reloadData();
-                            } catch (err) {
-                                alert("Falha ao cancelar tarefa: " + err.message);
-                            }
-                        }
-                    } else {
-                        if (confirm(`Cancelar a tarefa "${title}"?`)) {
-                            try {
-                                await CapIAuAPI.cancelTask(key);
-                                if (window.showToast) window.showToast(`Tarefa "${title}" cancelada!`, "info");
-                                if (window.logManager) {
-                                    window.logManager.log("Tasks", `Tarefa ${key} cancelada pelo usuário`, "WARN");
-                                }
-                            } catch (err) {
-                                alert("Falha ao cancelar tarefa: " + err.message);
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Remover/ocultar tarefa da lista
-            const dismissBtn = item.querySelector(".btn-dismiss-task");
-            if (dismissBtn) {
-                dismissBtn.addEventListener("click", async (e) => {
-                    e.stopPropagation();
-                    try {
-                        await CapIAuAPI.dismissTask(key);
-                        item.remove();
-                        if (window.logManager) {
-                            window.logManager.log("Tasks", `Tarefa ${key} removida da lista`, "INFO");
-                        }
-                    } catch (err) {
-                        alert("Falha ao remover tarefa da lista.");
-                    }
-                });
-            }
-
-            // Clique revela a mídia em 'Mídias' (qualquer status; só para vídeo/foto)
-            if (media.kind === "video" || media.kind === "photo") {
-                item.classList.add("task-card-clickable");
-                item.title = "Clique para mostrar na biblioteca";
-                item.addEventListener("click", (e) => {
-                    if (e.target.closest(".btn-task-action") || e.target.closest(".task-log-drawer")) return;
-                    const ok = media.kind === "photo"
-                        ? (window.libraryManager && window.libraryManager.revealPhotoById(media.id))
-                        : (window.libraryManager && window.libraryManager.revealVideoById(media.id));
-                    if (!ok) {
-                        alert(media.kind === "photo"
-                            ? "Foto correspondente não encontrada na biblioteca local."
-                            : "Vídeo correspondente não encontrado na biblioteca local.");
-                    }
-                });
-            }
-
-            // Aplica a animação pop-in mágica apenas UMA VEZ na criação inicial da tarefa
-            if (!this._renderedTaskKeys.has(key)) {
-                item.classList.add("task-magical-pop-in");
-                item.style.animationDelay = `${index * 80}ms`;
-                this._renderedTaskKeys.add(key);
-            }
-
-            feed.appendChild(item);
 
             // Auto-scroll se o log estiver aberto
             if (isExpanded) {
@@ -2597,6 +2490,163 @@ export class PanelsManager {
                 if (box) box.scrollTop = box.scrollHeight;
             }
         });
+    }
+
+    /** Associa todos os ouvintes de eventos a um card/linha de tarefa */
+    _bindTaskEvents(item, key, t, media, title) {
+        // Alternar visibilidade do Console Log (CMD)
+        const toggleLogBtn = item.querySelector(".btn-toggle-task-log");
+        if (toggleLogBtn) {
+            toggleLogBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (this.expandedTaskKeys.has(key)) {
+                    this.expandedTaskKeys.delete(key);
+                } else {
+                    this.expandedTaskKeys.add(key);
+                }
+                const drawer = item.querySelector(`#task-log-drawer-${key}`);
+                if (drawer) {
+                    const nowExpanded = this.expandedTaskKeys.has(key);
+                    drawer.classList.toggle("expanded", nowExpanded);
+                    toggleLogBtn.classList.toggle("active", nowExpanded);
+                    if (nowExpanded) {
+                        const box = drawer.querySelector(".task-log-box");
+                        if (box) box.scrollTop = box.scrollHeight;
+                    }
+                }
+            };
+        }
+
+        // Pausar geração de miniaturas
+        const pauseBtn = item.querySelector(".btn-pause-task");
+        if (pauseBtn) {
+            pauseBtn.onclick = async (e) => {
+                e.stopPropagation();
+                const videoId = key.startsWith("thumbs-") ? Number(key.split("thumbs-")[1]) : Number(key);
+                try {
+                    await CapIAuAPI.pauseThumbnails(videoId);
+                    if (window.logManager) {
+                        window.logManager.log("Tasks", `Solicitado pausa para miniaturas do vídeo ${videoId}`, "INFO");
+                    }
+                    await this.refreshTasks();
+                } catch (err) {
+                    alert("Falha ao pausar geração de miniaturas.");
+                }
+            };
+        }
+
+        // Retomar geração de miniaturas
+        const resumeBtn = item.querySelector(".btn-resume-task");
+        if (resumeBtn) {
+            resumeBtn.onclick = async (e) => {
+                e.stopPropagation();
+                const videoId = key.startsWith("thumbs-") ? Number(key.split("thumbs-")[1]) : Number(key);
+                try {
+                    await CapIAuAPI.resumeThumbnails(videoId);
+                    if (window.logManager) {
+                        window.logManager.log("Tasks", `Solicitado retomada para miniaturas do vídeo ${videoId}`, "INFO");
+                    }
+                    await this.refreshTasks();
+                } catch (err) {
+                    alert("Falha ao retomar geração de miniaturas.");
+                }
+            };
+        }
+
+        // Cancelar tarefa
+        const cancelBtn = item.querySelector(".btn-cancel-task");
+        if (cancelBtn) {
+            cancelBtn.onclick = async (e) => {
+                e.stopPropagation();
+                const isProxy = !isNaN(Number(key));
+                if (key.startsWith("thumbs-")) {
+                    if (confirm("Cancelar geração de miniaturas para este vídeo?")) {
+                        const videoId = Number(key.split("thumbs-")[1]);
+                        try {
+                            await CapIAuAPI.cancelThumbnails(videoId);
+                            if (window.logManager) {
+                                window.logManager.log("Tasks", `Solicitado cancelamento de miniaturas do vídeo ${videoId}`, "INFO");
+                            }
+                            await this.refreshTasks();
+                        } catch (err) {
+                            alert("Falha ao cancelar geração de miniaturas.");
+                        }
+                    }
+                } else if (key.startsWith("enrich") || t.type === "enrich") {
+                    if (confirm("Cancelar a sincronização de descrições?")) {
+                        try {
+                            await CapIAuAPI.cancelTask(key);
+                            if (window.showToast) window.showToast("Sincronização de descrições cancelada!", "info");
+                            if (window.logManager) {
+                                window.logManager.log("Tasks", `Cancelada sincronização de descrições (${key})`, "WARN");
+                            }
+                            await this.refreshTasks();
+                        } catch (err) {
+                            alert("Falha ao cancelar sincronização de descrições: " + err.message);
+                        }
+                    }
+                } else if (isProxy || key.startsWith("vision-") || key.startsWith("proxy-") || !isNaN(Number(key))) {
+                    if (confirm("Cancelar a análise ou processamento desta mídia?")) {
+                        try {
+                            const videoId = Number(key.replace("vision-", "").replace("proxy-", ""));
+                            await CapIAuAPI.cancelConversion(videoId);
+                            if (window.showToast) window.showToast(`Análise do vídeo #${videoId} cancelada!`, "info");
+                            if (window.libraryInstance) window.libraryInstance.reloadData();
+                            await this.refreshTasks();
+                        } catch (err) {
+                            alert("Falha ao cancelar tarefa: " + err.message);
+                        }
+                    }
+                } else {
+                    if (confirm(`Cancelar a tarefa "${title}"?`)) {
+                        try {
+                            await CapIAuAPI.cancelTask(key);
+                            if (window.showToast) window.showToast(`Tarefa "${title}" cancelada!`, "info");
+                            if (window.logManager) {
+                                window.logManager.log("Tasks", `Tarefa ${key} cancelada pelo usuário`, "WARN");
+                            }
+                            await this.refreshTasks();
+                        } catch (err) {
+                            alert("Falha ao cancelar tarefa: " + err.message);
+                        }
+                    }
+                }
+            };
+        }
+
+        // Remover/ocultar tarefa da lista
+        const dismissBtn = item.querySelector(".btn-dismiss-task");
+        if (dismissBtn) {
+            dismissBtn.onclick = async (e) => {
+                e.stopPropagation();
+                try {
+                    await CapIAuAPI.dismissTask(key);
+                    item.remove();
+                    if (window.logManager) {
+                        window.logManager.log("Tasks", `Tarefa ${key} removida da lista`, "INFO");
+                    }
+                } catch (err) {
+                    alert("Falha ao remover tarefa da lista.");
+                }
+            };
+        }
+
+        // Clique revela a mídia em 'Mídias' (qualquer status; só para vídeo/foto)
+        if (media && (media.kind === "video" || media.kind === "photo")) {
+            item.classList.add("task-card-clickable");
+            item.title = "Clique para mostrar na biblioteca";
+            item.onclick = (e) => {
+                if (e.target.closest(".btn-task-action") || e.target.closest(".task-log-drawer")) return;
+                const ok = media.kind === "photo"
+                    ? (window.libraryManager && window.libraryManager.revealPhotoById(media.id))
+                    : (window.libraryManager && window.libraryManager.revealVideoById(media.id));
+                if (!ok) {
+                    alert(media.kind === "photo"
+                        ? "Foto correspondente não encontrada na biblioteca local."
+                        : "Vídeo correspondente não encontrado na biblioteca local.");
+                }
+            };
+        }
     }
 
     /** Sincroniza a geração de miniaturas com a adição/remoção de vídeos na timeline */

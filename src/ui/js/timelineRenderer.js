@@ -1023,7 +1023,8 @@ export class CapiauTimelineRenderer {
         const volEff = effects.find(e => e && e.type === "volume");
         let clipVol = 1.0;
         if (volEff && volEff.disabled !== true) {
-            clipVol = (typeof volEff.level === "number" && !isNaN(volEff.level)) ? volEff.level : 1.0;
+            const rawVol = volEff.level !== undefined ? volEff.level : (volEff.gain !== undefined ? volEff.gain : 1.0);
+            clipVol = (typeof rawVol === "number" && Number.isFinite(rawVol)) ? rawVol : 1.0;
         }
 
         // 3. Ganho da dinâmica (makeup_db)

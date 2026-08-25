@@ -1734,7 +1734,8 @@ export class ProgramPlayer {
     }
 
     syncVideoToPlayhead() {
-        syncProgramViewport();
+        try {
+            syncProgramViewport();
 
         const currentFrame = TIMELINE_STATE.playheadFrame;
         const durationFrames = this.getDurationFrames();
@@ -1904,6 +1905,9 @@ export class ProgramPlayer {
 
         // Atualiza overlay de transformação (Fase 4)
         this.syncTransformOverlay();
+        } catch (err) {
+            console.warn("[ProgramPlayer] Erro durante syncVideoToPlayhead:", err);
+        }
     }
 
     /**
@@ -1960,7 +1964,10 @@ export class ProgramPlayer {
     /** Instante do arquivo (em segundos) correspondente a um frame da timeline. */
     _targetSecondsFor(cut, frame) {
         const fps = TIMELINE_STATE?.fps || 24;
-        return cut.in + ((frame - cut.timelineStartFrame) / fps);
+        const inSec = (cut && typeof cut.in === "number" && !isNaN(cut.in)) ? cut.in : 0;
+        const startFrame = (cut && typeof cut.timelineStartFrame === "number" && !isNaN(cut.timelineStartFrame)) ? cut.timelineStartFrame : 0;
+        const curFrame = (typeof frame === "number" && !isNaN(frame)) ? frame : 0;
+        return inSec + ((curFrame - startFrame) / fps);
     }
 
     /** true quando o buffer já tem o quadro certo decodificado e pode ir ao ar sem piscar. */
@@ -2231,24 +2238,25 @@ export class ProgramPlayer {
 
         // 4. Fades (dissolve) de entrada/saída por opacidade
         let fadeOpacity = 1.0;
-        const tIn = (currentFrame - cut.timelineStartFrame) / fps;                       // s desde o início
-        const tOut = (cut.timelineStartFrame + durFrames - currentFrame) / fps;          // s até o fim
-        effects.filter(e => e.type === "crossfade").forEach(cf => {
+        const tIn = (currentFrame - (cut.timelineStartFrame || 0)) / fps;                       // s desde o início
+        const tOut = ((cut.timelineStartFrame || 0) + durFrames - currentFrame) / fps;          // s até o fim
+        effects.filter(e => e && e.type === "crossfade").forEach(cf => {
             if (cf.disabled) return;
             const d = Math.max(0.05, cf.duration_s || 0.5);
             if (cf.side === "in" && tIn < d) {
                 const p = Math.max(0, Math.min(1, tIn / d));
                 const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
-                fadeOpacity = Math.min(fadeOpacity, factor);
+                if (typeof factor === "number" && Number.isFinite(factor)) fadeOpacity = Math.min(fadeOpacity, factor);
             }
             if (cf.side === "out" && tOut < d) {
                 const p = Math.max(0, Math.min(1, tOut / d));
                 const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
-                fadeOpacity = Math.min(fadeOpacity, factor);
+                if (typeof factor === "number" && Number.isFinite(factor)) fadeOpacity = Math.min(fadeOpacity, factor);
             }
         });
         
-        el.style.opacity = String(baseOpacity * fadeOpacity);
+        const rawFinalOpacity = baseOpacity * fadeOpacity;
+        el.style.opacity = String((typeof rawFinalOpacity === "number" && Number.isFinite(rawFinalOpacity)) ? Math.max(0, Math.min(1, rawFinalOpacity)) : 1.0);
 
         // 5. Recorte Dinâmico (Crop)
         const cropEffect = effects.find(e => e.type === "crop") || {};
@@ -2371,33 +2379,40 @@ export class ProgramPlayer {
                 if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
             }
 
-            // Volume do clipe individual
-            const clipVolEff = (cut.effects || []).find(e => e.type === "volume");
-            const clipVol = (clipVolEff && !clipVolEff.disabled) ? clipVolEff.level : 1.0;
+            // Volume do clipe individual (suporta level ou gain, garantindo número finito)
+            const clipVolEff = (cut.effects || []).find(e => e && e.type === "volume");
+            let clipVol = 1.0;
+            if (clipVolEff && !clipVolEff.disabled) {
+                const rawVol = clipVolEff.level !== undefined ? clipVolEff.level : (clipVolEff.gain !== undefined ? clipVolEff.gain : 1.0);
+                clipVol = (typeof rawVol === "number" && Number.isFinite(rawVol)) ? rawVol : 1.0;
+            }
 
             // Audio Fade-in / Fade-out duration
             let fadeVol = 1.0;
             const fpsVal = TIMELINE_STATE?.fps || 24;
-            const tIn = (currentFrame - cut.timelineStartFrame) / fpsVal; // s desde o início
-            const tOut = (cut.timelineStartFrame + (cut.outFrame - cut.inFrame) - currentFrame) / fpsVal; // s até o fim
+            const durCut = Math.max(1, ((cut.outFrame || 0) - (cut.inFrame || 0)) || (Math.round(((cut.out || 0) - (cut.in || 0)) * fpsVal)));
+            const tIn = (currentFrame - (cut.timelineStartFrame || 0)) / fpsVal; // s desde o início
+            const tOut = ((cut.timelineStartFrame || 0) + durCut - currentFrame) / fpsVal; // s até o fim
             const effects = cut.effects || [];
-            effects.filter(e => e.type === "crossfade").forEach(cf => {
+            effects.filter(e => e && e.type === "crossfade").forEach(cf => {
                 if (cf.disabled) return;
                 const d = Math.max(0.05, cf.duration_s || 0.5);
                 if (cf.side === "in" && tIn < d) {
                     const p = Math.max(0, Math.min(1, tIn / d));
                     const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
-                    fadeVol = Math.min(fadeVol, factor);
+                    if (typeof factor === "number" && Number.isFinite(factor)) fadeVol = Math.min(fadeVol, factor);
                 }
                 if (cf.side === "out" && tOut < d) {
                     const p = Math.max(0, Math.min(1, tOut / d));
                     const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
-                    fadeVol = Math.min(fadeVol, factor);
+                    if (typeof factor === "number" && Number.isFinite(factor)) fadeVol = Math.min(fadeVol, factor);
                 }
             });
 
-            const vol = track.volume !== undefined ? track.volume : 1.0;
-            el.volume = (track.muted || isHighSpeedOrReverse) ? 0 : Math.max(0, Math.min(1.0, vol * clipVol * fadeVol));
+            const vol = (track.volume !== undefined && typeof track.volume === "number" && Number.isFinite(track.volume)) ? track.volume : 1.0;
+            const rawFinalVol = vol * clipVol * fadeVol;
+            const finalVol = (typeof rawFinalVol === "number" && Number.isFinite(rawFinalVol)) ? Math.max(0, Math.min(1.0, rawFinalVol)) : 1.0;
+            el.volume = (track.muted || isHighSpeedOrReverse) ? 0 : finalVol;
             if (this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse && el.paused) {
                 this._retomarContextoAudioAoVivo(); // AudioContext acorda no mesmo caminho do play
                 el.play().catch(() => {});

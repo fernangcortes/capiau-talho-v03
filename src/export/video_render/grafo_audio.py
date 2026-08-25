@@ -315,7 +315,8 @@ def _estagio_volume(clipe: modelo.Clipe, pista: modelo.Pista, escopo: modelo.Esc
       reproduz o clamp da tela exatamente, inclusive com produto > 1.
     """
     bloco_volume = _bloco_ativo(clipe, "volume", escopo)
-    vol_clipe = _numero(bloco_volume.get("level"), 1.0) if bloco_volume is not None else 1.0
+    vol_val = bloco_volume.get("level") if (bloco_volume is not None and bloco_volume.get("level") is not None) else (bloco_volume.get("gain") if bloco_volume is not None else None)
+    vol_clipe = _numero(vol_val, 1.0) if bloco_volume is not None else 1.0
     vol_pista = _numero(pista.volume, 1.0)
     produto = vol_pista * vol_clipe
 

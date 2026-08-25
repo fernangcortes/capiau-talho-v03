@@ -2478,9 +2478,24 @@ button {
 
 /* Botão de toggle ativo na toolbar de tarefas */
 .flat-sub-btn.toggle-on {
-    background: rgba(6, 182, 212, 0.15);
-    border-color: rgba(6, 182, 212, 0.4);
-    color: var(--color-cyan);
+    background: rgba(6, 182, 212, 0.16) !important;
+    border: 1px solid rgba(6, 182, 212, 0.45) !important;
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan) !important;
+}
+
+.flat-sub-btn.violet-btn.toggle-on {
+    background: rgba(168, 85, 247, 0.18) !important;
+    border: 1px solid rgba(168, 85, 247, 0.45) !important;
+    color: var(--color-violet) !important;
+    text-shadow: 0 0 8px var(--color-violet) !important;
+}
+
+.flat-sub-btn.cyan-btn.toggle-on {
+    background: rgba(6, 182, 212, 0.18) !important;
+    border: 1px solid rgba(6, 182, 212, 0.45) !important;
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan) !important;
 }
 
 /* Pulso ao revelar uma mídia vinda do clique numa tarefa */
