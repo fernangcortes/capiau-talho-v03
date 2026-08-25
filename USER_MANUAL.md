@@ -376,6 +376,10 @@ O sistema suporta dois tipos de marcadores visuais altamente integrados com a ti
 - **Seleção Múltipla & Exclusão em Lote:** Segure **Shift + Clique** sobre múltiplos marcadores para selecioná-los (destacados com uma borda brilhante branca). Pressione a tecla **Delete** (ou **Backspace**) para excluir todos os marcadores selecionados de uma só vez.
 - **Navegação Rápida entre Marcadores:** Pressione **Shift + M** para saltar para o próximo marcador ou **Alt + M** para retroceder ao marcador anterior.
 
+### K. Compatibilidade de Efeitos de Volume em Sobreposições (B-Rolls e JL-Cuts)
+- **Suporte Intercambiável a `level` e `gain`:** Clipes de áudio com efeito de volume (`type: "volume"`) aceitam tanto o parâmetro `level` quanto `gain` (ex.: clipes de B-Roll com atenuação sonora gerados pela IA ou importados de montagens externas).
+- **Estabilidade do Playhead (Agulha):** O laço de animação e reprodução conta com proteção contra falhas e validação numérica estrita, garantindo que o arraste (*scrubbing*) e o playback atravessem sobreposições multipistas, fades e crossfades sem risco de travamento da agulha.
+
 ---
 
 ## 🎚️ 6. Tratamento de Áudio: Diagnóstico, Presets e Comparação A/B

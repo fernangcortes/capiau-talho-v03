@@ -148,3 +148,12 @@ sai dentro da conformação como descrito acima.
 > ⚠️ Não renomeie o arquivo devolvido: sem a convenção de nome, o retorno é ignorado.
 > Hospedagem de VST dentro do CapIAu-Talho não foi implementada (bug conhecido de crash, licença
 > ausente) — a mixagem fina continua sendo trabalho da DAW.
+
+## 6. Regras de Efeitos e Compatibilidade de Áudio na Timeline
+
+Para garantir reprodução contínua e exportação sem falhas ao compor timelines multipista (JL-cuts, B-rolls sobre falas):
+
+- **Propriedades de Volume (`level` vs. `gain`):** Clipes de áudio com efeito de volume (`type: "volume"`) aceitam tanto `level` quanto `gain` (ex.: `{"type": "volume", "gain": 0.18}` ou `{"type": "volume", "level": 0.18}`). O player web, o cálculo de waveforms e o renderizador interno normalizam ambos para valores finitos em `[0.0, 1.0]`, evitando valores `NaN` que travavam o laço de animação da agulha (`requestAnimationFrame`) na entrada de trilhas secundárias (A2/V2).
+- **Proteção do Playhead (Agulha):** A sincronização temporal (`syncVideoToPlayhead`) opera com isolamento de erros (`try...catch`) e validação estrita de números finitos (`Number.isFinite`), garantindo que o arraste (scrubbing) e a reprodução continuem ininterruptos mesmo se houver cortes sobrepostos com fades ou transições complexas.
+- **Fades e Curvas:** Efeitos de crossfade (`type: "crossfade"`) com curvas lineares, exponenciais, logarítmicas ou em S aplicam atenuação multiplicativa segura sobre o volume do clipe e da pista.
+
