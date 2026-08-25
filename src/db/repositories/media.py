@@ -51,6 +51,65 @@ class MediaRepository:
         """Atualiza o status de processamento e possíveis erros de conversão do vídeo."""
         conn.execute("UPDATE video SET status = ?, error_message = ? WHERE id = ?", (status, error_message, video_id))
 
+    # Colunas de cor graváveis (Fase 0 de docs/PLANO_COR_OCIO.md). Lista fechada
+    # porque o nome da coluna entra no SQL por f-string: sem whitelist isso seria
+    # injeção. Chave fora da lista é ignorada em silêncio de propósito -- o dict
+    # vem do FFprobe, que ganha campos novos a cada versão.
+    _COLUNAS_COR_VIDEO = (
+        "color_range", "color_space", "color_transfer", "color_primaries",
+        "pix_fmt", "field_order", "color_profile", "color_profile_origem",
+        "proxy_color_range", "proxy_pix_fmt",
+    )
+    _COLUNAS_COR_PHOTO = (
+        "color_profile", "color_profile_origem", "raw_params_json",
+    )
+
+    @staticmethod
+    def _update_color(conn: sqlite3.Connection, tabela: str, colunas: tuple,
+                      media_id: int, dados: Dict[str, Any]) -> bool:
+        """Grava colunas de cor e carimba color_auditado_em. True se gravou.
+
+        REGRA DO HUMANO: se a linha já tem color_profile_origem='humano' e a
+        gravação nova NÃO é humana, o perfil escolhido à mão é preservado (as
+        tags cruas continuam sendo atualizadas -- elas são fato do arquivo, não
+        opinião). Sem isso, qualquer reauditoria apagaria a correção manual, que
+        é exatamente o tipo de perda silenciosa que este plano existe para evitar.
+        """
+        campos = {k: v for k, v in dados.items() if k in colunas}
+        if not campos:
+            return False
+
+        if campos.get("color_profile_origem") != "humano":
+            cur = conn.execute(
+                f"SELECT color_profile_origem FROM {tabela} WHERE id = ?", (media_id,)
+            ).fetchone()
+            if cur and (cur["color_profile_origem"] if isinstance(cur, sqlite3.Row) else cur[0]) == "humano":
+                campos.pop("color_profile", None)
+                campos.pop("color_profile_origem", None)
+                if not campos:
+                    return False
+
+        sets = ", ".join(f"{c} = ?" for c in campos)
+        conn.execute(
+            f"UPDATE {tabela} SET {sets}, color_auditado_em = CURRENT_TIMESTAMP WHERE id = ?",
+            (*campos.values(), media_id),
+        )
+        return True
+
+    @staticmethod
+    def update_video_color(conn: sqlite3.Connection, video_id: int, dados: Dict[str, Any]) -> bool:
+        """Grava o bloco de cor de um vídeo (saída de src.color.deteccao.resolver)."""
+        return MediaRepository._update_color(
+            conn, "video", MediaRepository._COLUNAS_COR_VIDEO, video_id, dados
+        )
+
+    @staticmethod
+    def update_photo_color(conn: sqlite3.Connection, photo_id: int, dados: Dict[str, Any]) -> bool:
+        """Grava o bloco de cor de uma foto."""
+        return MediaRepository._update_color(
+            conn, "photo", MediaRepository._COLUNAS_COR_PHOTO, photo_id, dados
+        )
+
     # Quantas versões anteriores de decupagem manter por vídeo. Sem poda, um acervo
     # reprocessado várias vezes cresce sem limite.
     METADATA_HISTORY_KEEP = 20

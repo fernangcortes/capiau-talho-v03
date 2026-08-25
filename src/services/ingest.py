@@ -21,6 +21,29 @@ SUPPORTED_PHOTO = {
     '.arw', '.cr2', '.nef', '.dng', '.pef', '.raf', '.orf', '.rw2', '.raw'
 }
 
+def _registrar_cor_video(conn, video_id: int, filename: str, meta: Dict[str, Any]) -> None:
+    """Grava o bloco de cor do vídeo na ingestão (Fase 0 de docs/PLANO_COR_OCIO.md).
+
+    As tags já vieram no `meta` do FFprobe -- não há chamada extra a disco aqui.
+    Falha NUNCA derruba a ingestão: cor é acessório, mídia ingerida é o principal
+    (mesma regra do E2.A5 escrita em image_semantic.py).
+    """
+    try:
+        from src.color import deteccao
+        MediaRepository.update_video_color(conn, video_id, deteccao.resolver(meta))
+    except Exception as e:
+        print(f"[Cor] Falha ao registrar cor de {filename} (ingestão segue): {e}")
+
+
+def _registrar_cor_foto(conn, photo_id: int, filename: str, caminho: Path) -> None:
+    """Idem para foto: perfil pela extensão (RAW) ou pelo EXIF (JPEG/PNG)."""
+    try:
+        from src.color import deteccao
+        MediaRepository.update_photo_color(conn, photo_id, deteccao.resolver_foto(caminho))
+    except Exception as e:
+        print(f"[Cor] Falha ao registrar cor de {filename} (ingestão segue): {e}")
+
+
 def compute_hash(filepath: Path) -> str:
     """Calcula hash SHA-256 parcial/rápido de arquivos grandes para deduplicação."""
     import hashlib
@@ -74,6 +97,15 @@ class IngestService:
         duration = None
         
         with get_db() as conn:
+            # Garante que o project_id exista no banco para evitar violação de FOREIGN KEY
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM project WHERE id = ?", (project_id,))
+            if not cursor.fetchone():
+                cursor.execute("SELECT id FROM project ORDER BY id DESC LIMIT 1")
+                p_row = cursor.fetchone()
+                if p_row:
+                    project_id = p_row["id"]
+
             if ext in SUPPORTED_VIDEO or ext in SUPPORTED_AUDIO:
                 media_type = "video"
                 # Determina tipo de vídeo inicial com base na nomenclatura da pasta/arquivo
@@ -101,6 +133,7 @@ class IngestService:
                     codec=meta['codec'],
                     bitrate=meta['bitrate']
                 )
+                _registrar_cor_video(conn, media_id, filename, meta)
             else:
                 media_type = "photo"
                 # Inserção de foto
@@ -111,6 +144,7 @@ class IngestService:
                     filepath=str(target_path).replace('\\', '/'),
                     file_hash=file_hash
                 )
+                _registrar_cor_foto(conn, media_id, filename, target_path)
                 
         # Agenda as tarefas em background APÓS fechar a conexão do banco para evitar database is locked
         if media_type == "video":
@@ -196,6 +230,17 @@ class IngestService:
                     MediaRepository.update_video_status(conn, video_id, 'ingested')
                     TASK_MANAGER.update_progress(str(video_id), 100.0, "finished")
                     
+                    # Gera a miniatura principal da capa (thumb_{video_id}.jpg)
+                    try:
+                        thumb_main = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
+                        if not thumb_main.exists() or thumb_main.stat().st_size == 0:
+                            target_time = max(1.0, duration * 0.1)
+                            success_thumb = extract_frame(proxy_path, target_time, thumb_main)
+                            if not success_thumb or not thumb_main.exists():
+                                extract_frame(proxy_path, 0.0, thumb_main)
+                    except Exception as th_err:
+                        print(f"[IngestService] Erro ao extrair thumbnail principal: {th_err}")
+
                     # Dispara a geração de miniaturas progressivas em segundo plano
                     TASK_MANAGER.executor.submit(
                         IngestService._generate_timeline_thumbnails_task,

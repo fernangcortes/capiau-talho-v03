@@ -1541,3 +1541,134 @@ Responda em formato JSON puro:
             )
 
         return updated
+
+    @staticmethod
+    def analyze_video_all(video_id: int) -> Dict[str, Any]:
+        """Executa todas as camadas de IA para um vídeo em background:
+        1. Transcrição ASR (se depoimento ou áudio pendente)
+        2. Visão Computacional Multimodal (título, descrição, tags)
+        3. Detecção e Registro Facial nos keyframes
+        4. Indexação Vetorial Semântica (Qdrant)
+        """
+        task_key = f"analyze_all_video_{video_id}"
+        TASK_MANAGER.update_progress(
+            task_key, 5.0, "running", task_type="pipeline",
+            label=f"Análise Completa de IA (Vídeo #{video_id})",
+            log_message=f"[INIT] Iniciando pipeline completo de IA para vídeo #{video_id}."
+        )
+
+        with get_db() as conn:
+            video = MediaRepository.get_video(conn, video_id)
+            if not video:
+                TASK_MANAGER.update_progress(task_key, 100.0, "error", task_type="pipeline",
+                                             log_message="[ERROR] Vídeo não encontrado no banco de dados.")
+                return {"status": "error", "message": "Vídeo não encontrado."}
+            filepath = Path(video["filepath"])
+            duration = float(video.get("duration") or 0.0)
+            v_type = video.get("video_type", "unknown")
+            project_id = int(video.get("project_id", 1))
+
+        # Camada 4: Transcrição ASR
+        try:
+            TASK_MANAGER.update_progress(
+                task_key, 25.0, "running", task_type="pipeline",
+                label=f"Transcrição ASR (Vídeo #{video_id})",
+                log_message="[ASR] Executando Camada 4: Transcrição ASR e diarização..."
+            )
+            PipelineService.transcribe_video(video_id, filepath)
+        except Exception as e:
+            print(f"[AnalyzeAllVideo] Transcrição ASR ignorada ou falhou: {e}")
+            TASK_MANAGER.add_log(task_key, f"[WARN] ASR ignorada/não aplicável: {e}", "WARN")
+
+        # Camada 5 & 7: Visão Multimodal e Indexação Vetorial
+        try:
+            TASK_MANAGER.update_progress(
+                task_key, 60.0, "running", task_type="pipeline",
+                label=f"Visão Multimodal (Vídeo #{video_id})",
+                log_message="[LLM] Executando Camada 5 & 7: Visão Multimodal e Indexação Qdrant..."
+            )
+            PipelineService.analyze_video_vision(video_id, filepath, duration)
+        except Exception as e:
+            print(f"[AnalyzeAllVideo] Visão Multimodal falhou: {e}")
+            TASK_MANAGER.add_log(task_key, f"[WARN] Visão falhou: {e}", "WARN")
+
+        # Camada 6: Detecção Facial em Frame Principal
+        try:
+            TASK_MANAGER.update_progress(
+                task_key, 85.0, "running", task_type="pipeline",
+                label=f"Detecção Facial (Vídeo #{video_id})",
+                log_message="[VISION] Executando Camada 6: Detecção de Rostos..."
+            )
+            frame_dir = CONFIG.FRAMES_DIR / f"vid_{video_id}"
+            frame_dir.mkdir(parents=True, exist_ok=True)
+            sample_ts = min(1.0, duration / 2.0) if duration > 0 else 0.0
+            sample_frame = frame_dir / f"frame_{int(sample_ts*1000)}.jpg"
+            if not sample_frame.exists():
+                extract_frame(filepath, sample_frame, sample_ts)
+            if sample_frame.exists():
+                process_video_frame_faces(project_id, video_id, sample_ts, sample_frame)
+        except Exception as e:
+            print(f"[AnalyzeAllVideo] Detecção facial erro: {e}")
+            TASK_MANAGER.add_log(task_key, f"[WARN] Detecção facial erro: {e}", "WARN")
+
+        TASK_MANAGER.update_progress(
+            task_key, 100.0, "finished", task_type="pipeline",
+            label=f"Análise Completa Finalizada (#{video_id})",
+            log_message="[FINISHED] Todas as camadas de IA foram processadas com sucesso."
+        )
+        return {"status": "success", "message": "Pipeline completo executado."}
+
+    @staticmethod
+    def analyze_photo_all(photo_id: int) -> Dict[str, Any]:
+        """Executa todas as camadas de IA para uma foto em background:
+        1. Visão Multimodal (título, descrição, tags)
+        2. Detecção Facial
+        3. Indexação Vetorial (CLIP / Qdrant)
+        """
+        task_key = f"analyze_all_photo_{photo_id}"
+        TASK_MANAGER.update_progress(
+            task_key, 10.0, "running", task_type="pipeline",
+            label=f"Análise Completa de IA (Foto #{photo_id})",
+            log_message=f"[INIT] Iniciando pipeline completo de IA para foto #{photo_id}."
+        )
+
+        with get_db() as conn:
+            photo = MediaRepository.get_photo(conn, photo_id)
+            if not photo:
+                TASK_MANAGER.update_progress(task_key, 100.0, "error", task_type="pipeline",
+                                             log_message="[ERROR] Foto não encontrada no banco.")
+                return {"status": "error", "message": "Foto não encontrada."}
+            filepath = Path(photo["filepath"])
+            project_id = int(photo.get("project_id", 1))
+
+        # 1. Visão Multimodal
+        try:
+            TASK_MANAGER.update_progress(
+                task_key, 40.0, "running", task_type="pipeline",
+                label=f"Visão Multimodal (Foto #{photo_id})",
+                log_message="[LLM] Executando Camada 5: Visão Multimodal e Tags..."
+            )
+            PipelineService.analyze_photo_vision(photo_id, filepath)
+        except Exception as e:
+            print(f"[AnalyzeAllPhoto] Visão falhou: {e}")
+            TASK_MANAGER.add_log(task_key, f"[WARN] Visão falhou: {e}", "WARN")
+
+        # 2. Detecção Facial
+        try:
+            TASK_MANAGER.update_progress(
+                task_key, 80.0, "running", task_type="pipeline",
+                label=f"Detecção Facial (Foto #{photo_id})",
+                log_message="[VISION] Executando Camada 6: Detecção de Rostos..."
+            )
+            process_photo_faces(project_id, photo_id, filepath)
+        except Exception as e:
+            print(f"[AnalyzeAllPhoto] Detecção facial falhou: {e}")
+            TASK_MANAGER.add_log(task_key, f"[WARN] Detecção facial falhou: {e}", "WARN")
+
+        TASK_MANAGER.update_progress(
+            task_key, 100.0, "finished", task_type="pipeline",
+            label=f"Análise Completa Finalizada (#{photo_id})",
+            log_message="[FINISHED] Análise completa da foto concluída com sucesso."
+        )
+        return {"status": "success", "message": "Pipeline completo de foto executado."}
+

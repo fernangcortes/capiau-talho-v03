@@ -6,8 +6,36 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 
+# Metadados de COR lidos da stream de vídeo (Fase 0 de docs/PLANO_COR_OCIO.md).
+# Ausência de tag é informação: a camcorder AVCHD do acervo não etiqueta nada e a
+# Canon etiqueta full range. Por isso o valor ausente vira None e NUNCA um default
+# inventado -- quem decide o que fazer com o silêncio é src/color/deteccao.py.
+COLOR_KEYS = (
+    'color_range', 'color_space', 'color_transfer', 'color_primaries',
+    'pix_fmt', 'bits_per_raw_sample', 'field_order',
+)
+
+# Devolvido quando o FFprobe falha, para que nenhum chamador precise usar .get()
+# defensivo: as chaves existem sempre, o valor é que pode ser None.
+EMPTY_COLOR: Dict[str, Any] = {k: None for k in COLOR_KEYS}
+
+
+def _extract_color_metadata(video_stream: Dict[str, Any]) -> Dict[str, Any]:
+    """Tags de cor da stream de vídeo. Chave ausente no FFprobe -> None."""
+    out: Dict[str, Any] = {}
+    for key in COLOR_KEYS:
+        value = video_stream.get(key)
+        out[key] = value if value not in ("", None) else None
+    if out['bits_per_raw_sample'] is not None:
+        try:
+            out['bits_per_raw_sample'] = int(out['bits_per_raw_sample'])
+        except (TypeError, ValueError):
+            out['bits_per_raw_sample'] = None
+    return out
+
+
 def get_media_metadata(filepath: Path) -> Dict[str, Any]:
-    """Extrai metadados técnicos (duração, fps, resolução, codec e bitrate) via FFprobe."""
+    """Extrai metadados técnicos (duração, fps, resolução, codec, bitrate e cor) via FFprobe."""
     cmd = [
         'ffprobe', '-v', 'quiet', '-print_format', 'json',
         '-show_format', '-show_streams', str(filepath)
@@ -46,7 +74,8 @@ def get_media_metadata(filepath: Path) -> Dict[str, Any]:
             'fps': round(fps, 3),
             'resolution': resolution,
             'codec': codec,
-            'bitrate': bitrate
+            'bitrate': bitrate,
+            **_extract_color_metadata(video_stream),
         }
     except Exception as e:
         print(f"[FFmpeg] Erro ao executar FFprobe no arquivo {filepath.name}: {e}")
@@ -55,7 +84,8 @@ def get_media_metadata(filepath: Path) -> Dict[str, Any]:
             'fps': 0.0,
             'resolution': 'unknown',
             'codec': 'unknown',
-            'bitrate': 0
+            'bitrate': 0,
+            **EMPTY_COLOR,
         }
 
 def has_audio_stream(filepath: Path) -> bool:

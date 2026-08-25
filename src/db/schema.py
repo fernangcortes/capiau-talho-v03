@@ -474,6 +474,32 @@ def init_db(db_path: Path = None):
             cursor.execute("ALTER TABLE video ADD COLUMN metadata_origem TEXT DEFAULT 'ia'")
             print("[MIGRATION] Coluna 'metadata_origem' adicionada a tabela video.")
 
+        # Gerenciamento de cor -- Fase 0 de docs/PLANO_COR_OCIO.md.
+        # As cinco primeiras guardam a tag CRUA do FFprobe (NULL = o arquivo nao
+        # declarou nada, que e o caso dos 259 .MTS do acervo). color_profile e
+        # color_profile_origem sao a INTERPRETACAO de src/color/deteccao.py: o
+        # perfil nunca e NULL, e a origem diz se veio de tag, de heuristica ou do
+        # humano -- assim nada adivinha em silencio. field_order e brinde da mesma
+        # leitura (revela material entrelacado); proxy_color_range registra em que
+        # convencao o PROXY ficou, que hoje nao esta escrito em lugar nenhum.
+        for _col, _tipo in (
+            ("color_range", "TEXT"),
+            ("color_space", "TEXT"),
+            ("color_transfer", "TEXT"),
+            ("color_primaries", "TEXT"),
+            ("pix_fmt", "TEXT"),
+            ("field_order", "TEXT"),
+            ("color_profile", "TEXT"),
+            ("color_profile_origem", "TEXT"),
+            ("proxy_color_range", "TEXT"),
+            ("proxy_pix_fmt", "TEXT"),
+            ("color_auditado_em", "TIMESTAMP"),
+        ):
+            if _col not in video_cols:
+                cursor.execute(f"ALTER TABLE video ADD COLUMN {_col} {_tipo}")
+                print(f"[MIGRATION] Coluna '{_col}' adicionada a tabela video.")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_video_color_profile ON video(project_id, color_profile)")
+
         # Migracoes para tabela photo (descricao original preservada antes do enriquecimento)
         cursor.execute("PRAGMA table_info(photo)")
         photo_cols = [row[1] for row in cursor.fetchall()]
@@ -499,6 +525,21 @@ def init_db(db_path: Path = None):
         if "palette_hex" not in photo_cols:
             cursor.execute("ALTER TABLE photo ADD COLUMN palette_hex TEXT")
             print("[MIGRATION] Coluna 'palette_hex' adicionada a tabela photo.")
+
+        # Cor da foto -- Fase 0 de docs/PLANO_COR_OCIO.md. color_profile aqui e
+        # 'raw' (CR2: a cor final e decidida pelo rawpy, nao pelo arquivo) ou o
+        # espaco declarado no EXIF (JPEG). raw_params_json fica NULL ate a Fase 1.2
+        # passar parametros EXPLICITOS ao rawpy -- hoje ele roda com os defaults,
+        # incluindo no_auto_bright=False, e nada registra isso.
+        for _col, _tipo in (
+            ("color_profile", "TEXT"),
+            ("color_profile_origem", "TEXT"),
+            ("raw_params_json", "TEXT"),
+            ("color_auditado_em", "TIMESTAMP"),
+        ):
+            if _col not in photo_cols:
+                cursor.execute(f"ALTER TABLE photo ADD COLUMN {_col} {_tipo}")
+                print(f"[MIGRATION] Coluna '{_col}' adicionada a tabela photo.")
 
         # Migracoes para tabela theme (centroide de embedding e temas fixados pelo usuario)
         cursor.execute("PRAGMA table_info(theme)")
