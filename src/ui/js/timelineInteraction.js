@@ -93,6 +93,9 @@ export class CapiauTimelineInteraction {
 
         // F4: o player registra falha da fonte tratada; a UI devolve o A/B para Original.
         STATE.on("fonteAudioTratadaIndisponivel", (registro) => this._refletirFalhaFonteTratada(registro));
+
+        // Modo de edição simultânea / sincronizada de ajustes de todos os cortes da mesma mídia
+        this.syncMediaCutsMode = false;
         
         // Posição do mouse
         this.mouseX = 0;
@@ -1293,6 +1296,66 @@ export class CapiauTimelineInteraction {
             menu.appendChild(itemUnlink);
         }
 
+        // 7. Ações em Lote para Cortes da Mesma Mídia
+        const cutsOnTimeline = STATE.activeTimelineCuts || [];
+        const sameMediaVideoCuts = this._getSameMediaVideoCuts(clip, cutsOnTimeline);
+        const sameMediaAudioCuts = this._getSameMediaAudioCuts(clip, cutsOnTimeline);
+        const totalMediaCuts = clip.type === "photo" ? sameMediaVideoCuts.length : Math.max(sameMediaVideoCuts.length, sameMediaAudioCuts.length);
+
+        if (totalMediaCuts > 1) {
+            const sepBatch = document.createElement("div");
+            sepBatch.className = "menu-separator";
+            sepBatch.style.height = "1px";
+            sepBatch.style.background = "var(--border-glass)";
+            sepBatch.style.margin = "4px 0";
+            menu.appendChild(sepBatch);
+
+            // Item: Editar Ajustes de Todos os Cortes Juntos
+            const itemSyncEdit = document.createElement("div");
+            itemSyncEdit.className = "menu-item";
+            itemSyncEdit.style.display = "flex";
+            itemSyncEdit.style.alignItems = "center";
+            itemSyncEdit.style.justifyContent = "space-between";
+            itemSyncEdit.style.padding = "7px 12px";
+            itemSyncEdit.style.cursor = "pointer";
+            itemSyncEdit.innerHTML = `
+                <span style="display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-link" style="color:var(--color-cyan);"></i>
+                    <span>Editar Cortes Juntos (${totalMediaCuts})</span>
+                </span>
+            `;
+            itemSyncEdit.onclick = () => {
+                this.syncMediaCutsMode = true;
+                TIMELINE_STATE.selectClip(clip.id);
+                this.showClipInspector(clip);
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast(`Sincronização ativada: editando ${totalMediaCuts} cortes em lote.`, "info");
+                }
+                menu.remove();
+            };
+            menu.appendChild(itemSyncEdit);
+
+            // Item: Propagar Ajustes Deste Clipe para os Demais
+            const itemPropagate = document.createElement("div");
+            itemPropagate.className = "menu-item";
+            itemPropagate.style.display = "flex";
+            itemPropagate.style.alignItems = "center";
+            itemPropagate.style.justifyContent = "space-between";
+            itemPropagate.style.padding = "7px 12px";
+            itemPropagate.style.cursor = "pointer";
+            itemPropagate.innerHTML = `
+                <span style="display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-clone" style="color:var(--color-violet, #c084fc);"></i>
+                    <span>Propagar Ajustes p/ Todos (${totalMediaCuts})</span>
+                </span>
+            `;
+            itemPropagate.onclick = () => {
+                this.propagateAdjustmentsToAllMediaCuts(clip.id);
+                menu.remove();
+            };
+            menu.appendChild(itemPropagate);
+        }
+
         document.body.appendChild(menu);
 
         // Limita posição na tela
@@ -1860,13 +1923,137 @@ export class CapiauTimelineInteraction {
         }
     }
 
-    _mutateClipEffects(clipId, fn) {
+    _getSameMediaVideoCuts(clip, cuts = (STATE.activeTimelineCuts || [])) {
+        if (!clip) return [];
+        if (clip.photo_id !== undefined && clip.photo_id !== null) {
+            return cuts.filter(c => String(c.photo_id) === String(clip.photo_id));
+        }
+        if (clip.video_id !== undefined && clip.video_id !== null) {
+            return cuts.filter(c => String(c.video_id) === String(clip.video_id) && TIMELINE_STATE.trackKindOf(c.track) !== "audio");
+        }
+        return [clip];
+    }
+
+    _getSameMediaAudioCuts(clip, cuts = (STATE.activeTimelineCuts || [])) {
+        if (!clip) return [];
+        if (clip.video_id !== undefined && clip.video_id !== null) {
+            return cuts.filter(c => String(c.video_id) === String(clip.video_id) && TIMELINE_STATE.trackKindOf(c.track) === "audio");
+        }
+        const isAudio = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+        if (isAudio) return [clip];
+        if (clip.link_id) {
+            const partner = cuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
+            return partner ? [partner] : [];
+        }
+        return [];
+    }
+
+    _getSameMediaCutsByKind(clip, kind = "all", cuts = (STATE.activeTimelineCuts || [])) {
+        if (kind === "video") return this._getSameMediaVideoCuts(clip, cuts);
+        if (kind === "audio") return this._getSameMediaAudioCuts(clip, cuts);
+        const vCuts = this._getSameMediaVideoCuts(clip, cuts);
+        const aCuts = this._getSameMediaAudioCuts(clip, cuts);
+        return Array.from(new Set([...vCuts, ...aCuts]));
+    }
+
+    propagateAdjustmentsToAllMediaCuts(clipId, section = null) {
+        const cuts = [...STATE.activeTimelineCuts];
+        const sourceClip = cuts.find(c => c.id === clipId);
+        if (!sourceClip) return;
+
+        const videoCuts = this._getSameMediaVideoCuts(sourceClip, cuts);
+        const audioCuts = this._getSameMediaAudioCuts(sourceClip, cuts);
+        const totalAffected = Math.max(videoCuts.length, audioCuts.length);
+
+        if (videoCuts.length <= 1 && audioCuts.length <= 1) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Não há outros cortes desta mídia na timeline para propagar.", "info");
+            }
+            return;
+        }
+
+        TIMELINE_HISTORY.record(() => {
+            const sEff = sourceClip.effects || [];
+            const videoEffectTypes = ["transform", "crop", "color", "fit", "ken_burns", "crossfade"];
+            const audioEffectTypes = ["volume", "audio_eq", "audio_dynamics", "audio_render", "crossfade"];
+
+            // 1. Atualizar cortes de vídeo
+            videoCuts.forEach(c => {
+                if (c.id !== sourceClip.id) {
+                    c.effects = c.effects ? c.effects.map(e => ({ ...e })) : [];
+                    if (!section || section === "all") {
+                        // Preserva efeitos de áudio existentes no clipe e substitui os de vídeo
+                        const preservedAudio = c.effects.filter(e => e && !videoEffectTypes.includes(e.type));
+                        const clonedVideo = sEff.filter(e => e && videoEffectTypes.includes(e.type)).map(e => ({ ...e }));
+                        c.effects = [...preservedAudio, ...clonedVideo];
+                    } else if (videoEffectTypes.includes(section === "fades" ? "crossfade" : section)) {
+                        const targetType = section === "fades" ? "crossfade" : section;
+                        c.effects = c.effects.filter(e => e && e.type !== targetType);
+                        const sourceMatching = sEff.filter(e => e && e.type === targetType).map(e => ({ ...e }));
+                        c.effects.push(...sourceMatching);
+                    }
+                }
+            });
+
+            // 2. Atualizar cortes de áudio (se houver)
+            let sourceAudioEffects = [];
+            const isAudioTrack = TIMELINE_STATE.trackKindOf(sourceClip.track) === "audio";
+            if (isAudioTrack) {
+                sourceAudioEffects = sEff.filter(e => e && audioEffectTypes.includes(e.type));
+            } else if (sourceClip.link_id) {
+                const partner = cuts.find(c => c.link_id === sourceClip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
+                if (partner && partner.effects) {
+                    sourceAudioEffects = partner.effects.filter(e => e && audioEffectTypes.includes(e.type));
+                }
+            }
+
+            if (sourceAudioEffects.length > 0 || section) {
+                audioCuts.forEach(ac => {
+                    ac.effects = ac.effects ? ac.effects.map(e => ({ ...e })) : [];
+                    if (!section || section === "all") {
+                        const preservedVideo = ac.effects.filter(e => e && !audioEffectTypes.includes(e.type));
+                        const clonedAudio = sourceAudioEffects.map(e => ({ ...e }));
+                        ac.effects = [...preservedVideo, ...clonedAudio];
+                    } else if (audioEffectTypes.includes(section === "fades" ? "crossfade" : section)) {
+                        const targetType = section === "fades" ? "crossfade" : section;
+                        ac.effects = ac.effects.filter(e => e && e.type !== targetType);
+                        const sourceMatching = sourceAudioEffects.filter(e => e && e.type === targetType).map(e => ({ ...e }));
+                        ac.effects.push(...sourceMatching);
+                    }
+                    this._notificarPlayerAudioAoVivo(ac);
+                });
+            }
+
+            STATE.activeTimelineCuts = cuts;
+        });
+
+        this.refreshClipInspector();
+        if (this.renderer) this.renderer.requestRedraw();
+
+        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+            let mediaName = "mídia";
+            if (sourceClip.type === "photo") {
+                const p = STATE.allPhotos.find(ph => String(ph.id) === String(sourceClip.photo_id));
+                mediaName = p ? (p.title || p.filename) : "foto";
+            } else {
+                const v = STATE.allVideos.find(vd => String(vd.id) === String(sourceClip.video_id));
+                mediaName = v ? (v.title || v.filename) : "vídeo";
+            }
+            const secText = section ? ` (${section})` : "";
+            window.showToast(`Ajustes${secText} propagados com sucesso para todos os ${totalAffected} cortes de "${mediaName}"!`, "success");
+        }
+    }
+
+    _mutateClipEffects(clipId, fn, targetKind = "all") {
         TIMELINE_HISTORY.record(() => {
             const cuts = [...STATE.activeTimelineCuts];
-            const clip = cuts.find(c => c.id === clipId);
-            if (!clip) return;
-            clip.effects = clip.effects ? clip.effects.map(e => ({ ...e })) : [];
-            fn(clip);
+            const refClip = cuts.find(c => c.id === clipId);
+            if (!refClip) return;
+            const targets = this.syncMediaCutsMode ? this._getSameMediaCutsByKind(refClip, targetKind, cuts) : [refClip];
+            targets.forEach(clip => {
+                clip.effects = clip.effects ? clip.effects.map(e => ({ ...e })) : [];
+                fn(clip);
+            });
             STATE.activeTimelineCuts = cuts; // dispara recomposição do Program + redraw
         });
         const selected = STATE.activeTimelineCuts.find(c => c.id === TIMELINE_STATE.selectedClipId);
@@ -1882,7 +2069,7 @@ export class CapiauTimelineInteraction {
         this._mutateClipEffects(clipId, (clip) => {
             clip.effects = clip.effects.filter(e => e.type !== "fit");
             clip.effects.push({ type: "fit", mode });
-        });
+        }, "video");
     }
 
     setClipKenBurns(clipId, preset) {
@@ -1897,7 +2084,7 @@ export class CapiauTimelineInteraction {
             clip.effects = clip.effects.filter(e => e.type !== "ken_burns");
             const cfg = presets[preset];
             if (cfg) clip.effects.push({ type: "ken_burns", preset, easing: "easeInOut", ...cfg });
-        });
+        }, "video");
     }
 
     setClipTransform(clipId, key, value) {
@@ -1908,7 +2095,7 @@ export class CapiauTimelineInteraction {
                 clip.effects.push(tf);
             }
             tf[key] = value;
-        });
+        }, "video");
     }
 
     setClipColor(clipId, key, value) {
@@ -1919,7 +2106,7 @@ export class CapiauTimelineInteraction {
                 clip.effects.push(col);
             }
             col[key] = value;
-        });
+        }, "video");
     }
 
     setClipCrop(clipId, key, value) {
@@ -1930,17 +2117,20 @@ export class CapiauTimelineInteraction {
                 clip.effects.push(crop);
             }
             crop[key] = value;
-        });
+        }, "video");
     }
 
     setClipVolume(clipId, level) {
         this._mutateClipEffects(clipId, (clip) => {
             clip.effects = clip.effects.filter(e => e.type !== "volume");
             clip.effects.push({ type: "volume", level });
-        });
+            this._notificarPlayerAudioAoVivo(clip);
+        }, "audio");
     }
 
     setClipFade(clipId, side, dur, curve = null, tension = null) {
+        const clipRef = (STATE.activeTimelineCuts || []).find(c => c.id === clipId);
+        const isAudio = clipRef && TIMELINE_STATE.trackKindOf(clipRef.track) === "audio";
         this._mutateClipEffects(clipId, (clip) => {
             const existing = clip.effects.find(e => e.type === "crossfade" && e.side === side);
             const chosenDur = dur !== null ? dur : (existing ? (existing.duration_s || 0.5) : 0.5);
@@ -1959,10 +2149,12 @@ export class CapiauTimelineInteraction {
                     disabled: wasDisabled
                 });
             }
-        });
+        }, isAudio ? "audio" : "video");
     }
 
     setClipFadeCurve(clipId, side, curve, tension = null) {
+        const clipRef = (STATE.activeTimelineCuts || []).find(c => c.id === clipId);
+        const isAudio = clipRef && TIMELINE_STATE.trackKindOf(clipRef.track) === "audio";
         this._mutateClipEffects(clipId, (clip) => {
             const existing = clip.effects.find(e => e.type === "crossfade" && e.side === side);
             if (existing) {
@@ -1978,7 +2170,7 @@ export class CapiauTimelineInteraction {
                     disabled: false
                 });
             }
-        });
+        }, isAudio ? "audio" : "video");
     }
 
     // ── AJUSTES DE ÁUDIO AO VIVO (Etapa 2) — contratos E1/E2/E3 ──
@@ -2072,7 +2264,7 @@ export class CapiauTimelineInteraction {
             const novo = this._construirEfeitoAudioAoVivo(i >= 0 ? clip.effects[i] : null, "audio_eq", prop, valor);
             if (i >= 0) clip.effects[i] = novo; else clip.effects.push(novo);
             this._notificarPlayerAudioAoVivo(clip);
-        });
+        }, "audio");
     }
 
     setClipAudioDynamics(clipId, prop, valor) {
@@ -2081,7 +2273,7 @@ export class CapiauTimelineInteraction {
             const novo = this._construirEfeitoAudioAoVivo(i >= 0 ? clip.effects[i] : null, "audio_dynamics", prop, valor);
             if (i >= 0) clip.effects[i] = novo; else clip.effects.push(novo);
             this._notificarPlayerAudioAoVivo(clip);
-        });
+        }, "audio");
     }
 
     // ==================== ABA DE AJUSTES RETRÁTIL, REORDENÁVEL & BUSCA SEMÂNTICA ====================
@@ -2634,30 +2826,46 @@ export class CapiauTimelineInteraction {
         }
 
         const cuts = [...STATE.activeTimelineCuts];
-        const targetClip = cuts.find(c => c.id === targetClipId);
-        if (targetClip) {
-            targetClip.effects = [];
-        }
-        if (partnerClipId) {
-            const partnerClip = cuts.find(c => c.id === partnerClipId);
-            if (partnerClip) {
-                partnerClip.effects = [];
+
+        if (this.syncMediaCutsMode) {
+            const allMatching = this._getSameMediaCutsByKind(clip, "all", cuts);
+            allMatching.forEach(c => {
+                c.effects = [];
+                if (TIMELINE_STATE.trackKindOf(c.track) === "audio") {
+                    this._notificarPlayerAudioAoVivo(c);
+                }
+            });
+        } else {
+            const targetClip = cuts.find(c => c.id === targetClipId);
+            if (targetClip) {
+                targetClip.effects = [];
+            }
+            if (partnerClipId) {
+                const partnerClip = cuts.find(c => c.id === partnerClipId);
+                if (partnerClip) {
+                    partnerClip.effects = [];
+                }
+            }
+            if (partnerClipId) {
+                const partnerClip = cuts.find(c => c.id === partnerClipId);
+                if (partnerClip) this._notificarPlayerAudioAoVivo(partnerClip);
+            } else if (isAudio && targetClip) {
+                this._notificarPlayerAudioAoVivo(targetClip);
             }
         }
 
         STATE.activeTimelineCuts = cuts;
-        if (partnerClipId) {
-            const partnerClip = cuts.find(c => c.id === partnerClipId);
-            if (partnerClip) this._notificarPlayerAudioAoVivo(partnerClip);
-        } else if (isAudio && targetClip) {
-            this._notificarPlayerAudioAoVivo(targetClip);
-        }
 
         TIMELINE_HISTORY.commit();
-        this.renderAdjustmentsPanel(targetClip || clip);
+        const updatedTarget = cuts.find(c => c.id === targetClipId) || clip;
+        this.renderAdjustmentsPanel(updatedTarget);
         if (this.renderer) this.renderer.requestRedraw();
         if (typeof window !== "undefined" && typeof window.showToast === "function") {
-            window.showToast("Todos os ajustes do clipe foram restaurados para o padrão.", "info");
+            const totalCount = this.syncMediaCutsMode ? this._getSameMediaVideoCuts(clip, cuts).length : 1;
+            const msg = (this.syncMediaCutsMode && totalCount > 1)
+                ? `Todos os ajustes dos ${totalCount} cortes foram restaurados para o padrão.`
+                : "Todos os ajustes do clipe foram restaurados para o padrão.";
+            window.showToast(msg, "info");
         }
     }
 
@@ -3071,6 +3279,43 @@ export class CapiauTimelineInteraction {
         const fadeOutCurve = (fadeOut && fadeOut.curve) || "linear";
         const fadesDisabled = (fadeIn && fadeIn.disabled === true) || (fadeOut && fadeOut.disabled === true);
 
+        const currentCuts = STATE.activeTimelineCuts || [];
+        const sameVideoCuts = this._getSameMediaVideoCuts(clip, currentCuts);
+        const sameAudioCuts = this._getSameMediaAudioCuts(clip, currentCuts);
+        const totalMediaCuts = isPhoto ? sameVideoCuts.length : Math.max(sameVideoCuts.length, sameAudioCuts.length);
+        const isSyncActive = this.syncMediaCutsMode === true;
+
+        let batchBarHTML = "";
+        if (totalMediaCuts > 1) {
+            batchBarHTML = `
+                <div class="adj-batch-bar ${isSyncActive ? 'active' : ''}" id="adj-batch-sync-bar">
+                    <div class="adj-batch-info">
+                        <i class="fa-solid ${isSyncActive ? 'fa-link' : 'fa-link-slash'} adj-batch-icon"></i>
+                        <span class="adj-batch-text">${isSyncActive ? 'Editando todos os cortes' : 'Editar cortes juntos'}</span>
+                        <span class="adj-batch-count-badge" data-tooltip="${totalMediaCuts} cortes desta mesma mídia na timeline">${totalMediaCuts} cortes</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:4px;">
+                        <button id="btn-toggle-sync-media-cuts" class="btn-batch-toggle ${isSyncActive ? 'active' : ''}" data-tooltip="${isSyncActive ? 'Sincronização ativa: qualquer ajuste será aplicado a todos os ' + totalMediaCuts + ' cortes deste vídeo na timeline. Clique para desativar.' : 'Ativar sincronização: editar simultaneamente todos os ' + totalMediaCuts + ' cortes desta mídia.'}">
+                            <i class="fa-solid ${isSyncActive ? 'fa-toggle-on' : 'fa-toggle-off'}"></i>
+                            <span>${isSyncActive ? 'Ativo' : 'Ligar'}</span>
+                        </button>
+                        <button id="btn-propagate-media-cuts" class="btn-batch-propagate" data-tooltip="Copiar todos os ajustes deste corte para os outros ${totalMediaCuts - 1} corte(s) deste vídeo">
+                            <i class="fa-solid fa-clone"></i> <span>Propagar</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else if (totalMediaCuts === 1) {
+            batchBarHTML = `
+                <div class="adj-batch-bar" style="padding: 3px 6px; margin-bottom: 6px; opacity: 0.7;">
+                    <div class="adj-batch-info">
+                        <i class="fa-solid fa-film adj-batch-icon" style="font-size: 9px;"></i>
+                        <span class="adj-batch-text" style="font-size: 9.5px;">Corte único na timeline</span>
+                    </div>
+                </div>
+            `;
+        }
+
         let html = `
             <div style="font-size:11px; font-weight:bold; color:var(--color-cyan); display:flex; gap: 6px; align-items:center; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; margin-bottom: 4px;">
                 <i class="fa-solid fa-sliders"></i>
@@ -3083,6 +3328,7 @@ export class CapiauTimelineInteraction {
                 </div>
                 ` : ''}
             </div>
+            ${batchBarHTML}
         `;
 
         const mediaType = isPhoto ? "photo" : (isAudioTrack ? "audio" : "video");
@@ -5419,6 +5665,37 @@ export class CapiauTimelineInteraction {
             };
         }
 
+        // Controles de Lote / Sincronização da Mídia
+        const btnToggleSync = container.querySelector("#btn-toggle-sync-media-cuts");
+        if (btnToggleSync) {
+            btnToggleSync.onclick = () => {
+                this.syncMediaCutsMode = !this.syncMediaCutsMode;
+                this.renderAdjustmentsPanel(clip);
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    let mediaName = "mídia";
+                    if (clip.type === "photo") {
+                        const p = STATE.allPhotos.find(ph => String(ph.id) === String(clip.photo_id));
+                        mediaName = p ? (p.title || p.filename) : "foto";
+                    } else {
+                        const v = STATE.allVideos.find(vd => String(vd.id) === String(clip.video_id));
+                        mediaName = v ? (v.title || v.filename) : "vídeo";
+                    }
+                    if (this.syncMediaCutsMode) {
+                        window.showToast(`Sincronização ativada: ajustando todos os ${totalMediaCuts} cortes de "${mediaName}" simultaneamente.`, "info");
+                    } else {
+                        window.showToast("Sincronização desativada: ajustando apenas o corte selecionado.", "info");
+                    }
+                }
+            };
+        }
+
+        const btnPropagate = container.querySelector("#btn-propagate-media-cuts");
+        if (btnPropagate) {
+            btnPropagate.onclick = () => {
+                this.propagateAdjustmentsToAllMediaCuts(clip.id);
+            };
+        }
+
         // Momentos de estouro: clique leva o playhead até o instante da fonte;
         // "Ver mais/Ver menos" expande a lista sem redesenhar o painel inteiro.
         const diagBody = container.querySelector("#adj-audio-diag-body");
@@ -5599,16 +5876,17 @@ export class CapiauTimelineInteraction {
                 }
 
                 // Mutação rápida sem Undo/Redo no meio do arrasto para feedback em tempo real
-                if (targetClip) {
-                    targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
-                    let tf = targetClip.effects.find(e => e.type === "transform");
+                const targetCuts = this.syncMediaCutsMode ? this._getSameMediaVideoCuts(clip, cuts) : [targetClip].filter(Boolean);
+                targetCuts.forEach(tc => {
+                    tc.effects = tc.effects ? tc.effects.map(e => ({ ...e })) : [];
+                    let tf = tc.effects.find(e => e.type === "transform");
                     if (!tf) {
                         tf = { type: "transform", scale: 1.0, x: 0, y: 0, rotation: 0, opacity: 1.0 };
-                        targetClip.effects.push(tf);
+                        tc.effects.push(tf);
                     }
                     tf[prop] = val;
-                    STATE.activeTimelineCuts = cuts;
-                }
+                });
+                STATE.activeTimelineCuts = cuts;
             };
 
             slider.onchange = () => {
@@ -5678,16 +5956,17 @@ export class CapiauTimelineInteraction {
 
                 const cuts = [...STATE.activeTimelineCuts];
                 const targetClip = cuts.find(c => c.id === clipId);
-                if (targetClip) {
-                    targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
-                    let crop = targetClip.effects.find(e => e.type === "crop");
+                const targetCuts = this.syncMediaCutsMode ? this._getSameMediaVideoCuts(clip, cuts) : [targetClip].filter(Boolean);
+                targetCuts.forEach(tc => {
+                    tc.effects = tc.effects ? tc.effects.map(e => ({ ...e })) : [];
+                    let crop = tc.effects.find(e => e.type === "crop");
                     if (!crop) {
                         crop = { type: "crop", top: 0, right: 0, bottom: 0, left: 0 };
-                        targetClip.effects.push(crop);
+                        tc.effects.push(crop);
                     }
                     crop[prop] = val;
-                    STATE.activeTimelineCuts = cuts;
-                }
+                });
+                STATE.activeTimelineCuts = cuts;
             };
 
             slider.onchange = () => {
@@ -5738,16 +6017,17 @@ export class CapiauTimelineInteraction {
 
                 const cuts = [...STATE.activeTimelineCuts];
                 const targetClip = cuts.find(c => c.id === clipId);
-                if (targetClip) {
-                    targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
-                    let col = targetClip.effects.find(e => e.type === "color");
+                const targetCuts = this.syncMediaCutsMode ? this._getSameMediaVideoCuts(clip, cuts) : [targetClip].filter(Boolean);
+                targetCuts.forEach(tc => {
+                    tc.effects = tc.effects ? tc.effects.map(e => ({ ...e })) : [];
+                    let col = tc.effects.find(e => e.type === "color");
                     if (!col) {
                         col = { type: "color", brightness: 0, contrast: 0, saturation: 100, hue: 0, sepia: 0, grayscale: 0, blur: 0 };
-                        targetClip.effects.push(col);
+                        tc.effects.push(col);
                     }
                     col[prop] = val;
-                    STATE.activeTimelineCuts = cuts;
-                }
+                });
+                STATE.activeTimelineCuts = cuts;
             };
 
             slider.onchange = () => {
@@ -5814,15 +6094,18 @@ export class CapiauTimelineInteraction {
 
                     // Mutação rápida sem Undo/Redo no meio do arrasto (padrão das seções vizinhas)
                     const cuts = [...STATE.activeTimelineCuts];
-                    const targetClip = cuts.find(c => c.id === aoVivoTargetClipId());
-                    if (targetClip) {
-                        targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
-                        const i = targetClip.effects.findIndex(e => e.type === tipo);
-                        const novo = this._construirEfeitoAudioAoVivo(i >= 0 ? targetClip.effects[i] : null, tipo, prop, val);
-                        if (i >= 0) targetClip.effects[i] = novo; else targetClip.effects.push(novo);
-                        STATE.activeTimelineCuts = cuts; // dispara o autosave pelo caminho de sempre
-                        this._notificarPlayerAudioAoVivo(targetClip); // aplicação na hora (E2)
-                    }
+                    const targetCuts = this.syncMediaCutsMode
+                        ? this._getSameMediaAudioCuts(clip, cuts)
+                        : [cuts.find(c => c.id === aoVivoTargetClipId())].filter(Boolean);
+
+                    targetCuts.forEach(tc => {
+                        tc.effects = tc.effects ? tc.effects.map(e => ({ ...e })) : [];
+                        const i = tc.effects.findIndex(e => e.type === tipo);
+                        const novo = this._construirEfeitoAudioAoVivo(i >= 0 ? tc.effects[i] : null, tipo, prop, val);
+                        if (i >= 0) tc.effects[i] = novo; else tc.effects.push(novo);
+                        this._notificarPlayerAudioAoVivo(tc);
+                    });
+                    STATE.activeTimelineCuts = cuts;
                 };
 
                 slider.onchange = () => {
@@ -5870,17 +6153,21 @@ export class CapiauTimelineInteraction {
                 }
 
                 const cuts = [...STATE.activeTimelineCuts];
-                const targetClip = cuts.find(c => c.id === targetClipId);
-                if (targetClip) {
-                    targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
-                    let vol = targetClip.effects.find(e => e.type === "volume");
+                const targetCuts = this.syncMediaCutsMode
+                    ? this._getSameMediaAudioCuts(clip, cuts)
+                    : [cuts.find(c => c.id === targetClipId)].filter(Boolean);
+
+                targetCuts.forEach(tc => {
+                    tc.effects = tc.effects ? tc.effects.map(e => ({ ...e })) : [];
+                    let vol = tc.effects.find(e => e.type === "volume");
                     if (!vol) {
                         vol = { type: "volume", level: 1.0 };
-                        targetClip.effects.push(vol);
+                        tc.effects.push(vol);
                     }
                     vol.level = val;
-                    STATE.activeTimelineCuts = cuts;
-                }
+                    this._notificarPlayerAudioAoVivo(tc);
+                });
+                STATE.activeTimelineCuts = cuts;
             };
 
             volSlider.onchange = () => {
@@ -5934,16 +6221,20 @@ export class CapiauTimelineInteraction {
                 const section = btn.dataset.section;
                 TIMELINE_HISTORY.begin();
 
-                const isAudio = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+                const isAudioSection = section === "volume" || section === "audio_eq" || section === "audio_dynamics";
+                const isAudioTrack = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+                const targetKind = isAudioSection ? "audio" : (section === "fades" ? (isAudioTrack ? "audio" : "video") : "video");
+
                 let targetClipId = clipId;
-                if ((section === "volume" || section === "audio_eq" || section === "audio_dynamics") && !isAudio && clip.type === "video" && clip.link_id) {
+                if (isAudioSection && !isAudioTrack && clip.type === "video" && clip.link_id) {
                     const partner = STATE.activeTimelineCuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
                     if (partner) targetClipId = partner.id;
                 }
 
                 const cuts = [...STATE.activeTimelineCuts];
-                const targetClip = cuts.find(c => c.id === targetClipId);
-                if (targetClip) {
+                const targetCuts = this.syncMediaCutsMode ? this._getSameMediaCutsByKind(clip, targetKind, cuts) : [cuts.find(c => c.id === targetClipId)].filter(Boolean);
+
+                targetCuts.forEach(targetClip => {
                     targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
                     if (section === "transform") {
                         let tf = targetClip.effects.find(e => e.type === "transform");
@@ -5991,11 +6282,13 @@ export class CapiauTimelineInteraction {
                         const fades = targetClip.effects.filter(e => e.type === "crossfade");
                         fades.forEach(f => { f.disabled = !f.disabled; });
                     }
-                    STATE.activeTimelineCuts = cuts;
-                    if (section === "audio_eq" || section === "audio_dynamics") this._notificarPlayerAudioAoVivo(targetClip);
-                    this.refreshClipInspector();
-                }
+                    if (section === "audio_eq" || section === "audio_dynamics" || section === "volume") {
+                        this._notificarPlayerAudioAoVivo(targetClip);
+                    }
+                });
 
+                STATE.activeTimelineCuts = cuts;
+                this.refreshClipInspector();
                 TIMELINE_HISTORY.commit();
             };
         });
@@ -6006,16 +6299,20 @@ export class CapiauTimelineInteraction {
                 const section = btn.dataset.section;
                 TIMELINE_HISTORY.begin();
 
-                const isAudio = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+                const isAudioSection = section === "volume" || section === "audio_eq" || section === "audio_dynamics";
+                const isAudioTrack = TIMELINE_STATE.trackKindOf(clip.track) === "audio";
+                const targetKind = isAudioSection ? "audio" : (section === "fades" ? (isAudioTrack ? "audio" : "video") : "video");
+
                 let targetClipId = clipId;
-                if ((section === "volume" || section === "audio_eq" || section === "audio_dynamics") && !isAudio && clip.type === "video" && clip.link_id) {
+                if (isAudioSection && !isAudioTrack && clip.type === "video" && clip.link_id) {
                     const partner = STATE.activeTimelineCuts.find(c => c.link_id === clip.link_id && TIMELINE_STATE.trackKindOf(c.track) === "audio");
                     if (partner) targetClipId = partner.id;
                 }
 
                 const cuts = [...STATE.activeTimelineCuts];
-                const targetClip = cuts.find(c => c.id === targetClipId);
-                if (targetClip) {
+                const targetCuts = this.syncMediaCutsMode ? this._getSameMediaCutsByKind(clip, targetKind, cuts) : [cuts.find(c => c.id === targetClipId)].filter(Boolean);
+
+                targetCuts.forEach(targetClip => {
                     targetClip.effects = targetClip.effects ? targetClip.effects.map(e => ({ ...e })) : [];
                     if (section === "transform") {
                         targetClip.effects = targetClip.effects.filter(e => e.type !== "transform");
@@ -6038,11 +6335,13 @@ export class CapiauTimelineInteraction {
                     } else if (section === "fades") {
                         targetClip.effects = targetClip.effects.filter(e => e.type !== "crossfade");
                     }
-                    STATE.activeTimelineCuts = cuts;
-                    if (section === "audio_eq" || section === "audio_dynamics") this._notificarPlayerAudioAoVivo(targetClip);
-                    this.refreshClipInspector();
-                }
+                    if (section === "audio_eq" || section === "audio_dynamics" || section === "volume") {
+                        this._notificarPlayerAudioAoVivo(targetClip);
+                    }
+                });
 
+                STATE.activeTimelineCuts = cuts;
+                this.refreshClipInspector();
                 TIMELINE_HISTORY.commit();
             };
         });

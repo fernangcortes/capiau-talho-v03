@@ -519,6 +519,44 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     });
     menu.appendChild(addTlItem);
 
+    // Ações de Ajustes em Lote para Cortes desta Mídia na Timeline
+    const currentTimelineCuts = STATE.activeTimelineCuts || [];
+    const mediaCutsOnTl = currentTimelineCuts.filter(c => (isVideo ? String(c.video_id) === String(item.id) : String(c.photo_id) === String(item.id)) && (window.TIMELINE_STATE ? window.TIMELINE_STATE.trackKindOf(c.track) !== "audio" : true));
+    const totalMediaCutsOnTl = mediaCutsOnTl.length;
+
+    if (totalMediaCutsOnTl > 0) {
+        const adjustAllItem = document.createElement("div");
+        adjustAllItem.className = "menu-item";
+        adjustAllItem.innerHTML = `<i class="fa-solid fa-sliders" style="color:var(--color-cyan);"></i><span class="menu-item-text" style="font-weight:600; color:var(--color-cyan);">Ajustar Cortes na Timeline (${totalMediaCutsOnTl})</span>`;
+        adjustAllItem.addEventListener("click", () => {
+            menu.remove();
+            const interaction = window.timelineInteraction || window.panelsManager?.timelineInteraction;
+            if (interaction && window.TIMELINE_STATE && mediaCutsOnTl[0]) {
+                interaction.syncMediaCutsMode = true;
+                window.TIMELINE_STATE.selectClip(mediaCutsOnTl[0].id);
+                interaction.showClipInspector(mediaCutsOnTl[0]);
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Modo de edição sincronizada ativado para os ${totalMediaCutsOnTl} cortes de "${item.title || item.filename}".`, "info");
+                }
+            }
+        });
+        menu.appendChild(adjustAllItem);
+
+        if (totalMediaCutsOnTl > 1) {
+            const propAllItem = document.createElement("div");
+            propAllItem.className = "menu-item";
+            propAllItem.innerHTML = `<i class="fa-solid fa-clone" style="color:var(--color-violet, #c084fc);"></i><span class="menu-item-text">Propagar 1º corte p/ os demais (${totalMediaCutsOnTl})</span>`;
+            propAllItem.addEventListener("click", () => {
+                menu.remove();
+                const interaction = window.timelineInteraction || window.panelsManager?.timelineInteraction;
+                if (interaction && mediaCutsOnTl[0]) {
+                    interaction.propagateAdjustmentsToAllMediaCuts(mediaCutsOnTl[0].id);
+                }
+            });
+            menu.appendChild(propAllItem);
+        }
+    }
+
     // Separador
     const sep1 = document.createElement("div");
     sep1.className = "menu-separator";

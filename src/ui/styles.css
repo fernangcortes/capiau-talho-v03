@@ -7276,6 +7276,113 @@ input[type="number"] {
     padding: 2px 4px;
 }
 
+/* ── BARRA DE EDIÇÃO EM LOTE / SINCRONIZAÇÃO DE CORTES DA MÍDIA ── */
+.adj-batch-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 5px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 5px;
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+}
+.adj-batch-bar.active {
+    background: rgba(6, 182, 212, 0.12);
+    border-color: rgba(6, 182, 212, 0.4);
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.15);
+}
+.adj-batch-bar .adj-batch-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+}
+.adj-batch-bar .adj-batch-icon {
+    color: var(--text-muted);
+    font-size: 11px;
+    transition: color 0.2s ease;
+}
+.adj-batch-bar.active .adj-batch-icon {
+    color: var(--color-cyan);
+}
+.adj-batch-bar .adj-batch-text {
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+.adj-batch-bar.active .adj-batch-text {
+    color: #ffffff;
+    font-weight: 600;
+}
+.adj-batch-bar .adj-batch-count-badge {
+    font-size: 8.5px;
+    font-family: monospace;
+    font-weight: bold;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    margin-left: 2px;
+}
+.adj-batch-bar.active .adj-batch-count-badge {
+    background: rgba(6, 182, 212, 0.25);
+    color: var(--color-cyan);
+}
+.btn-batch-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    font-size: 9.5px;
+    font-weight: 600;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-batch-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+.btn-batch-toggle.active {
+    background: rgba(6, 182, 212, 0.2);
+    border-color: rgba(6, 182, 212, 0.5);
+    color: var(--color-cyan);
+}
+.btn-batch-toggle.active:hover {
+    background: rgba(6, 182, 212, 0.3);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.3);
+}
+.btn-batch-propagate {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    font-size: 9.5px;
+    font-weight: 600;
+    border-radius: 3px;
+    background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    color: var(--color-violet, #c084fc);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-batch-propagate:hover {
+    background: rgba(139, 92, 246, 0.25);
+    border-color: rgba(139, 92, 246, 0.6);
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+
 /* Barra de rolagem sutil da Biblioteca (tons de cinza flat) */
 .sidebar-left .sidebar-content.scrollable {
     scrollbar-width: thin !important;
