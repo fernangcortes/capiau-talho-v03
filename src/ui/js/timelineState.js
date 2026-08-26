@@ -1474,6 +1474,124 @@ export class CapiauTimelineState {
         STATE.emit("timelinePlayheadChanged", this.playheadFrame);
     }
 
+    /**
+     * Retorna a duração total da timeline em frames (posição final do último clipe).
+     * @returns {number}
+     */
+    getDurationFrames() {
+        const cuts = STATE.activeTimelineCuts || [];
+        let maxFrame = 0;
+        cuts.forEach(cut => {
+            const start = typeof cut.timelineStartFrame === "number" ? cut.timelineStartFrame : Math.round((cut.timeline_start || 0) * this.fps);
+            const inF = cut.inFrame !== undefined ? cut.inFrame : Math.round((cut.in || 0) * this.fps);
+            const outF = cut.outFrame !== undefined ? cut.outFrame : Math.round((cut.out || 0) * this.fps);
+            const dur = Math.max(0, outF - inF);
+            const end = start + dur;
+            if (end > maxFrame) maxFrame = end;
+        });
+        return maxFrame;
+    }
+
+    /**
+     * Retorna todos os pontos de corte da timeline (inícios e fins de cada clipe, além do frame 0),
+     * ordenados de forma crescente e sem duplicatas.
+     * @returns {number[]}
+     */
+    getAllEditPointFrames() {
+        const cuts = STATE.activeTimelineCuts || [];
+        const points = new Set([0]);
+        cuts.forEach(cut => {
+            const start = typeof cut.timelineStartFrame === "number" ? cut.timelineStartFrame : Math.round((cut.timeline_start || 0) * this.fps);
+            const inF = cut.inFrame !== undefined ? cut.inFrame : Math.round((cut.in || 0) * this.fps);
+            const outF = cut.outFrame !== undefined ? cut.outFrame : Math.round((cut.out || 0) * this.fps);
+            const dur = Math.max(0, outF - inF);
+            if (typeof start === "number" && !isNaN(start) && start >= 0) {
+                const s = Math.round(start);
+                points.add(s);
+                points.add(Math.round(s + dur));
+            }
+        });
+        return Array.from(points).sort((a, b) => a - b);
+    }
+
+    /**
+     * Retorna todos os frames de início dos clipes presentes na timeline.
+     * Mantido para compatibilidade.
+     * @returns {number[]}
+     */
+    getAllClipStartFrames() {
+        return this.getAllEditPointFrames();
+    }
+
+    /**
+     * Retorna o ponto de corte anterior (início ou fim de clipe) ao frame informado.
+     * Se o playhead já estiver no primeiro ponto ou antes, retorna 0 (início da timeline).
+     * @param {number} currentFrame
+     * @returns {number}
+     */
+    getPrevEditPointFrame(currentFrame = this.playheadFrame) {
+        const points = this.getAllEditPointFrames();
+        const cur = Math.round(currentFrame);
+        const prev = points.filter(p => p < cur);
+        if (prev.length > 0) {
+            return prev[prev.length - 1];
+        }
+        return 0;
+    }
+
+    getPrevClipStartFrame(currentFrame = this.playheadFrame) {
+        return this.getPrevEditPointFrame(currentFrame);
+    }
+
+    /**
+     * Retorna o próximo ponto de corte (início ou fim de clipe) posterior ao frame informado.
+     * Se não houver corte seguinte, retorna a duração total da timeline (fim do último clipe).
+     * @param {number} currentFrame
+     * @returns {number}
+     */
+    getNextEditPointFrame(currentFrame = this.playheadFrame) {
+        const points = this.getAllEditPointFrames();
+        const cur = Math.round(currentFrame);
+        const next = points.find(p => p > cur);
+        if (next !== undefined) {
+            return next;
+        }
+        const totalDur = this.getDurationFrames();
+        return cur < totalDur ? totalDur : cur;
+    }
+
+    getNextClipStartFrame(currentFrame = this.playheadFrame) {
+        return this.getNextEditPointFrame(currentFrame);
+    }
+
+    /**
+     * Move a agulha (playhead) para o ponto de corte anterior (início/fim de clipe ou início da timeline).
+     * @returns {number} O frame para onde a agulha foi movida.
+     */
+    moveToPrevEditPoint() {
+        const targetFrame = this.getPrevEditPointFrame(this.playheadFrame);
+        this.setPlayheadFrame(targetFrame);
+        return targetFrame;
+    }
+
+    moveToPrevClipStart() {
+        return this.moveToPrevEditPoint();
+    }
+
+    /**
+     * Move a agulha (playhead) para o próximo ponto de corte (início/fim de clipe ou fim da timeline).
+     * @returns {number} O frame para onde a agulha foi movida.
+     */
+    moveToNextEditPoint() {
+        const targetFrame = this.getNextEditPointFrame(this.playheadFrame);
+        this.setPlayheadFrame(targetFrame);
+        return targetFrame;
+    }
+
+    moveToNextClipStart() {
+        return this.moveToNextEditPoint();
+    }
+
     // ── CLIPES ──────────────────────────────────────────────────────────
 
     /**

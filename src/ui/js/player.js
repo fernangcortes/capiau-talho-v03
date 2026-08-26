@@ -3587,6 +3587,46 @@ export class VideoPlayer {
                 }
             }
         }
+        else if (code === "ArrowUp") {
+            e.preventDefault();
+            if (window.activeFocusedPlayer === "source") {
+                const vid = this.sourcePlayer.el("source-video");
+                if (vid) {
+                    const inPoint = STATE.markerIn;
+                    if (inPoint !== null && vid.currentTime > inPoint + 0.05) {
+                        this.sourcePlayer.seek(inPoint);
+                    } else {
+                        this.sourcePlayer.seek(0);
+                    }
+                }
+            } else {
+                this.programPlayer.pause();
+                const targetFrame = TIMELINE_STATE.moveToPrevEditPoint();
+                if (window.timelineInteraction && typeof window.timelineInteraction.ensureFrameVisible === "function") {
+                    window.timelineInteraction.ensureFrameVisible(targetFrame);
+                }
+            }
+        }
+        else if (code === "ArrowDown") {
+            e.preventDefault();
+            if (window.activeFocusedPlayer === "source") {
+                const vid = this.sourcePlayer.el("source-video");
+                if (vid) {
+                    const outPoint = STATE.markerOut;
+                    if (outPoint !== null && vid.currentTime < outPoint - 0.05) {
+                        this.sourcePlayer.seek(outPoint);
+                    } else if (vid.duration) {
+                        this.sourcePlayer.seek(vid.duration);
+                    }
+                }
+            } else {
+                this.programPlayer.pause();
+                const targetFrame = TIMELINE_STATE.moveToNextEditPoint();
+                if (window.timelineInteraction && typeof window.timelineInteraction.ensureFrameVisible === "function") {
+                    window.timelineInteraction.ensureFrameVisible(targetFrame);
+                }
+            }
+        }
     }
 
     // Métodos delegados para manter compatibilidade com a Biblioteca/ASR

@@ -6415,6 +6415,26 @@ export class CapiauTimelineInteraction {
 
     // --- MÉTODOS AUXILIARES DE EDICAO ---
 
+    /**
+     * Garante que o frame informado esteja visível no viewport da timeline, ajustando o scroll horizontal se necessário.
+     */
+    ensureFrameVisible(frame) {
+        if (!this.canvas) return;
+        const zoom = TIMELINE_STATE.zoom || 1;
+        const visibleWidth = this.canvas.clientWidth || this.canvas.width || 800;
+        const visibleFrames = visibleWidth / zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame || 0;
+
+        if (frame < scrollLeft) {
+            TIMELINE_STATE.setScrollLeftFrame(Math.max(0, frame - 15));
+        } else if (frame > scrollLeft + visibleFrames - 15) {
+            TIMELINE_STATE.setScrollLeftFrame(Math.max(0, Math.round(frame - visibleFrames * 0.5)));
+        }
+        if (this.renderer) {
+            this.renderer.requestRedraw();
+        }
+    }
+
     updatePlayhead(frame) {
         TIMELINE_STATE.setPlayheadFrame(frame);
     }

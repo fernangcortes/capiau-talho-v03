@@ -41,6 +41,16 @@ timeline (*Program*), dependendo de qual deles estiver focado.
                                                   vídeo para cortes
                                                   cirúrgicos.
 
+     **Setas (↑ / ↓)**    **Navegar Pontos de     **No Program / Timeline:**
+                          Corte (Edit Points)**   Move a agulha (playhead)
+                                                  para o ponto de corte
+                                                  (início ou fim de clipe)
+                                                  anterior (↑) ou próximo
+                                                  (↓).
+                                                  **No Source:** Pula para o
+                                                  ponto In/Início (↑) ou
+                                                  ponto Out/Fim (↓).
+
            **Q**          **Alternar Monitor      Quando um dos players
                           Maximizado**            estiver maximizado
                                                   (tela cheia), alterna
@@ -209,6 +219,13 @@ Timeline).
 |                       |                       | exatamente 1 frame    |
 |                       |                       | para a esquerda ou    |
 |                       |                       | direita na timeline.  |
++-----------------------+-----------------------+-----------------------+
+| **Setas (↑ / ↓)**     | **Ir aos Pontos de    | Move a agulha         |
+|                       | Corte (Edit Points)**  | (playhead) para o     |
+|                       |                       | ponto de corte        |
+|                       |                       | (início ou fim de     |
+|                       |                       | clipe) anterior (↑)   |
+|                       |                       | ou próximo (↓).       |
 +-----------------------+-----------------------+-----------------------+
 | **Alt + Setas (← /    | **Ajustar Entrada     | Ajusta a borda        |
 | →)**                  | (Trim In)**           | esquerda (In-point)   |
