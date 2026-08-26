@@ -1213,6 +1213,160 @@ export class CapiauTimelineState {
     }
 
     /**
+     * Ripple Trim / Ripple Delete até a posição da agulha (playhead).
+     * @param {"head"|"tail"|"left"|"right"} side - "head"/"left": Início até a agulha (Q); "tail"/"right": Agulha até o fim (W).
+     * @param {string|null} targetClipId - ID opcional de um clipe específico.
+     * @returns {boolean} true se realizou o corte com sucesso, false caso contrário.
+     */
+    rippleTrimToPlayhead(side = "head", targetClipId = null) {
+        const isHead = side === "head" || side === "left" || side === "prev";
+        const playhead = this.playheadFrame;
+        const cuts = [...STATE.activeTimelineCuts];
+        if (cuts.length === 0) return false;
+
+        // 1. Determina clipes candidatos
+        let candidates = [];
+        if (targetClipId) {
+            const c = cuts.find(item => item.id === targetClipId);
+            if (c) candidates.push(c);
+        } else if (this.selectedClipIds && this.selectedClipIds.size > 0) {
+            candidates = cuts.filter(c => this.selectedClipIds.has(c.id));
+        } else if (this.selectedClipId) {
+            const c = cuts.find(item => item.id === this.selectedClipId);
+            if (c) candidates.push(c);
+        }
+
+        const coversPlayhead = (c) => {
+            const start = c.timelineStartFrame || 0;
+            const dur = (c.outFrame || 0) - (c.inFrame || 0);
+            const end = start + dur;
+            return start < playhead && playhead < end;
+        };
+
+        let intersecting = candidates.filter(coversPlayhead);
+
+        // Se nenhum clipe selecionado intersecta a agulha, busca na pista ativa ou pistas sincronizadas
+        if (intersecting.length === 0) {
+            if (this.selectedTrack) {
+                const trackClip = cuts.find(c => c.track === this.selectedTrack && coversPlayhead(c));
+                if (trackClip) intersecting.push(trackClip);
+            }
+            if (intersecting.length === 0) {
+                const syncTracks = this.getSyncLockedTrackIds();
+                intersecting = cuts.filter(c => syncTracks.includes(c.track) && coversPlayhead(c));
+            }
+            if (intersecting.length === 0) {
+                intersecting = cuts.filter(coversPlayhead);
+            }
+        }
+
+        if (intersecting.length === 0) {
+            // Se a agulha estiver em um gap selecionado e for corte de início
+            if (isHead && this.selectedGap) {
+                const gap = this.selectedGap;
+                this.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
+                return true;
+            }
+            return false;
+        }
+
+        // Inclui parceiros vinculados (link_id) para manter sincronismo de áudio e vídeo
+        const targetIds = new Set(intersecting.map(c => c.id));
+        cuts.forEach(c => {
+            if (c.link_id && intersecting.some(t => t.link_id === c.link_id)) {
+                targetIds.add(c.id);
+            }
+        });
+        const finalTargets = cuts.filter(c => targetIds.has(c.id));
+
+        TIMELINE_HISTORY.record(() => {
+            const fps = this.fps;
+            const syncTracks = this.getSyncLockedTrackIds();
+
+            if (isHead) {
+                // --- RIPPLE TRIM DO INÍCIO ATÉ A AGULHA (Q) ---
+                // O trecho [cStart .. playhead] é descartado, mantendo [playhead .. cEnd]
+                let maxTrimDuration = 0;
+                let minStart = Infinity;
+                let maxEnd = -Infinity;
+
+                finalTargets.forEach(c => {
+                    const cStart = c.timelineStartFrame || 0;
+                    const cDur = (c.outFrame || 0) - (c.inFrame || 0);
+                    const cEnd = cStart + cDur;
+                    if (cStart < playhead && playhead < cEnd) {
+                        const delta = playhead - cStart;
+                        if (delta > maxTrimDuration) maxTrimDuration = delta;
+                        if (cStart < minStart) minStart = cStart;
+                        if (cEnd > maxEnd) maxEnd = cEnd;
+
+                        c.inFrame += delta;
+                        c.in = c.inFrame / fps;
+                        // O clipe resultante recua para cStart (fechando o início descartado)
+                        c.timelineStartFrame = cStart;
+                        c.timeline_start = cStart / fps;
+                    }
+                });
+
+                if (maxTrimDuration <= 0) return;
+
+                // Desloca todos os clipes subsequentes nas pistas com Sync Lock ativo
+                cuts.forEach(c => {
+                    if (!targetIds.has(c.id) && syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= minStart + maxTrimDuration - 1) {
+                        c.timelineStartFrame = Math.max(minStart, (c.timelineStartFrame || 0) - maxTrimDuration);
+                        c.timeline_start = c.timelineStartFrame / fps;
+                    }
+                });
+
+                // Posiciona a agulha no início do clipe resultante
+                if (minStart !== Infinity) {
+                    this.setPlayheadFrame(minStart);
+                }
+            } else {
+                // --- RIPPLE TRIM DA AGULHA ATÉ O FIM (W) ---
+                // O trecho [playhead .. cEnd] é descartado, mantendo [cStart .. playhead]
+                let maxTrimDuration = 0;
+                let minStart = Infinity;
+                let maxEnd = -Infinity;
+
+                finalTargets.forEach(c => {
+                    const cStart = c.timelineStartFrame || 0;
+                    const cDur = (c.outFrame || 0) - (c.inFrame || 0);
+                    const cEnd = cStart + cDur;
+                    if (cStart < playhead && playhead < cEnd) {
+                        const delta = cEnd - playhead;
+                        if (delta > maxTrimDuration) maxTrimDuration = delta;
+                        if (cStart < minStart) minStart = cStart;
+                        if (cEnd > maxEnd) maxEnd = cEnd;
+
+                        c.outFrame = c.inFrame + (playhead - cStart);
+                        c.out = c.outFrame / fps;
+                        c.timelineStartFrame = cStart;
+                        c.timeline_start = cStart / fps;
+                    }
+                });
+
+                if (maxTrimDuration <= 0) return;
+
+                // Desloca todos os clipes subsequentes nas pistas com Sync Lock ativo
+                cuts.forEach(c => {
+                    if (!targetIds.has(c.id) && syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= playhead - 1) {
+                        c.timelineStartFrame = Math.max(playhead, (c.timelineStartFrame || 0) - maxTrimDuration);
+                        c.timeline_start = c.timelineStartFrame / fps;
+                    }
+                });
+
+                // A agulha permanece na posição do playhead
+                this.setPlayheadFrame(playhead);
+            }
+
+            STATE.activeTimelineCuts = cuts;
+        });
+
+        return true;
+    }
+
+    /**
      * Inserção com Ripple: insere um clipe abrindo espaço nas pistas sincronizadas.
      */
     insertClipWithRipple(clipData, targetFrame, targetTrackId) {

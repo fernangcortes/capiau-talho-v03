@@ -1057,8 +1057,327 @@ export class CapiauTimelineInteraction {
                 e.preventDefault();
                 e.stopPropagation();
                 this.showFadeContextMenu(e.clientX, e.clientY, hit.data, fadeZone.side);
+                return;
             }
+            e.preventDefault();
+            e.stopPropagation();
+            this.showClipContextMenu(e.clientX, e.clientY, hit.data, frame);
+        } else if (hit && hit.type === "gap") {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showGapContextMenu(e.clientX, e.clientY, hit.data, frame);
         }
+    }
+
+    /**
+     * Exibe o menu de contexto customizado do clipe (corte, ripple trim, divisão, etc.).
+     */
+    showClipContextMenu(clientX, clientY, clip, frame) {
+        const oldMenu = document.getElementById("custom-timeline-context-menu");
+        if (oldMenu) oldMenu.remove();
+
+        const menu = document.createElement("div");
+        menu.id = "custom-timeline-context-menu";
+        menu.className = "custom-context-menu";
+        menu.style.position = "fixed";
+        menu.style.left = `${clientX}px`;
+        menu.style.top = `${clientY}px`;
+        menu.style.width = "230px";
+        menu.style.zIndex = "100000";
+        menu.style.padding = "6px 0";
+
+        const title = document.createElement("div");
+        title.style.padding = "6px 12px";
+        title.style.fontSize = "10px";
+        title.style.fontWeight = "bold";
+        title.style.color = "var(--color-cyan)";
+        title.style.borderBottom = "1px solid var(--border-glass)";
+        title.style.marginBottom = "4px";
+        title.style.display = "flex";
+        title.style.alignItems = "center";
+        title.style.gap = "6px";
+        const trackName = clip.track || "V1";
+        title.innerHTML = `<i class="fa-solid fa-film"></i> CLIPE [${trackName}]`;
+        menu.appendChild(title);
+
+        const playhead = TIMELINE_STATE.playheadFrame;
+        const cStart = clip.timelineStartFrame || 0;
+        const cDur = (clip.outFrame || 0) - (clip.inFrame || 0);
+        const cEnd = cStart + cDur;
+        const isPlayheadInside = cStart < playhead && playhead < cEnd;
+
+        // 1. Ripple Delete até a Agulha (Q)
+        const itemRippleHead = document.createElement("div");
+        itemRippleHead.className = "menu-item";
+        itemRippleHead.style.display = "flex";
+        itemRippleHead.style.alignItems = "center";
+        itemRippleHead.style.justifyContent = "space-between";
+        itemRippleHead.style.padding = "7px 12px";
+        itemRippleHead.style.cursor = isPlayheadInside ? "pointer" : "default";
+        itemRippleHead.style.opacity = isPlayheadInside ? "1" : "0.5";
+        itemRippleHead.innerHTML = `
+            <span style="display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-arrow-left-to-line" style="color:var(--color-cyan);"></i>
+                <span>Ripple Início ➔ Agulha</span>
+            </span>
+            <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Q</kbd>
+        `;
+        if (isPlayheadInside) {
+            itemRippleHead.onclick = () => {
+                const ok = TIMELINE_STATE.rippleTrimToPlayhead("head", clip.id);
+                if (ok && typeof window.showToast === "function") {
+                    window.showToast("Ripple Delete até a Agulha (Q)", "info");
+                }
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+                menu.remove();
+            };
+        }
+        menu.appendChild(itemRippleHead);
+
+        // 2. Ripple Delete da Agulha até o Fim (W)
+        const itemRippleTail = document.createElement("div");
+        itemRippleTail.className = "menu-item";
+        itemRippleTail.style.display = "flex";
+        itemRippleTail.style.alignItems = "center";
+        itemRippleTail.style.justifyContent = "space-between";
+        itemRippleTail.style.padding = "7px 12px";
+        itemRippleTail.style.cursor = isPlayheadInside ? "pointer" : "default";
+        itemRippleTail.style.opacity = isPlayheadInside ? "1" : "0.5";
+        itemRippleTail.innerHTML = `
+            <span style="display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-arrow-right-from-line" style="color:var(--color-cyan);"></i>
+                <span>Ripple Agulha ➔ Fim</span>
+            </span>
+            <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">W</kbd>
+        `;
+        if (isPlayheadInside) {
+            itemRippleTail.onclick = () => {
+                const ok = TIMELINE_STATE.rippleTrimToPlayhead("tail", clip.id);
+                if (ok && typeof window.showToast === "function") {
+                    window.showToast("Ripple Delete da Agulha até o Fim (W)", "info");
+                }
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+                menu.remove();
+            };
+        }
+        menu.appendChild(itemRippleTail);
+
+        // 3. Dividir no Playhead (Z)
+        const itemSplit = document.createElement("div");
+        itemSplit.className = "menu-item";
+        itemSplit.style.display = "flex";
+        itemSplit.style.alignItems = "center";
+        itemSplit.style.justifyContent = "space-between";
+        itemSplit.style.padding = "7px 12px";
+        itemSplit.style.cursor = isPlayheadInside ? "pointer" : "default";
+        itemSplit.style.opacity = isPlayheadInside ? "1" : "0.5";
+        itemSplit.innerHTML = `
+            <span style="display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-scissors" style="color:var(--color-violet);"></i>
+                <span>Dividir no Playhead</span>
+            </span>
+            <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Z</kbd>
+        `;
+        if (isPlayheadInside) {
+            itemSplit.onclick = () => {
+                TIMELINE_STATE.splitClip(clip.id, playhead);
+                if (typeof window.showToast === "function") {
+                    window.showToast("Clipe dividido no playhead (Z)", "info");
+                }
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+                menu.remove();
+            };
+        }
+        menu.appendChild(itemSplit);
+
+        // Divisor
+        const sep1 = document.createElement("div");
+        sep1.className = "menu-separator";
+        sep1.style.height = "1px";
+        sep1.style.background = "var(--border-glass)";
+        sep1.style.margin = "4px 0";
+        menu.appendChild(sep1);
+
+        // 4. Ripple Delete Clipe (Shift+Delete)
+        const itemRippleDel = document.createElement("div");
+        itemRippleDel.className = "menu-item menu-item-destructive";
+        itemRippleDel.style.display = "flex";
+        itemRippleDel.style.alignItems = "center";
+        itemRippleDel.style.justifyContent = "space-between";
+        itemRippleDel.style.padding = "7px 12px";
+        itemRippleDel.style.cursor = "pointer";
+        itemRippleDel.innerHTML = `
+            <span style="display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>Ripple Delete Clipe</span>
+            </span>
+            <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Shift+Del</kbd>
+        `;
+        itemRippleDel.onclick = () => {
+            TIMELINE_STATE.rippleDeleteClip(clip.id);
+            if (typeof window.showToast === "function") {
+                window.showToast("Clipe removido com Ripple", "info");
+            }
+            this.refreshClipInspector();
+            if (this.renderer) this.renderer.requestRedraw();
+            menu.remove();
+        };
+        menu.appendChild(itemRippleDel);
+
+        // 5. Lift Delete Clipe (Delete)
+        const itemLiftDel = document.createElement("div");
+        itemLiftDel.className = "menu-item";
+        itemLiftDel.style.display = "flex";
+        itemLiftDel.style.alignItems = "center";
+        itemLiftDel.style.justifyContent = "space-between";
+        itemLiftDel.style.padding = "7px 12px";
+        itemLiftDel.style.cursor = "pointer";
+        itemLiftDel.innerHTML = `
+            <span style="display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-trash" style="color:var(--text-muted);"></i>
+                <span>Lift Delete (Manter Gap)</span>
+            </span>
+            <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Del</kbd>
+        `;
+        itemLiftDel.onclick = () => {
+            TIMELINE_STATE.liftDeleteClip(clip.id);
+            if (typeof window.showToast === "function") {
+                window.showToast("Clipe apagado (Lift Delete)", "info");
+            }
+            this.refreshClipInspector();
+            if (this.renderer) this.renderer.requestRedraw();
+            menu.remove();
+        };
+        menu.appendChild(itemLiftDel);
+
+        // 6. Desvincular A/V (se tiver link_id)
+        if (clip.link_id) {
+            const sep2 = document.createElement("div");
+            sep2.className = "menu-separator";
+            sep2.style.height = "1px";
+            sep2.style.background = "var(--border-glass)";
+            sep2.style.margin = "4px 0";
+            menu.appendChild(sep2);
+
+            const itemUnlink = document.createElement("div");
+            itemUnlink.className = "menu-item";
+            itemUnlink.style.display = "flex";
+            itemUnlink.style.alignItems = "center";
+            itemUnlink.style.justifyContent = "space-between";
+            itemUnlink.style.padding = "7px 12px";
+            itemUnlink.style.cursor = "pointer";
+            itemUnlink.innerHTML = `
+                <span style="display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-link-slash" style="color:var(--color-cyan);"></i>
+                    <span>Desvincular Par A/V</span>
+                </span>
+                <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">U</kbd>
+            `;
+            itemUnlink.onclick = () => {
+                TIMELINE_HISTORY.record(() => {
+                    const cuts = [...STATE.activeTimelineCuts];
+                    const linkId = clip.link_id;
+                    cuts.forEach(c => { if (c.link_id === linkId) c.link_id = null; });
+                    STATE.activeTimelineCuts = cuts;
+                });
+                if (typeof window.showToast === "function") {
+                    window.showToast("Par A/V desvinculado (U)", "info");
+                }
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+                menu.remove();
+            };
+            menu.appendChild(itemUnlink);
+        }
+
+        document.body.appendChild(menu);
+
+        // Limita posição na tela
+        const win = this.canvas.ownerDocument.defaultView || window;
+        const w = menu.offsetWidth || 230;
+        const h = menu.offsetHeight || 200;
+        let left = clientX;
+        let top = clientY;
+        if (left + w > win.innerWidth - 8) left = Math.max(8, win.innerWidth - w - 8);
+        if (top + h > win.innerHeight - 8) top = Math.max(8, win.innerHeight - h - 8);
+        menu.style.left = `${left}px`;
+        menu.style.top = `${top}px`;
+
+        const closeHandler = (ev) => {
+            if (!menu.contains(ev.target)) {
+                menu.remove();
+                document.removeEventListener("mousedown", closeHandler);
+            }
+        };
+        setTimeout(() => document.addEventListener("mousedown", closeHandler), 10);
+    }
+
+    /**
+     * Exibe o menu de contexto do Gap (espaço vazio).
+     */
+    showGapContextMenu(clientX, clientY, gap, frame) {
+        const oldMenu = document.getElementById("custom-timeline-context-menu");
+        if (oldMenu) oldMenu.remove();
+
+        const menu = document.createElement("div");
+        menu.id = "custom-timeline-context-menu";
+        menu.className = "custom-context-menu";
+        menu.style.position = "fixed";
+        menu.style.left = `${clientX}px`;
+        menu.style.top = `${clientY}px`;
+        menu.style.width = "200px";
+        menu.style.zIndex = "100000";
+        menu.style.padding = "6px 0";
+
+        const title = document.createElement("div");
+        title.style.padding = "6px 12px";
+        title.style.fontSize = "10px";
+        title.style.fontWeight = "bold";
+        title.style.color = "var(--color-cyan)";
+        title.style.borderBottom = "1px solid var(--border-glass)";
+        title.style.marginBottom = "4px";
+        title.style.display = "flex";
+        title.style.alignItems = "center";
+        title.style.gap = "6px";
+        title.innerHTML = `<i class="fa-solid fa-arrows-left-right-to-line"></i> ESPAÇO VAZIO (GAP)`;
+        menu.appendChild(title);
+
+        const itemRippleDel = document.createElement("div");
+        itemRippleDel.className = "menu-item";
+        itemRippleDel.style.display = "flex";
+        itemRippleDel.style.alignItems = "center";
+        itemRippleDel.style.justifyContent = "space-between";
+        itemRippleDel.style.padding = "7px 12px";
+        itemRippleDel.style.cursor = "pointer";
+        itemRippleDel.innerHTML = `
+            <span style="display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-arrow-right-to-bracket" style="color:var(--color-cyan);"></i>
+                <span>Fechar Espaço (Ripple)</span>
+            </span>
+            <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Del</kbd>
+        `;
+        itemRippleDel.onclick = () => {
+            TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
+            if (typeof window.showToast === "function") {
+                window.showToast("Espaço fechado com Ripple", "info");
+            }
+            if (this.renderer) this.renderer.requestRedraw();
+            menu.remove();
+        };
+        menu.appendChild(itemRippleDel);
+
+        document.body.appendChild(menu);
+
+        const closeHandler = (ev) => {
+            if (!menu.contains(ev.target)) {
+                menu.remove();
+                document.removeEventListener("mousedown", closeHandler);
+            }
+        };
+        setTimeout(() => document.addEventListener("mousedown", closeHandler), 10);
     }
 
     /**
@@ -2379,6 +2698,67 @@ export class CapiauTimelineInteraction {
                 TIMELINE_STATE.setTool("track-backward");
                 if (this.canvas) this.canvas.style.cursor = this.getTrackSelectCursor("track-backward", false);
                 if (this.renderer) this.renderer.requestRedraw();
+            };
+        }
+
+        const btnRippleTrimHead = doc.getElementById("btn-ripple-trim-head");
+        if (btnRippleTrimHead && !btnRippleTrimHead.__capiauToolBound) {
+            btnRippleTrimHead.__capiauToolBound = true;
+            btnRippleTrimHead.onclick = () => {
+                const ok = TIMELINE_STATE.rippleTrimToPlayhead("head");
+                if (ok) {
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Ripple Delete até a Agulha (Q)", "info");
+                    }
+                    if (this.renderer) this.renderer.requestRedraw();
+                    this.refreshClipInspector();
+                }
+            };
+        }
+
+        const btnRippleTrimTail = doc.getElementById("btn-ripple-trim-tail");
+        if (btnRippleTrimTail && !btnRippleTrimTail.__capiauToolBound) {
+            btnRippleTrimTail.__capiauToolBound = true;
+            btnRippleTrimTail.onclick = () => {
+                const ok = TIMELINE_STATE.rippleTrimToPlayhead("tail");
+                if (ok) {
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Ripple Delete da Agulha até o Fim (W)", "info");
+                    }
+                    if (this.renderer) this.renderer.requestRedraw();
+                    this.refreshClipInspector();
+                }
+            };
+        }
+
+        const btnSplitPlayhead = doc.getElementById("btn-split-playhead");
+        if (btnSplitPlayhead && !btnSplitPlayhead.__capiauToolBound) {
+            btnSplitPlayhead.__capiauToolBound = true;
+            btnSplitPlayhead.onclick = () => {
+                const selectedId = TIMELINE_STATE.selectedClipId;
+                const playhead = TIMELINE_STATE.playheadFrame;
+                if (selectedId) {
+                    TIMELINE_STATE.splitClip(selectedId, playhead);
+                } else {
+                    const cuts = STATE.activeTimelineCuts || [];
+                    const target = cuts.find(c => {
+                        const s = c.timelineStartFrame || 0;
+                        const e = s + (c.outFrame - c.inFrame);
+                        return (c.track === TIMELINE_STATE.selectedTrack || c.track === "V1") && s < playhead && playhead < e;
+                    }) || cuts.find(c => {
+                        const s = c.timelineStartFrame || 0;
+                        const e = s + (c.outFrame - c.inFrame);
+                        return s < playhead && playhead < e;
+                    });
+                    if (target) {
+                        TIMELINE_STATE.splitClip(target.id, playhead);
+                    }
+                }
+                if (typeof window.showToast === "function") {
+                    window.showToast("Clipe dividido no playhead (Z)", "info");
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
             };
         }
 
@@ -5799,6 +6179,39 @@ export class CapiauTimelineInteraction {
                     return;
                 }
             }
+        }
+
+        // Atalhos de Ripple Trim até a Agulha (Q / W)
+        // Q: Ripple Delete do Início do corte até a Agulha (Ripple Trim Left / Previous Edit to Playhead)
+        if (e.key.toLowerCase() === "q" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const isPlayerMaximized = document.getElementById("source-player-panel")?.classList.contains("maximized") ||
+                                      document.getElementById("program-player-panel")?.classList.contains("maximized");
+            if (!isPlayerMaximized) {
+                const ok = TIMELINE_STATE.rippleTrimToPlayhead("head");
+                if (ok) {
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Ripple Delete até a Agulha (Q)", "info");
+                    }
+                    if (this.renderer) this.renderer.requestRedraw();
+                    this.refreshClipInspector();
+                }
+                e.preventDefault();
+                return;
+            }
+        }
+
+        // W: Ripple Delete da Agulha até o Fim do corte (Ripple Trim Right / Next Edit to Playhead)
+        if (e.key.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const ok = TIMELINE_STATE.rippleTrimToPlayhead("tail");
+            if (ok) {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Ripple Delete da Agulha até o Fim (W)", "info");
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+            }
+            e.preventDefault();
+            return;
         }
 
         // Seleção de Ferramentas NLE via teclado:

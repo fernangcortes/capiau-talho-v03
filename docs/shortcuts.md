@@ -95,7 +95,20 @@ Timeline).
 
 +-----------------------+-----------------------+-----------------------+
 | **Tecla**             | **Ação**              | **Descrição**         |
-+:=====================:+:======================+=======================+
+| **Q**                 | **Ripple Delete até a  | Corta a parte inicial |
+|                       | Agulha (Playhead)**    | do clipe (Início até  |
+|                       |                       | a agulha) e fecha o   |
+|                       |                       | espaço puxando os     |
+|                       |                       | clipes seguintes nas  |
+|                       |                       | pistas sincronizadas. |
++-----------------------+-----------------------+-----------------------+
+| **W**                 | **Ripple Delete da    | Corta a parte final   |
+|                       | Agulha até o Fim**    | do clipe (Agulha até  |
+|                       |                       | o fim) e fecha o      |
+|                       |                       | espaço puxando os     |
+|                       |                       | clipes seguintes nas  |
+|                       |                       | pistas sincronizadas. |
++-----------------------+-----------------------+-----------------------+
 | **V**                 | **Ferramenta de        | Retorna à Ferramenta  |
 |                       | Seleção Padrão**       | de Seleção Normal     |
 |                       |                       | (cursor padrão).      |

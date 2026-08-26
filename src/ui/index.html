@@ -830,6 +830,9 @@
                                 <button id="btn-tool-select" class="btn-toolbar-action active" data-tooltip="Ferramenta de Seleção (V)"><i class="fa-solid fa-arrow-pointer"></i></button>
                                 <button id="btn-tool-track-forward" class="btn-toolbar-action" data-tooltip="Selecionar Faixa para Frente (T) [Shift = 1 pista]"><i class="fa-solid fa-angles-right"></i></button>
                                 <button id="btn-tool-track-backward" class="btn-toolbar-action" data-tooltip="Selecionar Faixa para Trás (Shift + T) [Shift = 1 pista]"><i class="fa-solid fa-angles-left"></i></button>
+                                <button id="btn-ripple-trim-head" class="btn-toolbar-action" data-tooltip="Ripple Delete até a Agulha (Início → Agulha) (Q)"><i class="fa-solid fa-arrow-left-to-line"></i></button>
+                                <button id="btn-ripple-trim-tail" class="btn-toolbar-action" data-tooltip="Ripple Delete da Agulha até o Fim (Agulha → Fim) (W)"><i class="fa-solid fa-arrow-right-from-line"></i></button>
+                                <button id="btn-split-playhead" class="btn-toolbar-action" data-tooltip="Dividir Clipe no Playhead (Z)"><i class="fa-solid fa-scissors"></i></button>
 
                                 <div class="toolbar-divider"></div>
 
@@ -2253,8 +2256,14 @@
                 <p style="margin: 0;">Crie quantas pistas quiser pelo botão <strong>+</strong> no topo da sidebar de trilhas. Cada pista tem <strong>volume, mute, trava (cadeado)</strong> e o modo <strong>ímã <i class="fa-solid fa-magnet" style="font-size: 9px;"></i></strong>: pistas magnéticas (como a V1 Falas) mantêm os clipes grudados em sequência; pistas livres (como a V2 B-Roll) permitem posicionar em qualquer ponto do tempo. Clique duplo no nome renomeia; roda do mouse rola verticalmente quando há muitas pistas.</p>
                 <p style="margin: 0;"><strong>Pista de IA (verde):</strong> recebe as sugestões da análise ✨. Clique numa sugestão para aceitar (vai para a pista de destino) ou rejeitar.</p>
 
-                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">3. Atalhos na Timeline Canvas & Marcadores</h4>
+                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">3. Atalhos na Timeline Canvas & Edição NLE</h4>
                 <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px;">
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Q</kbd></div>
+                    <div>Ripple Delete até a Agulha (corta o início do clipe e fecha o espaço)</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">W</kbd></div>
+                    <div>Ripple Delete da Agulha até o Fim (corta o final do clipe e fecha o espaço)</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Z</kbd></div>
+                    <div>Dividir clipe no Playhead (Split)</div>
                     <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">M</kbd></div>
                     <div>Adicionar / Editar Marcador na Playhead (Box Compacto sem pausar vídeo)</div>
                     <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Tab</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Enter</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Esc</kbd></div>
@@ -2264,7 +2273,9 @@
                     <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Shift + M</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Alt + M</kbd></div>
                     <div>Navegar para o Próximo / Anterior Marcador</div>
                     <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Delete</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Backspace</kbd></div>
-                    <div>Excluir marcadores selecionados em lote (ou clipe ativo)</div>
+                    <div>Lift Delete (clipe) ou Ripple Delete (gap / marcadores selecionados)</div>
+                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Shift + Delete</kbd></div>
+                    <div>Ripple Delete do clipe (apaga o clipe e fecha o buraco)</div>
                     <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Setas</kbd></div>
                     <div>Focar e navegar entre clipes / trilhas</div>
                     <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Shift + Seta</kbd></div>
