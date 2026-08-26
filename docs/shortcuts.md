@@ -96,9 +96,27 @@ Timeline).
 +-----------------------+-----------------------+-----------------------+
 | **Tecla**             | **Ação**              | **Descrição**         |
 +:=====================:+:======================+=======================+
+| **V**                 | **Ferramenta de        | Retorna à Ferramenta  |
+|                       | Seleção Padrão**       | de Seleção Normal     |
+|                       |                       | (cursor padrão).      |
++-----------------------+-----------------------+-----------------------+
+| **T**                 | **Selecionar Faixa    | Seleciona todos os    |
+|                       | para Frente**         | clipes à direita em   |
+|                       |                       | todas as faixas       |
+|                       |                       | ativas para arrasto.  |
+|                       |                       | (*Shift+Clique:       |
+|                       |                       | apenas 1 faixa*).     |
++-----------------------+-----------------------+-----------------------+
+| **Shift + T**         | **Selecionar Faixa    | Seleciona todos os    |
+|                       | para Trás**           | clipes à esquerda em  |
+|                       |                       | todas as faixas       |
+|                       |                       | ativas para arrasto.  |
+|                       |                       | (*Shift+Clique:       |
+|                       |                       | apenas 1 faixa*).     |
++-----------------------+-----------------------+-----------------------+
 | **A**                 | **Abrir/Fechar        | **Se focado na        |
 |                       | Inspetor ou           | Biblioteca/Mídias:**  |
-|                       | Alternativas**        | Abre ou fecha o       |
+|                       | Alternativas (IA)**   | Abre ou fecha o       |
 |                       |                       | Inspetor de Mídia     |
 |                       |                       | Integrado.            |
 |                       |                       |                       |
@@ -109,10 +127,10 @@ Timeline).
 |                       |                       | para o clipe          |
 |                       |                       | selecionado.          |
 +-----------------------+-----------------------+-----------------------+
-| **Esc (Escape)**      | **Fechar Inspetor ou  | Fecha o Inspetor de   |
-|                       | Alternativas**        | Mídia ou o modal de   |
-|                       |                       | alternativas da IA    |
-|                       |                       | caso estejam abertos. |
+| **Esc (Escape)**      | **Fechar Inspetor,    | Fecha o Inspetor de   |
+|                       | Alternativas ou       | Mídia, modal de       |
+|                       | Desmarcar Seleção**   | alternativas ou limpa |
+|                       |                       | seleções múltiplas.   |
 +-----------------------+-----------------------+-----------------------+
 | **Delete /            | **Lift Delete /       | **Em clipe:** Apaga o |
 | Backspace**           | Deletar Gap / Ghost**  | clipe mantendo o      |

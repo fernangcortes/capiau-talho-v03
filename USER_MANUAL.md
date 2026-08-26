@@ -869,6 +869,10 @@ Para máxima agilidade na ilha de edição, utilize os atalhos de teclado profis
 | | **`L`** | Avançar reprodução (1x, 2x, 4x, 8x) |
 | | **`←` / `→`** | Avançar / Retroceder 1 frame |
 | | **`Shift + ←` / `→`** | Saltar 1 segundo |
+| **Ferramentas NLE** | **`V`** | Ferramenta de Seleção Padrão (*Selection Tool*) |
+| | **`T`** | Selecionar Faixa para Frente (*Track Select Forward*) |
+| | **`Shift + T`** | Selecionar Faixa para Trás (*Track Select Backward*) |
+| | **`Shift + Clique`** | Modificador de pista única (com ferramenta de faixa ativa) |
 | **Pontos de Corte** | **`I`** | Marcar ponto de Entrada (*IN*) |
 | | **`O`** | Marcar ponto de Saída (*OUT*) |
 | | **`Alt + X`** | Limpar pontos de In e Out |
@@ -876,7 +880,8 @@ Para máxima agilidade na ilha de edição, utilize os atalhos de teclado profis
 | | **`Shift + E`** | Inserir texto ou fala selecionada na timeline |
 | **Edição na Linha do Tempo** | **`Z`** | Dividir (*Split*) clipe na posição da agulha |
 | | **`U`** | Desvincular (*Unlink*) ou Vincular áudio e vídeo |
-| | **`Delete` / `Backspace`** | Excluir clipe(s) selecionado(s) |
+| | **`Delete` / `Backspace`** | Lift Delete de clipe(s) selecionado(s) ou Ripple Delete de Gap |
+| | **`Shift + Delete`** | Ripple Delete de clipe(s) selecionado(s) |
 | | **`Ctrl + Z`** | Desfazer (*Undo*) |
 | | **`Ctrl + Y` / `Ctrl + Shift + Z`** | Refazer (*Redo*) |
 | **Marcadores** | **`M`** | Criar ou editar marcador na agulha |

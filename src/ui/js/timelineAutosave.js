@@ -37,6 +37,8 @@ function performAutosave() {
             scrollTop: TIMELINE_STATE.scrollTop,
             trackHeightScale: TIMELINE_STATE.trackHeightScale || 1.0,
             selectedClipId: TIMELINE_STATE.selectedClipId,
+            selectedClipIds: Array.from(TIMELINE_STATE.selectedClipIds || []),
+            activeTool: TIMELINE_STATE.activeTool || "select",
             selectedTrack: TIMELINE_STATE.selectedTrack,
             undoStack: TIMELINE_HISTORY.undoStack,
             redoStack: TIMELINE_HISTORY.redoStack,
@@ -150,6 +152,11 @@ export function restoreAutosave(projectId) {
         TIMELINE_STATE.clampScrollTop();
         if (data.playheadFrame !== undefined) TIMELINE_STATE.setPlayheadFrame(data.playheadFrame);
         if (data.selectedClipId !== undefined) TIMELINE_STATE.selectedClipId = data.selectedClipId;
+        if (data.selectedClipIds !== undefined) TIMELINE_STATE.selectedClipIds = new Set(data.selectedClipIds);
+        if (data.activeTool !== undefined) {
+            TIMELINE_STATE.activeTool = data.activeTool;
+            STATE.emit("timelineToolChanged", TIMELINE_STATE.activeTool);
+        }
         if (data.selectedTrack !== undefined) TIMELINE_STATE.selectedTrack = data.selectedTrack;
 
         // 5. Restaura pilha de histórico

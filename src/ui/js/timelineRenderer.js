@@ -854,7 +854,7 @@ export class CapiauTimelineRenderer {
                 }
             }
 
-            const isSelected = TIMELINE_STATE.selectedClipId === cut.id;
+            const isSelected = (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.has(cut.id)) || TIMELINE_STATE.selectedClipId === cut.id;
             const isPartner = !isSelected && selectedLink && cut.link_id === selectedLink;
             ctx.strokeStyle = (isSelected || isPartner) ? this.colors.selection : style.border;
             ctx.lineWidth = isSelected ? 2 : 1.5;

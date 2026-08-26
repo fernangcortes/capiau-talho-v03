@@ -20,13 +20,19 @@ const VELOCIDADE_RENDER_FFMPEG_X_TEMPO_REAL = 31;    // medido: faixa 31–44x t
 // (Entrevista de 16 min leva ~11 min; a de 22 min, ~16 min.)
 const VELOCIDADE_RENDER_DENOISE_IA_X_TEMPO_REAL = 1.41;
 
+// Cursores SVG em alta definição para as ferramentas de seleção de faixas (Track Select Forward / Backward)
+const CURSOR_TRACK_FORWARD_ALL = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 6l6 6-6 6M11 6l6 6-6 6" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 6l6 6-6 6M11 6l6 6-6 6" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') 12 12, e-resize`;
+const CURSOR_TRACK_FORWARD_SINGLE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M7 6l6 6-6 6" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 6l6 6-6 6" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') 10 12, e-resize`;
+const CURSOR_TRACK_BACKWARD_ALL = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M20 6l-6 6 6 6M13 6l-6 6 6 6" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 6l-6 6 6 6M13 6l-6 6 6 6" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') 12 12, w-resize`;
+const CURSOR_TRACK_BACKWARD_SINGLE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M17 6l-6 6 6 6" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 6l-6 6 6 6" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') 14 12, w-resize`;
+
 export class CapiauTimelineInteraction {
     constructor(renderer) {
         this.renderer = renderer;
         this.canvas = renderer.canvas;
         
         // Estado local de interação
-        this.dragState = null; // null, "scrub", "drag-clip", "trim-left", "trim-right", "pan", "fade-in-drag", "fade-out-drag", "fade-in-curve", "fade-out-curve"
+        this.dragState = null; // null, "scrub", "drag-clip", "drag-selection", "trim-left", "trim-right", "pan", "fade-in-drag", "fade-out-drag", "fade-in-curve", "fade-out-curve"
         this.draggedClipId = null;
         this.dragStartMouseX = 0;
         this.dragStartMouseY = 0;
@@ -36,6 +42,11 @@ export class CapiauTimelineInteraction {
         this.dragStartFadeDur = 0;
         this.dragStartTension = 0;
         this.dragFadeSide = "in";
+
+        // Estado para arrasto múltiplo de clipes (Track Select e Multi-Select)
+        this.dragInitialClipPositions = null; // Map<clipId, { startFrame, track, inFrame, outFrame, duration }>
+        this.dragAnchorClip = null;
+        this.dragMinStartFrame = 0;
 
         // Cache de diagnósticos de áudio já buscados, chave "video_id|in|out" (somente leitura)
         this.audioDiagCache = {};
@@ -127,6 +138,7 @@ export class CapiauTimelineInteraction {
             }
         };
         this.boundKeyDown = (e) => this.onKeyDown(e);
+        this.boundKeyUp = (e) => this.onKeyUp(e);
         this.boundDragOver = (e) => {
             e.preventDefault();
             if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
@@ -147,6 +159,18 @@ export class CapiauTimelineInteraction {
         this.boundDrop = (e) => this.onDrop(e);
 
         this.init();
+    }
+
+    /**
+     * Retorna a string de cursor CSS correspondente à ferramenta e estado da tecla Shift.
+     */
+    getTrackSelectCursor(tool, isShift = false) {
+        if (tool === "track-forward") {
+            return isShift ? CURSOR_TRACK_FORWARD_SINGLE : CURSOR_TRACK_FORWARD_ALL;
+        } else if (tool === "track-backward") {
+            return isShift ? CURSOR_TRACK_BACKWARD_SINGLE : CURSOR_TRACK_BACKWARD_ALL;
+        }
+        return "default";
     }
 
     init() {
@@ -176,6 +200,7 @@ export class CapiauTimelineInteraction {
 
         // Keyboard Listener global
         win.addEventListener("keydown", this.boundKeyDown);
+        win.addEventListener("keyup", this.boundKeyUp);
 
         // Ouvir mudança de abas no painel esquerdo para atualizar ajustes
         STATE.on("leftTabChanged", (tabId) => {
@@ -194,6 +219,9 @@ export class CapiauTimelineInteraction {
 
         // Inicializa a barra de ferramentas e pesquisa semântica da aba de Ajustes
         this.initAdjustmentsToolbar();
+
+        // Inicializa os botões de ferramentas da timeline (V, T, Shift+T)
+        this.initToolsToolbar();
     }
 
     removeListeners() {
@@ -213,6 +241,7 @@ export class CapiauTimelineInteraction {
         this.canvas.removeEventListener("dragover", this.boundDragOver);
         this.canvas.removeEventListener("drop", this.boundDrop);
         win.removeEventListener("keydown", this.boundKeyDown);
+        win.removeEventListener("keyup", this.boundKeyUp);
     }
 
     setCanvas(canvas) {
@@ -458,6 +487,66 @@ export class CapiauTimelineInteraction {
 
         // 3. Clique nas trilhas
         if (track) {
+            // Ferramenta: Selecionar Faixa para Frente (T)
+            if (TIMELINE_STATE.activeTool === "track-forward") {
+                const hit = this.findClipAt(frame, track, y);
+                const fromFrame = (hit && hit.type === "clip") ? hit.data.timelineStartFrame : frame;
+                const selected = TIMELINE_STATE.selectTracksForward(fromFrame, e.shiftKey ? track : null);
+
+                if (selected.length > 0) {
+                    TIMELINE_HISTORY.begin();
+                    this.dragState = "drag-selection";
+                    this.dragStartMouseX = e.clientX;
+                    this.dragStartMouseY = e.clientY;
+                    this.dragAnchorClip = (hit && hit.type === "clip") ? hit.data : selected[0];
+                    this.dragInitialClipPositions = new Map();
+                    for (const c of selected) {
+                        this.dragInitialClipPositions.set(c.id, {
+                            startFrame: c.timelineStartFrame,
+                            track: c.track,
+                            inFrame: c.inFrame,
+                            outFrame: c.outFrame,
+                            duration: c.outFrame - c.inFrame
+                        });
+                    }
+                    this.dragMinStartFrame = Math.min(...Array.from(this.dragInitialClipPositions.values()).map(p => p.startFrame));
+                    if (hit && hit.type === "clip") this.syncPlayerToClip(hit.data);
+                }
+                this.refreshClipInspector();
+                this.renderer.requestRedraw();
+                return;
+            }
+
+            // Ferramenta: Selecionar Faixa para Trás (Shift + T)
+            if (TIMELINE_STATE.activeTool === "track-backward") {
+                const hit = this.findClipAt(frame, track, y);
+                const fromFrame = (hit && hit.type === "clip") ? (hit.data.timelineStartFrame + (hit.data.outFrame - hit.data.inFrame)) : frame;
+                const selected = TIMELINE_STATE.selectTracksBackward(fromFrame, e.shiftKey ? track : null);
+
+                if (selected.length > 0) {
+                    TIMELINE_HISTORY.begin();
+                    this.dragState = "drag-selection";
+                    this.dragStartMouseX = e.clientX;
+                    this.dragStartMouseY = e.clientY;
+                    this.dragAnchorClip = (hit && hit.type === "clip") ? hit.data : selected[0];
+                    this.dragInitialClipPositions = new Map();
+                    for (const c of selected) {
+                        this.dragInitialClipPositions.set(c.id, {
+                            startFrame: c.timelineStartFrame,
+                            track: c.track,
+                            inFrame: c.inFrame,
+                            outFrame: c.outFrame,
+                            duration: c.outFrame - c.inFrame
+                        });
+                    }
+                    this.dragMinStartFrame = Math.min(...Array.from(this.dragInitialClipPositions.values()).map(p => p.startFrame));
+                    if (hit && hit.type === "clip") this.syncPlayerToClip(hit.data);
+                }
+                this.refreshClipInspector();
+                this.renderer.requestRedraw();
+                return;
+            }
+
             const hit = this.findClipAt(frame, track, y);
 
             if (hit) {
@@ -466,8 +555,45 @@ export class CapiauTimelineInteraction {
                     const clipTrack = TIMELINE_STATE.getTrack(clip.track);
                     if (clipTrack && clipTrack.locked) {
                         // Pista travada: apenas seleciona, sem permitir arrastes
-                        TIMELINE_STATE.selectedClipId = clip.id;
+                        TIMELINE_STATE.selectClip(clip.id, e.shiftKey);
                         TIMELINE_STATE.selectedTrack = track;
+                        this.syncPlayerToClip(clip);
+                        this.refreshClipInspector();
+                        this.renderer.requestRedraw();
+                        return;
+                    }
+
+                    // Se pressionou Shift no modo normal de seleção, alterna seleção cumulativa
+                    if (e.shiftKey) {
+                        TIMELINE_STATE.toggleClipSelection(clip.id);
+                        this.syncPlayerToClip(clip);
+                        this.refreshClipInspector();
+                        this.renderer.requestRedraw();
+                        return;
+                    }
+
+                    // Se clicou em um clipe que já faz parte de uma seleção múltipla, inicia arrasto em grupo
+                    if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1 && TIMELINE_STATE.selectedClipIds.has(clip.id)) {
+                        TIMELINE_HISTORY.begin();
+                        this.dragState = "drag-selection";
+                        this.dragStartMouseX = e.clientX;
+                        this.dragStartMouseY = e.clientY;
+                        this.dragAnchorClip = clip;
+                        this.dragInitialClipPositions = new Map();
+                        const cuts = STATE.activeTimelineCuts || [];
+                        for (const cid of TIMELINE_STATE.selectedClipIds) {
+                            const c = cuts.find(x => x.id === cid);
+                            if (c) {
+                                this.dragInitialClipPositions.set(c.id, {
+                                    startFrame: c.timelineStartFrame,
+                                    track: c.track,
+                                    inFrame: c.inFrame,
+                                    outFrame: c.outFrame,
+                                    duration: c.outFrame - c.inFrame
+                                });
+                            }
+                        }
+                        this.dragMinStartFrame = Math.min(...Array.from(this.dragInitialClipPositions.values()).map(p => p.startFrame));
                         this.syncPlayerToClip(clip);
                         this.refreshClipInspector();
                         this.renderer.requestRedraw();
@@ -477,7 +603,7 @@ export class CapiauTimelineInteraction {
                     // Checa se clicou em um puxador de Fade In / Fade Out ou Ponto de Curva
                     const fadeZone = this.checkFadeZone(x, y, clip, false);
                     if (fadeZone && e.button === 0) {
-                        TIMELINE_STATE.selectedClipId = clip.id;
+                        TIMELINE_STATE.selectClip(clip.id, false);
                         TIMELINE_STATE.selectedTrack = track;
                         TIMELINE_HISTORY.begin();
 
@@ -502,7 +628,7 @@ export class CapiauTimelineInteraction {
                         return;
                     }
 
-                    TIMELINE_STATE.selectedClipId = clip.id;
+                    TIMELINE_STATE.selectClip(clip.id, false);
                     TIMELINE_STATE.selectedTrack = track;
                     TIMELINE_STATE.clearSelectedGap();
 
@@ -537,6 +663,7 @@ export class CapiauTimelineInteraction {
                     TIMELINE_STATE.selectedGhostClipId = ghost.id;
                     TIMELINE_STATE.selectedTrack = "Ghost";
                     TIMELINE_STATE.clearSelectedGap();
+                    TIMELINE_STATE.clearClipSelection();
                     
                     // Sincroniza player com o preview da sugestão
                     this.syncPlayerToClip(ghost);
@@ -551,7 +678,7 @@ export class CapiauTimelineInteraction {
                     TIMELINE_STATE.selectGap(gap);
                 } else {
                     TIMELINE_STATE.clearSelectedGap();
-                    TIMELINE_STATE.selectedClipId = null;
+                    TIMELINE_STATE.clearClipSelection();
                     TIMELINE_STATE.selectedGhostClipId = null;
                 }
             }
@@ -606,6 +733,21 @@ export class CapiauTimelineInteraction {
 
         // Atualiza cursores dinâmicos de trim, fades e tooltip com nome do arquivo
         if (!this.dragState && track) {
+            // Se a ferramenta de seleção de faixas estiver ativa, define o cursor apropriado
+            if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
+                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e.shiftKey);
+                this.hideMarkerTooltip();
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                if (TIMELINE_STATE.hoveredFadeHandle !== null) {
+                    TIMELINE_STATE.hoveredFadeHandle = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                return;
+            }
+
             this.hideMarkerTooltip();
             if (TIMELINE_STATE.hoveredMarkerId !== null) {
                 TIMELINE_STATE.hoveredMarkerId = null;
@@ -648,6 +790,9 @@ export class CapiauTimelineInteraction {
                 this.canvas.removeAttribute("title");
             }
         } else if (!this.dragState) {
+            if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
+                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e.shiftKey);
+            }
             this.hideMarkerTooltip();
             if (TIMELINE_STATE.hoveredMarkerId !== null) {
                 TIMELINE_STATE.hoveredMarkerId = null;
@@ -683,6 +828,45 @@ export class CapiauTimelineInteraction {
             const dx = e.clientX - this.dragStartMouseX;
             const deltaFrames = dx / TIMELINE_STATE.zoom;
             TIMELINE_STATE.setScrollLeftFrame(this.dragStartClipFrame - deltaFrames);
+        }
+        else if (this.dragState === "drag-selection" && this.dragInitialClipPositions) {
+            const dx = e.clientX - this.dragStartMouseX;
+            const rawDelta = Math.round(dx / TIMELINE_STATE.zoom);
+            const minPossibleDelta = -this.dragMinStartFrame;
+            let deltaFrames = Math.max(minPossibleDelta, rawDelta);
+
+            // Snapping magnético contra playhead, marcadores e clipes que NÃO estão na seleção
+            if (TIMELINE_STATE.snappingEnabled) {
+                const anchorInitStart = this.dragAnchorClip
+                    ? (this.dragInitialClipPositions.get(this.dragAnchorClip.id)?.startFrame ?? this.dragMinStartFrame)
+                    : this.dragMinStartFrame;
+                const rawAnchor = anchorInitStart + deltaFrames;
+                const snappedAnchor = this.snapFrame(rawAnchor, 8, Array.from(TIMELINE_STATE.selectedClipIds));
+                const snapOffset = snappedAnchor - rawAnchor;
+                deltaFrames = Math.max(minPossibleDelta, deltaFrames + snapOffset);
+            }
+
+            const cuts = [...STATE.activeTimelineCuts];
+            for (const [clipId, initPos] of this.dragInitialClipPositions.entries()) {
+                const cut = cuts.find(c => c.id === clipId);
+                if (cut) {
+                    cut.timelineStartFrame = Math.max(0, initPos.startFrame + deltaFrames);
+                    cut.timeline_start = cut.timelineStartFrame / (TIMELINE_STATE.fps || 24);
+                }
+            }
+            STATE.activeTimelineCuts = cuts;
+
+            if (this.renderer) {
+                const leadingFrame = Math.max(0, this.dragMinStartFrame + deltaFrames);
+                this.renderer.activeSnapFrame = deltaFrames !== rawDelta ? leadingFrame : null;
+                this.renderer.dropIndicator = {
+                    type: "overwrite",
+                    frame: leadingFrame,
+                    trackId: this.dragAnchorClip ? this.dragAnchorClip.track : "V1",
+                    durationFrames: 0
+                };
+                this.renderer.requestRedraw();
+            }
         }
         else if (this.dragState === "drag-clip" && this.draggedClipId) {
             const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
@@ -821,6 +1005,24 @@ export class CapiauTimelineInteraction {
             if (this.renderer) this.renderer.requestRedraw();
             return;
         }
+        if (this.dragState === "drag-selection") {
+            TIMELINE_HISTORY.commit();
+            STATE.emit("timelineCutsUpdated");
+            this.dragState = null;
+            this.dragInitialClipPositions = null;
+            this.dragAnchorClip = null;
+            this.draggedClipId = null;
+            this.refreshClipInspector();
+            if (this.canvas) {
+                if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
+                    this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e?.shiftKey || false);
+                } else {
+                    this.canvas.style.cursor = "default";
+                }
+            }
+            if (this.renderer) this.renderer.requestRedraw();
+            return;
+        }
         if (TIMELINE_STATE.hoveredMarkerId !== null) {
             TIMELINE_STATE.hoveredMarkerId = null;
             if (this.renderer) this.renderer.requestRedraw();
@@ -830,7 +1032,15 @@ export class CapiauTimelineInteraction {
         this.dragState = null;
         this.draggedClipId = null;
         this.mouseDownClip = null;
-        if (this.canvas) this.canvas.style.cursor = "default";
+        this.dragInitialClipPositions = null;
+        this.dragAnchorClip = null;
+        if (this.canvas) {
+            if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
+                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e?.shiftKey || false);
+            } else {
+                this.canvas.style.cursor = "default";
+            }
+        }
         if (this.renderer) this.renderer.requestRedraw();
     }
 
@@ -1088,7 +1298,7 @@ export class CapiauTimelineInteraction {
     /**
      * Calcula se o frame alvo deve sofrer encaixe (snapping) em relação a playhead, marcadores ou bordas de clipes.
      */
-    snapFrame(targetFrame, tolerancePx = 8) {
+    snapFrame(targetFrame, tolerancePx = 8, ignoredClipIds = null) {
         if (!TIMELINE_STATE.snappingEnabled) return targetFrame;
 
         const zoom = TIMELINE_STATE.zoom || 0.5;
@@ -1118,8 +1328,10 @@ export class CapiauTimelineInteraction {
 
         // 3. Encaixe nas bordas dos cortes (início/fim de clipes)
         if (STATE.activeTimelineCuts) {
+            const ignoredSet = ignoredClipIds ? new Set(ignoredClipIds) : null;
             STATE.activeTimelineCuts.forEach(cut => {
                 if (cut.id === this.draggedClipId) return;
+                if (ignoredSet && ignoredSet.has(cut.id)) return;
                 const startDiff = Math.abs(cut.timelineStartFrame - targetFrame);
                 if (startDiff < minDiff) {
                     minDiff = startDiff;
@@ -2128,6 +2340,53 @@ export class CapiauTimelineInteraction {
         if (typeof window !== "undefined" && typeof window.showToast === "function") {
             window.showToast("Todos os ajustes do clipe foram restaurados para o padrão.", "info");
         }
+    }
+
+    initToolsToolbar() {
+        const doc = (this.canvas && this.canvas.ownerDocument) || document;
+        const btnSelect = doc.getElementById("btn-tool-select");
+        const btnTrackForward = doc.getElementById("btn-tool-track-forward");
+        const btnTrackBackward = doc.getElementById("btn-tool-track-backward");
+
+        const updateButtons = (tool) => {
+            const current = tool || TIMELINE_STATE.activeTool || "select";
+            if (btnSelect) btnSelect.classList.toggle("active", current === "select");
+            if (btnTrackForward) btnTrackForward.classList.toggle("active", current === "track-forward");
+            if (btnTrackBackward) btnTrackBackward.classList.toggle("active", current === "track-backward");
+        };
+
+        if (btnSelect && !btnSelect.__capiauToolBound) {
+            btnSelect.__capiauToolBound = true;
+            btnSelect.onclick = () => {
+                TIMELINE_STATE.setTool("select");
+                if (this.canvas) this.canvas.style.cursor = "default";
+                if (this.renderer) this.renderer.requestRedraw();
+            };
+        }
+
+        if (btnTrackForward && !btnTrackForward.__capiauToolBound) {
+            btnTrackForward.__capiauToolBound = true;
+            btnTrackForward.onclick = () => {
+                TIMELINE_STATE.setTool("track-forward");
+                if (this.canvas) this.canvas.style.cursor = this.getTrackSelectCursor("track-forward", false);
+                if (this.renderer) this.renderer.requestRedraw();
+            };
+        }
+
+        if (btnTrackBackward && !btnTrackBackward.__capiauToolBound) {
+            btnTrackBackward.__capiauToolBound = true;
+            btnTrackBackward.onclick = () => {
+                TIMELINE_STATE.setTool("track-backward");
+                if (this.canvas) this.canvas.style.cursor = this.getTrackSelectCursor("track-backward", false);
+                if (this.renderer) this.renderer.requestRedraw();
+            };
+        }
+
+        STATE.on("timelineToolChanged", (tool) => {
+            updateButtons(tool);
+        });
+
+        updateButtons(TIMELINE_STATE.activeTool);
     }
 
     initAdjustmentsToolbar() {
@@ -5515,6 +5774,13 @@ export class CapiauTimelineInteraction {
             return;
         }
 
+        // Alternância e cursores dinâmicos para ferramentas de faixa
+        if (e.key === "Shift" && (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward")) {
+            if (this.canvas && !this.dragState) {
+                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, true);
+            }
+        }
+
         // Toggle do popup de alternativas com a tecla 'A'
         if (e.key.toLowerCase() === "a" && !e.ctrlKey && !e.metaKey && !e.altKey) {
             if (window.activeFocusedPlayer === "source") {
@@ -5535,11 +5801,52 @@ export class CapiauTimelineInteraction {
             }
         }
 
-        // Fechar popup de alternativas com a tecla 'Escape'
+        // Seleção de Ferramentas NLE via teclado:
+        // V: Ferramenta de Seleção Normal
+        if (e.key.toLowerCase() === "v" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            TIMELINE_STATE.setTool("select");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta de Seleção (V)", "info");
+            }
+            if (this.canvas) this.canvas.style.cursor = "default";
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // T / Shift+T: Selecionar Faixa para Frente (T) / para Trás (Shift+T)
+        if (e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (e.shiftKey) {
+                TIMELINE_STATE.setTool("track-backward");
+                if (typeof window.showToast === "function") {
+                    window.showToast("Ferramenta: Selecionar Faixa para Trás (Shift + T)", "info");
+                }
+            } else {
+                TIMELINE_STATE.setTool("track-forward");
+                if (typeof window.showToast === "function") {
+                    window.showToast("Ferramenta: Selecionar Faixa para Frente (T)", "info");
+                }
+            }
+            if (this.canvas) {
+                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e.shiftKey);
+            }
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // Fechar popup de alternativas ou desmarcar seleções com a tecla 'Escape'
         if (e.key === "Escape") {
-            const popup = this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup");
+            const popup = this.canvas ? this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup") : document.querySelector("#timeline-alternatives-popup");
             if (popup && popup.style.display === "flex") {
                 this.hideAlternativesPopup();
+                e.preventDefault();
+                return;
+            }
+            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) {
+                TIMELINE_STATE.clearClipSelection();
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
                 e.preventDefault();
                 return;
             }
@@ -5568,6 +5875,19 @@ export class CapiauTimelineInteraction {
             if (TIMELINE_STATE.selectedGap) {
                 const gap = TIMELINE_STATE.selectedGap;
                 TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
+                if (this.renderer) this.renderer.requestRedraw();
+                e.preventDefault();
+                return;
+            }
+            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1) {
+                if (e.shiftKey) {
+                    // Shift+Delete: Ripple Delete no conjunto de clipes
+                    TIMELINE_STATE.rippleDeleteSelectedClips();
+                } else {
+                    // Delete: Lift Delete no conjunto de clipes
+                    TIMELINE_STATE.liftDeleteSelectedClips();
+                }
+                this.refreshClipInspector();
                 if (this.renderer) this.renderer.requestRedraw();
                 e.preventDefault();
                 return;
@@ -5631,7 +5951,11 @@ export class CapiauTimelineInteraction {
             }
         }
         else if (e.key === "ArrowLeft") {
-            if (selectedId) {
+            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1) {
+                TIMELINE_STATE.nudgeSelectedClips(-1);
+                if (this.renderer) this.renderer.requestRedraw();
+                e.preventDefault();
+            } else if (selectedId) {
                 if (e.altKey) {
                     this.nudgeTrim(selectedId, "left", -1);
                 } else if (e.shiftKey) {
@@ -5639,11 +5963,15 @@ export class CapiauTimelineInteraction {
                 } else {
                     this.nudgeSelection(selectedId, -1); // 1 frame para trás
                 }
+                e.preventDefault();
             }
-            e.preventDefault();
         }
         else if (e.key === "ArrowRight") {
-            if (selectedId) {
+            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1) {
+                TIMELINE_STATE.nudgeSelectedClips(1);
+                if (this.renderer) this.renderer.requestRedraw();
+                e.preventDefault();
+            } else if (selectedId) {
                 if (e.altKey) {
                     this.nudgeTrim(selectedId, "left", 1);
                 } else if (e.shiftKey) {
@@ -5651,8 +5979,8 @@ export class CapiauTimelineInteraction {
                 } else {
                     this.nudgeSelection(selectedId, 1); // 1 frame para frente
                 }
+                e.preventDefault();
             }
-            e.preventDefault();
         }
         else if (e.key === "[") {
             if (selectedId) this.nudgeTrim(selectedId, "left", -1);
@@ -5661,6 +5989,14 @@ export class CapiauTimelineInteraction {
         else if (e.key === "]") {
             if (selectedId) this.nudgeTrim(selectedId, "right", 1);
             e.preventDefault();
+        }
+    }
+
+    onKeyUp(e) {
+        if (e.key === "Shift") {
+            if (this.canvas && !this.dragState && (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward")) {
+                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, false);
+            }
         }
     }
 

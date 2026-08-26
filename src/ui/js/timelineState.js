@@ -206,6 +206,8 @@ export class CapiauTimelineState {
         this.playheadFrame = 0; // Posição atual do cursor de reprodução em frames
 
         this.selectedClipId = null; // ID do clipe comum selecionado
+        this.selectedClipIds = new Set(); // IDs de múltiplos clipes selecionados
+        this.activeTool = "select"; // Ferramenta ativa: "select" (V), "track-forward" (T), "track-backward" (Shift+T)
         this.selectedTrack = "V1"; // Track focada ativa
         this.selectedGap = null; // Gap selecionado: { trackId, startFrame, endFrame, durationFrames }
         this.snappingEnabled = true; // Encaixe magnético global ativo por padrão
@@ -840,10 +842,272 @@ export class CapiauTimelineState {
         return gaps.find(g => frame >= g.startFrame && frame < g.endFrame) || null;
     }
 
+    // ── FERRAMENTAS DE EDIÇÃO E SELEÇÃO (NLE TOOLS) ───────────────────
+
+    /**
+     * Define a ferramenta ativa ("select", "track-forward", "track-backward").
+     */
+    setTool(tool) {
+        if (!["select", "track-forward", "track-backward"].includes(tool)) return;
+        this.activeTool = tool;
+        STATE.emit("timelineToolChanged", this.activeTool);
+    }
+
+    /**
+     * Seleciona todos os clipes nas pistas ativas a partir de fromFrame para a frente.
+     * @param {number} fromFrame Frame inicial de corte.
+     * @param {string|null} targetTrackId Se especificado (Shift pressionado), filtra apenas nesta pista.
+     */
+    selectTracksForward(fromFrame, targetTrackId = null) {
+        const cuts = STATE.activeTimelineCuts || [];
+        let activeTracks;
+        if (targetTrackId) {
+            const t = this.getTrack(targetTrackId);
+            if (!t || t.locked || t.kind === "ai") {
+                this.clearClipSelection();
+                return [];
+            }
+            activeTracks = [targetTrackId];
+        } else {
+            activeTracks = this.tracks
+                .filter(t => t.kind !== "ai" && !t.locked)
+                .map(t => t.id);
+        }
+
+        const selected = cuts.filter(c => {
+            if (!activeTracks.includes(c.track)) return false;
+            const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * this.fps);
+            const inF = c.inFrame !== undefined ? c.inFrame : Math.round((c.in || 0) * this.fps);
+            const outF = c.outFrame !== undefined ? c.outFrame : Math.round((c.out || 0) * this.fps);
+            const end = start + Math.max(1, outF - inF);
+            return start >= fromFrame || (start <= fromFrame && end > fromFrame);
+        });
+
+        const ids = selected.map(c => c.id);
+        this.selectClips(ids);
+        return selected;
+    }
+
+    /**
+     * Seleciona todos os clipes nas pistas ativas a partir de fromFrame para trás.
+     * @param {number} fromFrame Frame final de corte.
+     * @param {string|null} targetTrackId Se especificado (Shift pressionado), filtra apenas nesta pista.
+     */
+    selectTracksBackward(fromFrame, targetTrackId = null) {
+        const cuts = STATE.activeTimelineCuts || [];
+        let activeTracks;
+        if (targetTrackId) {
+            const t = this.getTrack(targetTrackId);
+            if (!t || t.locked || t.kind === "ai") {
+                this.clearClipSelection();
+                return [];
+            }
+            activeTracks = [targetTrackId];
+        } else {
+            activeTracks = this.tracks
+                .filter(t => t.kind !== "ai" && !t.locked)
+                .map(t => t.id);
+        }
+
+        const selected = cuts.filter(c => {
+            if (!activeTracks.includes(c.track)) return false;
+            const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * this.fps);
+            const inF = c.inFrame !== undefined ? c.inFrame : Math.round((c.in || 0) * this.fps);
+            const outF = c.outFrame !== undefined ? c.outFrame : Math.round((c.out || 0) * this.fps);
+            const end = start + Math.max(1, outF - inF);
+            return end <= fromFrame || (start <= fromFrame && end > fromFrame);
+        });
+
+        const ids = selected.map(c => c.id);
+        this.selectClips(ids);
+        return selected;
+    }
+
+    /**
+     * Seleciona um clipe específico, substituindo a seleção ou adicionando em modo multi.
+     */
+    selectClip(clipId, multi = false) {
+        if (!multi) {
+            this.selectedClipIds.clear();
+        }
+        if (clipId) {
+            this.selectedClipIds.add(clipId);
+            this.selectedClipId = clipId;
+            const cut = (STATE.activeTimelineCuts || []).find(c => c.id === clipId);
+            if (cut && cut.track) this.selectedTrack = cut.track;
+        } else if (!multi) {
+            this.selectedClipId = null;
+        }
+        this.clearSelectedGap();
+        this.selectedGhostClipId = null;
+        STATE.emit("timelineSelectionChanged", this.selectedClipId);
+    }
+
+    /**
+     * Define uma lista de IDs de clipes selecionados.
+     */
+    selectClips(clipIds) {
+        this.selectedClipIds = new Set(clipIds);
+        this.selectedClipId = clipIds.length > 0 ? clipIds[0] : null;
+        if (this.selectedClipId) {
+            const cut = (STATE.activeTimelineCuts || []).find(c => c.id === this.selectedClipId);
+            if (cut && cut.track) this.selectedTrack = cut.track;
+        }
+        this.clearSelectedGap();
+        this.selectedGhostClipId = null;
+        STATE.emit("timelineSelectionChanged", this.selectedClipId);
+    }
+
+    /**
+     * Limpa a seleção de clipes ativa.
+     */
+    clearClipSelection() {
+        this.selectedClipIds.clear();
+        this.selectedClipId = null;
+        STATE.emit("timelineSelectionChanged", null);
+    }
+
+    /**
+     * Alterna a seleção de um clipe (Shift+Clique).
+     */
+    toggleClipSelection(clipId) {
+        if (!clipId) return;
+        if (this.selectedClipIds.has(clipId)) {
+            this.selectedClipIds.delete(clipId);
+            this.selectedClipId = this.selectedClipIds.size > 0 ? Array.from(this.selectedClipIds)[0] : null;
+        } else {
+            this.selectedClipIds.add(clipId);
+            this.selectedClipId = clipId;
+        }
+        if (this.selectedClipId) {
+            const cut = (STATE.activeTimelineCuts || []).find(c => c.id === this.selectedClipId);
+            if (cut && cut.track) this.selectedTrack = cut.track;
+        }
+        this.clearSelectedGap();
+        this.selectedGhostClipId = null;
+        STATE.emit("timelineSelectionChanged", this.selectedClipId);
+    }
+
+    /**
+     * Lift Delete de todos os clipes atualmente selecionados.
+     */
+    liftDeleteSelectedClips() {
+        if (!this.selectedClipIds || this.selectedClipIds.size === 0) {
+            if (this.selectedClipId) return this.liftDeleteClip(this.selectedClipId);
+            return false;
+        }
+        TIMELINE_HISTORY.record(() => {
+            const cuts = [...STATE.activeTimelineCuts];
+            const toDeleteIds = new Set(this.selectedClipIds);
+
+            // Inclui parceiros vinculados (link_id)
+            cuts.forEach(c => {
+                if (toDeleteIds.has(c.id) && c.link_id) {
+                    cuts.forEach(partner => {
+                        if (partner.link_id === c.link_id) toDeleteIds.add(partner.id);
+                    });
+                }
+            });
+
+            const remaining = cuts.filter(c => !toDeleteIds.has(c.id));
+            this.clearClipSelection();
+            STATE.activeTimelineCuts = remaining;
+        });
+        return true;
+    }
+
+    /**
+     * Ripple Delete de todos os clipes selecionados.
+     */
+    rippleDeleteSelectedClips() {
+        if (!this.selectedClipIds || this.selectedClipIds.size === 0) {
+            if (this.selectedClipId) return this.rippleDeleteClip(this.selectedClipId);
+            return false;
+        }
+        TIMELINE_HISTORY.record(() => {
+            const cuts = [...STATE.activeTimelineCuts];
+            const toDeleteIds = new Set(this.selectedClipIds);
+
+            cuts.forEach(c => {
+                if (toDeleteIds.has(c.id) && c.link_id) {
+                    cuts.forEach(partner => {
+                        if (partner.link_id === c.link_id) toDeleteIds.add(partner.id);
+                    });
+                }
+            });
+
+            const selectedCuts = cuts.filter(c => toDeleteIds.has(c.id));
+            if (selectedCuts.length === 0) return;
+
+            let minStart = Infinity;
+            let maxEnd = -Infinity;
+            selectedCuts.forEach(c => {
+                const start = c.timelineStartFrame || 0;
+                const dur = c.outFrame - c.inFrame;
+                if (start < minStart) minStart = start;
+                if (start + dur > maxEnd) maxEnd = start + dur;
+            });
+
+            const durationFrames = Math.max(0, maxEnd - minStart);
+            const syncTracks = this.getSyncLockedTrackIds();
+            const remaining = cuts.filter(c => !toDeleteIds.has(c.id));
+
+            remaining.forEach(c => {
+                if (syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= maxEnd - 1) {
+                    c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) - durationFrames);
+                    c.timeline_start = c.timelineStartFrame / this.fps;
+                }
+            });
+
+            this.clearClipSelection();
+            STATE.activeTimelineCuts = remaining;
+        });
+        return true;
+    }
+
+    /**
+     * Nudge (deslocamento) de 1 ou N frames para todos os clipes selecionados.
+     */
+    nudgeSelectedClips(deltaFrames) {
+        if (!this.selectedClipIds || this.selectedClipIds.size === 0) {
+            if (this.selectedClipId) {
+                const cut = STATE.activeTimelineCuts.find(c => c.id === this.selectedClipId);
+                if (cut) {
+                    const newStart = Math.max(0, (cut.timelineStartFrame || 0) + deltaFrames);
+                    TIMELINE_HISTORY.record(() => {
+                        cut.timelineStartFrame = newStart;
+                        cut.timeline_start = newStart / this.fps;
+                        STATE.activeTimelineCuts = [...STATE.activeTimelineCuts];
+                    });
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        const cuts = STATE.activeTimelineCuts;
+        const selectedCuts = cuts.filter(c => this.selectedClipIds.has(c.id));
+        if (selectedCuts.length === 0) return false;
+
+        const minStart = Math.min(...selectedCuts.map(c => c.timelineStartFrame || 0));
+        const effectiveDelta = Math.max(-minStart, deltaFrames);
+        if (effectiveDelta === 0 && deltaFrames < 0) return false;
+
+        TIMELINE_HISTORY.record(() => {
+            selectedCuts.forEach(c => {
+                c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) + effectiveDelta);
+                c.timeline_start = c.timelineStartFrame / this.fps;
+            });
+            STATE.activeTimelineCuts = [...cuts];
+        });
+        return true;
+    }
+
     selectGap(gap) {
         this.selectedGap = gap;
         if (gap) {
             this.selectedClipId = null;
+            this.selectedClipIds.clear();
             this.selectedGhostClipId = null;
         }
         STATE.emit("timelineGapSelected", this.selectedGap);
@@ -1634,6 +1898,8 @@ class TimelineHistory {
             tracks: TIMELINE_STATE.tracks,
             ghosts: TIMELINE_STATE.ghostTrack,
             selectedClipId: TIMELINE_STATE.selectedClipId,
+            selectedClipIds: Array.from(TIMELINE_STATE.selectedClipIds || []),
+            activeTool: TIMELINE_STATE.activeTool || "select",
             selectedGhostClipId: TIMELINE_STATE.selectedGhostClipId
         }));
     }
@@ -1671,6 +1937,11 @@ class TimelineHistory {
 
     _restore(snap) {
         TIMELINE_STATE.selectedClipId = snap.selectedClipId !== undefined ? snap.selectedClipId : null;
+        TIMELINE_STATE.selectedClipIds = new Set(snap.selectedClipIds || (snap.selectedClipId ? [snap.selectedClipId] : []));
+        if (snap.activeTool) {
+            TIMELINE_STATE.activeTool = snap.activeTool;
+            STATE.emit("timelineToolChanged", TIMELINE_STATE.activeTool);
+        }
         TIMELINE_STATE.selectedGhostClipId = snap.selectedGhostClipId !== undefined ? snap.selectedGhostClipId : null;
         TIMELINE_STATE.setTracks(snap.tracks);
         STATE.activeTimelineCuts = snap.cuts || [];
