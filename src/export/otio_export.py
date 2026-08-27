@@ -140,8 +140,13 @@ def generate_otio_timeline(timeline_id: int, as_uri: bool = True) -> "otio.schem
                 out_s = float(cut.get('out', 0.0))
                 start_s = float(cut.get('timeline_start', playhead_s) or playhead_s)
                 is_photo = cut.get('type') == 'photo'
+                is_text = cut.get('type') == 'text'
 
-                if is_photo:
+                if is_text:
+                    filepath = None
+                    fps = timeline_fps
+                    clip_name = f"Title: {cut.get('text', 'Texto')}"
+                elif is_photo:
                     # Foto still: referencia o arquivo original; fps = fps da timeline
                     cursor.execute("SELECT filename, filepath FROM photo WHERE id = ?", (cut.get('photo_id'),))
                     p_row = cursor.fetchone()
@@ -171,7 +176,32 @@ def generate_otio_timeline(timeline_id: int, as_uri: bool = True) -> "otio.schem
                     ))
                     playhead_s = start_s
 
-                if is_photo:
+                if is_text:
+                    dur_frames = max(1, int((out_s - in_s) * fps))
+                    media_ref = otio.schema.GeneratorReference(
+                        generator_kind="Title",
+                        parameters={"text": str(cut.get("text", "")), "subtext": str(cut.get("subtext", ""))}
+                    )
+                    clip_range = otio.opentime.TimeRange(
+                        start_time=otio.opentime.RationalTime(0, fps),
+                        duration=otio.opentime.RationalTime(dur_frames, fps)
+                    )
+                    clip = otio.schema.Clip(
+                        name=clip_name,
+                        media_reference=media_ref,
+                        source_range=clip_range
+                    )
+                    clip.metadata["capiau"] = {
+                        "type": "text",
+                        "text": cut.get("text", ""),
+                        "subtext": cut.get("subtext", ""),
+                        "fontFamily": cut.get("fontFamily", "Outfit"),
+                        "textCategory": cut.get("textCategory", "lower_third"),
+                        "keyframes": cut.get("keyframes") or {}
+                    }
+                    track.append(clip)
+                    playhead_s += (out_s - in_s)
+                elif is_photo:
                     # Still congelado: source do 0 à duração do clipe na timeline.
                     dur_frames = max(1, int((out_s - in_s) * fps))
                     media_ref = otio.schema.ExternalReference(
