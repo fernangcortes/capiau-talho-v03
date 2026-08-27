@@ -4,6 +4,7 @@ import { CapIAuAPI } from "./api.js";
 import { FaceManager } from "./faces.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, evaluateFadeCurve } from "./timelineState.js";
 import { getActiveElement } from "./workspaceManager.js";
+import { PlayerTextOverlayManager } from "./playerTextOverlay.js";
 
 // Foco global do teclado para players: "source" ou "program"
 window.activeFocusedPlayer = "source";
@@ -1177,6 +1178,7 @@ export class ProgramPlayer {
         this.jklIndex = 0;
         this.playbackSpeed = 1.0;
         this._osdTimeout = null;
+        this.textOverlayManager = new PlayerTextOverlayManager();
         this.init();
     }
 
@@ -1185,6 +1187,7 @@ export class ProgramPlayer {
     }
 
     init() {
+        this.textOverlayManager.init();
         // Redesenha e sincroniza o player sempre que a timeline muda
         STATE.on("timelineCutsUpdated", () => this.syncVideoToPlayhead());
         STATE.on("timelineRestored", () => this.syncVideoToPlayhead());
@@ -1905,6 +1908,11 @@ export class ProgramPlayer {
 
         // Atualiza overlay de transformação (Fase 4)
         this.syncTransformOverlay();
+
+        // Atualiza camada de texto e títulos com interpolação de keyframes (Fase 2)
+        if (this.textOverlayManager) {
+            this.textOverlayManager.sync();
+        }
         } catch (err) {
             console.warn("[ProgramPlayer] Erro durante syncVideoToPlayhead:", err);
         }
@@ -3045,7 +3053,7 @@ export class ProgramPlayer {
             currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame))
         );
 
-        if (!activeClip) {
+        if (!activeClip || activeClip.type === "text" || activeClip.type === "audio") {
             overlay.style.display = "none";
             overlay.innerHTML = "";
             overlay.dataset.clipId = "";

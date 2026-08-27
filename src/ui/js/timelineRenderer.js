@@ -3,6 +3,7 @@
 import { STATE } from "./state.js";
 import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode, evaluateFadeCurve } from "./timelineState.js";
 import { WaveformManager } from "./waveformManager.js";
+import { getAllKeyframeTimelineFrames } from "./keyframeEngine.js";
 
 // Paleta de cores para pistas de vídeo (V1 roxo/íris clássico NLE, V2 ciano B-roll, etc.)
 const TRACK_PALETTE = [
@@ -17,6 +18,14 @@ const AI_TRACK_STYLE = {
     bg: "rgba(34, 197, 94, 0.06)",
     clipBg: "rgba(34, 197, 94, 0.12)",
     border: "rgba(34, 197, 94, 0.6)"
+};
+
+// Pistas de texto e títulos (âmbar / dourado sutil com badge)
+const TEXT_TRACK_STYLE = {
+    bg: "rgba(245, 158, 11, 0.07)",
+    clipBg: "rgba(245, 158, 11, 0.22)",
+    border: "rgba(245, 158, 11, 0.75)",
+    wave: null
 };
 
 // Pistas de áudio (verde-esmeralda, como nos NLEs)
@@ -158,6 +167,7 @@ export class CapiauTimelineRenderer {
     /** Estilo visual de uma pista de vídeo pelo identificador ou índice entre as pistas de vídeo. */
     getTrackStyle(track) {
         if (track.kind === "ai") return AI_TRACK_STYLE;
+        if (track.kind === "text") return TEXT_TRACK_STYLE;
         if (track.kind === "audio") return AUDIO_TRACK_STYLE;
         if (track.id === "V1") return TRACK_PALETTE[0]; // roxo clássico NLE para pista principal
         if (track.id === "V2") return TRACK_PALETTE[1]; // ciano para B-Roll
@@ -790,8 +800,9 @@ export class CapiauTimelineRenderer {
 
             const style = this.getTrackStyle(lane.track);
             const laneKind = lane.track.kind || "video";
+            const isText = cut.type === "text" || laneKind === "text";
             const isPhoto = cut.type === "photo";
-            const video = isPhoto ? null : STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
+            const video = (isPhoto || isText) ? null : STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
             const photo = isPhoto ? STATE.allPhotos.find(p => p.id === cut.photo_id) : null;
 
             // Espaçamento interno vertical do clipe
@@ -802,8 +813,19 @@ export class CapiauTimelineRenderer {
             ctx.fillStyle = style.clipBg;
             ctx.fillRect(startX, clipY, width, clipHeight);
 
+            // Estilização interna de clipe de texto
+            if (isText) {
+                ctx.save();
+                ctx.fillStyle = "rgba(245, 158, 11, 0.12)";
+                ctx.fillRect(startX, clipY, width, clipHeight);
+                // Faixa colorida sutil no topo do clipe de texto
+                ctx.fillStyle = "rgba(245, 158, 11, 0.8)";
+                ctx.fillRect(startX, clipY, width, 3);
+                ctx.restore();
+            }
+
             // Miniaturas para pista de vídeo (se habilitadas na pista e globalmente)
-            if (laneKind === "video" && !isPhoto && lane.track.thumbnailsEnabled && TIMELINE_STATE.globalThumbnailsInterval > 0 && video) {
+            if (laneKind === "video" && !isPhoto && !isText && lane.track.thumbnailsEnabled && TIMELINE_STATE.globalThumbnailsInterval > 0 && video) {
                 ctx.save();
                 ctx.beginPath();
                 ctx.rect(startX, clipY, width, clipHeight);
@@ -862,7 +884,7 @@ export class CapiauTimelineRenderer {
             ctx.strokeRect(startX, clipY, width, clipHeight);
             if (isPartner) ctx.setLineDash([]);
 
-            // Waveform apenas nos clipes das pistas de áudio (fotos não têm áudio)
+            // Waveform apenas nos clipes das pistas de áudio (fotos/textos não têm áudio)
             if (laneKind === "audio") {
                 this.drawWaveform(cut, startX, clipY, width, clipHeight, style.wave, lane.track);
                 // Faixa de diagnóstico de áudio: só desenha algo depois que o
@@ -872,7 +894,17 @@ export class CapiauTimelineRenderer {
 
             // Rótulo do clipe
             let label;
-            if (isPhoto) {
+            if (isText) {
+                const cat = cut.textCategory || "text";
+                let tag = "🅃";
+                if (cat === "lower_third") tag = "🅶🄲";
+                else if (cat === "quote") tag = "❝";
+                else if (cat === "subtitle") tag = "🄻🄴🄶";
+                else if (cat === "chapter" || cat === "title") tag = "🅃🄸🅃";
+                const txt = cut.text || "Texto";
+                const sub = cut.subtext ? ` • ${cut.subtext}` : "";
+                label = `${tag} "${txt}"${sub}`;
+            } else if (isPhoto) {
                 const name = photo ? (photo.title || photo.filename) : `Foto ${cut.photo_id}`;
                 const durS = framesToSeconds(cut.outFrame - cut.inFrame, TIMELINE_STATE.fps);
                 label = `▣ ${name} [${durS.toFixed(1)}s]`;
@@ -896,6 +928,33 @@ export class CapiauTimelineRenderer {
             ctx.font = "bold 10px Inter, sans-serif";
             ctx.fillText(label, startX + 8, clipY + 14);
             ctx.restore();
+
+            // Desenho dos Marcadores de Keyframe (losangos ◆) se houver canais de animação
+            if (cut.keyframes && Object.keys(cut.keyframes).length > 0) {
+                const fps = TIMELINE_STATE.fps || 24;
+                const kfFrames = getAllKeyframeTimelineFrames(cut, fps);
+                if (kfFrames.length > 0) {
+                    const kfY = clipY + clipHeight - 7;
+                    ctx.save();
+                    kfFrames.forEach(f => {
+                        const kfX = (f - scrollLeft) * zoom;
+                        if (kfX >= startX - 2 && kfX <= startX + width + 2) {
+                            ctx.fillStyle = "rgba(6, 182, 212, 0.95)";
+                            ctx.strokeStyle = "#ffffff";
+                            ctx.lineWidth = 1;
+                            ctx.beginPath();
+                            ctx.moveTo(kfX, kfY - 4);
+                            ctx.lineTo(kfX + 4, kfY);
+                            ctx.lineTo(kfX, kfY + 4);
+                            ctx.lineTo(kfX - 4, kfY);
+                            ctx.closePath();
+                            ctx.fill();
+                            ctx.stroke();
+                        }
+                    });
+                    ctx.restore();
+                }
+            }
 
             // Desenho dos Fades In / Out, curvas e manipuladores
             this.drawClipFades(cut, startX, clipY, width, clipHeight, laneKind);

@@ -173,7 +173,7 @@ export function evaluateFadeCurve(progress, curveType = "linear", tension = 0.0)
 // --- MODELO DE PISTAS ---
 
 // Alturas por tipo de pista (px no canvas)
-export const TRACK_HEIGHTS = { ai: 44, video: 72, audio: 48 };
+export const TRACK_HEIGHTS = { ai: 44, text: 52, video: 72, audio: 48 };
 
 // Duração padrão (segundos) de uma foto (still) ao ser inserida na timeline.
 export const PHOTO_DEFAULT_DURATION = 5;
@@ -181,6 +181,7 @@ export const PHOTO_DEFAULT_DURATION = 5;
 /**
  * Pistas padrão (ordem do array = ordem visual de cima para baixo).
  * "AI" é a pista de sugestões: somente leitura, recebe os ghost clips.
+ * "T1" é a pista de títulos, legendas e GCs (sobreposta ao vídeo).
  * "V1" é magnética (ripple) por padrão; "V2" é livre.
  * "A1"/"A2" são pistas de áudio reais: recebem o áudio vinculado (link_id)
  * dos clipes de vídeo, com trims independentes (L-cuts / J-cuts).
@@ -188,6 +189,7 @@ export const PHOTO_DEFAULT_DURATION = 5;
 function defaultTracks() {
     return [
         { id: "AI", name: "IA — Sugestões", kind: "ai", volume: 1.0, muted: false, locked: true, syncLocked: false, hidden: false, thumbnailsEnabled: false },
+        { id: "T1", name: "Títulos & GCs", kind: "text", volume: 1.0, muted: false, locked: false, syncLocked: true, hidden: false, thumbnailsEnabled: false },
         { id: "V2", name: "B-Roll", kind: "video", volume: 1.0, muted: false, locked: false, syncLocked: true, hidden: false, thumbnailsEnabled: true },
         { id: "V1", name: "Falas", kind: "video", volume: 1.0, muted: false, locked: false, syncLocked: true, hidden: false, thumbnailsEnabled: true },
         { id: "A1", name: "Áudio Falas", kind: "audio", volume: 1.0, muted: false, locked: false, syncLocked: true, hidden: false, thumbnailsEnabled: false },
@@ -495,6 +497,11 @@ export class CapiauTimelineState {
         return this.tracks.find(t => t.id === id) || null;
     }
 
+    /** Pistas de texto em ordem visual (de cima para baixo). */
+    getTextTracks() {
+        return this.tracks.filter(t => t.kind === "text");
+    }
+
     /** Pistas de vídeo em ordem visual (de cima para baixo). */
     getVideoTracks() {
         return this.tracks.filter(t => t.kind === "video");
@@ -600,7 +607,39 @@ export class CapiauTimelineState {
         STATE.emit("timelineTracksChanged", this.tracks);
     }
 
-    /** Adiciona uma nova pista de vídeo (logo abaixo da pista de IA). */
+    /** Adiciona uma nova pista de texto/títulos (inserida no grupo de pistas de texto ou abaixo de IA). */
+    addTextTrack(name = null) {
+        let n = 1;
+        while (this.tracks.some(t => t.id === `T${n}`)) n++;
+        const track = {
+            id: `T${n}`,
+            name: name || `T${n} Texto`,
+            kind: "text",
+            volume: 1.0,
+            muted: false,
+            locked: false,
+            syncLocked: true,
+            magnetic: false,
+            hidden: false,
+            thumbnailsEnabled: false
+        };
+        TIMELINE_HISTORY.record(() => {
+            const textTracks = this.getTextTracks();
+            let insertIdx = 0;
+            if (textTracks.length > 0) {
+                const lastTextTrack = textTracks[textTracks.length - 1];
+                insertIdx = this.tracks.findIndex(t => t.id === lastTextTrack.id) + 1;
+            } else {
+                const aiIdx = this.tracks.findIndex(t => t.kind === "ai");
+                insertIdx = aiIdx >= 0 ? aiIdx + 1 : 0;
+            }
+            this.tracks.splice(insertIdx, 0, track);
+            STATE.emit("timelineTracksChanged", this.tracks);
+        });
+        return track;
+    }
+
+    /** Adiciona uma nova pista de vídeo (logo abaixo da pista de IA/Texto). */
     addVideoTrack(name = null) {
         let n = 1;
         while (this.tracks.some(t => t.id === `V${n}`)) n++;
@@ -1607,6 +1646,9 @@ export class CapiauTimelineState {
             const inFrame = cut.inFrame !== undefined ? cut.inFrame : secondsToFrames(cut.in, fps);
             const outFrame = cut.outFrame !== undefined ? cut.outFrame : secondsToFrames(cut.out, fps);
 
+            const isText = cut.type === "text";
+            const defaultTrack = isText ? "T1" : "V1";
+
             return {
                 ...cut,
                 id: cut.id || `cut_${index}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
@@ -1615,9 +1657,11 @@ export class CapiauTimelineState {
                 outFrame: Math.round(outFrame),
                 in: cut.in !== undefined ? cut.in : framesToSeconds(inFrame, fps),
                 out: cut.out !== undefined ? cut.out : framesToSeconds(outFrame, fps),
-                track: cut.track || "V1",
+                track: cut.track || defaultTrack,
                 timelineStartFrame: cut.timelineStartFrame,
-                link_id: cut.link_id || null
+                link_id: cut.link_id || null,
+                // Garante objeto de keyframes inicializado se aplicável
+                keyframes: cut.keyframes || {}
             };
         });
     }
@@ -1769,6 +1813,72 @@ export class CapiauTimelineState {
             STATE.activeTimelineCuts = currentCuts;
         });
         return newCut;
+    }
+
+    /**
+     * Adiciona um novo clipe de TEXTO / TÍTULO / GC à timeline.
+     * Suporta presets, keyframes paramétricos e personalização de tipografia.
+     */
+    addTextClip(textData = {}, startFrame = null, durationFrames = null, trackId = null) {
+        const fps = this.fps || 24;
+        const sFrame = startFrame !== null && startFrame !== undefined ? Math.round(startFrame) : this.playheadFrame;
+        const durFrames = durationFrames !== null && durationFrames !== undefined ? Math.max(1, Math.round(durationFrames)) : Math.round(4 * fps); // 4s padrão
+
+        let targetTrack = trackId;
+        if (!targetTrack) {
+            const textTracks = this.getTextTracks().filter(t => !t.locked && !t.hidden);
+            targetTrack = textTracks.length > 0 ? textTracks[0].id : (this.getTextTracks()[0] || {}).id;
+            if (!targetTrack) {
+                const newT = this.addTextTrack();
+                targetTrack = newT.id;
+            }
+        }
+
+        const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        const newClip = {
+            id: textData.id || `txt_${stamp}`,
+            type: "text",
+            textCategory: textData.textCategory || textData.category || "lower_third",
+            text: textData.text || "Novo Texto",
+            subtext: textData.subtext || "",
+            fontFamily: textData.fontFamily || "Outfit",
+            fontSize: textData.fontSize !== undefined ? textData.fontSize : 36,
+            fontWeight: textData.fontWeight || "700",
+            fontStyle: textData.fontStyle || "normal",
+            color: textData.color || "#ffffff",
+            backgroundColor: textData.backgroundColor || "transparent",
+            boxPadding: textData.boxPadding !== undefined ? textData.boxPadding : 8,
+            boxBorderRadius: textData.boxBorderRadius !== undefined ? textData.boxBorderRadius : 4,
+            alignment: textData.alignment || "center",
+            posX: textData.posX !== undefined ? textData.posX : 0,
+            posY: textData.posY !== undefined ? textData.posY : 360,
+            scale: textData.scale !== undefined ? textData.scale : 1.0,
+            rotation: textData.rotation !== undefined ? textData.rotation : 0,
+            opacity: textData.opacity !== undefined ? textData.opacity : 1.0,
+            tracking: textData.tracking !== undefined ? textData.tracking : 0,
+            lineHeight: textData.lineHeight !== undefined ? textData.lineHeight : 1.2,
+            keyframes: textData.keyframes ? JSON.parse(JSON.stringify(textData.keyframes)) : {},
+            track: targetTrack,
+            inFrame: 0,
+            outFrame: durFrames,
+            in: 0,
+            out: durFrames / fps,
+            timelineStartFrame: Math.max(0, sFrame),
+            timeline_start: Math.max(0, sFrame) / fps,
+            link_id: null
+        };
+
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+            currentCuts.push(newClip);
+            STATE.activeTimelineCuts = currentCuts;
+            this.selectedClipId = newClip.id;
+            this.selectedClipIds.clear();
+            this.selectedClipIds.add(newClip.id);
+            STATE.emit("timelineSelectedClipChanged", newClip.id);
+        });
+
+        return newClip;
     }
 
     /**

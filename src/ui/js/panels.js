@@ -268,6 +268,16 @@ export class PanelsManager {
         }
 
         // ── Cabeçalhos dinâmicos das pistas ──
+        const btnAddTextTrack = document.getElementById("btn-add-text-track");
+        if (btnAddTextTrack) {
+            btnAddTextTrack.addEventListener("click", () => {
+                const name = prompt("Nome da nova pista de texto/títulos:", "Títulos & GCs");
+                if (name !== null) {
+                    TIMELINE_STATE.addTextTrack(name.trim() || null);
+                }
+            });
+        }
+
         const btnAddTrack = document.getElementById("btn-add-track");
         if (btnAddTrack) {
             btnAddTrack.addEventListener("click", () => {
@@ -2040,7 +2050,9 @@ export class PanelsManager {
         return {
             otio: "O Kdenlive 25.04 ou mais recente abre este arquivo diretamente, sem conversão.",
             xml:  "XML no padrão Final Cut Pro 7, importado por Premiere, Resolve e Final Cut.",
-            edl:  "⚠️ O EDL é achatado em pista única: timelines com V1/V2 ou A1/A2 perdem a separação de trilhas."
+            edl:  "⚠️ O EDL é achatado em pista única: timelines com V1/V2 ou A1/A2 perdem a separação de trilhas.",
+            srt:  "Legendas SubRip (.srt) universais com timecodes precisos para players e YouTube.",
+            vtt:  "Legendas WebVTT (.vtt) prontas para HTML5 e plataformas de streaming."
         };
     }
 
@@ -2157,10 +2169,60 @@ export class PanelsManager {
         const tl = this.getSelectedExportTimeline();
         if (!tl) return;
 
-        const FORMATOS = ["otio", "xml", "edl"];
+        const FORMATOS = ["otio", "xml", "edl", "srt", "vtt"];
         const formato = this.exportFormatChoice ? this.exportFormatChoice.value : "otio";
         if (!FORMATOS.includes(formato)) {
             alert("Formato de exportação inválido.");
+            return;
+        }
+
+        if (formato === "srt" || formato === "vtt") {
+            const cuts = (tl.cuts && Array.isArray(tl.cuts)) ? tl.cuts : (STATE.activeTimelineCuts || []);
+            const textClips = cuts.filter(c => c.type === "text").sort((a, b) => (a.timeline_start || 0) - (b.timeline_start || 0));
+            if (textClips.length === 0) {
+                alert("Não há clipes de texto ou títulos nesta timeline para exportar legendas.");
+                return;
+            }
+
+            let content = "";
+            const formatTime = (sec, isVtt = false) => {
+                const totalMs = Math.round(sec * 1000);
+                const ms = totalMs % 1000;
+                const s = Math.floor(sec) % 60;
+                const m = Math.floor(sec / 60) % 60;
+                const h = Math.floor(sec / 3600);
+                const delim = isVtt ? "." : ",";
+                return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}${delim}${String(ms).padStart(3,'0')}`;
+            };
+
+            if (formato === "srt") {
+                content = textClips.map((c, i) => {
+                    const startS = c.timeline_start || 0;
+                    const durS = (c.out || 0) - (c.in || 0);
+                    const endS = startS + durS;
+                    const text = (c.text || "").trim() + (c.subtext ? "\n" + c.subtext.trim() : "");
+                    return `${i+1}\n${formatTime(startS)} --> ${formatTime(endS)}\n${text}\n`;
+                }).join("\n");
+            } else {
+                content = "WEBVTT\n\n" + textClips.map((c, i) => {
+                    const startS = c.timeline_start || 0;
+                    const durS = (c.out || 0) - (c.in || 0);
+                    const endS = startS + durS;
+                    const text = (c.text || "").trim() + (c.subtext ? "\n" + c.subtext.trim() : "");
+                    return `${i+1}\n${formatTime(startS, true)} --> ${formatTime(endS, true)}\n${text}\n`;
+                }).join("\n");
+            }
+
+            const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${tl.name || 'timeline'}_legendas.${formato}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            this.closeExportModal();
             return;
         }
 
@@ -2989,6 +3051,7 @@ export class PanelsManager {
                 });
             } else {
                 const isAudio = track.kind === "audio";
+                const isText = track.kind === "text";
                 const muteIcon = track.muted
                     ? `<i class="fa-solid fa-volume-xmark" style="color: var(--color-rose);"></i>`
                     : `<i class="fa-solid fa-volume-high"></i>`;
@@ -3005,13 +3068,15 @@ export class PanelsManager {
                     ? `<i class="fa-solid fa-image" style="color: var(--color-cyan);"></i>`
                     : `<i class="fa-regular fa-image" style="color: var(--text-secondary); opacity: 0.5;"></i>`;
 
-                // Vídeo é só imagem; áudio tem volume/mute
-                const kindIcon = isAudio
-                    ? `<i class="fa-solid fa-music" style="font-size: 8px; color: var(--color-emerald, #10b981);"></i> `
-                    : "";
+                let kindIcon = "";
+                if (isAudio) {
+                    kindIcon = `<i class="fa-solid fa-music" style="font-size: 8px; color: var(--color-emerald, #10b981);"></i> `;
+                } else if (isText) {
+                    kindIcon = `<i class="fa-solid fa-font" style="font-size: 8px; color: #f59e0b;"></i> `;
+                }
                 const muteBtn = isAudio ? `<button class="btn-track-mute btn-track-action" title="Mutar Trilha" style="color: var(--text-secondary); font-size: 10px;">${muteIcon}</button>` : "";
                 const volumeSlider = isAudio ? `<input type="range" class="slider-track-volume" min="0" max="1" step="0.1" value="${track.volume}" style="width: 100%; height: 3px; accent-color: var(--color-cyan); cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">` : "";
-                const thumbBtn = isAudio ? "" : `<button class="btn-track-thumbnails btn-track-action" title="${track.thumbnailsEnabled ? 'Desativar miniaturas na pista' : 'Ativar miniaturas na pista'}" style="font-size: 9px;">${thumbIcon}</button>`;
+                const thumbBtn = (isAudio || isText) ? "" : `<button class="btn-track-thumbnails btn-track-action" title="${track.thumbnailsEnabled ? 'Desativar miniaturas na pista' : 'Ativar miniaturas na pista'}" style="font-size: 9px;">${thumbIcon}</button>`;
 
                 if (h >= 40) {
                     row.innerHTML = `

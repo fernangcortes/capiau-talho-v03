@@ -2,6 +2,19 @@
 import { STATE } from "./state.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds, framesToTimecode, evaluateFadeCurve, FADE_CURVE_PRESETS } from "./timelineState.js";
 import { setTabVisibility } from "./tabsCustomization.js";
+import {
+    hasKeyframes,
+    getKeyframeAt,
+    getPrevKeyframeTime,
+    getNextKeyframeTime,
+    addOrUpdateKeyframe,
+    removeKeyframe,
+    toggleKeyframing,
+    evaluateClipProperty,
+    EASING_OPTIONS
+} from "./keyframeEngine.js";
+import { FONT_MODAL } from "./fontCatalogModal.js";
+import { CURATED_FONTS, ensureFontLoaded } from "./fontManager.js";
 
 // Velocidades de render MEDIDAS nesta máquina (NÃO estimadas):
 //   - cadeia ffmpeg .... 31 a 44x tempo real (22 min de áudio → ~43 s de render)
@@ -2322,7 +2335,9 @@ export class CapiauTimelineInteraction {
     }
 
     _defaultAdjustmentOrder(mediaType) {
-        if (mediaType === "photo") {
+        if (mediaType === "text") {
+            return ["text_style", "transform", "fades"];
+        } else if (mediaType === "photo") {
             return ["transform", "crop", "ken_burns", "color", "fades"];
         } else if (mediaType === "audio") {
             return ["volume", "fades", "audio_eq", "audio_dynamics", "audio_diag", "audio_render", "audio_render_resultado"];
@@ -3057,6 +3072,55 @@ export class CapiauTimelineInteraction {
         }
     }
 
+    _escapeHTML(str) {
+        if (!str) return "";
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    _renderKeyframeControl(clip, prop, relTimeS) {
+        if (!clip) return "";
+        const active = hasKeyframes(clip, prop);
+        const atKf = getKeyframeAt(clip, prop, relTimeS);
+        const hasPrev = getPrevKeyframeTime(clip, prop, relTimeS) !== null;
+        const hasNext = getNextKeyframeTime(clip, prop, relTimeS) !== null;
+
+        const stopwatchClass = active ? "btn-kf-stopwatch active" : "btn-kf-stopwatch";
+        const diamondIcon = atKf ? "fa-solid fa-diamond" : "fa-regular fa-diamond";
+        const diamondColor = atKf ? "color: var(--color-cyan);" : (active ? "color: rgba(6, 182, 212, 0.5);" : "color: var(--text-muted);");
+
+        let easingSelect = "";
+        if (atKf) {
+            const currentEasing = atKf.easing || "linear";
+            const options = EASING_OPTIONS.map(opt => `<option value="${opt.id}" ${opt.id === currentEasing ? 'selected' : ''}>${opt.label}</option>`).join("");
+            easingSelect = `<select class="kf-easing-select" data-kf-easing-prop="${prop}" title="Curva de interpolação">${options}</select>`;
+        }
+
+        return `
+            <div class="kf-controls" data-prop="${prop}">
+                <button class="${stopwatchClass}" data-kf-action="toggle" data-prop="${prop}" title="${active ? 'Desativar keyframes nesta propriedade' : 'Ativar animação por keyframes'}">
+                    <i class="fa-solid fa-stopwatch"></i>
+                </button>
+                ${active ? `
+                    <button class="btn-kf-nav prev" data-kf-action="prev" data-prop="${prop}" ${hasPrev ? '' : 'disabled'} title="Keyframe anterior">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <button class="btn-kf-diamond" data-kf-action="diamond" data-prop="${prop}" title="${atKf ? 'Remover keyframe neste instante' : 'Adicionar keyframe neste instante'}" style="${diamondColor}">
+                        <i class="${diamondIcon}"></i>
+                    </button>
+                    <button class="btn-kf-nav next" data-kf-action="next" data-prop="${prop}" ${hasNext ? '' : 'disabled'} title="Próximo keyframe">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                    ${easingSelect}
+                ` : ''}
+            </div>
+        `;
+    }
+
     renderAdjustmentsPanel(clip) {
         const container = this.canvas.ownerDocument.getElementById("adjustments-panel-content");
         if (!container) return;
@@ -3331,9 +3395,166 @@ export class CapiauTimelineInteraction {
             ${batchBarHTML}
         `;
 
-        const mediaType = isPhoto ? "photo" : (isAudioTrack ? "audio" : "video");
+        const isText = clip.type === "text";
+        const mediaType = isText ? "text" : (isPhoto ? "photo" : (isAudioTrack ? "audio" : "video"));
         const sectionOrder = this._getAdjustmentSectionOrder(mediaType);
-        let audioDiagHTML = "", audioEqHTML = "", audioDynamicsHTML = "", audioRenderHTML = "", audioResultadoHTML = "", volumeHTML = "";
+        let audioDiagHTML = "", audioEqHTML = "", audioDynamicsHTML = "", audioRenderHTML = "", audioResultadoHTML = "", volumeHTML = "", textHTML = "";
+
+        const fps = TIMELINE_STATE.fps || 24;
+        const clipStartFrame = clip.timelineStartFrame !== undefined ? clip.timelineStartFrame : Math.round((clip.timeline_start || 0) * fps);
+        const relTimeS = Math.max(0, (TIMELINE_STATE.playheadFrame - clipStartFrame) / fps);
+
+        if (isText) {
+            const isTextOpen = states["text_style"] !== false;
+            const fontFamily = clip.fontFamily || "Outfit";
+            const fontSize = clip.fontSize !== undefined ? clip.fontSize : 36;
+            const tracking = clip.tracking !== undefined ? clip.tracking : 0;
+            const color = clip.color || "#ffffff";
+            const bgColor = clip.backgroundColor || "#000000";
+            const alignment = clip.alignment || "center";
+            const category = clip.textCategory || "lower_third";
+
+            const fontOptions = CURATED_FONTS.map(f => `<option value="${f.id}" ${f.id === fontFamily ? 'selected' : ''}>${f.name} (${f.mood})</option>`).join("");
+
+            let bgMode = clip.bgMode || "glass_dark";
+            let bgColorHex = "#000000";
+            let bgOpacityPct = 75;
+            const currentBg = clip.backgroundColor;
+
+            if (!currentBg || currentBg === "transparent" || currentBg === "#00000000") {
+                bgMode = "transparent";
+                bgOpacityPct = 0;
+            } else if (typeof currentBg === "string" && currentBg.startsWith("rgba")) {
+                const m = currentBg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+                if (m) {
+                    const r = parseInt(m[1]).toString(16).padStart(2, "0");
+                    const g = parseInt(m[2]).toString(16).padStart(2, "0");
+                    const b = parseInt(m[3]).toString(16).padStart(2, "0");
+                    bgColorHex = `#${r}${g}${b}`;
+                    const alpha = m[4] !== undefined ? parseFloat(m[4]) : 0.75;
+                    bgOpacityPct = Math.round(alpha * 100);
+                    if (alpha >= 0.98) bgMode = "solid";
+                    else if (bgColorHex === "#ffffff") bgMode = "glass_light";
+                    else bgMode = "glass_dark";
+                }
+            } else if (typeof currentBg === "string" && currentBg.startsWith("#")) {
+                bgColorHex = currentBg.slice(0, 7);
+                bgOpacityPct = 100;
+                bgMode = "solid";
+            }
+            if (clip.bgMode) bgMode = clip.bgMode;
+
+            const boxRadius = clip.boxBorderRadius !== undefined ? clip.boxBorderRadius : 4;
+            const boxPad = clip.boxPadding !== undefined ? clip.boxPadding : 8;
+
+            textHTML = `
+                <div class="adjustments-section" data-section-id="text_style">
+                    <div class="adjustments-section-header" data-section-toggle="text_style">
+                        <div class="adj-header-left">
+                            <span class="adj-drag-handle" title="Arraste para reordenar"><i class="fa-solid fa-grip-vertical"></i></span>
+                            <i class="fa-solid fa-chevron-right adj-collapse-chevron ${isTextOpen ? 'open' : ''}"></i>
+                            <span class="adj-title-text" style="color: #f59e0b;"><i class="fa-solid fa-font"></i> Tipografia & Conteúdo</span>
+                        </div>
+                        <div class="adj-header-actions" onclick="event.stopPropagation()">
+                            <button id="btn-open-font-catalog" class="lib-action-btn" title="Catálogo de Fontes, Specimen & Moods" style="color:#f59e0b; padding:2px 6px; font-size:10px;"><i class="fa-solid fa-swatchbook"></i> Fontes</button>
+                            <button id="btn-open-brandkit-modal" class="lib-action-btn" title="Brand Kit do Projeto" style="color:var(--color-cyan); padding:2px 6px; font-size:10px;"><i class="fa-solid fa-palette"></i> Brand Kit</button>
+                        </div>
+                    </div>
+                    <div class="adjustments-section-body" style="${isTextOpen ? '' : 'display:none;'}">
+                        <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;">
+                            <label style="font-size: 10px; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Texto Principal</label>
+                            <textarea data-text-prop="text" rows="2" placeholder="Digite o texto..." style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 6px; font-size: 12px; color: #fff; outline: none; font-family: inherit; resize: vertical;">${this._escapeHTML(clip.text || '')}</textarea>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;">
+                            <label style="font-size: 10px; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Subtexto / Cargo (GC)</label>
+                            <input type="text" data-text-prop="subtext" value="${this._escapeHTML(clip.subtext || '')}" placeholder="Ex: Diretora de Fotografia" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 4px 6px; font-size: 11px; color: #fff; outline: none;">
+                        </div>
+                        <div class="adjustments-row" data-control-id="text_category">
+                            <label>Categoria</label>
+                            <div class="control-wrap">
+                                <select data-text-prop="textCategory" class="nle-select" style="flex: 1; padding: 2px 4px; font-size: 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
+                                    <option value="lower_third" ${category === 'lower_third' ? 'selected' : ''}>Lower Third (GC)</option>
+                                    <option value="quote" ${category === 'quote' ? 'selected' : ''}>Citação / Aforismo</option>
+                                    <option value="subtitle" ${category === 'subtitle' ? 'selected' : ''}>Legenda Dinâmica</option>
+                                    <option value="chapter" ${category === 'chapter' ? 'selected' : ''}>Cartela de Capítulo</option>
+                                    <option value="title" ${category === 'title' ? 'selected' : ''}>Título Livre</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="adjustments-row" data-control-id="font_family">
+                            <label>Fonte</label>
+                            <div class="control-wrap" style="display:flex; gap:4px; align-items:center; flex:1;">
+                                <select data-text-prop="fontFamily" class="nle-select" style="flex: 1; padding: 2px 4px; font-size: 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
+                                    ${fontOptions}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="adjustments-row has-keyframing" data-control-id="font_size">
+                            <label>Tamanho</label>
+                            <div class="control-wrap" style="display:flex; align-items:center; gap:4px; flex:1;">
+                                <input type="range" data-text-prop="fontSize" min="14" max="120" value="${fontSize}" style="flex:1;">
+                                <span class="value-disp" style="min-width:35px; text-align:right;">${fontSize}px</span>
+                                ${this._renderKeyframeControl(clip, "fontSize", relTimeS)}
+                            </div>
+                        </div>
+                        <div class="adjustments-row has-keyframing" data-control-id="tracking">
+                            <label>Espaçamento</label>
+                            <div class="control-wrap" style="display:flex; align-items:center; gap:4px; flex:1;">
+                                <input type="range" data-text-prop="tracking" min="-5" max="30" step="0.5" value="${tracking}" style="flex:1;">
+                                <span class="value-disp" style="min-width:35px; text-align:right;">${tracking}px</span>
+                                ${this._renderKeyframeControl(clip, "tracking", relTimeS)}
+                            </div>
+                        </div>
+                        <div class="adjustments-row" data-control-id="alignment">
+                            <label>Alinhamento</label>
+                            <div style="display:flex; gap:4px;">
+                                <button class="lib-action-btn ${alignment === 'left' ? 'active' : ''}" data-text-align="left" style="padding:2px 8px; font-size:10px;"><i class="fa-solid fa-align-left"></i></button>
+                                <button class="lib-action-btn ${alignment === 'center' ? 'active' : ''}" data-text-align="center" style="padding:2px 8px; font-size:10px;"><i class="fa-solid fa-align-center"></i></button>
+                                <button class="lib-action-btn ${alignment === 'right' ? 'active' : ''}" data-text-align="right" style="padding:2px 8px; font-size:10px;"><i class="fa-solid fa-align-right"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- ── CONTROLES AVANÇADOS DE FUNDO & TRANSLUCIDEZ ── -->
+                        <div class="adjustments-row" data-control-id="text_bg_mode">
+                            <label>Estilo do Fundo</label>
+                            <div class="control-wrap" style="flex:1;">
+                                <select data-text-bg-mode class="nle-select" style="width:100%; padding:2px 4px; font-size:10px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); border-radius:4px; color:#fff;">
+                                    <option value="transparent" ${bgMode === 'transparent' ? 'selected' : ''}>Sem Fundo (Transparente)</option>
+                                    <option value="glass_dark" ${bgMode === 'glass_dark' ? 'selected' : ''}>Translúcido Escuro (Glassmorphism)</option>
+                                    <option value="glass_light" ${bgMode === 'glass_light' ? 'selected' : ''}>Translúcido Claro (Frosted)</option>
+                                    <option value="solid" ${bgMode === 'solid' ? 'selected' : ''}>Sólido (Opaco)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="adjustments-row" data-control-id="text_bg_opacity" style="${bgMode === 'transparent' ? 'display:none;' : ''}">
+                            <label>Opacidade Fundo</label>
+                            <div class="control-wrap" style="display:flex; align-items:center; gap:4px; flex:1;">
+                                <input type="range" data-text-bg-opacity min="5" max="100" value="${bgOpacityPct}" style="flex:1;">
+                                <span class="value-disp" style="min-width:35px; text-align:right;">${bgOpacityPct}%</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row" data-control-id="text_box_radius" style="${bgMode === 'transparent' ? 'display:none;' : ''}">
+                            <label>Arredondamento</label>
+                            <div class="control-wrap" style="display:flex; align-items:center; gap:4px; flex:1;">
+                                <input type="range" data-text-prop="boxBorderRadius" min="0" max="24" value="${boxRadius}" style="flex:1;">
+                                <span class="value-disp" style="min-width:35px; text-align:right;">${boxRadius}px</span>
+                            </div>
+                        </div>
+                        <div class="adjustments-row" data-control-id="text_colors">
+                            <label>Cores</label>
+                            <div style="display:flex; gap:12px; align-items:center;">
+                                <label style="font-size:9px; color:var(--text-muted); display:flex; align-items:center; gap:4px;">
+                                    Texto: <input type="color" data-text-prop="color" value="${color.length === 7 ? color : '#ffffff'}" style="width:20px; height:20px; border:none; background:transparent; cursor:pointer; padding:0;">
+                                </label>
+                                <label style="font-size:9px; color:var(--text-muted); display:flex; align-items:center; gap:4px; ${bgMode === 'transparent' ? 'opacity:0.35; pointer-events:none;' : ''}">
+                                    Fundo: <input type="color" data-text-bg-color value="${bgColorHex}" style="width:20px; height:20px; border:none; background:transparent; cursor:pointer; padding:0;">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
 
         if (isAudioTrack || partnerAudioClip) {
             this.audioDiagCache = this.audioDiagCache || {};
@@ -3571,39 +3792,44 @@ export class CapiauTimelineInteraction {
                     </div>
                 </div>
                 <div class="adjustments-section-body" style="${isTfOpen ? '' : 'display:none;'} opacity:${tfDisabled ? 0.4 : 1}; pointer-events:${tfDisabled ? 'none' : 'auto'}; transition:opacity 0.2s;">
-                    <div class="adjustments-row" data-control-id="x">
+                    <div class="adjustments-row has-keyframing" data-control-id="x">
                         <label>Posição X</label>
-                        <div class="control-wrap">
-                            <input type="range" data-prop="x" min="-100" max="100" value="${roundVal(x)}" data-tooltip="Posição X: ${roundVal(x)}%">
-                            <span class="value-disp">${roundVal(x)}%</span>
+                        <div class="control-wrap" style="display:flex; align-items:center; gap:4px; flex:1;">
+                            <input type="range" data-prop="x" min="-100" max="100" value="${roundVal(x)}" data-tooltip="Posição X: ${roundVal(x)}%" style="flex:1;">
+                            <span class="value-disp" style="min-width:35px; text-align:right;">${roundVal(x)}%</span>
+                            ${this._renderKeyframeControl(clip, "x", relTimeS)}
                         </div>
                     </div>
-                    <div class="adjustments-row" data-control-id="y">
+                    <div class="adjustments-row has-keyframing" data-control-id="y">
                         <label>Posição Y</label>
-                        <div class="control-wrap">
-                            <input type="range" data-prop="y" min="-100" max="100" value="${roundVal(y)}" data-tooltip="Posição Y: ${roundVal(y)}%">
-                            <span class="value-disp">${roundVal(y)}%</span>
+                        <div class="control-wrap" style="display:flex; align-items:center; gap:4px; flex:1;">
+                            <input type="range" data-prop="y" min="-100" max="100" value="${roundVal(y)}" data-tooltip="Posição Y: ${roundVal(y)}%" style="flex:1;">
+                            <span class="value-disp" style="min-width:35px; text-align:right;">${roundVal(y)}%</span>
+                            ${this._renderKeyframeControl(clip, "y", relTimeS)}
                         </div>
                     </div>
-                    <div class="adjustments-row" data-control-id="scale">
+                    <div class="adjustments-row has-keyframing" data-control-id="scale">
                         <label>Escala</label>
-                        <div class="control-wrap">
-                            <input type="range" data-prop="scale" min="50" max="300" value="${roundVal(scale * 100)}" data-tooltip="Escala: ${roundVal(scale * 100)}%">
-                            <span class="value-disp">${roundVal(scale * 100)}%</span>
+                        <div class="control-wrap" style="display:flex; align-items:center; gap:4px; flex:1;">
+                            <input type="range" data-prop="scale" min="50" max="300" value="${roundVal(scale * 100)}" data-tooltip="Escala: ${roundVal(scale * 100)}%" style="flex:1;">
+                            <span class="value-disp" style="min-width:35px; text-align:right;">${roundVal(scale * 100)}%</span>
+                            ${this._renderKeyframeControl(clip, "scale", relTimeS)}
                         </div>
                     </div>
-                    <div class="adjustments-row" data-control-id="rotation">
+                    <div class="adjustments-row has-keyframing" data-control-id="rotation">
                         <label>Rotação</label>
-                        <div class="control-wrap">
-                            <input type="range" data-prop="rotation" min="-180" max="180" value="${roundVal(rotation)}" data-tooltip="Rotação: ${roundVal(rotation)}°">
-                            <span class="value-disp">${roundVal(rotation)}°</span>
+                        <div class="control-wrap" style="display:flex; align-items:center; gap:4px; flex:1;">
+                            <input type="range" data-prop="rotation" min="-180" max="180" value="${roundVal(rotation)}" data-tooltip="Rotação: ${roundVal(rotation)}°" style="flex:1;">
+                            <span class="value-disp" style="min-width:35px; text-align:right;">${roundVal(rotation)}°</span>
+                            ${this._renderKeyframeControl(clip, "rotation", relTimeS)}
                         </div>
                     </div>
-                    <div class="adjustments-row" data-control-id="opacity">
+                    <div class="adjustments-row has-keyframing" data-control-id="opacity">
                         <label>Opacidade</label>
-                        <div class="control-wrap">
-                            <input type="range" data-prop="opacity" min="0" max="100" value="${roundVal(opacity * 100)}" data-tooltip="Opacidade: ${roundVal(opacity * 100)}%">
-                            <span class="value-disp">${roundVal(opacity * 100)}%</span>
+                        <div class="control-wrap" style="display:flex; align-items:center; gap:4px; flex:1;">
+                            <input type="range" data-prop="opacity" min="0" max="100" value="${roundVal(opacity * 100)}" data-tooltip="Opacidade: ${roundVal(opacity * 100)}%" style="flex:1;">
+                            <span class="value-disp" style="min-width:35px; text-align:right;">${roundVal(opacity * 100)}%</span>
+                            ${this._renderKeyframeControl(clip, "opacity", relTimeS)}
                         </div>
                     </div>
                 </div>
@@ -3822,7 +4048,8 @@ export class CapiauTimelineInteraction {
 
         // Renderiza as seções na ordem definida pelo usuário
         sectionOrder.forEach(secId => {
-            if (secId === "transform" && !isAudioTrack) html += transformHTML;
+            if (secId === "text_style" && textHTML) html += textHTML;
+            else if (secId === "transform" && !isAudioTrack) html += transformHTML;
             else if (secId === "crop" && !isAudioTrack) html += cropHTML;
             else if (secId === "ken_burns" && isPhoto) html += kbHTML;
             else if (secId === "color" && !isAudioTrack) html += colorHTML;
@@ -5656,6 +5883,254 @@ export class CapiauTimelineInteraction {
         const clip = STATE.activeTimelineCuts.find(c => c.id === clipId);
         if (!clip) return;
 
+        const fps = TIMELINE_STATE.fps || 24;
+        const clipStartFrame = clip.timelineStartFrame !== undefined ? clip.timelineStartFrame : Math.round((clip.timeline_start || 0) * fps);
+        const relTimeS = Math.max(0, (TIMELINE_STATE.playheadFrame - clipStartFrame) / fps);
+
+        // ── Botões de Ação de Keyframes (Toggle Stopwatch, Add/Remove Diamond, Prev/Next) ──
+        container.querySelectorAll("button[data-kf-action]").forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const action = btn.dataset.kfAction;
+                const prop = btn.dataset.prop;
+                TIMELINE_HISTORY.begin();
+
+                if (action === "toggle") {
+                    const cuts = [...STATE.activeTimelineCuts];
+                    const targetClip = cuts.find(c => c.id === clipId);
+                    if (targetClip) {
+                        let currentVal = 0;
+                        if (prop === "scale") {
+                            const tf = (targetClip.effects || []).find(ef => ef.type === "transform");
+                            currentVal = tf && tf.scale !== undefined ? tf.scale : 1.0;
+                        } else if (prop === "opacity") {
+                            const tf = (targetClip.effects || []).find(ef => ef.type === "transform");
+                            currentVal = tf && tf.opacity !== undefined ? tf.opacity : 1.0;
+                        } else if (prop === "x" || prop === "y" || prop === "rotation") {
+                            const tf = (targetClip.effects || []).find(ef => ef.type === "transform");
+                            currentVal = tf && tf[prop] !== undefined ? tf[prop] : 0;
+                        } else if (targetClip[prop] !== undefined) {
+                            currentVal = targetClip[prop];
+                        }
+                        toggleKeyframing(targetClip, prop, currentVal, relTimeS);
+                        STATE.activeTimelineCuts = cuts;
+                        TIMELINE_HISTORY.commit();
+                        this.renderAdjustmentsPanel(targetClip);
+                        if (this.renderer) this.renderer.requestRedraw();
+                    }
+                } else if (action === "diamond") {
+                    const cuts = [...STATE.activeTimelineCuts];
+                    const targetClip = cuts.find(c => c.id === clipId);
+                    if (targetClip) {
+                        const atKf = getKeyframeAt(targetClip, prop, relTimeS);
+                        if (atKf) {
+                            removeKeyframe(targetClip, prop, relTimeS);
+                        } else {
+                            let currentVal = evaluateClipProperty(targetClip, prop, relTimeS, null);
+                            if (currentVal === null) {
+                                if (prop === "scale" || prop === "opacity") currentVal = 1.0;
+                                else currentVal = targetClip[prop] !== undefined ? targetClip[prop] : 0;
+                            }
+                            addOrUpdateKeyframe(targetClip, prop, relTimeS, currentVal, "linear");
+                        }
+                        STATE.activeTimelineCuts = cuts;
+                        TIMELINE_HISTORY.commit();
+                        this.renderAdjustmentsPanel(targetClip);
+                        if (this.renderer) this.renderer.requestRedraw();
+                    }
+                } else if (action === "prev") {
+                    const prevTime = getPrevKeyframeTime(clip, prop, relTimeS);
+                    if (prevTime !== null) {
+                        const targetFrame = clipStartFrame + Math.round(prevTime * fps);
+                        TIMELINE_STATE.setPlayheadFrame(targetFrame);
+                    }
+                } else if (action === "next") {
+                    const nextTime = getNextKeyframeTime(clip, prop, relTimeS);
+                    if (nextTime !== null) {
+                        const targetFrame = clipStartFrame + Math.round(nextTime * fps);
+                        TIMELINE_STATE.setPlayheadFrame(targetFrame);
+                    }
+                }
+            };
+        });
+
+        // ── Dropdowns de Curva Easing de Keyframes ──
+        container.querySelectorAll("select[data-kf-easing-prop]").forEach(sel => {
+            sel.onchange = (e) => {
+                e.stopPropagation();
+                const prop = sel.dataset.kfEasingProp;
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === clipId);
+                if (targetClip) {
+                    const atKf = getKeyframeAt(targetClip, prop, relTimeS);
+                    if (atKf) {
+                        atKf.easing = sel.value;
+                        STATE.activeTimelineCuts = cuts;
+                        TIMELINE_HISTORY.commit();
+                        if (this.renderer) this.renderer.requestRedraw();
+                    }
+                }
+            };
+        });
+
+        // ── Propriedades de Tipografia & Texto ──
+        container.querySelectorAll("[data-text-prop]").forEach(input => {
+            const prop = input.dataset.textProp;
+            const eventName = (input.tagName === "TEXTAREA" || input.tagName === "INPUT") ? "input" : "change";
+
+            input.addEventListener(eventName, () => {
+                TIMELINE_HISTORY.begin();
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === clipId);
+                if (targetClip) {
+                    let val = input.value;
+                    if (input.type === "range" || input.type === "number") {
+                        val = parseFloat(val);
+                        const disp = input.nextElementSibling;
+                        if (disp && disp.classList.contains("value-disp")) {
+                            disp.textContent = `${val}px`;
+                        }
+                    }
+                    targetClip[prop] = val;
+
+                    if (hasKeyframes(targetClip, prop)) {
+                        addOrUpdateKeyframe(targetClip, prop, relTimeS, val, "linear");
+                    }
+
+                    STATE.activeTimelineCuts = cuts;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+            });
+
+            if (eventName === "input") {
+                input.addEventListener("change", () => {
+                    TIMELINE_HISTORY.commit();
+                });
+            }
+        });
+
+        container.querySelectorAll("button[data-text-align]").forEach(btn => {
+            btn.onclick = () => {
+                const align = btn.dataset.textAlign;
+                TIMELINE_HISTORY.begin();
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === clipId);
+                if (targetClip) {
+                    targetClip.alignment = align;
+                    STATE.activeTimelineCuts = cuts;
+                    TIMELINE_HISTORY.commit();
+                    this.renderAdjustmentsPanel(targetClip);
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+            };
+        });
+
+        // ── Controles de Fundo (Modo, Opacidade e Cor) ──
+        const selectBgMode = container.querySelector("select[data-text-bg-mode]");
+        if (selectBgMode) {
+            selectBgMode.onchange = () => {
+                const mode = selectBgMode.value;
+                TIMELINE_HISTORY.begin();
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === clipId);
+                if (targetClip) {
+                    targetClip.bgMode = mode;
+                    if (mode === "transparent") {
+                        targetClip.backgroundColor = "transparent";
+                    } else if (mode === "glass_dark") {
+                        targetClip.backgroundColor = "rgba(10, 8, 16, 0.75)";
+                    } else if (mode === "glass_light") {
+                        targetClip.backgroundColor = "rgba(255, 255, 255, 0.25)";
+                    } else if (mode === "solid") {
+                        const hex = targetClip.bgColorHex || "#000000";
+                        targetClip.backgroundColor = hex;
+                    }
+                    STATE.activeTimelineCuts = cuts;
+                    TIMELINE_HISTORY.commit();
+                    this.renderAdjustmentsPanel(targetClip);
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+            };
+        }
+
+        const inputBgOpacity = container.querySelector("input[data-text-bg-opacity]");
+        if (inputBgOpacity) {
+            inputBgOpacity.oninput = () => {
+                const pct = parseInt(inputBgOpacity.value);
+                const disp = inputBgOpacity.nextElementSibling;
+                if (disp && disp.classList.contains("value-disp")) {
+                    disp.textContent = `${pct}%`;
+                }
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === clipId);
+                if (targetClip) {
+                    const alpha = pct / 100;
+                    let hex = targetClip.bgColorHex || "#000000";
+                    if (typeof targetClip.backgroundColor === "string" && targetClip.backgroundColor.startsWith("#")) {
+                        hex = targetClip.backgroundColor;
+                    }
+                    let clean = hex.replace("#", "");
+                    if (clean.length === 3) clean = clean.split("").map(c => c + c).join("");
+                    const r = parseInt(clean.slice(0, 2), 16) || 0;
+                    const g = parseInt(clean.slice(2, 4), 16) || 0;
+                    const b = parseInt(clean.slice(4, 6), 16) || 0;
+                    targetClip.backgroundColor = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                    targetClip.bgMode = alpha >= 0.98 ? "solid" : "glass_dark";
+                    STATE.activeTimelineCuts = cuts;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+            };
+            inputBgOpacity.onchange = () => {
+                TIMELINE_HISTORY.commit();
+            };
+        }
+
+        const inputBgColor = container.querySelector("input[data-text-bg-color]");
+        if (inputBgColor) {
+            inputBgColor.oninput = () => {
+                const hex = inputBgColor.value;
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === clipId);
+                if (targetClip) {
+                    targetClip.bgColorHex = hex;
+                    let clean = hex.replace("#", "");
+                    if (clean.length === 3) clean = clean.split("").map(c => c + c).join("");
+                    const r = parseInt(clean.slice(0, 2), 16) || 0;
+                    const g = parseInt(clean.slice(2, 4), 16) || 0;
+                    const b = parseInt(clean.slice(4, 6), 16) || 0;
+
+                    let alpha = 0.75;
+                    if (typeof targetClip.backgroundColor === "string" && targetClip.backgroundColor.startsWith("rgba")) {
+                        const m = targetClip.backgroundColor.match(/rgba?\(\d+,\s*\d+,\s*\d+,\s*([\d.]+)\)/);
+                        if (m) alpha = parseFloat(m[1]);
+                    } else if (targetClip.bgMode === "solid") {
+                        alpha = 1.0;
+                    }
+                    targetClip.backgroundColor = alpha >= 0.98 ? hex : `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                    STATE.activeTimelineCuts = cuts;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+            };
+            inputBgColor.onchange = () => {
+                TIMELINE_HISTORY.commit();
+            };
+        }
+
+        // ── Botões de Abertura do Catálogo de Fontes & Brand Kit ──
+        const btnOpenFontCat = container.querySelector("#btn-open-font-catalog");
+        if (btnOpenFontCat) {
+            btnOpenFontCat.onclick = () => {
+                FONT_MODAL.open(clipId, "catalog");
+            };
+        }
+
+        const btnOpenBrandKit = container.querySelector("#btn-open-brandkit-modal");
+        if (btnOpenBrandKit) {
+            btnOpenBrandKit.onclick = () => {
+                FONT_MODAL.open(clipId, "brandkit");
+            };
+        }
+
         // Diagnóstico de áudio (somente leitura: não cria efeito no clipe e não dispara autosave)
         const diagRunBtn = container.querySelector("#adj-audio-diag-run");
         if (diagRunBtn) {
@@ -5885,8 +6360,12 @@ export class CapiauTimelineInteraction {
                         tc.effects.push(tf);
                     }
                     tf[prop] = val;
+                    if (hasKeyframes(tc, prop)) {
+                        addOrUpdateKeyframe(tc, prop, relTimeS, val, "linear");
+                    }
                 });
                 STATE.activeTimelineCuts = cuts;
+                if (this.renderer) this.renderer.requestRedraw();
             };
 
             slider.onchange = () => {
@@ -5894,6 +6373,13 @@ export class CapiauTimelineInteraction {
                 if (prop === "scale") val = val / 100;
                 else if (prop === "opacity") val = val / 100;
                 this.setClipTransform(clipId, prop, val);
+                const cuts = [...STATE.activeTimelineCuts];
+                const targetClip = cuts.find(c => c.id === clipId);
+                if (targetClip && hasKeyframes(targetClip, prop)) {
+                    addOrUpdateKeyframe(targetClip, prop, relTimeS, val, "linear");
+                    STATE.activeTimelineCuts = cuts;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
                 TIMELINE_HISTORY.commit();
                 const pp = (window.player && window.player.programPlayer) ? window.player.programPlayer : null;
                 if (pp && typeof pp.hideSnapGuides === "function") {

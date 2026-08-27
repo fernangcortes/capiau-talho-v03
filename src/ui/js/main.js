@@ -13,6 +13,8 @@ import { initAutosave, triggerAutosave } from "./timelineAutosave.js";
 import { initExportVideoPanel } from "./exportVideo.js";
 import { LOG_MANAGER } from "./logManager.js";
 import { initTabsCustomization, setTabVisibility } from "./tabsCustomization.js";
+import { TEXT_AI_ENGINE } from "./textAIEngine.js";
+import { TITLES_TAB } from "./titlesTab.js";
 
 // Função para destacar os termos da busca com <mark>
 function highlightTerms(text, query) {
@@ -1738,6 +1740,23 @@ window.addEventListener("DOMContentLoaded", () => {
     FaceManager.init();
     window.EntityManager = EntityManager;
     EntityManager.init();
+    window.TEXT_AI_ENGINE = TEXT_AI_ENGINE;
+    TEXT_AI_ENGINE.init();
+    window.TITLES_TAB = TITLES_TAB;
+    TITLES_TAB.init();
+
+    const btnToolAddText = document.getElementById("btn-tool-add-text");
+    if (btnToolAddText) {
+        btnToolAddText.addEventListener("click", () => {
+            TEXT_AI_ENGINE.insertSuggestion({
+                presetId: "gc_cinema_classic",
+                title: "Novo Título",
+                subtitle: "Subtexto / Cargo",
+                startFrame: window.TIMELINE_STATE?.playheadFrame || 0
+            });
+        });
+    }
+
     const settingsPanel = new SettingsPanelManager();
     window.settingsPanel = settingsPanel;
     

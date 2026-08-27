@@ -1,5 +1,6 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
+import { CREDITS_NORMALIZER } from "./creditsNormalizer.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -19,6 +20,9 @@ export class EntityManager {
     static _mergeCandidateIds = [];
 
     static init() {
+        const btnCredits = document.getElementById("btn-open-credits-normalizer");
+        if (btnCredits) btnCredits.addEventListener("click", () => CREDITS_NORMALIZER.openModal());
+
         const btnOpen = document.getElementById("btn-open-entities-manager");
         if (btnOpen) btnOpen.addEventListener("click", () => this.openEntitiesModal());
 
