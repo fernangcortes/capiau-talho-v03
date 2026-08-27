@@ -41,6 +41,7 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
 - [🚀 Recursos principais](#recursos-principais)
   - [🎞️ Decupagem e análise por IA](#decupagem-e-analise-por-ia)
   - [✂️ Timeline e edição](#timeline-e-edicao)
+  - [📝 Títulos, legendas e animação (Titler NLE)](#titulos-legendas-e-animacao-titler-nle)
   - [👥 Rostos e personagens](#rostos-e-personagens)
   - [🔊 Diagnóstico e tratamento de áudio](#diagnostico-e-tratamento-de-audio)
   - [🎬 Render de vídeo e exportação](#render-de-video-e-exportacao)
@@ -221,6 +222,15 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   plosiva ou um clique de microfone continuam visíveis com a timeline toda afastada — com média
   aritmética eles desapareceriam justamente no zoom em que você procura por eles. O botão **Ondas**
   gera as formas de todo o projeto de uma vez.
+
+### 📝 Títulos, legendas e animação (Titler NLE) <a id="titulos-legendas-e-animacao-titler-nle"></a>
+
+- **Motor NLE de titulação e cartelas.** Crie e posicione Lower Thirds (GCs com identificação automática de personagens), cartelas de contexto cinematográficas, títulos de capítulo e créditos finais diretamente na timeline.
+- **Overlay interativo no Player.** Manipule caixas de texto sobre o vídeo com alças de redimensionamento, arrasto livre, guias magnéticas e edição de texto no lugar com duplo clique.
+- **Catálogo de fontes Google Fonts integrado.** Explore e aplique centenas de tipografias divididas por estilo (*Serif*, *Sans*, *Display*, *Handwriting*, *Monospace*) com preview tipográfico ao vivo e download sob demanda.
+- **Motor de interpolação e keyframes.** Anime transições de entrada e saída com controle de opacidade, posição X/Y, escala, fades e curvas de easing (*Linear*, *Ease-In*, *Ease-Out*, *Ease-In-Out*).
+- **Normalizador de créditos e templates.** Formatação automática de cartelas e créditos de duas colunas a partir do texto bruto do roteiro ou metadados de produção.
+- **Exportação para SRT, VTT e OTIO.** Exporte faixas de texto como legendas padronizadas (`.srt` / `.vtt`) ou como geradores de título (`otio.schema.GeneratorReference`) preservando tipografia e minutagem para Kdenlive, Premiere, DaVinci Resolve e Final Cut Pro.
 
 ### 👥 Rostos e personagens <a id="rostos-e-personagens"></a>
 
@@ -481,6 +491,8 @@ graph TD
 Você pode rodar o CapIAu-Talho de duas formas:
 1. **Via Docker (Recomendado)**: Ambiente isolado e 100% reprodutível. Nunca quebra com atualizações do seu computador.
 2. **Localmente via Python Virtualenv**: Usando `.venv` com Python 3.12.
+
+> 💡 **Atalho Inteligente no Windows:** Dê duplo clique em `criar-atalho.bat` na raiz do projeto. Ele criará um ícone do CapIAu na sua Área de Trabalho que detecta automaticamente se o Docker está aberto (sobe via container) ou se deve iniciar via Python local. Você também pode fixá-lo na Barra de Tarefas!
 
 ---
 

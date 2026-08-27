@@ -348,6 +348,16 @@ inspecionar e saltar para qualquer ponto do acervo sem rolar até lá.
 | **`Enter`** | **Gravar** | Salva o novo título e volta à exibição normal. |
 | **`Esc`** | **Cancelar** | Descarta a edição e restaura o título anterior. |
 
+## 📝 Operações do Editor de Títulos e Text Overlay (Player)
+
+| Gesto / Tecla | Ação | Descrição |
+|---|---|---|
+| **Clique na caixa de texto** | **Selecionar Text Box** | Ativa a caixa delimitadora com alças de transformação sobre o monitor Program. |
+| **Arrastar caixa de texto** | **Mover / Reposicionar** | Move o GC ou título livremente com encaixe magnético no centro e bordas da imagem. |
+| **Arrastar alças de canto** | **Redimensionar** | Ajusta proporcionalmente o tamanho da tipografia e da caixa de fundo (*pill*). |
+| **Duplo clique no texto** | **Editar no Lugar** | Transforma o elemento visual do player em campo de digitação direto. |
+| **`Esc` (com texto ativo)** | **Concluir Edição** | Desmarca a caixa de texto e restaura os controles normais do player NLE. |
+
 ## 🛡️ Prevenção Automática de Conflitos de Digitação
 
 - O sistema detecta de forma inteligente se o cursor do usuário está

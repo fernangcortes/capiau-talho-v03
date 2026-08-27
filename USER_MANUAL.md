@@ -32,6 +32,9 @@ profissional.
 15. [🎹 15. Mapa de Atalhos de Teclado NLE](#15-mapa-de-atalhos-de-teclado-nle)
 16. [🌊 16. Formas de Onda Reais (Waveforms)](#16-formas-de-onda-reais-waveforms)
 17. [🎬 17. Exportar Vídeo: Render da Timeline em MP4](#17-exportar-vídeo-render-da-timeline-em-mp4)
+18. [📝 18. Gerador e Editor de Títulos, Legendas e Cartelas (NLE Titler)](#18-gerador-e-editor-de-títulos-legendas-e-cartelas-nle-titler)
+19. [🎧 19. Restauração e Tratamento Avançado de Áudio (Auphonic & Denoise IA)](#19-restauração-e-tratamento-avançado-de-áudio-auphonic--denoise-ia)
+20. [🚀 20. Atalho Inteligente e Inicialização do Sistema (Windows Launcher)](#20-atalho-inteligente-e-inicialização-do-sistema-windows-launcher)
 
 ---
 
@@ -1016,3 +1019,66 @@ O painel distingue os casos em vez de dar um diagnóstico genérico:
 | Pedido recusado (400/422) | Qual campo foi recusado e por quê |
 | Já tem render dessa timeline (409) | Explica a fila sequencial e o que fazer |
 | Sem falar com o servidor | "Não consegui falar com o servidor" |
+
+---
+
+## 📝 18. Gerador e Editor de Títulos, Legendas e Cartelas (NLE Titler)
+
+O CapIAu-Talho conta com um subsistema completo de titulação, cartelas cinematográficas, GC (Lower Thirds) e legendagem nativo da timeline, integrado ao canvas e aos formatos profissionais de intercâmbio.
+
+### Tipos de Clipes de Texto e Títulos
+1. **Lower Thirds (GCs / Identificação):** Nomes, cargos, funções de entrevistados e créditos inferiores com alinhamento visual inteligente e caixas de contraste (*pill* / fundo translúcido).
+2. **Títulos de Abertura & Capítulos:** Grandes títulos estilizados para introduções de atos narrativos e capítulos temáticos.
+3. **Cartelas de Contexto & Citações:** Textos centralizados com quebras de linha e tipografia cinematográfica para ambientação histórica ou contextualização documental.
+4. **Créditos de Encerramento (End Credits):** Formatação em duas colunas (Função / Nome) ou blocos normalizados gerados a partir do banco de dados ou do roteiro.
+5. **Subtítulos e Legendas:** Falas transcritas convertidas em clipes de legenda com temporização frame-a-frame.
+
+### Manipulação Direta no Player (Text Overlay Interativo)
+- **Arrastar e Posicionar:** Ao pausar o player sobre um clipe de texto na timeline, o *Text Overlay* exibe caixas delimitadoras interativas. Clique e arraste para posicionar o GC ou título livremente.
+- **Redimensionamento:** Alças de canto permitem escalonar o tamanho da fonte e a largura da caixa de texto diretamente no monitor de Programa.
+- **Edição no Lugar (In-Place Edit):** Duplo clique no texto sobre a tela de vídeo ativa a digitação direta do conteúdo.
+
+### Catálogo de Fontes & Google Fonts
+- Integração nativa com o **Catálogo de Fontes**: explore tipografias divididas por categorias (*Serif*, *Sans-Serif*, *Display*, *Handwriting*, *Monospace*).
+- Pré-visualização tipográfica em tempo real com carregamento sob demanda assíncrono via Web Fonts.
+
+### Motor de Animação e Keyframes
+- **Interpolação Suave:** Animação de posição X/Y, escala, opacidade, fade-in e fade-out.
+- **Curvas de Aceleração (Easing):** Suporte a curvas *Linear*, *Ease-In*, *Ease-Out* e *Ease-In-Out*.
+- **Presets Cinematográficos:** Modelos prontos de animação (ex: *Typewriter*, *Slide & Fade*, *Minimal Clean*, *Documentary Gold*).
+
+### Normalizador e Gerador de Créditos
+- Na aba de **Títulos & Créditos**, cole o texto bruto da equipe/elenco ou use os dados de personagens do projeto. O normalizador padroniza espaçamentos, hierarquias e gera a minutagem correta para a timeline.
+
+### Exportação Profissional de Legendas e Títulos
+- **SRT e WebVTT:** Exporte as faixas de texto diretamente como arquivos `.srt` e `.vtt` com códigos de tempo rigorosos em milissegundos.
+- **OpenTimelineIO (OTIO Generator Titles):** Clipes de texto são exportados como `otio.schema.GeneratorReference` do tipo `Title`, preservando metadados de fontes, cores, keyframes e posições para Kdenlive, Premiere, DaVinci Resolve e Final Cut Pro.
+
+---
+
+## 🎧 19. Restauração e Tratamento Avançado de Áudio (Auphonic & Denoise IA)
+
+Para produções documentais gravadas em condições acústicas adversas (ruído de vento, reverberação de salas vazias, desbalanceamento de ganho), o CapIAu-Talho oferece um fluxo estruturado de tratamento de áudio:
+
+1. **Diagnóstico Espectral:** Análise em tempo real de picos, faixas de frequência e nível de loudness integrado (LUFS).
+2. **Cadeias de Filtros FFmpeg Nativas:** Presets instantâneos de remoção de ruído contínuo (`afftdn`), de-click (`adeclip`), equalização de voz e limitador suave (`alimiter`).
+3. **Denoise Neural por IA:** Remoção de ruído residual utilizando redes neurais DPDFNet via `sherpa-onnx`.
+4. **Integração com Auphonic:** Workflow completo para masterização de diálogos, nivelamento dinâmico inteligente (Leveler), AutoEQ e remoção de eco/reverberação. *(Consulte o guia técnico detalhado em `docs/AUPHONIC_AUDIO_RESTORATION_GUIDE.md`)*.
+
+---
+
+## 🚀 20. Atalho Inteligente e Inicialização do Sistema (Windows Launcher)
+
+Para proporcionar uma experiência de aplicativo nativo no Windows:
+
+### Inicialização com 1 Clique (`criar-atalho.bat`)
+1. Dê duplo clique no arquivo **`criar-atalho.bat`** na raiz do projeto.
+2. O script detecta a pasta de instalação e cria o atalho oficial **`CapIAu`** na sua **Área de Trabalho** com o ícone do projeto.
+3. Para fixar na Barra de Tarefas: clique com o botão direito no atalho na Área de Trabalho e selecione **"Fixar na barra de tarefas"** (*Pin to taskbar*).
+
+### Lógica do Launcher Inteligente
+Quando acionado pela Barra de Tarefas ou Área de Trabalho:
+- **Se a porta 8000 já estiver ativa:** Abre imediatamente o navegador em `http://localhost:8000`.
+- **Se a porta 8000 estiver fechada e o Docker estiver rodando:** Executa `docker compose up -d`, aguarda a inicialização do container e abre o navegador.
+- **Se o Docker não estiver aberto:** Inicia o servidor automaticamente via Python local (`uvicorn src.api.server:app --port 8000 --reload`) em um console dedicado e abre o navegador.
+

@@ -59,6 +59,7 @@ docs/graficos/
 .claude/
 .gemini/
 logs/
+*.lnk
 
 # Documentos privados de produção e making of (repositório privado)
 makingof/
