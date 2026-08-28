@@ -1128,6 +1128,20 @@ export class WorkspaceManager {
                         if (popBtn) popBtn.style.display = "none";
                     }
                     
+                    // Inicializa motor global de tooltips na janela destacada
+                    if (typeof window.initGlobalTooltips === "function") {
+                        window.initGlobalTooltips(win.document, win);
+                    }
+
+                    // Se for a biblioteca de mídias, anexa o tracker do índice de rolagem (Scroll Index) à janela destacada
+                    if (panelId === "sidebar-left") {
+                        if (window.libraryScrollIndex) {
+                            window.libraryScrollIndex.attachToWindow(win);
+                        } else if (window.libraryManager?.scrollIndexTracker) {
+                            window.libraryManager.scrollIndexTracker.attachToWindow(win);
+                        }
+                    }
+
                     // Escuta atalhos de teclado no popout e redireciona para o player principal
                     win.addEventListener("keydown", (e) => {
                         console.log(`[WorkspaceManager] Tecla pressionada no popout ${panelId}:`, e.code);
@@ -1190,6 +1204,15 @@ export class WorkspaceManager {
         
         if (window.popoutWindows[panelId]) {
             delete window.popoutWindows[panelId];
+        }
+
+        // Se for a biblioteca de mídias, restaura o tracker do índice de rolagem para a janela principal
+        if (panelId === "sidebar-left") {
+            if (window.libraryScrollIndex) {
+                window.libraryScrollIndex.attachToWindow(window);
+            } else if (window.libraryManager?.scrollIndexTracker) {
+                window.libraryManager.scrollIndexTracker.attachToWindow(window);
+            }
         }
 
         // Se for a timeline, restaura o canvas de volta para a janela principal

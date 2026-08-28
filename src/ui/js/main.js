@@ -1562,168 +1562,182 @@ window.addEventListener("DOMContentLoaded", () => {
     initTabsCustomization();
     window.initTabsCustomization = initTabsCustomization;
 
-    // Auto-converter de title para data-tooltip para tooltips premium unificadas
-    const convertTitleToTooltip = (root = document) => {
-        root.querySelectorAll("[title]").forEach(el => {
-            const title = el.getAttribute("title");
-            if (title && !el.hasAttribute("data-tooltip")) {
-                el.setAttribute("data-tooltip", title);
-                el.removeAttribute("title");
-            }
-        });
-    };
-    convertTitleToTooltip();
-    
-    // Configura um MutationObserver para lidar com elementos criados dinamicamente
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach(mutation => {
-            mutation.addedNodes.forEach(node => {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.hasAttribute("title")) {
-                        const title = node.getAttribute("title");
-                        node.setAttribute("data-tooltip", title);
-                        node.removeAttribute("title");
-                    }
-                    node.querySelectorAll("[title]").forEach(el => {
-                        const title = el.getAttribute("title");
-                        el.setAttribute("data-tooltip", title);
-                        el.removeAttribute("title");
-                    });
+    // Motor Global de Tooltips Premium NLE
+    function initGlobalTooltips(doc = document, win = window) {
+        if (!doc || !doc.body) return;
+        if (doc._hasGlobalTooltipsInitialized) return;
+        doc._hasGlobalTooltipsInitialized = true;
+
+        // Auto-converter de title para data-tooltip para tooltips premium unificadas
+        const convertTitleToTooltip = (root = doc) => {
+            root.querySelectorAll("[title]").forEach(el => {
+                const title = el.getAttribute("title");
+                if (title && !el.hasAttribute("data-tooltip")) {
+                    el.setAttribute("data-tooltip", title);
+                    el.removeAttribute("title");
                 }
             });
+        };
+        convertTitleToTooltip(doc);
+        
+        // Configura um MutationObserver para lidar com elementos criados dinamicamente
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach(mutation => {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        if (node.hasAttribute("title")) {
+                            const title = node.getAttribute("title");
+                            node.setAttribute("data-tooltip", title);
+                            node.removeAttribute("title");
+                        }
+                        node.querySelectorAll("[title]").forEach(el => {
+                            const title = el.getAttribute("title");
+                            el.setAttribute("data-tooltip", title);
+                            el.removeAttribute("title");
+                        });
+                    }
+                });
+            });
         });
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+        observer.observe(doc.body, { childList: true, subtree: true });
 
-    // Criar elemento global de tooltip
-    const globalTooltip = document.createElement("div");
-    globalTooltip.id = "global-tooltip";
-    document.body.appendChild(globalTooltip);
-
-    // Eventos mouseover/mouseout delegados para exibir e posicionar a tooltip global
-    document.body.addEventListener("mouseover", (e) => {
-        const target = e.target.closest("[data-tooltip]");
-        if (!target) return;
-
-        // Sliders de controle na sidebar esquerda só exibem tooltip no estado mínimo (.sidebar-minimal), pois nos outros estados os valores/rótulos já aparecem na tela
-        const sidebarLeft = target.closest("#sidebar-left");
-        if (sidebarLeft && (target.matches(".adjustments-row input[type='range']") || target.matches("#library-zoom-slider"))) {
-            if (!sidebarLeft.classList.contains("sidebar-minimal")) {
-                return;
-            }
+        // Criar elemento global de tooltip
+        let globalTooltip = doc.getElementById("global-tooltip");
+        if (!globalTooltip) {
+            globalTooltip = doc.createElement("div");
+            globalTooltip.id = "global-tooltip";
+            doc.body.appendChild(globalTooltip);
         }
 
-        // Abas da biblioteca/sidebar (.tab-btn): exibem tooltip apenas nos estágios compacto e mínimo (onde mostram apenas ícones de linha). No estágio normal (texto visível), a tooltip é dispensada.
-        if (target.matches(".tab-btn, .media-tabs .tab-btn")) {
-            const sidebar = target.closest("#sidebar-left, #sidebar-right, .sidebar-left, .sidebar-right");
-            if (sidebar && sidebar.classList.contains("sidebar-normal")) {
-                return;
+        // Eventos mouseover/mouseout delegados para exibir e posicionar a tooltip global
+        doc.body.addEventListener("mouseover", (e) => {
+            const target = e.target.closest("[data-tooltip]");
+            if (!target) return;
+
+            // Sliders de controle na sidebar esquerda só exibem tooltip no estado mínimo (.sidebar-minimal), pois nos outros estados os valores/rótulos já aparecem na tela
+            const sidebarLeft = target.closest("#sidebar-left");
+            if (sidebarLeft && (target.matches(".adjustments-row input[type='range']") || target.matches("#library-zoom-slider"))) {
+                if (!sidebarLeft.classList.contains("sidebar-minimal")) {
+                    return;
+                }
             }
-        }
 
-        const text = target.getAttribute("data-tooltip");
-        if (!text) return;
+            // Abas da biblioteca/sidebar (.tab-btn): exibem tooltip apenas nos estágios compacto e mínimo (onde mostram apenas ícones de linha). No estágio normal (texto visível), a tooltip é dispensada.
+            if (target.matches(".tab-btn, .media-tabs .tab-btn")) {
+                const sidebar = target.closest("#sidebar-left, #sidebar-right, .sidebar-left, .sidebar-right");
+                if (sidebar && sidebar.classList.contains("sidebar-normal")) {
+                    return;
+                }
+            }
 
-        // Identifica se o elemento hovered é o título/descrição de um card de mídia na biblioteca (fotos/vídeos)
-        const isMediaTitle = !!target.closest(".media-card .media-info h4, .media-card h4, .media-info h4, .tree-file-item h4") && !target.closest("button");
+            const text = target.getAttribute("data-tooltip");
+            if (!text) return;
 
-        if (text.includes("\n")) {
-            const parts = text.split("\n");
-            const titlePart = escapeHtml(parts[0].trim());
-            const descLines = parts.slice(1).filter((line, idx) => idx > 0 || line.trim() !== "");
-            const descPart = escapeHtml(descLines.join("\n").trim());
-            
-            if (descPart && titlePart && descPart !== titlePart && !descPart.startsWith(titlePart)) {
-                globalTooltip.innerHTML = `<div style="font-weight: 600; color: #ffffff; margin-bottom: 3px; word-break: break-word;">${titlePart}</div><div style="font-weight: 400; opacity: 0.90; white-space: pre-line; word-break: break-word;">${descPart}</div>`;
+            // Identifica se o elemento hovered é o título/descrição de um card de mídia na biblioteca (fotos/vídeos)
+            const isMediaTitle = !!target.closest(".media-card .media-info h4, .media-card h4, .media-info h4, .tree-file-item h4") && !target.closest("button");
+
+            if (text.includes("\n")) {
+                const parts = text.split("\n");
+                const titlePart = escapeHtml(parts[0].trim());
+                const descLines = parts.slice(1).filter((line, idx) => idx > 0 || line.trim() !== "");
+                const descPart = escapeHtml(descLines.join("\n").trim());
+                
+                if (descPart && titlePart && descPart !== titlePart && !descPart.startsWith(titlePart)) {
+                    globalTooltip.innerHTML = `<div style="font-weight: 600; color: #ffffff; margin-bottom: 3px; word-break: break-word;">${titlePart}</div><div style="font-weight: 400; opacity: 0.90; white-space: pre-line; word-break: break-word;">${descPart}</div>`;
+                } else {
+                    const singleText = descPart || titlePart;
+                    globalTooltip.innerHTML = `<div style="font-weight: 400; opacity: 0.95; white-space: pre-line; word-break: break-word;">${singleText}</div>`;
+                }
             } else {
-                const singleText = descPart || titlePart;
-                globalTooltip.innerHTML = `<div style="font-weight: 400; opacity: 0.95; white-space: pre-line; word-break: break-word;">${singleText}</div>`;
+                globalTooltip.innerHTML = `<div style="font-weight: 400; opacity: 0.95; white-space: pre-line; word-break: break-word;">${escapeHtml(text.trim())}</div>`;
             }
-        } else {
-            globalTooltip.innerHTML = `<div style="font-weight: 400; opacity: 0.95; white-space: pre-line; word-break: break-word;">${escapeHtml(text.trim())}</div>`;
-        }
 
-        if (isMediaTitle) {
-            globalTooltip.classList.add("media-desc-tooltip");
-            const card = target.closest(".media-card, .tree-file-item");
-            const cardRect = card ? card.getBoundingClientRect() : null;
-            const isGrid = !!target.closest(".view-mode-grid");
+            if (isMediaTitle) {
+                globalTooltip.classList.add("media-desc-tooltip");
+                const card = target.closest(".media-card, .tree-file-item");
+                const cardRect = card ? card.getBoundingClientRect() : null;
+                const isGrid = !!target.closest(".view-mode-grid");
 
-            if (isGrid && cardRect) {
-                globalTooltip.style.width = `${cardRect.width}px`;
-                globalTooltip.style.maxWidth = `${Math.max(cardRect.width, 280)}px`;
+                if (isGrid && cardRect) {
+                    globalTooltip.style.width = `${cardRect.width}px`;
+                    globalTooltip.style.maxWidth = `${Math.max(cardRect.width, 280)}px`;
+                } else {
+                    globalTooltip.style.width = "max-content";
+                    globalTooltip.style.maxWidth = "320px";
+                }
             } else {
-                globalTooltip.style.width = "max-content";
-                globalTooltip.style.maxWidth = "320px";
+                globalTooltip.classList.remove("media-desc-tooltip");
+                globalTooltip.style.width = "";
+                globalTooltip.style.maxWidth = "";
             }
-        } else {
+
+            globalTooltip.classList.add("visible");
+
+            // Calcula a posição da tooltip
+            const rect = target.getBoundingClientRect();
+            const tooltipRect = globalTooltip.getBoundingClientRect();
+
+            let top = 0;
+            let left = 0;
+
+            if (isMediaTitle) {
+                const h4El = target.closest("h4") || target;
+                const h4Rect = h4El.getBoundingClientRect();
+                const card = target.closest(".media-card, .tree-file-item");
+                const cardRect = card ? card.getBoundingClientRect() : null;
+                const isGrid = !!target.closest(".view-mode-grid");
+
+                if (isGrid) {
+                    // Abre exatamente no começo da parte do texto (abaixo da thumbnail da foto/vídeo, sem tampar a foto)
+                    top = h4Rect.top - 2;
+                    left = cardRect ? cardRect.left : h4Rect.left;
+                } else {
+                    // Modo lista: abre no início do texto à direita da thumbnail
+                    top = h4Rect.top - 3;
+                    left = h4Rect.left - 4;
+                }
+
+                // Evita que ultrapasse a borda inferior da tela
+                if (top + tooltipRect.height > win.innerHeight - 8) {
+                    const overflowBottom = (top + tooltipRect.height) - (win.innerHeight - 8);
+                    top = Math.max(8, top - overflowBottom);
+                }
+            } else {
+                // Posição padrão para botões e controles: acima do elemento
+                top = rect.top - tooltipRect.height - 8;
+                left = rect.left + (rect.width - tooltipRect.width) / 2;
+
+                // Se sair do topo da tela, coloca abaixo do elemento
+                if (top < 8) {
+                    top = rect.bottom + 8;
+                }
+            }
+
+            // Garante que não ultrapasse as bordas laterais da tela
+            const screenMargin = 8;
+            if (left < screenMargin) {
+                left = screenMargin;
+            } else if (left + tooltipRect.width > win.innerWidth - screenMargin) {
+                left = win.innerWidth - tooltipRect.width - screenMargin;
+            }
+
+            globalTooltip.style.top = `${top}px`;
+            globalTooltip.style.left = `${left}px`;
+        });
+
+        doc.body.addEventListener("mouseout", (e) => {
+            const target = e.target.closest("[data-tooltip]");
+            if (!target) return;
+            globalTooltip.classList.remove("visible");
             globalTooltip.classList.remove("media-desc-tooltip");
             globalTooltip.style.width = "";
             globalTooltip.style.maxWidth = "";
-        }
+        });
+    }
+    window.initGlobalTooltips = initGlobalTooltips;
 
-        globalTooltip.classList.add("visible");
-
-        // Calcula a posição da tooltip
-        const rect = target.getBoundingClientRect();
-        const tooltipRect = globalTooltip.getBoundingClientRect();
-
-        let top = 0;
-        let left = 0;
-
-        if (isMediaTitle) {
-            const h4El = target.closest("h4") || target;
-            const h4Rect = h4El.getBoundingClientRect();
-            const card = target.closest(".media-card, .tree-file-item");
-            const cardRect = card ? card.getBoundingClientRect() : null;
-            const isGrid = !!target.closest(".view-mode-grid");
-
-            if (isGrid) {
-                // Abre exatamente no começo da parte do texto (abaixo da thumbnail da foto/vídeo, sem tampar a foto)
-                top = h4Rect.top - 2;
-                left = cardRect ? cardRect.left : h4Rect.left;
-            } else {
-                // Modo lista: abre no início do texto à direita da thumbnail
-                top = h4Rect.top - 3;
-                left = h4Rect.left - 4;
-            }
-
-            // Evita que ultrapasse a borda inferior da tela
-            if (top + tooltipRect.height > window.innerHeight - 8) {
-                const overflowBottom = (top + tooltipRect.height) - (window.innerHeight - 8);
-                top = Math.max(8, top - overflowBottom);
-            }
-        } else {
-            // Posição padrão para botões e controles: acima do elemento
-            top = rect.top - tooltipRect.height - 8;
-            left = rect.left + (rect.width - tooltipRect.width) / 2;
-
-            // Se sair do topo da tela, coloca abaixo do elemento
-            if (top < 8) {
-                top = rect.bottom + 8;
-            }
-        }
-
-        // Garante que não ultrapasse as bordas laterais da tela
-        const screenMargin = 8;
-        if (left < screenMargin) {
-            left = screenMargin;
-        } else if (left + tooltipRect.width > window.innerWidth - screenMargin) {
-            left = window.innerWidth - tooltipRect.width - screenMargin;
-        }
-
-        globalTooltip.style.top = `${top}px`;
-        globalTooltip.style.left = `${left}px`;
-    });
-
-    document.body.addEventListener("mouseout", (e) => {
-        const target = e.target.closest("[data-tooltip]");
-        if (!target) return;
-        globalTooltip.classList.remove("visible");
-        globalTooltip.classList.remove("media-desc-tooltip");
-        globalTooltip.style.width = "";
-        globalTooltip.style.maxWidth = "";
-    });
+    // Inicializa tooltips no documento principal
+    initGlobalTooltips(document, window);
 
     // Instanciando os gerenciadores
     const workspace = new WorkspaceManager();

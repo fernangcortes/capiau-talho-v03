@@ -441,11 +441,14 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     e.preventDefault();
     e.stopPropagation();
 
+    const targetDoc = cardEl?.ownerDocument || document;
+    const targetWin = targetDoc.defaultView || window;
+
     // Fecha qualquer menu de contexto aberto anteriormente e oculta tooltips de rolagem
-    const oldMenus = document.querySelectorAll(".custom-context-menu");
+    const oldMenus = targetDoc.querySelectorAll(".custom-context-menu");
     oldMenus.forEach(m => m.remove());
 
-    const scrollTooltip = document.getElementById("library-scroll-index-tooltip");
+    const scrollTooltip = targetDoc.getElementById("library-scroll-index-tooltip");
     if (scrollTooltip) {
         scrollTooltip.classList.remove("visible", "expanded");
     }
@@ -453,7 +456,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         window.libraryScrollIndex.hide();
     }
 
-    const menu = document.createElement("div");
+    const menu = targetDoc.createElement("div");
     menu.id = "custom-media-context-menu";
     menu.className = "custom-context-menu media-context-menu";
 
@@ -971,7 +974,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     });
     menu.appendChild(removeMediaItem);
 
-    document.body.appendChild(menu);
+    targetDoc.body.appendChild(menu);
 
     // Posicionamento inteligente anti-overflow
     const menuRect = menu.getBoundingClientRect();
@@ -981,12 +984,12 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     let posX = e.clientX;
     let posY = e.clientY;
 
-    if (posX + menuWidth > window.innerWidth - 10) {
-        posX = window.innerWidth - menuWidth - 10;
+    if (posX + menuWidth > targetWin.innerWidth - 10) {
+        posX = targetWin.innerWidth - menuWidth - 10;
         if (submenu) submenu.classList.add("submenu-left");
     }
-    if (posY + menuHeight > window.innerHeight - 10) {
-        posY = Math.max(10, window.innerHeight - menuHeight - 10);
+    if (posY + menuHeight > targetWin.innerHeight - 10) {
+        posY = Math.max(10, targetWin.innerHeight - menuHeight - 10);
     }
 
     menu.style.left = `${Math.max(10, posX)}px`;
@@ -1010,15 +1013,15 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     };
 
     const cleanup = () => {
-        document.removeEventListener("pointerdown", closeHandler, true);
-        document.removeEventListener("keydown", keyHandler, true);
-        window.removeEventListener("scroll", scrollHandler, true);
+        targetDoc.removeEventListener("pointerdown", closeHandler, true);
+        targetDoc.removeEventListener("keydown", keyHandler, true);
+        targetWin.removeEventListener("scroll", scrollHandler, true);
     };
 
     setTimeout(() => {
-        document.addEventListener("pointerdown", closeHandler, true);
-        document.addEventListener("keydown", keyHandler, true);
-        window.addEventListener("scroll", scrollHandler, true);
+        targetDoc.addEventListener("pointerdown", closeHandler, true);
+        targetDoc.addEventListener("keydown", keyHandler, true);
+        targetWin.addEventListener("scroll", scrollHandler, true);
     }, 10);
 }
 window.showMediaContextMenu = showMediaContextMenu;
@@ -1026,16 +1029,19 @@ window.showMediaContextMenu = showMediaContextMenu;
 // ── MENU DE CONTEXTO E GESTÃO DE BINS VIRTUAIS ───────────────────────
 
 export function showImportChoicesMenu(anchorEl, targetFolderPath = "root") {
-    const oldMenus = document.querySelectorAll(".custom-context-menu");
+    const targetDoc = anchorEl?.ownerDocument || document;
+    const targetWin = targetDoc.defaultView || window;
+
+    const oldMenus = targetDoc.querySelectorAll(".custom-context-menu");
     oldMenus.forEach(m => m.remove());
 
-    const menu = document.createElement("div");
+    const menu = targetDoc.createElement("div");
     menu.id = "custom-import-choices-menu";
     menu.className = "custom-context-menu";
     menu.style.zIndex = "999999";
 
     // Opção 1: Importar Pasta Inteira
-    const folderItem = document.createElement("div");
+    const folderItem = targetDoc.createElement("div");
     folderItem.className = "menu-item";
     folderItem.innerHTML = `<i class="fa-solid fa-folder-open" style="color:var(--color-cyan);"></i><span class="menu-item-text">Importar Pasta Inteira (HD/Externo)...</span>`;
     folderItem.addEventListener("click", async () => {
@@ -1066,7 +1072,7 @@ export function showImportChoicesMenu(anchorEl, targetFolderPath = "root") {
     menu.appendChild(folderItem);
 
     // Opção 2: Importar Arquivos Individuais
-    const filesItem = document.createElement("div");
+    const filesItem = targetDoc.createElement("div");
     filesItem.className = "menu-item";
     filesItem.innerHTML = `<i class="fa-solid fa-film" style="color:var(--color-violet);"></i><span class="menu-item-text">Importar Arquivos de Mídia...</span>`;
     filesItem.addEventListener("click", async () => {
@@ -1096,14 +1102,14 @@ export function showImportChoicesMenu(anchorEl, targetFolderPath = "root") {
     });
     menu.appendChild(filesItem);
 
-    document.body.appendChild(menu);
+    targetDoc.body.appendChild(menu);
 
     if (anchorEl && typeof anchorEl.getBoundingClientRect === "function") {
         const rect = anchorEl.getBoundingClientRect();
         let left = rect.left;
         let top = rect.bottom + 4;
-        if (left + 260 > window.innerWidth) left = window.innerWidth - 270;
-        if (top + 100 > window.innerHeight) top = rect.top - 100;
+        if (left + 260 > targetWin.innerWidth) left = targetWin.innerWidth - 270;
+        if (top + 100 > targetWin.innerHeight) top = rect.top - 100;
         menu.style.left = `${Math.max(10, left)}px`;
         menu.style.top = `${Math.max(10, top)}px`;
     } else {
@@ -1115,10 +1121,10 @@ export function showImportChoicesMenu(anchorEl, targetFolderPath = "root") {
     const closeHandler = (ev) => {
         if (!menu.contains(ev.target) && (!anchorEl || !anchorEl.contains(ev.target))) {
             menu.remove();
-            document.removeEventListener("pointerdown", closeHandler, true);
+            targetDoc.removeEventListener("pointerdown", closeHandler, true);
         }
     };
-    setTimeout(() => document.addEventListener("pointerdown", closeHandler, true), 10);
+    setTimeout(() => targetDoc.addEventListener("pointerdown", closeHandler, true), 10);
 }
 window.showImportChoicesMenu = showImportChoicesMenu;
 
@@ -1134,7 +1140,8 @@ export async function handleImportToFolder(targetFolderPath, anchorEl) {
 window.handleImportToFolder = handleImportToFolder;
 
 export function promptCreateSubfolder(parentFolderPath) {
-    const modal = document.createElement("div");
+    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || (window.popoutWindows?.["sidebar-left"]?.document) || document;
+    const modal = targetDoc.createElement("div");
     modal.className = "modal-overlay";
     modal.style.display = "flex";
     modal.innerHTML = `
@@ -1155,7 +1162,7 @@ export function promptCreateSubfolder(parentFolderPath) {
             </div>
         </div>
     `;
-    document.body.appendChild(modal);
+    targetDoc.body.appendChild(modal);
 
     const input = modal.querySelector("#subfolder-name-input");
     setTimeout(() => input?.focus(), 50);
@@ -1194,7 +1201,8 @@ export function promptCreateSubfolder(parentFolderPath) {
 }
 
 export function promptRenameFolder(folderPath, currentName) {
-    const modal = document.createElement("div");
+    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || (window.popoutWindows?.["sidebar-left"]?.document) || document;
+    const modal = targetDoc.createElement("div");
     modal.className = "modal-overlay";
     modal.style.display = "flex";
     modal.innerHTML = `
@@ -1215,7 +1223,7 @@ export function promptRenameFolder(folderPath, currentName) {
             </div>
         </div>
     `;
-    document.body.appendChild(modal);
+    targetDoc.body.appendChild(modal);
 
     const input = modal.querySelector("#rename-folder-input");
     setTimeout(() => {
@@ -1283,7 +1291,8 @@ export function setBinColor(folderPath, hexColor) {
 }
 
 export function confirmDeleteVirtualFolder(folderPath, folderName) {
-    const modal = document.createElement("div");
+    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || (window.popoutWindows?.["sidebar-left"]?.document) || document;
+    const modal = targetDoc.createElement("div");
     modal.className = "modal-overlay";
     modal.style.display = "flex";
     modal.innerHTML = `
@@ -1306,7 +1315,7 @@ export function confirmDeleteVirtualFolder(folderPath, folderName) {
             </div>
         </div>
     `;
-    document.body.appendChild(modal);
+    targetDoc.body.appendChild(modal);
 
     const close = () => modal.remove();
     modal.querySelector("#btn-close-del-bin").onclick = close;
@@ -1346,15 +1355,18 @@ export function showFolderContextMenu(e, node, folderHeader) {
     e.preventDefault();
     e.stopPropagation();
 
-    const oldMenus = document.querySelectorAll(".custom-context-menu");
+    const targetDoc = folderHeader?.ownerDocument || document;
+    const targetWin = targetDoc.defaultView || window;
+
+    const oldMenus = targetDoc.querySelectorAll(".custom-context-menu");
     oldMenus.forEach(m => m.remove());
 
-    const menu = document.createElement("div");
+    const menu = targetDoc.createElement("div");
     menu.id = "custom-folder-context-menu";
     menu.className = "custom-context-menu folder-context-menu";
 
     // 1. Importar Mídias para esta Pasta
-    const importItem = document.createElement("div");
+    const importItem = targetDoc.createElement("div");
     importItem.className = "menu-item";
     importItem.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" style="color:var(--color-cyan);"></i><span class="menu-item-text">Importar Mídias para esta Pasta...</span>`;
     importItem.addEventListener("click", async () => {
@@ -1364,7 +1376,7 @@ export function showFolderContextMenu(e, node, folderHeader) {
     menu.appendChild(importItem);
 
     // 2. Nova Subpasta
-    const newSubfolderItem = document.createElement("div");
+    const newSubfolderItem = targetDoc.createElement("div");
     newSubfolderItem.className = "menu-item";
     newSubfolderItem.innerHTML = `<i class="fa-solid fa-folder-plus" style="color:var(--color-violet);"></i><span class="menu-item-text">Nova Subpasta</span>`;
     newSubfolderItem.addEventListener("click", () => {
@@ -1374,7 +1386,7 @@ export function showFolderContextMenu(e, node, folderHeader) {
     menu.appendChild(newSubfolderItem);
 
     // 3. Abrir no Windows Explorer
-    const explorerItem = document.createElement("div");
+    const explorerItem = targetDoc.createElement("div");
     explorerItem.className = "menu-item";
     explorerItem.innerHTML = `<i class="fa-solid fa-folder-open"></i><span class="menu-item-text">Abrir no Windows Explorer</span>`;
     explorerItem.addEventListener("click", async () => {
@@ -1389,12 +1401,12 @@ export function showFolderContextMenu(e, node, folderHeader) {
     menu.appendChild(explorerItem);
 
     // Separador
-    const sep = document.createElement("div");
+    const sep = targetDoc.createElement("div");
     sep.className = "menu-separator";
     menu.appendChild(sep);
 
     // 4. Definir Cor do Bin (Submenu)
-    const colorMenuItem = document.createElement("div");
+    const colorMenuItem = targetDoc.createElement("div");
     colorMenuItem.className = "menu-item menu-item-has-submenu";
     colorMenuItem.innerHTML = `
         <i class="fa-solid fa-palette"></i>
@@ -1413,7 +1425,7 @@ export function showFolderContextMenu(e, node, folderHeader) {
         { name: "Cinza Neutro", hex: "#94a3b8" },
     ];
     BIN_COLORS.forEach(c => {
-        const sub = document.createElement("div");
+        const sub = targetDoc.createElement("div");
         sub.className = "menu-item";
         sub.innerHTML = `
             <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${c.hex}; margin-right:8px;"></span>
@@ -1430,7 +1442,7 @@ export function showFolderContextMenu(e, node, folderHeader) {
 
     // 5. Renomear Pasta
     if (node.path !== "root") {
-        const renameFolderItem = document.createElement("div");
+        const renameFolderItem = targetDoc.createElement("div");
         renameFolderItem.className = "menu-item";
         renameFolderItem.innerHTML = `<i class="fa-solid fa-pen-to-square"></i><span class="menu-item-text">Renomear Pasta</span>`;
         renameFolderItem.addEventListener("click", () => {
@@ -1440,12 +1452,12 @@ export function showFolderContextMenu(e, node, folderHeader) {
         menu.appendChild(renameFolderItem);
 
         // Separador
-        const sep2 = document.createElement("div");
+        const sep2 = targetDoc.createElement("div");
         sep2.className = "menu-separator";
         menu.appendChild(sep2);
 
         // 6. Excluir Pasta da Biblioteca
-        const deleteFolderItem = document.createElement("div");
+        const deleteFolderItem = targetDoc.createElement("div");
         deleteFolderItem.className = "menu-item menu-item-destructive";
         deleteFolderItem.innerHTML = `<i class="fa-solid fa-trash"></i><span class="menu-item-text">Excluir Pasta da Biblioteca</span>`;
         deleteFolderItem.addEventListener("click", () => {
@@ -1455,7 +1467,7 @@ export function showFolderContextMenu(e, node, folderHeader) {
         menu.appendChild(deleteFolderItem);
     }
 
-    document.body.appendChild(menu);
+    targetDoc.body.appendChild(menu);
 
     // Posicionamento
     const menuRect = menu.getBoundingClientRect();
@@ -1465,12 +1477,12 @@ export function showFolderContextMenu(e, node, folderHeader) {
     let posX = e.clientX;
     let posY = e.clientY;
 
-    if (posX + menuWidth > window.innerWidth - 10) {
-        posX = window.innerWidth - menuWidth - 10;
+    if (posX + menuWidth > targetWin.innerWidth - 10) {
+        posX = targetWin.innerWidth - menuWidth - 10;
         if (colorSubmenu) colorSubmenu.classList.add("submenu-left");
     }
-    if (posY + menuHeight > window.innerHeight - 10) {
-        posY = Math.max(10, window.innerHeight - menuHeight - 10);
+    if (posY + menuHeight > targetWin.innerHeight - 10) {
+        posY = Math.max(10, targetWin.innerHeight - menuHeight - 10);
     }
 
     menu.style.left = `${Math.max(10, posX)}px`;
@@ -1489,12 +1501,12 @@ export function showFolderContextMenu(e, node, folderHeader) {
         }
     };
     const cleanup = () => {
-        document.removeEventListener("pointerdown", closeHandler, true);
-        document.removeEventListener("keydown", keyHandler, true);
+        targetDoc.removeEventListener("pointerdown", closeHandler, true);
+        targetDoc.removeEventListener("keydown", keyHandler, true);
     };
     setTimeout(() => {
-        document.addEventListener("pointerdown", closeHandler, true);
-        document.addEventListener("keydown", keyHandler, true);
+        targetDoc.addEventListener("pointerdown", closeHandler, true);
+        targetDoc.addEventListener("keydown", keyHandler, true);
     }, 10);
 }
 window.showFolderContextMenu = showFolderContextMenu;
@@ -6039,55 +6051,110 @@ export class LibraryScrollIndexTracker {
         this.isEnabled = localStorage.getItem("library_scroll_index_enabled") !== "false";
         this.dwellDelay = parseInt(localStorage.getItem("library_scroll_index_dwell") || "1000", 10);
         this.thumbWidth = parseInt(localStorage.getItem("library_scroll_preview_thumb_width") || "128", 10);
-        
+
+        this.activeWindow = null;
+        this.activeDoc = null;
+
+        this._onPointerMove = (e) => this.handlePointerMove(e);
+        this._onPointerDown = (e) => this.handlePointerDown(e);
+        this._onPointerLeave = () => this.handlePointerLeave();
+        this._onPointerUp = () => this.handlePointerUp();
+        this._onWheel = (e) => this.handleWheel(e);
+        this._onResize = () => this.hide();
+
         this.init();
     }
 
     init() {
-        this.createTooltipElement();
-        this.bindEvents();
+        this.attachToWindow(window);
         this.bindSettings();
+        if (typeof window !== "undefined") {
+            window.libraryScrollIndex = this;
+        }
+    }
+
+    attachToWindow(win = window) {
+        if (!win || !win.document) return;
+
+        // Se já estava anexado a uma janela anterior, remove listeners antigos
+        if (this.activeDoc && this.activeWindow) {
+            try {
+                this.activeDoc.removeEventListener("pointermove", this._onPointerMove);
+                this.activeDoc.removeEventListener("pointerleave", this._onPointerLeave);
+                this.activeDoc.removeEventListener("pointerdown", this._onPointerDown);
+                this.activeWindow.removeEventListener("pointerup", this._onPointerUp);
+                this.activeWindow.removeEventListener("wheel", this._onWheel);
+                this.activeWindow.removeEventListener("resize", this._onResize);
+            } catch (err) {
+                console.warn("[LibraryScrollIndexTracker] Erro ao remover listeners anteriores:", err);
+            }
+        }
+
+        this.activeWindow = win;
+        this.activeDoc = win.document;
+        this.scrollContainer = null;
+        this.hide();
+
+        this.ensureTooltipElement();
+
+        this.activeDoc.addEventListener("pointermove", this._onPointerMove);
+        this.activeDoc.addEventListener("pointerleave", this._onPointerLeave);
+        this.activeDoc.addEventListener("pointerdown", this._onPointerDown);
+        this.activeWindow.addEventListener("pointerup", this._onPointerUp);
+        this.activeWindow.addEventListener("wheel", this._onWheel, { passive: false });
+        this.activeWindow.addEventListener("resize", this._onResize);
     }
 
     getScrollContainer() {
-        if (!this.scrollContainer || !this.scrollContainer.isConnected) {
-            this.scrollContainer = document.querySelector("#sidebar-left .sidebar-content.scrollable");
+        if (this.scrollContainer && this.scrollContainer.isConnected) {
+            return this.scrollContainer;
         }
+        let container = (this.activeDoc || document).querySelector("#sidebar-left .sidebar-content.scrollable");
+        if (!container && typeof document !== "undefined") {
+            container = document.querySelector("#sidebar-left .sidebar-content.scrollable");
+        }
+        if (!container && window.popoutWindows && window.popoutWindows["sidebar-left"] && !window.popoutWindows["sidebar-left"].closed) {
+            container = window.popoutWindows["sidebar-left"].document?.querySelector("#sidebar-left .sidebar-content.scrollable");
+        }
+        this.scrollContainer = container || null;
         return this.scrollContainer;
     }
 
-    createTooltipElement() {
-        let el = document.getElementById("library-scroll-index-tooltip");
+    ensureTooltipElement() {
+        const doc = this.activeDoc || document;
+        let el = doc.getElementById("library-scroll-index-tooltip");
         if (!el) {
-            el = document.createElement("div");
+            el = doc.createElement("div");
             el.id = "library-scroll-index-tooltip";
-            document.body.appendChild(el);
+            doc.body.appendChild(el);
         }
         el.style.setProperty("--scroll-thumb-width", `${this.thumbWidth}px`);
-        el.innerHTML = `
-            <div class="scroll-index-top">
-                <div class="scroll-index-thumb-wrapper">
-                    <img class="scroll-index-thumb" src="" alt="" style="display:none;">
-                    <i class="fa-solid fa-photo-film scroll-index-icon"></i>
-                </div>
-                <div class="scroll-index-meta">
-                    <div class="scroll-index-folder"><i class="fa-solid fa-folder"></i> <span>Biblioteca</span></div>
-                    <div class="scroll-index-title">Título da Mídia</div>
-                    <div class="scroll-index-sub">
-                        <span class="scroll-index-badge tag-interview">Fala</span>
-                        <span class="scroll-index-duration" style="font-family: monospace; font-size: 8.5px; color: var(--text-muted);"></span>
+        if (!el.querySelector(".scroll-index-top")) {
+            el.innerHTML = `
+                <div class="scroll-index-top">
+                    <div class="scroll-index-thumb-wrapper">
+                        <img class="scroll-index-thumb" src="" alt="" style="display:none;">
+                        <i class="fa-solid fa-photo-film scroll-index-icon"></i>
+                    </div>
+                    <div class="scroll-index-meta">
+                        <div class="scroll-index-folder"><i class="fa-solid fa-folder"></i> <span>Biblioteca</span></div>
+                        <div class="scroll-index-title">Título da Mídia</div>
+                        <div class="scroll-index-sub">
+                            <span class="scroll-index-badge tag-interview">Fala</span>
+                            <span class="scroll-index-duration" style="font-family: monospace; font-size: 8.5px; color: var(--text-muted);"></span>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="scroll-index-details">
-                <div class="scroll-index-summary"></div>
-                <div class="scroll-index-tags-row"></div>
-                <div class="scroll-index-footer">
-                    <span class="scroll-index-pos">Item 1 de 1</span>
-                    <span class="scroll-index-hint" style="color: var(--text-muted); opacity: 0.7;">Shift+Wheel: Zoom • Clique: Ir</span>
+                <div class="scroll-index-details">
+                    <div class="scroll-index-summary"></div>
+                    <div class="scroll-index-tags-row"></div>
+                    <div class="scroll-index-footer">
+                        <span class="scroll-index-pos">Item 1 de 1</span>
+                        <span class="scroll-index-hint" style="color: var(--text-muted); opacity: 0.7;">Shift+Wheel: Zoom • Clique: Ir</span>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
         this.tooltipEl = el;
         this.dom = {
             thumbImg: el.querySelector(".scroll-index-thumb"),
@@ -6100,155 +6167,157 @@ export class LibraryScrollIndexTracker {
             tagsRow: el.querySelector(".scroll-index-tags-row"),
             posEl: el.querySelector(".scroll-index-pos")
         };
+        return el;
+    }
+
+    createTooltipElement() {
+        return this.ensureTooltipElement();
     }
 
     isAnyModalOpen() {
-        return isAnyModalOpen();
+        return isAnyModalOpen(this.activeDoc || document);
     }
 
-    bindEvents() {
-        const onPointerMove = (e) => {
-            if (!this.isEnabled || document.querySelector(".custom-context-menu")) {
-                this.hide();
-                return;
+    handlePointerMove(e) {
+        const doc = this.activeDoc || document;
+        if (!this.isEnabled || doc.querySelector(".custom-context-menu")) {
+            this.hide();
+            return;
+        }
+
+        // Não exibe nem rastreia se qualquer modal ou overlay estiver aberto
+        if (this.isAnyModalOpen()) {
+            this.hide();
+            return;
+        }
+
+        const container = this.getScrollContainer();
+        if (!container) {
+            this.hide();
+            return;
+        }
+
+        // Apenas ativo se estiver na aba de Vídeos ou Fotos
+        const activeTab = doc.querySelector("#sidebar-left .tab-content.active")?.id;
+        if (activeTab !== "tab-videos" && activeTab !== "tab-photos") {
+            this.hide();
+            return;
+        }
+
+        // Verifica se a lista tem barra de rolagem (overflow)
+        if (container.scrollHeight <= container.clientHeight + 8) {
+            this.hide();
+            return;
+        }
+
+        const rect = container.getBoundingClientRect();
+        // Área da calha da barra (últimos 16px da borda direita da lista)
+        const isInsideGutter = (e.clientX >= rect.right - 16 && e.clientX <= rect.right + 4 && e.clientY >= rect.top && e.clientY <= rect.bottom);
+
+        if (!isInsideGutter) {
+            this.hide();
+            return;
+        }
+
+        // Verificação de hit-test no DOM
+        const hitEl = doc.elementFromPoint(e.clientX, e.clientY);
+        if (!hitEl || (!container.contains(hitEl) && hitEl !== container && !hitEl.closest("#sidebar-left"))) {
+            this.hide();
+            return;
+        }
+        if (hitEl.closest(".modal-overlay, #timeline-alternatives-popup, #timeline-alternatives-backdrop, #modal-timeline-help, #modal-edit-marker, .custom-context-menu")) {
+            this.hide();
+            return;
+        }
+
+        this.lastHoverEvent = e;
+        const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+        this.updateAtRatio(ratio, e, activeTab);
+
+        if (this.isPointerDownOnGutter) {
+            if (this.currentTargetItem) {
+                const itemRect = this.currentTargetItem.getBoundingClientRect();
+                const targetScroll = (itemRect.top - rect.top) + container.scrollTop;
+                container.scrollTop = Math.max(0, targetScroll - 4);
+            } else {
+                const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
+                container.scrollTop = targetScrollTop;
             }
+        }
+    }
 
-            // Não exibe nem rastreia se qualquer modal ou overlay estiver aberto
-            if (this.isAnyModalOpen()) {
-                this.hide();
-                return;
-            }
+    handlePointerLeave() {
+        this.isPointerDownOnGutter = false;
+        this.hide();
+    }
 
-            const container = this.getScrollContainer();
-            if (!container) {
-                this.hide();
-                return;
-            }
+    handlePointerDown(e) {
+        if (!this.isEnabled) return;
+        const doc = this.activeDoc || document;
+        if (this.isAnyModalOpen() || doc.querySelector(".custom-context-menu")) return;
+        const container = this.getScrollContainer();
+        if (!container) return;
 
-            // Apenas ativo se estiver na aba de Vídeos ou Fotos
-            const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id;
-            if (activeTab !== "tab-videos" && activeTab !== "tab-photos") {
-                this.hide();
-                return;
-            }
-
-            // Verifica se a lista tem barra de rolagem (overflow)
-            if (container.scrollHeight <= container.clientHeight + 8) {
-                this.hide();
-                return;
-            }
-
-            const rect = container.getBoundingClientRect();
-            // Área da calha da barra (últimos 16px da borda direita da lista)
-            const isInsideGutter = (e.clientX >= rect.right - 16 && e.clientX <= rect.right + 4 && e.clientY >= rect.top && e.clientY <= rect.bottom);
-
-            if (!isInsideGutter) {
-                this.hide();
-                return;
-            }
-
-            // Verificação de hit-test no DOM: garante que o elemento sob o ponteiro pertence à barra de rolagem da biblioteca
-            // e não a um modal, backdrop, dropdown ou menu de contexto sobreposto
-            const hitEl = document.elementFromPoint(e.clientX, e.clientY);
+        const activeTab = doc.querySelector("#sidebar-left .tab-content.active")?.id;
+        if (activeTab !== "tab-videos" && activeTab !== "tab-photos") return;
+        
+        const rect = container.getBoundingClientRect();
+        const isInsideGutter = (e.clientX >= rect.right - 16 && e.clientX <= rect.right + 4 && e.clientY >= rect.top && e.clientY <= rect.bottom);
+        if (isInsideGutter) {
+            const hitEl = doc.elementFromPoint(e.clientX, e.clientY);
             if (!hitEl || (!container.contains(hitEl) && hitEl !== container && !hitEl.closest("#sidebar-left"))) {
-                this.hide();
                 return;
             }
             if (hitEl.closest(".modal-overlay, #timeline-alternatives-popup, #timeline-alternatives-backdrop, #modal-timeline-help, #modal-edit-marker, .custom-context-menu")) {
-                this.hide();
                 return;
             }
 
-            this.lastHoverEvent = e;
+            this.isPointerDownOnGutter = true;
             const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
             this.updateAtRatio(ratio, e, activeTab);
 
-            if (this.isPointerDownOnGutter) {
-                if (this.currentTargetItem) {
-                    const itemRect = this.currentTargetItem.getBoundingClientRect();
-                    const targetScroll = (itemRect.top - rect.top) + container.scrollTop;
-                    container.scrollTop = Math.max(0, targetScroll - 4);
-                } else {
-                    const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
-                    container.scrollTop = targetScrollTop;
-                }
+            if (this.currentTargetItem) {
+                const itemRect = this.currentTargetItem.getBoundingClientRect();
+                const targetScroll = (itemRect.top - rect.top) + container.scrollTop;
+                container.scrollTo({ top: Math.max(0, targetScroll - 4), behavior: "smooth" });
+            } else {
+                const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
+                container.scrollTo({ top: targetScrollTop, behavior: "smooth" });
             }
-        };
+        }
+    }
 
-        const onPointerLeave = () => {
-            this.isPointerDownOnGutter = false;
+    handlePointerUp() {
+        this.isPointerDownOnGutter = false;
+    }
+
+    handleWheel(e) {
+        if (this.isAnyModalOpen()) {
             this.hide();
-        };
-
-        const onPointerDown = (e) => {
-            if (!this.isEnabled) return;
-            if (this.isAnyModalOpen() || document.querySelector(".custom-context-menu")) return;
-            const container = this.getScrollContainer();
-            if (!container) return;
-
-            const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id;
-            if (activeTab !== "tab-videos" && activeTab !== "tab-photos") return;
-            
-            const rect = container.getBoundingClientRect();
-            const isInsideGutter = (e.clientX >= rect.right - 16 && e.clientX <= rect.right + 4 && e.clientY >= rect.top && e.clientY <= rect.bottom);
-            if (isInsideGutter) {
-                const hitEl = document.elementFromPoint(e.clientX, e.clientY);
-                if (!hitEl || (!container.contains(hitEl) && hitEl !== container && !hitEl.closest("#sidebar-left"))) {
-                    return;
-                }
-                if (hitEl.closest(".modal-overlay, #timeline-alternatives-popup, #timeline-alternatives-backdrop, #modal-timeline-help, #modal-edit-marker, .custom-context-menu")) {
-                    return;
-                }
-
-                this.isPointerDownOnGutter = true;
-                const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-                this.updateAtRatio(ratio, e, activeTab);
-
-                if (this.currentTargetItem) {
-                    const itemRect = this.currentTargetItem.getBoundingClientRect();
-                    const targetScroll = (itemRect.top - rect.top) + container.scrollTop;
-                    container.scrollTo({ top: Math.max(0, targetScroll - 4), behavior: "smooth" });
-                } else {
-                    const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
-                    container.scrollTo({ top: targetScrollTop, behavior: "smooth" });
-                }
+            return;
+        }
+        if (e.shiftKey && this.tooltipEl && this.tooltipEl.classList.contains("visible")) {
+            e.preventDefault();
+            e.stopPropagation();
+            const delta = e.deltaY < 0 ? 12 : -12;
+            this.thumbWidth = Math.max(80, Math.min(240, this.thumbWidth + delta));
+            this.tooltipEl.style.setProperty("--scroll-thumb-width", `${this.thumbWidth}px`);
+            localStorage.setItem("library_scroll_preview_thumb_width", this.thumbWidth);
+            if (this.lastHoverEvent) {
+                const container = this.getScrollContainer();
+                if (container) this.positionTooltip(this.lastHoverEvent, container.getBoundingClientRect());
             }
-        };
+        }
+    }
 
-        const onPointerUp = () => {
-            this.isPointerDownOnGutter = false;
-        };
-
-        const onWheel = (e) => {
-            if (this.isAnyModalOpen()) {
-                this.hide();
-                return;
-            }
-            if (e.shiftKey && this.tooltipEl && this.tooltipEl.classList.contains("visible")) {
-                e.preventDefault();
-                e.stopPropagation();
-                const delta = e.deltaY < 0 ? 12 : -12;
-                this.thumbWidth = Math.max(80, Math.min(240, this.thumbWidth + delta));
-                this.tooltipEl.style.setProperty("--scroll-thumb-width", `${this.thumbWidth}px`);
-                localStorage.setItem("library_scroll_preview_thumb_width", this.thumbWidth);
-                if (this.lastHoverEvent) {
-                    const container = this.getScrollContainer();
-                    if (container) this.positionTooltip(this.lastHoverEvent, container.getBoundingClientRect());
-                }
-            }
-        };
-
-        document.addEventListener("pointermove", onPointerMove);
-        document.addEventListener("pointerleave", onPointerLeave);
-        document.addEventListener("pointerdown", onPointerDown);
-        window.addEventListener("pointerup", onPointerUp);
-        window.addEventListener("wheel", onWheel, { passive: false });
-        window.addEventListener("resize", () => this.hide());
+    bindEvents() {
+        // Métodos vinculados dinamicamente via attachToWindow()
     }
 
     bindSettings() {
-        const chkEnabled = document.getElementById("chk-scroll-index-enabled");
-        const selDwell = document.getElementById("sel-scroll-index-dwell");
+        const doc = this.activeDoc || document;
+        const chkEnabled = doc.getElementById("chk-scroll-index-enabled") || document.getElementById("chk-scroll-index-enabled");
+        const selDwell = doc.getElementById("sel-scroll-index-dwell") || document.getElementById("sel-scroll-index-dwell");
 
         if (chkEnabled) {
             chkEnabled.checked = this.isEnabled;
@@ -6269,7 +6338,8 @@ export class LibraryScrollIndexTracker {
     }
 
     updateAtRatio(ratio, mouseEvent, activeTabId) {
-        if (!this.isEnabled || document.querySelector(".custom-context-menu")) {
+        const doc = this.activeDoc || document;
+        if (!this.isEnabled || doc.querySelector(".custom-context-menu")) {
             this.hide();
             return;
         }
@@ -6277,7 +6347,7 @@ export class LibraryScrollIndexTracker {
         const container = this.getScrollContainer();
         if (!container) return;
 
-        const activeTabEl = document.getElementById(activeTabId);
+        const activeTabEl = doc.getElementById(activeTabId);
         if (!activeTabEl) return;
 
         // Apenas itens visíveis (ignora pastas recolhidas cujo offsetParent é null)
@@ -6511,6 +6581,8 @@ export class LibraryScrollIndexTracker {
     }
 
     positionTooltip(mouseEvent, containerRect) {
+        const win = this.activeWindow || window;
+        this.ensureTooltipElement();
         if (!this.tooltipEl) return;
         this.tooltipEl.classList.add("visible");
 
@@ -6519,13 +6591,13 @@ export class LibraryScrollIndexTracker {
         const tooltipHeight = tooltipRect.height || 70;
 
         let top = mouseEvent.clientY - (tooltipHeight / 2);
-        top = Math.max(10, Math.min(window.innerHeight - tooltipHeight - 10, top));
+        top = Math.max(10, Math.min(win.innerHeight - tooltipHeight - 10, top));
 
         // Por padrão: à direita da barra para não cobrir a mídia da biblioteca
         let left = containerRect.right + 6;
 
         // Se passar da borda direita da janela ou estiver maximizado: inverte para a esquerda da barra
-        if (left + tooltipWidth > window.innerWidth - 10) {
+        if (left + tooltipWidth > win.innerWidth - 10) {
             left = containerRect.right - 16 - tooltipWidth - 6;
         }
         left = Math.max(10, left);
