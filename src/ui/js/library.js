@@ -6047,6 +6047,7 @@ export class LibraryScrollIndexTracker {
         this.lastHoverEvent = null;
         this.currentTargetItem = null;
         this.isPointerDownOnGutter = false;
+        this.resizeObserver = null;
         
         this.isEnabled = localStorage.getItem("library_scroll_index_enabled") !== "false";
         this.dwellDelay = parseInt(localStorage.getItem("library_scroll_index_dwell") || "1000", 10);
@@ -6075,6 +6076,15 @@ export class LibraryScrollIndexTracker {
 
     attachToWindow(win = window) {
         if (!win || !win.document) return;
+
+        if (this.resizeObserver) {
+            try {
+                this.resizeObserver.disconnect();
+            } catch (err) {
+                console.warn("[LibraryScrollIndexTracker] Erro ao desconectar ResizeObserver anterior:", err);
+            }
+            this.resizeObserver = null;
+        }
 
         // Se já estava anexado a uma janela anterior, remove listeners antigos
         if (this.activeDoc && this.activeWindow) {
@@ -6167,6 +6177,19 @@ export class LibraryScrollIndexTracker {
             tagsRow: el.querySelector(".scroll-index-tags-row"),
             posEl: el.querySelector(".scroll-index-pos")
         };
+
+        if (!this.resizeObserver && typeof ResizeObserver !== "undefined") {
+            this.resizeObserver = new ResizeObserver(() => {
+                if (this.tooltipEl && this.tooltipEl.classList.contains("visible") && this.lastHoverEvent) {
+                    const container = this.getScrollContainer();
+                    if (container) {
+                        this.positionTooltip(this.lastHoverEvent, container.getBoundingClientRect());
+                    }
+                }
+            });
+            this.resizeObserver.observe(this.tooltipEl);
+        }
+
         return el;
     }
 
@@ -6391,7 +6414,16 @@ export class LibraryScrollIndexTracker {
             if (this.dwellDelay > 0) {
                 this.dwellTimer = setTimeout(() => {
                     this.tooltipEl.classList.add("expanded");
-                    if (this.lastHoverEvent) {
+                    if (typeof requestAnimationFrame !== "undefined") {
+                        requestAnimationFrame(() => {
+                            if (this.lastHoverEvent && this.tooltipEl && this.tooltipEl.classList.contains("visible")) {
+                                const currentContainer = this.getScrollContainer();
+                                if (currentContainer) {
+                                    this.positionTooltip(this.lastHoverEvent, currentContainer.getBoundingClientRect());
+                                }
+                            }
+                        });
+                    } else if (this.lastHoverEvent) {
                         const currentContainer = this.getScrollContainer();
                         if (currentContainer) {
                             this.positionTooltip(this.lastHoverEvent, currentContainer.getBoundingClientRect());
@@ -6582,6 +6614,7 @@ export class LibraryScrollIndexTracker {
 
     positionTooltip(mouseEvent, containerRect) {
         const win = this.activeWindow || window;
+        const doc = this.activeDoc || win.document || document;
         this.ensureTooltipElement();
         if (!this.tooltipEl) return;
         this.tooltipEl.classList.add("visible");
@@ -6590,17 +6623,33 @@ export class LibraryScrollIndexTracker {
         const tooltipWidth = tooltipRect.width || (this.thumbWidth + 160);
         const tooltipHeight = tooltipRect.height || 70;
 
+        const viewportHeight = Math.min(
+            win.innerHeight || 99999,
+            doc.documentElement?.clientHeight || 99999
+        );
+        const viewportWidth = Math.min(
+            win.innerWidth || 99999,
+            doc.documentElement?.clientWidth || 99999
+        );
+
+        const margin = 10;
         let top = mouseEvent.clientY - (tooltipHeight / 2);
-        top = Math.max(10, Math.min(win.innerHeight - tooltipHeight - 10, top));
+        
+        // Garante que o card nunca ultrapasse a borda inferior da tela ao expandir com descrição
+        if (top + tooltipHeight > viewportHeight - margin) {
+            top = viewportHeight - tooltipHeight - margin;
+        }
+        // Garante que o card nunca ultrapasse o topo da janela
+        top = Math.max(margin, top);
 
         // Por padrão: à direita da barra para não cobrir a mídia da biblioteca
         let left = containerRect.right + 6;
 
         // Se passar da borda direita da janela ou estiver maximizado: inverte para a esquerda da barra
-        if (left + tooltipWidth > win.innerWidth - 10) {
+        if (left + tooltipWidth > viewportWidth - margin) {
             left = containerRect.right - 16 - tooltipWidth - 6;
         }
-        left = Math.max(10, left);
+        left = Math.max(margin, left);
 
         this.tooltipEl.style.top = `${Math.round(top)}px`;
         this.tooltipEl.style.left = `${Math.round(left)}px`;

@@ -7434,6 +7434,9 @@ input[type="number"] {
     width: calc(var(--scroll-thumb-width) + 160px);
     min-width: 270px;
     max-width: 440px;
+    max-height: calc(100vh - 20px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     background: rgba(14, 14, 18, 0.96);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -7448,6 +7451,12 @@ input[type="number"] {
     transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
     opacity: 0;
     transform: scale(0.96);
+    scrollbar-width: none;
+}
+
+#library-scroll-index-tooltip::-webkit-scrollbar {
+    display: none;
+    width: 0;
 }
 
 #library-scroll-index-tooltip.visible {
@@ -7574,7 +7583,7 @@ input[type="number"] {
 }
 
 #library-scroll-index-tooltip.expanded .scroll-index-details {
-    max-height: 180px;
+    max-height: 380px;
     opacity: 1;
     margin-top: 8px;
     padding-top: 8px;
@@ -7586,7 +7595,7 @@ input[type="number"] {
     line-height: 1.4;
     color: rgba(255, 255, 255, 0.85);
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 4;
     -webkit-box-orient: vertical;
     overflow: hidden;
     word-break: break-word;
