@@ -253,6 +253,10 @@ export class CapiauTimelineInteraction {
         document.removeEventListener("mouseup", this.boundMouseUp);
         win.removeEventListener("mousemove", this.boundWindowMouseMove);
         this.canvas.removeEventListener("wheel", this.boundWheel);
+        const headersSidebar = this.canvas.ownerDocument.getElementById("timeline-headers-sidebar");
+        if (headersSidebar) {
+            headersSidebar.removeEventListener("wheel", this.boundWheel);
+        }
         this.canvas.removeEventListener("mouseleave", this.boundMouseLeave);
         this.canvas.removeEventListener("dragover", this.boundDragOver);
         this.canvas.removeEventListener("drop", this.boundDrop);
@@ -6836,7 +6840,44 @@ export class CapiauTimelineInteraction {
     onWheel(e) {
         e.preventDefault();
 
-        if (e.ctrlKey) {
+        if (e.altKey) {
+            // Alt + roda do mouse: mesmo funcionamento que setas para cima e para baixo (pulos entre cortes/pontos de edição)
+            window.activeFocusedPlayer = "program";
+
+            let deltaY = e.deltaY;
+            if (e.deltaMode === 1) deltaY *= 33; // DOM_DELTA_LINE
+            else if (e.deltaMode === 2) deltaY *= 400; // DOM_DELTA_PAGE
+
+            this._altWheelAccum = (this._altWheelAccum || 0) + deltaY;
+            clearTimeout(this._altWheelTimer);
+            this._altWheelTimer = setTimeout(() => {
+                this._altWheelAccum = 0;
+            }, 200);
+
+            const THRESHOLD = 25;
+            if (Math.abs(this._altWheelAccum) >= THRESHOLD) {
+                const isUp = this._altWheelAccum < 0;
+                this._altWheelAccum = 0;
+
+                const pp = (window.player && window.player.programPlayer) ? window.player.programPlayer : null;
+                if (pp) {
+                    pp.pause();
+                }
+
+                let targetFrame;
+                if (isUp) {
+                    // Scroll p/ cima (ArrowUp): mover agulha para o corte anterior
+                    targetFrame = TIMELINE_STATE.moveToPrevEditPoint();
+                } else {
+                    // Scroll p/ baixo (ArrowDown): mover agulha para o próximo corte
+                    targetFrame = TIMELINE_STATE.moveToNextEditPoint();
+                }
+
+                if (typeof this.ensureFrameVisible === "function" && targetFrame !== undefined) {
+                    this.ensureFrameVisible(targetFrame);
+                }
+            }
+        } else if (e.ctrlKey) {
             // Zoom horizontal centralizado no mouse
             const rect = this.canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
