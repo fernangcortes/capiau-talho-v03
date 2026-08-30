@@ -332,7 +332,7 @@ O CapIAu-Talho adota a **arquitetura clássica track-based de NLEs profissionais
 - **Camadas Transparentes:** Vídeos secundários (B-Roll) ou fotos posicionados em V2 sobrepõem visualmente o material de V1 nos trechos correspondentes.
 
 ### B. Gaps como Entidades de Primeira Classe & Ripple Delete
-- **Seleção de Gaps:** Dê um clique simples em qualquer espaço vazio entre clipes na timeline. O Gap será destacado com um retângulo tracejado ciano e uma etiqueta centralizada com sua duração exata (ex: `Vazio: 00:00:03:12`).
+- **Seleção de Gaps:** Dê um clique simples em qualquer espaço vazio entre clipes na timeline. O Gap será destacado com um retângulo tracejado ciano.
 - **Ripple Delete de Gap:** Com o Gap selecionado, pressione **`Delete`** ou **`Backspace`**. O espaço vazio é imediatamente eliminado, e os clipes subsequentes nas pistas com Sync Lock ativo avançam para fechar o buraco.
 
 ### C. Dupla Camada: Overwrite vs. Ripple Insert

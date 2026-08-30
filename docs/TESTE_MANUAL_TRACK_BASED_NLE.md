@@ -44,7 +44,7 @@ Este documento contém o roteiro passo a passo para validação manual de todas 
 - [ ] **3.1 Seleção de Gap (Espaço Vazio)**:
   1. Crie dois clipes em V1 com um espaço vazio de ~3 segundos entre eles.
   2. Dê um clique simples no espaço vazio entre os clipes.
-  3. **Resultado Esperado**: O Gap fica destacado visualmente com um retângulo tracejado ciano e uma etiqueta centralizada indicando a duração (ex: `Vazio: 00:00:03:00`).
+  3. **Resultado Esperado**: O Gap fica destacado visualmente com um retângulo tracejado ciano.
 
 - [ ] **3.2 Ripple Delete de Gap**:
   1. Com o Gap selecionado, pressione **`Delete`** ou **`Backspace`**.

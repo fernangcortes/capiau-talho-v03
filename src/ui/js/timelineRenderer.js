@@ -382,20 +382,6 @@ export class CapiauTimelineRenderer {
                 ctx.setLineDash([4, 4]);
                 ctx.strokeRect(startX + 1, clipY + 1, Math.max(1, width - 2), clipHeight - 2);
                 ctx.setLineDash([]);
-
-                // Badge de timecode do gap se couber na tela
-                if (width >= 40) {
-                    const badgeText = `Vazio: ${framesToTimecode(gap.durationFrames, TIMELINE_STATE.fps)}`;
-                    ctx.font = "bold 9px Outfit, sans-serif";
-                    const tw = ctx.measureText(badgeText).width;
-                    const bx = startX + (width - tw) / 2;
-                    const by = clipY + clipHeight / 2 + 3;
-
-                    ctx.fillStyle = "rgba(18, 18, 24, 0.8)";
-                    ctx.fillRect(bx - 4, by - 11, tw + 8, 14);
-                    ctx.fillStyle = "#06b6d4";
-                    ctx.fillText(badgeText, bx, by);
-                }
             } else {
                 ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
                 ctx.fillRect(startX, clipY, width, clipHeight);

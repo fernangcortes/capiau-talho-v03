@@ -169,9 +169,7 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
 
 - **Arquitetura Track-Based clássica de NLE.** A timeline opera no padrão multipista profissional
   (estilo Premiere / DaVinci Resolve), com posições temporais absolutas e total liberdade de montagem:
-  - **Gaps como entidades de primeira classe:** Clique no espaço vazio entre clipes para selecionar o Gap
-    (com badge de duração precisa, ex: `Vazio: 00:00:03:00`) e pressione **`Delete`** ou **`Backspace`**
-    para executar o *Ripple Delete* do buraco.
+  - **Gaps como entidades de primeira classe:** Clique no espaço vazio entre clipes para selecionar o Gap e pressione **`Delete`** ou **`Backspace`** para realizar Ripple Delete fechando o espaço imediatamente.
   - **Dupla camada de inserção:** Arraste normal para posicionamento livre / *Overwrite*; segure **`Ctrl`**
     (ou **`Cmd`**) ao arrastar ou soltar para executar *Ripple Insert* (com linha guia roxa e setas).
   - **Sync Lock granular por pista:** Botões dedicados nos cabeçalhos de V1, V2, A1 e A2 para
