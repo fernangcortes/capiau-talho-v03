@@ -2130,6 +2130,8 @@ window.addEventListener("DOMContentLoaded", () => {
             if (searchInput && searchInput.value.trim().length > 0) {
                 searchInput.dispatchEvent(new Event("input"));
             }
+
+            window.dispatchEvent(new Event("resize"));
         });
     });
 
@@ -2154,6 +2156,7 @@ window.addEventListener("DOMContentLoaded", () => {
             // Salva no localStorage
             localStorage.setItem("active-right-tab", tab);
             STATE.emit("rightTabChanged", tab);
+            window.dispatchEvent(new Event("resize"));
         });
     });
 

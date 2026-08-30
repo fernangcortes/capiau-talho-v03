@@ -156,12 +156,22 @@ export class CapiauTimelineInteraction {
         this.boundKeyDown = (e) => this.onKeyDown(e);
         this.boundKeyUp = (e) => this.onKeyUp(e);
         this.boundDragOver = (e) => {
+            const dragMedia = STATE.activeDragMedia;
+            const hasMedia = Boolean(
+                dragMedia || 
+                (e.dataTransfer && (
+                    e.dataTransfer.types.includes("application/x-capiau-media") || 
+                    e.dataTransfer.types.includes("Files")
+                ))
+            );
+            if (!hasMedia) {
+                return; // Ignora eventos de arrasto espúrios nativos do navegador
+            }
             e.preventDefault();
             if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
             const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);
             const isInsert = e.ctrlKey || e.metaKey;
 
-            const dragMedia = STATE.activeDragMedia;
             let durationSec = 5.0;
             let mediaType = "video";
             let title = "";
@@ -555,6 +565,10 @@ export class CapiauTimelineInteraction {
                 const btnExpandProgram = document.getElementById("btn-expand-program");
                 if (btnExpandProgram) btnExpandProgram.click();
             }
+        }
+
+        if (e.button === 0 || e.button === 1) {
+            e.preventDefault();
         }
         
         const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);

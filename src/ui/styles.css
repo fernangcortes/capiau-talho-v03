@@ -2069,6 +2069,18 @@ button {
     flex: 1;
 }
 
+.timeline-canvas-container {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#timeline-canvas {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+    touch-action: none;
+}
+
 .track-row {
     display: flex;
     align-items: center;

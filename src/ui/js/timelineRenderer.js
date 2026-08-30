@@ -223,9 +223,19 @@ export class CapiauTimelineRenderer {
             this.resize();
             this.requestRedraw();
         });
-        if (this.canvas && this.canvas.parentNode) {
-            this.resizeObserver.observe(this.canvas.parentNode);
+        if (this.canvas) {
+            if (this.canvas.parentNode) this.resizeObserver.observe(this.canvas.parentNode);
+            this.resizeObserver.observe(this.canvas);
+            const timelinePanel = this.canvas.closest("#timeline-panel");
+            if (timelinePanel) this.resizeObserver.observe(timelinePanel);
         }
+
+        STATE.on("leftTabChanged", () => {
+            requestAnimationFrame(() => this.resize());
+        });
+        STATE.on("rightTabChanged", () => {
+            requestAnimationFrame(() => this.resize());
+        });
 
         // Ouvintes de evento do estado para redesenho reativo
         STATE.on("timelineCutsUpdated", (cuts) => {
