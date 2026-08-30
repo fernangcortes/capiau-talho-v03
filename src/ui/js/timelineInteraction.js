@@ -159,7 +159,6 @@ export class CapiauTimelineInteraction {
             e.preventDefault();
             if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
             const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);
-            const snapped = this.snapFrame(Math.max(0, frame));
             const isInsert = e.ctrlKey || e.metaKey;
 
             const dragMedia = STATE.activeDragMedia;
@@ -177,8 +176,17 @@ export class CapiauTimelineInteraction {
             const durationFrames = Math.max(1, secondsToFrames(durationSec, fps));
             const targetTrackId = this.resolveDropTrack(track, y, mediaType);
 
+            const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
+            let snapped = Math.max(0, frame);
+            let snapGuideFrame = null;
+            if (!isSnapDisabled) {
+                const snapRes = this.snapClip(Math.max(0, frame), durationFrames, 8);
+                snapped = snapRes.snappedStart;
+                snapGuideFrame = snapRes.snapGuideFrame;
+            }
+
             if (this.renderer) {
-                this.renderer.activeSnapFrame = snapped !== frame ? snapped : null;
+                this.renderer.activeSnapFrame = snapGuideFrame;
                 this.renderer.dropIndicator = {
                     type: isInsert ? "insert" : "overwrite",
                     frame: snapped,
@@ -946,16 +954,23 @@ export class CapiauTimelineInteraction {
             const rawDelta = Math.round(dx / TIMELINE_STATE.zoom);
             const minPossibleDelta = -this.dragMinStartFrame;
             let deltaFrames = Math.max(minPossibleDelta, rawDelta);
+            let snapGuideFrame = null;
 
-            // Snapping magnético contra playhead, marcadores e clipes que NÃO estão na seleção
-            if (TIMELINE_STATE.snappingEnabled) {
-                const anchorInitStart = this.dragAnchorClip
-                    ? (this.dragInitialClipPositions.get(this.dragAnchorClip.id)?.startFrame ?? this.dragMinStartFrame)
-                    : this.dragMinStartFrame;
-                const rawAnchor = anchorInitStart + deltaFrames;
-                const snappedAnchor = this.snapFrame(rawAnchor, 8, Array.from(TIMELINE_STATE.selectedClipIds));
-                const snapOffset = snappedAnchor - rawAnchor;
-                deltaFrames = Math.max(minPossibleDelta, deltaFrames + snapOffset);
+            // Snapping magnético contra playhead, marcadores e clipes fora da seleção
+            const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
+            if (!isSnapDisabled) {
+                const ignoredIds = Array.from(this.dragInitialClipPositions.keys());
+                const cuts = STATE.activeTimelineCuts || [];
+                for (const cid of Array.from(this.dragInitialClipPositions.keys())) {
+                    const c = cuts.find(x => x.id === cid);
+                    if (c && c.link_id) {
+                        const partner = cuts.find(x => x.id !== c.id && x.link_id === c.link_id);
+                        if (partner) ignoredIds.push(partner.id);
+                    }
+                }
+                const snapRes = this.snapSelectionDelta(this.dragInitialClipPositions, rawDelta, 8, ignoredIds);
+                deltaFrames = Math.max(minPossibleDelta, snapRes.deltaFrames);
+                snapGuideFrame = snapRes.snapGuideFrame;
             }
 
             const cuts = [...STATE.activeTimelineCuts];
@@ -970,7 +985,7 @@ export class CapiauTimelineInteraction {
 
             if (this.renderer) {
                 const leadingFrame = Math.max(0, this.dragMinStartFrame + deltaFrames);
-                this.renderer.activeSnapFrame = deltaFrames !== rawDelta ? leadingFrame : null;
+                this.renderer.activeSnapFrame = snapGuideFrame;
                 this.renderer.dropIndicator = {
                     type: "overwrite",
                     frame: leadingFrame,
@@ -985,7 +1000,22 @@ export class CapiauTimelineInteraction {
             const dx = e.clientX - this.dragStartMouseX;
             const deltaFrames = Math.round(dx / TIMELINE_STATE.zoom);
             const rawStart = Math.max(0, this.dragStartClipFrame + deltaFrames);
-            const snappedStart = this.snapFrame(rawStart);
+            const clipDuration = clip ? (clip.outFrame - clip.inFrame) : 0;
+
+            const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
+            let snappedStart = rawStart;
+            let snapGuideFrame = null;
+
+            if (!isSnapDisabled && clip) {
+                const ignoredIds = [clip.id];
+                if (clip.link_id) {
+                    const partner = STATE.activeTimelineCuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                    if (partner) ignoredIds.push(partner.id);
+                }
+                const snapRes = this.snapClip(rawStart, clipDuration, 8, ignoredIds);
+                snappedStart = snapRes.snappedStart;
+                snapGuideFrame = snapRes.snapGuideFrame;
+            }
 
             // Trilha de destino: qualquer pista não travada sob o mouse
             let targetTrack = null;
@@ -996,26 +1026,67 @@ export class CapiauTimelineInteraction {
 
             const isInsert = e.ctrlKey || e.metaKey;
             if (this.renderer && clip) {
-                this.renderer.activeSnapFrame = snappedStart !== rawStart ? snappedStart : null;
+                this.renderer.activeSnapFrame = snapGuideFrame;
                 this.renderer.dropIndicator = {
                     type: isInsert ? "insert" : "overwrite",
                     frame: snappedStart,
                     trackId: targetTrack || clip.track,
-                    durationFrames: clip.outFrame - clip.inFrame
+                    durationFrames: clipDuration
                 };
             }
 
             this.moveClip(this.draggedClipId, snappedStart, targetTrack, isInsert);
         }
         else if (this.dragState === "trim-left" && this.draggedClipId) {
+            const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
             const dx = e.clientX - this.dragStartMouseX;
-            const deltaFrames = Math.round(dx / TIMELINE_STATE.zoom);
+            const rawDelta = Math.round(dx / TIMELINE_STATE.zoom);
+            let deltaFrames = rawDelta;
+            let snapGuideFrame = null;
+
+            const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
+            if (!isSnapDisabled && clip) {
+                const rawStart = this.dragStartClipFrame + rawDelta;
+                const ignoredIds = [clip.id];
+                if (clip.link_id) {
+                    const partner = STATE.activeTimelineCuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                    if (partner) ignoredIds.push(partner.id);
+                }
+                const snappedStart = this.snapFrame(rawStart, 8, ignoredIds);
+                if (snappedStart !== rawStart) {
+                    deltaFrames = snappedStart - this.dragStartClipFrame;
+                    snapGuideFrame = snappedStart;
+                }
+            }
+
+            if (this.renderer) this.renderer.activeSnapFrame = snapGuideFrame;
             const isRipple = e.ctrlKey || e.metaKey;
             this.trimClipLeft(this.draggedClipId, deltaFrames, isRipple);
         }
         else if (this.dragState === "trim-right" && this.draggedClipId) {
+            const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
             const dx = e.clientX - this.dragStartMouseX;
-            const deltaFrames = Math.round(dx / TIMELINE_STATE.zoom);
+            const rawDelta = Math.round(dx / TIMELINE_STATE.zoom);
+            let deltaFrames = rawDelta;
+            let snapGuideFrame = null;
+
+            const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
+            if (!isSnapDisabled && clip) {
+                const initialEnd = (clip.timelineStartFrame || 0) + (this.dragStartOutFrame - clip.inFrame);
+                const rawEnd = initialEnd + rawDelta;
+                const ignoredIds = [clip.id];
+                if (clip.link_id) {
+                    const partner = STATE.activeTimelineCuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                    if (partner) ignoredIds.push(partner.id);
+                }
+                const snappedEnd = this.snapFrame(rawEnd, 8, ignoredIds);
+                if (snappedEnd !== rawEnd) {
+                    deltaFrames = snappedEnd - initialEnd;
+                    snapGuideFrame = snappedEnd;
+                }
+            }
+
+            if (this.renderer) this.renderer.activeSnapFrame = snapGuideFrame;
             const isRipple = e.ctrlKey || e.metaKey;
             this.trimClipRight(this.draggedClipId, deltaFrames, isRipple);
         }
@@ -1748,7 +1819,6 @@ export class CapiauTimelineInteraction {
         const mediaType = payload.type || dragMedia?.type || "video";
         const targetTrack = this.resolveDropTrack(track, y, mediaType);
         const dropFrame = Math.max(0, frame);
-        const snappedFrame = this.snapFrame(dropFrame);
 
         if (this.renderer) {
             this.renderer.activeSnapFrame = null;
@@ -1785,6 +1855,14 @@ export class CapiauTimelineInteraction {
         }
 
         const effDur = Math.max(0.1, outTime - inTime);
+        const effDurFrames = Math.max(1, secondsToFrames(effDur, fps));
+
+        const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
+        let snappedFrame = dropFrame;
+        if (!isSnapDisabled) {
+            const snapRes = this.snapClip(dropFrame, effDurFrames, 8);
+            snappedFrame = snapRes.snappedStart;
+        }
 
         if (isInsert) {
             const inFrame = secondsToFrames(inTime, fps);
@@ -1824,57 +1902,166 @@ export class CapiauTimelineInteraction {
     }
 
     /**
-     * Calcula se o frame alvo deve sofrer encaixe (snapping) em relação a playhead, marcadores ou bordas de clipes.
+     * Coleta todos os alvos magnéticos válidos na timeline (Playhead, Marcadores e Bordas de Clipes estáticos).
+     */
+    getSnapTargets(ignoredClipIds = null) {
+        const targets = new Set();
+
+        // 1. Playhead
+        if (TIMELINE_STATE && typeof TIMELINE_STATE.playheadFrame === "number") {
+            targets.add(TIMELINE_STATE.playheadFrame);
+        }
+
+        // 2. Início absoluto da timeline (Frame 0)
+        targets.add(0);
+
+        // 3. Marcadores da Timeline
+        if (TIMELINE_STATE && TIMELINE_STATE.markers) {
+            TIMELINE_STATE.markers.forEach(marker => {
+                if (marker.id === this.draggedMarkerId) return;
+                if (typeof marker.frame === "number") targets.add(marker.frame);
+            });
+        }
+
+        // 4. Bordas dos cortes (Início e Fim)
+        if (STATE.activeTimelineCuts) {
+            const ignoredSet = ignoredClipIds ? new Set(ignoredClipIds.map(String)) : null;
+            STATE.activeTimelineCuts.forEach(cut => {
+                if (cut.id === this.draggedClipId) return;
+                if (ignoredSet && ignoredSet.has(String(cut.id))) return;
+                if (typeof cut.timelineStartFrame === "number") {
+                    targets.add(cut.timelineStartFrame);
+                    const dur = (cut.outFrame - cut.inFrame) || 0;
+                    if (dur > 0) {
+                        targets.add(cut.timelineStartFrame + dur);
+                    }
+                }
+            });
+        }
+
+        return Array.from(targets);
+    }
+
+    /**
+     * Calcula se um frame pontual deve sofrer encaixe (snapping) em relação aos alvos da timeline.
      */
     snapFrame(targetFrame, tolerancePx = 8, ignoredClipIds = null) {
         if (!TIMELINE_STATE.snappingEnabled) return targetFrame;
 
         const zoom = TIMELINE_STATE.zoom || 0.5;
         const toleranceFrames = tolerancePx / zoom;
+        const targets = this.getSnapTargets(ignoredClipIds);
 
         let bestSnap = targetFrame;
         let minDiff = toleranceFrames;
 
-        // 1. Encaixe na Playhead
-        const playheadDiff = Math.abs(TIMELINE_STATE.playheadFrame - targetFrame);
-        if (playheadDiff < minDiff) {
-            minDiff = playheadDiff;
-            bestSnap = TIMELINE_STATE.playheadFrame;
-        }
-
-        // 2. Encaixe nos Marcadores da Timeline
-        if (TIMELINE_STATE.markers) {
-            TIMELINE_STATE.markers.forEach(marker => {
-                if (marker.id === this.draggedMarkerId) return;
-                const diff = Math.abs(marker.frame - targetFrame);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    bestSnap = marker.frame;
-                }
-            });
-        }
-
-        // 3. Encaixe nas bordas dos cortes (início/fim de clipes)
-        if (STATE.activeTimelineCuts) {
-            const ignoredSet = ignoredClipIds ? new Set(ignoredClipIds) : null;
-            STATE.activeTimelineCuts.forEach(cut => {
-                if (cut.id === this.draggedClipId) return;
-                if (ignoredSet && ignoredSet.has(cut.id)) return;
-                const startDiff = Math.abs(cut.timelineStartFrame - targetFrame);
-                if (startDiff < minDiff) {
-                    minDiff = startDiff;
-                    bestSnap = cut.timelineStartFrame;
-                }
-                const dur = (cut.outFrame - cut.inFrame);
-                const endDiff = Math.abs((cut.timelineStartFrame + dur) - targetFrame);
-                if (endDiff < minDiff) {
-                    minDiff = endDiff;
-                    bestSnap = cut.timelineStartFrame + dur;
-                }
-            });
+        for (const t of targets) {
+            const diff = Math.abs(t - targetFrame);
+            if (diff < minDiff) {
+                minDiff = diff;
+                bestSnap = t;
+            }
         }
 
         return bestSnap;
+    }
+
+    /**
+     * Calcula o encaixe magnético bidirecional de um clipe (Início/Cabeça e Fim/Cauda).
+     * Retorna { snappedStart: number, snapGuideFrame: number | null }
+     */
+    snapClip(rawStart, durationFrames = 0, tolerancePx = 8, ignoredClipIds = null) {
+        if (!TIMELINE_STATE.snappingEnabled) {
+            return { snappedStart: rawStart, snapGuideFrame: null };
+        }
+
+        const zoom = TIMELINE_STATE.zoom || 0.5;
+        const toleranceFrames = tolerancePx / zoom;
+        const targets = this.getSnapTargets(ignoredClipIds);
+
+        const testHead = rawStart;
+        const testTail = rawStart + durationFrames;
+
+        let bestStart = rawStart;
+        let bestSnapGuide = null;
+        let minDiff = toleranceFrames;
+
+        for (const t of targets) {
+            // 1. Testa a cabeça (início do clipe) contra o alvo t
+            const headDiff = Math.abs(t - testHead);
+            if (headDiff < minDiff) {
+                minDiff = headDiff;
+                bestStart = t;
+                bestSnapGuide = t;
+            }
+
+            // 2. Testa a cauda (fim do clipe) contra o alvo t (se tiver duração)
+            if (durationFrames > 0) {
+                const tailDiff = Math.abs(t - testTail);
+                if (tailDiff < minDiff) {
+                    minDiff = tailDiff;
+                    bestStart = t - durationFrames;
+                    bestSnapGuide = t;
+                }
+            }
+        }
+
+        return {
+            snappedStart: Math.max(0, Math.round(bestStart)),
+            snapGuideFrame: bestSnapGuide
+        };
+    }
+
+    /**
+     * Calcula o melhor delta magnético para um grupo de clipes (T, Shift+T ou multi-seleção).
+     * Avalia as cabeças e caudas de todos os clipes selecionados contra os alvos estáticos.
+     * Retorna { deltaFrames: number, snapGuideFrame: number | null }
+     */
+    snapSelectionDelta(initialClipPositionsMap, rawDelta, tolerancePx = 8, ignoredClipIds = null) {
+        if (!TIMELINE_STATE.snappingEnabled || !initialClipPositionsMap || initialClipPositionsMap.size === 0) {
+            return { deltaFrames: rawDelta, snapGuideFrame: null };
+        }
+
+        const zoom = TIMELINE_STATE.zoom || 0.5;
+        const toleranceFrames = tolerancePx / zoom;
+        const targets = this.getSnapTargets(ignoredClipIds);
+
+        let bestOffset = 0;
+        let bestSnapGuide = null;
+        let minDiff = toleranceFrames;
+
+        for (const pos of initialClipPositionsMap.values()) {
+            const startFrame = pos.startFrame || 0;
+            const dur = pos.duration || ((pos.outFrame - pos.inFrame) || 0);
+
+            const testHead = startFrame + rawDelta;
+            const testTail = testHead + dur;
+
+            for (const t of targets) {
+                // Testa cabeça do clipe
+                const headDiff = Math.abs(t - testHead);
+                if (headDiff < minDiff) {
+                    minDiff = headDiff;
+                    bestOffset = t - testHead;
+                    bestSnapGuide = t;
+                }
+
+                // Testa cauda do clipe
+                if (dur > 0) {
+                    const tailDiff = Math.abs(t - testTail);
+                    if (tailDiff < minDiff) {
+                        minDiff = tailDiff;
+                        bestOffset = t - testTail;
+                        bestSnapGuide = t;
+                    }
+                }
+            }
+        }
+
+        return {
+            deltaFrames: rawDelta + bestOffset,
+            snapGuideFrame: bestSnapGuide
+        };
     }
 
     /**
