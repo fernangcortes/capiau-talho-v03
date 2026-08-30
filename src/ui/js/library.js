@@ -2816,11 +2816,66 @@ export class LibraryManager {
         // Estado do Filtro de Falhas & Seleção
         this.isFailedFilterActive = false;
         this.selectedFailedIds = new Set();
+        this.tabScrollPositions = {};
 
         this.init();
     }
 
+    getScrollContainer() {
+        let container = (this.activeDoc || document).querySelector("#sidebar-left .sidebar-content.scrollable");
+        if (!container && typeof document !== "undefined") {
+            container = document.querySelector("#sidebar-left .sidebar-content.scrollable");
+        }
+        if (!container && window.popoutWindows && window.popoutWindows["sidebar-left"] && !window.popoutWindows["sidebar-left"].closed) {
+            container = window.popoutWindows["sidebar-left"].document?.querySelector("#sidebar-left .sidebar-content.scrollable");
+        }
+        return container || null;
+    }
+
+    saveTabScrollPosition(tabId, scrollPos) {
+        if (!tabId) return;
+        if (scrollPos === undefined || scrollPos === null) {
+            const container = this.getScrollContainer();
+            scrollPos = container ? container.scrollTop : 0;
+        }
+        this.tabScrollPositions = this.tabScrollPositions || {};
+        this.tabScrollPositions[tabId] = scrollPos;
+        window._libraryTabScrollPositions = this.tabScrollPositions;
+    }
+
+    restoreTabScrollPosition(tabId, container = null) {
+        if (!tabId) return;
+        const cont = container || this.getScrollContainer();
+        if (!cont) return;
+        const target = (this.tabScrollPositions && this.tabScrollPositions[tabId] !== undefined)
+            ? this.tabScrollPositions[tabId]
+            : (window._libraryTabScrollPositions?.[tabId] || 0);
+
+        cont.scrollTop = target;
+        requestAnimationFrame(() => {
+            cont.scrollTop = target;
+            requestAnimationFrame(() => {
+                cont.scrollTop = target;
+            });
+        });
+    }
+
+    attachScrollListener(container = null) {
+        const cont = container || this.getScrollContainer();
+        if (!cont || cont._hasLibraryScrollListener) return;
+        cont._hasLibraryScrollListener = true;
+        cont.addEventListener("scroll", () => {
+            const doc = cont.ownerDocument || document;
+            const activeTabEl = doc.querySelector("#sidebar-left .tab-content.active");
+            const tabId = activeTabEl ? activeTabEl.id : (doc.getElementById("sidebar-left")?.getAttribute("data-active-tab") || "tab-videos");
+            if (tabId) {
+                this.saveTabScrollPosition(tabId, cont.scrollTop);
+            }
+        }, { passive: true });
+    }
+
     init() {
+        this.attachScrollListener();
         STATE.on("videosUpdated", (videos) => this.renderVideos(videos));
         STATE.on("photosUpdated", (photos) => this.renderPhotos(photos));
         STATE.on("projectChanged", () => { this.reloadData(); this.loadTriageReviewThreshold(); });
@@ -3347,10 +3402,21 @@ export class LibraryManager {
         // Busca de mídias (Filtro em tempo real)
         const searchInput = document.getElementById("library-search-input");
         if (searchInput) {
+            this._lastSearchQuery = searchInput.value;
             searchInput.addEventListener("input", () => {
+                const query = searchInput.value;
+                const isNewQuery = this._lastSearchQuery !== undefined && this._lastSearchQuery !== query;
+                this._lastSearchQuery = query;
+
+                if (isNewQuery) {
+                    // Quando o usuário digita uma busca explicitamente nova, reseta para o topo dos resultados
+                    this.saveTabScrollPosition("tab-videos", 0);
+                    this.saveTabScrollPosition("tab-photos", 0);
+                    this.saveTabScrollPosition("tab-docs", 0);
+                }
+
                 // Sincroniza o botão cíclico de status se o texto de busca for alterado
                 if (this._btnStatusCycle && this._statusSelect) {
-                    const query = searchInput.value;
                     let detectedVal = "all";
                     if (/\bstatus:pendente\b/.test(query)) {
                         detectedVal = "pending";
@@ -3967,8 +4033,14 @@ export class LibraryManager {
         }
     }
 
-    renderDocuments(docs) {
+    renderDocuments(docs, options = {}) {
         if (!this.docsListEl) return;
+        const container = this.getScrollContainer();
+        const shouldPreserveScroll = options.preserveScroll !== false;
+        const savedScroll = (shouldPreserveScroll && container)
+            ? (this.tabScrollPositions?.["tab-docs"] !== undefined ? this.tabScrollPositions["tab-docs"] : container.scrollTop)
+            : 0;
+
         this.docsListEl.innerHTML = "";
         
         if (!docs || docs.length === 0) {
@@ -4038,6 +4110,21 @@ export class LibraryManager {
                 this.refreshExtractionBadge(doc.id);
             }
         });
+
+        if (shouldPreserveScroll && container) {
+            const isTabActive = this.docsListEl.closest(".tab-content")?.classList.contains("active");
+            if (isTabActive && savedScroll > 0) {
+                container.scrollTop = savedScroll;
+                requestAnimationFrame(() => {
+                    container.scrollTop = savedScroll;
+                    requestAnimationFrame(() => {
+                        container.scrollTop = savedScroll;
+                    });
+                });
+            }
+            this.tabScrollPositions = this.tabScrollPositions || {};
+            this.tabScrollPositions["tab-docs"] = savedScroll;
+        }
     }
 
     /** Consulta a última rodada de extração do doc e atualiza o badge/título do
@@ -4216,8 +4303,14 @@ export class LibraryManager {
         return true;
     }
 
-    renderVideos(videos) {
+    renderVideos(videos, options = {}) {
         if (!this.videoListEl) return;
+        const container = this.getScrollContainer();
+        const shouldPreserveScroll = options.preserveScroll !== false;
+        const savedScroll = (shouldPreserveScroll && container)
+            ? (this.tabScrollPositions?.["tab-videos"] !== undefined ? this.tabScrollPositions["tab-videos"] : container.scrollTop)
+            : 0;
+
         this.videoListEl.innerHTML = "";
         
         if (videos.length === 0) {
@@ -4233,10 +4326,31 @@ export class LibraryManager {
         } else {
             renderTreeNode(tree, this.videoListEl, 0);
         }
+
+        if (shouldPreserveScroll && container) {
+            const isTabActive = this.videoListEl.closest(".tab-content")?.classList.contains("active");
+            if (isTabActive && savedScroll > 0) {
+                container.scrollTop = savedScroll;
+                requestAnimationFrame(() => {
+                    container.scrollTop = savedScroll;
+                    requestAnimationFrame(() => {
+                        container.scrollTop = savedScroll;
+                    });
+                });
+            }
+            this.tabScrollPositions = this.tabScrollPositions || {};
+            this.tabScrollPositions["tab-videos"] = savedScroll;
+        }
     }
 
-    renderPhotos(photos) {
+    renderPhotos(photos, options = {}) {
         if (!this.photoListEl) return;
+        const container = this.getScrollContainer();
+        const shouldPreserveScroll = options.preserveScroll !== false;
+        const savedScroll = (shouldPreserveScroll && container)
+            ? (this.tabScrollPositions?.["tab-photos"] !== undefined ? this.tabScrollPositions["tab-photos"] : container.scrollTop)
+            : 0;
+
         this.photoListEl.innerHTML = "";
         
         if (!photos || photos.length === 0) {
@@ -4289,6 +4403,21 @@ export class LibraryManager {
             });
         } else {
             renderTreeNode(tree, this.photoListEl, 0);
+        }
+
+        if (shouldPreserveScroll && container) {
+            const isTabActive = this.photoListEl.closest(".tab-content")?.classList.contains("active");
+            if (isTabActive && savedScroll > 0) {
+                container.scrollTop = savedScroll;
+                requestAnimationFrame(() => {
+                    container.scrollTop = savedScroll;
+                    requestAnimationFrame(() => {
+                        container.scrollTop = savedScroll;
+                    });
+                });
+            }
+            this.tabScrollPositions = this.tabScrollPositions || {};
+            this.tabScrollPositions["tab-photos"] = savedScroll;
         }
     }
 

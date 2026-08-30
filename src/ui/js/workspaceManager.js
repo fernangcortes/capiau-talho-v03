@@ -1123,6 +1123,11 @@ export class WorkspaceManager {
                         } else if (window.libraryManager?.scrollIndexTracker) {
                             window.libraryManager.scrollIndexTracker.attachToWindow(win);
                         }
+                        if (window.libraryInstance) {
+                            window.libraryInstance.attachScrollListener(win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                            const activeTab = win.document.querySelector("#sidebar-left .tab-content.active")?.id || "tab-videos";
+                            window.libraryInstance.restoreTabScrollPosition(activeTab, win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                        }
                     }
 
                     // Escuta atalhos de teclado no popout e redireciona para o player principal
@@ -1195,6 +1200,11 @@ export class WorkspaceManager {
                 window.libraryScrollIndex.attachToWindow(window);
             } else if (window.libraryManager?.scrollIndexTracker) {
                 window.libraryManager.scrollIndexTracker.attachToWindow(window);
+            }
+            if (window.libraryInstance) {
+                window.libraryInstance.attachScrollListener(document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id || "tab-videos";
+                window.libraryInstance.restoreTabScrollPosition(activeTab, document.querySelector("#sidebar-left .sidebar-content.scrollable"));
             }
         }
 

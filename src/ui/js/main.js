@@ -2076,6 +2076,21 @@ window.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".sidebar-left .tab-btn").forEach(btn => {
         btn.addEventListener("click", () => {
             const doc = btn.ownerDocument;
+            const scrollContainer = doc.querySelector("#sidebar-left .sidebar-content.scrollable");
+            const previousActiveBtn = doc.querySelector(".sidebar-left .tab-btn.active");
+            const previousTabId = previousActiveBtn ? previousActiveBtn.dataset.tab : null;
+            const newTabId = btn.dataset.tab;
+
+            // 1. Salva a posição de rolagem da aba que está sendo deixada
+            if (scrollContainer && previousTabId) {
+                if (window.libraryInstance) {
+                    window.libraryInstance.saveTabScrollPosition(previousTabId, scrollContainer.scrollTop);
+                } else {
+                    window._libraryTabScrollPositions = window._libraryTabScrollPositions || {};
+                    window._libraryTabScrollPositions[previousTabId] = scrollContainer.scrollTop;
+                }
+            }
+
             doc.querySelectorAll(".sidebar-left .tab-btn").forEach(b => b.classList.remove("active"));
             doc.querySelectorAll(".sidebar-left .tab-content").forEach(c => c.classList.remove("active"));
             
@@ -2093,10 +2108,26 @@ window.addEventListener("DOMContentLoaded", () => {
             // Salva no localStorage
             localStorage.setItem("active-left-tab", btn.dataset.tab);
             STATE.emit("leftTabChanged", btn.dataset.tab);
+
+            // 2. Restaura a posição de rolagem da nova aba ativa
+            if (scrollContainer) {
+                if (window.libraryInstance) {
+                    window.libraryInstance.restoreTabScrollPosition(newTabId, scrollContainer);
+                } else {
+                    const targetScroll = window._libraryTabScrollPositions?.[newTabId] || 0;
+                    scrollContainer.scrollTop = targetScroll;
+                    requestAnimationFrame(() => {
+                        scrollContainer.scrollTop = targetScroll;
+                        requestAnimationFrame(() => {
+                            scrollContainer.scrollTop = targetScroll;
+                        });
+                    });
+                }
+            }
             
-            // Dispatch input event to apply search filter immediately to the active tab
+            // Dispatch input event to apply search filter immediately to the active tab apenas se houver texto
             const searchInput = doc.getElementById("library-search-input");
-            if (searchInput) {
+            if (searchInput && searchInput.value.trim().length > 0) {
                 searchInput.dispatchEvent(new Event("input"));
             }
         });
