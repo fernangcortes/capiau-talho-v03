@@ -125,23 +125,6 @@ export class WorkspaceManager {
         if (btnSwapToProgram) btnSwapToProgram.addEventListener("click", (e) => { e.stopPropagation(); swapToProgram(); });
         if (btnSwapToSource) btnSwapToSource.addEventListener("click", (e) => { e.stopPropagation(); swapToSource(); });
 
-        // Atalho Q para alternar entre Source e Program maximizado
-        document.addEventListener("keydown", (e) => {
-            if (e.key && e.key.toLowerCase() === "q" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                const tag = document.activeElement ? document.activeElement.tagName : "";
-                if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement.isContentEditable) return;
-                const src = document.getElementById("source-player-panel");
-                const prg = document.getElementById("program-player-panel");
-                if (src && src.classList.contains("maximized")) {
-                    e.preventDefault();
-                    swapToProgram();
-                } else if (prg && prg.classList.contains("maximized")) {
-                    e.preventDefault();
-                    swapToSource();
-                }
-            }
-        });
-
         // Clique simples nos players: play/pause | Clique duplo: maximizar/minimizar
         const sourceWrapper = document.getElementById("source-video-wrapper");
         const programWrapper = document.getElementById("program-video-wrapper");

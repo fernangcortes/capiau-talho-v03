@@ -1357,6 +1357,8 @@ export class CapiauTimelineState {
                     }
                 });
 
+                STATE.activeTimelineCuts = cuts;
+
                 // Posiciona a agulha no início do clipe resultante
                 if (minStart !== Infinity) {
                     this.setPlayheadFrame(minStart);
@@ -1395,11 +1397,11 @@ export class CapiauTimelineState {
                     }
                 });
 
+                STATE.activeTimelineCuts = cuts;
+
                 // A agulha permanece na posição do playhead
                 this.setPlayheadFrame(playhead);
             }
-
-            STATE.activeTimelineCuts = cuts;
         });
 
         return true;

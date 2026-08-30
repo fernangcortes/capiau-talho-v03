@@ -6969,20 +6969,16 @@ export class CapiauTimelineInteraction {
         // Atalhos de Ripple Trim até a Agulha (Q / W)
         // Q: Ripple Delete do Início do corte até a Agulha (Ripple Trim Left / Previous Edit to Playhead)
         if (e.key.toLowerCase() === "q" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            const isPlayerMaximized = document.getElementById("source-player-panel")?.classList.contains("maximized") ||
-                                      document.getElementById("program-player-panel")?.classList.contains("maximized");
-            if (!isPlayerMaximized) {
-                const ok = TIMELINE_STATE.rippleTrimToPlayhead("head");
-                if (ok) {
-                    if (typeof window.showToast === "function") {
-                        window.showToast("Ripple Delete até a Agulha (Q)", "info");
-                    }
-                    if (this.renderer) this.renderer.requestRedraw();
-                    this.refreshClipInspector();
+            const ok = TIMELINE_STATE.rippleTrimToPlayhead("head");
+            if (ok) {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Ripple Delete até a Agulha (Q)", "info");
                 }
-                e.preventDefault();
-                return;
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
             }
+            e.preventDefault();
+            return;
         }
 
         // W: Ripple Delete da Agulha até o Fim do corte (Ripple Trim Right / Next Edit to Playhead)

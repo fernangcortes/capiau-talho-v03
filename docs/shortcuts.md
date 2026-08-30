@@ -51,13 +51,6 @@ timeline (*Program*), dependendo de qual deles estiver focado.
                                                   ponto In/Início (↑) ou
                                                   ponto Out/Fim (↓).
 
-           **Q**          **Alternar Monitor      Quando um dos players
-                          Maximizado**            estiver maximizado
-                                                  (tela cheia), alterna
-                                                  instantaneamente para o
-                                                  outro monitor
-                                                  maximizado.
-
     **Clique Simples**    **Play / Pause**        Clicar na área de vídeo
                                                   de qualquer player
                                                   (Source/Program)
