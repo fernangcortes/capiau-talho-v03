@@ -308,6 +308,78 @@ export function escapeHtml(str) {
         .replace(/'/g, "&#039;");
 }
 
+export function updateZoomTier(listEl, zoomVal) {
+    if (!listEl) return;
+    listEl.classList.remove("zoom-xs", "zoom-sm", "zoom-md", "zoom-lg", "zoom-xl");
+    if (zoomVal < 55) {
+        listEl.classList.add("zoom-xs");
+    } else if (zoomVal < 90) {
+        listEl.classList.add("zoom-sm");
+    } else if (zoomVal < 140) {
+        listEl.classList.add("zoom-md");
+    } else if (zoomVal < 210) {
+        listEl.classList.add("zoom-lg");
+    } else {
+        listEl.classList.add("zoom-xl");
+    }
+}
+
+export function getMediaRichContent(item, kind = "video", currentTitle = "") {
+    if (!item) return { descHtml: "", speakerHtml: "", tagsHtml: "" };
+
+    // 1. Descrição / Sinopse
+    const desc = (item.description || item.summary || item.caption || "").trim();
+    const showDesc = desc && desc !== currentTitle && !desc.startsWith(currentTitle);
+    const descHtml = showDesc ? `<div class="media-desc-text" title="${escapeHtml(desc)}">${escapeHtml(desc)}</div>` : "";
+
+    // 2. Falante / Personagem (para vídeos)
+    let speaker = "";
+    if (kind === "video") {
+        if (item.summary) {
+            const m = item.summary.match(/Entrevistado:\s*([^,\-\n\.]+)/i);
+            if (m) speaker = m[1].trim();
+        }
+        if (!speaker && item.description && item.description.includes("Entrevista com")) {
+            const m = item.description.match(/Entrevista com\s+([^,\-\n]+)/i);
+            if (m) speaker = m[1].trim();
+        }
+        if (!speaker && item.tags) {
+            try {
+                const parsed = typeof item.tags === "string" ? JSON.parse(item.tags) : item.tags;
+                if (Array.isArray(parsed)) {
+                    const sTag = parsed.find(t => t.startsWith("Speaker:") || t.startsWith("Person:"));
+                    if (sTag) speaker = sTag.split(":")[1].trim();
+                }
+            } catch(e) {}
+        }
+    }
+    const speakerHtml = speaker ? `<span class="badge-speaker" data-tooltip="Falante: ${escapeHtml(speaker)}"><i class="fa-solid fa-user-tie"></i> ${escapeHtml(speaker)}</span>` : "";
+
+    // 3. Tags Chips
+    let tagsHtml = "";
+    if (item.tags) {
+        try {
+            const parsed = typeof item.tags === "string" ? JSON.parse(item.tags) : item.tags;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                const chips = parsed
+                    .filter(t => !speaker || !t.toLowerCase().includes(speaker.toLowerCase()))
+                    .slice(0, 8)
+                    .map(t => {
+                        const isPerson = t.startsWith("Speaker:") || t.startsWith("Person:");
+                        const tagLabel = isPerson ? t.split(":")[1].trim() : t;
+                        const icon = isPerson ? '<i class="fa-solid fa-user" style="font-size:7.5px;"></i> ' : '';
+                        return `<span class="media-tag-chip ${isPerson ? 'person' : ''}">${icon}${escapeHtml(tagLabel)}</span>`;
+                    });
+                if (chips.length > 0) {
+                    tagsHtml = `<div class="media-tags-row">${chips.join("")}</div>`;
+                }
+            }
+        } catch(e) {}
+    }
+
+    return { descHtml, speakerHtml, tagsHtml };
+}
+
 /**
  * Inicia a edição de título inline no card de mídia (in-loco).
  * Transforma temporariamente o span .clip-title-text em um input focado,
@@ -2077,6 +2149,7 @@ function renderTreeNode(node, container, depth = 0) {
 
         // Tooltip rica e direta via buildMediaTooltip
         const tooltip = buildMediaTooltip(v, "video", forceRealFilename);
+        const { descHtml, speakerHtml, tagsHtml } = getMediaRichContent(v, "video", currentTitle);
 
         const visionBadgeHtml = hasVisionError ? `<div class="vision-error-badge" data-tooltip="Falha visual detectada. Clique em Reanalisar Falhas no topo"><i class="fa-solid fa-triangle-exclamation"></i> Falha Visual</div>` : '';
 
@@ -2102,9 +2175,12 @@ function renderTreeNode(node, container, depth = 0) {
                     ${statusGlow}
                     ${statusBadge}
                     <span class="badge-tag ${badgeClass}">${badgeLabel}</span>
+                    ${speakerHtml}
                     ${overrideBtnHtml}
                     ${actionBtn}
                 </div>
+                ${descHtml}
+                ${tagsHtml}
             </div>
         `;
 
@@ -2321,6 +2397,7 @@ function renderTreeNode(node, container, depth = 0) {
         const categoryLabel = p.category ? p.category : 'Foto';
         // Tooltip rica e direta via buildMediaTooltip
         const tooltip = buildMediaTooltip(p, "photo", forceRealFilename);
+        const { descHtml, tagsHtml } = getMediaRichContent(p, "photo", currentTitle);
         
         card.innerHTML = `
             <div class="media-thumbnail photo-thumb-container" style="position: relative;">
@@ -2341,6 +2418,8 @@ function renderTreeNode(node, container, depth = 0) {
                     <button class="btn-photo-add-timeline btn-card-action" data-tooltip="Adicionar à timeline (still)"><i class="fa-solid fa-plus"></i></button>
                     <button class="btn-photo-similar btn-card-action" data-tooltip="Encontrar similares"><i class="fa-solid fa-images"></i></button>
                 </div>
+                ${descHtml}
+                ${tagsHtml}
             </div>
         `;
         
@@ -3173,10 +3252,12 @@ export class LibraryManager {
             if (videoList) {
                 videoList.style.setProperty("--thumb-width", `${val}px`);
                 videoList.style.setProperty("--thumb-height", `${Math.round(val * 9 / 16)}px`);
+                updateZoomTier(videoList, val);
             }
             if (photoList) {
                 photoList.style.setProperty("--thumb-width", `${val}px`);
                 photoList.style.setProperty("--thumb-height", `${Math.round(val * 3 / 4)}px`);
+                updateZoomTier(photoList, val);
             }
             if (zoomLabel) zoomLabel.textContent = `${val}px`;
             if (zoomSlider) {

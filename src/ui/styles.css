@@ -828,7 +828,9 @@ button {
 /* Ocultação dinâmica */
 .hide-thumbnails .media-card.tree-file-item .media-thumbnail { display: none !important; }
 .hide-duration .media-card.tree-file-item .media-duration { display: none !important; }
-.hide-tags .media-card.tree-file-item .badge-tag { display: none !important; }
+.hide-tags .media-card.tree-file-item .badge-tag,
+.hide-tags .media-card.tree-file-item .media-tags-row,
+.hide-tags .media-card.tree-file-item .badge-speaker { display: none !important; }
 .hide-status .media-card.tree-file-item .badge { display: none !important; }
 
 /* ── MODO GRADE / CARDS (VIEW-MODE-GRID) ─────────────────────────── */
@@ -940,35 +942,57 @@ button {
     font-size: 9px !important;
 }
 
-/* Modo Lista (Árvore) de Fotos e Vídeos - Layout de 100% de largura com Título e Metadados */
+/* Modo Lista (Árvore) de Fotos e Vídeos - Layout adaptativo inteligente com Título, Metadados, Sinopse e Tags */
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item,
 #video-list:not(.view-mode-grid) .media-card.tree-file-item {
     display: flex !important;
     flex-direction: row !important;
-    align-items: center !important;
+    align-items: flex-start !important;
     width: 100% !important;
     height: auto !important;
-    min-height: 36px !important;
+    min-height: calc(var(--thumb-height, 36px) + 6px) !important;
     padding: 4px 8px !important;
     background: transparent !important;
-    border: none !important;
+    border: 1px solid transparent !important;
+    border-radius: 4px !important;
     gap: 8px !important;
     box-sizing: border-box !important;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item:hover,
 #video-list:not(.view-mode-grid) .media-card.tree-file-item:hover {
-    background: rgba(255, 255, 255, 0.05) !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+#photo-list:not(.view-mode-grid) .media-card.tree-file-item.active,
+#video-list:not(.view-mode-grid) .media-card.tree-file-item.active {
+    background: rgba(6, 182, 212, 0.1) !important;
+    border-color: rgba(6, 182, 212, 0.25) !important;
+    border-left: 3px solid var(--color-cyan) !important;
+    border-radius: 0 4px 4px 0 !important;
 }
 
-#photo-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail,
 #video-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail {
-    width: var(--thumb-width, 45px) !important;
-    max-width: 300px !important;
+    width: var(--thumb-width, 80px) !important;
+    max-width: 320px !important;
+    height: auto !important;
+    aspect-ratio: 16/9 !important;
+    object-fit: cover;
+    border-radius: 3px;
+    flex-shrink: 0 !important;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+#photo-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail {
+    width: var(--thumb-width, 80px) !important;
+    max-width: 320px !important;
     height: auto !important;
     aspect-ratio: 4/3 !important;
     object-fit: cover;
     border-radius: 3px;
     flex-shrink: 0 !important;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail img,
 #video-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail img {
@@ -976,6 +1000,7 @@ button {
     height: 100%;
     object-fit: cover;
     border-radius: 3px;
+    display: block;
 }
 
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item .media-info,
@@ -983,9 +1008,10 @@ button {
     display: flex !important;
     flex-direction: column !important;
     align-items: flex-start !important;
-    justify-content: center !important;
+    justify-content: flex-start !important;
     flex: 1 !important;
     min-width: 0 !important;
+    min-height: var(--thumb-height, 36px) !important;
     gap: 3px !important;
     overflow: hidden !important;
 }
@@ -998,9 +1024,10 @@ button {
     margin: 0 !important;
     width: 100% !important;
     min-width: 0 !important;
-    font-size: 11px !important;
-    font-weight: 500 !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
     color: var(--text-primary) !important;
+    line-height: 1.25 !important;
 }
 
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item .media-info h4 .clip-title-text,
@@ -1010,7 +1037,7 @@ button {
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    color: var(--text-primary) !important;
+    color: #f1f5f9 !important;
     display: block !important;
 }
 
@@ -1018,11 +1045,171 @@ button {
 #video-list:not(.view-mode-grid) .media-card.tree-file-item .media-info .media-meta-row {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 5px !important;
     width: 100% !important;
     margin-top: 0 !important;
-    flex-wrap: nowrap !important;
+    flex-wrap: wrap !important;
+    row-gap: 2px !important;
     overflow: hidden !important;
+    flex-shrink: 0 !important;
+}
+
+/* Badge de Falante / Personagem */
+.badge-speaker {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 7.5px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--color-emerald);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    font-weight: 500;
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.1;
+}
+.badge-speaker i {
+    font-size: 7px;
+}
+
+/* Sinopse / Decupagem Narrativa in-line */
+.media-card.tree-file-item .media-desc-text {
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: rgba(203, 213, 225, 0.78);
+    margin: 1px 0 0 0;
+    width: 100%;
+    min-width: 0;
+    word-break: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    transition: color 0.15s ease;
+}
+.media-card.tree-file-item:hover .media-desc-text {
+    color: rgba(241, 245, 249, 0.95);
+}
+
+/* Linha de Tags in-line */
+.media-card.tree-file-item .media-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    margin-top: 2px;
+    overflow: hidden;
+}
+
+.media-card.tree-file-item .media-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 8px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(148, 163, 184, 0.85);
+    white-space: nowrap;
+    line-height: 1.2;
+    transition: all 0.15s ease;
+}
+.media-card.tree-file-item .media-tag-chip.person {
+    background: rgba(138, 92, 246, 0.12);
+    border-color: rgba(138, 92, 246, 0.3);
+    color: #c4b5fd;
+}
+.media-card.tree-file-item:hover .media-tag-chip {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.14);
+    color: #e2e8f0;
+}
+
+/* ── ADAPTAÇÃO INTELIGENTE POR ZOOM TIERS ───────────────────────── */
+/* Tier XS: zoom < 55px -> modo ultra-compacto (1 linha por mídia) */
+.zoom-xs:not(.view-mode-grid) .media-card.tree-file-item {
+    min-height: 28px !important;
+    padding: 2px 6px !important;
+    gap: 6px !important;
+}
+.zoom-xs:not(.view-mode-grid) .media-card.tree-file-item .media-desc-text,
+.zoom-xs:not(.view-mode-grid) .media-card.tree-file-item .media-tags-row {
+    display: none !important;
+}
+
+/* Tier SM: 55px <= zoom < 90px -> 1 linha de sinopse, tags ocultas */
+.zoom-sm:not(.view-mode-grid) .media-card.tree-file-item .media-desc-text {
+    -webkit-line-clamp: 1 !important;
+}
+.zoom-sm:not(.view-mode-grid) .media-card.tree-file-item .media-tags-row {
+    display: none !important;
+}
+
+/* Tier MD: 90px <= zoom < 140px -> 2 linhas de sinopse + 1 linha de tags */
+.zoom-md:not(.view-mode-grid) .media-card.tree-file-item .media-desc-text {
+    -webkit-line-clamp: 2 !important;
+}
+.zoom-md:not(.view-mode-grid) .media-card.tree-file-item .media-tags-row {
+    max-height: 18px !important;
+    overflow: hidden !important;
+}
+
+/* Tier LG: 140px <= zoom < 210px -> 3 linhas de sinopse + tags completas (zoom 170px) */
+.zoom-lg:not(.view-mode-grid) .media-card.tree-file-item .media-info h4 {
+    font-size: 12px !important;
+}
+.zoom-lg:not(.view-mode-grid) .media-card.tree-file-item .media-desc-text {
+    font-size: 11px !important;
+    -webkit-line-clamp: 3 !important;
+    line-height: 1.38 !important;
+}
+
+/* Tier XL: zoom >= 210px -> sinopse expandida até 5 linhas + tags ricas */
+.zoom-xl:not(.view-mode-grid) .media-card.tree-file-item .media-info h4 {
+    font-size: 13px !important;
+}
+.zoom-xl:not(.view-mode-grid) .media-card.tree-file-item .media-desc-text {
+    font-size: 11.5px !important;
+    -webkit-line-clamp: 5 !important;
+    line-height: 1.4 !important;
+}
+
+/* Ocultação em modo grade */
+.view-mode-grid .media-desc-text,
+.view-mode-grid .media-tags-row,
+.view-mode-grid .badge-speaker {
+    display: none !important;
+}
+
+/* Adaptação por largura da barra lateral (Wide layout / Maximized / Minimal) */
+.sidebar-minimal .media-card.tree-file-item .media-tags-row,
+.sidebar-minimal .media-card.tree-file-item .badge-speaker {
+    display: none !important;
+}
+.sidebar-minimal .media-card.tree-file-item .media-desc-text {
+    -webkit-line-clamp: 1 !important;
+}
+
+.sidebar-left.wide-layout:not(.sidebar-minimal) .media-card.tree-file-item .media-desc-text,
+.sidebar-left.sidebar-maximized .media-card.tree-file-item .media-desc-text {
+    font-size: 11.5px !important;
+}
+.sidebar-left.wide-layout:not(.sidebar-minimal) .zoom-sm:not(.view-mode-grid) .media-card.tree-file-item .media-desc-text {
+    -webkit-line-clamp: 2 !important;
+}
+.sidebar-left.wide-layout:not(.sidebar-minimal) .zoom-md:not(.view-mode-grid) .media-card.tree-file-item .media-desc-text {
+    -webkit-line-clamp: 3 !important;
+}
+.sidebar-left.wide-layout:not(.sidebar-minimal) .zoom-lg:not(.view-mode-grid) .media-card.tree-file-item .media-desc-text {
+    -webkit-line-clamp: 4 !important;
 }
 
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item .btn-card-action,
