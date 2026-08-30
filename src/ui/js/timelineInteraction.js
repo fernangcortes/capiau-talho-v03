@@ -158,23 +158,107 @@ export class CapiauTimelineInteraction {
         this.boundDragOver = (e) => {
             e.preventDefault();
             if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-            const { frame, track } = this.getCoordinates(e.clientX, e.clientY);
+            const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);
             const snapped = this.snapFrame(Math.max(0, frame));
             const isInsert = e.ctrlKey || e.metaKey;
+
+            const dragMedia = STATE.activeDragMedia;
+            let durationSec = 5.0;
+            let mediaType = "video";
+            let title = "";
+
+            if (dragMedia) {
+                durationSec = dragMedia.effectiveDuration || dragMedia.duration || 5.0;
+                mediaType = dragMedia.type || "video";
+                title = dragMedia.title || dragMedia.filename || "";
+            }
+
+            const fps = (TIMELINE_STATE && TIMELINE_STATE.fps) ? TIMELINE_STATE.fps : 24;
+            const durationFrames = Math.max(1, secondsToFrames(durationSec, fps));
+            const targetTrackId = this.resolveDropTrack(track, y, mediaType);
+
             if (this.renderer) {
                 this.renderer.activeSnapFrame = snapped !== frame ? snapped : null;
                 this.renderer.dropIndicator = {
                     type: isInsert ? "insert" : "overwrite",
                     frame: snapped,
-                    trackId: track || "V1",
-                    durationFrames: secondsToFrames(5, TIMELINE_STATE.fps)
+                    trackId: targetTrackId,
+                    durationFrames: durationFrames,
+                    title: title,
+                    mediaType: mediaType
                 };
+                this.renderer.requestRedraw();
+            }
+        };
+        this.boundDragLeave = () => {
+            if (this.renderer) {
+                this.renderer.activeSnapFrame = null;
+                this.renderer.dropIndicator = null;
+                this.renderer.requestRedraw();
+            }
+        };
+        this.boundWindowDragEnd = () => {
+            STATE.activeDragMedia = null;
+            if (this.renderer) {
+                this.renderer.activeSnapFrame = null;
+                this.renderer.dropIndicator = null;
                 this.renderer.requestRedraw();
             }
         };
         this.boundDrop = (e) => this.onDrop(e);
 
         this.init();
+    }
+
+    /**
+     * Resolve a melhor pista de destino para uma mídia sendo arrastada.
+     * Trata áreas vazias abaixo das pistas, desvios de pistas de áudio/texto e pistas travadas.
+     */
+    resolveDropTrack(track, y, mediaType = "video") {
+        if (!window.TIMELINE_STATE) return "V1";
+        const videoTracks = (TIMELINE_STATE.getVideoTracks ? TIMELINE_STATE.getVideoTracks() : TIMELINE_STATE.tracks.filter(t => t.kind === "video")).filter(t => !t.locked && !t.hidden);
+        const defaultVideoTrack = videoTracks.find(t => t.id === "V1") || videoTracks[0] || { id: "V1" };
+
+        if (mediaType === "audio") {
+            const audioTracks = (TIMELINE_STATE.getAudioTracks ? TIMELINE_STATE.getAudioTracks() : TIMELINE_STATE.tracks.filter(t => t.kind === "audio")).filter(t => !t.locked && !t.hidden);
+            if (track) {
+                const t = TIMELINE_STATE.getTrack(track);
+                if (t && t.kind === "audio" && !t.locked) return t.id;
+            }
+            return (audioTracks[0] || { id: "A1" }).id;
+        }
+
+        // Para vídeo ou foto: se o cursor estiver sobre uma pista de vídeo válida e destravada
+        if (track) {
+            const t = TIMELINE_STATE.getTrack(track);
+            if (t && t.kind === "video" && !t.locked) return t.id;
+        }
+
+        // Se track é nulo (por exemplo, cursor abaixo de todas as pistas ou na régua)
+        if (y !== undefined && y !== null && this.renderer) {
+            const lanes = this.renderer.getTrackLanes().filter(l => l.track.kind === "video" && !l.track.locked);
+            if (lanes.length > 0) {
+                let closestLane = lanes[0];
+                let minDiff = Math.abs(y - (lanes[0].top + lanes[0].height / 2));
+                for (let i = 1; i < lanes.length; i++) {
+                    const diff = Math.abs(y - (lanes[i].top + lanes[i].height / 2));
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closestLane = lanes[i];
+                    }
+                }
+                if (closestLane) return closestLane.track.id;
+            }
+        }
+
+        // Se for broll e V2 existir e estiver disponível
+        const dragMedia = STATE.activeDragMedia;
+        if (dragMedia && dragMedia.video_type === "broll") {
+            const v2 = videoTracks.find(t => t.id === "V2");
+            if (v2) return v2.id;
+        }
+
+        return defaultVideoTrack.id;
     }
 
     /**
@@ -212,7 +296,11 @@ export class CapiauTimelineInteraction {
 
         // Arrastar-e-soltar de mídias da biblioteca para a timeline
         this.canvas.addEventListener("dragover", this.boundDragOver);
+        this.canvas.addEventListener("dragleave", this.boundDragLeave);
         this.canvas.addEventListener("drop", this.boundDrop);
+        win.addEventListener("dragend", this.boundWindowDragEnd);
+        window.addEventListener("dragend", this.boundWindowDragEnd);
+        document.addEventListener("dragend", this.boundWindowDragEnd);
 
         // Keyboard Listener global
         win.addEventListener("keydown", this.boundKeyDown);
@@ -259,7 +347,11 @@ export class CapiauTimelineInteraction {
         }
         this.canvas.removeEventListener("mouseleave", this.boundMouseLeave);
         this.canvas.removeEventListener("dragover", this.boundDragOver);
+        this.canvas.removeEventListener("dragleave", this.boundDragLeave);
         this.canvas.removeEventListener("drop", this.boundDrop);
+        win.removeEventListener("dragend", this.boundWindowDragEnd);
+        window.removeEventListener("dragend", this.boundWindowDragEnd);
+        document.removeEventListener("dragend", this.boundWindowDragEnd);
         win.removeEventListener("keydown", this.boundKeyDown);
         win.removeEventListener("keyup", this.boundKeyUp);
     }
@@ -1638,11 +1730,23 @@ export class CapiauTimelineInteraction {
             const raw = e.dataTransfer.getData("application/x-capiau-media");
             if (raw) payload = JSON.parse(raw);
         } catch (_) { payload = null; }
+
+        const dragMedia = STATE.activeDragMedia;
+        if (!payload && dragMedia) {
+            payload = {
+                type: dragMedia.type,
+                id: dragMedia.id,
+                inTime: dragMedia.inTime,
+                outTime: dragMedia.outTime,
+                duration: dragMedia.effectiveDuration
+            };
+        }
+
         if (!payload || payload.id === undefined || payload.id === null) return;
 
-        const { frame, track } = this.getCoordinates(e.clientX, e.clientY);
-        const trackObj = track ? TIMELINE_STATE.getTrack(track) : null;
-        const targetTrack = (trackObj && trackObj.kind === "video" && !trackObj.locked) ? track : "V1";
+        const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);
+        const mediaType = payload.type || dragMedia?.type || "video";
+        const targetTrack = this.resolveDropTrack(track, y, mediaType);
         const dropFrame = Math.max(0, frame);
         const snappedFrame = this.snapFrame(dropFrame);
 
@@ -1652,45 +1756,70 @@ export class CapiauTimelineInteraction {
         }
 
         const isInsert = e.ctrlKey || e.metaKey;
+        const fps = (TIMELINE_STATE && TIMELINE_STATE.fps) ? TIMELINE_STATE.fps : 24;
+
+        let inTime = 0.0;
+        let outTime = 5.0;
+
+        if (payload.type === "photo") {
+            const dur = (dragMedia && dragMedia.effectiveDuration) ? dragMedia.effectiveDuration : (payload.duration || 5.0);
+            inTime = 0.0;
+            outTime = dur;
+        } else {
+            const video = STATE.allVideos?.find(v => v.id === payload.id);
+            const totalDur = (video && video.duration && video.duration > 0) ? video.duration : 5.0;
+            if (payload.inTime !== undefined && payload.outTime !== undefined && payload.outTime > payload.inTime) {
+                inTime = payload.inTime;
+                outTime = payload.outTime;
+            } else if (dragMedia && dragMedia.id === payload.id && dragMedia.outTime > dragMedia.inTime) {
+                inTime = dragMedia.inTime;
+                outTime = dragMedia.outTime;
+            } else if (STATE.activeVideo && STATE.activeVideo.id === payload.id) {
+                if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
+                if (STATE.markerOut !== null && STATE.markerOut !== undefined) outTime = STATE.markerOut;
+                if (outTime <= inTime) outTime = totalDur;
+            } else {
+                inTime = 0.0;
+                outTime = totalDur;
+            }
+        }
+
+        const effDur = Math.max(0.1, outTime - inTime);
 
         if (isInsert) {
+            const inFrame = secondsToFrames(inTime, fps);
+            const outFrame = secondsToFrames(outTime, fps);
             if (payload.type === "photo") {
-                const dur = 5.0;
-                const outFrame = secondsToFrames(dur, TIMELINE_STATE.fps);
                 TIMELINE_STATE.insertClipWithRipple({
                     type: "photo",
                     photo_id: payload.id,
                     video_id: null,
                     inFrame: 0,
-                    outFrame: outFrame,
+                    outFrame: secondsToFrames(effDur, fps),
                     in: 0,
-                    out: dur,
+                    out: effDur,
                     effects: [{ type: "fit", mode: "fill" }]
                 }, snappedFrame, targetTrack);
             } else {
-                const video = STATE.allVideos.find(v => v.id === payload.id);
-                const dur = (video && video.duration) ? video.duration : 5.0;
-                const outFrame = secondsToFrames(dur, TIMELINE_STATE.fps);
                 TIMELINE_STATE.insertClipWithRipple({
                     type: "video",
                     video_id: payload.id,
                     photo_id: null,
-                    inFrame: 0,
+                    inFrame: inFrame,
                     outFrame: outFrame,
-                    in: 0,
-                    out: dur
+                    in: inTime,
+                    out: outTime
                 }, snappedFrame, targetTrack);
             }
         } else {
             if (payload.type === "photo") {
                 TIMELINE_STATE.addPhotoCut(payload.id, { track: targetTrack, timelineStartFrame: snappedFrame });
             } else {
-                const video = STATE.allVideos.find(v => v.id === payload.id);
-                const dur = (video && video.duration) ? video.duration : 5.0;
-                TIMELINE_STATE.addCut(payload.id, 0, dur, targetTrack, snappedFrame);
+                TIMELINE_STATE.addCut(payload.id, inTime, outTime, targetTrack, snappedFrame);
             }
         }
 
+        STATE.activeDragMedia = null;
         if (this.renderer) this.renderer.requestRedraw();
     }
 

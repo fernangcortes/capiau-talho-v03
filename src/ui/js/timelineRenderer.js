@@ -471,17 +471,101 @@ export class CapiauTimelineRenderer {
                 ctx.closePath();
                 ctx.fill();
 
+                // Etiqueta indicativa de Ripple Insert
+                if (lane && lane.height > 24) {
+                    ctx.font = "bold 9px Outfit, sans-serif";
+                    ctx.fillStyle = "#8b5cf6";
+                    ctx.textBaseline = "top";
+                    ctx.fillText("[RIPPLE INSERT]", startX + 8, topY + 6);
+                }
+
                 ctx.restore();
             } else if (type === "overwrite") {
                 const lane = this.getLane(trackId);
                 if (lane && durationFrames > 0) {
                     const width = durationFrames * zoom;
+                    const isPhoto = this.dropIndicator.mediaType === "photo";
+                    const bgGrad = isPhoto ? "rgba(6, 182, 212, 0.22)" : "rgba(139, 92, 246, 0.25)";
+                    const borderStroke = isPhoto ? "rgba(6, 182, 212, 0.85)" : "rgba(139, 92, 246, 0.9)";
+
                     ctx.save();
-                    ctx.fillStyle = "rgba(139, 92, 246, 0.2)";
+                    // Fundo translúcido do clipe fantasma
+                    ctx.fillStyle = bgGrad;
                     ctx.fillRect(startX, lane.top, width, lane.height);
-                    ctx.strokeStyle = "rgba(139, 92, 246, 0.8)";
+
+                    // Borda tracejada sutil de preview/ghost
+                    ctx.strokeStyle = borderStroke;
                     ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 2]);
                     ctx.strokeRect(startX, lane.top, width, lane.height);
+                    ctx.setLineDash([]);
+
+                    // Renderizar texto e badges no clipe fantasma se houver espaço
+                    if (width > 24 && lane.height > 20) {
+                        const title = this.dropIndicator.title || (isPhoto ? "Foto" : "Vídeo");
+                        const durSec = durationFrames / ((window.TIMELINE_STATE && window.TIMELINE_STATE.fps) ? window.TIMELINE_STATE.fps : 24);
+                        const durText = `${durSec.toFixed(1)}s`;
+
+                        ctx.font = "bold 10px Outfit, sans-serif";
+                        ctx.textBaseline = "top";
+
+                        // Badge / Tipo
+                        const badgeText = isPhoto ? "[FOTO]" : "[VÍDEO]";
+                        const badgeWidth = ctx.measureText(badgeText).width;
+
+                        ctx.fillStyle = isPhoto ? "rgba(6, 182, 212, 0.9)" : "rgba(168, 85, 247, 0.9)";
+                        ctx.fillText(badgeText, startX + 6, lane.top + 5);
+
+                        // Título
+                        if (width > badgeWidth + 50) {
+                            ctx.fillStyle = "#e2e8f0";
+                            ctx.font = "500 10px Outfit, sans-serif";
+                            const maxTitleW = width - badgeWidth - 70;
+                            let displayTitle = title;
+                            if (ctx.measureText(displayTitle).width > maxTitleW && maxTitleW > 20) {
+                                while (displayTitle.length > 3 && ctx.measureText(displayTitle + "…").width > maxTitleW) {
+                                    displayTitle = displayTitle.slice(0, -1);
+                                }
+                                displayTitle += "…";
+                            }
+                            if (maxTitleW > 20) {
+                                ctx.fillText(displayTitle, startX + badgeWidth + 10, lane.top + 5);
+                            }
+                        }
+
+                        // Duração no canto inferior esquerdo
+                        if (width > 60 && lane.height > 32) {
+                            ctx.font = "10px monospace";
+                            ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+                            ctx.textBaseline = "bottom";
+                            ctx.fillText(durText, startX + 6, lane.top + lane.height - 4);
+                        }
+                    }
+
+                    // Se for vídeo com áudio embutido e houver pista de áudio vinculada correspondente
+                    if (!isPhoto && window.TIMELINE_STATE && typeof window.TIMELINE_STATE.pairedAudioTrackId === "function") {
+                        const pairedAudioId = window.TIMELINE_STATE.pairedAudioTrackId(trackId);
+                        if (pairedAudioId) {
+                            const audioLane = this.getLane(pairedAudioId);
+                            if (audioLane) {
+                                ctx.fillStyle = "rgba(16, 185, 129, 0.18)"; // Verde Esmeralda / Áudio
+                                ctx.fillRect(startX, audioLane.top, width, audioLane.height);
+                                ctx.strokeStyle = "rgba(16, 185, 129, 0.75)";
+                                ctx.lineWidth = 1.5;
+                                ctx.setLineDash([4, 2]);
+                                ctx.strokeRect(startX, audioLane.top, width, audioLane.height);
+                                ctx.setLineDash([]);
+
+                                if (width > 30 && audioLane.height > 18) {
+                                    ctx.fillStyle = "rgba(16, 185, 129, 0.9)";
+                                    ctx.font = "bold 9px Outfit, sans-serif";
+                                    ctx.textBaseline = "top";
+                                    ctx.fillText("[ÁUDIO]", startX + 6, audioLane.top + 4);
+                                }
+                            }
+                        }
+                    }
+
                     ctx.restore();
                 }
             }

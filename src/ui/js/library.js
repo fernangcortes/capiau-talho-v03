@@ -2291,11 +2291,46 @@ function renderTreeNode(node, container, depth = 0) {
             showMediaContextMenu(e, v, "video", card);
         });
 
-        // Arrastar-e-soltar do vídeo para a timeline
+        // Arrastar-e-soltar do vídeo para a timeline com dimensões reais e In/Out
         card.draggable = true;
         card.addEventListener("dragstart", (e) => {
-            e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({ type: "video", id: v.id }));
+            let inTime = 0.0;
+            let outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
+            if (STATE.activeVideo && STATE.activeVideo.id === v.id) {
+                if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
+                if (STATE.markerOut !== null && STATE.markerOut !== undefined) outTime = STATE.markerOut;
+                if (outTime <= inTime) outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
+            }
+            const effDur = Math.max(0.1, outTime - inTime);
+
+            STATE.activeDragMedia = {
+                type: "video",
+                id: v.id,
+                title: currentTitle,
+                filename: v.filename,
+                duration: v.duration || 5.0,
+                inTime: inTime,
+                outTime: outTime,
+                effectiveDuration: effDur,
+                video_type: v.video_type || null
+            };
+
+            e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({
+                type: "video",
+                id: v.id,
+                inTime: inTime,
+                outTime: outTime,
+                duration: effDur
+            }));
             e.dataTransfer.effectAllowed = "copy";
+        });
+        card.addEventListener("dragend", () => {
+            STATE.activeDragMedia = null;
+            if (window.TIMELINE_INTERACTION?.renderer) {
+                window.TIMELINE_INTERACTION.renderer.dropIndicator = null;
+                window.TIMELINE_INTERACTION.renderer.activeSnapFrame = null;
+                window.TIMELINE_INTERACTION.renderer.requestRedraw();
+            }
         });
 
         // Listener para alternar título
@@ -2478,8 +2513,34 @@ function renderTreeNode(node, container, depth = 0) {
             card.style.cursor = "pointer";
             card.draggable = true;
             card.addEventListener("dragstart", (e) => {
-                e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({ type: "photo", id: p.id }));
+                const effDur = 5.0;
+                STATE.activeDragMedia = {
+                    type: "photo",
+                    id: p.id,
+                    title: currentTitle,
+                    filename: p.filename,
+                    duration: effDur,
+                    inTime: 0,
+                    outTime: effDur,
+                    effectiveDuration: effDur
+                };
+
+                e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({
+                    type: "photo",
+                    id: p.id,
+                    inTime: 0,
+                    outTime: effDur,
+                    duration: effDur
+                }));
                 e.dataTransfer.effectAllowed = "copy";
+            });
+            card.addEventListener("dragend", () => {
+                STATE.activeDragMedia = null;
+                if (window.TIMELINE_INTERACTION?.renderer) {
+                    window.TIMELINE_INTERACTION.renderer.dropIndicator = null;
+                    window.TIMELINE_INTERACTION.renderer.activeSnapFrame = null;
+                    window.TIMELINE_INTERACTION.renderer.requestRedraw();
+                }
             });
             card.addEventListener("click", () => {
                 if (STATE.openPhotosInPlayer) {
