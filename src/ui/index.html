@@ -150,8 +150,7 @@
                 </div>
                 
                 <div class="media-tabs" id="left-tabs">
-                    <button class="tab-btn active" data-tab="tab-videos" title="Vídeos"><i class="fa-solid fa-photo-film"></i> <span class="tab-text">Vídeos</span></button>
-                    <button class="tab-btn" data-tab="tab-photos" title="Fotos"><i class="fa-solid fa-camera"></i> <span class="tab-text">Fotos</span></button>
+                    <button class="tab-btn active" data-tab="tab-media" title="Mídias"><i class="fa-solid fa-photo-film"></i> <span class="tab-text">Mídias</span></button>
                     <button class="tab-btn" data-tab="tab-themes" title="Temas"><i class="fa-solid fa-tags"></i> <span class="tab-text">Temas</span></button>
                     <button class="tab-btn" data-tab="tab-faces" title="Rostos"><i class="fa-solid fa-user-friends"></i> <span class="tab-text">Rostos</span></button>
                     <button class="tab-btn" data-tab="tab-titles" title="Títulos & Textos"><i class="fa-solid fa-font"></i> <span class="tab-text">Títulos</span></button>
@@ -187,6 +186,14 @@
                             <i class="fa-solid fa-circle-stop"></i>
                             <span>Cancelar Análises</span>
                         </button>
+                    </div>
+
+                    <!-- Linha 2: Chips de Filtro Rápido por Tipo de Mídia -->
+                    <div class="media-type-filter-chips" id="media-type-filter-chips" style="display: flex; gap: 4px; align-items: center; width: 100%; margin-top: 1px;">
+                        <button class="chip-filter active" data-type-filter="all"><i class="fa-solid fa-layer-group"></i> <span>Todos</span> <span class="chip-count" id="count-all">0</span></button>
+                        <button class="chip-filter" data-type-filter="video"><i class="fa-solid fa-film"></i> <span>Vídeos</span> <span class="chip-count" id="count-video">0</span></button>
+                        <button class="chip-filter" data-type-filter="photo"><i class="fa-solid fa-camera"></i> <span>Fotos</span> <span class="chip-count" id="count-photo">0</span></button>
+                        <button class="chip-filter" data-type-filter="audio"><i class="fa-solid fa-music"></i> <span>Áudios</span> <span class="chip-count" id="count-audio">0</span></button>
                     </div>
 
                     <!-- Popover de Busca por Similaridade em Lote -->
@@ -344,15 +351,9 @@
                 </div>
                 
                 <div class="sidebar-content scrollable">
-                    <!-- Tab: Vídeos -->
-                    <div class="tab-content active" id="tab-videos">
-                        <div class="media-list" id="video-list">
-                            <!-- Inserido dinamicamente via JS -->
-                        </div>
-                    </div>
-                    
-                    <div class="tab-content" id="tab-photos">
-                        <div class="media-list" id="photo-list">
+                    <!-- Tab: Mídias Unificadas (Vídeos, Fotos, Áudios, Bins e Smart Bins) -->
+                    <div class="tab-content active" id="tab-media">
+                        <div class="media-list" id="media-tree-list">
                             <!-- Inserido dinamicamente via JS -->
                         </div>
                     </div>

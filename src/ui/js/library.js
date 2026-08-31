@@ -4,8 +4,36 @@ import { CapIAuAPI } from "./api.js";
 import { FaceManager } from "./faces.js";
 import { parseQuery, evaluateAST, getAvailableSuggestions } from "./searchParser.js";
 
-// Armazena o estado das pastas expandidas/recolhidas
+// Armazena o estado das pastas expandidas/recolhidas (persistido por projeto)
 const openFoldersSet = new Set();
+let _openFoldersLoadedFor = null;
+let _saveOpenFoldersTimer = null;
+
+function loadOpenFoldersState(projectId) {
+    if (_openFoldersLoadedFor === projectId) return;
+    _openFoldersLoadedFor = projectId;
+    openFoldersSet.clear();
+    try {
+        const raw = JSON.parse(localStorage.getItem(`capiau_open_folders_${projectId}`) || "[]");
+        if (Array.isArray(raw)) raw.forEach(pth => openFoldersSet.add(pth));
+    } catch (e) {
+        console.warn("Estado de pastas abertas ilegivel, comecando vazio:", e);
+    }
+}
+
+/** Grava em lote: alternar pastas dispara isso a cada clique. */
+function saveOpenFoldersState() {
+    if (_saveOpenFoldersTimer) clearTimeout(_saveOpenFoldersTimer);
+    _saveOpenFoldersTimer = setTimeout(() => {
+        _saveOpenFoldersTimer = null;
+        const projectId = _openFoldersLoadedFor ?? getActiveProjectId();
+        try {
+            localStorage.setItem(`capiau_open_folders_${projectId}`, JSON.stringify(Array.from(openFoldersSet)));
+        } catch (e) {
+            console.error("Erro ao salvar pastas abertas:", e);
+        }
+    }, 250);
+}
 
 // Preferências de exibição de títulos de clipes
 if (!window.titleDisplayPreferences) {
@@ -60,6 +88,20 @@ export function saveVirtualFoldersState(projectId = null) {
     }
 }
 
+/**
+ * Uma pasta removida leva junto tudo que esta abaixo dela. Antes so o caminho
+ * exato era testado: ao excluir "root/D:", o bin filho "root/D:/makinof-monstro"
+ * recriava o "D:" como no intermediario e a pasta reaparecia.
+ */
+export function isPathDeleted(path) {
+    if (!path || virtualDeletedFolders.size === 0) return false;
+    if (virtualDeletedFolders.has(path)) return true;
+    for (const deleted of virtualDeletedFolders) {
+        if (path.startsWith(deleted + "/")) return true;
+    }
+    return false;
+}
+
 export function handleLibraryUndo() {
     if (libraryUndoStack.length === 0) return false;
     const action = libraryUndoStack.pop();
@@ -71,7 +113,21 @@ export function handleLibraryUndo() {
         virtualFolderMap = action.previousFolderMap;
         virtualFolderColors = action.previousFolderColors;
         saveVirtualFoldersState(projectId);
-        if (window.libraryInstance) window.libraryInstance.reloadData();
+
+        // Recria no banco os bins que a exclusão apagou. As mídias que estavam
+        // dentro foram movidas para a pasta-mãe e continuam lá.
+        const recriar = async () => {
+            for (const b of (action.binsRemovidos || [])) {
+                try {
+                    await CapIAuAPI.createProjectBin(projectId, b.name, b.path, b.parent_path, b.color);
+                } catch (err) {
+                    console.error("Falha ao restaurar o bin " + b.path + ":", err);
+                }
+            }
+            if (window.libraryInstance) await window.libraryInstance.reloadData();
+        };
+        recriar();
+
         if (typeof window.showToast === "function") {
             window.showToast(`Pasta "${action.folderName}" restaurada à biblioteca!`, "success");
         }
@@ -225,6 +281,7 @@ export function buildMediaTooltip(item, kind = "video", forceRealFilename = fals
     const prefs = window.tooltipDisplayPreferences || {};
     const friendly = getFriendlyTitle(item);
     const filename = item.filename || "";
+    const filepath = item.filepath || "";
     const desc = (item.description || item.summary || "").trim();
     
     let parts = [];
@@ -232,20 +289,34 @@ export function buildMediaTooltip(item, kind = "video", forceRealFilename = fals
     // 1. Título principal no topo
     const mainTitle = forceRealFilename ? filename : (friendly || filename);
     if (mainTitle) parts.push(mainTitle);
+
+    // 2. Caminho real no disco (opcional — o tooltip vai para o atributo
+    //    data-tooltip de cada card, entao tudo aqui pesa na arvore inteira)
+    if (prefs.filepath !== false && filepath) {
+        parts.push(`📁 Disco: ${filepath}`);
+    }
     
-    // 2. Metadados opcionais configuráveis
+    // 3. Metadados opcionais configuráveis
     let metaItems = [];
     
-    if (prefs.category && item.category) {
+    if (prefs.category !== false && item.category) {
         const catLabel = CATEGORY_LABELS[item.category] || item.category;
         metaItems.push(`Categoria: ${catLabel}`);
     }
+
+    if (prefs.recordedAt !== false && item.recorded_at) {
+        metaItems.push(`Data: ${item.recorded_at}`);
+    }
+
+    if (item.virtual_folder && item.virtual_folder !== "root") {
+        metaItems.push(`Bin: ${item.virtual_folder.replace(/^root\/?/, "")}`);
+    }
     
-    if (prefs.duration && item.duration) {
+    if (prefs.duration !== false && item.duration) {
         metaItems.push(`Duração: ${formatTimecode(item.duration).substring(3, 11)}`);
     }
     
-    if (prefs.speaker && kind === "video") {
+    if (prefs.speaker !== false && kind === "video") {
         let speaker = "";
         if (item.summary) {
             const m = item.summary.match(/Entrevistado:\s*([^,\-\n\.]+)/i);
@@ -269,7 +340,7 @@ export function buildMediaTooltip(item, kind = "video", forceRealFilename = fals
         }
     }
     
-    if (prefs.tags && item.tags) {
+    if (prefs.tags !== false && item.tags) {
         try {
             const parsed = typeof item.tags === "string" ? JSON.parse(item.tags) : item.tags;
             if (Array.isArray(parsed) && parsed.length > 0) {
@@ -285,12 +356,10 @@ export function buildMediaTooltip(item, kind = "video", forceRealFilename = fals
         parts.push(metaItems.join(" • "));
     }
     
-    // 3. Sinopse / Descrição da decupagem
+    // 4. Sinopse / Descrição da decupagem
     if (desc) {
         if (desc !== mainTitle && !desc.startsWith(mainTitle)) {
             parts.push(desc);
-        } else if (parts.length === 1 && desc === mainTitle) {
-            // Não duplica se for idêntico
         }
     }
     
@@ -921,6 +990,24 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     sep3.className = "menu-separator";
     menu.appendChild(sep3);
 
+    // Item: Mostrar no Windows Explorer
+    const explorerItem = document.createElement("div");
+    explorerItem.className = "menu-item";
+    explorerItem.innerHTML = `<i class="fa-solid fa-folder-open" style="color:var(--color-cyan);"></i><span class="menu-item-text">Mostrar no Windows Explorer</span>`;
+    explorerItem.addEventListener("click", async () => {
+        menu.remove();
+        try {
+            if (item.filepath) {
+                await CapIAuAPI.openFolderInExplorer(item.filepath);
+            } else {
+                if (typeof window.showToast === "function") window.showToast("Caminho do arquivo não disponível.", "warning");
+            }
+        } catch (err) {
+            if (typeof window.showToast === "function") window.showToast("Erro ao abrir Explorer: " + err.message, "error");
+        }
+    });
+    menu.appendChild(explorerItem);
+
     // Item: Copiar Caminho do Arquivo
     const copyPathItem = document.createElement("div");
     copyPathItem.className = "menu-item";
@@ -942,44 +1029,33 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     });
     menu.appendChild(copyPathItem);
 
+    // Item: Mover para Pasta (Bin)...
+    const moveToBinItem = document.createElement("div");
+    moveToBinItem.className = "menu-item";
+    moveToBinItem.innerHTML = `<i class="fa-solid fa-folder-tree" style="color:var(--color-violet);"></i><span class="menu-item-text">Mover para Pasta (Bin)...</span>`;
+    moveToBinItem.addEventListener("click", () => {
+        menu.remove();
+        promptMoveMediaToBin(item, kind);
+    });
+    menu.appendChild(moveToBinItem);
+
+    // Item: Editar Metadados & Data
+    const editMetaItem = document.createElement("div");
+    editMetaItem.className = "menu-item";
+    editMetaItem.innerHTML = `<i class="fa-solid fa-pen-to-square" style="color:var(--color-gold);"></i><span class="menu-item-text">Editar Metadados & Data...</span>`;
+    editMetaItem.addEventListener("click", () => {
+        menu.remove();
+        promptEditMediaMetadata(item, kind);
+    });
+    menu.appendChild(editMetaItem);
+
     // Item: Relincar Arquivo Original
     const relinkItem = document.createElement("div");
     relinkItem.className = "menu-item";
-    relinkItem.innerHTML = `<i class="fa-solid fa-link"></i><span class="menu-item-text">Relincar Arquivo Original...</span>`;
-    relinkItem.addEventListener("click", async () => {
+    relinkItem.innerHTML = `<i class="fa-solid fa-link" style="color:var(--color-cyan);"></i><span class="menu-item-text">Relincar Mídias / Buscar no Disco...</span>`;
+    relinkItem.addEventListener("click", () => {
         menu.remove();
-        const currentPath = item.filepath || "";
-        const newPath = prompt(`Informe o novo caminho completo do arquivo para "${item.filename}":`, currentPath);
-        if (!newPath || newPath.trim() === "" || newPath.trim() === currentPath) return;
-
-        try {
-            if (isVideo) {
-                const res = await CapIAuAPI.relinkVideo(item.id, newPath.trim());
-                item.filepath = newPath.trim();
-                item.status = "ingested";
-
-                // Invalida cache de waveform e força extração imediata
-                const { WaveformManager } = await import("./waveformManager.js");
-                WaveformManager.clearCache(item.id);
-                WaveformManager.getWaveform(item.id, true);
-
-                if (window.timelineRenderer) window.timelineRenderer.requestRedraw();
-                if (window.libraryInstance) await window.libraryInstance.reloadData();
-                if (typeof window.showToast === "function") {
-                    window.showToast("Vídeo relincado com sucesso!", "success");
-                }
-            } else {
-                if (typeof window.showToast === "function") {
-                    window.showToast("Relink de foto em desenvolvimento", "info");
-                }
-            }
-        } catch (err) {
-            if (typeof window.showToast === "function") {
-                window.showToast("Erro ao relincar arquivo: " + err.message, "error");
-            } else {
-                alert("Erro ao relincar: " + err.message);
-            }
-        }
+        promptRelinkMediaDialog(item.filepath ? item.filepath.substring(0, item.filepath.lastIndexOf('/')) : "");
     });
     menu.appendChild(relinkItem);
 
@@ -1217,26 +1293,30 @@ export function promptExternalPathIngest(targetFolderPath = "root") {
         }
         close();
         const projectId = getActiveProjectId();
-        try {
-            if (typeof window.showToast === "function") window.showToast("Iniciando vinculação in-place...", "info");
-            await CapIAuAPI.triggerExternalIngest(pathVal, projectId);
-            if (targetFolderPath && targetFolderPath !== "root") {
-                virtualDeletedFolders.delete(targetFolderPath);
-                virtualEmptyFolders.add(targetFolderPath);
-                saveVirtualFoldersState(projectId);
-            }
-            if (typeof window.showToast === "function") {
-                window.showToast("Vinculação de pasta iniciada em background!", "success");
-            }
-            if (window.libraryInstance) await window.libraryInstance.reloadData();
-            else STATE.emit("projectChanged");
+        const folderName = pathVal.replace(/[\\\/]+$/, '').split(/[\\\/]/).pop() || "Pasta";
 
-            if (typeof window.openTasksDrawerAndSwitchTab === "function") {
-                window.openTasksDrawerAndSwitchTab();
+        promptFolderImportTarget(folderName, targetFolderPath, async (chosenVirtualFolder, isNewBin) => {
+            try {
+                if (typeof window.showToast === "function") window.showToast("Iniciando vinculação in-place...", "info");
+                await CapIAuAPI.triggerExternalIngest(pathVal, projectId, chosenVirtualFolder);
+                if (isNewBin || (chosenVirtualFolder && chosenVirtualFolder !== "root")) {
+                    virtualDeletedFolders.delete(chosenVirtualFolder);
+                    virtualEmptyFolders.add(chosenVirtualFolder);
+                    saveVirtualFoldersState(projectId);
+                }
+                if (typeof window.showToast === "function") {
+                    window.showToast("Vinculação de pasta iniciada em background!", "success");
+                }
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
+                else STATE.emit("projectChanged");
+
+                if (typeof window.openTasksDrawerAndSwitchTab === "function") {
+                    window.openTasksDrawerAndSwitchTab();
+                }
+            } catch (err) {
+                if (typeof window.showToast === "function") window.showToast("Erro na vinculação: " + err.message, "error");
             }
-        } catch (err) {
-            if (typeof window.showToast === "function") window.showToast("Erro na vinculação: " + err.message, "error");
-        }
+        });
     };
 }
 window.promptExternalPathIngest = promptExternalPathIngest;
@@ -1316,12 +1396,11 @@ export function showImportChoicesMenu(anchorEl, targetFolderPath = "root") {
             if (mediaFiles[0].webkitRelativePath) {
                 folderName = mediaFiles[0].webkitRelativePath.split("/")[0];
             }
-            const folderPath = (targetFolderPath && targetFolderPath !== "root")
-                ? (folderName ? `${targetFolderPath}/${folderName}` : targetFolderPath)
-                : (folderName ? `root/${folderName}` : "root");
 
-            await uploadMediaFiles(mediaFiles, folderPath);
-            input.remove();
+            promptFolderImportTarget(folderName || "Pasta", targetFolderPath, async (chosenVirtualFolder) => {
+                await uploadMediaFiles(mediaFiles, chosenVirtualFolder);
+                input.remove();
+            });
         });
         input.click();
     });
@@ -1561,12 +1640,19 @@ export function confirmDeleteVirtualFolder(folderPath, folderName) {
     };
 }
 
-export function executeDeleteFolder(folderPath, folderName) {
+export async function executeDeleteFolder(folderPath, folderName) {
     const projectId = getActiveProjectId();
+
+    // Guarda os bins que saem do banco (o proprio e os descendentes) para o Ctrl+Z
+    const binsRemovidos = (Array.isArray(window.projectBinsList) ? window.projectBinsList : [])
+        .filter(b => b.path === folderPath || b.path.startsWith(folderPath + "/"))
+        .map(b => ({ name: b.name, path: b.path, parent_path: b.parent_path, color: b.color }));
+
     libraryUndoStack.push({
         type: "delete_folder",
         folderPath,
         folderName,
+        binsRemovidos,
         previousDeletedFolders: new Set(virtualDeletedFolders),
         previousEmptyFolders: new Set(virtualEmptyFolders),
         previousFolderMap: { ...virtualFolderMap },
@@ -1577,12 +1663,25 @@ export function executeDeleteFolder(folderPath, folderName) {
     virtualEmptyFolders.delete(folderPath);
     saveVirtualFoldersState(projectId);
 
-    // Imediatamente atualiza a visualização local em 0ms sem esperar network
-    if (window.STATE?.allVideos) window.STATE.emit("videosUpdated", window.STATE.allVideos);
-    if (window.STATE?.allPhotos) window.STATE.emit("photosUpdated", window.STATE.allPhotos);
+    // Atualiza a árvore na hora, sem esperar a rede
+    if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia();
 
     if (typeof window.showToast === "function") {
         window.showToast(`Pasta "${folderName}" removida da biblioteca. Pressione Ctrl+Z para desfazer.`, "info");
+    }
+
+    // Persiste no banco: sem isso o bin voltava no proximo carregamento,
+    // porque buildTree remonta a arvore a partir de media_bin.
+    if (binsRemovidos.length > 0) {
+        try {
+            await CapIAuAPI.deleteProjectBin(projectId, folderPath, true);
+            if (window.libraryInstance) await window.libraryInstance.reloadData();
+        } catch (err) {
+            console.error("Falha ao remover o bin no banco:", err);
+            if (typeof window.showToast === "function") {
+                window.showToast("Pasta oculta só nesta sessão: " + err.message, "warning");
+            }
+        }
     }
 }
 
@@ -1744,7 +1843,387 @@ export function showFolderContextMenu(e, node, folderHeader) {
         targetDoc.addEventListener("keydown", keyHandler, true);
     }, 10);
 }
-window.showFolderContextMenu = showFolderContextMenu;
+// ── MODAIS DE ORGANIZAÇÃO, METADADOS E RELINK ───────────────────────────
+
+export function promptFolderImportTarget(folderName, targetFolderPath, onChoice) {
+    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || document;
+    const modal = targetDoc.createElement("div");
+    modal.className = "modal-overlay";
+    modal.style.display = "flex";
+    const currentDisplayName = (!targetFolderPath || targetFolderPath === "root") ? "Raiz da Biblioteca" : targetFolderPath.replace(/^root\/?/, "");
+
+    modal.innerHTML = `
+        <div class="modal-content glassmorphism" style="max-width: 440px; padding: 20px;">
+            <div class="modal-header" style="margin-bottom: 14px;">
+                <h2 style="font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-folder-tree" style="color: var(--color-cyan);"></i> Importação de Pasta
+                </h2>
+                <button class="btn-close-modal" id="btn-close-import-choice">&times;</button>
+            </div>
+            <div class="modal-body" style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                <p>Como você deseja organizar os arquivos da pasta <b>"${escapeHtml(folderName)}"</b> na biblioteca?</p>
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+                    <button id="btn-choice-create-bin" class="btn-primary" style="padding: 10px 14px; display: flex; align-items: center; gap: 10px; text-align: left; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.5); color: #fff; cursor: pointer; border-radius: 6px;">
+                        <i class="fa-solid fa-folder-plus" style="font-size: 16px; color: var(--color-violet);"></i>
+                        <div>
+                            <div style="font-weight: 700;">Criar Bin "${escapeHtml(folderName)}"</div>
+                            <div style="font-size: 10px; color: var(--text-muted);">Cria uma pasta virtual dedicada na biblioteca</div>
+                        </div>
+                    </button>
+                    <button id="btn-choice-current-folder" class="btn-secondary" style="padding: 10px 14px; display: flex; align-items: center; gap: 10px; text-align: left; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass); color: #fff; cursor: pointer; border-radius: 6px;">
+                        <i class="fa-solid fa-folder-open" style="font-size: 16px; color: var(--color-cyan);"></i>
+                        <div>
+                            <div style="font-weight: 700;">Importar na Pasta Atual (${escapeHtml(currentDisplayName)})</div>
+                            <div style="font-size: 10px; color: var(--text-muted);">Coloca as mídias diretamente na pasta selecionada</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; margin-top: 16px;">
+                <button id="btn-cancel-import-choice" class="btn-outline">Cancelar</button>
+            </div>
+        </div>
+    `;
+    targetDoc.body.appendChild(modal);
+
+    const close = () => modal.remove();
+    modal.querySelector("#btn-close-import-choice").onclick = close;
+    modal.querySelector("#btn-cancel-import-choice").onclick = close;
+
+    modal.querySelector("#btn-choice-create-bin").onclick = () => {
+        close();
+        const newBinPath = (!targetFolderPath || targetFolderPath === "root")
+            ? `root/${folderName}`
+            : `${targetFolderPath}/${folderName}`;
+        onChoice(newBinPath, true);
+    };
+
+    modal.querySelector("#btn-choice-current-folder").onclick = () => {
+        close();
+        onChoice(targetFolderPath || "root", false);
+    };
+}
+
+export function promptMoveMediaToBin(item, mediaType = "video") {
+    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || document;
+    const projectId = getActiveProjectId();
+    const modal = targetDoc.createElement("div");
+    modal.className = "modal-overlay";
+    modal.style.display = "flex";
+
+    // Coleta todas as pastas virtuais disponíveis
+    const binsSet = new Set(["root"]);
+    if (Array.isArray(window.projectBinsList)) {
+        window.projectBinsList.forEach(b => binsSet.add(b.path));
+    }
+    virtualEmptyFolders.forEach(p => binsSet.add(p));
+    (STATE.allVideos || []).forEach(v => { if (v.virtual_folder) binsSet.add(v.virtual_folder); });
+    (STATE.allPhotos || []).forEach(p => { if (p.virtual_folder) binsSet.add(p.virtual_folder); });
+
+    const currentBin = getItemVirtualFolder(item);
+    const binOptions = Array.from(binsSet).sort().map(binPath => {
+        const isSelected = binPath === currentBin ? "selected" : "";
+        const label = binPath === "root" ? "📁 Biblioteca (Raiz)" : `📁 ${binPath.replace(/^root\/?/, "")}`;
+        return `<option value="${escapeHtml(binPath)}" ${isSelected}>${escapeHtml(label)}</option>`;
+    }).join("");
+
+    modal.innerHTML = `
+        <div class="modal-content glassmorphism" style="max-width: 400px; padding: 18px;">
+            <div class="modal-header" style="margin-bottom: 12px;">
+                <h2 style="font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-folder-tree" style="color: var(--color-violet);"></i> Mover Mídia para Bin
+                </h2>
+                <button class="btn-close-modal" id="btn-close-move-bin">&times;</button>
+            </div>
+            <div class="modal-body" style="font-size: 11px; color: var(--text-secondary);">
+                <div style="margin-bottom: 8px; font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    Mídia: ${escapeHtml(item.filename || item.title || `Item #${item.id}`)}
+                </div>
+                <label style="display: block; margin-bottom: 6px;">Selecione o Bin de Destino:</label>
+                <div class="dropdown-wrapper" style="height: 32px; padding: 0 10px; margin-bottom: 10px; display: flex; align-items: center;">
+                    <select id="select-target-bin" style="background: transparent; border: none; outline: none; color: #fff; font-size: 11px; width: 100%; cursor: pointer;">
+                        ${binOptions}
+                        <option value="__new__">+ Criar Novo Bin...</option>
+                    </select>
+                </div>
+                <div id="new-bin-container" style="display: none; margin-top: 6px;">
+                    <label style="display: block; margin-bottom: 4px;">Nome da Nova Pasta:</label>
+                    <input type="text" id="input-new-bin-name" placeholder="Ex: Cenas Externas" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: 11px;">
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+                <button id="btn-cancel-move-bin" class="btn-outline">Cancelar</button>
+                <button id="btn-confirm-move-bin" class="btn-primary">Mover Mídia</button>
+            </div>
+        </div>
+    `;
+    targetDoc.body.appendChild(modal);
+
+    const close = () => modal.remove();
+    modal.querySelector("#btn-close-move-bin").onclick = close;
+    modal.querySelector("#btn-cancel-move-bin").onclick = close;
+
+    const selectEl = modal.querySelector("#select-target-bin");
+    const newBinContainer = modal.querySelector("#new-bin-container");
+    const newBinInput = modal.querySelector("#input-new-bin-name");
+
+    selectEl.addEventListener("change", () => {
+        if (selectEl.value === "__new__") {
+            newBinContainer.style.display = "block";
+            newBinInput.focus();
+        } else {
+            newBinContainer.style.display = "none";
+        }
+    });
+
+    modal.querySelector("#btn-confirm-move-bin").onclick = async () => {
+        let targetFolder = selectEl.value;
+        if (targetFolder === "__new__") {
+            const name = newBinInput.value.trim();
+            if (!name) {
+                alert("Por favor, informe o nome da nova pasta.");
+                return;
+            }
+            targetFolder = `root/${name}`;
+            await CapIAuAPI.createProjectBin(projectId, name, targetFolder, "root");
+            virtualEmptyFolders.add(targetFolder);
+        }
+        close();
+
+        try {
+            await CapIAuAPI.moveMediaToBin(mediaType, item.id, targetFolder);
+            item.virtual_folder = targetFolder;
+            virtualFolderMap[mediaFolderKey(item)] = targetFolder;
+            saveVirtualFoldersState(projectId);
+
+            if (window.libraryInstance) await window.libraryInstance.reloadData();
+            if (typeof window.showToast === "function") {
+                const displayName = targetFolder === "root" ? "Biblioteca (Raiz)" : targetFolder.replace(/^root\/?/, "");
+                window.showToast(`Mídia movida para "${displayName}"!`, "success");
+            }
+        } catch (err) {
+            if (typeof window.showToast === "function") window.showToast("Erro ao mover mídia: " + err.message, "error");
+        }
+    };
+}
+
+export function promptEditMediaMetadata(item, mediaType = "video") {
+    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || document;
+    const modal = targetDoc.createElement("div");
+    modal.className = "modal-overlay";
+    modal.style.display = "flex";
+
+    const currentTitle = item.title || "";
+    const currentCat = (item.category || "unknown").toLowerCase();
+    const currentRecAt = item.recorded_at ? item.recorded_at.replace(" ", "T").substring(0, 19) : "";
+    const currentDesc = item.description || "";
+    const currentSummary = item.summary || "";
+    const currentTags = Array.isArray(item.tags) ? item.tags.join(", ") : (item.tags || "");
+    const currentVFolder = item.virtual_folder || "root";
+
+    const catOptions = Object.entries(CATEGORY_LABELS).map(([k, label]) => {
+        const isSel = k.toLowerCase() === currentCat ? "selected" : "";
+        return `<option value="${k}" ${isSel}>${escapeHtml(label)}</option>`;
+    }).join("");
+
+    modal.innerHTML = `
+        <div class="modal-content glassmorphism" style="max-width: 480px; padding: 20px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header" style="margin-bottom: 14px;">
+                <h2 style="font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-pen-to-square" style="color: var(--color-gold);"></i> Editar Metadados da Mídia
+                </h2>
+                <button class="btn-close-modal" id="btn-close-edit-meta">&times;</button>
+            </div>
+            <div class="modal-body" style="font-size: 11px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-size: 10px; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 6px 8px; border-radius: 4px; word-break: break-all;">
+                    <strong>Arquivo:</strong> ${escapeHtml(item.filename || "")}<br>
+                    <strong>Caminho Real:</strong> ${escapeHtml(item.filepath || "")}
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Título Editorial:</label>
+                    <input type="text" id="meta-title" value="${escapeHtml(currentTitle)}" placeholder="Ex: Entrevista com Diretora" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: 11px;">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Categoria de Triagem:</label>
+                        <div class="dropdown-wrapper" style="height: 30px; padding: 0 8px; display: flex; align-items: center;">
+                            <select id="meta-category" style="background: transparent; border: none; outline: none; color: #fff; font-size: 11px; width: 100%; cursor: pointer;">
+                                <option value="">Sem Categoria</option>
+                                ${catOptions}
+                            </select>
+                        </div>
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Data / Diária de Gravação:</label>
+                        <input type="datetime-local" id="meta-recorded-at" value="${escapeHtml(currentRecAt)}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 5px 8px; border-radius: 4px; color: #fff; font-size: 11px;">
+                    </div>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Pasta Virtual (Bin):</label>
+                    <input type="text" id="meta-vfolder" value="${escapeHtml(currentVFolder)}" placeholder="root ou root/Subpasta" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: 11px;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Resumo / Destaque:</label>
+                    <input type="text" id="meta-summary" value="${escapeHtml(currentSummary)}" placeholder="Síntese curta da ação ou depoimento" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: 11px;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Descrição Detalhada:</label>
+                    <textarea id="meta-description" rows="3" placeholder="Descrição visual e contextual completa..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: 11px; resize: vertical;">${escapeHtml(currentDesc)}</textarea>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Tags (separadas por vírgula):</label>
+                    <input type="text" id="meta-tags" value="${escapeHtml(currentTags)}" placeholder="ex: externa, drone, luciana, por do sol" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: 11px;">
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+                <button id="btn-cancel-edit-meta" class="btn-outline">Cancelar</button>
+                <button id="btn-confirm-edit-meta" class="btn-primary">Salvar Metadados</button>
+            </div>
+        </div>
+    `;
+    targetDoc.body.appendChild(modal);
+
+    const close = () => modal.remove();
+    modal.querySelector("#btn-close-edit-meta").onclick = close;
+    modal.querySelector("#btn-cancel-edit-meta").onclick = close;
+
+    modal.querySelector("#btn-confirm-edit-meta").onclick = async () => {
+        const titleVal = modal.querySelector("#meta-title").value.trim();
+        const catVal = modal.querySelector("#meta-category").value;
+        const recAtVal = modal.querySelector("#meta-recorded-at").value;
+        const vFolderVal = modal.querySelector("#meta-vfolder").value.trim() || "root";
+        const sumVal = modal.querySelector("#meta-summary").value.trim();
+        const descVal = modal.querySelector("#meta-description").value.trim();
+        const tagsRaw = modal.querySelector("#meta-tags").value;
+        const tagsList = tagsRaw.split(",").map(t => t.trim()).filter(Boolean);
+
+        const payload = {
+            title: titleVal,
+            category: catVal || null,
+            recorded_at: recAtVal ? recAtVal.replace("T", " ") : null,
+            virtual_folder: vFolderVal,
+            summary: sumVal,
+            description: descVal,
+            tags: tagsList
+        };
+
+        close();
+        try {
+            const res = await CapIAuAPI.updateMediaMetadata(mediaType, item.id, payload);
+            if (res && res.media) {
+                Object.assign(item, res.media);
+            }
+            if (window.libraryInstance) await window.libraryInstance.reloadData();
+            if (typeof window.showToast === "function") {
+                window.showToast("Metadados atualizados com sucesso!", "success");
+            }
+        } catch (err) {
+            if (typeof window.showToast === "function") window.showToast("Erro ao salvar metadados: " + err.message, "error");
+        }
+    };
+}
+
+export function promptRelinkMediaDialog(prefillFolder = "") {
+    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || document;
+    const projectId = getActiveProjectId();
+    const modal = targetDoc.createElement("div");
+    modal.className = "modal-overlay";
+    modal.style.display = "flex";
+
+    modal.innerHTML = `
+        <div class="modal-content glassmorphism" style="max-width: 480px; padding: 20px;">
+            <div class="modal-header" style="margin-bottom: 14px;">
+                <h2 style="font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-link" style="color: var(--color-cyan);"></i> Relincar Mídias / Buscar no Disco
+                </h2>
+                <button class="btn-close-modal" id="btn-close-relink">&times;</button>
+            </div>
+            <div class="modal-body" style="font-size: 11px; color: var(--text-secondary); line-height: 1.5; display: flex; flex-direction: column; gap: 10px;">
+                <p>Se você trocou de computador ou moveu a pasta de arquivos, aponte a pasta raiz onde as gravações estão agora. O Talho fará uma <b>busca inteligente recursiva em todas as subpastas</b>, reconciliando os arquivos pelo nome e hash sem perder suas decupagens.</p>
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Pasta Raiz de Busca:</label>
+                    <div style="display: flex; gap: 6px;">
+                        <input type="text" id="relink-folder-input" value="${escapeHtml(prefillFolder)}" placeholder="Ex: D:/MeusProjetos/Gravacoes" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: 11px;">
+                        <button id="btn-browse-relink" class="btn-secondary" style="font-size: 11px; padding: 0 12px; cursor: pointer;">
+                            <i class="fa-solid fa-folder-open"></i> Procurar...
+                        </button>
+                    </div>
+                </div>
+                <div id="relink-status-feedback" style="display: none; padding: 8px; border-radius: 4px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); font-size: 11px;">
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+                <button id="btn-cancel-relink" class="btn-outline">Cancelar</button>
+                <button id="btn-start-relink" class="btn-primary" style="display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-arrows-rotate"></i> Iniciar Relink Recursivo
+                </button>
+            </div>
+        </div>
+    `;
+    targetDoc.body.appendChild(modal);
+
+    const close = () => modal.remove();
+    modal.querySelector("#btn-close-relink").onclick = close;
+    modal.querySelector("#btn-cancel-relink").onclick = close;
+
+    const input = modal.querySelector("#relink-folder-input");
+    const browseBtn = modal.querySelector("#btn-browse-relink");
+    const startBtn = modal.querySelector("#btn-start-relink");
+    const statusBox = modal.querySelector("#relink-status-feedback");
+
+    browseBtn.onclick = async () => {
+        try {
+            const res = await CapIAuAPI.selectFolder();
+            if (res && res.path) {
+                input.value = res.path;
+            }
+        } catch (err) {
+            console.error("Erro ao selecionar pasta:", err);
+        }
+    };
+
+    startBtn.onclick = async () => {
+        const folder = input.value.trim();
+        if (!folder) {
+            alert("Informe o caminho da pasta para busca.");
+            return;
+        }
+
+        startBtn.disabled = true;
+        startBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Buscando arquivos...`;
+        statusBox.style.display = "block";
+        statusBox.innerHTML = `<div style="color: var(--color-cyan);"><i class="fa-solid fa-magnifying-glass fa-spin"></i> Escaneando pasta e subpastas...</div>`;
+
+        try {
+            const res = await CapIAuAPI.relinkProjectMedia(projectId, folder);
+            const relinked = res.relinked_count || 0;
+            const alreadyConnected = res.already_connected_count || 0;
+            const stillMissing = res.still_missing_count || 0;
+
+            statusBox.innerHTML = `
+                <div style="color: var(--color-emerald); font-weight: 600; margin-bottom: 4px;">
+                    <i class="fa-solid fa-circle-check"></i> Varredura de Relink Concluída!
+                </div>
+                <div style="color: #fff;">
+                    • <b>${relinked}</b> mídias reconectadas com sucesso.<br>
+                    • <b>${alreadyConnected}</b> mídias já estavam com caminho válido.<br>
+                    • <b>${stillMissing}</b> mídias continuam não encontradas no disco.
+                </div>
+            `;
+            startBtn.innerHTML = `<i class="fa-solid fa-check"></i> Concluído`;
+
+            if (window.libraryInstance) await window.libraryInstance.reloadData();
+            if (window.timelineRenderer) window.timelineRenderer.requestRedraw();
+            if (typeof window.showToast === "function") {
+                window.showToast(`${relinked} arquivo(s) reconectado(s)!`, "success");
+            }
+        } catch (err) {
+            statusBox.innerHTML = `<div style="color: var(--color-rose);"><i class="fa-solid fa-triangle-exclamation"></i> Erro ao relincar: ${escapeHtml(err.message)}</div>`;
+            startBtn.disabled = false;
+            startBtn.innerHTML = `<i class="fa-solid fa-arrows-rotate"></i> Tentar Novamente`;
+        }
+    };
+}
 
 export async function handleDropToFolder(e, targetFolderPath) {
     const dataCapiau = e.dataTransfer.getData("application/x-capiau-media");
@@ -1755,12 +2234,26 @@ export async function handleDropToFolder(e, targetFolderPath) {
         try {
             const parsed = JSON.parse(dataCapiau);
             if (parsed && parsed.id) {
+                const kind = parsed.type === "photo" ? "photo" : "video";
                 virtualDeletedFolders.delete(targetFolderPath);
-                virtualFolderMap[parsed.id] = targetFolderPath;
+                virtualFolderMap[`${kind}:${parsed.id}`] = targetFolderPath;
                 saveVirtualFoldersState(projectId);
-                if (window.STATE?.allVideos) window.STATE.emit("videosUpdated", window.STATE.allVideos);
-                if (window.STATE?.allPhotos) window.STATE.emit("photosUpdated", window.STATE.allPhotos);
-                if (window.libraryInstance) window.libraryInstance.reloadData();
+
+                // Persiste no banco: antes o move so existia no localStorage e
+                // era perdido em outra maquina ou apos limpar o navegador.
+                try {
+                    await CapIAuAPI.moveMediaToBin(kind, parsed.id, targetFolderPath);
+                    const list = kind === "photo" ? (STATE.allPhotos || []) : (STATE.allVideos || []);
+                    const moved = list.find(m => m.id === parsed.id);
+                    if (moved) moved.virtual_folder = targetFolderPath;
+                } catch (apiErr) {
+                    console.error("Falha ao persistir o move da mídia:", apiErr);
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Mídia movida só nesta sessão: " + apiErr.message, "warning");
+                    }
+                }
+
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
                 if (typeof window.showToast === "function") {
                     window.showToast("Mídia movida para a pasta.", "success");
                 }
@@ -1890,58 +2383,141 @@ export function initLibraryDragAndDrop(libInstance) {
 
 function hasMatchingChildren(node, query, ast = null) {
     if (!query) return true;
-    if (!ast) ast = parseQuery(query);
+    if (!ast) ast = getCachedQueryAST(query);
     if (!ast) return true;
     
     if (node.type === "file") {
         const item = node.video || node.photo;
-        const tab = node.video ? "tab-videos" : "tab-photos";
-        return evaluateAST(ast, item, tab);
+        return evaluateAST(ast, item, "tab-media");
     }
     if (node.type === "folder") {
+        // Smart Bins fechados ainda nao materializaram os filhos: avalia a fonte.
+        if (node.sourceItems && Object.keys(node.children).length === 0) {
+            return node.sourceItems.some(item => evaluateAST(ast, item, "tab-media"));
+        }
         return Object.values(node.children).some(child => hasMatchingChildren(child, query, ast));
     }
     return false;
 }
 
-function getCommonBasePath(paths) {
-    if (paths.length === 0) return "";
-    if (paths.length === 1) {
-        const parts = paths[0].split("/");
-        parts.pop();
-        return parts.join("/") + "/";
-    }
-    
-    let commonParts = paths[0].split("/");
-    commonParts.pop();
-    
-    for (let i = 1; i < paths.length; i++) {
-        const parts = paths[i].split("/");
-        parts.pop();
-        
-        let j = 0;
-        while (j < commonParts.length && j < parts.length && commonParts[j] === parts[j]) {
-            j++;
+/**
+ * Discrimina video de foto. STATE.allVideos/allPhotos marcam `_mediaKind` em
+ * renderMedia; as heuristicas abaixo sao apenas fallback para itens avulsos
+ * (a checagem antiga `!!item.duration` classificava video de duracao 0 como foto).
+ */
+/**
+ * Contexto resolvido uma vez por render. Antes, cada no da arvore refazia
+ * document.getElementById("library-search-input"), parseQuery(...) e
+ * localStorage.getItem("library_sort_by") — ~2000 vezes por render.
+ */
+let renderCtx = { query: "", ast: null, sortBy: "name_asc" };
+let lastRenderedTree = null;
+
+/**
+ * Coleta os caminhos de pasta da ULTIMA arvore renderizada.
+ * Antes, expandir/recolher recalculava caminhos a partir do filepath de disco —
+ * caminhos que a arvore virtual nao usa mais, entao o botao nao expandia nada.
+ */
+const SMART_BINS_ROOT = "smart_bins_root";
+
+function collectFolderPaths(node, out = [], filterPrefix = null, skipSmartBins = false) {
+    if (!node || node.type !== "folder") return out;
+    // Os Smart Bins sao uma VISAO: cada midia aparece de novo em Diárias,
+    // Categorias e Tipos. Abrir todos de uma vez quadruplica o DOM sem
+    // mostrar nada novo, entao "expandir tudo" nao os inclui — eles abrem
+    // no clique direto, que continua funcionando.
+    if (skipSmartBins && node.path && node.path.startsWith(SMART_BINS_ROOT)) return out;
+    if (node.path && node.path !== "root") {
+        if (!filterPrefix || node.path === filterPrefix || node.path.startsWith(filterPrefix + "/")) {
+            out.push(node.path);
         }
-        commonParts = commonParts.slice(0, j);
     }
-    
-    if (commonParts.length === 0) return "";
-    return commonParts.join("/") + "/";
+    if (node.children) {
+        for (const key of Object.keys(node.children)) {
+            collectFolderPaths(node.children[key], out, filterPrefix, skipSmartBins);
+        }
+    }
+    return out;
+}
+const _queryASTCache = new Map();
+
+function getCachedQueryAST(query) {
+    if (!query) return null;
+    if (_queryASTCache.has(query)) return _queryASTCache.get(query);
+    let ast = null;
+    try {
+        ast = parseQuery(query);
+    } catch (e) {
+        ast = null;
+    }
+    if (_queryASTCache.size > 40) _queryASTCache.clear();
+    _queryASTCache.set(query, ast);
+    return ast;
 }
 
-function buildTree(items, mediaKey = "video") {
+function refreshRenderContext() {
+    const searchInput = document.getElementById("library-search-input");
+    const query = searchInput ? searchInput.value.trim() : "";
+    const sortSelect = document.getElementById("library-sort-by");
+    renderCtx = {
+        query,
+        ast: query ? getCachedQueryAST(query) : null,
+        sortBy: sortSelect?.value || localStorage.getItem("library_sort_by") || "name_asc"
+    };
+    return renderCtx;
+}
+
+function isVideoItem(item) {
+    if (!item) return false;
+    if (item._mediaKind) return item._mediaKind === "video";
+    if (item.type === "video") return true;
+    if (item.video_type !== undefined) return true;
+    return typeof item.duration === "number";
+}
+
+/**
+ * Chave do mapa legado de bins em localStorage. Antes era so o id numerico —
+ * e como video e foto agora dividem a mesma arvore, o video #5 e a foto #5
+ * caiam no mesmo bin. Novas gravacoes usam chave "tipo:id".
+ */
+function mediaFolderKey(item) {
+    return `${isVideoItem(item) ? "video" : "photo"}:${item.id}`;
+}
+
+/**
+ * Pasta virtual efetiva de um item. O banco e a fonte de verdade; o mapa em
+ * localStorage sobrevive apenas como legado dos bins criados antes da coluna
+ * virtual_folder existir (e so vale para video, que era a unica aba com drag).
+ */
+function getItemVirtualFolder(item) {
+    const stored = item.virtual_folder;
+    if (stored && stored !== "root") return stored;
+    const typed = virtualFolderMap[mediaFolderKey(item)];
+    if (typed) return typed;
+    if (isVideoItem(item) && virtualFolderMap[item.id]) return virtualFolderMap[item.id];
+    return stored || "root";
+}
+
+function makeMediaFileNode(item) {
+    const name = item.filename
+        || (item.filepath ? item.filepath.split(/[\\/]+/).filter(Boolean).pop() : `Item #${item.id}`);
+    const node = { name, type: "file" };
+    if (isVideoItem(item)) node.video = item;
+    else node.photo = item;
+    return node;
+}
+
+function mediaFileKey(item, name) {
+    return `${isVideoItem(item) ? "video" : "photo"}_${item.id}_${name}`;
+}
+
+function buildTree(items) {
     const projectId = getActiveProjectId();
     loadVirtualFoldersState(projectId);
+    loadOpenFoldersState(projectId);
 
-    if (!items || items.length === 0) {
-        return { name: "Biblioteca", type: "folder", path: "root", children: {}, isRoot: true, isOpen: true };
-    }
-    const filepaths = items.map(v => (v.filepath || v.filename || "").replace(/\\/g, "/"));
-    const commonBase = getCommonBasePath(filepaths);
-    
     const root = {
-        name: commonBase ? commonBase.split("/").filter(Boolean).pop() || commonBase : "Biblioteca",
+        name: "Biblioteca",
         type: "folder",
         path: "root",
         children: {},
@@ -1949,9 +2525,33 @@ function buildTree(items, mediaKey = "video") {
         isOpen: true
     };
 
-    // 1. Inserir subpastas vazias virtuais criadas pelo usuário
+    // 1. Inserir todos os Bins Virtuais cadastrados no projeto (mesmo vazios)
+    if (Array.isArray(window.projectBinsList)) {
+        window.projectBinsList.forEach(b => {
+            if (isPathDeleted(b.path)) return;
+            const relativeParts = b.path.replace(/^root\/?/, "").split("/").filter(Boolean);
+            let curr = root;
+            let cPath = "root";
+            for (let p of relativeParts) {
+                cPath = cPath + "/" + p;
+                if (!curr.children[p]) {
+                    curr.children[p] = {
+                        name: p,
+                        type: "folder",
+                        path: cPath,
+                        children: {},
+                        color: b.color || virtualFolderColors[cPath],
+                        isOpen: openFoldersSet.has(cPath)
+                    };
+                }
+                curr = curr.children[p];
+            }
+        });
+    }
+
+    // Também inserir de virtualEmptyFolders
     virtualEmptyFolders.forEach(folderPath => {
-        if (virtualDeletedFolders.has(folderPath)) return;
+        if (isPathDeleted(folderPath)) return;
         const relativeParts = folderPath.replace(/^root\/?/, "").split("/").filter(Boolean);
         let curr = root;
         let cPath = "root";
@@ -1969,52 +2569,135 @@ function buildTree(items, mediaKey = "video") {
             curr = curr.children[p];
         }
     });
-    
-    // 2. Inserir itens de mídia respeitando bins virtuais
-    items.forEach(v => {
-        const vPath = virtualFolderMap[v.id];
-        let folderParts = [];
-        let actualFileName = "";
 
-        if (vPath) {
-            if (virtualDeletedFolders.has(vPath)) return;
-            folderParts = vPath.replace(/^root\/?/, "").split("/").filter(Boolean);
-            actualFileName = v.filename || (v.filepath ? v.filepath.replace(/\\/g, "/").split("/").pop() : `Item #${v.id}`);
-        } else {
-            const normalized = (v.filepath || v.filename || "").replace(/\\/g, "/");
-            const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
-            const diskParts = relative.split("/").filter(Boolean);
-            folderParts = diskParts.slice(0, -1);
-            actualFileName = diskParts[diskParts.length - 1] || v.filename || `Item #${v.id}`;
-        }
-        
-        let current = root;
-        let currentPath = "root";
-        for (let i = 0; i < folderParts.length; i++) {
-            const folderName = folderParts[i];
-            currentPath = currentPath + "/" + folderName;
-            if (virtualDeletedFolders.has(currentPath)) return;
-            if (!current.children[folderName]) {
-                current.children[folderName] = {
-                    name: folderName,
-                    type: "folder",
-                    path: currentPath,
-                    children: {},
-                    isOpen: openFoldersSet.has(currentPath)
-                };
+    // 2. Inserir itens de mídia diretamente nos seus bins virtuais (sem poluição de pastas de disco)
+    if (items && items.length > 0) {
+        items.forEach(v => {
+            const vPath = getItemVirtualFolder(v);
+            if (isPathDeleted(vPath)) return;
+
+            let current = root;
+            if (vPath && vPath !== "root") {
+                const folderParts = vPath.replace(/^root\/?/, "").split("/").filter(Boolean);
+                let currentPath = "root";
+                for (let folderName of folderParts) {
+                    currentPath = currentPath + "/" + folderName;
+                    if (isPathDeleted(currentPath)) return;
+                    if (!current.children[folderName]) {
+                        current.children[folderName] = {
+                            name: folderName,
+                            type: "folder",
+                            path: currentPath,
+                            children: {},
+                            isOpen: openFoldersSet.has(currentPath)
+                        };
+                    }
+                    current = current.children[folderName];
+                }
             }
-            current = current.children[folderName];
-        }
-        
-        const fileNode = {
-            name: actualFileName,
-            type: "file"
+
+            const fileNode = makeMediaFileNode(v);
+            current.children[mediaFileKey(v, fileNode.name)] = fileNode;
+        });
+
+        // 3. Montar Ramo de Pastas Inteligentes (Smart Bins)
+        //    Os nos-folha guardam apenas a REFERENCIA ao array de itens (sourceItems).
+        //    Os nos de arquivo so sao materializados quando a pasta e aberta
+        //    (populateFolderChildren) — antes disso cada item era clonado 3x por render.
+        const smartRootPath = "smart_bins_root";
+        const smartRoot = {
+            name: "Pastas Inteligentes",
+            type: "folder",
+            path: smartRootPath,
+            isSmartRoot: true,
+            children: {},
+            isOpen: openFoldersSet.has(smartRootPath) // Recolhida por padrão, persistida se aberta
         };
-        fileNode[mediaKey] = v;
-        const fileKey = `${mediaKey}_${v.id}_${actualFileName}`;
-        current.children[fileKey] = fileNode;
-    });
-    
+
+        const makeSmartGroup = (parentPath, key, label, groupItems) => ({
+            name: label,
+            type: "folder",
+            path: `${parentPath}/${key}`,
+            isSmartBin: true,
+            badge: `${groupItems.length}`,
+            children: {},
+            sourceItems: groupItems,
+            isOpen: openFoldersSet.has(`${parentPath}/${key}`)
+        });
+
+        // Smart Bin: Diárias de Gravação
+        const diariasPath = "smart_bins_root/diarias";
+        const diariasNode = {
+            name: "Diárias de Gravação",
+            type: "folder",
+            path: diariasPath,
+            isSmartBin: true,
+            icon: "fa-calendar-days",
+            color: "var(--color-cyan)",
+            children: {},
+            isOpen: openFoldersSet.has(diariasPath)
+        };
+
+        // Smart Bin: Categorias de Triagem
+        const catPath = "smart_bins_root/categorias";
+        const catNode = {
+            name: "Categorias de Triagem",
+            type: "folder",
+            path: catPath,
+            isSmartBin: true,
+            icon: "fa-tags",
+            color: "var(--color-violet)",
+            children: {},
+            isOpen: openFoldersSet.has(catPath)
+        };
+
+        // Smart Bin: Tipos de Mídia
+        const tiposPath = "smart_bins_root/tipos";
+        const tiposNode = {
+            name: "Tipos de Mídia",
+            type: "folder",
+            path: tiposPath,
+            isSmartBin: true,
+            icon: "fa-layer-group",
+            color: "#f59e0b",
+            children: {},
+            isOpen: openFoldersSet.has(tiposPath)
+        };
+
+        // Uma unica passada sobre os itens alimenta os tres agrupamentos
+        const itemsByDate = {};
+        const itemsByCat = {};
+        const vids = [];
+        const photos = [];
+        items.forEach(item => {
+            const stamp = item.recorded_at || item.created_at || "";
+            const dateKey = stamp ? (stamp.split(" ")[0] || "Sem Data") : "Sem Data";
+            (itemsByDate[dateKey] || (itemsByDate[dateKey] = [])).push(item);
+
+            const catKey = item.category ? (CATEGORY_LABELS[item.category] || item.category) : "Sem Categoria";
+            (itemsByCat[catKey] || (itemsByCat[catKey] = [])).push(item);
+
+            if (isVideoItem(item)) vids.push(item);
+            else photos.push(item);
+        });
+
+        Object.keys(itemsByDate).sort().reverse().forEach(dt => {
+            diariasNode.children[dt] = makeSmartGroup(diariasPath, dt, dt, itemsByDate[dt]);
+        });
+        smartRoot.children["diarias"] = diariasNode;
+
+        Object.keys(itemsByCat).sort().forEach(cat => {
+            catNode.children[cat] = makeSmartGroup(catPath, cat, cat, itemsByCat[cat]);
+        });
+        smartRoot.children["categorias"] = catNode;
+
+        if (vids.length > 0) tiposNode.children["videos"] = makeSmartGroup(tiposPath, "videos", "Vídeos", vids);
+        if (photos.length > 0) tiposNode.children["fotos"] = makeSmartGroup(tiposPath, "fotos", "Fotos", photos);
+        smartRoot.children["tipos"] = tiposNode;
+
+        root.children["__smart_bins__"] = smartRoot;
+    }
+
     return root;
 }
 
@@ -2039,6 +2722,10 @@ function hasFailedChildren(node) {
         return window.libraryInstance ? window.libraryInstance.isMediaFailed(v) : false;
     }
     if (node.type === "folder") {
+        if (node.sourceItems && Object.keys(node.children).length === 0) {
+            return node.sourceItems.some(item =>
+                window.libraryInstance ? window.libraryInstance.isMediaFailed(item) : false);
+        }
         return Object.values(node.children).some(child => hasFailedChildren(child));
     }
     return false;
@@ -2088,10 +2775,185 @@ function animateStreamToggle(btnEl, goingToExpand, onComplete) {
     }, 900);
 }
 
+function getSortedChildrenKeys(node) {
+    if (!node || !node.children) return [];
+    const sortBy = renderCtx.sortBy || "name_asc";
+
+    return Object.keys(node.children).sort((a, b) => {
+        const nodeA = node.children[a];
+        const nodeB = node.children[b];
+        if (nodeA.type !== nodeB.type) {
+            return nodeA.type === "folder" ? -1 : 1;
+        }
+        if (nodeA.type === "folder") {
+            if (sortBy === "name_desc") {
+                return b.localeCompare(a);
+            }
+            return a.localeCompare(b);
+        }
+        const itemA = nodeA.video || nodeA.photo;
+        const itemB = nodeB.video || nodeB.photo;
+        if (!itemA || !itemB) return a.localeCompare(b);
+
+        if (sortBy === "name_asc") {
+            const nameA = itemA.filename || itemA.title || "";
+            const nameB = itemB.filename || itemB.title || "";
+            return nameA.localeCompare(nameB);
+        } else if (sortBy === "name_desc") {
+            const nameA = itemA.filename || itemA.title || "";
+            const nameB = itemB.filename || itemB.title || "";
+            return nameB.localeCompare(nameA);
+        } else if (sortBy === "type_interview") {
+            if (nodeA.video) {
+                const typeA = itemA.video_type === "interview" ? 0 : (itemA.video_type === "broll" ? 1 : 2);
+                const typeB = itemB.video_type === "interview" ? 0 : (itemB.video_type === "broll" ? 1 : 2);
+                if (typeA !== typeB) return typeA - typeB;
+            } else if (nodeA.photo) {
+                const catA = itemA.category || "";
+                const catB = itemB.category || "";
+                if (catA !== catB) return catA.localeCompare(catB);
+            }
+            return (itemA.filename || "").localeCompare(itemB.filename || "");
+        } else if (sortBy === "type_broll") {
+            if (nodeA.video) {
+                const typeA = itemA.video_type === "broll" ? 0 : (itemA.video_type === "interview" ? 1 : 2);
+                const typeB = itemB.video_type === "broll" ? 0 : (itemB.video_type === "interview" ? 1 : 2);
+                if (typeA !== typeB) return typeA - typeB;
+            } else if (nodeA.photo) {
+                const catA = itemA.category || "";
+                const catB = itemB.category || "";
+                if (catA !== catB) return catA.localeCompare(catB);
+            }
+            return (itemA.filename || "").localeCompare(itemB.filename || "");
+        } else if (sortBy === "duration_desc") {
+            const durA = itemA.duration || 0;
+            const durB = itemB.duration || 0;
+            if (durB !== durA) return durB - durA;
+            return (itemB.id || 0) - (itemA.id || 0);
+        } else if (sortBy === "date_desc") {
+            return (itemB.id || 0) - (itemA.id || 0);
+        }
+        return a.localeCompare(b);
+    });
+}
+
+/**
+ * Materializa os nos de arquivo de um Smart Bin apenas quando ele e aberto.
+ * Enquanto fechado o no guarda so a referencia ao array de itens.
+ */
+function materializeSmartBinChildren(node) {
+    if (!node || !node.sourceItems) return;
+    if (Object.keys(node.children).length > 0) return;
+    node.sourceItems.forEach(item => {
+        const fileNode = makeMediaFileNode(item);
+        node.children[mediaFileKey(item, fileNode.name)] = fileNode;
+    });
+}
+
+// ── RENDERIZACAO EM BLOCOS ────────────────────────────────────────────
+// Montar ~2000 cards de uma vez e uma tarefa unica de ~300ms que trava a
+// interface inteira. Aqui o primeiro bloco entra na hora (a lista aparece
+// imediatamente) e o resto e preenchido em tempo ocioso, em tarefas curtas.
+// Nao usamos rolagem como gatilho de proposito: isso faria a barra de rolagem
+// crescer enquanto o usuario rola e quebraria o indice lateral da biblioteca.
+const RENDER_CHUNK_SIZE = 120;
+// Se o agendador ficar parado esse tempo, monta o resto de uma vez.
+const CHUNK_STALL_TIMEOUT_MS = 1000;
+const pendingChunkJobs = new Set();
+
+function cancelPendingChunkJobs() {
+    pendingChunkJobs.forEach(job => job.cancel());
+    pendingChunkJobs.clear();
+}
+
+function appendChildrenChunked(node, keys, container, childDepth) {
+    const renderRange = (from, to) => {
+        const frag = document.createDocumentFragment();
+        for (let i = from; i < to; i++) {
+            renderTreeNode(node.children[keys[i]], frag, childDepth);
+        }
+        container.appendChild(frag);
+    };
+
+    if (keys.length <= RENDER_CHUNK_SIZE) {
+        renderRange(0, keys.length);
+        container._flushAllChunks = null;
+        return;
+    }
+
+    let cursor = RENDER_CHUNK_SIZE;
+    renderRange(0, cursor); // primeiro bloco sincrono: a lista nunca aparece vazia
+
+    let rafId = null;
+    let stallId = null;
+
+    const parar = () => {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        if (stallId !== null) clearTimeout(stallId);
+        rafId = null;
+        stallId = null;
+    };
+
+    // Monta tudo que falta agora. Usado pela rede de seguranca e por
+    // flushAllPendingChunks (revelar um item exige o card no DOM).
+    const concluir = () => {
+        parar();
+        if (cursor < keys.length) {
+            renderRange(cursor, keys.length);
+            cursor = keys.length;
+        }
+        pendingChunkJobs.delete(job);
+        container._flushAllChunks = null;
+    };
+
+    const job = { cancel: () => { parar(); container._flushAllChunks = null; } };
+
+    // requestAnimationFrame, nao setTimeout: em janela visivel entrega um bloco
+    // por quadro sem travar nada. Com a janela oculta o rAF nao dispara — por
+    // isso a rede de seguranca abaixo conclui de uma vez.
+    const armarRedeDeSeguranca = () => {
+        if (stallId !== null) clearTimeout(stallId);
+        stallId = setTimeout(concluir, CHUNK_STALL_TIMEOUT_MS);
+    };
+
+    const step = () => {
+        rafId = null;
+        const end = Math.min(cursor + RENDER_CHUNK_SIZE, keys.length);
+        renderRange(cursor, end);
+        cursor = end;
+        if (cursor < keys.length) {
+            rafId = requestAnimationFrame(step);
+            armarRedeDeSeguranca();
+        } else {
+            concluir();
+        }
+    };
+
+    container._flushAllChunks = concluir;
+    pendingChunkJobs.add(job);
+    rafId = requestAnimationFrame(step);
+    armarRedeDeSeguranca();
+}
+
+/** Garante que todos os blocos pendentes entraram no DOM (revelar item, exportar, etc). */
+function flushAllPendingChunks(root) {
+    const scope = root || document.getElementById("media-tree-list");
+    if (!scope) return;
+    if (typeof scope._flushAllChunks === "function") scope._flushAllChunks();
+    scope.querySelectorAll(".tree-folder-children").forEach(el => {
+        if (typeof el._flushAllChunks === "function") el._flushAllChunks();
+    });
+}
+
+function populateFolderChildren(node, folderChildren, depth) {
+    materializeSmartBinChildren(node);
+    folderChildren.innerHTML = "";
+    appendChildrenChunked(node, getSortedChildrenKeys(node), folderChildren, depth + 1);
+}
+
 function renderTreeNode(node, container, depth = 0) {
     if (node.type === "folder") {
-        const query = document.getElementById("library-search-input")?.value.toLowerCase().trim() || "";
-        if (query && !hasMatchingChildren(node, query)) {
+        if (renderCtx.ast && !hasMatchingChildren(node, renderCtx.query, renderCtx.ast)) {
             return;
         }
         if (window.libraryInstance && window.libraryInstance.isFailedFilterActive) {
@@ -2135,7 +2997,11 @@ function renderTreeNode(node, container, depth = 0) {
         
         const folderChildren = document.createElement("div");
         folderChildren.className = "tree-folder-children";
-        if (!node.isOpen) {
+        if (node.isOpen) {
+            populateFolderChildren(node, folderChildren, depth);
+            folderChildren.style.display = "block";
+            folderChildren.removeAttribute("hidden");
+        } else {
             folderChildren.style.display = "none";
             folderChildren.setAttribute("hidden", "true");
         }
@@ -2187,18 +3053,19 @@ function renderTreeNode(node, container, depth = 0) {
                 }
             }
             
-            folderChildren.style.display = node.isOpen ? "block" : "none";
             if (node.isOpen) {
+                if (folderChildren.children.length === 0) {
+                    populateFolderChildren(node, folderChildren, depth);
+                }
+                folderChildren.style.display = "block";
                 folderChildren.removeAttribute("hidden");
-            } else {
-                folderChildren.setAttribute("hidden", "true");
-            }
-            
-            if (node.isOpen) {
                 openFoldersSet.add(node.path);
             } else {
+                folderChildren.style.display = "none";
+                folderChildren.setAttribute("hidden", "true");
                 openFoldersSet.delete(node.path);
             }
+            saveOpenFoldersState();
         });
 
         // Clique direito sobre a pasta abre o Menu de Contexto de Bins
@@ -2225,92 +3092,18 @@ function renderTreeNode(node, container, depth = 0) {
         
         folderDiv.appendChild(folderHeader);
         folderDiv.appendChild(folderChildren);
-        
-        const savedSort = localStorage.getItem("library_sort_by");
-        const sortSelect = document.getElementById("library-sort-by");
-        if (sortSelect && savedSort && sortSelect.value !== savedSort) {
-            sortSelect.value = savedSort;
-        }
-        const sortBy = sortSelect?.value || savedSort || "name_asc";
-        const sortedKeys = Object.keys(node.children).sort((a, b) => {
-            const nodeA = node.children[a];
-            const nodeB = node.children[b];
-            if (nodeA.type !== nodeB.type) {
-                return nodeA.type === "folder" ? -1 : 1;
-            }
-            if (nodeA.type === "folder") {
-                if (sortBy === "name_desc") {
-                    return b.localeCompare(a);
-                }
-                return a.localeCompare(b);
-            }
-            const itemA = nodeA.video || nodeA.photo;
-            const itemB = nodeB.video || nodeB.photo;
-            if (!itemA || !itemB) return a.localeCompare(b);
-
-            if (sortBy === "name_asc") {
-                const nameA = itemA.filename || itemA.title || "";
-                const nameB = itemB.filename || itemB.title || "";
-                return nameA.localeCompare(nameB);
-            } else if (sortBy === "name_desc") {
-                const nameA = itemA.filename || itemA.title || "";
-                const nameB = itemB.filename || itemB.title || "";
-                return nameB.localeCompare(nameA);
-            } else if (sortBy === "type_interview") {
-                if (nodeA.video) {
-                    const typeA = itemA.video_type === "interview" ? 0 : (itemA.video_type === "broll" ? 1 : 2);
-                    const typeB = itemB.video_type === "interview" ? 0 : (itemB.video_type === "broll" ? 1 : 2);
-                    if (typeA !== typeB) return typeA - typeB;
-                } else if (nodeA.photo) {
-                    const catA = itemA.category || "";
-                    const catB = itemB.category || "";
-                    if (catA !== catB) return catA.localeCompare(catB);
-                }
-                return (itemA.filename || "").localeCompare(itemB.filename || "");
-            } else if (sortBy === "type_broll") {
-                if (nodeA.video) {
-                    const typeA = itemA.video_type === "broll" ? 0 : (itemA.video_type === "interview" ? 1 : 2);
-                    const typeB = itemB.video_type === "broll" ? 0 : (itemB.video_type === "interview" ? 1 : 2);
-                    if (typeA !== typeB) return typeA - typeB;
-                } else if (nodeA.photo) {
-                    const catA = itemA.category || "";
-                    const catB = itemB.category || "";
-                    if (catA !== catB) return catA.localeCompare(catB);
-                }
-                return (itemA.filename || "").localeCompare(itemB.filename || "");
-            } else if (sortBy === "duration_desc") {
-                const durA = itemA.duration || 0;
-                const durB = itemB.duration || 0;
-                if (durB !== durA) return durB - durA;
-                return (itemB.id || 0) - (itemA.id || 0);
-            } else if (sortBy === "date_desc") {
-                return (itemB.id || 0) - (itemA.id || 0);
-            }
-            return a.localeCompare(b);
-        });
-        
-        sortedKeys.forEach(key => {
-            renderTreeNode(node.children[key], folderChildren, depth + 1);
-        });
-        
         container.appendChild(folderDiv);
     } else if (node.type === "file" && node.video) {
         const v = node.video;
         
         // Verifica se corresponde ao filtro de busca
-        const searchInput = document.getElementById("library-search-input");
-        const query = searchInput ? searchInput.value.trim() : "";
-        
+        if (renderCtx.ast && !evaluateAST(renderCtx.ast, v, "tab-media")) {
+            return; // Oculta se não corresponder
+        }
+
         const friendlyTitle = getFriendlyTitle(v);
         const forceRealFilename = window.titleDisplayPreferences && window.titleDisplayPreferences[v.id] === "filename";
         const currentTitle = forceRealFilename ? v.filename : friendlyTitle;
-        
-        if (query) {
-            const ast = parseQuery(query);
-            if (ast && !evaluateAST(ast, v, "tab-videos")) {
-                return; // Oculta se não corresponder
-            }
-        }
         
         const hasVisionError = window.libraryInstance ? window.libraryInstance.isMediaFailed(v) : (v.status === "error");
 
@@ -2369,7 +3162,7 @@ function renderTreeNode(node, container, depth = 0) {
             const vVersion = v._thumbVersion || v.thumb_version || v.updated_at || "";
             const qs = vVersion ? `?v=${vVersion}` : "";
             const fallbackIcon = v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film';
-            thumbContent = `<img src="/api/video/${v.id}/thumbnail${qs}" alt="Thumb" onerror="this.onerror=null; this.style.display='none'; if(this.parentNode) this.parentNode.insertAdjacentHTML('beforeend', '<i class=\\'fa-solid ${fallbackIcon}\\'></i>');">`;
+            thumbContent = `<img src="/api/video/${v.id}/thumbnail${qs}" alt="Thumb" loading="lazy" decoding="async" onerror="this.onerror=null; this.style.display='none'; if(this.parentNode) this.parentNode.insertAdjacentHTML('beforeend', '<i class=\\'fa-solid ${fallbackIcon}\\'></i>');">`;
         }
         
         // Toggle title display icon
@@ -2604,13 +3397,8 @@ function renderTreeNode(node, container, depth = 0) {
         container.appendChild(card);
     } else if (node.type === "file" && node.photo) {
         const p = node.photo;
-        const searchInput = document.getElementById("library-search-input");
-        const query = searchInput ? searchInput.value.trim() : "";
-        if (query) {
-            const ast = parseQuery(query);
-            if (ast && !evaluateAST(ast, p, "tab-photos")) {
-                return;
-            }
+        if (renderCtx.ast && !evaluateAST(renderCtx.ast, p, "tab-media")) {
+            return;
         }
         
         const card = document.createElement("div");
@@ -2619,7 +3407,9 @@ function renderTreeNode(node, container, depth = 0) {
         card.style.paddingLeft = "6px";
         if (STATE.activePhoto && STATE.activePhoto.id === p.id) card.classList.add("active");
         
-        const src = p.proxy_path || (p.filepath && (p.filepath.startsWith('http') || p.filepath.startsWith('/')) ? p.filepath : `/originals/${p.filename}`);
+        // Card da biblioteca usa a miniatura (~320px), nao o proxy de 1024px.
+        // O lightbox continua abrindo o proxy/original em resolucao cheia.
+        const src = `/api/photo/${p.id}/thumbnail`;
         const isRaw = p.filename.toLowerCase().match(/\.(arw|cr2|nef|dng|pef|raf|orf|rw2|raw)$/);
         
         let imgHtml = "";
@@ -2641,7 +3431,7 @@ function renderTreeNode(node, container, depth = 0) {
                 imgHtml = `<div class="photo-placeholder-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>RAW...</span></div>`;
                 clickEnabled = false;
             } else {
-                imgHtml = `<img src="${src}" alt="${p.filename}" loading="lazy">`;
+                imgHtml = `<img src="${src}" alt="${escapeHtml(p.filename)}" loading="lazy" decoding="async">`;
             }
         }
         
@@ -2974,67 +3764,25 @@ window.globalExpandCollapseAll = function(expand, skipBtnAnimation = false) {
         }
     }
 
-    function processItems(items) {
-        if (!items || items.length === 0) return;
-        const filepaths = items.map(item => (item.filepath || item.filename || "").replace(/\\/g, "/"));
-        const commonBase = getCommonBasePath(filepaths);
-        
-        items.forEach(item => {
-            const normalized = (item.filepath || item.filename || "").replace(/\\/g, "/");
-            const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
-            const parts = relative.split("/").filter(Boolean);
-            
-            let currentPath = "root";
-            for (let i = 0; i < parts.length - 1; i++) {
-                currentPath = currentPath + "/" + parts[i];
-                if (expand) {
-                    openFoldersSet.add(currentPath);
-                } else {
-                    openFoldersSet.delete(currentPath);
-                }
-            }
-        });
-    }
-
-    processItems(STATE.allVideos);
-    processItems(STATE.allPhotos);
+    collectFolderPaths(lastRenderedTree, [], null, expand).forEach(fp => {
+        if (expand) openFoldersSet.add(fp);
+        else openFoldersSet.delete(fp);
+    });
 
     virtualEmptyFolders.forEach(fp => {
         if (expand) openFoldersSet.add(fp);
         else openFoldersSet.delete(fp);
     });
 
-    if (STATE.allVideos) STATE.emit("videosUpdated", STATE.allVideos);
-    if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
+    saveOpenFoldersState();
+    if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia();
 };
 
 window.expandCollapseAllSubfolders = function(folderPath, expand) {
-    function processItems(items) {
-        if (!items || items.length === 0) return;
-        const filepaths = items.map(item => (item.filepath || item.filename || "").replace(/\\/g, "/"));
-        const commonBase = getCommonBasePath(filepaths);
-        
-        items.forEach(item => {
-            const normalized = (item.filepath || item.filename || "").replace(/\\/g, "/");
-            const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
-            const parts = relative.split("/").filter(Boolean);
-            
-            let currentPath = "root";
-            for (let i = 0; i < parts.length - 1; i++) {
-                currentPath = currentPath + "/" + parts[i];
-                if (currentPath === folderPath || currentPath.startsWith(folderPath + "/")) {
-                    if (expand) {
-                        openFoldersSet.add(currentPath);
-                    } else {
-                        openFoldersSet.delete(currentPath);
-                    }
-                }
-            }
-        });
-    }
-
-    processItems(STATE.allVideos);
-    processItems(STATE.allPhotos);
+    collectFolderPaths(lastRenderedTree, [], folderPath).forEach(fp => {
+        if (expand) openFoldersSet.add(fp);
+        else openFoldersSet.delete(fp);
+    });
 
     virtualEmptyFolders.forEach(fp => {
         if (fp === folderPath || fp.startsWith(folderPath + "/")) {
@@ -3042,16 +3790,17 @@ window.expandCollapseAllSubfolders = function(folderPath, expand) {
             else openFoldersSet.delete(fp);
         }
     });
-    
-    if (STATE.allVideos) STATE.emit("videosUpdated", STATE.allVideos);
-    if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
+
+    saveOpenFoldersState();
+    if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia();
 };
 
 export class LibraryManager {
     constructor() {
         window.libraryInstance = this;
-        this.videoListEl = document.getElementById("video-list");
-        this.photoListEl = document.getElementById("photo-list");
+        this.mediaTreeListEl = document.getElementById("media-tree-list") || document.getElementById("video-list");
+        this.videoListEl = this.mediaTreeListEl;
+        this.photoListEl = this.mediaTreeListEl;
         this.docsListEl = document.getElementById("doc-list");
         this.btnScan = document.getElementById("btn-scan");
         this.btnImportExternal = document.getElementById("btn-import-external");
@@ -3127,7 +3876,7 @@ export class LibraryManager {
         cont.addEventListener("scroll", () => {
             const doc = cont.ownerDocument || document;
             const activeTabEl = doc.querySelector("#sidebar-left .tab-content.active");
-            const tabId = activeTabEl ? activeTabEl.id : (doc.getElementById("sidebar-left")?.getAttribute("data-active-tab") || "tab-videos");
+            const tabId = activeTabEl ? activeTabEl.id : (doc.getElementById("sidebar-left")?.getAttribute("data-active-tab") || "tab-media");
             if (tabId) {
                 this.saveTabScrollPosition(tabId, cont.scrollTop);
             }
@@ -3162,6 +3911,17 @@ export class LibraryManager {
                 } else {
                     el.classList.remove("active");
                 }
+            });
+        });
+
+        // Chips de filtro rápido de tipo de mídia (Todos, Vídeos, Fotos, Áudios)
+        const chipButtons = document.querySelectorAll(".media-type-filter-chips .chip-filter");
+        chipButtons.forEach(btn => {
+            btn.addEventListener("click", () => {
+                chipButtons.forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                this.activeTypeFilter = btn.getAttribute("data-type-filter") || "all";
+                this.scheduleRenderMedia();
             });
         });
 
@@ -3527,15 +4287,16 @@ export class LibraryManager {
         const chkTags = document.getElementById("chk-show-tags");
         const chkStatus = document.getElementById("chk-show-status");
         
-        const videoList = this.videoListEl || document.getElementById("video-list");
-        const photoList = this.photoListEl || document.getElementById("photo-list");
+        const getAllMediaLists = () => document.querySelectorAll("#media-tree-list, #video-list, #photo-list, .library-tree-list");
         
         function applyDisplayClasses() {
-            if (!videoList) return;
-            videoList.classList.toggle("hide-thumbnails", chkThumbnails ? !chkThumbnails.checked : false);
-            videoList.classList.toggle("hide-duration", chkDuration ? !chkDuration.checked : false);
-            videoList.classList.toggle("hide-tags", chkTags ? !chkTags.checked : false);
-            videoList.classList.toggle("hide-status", chkStatus ? !chkStatus.checked : false);
+            const lists = getAllMediaLists();
+            lists.forEach(list => {
+                list.classList.toggle("hide-thumbnails", chkThumbnails ? !chkThumbnails.checked : false);
+                list.classList.toggle("hide-duration", chkDuration ? !chkDuration.checked : false);
+                list.classList.toggle("hide-tags", chkTags ? !chkTags.checked : false);
+                list.classList.toggle("hide-status", chkStatus ? !chkStatus.checked : false);
+            });
         }
         
         const checkboxes = [chkThumbnails, chkDuration, chkTags, chkStatus];
@@ -3550,8 +4311,7 @@ export class LibraryManager {
                 chk.addEventListener("change", () => {
                     localStorage.setItem(`lib-pref-${chk.id}`, chk.checked);
                     applyDisplayClasses();
-                    // Re-renderiza para carregar imagens se Miniaturas foi ativado
-                    STATE.emit("videosUpdated", STATE.allVideos);
+                    if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia();
                 });
             }
         });
@@ -3580,8 +4340,7 @@ export class LibraryManager {
                     if (!window.tooltipDisplayPreferences) window.tooltipDisplayPreferences = {};
                     window.tooltipDisplayPreferences[key] = el.checked;
                     localStorage.setItem("tooltipDisplayPreferences", JSON.stringify(window.tooltipDisplayPreferences));
-                    if (STATE.allVideos) STATE.emit("videosUpdated", STATE.allVideos);
-                    if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
+                    if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia();
                 });
             }
         });
@@ -3593,14 +4352,11 @@ export class LibraryManager {
         const btnViewModeGrid = document.getElementById("btn-view-mode-grid");
         
         function setViewMode(mode) {
-            if (videoList) {
-                if (mode === "grid") videoList.classList.add("view-mode-grid");
-                else videoList.classList.remove("view-mode-grid");
-            }
-            if (photoList) {
-                if (mode === "grid") photoList.classList.add("view-mode-grid");
-                else photoList.classList.remove("view-mode-grid");
-            }
+            const lists = getAllMediaLists();
+            lists.forEach(list => {
+                if (mode === "grid") list.classList.add("view-mode-grid");
+                else list.classList.remove("view-mode-grid");
+            });
             if (mode === "grid") {
                 if (btnViewModeGrid) btnViewModeGrid.classList.add("active");
                 if (btnViewModeList) btnViewModeList.classList.remove("active");
@@ -3609,8 +4365,6 @@ export class LibraryManager {
                 if (btnViewModeGrid) btnViewModeGrid.classList.remove("active");
             }
             localStorage.setItem("lib-pref-view-mode", mode);
-            if (STATE.allVideos) STATE.emit("videosUpdated", STATE.allVideos);
-            if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
         }
         
         if (btnViewModeList) {
@@ -3625,16 +4379,12 @@ export class LibraryManager {
         const zoomLabel = document.getElementById("library-zoom-label");
         
         function setZoomValue(val) {
-            if (videoList) {
-                videoList.style.setProperty("--thumb-width", `${val}px`);
-                videoList.style.setProperty("--thumb-height", `${Math.round(val * 9 / 16)}px`);
-                updateZoomTier(videoList, val);
-            }
-            if (photoList) {
-                photoList.style.setProperty("--thumb-width", `${val}px`);
-                photoList.style.setProperty("--thumb-height", `${Math.round(val * 3 / 4)}px`);
-                updateZoomTier(photoList, val);
-            }
+            const lists = getAllMediaLists();
+            lists.forEach(list => {
+                list.style.setProperty("--thumb-width", `${val}px`);
+                list.style.setProperty("--thumb-height", `${Math.round(val * 9 / 16)}px`);
+                updateZoomTier(list, val);
+            });
             if (zoomLabel) zoomLabel.textContent = `${val}px`;
             if (zoomSlider) {
                 zoomSlider.value = val;
@@ -3670,8 +4420,7 @@ export class LibraryManager {
 
                 if (isNewQuery) {
                     // Quando o usuário digita uma busca explicitamente nova, reseta para o topo dos resultados
-                    this.saveTabScrollPosition("tab-videos", 0);
-                    this.saveTabScrollPosition("tab-photos", 0);
+                    this.saveTabScrollPosition("tab-media", 0);
                     this.saveTabScrollPosition("tab-docs", 0);
                 }
 
@@ -3696,26 +4445,30 @@ export class LibraryManager {
                     }
                 }
 
-                // 1. Update Videos tab
-                STATE.emit("videosUpdated", STATE.allVideos);
-                
-                // 2. Update Photos tab
-                STATE.emit("photosUpdated", STATE.allPhotos);
-                
-                // 3. Update Docs tab
-                if (this.allDocuments) {
-                    this.renderDocuments(this.allDocuments);
-                }
-                
-                // 4. Update Themes tab
-                if (window.panelsManager && typeof window.panelsManager.renderThemesList === 'function') {
-                    window.panelsManager.renderThemesList();
-                }
-                
-                // 5. Update Faces tab
-                if (window.FaceManager && typeof window.FaceManager.renderFaceClusters === 'function') {
-                    window.FaceManager.renderFaceClusters();
-                }
+                // Redesenhar a arvore inteira custa centenas de ms com uma
+                // biblioteca grande; sem debounce cada tecla travava a digitacao.
+                if (this._searchRenderTimer) clearTimeout(this._searchRenderTimer);
+                this._searchRenderTimer = setTimeout(() => {
+                    this._searchRenderTimer = null;
+
+                    // 1. Aba de Mídias (vídeos + fotos, render unico coalescido)
+                    this.scheduleRenderMedia();
+
+                    // 2. Aba de Documentos
+                    if (this.allDocuments) {
+                        this.renderDocuments(this.allDocuments);
+                    }
+
+                    // 3. Aba de Temas
+                    if (window.panelsManager && typeof window.panelsManager.renderThemesList === 'function') {
+                        window.panelsManager.renderThemesList();
+                    }
+
+                    // 4. Aba de Rostos
+                    if (window.FaceManager && typeof window.FaceManager.renderFaceClusters === 'function') {
+                        window.FaceManager.renderFaceClusters();
+                    }
+                }, 180);
             });
         }
 
@@ -3736,7 +4489,7 @@ export class LibraryManager {
                 }
                 // Só ativa o Inspetor de Mídia se estiver nas abas de Mídia (Vídeos/Fotos) ou se o Source Player estiver focado
                 const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id;
-                const isMediaTab = activeTab === "tab-videos" || activeTab === "tab-photos" || this.mediaInspectorActive;
+                const isMediaTab = activeTab === "tab-media" || activeTab === "tab-videos" || activeTab === "tab-photos" || this.mediaInspectorActive;
                 if (!isMediaTab && window.activeFocusedPlayer !== "source") {
                     return;
                 }
@@ -3849,11 +4602,10 @@ export class LibraryManager {
         if (!searchInput) return;
         
         switch (tabId) {
+            case "tab-media":
             case "tab-videos":
-                searchInput.placeholder = "Buscar mídias...";
-                break;
             case "tab-photos":
-                searchInput.placeholder = "Buscar fotos...";
+                searchInput.placeholder = "Buscar mídias...";
                 break;
             case "tab-themes":
                 searchInput.placeholder = "Buscar temas...";
@@ -3875,22 +4627,19 @@ export class LibraryManager {
         keySelect.innerHTML = "";
         
         let options = [];
-        const tabId = this.currentTabId || "tab-videos";
-        if (tabId === "tab-videos") {
+        const tabId = this.currentTabId || "tab-media";
+        if (tabId === "tab-media" || tabId === "tab-videos" || tabId === "tab-photos") {
             options = [
-                { value: "tipo", label: "Tipo (fala/bastidores)" },
+                { value: "tipo", label: "Tipo (fala/bastidores/video/foto)" },
                 { value: "status", label: "Status (pendente/asr/visao/erro)" },
                 { value: "cat", label: "Categoria (obra/processo...)" },
+                { value: "pasta", label: "Pasta / Bin" },
+                { value: "data", label: "Data / Diária" },
                 { value: "duracao", label: "Duração (segundos)" },
                 { value: "tag", label: "Tag" },
                 { value: "fps", label: "FPS" },
-                { value: "res", label: "Resolução" }
-            ];
-        } else if (tabId === "tab-photos") {
-            options = [
-                { value: "status", label: "Status (pendente/processado/erro)" },
-                { value: "tag", label: "Tag" },
-                { value: "formato", label: "Formato (raw/jpg)" }
+                { value: "res", label: "Resolução" },
+                { value: "formato", label: "Formato (raw/jpg/mp4)" }
             ];
         } else if (tabId === "tab-themes") {
             options = [
@@ -3921,9 +4670,10 @@ export class LibraryManager {
         if (!chipsContainer) return;
         chipsContainer.innerHTML = "";
         
-        const tabId = this.currentTabId || "tab-videos";
+        const tabId = this.currentTabId || "tab-media";
         let items = [];
-        if (tabId === "tab-videos") items = STATE.allVideos || [];
+        if (tabId === "tab-media") items = [...(STATE.allVideos || []), ...(STATE.allPhotos || [])];
+        else if (tabId === "tab-videos") items = STATE.allVideos || [];
         else if (tabId === "tab-photos") items = STATE.allPhotos || [];
         else if (tabId === "tab-docs") items = this.allDocuments || [];
         else if (tabId === "tab-themes") items = window.panelsManager?.allThemes || [];
@@ -3983,9 +4733,10 @@ export class LibraryManager {
             
             const lastWord = query.split(/\s+/).pop().toLowerCase();
             
-            const tabId = this.currentTabId || "tab-videos";
+            const tabId = this.currentTabId || "tab-media";
             let items = [];
-            if (tabId === "tab-videos") items = STATE.allVideos || [];
+            if (tabId === "tab-media") items = [...(STATE.allVideos || []), ...(STATE.allPhotos || [])];
+            else if (tabId === "tab-videos") items = STATE.allVideos || [];
             else if (tabId === "tab-photos") items = STATE.allPhotos || [];
             else if (tabId === "tab-docs") items = this.allDocuments || [];
             else if (tabId === "tab-themes") items = window.panelsManager?.allThemes || [];
@@ -4103,10 +4854,21 @@ export class LibraryManager {
 
     async reloadData() {
         try {
-            const videos = await CapIAuAPI.fetchVideos(STATE.currentProjectId);
+            const projectId = STATE.currentProjectId || 1;
+            try {
+                const binsResp = await CapIAuAPI.fetchProjectBins(projectId);
+                if (binsResp && Array.isArray(binsResp.bins)) {
+                    window.projectBinsList = binsResp.bins;
+                }
+            } catch (err) {
+                console.warn("[LibraryManager] Falha ao carregar bins:", err);
+            }
+
+            const videos = await CapIAuAPI.fetchVideos(projectId);
             STATE.allVideos = videos;
-            const photos = await CapIAuAPI.fetchPhotos(STATE.currentProjectId);
+            const photos = await CapIAuAPI.fetchPhotos(projectId);
             STATE.allPhotos = photos;
+            this.scheduleRenderMedia();
             await this.loadDocuments();
             this.checkFailedMediaCount();
         } catch (e) {
@@ -4504,29 +5266,25 @@ export class LibraryManager {
         const video = (STATE.allVideos || []).find(v => v.id === videoId);
         if (!video) return false;
 
-        // Abre a aba de vídeos na sidebar esquerda
-        const tabBtn = document.querySelector('.sidebar-left .tab-btn[data-tab="tab-videos"]');
+        const tabBtn = document.querySelector('.sidebar-left .tab-btn[data-tab="tab-media"]');
         if (tabBtn) tabBtn.click();
 
-        // Expande as pastas ancestrais do arquivo (mesmo cálculo do buildTree)
-        try {
-            const filepaths = STATE.allVideos.map(v => v.filepath.replace(/\\/g, "/"));
-            const commonBase = getCommonBasePath(filepaths);
-            const normalized = video.filepath.replace(/\\/g, "/");
-            const relative = commonBase ? normalized.substring(commonBase.length) : normalized;
-            const parts = relative.split("/").filter(Boolean);
+        // Expande os bins ancestrais do item (caminho virtual, nao mais o de disco)
+        const vPath = getItemVirtualFolder(video);
+        if (vPath && vPath !== "root") {
+            const parts = vPath.replace(/^root\/?/, "").split("/").filter(Boolean);
             let currentPath = "root";
-            for (let i = 0; i < parts.length - 1; i++) {
-                currentPath = currentPath + "/" + parts[i];
+            for (const part of parts) {
+                currentPath = currentPath + "/" + part;
                 openFoldersSet.add(currentPath);
             }
-        } catch (e) {
-            console.warn("Não foi possível calcular as pastas ancestrais:", e);
+            saveOpenFoldersState();
         }
 
-        // Re-renderiza a árvore já com as pastas abertas e destaca a seleção
-        this.renderVideos(STATE.allVideos);
         STATE.activeVideo = video;
+        this.renderMedia();
+
+        flushAllPendingChunks(); // o card alvo pode estar num bloco ainda nao montado
 
         requestAnimationFrame(() => {
             const card = document.querySelector(`.media-card.tree-file-item[data-video-id="${videoId}"]`);
@@ -4546,9 +5304,23 @@ export class LibraryManager {
         const photo = (STATE.allPhotos || []).find(p => p.id === photoId);
         if (!photo) return false;
 
-        const tabBtn = document.querySelector('.sidebar-left .tab-btn[data-tab="tab-photos"]');
+        const tabBtn = document.querySelector('.sidebar-left .tab-btn[data-tab="tab-media"]');
         if (tabBtn) tabBtn.click();
+
+        const vPath = getItemVirtualFolder(photo);
+        if (vPath && vPath !== "root") {
+            const parts = vPath.replace(/^root\/?/, "").split("/").filter(Boolean);
+            let currentPath = "root";
+            for (const part of parts) {
+                currentPath = currentPath + "/" + part;
+                openFoldersSet.add(currentPath);
+            }
+            saveOpenFoldersState();
+            this.renderMedia();
+        }
         STATE.activePhoto = photo;
+
+        flushAllPendingChunks();
 
         requestAnimationFrame(() => {
             const card = document.querySelector(`[data-photo-id="${photoId}"]`);
@@ -4563,122 +5335,123 @@ export class LibraryManager {
         return true;
     }
 
-    renderVideos(videos, options = {}) {
-        if (!this.videoListEl) return;
+    renderMedia(options = {}) {
+        const targetEl = document.getElementById("media-tree-list") || this.videoListEl;
+        if (!targetEl) return;
         const container = this.getScrollContainer();
         const shouldPreserveScroll = options.preserveScroll !== false;
         const savedScroll = (shouldPreserveScroll && container)
-            ? (this.tabScrollPositions?.["tab-videos"] !== undefined ? this.tabScrollPositions["tab-videos"] : container.scrollTop)
+            ? (this.tabScrollPositions?.["tab-media"] !== undefined ? this.tabScrollPositions["tab-media"] : container.scrollTop)
             : 0;
 
-        this.videoListEl.innerHTML = "";
-        
-        if (videos.length === 0) {
-            this.videoListEl.innerHTML = `<div class="empty-state-text">Nenhuma mídia encontrada na pasta watch/</div>`;
+        cancelPendingChunkJobs();
+        targetEl.innerHTML = "";
+        refreshRenderContext();
+
+        // Aplica modo de visualização e zoom persistidos diretamente no container
+        const savedMode = localStorage.getItem("lib-pref-view-mode") || "list";
+        if (savedMode === "grid") targetEl.classList.add("view-mode-grid");
+        else targetEl.classList.remove("view-mode-grid");
+
+        const savedZoom = parseInt(localStorage.getItem("lib-pref-zoom")) || 80;
+        targetEl.style.setProperty("--thumb-width", `${savedZoom}px`);
+        targetEl.style.setProperty("--thumb-height", `${Math.round(savedZoom * 9 / 16)}px`);
+        updateZoomTier(targetEl, savedZoom);
+
+        const allVids = STATE.allVideos || [];
+        const allPhotos = STATE.allPhotos || [];
+
+        // Atualiza contadores dos chips de tipo
+        const countAllEl = document.getElementById("count-all");
+        const countVideoEl = document.getElementById("count-video");
+        const countPhotoEl = document.getElementById("count-photo");
+        const countAudioEl = document.getElementById("count-audio");
+
+        if (countAllEl) countAllEl.textContent = `${allVids.length + allPhotos.length}`;
+        if (countVideoEl) countVideoEl.textContent = `${allVids.length}`;
+        if (countPhotoEl) countPhotoEl.textContent = `${allPhotos.length}`;
+        if (countAudioEl) countAudioEl.textContent = "0";
+
+        // Marca a origem de cada item uma unica vez: video e foto compartilham
+        // a mesma arvore agora, e adivinhar o tipo por `duration` dava falso negativo.
+        for (const v of allVids) v._mediaKind = "video";
+        for (const ph of allPhotos) ph._mediaKind = "photo";
+
+        // Filtro por chip de tipo
+        let items = [];
+        const typeFilter = this.activeTypeFilter || "all";
+        if (typeFilter === "video") {
+            items = allVids.slice();
+        } else if (typeFilter === "photo") {
+            items = allPhotos.slice();
+        } else if (typeFilter === "audio") {
+            items = [];
+        } else {
+            items = allVids.concat(allPhotos);
+        }
+
+        // Filtro da barra de busca (AST resolvido em refreshRenderContext)
+        if (renderCtx.ast) {
+            items = items.filter(it => evaluateAST(renderCtx.ast, it, "tab-media"));
+        }
+
+        if (items.length === 0) {
+            targetEl.innerHTML = `<div class="empty-state-text">Nenhuma mídia encontrada com os filtros atuais.</div>`;
             return;
         }
 
-        const tree = buildTree(videos, "video");
+        const tree = buildTree(items);
+        lastRenderedTree = tree;
         if (tree.isRoot && tree.name === "Biblioteca") {
-            Object.keys(tree.children).forEach(key => {
-                renderTreeNode(tree.children[key], this.videoListEl, 0);
-            });
+            appendChildrenChunked(tree, getSortedChildrenKeys(tree), targetEl, 0);
         } else {
-            renderTreeNode(tree, this.videoListEl, 0);
+            const fragment = document.createDocumentFragment();
+            renderTreeNode(tree, fragment, 0);
+            targetEl.appendChild(fragment);
         }
 
         if (shouldPreserveScroll && container) {
-            const isTabActive = this.videoListEl.closest(".tab-content")?.classList.contains("active");
+            const isTabActive = targetEl.closest(".tab-content")?.classList.contains("active");
             if (isTabActive && savedScroll > 0) {
                 container.scrollTop = savedScroll;
                 requestAnimationFrame(() => {
                     container.scrollTop = savedScroll;
-                    requestAnimationFrame(() => {
-                        container.scrollTop = savedScroll;
-                    });
                 });
             }
             this.tabScrollPositions = this.tabScrollPositions || {};
-            this.tabScrollPositions["tab-videos"] = savedScroll;
+            this.tabScrollPositions["tab-media"] = savedScroll;
         }
     }
 
-    renderPhotos(photos, options = {}) {
-        if (!this.photoListEl) return;
-        const container = this.getScrollContainer();
-        const shouldPreserveScroll = options.preserveScroll !== false;
-        const savedScroll = (shouldPreserveScroll && container)
-            ? (this.tabScrollPositions?.["tab-photos"] !== undefined ? this.tabScrollPositions["tab-photos"] : container.scrollTop)
-            : 0;
-
-        this.photoListEl.innerHTML = "";
-        
-        if (!photos || photos.length === 0) {
-            this.photoListEl.innerHTML = `<div class="empty-state-text">Nenhuma foto de set cadastrada.</div>`;
-            return;
-        }
-
-        // Apply search input query filter
-        const searchInput = document.getElementById("library-search-input");
-        const query = searchInput ? searchInput.value.trim() : "";
-        
-        let filtered = photos;
-        if (query) {
-            const ast = parseQuery(query);
-            if (ast) {
-                filtered = photos.filter(p => evaluateAST(ast, p, "tab-photos"));
+    /**
+     * Agenda um unico render por frame. Quase todos os call-sites emitem
+     * "videosUpdated" e "photosUpdated" em sequencia; sem coalescencia isso
+     * reconstruia a arvore inteira duas vezes seguidas.
+     */
+    scheduleRenderMedia(options = {}) {
+        this._pendingRenderOptions = { ...(this._pendingRenderOptions || {}), ...options };
+        if (this._renderScheduled) return;
+        this._renderScheduled = true;
+        // Microtask, nao requestAnimationFrame: rAF nao dispara com a janela
+        // oculta/minimizada, o que deixaria a biblioteca em branco ate o foco voltar.
+        Promise.resolve().then(() => {
+            this._renderScheduled = false;
+            const opts = this._pendingRenderOptions || {};
+            this._pendingRenderOptions = null;
+            try {
+                this.renderMedia(opts);
+            } catch (err) {
+                console.error("[LibraryManager] Falha ao renderizar a biblioteca:", err);
             }
-        }
-        
-        if (filtered.length === 0) {
-            this.photoListEl.innerHTML = `<div class="empty-state-text">Nenhuma foto encontrada.</div>`;
-            return;
-        }
-
-        // Apply sort
-        const savedSort = localStorage.getItem("library_sort_by") || "name_asc";
-        const sortSelect = document.getElementById("library-sort-by");
-        const sortBy = sortSelect?.value || savedSort;
-
-        filtered = [...filtered].sort((pA, pB) => {
-            if (sortBy === "name_asc") {
-                return (pA.title || pA.filename || "").localeCompare(pB.title || pB.filename || "");
-            } else if (sortBy === "name_desc") {
-                return (pB.title || pB.filename || "").localeCompare(pA.title || pA.filename || "");
-            } else if (sortBy === "type_interview" || sortBy === "type_broll") {
-                const catA = pA.category || "";
-                const catB = pB.category || "";
-                if (catA !== catB) return catA.localeCompare(catB);
-                return (pA.filename || "").localeCompare(pB.filename || "");
-            } else if (sortBy === "duration_desc" || sortBy === "date_desc") {
-                return (pB.id || 0) - (pA.id || 0);
-            }
-            return (pA.filename || "").localeCompare(pB.filename || "");
         });
+    }
 
-        const tree = buildTree(filtered, "photo");
-        if (tree.isRoot && tree.name === "Biblioteca") {
-            Object.keys(tree.children).forEach(key => {
-                renderTreeNode(tree.children[key], this.photoListEl, 0);
-            });
-        } else {
-            renderTreeNode(tree, this.photoListEl, 0);
-        }
+    renderVideos(videos, options = {}) {
+        this.scheduleRenderMedia(options);
+    }
 
-        if (shouldPreserveScroll && container) {
-            const isTabActive = this.photoListEl.closest(".tab-content")?.classList.contains("active");
-            if (isTabActive && savedScroll > 0) {
-                container.scrollTop = savedScroll;
-                requestAnimationFrame(() => {
-                    container.scrollTop = savedScroll;
-                    requestAnimationFrame(() => {
-                        container.scrollTop = savedScroll;
-                    });
-                });
-            }
-            this.tabScrollPositions = this.tabScrollPositions || {};
-            this.tabScrollPositions["tab-photos"] = savedScroll;
-        }
+    renderPhotos(photos, options = {}) {
+        this.scheduleRenderMedia(options);
     }
 
     async runWatchScan() {
@@ -5540,7 +6313,7 @@ export class LibraryManager {
 
         // Salva a aba ativa da biblioteca antes de trocar
         const activeTabBtn = document.querySelector(".sidebar-left .tab-btn.active");
-        this.preInspectorActiveTab = activeTabBtn ? activeTabBtn.dataset.tab : "tab-videos";
+        this.preInspectorActiveTab = activeTabBtn ? activeTabBtn.dataset.tab : "tab-media";
 
         // Salva estado do source player (maximizado ou não)
         const sourcePanel = document.getElementById("source-player-panel");
@@ -6737,7 +7510,7 @@ export class LibraryScrollIndexTracker {
 
         // Apenas ativo se estiver na aba de Vídeos ou Fotos
         const activeTab = doc.querySelector("#sidebar-left .tab-content.active")?.id;
-        if (activeTab !== "tab-videos" && activeTab !== "tab-photos") {
+        if (activeTab !== "tab-media" && activeTab !== "tab-videos" && activeTab !== "tab-photos") {
             this.hide();
             return;
         }
@@ -6797,7 +7570,7 @@ export class LibraryScrollIndexTracker {
         if (!container) return;
 
         const activeTab = doc.querySelector("#sidebar-left .tab-content.active")?.id;
-        if (activeTab !== "tab-videos" && activeTab !== "tab-photos") return;
+        if (activeTab !== "tab-media" && activeTab !== "tab-videos" && activeTab !== "tab-photos") return;
         
         const rect = container.getBoundingClientRect();
         const isInsideGutter = (e.clientX >= rect.right - 16 && e.clientX <= rect.right + 4 && e.clientY >= rect.top && e.clientY <= rect.bottom);
@@ -6977,8 +7750,9 @@ export class LibraryScrollIndexTracker {
             if (summaryEl) summaryEl.textContent = `Pasta contendo mídias organizadas.`;
             if (tagsRow) tagsRow.innerHTML = "";
         } else {
-            const isVideo = activeTabId === "tab-videos" || itemEl.hasAttribute("data-video-id");
-            const isPhoto = activeTabId === "tab-photos" || itemEl.hasAttribute("data-photo-id");
+            // Na aba unificada video e foto convivem: o atributo do card decide.
+            const isVideo = itemEl.hasAttribute("data-video-id") || activeTabId === "tab-videos";
+            const isPhoto = itemEl.hasAttribute("data-photo-id") || activeTabId === "tab-photos";
             
             const parentFolderName = itemEl.closest(".tree-folder-container")?.querySelector(".tree-folder-header .folder-name")?.textContent || "Biblioteca";
             if (folderSpan) folderSpan.textContent = parentFolderName;

@@ -707,7 +707,10 @@ button {
 .tag-broll { background: rgba(138, 92, 246, 0.15); color: var(--color-violet); }
 
 /* ── COMPACT LINE LAYOUT FOR TREE MEDIA ITEMS ──────────────────────── */
-#video-list {
+#video-list,
+#photo-list,
+#media-tree-list,
+.library-tree-list {
     --thumb-width: 80px;
     --thumb-height: 45px; /* 16:9 de 80px */
 }
@@ -836,8 +839,12 @@ button {
 /* ── MODO GRADE / CARDS (VIEW-MODE-GRID) ─────────────────────────── */
 #video-list.view-mode-grid .tree-folder-children:not([hidden]):not([style*="display: none"]),
 #photo-list.view-mode-grid .tree-folder-children:not([hidden]):not([style*="display: none"]),
+#media-tree-list.view-mode-grid .tree-folder-children:not([hidden]):not([style*="display: none"]),
+.library-tree-list.view-mode-grid .tree-folder-children:not([hidden]):not([style*="display: none"]),
 #video-list.view-mode-grid:not(:has(.tree-folder-container)),
-#photo-list.view-mode-grid:not(:has(.tree-folder-container)) {
+#photo-list.view-mode-grid:not(:has(.tree-folder-container)),
+#media-tree-list.view-mode-grid,
+.library-tree-list.view-mode-grid {
     display: grid !important;
     grid-template-columns: repeat(auto-fill, minmax(calc(var(--thumb-width, 130px) + 30px), 1fr)) !important;
     gap: 10px !important;
@@ -848,22 +855,36 @@ button {
 /* Força display: none em subpastas recolhidas mesmo em modo grade */
 #video-list.view-mode-grid .tree-folder-children[hidden],
 #photo-list.view-mode-grid .tree-folder-children[hidden],
+#media-tree-list.view-mode-grid .tree-folder-children[hidden],
+.library-tree-list.view-mode-grid .tree-folder-children[hidden],
 #video-list.view-mode-grid .tree-folder-children[style*="display: none"],
 #photo-list.view-mode-grid .tree-folder-children[style*="display: none"],
+#media-tree-list.view-mode-grid .tree-folder-children[style*="display: none"],
+.library-tree-list.view-mode-grid .tree-folder-children[style*="display: none"],
 #video-list .tree-folder-children[style*="display: none"],
 #photo-list .tree-folder-children[style*="display: none"],
+#media-tree-list .tree-folder-children[style*="display: none"],
+.library-tree-list .tree-folder-children[style*="display: none"],
 .tree-folder-children.collapsed {
     display: none !important;
 }
 
-/* Ocupação inteira das subpastas na grade */
+/* As mídias soltas na raiz são irmãs dos containers de pasta, então a própria
+   lista precisa ser a grade. O container de pasta ocupa a linha inteira.
+   (Antes havia um :not(:has(.tree-folder-container)) aqui: como a pasta
+   "Pastas Inteligentes" existe sempre, a grade nunca era aplicada e os cards
+   ficavam empilhados em largura total.) */
 #video-list.view-mode-grid .tree-folder-container,
-#photo-list.view-mode-grid .tree-folder-container {
+#photo-list.view-mode-grid .tree-folder-container,
+#media-tree-list.view-mode-grid .tree-folder-container,
+.library-tree-list.view-mode-grid .tree-folder-container {
     grid-column: 1 / -1;
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item,
-#photo-list.view-mode-grid .media-card.tree-file-item {
+#photo-list.view-mode-grid .media-card.tree-file-item,
+#media-tree-list.view-mode-grid .media-card.tree-file-item,
+.library-tree-list.view-mode-grid .media-card.tree-file-item {
     flex-direction: column !important;
     align-items: flex-start !important;
     height: auto !important;
@@ -882,7 +903,9 @@ button {
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item:hover,
-#photo-list.view-mode-grid .media-card.tree-file-item:hover {
+#photo-list.view-mode-grid .media-card.tree-file-item:hover,
+#media-tree-list.view-mode-grid .media-card.tree-file-item:hover,
+.library-tree-list.view-mode-grid .media-card.tree-file-item:hover {
     transform: scale(1.04, 1.08) translateY(-2px); /* Aumento sutil horizontal/vertical, levemente maior verticalmente */
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.6);
     border-color: rgba(6, 182, 212, 0.4) !important;
@@ -891,19 +914,25 @@ button {
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item .media-thumbnail,
-#photo-list.view-mode-grid .media-card.tree-file-item .media-thumbnail {
+#photo-list.view-mode-grid .media-card.tree-file-item .media-thumbnail,
+#media-tree-list.view-mode-grid .media-card.tree-file-item .media-thumbnail,
+.library-tree-list.view-mode-grid .media-card.tree-file-item .media-thumbnail {
     width: 100% !important;
     height: auto !important;
     aspect-ratio: 16/9 !important;
     border-radius: 4px !important;
 }
 
-#photo-list.view-mode-grid .media-card.tree-file-item.photo-item .media-thumbnail {
+#photo-list.view-mode-grid .media-card.tree-file-item.photo-item .media-thumbnail,
+#media-tree-list.view-mode-grid .media-card.tree-file-item.photo-item .media-thumbnail,
+.library-tree-list.view-mode-grid .media-card.tree-file-item.photo-item .media-thumbnail {
     aspect-ratio: 4/3 !important;
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item .media-info,
-#photo-list.view-mode-grid .media-card.tree-file-item .media-info {
+#photo-list.view-mode-grid .media-card.tree-file-item .media-info,
+#media-tree-list.view-mode-grid .media-card.tree-file-item .media-info,
+.library-tree-list.view-mode-grid .media-card.tree-file-item .media-info {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 4px !important;
@@ -911,13 +940,17 @@ button {
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item .media-info h4,
-#photo-list.view-mode-grid .media-card.tree-file-item .media-info h4 {
+#photo-list.view-mode-grid .media-card.tree-file-item .media-info h4,
+#media-tree-list.view-mode-grid .media-card.tree-file-item .media-info h4,
+.library-tree-list.view-mode-grid .media-card.tree-file-item .media-info h4 {
     width: 100% !important;
     font-size: 10px !important;
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item .media-info h4 .clip-title-text,
-#photo-list.view-mode-grid .media-card.tree-file-item .media-info h4 .clip-title-text {
+#photo-list.view-mode-grid .media-card.tree-file-item .media-info h4 .clip-title-text,
+#media-tree-list.view-mode-grid .media-card.tree-file-item .media-info h4 .clip-title-text,
+.library-tree-list.view-mode-grid .media-card.tree-file-item .media-info h4 .clip-title-text {
     white-space: normal !important;
     word-break: break-word;
     overflow: hidden;
@@ -930,21 +963,42 @@ button {
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item:hover .media-info h4 .clip-title-text,
-#photo-list.view-mode-grid .media-card.tree-file-item:hover .media-info h4 .clip-title-text {
+#photo-list.view-mode-grid .media-card.tree-file-item:hover .media-info h4 .clip-title-text,
+#media-tree-list.view-mode-grid .media-card.tree-file-item:hover .media-info h4 .clip-title-text,
+.library-tree-list.view-mode-grid .media-card.tree-file-item:hover .media-info h4 .clip-title-text {
     -webkit-line-clamp: 4;
     max-height: 56px;
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item .media-info .media-meta-row,
-#photo-list.view-mode-grid .media-card.tree-file-item .media-info .media-meta-row {
+#photo-list.view-mode-grid .media-card.tree-file-item .media-info .media-meta-row,
+#media-tree-list.view-mode-grid .media-card.tree-file-item .media-info .media-meta-row,
+.library-tree-list.view-mode-grid .media-card.tree-file-item .media-info .media-meta-row {
     width: 100% !important;
     justify-content: space-between !important;
     font-size: 9px !important;
 }
 
+/* ── PERFORMANCE DE LISTAS LONGAS ─────────────────────────────────────
+   A aba unificada "Mídias" renderiza vídeos e fotos na mesma árvore
+   (~2000 cards em bibliotecas reais). content-visibility faz o navegador
+   pular layout e pintura dos cards fora da viewport; contain-intrinsic-size
+   mantém a barra de rolagem estável reservando a altura estimada. */
+#media-tree-list .media-card.tree-file-item,
+.library-tree-list .media-card.tree-file-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto calc(var(--thumb-height, 45px) + 14px);
+}
+#media-tree-list.view-mode-grid .media-card.tree-file-item,
+.library-tree-list.view-mode-grid .media-card.tree-file-item {
+    contain-intrinsic-size: auto calc(var(--thumb-width, 130px) * 0.5625 + 70px);
+}
+
 /* Modo Lista (Árvore) de Fotos e Vídeos - Layout adaptativo inteligente com Título, Metadados, Sinopse e Tags */
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item,
-#video-list:not(.view-mode-grid) .media-card.tree-file-item {
+#video-list:not(.view-mode-grid) .media-card.tree-file-item,
+#media-tree-list:not(.view-mode-grid) .media-card.tree-file-item,
+.library-tree-list:not(.view-mode-grid) .media-card.tree-file-item {
     display: flex !important;
     flex-direction: row !important;
     align-items: flex-start !important;
@@ -960,19 +1014,25 @@ button {
     transition: background 0.15s ease, border-color 0.15s ease;
 }
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item:hover,
-#video-list:not(.view-mode-grid) .media-card.tree-file-item:hover {
+#video-list:not(.view-mode-grid) .media-card.tree-file-item:hover,
+#media-tree-list:not(.view-mode-grid) .media-card.tree-file-item:hover,
+.library-tree-list:not(.view-mode-grid) .media-card.tree-file-item:hover {
     background: rgba(255, 255, 255, 0.04) !important;
     border-color: rgba(255, 255, 255, 0.06) !important;
 }
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item.active,
-#video-list:not(.view-mode-grid) .media-card.tree-file-item.active {
+#video-list:not(.view-mode-grid) .media-card.tree-file-item.active,
+#media-tree-list:not(.view-mode-grid) .media-card.tree-file-item.active,
+.library-tree-list:not(.view-mode-grid) .media-card.tree-file-item.active {
     background: rgba(6, 182, 212, 0.1) !important;
     border-color: rgba(6, 182, 212, 0.25) !important;
     border-left: 3px solid var(--color-cyan) !important;
     border-radius: 0 4px 4px 0 !important;
 }
 
-#video-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail {
+#video-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail,
+#media-tree-list:not(.view-mode-grid) .media-card.tree-file-item:not(.photo-item) .media-thumbnail,
+.library-tree-list:not(.view-mode-grid) .media-card.tree-file-item:not(.photo-item) .media-thumbnail {
     width: var(--thumb-width, 80px) !important;
     max-width: 320px !important;
     height: auto !important;
@@ -983,7 +1043,9 @@ button {
     background: rgba(0, 0, 0, 0.45);
     border: 1px solid rgba(255, 255, 255, 0.08);
 }
-#photo-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail {
+#photo-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail,
+#media-tree-list:not(.view-mode-grid) .media-card.tree-file-item.photo-item .media-thumbnail,
+.library-tree-list:not(.view-mode-grid) .media-card.tree-file-item.photo-item .media-thumbnail {
     width: var(--thumb-width, 80px) !important;
     max-width: 320px !important;
     height: auto !important;
@@ -995,7 +1057,9 @@ button {
     border: 1px solid rgba(255, 255, 255, 0.08);
 }
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail img,
-#video-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail img {
+#video-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail img,
+#media-tree-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail img,
+.library-tree-list:not(.view-mode-grid) .media-card.tree-file-item .media-thumbnail img {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -1004,7 +1068,9 @@ button {
 }
 
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item .media-info,
-#video-list:not(.view-mode-grid) .media-card.tree-file-item .media-info {
+#video-list:not(.view-mode-grid) .media-card.tree-file-item .media-info,
+#media-tree-list:not(.view-mode-grid) .media-card.tree-file-item .media-info,
+.library-tree-list:not(.view-mode-grid) .media-card.tree-file-item .media-info {
     display: flex !important;
     flex-direction: column !important;
     align-items: flex-start !important;
@@ -1017,7 +1083,9 @@ button {
 }
 
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item .media-info h4,
-#video-list:not(.view-mode-grid) .media-card.tree-file-item .media-info h4 {
+#video-list:not(.view-mode-grid) .media-card.tree-file-item .media-info h4,
+#media-tree-list:not(.view-mode-grid) .media-card.tree-file-item .media-info h4,
+.library-tree-list:not(.view-mode-grid) .media-card.tree-file-item .media-info h4 {
     display: flex !important;
     align-items: center !important;
     gap: 4px !important;
@@ -1213,7 +1281,9 @@ button {
 }
 
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item .btn-card-action,
-#video-list:not(.view-mode-grid) .media-card.tree-file-item .btn-card-action {
+#video-list:not(.view-mode-grid) .media-card.tree-file-item .btn-card-action,
+#media-tree-list:not(.view-mode-grid) .media-card.tree-file-item .btn-card-action,
+.library-tree-list:not(.view-mode-grid) .media-card.tree-file-item .btn-card-action {
     display: inline-flex !important;
     position: relative !important;
     top: auto !important;
@@ -1232,19 +1302,25 @@ button {
     cursor: pointer !important;
 }
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item .btn-card-action:hover,
-#video-list:not(.view-mode-grid) .media-card.tree-file-item .btn-card-action:hover {
+#video-list:not(.view-mode-grid) .media-card.tree-file-item .btn-card-action:hover,
+#media-tree-list:not(.view-mode-grid) .media-card.tree-file-item .btn-card-action:hover,
+.library-tree-list:not(.view-mode-grid) .media-card.tree-file-item .btn-card-action:hover {
     background: var(--color-cyan) !important;
     color: #000 !important;
 }
 #photo-list:not(.view-mode-grid) .media-card.tree-file-item .btn-photo-similar:hover,
-#video-list:not(.view-mode-grid) .media-card.tree-file-item .btn-photo-similar:hover {
+#video-list:not(.view-mode-grid) .media-card.tree-file-item .btn-photo-similar:hover,
+#media-tree-list:not(.view-mode-grid) .media-card.tree-file-item .btn-photo-similar:hover,
+.library-tree-list:not(.view-mode-grid) .media-card.tree-file-item .btn-photo-similar:hover {
     background: var(--color-violet) !important;
     color: #fff !important;
 }
 
 /* Posicionamento flutuante do botão de deletar/cancelar na miniatura apenas no modo grade */
 #video-list.view-mode-grid .media-card.tree-file-item .btn-card-action,
-#photo-list.view-mode-grid .media-card.tree-file-item .btn-card-action {
+#photo-list.view-mode-grid .media-card.tree-file-item .btn-card-action,
+#media-tree-list.view-mode-grid .media-card.tree-file-item .btn-card-action,
+.library-tree-list.view-mode-grid .media-card.tree-file-item .btn-card-action {
     position: absolute;
     top: 12px;
     right: 12px;
@@ -1264,17 +1340,23 @@ button {
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item .btn-card-action.btn-hover-only,
-#photo-list.view-mode-grid .media-card.tree-file-item .btn-card-action.btn-hover-only {
+#photo-list.view-mode-grid .media-card.tree-file-item .btn-card-action.btn-hover-only,
+#media-tree-list.view-mode-grid .media-card.tree-file-item .btn-card-action.btn-hover-only,
+.library-tree-list.view-mode-grid .media-card.tree-file-item .btn-card-action.btn-hover-only {
     display: none;
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item:hover .btn-card-action.btn-hover-only,
-#photo-list.view-mode-grid .media-card.tree-file-item:hover .btn-card-action.btn-hover-only {
+#photo-list.view-mode-grid .media-card.tree-file-item:hover .btn-card-action.btn-hover-only,
+#media-tree-list.view-mode-grid .media-card.tree-file-item:hover .btn-card-action.btn-hover-only,
+.library-tree-list.view-mode-grid .media-card.tree-file-item:hover .btn-card-action.btn-hover-only {
     display: flex;
 }
 
 #video-list.view-mode-grid .media-card.tree-file-item .btn-card-action:hover,
-#photo-list.view-mode-grid .media-card.tree-file-item .btn-card-action:hover {
+#photo-list.view-mode-grid .media-card.tree-file-item .btn-card-action:hover,
+#media-tree-list.view-mode-grid .media-card.tree-file-item .btn-card-action:hover,
+.library-tree-list.view-mode-grid .media-card.tree-file-item .btn-card-action:hover {
     background: var(--color-rose) !important;
     color: #fff !important;
     transform: scale(1.1);
@@ -1282,20 +1364,26 @@ button {
 
 /* Responsividade de colunas no modo maximizado (Grade) */
 .sidebar-left.sidebar-maximized #video-list.view-mode-grid .tree-folder-children,
-.sidebar-left.sidebar-maximized #photo-list.view-mode-grid .tree-folder-children {
+.sidebar-left.sidebar-maximized #photo-list.view-mode-grid .tree-folder-children,
+.sidebar-left.sidebar-maximized #media-tree-list.view-mode-grid .tree-folder-children,
+.sidebar-left.sidebar-maximized .library-tree-list.view-mode-grid .tree-folder-children {
     grid-template-columns: repeat(auto-fill, minmax(max(calc(var(--thumb-width) + 40px), 200px), 1fr)) !important;
 }
 
 /* Quando a biblioteca está maximizada no modo LISTA (exibir em colunas responsivas) */
 .sidebar-left.sidebar-maximized #video-list:not(.view-mode-grid) .tree-folder-children,
-.sidebar-left.sidebar-maximized #photo-list:not(.view-mode-grid) .tree-folder-children {
+.sidebar-left.sidebar-maximized #photo-list:not(.view-mode-grid) .tree-folder-children,
+.sidebar-left.sidebar-maximized #media-tree-list:not(.view-mode-grid) .tree-folder-children,
+.sidebar-left.sidebar-maximized .library-tree-list:not(.view-mode-grid) .tree-folder-children {
     display: grid !important;
     grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)) !important;
     gap: 8px 16px !important;
 }
 
 .sidebar-left.sidebar-maximized #video-list:not(.view-mode-grid) .tree-folder-container,
-.sidebar-left.sidebar-maximized #photo-list:not(.view-mode-grid) .tree-folder-container {
+.sidebar-left.sidebar-maximized #photo-list:not(.view-mode-grid) .tree-folder-container,
+.sidebar-left.sidebar-maximized #media-tree-list:not(.view-mode-grid) .tree-folder-container,
+.sidebar-left.sidebar-maximized .library-tree-list:not(.view-mode-grid) .tree-folder-container {
     grid-column: 1 / -1;
 }
 
@@ -3042,11 +3130,124 @@ button {
 }
 
 /* Fundo sutil apenas no modo lista para organizar visualmente pastas aninhadas */
-#video-list:not(.view-mode-grid) .tree-folder-children {
+#video-list:not(.view-mode-grid) .tree-folder-children,
+#media-tree-list:not(.view-mode-grid) .tree-folder-children {
     background: rgba(255, 255, 255, 0.015);
     border-radius: 4px;
     padding-top: 2px;
     padding-bottom: 2px;
+}
+
+/* ── CHIPS DE FILTRO DE TIPO DE MÍDIA ── */
+.media-type-filter-chips {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    width: 100%;
+    padding: 2px 0;
+}
+
+.chip-filter {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 500;
+    font-family: inherit;
+    padding: 2px 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.chip-filter:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.chip-filter.active {
+    background: rgba(6, 182, 212, 0.18);
+    border-color: var(--color-cyan);
+    color: #fff;
+    font-weight: 600;
+}
+
+.chip-filter .chip-count {
+    font-size: 9px;
+    opacity: 0.7;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 0 4px;
+    border-radius: 8px;
+}
+
+/* ── SMART BINS STYLING ── */
+.smart-bins-root {
+    margin-top: 6px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    padding-top: 4px;
+}
+
+.smart-bin-header {
+    display: flex;
+    align-items: center;
+    padding: 4px 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    transition: var(--transition-smooth);
+    user-select: none;
+}
+
+.smart-bin-header:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: #fff;
+}
+
+.smart-bin-badge {
+    font-size: 9px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+    padding: 1px 5px;
+    border-radius: 8px;
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+/* ── BADGES DE TIPO DE MÍDIA ── */
+.media-badge-icon {
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.media-badge-video {
+    background: rgba(139, 92, 246, 0.2);
+    color: #c084fc;
+    border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
+.media-badge-photo {
+    background: rgba(6, 182, 212, 0.2);
+    color: #67e8f9;
+    border: 1px solid rgba(6, 182, 212, 0.4);
+}
+
+.media-badge-audio {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.4);
 }
 
 .tree-file-item {
