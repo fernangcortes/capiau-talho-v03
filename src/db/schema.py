@@ -13,6 +13,18 @@ CREATE TABLE IF NOT EXISTS project (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Pastas Virtuais / Bins do Projeto (desacopladas do disco)
+CREATE TABLE IF NOT EXISTS media_bin (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    path TEXT NOT NULL,
+    parent_path TEXT NOT NULL DEFAULT 'root',
+    color TEXT DEFAULT '#8b5cf6',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(project_id, path)
+);
+
 -- Videos (Entrevistas e B-rolls de bastidores)
 CREATE TABLE IF NOT EXISTS video (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,6 +33,8 @@ CREATE TABLE IF NOT EXISTS video (
     filepath TEXT NOT NULL,
     hash TEXT UNIQUE NOT NULL,
     video_type TEXT CHECK(video_type IN ('interview', 'broll', 'unknown')) DEFAULT 'unknown',
+    virtual_folder TEXT DEFAULT 'root',
+    recorded_at TIMESTAMP,
     
     -- Metadados tecnicos (FFprobe)
     duration REAL,
@@ -51,6 +65,8 @@ CREATE TABLE IF NOT EXISTS photo (
     filename TEXT NOT NULL,
     filepath TEXT NOT NULL,
     hash TEXT UNIQUE NOT NULL,
+    virtual_folder TEXT DEFAULT 'root',
+    recorded_at TIMESTAMP,
     title TEXT,       -- titulo curto (3-6 palavras) gerado pela IA
     category TEXT,    -- categoria de triagem (Eixo A)
     category_confidence REAL,
@@ -448,6 +464,15 @@ def init_db(db_path: Path = None):
         cursor.execute("PRAGMA table_info(video)")
         video_cols = [row[1] for row in cursor.fetchall()]
         
+        if "virtual_folder" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN virtual_folder TEXT DEFAULT 'root'")
+            print("[MIGRATION] Coluna 'virtual_folder' adicionada a tabela video.")
+        if "recorded_at" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN recorded_at TIMESTAMP")
+            print("[MIGRATION] Coluna 'recorded_at' adicionada a tabela video.")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_video_virtual_folder ON video(project_id, virtual_folder)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_media_bin_project ON media_bin(project_id, path)")
+            
         if "description" not in video_cols:
             cursor.execute("ALTER TABLE video ADD COLUMN description TEXT")
             print("[MIGRATION] Coluna 'description' adicionada a tabela video.")
@@ -503,6 +528,14 @@ def init_db(db_path: Path = None):
         # Migracoes para tabela photo (descricao original preservada antes do enriquecimento)
         cursor.execute("PRAGMA table_info(photo)")
         photo_cols = [row[1] for row in cursor.fetchall()]
+        if "virtual_folder" not in photo_cols:
+            cursor.execute("ALTER TABLE photo ADD COLUMN virtual_folder TEXT DEFAULT 'root'")
+            print("[MIGRATION] Coluna 'virtual_folder' adicionada a tabela photo.")
+        if "recorded_at" not in photo_cols:
+            cursor.execute("ALTER TABLE photo ADD COLUMN recorded_at TIMESTAMP")
+            print("[MIGRATION] Coluna 'recorded_at' adicionada a tabela photo.")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_photo_virtual_folder ON photo(project_id, virtual_folder)")
+        
         if "raw_description" not in photo_cols:
             cursor.execute("ALTER TABLE photo ADD COLUMN raw_description TEXT")
             print("[MIGRATION] Coluna 'raw_description' adicionada a tabela photo.")
