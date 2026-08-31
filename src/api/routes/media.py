@@ -4,6 +4,7 @@ import json
 import hashlib
 import math
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -561,9 +562,32 @@ def video_similar(video_id: int, project_id: int = Query(1), timestamp: float = 
         print(f"[VideoSimilar] Erro inesperado ({type(e).__name__}): {e}")
     return {"video_id": video_id, "timestamp": timestamp, "results": results, "index_status": index_status, "warning": warning}
 
+def _get_powershell_path() -> Optional[str]:
+    """Retorna o caminho do executável do PowerShell se disponível no sistema Windows."""
+    if sys.platform != "win32":
+        return None
+    for exe in ["powershell.exe", "powershell", "pwsh.exe", "pwsh"]:
+        found = shutil.which(exe)
+        if found:
+            return found
+    win_dir = os.environ.get("SystemRoot") or os.environ.get("WINDIR") or r"C:\Windows"
+    for candidate in [
+        Path(win_dir) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe",
+        Path(win_dir) / "SysWOW64" / "WindowsPowerShell" / "v1.0" / "powershell.exe",
+    ]:
+        if candidate.exists():
+            return str(candidate)
+    return None
+
 @router.post("/api/ingest/select-folder")
 def select_folder_dialog():
-    """Abre uma caixa de diálogo nativa do Windows para seleção de diretório."""
+    """Abre uma caixa de diálogo nativa do Windows para seleção de diretório se suportado."""
+    ps_exe = _get_powershell_path()
+    if not ps_exe:
+        return {
+            "status": "unsupported",
+            "message": "Seletor nativo do Windows indisponível neste ambiente de servidor (ex: Docker/Linux). Utilize a seleção de arquivos/pastas pelo navegador."
+        }
     try:
         ps_script = (
             "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; "
@@ -574,7 +598,7 @@ def select_folder_dialog():
             "    Write-Output $f.SelectedPath "
             "}"
         )
-        cmd = ["powershell.exe", "-NoProfile", "-STA", "-Command", ps_script]
+        cmd = [ps_exe, "-NoProfile", "-STA", "-Command", ps_script]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
         folder_path = proc.stdout.strip()
         if folder_path:
@@ -582,11 +606,17 @@ def select_folder_dialog():
         return {"status": "cancelled", "path": ""}
     except Exception as e:
         print(f"[select_folder_dialog] Erro: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro ao abrir seletor de pasta: {str(e)}")
+        return {"status": "error", "message": f"Erro ao abrir seletor de pasta: {str(e)}"}
 
 @router.post("/api/ingest/select-files")
 def select_files_dialog():
-    """Abre uma caixa de diálogo nativa do Windows para seleção múltipla de arquivos de mídia."""
+    """Abre uma caixa de diálogo nativa do Windows para seleção múltipla de arquivos de mídia se suportado."""
+    ps_exe = _get_powershell_path()
+    if not ps_exe:
+        return {
+            "status": "unsupported",
+            "message": "Seletor nativo do Windows indisponível neste ambiente de servidor (ex: Docker/Linux). Utilize a seleção de arquivos/pastas pelo navegador."
+        }
     try:
         ps_script = (
             "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; "
@@ -598,7 +628,7 @@ def select_files_dialog():
             "    $f.FileNames | ForEach-Object { Write-Output $_ } "
             "}"
         )
-        cmd = ["powershell.exe", "-NoProfile", "-STA", "-Command", ps_script]
+        cmd = [ps_exe, "-NoProfile", "-STA", "-Command", ps_script]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
         paths = [p.strip().replace('\\', '/') for p in proc.stdout.splitlines() if p.strip()]
         if paths:
@@ -606,7 +636,7 @@ def select_files_dialog():
         return {"status": "cancelled", "paths": []}
     except Exception as e:
         print(f"[select_files_dialog] Erro: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro ao abrir seletor de arquivos: {str(e)}")
+        return {"status": "error", "message": f"Erro ao abrir seletor de arquivos: {str(e)}"}
 
 @router.post("/api/ingest/external")
 def trigger_external_ingest(payload: ExternalPathIngest, background_tasks: BackgroundTasks):
@@ -892,6 +922,8 @@ def trigger_analyze_all_photo(photo_id: int, background_tasks: BackgroundTasks):
 @router.post("/api/project/open-folder-in-explorer")
 def open_folder_in_explorer(payload: OpenFolderPayload):
     """Abre um diretório ou a pasta do arquivo no Windows Explorer nativo."""
+    if sys.platform != "win32" and shutil.which("explorer") is None:
+        return {"status": "unsupported", "message": "Explorer nativo indisponível neste ambiente de servidor (ex: Docker/Linux)."}
     try:
         raw_path = payload.path.strip()
         p = Path(raw_path) if raw_path else CONFIG.ORIGINALS_DIR
@@ -909,7 +941,7 @@ def open_folder_in_explorer(payload: OpenFolderPayload):
         subprocess.Popen(['explorer', target_win])
         return {"status": "success", "message": f"Explorer aberto em: {target_win}"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao abrir Explorer: {str(e)}")
+        return {"status": "error", "message": f"Erro ao abrir Explorer: {str(e)}"}
 
 
 @router.post("/api/project/{project_id}/analyze-all-vision")

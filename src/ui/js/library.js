@@ -1100,6 +1100,147 @@ window.showMediaContextMenu = showMediaContextMenu;
 
 // ── MENU DE CONTEXTO E GESTÃO DE BINS VIRTUAIS ───────────────────────
 
+export async function uploadMediaFiles(fileList, targetFolderPath = "root") {
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return;
+
+    const projectId = getActiveProjectId();
+    const formData = new FormData();
+    formData.append("project_id", projectId);
+
+    for (let i = 0; i < files.length; i++) {
+        formData.append("files", files[i]);
+    }
+
+    try {
+        if (typeof window.showToast === "function") {
+            window.showToast(`Importando ${files.length} arquivo(s)...`, "info");
+        }
+        const res = await fetch("/api/ingest/upload-files", {
+            method: "POST",
+            body: formData
+        });
+        const data = await res.json();
+        if (data && data.status === "success") {
+            if (targetFolderPath && targetFolderPath !== "root") {
+                virtualDeletedFolders.delete(targetFolderPath);
+                virtualEmptyFolders.add(targetFolderPath);
+                saveVirtualFoldersState(projectId);
+            }
+            if (typeof window.showToast === "function") {
+                window.showToast(`${data.count || files.length} arquivo(s) importado(s) com sucesso!`, "success");
+            }
+            if (window.libraryInstance) await window.libraryInstance.reloadData();
+            else STATE.emit("projectChanged");
+
+            if (typeof window.openTasksDrawerAndSwitchTab === "function") {
+                window.openTasksDrawerAndSwitchTab();
+            }
+        } else {
+            throw new Error((data && (data.message || data.detail)) || "Falha na ingestão dos arquivos.");
+        }
+    } catch (err) {
+        if (typeof window.showToast === "function") {
+            window.showToast("Erro ao importar arquivos: " + err.message, "error");
+        } else {
+            alert("Erro ao importar arquivos: " + err.message);
+        }
+    }
+}
+window.uploadMediaFiles = uploadMediaFiles;
+
+export function promptExternalPathIngest(targetFolderPath = "root") {
+    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || (window.popoutWindows?.["sidebar-left"]?.document) || document;
+    const modal = targetDoc.createElement("div");
+    modal.className = "modal-overlay";
+    modal.style.display = "flex";
+    modal.style.zIndex = "9999999";
+    modal.innerHTML = `
+        <div class="modal-content glassmorphism" style="max-width: 460px; padding: 20px; border-radius: 8px;">
+            <div class="modal-header" style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px; margin: 0;">
+                    <i class="fa-solid fa-link" style="color: var(--color-cyan);"></i> Vincular Pasta Local / HD Externo
+                </h2>
+                <button class="btn-close-modal" id="btn-close-external-ingest" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 16px;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+                    Informe o caminho absoluto da pasta no disco ou HD externo. Os arquivos serão catalogados <strong>in-place (sem cópia de arquivos)</strong>.
+                </p>
+                <label style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; display: block;">Caminho da Pasta:</label>
+                <div style="display: flex; gap: 6px;">
+                    <input type="text" id="external-path-input" placeholder="Ex: D:/Gravacoes/Documentario ou E:\\Acervo" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.35); border: 1px solid var(--border-glass); padding: 8px 10px; border-radius: 4px; color: #fff; font-size: 12px; font-family: monospace;">
+                    <button id="btn-browse-win" class="btn-outline" title="Procurar no Windows" style="padding: 0 10px; font-size: 11px; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+                        <i class="fa-solid fa-folder-open"></i> Procurar...
+                    </button>
+                </div>
+                <div id="browse-hint" style="font-size: 10px; color: var(--text-muted, #888); margin-top: 6px;">
+                    Dica: Você pode copiar e colar o caminho da barra de endereços do Explorer.
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+                <button id="btn-cancel-external-ingest" class="btn-outline">Cancelar</button>
+                <button id="btn-confirm-external-ingest" class="btn-primary" style="background: var(--color-cyan); border-color: var(--color-cyan); color: #000; font-weight: 600;">Vincular In-Place</button>
+            </div>
+        </div>
+    `;
+    targetDoc.body.appendChild(modal);
+
+    const input = modal.querySelector("#external-path-input");
+    const btnBrowse = modal.querySelector("#btn-browse-win");
+    setTimeout(() => input?.focus(), 50);
+
+    const close = () => modal.remove();
+    modal.querySelector("#btn-close-external-ingest").onclick = close;
+    modal.querySelector("#btn-cancel-external-ingest").onclick = close;
+
+    btnBrowse.onclick = async () => {
+        try {
+            const resp = await CapIAuAPI.selectFolder();
+            if (resp && resp.status === "success" && resp.path) {
+                input.value = resp.path;
+            } else if (resp && resp.status === "unsupported") {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Diálogo nativo indisponível no ambiente do servidor. Digite ou cole o caminho no campo.", "info");
+                }
+            }
+        } catch (e) {
+            console.warn("[BrowseWin] Erro ao abrir seletor:", e);
+        }
+    };
+
+    modal.querySelector("#btn-confirm-external-ingest").onclick = async () => {
+        const pathVal = input.value.trim();
+        if (!pathVal) {
+            if (typeof window.showToast === "function") window.showToast("Informe o caminho da pasta.", "warning");
+            return;
+        }
+        close();
+        const projectId = getActiveProjectId();
+        try {
+            if (typeof window.showToast === "function") window.showToast("Iniciando vinculação in-place...", "info");
+            await CapIAuAPI.triggerExternalIngest(pathVal, projectId);
+            if (targetFolderPath && targetFolderPath !== "root") {
+                virtualDeletedFolders.delete(targetFolderPath);
+                virtualEmptyFolders.add(targetFolderPath);
+                saveVirtualFoldersState(projectId);
+            }
+            if (typeof window.showToast === "function") {
+                window.showToast("Vinculação de pasta iniciada em background!", "success");
+            }
+            if (window.libraryInstance) await window.libraryInstance.reloadData();
+            else STATE.emit("projectChanged");
+
+            if (typeof window.openTasksDrawerAndSwitchTab === "function") {
+                window.openTasksDrawerAndSwitchTab();
+            }
+        } catch (err) {
+            if (typeof window.showToast === "function") window.showToast("Erro na vinculação: " + err.message, "error");
+        }
+    };
+}
+window.promptExternalPathIngest = promptExternalPathIngest;
+
 export function showImportChoicesMenu(anchorEl, targetFolderPath = "root") {
     const targetDoc = anchorEl?.ownerDocument || document;
     const targetWin = targetDoc.defaultView || window;
@@ -1112,67 +1253,89 @@ export function showImportChoicesMenu(anchorEl, targetFolderPath = "root") {
     menu.className = "custom-context-menu";
     menu.style.zIndex = "999999";
 
-    // Opção 1: Importar Pasta Inteira
-    const folderItem = targetDoc.createElement("div");
-    folderItem.className = "menu-item";
-    folderItem.innerHTML = `<i class="fa-solid fa-folder-open" style="color:var(--color-cyan);"></i><span class="menu-item-text">Importar Pasta Inteira (HD/Externo)...</span>`;
-    folderItem.addEventListener("click", async () => {
-        menu.remove();
-        try {
-            if (typeof window.showToast === "function") window.showToast("Abrindo seletor de pasta...", "info");
-            const response = await CapIAuAPI.selectFolder();
-            if (response && response.status === "success" && response.path) {
-                const projectId = getActiveProjectId();
-                await CapIAuAPI.triggerExternalIngest(response.path, projectId);
-                if (targetFolderPath && targetFolderPath !== "root") {
-                    virtualDeletedFolders.delete(targetFolderPath);
-                    virtualEmptyFolders.add(targetFolderPath);
-                    saveVirtualFoldersState(projectId);
-                }
-                if (typeof window.showToast === "function") {
-                    window.showToast("Importação da pasta iniciada em background!", "success");
-                }
-                if (window.libraryInstance) await window.libraryInstance.reloadData();
-                if (typeof window.openTasksDrawerAndSwitchTab === "function") {
-                    window.openTasksDrawerAndSwitchTab();
-                }
-            }
-        } catch (err) {
-            if (typeof window.showToast === "function") window.showToast("Erro ao importar pasta: " + err.message, "error");
-        }
-    });
-    menu.appendChild(folderItem);
-
-    // Opção 2: Importar Arquivos Individuais
+    // Opção 1: Importar Arquivos Individuais
     const filesItem = targetDoc.createElement("div");
     filesItem.className = "menu-item";
     filesItem.innerHTML = `<i class="fa-solid fa-film" style="color:var(--color-violet);"></i><span class="menu-item-text">Importar Arquivos de Mídia...</span>`;
-    filesItem.addEventListener("click", async () => {
+    filesItem.addEventListener("click", () => {
         menu.remove();
-        try {
-            if (typeof window.showToast === "function") window.showToast("Abrindo seletor de arquivos...", "info");
-            const response = await CapIAuAPI.selectFiles();
-            if (response && response.status === "success" && response.paths && response.paths.length > 0) {
-                const projectId = getActiveProjectId();
-                await CapIAuAPI.triggerExternalFilesIngest(response.paths, projectId);
-                if (targetFolderPath && targetFolderPath !== "root") {
-                    virtualDeletedFolders.delete(targetFolderPath);
-                    virtualEmptyFolders.add(targetFolderPath);
-                    saveVirtualFoldersState(projectId);
-                }
-                if (typeof window.showToast === "function") {
-                    window.showToast(`Importação de ${response.paths.length} arquivo(s) iniciada!`, "success");
-                }
-                if (window.libraryInstance) await window.libraryInstance.reloadData();
-                if (typeof window.openTasksDrawerAndSwitchTab === "function") {
-                    window.openTasksDrawerAndSwitchTab();
-                }
+        const input = targetDoc.createElement("input");
+        input.type = "file";
+        input.multiple = true;
+        input.accept = "video/*,audio/*,image/*,.mp4,.mov,.mxf,.mts,.mkv,.avi,.wav,.mp3,.m4a,.bwf,.flac,.aac,.jpg,.jpeg,.png,.tiff,.webp,.arw,.cr2,.cr3,.nef,.dng,.pef,.raf,.orf,.rw2,.raw";
+        input.style.display = "none";
+        targetDoc.body.appendChild(input);
+        input.addEventListener("change", async () => {
+            const files = Array.from(input.files || []);
+            if (files.length > 0) {
+                await uploadMediaFiles(files, targetFolderPath);
             }
-        } catch (err) {
-            if (typeof window.showToast === "function") window.showToast("Erro ao importar arquivos: " + err.message, "error");
-        }
+            input.remove();
+        });
+        input.click();
     });
     menu.appendChild(filesItem);
+
+    // Opção 2: Importar Pasta Inteira (Upload pelo Navegador)
+    const folderUploadItem = targetDoc.createElement("div");
+    folderUploadItem.className = "menu-item";
+    folderUploadItem.innerHTML = `<i class="fa-solid fa-folder-open" style="color:var(--color-gold);"></i><span class="menu-item-text">Importar Pasta (Navegador)...</span>`;
+    folderUploadItem.addEventListener("click", () => {
+        menu.remove();
+        const input = targetDoc.createElement("input");
+        input.type = "file";
+        input.webkitdirectory = true;
+        input.directory = true;
+        input.multiple = true;
+        input.style.display = "none";
+        targetDoc.body.appendChild(input);
+        input.addEventListener("change", async () => {
+            const files = Array.from(input.files || []);
+            if (files.length === 0) {
+                input.remove();
+                return;
+            }
+            const supportedExts = new Set([
+                ".mp4", ".mov", ".mxf", ".mts", ".mkv", ".avi",
+                ".wav", ".mp3", ".m4a", ".bwf", ".flac", ".aac",
+                ".jpg", ".jpeg", ".png", ".tiff", ".webp",
+                ".arw", ".cr2", ".cr3", ".nef", ".dng", ".pef", ".raf", ".orf", ".rw2", ".raw"
+            ]);
+            const mediaFiles = files.filter(f => {
+                const ext = "." + f.name.split(".").pop().toLowerCase();
+                return supportedExts.has(ext);
+            });
+            if (mediaFiles.length === 0) {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Nenhum arquivo de mídia suportado encontrado na pasta.", "warning");
+                }
+                input.remove();
+                return;
+            }
+            let folderName = "";
+            if (mediaFiles[0].webkitRelativePath) {
+                folderName = mediaFiles[0].webkitRelativePath.split("/")[0];
+            }
+            const folderPath = (targetFolderPath && targetFolderPath !== "root")
+                ? (folderName ? `${targetFolderPath}/${folderName}` : targetFolderPath)
+                : (folderName ? `root/${folderName}` : "root");
+
+            await uploadMediaFiles(mediaFiles, folderPath);
+            input.remove();
+        });
+        input.click();
+    });
+    menu.appendChild(folderUploadItem);
+
+    // Opção 3: Vincular Pasta Local / HD Externo (In-place Link)
+    const folderLinkItem = targetDoc.createElement("div");
+    folderLinkItem.className = "menu-item";
+    folderLinkItem.innerHTML = `<i class="fa-solid fa-link" style="color:var(--color-cyan);"></i><span class="menu-item-text">Vincular Pasta / HD Externo (In-Place)...</span>`;
+    folderLinkItem.addEventListener("click", () => {
+        menu.remove();
+        promptExternalPathIngest(targetFolderPath);
+    });
+    menu.appendChild(folderLinkItem);
 
     targetDoc.body.appendChild(menu);
 
@@ -1180,8 +1343,8 @@ export function showImportChoicesMenu(anchorEl, targetFolderPath = "root") {
         const rect = anchorEl.getBoundingClientRect();
         let left = rect.left;
         let top = rect.bottom + 4;
-        if (left + 260 > targetWin.innerWidth) left = targetWin.innerWidth - 270;
-        if (top + 100 > targetWin.innerHeight) top = rect.top - 100;
+        if (left + 280 > targetWin.innerWidth) left = targetWin.innerWidth - 290;
+        if (top + 120 > targetWin.innerHeight) top = rect.top - 120;
         menu.style.left = `${Math.max(10, left)}px`;
         menu.style.top = `${Math.max(10, top)}px`;
     } else {
@@ -4529,23 +4692,7 @@ export class LibraryManager {
     }
 
     async runImportExternal() {
-        try {
-            const response = await CapIAuAPI.request("/api/ingest/select-folder", { method: "POST" });
-            if (response.status === "success" && response.path) {
-                const triggerRes = await CapIAuAPI.request("/api/ingest/external", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        path: response.path,
-                        project_id: STATE.currentProjectId
-                    }),
-                    headers: { "Content-Type": "application/json" }
-                });
-                alert("Ingestão in-place iniciada em background.");
-                this.reloadData();
-            }
-        } catch (err) {
-            alert("Erro ao importar pasta: " + err.message);
-        }
+        showImportChoicesMenu(this.btnImportExternal || document.getElementById("btn-add-media"), "root");
     }
 
     async runOpenProxies() {
