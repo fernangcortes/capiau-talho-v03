@@ -222,19 +222,88 @@ export class CapIAuAPI {
         return this.request("/api/ingest/select-files", { method: "POST" });
     }
 
-    static triggerExternalIngest(path, projectId) {
+    static triggerExternalIngest(path, projectId, virtualFolder = "root") {
         return this.request("/api/ingest/external", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ path, project_id: projectId })
+            body: JSON.stringify({ path, project_id: projectId, virtual_folder: virtualFolder })
         });
     }
 
-    static triggerExternalFilesIngest(paths, projectId) {
+    static triggerExternalFilesIngest(paths, projectId, virtualFolder = "root") {
         return this.request("/api/ingest/external-files", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ paths, project_id: projectId })
+            body: JSON.stringify({ paths, project_id: projectId, virtual_folder: virtualFolder })
+        });
+    }
+
+    // -- Pastas Virtuais (Bins) & Gestão de Mídia
+    static fetchProjectBins(projectId) {
+        return this.request(`/api/project/${projectId}/bins`);
+    }
+
+    static createProjectBin(projectId, name, path, parentPath = "root", color = "#8b5cf6") {
+        return this.request(`/api/project/${projectId}/bins`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: projectId, name, path, parent_path: parentPath, color })
+        });
+    }
+
+    static renameProjectBin(projectId, oldPath, newPath, newName) {
+        return this.request(`/api/project/${projectId}/bins/rename`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: projectId, old_path: oldPath, new_path: newPath, new_name: newName })
+        });
+    }
+
+    static setProjectBinColor(projectId, path, color) {
+        return this.request(`/api/project/${projectId}/bins/color`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: projectId, path, color })
+        });
+    }
+
+    static deleteProjectBin(projectId, path, moveToParent = true) {
+        return this.request(`/api/project/${projectId}/bins`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: projectId, path, move_to_parent: moveToParent })
+        });
+    }
+
+    static moveMediaToBin(mediaType, mediaId, targetVirtualFolder) {
+        return this.request("/api/media/move-to-bin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ media_type: mediaType, media_id: mediaId, target_virtual_folder: targetVirtualFolder })
+        });
+    }
+
+    static batchMoveMediaToBin(projectId, items, targetVirtualFolder) {
+        return this.request("/api/media/batch-move-to-bin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: projectId, items, target_virtual_folder: targetVirtualFolder })
+        });
+    }
+
+    static updateMediaMetadata(mediaType, mediaId, fields) {
+        return this.request(`/api/media/${mediaType}/${mediaId}/metadata`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(fields)
+        });
+    }
+
+    static relinkProjectMedia(projectId, searchFolder) {
+        return this.request(`/api/project/${projectId}/relink`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: projectId, search_folder: searchFolder })
         });
     }
 
