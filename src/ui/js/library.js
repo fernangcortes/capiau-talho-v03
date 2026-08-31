@@ -1881,6 +1881,50 @@ function hasFailedChildren(node) {
     return false;
 }
 
+const ARROW_DOWN_PATH = "M3 6 L8 11 L13 6";
+const ARROW_UP_PATH   = "M3 10 L8 5 L13 10";
+
+/**
+ * Animação de fluxo vetorial contínuo de 5 setinhas (Opção A em 0.5x = 0.9s de duração suave)
+ */
+function animateStreamToggle(btnEl, goingToExpand, onComplete) {
+    if (!btnEl) {
+        if (onComplete) onComplete();
+        return;
+    }
+    const viewport = btnEl.querySelector(".stream-viewport");
+    if (!viewport) {
+        if (onComplete) onComplete();
+        return;
+    }
+
+    const count = 5;
+    let arrowsHtml = "";
+    if (goingToExpand) {
+        // Fluxo descendo: 4 setas para baixo e a última apontando para cima
+        for (let i = 0; i < count - 1; i++) {
+            arrowsHtml += `<svg class="arrow-svg" style="margin-bottom: 3px;" viewBox="0 0 16 16"><path d="${ARROW_DOWN_PATH}" /></svg>`;
+        }
+        arrowsHtml += `<svg class="arrow-svg" viewBox="0 0 16 16"><path d="${ARROW_UP_PATH}" /></svg>`;
+    } else {
+        // Fluxo subindo: 1 seta para baixo na base e 4 setas para cima
+        arrowsHtml += `<svg class="arrow-svg" viewBox="0 0 16 16"><path d="${ARROW_DOWN_PATH}" /></svg>`;
+        for (let i = 0; i < count - 1; i++) {
+            arrowsHtml += `<svg class="arrow-svg" style="margin-top: 3px;" viewBox="0 0 16 16"><path d="${ARROW_UP_PATH}" /></svg>`;
+        }
+    }
+
+    viewport.innerHTML = `<div class="stream-track ${goingToExpand ? 'stream-anim-down' : 'stream-anim-up'}">${arrowsHtml}</div>`;
+    btnEl.classList.remove("state-collapsed", "state-expanded");
+    btnEl.classList.add(goingToExpand ? "state-expanded" : "state-collapsed");
+
+    setTimeout(() => {
+        const finalPath = goingToExpand ? ARROW_UP_PATH : ARROW_DOWN_PATH;
+        viewport.innerHTML = `<svg class="arrow-svg" viewBox="0 0 16 16"><path d="${finalPath}" /></svg>`;
+        if (onComplete) onComplete();
+    }, 900);
+}
+
 function renderTreeNode(node, container, depth = 0) {
     if (node.type === "folder") {
         const query = document.getElementById("library-search-input")?.value.toLowerCase().trim() || "";
@@ -1902,6 +1946,10 @@ function renderTreeNode(node, container, depth = 0) {
         const icon = node.isOpen ? "fa-folder-open" : "fa-folder";
         const chevron = node.isOpen ? "fa-chevron-down" : "fa-chevron-right";
         const folderColor = virtualFolderColors[node.path] || "var(--color-violet)";
+        const isFolderOpen = !!node.isOpen;
+        const toggleIconPath = isFolderOpen ? ARROW_UP_PATH : ARROW_DOWN_PATH;
+        const toggleStateClass = isFolderOpen ? "state-expanded" : "state-collapsed";
+        const toggleTitle = isFolderOpen ? "Recolher todas as subpastas" : "Expandir todas as subpastas";
         
         folderHeader.innerHTML = `
             <div style="display: flex; align-items: center; flex: 1; min-width: 0;">
@@ -1913,11 +1961,10 @@ function renderTreeNode(node, container, depth = 0) {
                 <button class="btn-folder-action" data-action="add-media" title="Importar mídias para esta pasta" style="background: none; border: none; padding: 2px 4px; color: var(--color-cyan); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;">
                     <i class="fa-solid fa-plus"></i>
                 </button>
-                <button class="btn-folder-action" data-action="expand" title="Expandir todas as subpastas" style="background: none; border: none; padding: 2px 4px; color: var(--color-cyan); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;">
-                    <i class="fa-solid fa-angles-down"></i>
-                </button>
-                <button class="btn-folder-action" data-action="collapse" title="Recolher todas as subpastas" style="background: none; border: none; padding: 2px 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;">
-                    <i class="fa-solid fa-angles-up"></i>
+                <button class="btn-folder-action btn-folder-toggle ${toggleStateClass}" data-action="toggle-subfolders" title="${toggleTitle}" style="background: none; border: none; padding: 2px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <div class="stream-viewport mini">
+                        <svg class="arrow-svg" viewBox="0 0 16 16"><path d="${toggleIconPath}" /></svg>
+                    </div>
                 </button>
             </div>
         `;
@@ -1946,7 +1993,15 @@ function renderTreeNode(node, container, depth = 0) {
                     handleImportToFolder(path, actionBtn);
                     return;
                 }
-                window.expandCollapseAllSubfolders(path, action === "expand");
+                if (action === "toggle-subfolders") {
+                    const isCurrentlyExpanded = actionBtn.classList.contains("state-expanded");
+                    const willExpand = !isCurrentlyExpanded;
+                    actionBtn.title = willExpand ? "Recolher todas as subpastas" : "Expandir todas as subpastas";
+                    animateStreamToggle(actionBtn, willExpand, () => {
+                        window.expandCollapseAllSubfolders(path, willExpand);
+                    });
+                    return;
+                }
                 return;
             }
             
@@ -1956,6 +2011,18 @@ function renderTreeNode(node, container, depth = 0) {
             
             folderHeader.querySelector(".chevron-icon").className = `fa-solid ${newChevron} chevron-icon`;
             folderHeader.querySelector(".folder-icon").className = `fa-solid ${newIcon} folder-icon`;
+            
+            const folderToggleBtn = folderHeader.querySelector(".btn-folder-toggle");
+            if (folderToggleBtn) {
+                folderToggleBtn.classList.remove("state-collapsed", "state-expanded");
+                folderToggleBtn.classList.add(node.isOpen ? "state-expanded" : "state-collapsed");
+                folderToggleBtn.title = node.isOpen ? "Recolher todas as subpastas" : "Expandir todas as subpastas";
+                const vp = folderToggleBtn.querySelector(".stream-viewport");
+                if (vp) {
+                    const finalPath = node.isOpen ? ARROW_UP_PATH : ARROW_DOWN_PATH;
+                    vp.innerHTML = `<svg class="arrow-svg" viewBox="0 0 16 16"><path d="${finalPath}" /></svg>`;
+                }
+            }
             
             folderChildren.style.display = node.isOpen ? "block" : "none";
             if (node.isOpen) {
@@ -2713,7 +2780,37 @@ window.applySceneCuration = async function(status, all = false) {
     }
 };
 
-window.globalExpandCollapseAll = function(expand) {
+window.isLibraryAllExpanded = false;
+
+window.globalToggleExpandCollapseAll = function(explicitState) {
+    const expandBtn = document.getElementById("btn-expand-all");
+    const targetState = (explicitState !== undefined) ? explicitState : !window.isLibraryAllExpanded;
+    window.isLibraryAllExpanded = targetState;
+
+    if (expandBtn) {
+        expandBtn.title = targetState ? "Recolher todas as pastas" : "Expandir todas as pastas";
+        animateStreamToggle(expandBtn, targetState, () => {
+            window.globalExpandCollapseAll(targetState, true);
+        });
+    } else {
+        window.globalExpandCollapseAll(targetState);
+    }
+};
+
+window.globalExpandCollapseAll = function(expand, skipBtnAnimation = false) {
+    window.isLibraryAllExpanded = expand;
+    const expandBtn = document.getElementById("btn-expand-all");
+    if (expandBtn && !skipBtnAnimation) {
+        expandBtn.classList.remove("state-collapsed", "state-expanded");
+        expandBtn.classList.add(expand ? "state-expanded" : "state-collapsed");
+        expandBtn.title = expand ? "Recolher todas as pastas" : "Expandir todas as pastas";
+        const vp = expandBtn.querySelector(".stream-viewport");
+        if (vp) {
+            const finalPath = expand ? ARROW_UP_PATH : ARROW_DOWN_PATH;
+            vp.innerHTML = `<svg class="arrow-svg" viewBox="0 0 16 16"><path d="${finalPath}" /></svg>`;
+        }
+    }
+
     function processItems(items) {
         if (!items || items.length === 0) return;
         const filepaths = items.map(item => (item.filepath || item.filename || "").replace(/\\/g, "/"));

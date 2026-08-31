@@ -300,10 +300,13 @@
                             </div>
                         </div>
 
-                        <!-- Direita: Expandir/Recolher, Fotos no Player, Ordenação Dropdown -->
+                        <!-- Direita: Expandir/Recolher (Toggle Único), Fotos no Player, Ordenação Dropdown -->
                         <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-                            <button id="btn-expand-all" class="lib-action-btn" title="Expandir todas as pastas" onclick="globalExpandCollapseAll(true)" style="color: var(--color-cyan);"><i class="fa-solid fa-angles-down"></i></button>
-                            <button id="btn-collapse-all" class="lib-action-btn" title="Recolher todas as pastas" onclick="globalExpandCollapseAll(false)"><i class="fa-solid fa-angles-up"></i></button>
+                            <button id="btn-expand-all" class="lib-action-btn state-collapsed" title="Expandir/Recolher todas as pastas" onclick="globalToggleExpandCollapseAll()">
+                                <div class="stream-viewport">
+                                    <svg class="arrow-svg" viewBox="0 0 16 16"><path d="M3 6 L8 11 L13 6" /></svg>
+                                </div>
+                            </button>
                             <button id="btn-library-photos-in-player" class="lib-action-btn" title="Abrir fotos no player de vídeo"><i class="fa-regular fa-circle-play"></i></button>
                             
                             <div style="width: 1px; height: 10px; background: rgba(255,255,255,0.12); margin: 0 2px;"></div>
