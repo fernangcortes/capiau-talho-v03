@@ -16,7 +16,9 @@ class MediaRepository:
         fps: float = 0.0,
         resolution: str = "",
         codec: str = "",
-        bitrate: int = 0
+        bitrate: int = 0,
+        virtual_folder: str = "root",
+        recorded_at: Optional[str] = None
     ) -> int:
         """Adiciona um vídeo ou retorna o ID se já existir com o mesmo hash."""
         cursor = conn.cursor()
@@ -26,9 +28,9 @@ class MediaRepository:
             return row['id']
             
         cursor.execute("""
-            INSERT INTO video (project_id, filename, filepath, hash, video_type, duration, fps, resolution, codec, bitrate, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ingested')
-        """, (project_id, filename, filepath, file_hash, video_type, duration, fps, resolution, codec, bitrate))
+            INSERT INTO video (project_id, filename, filepath, hash, video_type, duration, fps, resolution, codec, bitrate, virtual_folder, recorded_at, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ingested')
+        """, (project_id, filename, filepath, file_hash, video_type, duration, fps, resolution, codec, bitrate, virtual_folder or "root", recorded_at))
         return cursor.lastrowid
 
     @staticmethod
@@ -344,7 +346,9 @@ class MediaRepository:
         filepath: str,
         file_hash: str,
         description: str = "",
-        tags: Optional[List[str]] = None
+        tags: Optional[List[str]] = None,
+        virtual_folder: str = "root",
+        recorded_at: Optional[str] = None
     ) -> int:
         """Adiciona uma foto ou retorna o ID se já existir."""
         cursor = conn.cursor()
@@ -355,9 +359,9 @@ class MediaRepository:
             
         tags_str = json.dumps(tags if tags else [])
         cursor.execute("""
-            INSERT INTO photo (project_id, filename, filepath, hash, description, tags, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'pending')
-        """, (project_id, filename, filepath, file_hash, description, tags_str))
+            INSERT INTO photo (project_id, filename, filepath, hash, description, tags, virtual_folder, recorded_at, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        """, (project_id, filename, filepath, file_hash, description, tags_str, virtual_folder or "root", recorded_at))
         return cursor.lastrowid
 
     @staticmethod
@@ -488,3 +492,241 @@ class MediaRepository:
         """Reseta status temporários causados por interrupções do servidor."""
         conn.execute("UPDATE video SET status = 'ingested' WHERE status IN ('transcribing', 'analyzing')")
         conn.execute("UPDATE photo SET status = 'error' WHERE status = 'pending'")
+
+    # ── PASTAS VIRTUAIS / BINS ─────────────────────────────────────────
+    @staticmethod
+    def get_project_bins(conn: sqlite3.Connection, project_id: int) -> List[Dict[str, Any]]:
+        """Retorna todas as pastas virtuais (bins) cadastradas no projeto."""
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM media_bin WHERE project_id = ? ORDER BY path ASC", (project_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
+    @staticmethod
+    def create_or_update_bin(conn: sqlite3.Connection, project_id: int, name: str, path: str, parent_path: str = "root", color: str = "#8b5cf6") -> Dict[str, Any]:
+        """Cria ou atualiza um bin virtual."""
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO media_bin (project_id, name, path, parent_path, color)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(project_id, path) DO UPDATE SET
+                name = excluded.name,
+                parent_path = excluded.parent_path,
+                color = excluded.color
+        """, (project_id, name, path, parent_path, color))
+        conn.commit()
+        cursor.execute("SELECT * FROM media_bin WHERE project_id = ? AND path = ?", (project_id, path))
+        row = cursor.fetchone()
+        return dict(row) if row else {"name": name, "path": path, "parent_path": parent_path, "color": color}
+
+    @staticmethod
+    def rename_bin(conn: sqlite3.Connection, project_id: int, old_path: str, new_path: str, new_name: str) -> None:
+        """Renomeia um bin e atualiza em cascata subpastas e itens de mídia associados."""
+        cursor = conn.cursor()
+        # 1. Atualizar o próprio bin
+        cursor.execute("UPDATE media_bin SET name = ?, path = ? WHERE project_id = ? AND path = ?", (new_name, new_path, project_id, old_path))
+        
+        # 2. Atualizar subpastas filhas em media_bin
+        cursor.execute("""
+            UPDATE media_bin
+            SET path = ? || SUBSTR(path, LENGTH(?) + 1),
+                parent_path = CASE 
+                    WHEN parent_path = ? THEN ?
+                    WHEN parent_path LIKE ? || '/%' THEN ? || SUBSTR(parent_path, LENGTH(?) + 1)
+                    ELSE parent_path
+                END
+            WHERE project_id = ? AND path LIKE ? || '/%'
+        """, (new_path, old_path, old_path, new_path, old_path, new_path, old_path, project_id, old_path))
+
+        # 3. Atualizar video.virtual_folder
+        cursor.execute("""
+            UPDATE video
+            SET virtual_folder = CASE
+                WHEN virtual_folder = ? THEN ?
+                WHEN virtual_folder LIKE ? || '/%' THEN ? || SUBSTR(virtual_folder, LENGTH(?) + 1)
+                ELSE virtual_folder
+            END
+            WHERE project_id = ? AND (virtual_folder = ? OR virtual_folder LIKE ? || '/%')
+        """, (old_path, new_path, old_path, new_path, old_path, project_id, old_path, old_path))
+
+        # 4. Atualizar photo.virtual_folder
+        cursor.execute("""
+            UPDATE photo
+            SET virtual_folder = CASE
+                WHEN virtual_folder = ? THEN ?
+                WHEN virtual_folder LIKE ? || '/%' THEN ? || SUBSTR(virtual_folder, LENGTH(?) + 1)
+                ELSE virtual_folder
+            END
+            WHERE project_id = ? AND (virtual_folder = ? OR virtual_folder LIKE ? || '/%')
+        """, (old_path, new_path, old_path, new_path, old_path, project_id, old_path, old_path))
+        conn.commit()
+
+    @staticmethod
+    def set_bin_color(conn: sqlite3.Connection, project_id: int, path: str, color: str) -> None:
+        """Define a cor de um bin."""
+        conn.execute("UPDATE media_bin SET color = ? WHERE project_id = ? AND path = ?", (color, project_id, path))
+        conn.commit()
+
+    @staticmethod
+    def delete_bin(conn: sqlite3.Connection, project_id: int, path: str, move_to_parent: bool = True) -> None:
+        """Remove o bin. Move itens associados para o parent_path ou 'root'."""
+        cursor = conn.cursor()
+        cursor.execute("SELECT parent_path FROM media_bin WHERE project_id = ? AND path = ?", (project_id, path))
+        row = cursor.fetchone()
+        target_parent = row['parent_path'] if (row and move_to_parent) else 'root'
+
+        # Move mídias deste bin e subpastas para o parent
+        cursor.execute("""
+            UPDATE video
+            SET virtual_folder = ?
+            WHERE project_id = ? AND (virtual_folder = ? OR virtual_folder LIKE ? || '/%')
+        """, (target_parent, project_id, path, path))
+
+        cursor.execute("""
+            UPDATE photo
+            SET virtual_folder = ?
+            WHERE project_id = ? AND (virtual_folder = ? OR virtual_folder LIKE ? || '/%')
+        """, (target_parent, project_id, path, path))
+
+        # Remove o bin e subpastas de media_bin
+        cursor.execute("""
+            DELETE FROM media_bin
+            WHERE project_id = ? AND (path = ? OR path LIKE ? || '/%')
+        """, (project_id, path, path))
+        conn.commit()
+
+    @staticmethod
+    def move_media_to_bin(conn: sqlite3.Connection, media_type: str, media_id: int, target_virtual_folder: str) -> None:
+        """Move uma mídia para um bin virtual específico."""
+        folder = target_virtual_folder or "root"
+        table = "video" if media_type == "video" else "photo"
+        conn.execute(f"UPDATE {table} SET virtual_folder = ? WHERE id = ?", (folder, media_id))
+        conn.commit()
+
+    @staticmethod
+    def batch_move_media_to_bin(conn: sqlite3.Connection, items: List[Dict[str, Any]], target_virtual_folder: str) -> int:
+        """Move múltiplas mídias (vídeos ou fotos) para um bin virtual em lote."""
+        folder = target_virtual_folder or "root"
+        count = 0
+        for it in items:
+            m_type = it.get("type", "video")
+            m_id = it.get("id")
+            if m_id is not None:
+                table = "video" if m_type == "video" else "photo"
+                conn.execute(f"UPDATE {table} SET virtual_folder = ? WHERE id = ?", (folder, m_id))
+                count += 1
+        conn.commit()
+        return count
+
+    # ── EDIÇÃO DE METADADOS EDITORAIS E DATA ───────────────────────────
+    @staticmethod
+    def update_media_metadata_fields(conn: sqlite3.Connection, media_type: str, media_id: int, fields: Dict[str, Any]) -> Dict[str, Any]:
+        """Atualiza campos de metadados de uma mídia (vídeo ou foto) de forma genérica e segura."""
+        table = "video" if media_type == "video" else "photo"
+        # A tabela photo nao possui as colunas summary/metadata_origem: enviar
+        # esses campos gerava "no such column" e derrubava toda a edicao de fotos.
+        if table == "video":
+            allowed_cols = {"title", "category", "category_confidence", "description",
+                            "summary", "tags", "recorded_at", "virtual_folder", "metadata_origem"}
+        else:
+            allowed_cols = {"title", "category", "category_confidence", "description",
+                            "tags", "recorded_at", "virtual_folder"}
+        update_dict = {}
+        for k, v in fields.items():
+            if k in allowed_cols:
+                if k == "tags" and isinstance(v, list):
+                    update_dict[k] = json.dumps(v)
+                else:
+                    update_dict[k] = v
+        if not update_dict:
+            return {}
+
+        # Se for video e atualizar decupagem/título, arquiva no histórico
+        if table == "video" and ("title" in update_dict or "description" in update_dict or "summary" in update_dict or "tags" in update_dict):
+            cursor = conn.cursor()
+            cursor.execute("SELECT title, description, summary, tags FROM video WHERE id = ?", (media_id,))
+            curr = cursor.fetchone()
+            if curr:
+                t = update_dict.get("title", curr["title"])
+                d = update_dict.get("description", curr["description"])
+                s = update_dict.get("summary", curr["summary"])
+                tg = update_dict.get("tags", curr["tags"])
+                MediaRepository._try_archive(conn, media_id, t, d, s, tg, title_vazio_mantem=False)
+
+        sets = ", ".join(f"{c} = ?" for c in update_dict.keys())
+        conn.execute(f"UPDATE {table} SET {sets} WHERE id = ?", (*update_dict.values(), media_id))
+        conn.commit()
+
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM {table} WHERE id = ?", (media_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else {}
+
+    # ── RELINK INTELIGENTE RECURSIVO ──────────────────────────────────
+    @staticmethod
+    def relink_media_files_recursive(conn: sqlite3.Connection, project_id: int, search_folder: str) -> Dict[str, Any]:
+        """Varre uma pasta no disco recursivamente para relincar mídias ausentes por nome e hash."""
+        import os
+        from pathlib import Path
+        search_path = Path(search_folder)
+        if not search_path.exists():
+            return {"status": "error", "message": f"Pasta não encontrada: {search_folder}", "relinked_count": 0}
+
+        # 1. Carrega todas as mídias do projeto
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, filename, filepath, hash FROM video WHERE project_id = ?", (project_id,))
+        videos = [dict(r) for r in cursor.fetchall()]
+        cursor.execute("SELECT id, filename, filepath, hash FROM photo WHERE project_id = ?", (project_id,))
+        photos = [dict(r) for r in cursor.fetchall()]
+
+        # Mapeia mídias desconectadas (arquivo físico não existe mais no filepath atual)
+        missing_videos = {v['filename'].lower(): v for v in videos if not Path(v['filepath']).exists()}
+        missing_photos = {p['filename'].lower(): p for p in photos if not Path(p['filepath']).exists()}
+
+        total_media = len(videos) + len(photos)
+        total_missing = len(missing_videos) + len(missing_photos)
+        already_connected = total_media - total_missing
+
+        relinked_videos = 0
+        relinked_photos = 0
+
+        if not missing_videos and not missing_photos:
+            return {
+                "status": "success",
+                "message": "Todas as mídias já estão conectadas.",
+                "relinked_count": 0,
+                "already_connected_count": already_connected,
+                "still_missing_count": 0,
+            }
+
+        # 2. Varredura recursiva no disco
+        for root, _, files in os.walk(search_path):
+            for f in files:
+                f_lower = f.lower()
+                full_p = (Path(root) / f).resolve()
+                full_str = str(full_p).replace('\\', '/')
+
+                if f_lower in missing_videos:
+                    v_item = missing_videos[f_lower]
+                    cursor.execute("UPDATE video SET filepath = ?, status = 'ingested', error_message = NULL WHERE id = ?", (full_str, v_item['id']))
+                    relinked_videos += 1
+                    del missing_videos[f_lower]
+
+                elif f_lower in missing_photos:
+                    p_item = missing_photos[f_lower]
+                    # photo nao possui coluna error_message
+                    cursor.execute("UPDATE photo SET filepath = ?, status = 'ingested' WHERE id = ?", (full_str, p_item['id']))
+                    relinked_photos += 1
+                    del missing_photos[f_lower]
+
+        conn.commit()
+        total_relinked = relinked_videos + relinked_photos
+        return {
+            "status": "success",
+            "relinked_count": total_relinked,
+            "relinked_videos": relinked_videos,
+            "relinked_photos": relinked_photos,
+            # Nomes consumidos pelo modal de relink na UI
+            "already_connected_count": already_connected,
+            "still_missing_count": len(missing_videos) + len(missing_photos),
+            "still_missing": len(missing_videos) + len(missing_photos),
+        }
