@@ -1511,7 +1511,9 @@ export class CapiauTimelineState {
      * Define a posição do playhead.
      */
     setPlayheadFrame(val) {
-        this.playheadFrame = Math.max(0, val);
+        const newFrame = Math.max(0, val);
+        if (this.playheadFrame === newFrame) return;
+        this.playheadFrame = newFrame;
         STATE.emit("timelinePlayheadChanged", this.playheadFrame);
     }
 

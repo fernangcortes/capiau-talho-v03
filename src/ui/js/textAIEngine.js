@@ -14,10 +14,10 @@ export class TextAIEngine {
     }
 
     init() {
-        // Escuta movimentação do playhead para modo reativo
+        // Escuta movimentação do playhead para modo reativo com debounce para não impactar o scrub da agulha
         STATE.on("timelinePlayheadChanged", () => {
             if (this.reactiveEnabled) {
-                this.evaluatePlayheadContext();
+                this.schedulePlayheadEvaluation();
             }
         });
 
@@ -26,6 +26,16 @@ export class TextAIEngine {
                 this.evaluatePlayheadContext();
             }
         });
+    }
+
+    schedulePlayheadEvaluation() {
+        if (this._evalTimeout) clearTimeout(this._evalTimeout);
+        this._evalTimeout = setTimeout(() => {
+            this._evalTimeout = null;
+            if (this.reactiveEnabled) {
+                this.evaluatePlayheadContext();
+            }
+        }, 120);
     }
 
     setReactiveEnabled(enabled) {

@@ -142,6 +142,10 @@ export class CapiauTimelineInteraction {
             this.hideHoverPreview();
         };
         this.boundWindowMouseMove = (e) => {
+            if (this.dragState) {
+                this.onMouseMove(e);
+                return;
+            }
             if (this.isMarkerTooltipActive && !this.dragState && this.canvas) {
                 const rect = this.canvas.getBoundingClientRect();
                 if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {

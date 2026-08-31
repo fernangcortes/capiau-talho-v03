@@ -89,6 +89,16 @@ export class SourcePlayer {
         if (video) {
             video.addEventListener("timeupdate", () => this.onTimeUpdate());
             video.addEventListener("loadedmetadata", () => this.onLoadedMetadata());
+            video.addEventListener("seeked", () => {
+                if (video._pendingSeekTarget !== null && video._pendingSeekTarget !== undefined) {
+                    const target = video._pendingSeekTarget;
+                    video._pendingSeekTarget = null;
+                    const fpsVal = TIMELINE_STATE?.fps || 24;
+                    if (Math.abs(video.currentTime - target) > (0.5 / fpsVal)) {
+                        video.currentTime = target;
+                    }
+                }
+            });
             video.addEventListener("play", () => {
                 this.onPlayStateChange(true);
                 STATE.emit("playerPlayed", "source");
@@ -361,6 +371,7 @@ export class SourcePlayer {
     play(speed = 1.0) {
         const vid = this.el("source-video");
         if (!vid || !vid.src) return;
+        vid._pendingSeekTarget = null;
         this.stopReverse();
         this.setSpeed(speed);
         this.jklState = 'L';
@@ -394,7 +405,18 @@ export class SourcePlayer {
         const vid = this.el("source-video");
         if (!vid) return;
         this.stopReverse();
-        vid.currentTime = Math.max(0, Math.min(seconds, vid.duration || 0));
+        const target = Math.max(0, Math.min(seconds, vid.duration || 0));
+        const fpsVal = TIMELINE_STATE?.fps || 24;
+        if (Math.abs(vid.currentTime - target) > (0.5 / fpsVal)) {
+            if (vid.seeking) {
+                vid._pendingSeekTarget = target;
+            } else {
+                vid._pendingSeekTarget = null;
+                vid.currentTime = target;
+            }
+        } else if (!vid.seeking) {
+            vid._pendingSeekTarget = null;
+        }
     }
 
     seekScrubber(e) {
@@ -1600,6 +1622,7 @@ export class ProgramPlayer {
         this.playbackSpeed = speed;
         this.jklState = speed >= 0 ? 'L' : 'J';
         this.isPlaying = true;
+        this._videoPool().forEach(el => { el._pendingSeekTarget = null; });
 
         STATE.emit("playerPlayed", "program");
 
@@ -1738,9 +1761,7 @@ export class ProgramPlayer {
 
     syncVideoToPlayhead() {
         try {
-            syncProgramViewport();
-
-        const currentFrame = TIMELINE_STATE.playheadFrame;
+            const currentFrame = TIMELINE_STATE.playheadFrame;
         const durationFrames = this.getDurationFrames();
 
         // Atualiza tempos de scrubber
@@ -1940,6 +1961,20 @@ export class ProgramPlayer {
                 mediaContainer.appendChild(el);
             }
             if (!el) return;
+            if (!el._capiauSeekInit) {
+                el._capiauSeekInit = true;
+                el._pendingSeekTarget = null;
+                el.addEventListener("seeked", () => {
+                    if (el._pendingSeekTarget !== null && el._pendingSeekTarget !== undefined) {
+                        const target = el._pendingSeekTarget;
+                        el._pendingSeekTarget = null;
+                        const fpsVal = TIMELINE_STATE?.fps || 24;
+                        if (Math.abs(el.currentTime - target) > (0.5 / fpsVal)) {
+                            el.currentTime = Math.max(0, target);
+                        }
+                    }
+                });
+            }
             // Ao restaurar um pop-out o workspace limpa o src de todos os <video> do painel:
             // sem zerar o dataset o buffer ficaria "carregado" com um arquivo que saiu.
             if (!el.getAttribute("src") && el.dataset.loadedSrc) {
@@ -2040,9 +2075,11 @@ export class ProgramPlayer {
 
         if (srcChanged || (clipChanged && Math.abs(drift) > BUFFER_CONTINUITY_TOLERANCE)) {
             // Buffer entrando num clipe novo: posiciona antes de ir ao ar (está escondido).
+            el._pendingSeekTarget = null;
             el.currentTime = Math.max(0, target);
             el.playbackRate = baseRate;
         } else if (live && this.isPlaying && this.playbackSpeed > 0) {
+            el._pendingSeekTarget = null;
             if (Math.abs(drift) > 1.0) {
                 el.currentTime = Math.max(0, target);
                 el.playbackRate = baseRate;
@@ -2059,8 +2096,22 @@ export class ProgramPlayer {
                 el.currentTime = Math.max(0, target);
             }
         } else if (live) {
-            // Pausado (scrub manual): seek preciso é o comportamento esperado
-            if (Math.abs(drift) > 0.06) el.currentTime = Math.max(0, target);
+            // Pausado (scrub manual com a agulha):
+            // 1) Usa limiar proporcional ao framerate para não pular quadros
+            // 2) Se o elemento já estiver buscando (el.seeking), enfileira o target mais recente
+            //    em _pendingSeekTarget sem abortar a decodificação da GPU/navegador
+            const fpsVal = TIMELINE_STATE?.fps || 24;
+            const minStep = 0.5 / fpsVal;
+            if (Math.abs(drift) > minStep) {
+                if (el.seeking) {
+                    el._pendingSeekTarget = Math.max(0, target);
+                } else {
+                    el._pendingSeekTarget = null;
+                    el.currentTime = Math.max(0, target);
+                }
+            } else if (!el.seeking) {
+                el._pendingSeekTarget = null;
+            }
             if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
         }
 
@@ -2383,7 +2434,8 @@ export class ProgramPlayer {
                 else if (drift < -0.06) el.playbackRate = targetRate * 1.03;
                 else if (el.playbackRate !== targetRate) el.playbackRate = targetRate;
             } else {
-                if (Math.abs(drift) > 0.06) el.currentTime = Math.max(0, targetSeconds);
+                // Pausado (scrub manual com agulha): áudio não toca no scrub, sincroniza apenas em descontinuidade real
+                if (Math.abs(drift) > 0.25) el.currentTime = Math.max(0, targetSeconds);
                 if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
             }
 
