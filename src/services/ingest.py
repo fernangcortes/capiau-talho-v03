@@ -3,7 +3,7 @@ import os
 import shutil
 import time
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List, Tuple, Union
 
 from src.config import CONFIG
 from src.db.connection import get_db
@@ -61,14 +61,14 @@ def compute_hash(filepath: Path) -> str:
 
 class IngestService:
     @staticmethod
-    def ingest_file(filepath: Path, project_id: int = 1, copy_original: bool = True) -> bool:
-        """Ingere um único arquivo de mídia (copiando, extraindo metadados e enfileirando proxy)."""
+    def ingest_file(filepath: Path, project_id: int = 1, copy_original: bool = True, virtual_folder: str = "root") -> Optional[int]:
+        """Ingere um único arquivo de mídia (copiando, extraindo metadados e enfileirando proxy). Retorna o ID da mídia."""
         if not filepath.exists():
             raise IngestError(f"Arquivo não encontrado: {filepath}")
             
         ext = filepath.suffix.lower()
         if ext not in SUPPORTED_VIDEO and ext not in SUPPORTED_AUDIO and ext not in SUPPORTED_PHOTO:
-            return False
+            return None
             
         file_hash = compute_hash(filepath)
         filename = filepath.name
@@ -117,9 +117,18 @@ class IngestService:
                 else:
                     video_type = "unknown"
                 
-                # Extrai metadados técnicos
+                # Extrai metadados técnicos e data de gravação
                 meta = get_media_metadata(target_path)
                 duration = meta['duration']
+                recorded_at = meta.get('creation_time')
+                if not recorded_at:
+                    try:
+                        import datetime
+                        mtime = target_path.stat().st_mtime
+                        recorded_at = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        recorded_at = None
+
                 media_id = MediaRepository.add_video(
                     conn,
                     project_id=project_id,
@@ -131,18 +140,42 @@ class IngestService:
                     fps=meta['fps'],
                     resolution=meta['resolution'],
                     codec=meta['codec'],
-                    bitrate=meta['bitrate']
+                    bitrate=meta['bitrate'],
+                    virtual_folder=virtual_folder or "root",
+                    recorded_at=recorded_at
                 )
                 _registrar_cor_video(conn, media_id, filename, meta)
             else:
                 media_type = "photo"
+                recorded_at = None
+                try:
+                    from PIL import Image, ExifTags
+                    with Image.open(target_path) as img:
+                        exif = img._getexif()
+                        if exif:
+                            for tag, val in exif.items():
+                                if ExifTags.TAGS.get(tag) in ('DateTimeOriginal', 'DateTimeDigitized', 'DateTime'):
+                                    recorded_at = str(val).replace(':', '-', 2)
+                                    break
+                except Exception:
+                    pass
+                if not recorded_at:
+                    try:
+                        import datetime
+                        mtime = target_path.stat().st_mtime
+                        recorded_at = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        recorded_at = None
+
                 # Inserção de foto
                 media_id = MediaRepository.add_photo(
                     conn,
                     project_id=project_id,
                     filename=filename,
                     filepath=str(target_path).replace('\\', '/'),
-                    file_hash=file_hash
+                    file_hash=file_hash,
+                    virtual_folder=virtual_folder or "root",
+                    recorded_at=recorded_at
                 )
                 _registrar_cor_foto(conn, media_id, filename, target_path)
                 
@@ -161,29 +194,74 @@ class IngestService:
                 media_id,
                 target_path
             )
-        return True
+        return media_id
 
 
     @staticmethod
-    def ingest_external_path(path_obj: Path, project_id: int) -> Dict[str, Any]:
+    def ingest_external_path(path_obj: Path, project_id: int, target_virtual_folder: str = "root", preserve_subfolders: bool = True) -> Dict[str, Any]:
         """Varre recursivamente uma pasta externa ou ingere arquivo individual in-place (sem cópia)."""
         ingested_count = 0
+        ingested_ids = []
         if path_obj.is_file():
-            if IngestService.ingest_file(path_obj, project_id, copy_original=False):
+            mid = IngestService.ingest_file(path_obj, project_id, copy_original=False, virtual_folder=target_virtual_folder)
+            if mid:
                 ingested_count = 1
+                ingested_ids.append(mid)
         elif path_obj.is_dir():
+            base_folder = target_virtual_folder or "root"
+            pending_bins: Dict[str, str] = {}   # path -> nome do bin (deduplicado por pasta, nao por arquivo)
+
+            def virtual_folder_for(file_path: Path) -> str:
+                """Mapeia a subpasta de disco para o bin virtual correspondente, registrando os ancestrais."""
+                if not preserve_subfolders:
+                    return base_folder
+                try:
+                    rel = file_path.parent.relative_to(path_obj)
+                except ValueError:
+                    return base_folder
+                parts = [p for p in rel.as_posix().split("/") if p and p != "."]
+                if not parts:
+                    return base_folder
+                current = base_folder
+                for part in parts:
+                    current = f"{current}/{part}"
+                    pending_bins.setdefault(current, part)
+                return current
+
             for root, _, files in os.walk(path_obj):
                 for f in files:
                     filepath = Path(root) / f
                     try:
-                        if IngestService.ingest_file(filepath, project_id, copy_original=False):
+                        mid = IngestService.ingest_file(
+                            filepath, project_id, copy_original=False,
+                            virtual_folder=virtual_folder_for(filepath)
+                        )
+                        if mid:
                             ingested_count += 1
+                            ingested_ids.append(mid)
                     except Exception as ex:
                         print(f"[IngestService] Erro ao ingerir {filepath.name}: {ex}")
-                        
+
+            # Registra todos os bins descobertos em uma unica transacao (era 1 commit por arquivo)
+            if pending_bins:
+                try:
+                    with get_db() as conn:
+                        for bin_path, bin_name in sorted(pending_bins.items()):
+                            parent = bin_path.rsplit("/", 1)[0] if "/" in bin_path else "root"
+                            conn.execute("""
+                                INSERT INTO media_bin (project_id, name, path, parent_path, color)
+                                VALUES (?, ?, ?, ?, ?)
+                                ON CONFLICT(project_id, path) DO UPDATE SET
+                                    name = excluded.name,
+                                    parent_path = excluded.parent_path
+                            """, (project_id, bin_name, bin_path, parent, "#8b5cf6"))
+                except Exception as ex:
+                    print(f"[IngestService] Erro ao registrar bins virtuais: {ex}")
+
         return {
             "status": "success",
-            "ingested_count": ingested_count
+            "ingested_count": ingested_count,
+            "media_ids": ingested_ids
         }
 
     @staticmethod
