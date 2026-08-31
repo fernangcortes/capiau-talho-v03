@@ -133,13 +133,15 @@ export function needsTriageReview(item, tabId) {
     const threshold = (typeof window !== "undefined" && window.TRIAGE_REVIEW_THRESHOLD) || 0.55;
     const lowConfidence = item.category != null && item.category_confidence != null
         && item.category_confidence < threshold;
-    if (tabId === "tab-videos") {
-        // Entrevistas não passam por triagem de visão — sem categoria não é defeito
-        const analyzedNoCategory = !item.category && item.video_type !== "interview"
-            && !!(item.description || item.summary);
-        return lowConfidence || analyzedNoCategory;
+    if (tabId === "tab-videos" || tabId === "tab-media") {
+        if (item.video_type !== undefined || item.duration !== undefined) {
+            // Entrevistas não passam por triagem de visão — sem categoria não é defeito
+            const analyzedNoCategory = !item.category && item.video_type !== "interview"
+                && !!(item.description || item.summary);
+            return lowConfidence || analyzedNoCategory;
+        }
     }
-    if (tabId === "tab-photos") {
+    if (tabId === "tab-photos" || tabId === "tab-media") {
         const analyzedNoCategory = !item.category && !!item.description;
         return lowConfidence || analyzedNoCategory;
     }
@@ -150,22 +152,16 @@ export function needsTriageReview(item, tabId) {
 function matchTerm(item, tabId, term) {
     if (!item) return false;
     
-    if (tabId === "tab-videos") {
+    if (tabId === "tab-videos" || tabId === "tab-photos" || tabId === "tab-media") {
         const title = (item.title || "").toLowerCase();
         const filename = (item.filename || "").toLowerCase();
         const filepath = (item.filepath || "").toLowerCase();
         const description = (item.description || "").toLowerCase();
         const summary = (item.summary || "").toLowerCase();
         const cat = (item.category || "").toLowerCase();
-        return title.includes(term) || filename.includes(term) || filepath.includes(term) || description.includes(term) || summary.includes(term) || cat.includes(term);
-    }
-    
-    if (tabId === "tab-photos") {
-        const title = (item.title || "").toLowerCase();
-        const filename = (item.filename || "").toLowerCase();
-        const description = (item.description || "").toLowerCase();
-        const cat = (item.category || "").toLowerCase();
-        return title.includes(term) || filename.includes(term) || description.includes(term) || cat.includes(term);
+        const vFolder = (item.virtual_folder || "").toLowerCase();
+        const recAt = (item.recorded_at || "").toLowerCase();
+        return title.includes(term) || filename.includes(term) || filepath.includes(term) || description.includes(term) || summary.includes(term) || cat.includes(term) || vFolder.includes(term) || recAt.includes(term);
     }
     
     if (tabId === "tab-themes") {
@@ -202,7 +198,7 @@ function matchFilter(item, tabId, key, op, val) {
         return false;
     }
 
-    if (tabId === "tab-videos") {
+    if (tabId === "tab-videos" || tabId === "tab-media") {
         if (key === "tipo" || key === "type") {
             const t = (item.video_type || "").toLowerCase();
             if (valLower === "fala" || valLower === "entrevista" || valLower === "interview") {
@@ -211,6 +207,12 @@ function matchFilter(item, tabId, key, op, val) {
             if (valLower === "bastidores" || valLower === "broll") {
                 return t === "broll";
             }
+            if (valLower === "video" || valLower === "vídeo") {
+                return item.duration !== undefined || item.video_type !== undefined || item.type === "video";
+            }
+            if (valLower === "foto" || valLower === "photo") {
+                return item.duration === undefined && item.video_type === undefined && item.type !== "video";
+            }
             return t === valLower;
         }
         
@@ -218,13 +220,21 @@ function matchFilter(item, tabId, key, op, val) {
             const s = (item.status || "").toLowerCase();
             if (valLower === "pendente" || valLower === "pending") return s === "pending";
             if (valLower === "asr" || valLower === "transcrito" || valLower === "transcribed") return s === "transcribed";
-            if (valLower === "visao" || valLower === "analisado" || valLower === "analyzed") return s === "analyzed";
+            if (valLower === "visao" || valLower === "analisado" || valLower === "analyzed" || valLower === "processado") return s === "analyzed" || s === "ingested";
             if (valLower === "erro" || valLower === "error") return s === "error";
             return s === valLower;
         }
         
         if (key === "categoria" || key === "cat") {
             return (item.category || "").toLowerCase() === valLower;
+        }
+
+        if (key === "pasta" || key === "bin" || key === "folder") {
+            return (item.virtual_folder || "").toLowerCase().includes(valLower);
+        }
+
+        if (key === "data" || key === "diaria" || key === "date") {
+            return (item.recorded_at || "").toLowerCase().includes(valLower);
         }
         
         if (key === "duracao" || key === "dur" || key === "duration") {
@@ -256,6 +266,18 @@ function matchFilter(item, tabId, key, op, val) {
         if (key === "res" || key === "resolution") {
             return (item.resolution || "").toLowerCase().includes(valLower);
         }
+
+        if (key === "cor" || key === "paleta" || key === "temp") {
+            return (item.palette_temp || "").toLowerCase() === valLower;
+        }
+
+        if (key === "formato" || key === "format" || key === "ext") {
+            const ext = (item.filename || "").split(".").pop().toLowerCase();
+            if (valLower === "raw") {
+                return ["arw","cr2","nef","dng","pef","raf","orf","rw2","raw"].includes(ext);
+            }
+            return ext === valLower;
+        }
     }
     
     if (tabId === "tab-photos") {
@@ -270,7 +292,6 @@ function matchFilter(item, tabId, key, op, val) {
             return (item.category || "").toLowerCase() === valLower;
         }
         if (key === "cor" || key === "paleta" || key === "temp") {
-            // Temperatura de cor da paleta (E2.D2): quente | neutro | frio
             return (item.palette_temp || "").toLowerCase() === valLower;
         }
         if (key === "tag" || key === "tags") {
@@ -382,7 +403,7 @@ export function getAvailableSuggestions(items, tabId) {
         groups[key].count++;
     };
     
-    if (tabId === "tab-videos") {
+    if (tabId === "tab-videos" || tabId === "tab-media") {
         items.forEach(v => {
             // Tipo
             if (v.video_type === "interview") {

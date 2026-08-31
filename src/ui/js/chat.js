@@ -593,7 +593,7 @@ export class ChatManager {
             if (photo) {
                 STATE.currentPhotoList = STATE.allPhotos;
                 STATE.currentPhotoIndex = STATE.allPhotos.indexOf(photo);
-                const btnTabPhotos = getActiveQuerySelector('[data-tab="tab-photos"]');
+                const btnTabPhotos = getActiveQuerySelector('[data-tab="tab-media"]');
                 if (btnTabPhotos) btnTabPhotos.click();
                 if (window.libraryManager) {
                     window.libraryManager.openLightbox(photo);
@@ -660,7 +660,7 @@ export class ChatManager {
 
     locateMediaInLibrary(item) {
         if (item.type === "video") {
-            const btnTabVideos = getActiveQuerySelector('.tab-btn[data-tab="tab-videos"]');
+            const btnTabVideos = getActiveQuerySelector('.tab-btn[data-tab="tab-media"]');
             if (btnTabVideos) btnTabVideos.click();
             
             setTimeout(() => {
@@ -678,11 +678,11 @@ export class ChatManager {
                 }
             }, 150);
         } else if (item.type === "photo") {
-            const btnTabPhotos = getActiveQuerySelector('.tab-btn[data-tab="tab-photos"]');
+            const btnTabPhotos = getActiveQuerySelector('.tab-btn[data-tab="tab-media"]');
             if (btnTabPhotos) btnTabPhotos.click();
             
             setTimeout(() => {
-                const card = getActiveQuerySelector(`.photo-card[data-photo-id="${item.id}"]`);
+                const card = getActiveQuerySelector(`[data-photo-id="${item.id}"]`);
                 if (card) {
                     card.scrollIntoView({ behavior: "smooth", block: "center" });
                     card.style.background = "rgba(6, 182, 212, 0.3)";

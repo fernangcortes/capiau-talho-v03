@@ -273,7 +273,7 @@ function playSearchPlaylistItem(index) {
             } else {
                 STATE.currentPhotoList = STATE.allPhotos;
                 STATE.currentPhotoIndex = STATE.allPhotos.indexOf(photo);
-                const btnTabPhotos = document.querySelector('[data-tab="tab-photos"]');
+                const btnTabPhotos = document.querySelector('[data-tab="tab-media"]');
                 if (btnTabPhotos) btnTabPhotos.click();
                 if (window.libraryManager) {
                     window.libraryManager.openLightbox(photo);
@@ -2161,7 +2161,11 @@ window.addEventListener("DOMContentLoaded", () => {
     });
 
     // Restaurar abas do localStorage na inicialização
-    const savedLeftTab = localStorage.getItem("active-left-tab") || "tab-videos";
+    let savedLeftTab = localStorage.getItem("active-left-tab") || "tab-media";
+    if (savedLeftTab === "tab-videos" || savedLeftTab === "tab-photos") {
+        savedLeftTab = "tab-media";
+        localStorage.setItem("active-left-tab", "tab-media");
+    }
     if (sidebarLeft) {
         sidebarLeft.setAttribute("data-active-tab", savedLeftTab);
     }
