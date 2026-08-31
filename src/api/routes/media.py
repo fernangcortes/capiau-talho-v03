@@ -7,6 +7,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import threading
 import sys
 import time
 import cv2
@@ -19,7 +20,12 @@ from fastapi.responses import JSONResponse, FileResponse
 from src.config import CONFIG
 from src.db.connection import get_db
 from src.api.dependencies import get_db_conn
-from src.api.schemas import CategoryUpdate, TitleUpdate, ExternalPathIngest, ExternalFilesIngest, OpenFolderPayload, LabelFacePayload, MergeClustersPayload, ReassignFacesPayload
+from src.api.schemas import (
+    CategoryUpdate, TitleUpdate, ExternalPathIngest, ExternalFilesIngest, OpenFolderPayload,
+    LabelFacePayload, MergeClustersPayload, ReassignFacesPayload,
+    BinCreatePayload, BinRenamePayload, BinColorPayload, BinDeletePayload,
+    MediaMovePayload, BatchMediaMovePayload, MediaMetadataUpdatePayload, RelinkPayload
+)
 from src.db.repositories.media import MediaRepository
 from src.core.tasks import (TASK_MANAGER, read_worker_progress, WORKER_LOGS_DIR,
                             worker_is_running, write_worker_pid)
@@ -46,21 +52,38 @@ ASR_PRECO_HORA_USD = 0.31
 # para nao engolir uma linha gigante que todo hit teria de carregar.
 ANALISE_AUDIO_CACHE_TETO_BYTES = 262144
 
+# Lado maior da miniatura de foto servida para os cards da biblioteca.
+PHOTO_THUMB_MAX_PX = 320
+
+
+def _scan_dir_names(directory) -> set:
+    """Nomes de arquivo de um diretorio em uma unica varredura (set vazio se nao existir)."""
+    try:
+        return {e.name for e in os.scandir(directory) if e.is_file()}
+    except (FileNotFoundError, NotADirectoryError, OSError):
+        return set()
+
+
 @router.get("/api/videos")
 def list_videos(project_id: int = Query(1), conn: sqlite3.Connection = Depends(get_db_conn)):
     """Lista todos os vídeos cadastrados no projeto."""
     videos = MediaRepository.list_videos(conn, project_id)
+    # Uma varredura so do diretorio de proxies (centenas de arquivos) em vez de
+    # um stat() por video. THUMBNAILS_DIR fica de fora de proposito: guarda
+    # dezenas de milhares de frames de timeline, entao varrer tudo sai mais caro
+    # que os poucos stat() direcionados de que precisamos.
+    proxy_names = _scan_dir_names(CONFIG.PROXIES_DIR)
+
     for v in videos:
         # Injeta a versão da miniatura (mtime do arquivo no disco) para invalidação de cache no navegador
-        thumb_file = CONFIG.THUMBNAILS_DIR / f"thumb_{v['id']}.jpg"
-        if thumb_file.exists():
-            v['thumb_version'] = int(thumb_file.stat().st_mtime)
-        else:
+        try:
+            v['thumb_version'] = int((CONFIG.THUMBNAILS_DIR / f"thumb_{v['id']}.jpg").stat().st_mtime)
+        except OSError:
             v['thumb_version'] = 0
 
         # Injeta caminho do proxy se existir
         proxy_rel = f"proxy_vid_{v['id']}.mp4"
-        if (CONFIG.PROXIES_DIR / proxy_rel).exists():
+        if proxy_rel in proxy_names:
             v['proxy_path'] = f"/proxies/{proxy_rel}"
         else:
             from src.services.s3_service import S3Service
@@ -80,11 +103,14 @@ def list_videos(project_id: int = Query(1), conn: sqlite3.Connection = Depends(g
 def list_photos(project_id: int = Query(1), conn: sqlite3.Connection = Depends(get_db_conn)):
     """Lista todas as fotos e injeta caminhos relativos de proxies se existirem."""
     photos = MediaRepository.list_photos(conn, project_id)
+    # Idem: uma varredura em vez de um stat() por foto.
+    photo_proxy_names = _scan_dir_names(CONFIG.PROXIES_DIR / "photos")
+
     for p in photos:
         # Injeta caminho do proxy se existir
-        proxy_rel = f"photos/proxy_photo_{p['id']}.webp"
-        if (CONFIG.PROXIES_DIR / proxy_rel).exists():
-            p['proxy_path'] = f"/proxies/{proxy_rel}"
+        proxy_name = f"proxy_photo_{p['id']}.webp"
+        if proxy_name in photo_proxy_names:
+            p['proxy_path'] = f"/proxies/photos/{proxy_name}"
         else:
             p['proxy_path'] = None
             
@@ -93,6 +119,10 @@ def list_photos(project_id: int = Query(1), conn: sqlite3.Connection = Depends(g
             p['tags'] = json.loads(p['tags']) if p.get('tags') else []
         except Exception:
             p['tags'] = []
+
+    # Gera em segundo plano as miniaturas que faltarem (nao bloqueia a resposta)
+    _warm_photo_thumbnails(project_id)
+
     return photos
 
 # -- E2.C2: Fila de revisão de triagem + correção de categoria -----------------
@@ -640,28 +670,28 @@ def select_files_dialog():
 
 @router.post("/api/ingest/external")
 def trigger_external_ingest(payload: ExternalPathIngest, background_tasks: BackgroundTasks):
-    """Varre uma pasta ou arquivo externo inserindo os caminhos em formato Link (in-place)."""
+    """Varre uma pasta ou arquivo externo inserindo os caminhos em formato Link (in-place) para uma pasta virtual."""
     path_obj = Path(payload.path)
     if not path_obj.exists():
         raise HTTPException(status_code=404, detail="O caminho especificado não existe.")
         
     def bg_task():
-        print(f"[API] Ingestão externa in-place em background para: {payload.path}")
-        IngestService.ingest_external_path(path_obj, payload.project_id)
+        print(f"[API] Ingestão externa in-place em background para: {payload.path} (bin: {payload.virtual_folder})")
+        IngestService.ingest_external_path(path_obj, payload.project_id, target_virtual_folder=payload.virtual_folder or "root")
         
     background_tasks.add_task(bg_task)
     return {"status": "success", "message": f"Ingestão externa iniciada para projeto {payload.project_id}."}
 
 @router.post("/api/ingest/external-files")
 def trigger_external_files_ingest(payload: ExternalFilesIngest, background_tasks: BackgroundTasks):
-    """Ingere múltiplos arquivos externos in-place em background."""
+    """Ingere múltiplos arquivos externos in-place em background para uma pasta virtual."""
     def bg_task():
-        print(f"[API] Ingestão externa in-place de {len(payload.paths)} arquivos para projeto {payload.project_id}")
+        print(f"[API] Ingestão externa in-place de {len(payload.paths)} arquivos para projeto {payload.project_id} (bin: {payload.virtual_folder})")
         for p in payload.paths:
             try:
                 path_obj = Path(p)
                 if path_obj.exists() and path_obj.is_file():
-                    IngestService.ingest_file(path_obj, payload.project_id, copy_original=False)
+                    IngestService.ingest_file(path_obj, payload.project_id, copy_original=False, virtual_folder=payload.virtual_folder or "root")
             except Exception as ex:
                 print(f"[IngestService] Erro ao ingerir {p}: {ex}")
     background_tasks.add_task(bg_task)
@@ -671,6 +701,7 @@ def trigger_external_files_ingest(payload: ExternalFilesIngest, background_tasks
 async def upload_files_for_ingest(
     background_tasks: BackgroundTasks,
     project_id: int = Form(1),
+    virtual_folder: str = Form("root"),
     files: List[UploadFile] = File(...)
 ):
     """Recebe arquivos enviados via drag & drop e salva na pasta originals/ para ingestão."""
@@ -697,12 +728,75 @@ async def upload_files_for_ingest(
     def bg_task():
         for p in saved_paths:
             try:
-                IngestService.ingest_file(p, project_id, copy_original=False)
+                IngestService.ingest_file(p, project_id, copy_original=False, virtual_folder=virtual_folder or "root")
             except Exception as ex:
                 print(f"[UploadIngest] Erro ao ingerir {p.name}: {ex}")
                 
     background_tasks.add_task(bg_task)
     return {"status": "success", "count": len(saved_paths)}
+
+# ── PASTAS VIRTUAIS (BINS) & ORGANIZAÇÃO ─────────────────────────────
+
+@router.get("/api/project/{project_id}/bins")
+def get_project_bins(project_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Retorna a lista de todas as pastas virtuais (bins) do projeto."""
+    bins = MediaRepository.get_project_bins(conn, project_id)
+    return {"status": "success", "bins": bins}
+
+@router.post("/api/project/{project_id}/bins")
+def create_project_bin(project_id: int, payload: BinCreatePayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Cria ou atualiza uma pasta virtual no projeto."""
+    bin_row = MediaRepository.create_or_update_bin(
+        conn, project_id,
+        name=payload.name,
+        path=payload.path,
+        parent_path=payload.parent_path or "root",
+        color=payload.color or "#8b5cf6"
+    )
+    return {"status": "success", "bin": bin_row}
+
+@router.patch("/api/project/{project_id}/bins/rename")
+def rename_project_bin(project_id: int, payload: BinRenamePayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Renomeia uma pasta virtual e propaga para subpastas e mídias."""
+    MediaRepository.rename_bin(conn, project_id, payload.old_path, payload.new_path, payload.new_name)
+    return {"status": "success", "message": f"Bin renomeado para {payload.new_name}"}
+
+@router.patch("/api/project/{project_id}/bins/color")
+def set_project_bin_color(project_id: int, payload: BinColorPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Altera a cor temática do bin."""
+    MediaRepository.set_bin_color(conn, project_id, payload.path, payload.color)
+    return {"status": "success", "message": "Cor do bin atualizada."}
+
+@router.delete("/api/project/{project_id}/bins")
+def delete_project_bin(project_id: int, payload: BinDeletePayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Remove uma pasta virtual da biblioteca sem apagar nenhum arquivo físico."""
+    MediaRepository.delete_bin(conn, project_id, payload.path, payload.move_to_parent)
+    return {"status": "success", "message": "Bin removido da biblioteca."}
+
+@router.post("/api/media/move-to-bin")
+def move_media_to_bin(payload: MediaMovePayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Move uma mídia individual para uma pasta virtual."""
+    MediaRepository.move_media_to_bin(conn, payload.media_type, payload.media_id, payload.target_virtual_folder)
+    return {"status": "success", "message": "Mídia movida para a pasta virtual."}
+
+@router.post("/api/media/batch-move-to-bin")
+def batch_move_media_to_bin(payload: BatchMediaMovePayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Move múltiplas mídias em lote para uma pasta virtual."""
+    count = MediaRepository.batch_move_media_to_bin(conn, payload.items, payload.target_virtual_folder)
+    return {"status": "success", "moved_count": count}
+
+@router.patch("/api/media/{media_type}/{media_id}/metadata")
+def update_media_metadata(media_type: str, media_id: int, payload: MediaMetadataUpdatePayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Atualiza campos de metadados editoriais, data de gravação/diária e pasta virtual da mídia."""
+    data = payload.dict(exclude_unset=True)
+    updated = MediaRepository.update_media_metadata_fields(conn, media_type, media_id, data)
+    return {"status": "success", "media": updated}
+
+@router.post("/api/project/{project_id}/relink")
+def relink_project_media(project_id: int, payload: RelinkPayload, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Varre uma pasta raiz com subpastas para relincar automaticamente mídias desconectadas."""
+    res = MediaRepository.relink_media_files_recursive(conn, project_id, payload.search_folder)
+    return res
 
 @router.post("/api/project/{project_id}/scan-watch")
 def trigger_scan_watch(project_id: int, background_tasks: BackgroundTasks):
@@ -1200,6 +1294,96 @@ def get_photo_file(photo_id: int, raw: bool = Query(False, description="RAW em r
     if photo_path.exists():
         return FileResponse(photo_path)
     raise HTTPException(status_code=404, detail="Arquivo de foto não encontrado.")
+
+
+_photo_thumb_warmup_lock = threading.Lock()
+_photo_thumb_warmup_running = False
+
+
+def _build_photo_thumbnail(source: Path, dest: Path) -> bool:
+    """Gera a miniatura pequena de uma foto. Devolve False se nao conseguiu."""
+    try:
+        from PIL import Image
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(source) as img:
+            img = img.convert("RGB")
+            img.thumbnail((PHOTO_THUMB_MAX_PX, PHOTO_THUMB_MAX_PX), Image.LANCZOS)
+            img.save(dest, "WEBP", quality=78, method=4)
+        return True
+    except Exception as ex:
+        print(f"[Thumbnail] Falha ao gerar miniatura de {source.name}: {ex}")
+        return False
+
+
+def _warm_photo_thumbnails(project_id: int):
+    """Gera em segundo plano as miniaturas que faltam, uma unica vez por vez.
+
+    Sem isso, a primeira rolagem pela biblioteca paga ~50ms de geracao por foto.
+    """
+    global _photo_thumb_warmup_running
+    with _photo_thumb_warmup_lock:
+        if _photo_thumb_warmup_running:
+            return
+        _photo_thumb_warmup_running = True
+
+    def tarefa():
+        global _photo_thumb_warmup_running
+        try:
+            existentes = _scan_dir_names(CONFIG.THUMBNAILS_DIR)
+            proxies = _scan_dir_names(CONFIG.PROXIES_DIR / "photos")
+            gerados = 0
+            for nome in sorted(proxies):
+                if not nome.startswith("proxy_photo_") or not nome.endswith(".webp"):
+                    continue
+                pid = nome[len("proxy_photo_"):-len(".webp")]
+                destino_nome = f"photo_thumb_{pid}.webp"
+                if destino_nome in existentes:
+                    continue
+                if _build_photo_thumbnail(CONFIG.PROXIES_DIR / "photos" / nome,
+                                          CONFIG.THUMBNAILS_DIR / destino_nome):
+                    gerados += 1
+            if gerados:
+                print(f"[Thumbnail] {gerados} miniatura(s) de foto geradas em segundo plano.")
+        except Exception as ex:
+            print(f"[Thumbnail] Aquecimento de miniaturas falhou: {ex}")
+        finally:
+            _photo_thumb_warmup_running = False
+
+    threading.Thread(target=tarefa, daemon=True).start()
+
+
+@router.get("/api/photo/{photo_id}/thumbnail")
+def get_photo_thumbnail(photo_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+    """Miniatura pequena da foto, gerada uma vez e cacheada em disco.
+
+    O proxy da foto tem 1024px e 60-280 KB; o card da biblioteca mostra ~80px.
+    Servir o proxy inteiro fazia o navegador baixar e decodificar ~150x mais
+    pixels do que precisa — o que pesa muito ao rolar uma biblioteca grande,
+    e mais ainda quando os arquivos vem de um bind mount do Docker.
+    """
+    thumb_path = CONFIG.THUMBNAILS_DIR / f"photo_thumb_{photo_id}.webp"
+    cache_headers = {"Cache-Control": "public, max-age=604800"}
+    if thumb_path.exists() and thumb_path.stat().st_size > 0:
+        return FileResponse(thumb_path, headers=cache_headers)
+
+    # Fonte: o proxy (ja normalizado, inclusive para RAW) ou o original
+    source = CONFIG.PROXIES_DIR / f"photos/proxy_photo_{photo_id}.webp"
+    if not source.exists():
+        photo = MediaRepository.get_photo(conn, photo_id)
+        if not photo:
+            raise HTTPException(status_code=404, detail="Foto não encontrada.")
+        source = Path(photo["filepath"])
+        if not source.exists():
+            local_orig = CONFIG.ORIGINALS_DIR / photo["filename"]
+            if not local_orig.exists():
+                raise HTTPException(status_code=404, detail=f"Arquivo não encontrado para a foto {photo_id}")
+            source = local_orig
+
+    if not _build_photo_thumbnail(source, thumb_path):
+        # Sem miniatura: devolve a fonte para o card nao ficar vazio
+        return FileResponse(source, headers=cache_headers)
+
+    return FileResponse(thumb_path, headers=cache_headers)
 
 
 @router.get("/api/video/{video_id}/thumbnail")
