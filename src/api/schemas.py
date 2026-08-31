@@ -18,13 +18,62 @@ class ProjectExportOptions(BaseModel):
 class ExternalPathIngest(BaseModel):
     path: str
     project_id: int = 1
+    virtual_folder: str = "root"
 
 class ExternalFilesIngest(BaseModel):
     paths: List[str]
     project_id: int = 1
+    virtual_folder: str = "root"
 
 class OpenFolderPayload(BaseModel):
     path: str
+
+class BinCreatePayload(BaseModel):
+    project_id: int = 1
+    name: str
+    path: str
+    parent_path: str = "root"
+    color: str = "#8b5cf6"
+
+class BinRenamePayload(BaseModel):
+    project_id: int = 1
+    old_path: str
+    new_path: str
+    new_name: str
+
+class BinColorPayload(BaseModel):
+    project_id: int = 1
+    path: str
+    color: str
+
+class BinDeletePayload(BaseModel):
+    project_id: int = 1
+    path: str
+    move_to_parent: bool = True
+
+class MediaMovePayload(BaseModel):
+    media_type: str = "video" # 'video' | 'photo'
+    media_id: int
+    target_virtual_folder: str = "root"
+
+class BatchMediaMovePayload(BaseModel):
+    project_id: int = 1
+    items: List[Dict[str, Any]] # [{'type': 'video', 'id': 1}, ...]
+    target_virtual_folder: str = "root"
+
+class MediaMetadataUpdatePayload(BaseModel):
+    title: Optional[str] = None
+    category: Optional[str] = None
+    category_confidence: Optional[float] = None
+    description: Optional[str] = None
+    summary: Optional[str] = None
+    tags: Optional[List[str]] = None
+    recorded_at: Optional[str] = None
+    virtual_folder: Optional[str] = None
+
+class RelinkPayload(BaseModel):
+    project_id: int = 1
+    search_folder: str
 
 class CategoryUpdate(BaseModel):
     category: str
