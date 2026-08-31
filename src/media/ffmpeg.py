@@ -68,6 +68,11 @@ def get_media_metadata(filepath: Path) -> Dict[str, Any]:
             resolution = f"{video_stream['width']}x{video_stream['height']}"
             
         codec = video_stream.get('codec_name', audio_stream.get('codec_name', 'unknown'))
+
+        tags = fmt.get('tags', {}) or {}
+        if not tags and video_stream.get('tags'):
+            tags = video_stream.get('tags', {})
+        creation_time = tags.get('creation_time') or tags.get('date') or tags.get('com.apple.quicktime.creationdate')
         
         return {
             'duration': duration,
@@ -75,6 +80,7 @@ def get_media_metadata(filepath: Path) -> Dict[str, Any]:
             'resolution': resolution,
             'codec': codec,
             'bitrate': bitrate,
+            'creation_time': creation_time,
             **_extract_color_metadata(video_stream),
         }
     except Exception as e:
@@ -85,6 +91,7 @@ def get_media_metadata(filepath: Path) -> Dict[str, Any]:
             'resolution': 'unknown',
             'codec': 'unknown',
             'bitrate': 0,
+            'creation_time': None,
             **EMPTY_COLOR,
         }
 
