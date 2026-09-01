@@ -1,133 +1,119 @@
-# 🎹 Cheat Sheet de Atalhos de Teclado e Operações
+# 🎹 Cheat Sheet de Atalhos de Teclado, Perfis NLE e Manual
 
-O **CapIAu-Talho** foi projetado para ser operado de forma ágil por editores de vídeo através de atalhos de teclado no estilo NLE profissional.
-
-Abaixo está o guia completo dos comandos suportados no sistema:
+O **CapIAu-Talho** possui um **Sistema Central de Keymap e Perfis NLE** de alta performance, projetado para oferecer ergonomia de edição profissional tanto para quem utiliza o mapeamento nativo quanto para quem vem de outros softwares consagrados de mercado (*Kdenlive, Adobe Premiere Pro, DaVinci Resolve e Apple Final Cut Pro*).
 
 ---
 
-## 🎬 Controles do Player de Vídeo (Padrão NLE JKL)
+## 🎛️ 1. Perfis NLE Integrados de Fábrica
 
-Os atalhos abaixo controlam o player de origem (*Source*) ou o player de timeline (*Program*), dependendo de qual deles estiver focado.
+Você pode alternar o perfil ativo a qualquer momento através do menu **Perfil** no cabeçalho do **Guia de Atalhos** (<kbd>⌨️</kbd> na barra de ferramentas da timeline):
 
-| Tecla | Ação | Descrição |
+| Perfil NLE | Foco & Ergonomia | Destaques de Mapeamento |
 | :--- | :--- | :--- |
-| **`J`** | **Retroceder Vídeo** | Pressione consecutivamente para acelerar a velocidade de retrocesso (-1x, -2x, -4x, -8x). |
-| **`K`** | **Play / Pause** | Pausa a reprodução ou retoma a reprodução na velocidade normal (1.0x). |
-| **`L`** | **Avançar Vídeo** | Pressione consecutivamente para acelerar a velocidade de avanço (1.5x, 2x, 4x, 8x). |
-| **`Espaço`** | **Play / Pause (Geral)** | Atalho rápido para alternar reprodução/pausa no monitor ativo. |
+| 🎬 **CapIAu Padrão** | Híbrido moderno ultrarrápido para montagem documental e corte inteligente. | `Z` Split, `V` Seleção, `T` Faixa, `Q`/`W` Ripple Trims, `S` Snapping, `M` Marcador, `A` Alternativas IA. |
+| 🐧 **Kdenlive** | Padrão clássico do ecossistema Open Source e Linux NLE. | `Shift+R` / `X` Razor Split, `S` Seleção, `M` / `Shift+M` Espaçador, `V` Inserção, `F10` Snapping, `J`/`K`/`L` Shuttle. |
+| 🟣 **Adobe Premiere Pro** | Ergonomia familiar para editores acostumados ao ecossistema Adobe. | `Ctrl+K` / `C` Razor Split, `A` / `Shift+A` Seleção de Trilha, `V` Seleção, `S` Snapping, `Q`/`W` Ripple Trims. |
+| 🟡 **DaVinci Resolve** | Padrão Blackmagic Design para ilhas de edição e pós-produção. | `Ctrl+\` / `B` Blade Split, `A` Seleção, `N` Snapping, `Shift+Backspace` Ripple Delete, `Alt+[` / `Alt+]` Trims. |
+| 🍏 **Apple Final Cut Pro** | Ergonomia magnética e atalhos otimizados para fluxo contínuo. | `Cmd+B` / `B` Blade Split, `A` Seleção, `N` Snapping, `E` Append, `Shift+Delete` Ripple Delete. |
+| ⚙️ **Personalizado (Custom)** | Mapeamento livre configurado pelo usuário. | Totalmente editável pela aba **Personalizar Atalhos & Tabela**, com persistência local e exportação JSON. |
+
+---
+
+## ⌨️ 2. Teclado Visual Esquemático 1:1 & Área de Teste em Tempo Real
+
+No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado Visual & Índice Esquemático** oferece uma experiência interativa completa:
+
+* **Proporções Mecânicas 1:1 (ANSI TKL)**: Keycaps físicos proporcionais com pontos coloridos por categoria de função.
+* **Destaque Bidirecional**:
+  * Passar o mouse no **Teclado** ➔ Ilumina a linha correspondente nas 3 colunas esquemáticas abaixo e rola até ela.
+  * Passar o mouse no **Índice** ➔ Ilumina a tecla correspondente no teclado virtual.
+* **Camadas de Modificadores**: Alterne entre as camadas `Padrão`, `+ Shift`, `+ Ctrl` e `+ Alt` ou segure os modificadores no teclado físico para visualizar funções secundárias.
+* **Live Testing HUD**: Digite qualquer tecla física com o modal aberto para testar atalhos ao vivo com feedback de iluminação neon e descrição instantânea.
+* **Modo Tela Cheia (Fullscreen)**: Clique no botão <i class="fa-solid fa-expand"></i> para expandir o modal para `100vw × 100vh`, ocupando toda a tela com visibilidade total dos comandos.
+
+---
+
+## 🎬 3. Controles de Reprodução e Shuttle (Monitor Source & Program)
+
+| Tecla / Combinação | Ação | Descrição |
+| :--- | :--- | :--- |
+| **`Espaço`** | **Play / Pause Geral** | Alterna entre tocar e pausar no player atualmente focado (*Source* ou *Program*). |
+| **`J`** | **Shuttle Reverso** | Pressione consecutivamente para acelerar a velocidade de retrocesso (-1x, -2x, -4x, -8x). |
+| **`K`** | **Shuttle Parar** | Pausa a reprodução imediata ou redefine a velocidade normal. |
+| **`L`** | **Shuttle Avanço** | Pressione consecutivamente para acelerar a velocidade de avanço (1.5x, 2x, 4x, 8x). |
+| **`K + J`** | **Jog Recuar 1 Frame** | Pressione K mantendo pressionado J para recuar exatamente 1 frame. |
+| **`K + L`** | **Jog Avançar 1 Frame** | Pressione K mantendo pressionado L para avançar exatamente 1 frame. |
 | **`←` / `→`** | **Navegar Frames** | Retrocede ou avança exatamente 1 frame do vídeo para cortes cirúrgicos. |
-| **`↑` / `↓`** | **Navegar Pontos de Corte (Edit Points)** | **No Program / Timeline:** Move a agulha (playhead) para o ponto de corte (início ou fim de clipe) anterior (↑) ou próximo (↓).<br>**No Source:** Pula para o ponto In/Início (↑) ou ponto Out/Fim (↓). |
-| **Clique Simples** | **Play / Pause** | Clicar na área de vídeo de qualquer player (Source/Program) alterna a reprodução. |
-| **Duplo Clique** | **Maximizar / Minimizar** | Clicar duas vezes rápido na área de vídeo de qualquer player maximiza ou minimiza sua visualização. |
+| **`↑` / `↓`** | **Navegar Pontos de Corte (Edit Points)** | **Na Timeline:** Move a agulha para o corte anterior (↑) ou próximo (↓).<br>**No Source:** Pula para o ponto In/Início (↑) ou ponto Out/Fim (↓). |
+| **`Duplo Clique`** | **Maximizar / Minimizar Player** | Expande o monitor ativo para tela cheia ou restaura o layout. |
 
 ---
 
-## ✂️ Marcação de Pontos e Edição na Timeline
+## ✂️ 4. Marcação de Pontos, Inserção e Edição na Timeline
 
-| Tecla | Ação | Descrição |
+| Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
-| **`I`** | **Marcar Entrada (In)** | Define o frame/timestamp inicial do segmento a ser recortado do Source. |
-| **`O`** | **Marcar Saída (Out)** | Define o frame/timestamp final do segmento a ser recortado do Source. |
-| **`E`** | **Adicionar à Timeline** | Insere o segmento selecionado [In-Out] na trilha de destino correspondente. |
-| **`Shift + E`** | **Corte de Fala Rápido** | Insere diretamente a frase ou bloco de diálogo selecionado no painel de transcrições na trilha V1. |
+| **`I`** | **Marcar Entrada (In)** | Define o frame inicial do trecho a ser recortado no Source. |
+| **`O`** | **Marcar Saída (Out)** | Define o frame final do trecho a ser recortado no Source. |
+| **`Alt + X`** | **Limpar In / Out** | Remove as marcações de entrada e saída ativas. |
+| **`E`** | **Adicionar à Timeline (Append)** | Insere o trecho marcado [In-Out] na trilha de destino correspondente. |
+| **`Shift + E`** | **Corte de Fala Rápido** | Insere o texto/diálogo selecionado na transcrição diretamente na trilha V1/A1. |
+| **`Z`** *(ou `Shift+R`/`Ctrl+K`/`B`)* | **Dividir Clipe (Split)** | Corta o clipe na agulha (playhead). Se vinculado (A/V), divide áudio e vídeo juntos. |
+| **`Q`** | **Ripple Delete até a Agulha (Head)** | Corta do início do clipe até a agulha e puxa os clipes posteriores nas pistas com Sync Lock. |
+| **`W`** | **Ripple Delete da Agulha até o Fim (Tail)** | Corta da agulha até o fim do clipe e puxa os clipes posteriores nas pistas com Sync Lock. |
+| **`Delete` / `Backspace`** | **Lift Delete / Deletar Gap / Ghost** | **Em clipe:** Apaga o clipe mantendo o Gap vazio.<br>**Em Gap:** Fecha o espaço vazio puxando os clipes.<br>**Em Ghost:** Rejeita sugestão de IA. |
+| **`Shift + Delete`** | **Ripple Delete de Clipe** | Apaga o clipe selecionado e fecha o espaço vazio imediatamente. |
+| **`Alt + Delete`** | **Apagar Faixa Única** | Apaga apenas o vídeo ou o áudio do clipe selecionado, desvinculando o par temporariamente. |
+| **`U`** | **Desvincular / Vincular Par A/V** | Desvincula o par áudio/vídeo do clipe para possibilitar cortes L-Cut e J-Cut. |
+| **`Ctrl + Arraste`** | **Ripple Insert** | Insere mídia abrindo espaço e empurrando os cortes à direita nas pistas sincronizadas. |
+| **`Ctrl + Trim`** | **Ripple Trim** | Ajusta as bordas de entrada/saída compensando o tempo nas pistas sincronizadas. |
 
 ---
 
-## 🔄 Edição e Controle de Alternativas (IA), Inspetor & Histórico
+## 🎛️ 5. Ferramentas da Timeline e Ajustes de Precisão
 
-Os comandos abaixo mudam de comportamento contextualmente baseado em qual painel do programa você está interagindo (Biblioteca de Mídias vs. Timeline).
-
-| Tecla | Ação | Descrição |
+| Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
-| **`Q`** | **Ripple Delete até a Agulha (Playhead)** | Corta a parte inicial do clipe (Início até a agulha) e fecha o espaço puxando os clipes seguintes nas pistas sincronizadas. |
-| **`W`** | **Ripple Delete da Agulha até o Fim** | Corta a parte final do clipe (Agulha até o fim) e fecha o espaço puxando os clipes seguintes nas pistas sincronizadas. |
-| **`V`** | **Ferramenta de Seleção Padrão** | Retorna à Ferramenta de Seleção Normal (cursor padrão). |
-| **`T`** | **Selecionar Faixa para Frente** | Seleciona todos os clipes à direita em todas as faixas ativas para arrasto (*Shift+Clique: apenas 1 faixa*). |
-| **`Shift + T`** | **Selecionar Faixa para Trás** | Seleciona todos os clipes à esquerda em todas as faixas ativas para arrasto (*Shift+Clique: apenas 1 faixa*). |
-| **`A`** | **Abrir/Fechar Inspetor ou Alternativas (IA)** | **Se focado na Biblioteca/Mídias:** Abre ou fecha o Inspetor de Mídia Integrado.<br>**Se focado na Timeline:** Abre ou fecha o modal de alternativas da IA para o clipe selecionado. |
-| **`Esc` (Escape)** | **Fechar Inspetor, Alternativas ou Desmarcar Seleção** | Fecha o Inspetor de Mídia, modal de alternativas ou limpa seleções múltiplas. |
-| **`Delete` / `Backspace`** | **Lift Delete / Deletar Gap / Ghost** | **Em clipe:** Apaga o clipe mantendo o espaço vazio (Gap).<br>**Em Gap:** Executa o Ripple Delete do Gap, fechando o espaço nas pistas com Sync Lock.<br>**Em Ghost:** Rejeita a sugestão da IA. |
-| **`Shift + Delete`** | **Ripple Delete de Clipe** | Apaga o clipe selecionado e fecha o buraco puxando todos os clipes posteriores nas pistas com Sync Lock ativo. |
-| **`S`** | **Alternar Snapping Magnético** | Alterna o encaixe magnético global da timeline e exibe guias verticais em tempo real no Canvas. |
-| **`Ctrl + Arraste` (ou Drop)** | **Ripple Insert** | Insere clipe ou mídia abrindo espaço e empurrando os cortes à direita nas pistas sincronizadas. |
-| **`Ctrl + Trim`** | **Ripple Trim** | Ajusta as bordas de entrada/saída de um clipe compensando o tempo nas pistas com Sync Lock ativo. |
-| **`Enter` / `Y`** | **Aceitar Sugestão da IA** | Aceita e consolida o clipe fantasma (*ghost clip*) selecionado na timeline. |
-| **`U`** | **Desvincular Par A/V** | Desvincula o clipe de vídeo selecionado de seu respectivo par de áudio para trims independentes (J/L-cuts). |
-| **`Z`** | **Dividir Clipe (Split)** | Divide o clipe selecionado na timeline ao meio, exatamente na posição atual da agulha (playhead). Se estiver vinculado (A/V), divide ambos. |
-| **`←` / `→`** | **Deslocar Clipe (Nudge)** | Desloca o clipe selecionado exatamente 1 frame para a esquerda ou direita na timeline. |
-| **`↑` / `↓`** | **Ir aos Pontos de Corte (Edit Points)** | Move a agulha (playhead) para o ponto de corte (início ou fim de clipe) anterior (↑) ou próximo (↓). |
-| **`Alt + ←` / `Alt + →`** | **Ajustar Entrada (Trim In)** | Ajusta a borda esquerda (In-point) do clipe selecionado em 1 frame para trás (←) ou para a frente (→). |
-| **`Shift + ←` / `Shift + →`** | **Ajustar Saída (Trim Out)** | Ajusta a borda direita (Out-point) do clipe selecionado em 1 frame para trás (←) ou para a frente (→). |
-| **`[` / `]`** | **Ajustar Bordas (Nudge Trim)** | Atalho clássico de uma tecla: ajusta a borda esquerda para trás (`[`) ou a borda direita para a frente (`]`) em 1 frame. |
-| **`Ctrl + Z`** | **Desfazer** | Desfaz o último passo de edição na timeline. |
-| **`Ctrl + Y` ou `Ctrl + Shift + Z`** | **Refazer** | Refaz o passo de edição desfeito. |
-| **Duplo Clique (nos sliders / rótulos)** | **Resetar Ajuste** | Restaura o slider de ajuste selecionado (escala, posição X/Y, rotação, crop, volume) ao seu valor padrão. |
-| **Botão Sync Lock (cabeçalho de pista)** | **Sync Lock por Pista** | Ativa/desativa o sincronismo de operações de ripple para aquela pista. |
-| **Clique nos ícones M / S / Olho** | **Mute / Solo / Visibilidade** | Silencia (M), isola (S) ou oculta o vídeo da pista selecionada na Timeline. |
+| **`V`** *(ou `S` no Kdenlive / `A` no Resolve)* | **Ferramenta de Seleção** | Retorna ao cursor padrão de seleção e arraste. |
+| **`T`** *(ou `A` no Premiere)* | **Selecionar Faixa para Frente** | Seleciona todos os clipes à direita em todas as faixas ativas (*Shift = 1 faixa*). |
+| **`Shift + T`** *(ou `Shift+A`)* | **Selecionar Faixa para Trás** | Seleciona todos os clipes à esquerda em todas as faixas ativas (*Shift = 1 faixa*). |
+| **`S`** *(ou `F10` / `N`)* | **Alternar Snapping Magnético** | Liga ou desliga o magnetismo da timeline com guias visuais no Canvas. |
+| **`←` / `→`** | **Deslocar Clipe (Nudge 1 Frame)** | Desloca o clipe selecionado 1 frame para a esquerda ou direita. |
+| **`Alt + ←` / `Alt + →`** | **Ajustar Ponto IN (Trim In)** | Recua ou avança a borda esquerda do clipe selecionado em 1 frame. |
+| **`Shift + ←` / `Shift + →`** | **Ajustar Ponto OUT (Trim Out)** | Recua ou avança a borda direita do clipe selecionado em 1 frame. |
+| **`[` / `]`** | **Nudge Trim Rápido** | Ajusta borda esquerda (`[`) ou borda direita (`]`) em 1 frame. |
 
 ---
 
-## 📍 Marcadores de Timeline e Clipe (Teclado-First)
+## 📍 6. Marcadores de Timeline e Clipe
 
-| Tecla | Ação | Descrição |
+| Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
-| **`M`** | **Criar / Editar Marcador** | Adiciona um marcador compacto na playhead (auto-vincula ao clipe de vídeo sob a agulha ou na régua). Abre o box compacto sem pausar o vídeo. |
-| **`Tab`** | **Alternar Campos** | Alterna o foco do teclado entre Nome, Descrição e Cores. |
-| **`Enter` / `Esc`** | **Salvar e Fechar** | Salva o marcador e fecha o box flutuante instantaneamente. |
-| **`Shift + Clique`** | **Seleção Múltipla** | Seleciona múltiplos marcadores na timeline (borda branca de destaque). |
-| **`Shift + M` / `Alt + M`** | **Navegar Marcadores** | Pula a agulha para o próximo (`Shift+M`) ou anterior (`Alt+M`) marcador. |
-| **`Delete` / `Backspace`** | **Exclusão em Lote** | Apaga todos os marcadores selecionados na timeline em uma única ação. |
+| **`M`** | **Adicionar / Editar Marcador** | Cria ou edita marcador na agulha sem pausar a reprodução. |
+| **`Shift + M`** | **Pular para Próximo Marcador** | Move a agulha para o próximo marcador da timeline. |
+| **`Alt + M`** | **Pular para Marcador Anterior** | Move a agulha para o marcador anterior da timeline. |
+| **`Shift + Clique`** | **Seleção Múltipla de Marcadores** | Seleciona vários marcadores simultaneamente para edição ou exclusão em lote. |
+| **`Tab` (no box do marcador)** | **Alternar Campos** | Navega entre Título, Comentário e Seletor de Cores. |
+| **`Enter` / `Esc`** | **Salvar e Fechar Marcador** | Salva e fecha o popover de marcador instantaneamente. |
 
 ---
 
-## 📸 Navegação no Visualizador de Fotos (Lightbox)
+## 🤖 7. Inteligência Artificial, Inspetor e Comandos Globais
 
-Quando o modal visualizador de fotos de set estiver aberto, os seguintes atalhos estarão ativos:
-
-| Tecla | Ação | Descrição |
+| Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
-| **`←` (Seta Esquerda)** | **Foto Anterior** | Retrocede para a imagem anterior da galeria/pasta. |
-| **`→` (Seta Direita)** | **Próxima Foto** | Avança para a próxima imagem da galeria/pasta. |
-| **`Esc` (Escape)** | **Fechar Visualizador** | Fecha o modal de fotos de set com segurança. |
+| **`A`** | **Alternativas IA / Inspetor** | **Na Timeline:** Abre o carrossel de planos alternativos sugeridos pela IA.<br>**Na Biblioteca:** Abre o Inspetor de Metadados e Decupagem. |
+| **`Enter` / `Y`** | **Aceitar Sugestão de IA** | Aceita e consolida o clipe fantasma (*ghost clip*) sugerido na timeline. |
+| **`Del` (sobre Ghost)** | **Rejeitar Sugestão de IA** | Remove o clipe fantasma sugerido pela IA. |
+| **`Ctrl + S`** | **Salvar Timeline / Projeto** | Salva a timeline ativa e persiste no banco SQLite/JSON. |
+| **`Ctrl + Z`** | **Desfazer (Undo)** | Desfaz a última ação realizada na timeline. |
+| **`Ctrl + Y`** *(ou `Ctrl+Shift+Z`)* | **Refazer (Redo)** | Refaz a ação desfeita. |
+| **`Esc`** | **Fechar / Cancelar** | Fecha modais, limpa seleções e conclui edições de texto. |
 
 ---
 
-## 🗂️ Índice Temático de Rolagem da Biblioteca (Scroll Peeker)
+## 🛡️ Prevenção Inteligente de Conflitos de Digitação
 
-Ativos sobre a **barra de rolagem** da biblioteca, no painel esquerdo. Permitem inspecionar e saltar para qualquer ponto do acervo sem rolar até lá.
-
-| Gesto | Ação | Descrição |
-| :--- | :--- | :--- |
-| **Parar o mouse sobre a barra** | **Espiar o item** | Abre um cartão com miniatura, pasta de origem, título executivo, tipo (*Fala* / *Bastidores*), duração, resumo, tags e a posição (`N de M`). O tempo de parada é configurável em 0,5s / 1,0s / 1,5s, ou desativado, no menu de exibição da biblioteca. |
-| **Arrastar sobre a barra** | **Salto calibrado** | Rola continuamente alinhando o **topo do item real** sob o cursor, em vez da proporção crua — o salto para no começo do card, não no meio dele. |
-| **`Shift` + roda do mouse** | **Redimensionar a miniatura** | Com o cartão aberto, aumenta ou diminui a miniatura de 80 a 240 px. A escolha fica guardada entre sessões. |
-
----
-
-## ✏️ Renomeação de Mídias na Biblioteca
-
-| Gesto | Ação | Descrição |
-| :--- | :--- | :--- |
-| **Duplo clique no título** | **Editar no lugar** | Troca o título do card por um campo de edição, já com o texto selecionado. |
-| **`Enter`** | **Gravar** | Salva o novo título e volta à exibição normal. |
-| **`Esc`** | **Cancelar** | Descarta a edição e restaura o título anterior. |
-
----
-
-## 📝 Operações do Editor de Títulos e Text Overlay (Player)
-
-| Gesto / Tecla | Ação | Descrição |
-| :--- | :--- | :--- |
-| **Clique na caixa de texto** | **Selecionar Text Box** | Ativa a caixa delimitadora com alças de transformação sobre o monitor Program. |
-| **Arrastar caixa de texto** | **Mover / Reposicionar** | Move o GC ou título livremente com encaixe magnético no centro e bordas da imagem. |
-| **Arrastar alças de canto** | **Redimensionar** | Ajusta proporcionalmente o tamanho da tipografia e da caixa de fundo (*pill*). |
-| **Duplo clique no texto** | **Editar no Lugar** | Transforma o elemento visual do player em campo de digitação direto. |
-| **`Esc` (com texto ativo)** | **Concluir Edição** | Desmarca a caixa de texto e restaura os controles normais do player NLE. |
-
----
-
-## 🛡️ Prevenção Automática de Conflitos de Digitação
-
-- O sistema detecta de forma inteligente se o cursor do usuário está focado em qualquer elemento de formulário (campos de busca, inputs do chatbot, caixas de diálogo para nomear rostos, ou seletores de projetos).
-- **Os atalhos de controle de vídeo e timeline são temporariamente suspensos** nesse estado para permitir uma digitação fluida de textos e evitar que comandos acidentais ativem os players.
+O sistema monitora automaticamente o foco de digitação:
+* Ao focar em caixas de texto (Chatbot de IA, busca semântica, renomeação de mídias, edição de legendas/GCs), **todos os atalhos de playback e timeline são temporariamente suspensos**.
+* Ao pressionar `Esc` ou clicar fora do campo, os atalhos de edição NLE são reativados instantaneamente.

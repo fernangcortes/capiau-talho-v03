@@ -209,6 +209,8 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   mouse pela régua e pelos clipes, miniaturas progressivas e **duplo clique para resetar sliders**
   (posição, escala, rotação, crop e volume).
 
+- **Sistema de Keymap, Perfis NLE e Teclado Visual 1:1.** Motor centralizado com **6 perfis integrados** (*CapIAu*, *Kdenlive*, *Premiere Pro*, *DaVinci Resolve*, *Final Cut Pro* e *Custom*). Inclui simulador de teclado mecânico ANSI TKL em tamanho real com **destaque bidirecional** (hover tecla ↔ manual esquemático), camadas de modificadores (`Shift`, `Ctrl`, `Alt`), **Live Testing HUD** para testar atalhos sem sair do modal, gravação de teclas com detecção de conflitos e exportação/importação JSON.
+
 - **Marcadores teclado-first.** Marcadores de régua e marcadores ancorados ao clipe de vídeo
   (V1 / V2 B-Roll), com caixa flutuante compacta (310 px) que opera sem pausar a reprodução.
   Navegação rápida por teclado (**`M`** cria/edita, **`Tab`** alterna campos, **`Enter`/`Esc`** salva

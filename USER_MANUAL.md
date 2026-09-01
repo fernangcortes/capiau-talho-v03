@@ -860,41 +860,57 @@ Ao lado de cada configuração no painel, passe o mouse sobre o ícone **ⓘ** p
 
 ---
 
-## 🎹 15. Mapa de Atalhos de Teclado NLE
+## 🎹 15. Sistema de Keymap, Perfis NLE & Teclado Visual 1:1
 
-Para máxima agilidade na ilha de edição, utilize os atalhos de teclado profissionais suportados nativamente pelo CapIAu-Talho:
+O **CapIAu-Talho** conta com um motor completo de atalhos e perfis NLE, permitindo que montadores operem o sistema com a ergonomia de seu software de preferência ou customizem teclas livremente.
 
-| Categoria | Atalho | Ação |
+### 🎛️ Perfis NLE Suportados
+No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selecione o perfil ativo:
+1. **🎬 CapIAu Padrão (Default):** Híbrido moderno (`Z` Split, `V` Seleção, `T` Faixa, `Q`/`W` Ripple Trims, `S` Snapping, `M` Marcadores, `A` Alternativas IA).
+2. **🐧 Kdenlive:** Padrão clássico Open Source (`Shift+R` / `X` Split Razor, `S` Seleção, `M` Espaçador, `V` Inserção, `F10` Snapping, `J`/`K`/`L` Shuttle).
+3. **🟣 Adobe Premiere Pro:** Padrão Adobe (`Ctrl+K` / `C` Razor, `A` Seleção de Trilha, `V` Seleção, `S` Snapping, `Q`/`W` Ripple Trims).
+4. **🟡 DaVinci Resolve:** Padrão Blackmagic Design (`Ctrl+\` / `B` Blade, `A` Seleção, `N` Snapping, `Shift+Backspace` Ripple Delete).
+5. **🍏 Apple Final Cut Pro:** Padrão Apple NLE (`Cmd+B` / `B` Blade, `A` Seleção, `N` Snapping, `E` Append, `Alt+[` / `Alt+]` Trims).
+6. **⚙️ Personalizado (Custom):** Mapeamento livre com gravador de teclas, detector de conflitos e exportação/importação JSON.
+
+### ⌨️ Teclado Visual Esquemático 1:1 & Teste ao Vivo
+- **Layout ANSI TKL Mecânico:** Teclado visual responsivo com keycaps proporcionais e pontos indicadores de categoria coloridos.
+- **Destaque Bidirecional:** Passar o mouse sobre uma tecla ilumina a linha correspondente no manual esquemático e faz o scroll automático até ela; passar o mouse no manual ilumina a tecla no teclado virtual.
+- **Camadas de Modificadores:** Botões para alternar entre as camadas `Padrão`, `+ Shift`, `+ Ctrl` e `+ Alt` (com transição em tempo real ao segurar os modificadores no teclado físico).
+- **Live Testing HUD:** Digite qualquer atalho com o modal aberto para ver a tecla acender em neon e o nome e a descrição do comando serem exibidos instantaneamente no rodapé.
+- **Modo Tela Cheia:** Botão de maximizar (<i class="fa-solid fa-expand"></i>) para visualização imersiva em `100vw × 100vh`.
+
+### 📋 Tabela Resumida de Comandos Principais
+
+| Categoria | Atalho (CapIAu) | Ação & Descrição |
 | :--- | :---: | :--- |
-| **Reprodução & Scrubbing** | **`Espaço`** | Play / Pause no player ativo |
-| | **`J`** | Retroceder reprodução (1x, 2x, 4x, 8x) |
-| | **`K`** | Parar reprodução |
-| | **`L`** | Avançar reprodução (1x, 2x, 4x, 8x) |
-| | **`←` / `→`** | Avançar / Retroceder 1 frame |
-| | **`Shift + ←` / `→`** | Saltar 1 segundo |
-| **Ferramentas NLE** | **`V`** | Ferramenta de Seleção Padrão (*Selection Tool*) |
-| | **`T`** | Selecionar Faixa para Frente (*Track Select Forward*) |
-| | **`Shift + T`** | Selecionar Faixa para Trás (*Track Select Backward*) |
-| | **`Shift + Clique`** | Modificador de pista única (com ferramenta de faixa ativa) |
-| **Pontos de Corte** | **`I`** | Marcar ponto de Entrada (*IN*) |
-| | **`O`** | Marcar ponto de Saída (*OUT*) |
+| **Reprodução & Shuttle** | **`Espaço`** | Play / Pause no player ativo |
+| | **`J` / `K` / `L`** | Shuttle Reverso (-1x..-8x), Parar, Avanço (+1.5x..+8x) |
+| | **`K + J` / `K + L`** | Jog frame a frame (Recuar / Avançar 1 frame) |
+| | **`←` / `→`** | Navegar quadro a quadro (1 frame) |
+| | **`↑` / `↓`** | Saltar pontos de corte anteriores ou seguintes |
+| **Pontos de Corte & Inserção** | **`I` / `O`** | Marcar ponto de Entrada (In) e Saída (Out) |
 | | **`Alt + X`** | Limpar pontos de In e Out |
-| | **`E`** | Inserir trecho selecionado na timeline |
-| | **`Shift + E`** | Inserir texto ou fala selecionada na timeline |
-| **Edição na Linha do Tempo** | **`Z`** | Dividir (*Split*) clipe na posição da agulha |
-| | **`U`** | Desvincular (*Unlink*) ou Vincular áudio e vídeo |
-| | **`Delete` / `Backspace`** | Lift Delete de clipe(s) selecionado(s) ou Ripple Delete de Gap |
-| | **`Shift + Delete`** | Ripple Delete de clipe(s) selecionado(s) |
-| | **`Ctrl + Z`** | Desfazer (*Undo*) |
-| | **`Ctrl + Y` / `Ctrl + Shift + Z`** | Refazer (*Redo*) |
-| **Marcadores** | **`M`** | Criar ou editar marcador na agulha |
-| | **`Shift + M`** | Saltar para o próximo marcador |
-| | **`Alt + M`** | Retroceder para o marcador anterior |
+| | **`E`** | Adicionar segmento marcado à timeline (Append) |
+| | **`Shift + E`** | Inserir fala selecionada na transcrição na timeline |
+| **Edição & Ferramentas NLE** | **`Z`** *(ou `Shift+R`/`Ctrl+K`/`B`)* | Dividir clipe na agulha (*Split*) |
+| | **`V`** | Ferramenta de Seleção Padrão |
+| | **`T` / `Shift + T`** | Selecionar Faixa para Frente / Trás (*Shift = 1 faixa*) |
+| | **`Q` / `W`** | Ripple Delete até a agulha (Início→Agulha / Agulha→Fim) |
+| | **`Delete` / `Backspace`** | Lift Delete (clipe) ou Ripple Delete (espaço/gap) |
+| | **`Shift + Delete`** | Ripple Delete de clipe selecionado |
+| | **`U`** | Desvincular / Vincular par de áudio e vídeo |
+| | **`S`** *(ou `F10`/`N`)* | Alternar Snapping magnético global |
+| | **`Alt + ←` / `Alt + →`** | Ajustar ponto de entrada (Trim In em 1 frame) |
+| | **`Shift + ←` / `Shift + →`** | Ajustar ponto de saída (Trim Out em 1 frame) |
+| | **`Ctrl + Z` / `Ctrl + Y`** | Desfazer (*Undo*) / Refazer (*Redo*) |
+| **Marcadores** | **`M`** | Criar ou editar marcador na agulha (popover rápido) |
+| | **`Shift + M` / `Alt + M`** | Pular para o próximo / anterior marcador |
 | | **`Shift + Clique`** | Selecionar múltiplos marcadores para exclusão em lote |
-| **Inteligência Artificial & Players** | **`A`** | Carrossel de alternativas da IA / Abrir Inspetor de Mídia |
-| | **`Q`** | Alternar maximização entre Source Player e Program Player |
-| | **`Enter` / `Y`** | Aceitar sugestão da IA (*Ghost Clip*) selecionada |
-| | **`Esc`** | Fechar modais, desmarcar ou sair do Inspetor de Mídia |
+| **IA & Inspetor** | **`A`** | Carrossel de alternativas da IA (Timeline) ou Inspetor (Biblioteca) |
+| | **`Enter` / `Y`** | Aceitar sugestão da IA (*Ghost Clip*) |
+| | **`Del` (sobre Ghost)** | Rejeitar sugestão da IA |
+| | **`Esc`** | Fechar modais, desmarcar ou sair de campos de texto |
 
 ---
 
