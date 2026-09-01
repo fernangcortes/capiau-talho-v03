@@ -693,17 +693,20 @@ controles intuitivos rápidos:
   Program Player automaticamente**, garantindo que você veja o resultado
   do corte na linha do tempo.
 
-### Workspace \"Estúdio\" (Layout Flexível de Alta Densidade)
+### Layouts Modulares de Edição e Workspace "Estúdio"
 
-- Para decupagens robustas, ative o botão **Estúdio** no topo da tela.
+- **Disposição dos Monitores (Source & Program):**
+  - **Lado a Lado (`side-by-side`):** Formato clássico horizontal com Source à esquerda e Program à direita.
+  - **Empilhados (`stacked`):** Source no topo e Program na base. Neste formato, cabeçalhos e controles de transporte flutuam no *hover* do mouse (`position: absolute`), permitindo aproveitamento de 100% da área útil do vídeo.
+  - Alterne instantaneamente pelo seletor no Header (`Monitores`) ou pelos botões nos cabeçalhos dos players.
 
-- Este modo reorganiza completamente a interface. A biblioteca ganha
-  espaço predominante. Os dois monitores (Source e Program) são
-  empilhados na segunda coluna em formato ultralimpo, onde seus
-  controles de player só aparecem no *hover* do mouse
-  (position:absolute), e a transcrição fica disponível como uma terceira
-  coluna colapsável. A linha do tempo expande em 100% da largura
-  inferior.
+- **Posição da Linha do Tempo (Timeline):**
+  - **Entre os Menus Laterais (`center`):** Timeline contida na coluna central, com as barras laterais estendidas verticalmente.
+  - **Faixa de Baixo (`bottom-full`):** Timeline estendida em 100% de largura total no rodapé da janela, posicionando Biblioteca, Players e Transcrição/Inspetor na linha superior (`.studio-top`).
+  - Alterne pelo seletor no Header (`Timeline`), pelo botão no topo da barra de ferramentas da timeline ou pelo checkbox nas opções de visualização da timeline.
+
+- **Desacoplamento e Persistência:**
+  - Ambas as opções funcionam de forma totalmente independente em qualquer workspace ativa (Padrão, Montagem, Decupagem ou personalizadas), sendo salvas automaticamente no `localStorage` e nos presets customizados de workspace.
 
 - **Altura das Pistas:** Tanto no layout Padrão quanto no Estúdio, você
   pode ajustar a altura das trilhas da timeline de duas formas:
