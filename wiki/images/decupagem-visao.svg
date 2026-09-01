@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 240" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="880" height="240" rx="14" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+
+  <!-- Step 1 -->
+  <g transform="translate(30, 40)">
+    <rect width="180" height="160" rx="10" fill="#161622" stroke="#06b6d4" stroke-width="1.2"/>
+    <text x="20" y="35" fill="#06b6d4" font-family="sans-serif" font-size="13" font-weight="700">1. PYSCENEDETECT</text>
+    <text x="20" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Detecção de Cortes</text>
+    <text x="20" y="85" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Divisão em Beats</text>
+    <text x="20" y="105" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Planos-Sequência</text>
+    <text x="20" y="135" fill="#94a3b8" font-family="sans-serif" font-size="10">Segmentação Real</text>
+  </g>
+
+  <text x="225" y="125" fill="#06b6d4" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 2 -->
+  <g transform="translate(245, 40)">
+    <rect width="180" height="160" rx="10" fill="#161622" stroke="#3b82f6" stroke-width="1.2"/>
+    <text x="20" y="35" fill="#60a5fa" font-family="sans-serif" font-size="13" font-weight="700">2. MOVIMENTO</text>
+    <text x="20" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Estático / Tripé</text>
+    <text x="20" y="85" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Pan / Tilt / Dolly</text>
+    <text x="20" y="105" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Câmera na Mão</text>
+    <text x="20" y="135" fill="#94a3b8" font-family="sans-serif" font-size="10">Optical Flow</text>
+  </g>
+
+  <text x="440" y="125" fill="#3b82f6" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 3 -->
+  <g transform="translate(460, 40)">
+    <rect width="180" height="160" rx="10" fill="#161622" stroke="#8b5cf6" stroke-width="1.2"/>
+    <text x="20" y="35" fill="#a78bfa" font-family="sans-serif" font-size="13" font-weight="700">3. CLIP VETORIAL</text>
+    <text x="20" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Embeddings Locais</text>
+    <text x="20" y="85" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Busca por Conceito</text>
+    <text x="20" y="105" fill="#e2e8f0" font-family="sans-serif" font-size="11">• "Encontrar Similares"</text>
+    <text x="20" y="135" fill="#94a3b8" font-family="sans-serif" font-size="10">ChromaDB Multilíngue</text>
+  </g>
+
+  <text x="655" y="125" fill="#8b5cf6" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 4 -->
+  <g transform="translate(675, 40)">
+    <rect width="175" height="160" rx="10" fill="#161622" stroke="#10b981" stroke-width="1.2"/>
+    <text x="18" y="35" fill="#34d399" font-family="sans-serif" font-size="13" font-weight="700">4. TÍTULOS IA</text>
+    <text x="18" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Título de 3-6 Palavras</text>
+    <text x="18" y="85" fill="#e2e8f0" font-family="sans-serif" font-size="11">• "Zé: Crítica ao corte"</text>
+    <text x="18" y="105" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Substitui C0012.MOV</text>
+    <text x="18" y="135" fill="#94a3b8" font-family="sans-serif" font-size="10">Logging Automático</text>
+  </g>
+</svg>

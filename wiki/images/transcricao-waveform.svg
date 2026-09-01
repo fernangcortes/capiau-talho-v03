@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 240" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="880" height="240" rx="14" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+
+  <!-- Left Box: Speech Text -->
+  <g transform="translate(30, 35)">
+    <rect width="250" height="170" rx="10" fill="#161622" stroke="#06b6d4" stroke-width="1.2"/>
+    <text x="20" y="30" fill="#06b6d4" font-family="sans-serif" font-size="12" font-weight="700">BALÃO DE TRANSCRIÇÃO</text>
+    <rect x="20" y="45" width="80" height="20" rx="4" fill="#06b6d4" fill-opacity="0.2"/>
+    <text x="28" y="59" fill="#06b6d4" font-family="sans-serif" font-size="11" font-weight="700">Maria (Diretora)</text>
+    <text x="20" y="90" fill="#f8fafc" font-family="sans-serif" font-size="11">"O primeiro corte estava longo,</text>
+    <text x="20" y="108" fill="#f8fafc" font-family="sans-serif" font-size="11">mas o ritmo das falas era bom."</text>
+    <rect x="20" y="130" width="210" height="28" rx="6" fill="#1e1e2f" stroke="#8b5cf6"/>
+    <text x="30" y="148" fill="#a78bfa" font-family="sans-serif" font-size="11" font-weight="700">⚡ Shift + E ➔ Envia para V1/A1</text>
+  </g>
+
+  <!-- Arrow -->
+  <text x="295" y="125" fill="#06b6d4" font-family="sans-serif" font-size="22">➔</text>
+
+  <!-- Right Box: Waveform Inspector -->
+  <g transform="translate(330, 35)">
+    <rect width="520" height="170" rx="10" fill="#161622" stroke="#8b5cf6" stroke-width="1.2"/>
+    <text x="25" y="30" fill="#a78bfa" font-family="sans-serif" font-size="12" font-weight="700">🌊 INSPETOR DE FALA &amp; WAVEFORM INTERATIVA</text>
+    
+    <!-- Waveform Graphic -->
+    <rect x="25" y="45" width="470" height="50" rx="6" fill="#0a0a10" stroke="#2d2d42"/>
+    <!-- Simulated wave bars -->
+    <path d="M 35 70 L 45 55 L 55 85 L 65 60 L 75 80 L 85 50 L 95 90 L 105 52 L 115 88 L 125 65 L 135 75 L 145 70 L 165 70 L 175 55 L 185 85 L 195 50 L 205 90 L 215 55 L 225 80 L 235 60 L 245 70 L 265 70 L 275 52 L 285 88 L 295 50 L 305 90 L 315 55 L 325 82 L 335 62 L 345 70 L 365 70 L 375 55 L 385 85 L 395 50 L 405 90 L 415 52 L 425 88 L 435 65 L 445 75 L 455 70 L 485 70" stroke="#06b6d4" stroke-width="2" fill="none"/>
+    
+    <!-- Split Marker -->
+    <line x1="250" y1="45" x2="250" y2="95" stroke="#f43f5e" stroke-width="2"/>
+    <text x="255" y="60" fill="#f43f5e" font-family="sans-serif" font-size="9" font-weight="700">Duplo Clique (Split)</text>
+
+    <!-- Sub-features -->
+    <text x="25" y="125" fill="#e2e8f0" font-family="sans-serif" font-size="11">⏱️ Timestamps no Milissegundo • ✂️ Ajuste Fino de Alças In/Out • 👥 Atribuição de Rosto</text>
+    <text x="25" y="148" fill="#94a3b8" font-family="sans-serif" font-size="10">Gaveta de Pistas: Alertas para silêncios longos e saltos de áudio suspeitos.</text>
+  </g>
+</svg>

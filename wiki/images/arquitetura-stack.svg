@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="880" height="360" rx="14" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+
+  <!-- Left: Frontend -->
+  <g transform="translate(40, 40)">
+    <rect width="240" height="280" rx="12" fill="#161622" stroke="#06b6d4" stroke-width="1.5"/>
+    <text x="25" y="35" fill="#06b6d4" font-family="sans-serif" font-size="14" font-weight="700">🖥️ FRONTEND (SPA)</text>
+    <text x="25" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="12">• Canvas 2D NLE Engine</text>
+    <text x="25" y="90" fill="#e2e8f0" font-family="sans-serif" font-size="12">• Modern Vanilla JS (ES6+)</text>
+    <text x="25" y="115" fill="#e2e8f0" font-family="sans-serif" font-size="12">• Monitor Duplo (Source/Prog)</text>
+    <text x="25" y="140" fill="#e2e8f0" font-family="sans-serif" font-size="12">• Layout Seamless Flat</text>
+    <text x="25" y="165" fill="#e2e8f0" font-family="sans-serif" font-size="12">• WebSocket Live Logs</text>
+    <text x="25" y="190" fill="#e2e8f0" font-family="sans-serif" font-size="12">• Design Glassmorphism</text>
+  </g>
+
+  <!-- Center: Backend & Tasks -->
+  <g transform="translate(320, 40)">
+    <rect width="240" height="280" rx="12" fill="#161622" stroke="#8b5cf6" stroke-width="1.5"/>
+    <text x="25" y="35" fill="#a78bfa" font-family="sans-serif" font-size="14" font-weight="700">⚡ BACKEND (FastAPI)</text>
+    <text x="25" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="12">• REST API Controladores</text>
+    <text x="25" y="90" fill="#e2e8f0" font-family="sans-serif" font-size="12">• TASK_MANAGER Fila BG</text>
+    <text x="25" y="115" fill="#e2e8f0" font-family="sans-serif" font-size="12">• WebSocket Log Stream</text>
+    <text x="25" y="140" fill="#e2e8f0" font-family="sans-serif" font-size="12">• Cancelamento Gracioso</text>
+    <text x="25" y="165" fill="#e2e8f0" font-family="sans-serif" font-size="12">• Python 3.10+ Assíncrono</text>
+    <text x="25" y="190" fill="#e2e8f0" font-family="sans-serif" font-size="12">• Uvicorn High Performance</text>
+  </g>
+
+  <!-- Right: Storage & Engines -->
+  <g transform="translate(600, 40)">
+    <rect width="240" height="280" rx="12" fill="#161622" stroke="#10b981" stroke-width="1.5"/>
+    <text x="25" y="35" fill="#34d399" font-family="sans-serif" font-size="14" font-weight="700">💾 DADOS &amp; IA LOCAL</text>
+    <text x="25" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="12">• SQLite (Cortes &amp; Projetos)</text>
+    <text x="25" y="90" fill="#e2e8f0" font-family="sans-serif" font-size="12">• ChromaDB (Vetores CLIP)</text>
+    <text x="25" y="115" fill="#e2e8f0" font-family="sans-serif" font-size="12">• InsightFace ONNX (CPU)</text>
+    <text x="25" y="140" fill="#e2e8f0" font-family="sans-serif" font-size="12">• PySceneDetect (Cortes)</text>
+    <text x="25" y="165" fill="#e2e8f0" font-family="sans-serif" font-size="12">• FFmpeg 6.0+ Pipeline</text>
+    <text x="25" y="190" fill="#e2e8f0" font-family="sans-serif" font-size="12">• DeepFilterNet Denoise</text>
+  </g>
+
+  <!-- Arrows -->
+  <path d="M 280 180 L 320 180" stroke="#06b6d4" stroke-width="2.5" fill="none"/>
+  <path d="M 560 180 L 600 180" stroke="#8b5cf6" stroke-width="2.5" fill="none"/>
+</svg>

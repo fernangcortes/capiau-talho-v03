@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 180" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+    <linearGradient id="stepCyan" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="880" height="180" rx="14" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+
+  <!-- Step 1 -->
+  <g transform="translate(25, 30)">
+    <rect width="145" height="120" rx="10" fill="#161622" stroke="#06b6d4" stroke-width="1.2"/>
+    <circle cx="28" cy="28" r="14" fill="#06b6d4" fill-opacity="0.2"/>
+    <text x="23" y="33" fill="#06b6d4" font-family="sans-serif" font-size="13" font-weight="700">1</text>
+    <text x="20" y="65" fill="#f8fafc" font-family="sans-serif" font-size="13" font-weight="700">📁 Ingestão</text>
+    <text x="20" y="85" fill="#94a3b8" font-family="sans-serif" font-size="11">Copiar para watch/</text>
+    <text x="20" y="102" fill="#94a3b8" font-family="sans-serif" font-size="11">ou apontar HD</text>
+  </g>
+
+  <text x="180" y="95" fill="#06b6d4" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 2 -->
+  <g transform="translate(198, 30)">
+    <rect width="145" height="120" rx="10" fill="#161622" stroke="#3b82f6" stroke-width="1.2"/>
+    <circle cx="28" cy="28" r="14" fill="#3b82f6" fill-opacity="0.2"/>
+    <text x="23" y="33" fill="#3b82f6" font-family="sans-serif" font-size="13" font-weight="700">2</text>
+    <text x="20" y="65" fill="#f8fafc" font-family="sans-serif" font-size="13" font-weight="700">⚡ Escaneamento</text>
+    <text x="20" y="85" fill="#94a3b8" font-family="sans-serif" font-size="11">Extração FFprobe</text>
+    <text x="20" y="102" fill="#94a3b8" font-family="sans-serif" font-size="11">e Proxies H.264</text>
+  </g>
+
+  <text x="353" y="95" fill="#3b82f6" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 3 -->
+  <g transform="translate(371, 30)">
+    <rect width="145" height="120" rx="10" fill="#161622" stroke="#8b5cf6" stroke-width="1.2"/>
+    <circle cx="28" cy="28" r="14" fill="#8b5cf6" fill-opacity="0.2"/>
+    <text x="23" y="33" fill="#8b5cf6" font-family="sans-serif" font-size="13" font-weight="700">3</text>
+    <text x="20" y="65" fill="#f8fafc" font-family="sans-serif" font-size="13" font-weight="700">🎙️ IA &amp; Decupagem</text>
+    <text x="20" y="85" fill="#94a3b8" font-family="sans-serif" font-size="11">ASR por Palavra</text>
+    <text x="20" y="102" fill="#94a3b8" font-family="sans-serif" font-size="11">e CLIP Visual</text>
+  </g>
+
+  <text x="526" y="95" fill="#8b5cf6" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 4 -->
+  <g transform="translate(544, 30)">
+    <rect width="145" height="120" rx="10" fill="#161622" stroke="#ec4899" stroke-width="1.2"/>
+    <circle cx="28" cy="28" r="14" fill="#ec4899" fill-opacity="0.2"/>
+    <text x="23" y="33" fill="#ec4899" font-family="sans-serif" font-size="13" font-weight="700">4</text>
+    <text x="20" y="65" fill="#f8fafc" font-family="sans-serif" font-size="13" font-weight="700">✂️ Montagem NLE</text>
+    <text x="20" y="85" fill="#94a3b8" font-family="sans-serif" font-size="11">Cortes com Shift+E</text>
+    <text x="20" y="102" fill="#94a3b8" font-family="sans-serif" font-size="11">e J/L-Cuts Nativos</text>
+  </g>
+
+  <text x="699" y="95" fill="#ec4899" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 5 -->
+  <g transform="translate(717, 30)">
+    <rect width="138" height="120" rx="10" fill="#161622" stroke="#10b981" stroke-width="1.2"/>
+    <circle cx="28" cy="28" r="14" fill="#10b981" fill-opacity="0.2"/>
+    <text x="23" y="33" fill="#10b981" font-family="sans-serif" font-size="13" font-weight="700">5</text>
+    <text x="20" y="65" fill="#f8fafc" font-family="sans-serif" font-size="13" font-weight="700">🎬 Exportação</text>
+    <text x="20" y="85" fill="#94a3b8" font-family="sans-serif" font-size="11">OTIO (Kdenlive)</text>
+    <text x="20" y="102" fill="#94a3b8" font-family="sans-serif" font-size="11">XML / Master MP4</text>
+  </g>
+</svg>

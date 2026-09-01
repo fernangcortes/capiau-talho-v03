@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 240" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="880" height="240" rx="14" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+
+  <!-- Step 1 -->
+  <g transform="translate(30, 40)">
+    <rect width="180" height="160" rx="10" fill="#161622" stroke="#06b6d4" stroke-width="1.2"/>
+    <text x="20" y="35" fill="#06b6d4" font-family="sans-serif" font-size="13" font-weight="700">1. DETECÇÃO ONNX</text>
+    <text x="20" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="11">• InsightFace SCRFD</text>
+    <text x="20" y="85" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Otimizado para CPU</text>
+    <text x="20" y="105" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Fotos RAW &amp; Vídeos</text>
+    <text x="20" y="135" fill="#94a3b8" font-family="sans-serif" font-size="10">Local sem Nuvem</text>
+  </g>
+
+  <text x="225" y="125" fill="#06b6d4" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 2 -->
+  <g transform="translate(245, 40)">
+    <rect width="180" height="160" rx="10" fill="#161622" stroke="#3b82f6" stroke-width="1.2"/>
+    <text x="20" y="35" fill="#60a5fa" font-family="sans-serif" font-size="13" font-weight="700">2. VETORIZAÇÃO</text>
+    <text x="20" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="11">• ArcFace 512D</text>
+    <text x="20" y="85" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Assinatura Facial</text>
+    <text x="20" y="105" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Imune a luz/ângulo</text>
+    <text x="20" y="135" fill="#94a3b8" font-family="sans-serif" font-size="10">Vetor Criptografado</text>
+  </g>
+
+  <text x="440" y="125" fill="#3b82f6" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 3 -->
+  <g transform="translate(460, 40)">
+    <rect width="180" height="160" rx="10" fill="#161622" stroke="#8b5cf6" stroke-width="1.2"/>
+    <text x="20" y="35" fill="#a78bfa" font-family="sans-serif" font-size="13" font-weight="700">3. CLUSTERING DBSCAN</text>
+    <text x="20" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Agrupamento Automático</text>
+    <text x="20" y="85" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Unificação de Cenas</text>
+    <text x="20" y="105" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Grupos: Pessoa 01...</text>
+    <text x="20" y="135" fill="#94a3b8" font-family="sans-serif" font-size="10">Deduplicação Inteligente</text>
+  </g>
+
+  <text x="655" y="125" fill="#8b5cf6" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 4 -->
+  <g transform="translate(675, 40)">
+    <rect width="175" height="160" rx="10" fill="#161622" stroke="#10b981" stroke-width="1.2"/>
+    <text x="18" y="35" fill="#34d399" font-family="sans-serif" font-size="13" font-weight="700">4. ROTULAÇÃO EM MASSA</text>
+    <text x="18" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Nomear Personagem</text>
+    <text x="18" y="85" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Aplica a 100+ Clipes</text>
+    <text x="18" y="105" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Busca e Lower Thirds</text>
+    <text x="18" y="135" fill="#94a3b8" font-family="sans-serif" font-size="10">SQLite Persistido</text>
+  </g>
+</svg>

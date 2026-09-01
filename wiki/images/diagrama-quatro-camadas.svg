@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 560" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#f43f5e"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="880" height="560" rx="16" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+
+  <!-- Header -->
+  <text x="40" y="45" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="700">🏗️ As Quatro Camadas do Sistema CapIAu-Talho</text>
+  <text x="40" y="68" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13">Arquitetura Híbrida CPU-First Local e Processamento Multimodal de Alta Performance</text>
+
+  <!-- Flow Arrows connecting layers -->
+  <path d="M 440 175 L 440 195" stroke="#06b6d4" stroke-width="2.5" stroke-dasharray="4,4" fill="none"/>
+  <polygon points="436,195 440,203 444,195" fill="#06b6d4"/>
+
+  <path d="M 440 295 L 440 315" stroke="#8b5cf6" stroke-width="2.5" stroke-dasharray="4,4" fill="none"/>
+  <polygon points="436,315 440,323 444,315" fill="#8b5cf6"/>
+
+  <path d="M 440 415 L 440 435" stroke="#10b981" stroke-width="2.5" stroke-dasharray="4,4" fill="none"/>
+  <polygon points="436,435 440,443 444,435" fill="#10b981"/>
+
+  <!-- CAMADA 1 -->
+  <g transform="translate(40, 95)">
+    <rect width="800" height="80" rx="10" fill="#161622" stroke="#06b6d4" stroke-width="1.2"/>
+    <rect x="0" y="0" width="8" height="80" rx="4" fill="url(#cyanGrad)"/>
+    <text x="25" y="28" fill="#06b6d4" font-family="sans-serif" font-size="12" font-weight="700" letter-spacing="1">CAMADA 1 • INGESTÃO E NORMALIZAÇÃO</text>
+    
+    <!-- Badges -->
+    <rect x="25" y="38" width="230" height="30" rx="6" fill="#1e1e2f" stroke="#2d2d42"/>
+    <text x="35" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="12">📁 watch/ &amp; Discos Externos</text>
+
+    <text x="268" y="58" fill="#06b6d4" font-family="sans-serif" font-size="14">➔</text>
+
+    <rect x="290" y="38" width="220" height="30" rx="6" fill="#1e1e2f" stroke="#2d2d42"/>
+    <text x="300" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="12">⚡ FFprobe &amp; Ingestão In-Place</text>
+
+    <text x="522" y="58" fill="#06b6d4" font-family="sans-serif" font-size="14">➔</text>
+
+    <rect x="545" y="38" width="235" height="30" rx="6" fill="#1e1e2f" stroke="#2d2d42"/>
+    <text x="555" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="12">🎬 Proxies Leves H.264 (720p)</text>
+  </g>
+
+  <!-- CAMADA 2 -->
+  <g transform="translate(40, 215)">
+    <rect width="800" height="80" rx="10" fill="#161622" stroke="#8b5cf6" stroke-width="1.2"/>
+    <rect x="0" y="0" width="8" height="80" rx="4" fill="url(#purpleGrad)"/>
+    <text x="25" y="26" fill="#a78bfa" font-family="sans-serif" font-size="12" font-weight="700" letter-spacing="1">CAMADA 2 • INTELIGÊNCIA &amp; INDEXAÇÃO LOCAL (CPU-FIRST)</text>
+    
+    <!-- Sub-boxes -->
+    <rect x="25" y="38" width="175" height="30" rx="6" fill="#1e1e2f" stroke="#3730a3"/>
+    <text x="35" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="11">🎞️ PySceneDetect (Shots)</text>
+
+    <rect x="210" y="38" width="180" height="30" rx="6" fill="#1e1e2f" stroke="#3730a3"/>
+    <text x="220" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="11">🎙️ ASR Fonético / Diarização</text>
+
+    <rect x="400" y="38" width="185" height="30" rx="6" fill="#1e1e2f" stroke="#3730a3"/>
+    <text x="410" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="11">👥 InsightFace ONNX (CPU)</text>
+
+    <rect x="595" y="38" width="185" height="30" rx="6" fill="#1e1e2f" stroke="#3730a3"/>
+    <text x="605" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="11">🔍 CLIP Local (Vetores)</text>
+  </g>
+
+  <!-- CAMADA 3 -->
+  <g transform="translate(40, 335)">
+    <rect width="800" height="80" rx="10" fill="#161622" stroke="#10b981" stroke-width="1.2"/>
+    <rect x="0" y="0" width="8" height="80" rx="4" fill="url(#emeraldGrad)"/>
+    <text x="25" y="26" fill="#34d399" font-family="sans-serif" font-size="12" font-weight="700" letter-spacing="1">CAMADA 3 • MOTOR NLE &amp; ASSISTÊNCIA DE EDIÇÃO</text>
+    
+    <rect x="25" y="38" width="240" height="30" rx="6" fill="#1e1e2f" stroke="#065f46"/>
+    <text x="35" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="12">✂️ Timeline Canvas 2D Multipista</text>
+
+    <rect x="280" y="38" width="240" height="30" rx="6" fill="#1e1e2f" stroke="#065f46"/>
+    <text x="290" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="12">🤖 Agente Conversacional (RAG)</text>
+
+    <rect x="535" y="38" width="245" height="30" rx="6" fill="#1e1e2f" stroke="#065f46"/>
+    <text x="545" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="12">🔊 LUFS &amp; DeepFilterNet / Auphonic</text>
+  </g>
+
+  <!-- CAMADA 4 -->
+  <g transform="translate(40, 455)">
+    <rect width="800" height="80" rx="10" fill="#161622" stroke="#f59e0b" stroke-width="1.2"/>
+    <rect x="0" y="0" width="8" height="80" rx="4" fill="url(#amberGrad)"/>
+    <text x="25" y="26" fill="#fbbf24" font-family="sans-serif" font-size="12" font-weight="700" letter-spacing="1">CAMADA 4 • EXPORTAÇÃO &amp; INTEROPERABILIDADE NLE (ZERO APRISIONAMENTO)</text>
+    
+    <rect x="25" y="38" width="235" height="30" rx="6" fill="#1e1e2f" stroke="#854d0e"/>
+    <text x="35" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="12">🐧 OpenTimelineIO (.otio) ➔ Kdenlive</text>
+
+    <rect x="275" y="38" width="245" height="30" rx="6" fill="#1e1e2f" stroke="#854d0e"/>
+    <text x="285" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="12">🎬 XML FCP7 ➔ Premiere / Resolve</text>
+
+    <rect x="535" y="38" width="245" height="30" rx="6" fill="#1e1e2f" stroke="#854d0e"/>
+    <text x="545" y="58" fill="#e2e8f0" font-family="sans-serif" font-size="12">📹 Render Direto MP4 / ProRes</text>
+  </g>
+</svg>

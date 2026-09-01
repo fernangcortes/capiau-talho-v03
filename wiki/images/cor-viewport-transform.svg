@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 260" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="880" height="260" rx="14" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+
+  <!-- Left: OCIO Color Pipeline -->
+  <g transform="translate(40, 35)">
+    <rect width="380" height="190" rx="10" fill="#161622" stroke="#8b5cf6" stroke-width="1.2"/>
+    <text x="20" y="30" fill="#a78bfa" font-family="sans-serif" font-size="13" font-weight="700">🌈 GERENCIAMENTO OPENCOLORIO (OCIO)</text>
+    
+    <rect x="20" y="48" width="340" height="35" rx="6" fill="#1e1e2f" stroke="#3730a3"/>
+    <text x="30" y="70" fill="#e2e8f0" font-family="sans-serif" font-size="11">1. Normalização: Full Range (Canon) vs Limited (.MTS)</text>
+
+    <rect x="20" y="92" width="340" height="35" rx="6" fill="#1e1e2f" stroke="#3730a3"/>
+    <text x="30" y="114" fill="#e2e8f0" font-family="sans-serif" font-size="11">2. Criativo: Lift / Gamma / Gain &amp; LUTs 3D (.cube)</text>
+
+    <rect x="20" y="136" width="340" height="35" rx="6" fill="#1e1e2f" stroke="#3730a3"/>
+    <text x="30" y="158" fill="#e2e8f0" font-family="sans-serif" font-size="11">3. Semântico: Extração de Paleta e Tom em Linguagem</text>
+  </g>
+
+  <!-- Right: Viewport Transform / Crop -->
+  <g transform="translate(460, 35)">
+    <rect width="380" height="190" rx="10" fill="#161622" stroke="#06b6d4" stroke-width="1.2"/>
+    <text x="20" y="30" fill="#06b6d4" font-family="sans-serif" font-size="13" font-weight="700">📐 VIEWPORT NLE: TRANSFORMAÇÃO &amp; CROP</text>
+    
+    <!-- Video Preview with Bounding Box Handles -->
+    <rect x="20" y="50" width="180" height="120" rx="6" fill="#0f172a" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="3,3"/>
+    <!-- Handles -->
+    <rect x="16" y="46" width="8" height="8" fill="#06b6d4"/>
+    <rect x="196" y="46" width="8" height="8" fill="#06b6d4"/>
+    <rect x="16" y="166" width="8" height="8" fill="#06b6d4"/>
+    <rect x="196" y="166" width="8" height="8" fill="#06b6d4"/>
+    <circle cx="110" cy="110" r="4" fill="#06b6d4"/>
+
+    <!-- Labels -->
+    <text x="215" y="70" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Posição X e Y Direta</text>
+    <text x="215" y="92" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Escala e Zoom 4K</text>
+    <text x="215" y="114" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Recorte (Crop Handles)</text>
+    <text x="215" y="136" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Rotação e Opacidade</text>
+    <text x="215" y="158" fill="#94a3b8" font-family="sans-serif" font-size="10">Presets: 16:9, 9:16, 2.39:1, 4:3</text>
+  </g>
+</svg>

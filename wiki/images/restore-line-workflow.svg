@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 180" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="880" height="180" rx="14" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+
+  <!-- Step 1 -->
+  <g transform="translate(40, 30)">
+    <rect width="220" height="120" rx="8" fill="#161622" stroke="#8b5cf6" stroke-width="1.2"/>
+    <text x="20" y="35" fill="#a78bfa" font-family="sans-serif" font-size="13" font-weight="700">1. PAINEL EXPANDIDO</text>
+    <text x="20" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Largura Normal (320px)</text>
+    <text x="20" y="85" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Controles visíveis</text>
+    <text x="20" y="105" fill="#94a3b8" font-family="sans-serif" font-size="10">Clique no botão recolher</text>
+  </g>
+
+  <text x="280" y="95" fill="#8b5cf6" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 2 -->
+  <g transform="translate(320, 30)">
+    <rect width="240" height="120" rx="8" fill="#161622" stroke="#06b6d4" stroke-width="1.2"/>
+    <text x="20" y="35" fill="#06b6d4" font-family="sans-serif" font-size="13" font-weight="700">2. LINHA RESTAURADORA 4px</text>
+    <text x="20" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="11">• O painel vai para 0px</text>
+    <text x="20" y="85" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Linha sutil de 4px ativa</text>
+    <text x="20" y="105" fill="#94a3b8" font-family="sans-serif" font-size="10">Anti-Flicker: sem layout shift</text>
+  </g>
+
+  <text x="580" y="95" fill="#06b6d4" font-family="sans-serif" font-size="20">➔</text>
+
+  <!-- Step 3 -->
+  <g transform="translate(620, 30)">
+    <rect width="220" height="120" rx="8" fill="#161622" stroke="#10b981" stroke-width="1.2"/>
+    <text x="20" y="35" fill="#34d399" font-family="sans-serif" font-size="13" font-weight="700">3. RESTAURAÇÃO TOTAL</text>
+    <text x="20" y="65" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Clique na linha de 4px</text>
+    <text x="20" y="85" fill="#e2e8f0" font-family="sans-serif" font-size="11">• Painel reabre suave</text>
+    <text x="20" y="105" fill="#94a3b8" font-family="sans-serif" font-size="10">Aproveitamento 100% tela</text>
+  </g>
+</svg>

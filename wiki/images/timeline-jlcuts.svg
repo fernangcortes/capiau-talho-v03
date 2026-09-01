@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 340" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#14141f"/>
+    </linearGradient>
+    <linearGradient id="videoClip" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="audioClip" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#047857"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="brollClip" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6d28d9"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="880" height="340" rx="14" fill="url(#bgGrad)" stroke="#27273a" stroke-width="1.5"/>
+
+  <!-- J-CUT Section -->
+  <text x="40" y="40" fill="#06b6d4" font-family="sans-serif" font-size="14" font-weight="700" letter-spacing="1">1. J-CUT • O ÁUDIO ANTECIPA A IMAGEM</text>
+  <text x="40" y="60" fill="#94a3b8" font-family="sans-serif" font-size="12">A voz do entrevistado entra aos 00:00, enquanto a imagem só aparece aos 00:03 sobre a cena anterior.</text>
+
+  <!-- J-Cut Tracks -->
+  <g transform="translate(40, 75)">
+    <!-- Track Headers -->
+    <rect x="0" y="0" width="60" height="32" rx="4" fill="#1e1e2f" stroke="#374151"/>
+    <text x="18" y="21" fill="#94a3b8" font-family="sans-serif" font-size="12" font-weight="700">V1</text>
+
+    <rect x="0" y="38" width="60" height="32" rx="4" fill="#1e1e2f" stroke="#374151"/>
+    <text x="18" y="59" fill="#94a3b8" font-family="sans-serif" font-size="12" font-weight="700">A1</text>
+
+    <!-- Clips V1 -->
+    <rect x="70" y="0" width="300" height="32" rx="4" fill="url(#videoClip)" stroke="#475569"/>
+    <text x="85" y="21" fill="#cbd5e1" font-family="sans-serif" font-size="11">Cena Anterior (00:00 - 00:03)</text>
+
+    <rect x="375" y="0" width="425" height="32" rx="4" fill="#1e3a8a" stroke="#3b82f6"/>
+    <text x="390" y="21" fill="#93c5fd" font-family="sans-serif" font-size="11" font-weight="700">🎬 Imagem Entrevistado (Aos 00:03)</text>
+
+    <!-- Clips A1 (Voice starts earlier) -->
+    <rect x="70" y="38" width="160" height="32" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="85" y="59" fill="#94a3b8" font-family="sans-serif" font-size="11">Ambiente</text>
+
+    <rect x="235" y="38" width="565" height="32" rx="4" fill="url(#audioClip)" stroke="#10b981"/>
+    <text x="250" y="59" fill="#ecfdf5" font-family="sans-serif" font-size="11" font-weight="700">🎙️ Voz do Entrevistado (Entra aos 00:00)</text>
+
+    <!-- Visual connector J-shape -->
+    <line x1="235" y1="38" x2="375" y2="32" stroke="#06b6d4" stroke-width="2" stroke-dasharray="3,3"/>
+  </g>
+
+  <!-- L-CUT Section -->
+  <text x="40" y="200" fill="#a78bfa" font-family="sans-serif" font-size="14" font-weight="700" letter-spacing="1">2. L-CUT • O ÁUDIO CONTINUA SOBRE A COBERTURA</text>
+  <text x="40" y="220" fill="#94a3b8" font-family="sans-serif" font-size="12">O vídeo corta para um B-roll na pista V2, mas a voz do entrevistado na pista A1 continua tocando continuamente.</text>
+
+  <!-- L-Cut Tracks -->
+  <g transform="translate(40, 235)">
+    <!-- Track Headers -->
+    <rect x="0" y="0" width="60" height="32" rx="4" fill="#1e1e2f" stroke="#374151"/>
+    <text x="18" y="21" fill="#94a3b8" font-family="sans-serif" font-size="12" font-weight="700">V2</text>
+
+    <rect x="0" y="38" width="60" height="32" rx="4" fill="#1e1e2f" stroke="#374151"/>
+    <text x="18" y="59" fill="#94a3b8" font-family="sans-serif" font-size="12" font-weight="700">A1</text>
+
+    <!-- Clips V2 (B-roll covers) -->
+    <rect x="70" y="0" width="320" height="32" rx="4" fill="#1e3a8a" stroke="#3b82f6"/>
+    <text x="85" y="21" fill="#93c5fd" font-family="sans-serif" font-size="11">Imagem Entrevistado</text>
+
+    <rect x="395" y="0" width="405" height="32" rx="4" fill="url(#brollClip)" stroke="#c084fc"/>
+    <text x="410" y="21" fill="#faf5ff" font-family="sans-serif" font-size="11" font-weight="700">🎞️ B-Roll Cobertura de Set (V2)</text>
+
+    <!-- Clips A1 (Voice continues under B-roll) -->
+    <rect x="70" y="38" width="730" height="32" rx="4" fill="url(#audioClip)" stroke="#10b981"/>
+    <text x="85" y="59" fill="#ecfdf5" font-family="sans-serif" font-size="11" font-weight="700">🎙️ Voz do Entrevistado segue ininterrupta sob o B-Roll</text>
+  </g>
+</svg>
