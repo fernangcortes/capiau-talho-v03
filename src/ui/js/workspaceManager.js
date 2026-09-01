@@ -365,12 +365,26 @@ export class WorkspaceManager {
                 className: "splitter-players"
             });
         }
+
+        const timelineWrapper = document.querySelector(".timeline-canvas-wrapper");
+        if (timelineWrapper) {
+            // 5. Cabeçalho de Trilhas <-> Canvas da Timeline (Horizontal, ajusta largura em pixels dos cabeçalhos)
+            SplitterHelper.initSplitter(timelineWrapper, "#timeline-headers-sidebar", ".timeline-canvas-container", {
+                direction: "horizontal",
+                resizeTarget: "left",
+                unit: "px",
+                minVal: 150,
+                maxVal: 380,
+                defaultVal: 180,
+                className: "splitter-timeline-headers"
+            });
+        }
     }
 
     /** Remove todos os divisores (padrão e studio) da árvore do workspace. */
     removeAllSplitters() {
         document
-            .querySelectorAll(".workspace .panel-splitter, .workspace .panel-splitter-v")
+            .querySelectorAll(".workspace .panel-splitter, .workspace .panel-splitter-v, .timeline-canvas-wrapper .panel-splitter")
             .forEach(s => s.remove());
     }
 
@@ -430,6 +444,20 @@ export class WorkspaceManager {
                 maxVal: 80,
                 defaultVal: 50,
                 className: "splitter-studio-players"
+            });
+        }
+
+        const timelineWrapper = document.querySelector(".timeline-canvas-wrapper");
+        if (timelineWrapper) {
+            // Cabeçalho de Trilhas <-> Canvas da Timeline no modo Studio
+            SplitterHelper.initSplitter(timelineWrapper, "#timeline-headers-sidebar", ".timeline-canvas-container", {
+                direction: "horizontal",
+                resizeTarget: "left",
+                unit: "px",
+                minVal: 150,
+                maxVal: 380,
+                defaultVal: 180,
+                className: "splitter-timeline-headers"
             });
         }
     }
@@ -617,7 +645,8 @@ export class WorkspaceManager {
                 "layout-dim-splitter-studio-lib": getDim("layout-dim-splitter-studio-lib"),
                 "layout-dim-splitter-studio-right": getDim("layout-dim-splitter-studio-right"),
                 "layout-dim-splitter-studio-timeline": getDim("layout-dim-splitter-studio-timeline"),
-                "layout-dim-splitter-studio-players": getDim("layout-dim-splitter-studio-players")
+                "layout-dim-splitter-studio-players": getDim("layout-dim-splitter-studio-players"),
+                "layout-dim-splitter-timeline-headers": getDim("layout-dim-splitter-timeline-headers")
             },
             collapsed: {
                 sidebarLeft: sidebarLeft ? sidebarLeft.classList.contains("collapsed") : false,
@@ -815,6 +844,13 @@ export class WorkspaceManager {
                 const val = customConfig.splitters["layout-dim-splitter-players"];
                 const valStr = typeof val === "number" ? `${val}%` : String(val);
                 sourcePanel.style.flex = `0 0 ${valStr}`;
+            }
+            const timelineHeadersSidebar = document.getElementById("timeline-headers-sidebar");
+            if (timelineHeadersSidebar && customConfig.splitters["layout-dim-splitter-timeline-headers"]) {
+                const val = customConfig.splitters["layout-dim-splitter-timeline-headers"];
+                const valStr = typeof val === "number" ? `${val}px` : String(val);
+                timelineHeadersSidebar.style.width = valStr;
+                timelineHeadersSidebar.style.flex = `0 0 ${valStr}`;
             }
 
             // Re-inicializa divisores para escutar os tamanhos atualizados
@@ -1368,6 +1404,11 @@ export class SplitterHelper {
             isDragging = true;
             splitter.classList.add("active");
 
+            // Grava coordenadas exatas dos painéis no momento do clique
+            const startLeftRect = leftEl.getBoundingClientRect();
+            const startRightRect = rightEl.getBoundingClientRect();
+            const startContainerRect = container.getBoundingClientRect();
+
             // Adiciona classe de resizing ao body para desativar transições e seleções de texto temporariamente
             container.ownerDocument.body.classList.add("layout-resizing");
 
@@ -1385,15 +1426,14 @@ export class SplitterHelper {
 
             const handleMouseMove = (moveEvent) => {
                 if (!isDragging) return;
-                const containerRect = container.getBoundingClientRect();
 
                 if (unit === "px") {
                     let val;
                     if (direction === "horizontal") {
                         if (resizeTarget === "left") {
-                            val = moveEvent.clientX - containerRect.left;
+                            val = moveEvent.clientX - startLeftRect.left;
                         } else {
-                            val = containerRect.right - moveEvent.clientX;
+                            val = startRightRect.right - moveEvent.clientX;
                         }
                         if (val < minVal) val = minVal;
                         if (val > maxVal) val = maxVal;
@@ -1404,9 +1444,9 @@ export class SplitterHelper {
                     } else {
                         // vertical px
                         if (resizeTarget === "left") {
-                            val = moveEvent.clientY - containerRect.top;
+                            val = moveEvent.clientY - startLeftRect.top;
                         } else {
-                            val = containerRect.bottom - moveEvent.clientY;
+                            val = startRightRect.bottom - moveEvent.clientY;
                         }
                         if (val < minVal) val = minVal;
                         if (val > maxVal) val = maxVal;
@@ -1418,15 +1458,15 @@ export class SplitterHelper {
                 } else {
                     // percentual
                     if (direction === "horizontal") {
-                        const offsetX = moveEvent.clientX - containerRect.left;
-                        let pct = (offsetX / containerRect.width) * 100;
+                        const offsetX = moveEvent.clientX - startContainerRect.left;
+                        let pct = (offsetX / startContainerRect.width) * 100;
                         if (pct < minVal) pct = minVal;
                         if (pct > maxVal) pct = maxVal;
 
                         leftEl.style.flex = `0 0 ${pct}%`;
                     } else {
-                        const offsetY = moveEvent.clientY - containerRect.top;
-                        let pct = (offsetY / containerRect.height) * 100;
+                        const offsetY = moveEvent.clientY - startContainerRect.top;
+                        let pct = (offsetY / startContainerRect.height) * 100;
                         if (pct < minVal) pct = minVal;
                         if (pct > maxVal) pct = maxVal;
 

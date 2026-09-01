@@ -1725,6 +1725,28 @@ window.addEventListener("DOMContentLoaded", () => {
             globalTooltip.style.left = `${left}px`;
         });
 
+        // Atualização em tempo real da tooltip global durante arrastes de sliders (evento input)
+        doc.body.addEventListener("input", (e) => {
+            const target = e.target.closest("[data-tooltip]");
+            if (!target) return;
+            if (globalTooltip && globalTooltip.classList.contains("visible")) {
+                const text = target.getAttribute("data-tooltip");
+                if (text) {
+                    globalTooltip.innerHTML = `<div style="font-weight: 400; opacity: 0.95; white-space: pre-line; word-break: break-word;">${escapeHtml(text.trim())}</div>`;
+                    const rect = target.getBoundingClientRect();
+                    const tooltipRect = globalTooltip.getBoundingClientRect();
+                    let left = rect.left + (rect.width - tooltipRect.width) / 2;
+                    const screenMargin = 8;
+                    if (left < screenMargin) {
+                        left = screenMargin;
+                    } else if (left + tooltipRect.width > win.innerWidth - screenMargin) {
+                        left = win.innerWidth - tooltipRect.width - screenMargin;
+                    }
+                    globalTooltip.style.left = `${left}px`;
+                }
+            }
+        });
+
         doc.body.addEventListener("mouseout", (e) => {
             const target = e.target.closest("[data-tooltip]");
             if (!target) return;

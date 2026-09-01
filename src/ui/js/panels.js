@@ -2964,21 +2964,52 @@ export class PanelsManager {
     }
 
     /**
-     * Renderiza os cabeçalhos das pistas (nome, volume, mute, lock, remover)
+     * Renderiza ou atualiza os cabeçalhos das pistas (nome, volume, mute, lock, remover)
      * na sidebar da timeline, espelhando TIMELINE_STATE.tracks.
+     * Utiliza atualização in-place quando a lista de pistas não mudou, evitando reconstruções pesadas de DOM.
      */
     renderTrackHeaders() {
         const container = getActiveElement("timeline-track-headers");
         if (!container) return;
         const doc = container.ownerDocument;
-        container.innerHTML = "";
+        let inner = container.querySelector("#timeline-track-headers-inner");
 
-        const inner = doc.createElement("div");
+        const tracks = TIMELINE_STATE.tracks;
+        const existingRows = inner ? Array.from(inner.children) : [];
+        const canUpdateInPlace = inner && existingRows.length === tracks.length && tracks.every((t, i) => {
+            const row = existingRows[i];
+            const wasHidden = row.classList.contains("restore-line");
+            const isHidden = !!t.hidden;
+            return row.dataset.trackId === String(t.id) && wasHidden === isHidden;
+        });
+
+        if (canUpdateInPlace) {
+            tracks.forEach((track, i) => {
+                const row = existingRows[i];
+                if (track.hidden) return;
+                const h = TIMELINE_STATE.trackHeight(track);
+                const currentH = parseInt(row.style.height, 10);
+                if (currentH !== h) {
+                    row.style.height = `${h}px`;
+                }
+                const isCompact = h < 40;
+                const wasCompact = row.dataset.compact === "true";
+                if (isCompact !== wasCompact) {
+                    row.dataset.compact = isCompact ? "true" : "false";
+                    this.renderTrackRowContent(row, track, h);
+                }
+            });
+            inner.style.transform = `translateY(${-TIMELINE_STATE.scrollTop}px)`;
+            return;
+        }
+
+        container.innerHTML = "";
+        inner = doc.createElement("div");
         inner.id = "timeline-track-headers-inner";
         inner.style.cssText = "position: absolute; top: 0; left: 0; width: 100%; will-change: transform;";
         inner.style.transform = `translateY(${-TIMELINE_STATE.scrollTop}px)`;
 
-        TIMELINE_STATE.tracks.forEach(track => {
+        tracks.forEach(track => {
             const h = TIMELINE_STATE.trackHeight(track);
             const row = doc.createElement("div");
             row.dataset.trackId = track.id;
@@ -3006,192 +3037,266 @@ export class PanelsManager {
             }
 
             row.className = "timeline-header-track";
+            row.dataset.compact = (h < 40) ? "true" : "false";
             row.style.cssText = `height: ${h}px; border-bottom: 1px solid var(--border-glass); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding: 4px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); font-family: var(--font-heading); gap: 4px; overflow: hidden;`;
 
-            if (track.kind === "ai") {
-                if (h >= 40) {
-                    row.innerHTML = `
-                        <div style="display: flex; align-items: center; width: 100%;">
-                            <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: 9px;"></i> ${track.name}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px; margin-top: 2px;">
-                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;"><i class="fa-solid fa-eye"></i></button>
-                            <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
-                        </div>
-                    `;
-                } else {
-                    row.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                            <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: 9px;"></i> ${track.name}</span>
-                            <div style="display: flex; gap: 4px; align-items: center;">
-                                <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;"><i class="fa-solid fa-eye"></i></button>
-                                <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
-                            </div>
-                        </div>
-                    `;
-                }
-                row.querySelector(".btn-track-visibility").addEventListener("click", () => TIMELINE_STATE.toggleTrackVisibility(track.id));
-                row.querySelector(".btn-track-ai-run").addEventListener("click", () => {
-                    const selector = getActiveElement("select-ai-persona");
-                    const persona = selector && selector.value !== "none" ? selector.value : "diretora";
-                    this.runAiTimelineAnalysis(persona);
-                });
-            } else {
-                const isAudio = track.kind === "audio";
-                const isText = track.kind === "text";
-                const muteIcon = track.muted
-                    ? `<i class="fa-solid fa-volume-xmark" style="color: var(--color-rose);"></i>`
-                    : `<i class="fa-solid fa-volume-high"></i>`;
-                const lockIcon = track.locked
-                    ? `<i class="fa-solid fa-lock" style="color: var(--color-rose);"></i>`
-                    : `<i class="fa-solid fa-lock-open"></i>`;
-                const isSyncLocked = track.syncLocked !== undefined ? !!track.syncLocked : true;
-                const syncColor = isSyncLocked ? "var(--color-cyan)" : "var(--text-muted)";
-                const syncBtn = `<button class="btn-track-sync-lock btn-track-action" title="${isSyncLocked ? 'Sync Lock ativado: esta pista acompanha operações de Ripple e Inserção' : 'Sync Lock desativado: esta pista permanece fixa no tempo'}" style="color: ${syncColor}; font-size: 9px;"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>`;
+            this.renderTrackRowContent(row, track, h);
 
-                // Ícones de visibilidade e miniaturas
-                const visibilityIcon = `<i class="fa-solid fa-eye"></i>`;
-                const thumbIcon = track.thumbnailsEnabled
-                    ? `<i class="fa-solid fa-image" style="color: var(--color-cyan);"></i>`
-                    : `<i class="fa-regular fa-image" style="color: var(--text-secondary); opacity: 0.5;"></i>`;
+            // Alça de redimensionamento da altura individual desta pista (borda inferior)
+            row.style.position = "relative";
+            const resizeHandle = doc.createElement("div");
+            resizeHandle.className = "track-resize-handle";
 
-                let kindIcon = "";
-                if (isAudio) {
-                    kindIcon = `<i class="fa-solid fa-music" style="font-size: 8px; color: var(--color-emerald, #10b981);"></i> `;
-                } else if (isText) {
-                    kindIcon = `<i class="fa-solid fa-font" style="font-size: 8px; color: #f59e0b;"></i> `;
-                }
-                const muteBtn = isAudio ? `<button class="btn-track-mute btn-track-action" title="Mutar Trilha" style="color: var(--text-secondary); font-size: 10px;">${muteIcon}</button>` : "";
-                const volumeSlider = isAudio ? `<input type="range" class="slider-track-volume" min="0" max="1" step="0.1" value="${track.volume}" style="width: 100%; height: 3px; accent-color: var(--color-cyan); cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;">` : "";
-                const thumbBtn = (isAudio || isText) ? "" : `<button class="btn-track-thumbnails btn-track-action" title="${track.thumbnailsEnabled ? 'Desativar miniaturas na pista' : 'Ativar miniaturas na pista'}" style="font-size: 9px;">${thumbIcon}</button>`;
-
-                if (h >= 40) {
-                    row.innerHTML = `
-                        <div style="display: flex; align-items: center; width: 100%;">
-                            <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">${kindIcon}${track.id} ${track.name}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 6px; margin-top: 2px;">
-                            <div style="display: flex; gap: 6px; flex-shrink: 0; align-items: center;">
-                                ${thumbBtn}
-                                <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
-                                ${syncBtn}
-                                <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
-                                ${muteBtn}
-                            </div>
-                            ${volumeSlider ? `<div style="flex: 1; display: flex; align-items: center; margin-left: 8px;">${volumeSlider}</div>` : ''}
-                            <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px; flex-shrink: 0;"><i class="fa-solid fa-xmark"></i></button>
-                        </div>
-                    `;
-                } else {
-                    row.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px;">
-                            <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">${kindIcon}${track.id} ${track.name}</span>
-                            <div style="display: flex; gap: 4px; flex-shrink: 0;">
-                                ${thumbBtn}
-                                <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
-                                ${syncBtn}
-                                <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
-                                ${muteBtn}
-                                <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
-                            </div>
-                        </div>
-                        ${volumeSlider}
-                    `;
-                }
-
-                row.querySelector(".btn-track-visibility").addEventListener("click", () => TIMELINE_STATE.toggleTrackVisibility(track.id));
-                const btnThumb = row.querySelector(".btn-track-thumbnails");
-                if (btnThumb) btnThumb.addEventListener("click", () => TIMELINE_STATE.toggleTrackThumbnails(track.id));
-                const muteEl = row.querySelector(".btn-track-mute");
-                if (muteEl) muteEl.addEventListener("click", () => TIMELINE_STATE.toggleTrackMute(track.id));
-                row.querySelector(".btn-track-lock").addEventListener("click", () => TIMELINE_STATE.toggleTrackLock(track.id));
-                const syncEl = row.querySelector(".btn-track-sync-lock");
-                if (syncEl) syncEl.addEventListener("click", () => TIMELINE_STATE.toggleTrackSyncLock(track.id));
-                row.querySelector(".btn-track-remove").addEventListener("click", () => {
-                    if (confirm(`Remover a pista "${track.id} ${track.name}"? Os clipes dela serão movidos para outra pista do mesmo tipo.`)) {
-                        if (!TIMELINE_STATE.removeTrack(track.id)) {
-                            alert("Não é possível remover: a timeline precisa de ao menos uma pista de vídeo.");
-                        }
-                    }
-                });
-                const volumeEl = row.querySelector(".slider-track-volume");
-                if (volumeEl) volumeEl.addEventListener("input", (e) => {
-                    TIMELINE_STATE.setTrackVolume(track.id, parseFloat(e.target.value));
-                });
-                row.querySelector(".track-name-label").addEventListener("dblclick", () => {
-                    const newName = prompt("Novo nome da pista:", track.name);
-                    if (newName !== null && newName.trim()) {
-                        TIMELINE_STATE.renameTrack(track.id, newName);
-                    }
-                });
-            }
-
-            // Alça de redimensionamento da altura individual desta pista (borda inferior) se não oculta.
-            if (!track.hidden) {
-                row.style.position = "relative";
-                const resizeHandle = doc.createElement("div");
-                resizeHandle.className = "track-resize-handle";
-
-                let lastClickTime = 0;
-
-                const resetTrackHeight = (e) => {
-                    if (e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                    }
-                    delete track.heightPx;
-                    TIMELINE_STATE.clampScrollTop();
-                    STATE.emit("timelineTracksChanged", TIMELINE_STATE.tracks);
-                };
-
-                resizeHandle.addEventListener("mousedown", (e) => {
+            let lastClickTime = 0;
+            const resetTrackHeight = (e) => {
+                if (e) {
+                    e.preventDefault();
                     e.stopPropagation();
-                    const now = Date.now();
-                    if (now - lastClickTime < 380) {
-                        lastClickTime = 0;
-                        resetTrackHeight(e);
-                        return;
-                    }
-                    lastClickTime = now;
+                }
+                delete track.heightPx;
+                TIMELINE_STATE.clampScrollTop();
+                STATE.emit("timelineTracksChanged", TIMELINE_STATE.tracks);
+            };
 
-                    const startY = e.clientY;
-                    const startH = TIMELINE_STATE.trackHeight(track);
-                    const currentScale = TIMELINE_STATE.trackHeightScale || 1.0;
-                    let isDragging = false;
+            resizeHandle.addEventListener("mousedown", (e) => {
+                e.stopPropagation();
+                const now = Date.now();
+                if (now - lastClickTime < 380) {
+                    lastClickTime = 0;
+                    resetTrackHeight(e);
+                    return;
+                }
+                lastClickTime = now;
 
-                    const onMove = (ev) => {
-                        const delta = ev.clientY - startY;
-                        if (!isDragging && Math.abs(delta) < 3) return;
+                const startY = e.clientY;
+                const startH = TIMELINE_STATE.trackHeight(track);
+                const currentScale = TIMELINE_STATE.trackHeightScale || 1.0;
+                let isDragging = false;
+
+                const onMove = (ev) => {
+                    const delta = ev.clientY - startY;
+                    if (!isDragging && Math.abs(delta) < 3) return;
+                    if (!isDragging) {
                         isDragging = true;
                         doc.body.classList.add("layout-resizing");
-                        const nh = Math.min(240, Math.max(22, startH + delta));
-                        track.heightPx = Math.round(nh / currentScale);
-                        row.style.height = `${nh}px`;
+                    }
+                    const nh = Math.min(240, Math.max(22, startH + delta));
+                    track.heightPx = Math.round(nh / currentScale);
+                    row.style.height = `${nh}px`;
+                    
+                    const isCompact = nh < 40;
+                    const wasCompact = row.dataset.compact === "true";
+                    if (isCompact !== wasCompact) {
+                        row.dataset.compact = isCompact ? "true" : "false";
+                        this.renderTrackRowContent(row, track, nh);
+                    }
+
+                    TIMELINE_STATE.clampScrollTop();
+                    if (this.timelineRenderer) this.timelineRenderer.requestRedraw();
+                };
+
+                const onUp = () => {
+                    doc.body.classList.remove("layout-resizing");
+                    doc.removeEventListener("mousemove", onMove);
+                    doc.removeEventListener("mouseup", onUp);
+                    if (isDragging) {
                         TIMELINE_STATE.clampScrollTop();
-                        if (this.timelineRenderer) this.timelineRenderer.requestRedraw();
-                    };
+                        STATE.emit("timelineTracksChanged", TIMELINE_STATE.tracks);
+                    }
+                };
+                doc.addEventListener("mousemove", onMove);
+                doc.addEventListener("mouseup", onUp);
+            });
 
-                    const onUp = () => {
-                        doc.body.classList.remove("layout-resizing");
-                        doc.removeEventListener("mousemove", onMove);
-                        doc.removeEventListener("mouseup", onUp);
-                        if (isDragging) {
-                            TIMELINE_STATE.clampScrollTop();
-                            STATE.emit("timelineTracksChanged", TIMELINE_STATE.tracks);
-                        }
-                    };
-                    doc.addEventListener("mousemove", onMove);
-                    doc.addEventListener("mouseup", onUp);
-                });
-
-                resizeHandle.addEventListener("dblclick", resetTrackHeight);
-                row.appendChild(resizeHandle);
-            }
+            resizeHandle.addEventListener("dblclick", resetTrackHeight);
+            row.appendChild(resizeHandle);
 
             inner.appendChild(row);
         });
 
         container.appendChild(inner);
+    }
+
+    /** Renderiza os botões e controles internos de uma linha de cabeçalho de pista */
+    renderTrackRowContent(row, track, h) {
+        // Preserva a alça de redimensionamento se já existir
+        const existingHandle = row.querySelector(".track-resize-handle");
+
+        if (track.kind === "ai") {
+            if (h >= 40) {
+                row.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px;">
+                        <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: 9px;"></i> ${track.name}</span>
+                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;"><i class="fa-solid fa-eye"></i></button>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; align-items: center; width: 100%; gap: 4px; margin-top: 2px;">
+                        <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Analisar</button>
+                    </div>
+                `;
+            } else {
+                row.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px;">
+                        <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: 9px;"></i> ${track.name}</span>
+                        <div style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">
+                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;"><i class="fa-solid fa-eye"></i></button>
+                            <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                        </div>
+                    </div>
+                `;
+            }
+            row.querySelector(".btn-track-visibility").addEventListener("click", () => TIMELINE_STATE.toggleTrackVisibility(track.id));
+            row.querySelector(".btn-track-ai-run").addEventListener("click", () => {
+                const selector = getActiveElement("select-ai-persona");
+                const persona = selector && selector.value !== "none" ? selector.value : "diretora";
+                this.runAiTimelineAnalysis(persona);
+            });
+        } else {
+            const isAudio = track.kind === "audio";
+            const isText = track.kind === "text";
+            const trackVol = track.volume !== undefined ? Number(track.volume) : 1.0;
+            const volPct = Math.round(trackVol * 100);
+
+            const muteIcon = track.muted
+                ? `<i class="fa-solid fa-volume-xmark" style="color: var(--color-rose);"></i>`
+                : `<i class="fa-solid fa-volume-high"></i>`;
+            const lockIcon = track.locked
+                ? `<i class="fa-solid fa-lock" style="color: var(--color-rose);"></i>`
+                : `<i class="fa-solid fa-lock-open"></i>`;
+            const isSyncLocked = track.syncLocked !== undefined ? !!track.syncLocked : true;
+            const syncColor = isSyncLocked ? "var(--color-cyan)" : "var(--text-muted)";
+            const syncBtn = `<button class="btn-track-sync-lock btn-track-action" title="${isSyncLocked ? 'Sync Lock ativado: esta pista acompanha operações de Ripple e Inserção' : 'Sync Lock desativado: esta pista permanece fixa no tempo'}" style="color: ${syncColor}; font-size: 9px;"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>`;
+
+            const visibilityIcon = `<i class="fa-solid fa-eye"></i>`;
+            const thumbIcon = track.thumbnailsEnabled
+                ? `<i class="fa-solid fa-image" style="color: var(--color-cyan);"></i>`
+                : `<i class="fa-regular fa-image" style="color: var(--text-secondary); opacity: 0.5;"></i>`;
+
+            let kindIcon = "";
+            if (isAudio) {
+                kindIcon = `<i class="fa-solid fa-music" style="font-size: 8px; color: var(--color-emerald, #10b981);"></i> `;
+            } else if (isText) {
+                kindIcon = `<i class="fa-solid fa-font" style="font-size: 8px; color: #f59e0b;"></i> `;
+            }
+            const muteBtn = isAudio ? `<button class="btn-track-mute btn-track-action" title="Mutar Trilha (Duplo clique para 100%)" style="color: var(--text-secondary); font-size: 10px;">${muteIcon}</button>` : "";
+            const volumeSlider = isAudio ? `<input type="range" class="slider-track-volume" min="0" max="1" step="0.01" value="${trackVol}" data-tooltip="Volume: ${volPct}%" title="Volume: ${volPct}%" style="flex: 1; min-width: 30px;">` : "";
+            const thumbBtn = (isAudio || isText) ? "" : `<button class="btn-track-thumbnails btn-track-action" title="${track.thumbnailsEnabled ? 'Desativar miniaturas na pista' : 'Ativar miniaturas na pista'}" style="font-size: 9px;">${thumbIcon}</button>`;
+
+            if (h >= 40) {
+                row.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px;">
+                        <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${kindIcon}${track.id} ${track.name}</span>
+                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
+                            <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; width: 100%; gap: 6px; margin-top: 2px;">
+                        <div style="display: flex; gap: 6px; flex-shrink: 0; align-items: center;">
+                            ${thumbBtn}
+                            ${syncBtn}
+                            <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
+                            ${muteBtn}
+                        </div>
+                        ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="flex: 1; display: flex; align-items: center; min-width: 40px; gap: 4px; margin-left: 2px;">${volumeSlider}<span class="track-volume-val" style="font-size: 9px; font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
+                    </div>
+                `;
+            } else {
+                row.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px;">
+                        <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${kindIcon}${track.id}</span>
+                        <div style="display: flex; gap: 4px; flex-shrink: 0; align-items: center;">
+                            ${thumbBtn}
+                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
+                            ${syncBtn}
+                            <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
+                            ${muteBtn}
+                            <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                    ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="width: 100%; display: flex; align-items: center; gap: 4px; margin-top: 2px;">${volumeSlider}<span class="track-volume-val" style="font-size: 9px; font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
+                `;
+            }
+
+            row.querySelector(".btn-track-visibility").addEventListener("click", () => TIMELINE_STATE.toggleTrackVisibility(track.id));
+            const btnThumb = row.querySelector(".btn-track-thumbnails");
+            if (btnThumb) btnThumb.addEventListener("click", () => TIMELINE_STATE.toggleTrackThumbnails(track.id));
+            
+            const volumeEl = row.querySelector(".slider-track-volume");
+            const volumeWrapper = row.querySelector(".track-volume-wrapper");
+            const updateVolumeTooltip = (val) => {
+                const pct = Math.round(val * 100);
+                const label = `Volume: ${pct}%`;
+                if (volumeEl) {
+                    volumeEl.setAttribute("data-tooltip", label);
+                    volumeEl.title = label;
+                }
+                if (volumeWrapper) {
+                    volumeWrapper.title = `${label} (Duplo clique para 100%)`;
+                }
+                const valBadge = row.querySelector(".track-volume-val");
+                if (valBadge) {
+                    valBadge.textContent = `${pct}%`;
+                }
+                const globalTip = document.getElementById("global-tooltip");
+                if (globalTip && globalTip.classList.contains("visible")) {
+                    globalTip.innerHTML = `<div style="font-weight: 400; opacity: 0.95; white-space: pre-line; word-break: break-word;">${label}</div>`;
+                }
+            };
+
+            const muteEl = row.querySelector(".btn-track-mute");
+            if (muteEl) {
+                muteEl.addEventListener("click", () => TIMELINE_STATE.toggleTrackMute(track.id));
+                muteEl.addEventListener("dblclick", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (volumeEl) volumeEl.value = 1.0;
+                    TIMELINE_STATE.setTrackVolume(track.id, 1.0);
+                    updateVolumeTooltip(1.0);
+                    if (track.muted) TIMELINE_STATE.toggleTrackMute(track.id);
+                });
+            }
+
+            row.querySelector(".btn-track-lock").addEventListener("click", () => TIMELINE_STATE.toggleTrackLock(track.id));
+            const syncEl = row.querySelector(".btn-track-sync-lock");
+            if (syncEl) syncEl.addEventListener("click", () => TIMELINE_STATE.toggleTrackSyncLock(track.id));
+            row.querySelector(".btn-track-remove").addEventListener("click", () => {
+                if (confirm(`Remover a pista "${track.id} ${track.name}"? Os clipes dela serão movidos para outra pista do mesmo tipo.`)) {
+                    if (!TIMELINE_STATE.removeTrack(track.id)) {
+                        alert("Não é possível remover: a timeline precisa de ao menos uma pista de vídeo.");
+                    }
+                }
+            });
+            
+            if (volumeEl) {
+                volumeEl.addEventListener("input", (e) => {
+                    const val = parseFloat(e.target.value);
+                    TIMELINE_STATE.setTrackVolume(track.id, val);
+                    updateVolumeTooltip(val);
+                });
+                volumeEl.addEventListener("dblclick", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    volumeEl.value = 1.0;
+                    TIMELINE_STATE.setTrackVolume(track.id, 1.0);
+                    updateVolumeTooltip(1.0);
+                    if (track.muted) TIMELINE_STATE.toggleTrackMute(track.id);
+                });
+            }
+            
+            row.querySelector(".track-name-label").addEventListener("dblclick", () => {
+                const newName = prompt("Novo nome da pista:", track.name);
+                if (newName !== null && newName.trim()) {
+                    TIMELINE_STATE.renameTrack(track.id, newName);
+                }
+            });
+        }
+
+        // Restaura a alça de redimensionamento caso tenha sido recriada
+        if (existingHandle && !row.querySelector(".track-resize-handle")) {
+            row.appendChild(existingHandle);
+        }
     }
 
     /** Sincroniza o scroll vertical dos cabeçalhos com o canvas. */

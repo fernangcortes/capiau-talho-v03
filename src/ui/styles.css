@@ -4821,12 +4821,24 @@ mark.search-highlight {
 .center-stage:has(#timeline-panel.collapsed) .splitter-timeline { display: none !important; }
 .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline { display: none !important; }
 .monitors-container:has(.player-panel.maximized) .splitter-players { display: none !important; }
+.timeline-canvas-wrapper:has(#timeline-headers-sidebar.collapsed) .splitter-timeline-headers { display: none !important; }
+.timeline-headers-sidebar.collapsed + .splitter-timeline-headers { display: none !important; }
 
 /* Prevenção de travamentos e transições lentas durante o arraste */
-body.layout-resizing * {
-    transition: none !important;
+body.layout-resizing {
     user-select: none !important;
     -webkit-user-select: none !important;
+}
+body.layout-resizing .workspace,
+body.layout-resizing .workspace > div,
+body.layout-resizing .workspace > section,
+body.layout-resizing .timeline-panel,
+body.layout-resizing .timeline-headers-sidebar,
+body.layout-resizing .timeline-header-track,
+body.layout-resizing .sidebar-left,
+body.layout-resizing .sidebar-right,
+body.layout-resizing .player-panel {
+    transition: none !important;
 }
 
 /* Flat layout sem espaçamento e cantos arredondados quando ancorados no workspace */
@@ -5478,10 +5490,17 @@ select option, .nle-select option {
 
 .timeline-actions-sidebar.collapsed {
     width: 0px !important;
-    padding: 3px 0 !important;
-    opacity: 0;
-    pointer-events: none;
+    flex: 0 0 0px !important;
+    flex-basis: 0px !important;
+    min-width: 0px !important;
+    max-width: 0px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    border: none !important;
     border-right: none !important;
+    overflow: hidden !important;
 }
 
 /* Header toolbar layout for close/cycle buttons */
@@ -5689,13 +5708,21 @@ select option, .nle-select option {
 
 /* ── TRACK HEADERS RETRACION ───────────────────────────────────────── */
 .timeline-headers-sidebar {
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, border-right 0.3s ease;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), flex-basis 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, border-right 0.3s ease;
 }
 .timeline-headers-sidebar.collapsed {
     width: 0px !important;
-    opacity: 0;
-    pointer-events: none;
+    flex: 0 0 0px !important;
+    flex-basis: 0px !important;
+    min-width: 0px !important;
+    max-width: 0px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    border: none !important;
     border-right: none !important;
+    overflow: hidden !important;
 }
 
 /* Restaura a barra de ferramentas (linha finíssima que brilha no hover, sem alterar largura para evitar flicker do canvas) */
@@ -5872,6 +5899,74 @@ select option, .nle-select option {
     transform: scale(1.05);
     background: rgba(34, 197, 94, 0.18) !important;
     box-shadow: 0 0 8px rgba(34, 197, 94, 0.35);
+}
+
+/* ── SPLITTER & VOLUME SLIDER DAS TRILHAS DA TIMELINE ────────────────── */
+.splitter-timeline-headers {
+    width: 4px;
+    height: 100%;
+    background: transparent;
+    cursor: col-resize;
+    z-index: 20;
+    flex-shrink: 0;
+    transition: background 0.2s, box-shadow 0.2s;
+    border-right: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+}
+.splitter-timeline-headers:hover,
+.splitter-timeline-headers.active {
+    background: rgba(6, 182, 212, 0.85);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.8);
+}
+
+.track-volume-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.slider-track-volume {
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    height: 3px;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.2s, height 0.15s;
+    box-sizing: border-box;
+}
+.slider-track-volume:hover {
+    background: rgba(255, 255, 255, 0.28);
+    height: 4px;
+}
+.slider-track-volume::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--color-cyan, #06b6d4);
+    cursor: pointer;
+    box-shadow: 0 0 4px rgba(6, 182, 212, 0.6);
+    transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.slider-track-volume:hover::-webkit-slider-thumb {
+    transform: scale(1.25);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.95);
+}
+.slider-track-volume::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--color-cyan, #06b6d4);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 4px rgba(6, 182, 212, 0.6);
+    transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.slider-track-volume:hover::-moz-range-thumb {
+    transform: scale(1.25);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.95);
 }
 
 /* ── NOTIFICAÇÃO FLUTUANTE DE STATUS DE IA ───────────────────────── */
