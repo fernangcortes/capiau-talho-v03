@@ -755,14 +755,14 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         thumbItem.addEventListener("click", () => {
             menu.remove();
             let curTime = 0.0;
-            const sourceVideo = document.getElementById("source-video-player");
+            const sourceVideo = document.getElementById("source-video");
             if (sourceVideo && !isNaN(sourceVideo.currentTime)) {
                 curTime = sourceVideo.currentTime;
             } else if (STATE.activeVideo && STATE.activeVideo.id === item.id && STATE.currentTime !== undefined) {
                 curTime = STATE.currentTime;
             }
-            if (typeof window.setCustomThumbnail === "function") {
-                window.setCustomThumbnail(item.id, curTime);
+            if (typeof window.setVideoThumbnail === "function") {
+                window.setVideoThumbnail(item.id, curTime);
             }
         });
         menu.appendChild(thumbItem);
@@ -7274,12 +7274,44 @@ window.setVideoThumbnail = async function(videoId, timestamp, triggerBtn = null)
             if (target) {
                 target._thumbVersion = ver;
             }
-            const cardImgs = document.querySelectorAll(`.tree-file-item[data-video-id="${videoId}"] .media-thumbnail img`);
-            cardImgs.forEach(img => {
-                img.src = `/api/video/${videoId}/thumbnail?v=${ver}`;
-                img.style.display = "";
+
+            // Atualiza diretamente os cards da biblioteca sem recriar o DOM nem resetar o scroll
+            const cardThumbnails = document.querySelectorAll(`.tree-file-item[data-video-id="${videoId}"] .media-thumbnail`);
+            cardThumbnails.forEach(thumbEl => {
+                let img = thumbEl.querySelector("img");
+                if (img) {
+                    img.src = `/api/video/${videoId}/thumbnail?v=${ver}`;
+                    img.style.display = "";
+                    const icon = thumbEl.querySelector("i.fa-solid");
+                    if (icon) icon.remove();
+                } else {
+                    const fallbackIcon = (target && target.video_type === 'interview') ? 'fa-microphone-lines' : 'fa-film';
+                    const icon = thumbEl.querySelector("i.fa-solid");
+                    if (icon) icon.remove();
+                    img = document.createElement("img");
+                    img.alt = "Thumb";
+                    img.loading = "lazy";
+                    img.decoding = "async";
+                    img.onerror = function() {
+                        this.onerror = null;
+                        this.style.display = 'none';
+                        if (this.parentNode) {
+                            this.parentNode.insertAdjacentHTML('beforeend', `<i class="fa-solid ${fallbackIcon}"></i>`);
+                        }
+                    };
+                    img.src = `/api/video/${videoId}/thumbnail?v=${ver}`;
+                    thumbEl.prepend(img);
+                }
             });
-            STATE.emit("videosUpdated", STATE.allVideos);
+
+            // Atualiza miniaturas nas tarefas caso estejam abertas
+            const taskImgs = document.querySelectorAll(`.task-item[data-video-id="${videoId}"] img, .task-item[data-task-id="thumbs-${videoId}"] img, .task-item[data-task-id="${videoId}"] img`);
+            taskImgs.forEach(img => {
+                img.src = `/api/video/${videoId}/thumbnail?v=${ver}`;
+            });
+
+            // Notifica ouvintes específicos sem acionar rebuild destrutivo da biblioteca
+            STATE.emit("videoThumbnailUpdated", { videoId, version: ver, video: target });
             
             if (triggerBtn) {
                 triggerBtn.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan);"></i>';
@@ -7322,6 +7354,8 @@ window.setVideoThumbnail = async function(videoId, timestamp, triggerBtn = null)
         return false;
     }
 };
+
+window.setCustomThumbnail = window.setVideoThumbnail;
 
 /**
  * Motor de Índice Temático Inteligente e Pré-visualização ao passar o mouse na barra de rolagem (Scroll Peeker).
