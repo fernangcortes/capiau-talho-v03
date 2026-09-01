@@ -497,9 +497,21 @@ export class PanelsManager {
             });
         }
 
-        if (btnCloseHelp && modalHelp) {
-            btnCloseHelp.addEventListener("click", () => {
-                modalHelp.style.display = "none";
+        if (modalHelp) {
+            if (btnCloseHelp) {
+                btnCloseHelp.addEventListener("click", () => {
+                    modalHelp.style.display = "none";
+                });
+            }
+            modalHelp.addEventListener("click", (e) => {
+                if (e.target === modalHelp) {
+                    modalHelp.style.display = "none";
+                }
+            });
+            window.addEventListener("keydown", (e) => {
+                if (e.key === "Escape" && modalHelp.style.display !== "none") {
+                    modalHelp.style.display = "none";
+                }
             });
         }
 

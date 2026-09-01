@@ -2249,88 +2249,173 @@
 
     <!-- Modal de Ajuda de Atalhos e Manual -->
     <div id="modal-timeline-help" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 11000; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
-        <div class="glassmorphism" style="width: 550px; max-height: 80%; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border-glass); border-radius: 12px; padding: 25px; display: flex; flex-direction: column; gap: 15px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.8); overflow-y: auto; box-sizing: border-box;">
-            <h3 style="color: var(--color-cyan); margin: 0; font-family: var(--font-heading); display: flex; align-items: center; gap: 10px; font-size: 16px;">
-                <i class="fa-solid fa-keyboard"></i> Guia Rápido & Atalhos de Teclado
-            </h3>
-            <button id="btn-close-help" style="position: absolute; top: 15px; right: 15px; border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 16px;"><i class="fa-solid fa-xmark"></i></button>
+        <div class="glassmorphism" style="width: 640px; max-height: 85vh; background: rgba(15, 23, 42, 0.96); border: 1px solid var(--border-glass); border-radius: 12px; padding: 22px 25px; display: flex; flex-direction: column; gap: 14px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow-y: auto; box-sizing: border-box;">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
+                <h3 style="color: var(--color-cyan); margin: 0; font-family: var(--font-heading); display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700;">
+                    <i class="fa-solid fa-keyboard" style="color: var(--color-cyan);"></i> Guia Rápido & Cheat Sheet de Atalhos (NLE)
+                </h3>
+                <button id="btn-close-help" style="border: none; background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-size: 15px; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.color='#fff'; this.style.background='rgba(255,255,255,0.15)';" onmouseout="this.style.color='var(--text-secondary)'; this.style.background='rgba(255,255,255,0.05)';"><i class="fa-solid fa-xmark"></i></button>
+            </div>
             
-            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.6; display: flex; flex-direction: column; gap: 12px;">
-                <p style="margin: 0;">O <strong>CapIAu-Talho</strong> é otimizado para navegação ultra-rápida via teclado. Aqui está o resumo de como operar a Timeline Canvas:</p>
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.55; display: flex; flex-direction: column; gap: 14px;">
+                <p style="margin: 0; font-size: 11.5px; color: rgba(255,255,255,0.75);">O <strong>CapIAu-Talho</strong> segue as convenções universais da indústria cinematográfica e NLE (Premiere, DaVinci Resolve, Final Cut). Veja a referência completa de comandos:</p>
                 
-                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">1. Controle de Reprodução (Monitores)</h4>
-                <div style="display: grid; grid-template-columns: 120px 1fr; gap: 6px;">
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Espaço</kbd></div>
-                    <div>Play / Pause no player ativo</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">I</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">O</kbd></div>
-                    <div>Define ponto IN / OUT no Monitor de Origem</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">E</kbd></div>
-                    <div>Insere trecho cortado na Timeline</div>
+                <!-- 1. Controle de Reprodução & Shuttle JKL -->
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
+                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-play" style="color: var(--color-cyan); font-size: 10px;"></i> 1. Controle de Reprodução & Shuttle J-K-L (Players)
+                    </h4>
+                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Espaço</kbd></div>
+                        <div>Play / Pause no player focado (Source ou Program)</div>
+                        
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">J</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">K</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">L</kbd></div>
+                        <div>Shuttle: Reverso (<kbd>J</kbd>), Parar (<kbd>K</kbd>), Avanço (<kbd>L</kbd>) — toques repetidos aumentam a velocidade (1x, 2x, 4x, 8x...)</div>
+                        
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">K + J</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">K + L</kbd></div>
+                        <div>Jog frame a frame: Recuar (<kbd>K+J</kbd>) / Avançar (<kbd>K+L</kbd>) exatamente 1 frame</div>
+                        
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">I</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">O</kbd></div>
+                        <div>Marcar ponto de Entrada (IN) / Saída (OUT) no Monitor de Origem</div>
+                        
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">E</kbd></div>
+                        <div>Inserir trecho marcado (IN ➔ OUT) no final da Timeline (Append)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Setas (← / →)</kbd></div>
+                        <div>Recuar / Avançar 1 frame (quando nenhum clipe estiver selecionado)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Setas (↑ / ↓)</kbd></div>
+                        <div>Source: ir p/ Início ou Fim / IN ou OUT; Program: pular p/ corte anterior (↑) ou próximo (↓)</div>
+                    </div>
                 </div>
 
-                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">2. Pistas Dinâmicas (Multipista)</h4>
-                <p style="margin: 0;">Crie quantas pistas quiser pelo botão <strong>+</strong> no topo da sidebar de trilhas. Cada pista tem <strong>volume, mute, trava (cadeado)</strong> e o modo <strong>ímã <i class="fa-solid fa-magnet" style="font-size: 9px;"></i></strong>: pistas magnéticas (como a V1 Falas) mantêm os clipes grudados em sequência; pistas livres (como a V2 B-Roll) permitem posicionar em qualquer ponto do tempo. Clique duplo no nome renomeia; roda do mouse rola verticalmente quando há muitas pistas.</p>
-                <p style="margin: 0;"><strong>Pista de IA (verde):</strong> recebe as sugestões da análise ✨. Clique numa sugestão para aceitar (vai para a pista de destino) ou rejeitar.</p>
+                <!-- 2. Ferramentas NLE & Modos de Seleção -->
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
+                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-toolbox" style="color: var(--color-cyan); font-size: 10px;"></i> 2. Ferramentas da Timeline & Modos de Seleção
+                    </h4>
+                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">V</kbd></div>
+                        <div>Ferramenta de Seleção Padrão (Select Tool / Seta)</div>
 
-                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">3. Atalhos na Timeline Canvas & Edição NLE</h4>
-                <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px;">
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Q</kbd></div>
-                    <div>Ripple Delete até a Agulha (corta o início do clipe e fecha o espaço)</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">W</kbd></div>
-                    <div>Ripple Delete da Agulha até o Fim (corta o final do clipe e fecha o espaço)</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Z</kbd></div>
-                    <div>Dividir clipe no Playhead (Split)</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">M</kbd></div>
-                    <div>Adicionar / Editar Marcador na Playhead (Box Compacto sem pausar vídeo)</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Tab</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Enter</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Esc</kbd></div>
-                    <div>Navegar campos (Nome ➔ Descrição ➔ Cor), salvar e fechar box instantaneamente</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Shift + Click</kbd></div>
-                    <div>Seleção múltipla de marcadores (borda branca de destaque)</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Shift + M</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Alt + M</kbd></div>
-                    <div>Navegar para o Próximo / Anterior Marcador</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Delete</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Backspace</kbd></div>
-                    <div>Lift Delete (clipe) ou Ripple Delete (gap / marcadores selecionados)</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Shift + Delete</kbd></div>
-                    <div>Ripple Delete do clipe (apaga o clipe e fecha o buraco)</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Setas (← / →)</kbd></div>
-                    <div>Navegar 1 frame / Nudge de clipe selecionado</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Setas (↑ / ↓)</kbd></div>
-                    <div>Mover agulha para o ponto de corte anterior (↑) / próximo (↓)</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Alt + Roda Mouse</kbd></div>
-                    <div>Mover agulha para o corte anterior (rolar p/ cima) / próximo (rolar p/ baixo)</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Alt + Setas</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Shift + Setas</kbd></div>
-                    <div>Trim In (Alt) / Trim Out (Shift) do clipe selecionado em 1 frame</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">[</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">]</kbd></div>
-                    <div>Trim do início / fim do clipe focado</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl + Roda Mouse</kbd></div>
-                    <div>Zoom horizontal na agulha</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Shift + Roda Mouse</kbd></div>
-                    <div>Zoom vertical / altura das pistas</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Botão Meio Drag</kbd></div>
-                    <div>Pan/Scroll horizontal pela timeline</div>
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">T</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + T</kbd></div>
+                        <div>Selecionar Faixa para Frente (<kbd>T</kbd>) / Selecionar Faixa para Trás (<kbd>Shift+T</kbd>)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">S</kbd></div>
+                        <div>Alternar Snapping Magnético global (Ligar / Desligar atração)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Esc</kbd></div>
+                        <div>Desmarcar clipes selecionados / fechar pop-ups e caixas de diálogo</div>
+                    </div>
                 </div>
 
-                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">4. Faixas Fantasmas de IA (Ghost Tracks)</h4>
-                <div style="display: grid; grid-template-columns: 120px 1fr; gap: 6px;">
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Enter</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Y</kbd></div>
-                    <div>Aceitar sugestão de IA e torná-la real</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Del</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">N</kbd></div>
-                    <div>Rejeitar e apagar sugestão / clipe ativo</div>
+                <!-- 3. Edição, Split & Ripple Trims -->
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
+                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-scissors" style="color: var(--color-cyan); font-size: 10px;"></i> 3. Edição, Split & Ripple Trims na Timeline
+                    </h4>
+                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Q</kbd></div>
+                        <div>Ripple Trim In (apaga do início do clipe até a agulha e fecha o espaço)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">W</kbd></div>
+                        <div>Ripple Trim Out (apaga da agulha até o fim do clipe e fecha o espaço)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Z</kbd></div>
+                        <div>Dividir clipe no Playhead (Split / Fatiar corte)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Del</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Backspace</kbd></div>
+                        <div>Lift Delete (apaga clipe mantendo o gap) ou Ripple Delete (ao clicar numa lacuna/gap)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + Del</kbd></div>
+                        <div>Ripple Delete do clipe (apaga o clipe e fecha o espaço em toda a timeline)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Alt + Del</kbd></div>
+                        <div>Apagar apenas o clipe selecionado (desvincula e preserva o par de áudio/vídeo)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">U</kbd></div>
+                        <div>Desvincular par Áudio/Vídeo (A/V) do clipe selecionado</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Alt + Setas</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + Setas</kbd></div>
+                        <div>Trim In (<kbd>Alt+←/→</kbd>) / Trim Out (<kbd>Shift+←/→</kbd>) do clipe selecionado em 1 frame</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">[</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">]</kbd></div>
+                        <div>Nudge trim do início (<kbd>[</kbd>) / fim (<kbd>]</kbd>) do clipe focado</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Setas (← / →)</kbd></div>
+                        <div>Nudge de posição do clipe selecionado em 1 frame para trás / frente</div>
+                    </div>
                 </div>
 
-                <h4 style="color: #fff; margin: 5px 0 2px 0; font-size: 12px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">5. Histórico e Áudio Vinculado (A/V)</h4>
-                <p style="margin: 0;">Todo clipe de vídeo entra com o <strong>áudio vinculado</strong> numa pista de áudio (A1/A2, verde). O par se move junto, mas os <strong>trims são independentes</strong>: estique a borda do clipe de áudio para criar <strong>J-cuts</strong> (áudio entra antes da imagem) e <strong>L-cuts</strong> (áudio continua após o corte).</p>
-                <div style="display: grid; grid-template-columns: 120px 1fr; gap: 6px;">
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl + Z</kbd></div>
-                    <div>Desfazer edição da timeline</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl + Shift + Z</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl + Y</kbd></div>
-                    <div>Refazer edição desfeita</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">U</kbd></div>
-                    <div>Desvincular o par A/V do clipe selecionado</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Del</kbd></div>
-                    <div>Apagar o clipe selecionado + par vinculado</div>
-                    <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Alt + Del</kbd></div>
-                    <div>Apagar só o clipe selecionado (desvincula o par)</div>
+                <!-- 4. Marcadores da Timeline -->
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
+                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-bookmark" style="color: var(--color-cyan); font-size: 10px;"></i> 4. Marcadores da Timeline & Navegação
+                    </h4>
+                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">M</kbd></div>
+                        <div>Criar / Editar Marcador no Playhead (Box rápido compacto sem pausar reprodução)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + M</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Alt + M</kbd></div>
+                        <div>Pular para o Próximo (<kbd>Shift+M</kbd>) / Anterior (<kbd>Alt+M</kbd>) Marcador</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + Click</kbd></div>
+                        <div>Seleção múltipla de marcadores na Timeline</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Tab</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Enter</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Esc</kbd></div>
+                        <div>Navegar campos (Nome ➔ Descrição ➔ Cor), salvar e fechar box instantaneamente</div>
+                    </div>
+                </div>
+
+                <!-- 5. Sugestões de IA & Alternativas -->
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
+                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--color-cyan); font-size: 10px;"></i> 5. Assistência de IA, Tomadas & Alternativas (Ghost Tracks)
+                    </h4>
+                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">A</kbd></div>
+                        <div>Alternar pop-up de Tomadas/Alternativas de IA no clipe selecionado (ou Inspetor na Biblioteca/Rostos)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Enter</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Y</kbd></div>
+                        <div>Aceitar sugestão da faixa fantasma de IA (transforma em clipe real na trilha)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Del</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">N</kbd></div>
+                        <div>Rejeitar e apagar sugestão de IA</div>
+                    </div>
+                </div>
+
+                <!-- 6. Canvas, Zoom, Histórico & Layout -->
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
+                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-sliders" style="color: var(--color-cyan); font-size: 10px;"></i> 6. Canvas, Zoom, Histórico & Workspaces
+                    </h4>
+                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Ctrl + Roda Mouse</kbd></div>
+                        <div>Zoom horizontal na posição da agulha</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + Roda Mouse</kbd></div>
+                        <div>Zoom vertical / altura das faixas de vídeo e áudio</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Botão Meio Drag</kbd></div>
+                        <div>Pan / Rolagem horizontal contínua pela timeline</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Ctrl + Z</kbd></div>
+                        <div>Desfazer última edição na timeline (*Undo*)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Ctrl + Shift + Z</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Ctrl + Y</kbd></div>
+                        <div>Refazer edição desfeita (*Redo*)</div>
+
+                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Ctrl + Shift + S</kbd></div>
+                        <div>Salvar layout atual como Preset de Workspace customizado</div>
+                    </div>
+                </div>
+
+                <!-- 7. Pistas Dinâmicas (Multipista) -->
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
+                    <h4 style="color: #fff; margin: 0 0 6px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-layer-group" style="color: var(--color-cyan); font-size: 10px;"></i> 7. Pistas Dinâmicas (Multipista)
+                    </h4>
+                    <p style="margin: 0; font-size: 11.5px;">Crie quantas pistas precisar pelo botão <strong>+</strong> no topo da sidebar de trilhas. Cada faixa possui <strong>volume, mute, trava (cadeado)</strong> e o modo <strong>ímã <i class="fa-solid fa-magnet" style="font-size: 9px;"></i></strong>: faixas magnéticas (como a V1 Falas) mantêm clipes grudados em sequência automática; faixas livres (como V2 B-Roll) permitem posicionamento em qualquer ponto no tempo.</p>
                 </div>
             </div>
         </div>
