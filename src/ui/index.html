@@ -73,6 +73,29 @@
                 </button>
             </div>
             
+            <!-- Controles de Layout (Monitores & Timeline) -->
+            <div class="project-area glassmorphism layout-controls-group" style="background: rgba(6, 182, 212, 0.08); border-color: rgba(6, 182, 212, 0.25); display: flex; align-items: center; gap: 6px; padding: 2px 8px;">
+                <!-- Seletor de Disposição dos Monitores -->
+                <div style="display: flex; align-items: center; gap: 4px;" data-tooltip="Disposição dos Monitores (Preview & Program)">
+                    <i id="icon-monitors-layout" class="fa-solid fa-table-columns" style="color: var(--color-cyan); font-size: 11px;"></i>
+                    <select id="select-monitors-layout" style="color: var(--color-cyan); max-width: 140px; background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; cursor: pointer;">
+                        <option value="side-by-side">Monitores: Lado a Lado</option>
+                        <option value="stacked">Monitores: Empilhados</option>
+                    </select>
+                </div>
+
+                <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.15);"></div>
+
+                <!-- Seletor de Posição da Timeline -->
+                <div style="display: flex; align-items: center; gap: 4px;" data-tooltip="Posição da Linha do Tempo">
+                    <i id="icon-timeline-position" class="fa-solid fa-arrows-left-right-to-line" style="color: #c084fc; font-size: 11px;"></i>
+                    <select id="select-timeline-position" style="color: #c084fc; max-width: 145px; background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; cursor: pointer;">
+                        <option value="center">Timeline: Entre menus</option>
+                        <option value="bottom-full">Timeline: Faixa de baixo</option>
+                    </select>
+                </div>
+            </div>
+            
             <div class="search-area glassmorphism">
                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
                 <input type="text" id="semantic-search-input" placeholder="Buscar falas ou B-rolls semanticamente (ex: escolha das lentes)...">
@@ -668,6 +691,7 @@
                                 <div class="current-media-title" id="source-player-title" style="font-size: 11px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width: 200px;"></div>
                             </div>
                             <div style="display: flex; gap: 8px; align-items: center;">
+                                <button id="btn-toggle-monitors-layout-source" class="btn-control btn-toggle-monitors-layout" data-tooltip="Alternar Disposição dos Monitores (Lado a Lado / Empilhados)" title="Alternar Monitores: Lado a Lado / Empilhados" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-table-columns" style="transform: rotate(90deg); display: inline-block;"></i></button>
                                 <button id="btn-swap-to-program" class="btn-control btn-swap-player" title="Alternar para Program (Q)" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px; display: none;"><i class="fa-solid fa-right-left"></i></button>
                                 <button id="btn-popout-source" class="btn-control" title="Destacar Player" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-up-right-from-square"></i></button>
                                 <button id="btn-expand-source" class="btn-control" title="Maximizar" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-expand"></i></button>
@@ -717,6 +741,7 @@
                     <section class="player-panel glassmorphism" id="program-player-panel" style="flex: 1; display: flex; flex-direction: column; position: relative;">
                         <div class="player-header" style="display: flex; justify-content: flex-end; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-glass);">
                             <div style="display: flex; gap: 8px; align-items: center;">
+                                <button id="btn-toggle-monitors-layout-program" class="btn-control btn-toggle-monitors-layout" data-tooltip="Alternar Disposição dos Monitores (Lado a Lado / Empilhados)" title="Alternar Monitores: Lado a Lado / Empilhados" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-table-columns" style="transform: rotate(90deg); display: inline-block;"></i></button>
                                 <button id="btn-swap-to-source" class="btn-control btn-swap-player" title="Alternar para Source (Q)" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px; display: none;"><i class="fa-solid fa-right-left"></i></button>
                                 <select id="program-preview-zoom" title="Zoom do Preview" style="font-size: 10px; height: 20px; padding: 0 4px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; border-radius: 4px; outline: none; cursor: pointer;">
                                     <option value="fit">Ajustar</option>
@@ -833,6 +858,7 @@
                                     <button class="btn-toolbar-toggle" id="btn-toggle-toolbar" data-tooltip="Ocultar Barra de Ferramentas"><i class="fa-solid fa-chevron-left"></i></button>
                                     <button class="btn-toolbar-toggle" id="toggle-timeline" data-tooltip="Recolher Painel da Timeline"><i class="fa-solid fa-chevron-down"></i></button>
                                     <button class="btn-toolbar-toggle" id="btn-cycle-columns" data-tooltip="Alternar Colunas (1 ou 2 colunas)"><i class="fa-solid fa-table-cells-large"></i></button>
+                                    <button class="btn-toolbar-toggle" id="btn-toggle-timeline-position" data-tooltip="Alternar Posição da Timeline (Entre Menus / Faixa de Baixo)"><i class="fa-solid fa-window-maximize"></i></button>
                                     <button class="btn-toolbar-toggle" id="btn-popout-timeline" data-tooltip="Destacar em Janela Flutuante"><i class="fa-solid fa-up-right-from-square"></i></button>
                                 </div>
                                 
@@ -921,6 +947,9 @@
                                 </label>
                                 <label style="display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-family: Inter, sans-serif; user-select: none;">
                                     <input type="checkbox" id="chk-timeline-toolbar-top" style="accent-color: var(--color-cyan);"> Barra no topo (entre timeline e players)
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-family: Inter, sans-serif; user-select: none;">
+                                    <input type="checkbox" id="chk-timeline-bottom-full" style="accent-color: var(--color-cyan);"> Timeline na faixa de baixo (largura total)
                                 </label>
                                 <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
                                     <span style="font-size: 9px; color: var(--text-muted); font-family: Inter, sans-serif;">Densidade de Miniaturas:</span>

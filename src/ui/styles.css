@@ -4820,7 +4820,9 @@ mark.search-highlight {
 .workspace:has(#sidebar-right.collapsed) .splitter-sidebar-right { display: none !important; }
 .center-stage:has(#timeline-panel.collapsed) .splitter-timeline { display: none !important; }
 .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline { display: none !important; }
-.monitors-container:has(.player-panel.maximized) .splitter-players { display: none !important; }
+.monitors-container:has(.player-panel.maximized) .splitter-players,
+.monitors-container:has(.player-panel.maximized) .splitter-studio-players,
+.monitors-container:has(.player-panel.maximized) .splitter-players-v { display: none !important; }
 .timeline-canvas-wrapper:has(#timeline-headers-sidebar.collapsed) .splitter-timeline-headers { display: none !important; }
 .timeline-headers-sidebar.collapsed + .splitter-timeline-headers { display: none !important; }
 
@@ -4922,12 +4924,17 @@ body.layout-resizing .player-panel {
     pointer-events: auto !important;
 }
 
-/* Workspace passa a empilhar: [linha superior] sobre [timeline full-width] */
+/* ==========================================================================
+   ── MODOS DE LAYOUT DESACOPLADOS (TIMELINE E MONITORES) ──
+   ========================================================================== */
+
+/* 1. Posicionamento da Timeline: Na Faixa de Baixo (Full-Width) */
+body.layout-timeline-bottom .workspace,
 body.studio .workspace {
-    flex-direction: column;
+    flex-direction: column !important;
 }
 
-/* Linha superior agrupa as 3 colunas e ocupa o espaço acima da timeline */
+body.layout-timeline-bottom .studio-top,
 body.studio .studio-top {
     display: flex;
     flex: 1;
@@ -4936,24 +4943,15 @@ body.studio .studio-top {
     position: relative;
 }
 
-/* Center-stage vira a coluna do meio contendo apenas os players */
+body.layout-timeline-bottom .studio-top > .center-stage,
 body.studio .studio-top > .center-stage {
     min-width: 0;
     height: 100%;
+    flex: 1;
 }
 
-/* Players empilhados (Source em cima, Program embaixo).
-   !important vence o inline min-height:300px / width:100% / flex:1. */
-body.studio .monitors-container {
-    flex-direction: column !important;
-    width: 100% !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    flex: 1 1 auto !important;
-}
-
-/* Seamless: colunas encostadas, sem cantos nem bordas (a regra base usa `.workspace >`,
-   que não alcança as sidebars quando reparenteadas dentro de .studio-top). */
+body.layout-timeline-bottom .studio-top > .sidebar-left,
+body.layout-timeline-bottom .studio-top > .sidebar-right,
 body.studio .studio-top > .sidebar-left,
 body.studio .studio-top > .sidebar-right {
     border-radius: 0 !important;
@@ -4961,12 +4959,34 @@ body.studio .studio-top > .sidebar-right {
     box-shadow: none !important;
 }
 
-/* ── Players limpos: só vídeo; cabeçalho e controles surgem no hover ── */
-body.studio .player-panel {
-    position: relative;
+body.layout-timeline-bottom .studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib,
+body.studio .studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib { display: none !important; }
+body.layout-timeline-bottom .studio-top:has(#sidebar-right.collapsed) .splitter-studio-right,
+body.studio .studio-top:has(#sidebar-right.collapsed) .splitter-studio-right { display: none !important; }
+body.layout-timeline-bottom .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline,
+body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline { display: none !important; }
+
+/* 2. Disposição dos Monitores: Empilhados (Source Acima, Program Abaixo) */
+body.layout-monitors-stacked .monitors-container,
+.monitors-container.stacked {
+    flex-direction: column !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
 }
-body.studio .player-header,
-body.studio .player-controls {
+
+body.layout-monitors-stacked .player-panel,
+.monitors-container.stacked .player-panel {
+    position: relative;
+    width: 100% !important;
+    min-height: 0 !important;
+}
+
+body.layout-monitors-stacked .player-header,
+body.layout-monitors-stacked .player-controls,
+.monitors-container.stacked .player-header,
+.monitors-container.stacked .player-controls {
     position: absolute;
     left: 0;
     right: 0;
@@ -4976,30 +4996,48 @@ body.studio .player-controls {
     transition: opacity 0.2s ease;
     border: none !important;
 }
-body.studio .player-header {
+
+body.layout-monitors-stacked .player-header,
+.monitors-container.stacked .player-header {
     top: 0;
     background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent);
 }
-body.studio .player-controls {
+
+body.layout-monitors-stacked .player-controls,
+.monitors-container.stacked .player-controls {
     bottom: 0;
     background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
 }
-body.studio .player-panel:hover .player-header,
-body.studio .player-panel:hover .player-controls {
+
+body.layout-monitors-stacked .player-panel:hover .player-header,
+body.layout-monitors-stacked .player-panel:hover .player-controls,
+.monitors-container.stacked .player-panel:hover .player-header,
+.monitors-container.stacked .player-panel:hover .player-controls {
     opacity: 1;
     pointer-events: auto;
 }
 
-/* Vídeo/foto preenchem o painel (remove o cap 52vh do layout padrão) */
-body.studio .video-container video,
-body.studio .video-container img {
+body.layout-monitors-stacked .video-container video,
+body.layout-monitors-stacked .video-container img,
+.monitors-container.stacked .video-container video,
+.monitors-container.stacked .video-container img {
     max-height: none;
 }
 
-/* Ocultar divisores do studio quando o painel adjacente está colapsado */
-body.studio .studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib { display: none !important; }
-body.studio .studio-top:has(#sidebar-right.collapsed) .splitter-studio-right { display: none !important; }
-body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline { display: none !important; }
+/* 3. Disposição dos Monitores: Lado a Lado (Horizontal) */
+body.layout-monitors-side-by-side .monitors-container,
+.monitors-container.side-by-side {
+    flex-direction: row !important;
+    width: 100% !important;
+    height: 100% !important;
+    flex: 1 !important;
+}
+
+body.layout-monitors-side-by-side .player-panel,
+.monitors-container.side-by-side .player-panel {
+    height: 100% !important;
+    min-width: 0 !important;
+}
 
 /* ── CHAT IA WIDESCREEN LAYOUTS ── */
 #chat-container.wide-layout #btn-chat-layout {
