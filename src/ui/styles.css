@@ -841,8 +841,8 @@ button {
 #photo-list.view-mode-grid .tree-folder-children:not([hidden]):not([style*="display: none"]),
 #media-tree-list.view-mode-grid .tree-folder-children:not([hidden]):not([style*="display: none"]),
 .library-tree-list.view-mode-grid .tree-folder-children:not([hidden]):not([style*="display: none"]),
-#video-list.view-mode-grid:not(:has(.tree-folder-container)),
-#photo-list.view-mode-grid:not(:has(.tree-folder-container)),
+#video-list.view-mode-grid,
+#photo-list.view-mode-grid,
 #media-tree-list.view-mode-grid,
 .library-tree-list.view-mode-grid {
     display: grid !important;
@@ -9995,5 +9995,343 @@ input[type="number"] {
 .text-inline-editor-main:focus {
     box-shadow: 0 0 20px rgba(6, 182, 212, 0.7);
 }
+
+/* ── SISTEMA DE KEYMAP & PERFIS NLE ──────────────────────────────────── */
+.keymap-tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 8px;
+}
+
+.btn-tab-keymap {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-tab-keymap:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.btn-tab-keymap.active {
+    background: rgba(6, 182, 212, 0.15);
+    color: var(--color-cyan);
+    border-color: rgba(6, 182, 212, 0.4);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+}
+
+.keymap-table-container {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(10, 15, 26, 0.6);
+    overflow: hidden;
+}
+
+.keymap-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+}
+
+.keymap-table th {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+}
+
+.keymap-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    color: var(--text-primary);
+}
+
+.keymap-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.keymap-badge-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-family: monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.keymap-badge-btn:hover {
+    background: rgba(6, 182, 212, 0.2);
+    border-color: var(--color-cyan);
+    color: var(--color-cyan);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.3);
+}
+
+.keymap-pill-filter {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 10.5px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.keymap-pill-filter:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.keymap-pill-filter.active {
+    background: rgba(6, 182, 212, 0.2);
+    border-color: var(--color-cyan);
+    color: var(--color-cyan);
+    font-weight: 600;
+}
+
+.key-recorder-recording {
+    animation: keyRecorderPulse 1.5s infinite ease-in-out;
+}
+
+@keyframes keyRecorderPulse {
+    0%, 100% {
+        box-shadow: 0 0 15px rgba(6, 182, 212, 0.4), inset 0 0 10px rgba(6, 182, 212, 0.15);
+        border-color: var(--color-cyan);
+    }
+    50% {
+        box-shadow: 0 0 25px rgba(6, 182, 212, 0.8), inset 0 0 15px rgba(6, 182, 212, 0.3);
+        border-color: #38bdf8;
+    }
+}
+
+.btn-keymap-action {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    height: 28px;
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    width: auto !important;
+    min-width: fit-content;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+}
+
+.btn-keymap-action:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.btn-keymap-action.cyan {
+    color: var(--color-cyan);
+    border-color: rgba(6, 182, 212, 0.3);
+    background: rgba(6, 182, 212, 0.08);
+}
+.btn-keymap-action.cyan:hover {
+    background: rgba(6, 182, 212, 0.2);
+    border-color: var(--color-cyan);
+    color: #fff;
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.3);
+}
+
+.btn-keymap-action.rose {
+    color: var(--color-rose);
+    border-color: rgba(244, 63, 94, 0.3);
+    background: rgba(244, 63, 94, 0.08);
+}
+.btn-keymap-action.rose:hover {
+    background: rgba(244, 63, 94, 0.2);
+    border-color: var(--color-rose);
+    color: #fff;
+    box-shadow: 0 0 8px rgba(244, 63, 94, 0.3);
+}
+
+.btn-keymap-row-edit {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    height: 24px;
+    width: 24px;
+    padding: 0;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-keymap-row-edit:hover {
+    background: rgba(6, 182, 212, 0.2);
+    border-color: var(--color-cyan);
+    color: var(--color-cyan);
+}
+
+/* ── MODAL FULLSCREEN / EXPANDIDO ────────────────────────────────────── */
+.modal-fullscreen-container {
+    width: 96vw !important;
+    max-width: 1440px !important;
+    height: 92vh !important;
+    max-height: 94vh !important;
+    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.modal-fullscreen-container.is-maximized {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    padding: 16px 24px !important;
+}
+
+/* ── TECLADO ESQUEMÁTICO REAL RESPONSIVO ──────────────────────────── */
+.vk-blueprint-box {
+    background-color: #090d16;
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 20px 20px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.vk-keycap {
+    height: 38px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    background: #151d2f;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11.5px;
+    font-weight: 700;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
+    user-select: none;
+    padding: 0 4px;
+}
+
+.modal-fullscreen-container.is-maximized .vk-keycap {
+    height: 44px;
+    font-size: 12.5px;
+}
+
+.vk-keycap:hover {
+    background: #1e293b;
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.8), 0 0 8px rgba(6, 182, 212, 0.3);
+}
+
+.vk-keycap.is-pressed, .vk-keycap:active {
+    transform: translateY(2px) !important;
+    box-shadow: 0 0 0 rgba(0,0,0,0), 0 0 14px var(--color-cyan) !important;
+    border-color: var(--color-cyan) !important;
+    background: #0e7490 !important;
+    color: #fff !important;
+}
+
+.vk-keycap.highlight-hover {
+    box-shadow: 0 0 12px var(--color-cyan), 0 0 2px var(--color-cyan) !important;
+    border-color: var(--color-cyan) !important;
+    color: #fff !important;
+}
+
+/* Ponto indicador de função NLE no canto da tecla */
+.vk-key-dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+/* Cores de categorias de atalhos nas teclas */
+.vk-cat-playback { background: rgba(6, 182, 212, 0.22) !important; border-color: rgba(6, 182, 212, 0.5) !important; color: #67e8f9 !important; }
+.vk-cat-tools { background: rgba(245, 158, 11, 0.22) !important; border-color: rgba(245, 158, 11, 0.5) !important; color: #fde047 !important; }
+.vk-cat-edit { background: rgba(139, 92, 246, 0.25) !important; border-color: rgba(139, 92, 246, 0.55) !important; color: #c4b5fd !important; }
+.vk-cat-markers { background: rgba(56, 189, 248, 0.22) !important; border-color: rgba(56, 189, 248, 0.5) !important; color: #7dd3fc !important; }
+.vk-cat-ai { background: rgba(236, 72, 153, 0.25) !important; border-color: rgba(236, 72, 153, 0.55) !important; color: #f472b6 !important; }
+.vk-cat-canvas_history { background: rgba(100, 116, 139, 0.3) !important; border-color: rgba(148, 163, 184, 0.45) !important; color: #e2e8f0 !important; }
+
+/* Larguras flex proporcionais para preencher 100% da largura disponível */
+.vk-w-1u   { flex: 1; min-width: 0; }
+.vk-w-125u { flex: 1.25; min-width: 0; }
+.vk-w-15u  { flex: 1.5; min-width: 0; }
+.vk-w-175u { flex: 1.75; min-width: 0; }
+.vk-w-2u   { flex: 2; min-width: 0; }
+.vk-w-225u { flex: 2.25; min-width: 0; }
+.vk-w-275u { flex: 2.75; min-width: 0; }
+.vk-w-625u { flex: 6.25; min-width: 0; }
+.vk-spacer-1 { width: 14px; flex-shrink: 0; }
+.vk-spacer-2 { width: 10px; flex-shrink: 0; }
+
+/* ── ITENS DO ÍNDICE ESQUEMÁTICO (MANUAL BREAKDOWN) ─────────────────── */
+.vk-schematic-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
+    border-radius: 5px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.vk-schematic-item:hover, .vk-schematic-item.active {
+    background: rgba(6, 182, 212, 0.2) !important;
+    border-color: var(--color-cyan) !important;
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.35);
+    transform: translateX(3px);
+    color: #fff;
+}
+
+
 
 

@@ -8,6 +8,7 @@ import { CapiauTimelineInteraction } from "./timelineInteraction.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames } from "./timelineState.js";
 import { getActiveElement, getActiveQuerySelector } from "./workspaceManager.js";
 import { WaveformManager } from "./waveformManager.js";
+import { KEYMAP_SERVICE, COMMANDS_CATALOG, COMMAND_CATEGORIES, PRESET_NAMES } from "./keymapService.js";
 
 export class PanelsManager {
     constructor() {
@@ -486,34 +487,8 @@ export class PanelsManager {
         STATE.on("timelineVScrollChanged", () => this.syncTrackHeadersScroll());
         this.renderTrackHeaders();
 
-        // Modal de Ajuda / Atalhos de Teclado
-        const btnHelp = document.getElementById("btn-timeline-help");
-        const btnCloseHelp = document.getElementById("btn-close-help");
-        const modalHelp = document.getElementById("modal-timeline-help");
-
-        if (btnHelp && modalHelp) {
-            btnHelp.addEventListener("click", () => {
-                modalHelp.style.display = "flex";
-            });
-        }
-
-        if (modalHelp) {
-            if (btnCloseHelp) {
-                btnCloseHelp.addEventListener("click", () => {
-                    modalHelp.style.display = "none";
-                });
-            }
-            modalHelp.addEventListener("click", (e) => {
-                if (e.target === modalHelp) {
-                    modalHelp.style.display = "none";
-                }
-            });
-            window.addEventListener("keydown", (e) => {
-                if (e.key === "Escape" && modalHelp.style.display !== "none") {
-                    modalHelp.style.display = "none";
-                }
-            });
-        }
+        // Inicializa o Sistema de Keymap & Perfis NLE
+        this.initKeymapManager();
 
         // Foco do teclado para o player Program ao clicar em qualquer parte do painel da timeline
         const timelinePanel = document.getElementById("timeline-panel");
@@ -3440,6 +3415,750 @@ export class PanelsManager {
                 this.updateImportConfirmState();
             }, 1200);
         }
+    }
+
+    // ── SISTEMA DE KEYMAP & PERFIS NLE ────────────────────────────────────
+    initKeymapManager() {
+        const btnHelp = document.getElementById("btn-timeline-help");
+        const btnMaximize = document.getElementById("btn-maximize-help");
+        const modalHelpCard = document.getElementById("modal-timeline-help-card");
+        const btnCloseHelp = document.getElementById("btn-close-help");
+        const modalHelp = document.getElementById("modal-timeline-help");
+        const selectPreset = document.getElementById("select-keymap-preset");
+        const tabBtnVirtual = document.getElementById("tab-btn-keymap-virtual");
+        const tabBtnCheatsheet = document.getElementById("tab-btn-keymap-cheatsheet");
+        const tabBtnEditor = document.getElementById("tab-btn-keymap-editor");
+        const containerVirtual = document.getElementById("container-keymap-virtual");
+        const containerCheatsheet = document.getElementById("container-keymap-cheatsheet");
+        const containerEditor = document.getElementById("container-keymap-editor");
+        const inputSearch = document.getElementById("input-search-keymap");
+        const categoryPills = document.getElementById("keymap-category-pills");
+        const btnExport = document.getElementById("btn-export-keymap");
+        const btnImport = document.getElementById("btn-import-keymap");
+        const fileImport = document.getElementById("file-import-keymap");
+        const btnReset = document.getElementById("btn-reset-keymap");
+
+        this._activeEditorCategory = "all";
+        this._keymapSearchQuery = "";
+        this._vkActiveLayer = "none";
+
+        const refreshAll = () => {
+            if (selectPreset) selectPreset.value = KEYMAP_SERVICE.getActivePreset();
+            const lblPreset = document.getElementById("lbl-active-preset-name");
+            if (lblPreset) {
+                lblPreset.textContent = PRESET_NAMES[KEYMAP_SERVICE.getActivePreset()] || "Personalizado";
+            }
+            this.renderVirtualKeyboardUI();
+            this.renderKeymapCheatsheet();
+            this.renderKeymapEditor(this._activeEditorCategory, this._keymapSearchQuery);
+        };
+
+        if (btnMaximize && modalHelpCard) {
+            btnMaximize.addEventListener("click", () => {
+                modalHelpCard.classList.toggle("is-maximized");
+                const isMax = modalHelpCard.classList.contains("is-maximized");
+                btnMaximize.innerHTML = isMax ? `<i class="fa-solid fa-compress"></i>` : `<i class="fa-solid fa-expand"></i>`;
+                btnMaximize.title = isMax ? "Restaurar Janela" : "Alternar Tela Cheia";
+            });
+        }
+
+        if (btnHelp && modalHelp) {
+            btnHelp.addEventListener("click", () => {
+                modalHelp.style.display = "flex";
+                refreshAll();
+            });
+            if (btnCloseHelp) {
+                btnCloseHelp.addEventListener("click", () => {
+                    modalHelp.style.display = "none";
+                });
+            }
+            modalHelp.addEventListener("click", (e) => {
+                if (e.target === modalHelp) {
+                    modalHelp.style.display = "none";
+                }
+            });
+            window.addEventListener("keydown", (e) => {
+                const recorderModal = document.getElementById("modal-key-recorder");
+                if (recorderModal && recorderModal.style.display !== "none") return;
+                if (e.key === "Escape" && modalHelp.style.display !== "none") {
+                    modalHelp.style.display = "none";
+                }
+            });
+        }
+
+        if (selectPreset) {
+            selectPreset.addEventListener("change", (e) => {
+                KEYMAP_SERVICE.setPreset(e.target.value);
+                refreshAll();
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Perfil alterado para: ${PRESET_NAMES[e.target.value] || e.target.value}`, "info");
+                }
+            });
+        }
+
+        const switchTab = (activeTab) => {
+            [tabBtnVirtual, tabBtnCheatsheet, tabBtnEditor].forEach(btn => {
+                if (btn) btn.classList.remove("active");
+            });
+            if (containerVirtual) containerVirtual.style.display = "none";
+            if (containerCheatsheet) containerCheatsheet.style.display = "none";
+            if (containerEditor) containerEditor.style.display = "none";
+
+            if (activeTab === "virtual") {
+                if (tabBtnVirtual) tabBtnVirtual.classList.add("active");
+                if (containerVirtual) containerVirtual.style.display = "flex";
+                this.renderVirtualKeyboardUI();
+            } else if (activeTab === "cheatsheet") {
+                if (tabBtnCheatsheet) tabBtnCheatsheet.classList.add("active");
+                if (containerCheatsheet) containerCheatsheet.style.display = "flex";
+                this.renderKeymapCheatsheet();
+            } else if (activeTab === "editor") {
+                if (tabBtnEditor) tabBtnEditor.classList.add("active");
+                if (containerEditor) containerEditor.style.display = "flex";
+                this.renderKeymapEditor(this._activeEditorCategory, this._keymapSearchQuery);
+            }
+        };
+
+        if (tabBtnVirtual) tabBtnVirtual.addEventListener("click", () => switchTab("virtual"));
+        if (tabBtnCheatsheet) tabBtnCheatsheet.addEventListener("click", () => switchTab("cheatsheet"));
+        if (tabBtnEditor) tabBtnEditor.addEventListener("click", () => switchTab("editor"));
+
+        if (inputSearch) {
+            inputSearch.addEventListener("input", (e) => {
+                this._keymapSearchQuery = e.target.value.toLowerCase().trim();
+                this.renderKeymapEditor(this._activeEditorCategory, this._keymapSearchQuery);
+            });
+        }
+
+        if (categoryPills) {
+            categoryPills.querySelectorAll(".keymap-pill-filter").forEach(pill => {
+                pill.addEventListener("click", () => {
+                    categoryPills.querySelectorAll(".keymap-pill-filter").forEach(p => p.classList.remove("active"));
+                    pill.classList.add("active");
+                    this._activeEditorCategory = pill.dataset.category || "all";
+                    this.renderKeymapEditor(this._activeEditorCategory, this._keymapSearchQuery);
+                });
+            });
+        }
+
+        if (btnExport) {
+            btnExport.addEventListener("click", () => {
+                KEYMAP_SERVICE.exportJSON();
+                if (typeof window.showToast === "function") {
+                    window.showToast("Atalhos exportados em arquivo JSON", "success");
+                }
+            });
+        }
+
+        if (btnImport && fileImport) {
+            btnImport.addEventListener("click", () => {
+                fileImport.click();
+            });
+            fileImport.addEventListener("change", (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const result = KEYMAP_SERVICE.importJSON(ev.target.result);
+                    if (result.success) {
+                        if (typeof window.showToast === "function") {
+                            window.showToast("Atalhos customizados importados com sucesso!", "success");
+                        }
+                        refreshAll();
+                    } else {
+                        if (typeof window.showToast === "function") {
+                            window.showToast(`Erro na importação: ${result.error}`, "error");
+                        }
+                    }
+                    fileImport.value = "";
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        if (btnReset) {
+            btnReset.addEventListener("click", () => {
+                if (confirm("Deseja restaurar todos os atalhos para os valores de fábrica do CapIAu?")) {
+                    KEYMAP_SERVICE.resetAllToDefault();
+                    refreshAll();
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Atalhos restaurados para o padrão de fábrica", "info");
+                    }
+                }
+            });
+        }
+
+        STATE.on("keymapChanged", () => {
+            refreshAll();
+        });
+
+        this.initVirtualKeyboardEvents();
+        this.initKeyRecorderModal();
+        refreshAll();
+    }
+
+    renderVirtualKeyboardUI() {
+        const reverseMap = KEYMAP_SERVICE.getReverseBindingMap();
+        const keycaps = document.querySelectorAll(".vk-keycap");
+        const activeLayer = this._vkActiveLayer || "none";
+
+        keycaps.forEach(keyEl => {
+            const code = keyEl.dataset.code;
+            if (!code) return;
+
+            // Limpa classes anteriores de categorias
+            keyEl.classList.remove(
+                "vk-cat-playback", "vk-cat-tools", "vk-cat-edit", 
+                "vk-cat-markers", "vk-cat-ai", "vk-cat-canvas_history"
+            );
+
+            // Remove ponto indicador antigo se existir
+            const oldDot = keyEl.querySelector(".vk-key-dot");
+            if (oldDot) oldDot.remove();
+
+            let combo = code;
+            if (activeLayer === "shift") combo = "Shift+" + code;
+            else if (activeLayer === "ctrl") combo = "Ctrl+" + code;
+            else if (activeLayer === "alt") combo = "Alt+" + code;
+
+            const cmd = reverseMap[combo] || (activeLayer === "none" ? reverseMap[code] : null);
+
+            if (cmd) {
+                keyEl.classList.add(`vk-cat-${cmd.category}`);
+                const dot = document.createElement("span");
+                dot.className = "vk-key-dot";
+                if (cmd.category === "playback") dot.style.backgroundColor = "var(--color-cyan)";
+                else if (cmd.category === "tools") dot.style.backgroundColor = "var(--color-amber)";
+                else if (cmd.category === "edit") dot.style.backgroundColor = "var(--color-violet)";
+                else if (cmd.category === "markers") dot.style.backgroundColor = "var(--color-sky)";
+                else if (cmd.category === "ai") dot.style.backgroundColor = "#ec4899";
+                else dot.style.backgroundColor = "#94a3b8";
+                keyEl.appendChild(dot);
+            }
+        });
+
+        this.renderSchematicIndex(reverseMap);
+    }
+
+    renderSchematicIndex(reverseMap) {
+        const listPlayback = document.getElementById("vk-schematic-list-playback");
+        const listEdit = document.getElementById("vk-schematic-list-edit");
+        const listTools = document.getElementById("vk-schematic-list-tools");
+
+        if (!listPlayback || !listEdit || !listTools) return;
+
+        listPlayback.innerHTML = "";
+        listEdit.innerHTML = "";
+        listTools.innerHTML = "";
+
+        if (!reverseMap) {
+            reverseMap = KEYMAP_SERVICE.getReverseBindingMap();
+        }
+
+        // Agrupa por categoria para renderização esquemática
+        Object.entries(reverseMap).forEach(([combo, cmd]) => {
+            const item = document.createElement("div");
+            item.className = "vk-schematic-item";
+            item.dataset.code = combo.split("+").pop();
+            item.dataset.combo = combo;
+
+            const cleanKey = KEYMAP_SERVICE.formatCombo(combo);
+            const cmdName = cmd.label || cmd.name || cmd.id;
+
+            item.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                    <kbd style="padding: 1px 5px; border-radius: 3px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.12); font-family: monospace; font-weight: 700; font-size: 10px; color: var(--color-cyan); white-space: nowrap;">${cleanKey}</kbd>
+                    <span style="font-weight: 600; color: rgba(255,255,255,0.9); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cmdName}</span>
+                </div>
+                <span style="font-size: 9px; color: var(--text-muted); font-family: monospace; margin-left: 4px;">→</span>
+            `;
+
+            // Hover bidirecional: passa no índice -> ilumina a tecla
+            item.addEventListener("mouseenter", () => {
+                this.highlightKeycap(item.dataset.code);
+            });
+            item.addEventListener("mouseleave", () => {
+                this.clearKeymapHighlight();
+            });
+            item.addEventListener("click", () => {
+                this.triggerKeymapFeedback(item.dataset.code, combo, cmd);
+            });
+
+            if (cmd.category === "playback") {
+                listPlayback.appendChild(item);
+            } else if (cmd.category === "edit") {
+                listEdit.appendChild(item);
+            } else {
+                listTools.appendChild(item);
+            }
+        });
+    }
+
+    highlightKeycap(code) {
+        const keyEl = document.querySelector(`.vk-keycap[data-code="${code}"]`);
+        if (keyEl) keyEl.classList.add("highlight-hover");
+    }
+
+    highlightSchematicItem(code, combo) {
+        document.querySelectorAll(".vk-schematic-item").forEach(item => {
+            if (item.dataset.combo === combo || item.dataset.code === code) {
+                item.classList.add("active");
+                item.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            } else {
+                item.classList.remove("active");
+            }
+        });
+    }
+
+    clearKeymapHighlight() {
+        document.querySelectorAll(".vk-keycap").forEach(k => k.classList.remove("highlight-hover"));
+        document.querySelectorAll(".vk-schematic-item").forEach(item => item.classList.remove("active"));
+    }
+
+    triggerKeymapFeedback(code, comboDisplay, cmd) {
+        document.querySelectorAll(".vk-keycap").forEach(k => k.classList.remove("is-pressed"));
+        const keyEl = document.querySelector(`.vk-keycap[data-code="${code}"]`);
+        if (keyEl) {
+            keyEl.classList.add("is-pressed");
+            setTimeout(() => keyEl.classList.remove("is-pressed"), 250);
+        }
+
+        this.highlightSchematicItem(code, comboDisplay);
+
+        const badge = document.getElementById("vk-live-combo-badge");
+        const title = document.getElementById("vk-live-action-title");
+        const desc = document.getElementById("vk-live-action-desc");
+
+        const cleanCombo = KEYMAP_SERVICE.formatCombo(comboDisplay);
+        if (badge) badge.textContent = cleanCombo;
+
+        if (cmd) {
+            const cmdName = cmd.label || cmd.name || cmd.id;
+            if (title) title.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--color-cyan);"></i> <span>${cmdName}</span>`;
+            if (desc) desc.textContent = cmd.description || "Comando atribuído.";
+        } else {
+            if (title) title.innerHTML = `<i class="fa-solid fa-circle-xmark" style="color: var(--text-muted);"></i> <span style="color: var(--text-muted);">Nenhuma ação mapeada</span>`;
+            if (desc) desc.textContent = `Nenhum comando atribuído à combinação [${cleanCombo}] no perfil ativo.`;
+        }
+    }
+
+    initVirtualKeyboardEvents() {
+        const modal = document.getElementById("modal-timeline-help");
+
+        // Botões de camada de modificadores
+        document.querySelectorAll(".vk-mod-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                this._vkActiveLayer = btn.dataset.layer || "none";
+                document.querySelectorAll(".vk-mod-btn").forEach(b => {
+                    if (b === btn) {
+                        b.classList.add("active");
+                        b.style.background = "rgba(6,182,212,0.2)";
+                        b.style.borderColor = "var(--color-cyan)";
+                        b.style.color = "var(--color-cyan)";
+                    } else {
+                        b.classList.remove("active");
+                        b.style.background = "rgba(255,255,255,0.04)";
+                        b.style.borderColor = "rgba(255,255,255,0.08)";
+                        b.style.color = "var(--text-secondary)";
+                    }
+                });
+                this.renderVirtualKeyboardUI();
+            });
+        });
+
+        // Hover bidirecional e clique nas teclas do teclado virtual
+        document.querySelectorAll(".vk-keycap").forEach(keyEl => {
+            keyEl.addEventListener("mouseenter", () => {
+                const code = keyEl.dataset.code;
+                let combo = code;
+                const activeLayer = this._vkActiveLayer || "none";
+                if (activeLayer === "shift") combo = "Shift+" + code;
+                else if (activeLayer === "ctrl") combo = "Ctrl+" + code;
+                else if (activeLayer === "alt") combo = "Alt+" + code;
+
+                const reverseMap = KEYMAP_SERVICE.getReverseBindingMap();
+                const cmd = reverseMap[combo] || (activeLayer === "none" ? reverseMap[code] : null);
+
+                this.highlightSchematicItem(code, combo);
+
+                // Prévia ao vivo no rodapé
+                const badge = document.getElementById("vk-live-combo-badge");
+                const title = document.getElementById("vk-live-action-title");
+                const desc = document.getElementById("vk-live-action-desc");
+                const cleanCombo = KEYMAP_SERVICE.formatCombo(combo);
+
+                if (badge) badge.textContent = cleanCombo;
+                if (cmd) {
+                    const cmdName = cmd.label || cmd.name || cmd.id;
+                    if (title) title.innerHTML = `<i class="fa-solid fa-circle-info" style="color: var(--color-cyan);"></i> <span>${cmdName}</span>`;
+                    if (desc) desc.textContent = cmd.description || "";
+                } else {
+                    if (title) title.innerHTML = `<span style="color: var(--text-muted);">Tecla [${cleanCombo}]</span>`;
+                    if (desc) desc.textContent = "Nenhum comando mapeado nesta tecla para a camada atual.";
+                }
+            });
+
+            keyEl.addEventListener("mouseleave", () => {
+                this.clearKeymapHighlight();
+            });
+
+            keyEl.addEventListener("click", () => {
+                const code = keyEl.dataset.code;
+                let combo = code;
+                const activeLayer = this._vkActiveLayer || "none";
+                if (activeLayer === "shift") combo = "Shift+" + code;
+                else if (activeLayer === "ctrl") combo = "Ctrl+" + code;
+                else if (activeLayer === "alt") combo = "Alt+" + code;
+
+                const reverseMap = KEYMAP_SERVICE.getReverseBindingMap();
+                const cmd = reverseMap[combo] || (activeLayer === "none" ? reverseMap[code] : null);
+
+                this.triggerKeymapFeedback(code, combo, cmd);
+            });
+        });
+
+        // Escuta digitação física de teclas reais dentro do modal
+        window.addEventListener("keydown", (e) => {
+            if (!modal || modal.style.display === "none") return;
+            const recorderModal = document.getElementById("modal-key-recorder");
+            if (recorderModal && recorderModal.style.display !== "none") return;
+
+            // Ignora se estiver digitando no campo de busca do editor
+            if (e.target && e.target.tagName === "INPUT") return;
+
+            // Atualiza camada de modificadores
+            if (e.shiftKey && this._vkActiveLayer !== "shift") {
+                this.setVirtualKeyboardLayer("shift");
+            } else if ((e.ctrlKey || e.metaKey) && this._vkActiveLayer !== "ctrl") {
+                this.setVirtualKeyboardLayer("ctrl");
+            } else if (e.altKey && this._vkActiveLayer !== "alt") {
+                this.setVirtualKeyboardLayer("alt");
+            }
+
+            const parts = [];
+            if (e.ctrlKey || e.metaKey) parts.push("Ctrl");
+            if (e.altKey) parts.push("Alt");
+            if (e.shiftKey) parts.push("Shift");
+
+            let code = e.code;
+            if (!code || code === "Unidentified") {
+                code = e.key.length === 1 ? `Key${e.key.toUpperCase()}` : e.key;
+            }
+            parts.push(code);
+
+            const fullCombo = parts.join("+");
+            const reverseMap = KEYMAP_SERVICE.getReverseBindingMap();
+            const cmd = reverseMap[fullCombo] || reverseMap[code];
+
+            this.triggerKeymapFeedback(code, fullCombo, cmd);
+        });
+
+        window.addEventListener("keyup", (e) => {
+            if (!modal || modal.style.display === "none") return;
+            if (!e.shiftKey && !e.ctrlKey && !e.altKey && this._vkActiveLayer !== "none") {
+                this.setVirtualKeyboardLayer("none");
+            }
+        });
+    }
+
+    setVirtualKeyboardLayer(layer) {
+        this._vkActiveLayer = layer;
+        document.querySelectorAll(".vk-mod-btn").forEach(btn => {
+            if (btn.dataset.layer === layer) {
+                btn.classList.add("active");
+                btn.style.background = "rgba(6,182,212,0.2)";
+                btn.style.borderColor = "var(--color-cyan)";
+                btn.style.color = "var(--color-cyan)";
+            } else {
+                btn.classList.remove("active");
+                btn.style.background = "rgba(255,255,255,0.04)";
+                btn.style.borderColor = "rgba(255,255,255,0.08)";
+                btn.style.color = "var(--text-secondary)";
+            }
+        });
+        this.renderVirtualKeyboardUI();
+    }
+
+    renderKeymapCheatsheet() {
+        const container = document.getElementById("keymap-cheatsheet-content");
+        if (!container) return;
+
+        const categoryIcons = {
+            playback: "fa-play",
+            tools: "fa-toolbox",
+            edit: "fa-scissors",
+            markers: "fa-bookmark",
+            ai: "fa-wand-magic-sparkles",
+            canvas_history: "fa-sliders"
+        };
+
+        const activePreset = KEYMAP_SERVICE.getActivePreset();
+        let html = "";
+
+        // Renderiza cada categoria
+        Object.entries(COMMAND_CATEGORIES).forEach(([catId, catMeta], index) => {
+            const cmds = Object.values(COMMANDS_CATALOG).filter(c => c.category === catId);
+            if (cmds.length === 0) return;
+
+            const icon = categoryIcons[catId] || "fa-keyboard";
+            const catTitle = catMeta.label || catMeta.name || catId;
+
+            html += `
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
+                <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid ${icon}" style="color: var(--color-cyan); font-size: 10px;"></i> ${catTitle}
+                </h4>
+                <div style="display: grid; grid-template-columns: 160px 1fr; gap: 6px; font-size: 11.5px; align-items: center;">
+            `;
+
+            cmds.forEach(cmd => {
+                const badgesHtml = KEYMAP_SERVICE.getShortcutBadgesHTML(cmd.id);
+                html += `
+                    <div>${badgesHtml}</div>
+                    <div style="color: rgba(255,255,255,0.85);">${cmd.description}</div>
+                `;
+            });
+
+            html += `
+                </div>
+            </div>
+            `;
+        });
+
+        // 7. Pistas Dinâmicas (Multipista)
+        html += `
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
+            <h4 style="color: #fff; margin: 0 0 6px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-layer-group" style="color: var(--color-cyan); font-size: 10px;"></i> 7. Pistas Dinâmicas (Multipista)
+            </h4>
+            <p style="margin: 0; font-size: 11.5px; color: rgba(255,255,255,0.85); line-height: 1.5;">
+                Crie quantas pistas precisar pelo botão <strong>+</strong> no topo da sidebar de trilhas. Cada faixa possui <strong>volume, mute, trava (cadeado)</strong> e o modo <strong>ímã <i class="fa-solid fa-magnet" style="font-size: 9px;"></i></strong>: faixas magnéticas mantêm clipes grudados em sequência contínua; faixas livres permitem posicionamento em qualquer ponto no tempo.
+            </p>
+        </div>
+        `;
+
+        container.innerHTML = html;
+    }
+
+    renderKeymapEditor(activeCategory = "all", searchQuery = "") {
+        const tbody = document.getElementById("keymap-editor-table-body");
+        if (!tbody) return;
+
+        let cmds = Object.values(COMMANDS_CATALOG);
+
+        if (activeCategory !== "all") {
+            cmds = cmds.filter(c => c.category === activeCategory);
+        }
+
+        if (searchQuery) {
+            cmds = cmds.filter(c => 
+                (c.label || c.name || c.id).toLowerCase().includes(searchQuery) ||
+                (c.description || "").toLowerCase().includes(searchQuery) ||
+                (c.id || "").toLowerCase().includes(searchQuery)
+            );
+        }
+
+        if (cmds.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 25px; color: var(--text-muted); font-size: 12px;">
+                        Nenhum comando encontrado com os filtros atuais.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        const isCustom = KEYMAP_SERVICE.getActivePreset() === "custom";
+
+        let html = "";
+        let currentCat = "";
+
+        cmds.forEach(cmd => {
+            if (activeCategory === "all" && cmd.category !== currentCat) {
+                currentCat = cmd.category;
+                const catMeta = COMMAND_CATEGORIES[currentCat];
+                const catTitle = catMeta ? (catMeta.label || catMeta.name) : currentCat;
+                html += `
+                    <tr style="background: rgba(255,255,255,0.03);">
+                        <td colspan="4" style="padding: 6px 12px; font-weight: 700; color: var(--color-cyan); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            ${catTitle}
+                        </td>
+                    </tr>
+                `;
+            }
+
+            const badgesHtml = KEYMAP_SERVICE.getShortcutBadgesHTML(cmd.id);
+            const isOverridden = isCustom && KEYMAP_SERVICE.customBindings[cmd.id] !== undefined;
+            const cmdDisplayName = cmd.label || cmd.name || cmd.id;
+
+            html += `
+                <tr data-cmd-id="${cmd.id}">
+                    <td style="font-weight: 600; color: #fff;">
+                        ${cmdDisplayName}
+                        ${isOverridden ? '<span style="font-size: 9px; color: var(--color-cyan); margin-left: 4px; background: rgba(6,182,212,0.15); padding: 1px 4px; border-radius: 3px;">MODIFICADO</span>' : ''}
+                    </td>
+                    <td style="color: var(--text-secondary); font-size: 11px;">
+                        ${cmd.description}
+                    </td>
+                    <td style="text-align: center;">
+                        <button class="keymap-badge-btn btn-trigger-record" data-cmd-id="${cmd.id}" title="Clique para gravar um novo atalho">
+                            ${badgesHtml}
+                            <i class="fa-solid fa-pen-to-square" style="font-size: 10px; margin-left: 4px; opacity: 0.7;"></i>
+                        </button>
+                    </td>
+                    <td style="text-align: center;">
+                        <button class="btn-keymap-row-edit btn-trigger-record" data-cmd-id="${cmd.id}" title="Remapear atalho">
+                            <i class="fa-solid fa-keyboard"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+
+        // Binda eventos de clique para gravar atalho
+        tbody.querySelectorAll(".btn-trigger-record").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const cmdId = btn.getAttribute("data-cmd-id");
+                if (cmdId) {
+                    this.openKeyRecorderModal(cmdId);
+                }
+            });
+        });
+    }
+
+    initKeyRecorderModal() {
+        const modal = document.getElementById("modal-key-recorder");
+        const btnCancelX = document.getElementById("btn-cancel-key-recorder");
+        const btnCancel = document.getElementById("btn-recorder-cancel");
+        const btnSave = document.getElementById("btn-recorder-save");
+        const lblLiveKeys = document.getElementById("lbl-recorder-live-keys");
+        const conflictBox = document.getElementById("key-recorder-conflict-box");
+        const conflictMsg = document.getElementById("lbl-recorder-conflict-msg");
+
+        this._recordedCombo = null;
+        this._recordingCmdId = null;
+
+        const closeModal = () => {
+            if (modal) modal.style.display = "none";
+            this._recordingCmdId = null;
+            this._recordedCombo = null;
+        };
+
+        if (btnCancelX) btnCancelX.addEventListener("click", closeModal);
+        if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+        if (modal) {
+            modal.addEventListener("click", (e) => {
+                if (e.target === modal) closeModal();
+            });
+        }
+
+        const handleKeyRecord = (e) => {
+            if (!this._recordingCmdId || !modal || modal.style.display === "none") return;
+
+            // Ignora teclas modificadoras sozinhas
+            if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) {
+                return;
+            }
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (e.key === "Escape") {
+                closeModal();
+                return;
+            }
+
+            // Normaliza a combinação
+            const parts = [];
+            if (e.ctrlKey || e.metaKey) parts.push("Ctrl");
+            if (e.altKey) parts.push("Alt");
+            if (e.shiftKey) parts.push("Shift");
+
+            let code = e.code;
+            if (!code || code === "Unidentified") {
+                code = e.key.length === 1 ? `Key${e.key.toUpperCase()}` : e.key;
+            }
+            parts.push(code);
+
+            const combo = parts.join("+");
+            this._recordedCombo = combo;
+
+            // Exibição amigável
+            if (lblLiveKeys) {
+                lblLiveKeys.textContent = KEYMAP_SERVICE.formatCombo(combo);
+            }
+
+            if (btnSave) {
+                btnSave.disabled = false;
+            }
+
+            // Checagem de conflitos
+            const conflicts = KEYMAP_SERVICE.findConflicts(combo, this._recordingCmdId);
+            if (conflicts.length > 0) {
+                const confNames = conflicts.map(c => c.label || c.name || c.id).join(", ");
+                if (conflictBox && conflictMsg) {
+                    conflictMsg.textContent = `Atenção: Combinação já usada por: ${confNames}. Se salvar, o atalho será reatribuído para este comando.`;
+                    conflictBox.style.display = "block";
+                }
+            } else {
+                if (conflictBox) conflictBox.style.display = "none";
+            }
+
+            if (e.key === "Enter" && this._recordedCombo) {
+                saveBinding();
+            }
+        };
+
+        const saveBinding = () => {
+            if (!this._recordingCmdId || !this._recordedCombo) return;
+
+            KEYMAP_SERVICE.setCustomBinding(this._recordingCmdId, this._recordedCombo);
+            const cmd = KEYMAP_SERVICE.getCommand(this._recordingCmdId);
+            const cmdName = cmd ? (cmd.label || cmd.name) : this._recordingCmdId;
+
+            if (typeof window.showToast === "function") {
+                window.showToast(`Atalho para "${cmdName}" definido como ${KEYMAP_SERVICE.formatCombo(this._recordedCombo)}`, "success");
+            }
+
+            closeModal();
+            this.renderKeymapCheatsheet();
+            this.renderKeymapEditor(this._activeEditorCategory, this._keymapSearchQuery);
+
+            const selectPreset = document.getElementById("select-keymap-preset");
+            if (selectPreset) selectPreset.value = "custom";
+        };
+
+        if (btnSave) {
+            btnSave.addEventListener("click", saveBinding);
+        }
+
+        window.addEventListener("keydown", handleKeyRecord, true);
+    }
+
+    openKeyRecorderModal(cmdId) {
+        const modal = document.getElementById("modal-key-recorder");
+        const lblCmdName = document.getElementById("lbl-recorder-cmd-name");
+        const lblLiveKeys = document.getElementById("lbl-recorder-live-keys");
+        const conflictBox = document.getElementById("key-recorder-conflict-box");
+        const btnSave = document.getElementById("btn-recorder-save");
+
+        const cmd = KEYMAP_SERVICE.getCommand(cmdId);
+        if (!cmd || !modal) return;
+
+        this._recordingCmdId = cmdId;
+        this._recordedCombo = null;
+
+        if (lblCmdName) lblCmdName.textContent = cmd.label || cmd.name || cmd.id;
+        if (lblLiveKeys) lblLiveKeys.textContent = "Pressione uma tecla ou combinação (ex: Ctrl+K, S, Shift+R)...";
+        if (conflictBox) conflictBox.style.display = "none";
+        if (btnSave) btnSave.disabled = true;
+
+        modal.style.display = "flex";
     }
 }
 

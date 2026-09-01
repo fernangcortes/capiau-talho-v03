@@ -2249,174 +2249,340 @@
 
     <!-- Modal de Ajuda de Atalhos e Manual -->
     <div id="modal-timeline-help" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 11000; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
-        <div class="glassmorphism" style="width: 640px; max-height: 85vh; background: rgba(15, 23, 42, 0.96); border: 1px solid var(--border-glass); border-radius: 12px; padding: 22px 25px; display: flex; flex-direction: column; gap: 14px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow-y: auto; box-sizing: border-box;">
-            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
-                <h3 style="color: var(--color-cyan); margin: 0; font-family: var(--font-heading); display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700;">
-                    <i class="fa-solid fa-keyboard" style="color: var(--color-cyan);"></i> Guia Rápido & Cheat Sheet de Atalhos (NLE)
+        <div id="modal-timeline-help-card" class="glassmorphism modal-fullscreen-container" style="background: rgba(15, 23, 42, 0.98); border: 1px solid var(--border-glass); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow-y: hidden; box-sizing: border-box;">
+            <!-- Cabeçalho com Título, Seletor de Perfil NLE, Maximize e Fechar -->
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; flex-shrink: 0; gap: 15px; flex-wrap: wrap;">
+                <h3 style="color: var(--color-cyan); margin: 0; font-family: var(--font-heading); display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700;">
+                    <i class="fa-solid fa-keyboard" style="color: var(--color-cyan);"></i> Atalhos & Perfis de Teclado (NLE)
                 </h3>
-                <button id="btn-close-help" style="border: none; background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-size: 15px; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.color='#fff'; this.style.background='rgba(255,255,255,0.15)';" onmouseout="this.style.color='var(--text-secondary)'; this.style.background='rgba(255,255,255,0.05)';"><i class="fa-solid fa-xmark"></i></button>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 10.5px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Perfil:</span>
+                        <select id="select-keymap-preset" class="nle-select" style="background: rgba(10, 15, 26, 0.9); color: var(--color-cyan); border: 1px solid var(--border-glass); border-radius: 6px; padding: 3px 8px; font-size: 11.5px; font-weight: 600; outline: none; cursor: pointer;">
+                            <option value="capiau">🎬 CapIAu Padrão</option>
+                            <option value="kdenlive">🐧 Kdenlive</option>
+                            <option value="premiere">🟣 Adobe Premiere Pro</option>
+                            <option value="resolve">🟡 DaVinci Resolve</option>
+                            <option value="finalcut">🍏 Apple Final Cut Pro</option>
+                            <option value="custom">⚙️ Personalizado (Custom)</option>
+                        </select>
+                    </div>
+                    <button id="btn-maximize-help" style="border: none; background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-size: 13px; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Alternar Tela Cheia"><i class="fa-solid fa-expand"></i></button>
+                    <button id="btn-close-help" style="border: none; background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-size: 15px; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
+                </div>
             </div>
-            
-            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.55; display: flex; flex-direction: column; gap: 14px;">
-                <p style="margin: 0; font-size: 11.5px; color: rgba(255,255,255,0.75);">O <strong>CapIAu-Talho</strong> segue as convenções universais da indústria cinematográfica e NLE (Premiere, DaVinci Resolve, Final Cut). Veja a referência completa de comandos:</p>
-                
-                <!-- 1. Controle de Reprodução & Shuttle JKL -->
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
-                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-play" style="color: var(--color-cyan); font-size: 10px;"></i> 1. Controle de Reprodução & Shuttle J-K-L (Players)
-                    </h4>
-                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Espaço</kbd></div>
-                        <div>Play / Pause no player focado (Source ou Program)</div>
-                        
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">J</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">K</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">L</kbd></div>
-                        <div>Shuttle: Reverso (<kbd>J</kbd>), Parar (<kbd>K</kbd>), Avanço (<kbd>L</kbd>) — toques repetidos aumentam a velocidade (1x, 2x, 4x, 8x...)</div>
-                        
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">K + J</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">K + L</kbd></div>
-                        <div>Jog frame a frame: Recuar (<kbd>K+J</kbd>) / Avançar (<kbd>K+L</kbd>) exatamente 1 frame</div>
-                        
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">I</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">O</kbd></div>
-                        <div>Marcar ponto de Entrada (IN) / Saída (OUT) no Monitor de Origem</div>
-                        
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">E</kbd></div>
-                        <div>Inserir trecho marcado (IN ➔ OUT) no final da Timeline (Append)</div>
 
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Setas (← / →)</kbd></div>
-                        <div>Recuar / Avançar 1 frame (quando nenhum clipe estiver selecionado)</div>
+            <!-- Abas do Modal -->
+            <div class="keymap-tabs" style="flex-shrink: 0;">
+                <button id="tab-btn-keymap-virtual" class="btn-tab-keymap active">
+                    <i class="fa-solid fa-keyboard"></i> Teclado Visual & Índice Esquemático
+                </button>
+                <button id="tab-btn-keymap-cheatsheet" class="btn-tab-keymap">
+                    <i class="fa-solid fa-list-check"></i> Guia Rápido Dinâmico
+                </button>
+                <button id="tab-btn-keymap-editor" class="btn-tab-keymap">
+                    <i class="fa-solid fa-sliders"></i> Personalizar Atalhos & Tabela
+                </button>
+            </div>
 
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Setas (↑ / ↓)</kbd></div>
-                        <div>Source: ir p/ Início ou Fim / IN ou OUT; Program: pular p/ corte anterior (↑) ou próximo (↓)</div>
+            <!-- TAB 1: Teclado Visual & Índice Esquemático -->
+            <div id="container-keymap-virtual" style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow: hidden;">
+                <!-- Barra de Camadas de Modificadores e Legenda -->
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; flex-shrink: 0;">
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <span style="font-size: 10px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase;">Camada:</span>
+                        <button class="vk-mod-btn active" data-layer="none" style="padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(6,182,212,0.2); border: 1px solid var(--color-cyan); color: var(--color-cyan); cursor: pointer;">Padrão</button>
+                        <button class="vk-mod-btn" data-layer="shift" style="padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-secondary); cursor: pointer;">+ Shift</button>
+                        <button class="vk-mod-btn" data-layer="ctrl" style="padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-secondary); cursor: pointer;">+ Ctrl</button>
+                        <button class="vk-mod-btn" data-layer="alt" style="padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-secondary); cursor: pointer;">+ Alt</button>
+                    </div>
+
+                    <!-- Legenda de Cores -->
+                    <div style="display: flex; align-items: center; gap: 10px; font-size: 10px; color: var(--text-secondary); font-family: monospace;">
+                        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(6,182,212,0.6); border: 1px solid var(--color-cyan); display: inline-block;"></span> Reprodução</span>
+                        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(245,158,11,0.6); border: 1px solid var(--color-amber); display: inline-block;"></span> Ferramentas</span>
+                        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(139,92,246,0.6); border: 1px solid var(--color-violet); display: inline-block;"></span> Cortes/Split</span>
+                        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(56,189,248,0.6); border: 1px solid var(--color-sky); display: inline-block;"></span> Marcadores</span>
+                        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(236,72,153,0.6); border: 1px solid #ec4899; display: inline-block;"></span> IA</span>
                     </div>
                 </div>
 
-                <!-- 2. Ferramentas NLE & Modos de Seleção -->
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
-                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-toolbox" style="color: var(--color-cyan); font-size: 10px;"></i> 2. Ferramentas da Timeline & Modos de Seleção
-                    </h4>
-                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">V</kbd></div>
-                        <div>Ferramenta de Seleção Padrão (Select Tool / Seta)</div>
+                <!-- Teclado Visual 1:1 com Grid de Blueprint -->
+                <div class="vk-blueprint-box" style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); display: flex; gap: 14px; justify-content: space-between; flex-shrink: 0; box-shadow: inset 0 2px 8px rgba(0,0,0,0.6); width: 100%; box-sizing: border-box;">
+                    <!-- Bloco Alfanumérico Principal (15u) -->
+                    <div id="vk-main-keypad" style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0;">
+                        <!-- Linha F: Esc + F1..F12 -->
+                        <div style="display: flex; gap: 4px; margin-bottom: 2px;">
+                            <div class="vk-keycap vk-w-1u" data-code="Escape">Esc</div>
+                            <div class="vk-spacer-1"></div>
+                            <div class="vk-keycap vk-w-1u" data-code="F1">F1</div>
+                            <div class="vk-keycap vk-w-1u" data-code="F2">F2</div>
+                            <div class="vk-keycap vk-w-1u" data-code="F3">F3</div>
+                            <div class="vk-keycap vk-w-1u" data-code="F4">F4</div>
+                            <div class="vk-spacer-2"></div>
+                            <div class="vk-keycap vk-w-1u" data-code="F5">F5</div>
+                            <div class="vk-keycap vk-w-1u" data-code="F6">F6</div>
+                            <div class="vk-keycap vk-w-1u" data-code="F7">F7</div>
+                            <div class="vk-keycap vk-w-1u" data-code="F8">F8</div>
+                            <div class="vk-spacer-2"></div>
+                            <div class="vk-keycap vk-w-1u" data-code="F9">F9</div>
+                            <div class="vk-keycap vk-w-1u" data-code="F10">F10</div>
+                            <div class="vk-keycap vk-w-1u" data-code="F11">F11</div>
+                            <div class="vk-keycap vk-w-1u" data-code="F12">F12</div>
+                        </div>
 
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">T</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + T</kbd></div>
-                        <div>Selecionar Faixa para Frente (<kbd>T</kbd>) / Selecionar Faixa para Trás (<kbd>Shift+T</kbd>)</div>
+                        <!-- Linha 1: Números -->
+                        <div style="display: flex; gap: 4px;">
+                            <div class="vk-keycap vk-w-1u" data-code="Backquote">~</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Digit1">1</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Digit2">2</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Digit3">3</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Digit4">4</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Digit5">5</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Digit6">6</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Digit7">7</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Digit8">8</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Digit9">9</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Digit0">0</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Minus">-</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Equal">=</div>
+                            <div class="vk-keycap vk-w-2u" style="font-size: 10px;" data-code="Backspace">⌫ Del</div>
+                        </div>
 
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">S</kbd></div>
-                        <div>Alternar Snapping Magnético global (Ligar / Desligar atração)</div>
+                        <!-- Linha 2: QWERTY -->
+                        <div style="display: flex; gap: 4px;">
+                            <div class="vk-keycap vk-w-15u" style="font-size: 10px;" data-code="Tab">Tab</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyQ">Q</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyW">W</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyE">E</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyR">R</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyT">T</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyY">Y</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyU">U</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyI">I</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyO">O</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyP">P</div>
+                            <div class="vk-keycap vk-w-1u" data-code="BracketLeft">[</div>
+                            <div class="vk-keycap vk-w-1u" data-code="BracketRight">]</div>
+                            <div class="vk-keycap vk-w-15u" style="font-size: 10px;" data-code="Backslash">\</div>
+                        </div>
 
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Esc</kbd></div>
-                        <div>Desmarcar clipes selecionados / fechar pop-ups e caixas de diálogo</div>
+                        <!-- Linha 3: Home Row -->
+                        <div style="display: flex; gap: 4px;">
+                            <div class="vk-keycap vk-w-175u" style="font-size: 10px;" data-code="CapsLock">Caps</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyA">A</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyS">S</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyD">D</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyF">F</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyG">G</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyH">H</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyJ">J</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyK">K</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyL">L</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Semicolon">;</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Quote">'</div>
+                            <div class="vk-keycap vk-w-225u" style="font-size: 10px;" data-code="Enter">↵ Enter</div>
+                        </div>
+
+                        <!-- Linha 4: Bottom Row -->
+                        <div style="display: flex; gap: 4px;">
+                            <div class="vk-keycap vk-w-225u" style="font-size: 10px;" data-code="ShiftLeft">⇧ Shift</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyZ">Z</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyX">X</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyC">C</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyV">V</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyB">B</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyN">N</div>
+                            <div class="vk-keycap vk-w-1u" data-code="KeyM">M</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Comma">,</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Period">.</div>
+                            <div class="vk-keycap vk-w-1u" data-code="Slash">/</div>
+                            <div class="vk-keycap vk-w-275u" style="font-size: 10px;" data-code="ShiftRight">⇧ Shift</div>
+                        </div>
+
+                        <!-- Linha 5: Modificadores & Espaço -->
+                        <div style="display: flex; gap: 4px;">
+                            <div class="vk-keycap vk-w-125u" style="font-size: 10px;" data-code="ControlLeft">Ctrl</div>
+                            <div class="vk-keycap vk-w-125u" style="font-size: 10px;" data-code="AltLeft">Alt</div>
+                            <div class="vk-keycap vk-w-625u" style="font-size: 9.5px; letter-spacing: 1px;" data-code="Space">ESPAÇO (PLAY / PAUSE)</div>
+                            <div class="vk-keycap vk-w-125u" style="font-size: 10px;" data-code="AltRight">Alt</div>
+                            <div class="vk-keycap vk-w-125u" style="font-size: 10px;" data-code="ControlRight">Ctrl</div>
+                        </div>
+                    </div>
+
+                    <!-- Bloco de Navegação & Setas -->
+                    <div style="display: flex; flex-direction: column; justify-content: space-between; width: 120px; flex-shrink: 0; border-left: 1px solid rgba(255,255,255,0.08); padding-left: 12px;">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <div style="display: flex; gap: 4px;">
+                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="Insert">Ins</div>
+                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="Home">Hom</div>
+                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="PageUp">PgU</div>
+                            </div>
+                            <div style="display: flex; gap: 4px;">
+                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="Delete">Del</div>
+                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="End">End</div>
+                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="PageDown">PgD</div>
+                            </div>
+                        </div>
+
+                        <!-- Setas em T Invertido -->
+                        <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+                            <div style="display: flex; gap: 4px; width: 100%;">
+                                <div class="vk-w-1u" style="visibility: hidden; pointer-events: none;"></div>
+                                <div class="vk-keycap vk-w-1u" data-code="ArrowUp"><i class="fa-solid fa-caret-up" style="font-size: 13px;"></i></div>
+                                <div class="vk-w-1u" style="visibility: hidden; pointer-events: none;"></div>
+                            </div>
+                            <div style="display: flex; gap: 4px; width: 100%;">
+                                <div class="vk-keycap vk-w-1u" data-code="ArrowLeft"><i class="fa-solid fa-caret-left" style="font-size: 13px;"></i></div>
+                                <div class="vk-keycap vk-w-1u" data-code="ArrowDown"><i class="fa-solid fa-caret-down" style="font-size: 13px;"></i></div>
+                                <div class="vk-keycap vk-w-1u" data-code="ArrowRight"><i class="fa-solid fa-caret-right" style="font-size: 13px;"></i></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- 3. Edição, Split & Ripple Trims -->
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
-                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-scissors" style="color: var(--color-cyan); font-size: 10px;"></i> 3. Edição, Split & Ripple Trims na Timeline
-                    </h4>
-                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Q</kbd></div>
-                        <div>Ripple Trim In (apaga do início do clipe até a agulha e fecha o espaço)</div>
+                <!-- Índice Esquemático do Manual (3 Colunas com Expansão Natural) -->
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; min-height: 0;">
+                    <!-- Coluna A: Reprodução & Shuttle -->
+                    <div style="background: rgba(10, 15, 26, 0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; min-height: 0; height: 100%; box-sizing: border-box;">
+                        <div style="display: flex; align-items: center; gap: 6px; color: var(--color-cyan); font-family: monospace; font-size: 11px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 4px; flex-shrink: 0;">
+                            <i class="fa-solid fa-play" style="font-size: 9px;"></i> SEÇÃO A · REPRODUÇÃO & NAVEGAÇÃO
+                        </div>
+                        <div id="vk-schematic-list-playback" style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px;"></div>
+                    </div>
 
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">W</kbd></div>
-                        <div>Ripple Trim Out (apaga da agulha até o fim do clipe e fecha o espaço)</div>
+                    <!-- Coluna B: Edição & Cortes -->
+                    <div style="background: rgba(10, 15, 26, 0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; min-height: 0; height: 100%; box-sizing: border-box;">
+                        <div style="display: flex; align-items: center; gap: 6px; color: var(--color-violet); font-family: monospace; font-size: 11px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 4px; flex-shrink: 0;">
+                            <i class="fa-solid fa-scissors" style="font-size: 9px;"></i> SEÇÃO B · EDIÇÃO & CORTES
+                        </div>
+                        <div id="vk-schematic-list-edit" style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px;"></div>
+                    </div>
 
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Z</kbd></div>
-                        <div>Dividir clipe no Playhead (Split / Fatiar corte)</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Del</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Backspace</kbd></div>
-                        <div>Lift Delete (apaga clipe mantendo o gap) ou Ripple Delete (ao clicar numa lacuna/gap)</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + Del</kbd></div>
-                        <div>Ripple Delete do clipe (apaga o clipe e fecha o espaço em toda a timeline)</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Alt + Del</kbd></div>
-                        <div>Apagar apenas o clipe selecionado (desvincula e preserva o par de áudio/vídeo)</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">U</kbd></div>
-                        <div>Desvincular par Áudio/Vídeo (A/V) do clipe selecionado</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Alt + Setas</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + Setas</kbd></div>
-                        <div>Trim In (<kbd>Alt+←/→</kbd>) / Trim Out (<kbd>Shift+←/→</kbd>) do clipe selecionado em 1 frame</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">[</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">]</kbd></div>
-                        <div>Nudge trim do início (<kbd>[</kbd>) / fim (<kbd>]</kbd>) do clipe focado</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Setas (← / →)</kbd></div>
-                        <div>Nudge de posição do clipe selecionado em 1 frame para trás / frente</div>
+                    <!-- Coluna C: Ferramentas, Marcadores & IA -->
+                    <div style="background: rgba(10, 15, 26, 0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; min-height: 0; height: 100%; box-sizing: border-box;">
+                        <div style="display: flex; align-items: center; gap: 6px; color: var(--color-amber); font-family: monospace; font-size: 11px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 4px; flex-shrink: 0;">
+                            <i class="fa-solid fa-toolbox" style="font-size: 9px;"></i> SEÇÃO C · FERRAMENTAS, IA & MARCADORES
+                        </div>
+                        <div id="vk-schematic-list-tools" style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px;"></div>
                     </div>
                 </div>
 
-                <!-- 4. Marcadores da Timeline -->
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
-                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-bookmark" style="color: var(--color-cyan); font-size: 10px;"></i> 4. Marcadores da Timeline & Navegação
-                    </h4>
-                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">M</kbd></div>
-                        <div>Criar / Editar Marcador no Playhead (Box rápido compacto sem pausar reprodução)</div>
+                <!-- Rodapé de Teste Ativo em Tempo Real (Live HUD) -->
+                <div style="background: rgba(10, 15, 26, 0.95); border: 1px solid rgba(6,182,212,0.3); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0;">
+                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                        <div id="vk-live-combo-badge" style="padding: 3px 8px; border-radius: 5px; background: rgba(6,182,212,0.15); border: 1px solid var(--color-cyan); color: var(--color-cyan); font-family: monospace; font-weight: 700; font-size: 12px; text-align: center; min-width: 60px;">
+                            ESPAÇO
+                        </div>
+                        <div style="min-width: 0;">
+                            <div id="vk-live-action-title" style="font-size: 12px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-circle-check" style="color: var(--color-cyan);"></i> <span>Play / Pause</span>
+                            </div>
+                            <div id="vk-live-action-desc" style="font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                Inicia ou pausa a reprodução no player focado (Source ou Program).
+                            </div>
+                        </div>
+                    </div>
 
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + M</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Alt + M</kbd></div>
-                        <div>Pular para o Próximo (<kbd>Shift+M</kbd>) / Anterior (<kbd>Alt+M</kbd>) Marcador</div>
+                    <div style="display: flex; align-items: center; gap: 6px; font-family: monospace; font-size: 10px; color: var(--text-muted); flex-shrink: 0;">
+                        <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+                        <span>TESTE AO VIVO: Digite no teclado</span>
+                    </div>
+                </div>
+            </div>
 
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + Click</kbd></div>
-                        <div>Seleção múltipla de marcadores na Timeline</div>
+            <!-- TAB 2: Guia Rápido Dinâmico -->
+            <div id="container-keymap-cheatsheet" style="flex: 1; overflow-y: auto; display: none; flex-direction: column; gap: 12px; padding-right: 4px;">
+                <p id="keymap-cheatsheet-intro" style="margin: 0; font-size: 11.5px; color: rgba(255,255,255,0.75);">
+                    O <strong>CapIAu-Talho</strong> está operando com o perfil ativo: <strong id="lbl-active-preset-name" style="color: var(--color-cyan);">CapIAu Padrão</strong>.
+                </p>
+                <div id="keymap-cheatsheet-content" style="display: flex; flex-direction: column; gap: 12px;">
+                    <!-- Preenchido dinamicamente pelo render do KeymapService -->
+                </div>
+            </div>
 
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Tab</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Enter</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Esc</kbd></div>
-                        <div>Navegar campos (Nome ➔ Descrição ➔ Cor), salvar e fechar box instantaneamente</div>
+            <!-- TAB 3: Personalizar Atalhos & Keymap -->
+            <div id="container-keymap-editor" style="flex: 1; overflow-y: hidden; display: none; flex-direction: column; gap: 10px;">
+                <!-- Barra de Ferramentas do Editor -->
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px;">
+                        <i class="fa-solid fa-magnifying-glass" style="color: var(--text-muted); font-size: 12px;"></i>
+                        <input type="text" id="input-search-keymap" placeholder="Buscar atalho ou comando (ex: split, trim, jkl)..." style="flex: 1; height: 28px; background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); border-radius: 6px; padding: 0 10px; font-size: 11.5px; color: #fff; outline: none;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                        <button id="btn-export-keymap" class="btn-keymap-action cyan" title="Exportar atalhos como arquivo JSON">
+                            <i class="fa-solid fa-download"></i> Exportar
+                        </button>
+                        <button id="btn-import-keymap" class="btn-keymap-action" title="Importar atalhos de um arquivo JSON">
+                            <i class="fa-solid fa-upload"></i> Importar
+                        </button>
+                        <input type="file" id="file-import-keymap" accept=".json" style="display: none;">
+                        <button id="btn-reset-keymap" class="btn-keymap-action rose" title="Restaurar atalhos para os padrões de fábrica">
+                            <i class="fa-solid fa-rotate-left"></i> Restaurar
+                        </button>
                     </div>
                 </div>
 
-                <!-- 5. Sugestões de IA & Alternativas -->
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
-                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--color-cyan); font-size: 10px;"></i> 5. Assistência de IA, Tomadas & Alternativas (Ghost Tracks)
-                    </h4>
-                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">A</kbd></div>
-                        <div>Alternar pop-up de Tomadas/Alternativas de IA no clipe selecionado (ou Inspetor na Biblioteca/Rostos)</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Enter</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Y</kbd></div>
-                        <div>Aceitar sugestão da faixa fantasma de IA (transforma em clipe real na trilha)</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Del</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">N</kbd></div>
-                        <div>Rejeitar e apagar sugestão de IA</div>
-                    </div>
+                <!-- Filtro por Pílulas de Categoria -->
+                <div id="keymap-category-pills" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; flex-shrink: 0;">
+                    <button class="keymap-pill-filter active" data-category="all">Todas as Ações</button>
+                    <button class="keymap-pill-filter" data-category="playback">Reprodução</button>
+                    <button class="keymap-pill-filter" data-category="tools">Ferramentas</button>
+                    <button class="keymap-pill-filter" data-category="edit">Edição & Cortes</button>
+                    <button class="keymap-pill-filter" data-category="markers">Marcadores</button>
+                    <button class="keymap-pill-filter" data-category="ai">Assistência IA</button>
+                    <button class="keymap-pill-filter" data-category="canvas_history">Canvas & Histórico</button>
                 </div>
 
-                <!-- 6. Canvas, Zoom, Histórico & Layout -->
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
-                    <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-sliders" style="color: var(--color-cyan); font-size: 10px;"></i> 6. Canvas, Zoom, Histórico & Workspaces
-                    </h4>
-                    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 6px; font-size: 11.5px;">
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Ctrl + Roda Mouse</kbd></div>
-                        <div>Zoom horizontal na posição da agulha</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Shift + Roda Mouse</kbd></div>
-                        <div>Zoom vertical / altura das faixas de vídeo e áudio</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Botão Meio Drag</kbd></div>
-                        <div>Pan / Rolagem horizontal contínua pela timeline</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Ctrl + Z</kbd></div>
-                        <div>Desfazer última edição na timeline (*Undo*)</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Ctrl + Shift + Z</kbd> / <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Ctrl + Y</kbd></div>
-                        <div>Refazer edição desfeita (*Redo*)</div>
-
-                        <div><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff;">Ctrl + Shift + S</kbd></div>
-                        <div>Salvar layout atual como Preset de Workspace customizado</div>
-                    </div>
+                <!-- Tabela de Comandos Scrollável -->
+                <div class="keymap-table-container" style="flex: 1; overflow-y: auto;">
+                    <table class="keymap-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 220px;">Ação / Comando</th>
+                                <th>Descrição</th>
+                                <th style="width: 180px; text-align: center;">Atalho Atual</th>
+                                <th style="width: 70px; text-align: center;">Editar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="keymap-editor-table-body">
+                            <!-- Preenchido dinamicamente -->
+                        </tbody>
+                    </table>
                 </div>
+            </div>
+        </div>
+    </div>
 
-                <!-- 7. Pistas Dinâmicas (Multipista) -->
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
-                    <h4 style="color: #fff; margin: 0 0 6px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-layer-group" style="color: var(--color-cyan); font-size: 10px;"></i> 7. Pistas Dinâmicas (Multipista)
-                    </h4>
-                    <p style="margin: 0; font-size: 11.5px;">Crie quantas pistas precisar pelo botão <strong>+</strong> no topo da sidebar de trilhas. Cada faixa possui <strong>volume, mute, trava (cadeado)</strong> e o modo <strong>ímã <i class="fa-solid fa-magnet" style="font-size: 9px;"></i></strong>: faixas magnéticas (como a V1 Falas) mantêm clipes grudados em sequência automática; faixas livres (como V2 B-Roll) permitem posicionamento em qualquer ponto no tempo.</p>
-                </div>
+    <!-- Modal de Captura / Gravação de Tecla -->
+    <div id="modal-key-recorder" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 12000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+        <div class="glassmorphism" style="width: 420px; background: rgba(15, 23, 42, 0.98); border: 1px solid var(--color-cyan); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 15px 40px rgba(0,0,0,0.8); text-align: center;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
+                <h4 style="margin: 0; color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-keyboard" style="color: var(--color-cyan);"></i> Gravar Atalho de Teclado
+                </h4>
+                <button id="btn-cancel-key-recorder" style="border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 14px;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div style="font-size: 11.5px; color: var(--text-secondary);">
+                Pressione a nova combinação para: <strong id="lbl-recorder-cmd-name" style="color: #fff;">-</strong>
+            </div>
+
+            <!-- Caixa de Captura Interativa com Animação -->
+            <div id="key-recorder-box" class="key-recorder-recording" style="background: rgba(0,0,0,0.5); border: 1.5px dashed var(--color-cyan); border-radius: 8px; padding: 18px; display: flex; align-items: center; justify-content: center; min-height: 50px;">
+                <span id="lbl-recorder-live-keys" style="font-family: monospace; font-size: 16px; font-weight: 700; color: var(--color-cyan); letter-spacing: 1px;">
+                    Aguardando teclas...
+                </span>
+            </div>
+
+            <!-- Aviso de Conflito -->
+            <div id="key-recorder-conflict-box" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #fca5a5; text-align: left;">
+                <i class="fa-solid fa-triangle-exclamation"></i> <span id="lbl-recorder-conflict-msg">Conflito detectado</span>
+            </div>
+
+            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+                <button id="btn-recorder-cancel" class="btn-outline" style="height: 30px; font-size: 11px; padding: 0 12px;">Cancelar (Esc)</button>
+                <button id="btn-recorder-save" class="btn-primary" style="height: 30px; font-size: 11px; padding: 0 14px;" disabled>Salvar Atalho</button>
             </div>
         </div>
     </div>

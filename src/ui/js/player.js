@@ -5,6 +5,7 @@ import { FaceManager } from "./faces.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, evaluateFadeCurve } from "./timelineState.js";
 import { getActiveElement } from "./workspaceManager.js";
 import { PlayerTextOverlayManager } from "./playerTextOverlay.js";
+import { KEYMAP_SERVICE } from "./keymapService.js";
 
 // Foco global do teclado para players: "source" ou "program"
 window.activeFocusedPlayer = "source";
@@ -3580,74 +3581,110 @@ export class VideoPlayer {
             return;
         }
 
-        const code = e.code;
         const activePlayer = window.activeFocusedPlayer === "source" ? this.sourcePlayer : this.programPlayer;
 
-        if (code === "KeyK") {
+        // Shuttle Parar (K)
+        if (KEYMAP_SERVICE.matches(e, "playback.shuttle_stop")) {
             e.preventDefault();
             this.isKeyKDown = true;
             activePlayer.shuttleStop();
+            return;
         } 
-        else if (code === "Space") {
+        
+        // Play / Pause (Espaço)
+        if (KEYMAP_SERVICE.matches(e, "playback.play_pause")) {
             e.preventDefault();
             activePlayer.togglePlay();
+            return;
         }
-        else if (code === "KeyL") {
+
+        // Jog Avançar 1 frame (K + L) ou Shuttle Avanço (L)
+        if (this.isKeyKDown && KEYMAP_SERVICE.matches(e, "playback.jog_next_frame", { isHoldingKey: "KeyK" })) {
+            e.preventDefault();
+            this.stepFrame(1);
+            return;
+        } else if (KEYMAP_SERVICE.matches(e, "playback.shuttle_forward")) {
             e.preventDefault();
             if (this.isKeyKDown) {
-                // Combo K + L: Avança 1 frame
                 this.stepFrame(1);
             } else {
                 activePlayer.shuttleForward();
             }
-        } 
-        else if (code === "KeyJ") {
+            return;
+        }
+
+        // Jog Recuar 1 frame (K + J) ou Shuttle Reverso (J)
+        if (this.isKeyKDown && KEYMAP_SERVICE.matches(e, "playback.jog_prev_frame", { isHoldingKey: "KeyK" })) {
+            e.preventDefault();
+            this.stepFrame(-1);
+            return;
+        } else if (KEYMAP_SERVICE.matches(e, "playback.shuttle_reverse")) {
             e.preventDefault();
             if (this.isKeyKDown) {
-                // Combo K + J: Recua 1 frame
                 this.stepFrame(-1);
             } else {
                 activePlayer.shuttleReverse();
             }
-        } 
-        else if (code === "KeyI") {
+            return;
+        }
+
+        // Marcar Ponto IN
+        if (KEYMAP_SERVICE.matches(e, "playback.mark_in")) {
             if (window.activeFocusedPlayer === "source") {
                 this.sourcePlayer.markIn();
+                e.preventDefault();
+                return;
             }
         } 
-        else if (code === "KeyO") {
+
+        // Marcar Ponto OUT
+        if (KEYMAP_SERVICE.matches(e, "playback.mark_out")) {
             if (window.activeFocusedPlayer === "source") {
                 this.sourcePlayer.markOut();
+                e.preventDefault();
+                return;
             }
         } 
-        else if (code === "KeyE") {
+
+        // Inserir na Timeline (Append)
+        if (KEYMAP_SERVICE.matches(e, "playback.append_timeline")) {
             if (window.activeFocusedPlayer === "source") {
                 this.sourcePlayer.appendToTimeline();
+                e.preventDefault();
+                return;
             }
         } 
-        else if (code === "ArrowLeft") {
-            e.preventDefault();
+
+        // 1 frame para trás (quando nenhum clipe selecionado)
+        if (KEYMAP_SERVICE.matches(e, "playback.step_prev")) {
             if (window.activeFocusedPlayer === "source") {
+                e.preventDefault();
                 const vid = this.sourcePlayer.el("source-video");
                 if (vid) this.sourcePlayer.seek(vid.currentTime - (1 / (TIMELINE_STATE?.fps || 24)));
-            } else {
-                if (!TIMELINE_STATE.selectedClipId) {
-                    this.stepFrame(-1);
-                }
+                return;
+            } else if (!TIMELINE_STATE.selectedClipId && (!TIMELINE_STATE.selectedClipIds || TIMELINE_STATE.selectedClipIds.size <= 1)) {
+                e.preventDefault();
+                this.stepFrame(-1);
+                return;
             }
         } 
-        else if (code === "ArrowRight") {
-            e.preventDefault();
+
+        // 1 frame para frente (quando nenhum clipe selecionado)
+        if (KEYMAP_SERVICE.matches(e, "playback.step_next")) {
             if (window.activeFocusedPlayer === "source") {
+                e.preventDefault();
                 const vid = this.sourcePlayer.el("source-video");
                 if (vid) this.sourcePlayer.seek(vid.currentTime + (1 / (TIMELINE_STATE?.fps || 24)));
-            } else {
-                if (!TIMELINE_STATE.selectedClipId) {
-                    this.stepFrame(1);
-                }
+                return;
+            } else if (!TIMELINE_STATE.selectedClipId && (!TIMELINE_STATE.selectedClipIds || TIMELINE_STATE.selectedClipIds.size <= 1)) {
+                e.preventDefault();
+                this.stepFrame(1);
+                return;
             }
         }
-        else if (code === "ArrowUp") {
+
+        // Ponto de Corte Anterior / Início
+        if (KEYMAP_SERVICE.matches(e, "playback.prev_edit_point")) {
             e.preventDefault();
             if (window.activeFocusedPlayer === "source") {
                 const vid = this.sourcePlayer.el("source-video");
@@ -3666,8 +3703,11 @@ export class VideoPlayer {
                     window.timelineInteraction.ensureFrameVisible(targetFrame);
                 }
             }
+            return;
         }
-        else if (code === "ArrowDown") {
+
+        // Ponto de Corte Seguinte / Fim
+        if (KEYMAP_SERVICE.matches(e, "playback.next_edit_point")) {
             e.preventDefault();
             if (window.activeFocusedPlayer === "source") {
                 const vid = this.sourcePlayer.el("source-video");
@@ -3686,6 +3726,7 @@ export class VideoPlayer {
                     window.timelineInteraction.ensureFrameVisible(targetFrame);
                 }
             }
+            return;
         }
     }
 

@@ -1,5 +1,5 @@
-// Gerenciador de Workspaces Customizáveis e Pop-outs Multi-Monitores (CapIAu-Talho)
 import { STATE } from "./state.js";
+import { KEYMAP_SERVICE } from "./keymapService.js";
 
 window.popoutWindows = {};
 
@@ -204,9 +204,9 @@ export class WorkspaceManager {
             });
         }
 
-        // Atalho de teclado global Ctrl + Shift + S para abrir a modal de salvamento de workspace de qualquer lugar
+        // Atalho de teclado global para abrir a modal de salvamento de workspace de qualquer lugar
         document.addEventListener("keydown", (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyS") {
+            if (KEYMAP_SERVICE.matches(e, "workspace.save")) {
                 e.preventDefault();
                 this.promptSaveWorkspace();
             }

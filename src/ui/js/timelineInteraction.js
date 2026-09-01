@@ -15,6 +15,7 @@ import {
 } from "./keyframeEngine.js";
 import { FONT_MODAL } from "./fontCatalogModal.js";
 import { CURATED_FONTS, ensureFontLoaded } from "./fontManager.js";
+import { KEYMAP_SERVICE } from "./keymapService.js";
 
 // Velocidades de render MEDIDAS nesta máquina (NÃO estimadas):
 //   - cadeia ffmpeg .... 31 a 44x tempo real (22 min de áudio → ~43 s de render)
@@ -7269,143 +7270,8 @@ export class CapiauTimelineInteraction {
             return;
         }
 
-        const selectedId = TIMELINE_STATE.selectedClipId;
-        const cuts = [...STATE.activeTimelineCuts];
-
-        // Atalhos de Marcadores da Timeline (M, Shift+M, Alt+M)
-        if (e.key.toLowerCase() === "m" && !e.ctrlKey && !e.metaKey) {
-            if (window.activeFocusedPlayer === "source") {
-                return;
-            }
-            e.preventDefault();
-            const playhead = TIMELINE_STATE.playheadFrame;
-
-            if (e.shiftKey) {
-                // Shift + M: Pula para o próximo marcador
-                const nextM = TIMELINE_STATE.getNextMarker(playhead);
-                if (nextM) {
-                    this.updatePlayhead(nextM.frame);
-                }
-                return;
-            } else if (e.altKey) {
-                // Alt + M: Pula para o marcador anterior
-                const prevM = TIMELINE_STATE.getPrevMarker(playhead);
-                if (prevM) {
-                    this.updatePlayhead(prevM.frame);
-                }
-                return;
-            }
-
-            // Se o popover de edição já estiver aberto, salva primeiro as edições antes de prosseguir
-            const modal = this.canvas ? this.canvas.ownerDocument.getElementById("modal-edit-marker") : document.getElementById("modal-edit-marker");
-            if (modal && modal.style.display !== "none") {
-                const btnSave = modal.querySelector("#btn-marker-save");
-                if (btnSave) btnSave.click();
-            }
-
-            // Tecla M simples: abre o popover de edição se já houver marcador no local ou cria novo
-            const existing = TIMELINE_STATE.getMarkerAtFrame(playhead, 3);
-            if (existing) {
-                this.openMarkerEditModal(existing);
-            } else {
-                const newMarker = TIMELINE_STATE.addMarker({ frame: playhead });
-                this.openMarkerEditModal(newMarker);
-            }
-            return;
-        }
-
-        // Alternância e cursores dinâmicos para ferramentas de faixa
-        if (e.key === "Shift" && (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward")) {
-            if (this.canvas && !this.dragState) {
-                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, true);
-            }
-        }
-
-        // Toggle do popup de alternativas com a tecla 'A'
-        if (e.key.toLowerCase() === "a" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            if (window.activeFocusedPlayer === "source") {
-                return; // Let the media library inspector handle it
-            }
-            const popup = this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup");
-            if (popup && popup.style.display === "flex") {
-                this.hideAlternativesPopup();
-                e.preventDefault();
-                return;
-            } else if (selectedId) {
-                const clip = cuts.find(c => c.id === selectedId);
-                if (clip && clip.origin === "ai" && clip.alternatives && clip.alternatives.length > 0) {
-                    this.showAlternativesPopup(clip);
-                    e.preventDefault();
-                    return;
-                }
-            }
-        }
-
-        // Atalhos de Ripple Trim até a Agulha (Q / W)
-        // Q: Ripple Delete do Início do corte até a Agulha (Ripple Trim Left / Previous Edit to Playhead)
-        if (e.key.toLowerCase() === "q" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            const ok = TIMELINE_STATE.rippleTrimToPlayhead("head");
-            if (ok) {
-                if (typeof window.showToast === "function") {
-                    window.showToast("Ripple Delete até a Agulha (Q)", "info");
-                }
-                if (this.renderer) this.renderer.requestRedraw();
-                this.refreshClipInspector();
-            }
-            e.preventDefault();
-            return;
-        }
-
-        // W: Ripple Delete da Agulha até o Fim do corte (Ripple Trim Right / Next Edit to Playhead)
-        if (e.key.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            const ok = TIMELINE_STATE.rippleTrimToPlayhead("tail");
-            if (ok) {
-                if (typeof window.showToast === "function") {
-                    window.showToast("Ripple Delete da Agulha até o Fim (W)", "info");
-                }
-                if (this.renderer) this.renderer.requestRedraw();
-                this.refreshClipInspector();
-            }
-            e.preventDefault();
-            return;
-        }
-
-        // Seleção de Ferramentas NLE via teclado:
-        // V: Ferramenta de Seleção Normal
-        if (e.key.toLowerCase() === "v" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            TIMELINE_STATE.setTool("select");
-            if (typeof window.showToast === "function") {
-                window.showToast("Ferramenta de Seleção (V)", "info");
-            }
-            if (this.canvas) this.canvas.style.cursor = "default";
-            if (this.renderer) this.renderer.requestRedraw();
-            e.preventDefault();
-            return;
-        }
-
-        // T / Shift+T: Selecionar Faixa para Frente (T) / para Trás (Shift+T)
-        if (e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            if (e.shiftKey) {
-                TIMELINE_STATE.setTool("track-backward");
-                if (typeof window.showToast === "function") {
-                    window.showToast("Ferramenta: Selecionar Faixa para Trás (Shift + T)", "info");
-                }
-            } else {
-                TIMELINE_STATE.setTool("track-forward");
-                if (typeof window.showToast === "function") {
-                    window.showToast("Ferramenta: Selecionar Faixa para Frente (T)", "info");
-                }
-            }
-            if (this.canvas) {
-                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e.shiftKey);
-            }
-            if (this.renderer) this.renderer.requestRedraw();
-            e.preventDefault();
-            return;
-        }
-
         // Fechar popup de alternativas ou desmarcar seleções com a tecla 'Escape'
-        if (e.key === "Escape") {
+        if (KEYMAP_SERVICE.matches(e, "tools.escape") || e.key === "Escape") {
             const popup = this.canvas ? this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup") : document.querySelector("#timeline-alternatives-popup");
             if (popup && popup.style.display === "flex") {
                 this.hideAlternativesPopup();
@@ -7421,77 +7287,174 @@ export class CapiauTimelineInteraction {
             }
         }
 
-        // Undo / Redo globais da timeline
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-            e.preventDefault();
-            if (e.shiftKey) TIMELINE_HISTORY.redo();
-            else TIMELINE_HISTORY.undo();
-            return;
+        const selectedId = TIMELINE_STATE.selectedClipId;
+        const cuts = [...STATE.activeTimelineCuts];
+
+        // ── MARCADORES (Próximo, Anterior, Criar/Editar) ──────────────────────
+        if (KEYMAP_SERVICE.matches(e, "markers.next")) {
+            if (window.activeFocusedPlayer !== "source") {
+                e.preventDefault();
+                const nextM = TIMELINE_STATE.getNextMarker(TIMELINE_STATE.playheadFrame);
+                if (nextM) this.updatePlayhead(nextM.frame);
+                return;
+            }
         }
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        if (KEYMAP_SERVICE.matches(e, "markers.prev")) {
+            if (window.activeFocusedPlayer !== "source") {
+                e.preventDefault();
+                const prevM = TIMELINE_STATE.getPrevMarker(TIMELINE_STATE.playheadFrame);
+                if (prevM) this.updatePlayhead(prevM.frame);
+                return;
+            }
+        }
+        if (KEYMAP_SERVICE.matches(e, "markers.add_edit")) {
+            if (window.activeFocusedPlayer !== "source") {
+                e.preventDefault();
+                const playhead = TIMELINE_STATE.playheadFrame;
+                const modal = this.canvas ? this.canvas.ownerDocument.getElementById("modal-edit-marker") : document.getElementById("modal-edit-marker");
+                if (modal && modal.style.display !== "none") {
+                    const btnSave = modal.querySelector("#btn-marker-save");
+                    if (btnSave) btnSave.click();
+                }
+                const existing = TIMELINE_STATE.getMarkerAtFrame(playhead, 3);
+                if (existing) {
+                    this.openMarkerEditModal(existing);
+                } else {
+                    const newMarker = TIMELINE_STATE.addMarker({ frame: playhead });
+                    this.openMarkerEditModal(newMarker);
+                }
+                return;
+            }
+        }
+
+        // Alternância e cursores dinâmicos para ferramentas de faixa
+        if (e.key === "Shift" && (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward")) {
+            if (this.canvas && !this.dragState) {
+                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, true);
+            }
+        }
+
+        // Toggle do popup de alternativas de IA
+        if (KEYMAP_SERVICE.matches(e, "ai.toggle_alternatives")) {
+            if (window.activeFocusedPlayer !== "source") {
+                const popup = this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup");
+                if (popup && popup.style.display === "flex") {
+                    this.hideAlternativesPopup();
+                    e.preventDefault();
+                    return;
+                } else if (selectedId) {
+                    const clip = cuts.find(c => c.id === selectedId);
+                    if (clip && clip.origin === "ai" && clip.alternatives && clip.alternatives.length > 0) {
+                        this.showAlternativesPopup(clip);
+                        e.preventDefault();
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Ripple Trim Head (Q no CapIAu/Premiere)
+        if (KEYMAP_SERVICE.matches(e, "edit.ripple_trim_head")) {
+            const ok = TIMELINE_STATE.rippleTrimToPlayhead("head");
+            if (ok) {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Ripple Trim Início até a Agulha", "info");
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+            }
             e.preventDefault();
-            TIMELINE_HISTORY.redo();
             return;
         }
 
-        if (e.key === "Delete" || e.key === "Backspace") {
-            if (TIMELINE_STATE.selectedMarkerIds.size > 0) {
-                TIMELINE_STATE.removeSelectedMarkers();
-                if (this.renderer) this.renderer.requestRedraw();
-                e.preventDefault();
-                return;
-            }
-            if (TIMELINE_STATE.selectedGap) {
-                const gap = TIMELINE_STATE.selectedGap;
-                TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
-                if (this.renderer) this.renderer.requestRedraw();
-                e.preventDefault();
-                return;
-            }
-            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1) {
-                if (e.shiftKey) {
-                    // Shift+Delete: Ripple Delete no conjunto de clipes
-                    TIMELINE_STATE.rippleDeleteSelectedClips();
-                } else {
-                    // Delete: Lift Delete no conjunto de clipes
-                    TIMELINE_STATE.liftDeleteSelectedClips();
+        // Ripple Trim Tail (W no CapIAu/Premiere)
+        if (KEYMAP_SERVICE.matches(e, "edit.ripple_trim_tail")) {
+            const ok = TIMELINE_STATE.rippleTrimToPlayhead("tail");
+            if (ok) {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Ripple Trim Agulha até o Fim", "info");
                 }
-                this.refreshClipInspector();
                 if (this.renderer) this.renderer.requestRedraw();
-                e.preventDefault();
-                return;
-            }
-            if (selectedId) {
-                if (e.shiftKey) {
-                    // Shift+Delete: Ripple Delete (apaga o clipe e fecha o buraco nas pistas com Sync Lock)
-                    TIMELINE_STATE.rippleDeleteClip(selectedId);
-                } else {
-                    // Delete: Lift Delete (apaga o clipe e deixa o gap intacto)
-                    TIMELINE_STATE.liftDeleteClip(selectedId);
-                }
                 this.refreshClipInspector();
-                if (this.renderer) this.renderer.requestRedraw();
-                e.preventDefault();
-                return;
-            } else if (TIMELINE_STATE.selectedGhostClipId) {
-                // Rejeitar sugestão fantasma
-                TIMELINE_STATE.rejectGhostSuggestion(TIMELINE_STATE.selectedGhostClipId);
-                TIMELINE_STATE.selectedGhostClipId = null;
-                e.preventDefault();
-                return;
             }
+            e.preventDefault();
+            return;
         }
-        else if (e.key.toLowerCase() === "s" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            // S: alterna o Snapping magnético global
+
+        // Ferramenta Seleção (V no CapIAu/Premiere, S no Kdenlive, A no DaVinci/FinalCut)
+        if (KEYMAP_SERVICE.matches(e, "tools.select")) {
+            TIMELINE_STATE.setTool("select");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta de Seleção", "info");
+            }
+            if (this.canvas) this.canvas.style.cursor = "default";
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // Selecionar Faixa para Frente
+        if (KEYMAP_SERVICE.matches(e, "tools.track_forward")) {
+            TIMELINE_STATE.setTool("track-forward");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta: Selecionar Faixa para Frente", "info");
+            }
+            if (this.canvas) {
+                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, false);
+            }
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // Selecionar Faixa para Trás
+        if (KEYMAP_SERVICE.matches(e, "tools.track_backward")) {
+            TIMELINE_STATE.setTool("track-backward");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta: Selecionar Faixa para Trás", "info");
+            }
+            if (this.canvas) {
+                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, true);
+            }
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // Snapping magnético global
+        if (KEYMAP_SERVICE.matches(e, "tools.snapping")) {
             const enabled = TIMELINE_STATE.toggleSnapping();
             if (typeof window.showToast === "function") {
                 window.showToast(`Snapping ${enabled ? 'Ativado' : 'Desativado'}`, "info");
             }
             if (this.renderer) this.renderer.requestRedraw();
             e.preventDefault();
+            return;
         }
-        else if (e.key.toLowerCase() === "u" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            // U: desvincula o par A/V do clipe selecionado
+
+        // Undo / Redo
+        if (KEYMAP_SERVICE.matches(e, "history.redo")) {
+            e.preventDefault();
+            TIMELINE_HISTORY.redo();
+            return;
+        }
+        if (KEYMAP_SERVICE.matches(e, "history.undo")) {
+            e.preventDefault();
+            TIMELINE_HISTORY.undo();
+            return;
+        }
+
+        // Split / Dividir clipe no Playhead
+        if (KEYMAP_SERVICE.matches(e, "edit.split")) {
+            if (selectedId) {
+                TIMELINE_STATE.splitClip(selectedId, TIMELINE_STATE.playheadFrame);
+                e.preventDefault();
+                return;
+            }
+        }
+
+        // Desvincular Par A/V
+        if (KEYMAP_SERVICE.matches(e, "edit.unlink_av")) {
             if (selectedId) {
                 const clip = cuts.find(c => c.id === selectedId);
                 if (clip && clip.link_id) {
@@ -7500,64 +7463,150 @@ export class CapiauTimelineInteraction {
                         cuts.forEach(c => { if (c.link_id === linkId) c.link_id = null; });
                         STATE.activeTimelineCuts = cuts;
                     });
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Áudio/Vídeo Desvinculados", "info");
+                    }
                     e.preventDefault();
+                    return;
                 }
             }
         }
-        else if (e.key === "Enter" || e.key.toLowerCase() === "y") {
+
+        // Aceitar / Rejeitar sugestões de IA
+        if (KEYMAP_SERVICE.matches(e, "ai.accept_ghost")) {
             if (TIMELINE_STATE.selectedGhostClipId) {
-                // Aceitar sugestão fantasma
                 TIMELINE_STATE.acceptGhostSuggestion(TIMELINE_STATE.selectedGhostClipId);
                 TIMELINE_STATE.selectedGhostClipId = null;
                 e.preventDefault();
+                return;
             }
         }
-        else if (e.key.toLowerCase() === "z" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            // Z: divide o clipe selecionado no playhead
-            if (selectedId) {
-                TIMELINE_STATE.splitClip(selectedId, TIMELINE_STATE.playheadFrame);
+        if (KEYMAP_SERVICE.matches(e, "ai.reject_ghost")) {
+            if (TIMELINE_STATE.selectedGhostClipId) {
+                TIMELINE_STATE.rejectGhostSuggestion(TIMELINE_STATE.selectedGhostClipId);
+                TIMELINE_STATE.selectedGhostClipId = null;
                 e.preventDefault();
+                return;
             }
         }
-        else if (e.key === "ArrowLeft") {
+
+        // Deletes (Apagar clipe selecionado, marcadores, gap ou ripple delete)
+        if (TIMELINE_STATE.selectedMarkerIds.size > 0 && (e.key === "Delete" || e.key === "Backspace" || KEYMAP_SERVICE.matches(e, "edit.lift_delete") || KEYMAP_SERVICE.matches(e, "edit.ripple_delete"))) {
+            TIMELINE_STATE.removeSelectedMarkers();
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        if (TIMELINE_STATE.selectedGap && (e.key === "Delete" || e.key === "Backspace" || KEYMAP_SERVICE.matches(e, "edit.lift_delete") || KEYMAP_SERVICE.matches(e, "edit.ripple_delete"))) {
+            const gap = TIMELINE_STATE.selectedGap;
+            TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        if (KEYMAP_SERVICE.matches(e, "edit.delete_single_stream")) {
+            if (selectedId) {
+                const clip = cuts.find(c => c.id === selectedId);
+                if (clip && clip.link_id) {
+                    const linkId = clip.link_id;
+                    cuts.forEach(c => { if (c.link_id === linkId) c.link_id = null; });
+                }
+                TIMELINE_STATE.liftDeleteClip(selectedId);
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+                e.preventDefault();
+                return;
+            }
+        }
+
+        if (KEYMAP_SERVICE.matches(e, "edit.ripple_delete")) {
+            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1) {
+                TIMELINE_STATE.rippleDeleteSelectedClips();
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+                e.preventDefault();
+                return;
+            } else if (selectedId) {
+                TIMELINE_STATE.rippleDeleteClip(selectedId);
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+                e.preventDefault();
+                return;
+            }
+        }
+
+        if (KEYMAP_SERVICE.matches(e, "edit.lift_delete")) {
+            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1) {
+                TIMELINE_STATE.liftDeleteSelectedClips();
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+                e.preventDefault();
+                return;
+            } else if (selectedId) {
+                TIMELINE_STATE.liftDeleteClip(selectedId);
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+                e.preventDefault();
+                return;
+            }
+        }
+
+        // Trims & Nudge de Clipes
+        if (KEYMAP_SERVICE.matches(e, "edit.trim_in_nudge_left")) {
+            if (selectedId) {
+                this.nudgeTrim(selectedId, "left", -1);
+                e.preventDefault();
+                return;
+            }
+        }
+        if (KEYMAP_SERVICE.matches(e, "edit.trim_in_nudge_right")) {
+            if (selectedId) {
+                this.nudgeTrim(selectedId, "left", 1);
+                e.preventDefault();
+                return;
+            }
+        }
+        if (KEYMAP_SERVICE.matches(e, "edit.trim_out_nudge_left")) {
+            if (selectedId) {
+                this.nudgeTrim(selectedId, "right", -1);
+                e.preventDefault();
+                return;
+            }
+        }
+        if (KEYMAP_SERVICE.matches(e, "edit.trim_out_nudge_right")) {
+            if (selectedId) {
+                this.nudgeTrim(selectedId, "right", 1);
+                e.preventDefault();
+                return;
+            }
+        }
+
+        if (KEYMAP_SERVICE.matches(e, "edit.nudge_left")) {
             if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1) {
                 TIMELINE_STATE.nudgeSelectedClips(-1);
                 if (this.renderer) this.renderer.requestRedraw();
                 e.preventDefault();
+                return;
             } else if (selectedId) {
-                if (e.altKey) {
-                    this.nudgeTrim(selectedId, "left", -1);
-                } else if (e.shiftKey) {
-                    this.nudgeTrim(selectedId, "right", -1);
-                } else {
-                    this.nudgeSelection(selectedId, -1); // 1 frame para trás
-                }
+                this.nudgeSelection(selectedId, -1);
                 e.preventDefault();
+                return;
             }
         }
-        else if (e.key === "ArrowRight") {
+
+        if (KEYMAP_SERVICE.matches(e, "edit.nudge_right")) {
             if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1) {
                 TIMELINE_STATE.nudgeSelectedClips(1);
                 if (this.renderer) this.renderer.requestRedraw();
                 e.preventDefault();
+                return;
             } else if (selectedId) {
-                if (e.altKey) {
-                    this.nudgeTrim(selectedId, "left", 1);
-                } else if (e.shiftKey) {
-                    this.nudgeTrim(selectedId, "right", 1);
-                } else {
-                    this.nudgeSelection(selectedId, 1); // 1 frame para frente
-                }
+                this.nudgeSelection(selectedId, 1);
                 e.preventDefault();
+                return;
             }
-        }
-        else if (e.key === "[") {
-            if (selectedId) this.nudgeTrim(selectedId, "left", -1);
-            e.preventDefault();
-        }
-        else if (e.key === "]") {
-            if (selectedId) this.nudgeTrim(selectedId, "right", 1);
-            e.preventDefault();
         }
     }
 
