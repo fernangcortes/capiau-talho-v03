@@ -144,71 +144,41 @@ similaridade cosseno).
 
 ### A Matemática da Nitidez e Nitidez Laplaciana
 
-Antes de enviar o crop de um rosto para o banco vetorial ou agrupamento,
-o sistema calcula o **Filtro Laplaciano** da imagem para extrair sua
-variância. \$\$\\text{Nitidez} = \\sigma\^2(\\nabla\^2 I)\$\$ Se o valor
-for inferior ao threshold, o rosto é considerado borrado (desfocado pelo
-movimento da câmera ou profundidade de campo rasa) e descartado para não
-poluir o banco de dados.
+Antes de enviar o crop de um rosto para o banco vetorial ou agrupamento, o sistema calcula o **Filtro Laplaciano** da imagem para extrair sua variância:
+
+$$\text{Nitidez} = \sigma^2(\nabla^2 I)$$
+
+Se o valor for inferior ao threshold, o rosto é considerado borrado (desfocado pelo movimento da câmera ou profundidade de campo rasa) e descartado para não poluir o banco de dados.
 
 ### Parâmetros sob a Lupa
 
-+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--+
-
-\| PARÂMETROS DE VISÃO LOCAL (TIER 0) \|
-
-+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--+\-\-\-\-\-\-\-\-\--+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--+
-
-\| Chave \| Default \| Comportamento em Produção \|
-
-+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--+\-\-\-\-\-\-\-\-\--+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--+
-
-\| faces.detector_score \| 0.60 \| Confiança mínima da YuNet \|
-
-\| faces.nms_threshold \| 0.30 \| Supressão de Caixas Duplicadas \|
-
-\| faces.blur_threshold \| 10.0 \| Filtro de nitidez Laplaciana \|
-
-\| faces.dbscan_eps \| 0.38 \| Similaridade cosseno (distância)\|
-
-\| faces.dbscan_min_samples \| 3 \| Amostras mínimas por personagem\|
-
-+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--+\-\-\-\-\-\-\-\-\--+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--+
+| Chave | Default | Comportamento em Produção |
+| :--- | :---: | :--- |
+| `faces.detector_score` | `0.60` | Confiança mínima da YuNet |
+| `faces.nms_threshold` | `0.30` | Supressão de Caixas Duplicadas |
+| `faces.blur_threshold` | `10.0` | Filtro de nitidez Laplaciana |
+| `faces.dbscan_eps` | `0.38` | Similaridade cosseno (distância máxima) |
+| `faces.dbscan_min_samples` | `3` | Amostras mínimas por personagem |
 
 #### faces.detector_score (Sensibilidade de Detecção)
 
-- **Ajuste:** Se abaixado para 0.45, a YuNet detectará rostos de perfil,
-  na penumbra do set, ou cobertos por bonés/cabelo. Útil em sets de
-  iluminação dramática (ex: chiaroscuro).
-
-- **Risco:** Valores baixos demais geram falsas detecções (ex: texturas
-  de madeira ou roupas sendo identificadas como rostos).
+- **Ajuste:** Se abaixado para 0.45, a YuNet detectará rostos de perfil, na penumbra do set, ou cobertos por bonés/cabelo. Útil em sets de iluminação dramática (ex: chiaroscuro).
+- **Risco:** Valores baixos demais geram falsas detecções (ex: texturas de madeira ou roupas sendo identificadas como rostos).
 
 #### faces.nms_threshold (Supressão de Não-Máximos)
 
-- **Ajuste:** Controla a sobreposição de retângulos na imagem. Se o
-  detector colocar duas caixas de tamanhos ligeiramente diferentes no
-  mesmo rosto, o NMS elimina a de menor confiança. Aumentar este valor
-  permite caixas mais sobrepostas; diminuir força caixas mais separadas.
+- **Ajuste:** Controla a sobreposição de retângulos na imagem. Se o detector colocar duas caixas de tamanhos ligeiramente diferentes no mesmo rosto, o NMS elimina a de menor confiança. Aumentar este valor permite caixas mais sobrepostas; diminuir força caixas mais separadas.
 
 #### faces.blur_threshold (Variância Laplaciana Mínima)
 
-- **Ajuste:** Para filmagens com câmeras de cinema com profundidade de
-  campo muito curta (lentes anamórficas abertas em f/1.8 onde apenas os
-  olhos estão em foco e o resto do rosto sofre bokeh sutil), abaixe para
-  5.0 ou 6.0 para não descartar crops válidos.
-
-- **Sets de Ação/Handheld:** Em filmagens de bastidores dinâmicas com
-  câmera na mão (*shaky cam*), aumente para 15.0 para descartar
-  agressivamente frames borrados por movimento, mantendo na biblioteca
-  de rostos apenas fotos nítidas.
+- **Ajuste:** Para filmagens com câmeras de cinema com profundidade de campo muito curta (lentes anamórficas abertas em f/1.8 onde apenas os olhos estão em foco e o resto do rosto sofre bokeh sutil), abaixe para 5.0 ou 6.0 para não descartar crops válidos.
+- **Sets de Ação/Handheld:** Em filmagens de bastidores dinâmicas com câmera na mão (*shaky cam*), aumente para 15.0 para descartar agressivamente frames borrados por movimento, mantendo na biblioteca de rostos apenas fotos nítidas.
 
 #### faces.dbscan_eps (Epsilon do DBSCAN)
 
-- **Ajuste:** É o raio de busca do algoritmo de clustering. A distância
-  cosseno máxima para considerar que duas faces pertencem ao mesmo ator.
-  \$\$\\text{Distância Cosseno} = 1.0 - \\frac{\\mathbf{u} \\cdot
-  \\mathbf{v}}{\|\\mathbf{u}\|\_2 \|\\mathbf{v}\|\_2}\$\$
+- **Ajuste:** É o raio de busca do algoritmo de clustering. A distância cosseno máxima para considerar que duas faces pertencem ao mesmo ator:
+
+$$\text{Distância Cosseno} = 1.0 - \frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{u}\|_2 \|\mathbf{v}\|_2}$$
 
   - **EPS Alto (ex: 0.45):** O algoritmo fica mais tolerante. Juntará o
     mesmo ator sob luz amarela quente de estúdio e luz azul externa fria

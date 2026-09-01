@@ -92,7 +92,7 @@ Para garantir que o CapIAu / Talho funcione offline com resposta instantânea e 
 
 ### 4.1. Espaço Vetorial de Características ($D$-dimensional)
 Para cada clipe analisado pelo `src/media/audio_analysis.py`, geramos o vetor:
-$$\vec{v} = [ \text{LUFS\_I}, \text{LRA}, \text{TruePeak\_dB}, \text{NoiseFloor\_dB}, \text{ClipPct}, \text{FlatFactor}, \text{StereoCorr} ]$$
+$$\vec{v} = [ \mathbf{LUFS_I}, \mathbf{LRA}, \mathbf{TruePeak_{dB}}, \mathbf{NoiseFloor_{dB}}, \mathbf{ClipPct}, \mathbf{FlatFactor}, \mathbf{StereoCorr} ]$$
 
 ### 4.2. Base de Treinamento e Testes Automatizados
 O Talho executará um script de lote (`scripts/benchmark_audio_clustering.py`) sobre centenas de amostras sintéticas e reais de áudio (vozes masculinas/femininas, microfones lapela/shotgun/celular, salas secas/eco/ruído de rua) gerando clusters de problemas:
