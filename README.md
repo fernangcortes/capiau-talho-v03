@@ -388,75 +388,7 @@ que exige um modelo grande, uma vez por mídia.
 
 ### Diagrama de fluxo <a id="diagrama-de-fluxo"></a>
 
-```mermaid
-graph TD
-    subgraph HD["💾 Armazenamento do usuário"]
-        Originals["Vídeos e fotos originais<br/>.mp4 · .mov · .mxf · RAW"]
-    end
-
-    subgraph Backend["🐍 Backend FastAPI — 100% CPU local, sem GPU"]
-        Watcher["Ingestor<br/>varredura + SHA-256"]
-        FFmpeg["FFmpeg<br/>proxies 720p · MP3 16 kHz · recorte de rostos"]
-        Segmentation["PySceneDetect + OpenCV<br/>shots, beats e movimento de câmera"]
-        SQLite[("SQLite<br/>metadados · diálogos · projetos · timelines")]
-        MiniLM["Sentence-Transformers MiniLM<br/>embeddings de texto"]
-        CLIPEngine["CLIP multilíngue<br/>embeddings de imagem"]
-        FaceEngine["YuNet + SFace (ONNX)<br/>detecção e biometria facial"]
-        Qdrant[("Qdrant local<br/>busca vetorial &lt; 5 ms")]
-        AudioFX["FFmpeg cadeias de áudio<br/>loudness · adeclip · afftdn · alimiter"]
-        DenoiseIA["DPDFNet via sherpa-onnx<br/>denoise por IA (opcional)"]
-    end
-
-    subgraph Cloud["☁️ APIs de nuvem — uso cirúrgico"]
-        AssemblyAI["AssemblyAI<br/>transcrição + diarização pt-BR"]
-        OpenRouter["OpenRouter<br/>DeepSeek V4-Flash · Gemini 2.5 Flash"]
-        S3["AWS S3 (opcional)<br/>armazenamento remoto"]
-        Auphonic["Auphonic (opcional)<br/>dereverb · AutoEQ · alargamento de banda"]
-    end
-
-    subgraph Frontend["💻 Frontend web — NLE em Canvas 2D"]
-        Biblioteca["Biblioteca em árvore<br/>+ aba Rostos"]
-        Player["Players duplos<br/>Source / Program · JKL · I-O"]
-        Timeline["Timeline multipista<br/>V1/V2 · A1/A2 · undo/redo"]
-        Chat["Chat do agente editor<br/>+ modal de alternativas"]
-    end
-
-    Originals --> Watcher
-    Watcher --> SQLite
-    Watcher --> FFmpeg
-
-    FFmpeg -->|proxy 720p/360p| Player
-    FFmpeg -->|proxy 720p| Segmentation
-    FFmpeg -->|mono MP3 16 kHz| AssemblyAI
-    FFmpeg -->|frames de set / B-roll| CLIPEngine
-    FFmpeg -->|recorte de rostos| FaceEngine
-    FFmpeg -.->|opcional| S3
-
-    AssemblyAI -->|diarização + timestamps| SQLite
-    AssemblyAI -->|texto para indexar| MiniLM
-    MiniLM -->|embeddings de texto| Qdrant
-
-    Segmentation -->|shots · beats · keyframes| SQLite
-    Segmentation -->|keyframes por segmento| OpenRouter
-
-    CLIPEngine -->|embeddings de imagem| Qdrant
-    FaceEngine -->|embeddings e grupos de rostos| SQLite
-
-    Timeline -->|medir e tratar áudio| AudioFX
-    DenoiseIA -->|ruído afundado| AudioFX
-    Auphonic -.->|nuvem, opcional| AudioFX
-    AudioFX -->|"WAV derivado em data/audio_tratado"| SQLite
-
-    SQLite -->|contexto da timeline| OpenRouter
-    OpenRouter -->|operações e ghost clips| Timeline
-    OpenRouter -->|temas e descrições| SQLite
-    OpenRouter -->|descrições visuais| Qdrant
-
-    Qdrant -->|busca híbrida e similares| Biblioteca
-    Biblioteca --> Timeline
-    Chat --> Timeline
-    Timeline -->|exportar .otio / .xml / .edl| HD
-```
+![Diagrama de fluxo da arquitetura](docs/images/diagrama-fluxo-arquitetura.svg)
 
 ### O caminho de uma mídia, do disco à timeline <a id="o-caminho-de-uma-midia-do-disco-a-timeline"></a>
 

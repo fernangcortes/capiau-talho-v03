@@ -1,4 +1,4 @@
-﻿# Guia de Restauração de Áudio Auphonic e Sistema de Diagnóstico Inteligente — CapIAu / Talho
+# Guia de Restauração de Áudio Auphonic e Sistema de Diagnóstico Inteligente — CapIAu / Talho
 
 > **Referência de Sessão Antigravity:** [Auphonic Audio Restoration Guide](conversation://ee745f2c-3917-4514-8471-125c91618dbd)  
 > **Data de Registro:** 27 de Agosto de 2026  
@@ -18,34 +18,7 @@ O objetivo a médio/longo prazo no Talho é duplo:
 
 ## 2. Anatomia Técnica dos Algoritmos Auphonic (Estado da Arte 2026)
 
-```mermaid
-flowchart LR
-    subgraph IN["Entrada"]
-        WAV["PCM 24-bit / 48kHz (Linear)"]
-    end
-
-    subgraph RESTORE["1. Filtragem & Restauração"]
-        HPF["Adaptive High-Pass\n(Corte <50-80Hz + Notch 60Hz)"]
-        EQ["Voice AutoEQ\n(De-esser + De-plosive)"]
-        BW["Bandwidth Extension\n(Síntese de Agudos 10-20kHz)"]
-        SV["Studio Voice (Beta)\n(Reconstrução Neural de Clipping)"]
-    end
-
-    subgraph DENOISE["2. Denoising & Acústica"]
-        DYN["Dynamic Denoiser\n(Keep Speech & Music)"]
-        DEREV["Dereverberation\n(Atenuação de Eco de Sala)"]
-        BRTH["Breath Reduction\n(Redução de Respiração)"]
-        ISO["Speech Isolation\n(Corte Cirúrgico de Fundo)"]
-    end
-
-    subgraph DYNAMICS["3. Dinâmica & Normalização"]
-        LEV["Adaptive Leveler\n(Classificador Voz/Música + Ganho Dinâmico)"]
-        LOUD["Loudness Target\n(Dialog Loudness -14 / -16 / -23 LUFS)"]
-        TP["True Peak Limiter\n(-1.0 dBTP Oversampling)"]
-    end
-
-    WAV --> RESTORE --> DENOISE --> DYNAMICS --> OUT["Áudio Masterizado"]
-```
+![Anatomia Técnica dos Algoritmos Auphonic](images/auphonic-algoritmos.svg)
 
 ### 2.1. Filtering and Enhancement (Filtragem e Síntese)
 * **Adaptive High-Pass Filtering:** Detecta a frequência fundamental do locutor e corta ruídos subsônicos, impactos físicos e efeito de proximidade excessivo de lapelas. Aplica *notch filters* para cancelar zumbido elétrico (*ground hum* de 60 Hz no Brasil / 50 Hz internacional e harmônicos).
@@ -124,17 +97,7 @@ $$\vec{v} = [ \text{LUFS\_I}, \text{LRA}, \text{TruePeak\_dB}, \text{NoiseFloor\
 ### 4.2. Base de Treinamento e Testes Automatizados
 O Talho executará um script de lote (`scripts/benchmark_audio_clustering.py`) sobre centenas de amostras sintéticas e reais de áudio (vozes masculinas/femininas, microfones lapela/shotgun/celular, salas secas/eco/ruído de rua) gerando clusters de problemas:
 
-```mermaid
-graph TD
-    A["Áudio do Usuário (WAV)"] --> B["ffmpeg ebur128 + astats + volumedetect"]
-    B --> C["Vetor de Métricas: v = [LUFS, LRA, TP, Floor, Clip, Flat]"]
-    C --> D{"IA Disponível?"}
-    D -- Sim --> E["LLM / Assistente de Áudio\n(Gera Relatório Explicativo Rico)"]
-    D -- Não (Offline) --> F["K-Nearest Neighbors / Matriz de Proximidade\n(Busca Cluster mais Próximo na Base)"]
-    E --> G["Prescrição de Filtros & Gráficos"]
-    F --> G
-    G --> H["1-Click Apply (FFmpeg Local DSP ou Auphonic Cloud)"]
-```
+![Fluxo de Clustering e Prescrição](images/auphonic-clustering-flow.svg)
 
 ### 4.3. Tabela de Clusters e Prescrições Automáticas
 
