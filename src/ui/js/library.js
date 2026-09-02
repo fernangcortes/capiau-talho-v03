@@ -3910,6 +3910,57 @@ export class LibraryManager {
         }, { passive: true });
     }
 
+    attachWheelZoomListener(targetDoc = (this.activeDoc || document)) {
+        if (!targetDoc) return;
+
+        const handleWheel = (e) => {
+            if (!e.shiftKey) return;
+
+            const target = e.target;
+            if (!target) return;
+
+            // Verifica se o evento ocorreu dentro do container/grid da Biblioteca de Mídias
+            const isInsideMedia = target.closest("#tab-media, #media-tree-list, #video-list, #photo-list, .library-tree-list, .media-card, .zoom-container, #library-zoom-slider");
+            if (!isInsideMedia) {
+                const activeTab = (targetDoc || document).querySelector("#sidebar-left .tab-content.active")?.id;
+                const isMediaTabActive = activeTab === "tab-media" || activeTab === "tab-videos" || activeTab === "tab-photos";
+                const isInsideSidebar = target.closest("#sidebar-left");
+                if (!isMediaTabActive || !isInsideSidebar) {
+                    return;
+                }
+            }
+
+            if (typeof isAnyModalOpen === "function" && isAnyModalOpen(targetDoc)) {
+                return;
+            }
+
+            // Impede o scroll nativo (horizontal ou vertical) do navegador
+            e.preventDefault();
+            e.stopPropagation();
+
+            const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+            if (delta === 0) return;
+
+            const currentZoom = parseInt(localStorage.getItem("lib-pref-zoom"), 10) || 80;
+            const step = delta < 0 ? 10 : -10;
+            const newZoom = Math.max(30, Math.min(300, currentZoom + step));
+
+            if (typeof this.setZoomValue === "function") {
+                this.setZoomValue(newZoom);
+            } else if (typeof window.setLibraryZoomValue === "function") {
+                window.setLibraryZoomValue(newZoom);
+            }
+        };
+
+        const targetElements = targetDoc.querySelectorAll("#sidebar-left, #sidebar-left .sidebar-content.scrollable, #tab-media, #media-tree-list, .library-tree-list");
+        targetElements.forEach(el => {
+            if (el && !el._hasLibraryWheelZoomListener) {
+                el._hasLibraryWheelZoomListener = true;
+                el.addEventListener("wheel", handleWheel, { passive: false });
+            }
+        });
+    }
+
     onPopoutReady(win) {
         if (!win || !win.document) return;
         this.activeDoc = win.document;
@@ -3925,6 +3976,8 @@ export class LibraryManager {
         if (typeof this.applyDisplayClasses === "function") {
             this.applyDisplayClasses();
         }
+        this.attachScrollListener(win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+        this.attachWheelZoomListener(win.document);
     }
 
     onPopoutRestored() {
@@ -3941,10 +3994,13 @@ export class LibraryManager {
         if (typeof this.applyDisplayClasses === "function") {
             this.applyDisplayClasses();
         }
+        this.attachScrollListener();
+        this.attachWheelZoomListener(document);
     }
 
     init() {
         this.attachScrollListener();
+        this.attachWheelZoomListener();
         STATE.on("videosUpdated", (videos) => this.renderVideos(videos));
         STATE.on("photosUpdated", (photos) => this.renderPhotos(photos));
         STATE.on("projectChanged", () => { this.reloadData(); this.loadTriageReviewThreshold(); });
@@ -4459,7 +4515,7 @@ export class LibraryManager {
         const zoomLabel = document.getElementById("library-zoom-label");
         
         function setZoomValue(val) {
-            const numericVal = parseInt(val, 10);
+            const numericVal = Math.max(30, Math.min(300, parseInt(val, 10)));
             if (isNaN(numericVal)) return;
 
             const lists = getAllMediaLists();
