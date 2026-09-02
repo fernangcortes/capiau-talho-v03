@@ -398,13 +398,19 @@ export function updateZoomTier(listEl, zoomVal) {
 
 export function getAllLibraryDocuments() {
     const docs = [document];
-    if (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed) {
-        if (!docs.includes(window.popoutWindows["sidebar-left"].document)) {
-            docs.push(window.popoutWindows["sidebar-left"].document);
+    if (window.popoutWindows) {
+        for (const name in window.popoutWindows) {
+            const win = window.popoutWindows[name];
+            if (win && !win.closed && win.document) {
+                if (!docs.includes(win.document)) {
+                    docs.push(win.document);
+                }
+            }
         }
     }
     return docs;
 }
+window.getAllLibraryDocuments = getAllLibraryDocuments;
 
 export function getAllMediaLists() {
     const listSet = new Set();
@@ -1873,7 +1879,7 @@ export function showFolderContextMenu(e, node, folderHeader) {
 // ── MODAIS DE ORGANIZAÇÃO, METADADOS E RELINK ───────────────────────────
 
 export function promptFolderImportTarget(folderName, targetFolderPath, onChoice) {
-    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || document;
+    const targetDoc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed) ? window.popoutWindows["sidebar-left"].document : (document.querySelector("#sidebar-left")?.ownerDocument || document);
     const modal = targetDoc.createElement("div");
     modal.className = "modal-overlay";
     modal.style.display = "flex";
@@ -1932,7 +1938,7 @@ export function promptFolderImportTarget(folderName, targetFolderPath, onChoice)
 }
 
 export function promptMoveMediaToBin(item, mediaType = "video") {
-    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || document;
+    const targetDoc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed) ? window.popoutWindows["sidebar-left"].document : (document.querySelector("#sidebar-left")?.ownerDocument || document);
     const projectId = getActiveProjectId();
     const modal = targetDoc.createElement("div");
     modal.className = "modal-overlay";
@@ -2035,7 +2041,7 @@ export function promptMoveMediaToBin(item, mediaType = "video") {
 }
 
 export function promptEditMediaMetadata(item, mediaType = "video") {
-    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || document;
+    const targetDoc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed) ? window.popoutWindows["sidebar-left"].document : (document.querySelector("#sidebar-left")?.ownerDocument || document);
     const modal = targetDoc.createElement("div");
     modal.className = "modal-overlay";
     modal.style.display = "flex";
@@ -2151,7 +2157,7 @@ export function promptEditMediaMetadata(item, mediaType = "video") {
 }
 
 export function promptRelinkMediaDialog(prefillFolder = "") {
-    const targetDoc = document.querySelector("#sidebar-left")?.ownerDocument || document;
+    const targetDoc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed) ? window.popoutWindows["sidebar-left"].document : (document.querySelector("#sidebar-left")?.ownerDocument || document);
     const projectId = getActiveProjectId();
     const modal = targetDoc.createElement("div");
     modal.className = "modal-overlay";
@@ -5510,7 +5516,10 @@ export class LibraryManager {
         const video = (STATE.allVideos || []).find(v => v.id === videoId);
         if (!video) return false;
 
-        const tabBtn = document.querySelector('.sidebar-left .tab-btn[data-tab="tab-media"]');
+        const targetDoc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed)
+            ? window.popoutWindows["sidebar-left"].document
+            : (this.activeDoc || document);
+        const tabBtn = targetDoc.querySelector('.sidebar-left .tab-btn[data-tab="tab-media"]');
         if (tabBtn) tabBtn.click();
 
         // Expande os bins ancestrais do item (caminho virtual, nao mais o de disco)
@@ -6662,16 +6671,20 @@ export class LibraryManager {
         if (mainView) mainView.style.display = "flex";
         if (inspectorView) inspectorView.style.display = "none";
 
+        const targetDoc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed)
+            ? window.popoutWindows["sidebar-left"].document
+            : (this.activeDoc || document);
+
         // Restaura a aba ativa que o usuário tinha antes de abrir o inspetor
         if (this.preInspectorActiveTab) {
-            const tabBtn = document.querySelector(`.sidebar-left .tab-btn[data-tab="${this.preInspectorActiveTab}"]`);
+            const tabBtn = targetDoc.querySelector(`.sidebar-left .tab-btn[data-tab="${this.preInspectorActiveTab}"]`);
             if (tabBtn) tabBtn.click();
         }
 
         // Faz scroll até o card do vídeo ativo na biblioteca
         if (STATE.activeVideo) {
             requestAnimationFrame(() => {
-                const activeCard = document.querySelector(`.media-card.tree-file-item[data-video-id="${STATE.activeVideo.id}"]`);
+                const activeCard = targetDoc.querySelector(`.media-card.tree-file-item[data-video-id="${STATE.activeVideo.id}"]`);
                 if (activeCard) {
                     activeCard.scrollIntoView({ block: "nearest", behavior: "smooth" });
                 }
@@ -6825,16 +6838,18 @@ export class LibraryManager {
                             titleTextEl.textContent = newTitle;
                             titleTextEl.title = newTitle;
                             
-                            // Atualiza os cards da biblioteca no DOM
-                            const cardTitle = document.querySelector(`.media-card[data-video-id="${video.id}"] .clip-title-text`);
-                            if (cardTitle) cardTitle.textContent = newTitle;
-                            
-                            // Atualiza tooltip no card
-                            const cardH4 = document.querySelector(`.media-card[data-video-id="${video.id}"] h4`);
-                            if (cardH4) {
-                                const newTooltip = buildMediaTooltip(video, "video", false);
-                                cardH4.setAttribute("data-tooltip", newTooltip);
-                            }
+                            // Atualiza os cards da biblioteca no DOM (em todas as janelas)
+                            getAllLibraryDocuments().forEach(targetDoc => {
+                                const cardTitle = targetDoc.querySelector(`.media-card[data-video-id="${video.id}"] .clip-title-text`);
+                                if (cardTitle) cardTitle.textContent = newTitle;
+                                
+                                // Atualiza tooltip no card
+                                const cardH4 = targetDoc.querySelector(`.media-card[data-video-id="${video.id}"] h4`);
+                                if (cardH4) {
+                                    const newTooltip = buildMediaTooltip(video, "video", false);
+                                    cardH4.setAttribute("data-tooltip", newTooltip);
+                                }
+                            });
                             
                             if (typeof window.showToast === "function") {
                                 window.showToast("Título atualizado com sucesso!", "success");
@@ -7529,39 +7544,42 @@ window.setVideoThumbnail = async function(videoId, timestamp, triggerBtn = null)
                 target._thumbVersion = ver;
             }
 
-            // Atualiza diretamente os cards da biblioteca sem recriar o DOM nem resetar o scroll
-            const cardThumbnails = document.querySelectorAll(`.tree-file-item[data-video-id="${videoId}"] .media-thumbnail`);
-            cardThumbnails.forEach(thumbEl => {
-                let img = thumbEl.querySelector("img");
-                if (img) {
-                    img.src = `/api/video/${videoId}/thumbnail?v=${ver}`;
-                    img.style.display = "";
-                    const icon = thumbEl.querySelector("i.fa-solid");
-                    if (icon) icon.remove();
-                } else {
-                    const fallbackIcon = (target && target.video_type === 'interview') ? 'fa-microphone-lines' : 'fa-film';
-                    const icon = thumbEl.querySelector("i.fa-solid");
-                    if (icon) icon.remove();
-                    img = document.createElement("img");
-                    img.alt = "Thumb";
-                    img.loading = "lazy";
-                    img.decoding = "async";
-                    img.onerror = function() {
-                        this.onerror = null;
-                        this.style.display = 'none';
-                        if (this.parentNode) {
-                            this.parentNode.insertAdjacentHTML('beforeend', `<i class="fa-solid ${fallbackIcon}"></i>`);
-                        }
-                    };
-                    img.src = `/api/video/${videoId}/thumbnail?v=${ver}`;
-                    thumbEl.prepend(img);
-                }
-            });
+            // Atualiza diretamente os cards da biblioteca sem recriar o DOM nem resetar o scroll em todas as janelas (principal e destacadas)
+            const allDocs = getAllLibraryDocuments();
+            allDocs.forEach(doc => {
+                const cardThumbnails = doc.querySelectorAll(`.tree-file-item[data-video-id="${videoId}"] .media-thumbnail, .media-card[data-video-id="${videoId}"] .media-thumbnail`);
+                cardThumbnails.forEach(thumbEl => {
+                    let img = thumbEl.querySelector("img");
+                    if (img) {
+                        img.src = `/api/video/${videoId}/thumbnail?v=${ver}`;
+                        img.style.display = "";
+                        const icon = thumbEl.querySelector("i.fa-solid");
+                        if (icon) icon.remove();
+                    } else {
+                        const fallbackIcon = (target && target.video_type === 'interview') ? 'fa-microphone-lines' : 'fa-film';
+                        const icon = thumbEl.querySelector("i.fa-solid");
+                        if (icon) icon.remove();
+                        img = doc.createElement("img");
+                        img.alt = "Thumb";
+                        img.loading = "lazy";
+                        img.decoding = "async";
+                        img.onerror = function() {
+                            this.onerror = null;
+                            this.style.display = 'none';
+                            if (this.parentNode) {
+                                this.parentNode.insertAdjacentHTML('beforeend', `<i class="fa-solid ${fallbackIcon}"></i>`);
+                            }
+                        };
+                        img.src = `/api/video/${videoId}/thumbnail?v=${ver}`;
+                        thumbEl.prepend(img);
+                    }
+                });
 
-            // Atualiza miniaturas nas tarefas caso estejam abertas
-            const taskImgs = document.querySelectorAll(`.task-item[data-video-id="${videoId}"] img, .task-item[data-task-id="thumbs-${videoId}"] img, .task-item[data-task-id="${videoId}"] img`);
-            taskImgs.forEach(img => {
-                img.src = `/api/video/${videoId}/thumbnail?v=${ver}`;
+                // Atualiza miniaturas nas tarefas caso estejam abertas
+                const taskImgs = doc.querySelectorAll(`.task-item[data-video-id="${videoId}"] img, .task-item[data-task-id="thumbs-${videoId}"] img, .task-item[data-task-id="${videoId}"] img`);
+                taskImgs.forEach(img => {
+                    img.src = `/api/video/${videoId}/thumbnail?v=${ver}`;
+                });
             });
 
             // Notifica ouvintes específicos sem acionar rebuild destrutivo da biblioteca
