@@ -1335,6 +1335,9 @@ export class WorkspaceManager {
                             window.libraryInstance.attachScrollListener(win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
                             const activeTab = win.document.querySelector("#sidebar-left .tab-content.active")?.id || "tab-media";
                             window.libraryInstance.restoreTabScrollPosition(activeTab, win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                            if (typeof window.libraryInstance.onPopoutReady === "function") {
+                                window.libraryInstance.onPopoutReady(win);
+                            }
                         }
                     }
 
@@ -1413,6 +1416,9 @@ export class WorkspaceManager {
                 window.libraryInstance.attachScrollListener(document.querySelector("#sidebar-left .sidebar-content.scrollable"));
                 const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id || "tab-media";
                 window.libraryInstance.restoreTabScrollPosition(activeTab, document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                if (typeof window.libraryInstance.onPopoutRestored === "function") {
+                    window.libraryInstance.onPopoutRestored();
+                }
             }
         }
 

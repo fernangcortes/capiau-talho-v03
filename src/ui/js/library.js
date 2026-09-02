@@ -393,6 +393,30 @@ export function updateZoomTier(listEl, zoomVal) {
     }
 }
 
+export function getAllLibraryDocuments() {
+    const docs = [document];
+    if (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed) {
+        if (!docs.includes(window.popoutWindows["sidebar-left"].document)) {
+            docs.push(window.popoutWindows["sidebar-left"].document);
+        }
+    }
+    return docs;
+}
+
+export function getAllMediaLists() {
+    const listSet = new Set();
+    getAllLibraryDocuments().forEach(doc => {
+        try {
+            const elements = doc.querySelectorAll("#media-tree-list, #video-list, #photo-list, .library-tree-list");
+            elements.forEach(el => listSet.add(el));
+        } catch (e) {}
+    });
+    if (window.libraryInstance?.mediaTreeListEl && !listSet.has(window.libraryInstance.mediaTreeListEl)) {
+        listSet.add(window.libraryInstance.mediaTreeListEl);
+    }
+    return Array.from(listSet);
+}
+
 export function getMediaRichContent(item, kind = "video", currentTitle = "") {
     if (!item) return { descHtml: "", speakerHtml: "", tagsHtml: "" };
 
@@ -2456,9 +2480,12 @@ function getCachedQueryAST(query) {
 }
 
 function refreshRenderContext() {
-    const searchInput = document.getElementById("library-search-input");
+    const doc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed)
+        ? window.popoutWindows["sidebar-left"].document
+        : (window.libraryInstance?.activeDoc || document);
+    const searchInput = doc.getElementById("library-search-input") || document.getElementById("library-search-input");
     const query = searchInput ? searchInput.value.trim() : "";
-    const sortSelect = document.getElementById("library-sort-by");
+    const sortSelect = doc.getElementById("library-sort-by") || document.getElementById("library-sort-by");
     renderCtx = {
         query,
         ast: query ? getCachedQueryAST(query) : null,
@@ -3883,6 +3910,39 @@ export class LibraryManager {
         }, { passive: true });
     }
 
+    onPopoutReady(win) {
+        if (!win || !win.document) return;
+        this.activeDoc = win.document;
+        this.activeWindow = win;
+        const savedZoom = parseInt(localStorage.getItem("lib-pref-zoom"), 10) || 80;
+        if (typeof this.setZoomValue === "function") {
+            this.setZoomValue(savedZoom);
+        }
+        const savedMode = localStorage.getItem("lib-pref-view-mode") || "list";
+        if (typeof this.setViewMode === "function") {
+            this.setViewMode(savedMode);
+        }
+        if (typeof this.applyDisplayClasses === "function") {
+            this.applyDisplayClasses();
+        }
+    }
+
+    onPopoutRestored() {
+        this.activeDoc = document;
+        this.activeWindow = window;
+        const savedZoom = parseInt(localStorage.getItem("lib-pref-zoom"), 10) || 80;
+        if (typeof this.setZoomValue === "function") {
+            this.setZoomValue(savedZoom);
+        }
+        const savedMode = localStorage.getItem("lib-pref-view-mode") || "list";
+        if (typeof this.setViewMode === "function") {
+            this.setViewMode(savedMode);
+        }
+        if (typeof this.applyDisplayClasses === "function") {
+            this.applyDisplayClasses();
+        }
+    }
+
     init() {
         this.attachScrollListener();
         STATE.on("videosUpdated", (videos) => this.renderVideos(videos));
@@ -3896,21 +3956,29 @@ export class LibraryManager {
             this.scrollIndexTracker?.hide();
         });
         STATE.on("activeVideoChanged", (video) => {
-            document.querySelectorAll(".media-card.tree-file-item:not(.photo-item)").forEach(el => {
-                if (video && el.getAttribute("data-video-id") == video.id) {
-                    el.classList.add("active");
-                } else {
-                    el.classList.remove("active");
-                }
+            getAllLibraryDocuments().forEach(doc => {
+                try {
+                    doc.querySelectorAll(".media-card.tree-file-item:not(.photo-item)").forEach(el => {
+                        if (video && el.getAttribute("data-video-id") == video.id) {
+                            el.classList.add("active");
+                        } else {
+                            el.classList.remove("active");
+                        }
+                    });
+                } catch (e) {}
             });
         });
         STATE.on("activePhotoChanged", (photo) => {
-            document.querySelectorAll("[data-photo-id]").forEach(el => {
-                if (photo && el.getAttribute("data-photo-id") == photo.id) {
-                    el.classList.add("active");
-                } else {
-                    el.classList.remove("active");
-                }
+            getAllLibraryDocuments().forEach(doc => {
+                try {
+                    doc.querySelectorAll("[data-photo-id]").forEach(el => {
+                        if (photo && el.getAttribute("data-photo-id") == photo.id) {
+                            el.classList.add("active");
+                        } else {
+                            el.classList.remove("active");
+                        }
+                    });
+                } catch (e) {}
             });
         });
 
@@ -4287,15 +4355,21 @@ export class LibraryManager {
         const chkTags = document.getElementById("chk-show-tags");
         const chkStatus = document.getElementById("chk-show-status");
         
-        const getAllMediaLists = () => document.querySelectorAll("#media-tree-list, #video-list, #photo-list, .library-tree-list");
-        
         function applyDisplayClasses() {
+            const doc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed)
+                ? window.popoutWindows["sidebar-left"].document
+                : (window.libraryInstance?.activeDoc || document);
+            const chkThumb = doc.getElementById("chk-show-thumbnails") || document.getElementById("chk-show-thumbnails");
+            const chkDur = doc.getElementById("chk-show-duration") || document.getElementById("chk-show-duration");
+            const chkTag = doc.getElementById("chk-show-tags") || document.getElementById("chk-show-tags");
+            const chkStat = doc.getElementById("chk-show-status") || document.getElementById("chk-show-status");
+
             const lists = getAllMediaLists();
             lists.forEach(list => {
-                list.classList.toggle("hide-thumbnails", chkThumbnails ? !chkThumbnails.checked : false);
-                list.classList.toggle("hide-duration", chkDuration ? !chkDuration.checked : false);
-                list.classList.toggle("hide-tags", chkTags ? !chkTags.checked : false);
-                list.classList.toggle("hide-status", chkStatus ? !chkStatus.checked : false);
+                list.classList.toggle("hide-thumbnails", chkThumb ? !chkThumb.checked : false);
+                list.classList.toggle("hide-duration", chkDur ? !chkDur.checked : false);
+                list.classList.toggle("hide-tags", chkTag ? !chkTag.checked : false);
+                list.classList.toggle("hide-status", chkStat ? !chkStat.checked : false);
             });
         }
         
@@ -4357,13 +4431,19 @@ export class LibraryManager {
                 if (mode === "grid") list.classList.add("view-mode-grid");
                 else list.classList.remove("view-mode-grid");
             });
-            if (mode === "grid") {
-                if (btnViewModeGrid) btnViewModeGrid.classList.add("active");
-                if (btnViewModeList) btnViewModeList.classList.remove("active");
-            } else {
-                if (btnViewModeList) btnViewModeList.classList.add("active");
-                if (btnViewModeGrid) btnViewModeGrid.classList.remove("active");
-            }
+            getAllLibraryDocuments().forEach(doc => {
+                try {
+                    const btnGrid = doc.getElementById("btn-view-mode-grid");
+                    const btnList = doc.getElementById("btn-view-mode-list");
+                    if (mode === "grid") {
+                        if (btnGrid) btnGrid.classList.add("active");
+                        if (btnList) btnList.classList.remove("active");
+                    } else {
+                        if (btnList) btnList.classList.add("active");
+                        if (btnGrid) btnGrid.classList.remove("active");
+                    }
+                } catch (e) {}
+            });
             localStorage.setItem("lib-pref-view-mode", mode);
         }
         
@@ -4379,18 +4459,29 @@ export class LibraryManager {
         const zoomLabel = document.getElementById("library-zoom-label");
         
         function setZoomValue(val) {
+            const numericVal = parseInt(val, 10);
+            if (isNaN(numericVal)) return;
+
             const lists = getAllMediaLists();
             lists.forEach(list => {
-                list.style.setProperty("--thumb-width", `${val}px`);
-                list.style.setProperty("--thumb-height", `${Math.round(val * 9 / 16)}px`);
-                updateZoomTier(list, val);
+                list.style.setProperty("--thumb-width", `${numericVal}px`);
+                list.style.setProperty("--thumb-height", `${Math.round(numericVal * 9 / 16)}px`);
+                updateZoomTier(list, numericVal);
             });
-            if (zoomLabel) zoomLabel.textContent = `${val}px`;
-            if (zoomSlider) {
-                zoomSlider.value = val;
-                zoomSlider.setAttribute("data-tooltip", `Zoom Thumbs: ${val}px`);
-            }
-            localStorage.setItem("lib-pref-zoom", val);
+
+            getAllLibraryDocuments().forEach(doc => {
+                try {
+                    const lbl = doc.getElementById("library-zoom-label");
+                    if (lbl) lbl.textContent = `${numericVal}px`;
+                    const sld = doc.getElementById("library-zoom-slider");
+                    if (sld) {
+                        sld.value = numericVal;
+                        sld.setAttribute("data-tooltip", `Zoom Thumbs: ${numericVal}px`);
+                    }
+                } catch (e) {}
+            });
+
+            localStorage.setItem("lib-pref-zoom", numericVal);
         }
         
         if (zoomSlider) {
@@ -4401,6 +4492,13 @@ export class LibraryManager {
                 setZoomValue(80);
             });
         }
+
+        this.applyDisplayClasses = applyDisplayClasses;
+        this.setViewMode = setViewMode;
+        this.setZoomValue = setZoomValue;
+        this.getAllMediaLists = getAllMediaLists;
+        window.setLibraryZoomValue = setZoomValue;
+        window.getAllMediaLists = getAllMediaLists;
         
         // Carrega preferências salvas
         const savedViewMode = localStorage.getItem("lib-pref-view-mode") || "list";
@@ -5287,7 +5385,10 @@ export class LibraryManager {
         flushAllPendingChunks(); // o card alvo pode estar num bloco ainda nao montado
 
         requestAnimationFrame(() => {
-            const card = document.querySelector(`.media-card.tree-file-item[data-video-id="${videoId}"]`);
+            const targetDoc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed)
+                ? window.popoutWindows["sidebar-left"].document
+                : (this.activeDoc || document);
+            const card = targetDoc.querySelector(`.media-card.tree-file-item[data-video-id="${videoId}"]`);
             if (card) {
                 card.scrollIntoView({ block: "center", behavior: "smooth" });
                 card.classList.remove("reveal-pulse");
@@ -5304,7 +5405,10 @@ export class LibraryManager {
         const photo = (STATE.allPhotos || []).find(p => p.id === photoId);
         if (!photo) return false;
 
-        const tabBtn = document.querySelector('.sidebar-left .tab-btn[data-tab="tab-media"]');
+        const targetDoc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed)
+            ? window.popoutWindows["sidebar-left"].document
+            : (this.activeDoc || document);
+        const tabBtn = targetDoc.querySelector('.sidebar-left .tab-btn[data-tab="tab-media"]');
         if (tabBtn) tabBtn.click();
 
         const vPath = getItemVirtualFolder(photo);
@@ -5323,7 +5427,7 @@ export class LibraryManager {
         flushAllPendingChunks();
 
         requestAnimationFrame(() => {
-            const card = document.querySelector(`[data-photo-id="${photoId}"]`);
+            const card = targetDoc.querySelector(`[data-photo-id="${photoId}"]`);
             if (card) {
                 card.scrollIntoView({ block: "center", behavior: "smooth" });
                 card.classList.remove("reveal-pulse");
@@ -5336,7 +5440,7 @@ export class LibraryManager {
     }
 
     renderMedia(options = {}) {
-        const targetEl = document.getElementById("media-tree-list") || this.videoListEl;
+        const targetEl = (this.activeDoc || document).getElementById("media-tree-list") || document.getElementById("media-tree-list") || this.videoListEl;
         if (!targetEl) return;
         const container = this.getScrollContainer();
         const shouldPreserveScroll = options.preserveScroll !== false;
@@ -5362,15 +5466,19 @@ export class LibraryManager {
         const allPhotos = STATE.allPhotos || [];
 
         // Atualiza contadores dos chips de tipo
-        const countAllEl = document.getElementById("count-all");
-        const countVideoEl = document.getElementById("count-video");
-        const countPhotoEl = document.getElementById("count-photo");
-        const countAudioEl = document.getElementById("count-audio");
+        getAllLibraryDocuments().forEach(doc => {
+            try {
+                const countAllEl = doc.getElementById("count-all");
+                const countVideoEl = doc.getElementById("count-video");
+                const countPhotoEl = doc.getElementById("count-photo");
+                const countAudioEl = doc.getElementById("count-audio");
 
-        if (countAllEl) countAllEl.textContent = `${allVids.length + allPhotos.length}`;
-        if (countVideoEl) countVideoEl.textContent = `${allVids.length}`;
-        if (countPhotoEl) countPhotoEl.textContent = `${allPhotos.length}`;
-        if (countAudioEl) countAudioEl.textContent = "0";
+                if (countAllEl) countAllEl.textContent = `${allVids.length + allPhotos.length}`;
+                if (countVideoEl) countVideoEl.textContent = `${allVids.length}`;
+                if (countPhotoEl) countPhotoEl.textContent = `${allPhotos.length}`;
+                if (countAudioEl) countAudioEl.textContent = "0";
+            } catch (e) {}
+        });
 
         // Marca a origem de cada item uma unica vez: video e foto compartilham
         // a mesma arvore agora, e adivinhar o tipo por `duration` dava falso negativo.
