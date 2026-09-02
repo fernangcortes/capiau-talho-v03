@@ -6259,6 +6259,21 @@ select option, .nle-select option {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.custom-context-menu .menu-item .menu-item-shortcut {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-left: auto;
+    padding-left: 14px;
+    font-family: var(--font-mono, monospace);
+    opacity: 0.75;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+    user-select: none;
+}
+.custom-context-menu .menu-item:hover .menu-item-shortcut {
+    color: rgba(255, 255, 255, 0.95);
+    opacity: 1;
+}
 .custom-context-menu .menu-item .menu-item-chevron {
     font-size: 9px;
     color: var(--text-muted);

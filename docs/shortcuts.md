@@ -49,12 +49,28 @@ No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado V
 | **`Shift + I`** | **Ir para Ponto IN** | Posiciona a agulha de reprodução exatamente no ponto de entrada marcado. |
 | **`Shift + O`** | **Ir para Ponto OUT** | Posiciona a agulha de reprodução exatamente no ponto de saída marcado. |
 | **`Duplo Clique` (Player)** | **Maximizar / Minimizar Player** | Expande o monitor ativo para tela cheia ou restaura o layout. |
-| **`Duplo Clique` (Biblioteca)** | **Inserir Direto na Timeline** | Insere o arquivo de mídia diretamente na timeline na posição da agulha. |
 | **`Shift + Roda` (Biblioteca)** | **Zoom Dinâmico de Cards** | Ajusta progressivamente o tamanho dos cards e miniaturas da biblioteca. |
 
 ---
 
-## ✂️ 4. Marcação de Pontos, Inserção e Edição na Timeline
+## 📥 4. Ingestão e Inserção de Mídias na Timeline (Biblioteca & Duplo Clique)
+
+O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combinações de teclas no duplo clique** e pelo **submenu "Adicionar à Timeline"** no menu de contexto (botão direito):
+
+| Tecla / Combinação | Modo de Ingestão | Ação e Comportamento na Timeline | Posição da Agulha |
+| :--- | :--- | :--- | :--- |
+| **`Duplo Clique`** | **Na Posição da Agulha (Playhead)** | Insere no frame exato onde a agulha está na pista ativa/padrão. | Final do clipe inserido |
+| **`Shift + Duplo Clique`** | **No Final da Timeline (Append)** | Localiza o término do último corte existente e anexa no final da timeline. | Final do clipe inserido |
+| **`Ctrl + Duplo Clique`** *(ou `Cmd`)* | **No 1º Espaço Vazio (Primeiro Gap)** | Encontra o primeiro espaço vazio (gap) a partir do frame 0 e insere no início dele. | **Início do clipe inserido** |
+| **`Ctrl + Shift + Duplo Clique`** | **No Próximo Espaço Vazio (Após Agulha)** | Encontra o primeiro gap à frente da agulha atual e insere no início dele. | **Início do clipe inserido** |
+| **`Alt + Shift + Duplo Clique`** | **No Início da Timeline (Frame 0)** | Insere no frame 0 da pista de destino. | Início (Frame 0) |
+| **`Alt + Duplo Clique`** | **Inserir Empurrando (Ripple Insert)** | Divide clipes sob a agulha e empurra todos os cortes subsequentes pela duração do novo clipe. | Final do clipe inserido |
+| **`Ctrl + Alt + Duplo Clique`** | **Sobrepor em Pista Superior (Overlay)** | Insere na pista superior livre (ex: V2/B-Roll) na posição da agulha. | Final do clipe inserido |
+| **`Botão Direito ➔ Substituir`** | **Substituir Clipe Selecionado** | Substitui a mídia do clipe atualmente selecionado na timeline mantendo seu início. | Mantém posição |
+
+---
+
+## ✂️ 5. Marcação de Pontos e Edição na Timeline
 
 | Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
@@ -77,7 +93,7 @@ No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado V
 
 ---
 
-## 🎛️ 5. Ferramentas da Timeline e Ajustes de Precisão
+## 🎛️ 6. Ferramentas da Timeline e Ajustes de Precisão
 
 | Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
@@ -92,7 +108,7 @@ No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado V
 
 ---
 
-## 📍 6. Marcadores de Timeline e Clipe
+## 📍 7. Marcadores de Timeline e Clipe
 
 | Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
@@ -105,7 +121,7 @@ No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado V
 
 ---
 
-## 🤖 7. Inteligência Artificial, Inspetor e Comandos Globais
+## 🤖 8. Inteligência Artificial, Inspetor e Comandos Globais
 
 | Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |

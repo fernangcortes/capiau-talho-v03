@@ -2063,6 +2063,297 @@ export class CapiauTimelineState {
     }
 
     /**
+     * Inserção avançada de mídias (vídeos ou fotos) na timeline com suporte a múltiplos modos:
+     * - "playhead": na posição atual da agulha (padrão / duplo clique)
+     * - "end": no final do último clipe da timeline (Shift + duplo clique)
+     * - "first_gap": no primeiro espaço vazio a partir do frame 0 (Ctrl + duplo clique) -> agulha vai pro início
+     * - "next_gap": no próximo espaço vazio após a agulha (Ctrl + Shift + duplo clique) -> agulha vai pro início
+     * - "start": no início da timeline / Frame 0 (Alt + Shift + duplo clique) -> agulha vai pro início
+     * - "ripple": ripple insert abrindo espaço na agulha (Alt + duplo clique)
+     * - "overlay": sobreposição em pista superior / B-Roll (Ctrl + Alt + duplo clique)
+     * - "replace": substitui o clipe selecionado na timeline mantendo posição
+     *
+     * @param {Object} params
+     * @param {"video"|"photo"} [params.type="video"] Tipo da mídia
+     * @param {number|string} params.id ID do vídeo ou foto
+     * @param {number} [params.inSec] Ponto IN em segundos
+     * @param {number} [params.outSec] Ponto OUT em segundos
+     * @param {string} [params.mode="playhead"] Modo de inserção
+     * @param {string} [params.targetTrack=null] Pista de destino opcional
+     * @param {number} [params.timelineStartFrame=null] Frame inicial explícito
+     * @returns {Object|null} Novo clipe adicionado ou substituído
+     */
+    insertMedia({ type = "video", id, inSec = null, outSec = null, mode = "playhead", targetTrack = null, timelineStartFrame = null } = {}) {
+        if (!id) return null;
+        const isVideo = type === "video";
+        const video = isVideo ? (STATE.allVideos || []).find(v => v.id === id) : null;
+        const photo = !isVideo ? (STATE.allPhotos || []).find(p => p.id === id) : null;
+
+        // Auto-configuração no primeiro clipe de vídeo da timeline (Fase 2.3)
+        if ((STATE.activeTimelineCuts || []).length === 0 && video) {
+            let w = 1920, h = 1080;
+            if (video.resolution && video.resolution.includes("x")) {
+                const parts = video.resolution.split("x").map(Number);
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    w = parts[0];
+                    h = parts[1];
+                }
+            }
+            const fps = parseFloat(video.fps) || 24;
+            this.width = w;
+            this.height = h;
+            this.fps = fps;
+            STATE.emit("timelineFpsChanged", this.fps);
+            STATE.emit("timelinePropertiesChanged", { width: w, height: h, fps });
+        }
+
+        const fps = this.fps || 24;
+
+        // 1. Determina limites de tempo (In / Out)
+        let actualInSec = 0.0;
+        let actualOutSec = 5.0;
+
+        if (isVideo) {
+            const vidDur = (video && video.duration && video.duration > 0) ? video.duration : 5.0;
+            actualInSec = (inSec !== null && inSec !== undefined) ? Number(inSec) : 0.0;
+            actualOutSec = (outSec !== null && outSec !== undefined) ? Number(outSec) : vidDur;
+            if (actualOutSec <= actualInSec) actualOutSec = actualInSec + vidDur;
+        } else {
+            actualInSec = 0.0;
+            actualOutSec = (outSec !== null && outSec !== undefined) ? Number(outSec) : PHOTO_DEFAULT_DURATION;
+        }
+
+        const inFrame = Math.max(0, secondsToFrames(actualInSec, fps));
+        const outFrame = Math.max(inFrame + 1, secondsToFrames(actualOutSec, fps));
+        const durFrames = outFrame - inFrame;
+        const effDurSec = durFrames / fps;
+
+        // 2. Determina Pista de Destino
+        let track = targetTrack;
+        const videoTracks = this.getVideoTracks().filter(t => !t.locked);
+
+        if (mode === "overlay") {
+            const activeTrackId = this.selectedTrack || "V1";
+            const curIdx = videoTracks.findIndex(t => t.id === activeTrackId);
+            if (curIdx > 0) {
+                track = videoTracks[curIdx - 1].id;
+            } else if (videoTracks.some(t => t.id === "V2") && activeTrackId !== "V2") {
+                track = "V2";
+            } else {
+                const newT = this.addVideoTrack();
+                track = newT ? newT.id : (videoTracks[0] || { id: "V1" }).id;
+            }
+        } else if (!track) {
+            if (this.selectedTrack) {
+                const tObj = this.getTrack(this.selectedTrack);
+                if (tObj && tObj.kind === "video" && !tObj.locked) {
+                    track = this.selectedTrack;
+                }
+            }
+            if (!track) {
+                const v2 = videoTracks.find(t => t.id === "V2");
+                const v1 = videoTracks.find(t => t.id === "V1");
+                if (!isVideo || (video && video.video_type === "broll")) {
+                    track = (v2 || v1 || videoTracks[0] || { id: "V1" }).id;
+                } else {
+                    track = (v1 || videoTracks[0] || { id: "V1" }).id;
+                }
+            }
+        }
+
+        // 3. Determina Start Frame & Posição da Agulha
+        const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        let startFrame = 0;
+        let setPlayheadAtStart = false;
+
+        if (timelineStartFrame !== null && timelineStartFrame !== undefined) {
+            startFrame = Math.max(0, Math.round(timelineStartFrame));
+        } else if (mode === "end") {
+            const lastFrame = currentCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+            startFrame = lastFrame;
+        } else if (mode === "start") {
+            startFrame = 0;
+            setPlayheadAtStart = true;
+        } else if (mode === "first_gap") {
+            const gaps = this.getTrackGaps(track);
+            if (gaps.length > 0) {
+                startFrame = gaps[0].startFrame;
+            } else {
+                const trackCuts = currentCuts.filter(c => c.track === track);
+                startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+            }
+            setPlayheadAtStart = true;
+        } else if (mode === "next_gap") {
+            const curPlayhead = (this.playheadFrame !== null && this.playheadFrame !== undefined) ? this.playheadFrame : 0;
+            const gaps = this.getTrackGaps(track);
+            const nextGap = gaps.find(g => g.endFrame > curPlayhead);
+            if (nextGap) {
+                startFrame = Math.max(curPlayhead, nextGap.startFrame);
+            } else {
+                const trackCuts = currentCuts.filter(c => c.track === track);
+                startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+            }
+            setPlayheadAtStart = true;
+        } else if (mode === "replace") {
+            const selClip = currentCuts.find(c => c.id === this.selectedClipId);
+            if (selClip) {
+                startFrame = selClip.timelineStartFrame || 0;
+                track = selClip.track || track;
+            } else {
+                startFrame = (this.playheadFrame !== null && this.playheadFrame !== undefined) ? this.playheadFrame : 0;
+            }
+        } else {
+            // "playhead", "ripple", "overlay"
+            startFrame = (this.playheadFrame !== null && this.playheadFrame !== undefined) ? this.playheadFrame : 0;
+        }
+
+        startFrame = Math.max(0, Math.round(startFrame));
+
+        // 4. Executa a Ingestão com Histórico (Undo/Redo)
+        const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        const audioTrackId = isVideo ? this.pairedAudioTrackId(track) : null;
+        const linkId = audioTrackId ? `link_${stamp}` : null;
+
+        let createdCut = null;
+
+        TIMELINE_HISTORY.record(() => {
+            let workingCuts = [...currentCuts];
+
+            // A) Modo Replace: Remove o clipe selecionado e parceiro de áudio
+            if (mode === "replace" && this.selectedClipId) {
+                const selId = this.selectedClipId;
+                const selClip = workingCuts.find(c => c.id === selId);
+                const partnerLinkId = selClip?.link_id;
+                workingCuts = workingCuts.filter(c => c.id !== selId && (!partnerLinkId || c.link_id !== partnerLinkId));
+            }
+
+            // B) Modo Ripple: Empurra clipes subsequentes e divide cortes intersectados
+            if (mode === "ripple") {
+                const splitAndShift = [];
+                for (const c of workingCuts) {
+                    const cStart = c.timelineStartFrame || 0;
+                    const cDur = c.outFrame - c.inFrame;
+                    const cEnd = cStart + cDur;
+
+                    if (cStart >= startFrame) {
+                        splitAndShift.push({
+                            ...c,
+                            timelineStartFrame: cStart + durFrames,
+                            timeline_start: (cStart + durFrames) / fps
+                        });
+                    } else if (cStart < startFrame && cEnd > startFrame) {
+                        const offsetFrames = startFrame - cStart;
+                        const newLink = c.link_id ? `link_${Date.now()}_${Math.floor(Math.random()*900+100)}` : null;
+
+                        splitAndShift.push({
+                            ...c,
+                            outFrame: c.inFrame + offsetFrames,
+                            out: (c.inFrame + offsetFrames) / fps
+                        });
+
+                        splitAndShift.push({
+                            ...c,
+                            id: `cut_${Date.now()}_${Math.floor(Math.random()*900+100)}_${c.id.endsWith("_a") ? "a" : "v"}`,
+                            timelineStartFrame: startFrame + durFrames,
+                            timeline_start: (startFrame + durFrames) / fps,
+                            inFrame: c.inFrame + offsetFrames,
+                            in: (c.inFrame + offsetFrames) / fps,
+                            link_id: newLink
+                        });
+                    } else {
+                        splitAndShift.push(c);
+                    }
+                }
+                workingCuts = splitAndShift;
+            }
+
+            // C) Criação do novo corte
+            if (isVideo) {
+                createdCut = {
+                    id: `cut_${stamp}`,
+                    type: "video",
+                    video_id: id,
+                    inFrame: inFrame,
+                    outFrame: outFrame,
+                    in: actualInSec,
+                    out: actualOutSec,
+                    track: track,
+                    timelineStartFrame: startFrame,
+                    timeline_start: startFrame / fps,
+                    link_id: linkId
+                };
+                workingCuts.push(createdCut);
+
+                if (audioTrackId) {
+                    workingCuts.push({
+                        id: `cut_${stamp}_a`,
+                        type: "video",
+                        video_id: id,
+                        inFrame: inFrame,
+                        outFrame: outFrame,
+                        in: actualInSec,
+                        out: actualOutSec,
+                        track: audioTrackId,
+                        timelineStartFrame: startFrame,
+                        timeline_start: startFrame / fps,
+                        link_id: linkId
+                    });
+                }
+            } else {
+                createdCut = {
+                    id: `cut_${stamp}`,
+                    type: "photo",
+                    photo_id: id,
+                    video_id: null,
+                    inFrame: 0,
+                    outFrame: durFrames,
+                    in: 0,
+                    out: effDurSec,
+                    track: track,
+                    timelineStartFrame: startFrame,
+                    timeline_start: startFrame / fps,
+                    link_id: null,
+                    effects: [{ type: "fit", mode: "fill" }]
+                };
+                workingCuts.push(createdCut);
+            }
+
+            STATE.activeTimelineCuts = workingCuts;
+        });
+
+        // 5. Ajuste da Agulha (Playhead)
+        if (typeof this.setPlayheadFrame === "function") {
+            if (setPlayheadAtStart) {
+                this.setPlayheadFrame(startFrame);
+            } else {
+                this.setPlayheadFrame(startFrame + durFrames);
+            }
+        }
+
+        // 6. Foco e Notificação
+        window.activeFocusedPlayer = "program";
+        const mediaTitle = isVideo ? (video?.title || video?.filename || "Vídeo") : (photo?.title || photo?.filename || "Foto");
+        const modeLabels = {
+            playhead: "na agulha",
+            end: "no final da timeline",
+            first_gap: "no 1º espaço vazio",
+            next_gap: "no próximo espaço vazio",
+            start: "no início da timeline (Frame 0)",
+            ripple: "com empurrão (Ripple Insert)",
+            overlay: `sobreposto em ${track}`,
+            replace: "substituindo clipe"
+        };
+        const label = modeLabels[mode] || "na timeline";
+
+        STATE.emit("statusChanged", { text: `"${mediaTitle}" inserido ${label}.`, active: true });
+        if (typeof window.showToast === "function") {
+            window.showToast(`${isVideo ? 'Vídeo' : 'Foto'} inserido ${label}!`, "success");
+        }
+
+        return createdCut;
+    }
+
+    /**
      * Adiciona um novo corte à timeline de forma compatível e reativa.
      */
     addCut(videoId, inSec, outSec, track = null, timelineStartFrame = null) {

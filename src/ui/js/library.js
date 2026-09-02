@@ -366,6 +366,8 @@ export function buildMediaTooltip(item, kind = "video", forceRealFilename = fals
         }
     }
     
+    parts.push("⚡ 2x Clique: Na agulha | Shift: Final | Ctrl: 1º Gap | Alt: Empurrar");
+
     if (parts.length === 0) return "Sem decupagem";
     return parts.join("\n\n");
 }
@@ -661,40 +663,80 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     });
     menu.appendChild(openItem);
 
-    // Item: Adicionar à Timeline
-    const addTlItem = document.createElement("div");
-    addTlItem.className = "menu-item";
-    addTlItem.innerHTML = `<i class="fa-solid fa-plus"></i><span class="menu-item-text">Adicionar à Timeline</span>`;
-    addTlItem.addEventListener("click", () => {
-        menu.remove();
-        if (isVideo) {
-            let inTime = 0.0;
-            let outTime = item.duration || 0.0;
-            if (STATE.activeVideo && STATE.activeVideo.id === item.id) {
-                if (STATE.markerIn !== null) inTime = STATE.markerIn;
-                if (STATE.markerOut !== null) outTime = STATE.markerOut;
-            }
-            if (window.TIMELINE_STATE) {
-                window.TIMELINE_STATE.addCut(item.id, inTime, outTime, null);
-                STATE.activeVideo = item;
-                window.activeFocusedPlayer = "source";
-                STATE.emit("statusChanged", { text: `Vídeo adicionado à timeline.`, active: true });
-                if (typeof window.showToast === "function") {
-                    window.showToast("Vídeo adicionado à timeline!", "success");
-                }
-            }
-        } else {
-            if (window.TIMELINE_STATE) {
-                window.TIMELINE_STATE.addPhotoCut(item.id, {});
-                STATE.activePhoto = item;
-                STATE.emit("statusChanged", { text: `Foto adicionada à timeline.`, active: true });
-                if (typeof window.showToast === "function") {
-                    window.showToast("Foto adicionada à timeline!", "success");
-                }
-            }
+    // Helper para extrair In/Out e executar a inserção
+    const runMediaInsert = (mode) => {
+        let inTime = 0.0;
+        let outTime = isVideo ? (item.duration || 5.0) : 5.0;
+        if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id) {
+            if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
+            if (STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) outTime = STATE.markerOut;
         }
+        if (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.insertMedia === "function") {
+            window.TIMELINE_STATE.insertMedia({
+                type: isVideo ? "video" : "photo",
+                id: item.id,
+                inSec: inTime,
+                outSec: outTime,
+                mode: mode
+            });
+        }
+    };
+
+    // Submenu: Adicionar à Timeline (com todas as formas de ingestão)
+    const addTlMenuItem = document.createElement("div");
+    addTlMenuItem.className = "menu-item menu-item-has-submenu";
+    addTlMenuItem.innerHTML = `
+        <i class="fa-solid fa-plus" style="color:var(--color-cyan);"></i>
+        <span class="menu-item-text" style="font-weight:600;">Adicionar à Timeline</span>
+        <i class="fa-solid fa-chevron-right menu-item-chevron"></i>
+        <div class="menu-submenu" style="min-width: 290px;"></div>
+    `;
+    const addTlSubmenu = addTlMenuItem.querySelector(".menu-submenu");
+
+    // Ações do Submenu
+    const insertionOptions = [
+        { mode: "playhead", icon: "fa-location-crosshairs", label: "Na Posição da Agulha (Playhead)", shortcut: "2x Clique" },
+        { mode: "end", icon: "fa-forward-step", label: "No Final da Timeline (Append)", shortcut: "Shift + 2x Clique" },
+        { mode: "first_gap", icon: "fa-arrows-to-dot", label: "No 1º Espaço Vazio (Primeiro Gap)", shortcut: "Ctrl + 2x Clique" },
+        { mode: "next_gap", icon: "fa-forward", label: "No Próximo Espaço Vazio (Após Agulha)", shortcut: "Ctrl+Shift + 2x Clique" },
+        { mode: "start", icon: "fa-backward-step", label: "No Início da Timeline (Frame 0)", shortcut: "Alt+Shift + 2x Clique" },
+        { mode: "ripple", icon: "fa-arrows-left-right", label: "Inserir Empurrando (Ripple Insert)", shortcut: "Alt + 2x Clique" },
+        { mode: "overlay", icon: "fa-layer-group", label: "Sobrepor em Pista Superior (Overlay)", shortcut: "Ctrl+Alt + 2x Clique" }
+    ];
+
+    if (window.TIMELINE_STATE?.selectedClipId) {
+        insertionOptions.push({
+            mode: "replace",
+            icon: "fa-arrow-right-arrow-left",
+            label: "Substituir Clipe Selecionado",
+            shortcut: "Replace"
+        });
+    }
+
+    insertionOptions.forEach(opt => {
+        const subItem = document.createElement("div");
+        subItem.className = "menu-item";
+        subItem.innerHTML = `
+            <i class="fa-solid ${opt.icon}"></i>
+            <span class="menu-item-text">${opt.label}</span>
+            <span class="menu-item-shortcut">${opt.shortcut}</span>
+        `;
+        subItem.addEventListener("click", (e) => {
+            e.stopPropagation();
+            menu.remove();
+            runMediaInsert(opt.mode);
+        });
+        addTlSubmenu.appendChild(subItem);
     });
-    menu.appendChild(addTlItem);
+
+    // Clique direto no item-pai executa o modo padrão (playhead)
+    addTlMenuItem.addEventListener("click", (e) => {
+        if (e.target.closest(".menu-submenu")) return;
+        menu.remove();
+        runMediaInsert("playhead");
+    });
+
+    menu.appendChild(addTlMenuItem);
 
     // Ações de Ajustes em Lote para Cortes desta Mídia na Timeline
     const currentTimelineCuts = STATE.activeTimelineCuts || [];
@@ -1167,7 +1209,10 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
 
     if (posX + menuWidth > targetWin.innerWidth - 10) {
         posX = targetWin.innerWidth - menuWidth - 10;
-        if (submenu) submenu.classList.add("submenu-left");
+    }
+    const allSubmenus = menu.querySelectorAll(".menu-submenu");
+    if (posX + menuWidth + 280 > targetWin.innerWidth) {
+        allSubmenus.forEach(sm => sm.classList.add("submenu-left"));
     }
     if (posY + menuHeight > targetWin.innerHeight - 10) {
         posY = Math.max(10, targetWin.innerHeight - menuHeight - 10);
@@ -3427,7 +3472,7 @@ function renderTreeNode(node, container, depth = 0) {
             });
         }
         
-        // Duplo clique no card insere o vídeo diretamente na timeline principal (Program), pulando o Source
+        // Duplo clique no card insere o vídeo na timeline com suporte a atalhos de modificadores
         card.addEventListener("dblclick", (e) => {
             if (e.target.closest("button") || e.target.closest(".btn-card-action") || e.target.closest(".btn-toggle-filename") || e.target.closest(".btn-select-similar-item") || e.target.closest("input")) return;
             e.preventDefault();
@@ -3438,36 +3483,36 @@ function renderTreeNode(node, container, depth = 0) {
                 _librarySingleClickTimer = null;
             }
 
+            let mode = "playhead";
+            if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                mode = "end";
+            } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+                mode = "first_gap";
+            } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
+                mode = "next_gap";
+            } else if (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                mode = "start";
+            } else if (e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                mode = "ripple";
+            } else if ((e.ctrlKey || e.metaKey) && e.altKey) {
+                mode = "overlay";
+            }
+
             let inTime = 0.0;
             let outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
-            
-            if (window.TIMELINE_STATE) {
-                let targetTrack = null;
-                const activeTrackId = window.TIMELINE_STATE.selectedTrack;
-                if (activeTrackId) {
-                    const tObj = window.TIMELINE_STATE.getTrack(activeTrackId);
-                    if (tObj && tObj.kind === "video" && !tObj.locked) {
-                        targetTrack = activeTrackId;
-                    }
-                }
+            if (STATE.activeVideo && STATE.activeVideo.id === v.id) {
+                if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
+                if (STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) outTime = STATE.markerOut;
+            }
 
-                const playheadFrame = (window.TIMELINE_STATE.playheadFrame !== null && window.TIMELINE_STATE.playheadFrame !== undefined)
-                    ? window.TIMELINE_STATE.playheadFrame
-                    : null;
-
-                const newCut = window.TIMELINE_STATE.addCut(v.id, inTime, outTime, targetTrack, playheadFrame);
-
-                if (newCut && typeof window.TIMELINE_STATE.setPlayheadFrame === "function") {
-                    const durFrames = (newCut.outFrame || 0) - (newCut.inFrame || 0);
-                    const newPlayhead = (newCut.timelineStartFrame || 0) + durFrames;
-                    window.TIMELINE_STATE.setPlayheadFrame(newPlayhead);
-                }
-
-                window.activeFocusedPlayer = "program";
-                STATE.emit("statusChanged", { text: `Vídeo "${currentTitle}" inserido na timeline (${formatTimecode(inTime).substring(3, 11)} - ${formatTimecode(outTime).substring(3, 11)}).`, active: true });
-                if (typeof window.showToast === "function") {
-                    window.showToast("Vídeo inserido na timeline!", "success");
-                }
+            if (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.insertMedia === "function") {
+                window.TIMELINE_STATE.insertMedia({
+                    type: "video",
+                    id: v.id,
+                    inSec: inTime,
+                    outSec: outTime,
+                    mode: mode
+                });
             }
         });
 
@@ -3671,7 +3716,7 @@ function renderTreeNode(node, container, depth = 0) {
             });
         }
         
-        // Duplo clique no card insere a foto diretamente na timeline principal (Program), pulando o Source/Lightbox
+        // Duplo clique no card insere a foto na timeline com suporte a atalhos de modificadores
         card.addEventListener("dblclick", (e) => {
             if (e.target.closest("button") || e.target.closest(".btn-card-action") || e.target.closest(".btn-toggle-filename") || e.target.closest(".btn-select-similar-item") || e.target.closest("input")) return;
             e.preventDefault();
@@ -3681,37 +3726,30 @@ function renderTreeNode(node, container, depth = 0) {
                 clearTimeout(_librarySingleClickTimer);
                 _librarySingleClickTimer = null;
             }
+
+            let mode = "playhead";
+            if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                mode = "end";
+            } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+                mode = "first_gap";
+            } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
+                mode = "next_gap";
+            } else if (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                mode = "start";
+            } else if (e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                mode = "ripple";
+            } else if ((e.ctrlKey || e.metaKey) && e.altKey) {
+                mode = "overlay";
+            }
             
-            if (window.TIMELINE_STATE) {
-                let targetTrack = null;
-                const activeTrackId = window.TIMELINE_STATE.selectedTrack;
-                if (activeTrackId) {
-                    const tObj = window.TIMELINE_STATE.getTrack(activeTrackId);
-                    if (tObj && tObj.kind === "video" && !tObj.locked) {
-                        targetTrack = activeTrackId;
-                    }
-                }
-
-                const playheadFrame = (window.TIMELINE_STATE.playheadFrame !== null && window.TIMELINE_STATE.playheadFrame !== undefined)
-                    ? window.TIMELINE_STATE.playheadFrame
-                    : null;
-
-                const newCut = window.TIMELINE_STATE.addPhotoCut(p.id, {
-                    track: targetTrack,
-                    timelineStartFrame: playheadFrame
+            if (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.insertMedia === "function") {
+                window.TIMELINE_STATE.insertMedia({
+                    type: "photo",
+                    id: p.id,
+                    inSec: 0,
+                    outSec: 5.0,
+                    mode: mode
                 });
-
-                if (newCut && typeof window.TIMELINE_STATE.setPlayheadFrame === "function") {
-                    const durFrames = (newCut.outFrame || 0) - (newCut.inFrame || 0);
-                    const newPlayhead = (newCut.timelineStartFrame || 0) + durFrames;
-                    window.TIMELINE_STATE.setPlayheadFrame(newPlayhead);
-                }
-
-                window.activeFocusedPlayer = "program";
-                STATE.emit("statusChanged", { text: `Foto "${currentTitle}" inserida na timeline.`, active: true });
-                if (typeof window.showToast === "function") {
-                    window.showToast("Foto inserida na timeline!", "success");
-                }
             }
         });
         

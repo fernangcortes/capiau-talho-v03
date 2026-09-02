@@ -753,21 +753,27 @@ controles intuitivos rápidos:
 
 ### Inserção de Mídias na Timeline
 
-- Você pode adicionar mídias à timeline de três formas:
+Você pode adicionar mídias à timeline de diversas formas altamente ergonômicas:
 
-  1.  **Inserção Direta por Duplo Clique:** Dê um duplo clique rápido sobre
-      qualquer card de vídeo ou foto na biblioteca. A mídia será inserida
-      instantaneamente na trilha de destino no ponto da agulha (com *debounce*
-      inteligente para não engasgar o monitor Source).
+1. **Modos de Ingestão por Duplo Clique & Modificadores:**
+   - **`2x Clique`** ➔ **Na Posição da Agulha (Playhead):** Insere a mídia na posição atual do cursor de reprodução e move a agulha para o término do clipe inserido.
+   - **`Shift + 2x Clique`** ➔ **No Final da Timeline (Append):** Localiza o término do último corte da timeline e anexa a mídia no final.
+   - **`Ctrl + 2x Clique`** *(ou `Cmd`)* ➔ **No 1º Espaço Vazio (Primeiro Gap):** Localiza o primeiro gap a partir do frame 0 e insere no início dele, **posicionando a agulha no começo da mídia**.
+   - **`Ctrl + Shift + 2x Clique`** ➔ **No Próximo Espaço Vazio (Após Agulha):** Encontra o primeiro gap à frente da agulha atual e insere no início dele, **posicionando a agulha no começo da mídia**.
+   - **`Alt + Shift + 2x Clique`** ➔ **No Início da Timeline (Frame 0):** Insere no frame 0 da pista de destino.
+   - **`Alt + 2x Clique`** ➔ **Inserir Empurrando (Ripple Insert):** Divide clipes intersectados sob a agulha e empurra todos os cortes subsequentes pela duração do novo clipe.
+   - **`Ctrl + Alt + 2x Clique`** ➔ **Sobrepor em Pista Superior (Overlay):** Insere na pista superior livre (ex: V2/B-Roll) na posição da agulha.
 
-  2.  **Arrastar-e-Soltar (Drag-and-Drop):** Clique e segure qualquer vídeo ou
-      foto na barra lateral e arraste-o diretamente para a trilha desejada na
-      timeline (segure **`Ctrl`** durante o drop para fazer *Ripple Insert*).
+2. **Submenu de Contexto no Botão Direito (`Adicionar à Timeline`):**
+   - Ao clicar com o botão direito sobre qualquer card de vídeo ou foto na biblioteca, passe o cursor sobre **"Adicionar à Timeline"** para abrir um submenu com todas as opções acima e seus atalhos correspondentes.
+   - Se houver um clipe selecionado na timeline, o submenu inclui a opção **"Substituir Clipe Selecionado"** para trocar a mídia preservando o posicionamento na timeline.
+   - Clicar diretamente no item pai aciona a inserção padrão na posição da agulha.
 
-  3.  **Inserção Rápida de Fotos:** Passe o mouse sobre qualquer miniatura de
-      foto para revelar um botão flutuante \"+\". O clique adicionará a
-      imagem como still (duração padrão de 5s) na timeline no ponto da
-      agulha.
+3. **Arrastar-e-Soltar (Drag-and-Drop):**
+   - Clique e arraste qualquer vídeo ou foto para a trilha desejada na timeline (segure **`Ctrl`** durante o drop para fazer *Ripple Insert*).
+
+4. **Inserção Rápida de Fotos:**
+   - Passe o mouse sobre qualquer miniatura de foto para revelar o botão flutuante `+`, inserindo a imagem como still (5s padrão) na agulha.
 
 ### 🪟 Janelas Destacadas Multi-monitor com Persistência & Auto-Reconexão
 
@@ -938,7 +944,14 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | | **`'` (Aspas Simples)** | Extract: extrai intervalo [In–Out] e fecha Gap com Ripple |
 | | **`E`** | Adicionar segmento marcado à timeline (Append) |
 | | **`Shift + E`** | Inserir fala selecionada na transcrição na timeline |
-| | **`Duplo Clique`** | Inserir mídia da biblioteca diretamente na timeline |
+| **Ingestão na Timeline (Biblioteca)** | **`Duplo Clique`** | Inserir na timeline na posição da agulha (*Playhead*) |
+| | **`Shift + Duplo Clique`** | Inserir no final do último clipe (*Append*) |
+| | **`Ctrl + Duplo Clique`** | Inserir no 1º espaço vazio (*First Gap*) e mover agulha pro início |
+| | **`Ctrl + Shift + Duplo Clique`** | Inserir no próximo espaço vazio (*Next Gap*) e mover agulha pro início |
+| | **`Alt + Shift + Duplo Clique`** | Inserir no início da timeline (*Frame 0*) |
+| | **`Alt + Duplo Clique`** | Inserir empurrando cortes subsequentes (*Ripple Insert*) |
+| | **`Ctrl + Alt + Duplo Clique`** | Sobrepor em pista superior (*Overlay B-Roll*) |
+| | **`Botão Direito ➔ Substituir`** | Substituir clipe selecionado na timeline |
 | **Edição & Ferramentas NLE** | **`Z`** *(ou `Shift+R`/`Ctrl+K`/`B`)* | Dividir clipe na agulha (*Split*) |
 | | **`V`** | Ferramenta de Seleção Padrão |
 | | **`T` / `Shift + T`** | Selecionar Faixa para Frente / Trás (*Shift = 1 faixa*) |
