@@ -254,6 +254,8 @@ export class CapiauTimelineRenderer {
         STATE.on("timelineSnappingChanged", () => this.requestRedraw());
         STATE.on("activeVideoChanged", () => this.requestRedraw());
         STATE.on("waveformLoaded", () => this.requestRedraw());
+        STATE.on("timelineInOutChanged", () => this.requestRedraw());
+        STATE.on("timelineLoopChanged", () => this.requestRedraw());
         WaveformManager.addListener(() => this.requestRedraw());
 
         // Guias de interação e drop
@@ -341,6 +343,9 @@ export class CapiauTimelineRenderer {
 
         // Desenha a grade e a régua de tempo (por cima das pistas roladas)
         this.drawRuler();
+
+        // Desenha a região e os colchetes In/Out na régua
+        this.drawInOutRegion();
 
         // Desenha marcadores na timeline
         this.drawMarkers();
@@ -724,6 +729,163 @@ export class CapiauTimelineRenderer {
                 ctx.fillStyle = this.colors.rulerText;
                 ctx.fillText(label, x + 4, this.rulerHeight - 16);
             }
+        }
+    }
+
+    /**
+     * Desenha os colchetes e a região destacada de In/Out na régua da timeline.
+     */
+    drawInOutRegion() {
+        const inF = TIMELINE_STATE.inFrame;
+        const outF = TIMELINE_STATE.outFrame;
+        if (inF === null && outF === null) return;
+
+        const ctx = this.ctx;
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+        const fps = TIMELINE_STATE.fps || 24;
+
+        const inX = (inF !== null) ? (inF - scrollLeft) * zoom : null;
+        const outX = (outF !== null) ? (outF - scrollLeft) * zoom : null;
+
+        const startX = (inX !== null) ? inX : 0;
+        const endX = (outX !== null) ? outX : this.width;
+
+        // 1. Faixa destacada da área de trabalho na régua
+        if (endX > startX) {
+            ctx.save();
+            ctx.beginPath();
+            const rectLeft = Math.max(0, startX);
+            const rectRight = Math.min(this.width, endX);
+            const rectWidth = Math.max(0, rectRight - rectLeft);
+
+            if (rectWidth > 0) {
+                ctx.rect(rectLeft, 0, rectWidth, this.rulerHeight);
+                ctx.fillStyle = "rgba(6, 182, 212, 0.16)";
+                ctx.fill();
+
+                // Bordas luminosas superior e inferior na régua
+                ctx.strokeStyle = "rgba(6, 182, 212, 0.6)";
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(rectLeft, 1);
+                ctx.lineTo(rectRight, 1);
+                ctx.moveTo(rectLeft, this.rulerHeight - 1);
+                ctx.lineTo(rectRight, this.rulerHeight - 1);
+                ctx.stroke();
+
+                // Resumo de duração do intervalo no centro do trecho da régua se houver espaço
+                if (inX !== null && outX !== null && (outX - inX) >= 120) {
+                    const durFrames = Math.max(0, outF - inF);
+                    const durSec = durFrames / fps;
+                    const inTc = framesToTimecode(inF, fps).substring(3, 11);
+                    const outTc = framesToTimecode(outF, fps).substring(3, 11);
+                    const text = `IN ${inTc} → OUT ${outTc} (${durSec.toFixed(1)}s)`;
+
+                    ctx.font = "bold 9px 'Outfit', 'Inter', monospace";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillStyle = "#e2e8f0";
+
+                    const midX = (inX + outX) / 2;
+                    if (midX >= 40 && midX <= this.width - 40) {
+                        ctx.fillText(text, midX, this.rulerHeight / 2 - 1);
+                    }
+                }
+            }
+            ctx.restore();
+        }
+
+        // 2. Colchete e puxador do ponto IN
+        if (inX !== null && inX >= -20 && inX <= this.width + 20) {
+            ctx.save();
+
+            // Guia vertical pontilhada sutil através das pistas
+            ctx.strokeStyle = "rgba(6, 182, 212, 0.35)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(inX, this.rulerHeight);
+            ctx.lineTo(inX, this.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Colchete de IN na régua (Cor Ciano #06b6d4)
+            ctx.strokeStyle = "#06b6d4";
+            ctx.fillStyle = "#06b6d4";
+            ctx.lineWidth = 2.5;
+
+            // Desenha o colchete "[" na régua
+            ctx.beginPath();
+            ctx.moveTo(inX + 7, 3);
+            ctx.lineTo(inX, 3);
+            ctx.lineTo(inX, this.rulerHeight - 3);
+            ctx.lineTo(inX + 7, this.rulerHeight - 3);
+            ctx.stroke();
+
+            // Puxador / Aba triangular superior do IN
+            ctx.beginPath();
+            ctx.moveTo(inX, 1);
+            ctx.lineTo(inX + 9, 1);
+            ctx.lineTo(inX + 9, 8);
+            ctx.lineTo(inX, 15);
+            ctx.closePath();
+            ctx.fill();
+
+            // Badge / Rótulo "IN" em miniatura
+            ctx.font = "bold 7px 'Outfit', sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = "#0a0a0f";
+            ctx.fillText("IN", inX + 4, 6);
+
+            ctx.restore();
+        }
+
+        // 3. Colchete e puxador do ponto OUT
+        if (outX !== null && outX >= -20 && outX <= this.width + 20) {
+            ctx.save();
+
+            // Guia vertical pontilhada sutil através das pistas
+            ctx.strokeStyle = "rgba(244, 63, 94, 0.35)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(outX, this.rulerHeight);
+            ctx.lineTo(outX, this.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Colchete de OUT na régua (Cor Rosa/Rose #f43f5e)
+            ctx.strokeStyle = "#f43f5e";
+            ctx.fillStyle = "#f43f5e";
+            ctx.lineWidth = 2.5;
+
+            // Desenha o colchete "]" na régua
+            ctx.beginPath();
+            ctx.moveTo(outX - 7, 3);
+            ctx.lineTo(outX, 3);
+            ctx.lineTo(outX, this.rulerHeight - 3);
+            ctx.lineTo(outX - 7, this.rulerHeight - 3);
+            ctx.stroke();
+
+            // Puxador / Aba triangular superior do OUT
+            ctx.beginPath();
+            ctx.moveTo(outX, 1);
+            ctx.lineTo(outX - 9, 1);
+            ctx.lineTo(outX - 9, 8);
+            ctx.lineTo(outX, 15);
+            ctx.closePath();
+            ctx.fill();
+
+            // Badge / Rótulo "OUT" em miniatura
+            ctx.font = "bold 7px 'Outfit', sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText("OUT", outX - 4, 6);
+
+            ctx.restore();
         }
     }
 

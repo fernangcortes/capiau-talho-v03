@@ -1912,19 +1912,28 @@ button {
     transition: all 0.2s ease;
     padding: 4px 6px !important;
 }
-.player-controls #btn-mark-in {
+.player-controls #btn-mark-in,
+.player-controls #btn-program-mark-in {
     color: var(--color-cyan) !important;
 }
-.player-controls #btn-mark-in:hover {
+.player-controls #btn-mark-in:hover,
+.player-controls #btn-program-mark-in:hover {
     color: #fff !important;
     text-shadow: 0 0 8px var(--color-cyan);
 }
-.player-controls #btn-mark-out {
+.player-controls #btn-mark-out,
+.player-controls #btn-program-mark-out {
     color: var(--color-rose) !important;
 }
-.player-controls #btn-mark-out:hover {
+.player-controls #btn-mark-out:hover,
+.player-controls #btn-program-mark-out:hover {
     color: #fff !important;
     text-shadow: 0 0 8px var(--color-rose);
+}
+
+.player-controls #btn-program-loop.active {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 6px var(--color-cyan);
 }
 
 .player-controls .btn-append {

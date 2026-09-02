@@ -1200,8 +1200,9 @@ export class ProgramPlayer {
         this.jklState = 'K';
         this.jklIndex = 0;
         this.playbackSpeed = 1.0;
+        this.isPlayInOut = false;
         this._osdTimeout = null;
-        this.textOverlayManager = new PlayerTextOverlayManager();
+        this.textOverlayManager = (typeof PlayerTextOverlayManager === "function") ? new PlayerTextOverlayManager() : { init: () => {}, render: () => {} };
         this.init();
     }
 
@@ -1210,13 +1211,25 @@ export class ProgramPlayer {
     }
 
     init() {
-        this.textOverlayManager.init();
+        if (this.textOverlayManager && typeof this.textOverlayManager.init === "function") {
+            this.textOverlayManager.init();
+        }
         // Redesenha e sincroniza o player sempre que a timeline muda
-        STATE.on("timelineCutsUpdated", () => this.syncVideoToPlayhead());
-        STATE.on("timelineRestored", () => this.syncVideoToPlayhead());
+        STATE.on("timelineCutsUpdated", () => {
+            this.syncVideoToPlayhead();
+            this.updateMarkersUI();
+        });
+        STATE.on("timelineRestored", () => {
+            this.syncVideoToPlayhead();
+            this.updateMarkersUI();
+        });
 
         // Escuta mudanças manuais da agulha (scrubbing)
         STATE.on("timelinePlayheadChanged", () => this.syncVideoToPlayhead());
+
+        // Escuta mudanças de pontos In/Out e Loop
+        STATE.on("timelineInOutChanged", () => this.updateMarkersUI());
+        STATE.on("timelineLoopChanged", (isLoop) => this.updateLoopButtonUI(isLoop));
 
         // Fotos podem carregar depois da timeline: recompõe quando a lista chega
         STATE.on("photosUpdated", () => this.syncVideoToPlayhead());
@@ -1231,6 +1244,22 @@ export class ProgramPlayer {
         // Botão Play Program
         const btnPlay = this.el("btn-program-play");
         if (btnPlay) btnPlay.addEventListener("click", () => this.togglePlay());
+
+        // Botões de Entrada, Saída e Loop no Program Player
+        const btnMarkIn = this.el("btn-program-mark-in");
+        if (btnMarkIn) btnMarkIn.addEventListener("click", () => TIMELINE_STATE.setInPoint());
+
+        const btnMarkOut = this.el("btn-program-mark-out");
+        if (btnMarkOut) btnMarkOut.addEventListener("click", () => TIMELINE_STATE.setOutPoint());
+
+        const btnClearInOut = this.el("btn-program-clear-in-out");
+        if (btnClearInOut) btnClearInOut.addEventListener("click", () => TIMELINE_STATE.clearInOut());
+
+        const btnLoop = this.el("btn-program-loop");
+        if (btnLoop) btnLoop.addEventListener("click", () => TIMELINE_STATE.toggleLoop());
+
+        const btnPlayInOut = this.el("btn-program-play-in-out");
+        if (btnPlayInOut) btnPlayInOut.addEventListener("click", () => this.playInOut());
 
         // Navegação de frames
         const btnPrev = this.el("btn-program-prev-frame");
@@ -1646,21 +1675,60 @@ export class ProgramPlayer {
             const fpsVal = TIMELINE_STATE?.fps || 24;
 
             if (this.playbackSpeed > 0) {
-                if (TIMELINE_STATE.playheadFrame >= maxDur && maxDur > 0) {
-                    this.pause();
-                    TIMELINE_STATE.setPlayheadFrame(maxDur);
-                    return;
+                const nextFrame = TIMELINE_STATE.playheadFrame + (elapsedSecs * fpsVal * this.playbackSpeed);
+
+                // 1. Modo Tocar de IN até OUT
+                if (this.isPlayInOut) {
+                    const outLimit = (TIMELINE_STATE.outFrame !== null) ? TIMELINE_STATE.outFrame : maxDur;
+                    if (nextFrame >= outLimit && outLimit > 0) {
+                        if (TIMELINE_STATE.isLooping) {
+                            const loopStart = (TIMELINE_STATE.inFrame !== null) ? TIMELINE_STATE.inFrame : 0;
+                            TIMELINE_STATE.setPlayheadFrame(loopStart);
+                        } else {
+                            this.pause();
+                            TIMELINE_STATE.setPlayheadFrame(outLimit);
+                            this.isPlayInOut = false;
+                            return;
+                        }
+                    } else {
+                        TIMELINE_STATE.setPlayheadFrame(nextFrame);
+                    }
                 }
-                const elapsedFrames = elapsedSecs * fpsVal * this.playbackSpeed;
-                TIMELINE_STATE.setPlayheadFrame(Math.min(maxDur, TIMELINE_STATE.playheadFrame + elapsedFrames));
+                // 2. Modo de reprodução normal (com ou sem Loop)
+                else {
+                    if (TIMELINE_STATE.isLooping) {
+                        const outLimit = (TIMELINE_STATE.outFrame !== null) ? TIMELINE_STATE.outFrame : maxDur;
+                        if (nextFrame >= outLimit && outLimit > 0) {
+                            const loopStart = (TIMELINE_STATE.inFrame !== null) ? TIMELINE_STATE.inFrame : 0;
+                            TIMELINE_STATE.setPlayheadFrame(loopStart);
+                        } else {
+                            TIMELINE_STATE.setPlayheadFrame(nextFrame);
+                        }
+                    } else {
+                        if (nextFrame >= maxDur && maxDur > 0) {
+                            this.pause();
+                            TIMELINE_STATE.setPlayheadFrame(maxDur);
+                            return;
+                        }
+                        TIMELINE_STATE.setPlayheadFrame(nextFrame);
+                    }
+                }
             } else if (this.playbackSpeed < 0) {
-                if (TIMELINE_STATE.playheadFrame <= 0) {
-                    this.pause();
-                    TIMELINE_STATE.setPlayheadFrame(0);
-                    return;
+                const prevFrame = TIMELINE_STATE.playheadFrame - (elapsedSecs * fpsVal * Math.abs(this.playbackSpeed));
+                const inLimit = (TIMELINE_STATE.isLooping && TIMELINE_STATE.inFrame !== null) ? TIMELINE_STATE.inFrame : 0;
+
+                if (prevFrame <= inLimit) {
+                    if (TIMELINE_STATE.isLooping) {
+                        const loopEnd = (TIMELINE_STATE.outFrame !== null) ? TIMELINE_STATE.outFrame : maxDur;
+                        TIMELINE_STATE.setPlayheadFrame(loopEnd);
+                    } else {
+                        this.pause();
+                        TIMELINE_STATE.setPlayheadFrame(0);
+                        return;
+                    }
+                } else {
+                    TIMELINE_STATE.setPlayheadFrame(prevFrame);
                 }
-                const elapsedFrames = elapsedSecs * fpsVal * Math.abs(this.playbackSpeed);
-                TIMELINE_STATE.setPlayheadFrame(Math.max(0, TIMELINE_STATE.playheadFrame - elapsedFrames));
             }
 
             // Heartbeat de atividade do editor para o backend
@@ -1676,6 +1744,7 @@ export class ProgramPlayer {
 
     pause() {
         this.isPlaying = false;
+        this.isPlayInOut = false;
         this.playbackSpeed = 1.0;
         this.jklState = 'K';
         this.jklIndex = 0;
@@ -1687,11 +1756,94 @@ export class ProgramPlayer {
         const btnPlay = this.el("btn-program-play");
         if (btnPlay) btnPlay.innerHTML = `<i class="fa-solid fa-play"></i>`;
 
-        this._videoPool().forEach(el => { if (!el.paused) el.pause(); });        // Pausa também as pistas de áudio dedicadas
+        this._videoPool().forEach(el => { if (!el.paused) el.pause(); });
         if (this.audioPool) {
             Object.values(this.audioPool).forEach(el => {
                 if (!el.paused) el.pause();
             });
+        }
+    }
+
+    /**
+     * Toca o trecho delimitado entre os pontos IN e OUT da timeline.
+     */
+    playInOut() {
+        const range = TIMELINE_STATE.getEffectiveInOutFrames();
+        TIMELINE_STATE.setPlayheadFrame(range.startFrame);
+        this.isPlayInOut = true;
+        this.play(1.0);
+    }
+
+    /**
+     * Atualiza os marcadores de IN e OUT na barra de progresso do Program Player.
+     */
+    updateMarkersUI() {
+        const markerInBar = this.el("program-marker-in-pos");
+        const markerOutBar = this.el("program-marker-out-pos");
+        const inOutSpan = this.el("program-inout-span");
+        const durationFrames = this.getDurationFrames();
+
+        if (durationFrames > 0) {
+            const inF = TIMELINE_STATE.inFrame;
+            const outF = TIMELINE_STATE.outFrame;
+
+            let pctIn = 0;
+            let pctOut = 100;
+
+            if (inF !== null) {
+                pctIn = Math.max(0, Math.min(100, (inF / durationFrames) * 100));
+                if (markerInBar) {
+                    markerInBar.style.left = `${pctIn}%`;
+                    markerInBar.style.display = "block";
+                }
+            } else if (markerInBar) {
+                markerInBar.style.display = "none";
+            }
+
+            if (outF !== null) {
+                pctOut = Math.max(0, Math.min(100, (outF / durationFrames) * 100));
+                if (markerOutBar) {
+                    markerOutBar.style.left = `${pctOut}%`;
+                    markerOutBar.style.display = "block";
+                }
+            } else if (markerOutBar) {
+                markerOutBar.style.display = "none";
+            }
+
+            if (inOutSpan) {
+                if (inF !== null || outF !== null) {
+                    const left = (inF !== null) ? pctIn : 0;
+                    const right = (outF !== null) ? pctOut : 100;
+                    const width = Math.max(0, right - left);
+                    inOutSpan.style.left = `${left}%`;
+                    inOutSpan.style.width = `${width}%`;
+                    inOutSpan.style.display = "block";
+                } else {
+                    inOutSpan.style.display = "none";
+                }
+            }
+        } else {
+            if (markerInBar) markerInBar.style.display = "none";
+            if (markerOutBar) markerOutBar.style.display = "none";
+            if (inOutSpan) inOutSpan.style.display = "none";
+        }
+    }
+
+    /**
+     * Atualiza o estado visual do botão de Loop no Program Player.
+     */
+    updateLoopButtonUI(isLooping) {
+        const btnLoop = this.el("btn-program-loop");
+        if (btnLoop) {
+            if (isLooping) {
+                btnLoop.classList.add("active");
+                btnLoop.style.color = "var(--color-cyan)";
+                btnLoop.style.borderColor = "var(--color-cyan)";
+            } else {
+                btnLoop.classList.remove("active");
+                btnLoop.style.color = "";
+                btnLoop.style.borderColor = "";
+            }
         }
     }
 
@@ -3591,6 +3743,13 @@ export class VideoPlayer {
             return;
         } 
         
+        // Intercepta Alt+Espaço para bloquear abertura do menu do Windows e redirecionar para Play In-Out
+        if (e.altKey && !e.ctrlKey && !e.shiftKey && (e.code === "Space" || e.key === " " || e.key === "Spacebar")) {
+            e.preventDefault();
+            this.programPlayer.playInOut();
+            return;
+        }
+
         // Play / Pause (Espaço)
         if (KEYMAP_SERVICE.matches(e, "playback.play_pause")) {
             e.preventDefault();
@@ -3630,21 +3789,132 @@ export class VideoPlayer {
 
         // Marcar Ponto IN
         if (KEYMAP_SERVICE.matches(e, "playback.mark_in")) {
+            e.preventDefault();
             if (window.activeFocusedPlayer === "source") {
                 this.sourcePlayer.markIn();
-                e.preventDefault();
-                return;
+            } else {
+                TIMELINE_STATE.setInPoint();
             }
+            return;
         } 
 
         // Marcar Ponto OUT
         if (KEYMAP_SERVICE.matches(e, "playback.mark_out")) {
+            e.preventDefault();
             if (window.activeFocusedPlayer === "source") {
                 this.sourcePlayer.markOut();
-                e.preventDefault();
-                return;
+            } else {
+                TIMELINE_STATE.setOutPoint();
             }
+            return;
         } 
+
+        // Limpar Ponto IN
+        if (KEYMAP_SERVICE.matches(e, "playback.clear_in")) {
+            e.preventDefault();
+            if (window.activeFocusedPlayer === "source") {
+                STATE.markerIn = null;
+                this.sourcePlayer.updateMarkersUI();
+            } else {
+                TIMELINE_STATE.clearInPoint();
+            }
+            return;
+        }
+
+        // Limpar Ponto OUT
+        if (KEYMAP_SERVICE.matches(e, "playback.clear_out")) {
+            e.preventDefault();
+            if (window.activeFocusedPlayer === "source") {
+                STATE.markerOut = null;
+                this.sourcePlayer.updateMarkersUI();
+            } else {
+                TIMELINE_STATE.clearOutPoint();
+            }
+            return;
+        }
+
+        // Limpar Pontos IN e OUT
+        if (KEYMAP_SERVICE.matches(e, "playback.clear_in_out")) {
+            e.preventDefault();
+            if (window.activeFocusedPlayer === "source") {
+                STATE.markerIn = null;
+                STATE.markerOut = null;
+                this.sourcePlayer.updateMarkersUI();
+            } else {
+                TIMELINE_STATE.clearInOut();
+            }
+            return;
+        }
+
+        // Marcar Clipe (X)
+        if (KEYMAP_SERVICE.matches(e, "playback.mark_clip")) {
+            e.preventDefault();
+            TIMELINE_STATE.markClip();
+            return;
+        }
+
+        // Ir para o Ponto IN
+        if (KEYMAP_SERVICE.matches(e, "playback.goto_in")) {
+            e.preventDefault();
+            if (window.activeFocusedPlayer === "source") {
+                const inPoint = STATE.markerIn;
+                if (inPoint !== null) this.sourcePlayer.seek(inPoint);
+                else this.sourcePlayer.seek(0);
+            } else {
+                this.programPlayer.pause();
+                TIMELINE_STATE.seekToIn();
+            }
+            return;
+        }
+
+        // Ir para o Ponto OUT
+        if (KEYMAP_SERVICE.matches(e, "playback.goto_out")) {
+            e.preventDefault();
+            if (window.activeFocusedPlayer === "source") {
+                const vid = this.sourcePlayer.el("source-video");
+                const outPoint = STATE.markerOut;
+                if (outPoint !== null) this.sourcePlayer.seek(outPoint);
+                else if (vid && vid.duration) this.sourcePlayer.seek(vid.duration);
+            } else {
+                this.programPlayer.pause();
+                TIMELINE_STATE.seekToOut();
+            }
+            return;
+        }
+
+        // Tocar de IN até OUT
+        if (KEYMAP_SERVICE.matches(e, "playback.play_in_to_out")) {
+            e.preventDefault();
+            this.programPlayer.playInOut();
+            return;
+        }
+
+        // Alternar Loop IN-OUT
+        if (KEYMAP_SERVICE.matches(e, "playback.toggle_loop")) {
+            e.preventDefault();
+            TIMELINE_STATE.toggleLoop();
+            return;
+        }
+
+        // Lift no Intervalo IN-OUT
+        if (KEYMAP_SERVICE.matches(e, "edit.lift_in_out")) {
+            e.preventDefault();
+            const ok = TIMELINE_STATE.liftRange();
+            if (ok && typeof window.showToast === "function") {
+                window.showToast("Lift executado no intervalo IN-OUT", "info");
+            }
+            return;
+        }
+
+        // Extract no Intervalo IN-OUT
+        if (KEYMAP_SERVICE.matches(e, "edit.extract_in_out")) {
+            e.preventDefault();
+            const ok = TIMELINE_STATE.extractRange();
+            if (ok && typeof window.showToast === "function") {
+                window.showToast("Extract executado no intervalo IN-OUT", "info");
+            }
+            return;
+        }
 
         // Inserir na Timeline (Append)
         if (KEYMAP_SERVICE.matches(e, "playback.append_timeline")) {

@@ -64,19 +64,67 @@ export const COMMANDS_CATALOG = [
         id: "playback.mark_in",
         category: "playback",
         label: "Marcar Ponto de Entrada (IN)",
-        description: "Define o ponto inicial de corte no Monitor de Origem"
+        description: "Define o ponto inicial de corte no Player ou Linha do Tempo"
     },
     {
         id: "playback.mark_out",
         category: "playback",
         label: "Marcar Ponto de Saída (OUT)",
-        description: "Define o ponto final de corte no Monitor de Origem"
+        description: "Define o ponto final de corte no Player ou Linha do Tempo"
+    },
+    {
+        id: "playback.clear_in",
+        category: "playback",
+        label: "Limpar Ponto IN",
+        description: "Remove o ponto de entrada (IN) no Player ou Linha do Tempo"
+    },
+    {
+        id: "playback.clear_out",
+        category: "playback",
+        label: "Limpar Ponto OUT",
+        description: "Remove o ponto de saída (OUT) no Player ou Linha do Tempo"
+    },
+    {
+        id: "playback.clear_in_out",
+        category: "playback",
+        label: "Limpar Pontos IN e OUT",
+        description: "Remove ambos os pontos de entrada e saída (IN e OUT)"
+    },
+    {
+        id: "playback.mark_clip",
+        category: "playback",
+        label: "Marcar Clipe (IN / OUT)",
+        description: "Define pontos IN e OUT nos limites do clipe selecionado ou sob a agulha"
+    },
+    {
+        id: "playback.goto_in",
+        category: "playback",
+        label: "Ir para o Ponto IN",
+        description: "Move a agulha de reprodução diretamente para o ponto IN"
+    },
+    {
+        id: "playback.goto_out",
+        category: "playback",
+        label: "Ir para o Ponto OUT",
+        description: "Move a agulha de reprodução diretamente para o ponto OUT"
+    },
+    {
+        id: "playback.play_in_to_out",
+        category: "playback",
+        label: "Tocar de IN até OUT",
+        description: "Reproduz o trecho delimitado entre os pontos IN e OUT e pausa"
+    },
+    {
+        id: "playback.toggle_loop",
+        category: "playback",
+        label: "Alternar Reprodução em Loop",
+        description: "Liga ou desliga a reprodução contínua em loop entre os pontos IN e OUT"
     },
     {
         id: "playback.append_timeline",
         category: "playback",
         label: "Inserir na Timeline (Append)",
-        description: "Insere o trecho marcado (IN ➔ OUT) no final da timeline"
+        description: "Insere o trecho marcado (IN ➔ OUT) na timeline"
     },
     {
         id: "playback.step_prev",
@@ -165,6 +213,18 @@ export const COMMANDS_CATALOG = [
         category: "edit",
         label: "Ripple Delete (Apagar e Fechar Espaço)",
         description: "Apaga o clipe e puxa todos os clipes posteriores para fechar a lacuna"
+    },
+    {
+        id: "edit.lift_in_out",
+        category: "edit",
+        label: "Lift no Intervalo IN–OUT",
+        description: "Apaga o conteúdo dentro do intervalo IN–OUT nas pistas ativas deixando o espaço vazio (gap)"
+    },
+    {
+        id: "edit.extract_in_out",
+        category: "edit",
+        label: "Extract (Ripple Delete) no Intervalo IN–OUT",
+        description: "Apaga o conteúdo dentro do intervalo IN–OUT e puxa os clipes posteriores para fechar o espaço"
     },
     {
         id: "edit.delete_single_stream",
@@ -298,6 +358,14 @@ export const KEYMAP_PRESETS = {
         "playback.jog_next_frame": ["KeyK+KeyL"],
         "playback.mark_in": ["KeyI"],
         "playback.mark_out": ["KeyO"],
+        "playback.clear_in": ["Alt+KeyI"],
+        "playback.clear_out": ["Alt+KeyO"],
+        "playback.clear_in_out": ["Alt+KeyX"],
+        "playback.mark_clip": ["KeyX"],
+        "playback.goto_in": ["Shift+KeyI"],
+        "playback.goto_out": ["Shift+KeyO"],
+        "playback.play_in_to_out": ["Shift+Space", "Alt+Slash"],
+        "playback.toggle_loop": ["Ctrl+KeyL", "Ctrl+Shift+Space"],
         "playback.append_timeline": ["KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
@@ -315,6 +383,8 @@ export const KEYMAP_PRESETS = {
         "edit.ripple_trim_tail": ["KeyW"],
         "edit.lift_delete": ["Delete", "Backspace"],
         "edit.ripple_delete": ["Shift+Delete"],
+        "edit.lift_in_out": ["Semicolon", "Alt+Delete"],
+        "edit.extract_in_out": ["Quote", "Alt+Shift+Delete"],
         "edit.delete_single_stream": ["Alt+Delete"],
         "edit.unlink_av": ["KeyU"],
         "edit.nudge_left": ["ArrowLeft"],
@@ -347,6 +417,14 @@ export const KEYMAP_PRESETS = {
         "playback.jog_next_frame": ["KeyK+KeyL", "ArrowRight"],
         "playback.mark_in": ["KeyI"],
         "playback.mark_out": ["KeyO"],
+        "playback.clear_in": ["Ctrl+Shift+KeyI", "Alt+KeyI"],
+        "playback.clear_out": ["Ctrl+Shift+KeyO", "Alt+KeyO"],
+        "playback.clear_in_out": ["Ctrl+Shift+KeyX", "Alt+KeyX"],
+        "playback.mark_clip": ["KeyX"],
+        "playback.goto_in": ["Shift+KeyI"],
+        "playback.goto_out": ["Shift+KeyO"],
+        "playback.play_in_to_out": ["Shift+Space"],
+        "playback.toggle_loop": ["Ctrl+Shift+Space", "Ctrl+KeyL"],
         "playback.append_timeline": ["KeyV", "KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
@@ -364,6 +442,8 @@ export const KEYMAP_PRESETS = {
         "edit.ripple_trim_tail": ["BracketRight", "KeyW"],
         "edit.lift_delete": ["Backspace"],
         "edit.ripple_delete": ["Delete", "Shift+Delete"],
+        "edit.lift_in_out": ["Alt+Backspace", "Semicolon"],
+        "edit.extract_in_out": ["Shift+Delete", "Quote"],
         "edit.delete_single_stream": ["Alt+Delete"],
         "edit.unlink_av": ["KeyU", "Ctrl+Shift+KeyU"],
         "edit.nudge_left": ["ArrowLeft"],
@@ -396,6 +476,14 @@ export const KEYMAP_PRESETS = {
         "playback.jog_next_frame": ["KeyK+KeyL", "ArrowRight"],
         "playback.mark_in": ["KeyI"],
         "playback.mark_out": ["KeyO"],
+        "playback.clear_in": ["Ctrl+Shift+KeyI", "Alt+KeyI"],
+        "playback.clear_out": ["Ctrl+Shift+KeyO", "Alt+KeyO"],
+        "playback.clear_in_out": ["Ctrl+Shift+KeyX", "Alt+KeyX"],
+        "playback.mark_clip": ["Slash", "KeyX"],
+        "playback.goto_in": ["Shift+KeyI"],
+        "playback.goto_out": ["Shift+KeyO"],
+        "playback.play_in_to_out": ["Ctrl+Shift+Space", "Shift+Space", "Alt+KeyK"],
+        "playback.toggle_loop": ["Ctrl+KeyL"],
         "playback.append_timeline": ["Period", "KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
@@ -413,6 +501,8 @@ export const KEYMAP_PRESETS = {
         "edit.ripple_trim_tail": ["KeyW"],
         "edit.lift_delete": ["Backspace"],
         "edit.ripple_delete": ["Shift+Delete", "Alt+Backspace"],
+        "edit.lift_in_out": ["Semicolon", "Alt+Delete"],
+        "edit.extract_in_out": ["Quote", "Shift+Delete"],
         "edit.delete_single_stream": ["Alt+Delete"],
         "edit.unlink_av": ["Ctrl+KeyL", "KeyU"],
         "edit.nudge_left": ["Alt+ArrowLeft"],
@@ -445,6 +535,14 @@ export const KEYMAP_PRESETS = {
         "playback.jog_next_frame": ["KeyK+KeyL", "ArrowRight"],
         "playback.mark_in": ["KeyI"],
         "playback.mark_out": ["KeyO"],
+        "playback.clear_in": ["Alt+KeyI"],
+        "playback.clear_out": ["Alt+KeyO"],
+        "playback.clear_in_out": ["Alt+KeyX"],
+        "playback.mark_clip": ["KeyX"],
+        "playback.goto_in": ["Shift+KeyI"],
+        "playback.goto_out": ["Shift+KeyO"],
+        "playback.play_in_to_out": ["Alt+Slash", "Shift+Space"],
+        "playback.toggle_loop": ["Ctrl+Slash", "Ctrl+KeyL"],
         "playback.append_timeline": ["Shift+F12", "F9", "KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
@@ -462,6 +560,8 @@ export const KEYMAP_PRESETS = {
         "edit.ripple_trim_tail": ["Shift+BracketRight", "KeyW"],
         "edit.lift_delete": ["Backspace"],
         "edit.ripple_delete": ["Shift+Backspace", "Delete"],
+        "edit.lift_in_out": ["Backspace", "Semicolon"],
+        "edit.extract_in_out": ["Shift+Backspace", "Quote"],
         "edit.delete_single_stream": ["Alt+Delete", "Alt+Backspace"],
         "edit.unlink_av": ["Ctrl+Alt+KeyL", "KeyU"],
         "edit.nudge_left": ["Comma"],
@@ -494,6 +594,14 @@ export const KEYMAP_PRESETS = {
         "playback.jog_next_frame": ["KeyK+KeyL", "ArrowRight"],
         "playback.mark_in": ["KeyI"],
         "playback.mark_out": ["KeyO"],
+        "playback.clear_in": ["Alt+KeyI"],
+        "playback.clear_out": ["Alt+KeyO"],
+        "playback.clear_in_out": ["Alt+KeyX"],
+        "playback.mark_clip": ["KeyX"],
+        "playback.goto_in": ["Shift+KeyI"],
+        "playback.goto_out": ["Shift+KeyO"],
+        "playback.play_in_to_out": ["Alt+Slash", "Shift+Space"],
+        "playback.toggle_loop": ["Cmd+KeyL", "Ctrl+KeyL"],
         "playback.append_timeline": ["KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
@@ -511,6 +619,8 @@ export const KEYMAP_PRESETS = {
         "edit.ripple_trim_tail": ["Alt+BracketRight", "KeyW"],
         "edit.lift_delete": ["Delete"],
         "edit.ripple_delete": ["Shift+Delete", "Backspace"],
+        "edit.lift_in_out": ["Delete", "Semicolon"],
+        "edit.extract_in_out": ["Shift+Delete", "Quote"],
         "edit.delete_single_stream": ["Alt+Delete"],
         "edit.unlink_av": ["Cmd+Shift+KeyS", "KeyU"],
         "edit.nudge_left": ["Comma"],

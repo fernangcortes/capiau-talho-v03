@@ -235,6 +235,11 @@ export class CapiauTimelineState {
         this.hoveredMarkerId = null; // ID do marcador sobre o qual o mouse está iterando (para mostrar rótulo no hover)
         this.selectedMarkerIds = new Set(); // Conjunto de IDs de marcadores selecionados na timeline
 
+        // Pontos de Entrada e Saída (IN / OUT / LOOP)
+        this.inFrame = null; // Ponto IN marcado na timeline (em frames)
+        this.outFrame = null; // Ponto OUT marcado na timeline (em frames)
+        this.isLooping = false; // Modo de reprodução em loop contínuo entre In e Out (ou timeline)
+
         // Manipulador de Fade ativo no hover ({ clipId, side: "in"|"out", type: "duration"|"curve" })
         this.hoveredFadeHandle = null;
     }
@@ -242,6 +247,393 @@ export class CapiauTimelineState {
     /** Atalho reativo para a lista ativa de cortes na timeline. */
     get cuts() {
         return (STATE && STATE.activeTimelineCuts) || [];
+    }
+
+    // ── PONTOS DE ENTRADA E SAÍDA (IN / OUT / LOOP) ───────────────────────
+
+    /**
+     * Define o ponto IN na timeline.
+     * @param {number} [frame=this.playheadFrame] Frame absoluto.
+     */
+    setInPoint(frame = this.playheadFrame) {
+        const f = Math.max(0, Math.round(Number(frame) || 0));
+        this.inFrame = f;
+        if (this.outFrame !== null && this.outFrame <= this.inFrame) {
+            this.outFrame = null;
+        }
+        STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+        return this.inFrame;
+    }
+
+    /**
+     * Define o ponto OUT na timeline.
+     * @param {number} [frame=this.playheadFrame] Frame absoluto.
+     */
+    setOutPoint(frame = this.playheadFrame) {
+        const f = Math.max(0, Math.round(Number(frame) || 0));
+        this.outFrame = f;
+        if (this.inFrame !== null && this.inFrame >= this.outFrame) {
+            this.inFrame = null;
+        }
+        STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+        return this.outFrame;
+    }
+
+    /** Limpa o ponto IN. */
+    clearInPoint() {
+        if (this.inFrame !== null) {
+            this.inFrame = null;
+            STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+        }
+    }
+
+    /** Limpa o ponto OUT. */
+    clearOutPoint() {
+        if (this.outFrame !== null) {
+            this.outFrame = null;
+            STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+        }
+    }
+
+    /** Limpa ambos os pontos IN e OUT. */
+    clearInOut() {
+        if (this.inFrame !== null || this.outFrame !== null) {
+            this.inFrame = null;
+            this.outFrame = null;
+            STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+        }
+    }
+
+    /**
+     * Marca pontos IN e OUT em torno do clipe selecionado ou sob o playhead.
+     * @param {string} [clipId=null] ID do clipe (opcional).
+     */
+    markClip(clipId = null) {
+        const cuts = STATE.activeTimelineCuts || [];
+        let targetCut = null;
+        if (clipId) {
+            targetCut = cuts.find(c => c.id === clipId);
+        } else if (this.selectedClipId) {
+            targetCut = cuts.find(c => c.id === this.selectedClipId);
+        } else {
+            const targetTrack = this.selectedTrack || "V1";
+            targetCut = cuts.find(c => c.track === targetTrack && this.playheadFrame >= c.timelineStartFrame && this.playheadFrame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
+            if (!targetCut) {
+                targetCut = cuts.find(c => this.playheadFrame >= c.timelineStartFrame && this.playheadFrame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
+            }
+        }
+
+        if (targetCut) {
+            const start = targetCut.timelineStartFrame;
+            const end = targetCut.timelineStartFrame + (targetCut.outFrame - targetCut.inFrame);
+            this.inFrame = start;
+            this.outFrame = end;
+            STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Alterna ou define o estado de reprodução em loop.
+     * @param {boolean} [forceState=null]
+     */
+    toggleLoop(forceState = null) {
+        this.isLooping = (forceState !== null) ? Boolean(forceState) : !this.isLooping;
+        STATE.emit("timelineLoopChanged", this.isLooping);
+        return this.isLooping;
+    }
+
+    /** Retorna true se houver ponto IN ou OUT definido. */
+    hasInOut() {
+        return this.inFrame !== null || this.outFrame !== null;
+    }
+
+    /**
+     * Retorna os frames efetivos de início e fim da região de trabalho.
+     * Se ambos null, retorna [0, maxDuration].
+     */
+    getEffectiveInOutFrames() {
+        const cuts = STATE.activeTimelineCuts || [];
+        const maxDuration = cuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + ((c.outFrame || 0) - (c.inFrame || 0))), 0);
+        const start = (this.inFrame !== null) ? this.inFrame : 0;
+        const end = (this.outFrame !== null) ? this.outFrame : maxDuration;
+        return { startFrame: start, endFrame: Math.max(start, end), durationFrames: Math.max(0, end - start) };
+    }
+
+    /** Move a agulha para o ponto IN (ou 0). */
+    seekToIn() {
+        const target = (this.inFrame !== null) ? this.inFrame : 0;
+        this.setPlayheadFrame(target);
+        if (window.timelineInteraction && typeof window.timelineInteraction.ensureFrameVisible === "function") {
+            window.timelineInteraction.ensureFrameVisible(target);
+        }
+        return target;
+    }
+
+    /** Move a agulha para o ponto OUT (ou duração máxima). */
+    seekToOut() {
+        const cuts = STATE.activeTimelineCuts || [];
+        const maxDuration = cuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + ((c.outFrame || 0) - (c.inFrame || 0))), 0);
+        const target = (this.outFrame !== null) ? this.outFrame : maxDuration;
+        this.setPlayheadFrame(target);
+        if (window.timelineInteraction && typeof window.timelineInteraction.ensureFrameVisible === "function") {
+            window.timelineInteraction.ensureFrameVisible(target);
+        }
+        return target;
+    }
+
+    /**
+     * Lift Delete no intervalo IN-OUT:
+     * Remove o conteúdo das pistas destravadas dentro do intervalo [inFrame, outFrame],
+     * deixando o espaço vazio (gap).
+     * @param {number} [inF=this.inFrame] Frame inicial do intervalo.
+     * @param {number} [outF=this.outFrame] Frame final do intervalo.
+     * @returns {boolean} True se a operação foi realizada com sucesso.
+     */
+    liftRange(inF = this.inFrame, outF = this.outFrame) {
+        const range = this.getEffectiveInOutFrames();
+        const startF = (inF !== null && inF !== undefined) ? inF : range.startFrame;
+        const endF = (outF !== null && outF !== undefined) ? outF : range.endFrame;
+
+        if (startF >= endF) return false;
+
+        const cuts = STATE.activeTimelineCuts || [];
+        if (cuts.length === 0) return false;
+
+        const activeTrackIds = this.tracks
+            .filter(t => t.kind !== "ai" && !t.locked)
+            .map(t => t.id);
+
+        let modified = false;
+
+        TIMELINE_HISTORY.record(() => {
+            const newCuts = [];
+
+            for (const cut of cuts) {
+                if (!activeTrackIds.includes(cut.track)) {
+                    newCuts.push(cut);
+                    continue;
+                }
+
+                const cStart = cut.timelineStartFrame !== undefined ? cut.timelineStartFrame : Math.round((cut.timeline_start || 0) * this.fps);
+                const cIn = cut.inFrame !== undefined ? cut.inFrame : Math.round((cut.in || 0) * this.fps);
+                const cOut = cut.outFrame !== undefined ? cut.outFrame : Math.round((cut.out || 0) * this.fps);
+                const cDur = cOut - cIn;
+                const cEnd = cStart + cDur;
+
+                // 1. Clipe totalmente fora do intervalo: mantém intacto
+                if (cEnd <= startF || cStart >= endF) {
+                    newCuts.push(cut);
+                    continue;
+                }
+
+                modified = true;
+
+                // 2. Clipe totalmente contido dentro do intervalo: é removido completamente
+                if (cStart >= startF && cEnd <= endF) {
+                    continue;
+                }
+
+                // 3. Clipe atravessa todo o intervalo (começa antes e termina depois): divide em 2 partes
+                if (cStart < startF && cEnd > endF) {
+                    const leftDur = startF - cStart;
+                    const leftCut = {
+                        ...JSON.parse(JSON.stringify(cut)),
+                        id: `cut_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                        timelineStartFrame: cStart,
+                        timeline_start: cStart / this.fps,
+                        inFrame: cIn,
+                        in: cIn / this.fps,
+                        outFrame: cIn + leftDur,
+                        out: (cIn + leftDur) / this.fps
+                    };
+                    newCuts.push(leftCut);
+
+                    const rightOffset = endF - cStart;
+                    const rightDur = cEnd - endF;
+                    const rightCut = {
+                        ...JSON.parse(JSON.stringify(cut)),
+                        id: `cut_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                        timelineStartFrame: endF,
+                        timeline_start: endF / this.fps,
+                        inFrame: cIn + rightOffset,
+                        in: (cIn + rightOffset) / this.fps,
+                        outFrame: cIn + rightOffset + rightDur,
+                        out: (cIn + rightOffset + rightDur) / this.fps
+                    };
+                    newCuts.push(rightCut);
+                    continue;
+                }
+
+                // 4. Clipe começa antes do In e termina dentro do intervalo: apara a cauda
+                if (cStart < startF && cEnd <= endF) {
+                    const newDur = startF - cStart;
+                    const trimmedCut = {
+                        ...cut,
+                        outFrame: cIn + newDur,
+                        out: (cIn + newDur) / this.fps
+                    };
+                    newCuts.push(trimmedCut);
+                    continue;
+                }
+
+                // 5. Clipe começa dentro do intervalo e termina depois do Out: apara a cabeça
+                if (cStart >= startF && cEnd > endF) {
+                    const cutOffset = endF - cStart;
+                    const newDur = cEnd - endF;
+                    const trimmedCut = {
+                        ...cut,
+                        timelineStartFrame: endF,
+                        timeline_start: endF / this.fps,
+                        inFrame: cIn + cutOffset,
+                        in: (cIn + cutOffset) / this.fps
+                    };
+                    newCuts.push(trimmedCut);
+                    continue;
+                }
+            }
+
+            if (modified) {
+                this.clearClipSelection();
+                STATE.activeTimelineCuts = newCuts;
+            }
+        });
+
+        return modified;
+    }
+
+    /**
+     * Extract (Ripple Delete) no intervalo IN-OUT:
+     * Remove o conteúdo das pistas destravadas dentro de [inFrame, outFrame]
+     * e fecha o espaço puxando todos os clipes à direita para a esquerda pela duração do intervalo.
+     * @param {number} [inF=this.inFrame] Frame inicial do intervalo.
+     * @param {number} [outF=this.outFrame] Frame final do intervalo.
+     * @returns {boolean} True se a operação foi realizada com sucesso.
+     */
+    extractRange(inF = this.inFrame, outF = this.outFrame) {
+        const range = this.getEffectiveInOutFrames();
+        const startF = (inF !== null && inF !== undefined) ? inF : range.startFrame;
+        const endF = (outF !== null && outF !== undefined) ? outF : range.endFrame;
+
+        if (startF >= endF) return false;
+
+        const cuts = STATE.activeTimelineCuts || [];
+        if (cuts.length === 0) return false;
+
+        const durationFrames = endF - startF;
+        const activeTrackIds = this.tracks
+            .filter(t => t.kind !== "ai" && !t.locked)
+            .map(t => t.id);
+        const syncTrackIds = this.getSyncLockedTrackIds();
+
+        let modified = false;
+
+        TIMELINE_HISTORY.record(() => {
+            const intermediateCuts = [];
+
+            for (const cut of cuts) {
+                if (!activeTrackIds.includes(cut.track)) {
+                    intermediateCuts.push(cut);
+                    continue;
+                }
+
+                const cStart = cut.timelineStartFrame !== undefined ? cut.timelineStartFrame : Math.round((cut.timeline_start || 0) * this.fps);
+                const cIn = cut.inFrame !== undefined ? cut.inFrame : Math.round((cut.in || 0) * this.fps);
+                const cOut = cut.outFrame !== undefined ? cut.outFrame : Math.round((cut.out || 0) * this.fps);
+                const cDur = cOut - cIn;
+                const cEnd = cStart + cDur;
+
+                if (cEnd <= startF || cStart >= endF) {
+                    intermediateCuts.push(cut);
+                    continue;
+                }
+
+                modified = true;
+
+                if (cStart >= startF && cEnd <= endF) {
+                    continue;
+                }
+
+                if (cStart < startF && cEnd > endF) {
+                    const leftDur = startF - cStart;
+                    const leftCut = {
+                        ...JSON.parse(JSON.stringify(cut)),
+                        id: `cut_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                        timelineStartFrame: cStart,
+                        timeline_start: cStart / this.fps,
+                        inFrame: cIn,
+                        in: cIn / this.fps,
+                        outFrame: cIn + leftDur,
+                        out: (cIn + leftDur) / this.fps
+                    };
+                    intermediateCuts.push(leftCut);
+
+                    const rightOffset = endF - cStart;
+                    const rightDur = cEnd - endF;
+                    const rightCut = {
+                        ...JSON.parse(JSON.stringify(cut)),
+                        id: `cut_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                        timelineStartFrame: endF,
+                        timeline_start: endF / this.fps,
+                        inFrame: cIn + rightOffset,
+                        in: (cIn + rightOffset) / this.fps,
+                        outFrame: cIn + rightOffset + rightDur,
+                        out: (cIn + rightOffset + rightDur) / this.fps
+                    };
+                    intermediateCuts.push(rightCut);
+                    continue;
+                }
+
+                if (cStart < startF && cEnd <= endF) {
+                    const newDur = startF - cStart;
+                    const trimmedCut = {
+                        ...cut,
+                        outFrame: cIn + newDur,
+                        out: (cIn + newDur) / this.fps
+                    };
+                    intermediateCuts.push(trimmedCut);
+                    continue;
+                }
+
+                if (cStart >= startF && cEnd > endF) {
+                    const cutOffset = endF - cStart;
+                    const newDur = cEnd - endF;
+                    const trimmedCut = {
+                        ...cut,
+                        timelineStartFrame: endF,
+                        timeline_start: endF / this.fps,
+                        inFrame: cIn + cutOffset,
+                        in: (cIn + cutOffset) / this.fps
+                    };
+                    intermediateCuts.push(trimmedCut);
+                    continue;
+                }
+            }
+
+            const finalCuts = intermediateCuts.map(c => {
+                const cStart = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * this.fps);
+                if (syncTrackIds.includes(c.track) && cStart >= endF - 1) {
+                    const newStart = Math.max(0, cStart - durationFrames);
+                    return {
+                        ...c,
+                        timelineStartFrame: newStart,
+                        timeline_start: newStart / this.fps
+                    };
+                }
+                return c;
+            });
+
+            if (this.outFrame !== null) {
+                this.outFrame = Math.max(this.inFrame !== null ? this.inFrame : 0, this.outFrame - durationFrames);
+            }
+
+            this.clearClipSelection();
+            STATE.activeTimelineCuts = finalCuts;
+            STATE.emit("timelineInOutChanged", { inFrame: this.inFrame, outFrame: this.outFrame });
+        });
+
+        return modified;
     }
 
     // ── MARCADORES DA TIMELINE ──────────────────────────────────────────
@@ -2286,7 +2678,9 @@ class TimelineHistory {
             selectedClipId: TIMELINE_STATE.selectedClipId,
             selectedClipIds: Array.from(TIMELINE_STATE.selectedClipIds || []),
             activeTool: TIMELINE_STATE.activeTool || "select",
-            selectedGhostClipId: TIMELINE_STATE.selectedGhostClipId
+            selectedGhostClipId: TIMELINE_STATE.selectedGhostClipId,
+            inFrame: TIMELINE_STATE.inFrame,
+            outFrame: TIMELINE_STATE.outFrame
         }));
     }
 
@@ -2332,6 +2726,9 @@ class TimelineHistory {
         TIMELINE_STATE.setTracks(snap.tracks);
         STATE.activeTimelineCuts = snap.cuts || [];
         TIMELINE_STATE.ghostTrack = snap.ghosts || [];
+        if (snap.inFrame !== undefined) TIMELINE_STATE.inFrame = snap.inFrame;
+        if (snap.outFrame !== undefined) TIMELINE_STATE.outFrame = snap.outFrame;
+        STATE.emit("timelineInOutChanged", { inFrame: TIMELINE_STATE.inFrame, outFrame: TIMELINE_STATE.outFrame });
         STATE.emit("timelineGhostUpdated", TIMELINE_STATE.ghostTrack);
         STATE.emit("timelineRestored");
         this._notify();

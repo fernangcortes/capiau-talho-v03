@@ -586,8 +586,41 @@ export class CapiauTimelineInteraction {
             this.mouseDownClip = null;
         }
         
-        // 1. Clique na régua de tempo ou clipe (Scrubbing / Drag de Marcador / Mover Playhead)
+        // 1. Clique na régua de tempo (In/Out Drag, Scrubbing, Drag de Marcador, Mover Playhead)
         if (y < this.renderer.rulerHeight) {
+            const zoom = TIMELINE_STATE.zoom;
+            const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+            const inF = TIMELINE_STATE.inFrame;
+            const outF = TIMELINE_STATE.outFrame;
+
+            const inX = (inF !== null) ? (inF - scrollLeft) * zoom : null;
+            const outX = (outF !== null) ? (outF - scrollLeft) * zoom : null;
+
+            // Arraste do ponto IN na régua
+            if (inX !== null && Math.abs(x - inX) <= 8) {
+                this.dragState = "drag-in-point";
+                this.dragStartMouseX = e.clientX;
+                this.dragStartFrame = inF;
+                return;
+            }
+
+            // Arraste do ponto OUT na régua
+            if (outX !== null && Math.abs(x - outX) <= 8) {
+                this.dragState = "drag-out-point";
+                this.dragStartMouseX = e.clientX;
+                this.dragStartFrame = outF;
+                return;
+            }
+
+            // Arraste / Deslizamento da faixa IN-OUT inteira com Alt ou Shift
+            if (inX !== null && outX !== null && x > inX && x < outX && (e.altKey || e.shiftKey)) {
+                this.dragState = "drag-in-out-span";
+                this.dragStartMouseX = e.clientX;
+                this.dragStartInFrame = inF;
+                this.dragStartOutFrame = outF;
+                return;
+            }
+
             const hitMarker = this.getMarkerAtX(x, 14, y);
             if (hitMarker) {
                 TIMELINE_STATE.selectMarker(hitMarker.id, e.shiftKey || e.ctrlKey);
@@ -944,12 +977,64 @@ export class CapiauTimelineInteraction {
             this.canvas.removeAttribute("title");
         }
 
+        // Feedback de cursor sobre colchetes e faixa In/Out na régua
+        if (!this.dragState && y < this.renderer.rulerHeight) {
+            const inF = TIMELINE_STATE.inFrame;
+            const outF = TIMELINE_STATE.outFrame;
+            const zoom = TIMELINE_STATE.zoom;
+            const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+            const inX = inF !== null ? (inF - scrollLeft) * zoom : null;
+            const outX = outF !== null ? (outF - scrollLeft) * zoom : null;
+
+            if (inX !== null && Math.abs(x - inX) <= 8) {
+                this.canvas.style.cursor = "w-resize";
+                return;
+            }
+            if (outX !== null && Math.abs(x - outX) <= 8) {
+                this.canvas.style.cursor = "w-resize";
+                return;
+            }
+            if (inX !== null && outX !== null && x > inX && x < outX && (e.altKey || e.shiftKey)) {
+                this.canvas.style.cursor = "grab";
+                return;
+            }
+        }
+
         if (!this.dragState) {
             return;
         }
 
         // Processar arrastes baseados no estado
-        if (this.dragState === "scrub") {
+        if (this.dragState === "drag-in-point") {
+            const rawFrame = Math.max(0, Math.round(frame));
+            const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
+            const snappedFrame = isSnapDisabled ? rawFrame : this.snapFrame(rawFrame, 8);
+            const maxAllowed = (TIMELINE_STATE.outFrame !== null) ? TIMELINE_STATE.outFrame - 1 : Infinity;
+            const targetFrame = Math.min(maxAllowed, Math.max(0, snappedFrame));
+            TIMELINE_STATE.setInPoint(targetFrame);
+            if (this.renderer) this.renderer.requestRedraw();
+        }
+        else if (this.dragState === "drag-out-point") {
+            const rawFrame = Math.max(1, Math.round(frame));
+            const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
+            const snappedFrame = isSnapDisabled ? rawFrame : this.snapFrame(rawFrame, 8);
+            const minAllowed = (TIMELINE_STATE.inFrame !== null) ? TIMELINE_STATE.inFrame + 1 : 1;
+            const targetFrame = Math.max(minAllowed, snappedFrame);
+            TIMELINE_STATE.setOutPoint(targetFrame);
+            if (this.renderer) this.renderer.requestRedraw();
+        }
+        else if (this.dragState === "drag-in-out-span") {
+            const dx = e.clientX - this.dragStartMouseX;
+            const deltaFrames = Math.round(dx / TIMELINE_STATE.zoom);
+            const dur = Math.max(1, this.dragStartOutFrame - this.dragStartInFrame);
+            let newIn = Math.max(0, this.dragStartInFrame + deltaFrames);
+            let newOut = newIn + dur;
+            TIMELINE_STATE.inFrame = newIn;
+            TIMELINE_STATE.outFrame = newOut;
+            STATE.emit("timelineInOutChanged", { inFrame: newIn, outFrame: newOut });
+            if (this.renderer) this.renderer.requestRedraw();
+        }
+        else if (this.dragState === "scrub") {
             this.updatePlayhead(frame);
         } 
         else if (this.dragState === "drag-marker" && this.draggedMarkerId) {
@@ -1189,6 +1274,13 @@ export class CapiauTimelineInteraction {
             this.renderer.activeSnapFrame = null;
             this.renderer.dropIndicator = null;
         }
+        if (this.dragState === "drag-in-point" || this.dragState === "drag-out-point" || this.dragState === "drag-in-out-span") {
+            this.dragState = null;
+            if (this.canvas) this.canvas.style.cursor = "default";
+            if (window.triggerAutosave) window.triggerAutosave();
+            if (this.renderer) this.renderer.requestRedraw();
+            return;
+        }
         if (this.dragState === "drag-marker") {
             this.dragState = null;
             this.draggedMarkerId = null;
@@ -1247,11 +1339,16 @@ export class CapiauTimelineInteraction {
     }
 
     /**
-     * Handler de clique com botão direito no canvas (menu de contexto de fades, etc.).
+     * Handler de clique com botão direito no canvas (menu de contexto de régua, clipes, fades, gaps).
      */
     onContextMenu(e) {
         const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);
-        if (!track) return;
+        if (y < this.renderer.rulerHeight || !track) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showRulerContextMenu(e.clientX, e.clientY, frame);
+            return;
+        }
         const hit = this.findClipAt(frame, track, y);
         if (hit && hit.type === "clip") {
             const fadeZone = this.checkFadeZone(x, y, hit.data, true);
@@ -1268,7 +1365,159 @@ export class CapiauTimelineInteraction {
             e.preventDefault();
             e.stopPropagation();
             this.showGapContextMenu(e.clientX, e.clientY, hit.data, frame);
+        } else {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showRulerContextMenu(e.clientX, e.clientY, frame);
         }
+    }
+
+    /**
+     * Exibe menu de contexto da régua / timeline (marcação In/Out, Loop, Lift, Extract).
+     */
+    showRulerContextMenu(clientX, clientY, targetFrame) {
+        const oldMenu = document.getElementById("custom-timeline-context-menu");
+        if (oldMenu) oldMenu.remove();
+
+        const menu = document.createElement("div");
+        menu.id = "custom-timeline-context-menu";
+        menu.className = "custom-context-menu";
+        menu.style.position = "fixed";
+        menu.style.left = `${clientX}px`;
+        menu.style.top = `${clientY}px`;
+        menu.style.width = "250px";
+        menu.style.zIndex = "100000";
+        menu.style.padding = "6px 0";
+
+        const title = document.createElement("div");
+        title.style.padding = "6px 12px";
+        title.style.fontSize = "10px";
+        title.style.fontWeight = "bold";
+        title.style.color = "var(--color-cyan)";
+        title.style.borderBottom = "1px solid var(--border-glass)";
+        title.style.marginBottom = "4px";
+        title.style.display = "flex";
+        title.style.alignItems = "center";
+        title.style.gap = "6px";
+        title.innerHTML = `<i class="fa-solid fa-arrows-left-right-to-line"></i> INTERVALO & RÉGUA`;
+        menu.appendChild(title);
+
+        const currentFrame = Math.round(targetFrame !== undefined ? targetFrame : TIMELINE_STATE.playheadFrame);
+
+        const addItem = (icon, label, kbd, action, isEnabled = true, iconColor = "var(--color-cyan)") => {
+            const item = document.createElement("div");
+            item.className = "menu-item";
+            item.style.display = "flex";
+            item.style.alignItems = "center";
+            item.style.justifyContent = "space-between";
+            item.style.padding = "7px 12px";
+            item.style.cursor = isEnabled ? "pointer" : "default";
+            item.style.opacity = isEnabled ? "1" : "0.5";
+            item.innerHTML = `
+                <span style="display:flex; align-items:center; gap:8px;">
+                    <i class="${icon}" style="color:${iconColor}; width:14px; text-align:center;"></i>
+                    <span>${label}</span>
+                </span>
+                ${kbd ? `<kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">${kbd}</kbd>` : ""}
+            `;
+            if (isEnabled) {
+                item.onclick = () => {
+                    action();
+                    if (this.renderer) this.renderer.requestRedraw();
+                    menu.remove();
+                };
+            }
+            menu.appendChild(item);
+        };
+
+        const addDivider = () => {
+            const div = document.createElement("div");
+            div.style.height = "1px";
+            div.style.background = "var(--border-glass)";
+            div.style.margin = "4px 0";
+            menu.appendChild(div);
+        };
+
+        // 1. Marcar In / Out / Clip
+        addItem("fa-solid fa-bracket-square", "Marcar Ponto IN", "I", () => {
+            TIMELINE_STATE.setInPoint(currentFrame);
+        }, true, "#06b6d4");
+
+        addItem("fa-solid fa-bracket-square", "Marcar Ponto OUT", "O", () => {
+            TIMELINE_STATE.setOutPoint(currentFrame);
+        }, true, "#f43f5e");
+
+        addItem("fa-solid fa-crop-simple", "Marcar Clipe", "X", () => {
+            TIMELINE_STATE.markClip();
+        });
+
+        addDivider();
+
+        // 2. Limpar
+        const hasIn = TIMELINE_STATE.inFrame !== null;
+        const hasOut = TIMELINE_STATE.outFrame !== null;
+        const hasAny = hasIn || hasOut;
+
+        addItem("fa-solid fa-xmark", "Limpar Ponto IN", "Alt+I", () => {
+            TIMELINE_STATE.clearInPoint();
+        }, hasIn);
+
+        addItem("fa-solid fa-xmark", "Limpar Ponto OUT", "Alt+O", () => {
+            TIMELINE_STATE.clearOutPoint();
+        }, hasOut);
+
+        addItem("fa-solid fa-trash-can", "Limpar Pontos IN e OUT", "Alt+X", () => {
+            TIMELINE_STATE.clearInOut();
+        }, hasAny);
+
+        addDivider();
+
+        // 3. Navegação e Playback
+        addItem("fa-solid fa-backward-step", "Ir para Ponto IN", "Shift+I", () => {
+            TIMELINE_STATE.seekToIn();
+        }, true);
+
+        addItem("fa-solid fa-forward-step", "Ir para Ponto OUT", "Shift+O", () => {
+            TIMELINE_STATE.seekToOut();
+        }, true);
+
+        addItem("fa-solid fa-play", "Tocar de IN até OUT", "Shift+Espaço", () => {
+            if (window.programPlayer && typeof window.programPlayer.playInOut === "function") {
+                window.programPlayer.playInOut();
+            }
+        }, true);
+
+        addItem("fa-solid fa-repeat", TIMELINE_STATE.isLooping ? "Desativar Loop" : "Ativar Loop IN-OUT", "Ctrl+L", () => {
+            TIMELINE_STATE.toggleLoop();
+        }, true, TIMELINE_STATE.isLooping ? "var(--color-cyan)" : "inherit");
+
+        addDivider();
+
+        // 4. Edição Destrutiva no Intervalo
+        addItem("fa-solid fa-scissors", "Lift no Intervalo IN–OUT", ";", () => {
+            TIMELINE_STATE.liftRange();
+            if (typeof window.showToast === "function") window.showToast("Lift executado no intervalo IN-OUT", "info");
+        }, hasAny);
+
+        addItem("fa-solid fa-film", "Extract no Intervalo IN–OUT", "'", () => {
+            TIMELINE_STATE.extractRange();
+            if (typeof window.showToast === "function") window.showToast("Extract executado no intervalo IN-OUT", "info");
+        }, hasAny);
+
+        document.body.appendChild(menu);
+
+        // Ajusta posição para não vazar da tela
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+        if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+
+        const closeHandler = (evt) => {
+            if (!menu.contains(evt.target)) {
+                menu.remove();
+                document.removeEventListener("mousedown", closeHandler);
+            }
+        };
+        setTimeout(() => document.addEventListener("mousedown", closeHandler), 10);
     }
 
     /**
@@ -1792,19 +2041,42 @@ export class CapiauTimelineInteraction {
     }
 
     /**
-     * Handler de clique duplo no canvas (abre edição de marcador ao clicar na régua).
+     * Handler de clique duplo no canvas (abre edição de marcador ou pula para In/Out ao clicar na régua).
      */
     onDblClick(e) {
         const { x, y, frame } = this.getCoordinates(e.clientX, e.clientY);
-        const marker = this.getMarkerAtX(x, 14, y);
-        if (marker) {
-            this.openMarkerEditModal(marker);
+        if (y < this.renderer.rulerHeight) {
+            const zoom = TIMELINE_STATE.zoom;
+            const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+            const inF = TIMELINE_STATE.inFrame;
+            const outF = TIMELINE_STATE.outFrame;
+            const inX = (inF !== null) ? (inF - scrollLeft) * zoom : null;
+            const outX = (outF !== null) ? (outF - scrollLeft) * zoom : null;
+
+            if (inX !== null && Math.abs(x - inX) <= 8) {
+                TIMELINE_STATE.seekToIn();
+                return;
+            }
+            if (outX !== null && Math.abs(x - outX) <= 8) {
+                TIMELINE_STATE.seekToOut();
+                return;
+            }
+
+            const marker = this.getMarkerAtX(x, 14, y);
+            if (marker) {
+                this.openMarkerEditModal(marker);
+                this.hideMarkerTooltip();
+                return;
+            }
+            const newMarker = TIMELINE_STATE.addMarker({ frame: Math.round(frame) });
+            this.openMarkerEditModal(newMarker);
             this.hideMarkerTooltip();
             return;
         }
-        if (y < this.renderer.rulerHeight) {
-            const newMarker = TIMELINE_STATE.addMarker({ frame: Math.round(frame) });
-            this.openMarkerEditModal(newMarker);
+
+        const clipMarker = this.getMarkerAtX(x, 14, y);
+        if (clipMarker) {
+            this.openMarkerEditModal(clipMarker);
             this.hideMarkerTooltip();
         }
     }

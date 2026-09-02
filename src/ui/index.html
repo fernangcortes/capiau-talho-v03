@@ -812,18 +812,27 @@
                             <div class="scrubber-container" style="display: flex; align-items: center; gap: 10px; width: 100%;">
                                 <span class="time-code" id="program-current-time" style="font-size: 10px; font-family: monospace; color: var(--text-secondary);">00:00:00:00</span>
                                 <div class="scrubber-bar" id="program-scrubber-progress-bar" style="flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; position: relative; cursor: pointer;">
+                                    <div class="program-inout-span" id="program-inout-span" style="position: absolute; height: 100%; top: 0; left: 0%; width: 0%; background: rgba(6, 182, 212, 0.25); border-radius: 2px; pointer-events: none; display: none;"></div>
                                     <div class="scrubber-fill" id="program-scrubber-progress-fill" style="height: 100%; width: 0%; background: #a855f7; border-radius: 3px;"></div>
-                                    <div class="scrubber-handle" id="program-scrubber-progress-handle" style="width: 10px; height: 10px; border-radius: 50%; background: #fff; position: absolute; top: -2px; left: 0%; transform: translateX(-50%); pointer-events: none;"></div>
+                                    <div class="scrubber-marker in-marker" id="program-marker-in-pos" style="position: absolute; top: -4px; width: 2px; height: 14px; background: #06b6d4; display: none; z-index: 2; pointer-events: none; box-shadow: 0 0 4px #06b6d4;"></div>
+                                    <div class="scrubber-marker out-marker" id="program-marker-out-pos" style="position: absolute; top: -4px; width: 2px; height: 14px; background: #f43f5e; display: none; z-index: 2; pointer-events: none; box-shadow: 0 0 4px #f43f5e;"></div>
+                                    <div class="scrubber-handle" id="program-scrubber-progress-handle" style="width: 10px; height: 10px; border-radius: 50%; background: #fff; position: absolute; top: -2px; left: 0%; transform: translateX(-50%); pointer-events: none; z-index: 3;"></div>
                                 </div>
                                 <span class="time-code" id="program-duration-time" style="font-size: 10px; font-family: monospace; color: var(--text-secondary);">00:00:00:00</span>
                             </div>
                             
                             <!-- Botoes -->
                             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                <div style="display: flex; gap: 6px;">
-                                    <button id="btn-program-prev-frame" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Frame Anterior"><i class="fa-solid fa-chevron-left"></i></button>
-                                    <button id="btn-program-play" class="btn-control play-btn" style="padding: 4px 12px; font-size: 11px;" title="Play/Pause"><i class="fa-solid fa-play"></i></button>
-                                    <button id="btn-program-next-frame" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Próximo Frame"><i class="fa-solid fa-chevron-right"></i></button>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <button id="btn-program-prev-frame" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Frame Anterior (Seta Esquerda)"><i class="fa-solid fa-chevron-left"></i></button>
+                                    <button id="btn-program-play" class="btn-control play-btn" style="padding: 4px 12px; font-size: 11px;" title="Play/Pause (Espaço)"><i class="fa-solid fa-play"></i></button>
+                                    <button id="btn-program-next-frame" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Próximo Frame (Seta Direita)"><i class="fa-solid fa-chevron-right"></i></button>
+                                    <div style="width: 1px; height: 16px; background: var(--border-glass); margin: 0 2px;"></div>
+                                    <button id="btn-program-mark-in" class="btn-control btn-marker-in" style="padding: 4px 8px; font-size: 10px; font-weight: bold; color: var(--color-cyan);" title="Marcar Ponto IN (I)"><i class="fa-solid fa-bracket-square"></i> IN</button>
+                                    <button id="btn-program-mark-out" class="btn-control btn-marker-out" style="padding: 4px 8px; font-size: 10px; font-weight: bold; color: #f43f5e;" title="Marcar Ponto OUT (O)"><i class="fa-solid fa-bracket-square"></i> OUT</button>
+                                    <button id="btn-program-play-in-out" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Tocar de IN até OUT (Shift+Espaço)"><i class="fa-solid fa-play"></i><i class="fa-solid fa-arrows-left-right" style="font-size: 8px; margin-left: 2px;"></i></button>
+                                    <button id="btn-program-loop" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Alternar Loop Contínuo (Ctrl+L)"><i class="fa-solid fa-repeat"></i></button>
+                                    <button id="btn-program-clear-in-out" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Limpar Pontos IN e OUT (Alt+X)"><i class="fa-solid fa-xmark"></i></button>
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: center;">
                                     <!-- Volume / Resolution selector -->
@@ -1580,6 +1589,13 @@
                     <p id="export-format-hint" style="font-size: 10px; color: var(--text-secondary); margin: 6px 0 0 0; line-height: 1.5;"></p>
                 </div>
 
+                <div>
+                    <label class="ev-check" style="display: flex; align-items: center; gap: 8px; font-size: 11px; cursor: pointer; color: var(--text-primary);" data-tooltip="Gera o arquivo de timeline (.otio, .xml, .edl) apontando para os proxies 720p locais em vez dos originais">
+                        <input type="checkbox" id="chk-export-timeline-proxies" style="accent-color: var(--color-cyan); cursor: pointer;">
+                        <span>Exportar apontando para mídias proxy (720p)</span>
+                    </label>
+                </div>
+
                 <p id="export-warning" style="display: none; font-size: 11px; line-height: 1.5; margin: 0; padding: 8px 10px; border-radius: 6px; background: rgba(234, 179, 8, 0.12); border: 1px solid rgba(234, 179, 8, 0.35); color: #eab308;"></p>
 
             </div>
@@ -1787,11 +1803,17 @@
                         </div>
                         <div class="ev-tracks-subtitulo">Pistas <span class="ev-tracks-dica">(uma linha por pista real da timeline)</span></div>
                         <div id="ev-tracks-list" class="ev-tracks-list"><!-- montado pelo preflight --></div>
-                        <div id="ev-proxy-fallback-wrap" style="display: none;">
-                            <label class="ev-check ev-proxy-fallback" data-tooltip="Master segue com mídia de proxy quando o original estiver indisponível; o nome ganha sufixo _proxy">
-                                <input type="checkbox" id="ev-proxy-fallback">
-                                <span>Aceitar fallback para proxy se o original estiver indisponível</span>
+                        <div class="ev-proxy-opcoes" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-glass);">
+                            <label class="ev-check" data-tooltip="Renderiza utilizando os arquivos de proxy (720p locais) em vez dos originais pesados, viabilizando render rápido ou exportação offline">
+                                <input type="checkbox" id="ev-use-proxies">
+                                <span><i class="fa-solid fa-bolt" style="color: var(--color-cyan); margin-right: 4px;"></i> Exportar com proxies (render rápido / offline)</span>
                             </label>
+                            <div id="ev-proxy-fallback-wrap" style="display: none; margin-top: 4px; padding-left: 20px;">
+                                <label class="ev-check ev-proxy-fallback" data-tooltip="Master segue com mídia de proxy quando o original estiver indisponível; o nome ganha sufixo _proxy">
+                                    <input type="checkbox" id="ev-proxy-fallback">
+                                    <span>Aceitar fallback para proxy se o original estiver indisponível</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </section>

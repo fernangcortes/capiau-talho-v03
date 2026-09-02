@@ -249,7 +249,8 @@ function _corpoPedido(kind) {
             filename: (_el.outNome && _el.outNome.value.trim()) || null
         },
         post: _lerPost(),
-        allow_proxy_fallback: !!(_el.proxyFallback && _el.proxyFallback.checked)
+        allow_proxy_fallback: !!(_el.proxyFallback && _el.proxyFallback.checked),
+        use_proxies: !!(_el.useProxies && _el.useProxies.checked)
     };
 }
 
@@ -402,6 +403,20 @@ export function initExportVideoPanel() {
         });
     }
 
+    if (_el.useProxies) {
+        _el.useProxies.addEventListener("change", () => {
+            if (_el.proxyFallbackWrap) {
+                const precisa = _el.proxyFallbackWrap.dataset.precisaFallback === "true";
+                _el.proxyFallbackWrap.style.display = (_el.useProxies.checked ? "none" : (precisa ? "" : "none"));
+            }
+            _agendarRepreflight();
+        });
+    }
+
+    if (_el.proxyFallback) {
+        _el.proxyFallback.addEventListener("change", () => _agendarRepreflight());
+    }
+
     // Troca de timeline salva: recarrega preferências + preflight.
     if (_el.timelineSelect) {
         _el.timelineSelect.addEventListener("change", () => {
@@ -490,6 +505,7 @@ function _mapearElementos() {
         engineMsg: _q("ev-engine-indisponivel"),
         banner: _q("ev-banner-fidelidade"),
         tracksList: _q("ev-tracks-list"),
+        useProxies: _q("ev-use-proxies"),
         proxyFallbackWrap: _q("ev-proxy-fallback-wrap"),
         proxyFallback: _q("ev-proxy-fallback"),
         rangeInOutRadio: _q("ev-range-inout"),
@@ -755,19 +771,39 @@ function aplicarPreflight(pfBruto) {
     if (_el.infoRes) _el.infoRes.textContent = `${pf.largura}×${pf.altura}`;
     if (_el.infoClipes) _el.infoClipes.textContent = `${pf.clipes} clipes`;
 
-    // 2. Faixa IN–OUT pré-preenchida com o alcance completo (editável).
-    if (_el.rangeIni && document.activeElement !== _el.rangeIni) _el.rangeIni.value = "0";
-    if (_el.rangeFim && document.activeElement !== _el.rangeFim) {
-        _el.rangeFim.value = String(Math.round((Number(pf.duracao_s) || 0) * 10) / 10);
+    // 2. Faixa IN–OUT pré-preenchida com os pontos marcados na timeline (ou alcance completo).
+    const fpsVal = Number(pf.fps) || TIMELINE_STATE.fps || 24;
+    const hasTimelineInOut = TIMELINE_STATE && typeof TIMELINE_STATE.hasInOut === "function" && TIMELINE_STATE.hasInOut();
+
+    if (hasTimelineInOut) {
+        const range = TIMELINE_STATE.getEffectiveInOutFrames();
+        const startSec = range.startFrame / fpsVal;
+        const endSec = range.endFrame / fpsVal;
+        if (_el.rangeIni && document.activeElement !== _el.rangeIni) {
+            _el.rangeIni.value = String(Math.round(startSec * 100) / 100);
+        }
+        if (_el.rangeFim && document.activeElement !== _el.rangeFim) {
+            _el.rangeFim.value = String(Math.round(endSec * 100) / 100);
+        }
+        if (_el.rangeInOutRadio) _el.rangeInOutRadio.checked = true;
+    } else {
+        if (_el.rangeIni && document.activeElement !== _el.rangeIni) _el.rangeIni.value = "0";
+        if (_el.rangeFim && document.activeElement !== _el.rangeFim) {
+            _el.rangeFim.value = String(Math.round((Number(pf.duracao_s) || 0) * 10) / 10);
+        }
     }
     _atualizarVisibilidadeFaixa();
 
     // 3. Pistas REAIS (§7.5) — SEMPRE do preflight; nada de V1/V2/A1/A2 fixo.
     montarListaPistas(pf.pistas || []);
 
-    // 4. Fallback de proxy só aparece quando há original indisponível.
+    // 4. Fallback de proxy só aparece quando há original indisponível e useProxies não está marcado.
     const precisaFallback = Array.isArray(pf.midia && pf.midia.sem_original) && pf.midia.sem_original.length > 0;
-    if (_el.proxyFallbackWrap) _el.proxyFallbackWrap.style.display = precisaFallback ? "" : "none";
+    if (_el.proxyFallbackWrap) {
+        _el.proxyFallbackWrap.dataset.precisaFallback = precisaFallback ? "true" : "false";
+        const usandoProxiesDireto = !!(_el.useProxies && _el.useProxies.checked);
+        _el.proxyFallbackWrap.style.display = (precisaFallback && !usandoProxiesDireto) ? "" : "none";
+    }
 
     // 4b. Tela x banco: avisa quando o que esta na tela nao e o que sera exportado.
     _avaliarDesatualizacao(pf);
@@ -778,8 +814,9 @@ function aplicarPreflight(pfBruto) {
 
     // 6. Destino sugerido (editável só para este export).
     if (_el.outDir && pf.saida && pf.saida.dir) _el.outDir.value = pf.saida.dir;
-    if (_el.outNome && pf.saida && pf.saida.filename_sugerido && document.activeElement !== _el.outNome) {
-        _el.outNome.value = pf.saida.filename_sugerido;
+    const sugerido = pf.saida && (pf.saida.filename_sugerido || pf.saida.nome_arquivo_sugerido);
+    if (_el.outNome && sugerido && document.activeElement !== _el.outNome) {
+        _el.outNome.value = sugerido;
     }
 }
 
@@ -1482,7 +1519,12 @@ async function _abrirPastaDoRender(avisar) {
         return;
     }
     const r = await _postJson("/api/render/revelar", { caminho });
-    if (r.ok) {
+    if (r.ok && r.data && r.data.status === "unsupported") {
+        if (avisar) {
+            _toast("Servidor em contêiner Docker (sem desktop local). Caminho copiado para a área de transferência!", "info");
+            _copiarCaminhoDoRender(false);
+        }
+    } else if (r.ok) {
         if (avisar) _toast("Pasta aberta com o arquivo selecionado.", "success");
     } else if (avisar) {
         const det = (r.data && (r.data.detail || r.data.message)) || `HTTP ${r.status}`;
