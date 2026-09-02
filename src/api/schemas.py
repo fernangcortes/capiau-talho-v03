@@ -280,6 +280,7 @@ class RenderPedidoPayload(BaseModel):
     output: RenderOutputPayload = Field(default_factory=RenderOutputPayload)
     post: RenderPostPayload = Field(default_factory=RenderPostPayload)
     allow_proxy_fallback: bool = False
+    use_proxies: bool = False
 
 
 def pedido_render_do_payload(timeline_id: int, payload: RenderPedidoPayload) -> "modelo.Pedido":
@@ -349,6 +350,7 @@ def pedido_render_do_payload(timeline_id: int, payload: RenderPedidoPayload) -> 
             ingerir=payload.post.ingest,
         ),
         permitir_fallback_proxy=bool(payload.allow_proxy_fallback),
+        usar_proxies=bool(payload.use_proxies),
     )
 
 

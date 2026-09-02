@@ -156,9 +156,12 @@ def get_health(request: Request):
     }
 
 
-# Montagem de endpoints para arquivos estáticos locais (player/visualizacao)
 app.mount("/proxies", StaticFiles(directory=str(CONFIG.PROXIES_DIR)), name="proxies")
 app.mount("/originals", StaticFiles(directory=str(CONFIG.ORIGINALS_DIR)), name="originals")
+
+exports_dir = CONFIG.EXPORTS_DIR
+exports_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/exports", StaticFiles(directory=str(exports_dir)), name="exports")
 
 cache_dir = CONFIG.BASE_DIR / "data/cache"
 cache_dir.mkdir(parents=True, exist_ok=True)

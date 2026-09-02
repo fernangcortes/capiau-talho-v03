@@ -2214,7 +2214,10 @@ export class PanelsManager {
         }
 
         try {
-            window.open(`/api/timeline/${tl.id}/export/${formato}`, "_blank");
+            const chkProxies = document.getElementById("chk-export-timeline-proxies");
+            const useProxies = !!(chkProxies && chkProxies.checked);
+            const query = useProxies ? "?use_proxies=true" : "";
+            window.open(`/api/timeline/${tl.id}/export/${formato}${query}`, "_blank");
             this.closeExportModal();
         } catch (e) {
             alert("Falha ao exportar arquivo de timeline.");

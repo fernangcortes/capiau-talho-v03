@@ -70,6 +70,7 @@ class RelatorioMidia:
     sem_referencia: List[str] = field(default_factory=list)
     clipes_proxy: List[str] = field(default_factory=list)           # saem de proxy NESTE render
     usa_proxy_fallback: bool = False    # master aceitou cair para proxy (marca no nome)
+    usa_proxies: bool = False           # usuario escolheu explicitamente exportar com proxies
     drives_fora: List[str] = field(default_factory=list)            # letras que nao responderam
     drives_verificados: Dict[str, bool] = field(default_factory=dict)
     recusas: List[str] = field(default_factory=list)                # nao vazio => RECUSADO
@@ -217,7 +218,11 @@ def resolver_fontes(seq, pedido, *,
         (rascunho nao pode falhar por falta de proxy).
     """
     buscar = buscar_midia or _carregar_do_banco
-    rel = RelatorioMidia(kind_render=str(getattr(pedido, "kind", "master")))
+    usar_proxies = bool(getattr(pedido, "usar_proxies", False))
+    rel = RelatorioMidia(
+        kind_render=str(getattr(pedido, "kind", "master")),
+        usa_proxies=usar_proxies
+    )
     master = rel.kind_render != "draft"
 
     cache_drives: Dict[str, bool] = {}
@@ -309,7 +314,20 @@ def resolver_fontes(seq, pedido, *,
 
         proxy_existe = _arquivo_existe_local(proxy)
 
-        if master:
+        if usar_proxies:
+            if proxy_existe:
+                fonte = FonteClipe(clipe.id, tipo_midia, proxy, "proxy", ST_OK,
+                                   "Render sai do PROXY (escolha do usuário no modal).")
+                rel.clipes_proxy.append(clipe.id)
+            elif existe_original:
+                fonte = FonteClipe(clipe.id, tipo_midia, original, "original", ST_OK,
+                                   "Proxy não encontrado; usando original como fallback.")
+            else:
+                fonte = FonteClipe(clipe.id, tipo_midia, None, "", ST_AUSENTE,
+                                   (motivo_original or "original indisponivel")
+                                   + f"; e sem proxy ({proxy}).")
+                rel.ausentes.append(clipe.id)
+        elif master:
             if existe_original:
                 fonte = FonteClipe(clipe.id, tipo_midia, original, "original", ST_OK,
                                    "Master sai do ORIGINAL.")
@@ -348,7 +366,7 @@ def resolver_fontes(seq, pedido, *,
             + ", ".join(rel.ausentes)
             + ". Renderizar preto no lugar deles seria mentir.")
 
-    if master and rel.originais_indisponiveis:
+    if master and not usar_proxies and rel.originais_indisponiveis:
         if not bool(getattr(pedido, "permitir_fallback_proxy", False)):
             letras = sorted(set(rel.drives_fora)) or ["?"]
             rel.recusas.append(
@@ -361,10 +379,7 @@ def resolver_fontes(seq, pedido, *,
             rel.usa_proxy_fallback = True
             rel.clipes_proxy = sorted(set(rel.originais_indisponiveis))
 
-    if not master:
-        # No rascunho tudo que sai de proxy ja foi anotado clipe a clipe.
-        rel.clipes_proxy = sorted(set(rel.clipes_proxy))
-
+    rel.clipes_proxy = sorted(set(rel.clipes_proxy))
     rel.drives_verificados = dict(cache_drives)
     rel.drives_fora = sorted(set(rel.drives_fora))
     return rel

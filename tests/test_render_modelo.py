@@ -256,6 +256,16 @@ class TestPedido(unittest.TestCase):
         """Master nunca cai calado para proxy: a permissao e explicita."""
         self.assertFalse(modelo.Pedido(timeline_id=1).permitir_fallback_proxy)
 
+    def test_usar_proxies_e_desligado_por_padrao(self):
+        self.assertFalse(modelo.Pedido(timeline_id=1).usar_proxies)
+
+    def test_pedido_do_payload_com_use_proxies(self):
+        from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload
+        payload = RenderPedidoPayload(kind="master", use_proxies=True)
+        pedido = pedido_render_do_payload(10, payload)
+        self.assertTrue(pedido.usar_proxies)
+        self.assertEqual(pedido.timeline_id, 10)
+
 
 if __name__ == "__main__":
     unittest.main()

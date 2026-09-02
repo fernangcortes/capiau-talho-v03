@@ -198,5 +198,50 @@ class TestF0OTIOTimelineExport(unittest.TestCase):
 
         print("\n[OK] Teste de exportacao de FOTO still (OTIO) passou com sucesso!")
 
+    def test_otio_export_with_proxies(self):
+        # 1. Projeto + vídeo e foto com arquivos de proxy criados no disco
+        proj_id = add_project("Teste OTIO Proxy", "Export com proxies", "")
+        v_path = str((self.test_dir / "originals" / "video_full.mp4").resolve())
+        v_id = add_video(
+            project_id=proj_id, filename="video_full.mp4", filepath=v_path,
+            file_hash="hash_vproxy_1", video_type="interview", duration=20.0, fps=24.0
+        )
+        
+        # Criar os arquivos de proxy correspondentes
+        proxy_dir = CONFIG.PROXIES_DIR
+        proxy_dir.mkdir(parents=True, exist_ok=True)
+        photo_proxy_dir = proxy_dir / "photos"
+        photo_proxy_dir.mkdir(parents=True, exist_ok=True)
+
+        v_proxy_file = proxy_dir / f"proxy_vid_{v_id}.mp4"
+        v_proxy_file.write_text("dummy_proxy_video")
+
+        tracks = [{"id": "V1", "name": "Video", "kind": "video"}]
+        cuts = [{"id": "cut_v", "video_id": v_id, "in": 0.0, "out": 5.0, "track": "V1", "timeline_start": 0.0}]
+
+        with get_db() as conn:
+            timeline_id = ProjectRepository.save_timeline(
+                conn=conn, project_id=proj_id, name="TL Proxy Test", description="proxies",
+                cuts=cuts, tracks=tracks, fps=24.0
+            )
+
+        # Sem use_proxies -> aponta para o original
+        otio_orig = generate_otio_timeline(timeline_id, use_proxies=False)
+        v1_orig = next(t for t in otio_orig.tracks if t.name.startswith("V1"))
+        clip_orig = [c for c in v1_orig if isinstance(c, otio.schema.Clip)][0]
+        self.assertIn("video_full.mp4", str(clip_orig.media_reference.target_url))
+
+        # Com use_proxies -> aponta para o proxy
+        otio_proxy = generate_otio_timeline(timeline_id, use_proxies=True)
+        v1_proxy = next(t for t in otio_proxy.tracks if t.name.startswith("V1"))
+        clip_proxy = [c for c in v1_proxy if isinstance(c, otio.schema.Clip)][0]
+        self.assertIn(f"proxy_vid_{v_id}.mp4", str(clip_proxy.media_reference.target_url))
+
+        # Export com proxy gera arquivo com sufixo _proxy
+        out_proxy_file = export_timeline_file(timeline_id, "otio", use_proxies=True)
+        self.assertTrue(out_proxy_file.exists())
+        self.assertTrue(out_proxy_file.name.endswith("_proxy.otio"))
+
+
 if __name__ == "__main__":
     unittest.main()

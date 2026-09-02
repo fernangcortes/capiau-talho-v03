@@ -79,7 +79,7 @@ def _bloco_audio_tratado(cut: dict) -> "tuple[Path | None, str | None]":
     return candidato, None
 
 
-def generate_otio_timeline(timeline_id: int, as_uri: bool = True) -> "otio.schema.Timeline":
+def generate_otio_timeline(timeline_id: int, as_uri: bool = True, use_proxies: bool = False) -> "otio.schema.Timeline":
     """Carrega os cortes salvos na tabela 'timeline' e monta uma timeline do OpenTimelineIO.
 
     Suporta o formato v2 multipista (tracks nomeadas + posições absolutas com Gaps)
@@ -148,11 +148,16 @@ def generate_otio_timeline(timeline_id: int, as_uri: bool = True) -> "otio.schem
                     clip_name = f"Title: {cut.get('text', 'Texto')}"
                 elif is_photo:
                     # Foto still: referencia o arquivo original; fps = fps da timeline
-                    cursor.execute("SELECT filename, filepath FROM photo WHERE id = ?", (cut.get('photo_id'),))
+                    photo_id = cut.get('photo_id')
+                    cursor.execute("SELECT filename, filepath FROM photo WHERE id = ?", (photo_id,))
                     p_row = cursor.fetchone()
                     if not p_row:
                         continue
                     filepath = p_row['filepath']
+                    if use_proxies and photo_id is not None:
+                        p_proxy = CONFIG.PROXIES_DIR / "photos" / f"proxy_photo_{int(photo_id)}.webp"
+                        if p_proxy.exists():
+                            filepath = str(p_proxy)
                     fps = timeline_fps
                     clip_name = p_row['filename']
                 else:
@@ -162,6 +167,10 @@ def generate_otio_timeline(timeline_id: int, as_uri: bool = True) -> "otio.schem
                     if not v_row:
                         continue
                     filepath = v_row['filepath']
+                    if use_proxies and video_id is not None:
+                        v_proxy = CONFIG.PROXIES_DIR / f"proxy_vid_{int(video_id)}.mp4"
+                        if v_proxy.exists():
+                            filepath = str(v_proxy)
                     fps = float(v_row['fps']) if v_row['fps'] else timeline_fps
                     clip_name = v_row['filename']
 
@@ -307,7 +316,7 @@ def _resolve_worker_python() -> "Path | None":
     return None
 
 
-def _export_via_worker(timeline_id: int, output_format: str) -> Path:
+def _export_via_worker(timeline_id: int, output_format: str, use_proxies: bool = False) -> Path:
     """Roda a exportação num subprocesso do venv 3.12 (que tem o opentimelineio)."""
     worker_py = _resolve_worker_python()
     if worker_py is None:
@@ -324,8 +333,12 @@ def _export_via_worker(timeline_id: int, output_format: str) -> Path:
     env["CAPIAU_DB_PATH"] = str(CONFIG.DB_PATH)
     env["CAPIAU_EXPORTS_DIR"] = str(CONFIG.EXPORTS_DIR)
 
+    cmd = [str(worker_py), "-m", "src.export.otio_export", str(timeline_id), output_format]
+    if use_proxies:
+        cmd.append("--use-proxies")
+
     proc = subprocess.run(
-        [str(worker_py), "-m", "src.export.otio_export", str(timeline_id), output_format],
+        cmd,
         cwd=str(_REPO_ROOT), capture_output=True, text=True,
         encoding="utf-8", errors="replace", timeout=180, env=env,
     )
@@ -340,24 +353,24 @@ def _export_via_worker(timeline_id: int, output_format: str) -> Path:
     raise RuntimeError("Worker de exportacao nao devolveu o caminho do arquivo gerado.")
 
 
-def export_timeline_file(timeline_id: int, output_format: str = "otio") -> Path:
+def export_timeline_file(timeline_id: int, output_format: str = "otio", use_proxies: bool = False) -> Path:
     """Exporta a timeline para .otio, .xml ou .edl e retorna o caminho em data/exports/.
 
     Com o otio importável, roda no próprio processo; sem ele, delega ao worker 3.12.
     """
     if not OTIO_AVAILABLE:
-        return _export_via_worker(timeline_id, output_format)
-    return _export_in_process(timeline_id, output_format)
+        return _export_via_worker(timeline_id, output_format, use_proxies=use_proxies)
+    return _export_in_process(timeline_id, output_format, use_proxies=use_proxies)
 
 
-def _export_in_process(timeline_id: int, output_format: str = "otio") -> Path:
+def _export_in_process(timeline_id: int, output_format: str = "otio", use_proxies: bool = False) -> Path:
     """Exporta a timeline selecionada para o formato especificado (.otio, .xml ou .edl).
 
     Salva o arquivo em data/exports/ e retorna o caminho.
     """
     # O .otio vai para o Kdenlive, que quer caminho absoluto simples; o .xml vai para
     # Premiere/Resolve, que esperam URL em <pathurl>. Ver `_media_target_url`.
-    otio_timeline = generate_otio_timeline(timeline_id, as_uri=(output_format != "otio"))
+    otio_timeline = generate_otio_timeline(timeline_id, as_uri=(output_format != "otio"), use_proxies=use_proxies)
 
     # EDL (CMX 3600) suporta apenas UMA trilha de vídeo: achata as pistas de VÍDEO
     # (clipe da pista mais alta prevalece, como na visualização do programa)
@@ -373,7 +386,8 @@ def _export_in_process(timeline_id: int, output_format: str = "otio") -> Path:
             print(f"[EXPORT] Falha ao achatar timeline para EDL: {flatten_err}")
 
     CONFIG.EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    filename = f"timeline_{timeline_id}.{output_format}"
+    suffix = "_proxy" if use_proxies else ""
+    filename = f"timeline_{timeline_id}{suffix}.{output_format}"
     output_path = CONFIG.EXPORTS_DIR / filename
 
     # Resolver o adaptador do OTIO correto
@@ -388,7 +402,7 @@ def _export_in_process(timeline_id: int, output_format: str = "otio") -> Path:
 
 
 if __name__ == "__main__":
-    # Modo worker: `python -m src.export.otio_export <timeline_id> <formato>`
+    # Modo worker: `python -m src.export.otio_export <timeline_id> <formato> [--use-proxies]`
     # Executado pelo venv 3.12 quando o Python principal nao tem o opentimelineio.
     if os.environ.get("CAPIAU_DB_PATH"):
         CONFIG.DB_PATH = Path(os.environ["CAPIAU_DB_PATH"])
@@ -400,9 +414,10 @@ if __name__ == "__main__":
         print("[EXPORT-WORKER] Este Python tambem nao tem o opentimelineio instalado.", file=sys.stderr)
         sys.exit(3)
     if len(sys.argv) < 3:
-        print("Uso: python -m src.export.otio_export <timeline_id> <otio|xml|edl>", file=sys.stderr)
+        print("Uso: python -m src.export.otio_export <timeline_id> <otio|xml|edl> [--use-proxies]", file=sys.stderr)
         sys.exit(2)
 
-    _result_path = _export_in_process(int(sys.argv[1]), sys.argv[2])
+    use_proxies = len(sys.argv) > 3 and sys.argv[3] in ("1", "true", "True", "--use-proxies")
+    _result_path = _export_in_process(int(sys.argv[1]), sys.argv[2], use_proxies=use_proxies)
     # Ultima linha em JSON: contrato de saida lido pelo processo pai
     print(json.dumps({"path": str(_result_path)}))

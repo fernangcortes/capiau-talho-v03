@@ -143,6 +143,14 @@ def relatorio(seq, pedido, relatorio_midia) -> Dict[str, Any]:
             sorted(set(relatorio_midia.originais_indisponiveis))))
 
     # ------------------------------------------------------------------- WARN
+    if getattr(relatorio_midia, "usa_proxies", False):
+        avisos.append(_aviso(
+            "warn", "RENDER_COM_PROXIES",
+            "Exportação configurada com PROXIES",
+            "O render utilizará os arquivos de proxy (720p) conforme selecionado no modal. "
+            "A geometria e os efeitos serão aplicados normalmente sobre os proxies locais.",
+            sorted(set(relatorio_midia.clipes_proxy))))
+
     if getattr(relatorio_midia, "usa_proxy_fallback", False):
         avisos.append(_aviso(
             "warn", "MASTER_CAINDO_PARA_PROXY",

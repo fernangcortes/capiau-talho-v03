@@ -417,6 +417,8 @@ class Pedido:
     # Preenchido por midia.py quando o HD dos originais esta fora e o usuario
     # aceitou seguir em proxy: o nome do arquivo ganha marca e o log avisa.
     permitir_fallback_proxy: bool = False
+    # Quando o usuario escolhe explicitamente exportar com proxies pelo modal
+    usar_proxies: bool = False
 
     @property
     def e_rascunho(self) -> bool:

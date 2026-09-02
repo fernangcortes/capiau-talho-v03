@@ -493,13 +493,13 @@ def _tem_efeito_tipo_a(sequencia: dict) -> bool:
 
 
 @router.get("/api/timeline/{timeline_id}/export/{export_format}")
-def export_timeline(timeline_id: int, export_format: str):
+def export_timeline(timeline_id: int, export_format: str, use_proxies: bool = False):
     """Exporta a timeline em formato XML/EDL/OTIO e retorna o arquivo para download."""
     if export_format not in ["otio", "xml", "edl"]:
         raise HTTPException(status_code=400, detail="Formato inválido. Use 'otio', 'xml' ou 'edl'.")
 
     try:
-        file_path = export_timeline_file(timeline_id, export_format)
+        file_path = export_timeline_file(timeline_id, export_format, use_proxies=use_proxies)
         if not file_path.exists():
             raise HTTPException(status_code=500, detail="O arquivo de timeline não pôde ser gerado.")
 
@@ -1049,7 +1049,8 @@ def _resolver_saida(pedido: "modelo_render.Pedido", nome_timeline: str) -> dict:
     slug = _SLUG_SEGURO.sub("_", (nome_timeline or "").strip()).strip(" .") \
         or f"timeline_{pedido.timeline_id}"
     carimbo = datetime.now().strftime("%Y-%m-%d_%H%M")
-    nome = pedido.saida.nome_arquivo or f"{slug}_{carimbo}.{ext}"
+    sufixo_proxy = "_proxy" if getattr(pedido, "usar_proxies", False) else ""
+    nome = pedido.saida.nome_arquivo or f"{slug}_{carimbo}{sufixo_proxy}.{ext}"
     if "." not in Path(nome).name:
         nome = f"{nome}.{ext}"
     return {
@@ -1297,6 +1298,7 @@ def _gravar_registro_ultimo(pedido: "modelo_render.Pedido", task_key: str,
                    "pistas": pedido.escopo.pistas},
         "overrides": pedido.overrides,
         "allow_proxy_fallback": pedido.permitir_fallback_proxy,
+        "use_proxies": pedido.usar_proxies,
         "pos": {"abrir_pasta": pedido.pos.abrir_pasta,
                 "copiar_caminho": pedido.pos.copiar_caminho,
                 "salvar_como": pedido.pos.salvar_como,
@@ -1427,8 +1429,14 @@ def revelar_render(payload: RevelarRenderPayload):
             subprocess.Popen(["explorer", "/select,", str(alvo)])
         elif sys.platform == "darwin":
             subprocess.Popen(["open", "-R", str(alvo)])
-        else:
+        elif shutil.which("xdg-open"):
             subprocess.Popen(["xdg-open", str(alvo.parent)])
+        else:
+            return {
+                "status": "unsupported",
+                "revelado": str(alvo),
+                "mensagem": "Servidor em execução em ambiente headless/Docker sem gerenciador de janelas desktop."
+            }
     except OSError as e:
         raise HTTPException(status_code=500,
                             detail=f"Nao consegui abrir o gerenciador de arquivos: {e}")

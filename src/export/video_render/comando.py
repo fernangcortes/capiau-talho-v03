@@ -423,8 +423,21 @@ def casar_entradas(entradas: List[Dict[str, Any]], seq, rel_midia) -> Tuple[List
 
         item_escolhido: Optional[Dict[str, Any]] = None
 
+        # 0. casamento direto por clipe_id (exato, respeita in_out, segmentos e recortes)
+        clipe_id = ent.get("clipe_id")
+        if clipe_id:
+            base_id = _id_base(clipe_id)
+            fonte = fontes.get(clipe_id) or fontes.get(base_id)
+            if fonte and fonte.caminho:
+                caminho_final = fonte.wav_tratado if ent.get("tratado") and fonte.wav_tratado else fonte.caminho
+                item_escolhido = {
+                    "rotulo": f"{clipe_id}@{i}",
+                    "base_id": base_id,
+                    "caminho": Path(caminho_final)
+                }
+
         # 1. id embutido na sugestao
-        if isinstance(sugestao, str) and sugestao.strip():
+        if item_escolhido is None and isinstance(sugestao, str) and sugestao.strip():
             m = _RE_ID_VID.search(sugestao) or _RE_ID_FOTO.search(sugestao)
             if m:
                 alvo_id = m.group(1)
