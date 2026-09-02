@@ -306,7 +306,13 @@ publica progresso no TASK_MANAGER.
 
 ---
 
-## 10. Render de Vídeo da Timeline
+## 10. Render de Vídeo e Exportação da Timeline
+
+### GET /api/timeline/{timeline_id}/export/{formato}
+Gera e baixa o arquivo de intercâmbio de timeline nos formatos suportados (`otio`, `xml`, `edl`, `fcpxml`, etc.).
+
+**Query params:**
+- `use_proxies` (bool, default `false`): Quando `true`, as referências de mídia no arquivo gerado apontam para os proxies leves locais (`data/proxies/...`) com o sufixo `_proxy` no nome do arquivo, permitindo edição remota/offline em outros NLEs.
 
 ### POST /api/timeline/{timeline_id}/render/preflight
 **Não renderiza nada.** É o que o painel chama ao abrir. Barato de propósito: só banco e metadado,
@@ -320,8 +326,9 @@ nenhum ffprobe, nenhum decode.
   "resolucao": { "largura": 1920, "altura": 1080 },
   "clipes_total": 6, "clipes_no_render": 6,
   "pistas": [ { "id": "V2", "kind": "video", "clipes": 3, "muted": false, "hidden": false } ],
-  "midia": { "ausentes": [], "originais_indisponiveis": [], "usa_proxy_fallback": false },
+  "midia": { "ausentes": [], "originais_indisponiveis": [], "usa_proxies": false, "usa_proxy_fallback": false, "clipes_proxy": [] },
   "fidelidade": { "pode_renderizar": true, "avisos": [
+      { "nivel": "warn", "codigo": "RENDER_COM_PROXIES", "titulo": "Exportando com proxies locais", "clipes": ["cut_1", "cut_2"] },
       { "nivel": "warn", "codigo": "JOELHO_COMPRESSOR", "titulo": "...", "clipes": ["cut_1"] } ] },
   "bloqueios": [],
   "assinatura": { "clipes": 6, "efeitos": 0, "duracao_total_s": 47.85 },
@@ -332,7 +339,7 @@ nenhum ffprobe, nenhum decode.
 `assinatura` existe para o painel comparar a versão salva com a que está na tela: o auto-salvamento
 grava em `localStorage`, então exportar sem salvar renderizaria a montagem anterior.
 
-Avisos de nível `block` (mídia ausente, master sem original) **impedem** o render; `warn` só avisa.
+Avisos de nível `block` (mídia ausente, master sem original) **impedem** o render; `warn` só avisa (como `RENDER_COM_PROXIES`).
 
 ### POST /api/timeline/{timeline_id}/render
 Valida, recusa em bloqueio e **enfileira** — nunca segura o request.
@@ -346,6 +353,7 @@ Valida, recusa em bloqueio e **enfileira** — nunca segura o request.
   "scope": { "categories": { "color": true }, "tracks": { "V1": true } },
   "output": { "dir": null, "filename": null },
   "post": { "open_folder": true, "copy_path": false, "save_as": false, "ingest": false },
+  "use_proxies": false,                  // força o uso explícito de proxies locais (sugere sufixo _proxy)
   "allow_proxy_fallback": false }
 ```
 

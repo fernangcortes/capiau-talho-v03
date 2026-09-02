@@ -170,6 +170,8 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
 - **Arquitetura Track-Based clássica de NLE.** A timeline opera no padrão multipista profissional
   (estilo Premiere / DaVinci Resolve), com posições temporais absolutas e total liberdade de montagem:
   - **Gaps como entidades de primeira classe:** Clique no espaço vazio entre clipes para selecionar o Gap e pressione **`Delete`** ou **`Backspace`** para realizar Ripple Delete fechando o espaço imediatamente.
+  - **Pontos de Entrada/Saída [In–Out], Loop e Operações Lift / Extract:** Marque intervalos com **`I`** e **`O`** (limpe com **`Alt+X`**), salte com **`Shift+I`/`Shift+O`** e alterne reprodução contínua em loop com **`Ctrl+L`** / **`Cmd+L`**. Execute operações de **Lift** (`;` - remove mantendo o gap) e **Extract** (`'` - remove e fecha com ripple).
+  - **Prioridade de Hitbox & Cursores Temáticos SVG:** A agulha (playhead) tem prioridade de seleção na régua sobreposta a pontos In/Out, com contorno sutil inteligente e cursores gráficos em alta resolução (Vermelho para Playhead, Ciano para In, Rosa para Out, Bidirecional para Intervalo).
   - **Dupla camada de inserção:** Arraste normal para posicionamento livre / *Overwrite*; segure **`Ctrl`**
     (ou **`Cmd`**) ao arrastar ou soltar para executar *Ripple Insert* (com linha guia roxa e setas).
   - **Sync Lock granular por pista:** Botões dedicados nos cabeçalhos de V1, V2, A1 e A2 para
@@ -311,11 +313,17 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   real vindo do `-progress` do FFmpeg, cancelamento que encerra o processo e descarta o parcial, e
   encoder por hardware (NVENC/QSV/AMF) detectado automaticamente.
 
+- **Exportação de Timeline e Render com Proxies Locais.** Exporte sequências de intercâmbio (`.otio`, `.xml`, `.edl`)
+  apontando diretamente para os proxies locais com sufixo `_proxy` para montagem offline em outras máquinas, ou renderize vídeos
+  MP4 em alta velocidade utilizando exclusivamente os proxies locais com aviso informativo de fidelidade (`RENDER_COM_PROXIES`).
+
 ### 🖥️ Interface e produtividade <a id="interface-e-produtividade"></a>
 
-- **Janelas destacáveis (workspaces multi-monitor).** Destaque Biblioteca, Timeline, Players ou
-  Chatbot em janelas independentes, com sincronia de playhead, seleções e comandos em tempo real via
-  `BroadcastChannel`.
+- **Janelas destacáveis multi-monitor com persistência total.** Destaque a Biblioteca ou outros painéis
+  em janelas popout nomeadas (`CapIAu_Library_Window`) com handshake bidirecional via `BroadcastChannel`,
+  gravação de coordenadas de tela (`screenX`/`screenY`/`outerWidth`/`outerHeight` no `localStorage`) e reposicionamento
+  automático (`moveTo`/`resizeTo`). Inclui **zoom dinâmico de cards via `Shift + Roda`**, **inserção direta na timeline
+  por duplo clique** com *debounce* no player Source e sincronização de pôsteres/miniaturas em tempo real em todas as janelas.
 
 - **Visualização em árvore hierárquica e ações de mídia.** Navegue por acervos gigantes organizados
   dinamicamente em pastas e subpastas recursivas colapsadas no estilo do Explorer, com:

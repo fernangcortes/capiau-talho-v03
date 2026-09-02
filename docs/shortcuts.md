@@ -38,6 +38,7 @@ No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado V
 | Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
 | **`Espaço`** | **Play / Pause Geral** | Alterna entre tocar e pausar no player atualmente focado (*Source* ou *Program*). |
+| **`Ctrl + L` / `Cmd + L`** | **Alternar Loop Contínuo** | Liga ou desliga a reprodução contínua em loop no intervalo marcado [In–Out]. |
 | **`J`** | **Shuttle Reverso** | Pressione consecutivamente para acelerar a velocidade de retrocesso (-1x, -2x, -4x, -8x). |
 | **`K`** | **Shuttle Parar** | Pausa a reprodução imediata ou redefine a velocidade normal. |
 | **`L`** | **Shuttle Avanço** | Pressione consecutivamente para acelerar a velocidade de avanço (1.5x, 2x, 4x, 8x). |
@@ -45,7 +46,11 @@ No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado V
 | **`K + L`** | **Jog Avançar 1 Frame** | Pressione K mantendo pressionado L para avançar exatamente 1 frame. |
 | **`←` / `→`** | **Navegar Frames** | Retrocede ou avança exatamente 1 frame do vídeo para cortes cirúrgicos. |
 | **`↑` / `↓`** | **Navegar Pontos de Corte (Edit Points)** | **Na Timeline:** Move a agulha para o corte anterior (↑) ou próximo (↓).<br>**No Source:** Pula para o ponto In/Início (↑) ou ponto Out/Fim (↓). |
-| **`Duplo Clique`** | **Maximizar / Minimizar Player** | Expande o monitor ativo para tela cheia ou restaura o layout. |
+| **`Shift + I`** | **Ir para Ponto IN** | Posiciona a agulha de reprodução exatamente no ponto de entrada marcado. |
+| **`Shift + O`** | **Ir para Ponto OUT** | Posiciona a agulha de reprodução exatamente no ponto de saída marcado. |
+| **`Duplo Clique` (Player)** | **Maximizar / Minimizar Player** | Expande o monitor ativo para tela cheia ou restaura o layout. |
+| **`Duplo Clique` (Biblioteca)** | **Inserir Direto na Timeline** | Insere o arquivo de mídia diretamente na timeline na posição da agulha. |
+| **`Shift + Roda` (Biblioteca)** | **Zoom Dinâmico de Cards** | Ajusta progressivamente o tamanho dos cards e miniaturas da biblioteca. |
 
 ---
 
@@ -53,9 +58,11 @@ No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado V
 
 | Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
-| **`I`** | **Marcar Entrada (In)** | Define o frame inicial do trecho a ser recortado no Source. |
-| **`O`** | **Marcar Saída (Out)** | Define o frame final do trecho a ser recortado no Source. |
-| **`Alt + X`** | **Limpar In / Out** | Remove as marcações de entrada e saída ativas. |
+| **`I`** | **Marcar Entrada (In)** | **No Source / Na Timeline:** Define o frame inicial do trecho ativo. |
+| **`O`** | **Marcar Saída (Out)** | **No Source / Na Timeline:** Define o frame final do trecho ativo. |
+| **`Alt + X`** | **Limpar In / Out** | Remove as marcações de entrada e saída ativas no monitor ou timeline. |
+| **`;` (Ponto e Vírgula)** | **Lift (Extração com Gap)** | Remove o trecho entre [In–Out] mantendo o espaço vazio correspondente. |
+| **`'` (Aspas Simples)** | **Extract (Extração com Ripple)** | Remove o trecho entre [In–Out] e fecha o espaço puxando os clipes à direita. |
 | **`E`** | **Adicionar à Timeline (Append)** | Insere o trecho marcado [In-Out] na trilha de destino correspondente. |
 | **`Shift + E`** | **Corte de Fala Rápido** | Insere o texto/diálogo selecionado na transcrição diretamente na trilha V1/A1. |
 | **`Z`** *(ou `Shift+R`/`Ctrl+K`/`B`)* | **Dividir Clipe (Split)** | Corta o clipe na agulha (playhead). Se vinculado (A/V), divide áudio e vídeo juntos. |

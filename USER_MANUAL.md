@@ -383,6 +383,19 @@ O sistema suporta dois tipos de marcadores visuais altamente integrados com a ti
 - **Suporte Intercambiável a `level` e `gain`:** Clipes de áudio com efeito de volume (`type: "volume"`) aceitam tanto o parâmetro `level` quanto `gain` (ex.: clipes de B-Roll com atenuação sonora gerados pela IA ou importados de montagens externas).
 - **Estabilidade do Playhead (Agulha):** O laço de animação e reprodução conta com proteção contra falhas e validação numérica estrita, garantindo que o arraste (*scrubbing*) e o playback atravessem sobreposições multipistas, fades e crossfades sem risco de travamento da agulha.
 
+### L. Pontos de Entrada e Saída (In/Out), Loop Contínuo e Operações Lift/Extract
+A timeline e os monitores de vídeo contam com o conjunto completo de corte profissional baseado em pontos [In–Out]:
+- **Marcação Cirúrgica de Intervalos:** Pressione **`I`** para marcar o Ponto de Entrada (In) e **`O`** para marcar o Ponto de Saída (Out) na timeline ou no monitor Source. Para limpar as marcações, pressione **`Alt + X`** (ou **`Option + X`**).
+- **Navegação Rápida:** Pressione **`Shift + I`** para saltar a agulha diretamente para o ponto In e **`Shift + O`** para o ponto Out.
+- **Reprodução em Loop Contínuo (`Ctrl + L` / `Cmd + L`):** Alterna o modo de repetição cíclica. Ao chegar ao ponto Out, o player retrocede instantaneamente para o ponto In, ideal para refinar transições e diálogos.
+- **Operações NLE Lift e Extract:**
+  - **Lift (`;` - Ponto e Vírgula):** Remove o trecho contido no intervalo [In–Out] das pistas ativas preservando o espaço vazio (Gap), sem deslocar os clipes posteriores.
+  - **Extract (`'` - Aspas Simples):** Remove o trecho contido no intervalo [In–Out] e executa o fechamento com Ripple, puxando os clipes à direita nas pistas com Sync Lock ativo.
+- **Priorização de Hitboxes da Régua & Cursores Temáticos em Alta Resolução:**
+  - A agulha de reprodução (Playhead) tem prioridade absoluta de clique e arraste no topo da régua mesmo quando sobreposta exatamente a marcadores de In ou Out.
+  - A cabeça da agulha recebe um contorno sutil automático quando posicionada próxima a marcadores para máxima clareza visual.
+  - Cursores gráficos temáticos em SVG indicam a ferramenta ativa sob o mouse: **Vermelho** para Playhead, **Ciano** para Ponto IN, **Rosa** para Ponto OUT e cursor bidirecional para transladar todo o intervalo In/Out segurando **`Alt`** ou **`Shift`** mantendo a duração constante.
+
 ---
 
 ## 🎚️ 6. Tratamento de Áudio: Diagnóstico, Presets e Comparação A/B
@@ -571,7 +584,12 @@ localStorage do seu navegador:
 3.  Escolha o formato de saída no seletor (XML para
     Premiere/Resolve/FCP, OpenTimelineIO .otio ou EDL).
 
-4.  Clique em **Exportar**. O download iniciará no seu navegador e o
+4.  **Exportação com Proxies Locais:** Se desejar transferir a timeline para outro
+    computador sem carregar discos de mídias originais pesadas, marque a opção
+    **"Usar proxies locais"**. O sistema gerará o arquivo (ex: `montagem_proxy.otio`)
+    apontando diretamente para os vídeos leves em `data/proxies/`.
+
+5.  Clique em **Exportar**. O download iniciará no seu navegador e o
     arquivo estará pronto para ser importado no seu editor NLE
     profissional.
 
@@ -728,18 +746,38 @@ controles intuitivos rápidos:
   simples (*line-icons*) livres de contornos e boxes, minimizando a
   poluição visual na biblioteca.
 
-### Inserção Rápida e Arrastar-e-Soltar (Drag-and-Drop)
+- **Zoom Dinâmico via Teclado e Roda do Mouse (`Shift + Wheel`):**
+  Passe o cursor sobre a grade de mídias, segure **`Shift`** e gire a roda do
+  mouse para ampliar ou reduzir o tamanho dos cards de forma contínua e suave,
+  sincronizando as variáveis visuais instantaneamente.
 
-- Você pode adicionar mídias à timeline de duas formas:
+### Inserção de Mídias na Timeline
 
-  1.  **Arrastar-e-Soltar:** Clique e segure qualquer vídeo ou foto na
-      barra lateral e arraste-o diretamente para a trilha desejada na
-      timeline.
+- Você pode adicionar mídias à timeline de três formas:
 
-  2.  **Inserção Rápida:** Passe o mouse sobre qualquer miniatura de
+  1.  **Inserção Direta por Duplo Clique:** Dê um duplo clique rápido sobre
+      qualquer card de vídeo ou foto na biblioteca. A mídia será inserida
+      instantaneamente na trilha de destino no ponto da agulha (com *debounce*
+      inteligente para não engasgar o monitor Source).
+
+  2.  **Arrastar-e-Soltar (Drag-and-Drop):** Clique e segure qualquer vídeo ou
+      foto na barra lateral e arraste-o diretamente para a trilha desejada na
+      timeline (segure **`Ctrl`** durante o drop para fazer *Ripple Insert*).
+
+  3.  **Inserção Rápida de Fotos:** Passe o mouse sobre qualquer miniatura de
       foto para revelar um botão flutuante \"+\". O clique adicionará a
       imagem como still (duração padrão de 5s) na timeline no ponto da
       agulha.
+
+### 🪟 Janelas Destacadas Multi-monitor com Persistência & Auto-Reconexão
+
+Para ilhas de edição com 2 ou mais monitores, o CapIAu-Talho permite desacoplar a Biblioteca de Mídias e outros painéis em janelas flutuantes nativas do navegador:
+
+- **Desacoplamento Limpo:** Clique no ícone de popout (<i class="fa-solid fa-arrow-up-right-from-square"></i>) no cabeçalho da biblioteca. O painel é movido para uma janela dedicada nomeada (`CapIAu_Library_Window`).
+- **Persistência de Coordenadas de Tela:** O sistema grava no `localStorage` a posição exata (`screenX`, `screenY`) e dimensões (`outerWidth`, `outerHeight`) da janela em monitores secundários. Ao reabrir o painel ou recarregar a página, a janela destacada é reposicionada automaticamente via `moveTo` e `resizeTo`.
+- **Handshake Bidirecional (`BroadcastChannel`):** A comunicação entre a janela principal e a janela popout é bidirecional e em tempo real: seleção de clipes, reprodução no Source Player, zoom de miniaturas e alteração de metadados ocorrem em perfeita sincronia.
+- **Sincronização Global de Miniaturas:** Ao definir um novo frame de pôster/miniatura para um vídeo (`setVideoThumbnail`), a nova imagem é atualizada simultaneamente nos cards da janela principal, da janela destacada e no gerenciador de tarefas.
+- **Imunidade a Troca de Workspaces:** Alternar presets de workspace ou reposicionar a timeline não fecha nem quebra elementos do DOM que estão na janela popout. Ao fechar a janela externa, o painel retorna perfeitamente para sua coluna original no layout.
 
 ## ⚙️ 10. Configurações da Sequência, Auto-Configuração e Zoom do Preview
 
@@ -888,14 +926,19 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | Categoria | Atalho (CapIAu) | Ação & Descrição |
 | :--- | :---: | :--- |
 | **Reprodução & Shuttle** | **`Espaço`** | Play / Pause no player ativo |
+| | **`Ctrl + L` / `Cmd + L`** | Alternar Loop Contínuo no intervalo [In–Out] |
 | | **`J` / `K` / `L`** | Shuttle Reverso (-1x..-8x), Parar, Avanço (+1.5x..+8x) |
 | | **`K + J` / `K + L`** | Jog frame a frame (Recuar / Avançar 1 frame) |
 | | **`←` / `→`** | Navegar quadro a quadro (1 frame) |
 | | **`↑` / `↓`** | Saltar pontos de corte anteriores ou seguintes |
+| | **`Shift + I` / `Shift + O`** | Saltar agulha diretamente para ponto IN ou ponto OUT |
 | **Pontos de Corte & Inserção** | **`I` / `O`** | Marcar ponto de Entrada (In) e Saída (Out) |
-| | **`Alt + X`** | Limpar pontos de In e Out |
+| | **`Alt + X`** | Limpar pontos de In e Out ativos |
+| | **`;` (Ponto e Vírgula)** | Lift: extrai intervalo [In–Out] mantendo Gap vazio |
+| | **`'` (Aspas Simples)** | Extract: extrai intervalo [In–Out] e fecha Gap com Ripple |
 | | **`E`** | Adicionar segmento marcado à timeline (Append) |
 | | **`Shift + E`** | Inserir fala selecionada na transcrição na timeline |
+| | **`Duplo Clique`** | Inserir mídia da biblioteca diretamente na timeline |
 | **Edição & Ferramentas NLE** | **`Z`** *(ou `Shift+R`/`Ctrl+K`/`B`)* | Dividir clipe na agulha (*Split*) |
 | | **`V`** | Ferramenta de Seleção Padrão |
 | | **`T` / `Shift + T`** | Selecionar Faixa para Frente / Trás (*Shift = 1 faixa*) |
@@ -907,10 +950,12 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | | **`Alt + ←` / `Alt + →`** | Ajustar ponto de entrada (Trim In em 1 frame) |
 | | **`Shift + ←` / `Shift + →`** | Ajustar ponto de saída (Trim Out em 1 frame) |
 | | **`Ctrl + Z` / `Ctrl + Y`** | Desfazer (*Undo*) / Refazer (*Redo*) |
+| **Biblioteca & Visualização** | **`Shift + Roda`** | Zoom dinâmico contínuo nos cards de mídia |
+| | **`A` (na Biblioteca)** | Abrir Inspetor de Metadados da mídia selecionada |
 | **Marcadores** | **`M`** | Criar ou editar marcador na agulha (popover rápido) |
 | | **`Shift + M` / `Alt + M`** | Pular para o próximo / anterior marcador |
 | | **`Shift + Clique`** | Selecionar múltiplos marcadores para exclusão em lote |
-| **IA & Inspetor** | **`A`** | Carrossel de alternativas da IA (Timeline) ou Inspetor (Biblioteca) |
+| **IA & Inspetor** | **`A` (na Timeline)** | Carrossel de alternativas da IA para o clipe ativo |
 | | **`Enter` / `Y`** | Aceitar sugestão da IA (*Ghost Clip*) |
 | | **`Del` (sobre Ghost)** | Rejeitar sugestão da IA |
 | | **`Esc`** | Fechar modais, desmarcar ou sair de campos de texto |
@@ -994,14 +1039,15 @@ versão"**, que salva a montagem da tela e já passa a exportar ela.
 2. **Preset** — `Master 1080p`, `YouTube`, `Reels/TikTok 9:16`, `WhatsApp leve`.
 3. **Avançado** — resolução, fps, container, codec, qualidade (CRF), bitrate de áudio. Campo em
    branco significa "usa o do preset".
-4. **Faixa** — timeline inteira ou apenas o intervalo IN–OUT.
-5. **Incluir no render** — por categoria (cor, transições, movimento, ajustes de áudio) e **por
+4. **Faixa** — timeline inteira ou apenas o intervalo marcado [IN–OUT].
+5. **Usar Proxies Locais** — opção explícita para renderizar o vídeo utilizando exclusivamente os proxies locais em `data/proxies/` (ideal para exportações ultrarrápidas de rascunho/revisão ou quando o disco original estiver desconectado). O nome do arquivo sugerido recebe o sufixo `_proxy.mp4`.
+6. **Incluir no render** — por categoria (cor, transições, movimento, ajustes de áudio) e **por
    pista**, montado a partir das pistas reais da sua timeline. Desmarcar aqui é escolha sua e não
    gera aviso.
-6. **Banner de fidelidade** (âmbar) — o que o motor ainda não reproduz igual, com a lista de clipes.
-7. **Destino** — pasta e nome do arquivo.
-8. **Após concluir** — abrir pasta, copiar caminho, salvar como, ingerir na biblioteca.
-9. **Exportar Rascunho** ou **Exportar Master**.
+7. **Banner de fidelidade** (âmbar) — o que o motor ainda não reproduz igual (ou aviso informativo `RENDER_COM_PROXIES`), com a lista de clipes.
+8. **Destino** — pasta e nome do arquivo.
+9. **Após concluir** — abrir pasta, copiar caminho, salvar como, ingerir na biblioteca.
+10. **Exportar Rascunho** ou **Exportar Master**.
 
 ### Rascunho x Master
 
@@ -1015,8 +1061,8 @@ versão"**, que salva a montagem da tela e já passa a exportar ela.
 **Os dois usam o mesmo grafo de efeitos.** O rascunho não é menos fiel — é mais barato.
 
 Se o HD dos originais estiver desconectado, o master **não cai calado para o proxy**: ou recusa
-listando os clipes órfãos, ou (com a permissão explícita) segue em proxy, avisa e marca `_proxy` no
-nome do arquivo.
+listando os clipes órfãos, ou (com a permissão explícita / opção `Usar Proxies Locais` marcada) segue em proxy, exibe o aviso informativo de fidelidade e marca `_proxy` no
+nome do arquivo gerado.
 
 ### Enquanto roda, e depois
 
