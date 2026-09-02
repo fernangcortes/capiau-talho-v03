@@ -52,75 +52,203 @@
             height: 100% !important;
             flex: 1 !important;
         }
+        .popout-loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            user-select: none;
+            text-align: center;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
     <div id="panel-container">
-        <!-- O conteúdo será injetado dinamicamente -->
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
-            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: var(--color-cyan);"></i>
-            <p style="margin-top: 15px; font-size: 13px; color: var(--text-secondary);">Sincronizando painel com o editor...</p>
+        <!-- O conteúdo será injetado dinamicamente via adoptNode -->
+        <div class="popout-loading-state" id="popout-loader">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 28px; color: var(--color-cyan);"></i>
+            <p style="margin-top: 15px; font-size: 13px; color: var(--text-secondary); font-weight: 500;">
+                Sincronizando painel com o editor principal...
+            </p>
+            <span style="font-size: 11px; color: var(--text-muted, #64748b); margin-top: 4px;">
+                Aguardando conexão via BroadcastChannel
+            </span>
         </div>
     </div>
     
     <script type="module">
         // Captura o tipo de painel pela URL
         const params = new URLSearchParams(window.location.search);
-        const panelName = params.get("panel") || "none";
+        const panelName = params.get("panel") || "sidebar-left";
         
-        // Define o título da página
-        document.title = `Talho - Painel: ${panelName.toUpperCase().replace("-panel", "")}`;
+        // Mapeamento de títulos e identificadores de janela fixos
+        const TITLE_MAP = {
+            "sidebar-left": "CapIAu-Talho — Biblioteca",
+            "sidebar-right": "CapIAu-Talho — Painel Lateral",
+            "timeline-panel": "CapIAu-Talho — Linha do Tempo",
+            "source-player-panel": "CapIAu-Talho — Player de Origem",
+            "program-player-panel": "CapIAu-Talho — Player de Programa"
+        };
         
-        // Abre canal de comunicação
-        const channel = new BroadcastChannel("capiau-workspace-sync");
-        
-        // Acessa a janela pai (main editor)
-        const opener = window.opener;
-        if (!opener) {
-            document.getElementById("panel-container").innerHTML = `
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--color-rose);">
-                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 32px;"></i>
-                    <p style="margin-top: 15px; font-size: 14px;">Erro: Esta janela deve ser aberta a partir do editor principal.</p>
-                </div>
-            `;
-        } else {
-            // Envia sinal de inicialização para a janela principal
-            channel.postMessage({
-                type: "POPOUT_READY",
-                panel: panelName
-            });
-            
-            // Monitora redimensionamento do painel para aplicar classes de layout amplo/estreito
-            const container = document.getElementById("panel-container");
-            const observer = new ResizeObserver(entries => {
-                for (let entry of entries) {
-                    const width = entry.contentRect.width;
-                    if (width >= 550) {
-                        container.classList.add("wide-layout");
-                        container.classList.remove("narrow-layout");
-                        if (container.firstElementChild) {
-                            container.firstElementChild.classList.add("wide-layout");
-                            container.firstElementChild.classList.remove("narrow-layout");
+        function getExpectedWindowName(panel) {
+            if (panel === "sidebar-left") return "CapIAu_Library_Window";
+            if (panel === "sidebar-right") return "CapIAu_RightSidebar_Window";
+            if (panel === "timeline-panel") return "CapIAu_Timeline_Window";
+            if (panel === "source-player-panel") return "CapIAu_SourcePlayer_Window";
+            if (panel === "program-player-panel") return "CapIAu_ProgramPlayer_Window";
+            return `CapIAu_${panel.replace(/-/g, "_")}_Window`;
+        }
+
+        // Define o título da página e garante o nome fixo no Window object
+        document.title = TITLE_MAP[panelName] || `CapIAu-Talho — Painel: ${panelName.toUpperCase().replace("-PANEL", "")}`;
+        const expectedWindowName = getExpectedWindowName(panelName);
+        if (!window.name || window.name !== expectedWindowName) {
+            window.name = expectedWindowName;
+        }
+
+        // ── PERSISTÊNCIA E RESTAURAÇÃO DE BOUNDS (COORDENADAS E DIMENSÕES) ──
+        try {
+            const rawBounds = localStorage.getItem(`capiau_popout_bounds_${panelName}`);
+            if (rawBounds) {
+                const b = JSON.parse(rawBounds);
+                if (b && typeof b === "object") {
+                    const x = b.screenX !== undefined ? b.screenX : b.left;
+                    const y = b.screenY !== undefined ? b.screenY : b.top;
+                    const w = b.outerWidth || b.width;
+                    const h = b.outerHeight || b.height;
+                    if (w > 150 && h > 150) {
+                        if (x !== undefined && y !== undefined && !isNaN(x) && !isNaN(y)) {
+                            window.moveTo(x, y);
                         }
-                    } else {
-                        container.classList.add("narrow-layout");
-                        container.classList.remove("wide-layout");
-                        if (container.firstElementChild) {
-                            container.firstElementChild.classList.add("narrow-layout");
-                            container.firstElementChild.classList.remove("wide-layout");
-                        }
+                        window.resizeTo(w, h);
                     }
                 }
-            });
-            observer.observe(container);
-            // Avisa a janela principal quando esta janela for fechada
-            window.addEventListener("beforeunload", () => {
-                channel.postMessage({
-                    type: "POPOUT_CLOSED",
-                    panel: panelName
-                });
-            });
+            }
+        } catch (err) {
+            console.warn("[Popout] Erro ao restaurar dimensões salvas:", err);
         }
+
+        function saveCurrentBounds() {
+            if (window.outerWidth < 100 || window.outerHeight < 100) return;
+            const screenX = window.screenX !== undefined ? window.screenX : window.screenLeft;
+            const screenY = window.screenY !== undefined ? window.screenY : window.screenTop;
+            const bounds = {
+                screenX: screenX,
+                screenY: screenY,
+                outerWidth: window.outerWidth,
+                outerHeight: window.outerHeight,
+                innerWidth: window.innerWidth,
+                innerHeight: window.innerHeight,
+                availWidth: window.screen?.availWidth || null,
+                availHeight: window.screen?.availHeight || null,
+                isMaximized: (
+                    Math.abs(window.outerWidth - (window.screen?.availWidth || 0)) < 40 &&
+                    Math.abs(window.outerHeight - (window.screen?.availHeight || 0)) < 60
+                ),
+                updatedAt: Date.now()
+            };
+            try {
+                localStorage.setItem(`capiau_popout_bounds_${panelName}`, JSON.stringify(bounds));
+            } catch (e) {}
+        }
+
+        let resizeTimeout = null;
+        window.addEventListener("resize", () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(saveCurrentBounds, 250);
+        });
+        window.addEventListener("pagehide", saveCurrentBounds);
+        // Intervalo periódico para capturar movimentação de tela/monitor sem evento nativo 'move'
+        setInterval(saveCurrentBounds, 2500);
+
+        // ── COMUNICAÇÃO BIDIRECIONAL & HANDSHAKE VIA BROADCASTCHANNEL ──
+        const channel = new BroadcastChannel("capiau-workspace-sync");
+
+        function connectToMainEditor() {
+            let connected = false;
+            try {
+                if (window.opener && !window.opener.closed) {
+                    if (window.opener.workspaceManager && typeof window.opener.workspaceManager.registerPopout === "function") {
+                        window.opener.workspaceManager.registerPopout(panelName, window);
+                        connected = true;
+                    } else if (window.opener.popoutWindows) {
+                        window.opener.popoutWindows[panelName] = window;
+                        if (window.opener.workspaceManager && typeof window.opener.workspaceManager.attachPanelToPopout === "function") {
+                            window.opener.workspaceManager.attachPanelToPopout(panelName, window);
+                        }
+                        connected = true;
+                    }
+                }
+            } catch (err) {
+                console.warn("[Popout] Acesso direto ao opener em transição:", err);
+            }
+
+            // Notifica também pelo BroadcastChannel
+            channel.postMessage({
+                type: "POPOUT_READY",
+                panel: panelName,
+                windowName: window.name,
+                timestamp: Date.now()
+            });
+
+            return connected;
+        }
+
+        // Emite sinal inicial e registra esta janela no editor principal
+        connectToMainEditor();
+        setTimeout(connectToMainEditor, 150);
+        setTimeout(connectToMainEditor, 500);
+
+        // Escuta handshakes da janela principal (ex: após refresh/Ctrl+F5 no app principal)
+        channel.addEventListener("message", (e) => {
+            const data = e.data;
+            if (!data) return;
+            if (data.type === "MAIN_HANDSHAKE") {
+                console.log(`[Popout] Handshake recebido do editor principal para '${panelName}'. Reconectando...`);
+                const ok = connectToMainEditor();
+                // Caso o vínculo do opener tenha sido cortado pelo navegador durante o refresh,
+                // recarrega a página do popout no mesmo URL mantendo estilos e posição
+                if (!ok && (!window.opener || window.opener.closed)) {
+                    console.log("[Popout] Opener desconectado. Recarregando panel.html para restabelecer vínculo...");
+                    window.location.reload();
+                }
+            }
+        });
+
+        // Monitora redimensionamento do painel para aplicar classes responsivas (wide/narrow)
+        const container = document.getElementById("panel-container");
+        const observer = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                const width = entry.contentRect.width;
+                if (width >= 550) {
+                    container.classList.add("wide-layout");
+                    container.classList.remove("narrow-layout");
+                    if (container.firstElementChild && container.firstElementChild.id !== "popout-loader") {
+                        container.firstElementChild.classList.add("wide-layout");
+                        container.firstElementChild.classList.remove("narrow-layout");
+                    }
+                } else {
+                    container.classList.add("narrow-layout");
+                    container.classList.remove("wide-layout");
+                    if (container.firstElementChild && container.firstElementChild.id !== "popout-loader") {
+                        container.firstElementChild.classList.add("narrow-layout");
+                        container.firstElementChild.classList.remove("wide-layout");
+                    }
+                }
+            }
+        });
+        observer.observe(container);
+
+        // Notifica a janela principal ao fechar a janela destacada
+        window.addEventListener("beforeunload", () => {
+            saveCurrentBounds();
+            channel.postMessage({
+                type: "POPOUT_CLOSED",
+                panel: panelName
+            });
+        });
     </script>
 </body>
 </html>

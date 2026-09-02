@@ -4061,6 +4061,11 @@ export class LibraryManager {
         if (!win || !win.document) return;
         this.activeDoc = win.document;
         this.activeWindow = win;
+        this.mediaTreeListEl = win.document.getElementById("media-tree-list") || win.document.getElementById("video-list") || this.mediaTreeListEl;
+        this.videoListEl = this.mediaTreeListEl;
+        this.photoListEl = this.mediaTreeListEl;
+        this.docsListEl = win.document.getElementById("doc-list") || this.docsListEl;
+
         const savedZoom = parseInt(localStorage.getItem("lib-pref-zoom"), 10) || 80;
         if (typeof this.setZoomValue === "function") {
             this.setZoomValue(savedZoom);
@@ -4079,6 +4084,11 @@ export class LibraryManager {
     onPopoutRestored() {
         this.activeDoc = document;
         this.activeWindow = window;
+        this.mediaTreeListEl = document.getElementById("media-tree-list") || document.getElementById("video-list") || this.mediaTreeListEl;
+        this.videoListEl = this.mediaTreeListEl;
+        this.photoListEl = this.mediaTreeListEl;
+        this.docsListEl = document.getElementById("doc-list") || this.docsListEl;
+
         const savedZoom = parseInt(localStorage.getItem("lib-pref-zoom"), 10) || 80;
         if (typeof this.setZoomValue === "function") {
             this.setZoomValue(savedZoom);
@@ -4199,9 +4209,16 @@ export class LibraryManager {
             const tag = document.activeElement?.tagName;
             if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || document.activeElement?.isContentEditable) return;
 
-            // Atalho Delete para excluir a pasta de biblioteca selecionada
+            // Atalho Delete para excluir a pasta de biblioteca selecionada SOMENTE se o foco estiver na biblioteca
             if (e.key === "Delete" || e.key === "Del") {
-                if (window.selectedLibraryFolder && window.selectedLibraryFolder.path && window.selectedLibraryFolder.path !== "root") {
+                const targetDoc = this.activeDoc || document;
+                const activeEl = targetDoc.activeElement || document.activeElement;
+                const isInsideSidebarLeft = (e.target && e.target.closest && e.target.closest("#sidebar-left")) || 
+                                           (activeEl && activeEl.closest && activeEl.closest("#sidebar-left"));
+                
+                const hasTimelineSelection = !!(window.TIMELINE_STATE?.selectedClipId || (window.TIMELINE_STATE?.selectedClipIds && window.TIMELINE_STATE.selectedClipIds.size > 0) || window.TIMELINE_STATE?.selectedGap || (window.TIMELINE_STATE?.selectedMarkerIds && window.TIMELINE_STATE.selectedMarkerIds.size > 0));
+                
+                if (isInsideSidebarLeft && !hasTimelineSelection && window.selectedLibraryFolder && window.selectedLibraryFolder.path && window.selectedLibraryFolder.path !== "root") {
                     e.preventDefault();
                     e.stopPropagation();
                     confirmDeleteVirtualFolder(window.selectedLibraryFolder.path, window.selectedLibraryFolder.name);

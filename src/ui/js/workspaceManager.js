@@ -4,14 +4,37 @@ import { KEYMAP_SERVICE } from "./keymapService.js";
 window.popoutWindows = {};
 
 /**
+ * Retorna o nome fixo da janela popout para reutilização multi-monitor.
+ */
+export function getPopoutWindowName(panelId) {
+    if (panelId === "sidebar-left") return "CapIAu_Library_Window";
+    if (panelId === "sidebar-right") return "CapIAu_RightSidebar_Window";
+    if (panelId === "timeline-panel") return "CapIAu_Timeline_Window";
+    if (panelId === "source-player-panel") return "CapIAu_SourcePlayer_Window";
+    if (panelId === "program-player-panel") return "CapIAu_ProgramPlayer_Window";
+    return `CapIAu_${panelId.replace(/-/g, "_")}_Window`;
+}
+
+export function getPanelIdFromWindowName(windowName) {
+    if (windowName === "CapIAu_Library_Window") return "sidebar-left";
+    if (windowName === "CapIAu_RightSidebar_Window") return "sidebar-right";
+    if (windowName === "CapIAu_Timeline_Window") return "timeline-panel";
+    if (windowName === "CapIAu_SourcePlayer_Window") return "source-player-panel";
+    if (windowName === "CapIAu_ProgramPlayer_Window") return "program-player-panel";
+    return null;
+}
+
+/**
  * Procura um elemento pelo ID varrendo a janela principal e qualquer janela popout aberta.
  */
 export function getActiveElement(id) {
     for (const name in window.popoutWindows) {
         const win = window.popoutWindows[name];
         if (win && !win.closed) {
-            const el = win.document.getElementById(id);
-            if (el) return el;
+            try {
+                const el = win.document?.getElementById(id);
+                if (el) return el;
+            } catch (err) {}
         }
     }
     return document.getElementById(id);
@@ -24,8 +47,10 @@ export function getActiveQuerySelector(selector) {
     for (const name in window.popoutWindows) {
         const win = window.popoutWindows[name];
         if (win && !win.closed) {
-            const el = win.document.querySelector(selector);
-            if (el) return el;
+            try {
+                const el = win.document?.querySelector(selector);
+                if (el) return el;
+            } catch (err) {}
         }
     }
     return document.querySelector(selector);
@@ -42,9 +67,24 @@ export class WorkspaceManager {
         this.init();
     }
 
+    sendHandshake() {
+        try {
+            this.channel.postMessage({
+                type: "MAIN_HANDSHAKE",
+                timestamp: Date.now()
+            });
+        } catch (e) {}
+    }
+
     init() {
         // Escuta mensagens do BroadcastChannel para sincronia bidirecional
         this.channel.addEventListener("message", (e) => this.handleMessage(e));
+
+        // Dispara handshake inicial e retries para reconectar janelas já abertas no segundo monitor
+        this.sendHandshake();
+        setTimeout(() => this.sendHandshake(), 100);
+        setTimeout(() => this.sendHandshake(), 350);
+        setTimeout(() => this.sendHandshake(), 800);
 
         // Vincula cliques de pop-out nos cabeçalhos dos painéis
         const popoutButtons = [
@@ -493,7 +533,11 @@ export class WorkspaceManager {
         const reopenRight = document.getElementById("reopen-right");
         const reopenTimeline = document.getElementById("reopen-timeline");
 
-        if (!workspace || !sidebarLeft || !centerStage || !sidebarRight || !timelinePanel) return;
+        if (!workspace) return;
+
+        const isLeftPopped = !!(window.popoutWindows?.["sidebar-left"] && !window.popoutWindows["sidebar-left"].closed);
+        const isRightPopped = !!(window.popoutWindows?.["sidebar-right"] && !window.popoutWindows["sidebar-right"].closed);
+        const isTimelinePopped = !!(window.popoutWindows?.["timeline-panel"] && !window.popoutWindows["timeline-panel"].closed);
 
         if (position === "bottom-full") {
             if (!this.studioTop) {
@@ -501,16 +545,22 @@ export class WorkspaceManager {
                 this.studioTop.className = "studio-top";
             }
             // Agrupa as colunas superiores dentro de studioTop
-            this.studioTop.appendChild(sidebarLeft);
-            if (reopenLeft) this.studioTop.appendChild(reopenLeft);
-            this.studioTop.appendChild(centerStage);
-            this.studioTop.appendChild(sidebarRight);
-            if (reopenRight) this.studioTop.appendChild(reopenRight);
+            if (sidebarLeft && !isLeftPopped && sidebarLeft.ownerDocument === document) {
+                this.studioTop.appendChild(sidebarLeft);
+            }
+            if (reopenLeft && reopenLeft.ownerDocument === document) this.studioTop.appendChild(reopenLeft);
+            if (centerStage && centerStage.ownerDocument === document) this.studioTop.appendChild(centerStage);
+            if (sidebarRight && !isRightPopped && sidebarRight.ownerDocument === document) {
+                this.studioTop.appendChild(sidebarRight);
+            }
+            if (reopenRight && reopenRight.ownerDocument === document) this.studioTop.appendChild(reopenRight);
 
             // Timeline no workspace abaixo de studioTop (full-width)
             workspace.appendChild(this.studioTop);
-            workspace.appendChild(timelinePanel);
-            if (reopenTimeline) {
+            if (timelinePanel && !isTimelinePopped && timelinePanel.ownerDocument === document) {
+                workspace.appendChild(timelinePanel);
+            }
+            if (reopenTimeline && reopenTimeline.ownerDocument === document) {
                 workspace.appendChild(reopenTimeline);
             }
 
@@ -520,17 +570,23 @@ export class WorkspaceManager {
             }
         } else {
             // Timeline volta para dentro do center-stage
-            centerStage.appendChild(timelinePanel);
-            if (reopenTimeline) {
+            if (centerStage && timelinePanel && !isTimelinePopped && timelinePanel.ownerDocument === document) {
+                centerStage.appendChild(timelinePanel);
+            }
+            if (reopenTimeline && reopenTimeline.ownerDocument === document && centerStage) {
                 centerStage.appendChild(reopenTimeline);
             }
 
             // Restaura ordem original no workspace
-            workspace.appendChild(sidebarLeft);
-            if (reopenLeft) workspace.appendChild(reopenLeft);
-            workspace.appendChild(centerStage);
-            workspace.appendChild(sidebarRight);
-            if (reopenRight) workspace.appendChild(reopenRight);
+            if (sidebarLeft && !isLeftPopped && sidebarLeft.ownerDocument === document) {
+                workspace.appendChild(sidebarLeft);
+            }
+            if (reopenLeft && reopenLeft.ownerDocument === document) workspace.appendChild(reopenLeft);
+            if (centerStage && centerStage.ownerDocument === document) workspace.appendChild(centerStage);
+            if (sidebarRight && !isRightPopped && sidebarRight.ownerDocument === document) {
+                workspace.appendChild(sidebarRight);
+            }
+            if (reopenRight && reopenRight.ownerDocument === document) workspace.appendChild(reopenRight);
 
             if (this.studioTop && this.studioTop.parentNode) {
                 this.studioTop.remove();
@@ -957,15 +1013,6 @@ export class WorkspaceManager {
 
     applyWorkspace(ws) {
         console.log(`[WorkspaceManager] Aplicando Workspace Preset: ${ws}`);
-        
-        // 1. Restaura todas as janelas popout primeiro para ter base limpa
-        const activePopouts = { ...window.popoutWindows };
-        for (const panelId in activePopouts) {
-            if (activePopouts[panelId] && !activePopouts[panelId].closed) {
-                activePopouts[panelId].close();
-            }
-            this.restorePanel(panelId);
-        }
 
         const customWorkspaces = this.getCustomWorkspaces();
         const customConfig = customWorkspaces[ws];
@@ -1271,96 +1318,79 @@ export class WorkspaceManager {
     togglePopout(panelId) {
         if (window.popoutWindows[panelId] && !window.popoutWindows[panelId].closed) {
             // Se já está aberto, fecha o popout (restaurando localmente)
-            window.popoutWindows[panelId].close();
+            try {
+                window.popoutWindows[panelId].close();
+            } catch (e) {}
             this.restorePanel(panelId);
         } else {
-            // Abre nova janela popout leve
-            const width = panelId.includes("player") ? 640 : 800;
-            const height = panelId.includes("player") ? 480 : 600;
+            const winName = getPopoutWindowName(panelId);
+            
+            // Lê dimensões e coordenadas salvas no localStorage
+            let width = panelId.includes("player") ? 640 : 800;
+            let height = panelId.includes("player") ? 480 : 600;
+            let left = null;
+            let top = null;
+            
+            try {
+                const rawBounds = localStorage.getItem(`capiau_popout_bounds_${panelId}`);
+                if (rawBounds) {
+                    const b = JSON.parse(rawBounds);
+                    if (b && typeof b === "object") {
+                        const w = b.outerWidth || b.width;
+                        const h = b.outerHeight || b.height;
+                        if (w > 150 && h > 150) {
+                            width = w;
+                            height = h;
+                        }
+                        const x = b.screenX !== undefined ? b.screenX : b.left;
+                        const y = b.screenY !== undefined ? b.screenY : b.top;
+                        if (x !== undefined && y !== undefined && !isNaN(x) && !isNaN(y)) {
+                            left = x;
+                            top = y;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("[WorkspaceManager] Erro ao ler bounds salvos:", e);
+            }
+            
+            let features = `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`;
+            if (left !== null && top !== null) {
+                features += `,left=${left},top=${top},screenX=${left},screenY=${top}`;
+            }
             
             const popup = window.open(
                 `panel.html?panel=${panelId}`,
-                `popout-${panelId}`,
-                `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`
+                winName,
+                features
             );
             
             if (popup) {
                 window.popoutWindows[panelId] = popup;
+                localStorage.setItem(`capiau_popout_active_${panelId}`, "true");
             } else {
                 alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
             }
         }
     }
 
+    registerPopout(panelId, win) {
+        if (!win || win.closed) return;
+        window.popoutWindows[panelId] = win;
+        this.attachPanelToPopout(panelId, win);
+    }
+
     handleMessage(e) {
         const data = e.data;
+        if (!data || !data.type) return;
         
         if (data.type === "POPOUT_READY") {
             const panelId = data.panel;
-            console.log(`[WorkspaceManager] Pop-out pronto: ${panelId}`);
+            console.log(`[WorkspaceManager] Pop-out sinalizado: ${panelId}`);
             
-            const localPanel = document.getElementById(panelId);
-            if (localPanel) {
-                this.poppedElements[panelId] = localPanel;
-                this.originalParents[panelId] = localPanel.parentNode;
-                this.originalNextSiblings[panelId] = localPanel.nextSibling;
-                
-                const win = window.popoutWindows[panelId];
-                if (win) {
-                    const container = win.document.getElementById("panel-container");
-                    if (container) {
-                        container.innerHTML = ""; // Limpa loader
-                        win.document.adoptNode(localPanel);
-                        container.appendChild(localPanel);
-                        localPanel.classList.remove("popped-out-hidden");
-                        
-                        // Oculta o botão de pop-out para evitar redundância na janela destacada
-                        const popBtn = localPanel.querySelector('[id*="popout"]');
-                        if (popBtn) popBtn.style.display = "none";
-                    }
-                    
-                    // Inicializa motor global de tooltips na janela destacada
-                    if (typeof window.initGlobalTooltips === "function") {
-                        window.initGlobalTooltips(win.document, win);
-                    }
-
-                    // Se for a biblioteca de mídias, anexa o tracker do índice de rolagem (Scroll Index) à janela destacada
-                    if (panelId === "sidebar-left") {
-                        if (window.libraryScrollIndex) {
-                            window.libraryScrollIndex.attachToWindow(win);
-                        } else if (window.libraryManager?.scrollIndexTracker) {
-                            window.libraryManager.scrollIndexTracker.attachToWindow(win);
-                        }
-                        if (window.libraryInstance) {
-                            window.libraryInstance.attachScrollListener(win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
-                            const activeTab = win.document.querySelector("#sidebar-left .tab-content.active")?.id || "tab-media";
-                            window.libraryInstance.restoreTabScrollPosition(activeTab, win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
-                            if (typeof window.libraryInstance.onPopoutReady === "function") {
-                                window.libraryInstance.onPopoutReady(win);
-                            }
-                        }
-                    }
-
-                    // Escuta atalhos de teclado no popout e redireciona para o player principal
-                    win.addEventListener("keydown", (e) => {
-                        console.log(`[WorkspaceManager] Tecla pressionada no popout ${panelId}:`, e.code);
-                        const activeTag = win.document.activeElement.tagName.toLowerCase();
-                        if (activeTag === "input" || activeTag === "textarea") return;
-                        
-                        if (window.player && typeof window.player.handleGlobalKeyboard === "function") {
-                            window.player.handleGlobalKeyboard(e);
-                        }
-                    });
-                    win.addEventListener("keyup", (e) => {
-                        if (e.code === "KeyK" && window.player) {
-                            window.player.isKeyKDown = false;
-                        }
-                    });
-                }
-                
-                if (panelId === "timeline-panel") {
-                    this.syncTimelineCanvasToPopout();
-                }
+            const win = window.popoutWindows[panelId];
+            if (win && !win.closed) {
+                this.attachPanelToPopout(panelId, win);
             }
         }
         else if (data.type === "POPOUT_CLOSED") {
@@ -1368,12 +1398,105 @@ export class WorkspaceManager {
         }
     }
 
+    attachPanelToPopout(panelId, win) {
+        if (!win || win.closed || !win.document) return;
+        
+        const localPanel = document.getElementById(panelId) || this.poppedElements[panelId];
+        if (!localPanel) {
+            console.warn(`[WorkspaceManager] Painel '${panelId}' não encontrado para anexação.`);
+            return;
+        }
+
+        // Se o elemento ainda está no DOM do documento principal, armazena seus nós pais de origem
+        if (localPanel.ownerDocument === document) {
+            this.poppedElements[panelId] = localPanel;
+            this.originalParents[panelId] = localPanel.parentNode;
+            this.originalNextSiblings[panelId] = localPanel.nextSibling;
+        }
+
+        const container = win.document.getElementById("panel-container");
+        if (container) {
+            // Limpa loader da janela popout e injeta o elemento
+            container.innerHTML = "";
+            win.document.adoptNode(localPanel);
+            container.appendChild(localPanel);
+            localPanel.classList.remove("popped-out-hidden");
+            
+            // Oculta o botão de pop-out para evitar redundância na janela destacada
+            const popBtn = localPanel.querySelector('[id*="popout"]');
+            if (popBtn) popBtn.style.display = "none";
+        }
+
+        localStorage.setItem(`capiau_popout_active_${panelId}`, "true");
+
+        // Inicializa motor global de tooltips na janela destacada
+        if (typeof window.initGlobalTooltips === "function") {
+            window.initGlobalTooltips(win.document, win);
+        }
+
+        // Se for a biblioteca de mídias, anexa o tracker do índice de rolagem (Scroll Index) à janela destacada
+        if (panelId === "sidebar-left") {
+            if (window.libraryScrollIndex) {
+                window.libraryScrollIndex.attachToWindow(win);
+            } else if (window.libraryManager?.scrollIndexTracker) {
+                window.libraryManager.scrollIndexTracker.attachToWindow(win);
+            }
+            if (window.libraryInstance) {
+                window.libraryInstance.attachScrollListener(win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                const activeTab = win.document.querySelector("#sidebar-left .tab-content.active")?.id || "tab-media";
+                window.libraryInstance.restoreTabScrollPosition(activeTab, win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                if (typeof window.libraryInstance.onPopoutReady === "function") {
+                    window.libraryInstance.onPopoutReady(win);
+                }
+            } else {
+                // Caso a instância da biblioteca ainda esteja inicializando (ex: no carregamento do app)
+                setTimeout(() => {
+                    if (window.libraryInstance) {
+                        window.libraryInstance.attachScrollListener(win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                        if (typeof window.libraryInstance.onPopoutReady === "function") {
+                            window.libraryInstance.onPopoutReady(win);
+                        }
+                    }
+                }, 100);
+            }
+        }
+
+        // Escuta atalhos de teclado no popout e redireciona para o player principal
+        if (!win._hasWorkspaceKeyHandler) {
+            win._hasWorkspaceKeyHandler = true;
+            win.addEventListener("keydown", (e) => {
+                const activeTag = win.document.activeElement?.tagName?.toLowerCase();
+                if (activeTag === "input" || activeTag === "textarea") return;
+                
+                if (window.player && typeof window.player.handleGlobalKeyboard === "function") {
+                    window.player.handleGlobalKeyboard(e);
+                }
+            });
+            win.addEventListener("keyup", (e) => {
+                if (e.code === "KeyK" && window.player) {
+                    window.player.isKeyKDown = false;
+                }
+            });
+        }
+
+        if (panelId === "timeline-panel") {
+            this.syncTimelineCanvasToPopout();
+        }
+
+        try {
+            this.channel.postMessage({
+                type: "POPOUT_ACK",
+                panel: panelId
+            });
+        } catch (e) {}
+    }
+
     restorePanel(panelId) {
         console.log(`[WorkspaceManager] Restaurando painel localmente: ${panelId}`);
-        const localPanel = this.poppedElements[panelId];
+        const localPanel = this.poppedElements[panelId] || document.getElementById(panelId);
         const parent = this.originalParents[panelId];
         
-        if (localPanel && parent) {
+        if (localPanel) {
             // Pausa e descarrega qualquer player de vídeo dentro do painel para evitar áudio fantasma
             try {
                 const videos = localPanel.querySelectorAll("video");
@@ -1387,13 +1510,49 @@ export class WorkspaceManager {
                 console.warn("[WorkspaceManager] Erro ao descarregar vídeos no restorePanel:", err);
             }
 
-            const sibling = this.originalNextSiblings[panelId];
             document.adoptNode(localPanel);
-            if (sibling && sibling.parentNode === parent) {
-                parent.insertBefore(localPanel, sibling);
-            } else {
-                parent.appendChild(localPanel);
+
+            const workspace = document.querySelector(".workspace");
+            const topContainer = document.querySelector(".studio-top") || workspace;
+
+            if (panelId === "sidebar-left") {
+                const centerStage = topContainer?.querySelector(".center-stage");
+                if (centerStage && centerStage.parentNode === topContainer) {
+                    topContainer.insertBefore(localPanel, centerStage);
+                } else if (topContainer) {
+                    topContainer.prepend(localPanel);
+                }
+            } else if (panelId === "sidebar-right") {
+                if (topContainer) {
+                    topContainer.appendChild(localPanel);
+                }
+            } else if (panelId === "timeline-panel") {
+                if (this.timelinePosition === "bottom-full" && workspace) {
+                    workspace.appendChild(localPanel);
+                } else {
+                    const centerStage = document.querySelector(".center-stage");
+                    if (centerStage) centerStage.appendChild(localPanel);
+                }
+            } else if (panelId === "source-player-panel") {
+                const monitors = document.querySelector(".monitors-container");
+                const program = document.getElementById("program-player-panel");
+                if (monitors && program) {
+                    monitors.insertBefore(localPanel, program);
+                } else if (monitors) {
+                    monitors.prepend(localPanel);
+                }
+            } else if (panelId === "program-player-panel") {
+                const monitors = document.querySelector(".monitors-container");
+                if (monitors) monitors.appendChild(localPanel);
+            } else if (parent) {
+                const sibling = this.originalNextSiblings[panelId];
+                if (sibling && sibling.parentNode === parent) {
+                    parent.insertBefore(localPanel, sibling);
+                } else {
+                    parent.appendChild(localPanel);
+                }
             }
+
             localPanel.classList.remove("popped-out-hidden");
             
             // Restaura a exibição do botão de pop-out
@@ -1404,6 +1563,8 @@ export class WorkspaceManager {
         if (window.popoutWindows[panelId]) {
             delete window.popoutWindows[panelId];
         }
+
+        localStorage.removeItem(`capiau_popout_active_${panelId}`);
 
         // Se for a biblioteca de mídias, restaura o tracker do índice de rolagem para a janela principal
         if (panelId === "sidebar-left") {
