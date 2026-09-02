@@ -9,6 +9,9 @@ const openFoldersSet = new Set();
 let _openFoldersLoadedFor = null;
 let _saveOpenFoldersTimer = null;
 
+// Timer global para debounce de clique simples na biblioteca (evita disparar Source ao dar duplo clique)
+let _librarySingleClickTimer = null;
+
 function loadOpenFoldersState(projectId) {
     if (_openFoldersLoadedFor === projectId) return;
     _openFoldersLoadedFor = projectId;
@@ -3331,19 +3334,37 @@ function renderTreeNode(node, container, depth = 0) {
             });
         }
         
-        card.addEventListener("click", () => {
-            STATE.activeVideo = v;
-            window.activeFocusedPlayer = "source";
+        card.addEventListener("click", (e) => {
+            if (e.target.closest("button") || e.target.closest(".btn-card-action") || e.target.closest(".btn-toggle-filename") || e.target.closest(".btn-select-similar-item") || e.target.closest("input")) return;
+
+            if (_librarySingleClickTimer) {
+                clearTimeout(_librarySingleClickTimer);
+                _librarySingleClickTimer = null;
+            }
+
+            _librarySingleClickTimer = setTimeout(() => {
+                _librarySingleClickTimer = null;
+                STATE.activeVideo = v;
+                window.activeFocusedPlayer = "source";
+            }, 250);
         });
 
         // Clique direito aciona o Super-Menu de Contexto
         card.addEventListener("contextmenu", (e) => {
+            if (_librarySingleClickTimer) {
+                clearTimeout(_librarySingleClickTimer);
+                _librarySingleClickTimer = null;
+            }
             showMediaContextMenu(e, v, "video", card);
         });
 
         // Arrastar-e-soltar do vídeo para a timeline com dimensões reais e In/Out
         card.draggable = true;
         card.addEventListener("dragstart", (e) => {
+            if (_librarySingleClickTimer) {
+                clearTimeout(_librarySingleClickTimer);
+                _librarySingleClickTimer = null;
+            }
             let inTime = 0.0;
             let outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
             if (STATE.activeVideo && STATE.activeVideo.id === v.id) {
@@ -3388,6 +3409,10 @@ function renderTreeNode(node, container, depth = 0) {
         if (toggleBtn) {
             toggleBtn.addEventListener("click", (e) => {
                 e.stopPropagation();
+                if (_librarySingleClickTimer) {
+                    clearTimeout(_librarySingleClickTimer);
+                    _librarySingleClickTimer = null;
+                }
                 if (!window.titleDisplayPreferences) window.titleDisplayPreferences = {};
                 window.titleDisplayPreferences[v.id] = forceRealFilename ? "friendly" : "filename";
                 localStorage.setItem("titleDisplayPreferences", JSON.stringify(window.titleDisplayPreferences));
@@ -3396,27 +3421,46 @@ function renderTreeNode(node, container, depth = 0) {
             });
         }
         
-        // Duplo clique no card envia o vídeo (ou trecho marcado In/Out) diretamente para a timeline
+        // Duplo clique no card insere o vídeo diretamente na timeline principal (Program), pulando o Source
         card.addEventListener("dblclick", (e) => {
-            if (e.target.closest("button") || e.target.closest(".btn-card-action") || e.target.closest(".btn-toggle-filename") || e.target.closest(".btn-select-similar-item")) return;
+            if (e.target.closest("button") || e.target.closest(".btn-card-action") || e.target.closest(".btn-toggle-filename") || e.target.closest(".btn-select-similar-item") || e.target.closest("input")) return;
             e.preventDefault();
             e.stopPropagation();
             
-            let inTime = 0.0;
-            let outTime = v.duration || 0.0;
-            
-            if (STATE.activeVideo && STATE.activeVideo.id === v.id) {
-                if (STATE.markerIn !== null) inTime = STATE.markerIn;
-                if (STATE.markerOut !== null) outTime = STATE.markerOut;
+            if (_librarySingleClickTimer) {
+                clearTimeout(_librarySingleClickTimer);
+                _librarySingleClickTimer = null;
             }
+
+            let inTime = 0.0;
+            let outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
             
             if (window.TIMELINE_STATE) {
-                window.TIMELINE_STATE.addCut(v.id, inTime, outTime, null);
-                STATE.activeVideo = v;
-                window.activeFocusedPlayer = "source";
-                STATE.emit("statusChanged", { text: `Vídeo "${currentTitle}" adicionado à timeline (${formatTimecode(inTime).substring(3, 11)} - ${formatTimecode(outTime).substring(3, 11)}).`, active: true });
+                let targetTrack = null;
+                const activeTrackId = window.TIMELINE_STATE.selectedTrack;
+                if (activeTrackId) {
+                    const tObj = window.TIMELINE_STATE.getTrack(activeTrackId);
+                    if (tObj && tObj.kind === "video" && !tObj.locked) {
+                        targetTrack = activeTrackId;
+                    }
+                }
+
+                const playheadFrame = (window.TIMELINE_STATE.playheadFrame !== null && window.TIMELINE_STATE.playheadFrame !== undefined)
+                    ? window.TIMELINE_STATE.playheadFrame
+                    : null;
+
+                const newCut = window.TIMELINE_STATE.addCut(v.id, inTime, outTime, targetTrack, playheadFrame);
+
+                if (newCut && typeof window.TIMELINE_STATE.setPlayheadFrame === "function") {
+                    const durFrames = (newCut.outFrame || 0) - (newCut.inFrame || 0);
+                    const newPlayhead = (newCut.timelineStartFrame || 0) + durFrames;
+                    window.TIMELINE_STATE.setPlayheadFrame(newPlayhead);
+                }
+
+                window.activeFocusedPlayer = "program";
+                STATE.emit("statusChanged", { text: `Vídeo "${currentTitle}" inserido na timeline (${formatTimecode(inTime).substring(3, 11)} - ${formatTimecode(outTime).substring(3, 11)}).`, active: true });
                 if (typeof window.showToast === "function") {
-                    window.showToast("Vídeo adicionado à timeline!", "success");
+                    window.showToast("Vídeo inserido na timeline!", "success");
                 }
             }
         });
@@ -3553,6 +3597,10 @@ function renderTreeNode(node, container, depth = 0) {
         
         // Clique direito aciona o Super-Menu de Contexto
         card.addEventListener("contextmenu", (e) => {
+            if (_librarySingleClickTimer) {
+                clearTimeout(_librarySingleClickTimer);
+                _librarySingleClickTimer = null;
+            }
             showMediaContextMenu(e, p, "photo", card);
         });
 
@@ -3560,6 +3608,10 @@ function renderTreeNode(node, container, depth = 0) {
             card.style.cursor = "pointer";
             card.draggable = true;
             card.addEventListener("dragstart", (e) => {
+                if (_librarySingleClickTimer) {
+                    clearTimeout(_librarySingleClickTimer);
+                    _librarySingleClickTimer = null;
+                }
                 const effDur = 5.0;
                 STATE.activeDragMedia = {
                     type: "photo",
@@ -3589,32 +3641,70 @@ function renderTreeNode(node, container, depth = 0) {
                     window.TIMELINE_INTERACTION.renderer.requestRedraw();
                 }
             });
-            card.addEventListener("click", () => {
-                if (STATE.openPhotosInPlayer) {
-                    STATE.activePhoto = p;
-                } else {
-                    const libInstance = window.libraryInstance || window.panelsManager?.library;
-                    STATE.currentPhotoList = STATE.allPhotos || [p];
-                    STATE.currentPhotoIndex = (STATE.currentPhotoList).indexOf(p);
-                    if (libInstance && typeof libInstance.openLightbox === 'function') {
-                        libInstance.openLightbox(p);
-                    }
+            card.addEventListener("click", (e) => {
+                if (e.target.closest("button") || e.target.closest(".btn-card-action") || e.target.closest(".btn-toggle-filename") || e.target.closest(".btn-select-similar-item") || e.target.closest("input")) return;
+
+                if (_librarySingleClickTimer) {
+                    clearTimeout(_librarySingleClickTimer);
+                    _librarySingleClickTimer = null;
                 }
+
+                _librarySingleClickTimer = setTimeout(() => {
+                    _librarySingleClickTimer = null;
+                    if (STATE.openPhotosInPlayer) {
+                        STATE.activePhoto = p;
+                    } else {
+                        const libInstance = window.libraryInstance || window.panelsManager?.library;
+                        STATE.currentPhotoList = STATE.allPhotos || [p];
+                        STATE.currentPhotoIndex = (STATE.currentPhotoList).indexOf(p);
+                        if (libInstance && typeof libInstance.openLightbox === 'function') {
+                            libInstance.openLightbox(p);
+                        }
+                    }
+                }, 250);
             });
         }
         
-        // Duplo clique no card envia a foto diretamente para a timeline como still
+        // Duplo clique no card insere a foto diretamente na timeline principal (Program), pulando o Source/Lightbox
         card.addEventListener("dblclick", (e) => {
-            if (e.target.closest("button") || e.target.closest(".btn-card-action") || e.target.closest(".btn-toggle-filename") || e.target.closest(".btn-select-similar-item")) return;
+            if (e.target.closest("button") || e.target.closest(".btn-card-action") || e.target.closest(".btn-toggle-filename") || e.target.closest(".btn-select-similar-item") || e.target.closest("input")) return;
             e.preventDefault();
             e.stopPropagation();
+
+            if (_librarySingleClickTimer) {
+                clearTimeout(_librarySingleClickTimer);
+                _librarySingleClickTimer = null;
+            }
             
             if (window.TIMELINE_STATE) {
-                window.TIMELINE_STATE.addPhotoCut(p.id, {});
-                STATE.activePhoto = p;
-                STATE.emit("statusChanged", { text: `Foto "${currentTitle}" adicionada à timeline.`, active: true });
+                let targetTrack = null;
+                const activeTrackId = window.TIMELINE_STATE.selectedTrack;
+                if (activeTrackId) {
+                    const tObj = window.TIMELINE_STATE.getTrack(activeTrackId);
+                    if (tObj && tObj.kind === "video" && !tObj.locked) {
+                        targetTrack = activeTrackId;
+                    }
+                }
+
+                const playheadFrame = (window.TIMELINE_STATE.playheadFrame !== null && window.TIMELINE_STATE.playheadFrame !== undefined)
+                    ? window.TIMELINE_STATE.playheadFrame
+                    : null;
+
+                const newCut = window.TIMELINE_STATE.addPhotoCut(p.id, {
+                    track: targetTrack,
+                    timelineStartFrame: playheadFrame
+                });
+
+                if (newCut && typeof window.TIMELINE_STATE.setPlayheadFrame === "function") {
+                    const durFrames = (newCut.outFrame || 0) - (newCut.inFrame || 0);
+                    const newPlayhead = (newCut.timelineStartFrame || 0) + durFrames;
+                    window.TIMELINE_STATE.setPlayheadFrame(newPlayhead);
+                }
+
+                window.activeFocusedPlayer = "program";
+                STATE.emit("statusChanged", { text: `Foto "${currentTitle}" inserida na timeline.`, active: true });
                 if (typeof window.showToast === "function") {
-                    window.showToast("Foto adicionada à timeline!", "success");
+                    window.showToast("Foto inserida na timeline!", "success");
                 }
             }
         });
