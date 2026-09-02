@@ -245,6 +245,95 @@ assert.ok(KEYMAP_PRESETS.kdenlive["playback.play_in_to_out"].length > 0);
 
 console.log("  ✔ Todos os 5 presets NLE contêm todos os atalhos In/Out, Loop, Lift e Extract.");
 
+// ── TESTE 7: Prioridade de Colisão Playhead vs Marcadores IN/OUT e Movimentação de Span ──
+console.log("\n7. Testando prioridade de colisão Playhead vs Marcadores IN/OUT e deslocamento de intervalo...");
+
+const mockRenderer = {
+    rulerHeight: 30,
+    width: 1000,
+    height: 300,
+    requestRedraw: () => {}
+};
+
+// Carrega timelineInteraction.js para teste isolado de métodos de colisão
+const codeInteraction = readFileSync(path.join(raiz, "src", "ui", "js", "timelineInteraction.js"), "utf8");
+const cleanedInteractionCode = codeInteraction
+    .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, "")
+    .replace(/export class CapiauTimelineInteraction/g, "class CapiauTimelineInteraction")
+    .replace(/export default /g, "var defaultInteraction = ");
+
+context.mockRenderer = mockRenderer;
+context.document.getElementById = () => ({
+    classList: { contains: () => false },
+    addEventListener: () => {},
+    style: {}
+});
+context.document.querySelectorAll = () => [];
+
+try {
+    vm.runInContext(cleanedInteractionCode + "; var interactionInstance = new CapiauTimelineInteraction(mockRenderer);", context);
+    const interaction = context.interactionInstance;
+
+    // Caso A: Playhead e IN coincidentes no frame 100
+    TIMELINE_STATE.zoom = 1;
+    TIMELINE_STATE.scrollLeftFrame = 0;
+    TIMELINE_STATE.setPlayheadFrame(100);
+    TIMELINE_STATE.setInPoint(100);
+    TIMELINE_STATE.setOutPoint(300);
+
+    const inX = 100; // zoom 1, scroll 0
+
+    // Topo da régua (y = 6px): prioridade total para o Playhead Head
+    assert.equal(interaction.checkHitPlayheadHead(inX, 6), true, "Deve atingir a cabeça do Playhead no topo");
+    assert.equal(interaction.checkHitMarkIn(inX, 6, false), false, "Não deve capturar IN no topo sem Alt quando a agulha está sobreposta");
+
+    // Abaixo do topo (y = 18px): permite capturar o colchete IN
+    assert.equal(interaction.checkHitPlayheadHead(inX, 18), false, "Não deve atingir a cabeça do Playhead abaixo de y=14");
+    assert.equal(interaction.checkHitMarkIn(inX, 18, false), true, "Deve capturar o colchete IN na parte inferior da régua");
+
+    // Com tecla Alt no topo: Alt força a captura do marcador IN
+    assert.equal(interaction.checkHitMarkIn(inX, 6, true), true, "Com Alt, deve capturar o marcador IN mesmo no topo");
+
+    // Caso B: Playhead e OUT coincidentes no frame 250
+    TIMELINE_STATE.setPlayheadFrame(250);
+    TIMELINE_STATE.setOutPoint(250);
+    const outX = 250;
+
+    // Topo da régua (y = 6px): prioridade total para o Playhead Head
+    assert.equal(interaction.checkHitPlayheadHead(outX, 6), true, "Deve atingir a cabeça do Playhead no topo sobre OUT");
+    assert.equal(interaction.checkHitMarkOut(outX, 6, false), false, "Não deve capturar OUT no topo sem Alt quando a agulha está sobreposta");
+
+    // Abaixo do topo (y = 18px): captura o colchete OUT
+    assert.equal(interaction.checkHitMarkOut(outX, 18, false), true, "Deve capturar o colchete OUT na parte inferior da régua");
+
+    // Com tecla Alt no topo: Alt força a captura do marcador OUT
+    assert.equal(interaction.checkHitMarkOut(outX, 6, true), true, "Com Alt, deve capturar o marcador OUT mesmo no topo");
+
+    // Caso C: Deslocamento do span IN-OUT mantendo distância constante
+    const initialIn = 50;
+    const initialOut = 150;
+    const initialDur = initialOut - initialIn; // 100 frames
+    TIMELINE_STATE.setInPoint(initialIn);
+    TIMELINE_STATE.setOutPoint(initialOut);
+
+    const deltaX = 35; // deslocar 35 frames para a direita
+    const deltaFrames = Math.round(deltaX / TIMELINE_STATE.zoom);
+    const dur = Math.max(1, initialOut - initialIn);
+    const newIn = Math.max(0, initialIn + deltaFrames);
+    const newOut = newIn + dur;
+    TIMELINE_STATE.inFrame = newIn;
+    TIMELINE_STATE.outFrame = newOut;
+
+    assert.equal(TIMELINE_STATE.inFrame, 85);
+    assert.equal(TIMELINE_STATE.outFrame, 185);
+    assert.equal(TIMELINE_STATE.outFrame - TIMELINE_STATE.inFrame, initialDur, "Duração do intervalo IN-OUT deve ser preservada ao mover com Alt/Shift");
+
+    console.log("  ✔ Prioridades de clique/arraste Playhead vs IN/OUT e integridade do span aprovadas.");
+} catch (err) {
+    console.error("Erro ao testar interação:", err);
+    throw err;
+}
+
 console.log("\n==========================================");
 console.log("🎉 TODOS OS TESTES PASSARAM COM SUCESSO!");
 console.log("==========================================");

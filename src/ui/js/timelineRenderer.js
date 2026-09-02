@@ -1925,22 +1925,52 @@ export class CapiauTimelineRenderer {
         const x = (playhead - scrollLeft) * zoom;
 
         // Se estiver visível no canvas, desenha
-        if (x >= 0 && x <= this.width) {
-            ctx.strokeStyle = this.colors.playhead;
+        if (x >= -10 && x <= this.width + 10) {
+            ctx.save();
+            ctx.strokeStyle = this.colors.playhead || "#ef4444";
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, this.height);
             ctx.stroke();
 
-            // Desenha pequena cabeça triangular no topo da régua
-            ctx.fillStyle = this.colors.playhead;
+            // Verifica se está muito próximo de uma marcação IN ou OUT (<= 10px)
+            const inF = TIMELINE_STATE.inFrame;
+            const outF = TIMELINE_STATE.outFrame;
+            const inX = inF !== null ? (inF - scrollLeft) * zoom : null;
+            const outX = outF !== null ? (outF - scrollLeft) * zoom : null;
+
+            const isNearIn = inX !== null && Math.abs(x - inX) <= 10;
+            const isNearOut = outX !== null && Math.abs(x - outX) <= 10;
+            const isNearInOut = isNearIn || isNearOut;
+
+            // Desenha a cabeça triangular/pentagonal no topo da régua
+            ctx.fillStyle = this.colors.playhead || "#ef4444";
             ctx.beginPath();
-            ctx.moveTo(x - 5, 0);
-            ctx.lineTo(x + 5, 0);
-            ctx.lineTo(x, 8);
+            if (isNearInOut) {
+                // Cabeça pentagonal com topo reto para destacar da aba do colchete
+                ctx.moveTo(x - 5, 0);
+                ctx.lineTo(x + 5, 0);
+                ctx.lineTo(x + 5, 3);
+                ctx.lineTo(x, 9);
+                ctx.lineTo(x - 5, 3);
+            } else {
+                // Cabeça triangular padrão limpa
+                ctx.moveTo(x - 5, 0);
+                ctx.lineTo(x + 5, 0);
+                ctx.lineTo(x, 8);
+            }
             ctx.closePath();
             ctx.fill();
+
+            // Contorno extremamente sutil que surge APENAS quando muito próximo de uma marcação IN ou OUT
+            if (isNearInOut) {
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            ctx.restore();
         }
     }
 }

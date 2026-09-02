@@ -38,7 +38,13 @@ const VELOCIDADE_RENDER_DENOISE_IA_X_TEMPO_REAL = 1.41;
 const CURSOR_TRACK_FORWARD_ALL = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 6l6 6-6 6M11 6l6 6-6 6" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 6l6 6-6 6M11 6l6 6-6 6" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') 12 12, e-resize`;
 const CURSOR_TRACK_FORWARD_SINGLE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M7 6l6 6-6 6" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 6l6 6-6 6" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') 10 12, e-resize`;
 const CURSOR_TRACK_BACKWARD_ALL = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M20 6l-6 6 6 6M13 6l-6 6 6 6" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 6l-6 6 6 6M13 6l-6 6 6 6" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') 12 12, w-resize`;
-const CURSOR_TRACK_BACKWARD_SINGLE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M17 6l-6 6 6 6" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 6l-6 6 6 6" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') 14 12, w-resize`;
+const CURSOR_TRACK_BACKWARD_SINGLE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M17 6l-6 6 6 6M13 6l-6 6 6 6" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 6l-6 6 6 6M13 6l-6 6 6 6" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') 14 12, w-resize`;
+
+// Cursores SVG temáticos de alta definição para Playhead (Vermelho), Ponto IN (Ciano), Ponto OUT (Rosa) e Intervalo
+const CURSOR_PLAYHEAD = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2v20M5 12h-3M5 9l-3 3 3 3M19 12h3M19 9l3 3-3 3" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M7 2h10v4l-5 5-5-5z" fill="%23000" stroke="%23000" stroke-width="2"/><path d="M12 2v20M5 12h-3M5 9l-3 3 3 3M19 12h3M19 9l3 3-3 3" stroke="%23ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M7 2h10v4l-5 5-5-5z" fill="%23ef4444"/></svg>') 12 12, ew-resize`;
+const CURSOR_MARK_IN = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M11 4H6v16h5M12 12h9M18 8l4 4-4 4" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 4H6v16h5M12 12h9M18 8l4 4-4 4" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 3h5v4l-5 5z" fill="%2306b6d4"/></svg>') 6 12, w-resize`;
+const CURSOR_MARK_OUT = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M13 4h5v16h-5M12 12H3M6 8l-4 4 4 4" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 4h5v16h-5M12 12H3M6 8l-4 4 4 4" fill="none" stroke="%23f43f5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 3h-5v4l5 5z" fill="%23f43f5e"/></svg>') 18 12, e-resize`;
+const CURSOR_IN_OUT_SPAN = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 6v12M20 6v12M4 12h16M7 9l-3 3 3 3M17 9l3 3-3 3" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 6v12M7 9l-3 3 3 3" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 6v12M17 9l3 3-3 3" fill="none" stroke="%23f43f5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12h16" fill="none" stroke="%23e2e8f0" stroke-width="2" stroke-linecap="round"/></svg>') 12 12, grab`;
 
 export class CapiauTimelineInteraction {
     constructor(renderer) {
@@ -555,6 +561,87 @@ export class CapiauTimelineInteraction {
         return null;
     }
 
+    /**
+     * Verifica se as coordenadas (x, y) atingem a cabeça/puxador superior do Playhead.
+     */
+    checkHitPlayheadHead(x, y) {
+        if (y > 14) return false;
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+        const playheadX = (TIMELINE_STATE.playheadFrame - scrollLeft) * zoom;
+        return Math.abs(x - playheadX) <= 7;
+    }
+
+    /**
+     * Verifica se as coordenadas (x, y) atingem o ponto IN na régua, considerando prioridades.
+     */
+    checkHitMarkIn(x, y, isAlt = false) {
+        const inF = TIMELINE_STATE.inFrame;
+        if (inF === null) return false;
+        if (y >= (this.renderer ? this.renderer.rulerHeight : 30)) return false;
+
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+        const inX = (inF - scrollLeft) * zoom;
+
+        // Se está na proximidade do colchete IN
+        const isNearIn = Math.abs(x - inX) <= 8;
+        if (!isNearIn) return false;
+
+        const playheadX = (TIMELINE_STATE.playheadFrame - scrollLeft) * zoom;
+        const isPlayheadCoincident = Math.abs(playheadX - inX) <= 7;
+
+        if (isPlayheadCoincident) {
+            // Se Alt está pressionado, captura a alça do IN
+            if (isAlt) {
+                return true;
+            }
+            // Sem Alt: a cabeça no topo (y <= 12) é reservada exclusivamente para a agulha (playhead)
+            if (y <= 12 && Math.abs(x - playheadX) <= 6) {
+                return false;
+            }
+            // Na parte inferior da régua (y > 12) ou na aba lateral do colchete à direita (inX a inX + 9)
+            return (y > 12 && Math.abs(x - inX) <= 8) || (x >= inX + 2 && x <= inX + 9 && y <= 16);
+        }
+
+        return true;
+    }
+
+    /**
+     * Verifica se as coordenadas (x, y) atingem o ponto OUT na régua, considerando prioridades.
+     */
+    checkHitMarkOut(x, y, isAlt = false) {
+        const outF = TIMELINE_STATE.outFrame;
+        if (outF === null) return false;
+        if (y >= (this.renderer ? this.renderer.rulerHeight : 30)) return false;
+
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+        const outX = (outF - scrollLeft) * zoom;
+
+        // Se está na proximidade do colchete OUT
+        const isNearOut = Math.abs(x - outX) <= 8;
+        if (!isNearOut) return false;
+
+        const playheadX = (TIMELINE_STATE.playheadFrame - scrollLeft) * zoom;
+        const isPlayheadCoincident = Math.abs(playheadX - outX) <= 7;
+
+        if (isPlayheadCoincident) {
+            // Se Alt está pressionado, captura a alça do OUT
+            if (isAlt) {
+                return true;
+            }
+            // Sem Alt: a cabeça no topo (y <= 12) é reservada exclusivamente para a agulha (playhead)
+            if (y <= 12 && Math.abs(x - playheadX) <= 6) {
+                return false;
+            }
+            // Na parte inferior da régua (y > 12) ou na aba lateral do colchete à esquerda (outX - 9 a outX)
+            return (y > 12 && Math.abs(x - outX) <= 8) || (x <= outX - 2 && x >= outX - 9 && y <= 16);
+        }
+
+        return true;
+    }
+
     onMouseDown(e) {
         window.activeFocusedPlayer = "program";
         this.mouseDownX = e.clientX;
@@ -596,32 +683,46 @@ export class CapiauTimelineInteraction {
             const inX = (inF !== null) ? (inF - scrollLeft) * zoom : null;
             const outX = (outF !== null) ? (outF - scrollLeft) * zoom : null;
 
-            // Arraste do ponto IN na régua
-            if (inX !== null && Math.abs(x - inX) <= 8) {
+            // Prioridade 1: Cabeça da agulha de reprodução (Playhead) no topo da régua
+            if (!e.altKey && this.checkHitPlayheadHead(x, y)) {
+                this.dragState = "scrub";
+                if (this.canvas) this.canvas.style.cursor = CURSOR_PLAYHEAD;
+                this.updatePlayhead(TIMELINE_STATE.playheadFrame);
+                this.hideMarkerTooltip();
+                if (this.renderer) this.renderer.requestRedraw();
+                return;
+            }
+
+            // Prioridade 2: Arraste do ponto IN na régua (se clicou no colchete IN)
+            if (this.checkHitMarkIn(x, y, e.altKey)) {
                 this.dragState = "drag-in-point";
+                if (this.canvas) this.canvas.style.cursor = CURSOR_MARK_IN;
                 this.dragStartMouseX = e.clientX;
                 this.dragStartFrame = inF;
                 return;
             }
 
-            // Arraste do ponto OUT na régua
-            if (outX !== null && Math.abs(x - outX) <= 8) {
+            // Prioridade 3: Arraste do ponto OUT na régua (se clicou no colchete OUT)
+            if (this.checkHitMarkOut(x, y, e.altKey)) {
                 this.dragState = "drag-out-point";
+                if (this.canvas) this.canvas.style.cursor = CURSOR_MARK_OUT;
                 this.dragStartMouseX = e.clientX;
                 this.dragStartFrame = outF;
                 return;
             }
 
-            // Arraste / Deslizamento da faixa IN-OUT inteira com Alt ou Shift
+            // Prioridade 4: Arraste / Deslizamento da faixa IN-OUT inteira com Alt ou Shift (mantém duração constante)
             if (inX !== null && outX !== null && x > inX && x < outX && (e.altKey || e.shiftKey)) {
                 this.dragState = "drag-in-out-span";
+                if (this.canvas) this.canvas.style.cursor = CURSOR_IN_OUT_SPAN;
                 this.dragStartMouseX = e.clientX;
                 this.dragStartInFrame = inF;
                 this.dragStartOutFrame = outF;
                 return;
             }
 
-            const hitMarker = this.getMarkerAtX(x, 14, y);
+            // Prioridade 5: Marcador de régua
+            const hitMarker = this.getMarkerAtX(x, 10, y);
             if (hitMarker) {
                 TIMELINE_STATE.selectMarker(hitMarker.id, e.shiftKey || e.ctrlKey);
                 this.dragState = "drag-marker";
@@ -634,7 +735,10 @@ export class CapiauTimelineInteraction {
             if (!e.shiftKey && !e.ctrlKey) {
                 TIMELINE_STATE.clearSelectedMarkers();
             }
+
+            // Prioridade 6: Clique geral na régua (Move Playhead e inicia Scrub)
             this.dragState = "scrub";
+            if (this.canvas) this.canvas.style.cursor = CURSOR_PLAYHEAD;
             this.updatePlayhead(frame);
             this.hideMarkerTooltip();
             return;
@@ -870,9 +974,98 @@ export class CapiauTimelineInteraction {
         const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);
         this.mouseX = x;
         this.mouseY = y;
+        // 1. Se o mouse estiver sobre a régua (y < rulerHeight)
+        if (!this.dragState && y < (this.renderer ? this.renderer.rulerHeight : 30)) {
+            const zoom = TIMELINE_STATE.zoom;
+            const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+            const inF = TIMELINE_STATE.inFrame;
+            const outF = TIMELINE_STATE.outFrame;
+            const inX = inF !== null ? (inF - scrollLeft) * zoom : null;
+            const outX = outF !== null ? (outF - scrollLeft) * zoom : null;
+
+            // Prioridade 1: Cabeça do Playhead no topo da régua
+            if (!e.altKey && this.checkHitPlayheadHead(x, y)) {
+                this.canvas.style.cursor = CURSOR_PLAYHEAD;
+                this.canvas.setAttribute("data-tooltip", "Arrastar Agulha (Playhead)");
+                this.hideMarkerTooltip();
+                this.hideHoverPreview();
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                return;
+            }
+
+            // Prioridade 2: Ponto IN
+            if (this.checkHitMarkIn(x, y, e.altKey)) {
+                this.canvas.style.cursor = CURSOR_MARK_IN;
+                this.canvas.setAttribute("data-tooltip", "Arrastar Ponto IN");
+                this.hideMarkerTooltip();
+                this.hideHoverPreview();
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                return;
+            }
+
+            // Prioridade 3: Ponto OUT
+            if (this.checkHitMarkOut(x, y, e.altKey)) {
+                this.canvas.style.cursor = CURSOR_MARK_OUT;
+                this.canvas.setAttribute("data-tooltip", "Arrastar Ponto OUT");
+                this.hideMarkerTooltip();
+                this.hideHoverPreview();
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                return;
+            }
+
+            // Prioridade 4: Faixa IN-OUT com Alt ou Shift (mantém distância fixa)
+            if (inX !== null && outX !== null && x > inX && x < outX && (e.altKey || e.shiftKey)) {
+                this.canvas.style.cursor = CURSOR_IN_OUT_SPAN;
+                this.canvas.setAttribute("data-tooltip", "Mover Intervalo IN/OUT (mantendo duração)");
+                this.hideMarkerTooltip();
+                this.hideHoverPreview();
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                return;
+            }
+
+            // Prioridade 5: Marcador de régua
+            const hoverRulerMarker = this.getMarkerAtX(x, 10, y);
+            if (hoverRulerMarker) {
+                this.canvas.style.cursor = "pointer";
+                this.canvas.removeAttribute("title");
+                this.canvas.removeAttribute("data-tooltip");
+                this.showMarkerTooltip(hoverRulerMarker, e.clientX, e.clientY);
+                this.hideHoverPreview();
+                if (TIMELINE_STATE.hoveredMarkerId !== hoverRulerMarker.id) {
+                    TIMELINE_STATE.hoveredMarkerId = hoverRulerMarker.id;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                return;
+            }
+
+            // Área livre da régua
+            this.canvas.style.cursor = "default";
+            this.canvas.removeAttribute("data-tooltip");
+            this.hideMarkerTooltip();
+            this.hideHoverPreview();
+            if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                TIMELINE_STATE.hoveredMarkerId = null;
+                if (this.renderer) this.renderer.requestRedraw();
+            }
+            return;
+        }
+
+        // 2. Se o mouse estiver sobre as pistas (y >= rulerHeight)
         let isHoveringMarker = false;
 
-        // Tooltip e Rótulo de hover (Marcadores de Régua ou de Clipe)
+        // Tooltip e Rótulo de hover em Marcadores de Clipe
         if (!this.dragState) {
             const hoverMarker = this.getMarkerAtX(x, 14, y);
             if (hoverMarker) {
@@ -977,35 +1170,13 @@ export class CapiauTimelineInteraction {
             this.canvas.removeAttribute("title");
         }
 
-        // Feedback de cursor sobre colchetes e faixa In/Out na régua
-        if (!this.dragState && y < this.renderer.rulerHeight) {
-            const inF = TIMELINE_STATE.inFrame;
-            const outF = TIMELINE_STATE.outFrame;
-            const zoom = TIMELINE_STATE.zoom;
-            const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
-            const inX = inF !== null ? (inF - scrollLeft) * zoom : null;
-            const outX = outF !== null ? (outF - scrollLeft) * zoom : null;
-
-            if (inX !== null && Math.abs(x - inX) <= 8) {
-                this.canvas.style.cursor = "w-resize";
-                return;
-            }
-            if (outX !== null && Math.abs(x - outX) <= 8) {
-                this.canvas.style.cursor = "w-resize";
-                return;
-            }
-            if (inX !== null && outX !== null && x > inX && x < outX && (e.altKey || e.shiftKey)) {
-                this.canvas.style.cursor = "grab";
-                return;
-            }
-        }
-
         if (!this.dragState) {
             return;
         }
 
         // Processar arrastes baseados no estado
         if (this.dragState === "drag-in-point") {
+            if (this.canvas) this.canvas.style.cursor = CURSOR_MARK_IN;
             const rawFrame = Math.max(0, Math.round(frame));
             const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
             const snappedFrame = isSnapDisabled ? rawFrame : this.snapFrame(rawFrame, 8);
@@ -1015,6 +1186,7 @@ export class CapiauTimelineInteraction {
             if (this.renderer) this.renderer.requestRedraw();
         }
         else if (this.dragState === "drag-out-point") {
+            if (this.canvas) this.canvas.style.cursor = CURSOR_MARK_OUT;
             const rawFrame = Math.max(1, Math.round(frame));
             const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
             const snappedFrame = isSnapDisabled ? rawFrame : this.snapFrame(rawFrame, 8);
@@ -1024,6 +1196,7 @@ export class CapiauTimelineInteraction {
             if (this.renderer) this.renderer.requestRedraw();
         }
         else if (this.dragState === "drag-in-out-span") {
+            if (this.canvas) this.canvas.style.cursor = CURSOR_IN_OUT_SPAN;
             const dx = e.clientX - this.dragStartMouseX;
             const deltaFrames = Math.round(dx / TIMELINE_STATE.zoom);
             const dur = Math.max(1, this.dragStartOutFrame - this.dragStartInFrame);
@@ -1035,6 +1208,7 @@ export class CapiauTimelineInteraction {
             if (this.renderer) this.renderer.requestRedraw();
         }
         else if (this.dragState === "scrub") {
+            if (this.canvas) this.canvas.style.cursor = CURSOR_PLAYHEAD;
             this.updatePlayhead(frame);
         } 
         else if (this.dragState === "drag-marker" && this.draggedMarkerId) {
@@ -2045,24 +2219,21 @@ export class CapiauTimelineInteraction {
      */
     onDblClick(e) {
         const { x, y, frame } = this.getCoordinates(e.clientX, e.clientY);
-        if (y < this.renderer.rulerHeight) {
-            const zoom = TIMELINE_STATE.zoom;
-            const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
-            const inF = TIMELINE_STATE.inFrame;
-            const outF = TIMELINE_STATE.outFrame;
-            const inX = (inF !== null) ? (inF - scrollLeft) * zoom : null;
-            const outX = (outF !== null) ? (outF - scrollLeft) * zoom : null;
-
-            if (inX !== null && Math.abs(x - inX) <= 8) {
+        if (y < (this.renderer ? this.renderer.rulerHeight : 30)) {
+            // Se der duplo clique na cabeça do playhead, não abre modal de marcador
+            if (this.checkHitPlayheadHead(x, y)) {
+                return;
+            }
+            if (this.checkHitMarkIn(x, y, e.altKey)) {
                 TIMELINE_STATE.seekToIn();
                 return;
             }
-            if (outX !== null && Math.abs(x - outX) <= 8) {
+            if (this.checkHitMarkOut(x, y, e.altKey)) {
                 TIMELINE_STATE.seekToOut();
                 return;
             }
 
-            const marker = this.getMarkerAtX(x, 14, y);
+            const marker = this.getMarkerAtX(x, 10, y);
             if (marker) {
                 this.openMarkerEditModal(marker);
                 this.hideMarkerTooltip();
