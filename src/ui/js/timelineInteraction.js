@@ -3668,38 +3668,60 @@ export class CapiauTimelineInteraction {
 
     initToolsToolbar() {
         const doc = (this.canvas && this.canvas.ownerDocument) || document;
-        const btnSelect = doc.getElementById("btn-tool-select");
-        const btnTrackForward = doc.getElementById("btn-tool-track-forward");
-        const btnTrackBackward = doc.getElementById("btn-tool-track-backward");
+        const toolButtons = {
+            "select": doc.getElementById("btn-tool-select"),
+            "marquee": doc.getElementById("btn-tool-marquee"),
+            "track-forward": doc.getElementById("btn-tool-track-forward"),
+            "track-backward": doc.getElementById("btn-tool-track-backward"),
+            "blade": doc.getElementById("btn-tool-blade"),
+            "slip": doc.getElementById("btn-tool-slip"),
+            "slide": doc.getElementById("btn-tool-slide"),
+            "rolling": doc.getElementById("btn-tool-rolling"),
+            "rate-stretch": doc.getElementById("btn-tool-rate-stretch"),
+            "hand": doc.getElementById("btn-tool-hand"),
+            "zoom": doc.getElementById("btn-tool-zoom")
+        };
 
         const updateButtons = (tool) => {
             const current = tool || TIMELINE_STATE.activeTool || "select";
-            if (btnSelect) btnSelect.classList.toggle("active", current === "select");
-            if (btnTrackForward) btnTrackForward.classList.toggle("active", current === "track-forward");
-            if (btnTrackBackward) btnTrackBackward.classList.toggle("active", current === "track-backward");
+            for (const [tKey, btn] of Object.entries(toolButtons)) {
+                if (btn) btn.classList.toggle("active", current === tKey);
+            }
         };
 
-        if (btnSelect && !btnSelect.__capiauToolBound) {
-            btnSelect.__capiauToolBound = true;
-            btnSelect.onclick = () => {
-                TIMELINE_STATE.setTool("select");
-                if (this.canvas) this.canvas.style.cursor = "default";
-                if (this.renderer) this.renderer.requestRedraw();
-            };
-        }
+        const bindToolClick = (btn, toolName, cursorStyle) => {
+            if (btn && !btn.__capiauToolBound) {
+                btn.__capiauToolBound = true;
+                btn.onclick = () => {
+                    TIMELINE_STATE.setTool(toolName);
+                    if (this.canvas && cursorStyle) this.canvas.style.cursor = cursorStyle;
+                    if (this.renderer) this.renderer.requestRedraw();
+                };
+            }
+        };
 
-        if (btnTrackForward && !btnTrackForward.__capiauToolBound) {
-            btnTrackForward.__capiauToolBound = true;
-            btnTrackForward.onclick = () => {
+        bindToolClick(toolButtons["select"], "select", "default");
+        bindToolClick(toolButtons["marquee"], "marquee", "crosshair");
+        bindToolClick(toolButtons["blade"], "blade", "crosshair");
+        bindToolClick(toolButtons["slip"], "slip", "ew-resize");
+        bindToolClick(toolButtons["slide"], "slide", "ew-resize");
+        bindToolClick(toolButtons["rolling"], "rolling", "col-resize");
+        bindToolClick(toolButtons["rate-stretch"], "rate-stretch", "ew-resize");
+        bindToolClick(toolButtons["hand"], "hand", "grab");
+        bindToolClick(toolButtons["zoom"], "zoom", "zoom-in");
+
+        if (toolButtons["track-forward"] && !toolButtons["track-forward"].__capiauToolBound) {
+            toolButtons["track-forward"].__capiauToolBound = true;
+            toolButtons["track-forward"].onclick = () => {
                 TIMELINE_STATE.setTool("track-forward");
                 if (this.canvas) this.canvas.style.cursor = this.getTrackSelectCursor("track-forward", false);
                 if (this.renderer) this.renderer.requestRedraw();
             };
         }
 
-        if (btnTrackBackward && !btnTrackBackward.__capiauToolBound) {
-            btnTrackBackward.__capiauToolBound = true;
-            btnTrackBackward.onclick = () => {
+        if (toolButtons["track-backward"] && !toolButtons["track-backward"].__capiauToolBound) {
+            toolButtons["track-backward"].__capiauToolBound = true;
+            toolButtons["track-backward"].onclick = () => {
                 TIMELINE_STATE.setTool("track-backward");
                 if (this.canvas) this.canvas.style.cursor = this.getTrackSelectCursor("track-backward", false);
                 if (this.renderer) this.renderer.requestRedraw();
@@ -3747,11 +3769,11 @@ export class CapiauTimelineInteraction {
                 } else {
                     const cuts = STATE.activeTimelineCuts || [];
                     const target = cuts.find(c => {
-                        const s = c.timelineStartFrame || 0;
+                        const s = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * (TIMELINE_STATE.fps || 24));
                         const e = s + (c.outFrame - c.inFrame);
                         return (c.track === TIMELINE_STATE.selectedTrack || c.track === "V1") && s < playhead && playhead < e;
                     }) || cuts.find(c => {
-                        const s = c.timelineStartFrame || 0;
+                        const s = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * (TIMELINE_STATE.fps || 24));
                         const e = s + (c.outFrame - c.inFrame);
                         return s < playhead && playhead < e;
                     });

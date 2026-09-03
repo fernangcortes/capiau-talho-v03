@@ -2093,6 +2093,157 @@ button {
     gap: 6px;
 }
 
+/* ── TIMELINE HEADER BAR (ZONA 1) ────────────────────────────────── */
+.timeline-header-bar {
+    display: flex !important;
+    width: 100% !important;
+    height: 32px;
+    min-height: 32px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    background: rgba(14, 14, 18, 0.95);
+    border-bottom: 1px solid var(--border-glass);
+    flex-shrink: 0;
+    gap: 6px;
+    user-select: none;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    z-index: 15;
+    transition: height 0.25s cubic-bezier(0.4, 0, 0.2, 1), min-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, padding 0.25s ease, border-bottom 0.25s ease;
+}
+.timeline-header-bar::-webkit-scrollbar {
+    display: none;
+}
+
+.timeline-header-bar.collapsed {
+    height: 0px !important;
+    min-height: 0px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-bottom: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    overflow: hidden !important;
+}
+
+/* Linha finíssima restauradora do cabeçalho superior (4px ciano, sem alterar height no hover) */
+.timeline-header-restore-line {
+    width: 100%;
+    height: 4px;
+    background: rgba(6, 182, 212, 0.15);
+    border-bottom: 1px solid rgba(6, 182, 212, 0.3);
+    cursor: pointer;
+    z-index: 100;
+    transition: background 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+}
+.timeline-header-restore-line:hover {
+    background: rgba(6, 182, 212, 0.85);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
+}
+
+.timeline-header-left,
+.timeline-header-center,
+.timeline-header-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.timeline-title-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+.timeline-title-group:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.timeline-name-display {
+    font-family: var(--font-heading);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.btn-header-flat {
+    width: 24px;
+    height: 24px;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0;
+    transition: transform var(--transition-fast), color var(--transition-fast), text-shadow var(--transition-fast);
+    flex-shrink: 0;
+}
+.btn-header-flat:hover {
+    transform: scale(1.1);
+    color: #fff;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+.header-v-divider {
+    width: 1px;
+    height: 14px;
+    background: var(--border-glass);
+    margin: 0 2px;
+    flex-shrink: 0;
+}
+
+.timeline-header-btn-group,
+.timeline-header-ai-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.timeline-header-sliders {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px;
+}
+.slider-control-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.track-height-slider-compact,
+.timeline-zoom-slider-compact {
+    width: 58px;
+    height: 4px;
+    accent-color: var(--color-cyan);
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
+    outline: none;
+    border: none;
+    margin: 0;
+    padding: 0;
+}
+.track-height-slider-compact:hover,
+.timeline-zoom-slider-compact:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
 .timeline-actions {
     display: flex;
     align-items: center;
@@ -5669,6 +5820,35 @@ select option, .nle-select option {
     color: var(--color-cyan);
     text-shadow: 0 0 8px var(--color-cyan);
 }
+#btn-tool-marquee:hover {
+    color: var(--color-cyan);
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+#btn-tool-blade:hover {
+    color: #f59e0b !important;
+    text-shadow: 0 0 8px #f59e0b;
+}
+#btn-split-playhead:hover {
+    color: #f59e0b;
+    text-shadow: 0 0 8px #f59e0b;
+}
+#btn-ripple-trim-head:hover,
+#btn-ripple-trim-tail:hover {
+    color: var(--color-violet);
+    text-shadow: 0 0 8px var(--color-violet);
+}
+#btn-tool-slip:hover,
+#btn-tool-slide:hover,
+#btn-tool-rolling:hover,
+#btn-tool-rate-stretch:hover {
+    color: var(--color-cyan);
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+#btn-tool-hand:hover,
+#btn-tool-zoom:hover {
+    color: #38bdf8;
+    text-shadow: 0 0 8px #38bdf8;
+}
 
 /* Save / Undo / Redo / etc active transitions */
 #btn-save-timeline:hover {
@@ -6017,7 +6197,7 @@ select option, .nle-select option {
 }
 
 /* ── NOTIFICAÇÃO FLUTUANTE DE STATUS DE IA ───────────────────────── */
-.panel-header {
+.timeline-ai-floating-status {
     display: none;
     position: absolute;
     bottom: 8px;
@@ -6030,7 +6210,7 @@ select option, .nle-select option {
     padding: 6px 10px;
     pointer-events: none;
 }
-.panel-header:has(.fa-spin) {
+.timeline-ai-floating-status:has(.fa-spin) {
     display: flex !important;
 }
 

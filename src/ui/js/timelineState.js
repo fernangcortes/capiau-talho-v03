@@ -1276,10 +1276,14 @@ export class CapiauTimelineState {
     // ── FERRAMENTAS DE EDIÇÃO E SELEÇÃO (NLE TOOLS) ───────────────────
 
     /**
-     * Define a ferramenta ativa ("select", "track-forward", "track-backward").
+     * Define a ferramenta ativa ("select", "marquee", "blade", "slip", "slide", "rolling", "rate-stretch", "hand", "zoom", "track-forward", "track-backward").
      */
     setTool(tool) {
-        if (!["select", "track-forward", "track-backward"].includes(tool)) return;
+        const validTools = [
+            "select", "marquee", "blade", "slip", "slide", "rolling", "rate-stretch", "hand", "zoom",
+            "track-forward", "track-backward"
+        ];
+        if (!validTools.includes(tool)) return;
         this.activeTool = tool;
         STATE.emit("timelineToolChanged", this.activeTool);
     }

@@ -311,6 +311,30 @@ export class PanelsManager {
             });
         }
 
+        // ── Zoom da régua da timeline: slider horizontal (0.05px/f – 3.0px/f) ──
+        const timelineZoomSlider = document.getElementById("timeline-zoom-slider");
+        if (timelineZoomSlider) {
+            timelineZoomSlider.value = TIMELINE_STATE.zoom ? String(TIMELINE_STATE.zoom) : "0.5";
+            timelineZoomSlider.addEventListener("input", (e) => {
+                const z = parseFloat(e.target.value);
+                if (!isNaN(z) && z > 0) {
+                    TIMELINE_STATE.setZoom(z);
+                    if (this.timelineRenderer) this.timelineRenderer.requestRedraw();
+                }
+            });
+            timelineZoomSlider.addEventListener("dblclick", () => {
+                TIMELINE_STATE.setZoom(0.5);
+                timelineZoomSlider.value = "0.5";
+                if (this.timelineRenderer) this.timelineRenderer.requestRedraw();
+            });
+            STATE.on("timelineZoomChanged", (newZoom) => {
+                const zEl = getActiveElement("timeline-zoom-slider");
+                if (zEl && Math.abs(parseFloat(zEl.value) - newZoom) > 0.01) {
+                    zEl.value = String(newZoom);
+                }
+            });
+        }
+
         // ── Undo / Redo da timeline ──
         const btnUndo = document.getElementById("btn-undo-timeline");
         const btnRedo = document.getElementById("btn-redo-timeline");
@@ -3379,6 +3403,10 @@ export class PanelsManager {
         if (nameInput) {
             const newName = detail.name || `Timeline ${detail.id || ""}`;
             nameInput.value = newName;
+            const nameDisplay = getActiveElement("timeline-name-display");
+            if (nameDisplay) {
+                nameDisplay.textContent = newName;
+            }
             const btnRename = getActiveElement("btn-rename-timeline");
             if (btnRename) {
                 btnRename.setAttribute("data-tooltip", `Renomear Timeline (Atual: ${newName})`);

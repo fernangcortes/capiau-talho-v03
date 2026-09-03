@@ -19,7 +19,7 @@
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Customizados -->
-    <link rel="stylesheet" href="styles.css?v=15">
+    <link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
     <div class="app-container">
@@ -852,70 +852,57 @@
                 
                 <!-- Bottom Timeline & Storyboard sequence panel -->
                 <section class="timeline-panel glassmorphism" id="timeline-panel">
-                    <!-- Mantido oculto apenas para compatibilidade de status da IA no panels.js -->
-                    <div class="panel-header" style="display: none;">
-                        <h3><i class="fa-solid fa-list-check"></i></h3>
-                    </div>
-                    
-                    <!-- Multi-track interactive area -->
-                    <div class="timeline-track-area">
-                        <div class="timeline-canvas-wrapper" style="position: relative; width: 100%; flex: 1; min-height: 170px; display: flex; flex-direction: row; background: rgba(0, 0, 0, 0.3); overflow: hidden;">
-                            <!-- Nova Barra de Ferramentas Vertical à Esquerda -->
-                            <div class="timeline-actions-sidebar cols-1" id="timeline-actions-sidebar">
-                                <!-- Fechar/Recolher Toolbar & Ciclo de Colunas -->
-                                <div class="toolbar-header">
-                                    <button class="btn-toolbar-toggle" id="btn-toggle-toolbar" data-tooltip="Ocultar Barra de Ferramentas"><i class="fa-solid fa-chevron-left"></i></button>
-                                    <button class="btn-toolbar-toggle" id="toggle-timeline" data-tooltip="Recolher Painel da Timeline"><i class="fa-solid fa-chevron-down"></i></button>
-                                    <button class="btn-toolbar-toggle" id="btn-cycle-columns" data-tooltip="Alternar Colunas (1 ou 2 colunas)"><i class="fa-solid fa-table-cells-large"></i></button>
-                                    <button class="btn-toolbar-toggle" id="btn-toggle-timeline-position" data-tooltip="Alternar Posição da Timeline (Entre Menus / Faixa de Baixo)"><i class="fa-solid fa-window-maximize"></i></button>
-                                    <button class="btn-toolbar-toggle" id="btn-popout-timeline" data-tooltip="Destacar em Janela Flutuante"><i class="fa-solid fa-up-right-from-square"></i></button>
-                                </div>
-                                
-                                <div class="toolbar-divider"></div>
-
-                                <!-- Ferramentas de Seleção e Edição (NLE Tools) -->
-                                <button id="btn-tool-select" class="btn-toolbar-action active" data-tooltip="Ferramenta de Seleção (V)"><i class="fa-solid fa-arrow-pointer"></i></button>
-                                <button id="btn-tool-track-forward" class="btn-toolbar-action" data-tooltip="Selecionar Faixa para Frente (T) [Shift = 1 pista]"><i class="fa-solid fa-angles-right"></i></button>
-                                <button id="btn-tool-track-backward" class="btn-toolbar-action" data-tooltip="Selecionar Faixa para Trás (Shift + T) [Shift = 1 pista]"><i class="fa-solid fa-angles-left"></i></button>
-                                <button id="btn-ripple-trim-head" class="btn-toolbar-action" data-tooltip="Ripple Delete até a Agulha (Início → Agulha) (Q)"><i class="fa-solid fa-arrow-left-to-line"></i></button>
-                                <button id="btn-ripple-trim-tail" class="btn-toolbar-action" data-tooltip="Ripple Delete da Agulha até o Fim (Agulha → Fim) (W)"><i class="fa-solid fa-arrow-right-from-line"></i></button>
-                                <button id="btn-split-playhead" class="btn-toolbar-action" data-tooltip="Dividir Clipe no Playhead (Z)"><i class="fa-solid fa-scissors"></i></button>
-                                <button id="btn-tool-add-text" class="btn-toolbar-action" data-tooltip="Inserir Título / Lower Third na Agulha (Ctrl+T)" style="color: #f59e0b;"><i class="fa-solid fa-font"></i></button>
-
-                                <div class="toolbar-divider"></div>
-
-                                <!-- Altura vertical das pistas: slider global (arraste a borda de cada pista p/ ajuste individual) -->
-                                <div class="track-height-control" data-tooltip="Altura das pistas (global) — Shift + Wheel do mouse ou arraste a borda para ajuste individual">
-                                    <input type="range" id="track-height-slider" class="track-height-slider" min="50" max="170" step="5" value="100">
-                                </div>
-
-                                <div class="toolbar-divider"></div>
-
-                                <!-- Nome/Renomear Timeline -->
-                                <button id="btn-rename-timeline" class="btn-toolbar-action" data-tooltip="Renomear Timeline (Clique para editar)"><i class="fa-solid fa-pen-to-square"></i></button>
-                                <button id="btn-seq-settings-timeline" class="btn-toolbar-action" data-tooltip="Configurações da Sequência (Resolução/FPS)"><i class="fa-solid fa-gear"></i></button>
-                                <button id="btn-timeline-view-options" class="btn-toolbar-action" data-tooltip="Opções de Visualização (Hover / Miniaturas)"><i class="fa-solid fa-eye"></i></button>
+                    <!-- Zona 1: Cabeçalho Superior da Timeline (Gestão de Projeto, Arquivo, Exibição & Controles) -->
+                    <div class="timeline-header-bar" id="timeline-header-bar">
+                        <!-- Esquerda: Sequência & Configurações -->
+                        <div class="timeline-header-left">
+                            <div class="timeline-title-group" id="timeline-title-group" data-tooltip="Clique para renomear a sequência">
+                                <h3 style="margin: 0; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-clapperboard" style="color: var(--color-cyan); font-size: 11px;"></i>
+                                    <span id="timeline-name-display" class="timeline-name-display">Rascunho Making Of #1</span>
+                                </h3>
+                                <button id="btn-rename-timeline" class="btn-header-flat" data-tooltip="Renomear Timeline (Clique para editar)"><i class="fa-solid fa-pen-to-square"></i></button>
                                 <input type="text" id="timeline-name-input" value="Rascunho Making Of #1" style="display: none;">
-                                
-                                <div class="toolbar-divider"></div>
-                                
-                                <!-- Salvar / Carregar -->
-                                <button id="btn-save-timeline" class="btn-toolbar-action" data-tooltip="Salvar Timeline (Ctrl+S)"><i class="fa-solid fa-floppy-disk"></i></button>
-                                <button id="btn-load-timeline" class="btn-toolbar-action" data-tooltip="Carregar Timeline"><i class="fa-solid fa-folder-open"></i></button>
-                                
-                                <div class="toolbar-divider"></div>
-                                
-                                <!-- Undo / Redo / Marcador -->
-                                <button id="btn-add-marker" class="btn-toolbar-action" data-tooltip="Adicionar Marcador na Playhead (M)" style="color: var(--color-cyan);"><i class="fa-solid fa-bookmark"></i></button>
-                                <button id="btn-undo-timeline" class="btn-toolbar-action" data-tooltip="Desfazer (Ctrl+Z)" style="opacity: 0.4;"><i class="fa-solid fa-rotate-left"></i></button>
-                                <button id="btn-redo-timeline" class="btn-toolbar-action" data-tooltip="Refazer (Ctrl+Y)" style="opacity: 0.4;"><i class="fa-solid fa-rotate-right"></i></button>
-                                
-                                <div class="toolbar-divider"></div>
-                                
-                                <!-- IA Persona / AI Suggest -->
-                                <div class="btn-toolbar-action select-wrapper-btn" style="background: rgba(139, 92, 246, 0.1); color: #c084fc;" data-tooltip="Escolher IA Persona">
-                                    <i class="fa-solid fa-robot"></i>
-                                    <select id="select-ai-persona" class="toolbar-invisible-select">
+                            </div>
+                            <div class="header-v-divider"></div>
+                            <button id="btn-seq-settings-timeline" class="btn-header-flat" data-tooltip="Configurações da Sequência (Resolução/FPS)"><i class="fa-solid fa-gear"></i></button>
+                            <button id="btn-timeline-view-options" class="btn-header-flat" data-tooltip="Opções de Visualização (Hover / Miniaturas)"><i class="fa-solid fa-eye"></i></button>
+                        </div>
+
+                        <!-- Centro: Sliders de Zoom & Altura de Pistas + Histórico + IA -->
+                        <div class="timeline-header-center">
+                            <!-- Grupo Arquivo -->
+                            <div class="timeline-header-btn-group">
+                                <button id="btn-save-timeline" class="btn-header-flat" data-tooltip="Salvar Timeline (Ctrl+S)"><i class="fa-solid fa-floppy-disk"></i></button>
+                                <button id="btn-load-timeline" class="btn-header-flat" data-tooltip="Carregar Timeline"><i class="fa-solid fa-folder-open"></i></button>
+                                <button id="btn-import-timeline" class="btn-header-flat" data-tooltip="Importar Timeline (.otio .xml .edl)"><i class="fa-solid fa-file-import"></i></button>
+                                <button id="btn-export-timeline" class="btn-header-flat" data-tooltip="Exportar Timeline (.otio .xml .edl)"><i class="fa-solid fa-file-export"></i></button>
+                                <button id="btn-export-video" class="btn-header-flat" data-tooltip="Exportar Vídeo (MP4 render)"><i class="fa-solid fa-film"></i></button>
+                            </div>
+                            <div class="header-v-divider"></div>
+                            <!-- Grupo Undo / Redo -->
+                            <div class="timeline-header-btn-group">
+                                <button id="btn-undo-timeline" class="btn-header-flat" data-tooltip="Desfazer (Ctrl+Z)" style="opacity: 0.4;"><i class="fa-solid fa-rotate-left"></i></button>
+                                <button id="btn-redo-timeline" class="btn-header-flat" data-tooltip="Refazer (Ctrl+Y)" style="opacity: 0.4;"><i class="fa-solid fa-rotate-right"></i></button>
+                            </div>
+                            <div class="header-v-divider"></div>
+                            <!-- Sliders Compactos: Altura de Pistas & Zoom -->
+                            <div class="timeline-header-sliders">
+                                <div class="slider-control-item" data-tooltip="Altura das pistas (global) — Shift + Wheel ou arraste a borda para ajuste individual">
+                                    <i class="fa-solid fa-arrows-up-down" style="font-size: 9px; color: var(--text-muted);"></i>
+                                    <input type="range" id="track-height-slider" class="track-height-slider-compact" min="50" max="170" step="5" value="100">
+                                </div>
+                                <div class="slider-control-item" data-tooltip="Zoom da régua da Timeline (ou Ctrl + Wheel)">
+                                    <i class="fa-solid fa-magnifying-glass" style="font-size: 9px; color: var(--text-muted);"></i>
+                                    <input type="range" id="timeline-zoom-slider" class="timeline-zoom-slider-compact" min="0.05" max="3.0" step="0.05" value="0.5">
+                                </div>
+                            </div>
+                            <div class="header-v-divider"></div>
+                            <!-- IA Persona & Sugestões -->
+                            <div class="timeline-header-ai-group">
+                                <div class="select-wrapper-btn" style="background: rgba(139, 92, 246, 0.1); color: #c084fc; border-radius: 4px; padding: 2px 6px; display: flex; align-items: center; gap: 4px;" data-tooltip="Escolher IA Persona">
+                                    <i class="fa-solid fa-robot" style="font-size: 10px;"></i>
+                                    <select id="select-ai-persona" class="toolbar-invisible-select" style="font-size: 10px;">
                                         <option value="none">IA Persona...</option>
                                         <option value="montadora">IA Montadora</option>
                                         <option value="diretora">IA Diretora</option>
@@ -923,23 +910,73 @@
                                         <option value="colorista">IA Colorista & FX</option>
                                     </select>
                                 </div>
-                                <button id="btn-ai-suggest" class="btn-toolbar-action" style="color: #22c55e;" data-tooltip="✨ Analisar corte com IA"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                                <button id="btn-ai-suggest" class="btn-header-flat" style="color: #22c55e;" data-tooltip="✨ Analisar corte com IA"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- Direita: Layout & Janela -->
+                        <div class="timeline-header-right">
+                            <button id="btn-cycle-columns" class="btn-header-flat" data-tooltip="Alternar Colunas da Tool Strip (1 ou 2)"><i class="fa-solid fa-table-cells-large"></i></button>
+                            <button id="btn-toggle-timeline-position" class="btn-header-flat" data-tooltip="Alternar Posição da Timeline (Entre Menus / Faixa de Baixo)"><i class="fa-solid fa-window-maximize"></i></button>
+                            <button id="btn-popout-timeline" class="btn-header-flat" data-tooltip="Destacar em Janela Flutuante"><i class="fa-solid fa-up-right-from-square"></i></button>
+                            <button id="btn-timeline-help" class="btn-header-flat" data-tooltip="Guia e Cheat Sheet de Atalhos"><i class="fa-solid fa-keyboard"></i></button>
+                            <button id="btn-toggle-timeline-header" class="btn-header-flat" data-tooltip="Recolher Cabeçalho da Timeline"><i class="fa-solid fa-chevron-up"></i></button>
+                            <button id="toggle-timeline" class="btn-header-flat" data-tooltip="Recolher Painel Inteiro da Timeline"><i class="fa-solid fa-chevron-down"></i></button>
+                        </div>
+                    </div>
+                    
+                    <!-- Linha finíssima restauradora do cabeçalho superior (visível apenas quando colapsado) -->
+                    <div id="reopen-timeline-header" class="timeline-header-restore-line" data-tooltip="Expandir Cabeçalho da Timeline" style="display: none;"></div>
+                    
+                    <!-- Multi-track interactive area -->
+                    <div class="timeline-track-area">
+                        <div class="timeline-canvas-wrapper" style="position: relative; width: 100%; flex: 1; min-height: 170px; display: flex; flex-direction: row; background: rgba(0, 0, 0, 0.3); overflow: hidden;">
+                            <!-- Zona 2: Tool Strip Vertical de Edição NLE (Cursores e Ferramentas) -->
+                            <div class="timeline-actions-sidebar cols-1" id="timeline-actions-sidebar">
+                                <!-- Recolher Toolbar -->
+                                <div class="toolbar-header">
+                                    <button class="btn-toolbar-toggle" id="btn-toggle-toolbar" data-tooltip="Ocultar Barra de Ferramentas"><i class="fa-solid fa-chevron-left"></i></button>
+                                </div>
                                 
                                 <div class="toolbar-divider"></div>
-                                
-                                <!-- Exportar (formato e timeline são escolhidos no diálogo) -->
-                                <button id="btn-export-timeline" class="btn-toolbar-action" data-tooltip="Exportar Timeline"><i class="fa-solid fa-file-export"></i></button>
 
-                                <!-- Exportar Vídeo (render MP4 no backend; painel próprio, auto-ligado em js/exportVideo.js) -->
-                                <button id="btn-export-video" class="btn-toolbar-action" data-tooltip="Exportar Vídeo"><i class="fa-solid fa-film"></i></button>
+                                <!-- Grupo 1: Seleção -->
+                                <button id="btn-tool-select" class="btn-toolbar-action active" data-tooltip="Ferramenta de Seleção (V)"><i class="fa-solid fa-arrow-pointer"></i></button>
+                                <button id="btn-tool-marquee" class="btn-toolbar-action" data-tooltip="Seleção por Caixa / Retângulo (Marquee)"><i class="fa-solid fa-vector-square"></i></button>
 
-                                <!-- Importar (.otio/.xml/.edl escolhidos no diálogo) -->
-                                <button id="btn-import-timeline" class="btn-toolbar-action" data-tooltip="Importar Timeline (&#111;.otio &#111;.xml &#111;.edl)"><i class="fa-solid fa-file-import"></i></button>
-                                
-                                <div class="toolbar-spacer" style="flex: 1; min-height: 10px; width: 100%;"></div>
-                                
-                                <!-- Ajuda -->
-                                <button id="btn-timeline-help" class="btn-toolbar-action" data-tooltip="Guia e Cheat Sheet de Atalhos"><i class="fa-solid fa-keyboard"></i></button>
+                                <div class="toolbar-divider"></div>
+
+                                <!-- Grupo 2: Seleção de Faixas -->
+                                <button id="btn-tool-track-forward" class="btn-toolbar-action" data-tooltip="Selecionar Faixa para Frente (T) [Shift = 1 pista]"><i class="fa-solid fa-angles-right"></i></button>
+                                <button id="btn-tool-track-backward" class="btn-toolbar-action" data-tooltip="Selecionar Faixa para Trás (Shift + T) [Shift = 1 pista]"><i class="fa-solid fa-angles-left"></i></button>
+
+                                <div class="toolbar-divider"></div>
+
+                                <!-- Grupo 3: Corte & Trims -->
+                                <button id="btn-tool-blade" class="btn-toolbar-action" data-tooltip="Ferramenta Lâmina / Gilete (C) [Shift+C: Global]" style="color: #f59e0b;"><i class="fa-solid fa-scissors"></i></button>
+                                <button id="btn-split-playhead" class="btn-toolbar-action" data-tooltip="Dividir Clipe no Playhead (Z)"><i class="fa-solid fa-divide"></i></button>
+                                <button id="btn-ripple-trim-head" class="btn-toolbar-action" data-tooltip="Ripple Delete até a Agulha (Início → Agulha) (Q)"><i class="fa-solid fa-arrow-left-to-line"></i></button>
+                                <button id="btn-ripple-trim-tail" class="btn-toolbar-action" data-tooltip="Ripple Delete da Agulha até o Fim (Agulha → Fim) (W)"><i class="fa-solid fa-arrow-right-from-line"></i></button>
+
+                                <div class="toolbar-divider"></div>
+
+                                <!-- Grupo 4: Deslocamento Dinâmico (Trims & Slip/Slide) -->
+                                <button id="btn-tool-slip" class="btn-toolbar-action" data-tooltip="Deslizar Conteúdo Interno / Slip Tool (Y)"><i class="fa-solid fa-arrows-left-right"></i></button>
+                                <button id="btn-tool-slide" class="btn-toolbar-action" data-tooltip="Deslocamento com Compensação / Slide Tool"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>
+                                <button id="btn-tool-rolling" class="btn-toolbar-action" data-tooltip="Corte Contínuo Adjacente / Rolling Edit (N)"><i class="fa-solid fa-arrows-split-up-and-left"></i></button>
+                                <button id="btn-tool-rate-stretch" class="btn-toolbar-action" data-tooltip="Esticar / Comprimir Taxa de Velocidade (R)"><i class="fa-solid fa-clock-rotate-left"></i></button>
+
+                                <div class="toolbar-divider"></div>
+
+                                <!-- Grupo 5: Criação -->
+                                <button id="btn-tool-add-text" class="btn-toolbar-action" data-tooltip="Inserir Título / Lower Third na Agulha (Ctrl+T)" style="color: #f59e0b;"><i class="fa-solid fa-font"></i></button>
+                                <button id="btn-add-marker" class="btn-toolbar-action" data-tooltip="Adicionar Marcador na Playhead (M)" style="color: var(--color-cyan);"><i class="fa-solid fa-bookmark"></i></button>
+
+                                <div class="toolbar-divider"></div>
+
+                                <!-- Grupo 6: Navegação -->
+                                <button id="btn-tool-hand" class="btn-toolbar-action" data-tooltip="Ferramenta Mão / Pan (H ou Botão Meio)"><i class="fa-solid fa-hand"></i></button>
+                                <button id="btn-tool-zoom" class="btn-toolbar-action" data-tooltip="Ferramenta Zoom / Lupa (Z)"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
                             </div>
                             
                             <!-- Linha finíssima restauradora da toolbar (visível apenas quando colapsada) -->
@@ -995,6 +1032,10 @@
                                 <canvas id="timeline-canvas" style="display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
                             </div>
                         </div>
+                    </div>
+                    <!-- Notificação flutuante de status de IA -->
+                    <div class="timeline-ai-floating-status panel-header" id="timeline-ai-floating-status" style="display: none;">
+                        <h3><i class="fa-solid fa-list-check"></i></h3>
                     </div>
                 </section>
                 
@@ -2781,7 +2822,7 @@
     </div>
 
     <!-- Lógica da Aplicação -->
-    <script type="module" src="js/main.js?v=15"></script>
+    <script type="module" src="js/main.js?v=17"></script>
 </body>
 </html>
 

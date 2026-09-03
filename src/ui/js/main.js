@@ -2,7 +2,7 @@ import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { VideoPlayer, formatTimecode } from "./player.js";
 import { LibraryManager } from "./library.js?v=10";
-import { PanelsManager } from "./panels.js?v=10";
+import { PanelsManager } from "./panels.js?v=16";
 import { ChatManager } from "./chat.js";
 import { ProjectsManager } from "./projects.js";
 import { FaceManager } from "./faces.js";
@@ -1932,6 +1932,35 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // ── CONFIGURAÇÃO DE RETRAÇÃO DO CABEÇALHO SUPERIOR DA TIMELINE ──
+    const timelineHeaderBar = document.getElementById("timeline-header-bar");
+    const btnToggleTimelineHeader = document.getElementById("btn-toggle-timeline-header");
+    const reopenTimelineHeader = document.getElementById("reopen-timeline-header");
+
+    if (btnToggleTimelineHeader && timelineHeaderBar && reopenTimelineHeader) {
+        btnToggleTimelineHeader.addEventListener("click", (e) => {
+            e.stopPropagation();
+            timelineHeaderBar.classList.add("collapsed");
+            reopenTimelineHeader.style.display = "block";
+            localStorage.setItem("capiau_timeline_header_collapsed", "true");
+            window.dispatchEvent(new Event("resize"));
+        });
+    }
+
+    if (reopenTimelineHeader && timelineHeaderBar) {
+        reopenTimelineHeader.addEventListener("click", () => {
+            timelineHeaderBar.classList.remove("collapsed");
+            reopenTimelineHeader.style.display = "none";
+            localStorage.setItem("capiau_timeline_header_collapsed", "false");
+            window.dispatchEvent(new Event("resize"));
+        });
+    }
+
+    if (localStorage.getItem("capiau_timeline_header_collapsed") === "true" && timelineHeaderBar && reopenTimelineHeader) {
+        timelineHeaderBar.classList.add("collapsed");
+        reopenTimelineHeader.style.display = "block";
+    }
+
     // Alternar colunas do toolbar vertical (1 ou 2 colunas de botões)
     if (btnCycleColumns && timelineActionsSidebar) {
         btnCycleColumns.addEventListener("click", () => {
@@ -1949,18 +1978,51 @@ window.addEventListener("DOMContentLoaded", () => {
     // ── GATILHO E SINCRONIZAÇÃO DE RENOMEAR TIMELINE ──
     const btnRenameTimeline = document.getElementById("btn-rename-timeline");
     const timelineNameInput = document.getElementById("timeline-name-input");
-    if (btnRenameTimeline && timelineNameInput) {
-        btnRenameTimeline.addEventListener("click", () => {
-            const currentName = timelineNameInput.value || "Versão sem nome";
-            const newName = prompt("Renomear a timeline atual:", currentName);
-            if (newName !== null && newName.trim() !== "") {
-                timelineNameInput.value = newName.trim();
-                btnRenameTimeline.setAttribute("data-tooltip", `Renomear Timeline (Atual: ${newName.trim()})`);
+    const timelineNameDisplay = document.getElementById("timeline-name-display");
+    const timelineTitleGroup = document.getElementById("timeline-title-group");
+
+    const doRenameTimeline = () => {
+        const currentName = timelineNameInput ? timelineNameInput.value : (timelineNameDisplay ? timelineNameDisplay.textContent : "Rascunho Making Of #1");
+        const newName = prompt("Renomear a timeline atual:", currentName);
+        if (newName !== null && newName.trim() !== "") {
+            const clean = newName.trim();
+            if (timelineNameInput) {
+                timelineNameInput.value = clean;
                 timelineNameInput.dispatchEvent(new Event("change"));
             }
+            if (timelineNameDisplay) {
+                timelineNameDisplay.textContent = clean;
+            }
+            if (btnRenameTimeline) {
+                btnRenameTimeline.setAttribute("data-tooltip", `Renomear Timeline (Atual: ${clean})`);
+            }
+        }
+    };
+
+    if (btnRenameTimeline) {
+        btnRenameTimeline.addEventListener("click", (e) => {
+            e.stopPropagation();
+            doRenameTimeline();
         });
-        
-        if (timelineNameInput.value) {
+    }
+
+    if (timelineTitleGroup) {
+        timelineTitleGroup.addEventListener("click", (e) => {
+            // Evita disparar se clicou diretamente no botão que já tem handler próprio
+            if (e.target.closest("#btn-rename-timeline")) return;
+            doRenameTimeline();
+        });
+    }
+
+    if (timelineNameInput) {
+        timelineNameInput.addEventListener("change", () => {
+            if (timelineNameDisplay) timelineNameDisplay.textContent = timelineNameInput.value;
+            if (btnRenameTimeline) btnRenameTimeline.setAttribute("data-tooltip", `Renomear Timeline (Atual: ${timelineNameInput.value})`);
+        });
+        if (timelineNameDisplay && timelineNameInput.value) {
+            timelineNameDisplay.textContent = timelineNameInput.value;
+        }
+        if (btnRenameTimeline && timelineNameInput.value) {
             btnRenameTimeline.setAttribute("data-tooltip", `Renomear Timeline (Atual: ${timelineNameInput.value})`);
         }
     }
@@ -2040,6 +2102,12 @@ window.addEventListener("DOMContentLoaded", () => {
             window.dispatchEvent(new Event("resize"));
         }
         window.setTimelineToolbarPosition = setTimelineToolbarPosition;
+
+        // Suíte NLE Clássica: garantir que por padrão a barra de ferramentas fique na posição clássica vertical à esquerda
+        if (localStorage.getItem("capiau_nle_suite_toolbar_v1") !== "true") {
+            localStorage.setItem("capiau_nle_suite_toolbar_v1", "true");
+            localStorage.removeItem("capiau_timeline_toolbar_top");
+        }
 
         const chkToolbarTop = document.getElementById("chk-timeline-toolbar-top");
         if (chkToolbarTop) {
