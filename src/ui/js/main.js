@@ -1703,13 +1703,41 @@ window.addEventListener("DOMContentLoaded", () => {
                     top = Math.max(8, top - overflowBottom);
                 }
             } else {
-                // Posição padrão para botões e controles: acima do elemento
-                top = rect.top - tooltipRect.height - 8;
-                left = rect.left + (rect.width - tooltipRect.width) / 2;
+                const sidebarToolbar = target.closest("#timeline-actions-sidebar");
+                const isRestoreLine = target.matches("#reopen-toolbar, #reopen-headers, .timeline-header-restore-line, .restore-line");
 
-                // Se sair do topo da tela, coloca abaixo do elemento
-                if (top < 8) {
-                    top = rect.bottom + 8;
+                if (sidebarToolbar && !sidebarToolbar.classList.contains("horizontal-toolbar")) {
+                    // Barra de ferramentas na posição lateral clássica (1 ou 2 colunas):
+                    // Posiciona à DIREITA de toda a barra para NUNCA tampar os botões da barra ou da coluna adjacente
+                    const sidebarRect = sidebarToolbar.getBoundingClientRect();
+                    left = sidebarRect.right + 10;
+                    top = rect.top + (rect.height - tooltipRect.height) / 2;
+                    // Clamp vertical para não vazar o topo ou rodapé da tela
+                    top = Math.max(8, Math.min(win.innerHeight - tooltipRect.height - 8, top));
+                } else if (isRestoreLine) {
+                    // Linhas restauradoras finas na borda da tela
+                    left = rect.right + 10;
+                    top = rect.top + (rect.height - tooltipRect.height) / 2;
+                    top = Math.max(8, Math.min(win.innerHeight - tooltipRect.height - 8, top));
+                } else if (sidebarToolbar && sidebarToolbar.classList.contains("horizontal-toolbar")) {
+                    // Barra de ferramentas em modo horizontal (acima da timeline):
+                    // Prioridade: ACIMA do botão (para não sobrepor a régua de tempo, agulha e clipes da timeline)
+                    top = rect.top - tooltipRect.height - 8;
+                    left = rect.left + (rect.width - tooltipRect.width) / 2;
+
+                    // Se não houver espaço acima (topo da viewport), abre abaixo
+                    if (top < 8) {
+                        top = rect.bottom + 8;
+                    }
+                } else {
+                    // Posição padrão para demais botões e controles: acima do elemento
+                    top = rect.top - tooltipRect.height - 8;
+                    left = rect.left + (rect.width - tooltipRect.width) / 2;
+
+                    // Se sair do topo da tela, coloca abaixo do elemento
+                    if (top < 8) {
+                        top = rect.bottom + 8;
+                    }
                 }
             }
 
@@ -1914,6 +1942,47 @@ window.addEventListener("DOMContentLoaded", () => {
             reopenToolbar.style.display = "none";
             window.dispatchEvent(new Event("resize"));
         });
+    }
+
+    if (timelineActionsSidebar) {
+        let targetScrollTop = timelineActionsSidebar.scrollTop;
+        let isSmoothScrolling = false;
+
+        const smoothScrollLoop = () => {
+            const current = timelineActionsSidebar.scrollTop;
+            const diff = targetScrollTop - current;
+            if (Math.abs(diff) > 0.4) {
+                // Interpolação amortecida (lerp 0.22): desaceleração fluida sem solavancos
+                timelineActionsSidebar.scrollTop = current + diff * 0.22;
+                requestAnimationFrame(smoothScrollLoop);
+            } else {
+                timelineActionsSidebar.scrollTop = targetScrollTop;
+                isSmoothScrolling = false;
+            }
+        };
+
+        timelineActionsSidebar.addEventListener("wheel", (e) => {
+            if (!timelineActionsSidebar.classList.contains("horizontal-toolbar")) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                let delta = e.deltaY;
+                if (e.deltaMode === 1) delta *= 22; // normalização por linha
+                else if (e.deltaMode === 2) delta *= 75; // normalização por página
+                else delta *= 0.7; // amortecimento para trackpads/touchwheels
+
+                const maxScroll = Math.max(0, timelineActionsSidebar.scrollHeight - timelineActionsSidebar.clientHeight);
+                if (!isSmoothScrolling) {
+                    targetScrollTop = timelineActionsSidebar.scrollTop;
+                }
+                targetScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop + delta));
+
+                if (!isSmoothScrolling) {
+                    isSmoothScrolling = true;
+                    requestAnimationFrame(smoothScrollLoop);
+                }
+            }
+        }, { passive: false });
     }
 
     if (btnToggleHeaders && timelineHeadersSidebar && reopenHeaders) {

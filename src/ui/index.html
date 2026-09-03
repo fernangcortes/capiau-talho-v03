@@ -19,7 +19,7 @@
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Customizados -->
-    <link rel="stylesheet" href="styles.css?v=17">
+    <link rel="stylesheet" href="styles.css?v=23">
 </head>
 <body>
     <div class="app-container">
@@ -929,8 +929,8 @@
                     <div id="reopen-timeline-header" class="timeline-header-restore-line" data-tooltip="Expandir Cabeçalho da Timeline" style="display: none;"></div>
                     
                     <!-- Multi-track interactive area -->
-                    <div class="timeline-track-area">
-                        <div class="timeline-canvas-wrapper" style="position: relative; width: 100%; flex: 1; min-height: 170px; display: flex; flex-direction: row; background: rgba(0, 0, 0, 0.3); overflow: hidden;">
+                    <div class="timeline-track-area" style="flex: 1 1 0%; min-height: 0; height: 100%; max-height: 100%; display: flex; flex-direction: column; overflow: hidden; position: relative; width: 100%;">
+                        <div class="timeline-canvas-wrapper" style="position: relative; width: 100%; flex: 1 1 0%; min-height: 0; height: 100%; max-height: 100%; display: flex; flex-direction: row; background: rgba(0, 0, 0, 0.3); overflow: hidden;">
                             <!-- Zona 2: Tool Strip Vertical de Edição NLE (Cursores e Ferramentas) -->
                             <div class="timeline-actions-sidebar cols-1" id="timeline-actions-sidebar">
                                 <!-- Recolher Toolbar -->
@@ -953,17 +953,17 @@
                                 <div class="toolbar-divider"></div>
 
                                 <!-- Grupo 3: Corte & Trims -->
-                                <button id="btn-tool-blade" class="btn-toolbar-action" data-tooltip="Ferramenta Lâmina / Gilete (C) [Shift+C: Global]" style="color: #f59e0b;"><i class="fa-solid fa-scissors"></i></button>
+                                <button id="btn-tool-blade" class="btn-toolbar-action" data-tooltip="Ferramenta Lâmina / Gilete (C) [Shift+C: Global | Alt+Clique: Pista Individual J/L-Cut]" style="color: #f59e0b;"><i class="fa-solid fa-scissors"></i></button>
                                 <button id="btn-split-playhead" class="btn-toolbar-action" data-tooltip="Dividir Clipe no Playhead (Z)"><i class="fa-solid fa-divide"></i></button>
-                                <button id="btn-ripple-trim-head" class="btn-toolbar-action" data-tooltip="Ripple Delete até a Agulha (Início → Agulha) (Q)"><i class="fa-solid fa-arrow-left-to-line"></i></button>
-                                <button id="btn-ripple-trim-tail" class="btn-toolbar-action" data-tooltip="Ripple Delete da Agulha até o Fim (Agulha → Fim) (W)"><i class="fa-solid fa-arrow-right-from-line"></i></button>
+                                <button id="btn-ripple-trim-head" class="btn-toolbar-action" data-tooltip="Ripple Delete até a Agulha (Início → Agulha) (Q)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block;"><line x1="5" y1="4" x2="5" y2="20"></line><line x1="19" y1="12" x2="6" y2="12"></line><polyline points="12 6 6 12 12 18"></polyline></svg></button>
+                                <button id="btn-ripple-trim-tail" class="btn-toolbar-action" data-tooltip="Ripple Delete da Agulha até o Fim (Agulha → Fim) (W)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block;"><line x1="19" y1="4" x2="19" y2="20"></line><line x1="5" y1="12" x2="18" y2="12"></line><polyline points="12 6 18 12 12 18"></polyline></svg></button>
 
                                 <div class="toolbar-divider"></div>
 
                                 <!-- Grupo 4: Deslocamento Dinâmico (Trims & Slip/Slide) -->
                                 <button id="btn-tool-slip" class="btn-toolbar-action" data-tooltip="Deslizar Conteúdo Interno / Slip Tool (Y)"><i class="fa-solid fa-arrows-left-right"></i></button>
-                                <button id="btn-tool-slide" class="btn-toolbar-action" data-tooltip="Deslocamento com Compensação / Slide Tool"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>
-                                <button id="btn-tool-rolling" class="btn-toolbar-action" data-tooltip="Corte Contínuo Adjacente / Rolling Edit (N)"><i class="fa-solid fa-arrows-split-up-and-left"></i></button>
+                                <button id="btn-tool-slide" class="btn-toolbar-action" data-tooltip="Deslocamento com Compensação / Slide Tool"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block;"><line x1="3" y1="4" x2="3" y2="20"></line><line x1="21" y1="4" x2="21" y2="20"></line><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="9 8 5 12 9 16"></polyline><polyline points="15 8 19 12 15 16"></polyline></svg></button>
+                                <button id="btn-tool-rolling" class="btn-toolbar-action" data-tooltip="Corte Contínuo Adjacente / Rolling Edit (N)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block;"><line x1="12" y1="4" x2="12" y2="20"></line><polyline points="7 8 3 12 7 16"></polyline><polyline points="17 8 21 12 17 16"></polyline></svg></button>
                                 <button id="btn-tool-rate-stretch" class="btn-toolbar-action" data-tooltip="Esticar / Comprimir Taxa de Velocidade (R)"><i class="fa-solid fa-clock-rotate-left"></i></button>
 
                                 <div class="toolbar-divider"></div>
@@ -2822,7 +2822,7 @@
     </div>
 
     <!-- Lógica da Aplicação -->
-    <script type="module" src="js/main.js?v=17"></script>
+    <script type="module" src="js/main.js?v=23"></script>
 </body>
 </html>
 

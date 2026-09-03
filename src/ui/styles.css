@@ -2065,6 +2065,31 @@ button {
     overflow: hidden;
 }
 
+/* ── TIMELINE TRACK AREA & CANVAS WRAPPER ──────────────────────────── */
+.timeline-track-area {
+    flex: 1 1 0%;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+}
+
+.timeline-canvas-wrapper {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden !important;
+}
+
 .timeline-panel.collapsed {
     height: 0px !important;
     flex-basis: 0px !important;
@@ -5653,6 +5678,9 @@ select option, .nle-select option {
 /* ── TIMELINE VERTICAL TOOLBAR ────────────────────────────────────── */
 .timeline-actions-sidebar {
     width: 36px;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -5663,20 +5691,20 @@ select option, .nle-select option {
     z-index: 20;
     flex-shrink: 0;
     box-sizing: border-box;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
     padding: 3px;
     gap: 2px;
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease, opacity 0.3s ease, border-right 0.3s ease;
 }
 
-/* Scrollbar sutil para caso o container overflow */
+/* Ocultar barra de rolagem em WebKit/Blink (Chrome, Edge, Safari) */
 .timeline-actions-sidebar::-webkit-scrollbar {
-    width: 3px;
-}
-.timeline-actions-sidebar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 2px;
+    display: none !important;
+    width: 0px !important;
+    height: 0px !important;
 }
 
 .timeline-actions-sidebar.cols-1 {
@@ -5791,6 +5819,11 @@ select option, .nle-select option {
     cursor: pointer;
     font-size: 11px;
     transition: transform var(--transition-fast), color var(--transition-fast), text-shadow var(--transition-fast);
+}
+
+.btn-toolbar-action svg {
+    pointer-events: none;
+    flex-shrink: 0;
 }
 
 .btn-toolbar-action:hover {
