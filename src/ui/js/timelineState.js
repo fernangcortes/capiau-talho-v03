@@ -3094,6 +3094,149 @@ export class CapiauTimelineState {
         });
         return true;
     }
+
+    /**
+     * Desliza o conteúdo interno de um clipe (Slip Tool), alterando inFrame e outFrame
+     * sem alterar timelineStartFrame nem a duração do clipe na timeline.
+     * 
+     * @param {string} clipId ID do clipe a ser deslizado.
+     * @param {number} deltaFrames Deslocamento relativo em frames (positivo avança no tempo do vídeo, negativo recua).
+     * @param {boolean} [slipLinked=true] Se true, desliza também o par A/V vinculado sincronizadamente.
+     * @param {number|null} [baseIn=null] Ponto IN de referência original (usado em arrasto contínuo).
+     * @param {number|null} [baseOut=null] Ponto OUT de referência original (usado em arrasto contínuo).
+     * @param {number|null} [partnerBaseIn=null] Ponto IN de referência do parceiro (usado em arrasto contínuo).
+     * @param {number|null} [partnerBaseOut=null] Ponto OUT de referência do parceiro (usado em arrasto contínuo).
+     * @returns {object|null} Objeto com dados do slip ou null se a operação não puder ser executada.
+     */
+    slipClip(clipId, deltaFrames, slipLinked = true, baseIn = null, baseOut = null, partnerBaseIn = null, partnerBaseOut = null) {
+        if (!clipId) return null;
+
+        let result = null;
+        const doSlip = () => {
+            const cuts = [...STATE.activeTimelineCuts];
+            const clip = cuts.find(c => c.id === clipId);
+            if (!clip) return;
+
+            const trackObj = this.getTrack(clip.track);
+            if (trackObj && trackObj.locked) return;
+
+            const fps = this.fps || 24;
+
+            const refIn = (baseIn !== null && baseIn !== undefined) ? baseIn : clip.inFrame;
+            const refOut = (baseOut !== null && baseOut !== undefined) ? baseOut : clip.outFrame;
+            const duration = refOut - refIn;
+            if (duration <= 0) return;
+
+            const getMaxMediaFrames = (c) => {
+                if (c.mediaDurationFrames !== undefined && c.mediaDurationFrames !== null) {
+                    return c.mediaDurationFrames;
+                }
+                if (c.sourceDuration !== undefined && c.sourceDuration !== null) {
+                    return Math.round(c.sourceDuration * fps);
+                }
+                if (c.media_duration !== undefined && c.media_duration !== null) {
+                    return Math.round(c.media_duration * fps);
+                }
+                if (c.video_id && typeof STATE !== "undefined" && Array.isArray(STATE.allVideos)) {
+                    const v = STATE.allVideos.find(vid => String(vid.id) === String(c.video_id));
+                    if (v && v.duration) return Math.round(v.duration * fps);
+                }
+                return Infinity;
+            };
+
+            const maxMediaFrames = getMaxMediaFrames(clip);
+
+            // Limites do clipe principal:
+            // newIn = refIn + delta >= 0 => delta >= -refIn
+            let minDelta = -refIn;
+            // newOut = refOut + delta <= maxMediaFrames => delta <= maxMediaFrames - refOut
+            let maxDelta = Number.isFinite(maxMediaFrames) ? (maxMediaFrames - refOut) : Infinity;
+
+            // Parceiro vinculado (áudio/vídeo)
+            let partner = null;
+            let partnerRefIn = 0;
+            let partnerRefOut = 0;
+            if (slipLinked && clip.link_id) {
+                partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                if (partner) {
+                    const partnerTrack = this.getTrack(partner.track);
+                    if (partnerTrack && partnerTrack.locked) {
+                        partner = null; // Pista do parceiro travada: não move parceiro
+                    } else {
+                        partnerRefIn = (partnerBaseIn !== null && partnerBaseIn !== undefined) ? partnerBaseIn : partner.inFrame;
+                        partnerRefOut = (partnerBaseOut !== null && partnerBaseOut !== undefined) ? partnerBaseOut : partner.outFrame;
+                        const partnerMaxFrames = getMaxMediaFrames(partner);
+
+                        minDelta = Math.max(minDelta, -partnerRefIn);
+                        if (Number.isFinite(partnerMaxFrames)) {
+                            maxDelta = Math.min(maxDelta, partnerMaxFrames - partnerRefOut);
+                        }
+                    }
+                }
+            }
+
+            if (minDelta > maxDelta) {
+                return;
+            }
+
+            const clampedDelta = Math.max(minDelta, Math.min(maxDelta, deltaFrames));
+
+            // Aplica ao clipe principal (timelineStartFrame e duração permanecem intactos)
+            clip.inFrame = refIn + clampedDelta;
+            clip.outFrame = refOut + clampedDelta;
+            clip.in = clip.inFrame / fps;
+            clip.out = clip.outFrame / fps;
+
+            if (partner) {
+                partner.inFrame = partnerRefIn + clampedDelta;
+                partner.outFrame = partnerRefOut + clampedDelta;
+                partner.in = partner.inFrame / fps;
+                partner.out = partner.outFrame / fps;
+                const videoCut = (this.trackKindOf(clip.track) === "video") ? clip : partner;
+                const audioCut = (this.trackKindOf(clip.track) === "audio") ? clip : partner;
+                if (videoCut && audioCut) {
+                    audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+                }
+            } else if (clip.link_id) {
+                // Modo independente J/L Slip (Alt pressionado): parceiro permanece estático e syncOffset é mantido
+                const other = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                if (other) {
+                    if (partnerBaseIn !== null && partnerBaseIn !== undefined) {
+                        other.inFrame = partnerBaseIn;
+                        other.outFrame = partnerBaseOut;
+                        other.in = other.inFrame / fps;
+                        other.out = other.outFrame / fps;
+                    }
+                    const videoCut = (this.trackKindOf(clip.track) === "video") ? clip : other;
+                    const audioCut = (this.trackKindOf(clip.track) === "audio") ? clip : other;
+                    if (videoCut && audioCut) {
+                        audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+                    }
+                }
+            }
+
+            STATE.activeTimelineCuts = cuts;
+            result = {
+                clipId: clip.id,
+                appliedDelta: clampedDelta,
+                inFrame: clip.inFrame,
+                outFrame: clip.outFrame,
+                duration: duration,
+                timelineStartFrame: clip.timelineStartFrame,
+                partnerClipId: partner ? partner.id : null,
+                partnerInFrame: partner ? partner.inFrame : null,
+                partnerOutFrame: partner ? partner.outFrame : null
+            };
+        };
+
+        if (TIMELINE_HISTORY.pending) {
+            doSlip();
+        } else {
+            TIMELINE_HISTORY.record(doSlip);
+        }
+
+        return result;
+    }
 }
 
 export const TIMELINE_STATE = new CapiauTimelineState();

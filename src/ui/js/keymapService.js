@@ -177,6 +177,12 @@ export const COMMANDS_CATALOG = [
         description: "Fatia todas as pistas destravadas na coordenada da agulha de reprodução"
     },
     {
+        id: "tools.slip",
+        category: "tools",
+        label: "Deslizar Conteúdo Interno (Slip Tool)",
+        description: "Desliza os pontos IN e OUT da mídia bruta mantendo a posição e duração na timeline"
+    },
+    {
         id: "tools.track_forward",
         category: "tools",
         label: "Selecionar Faixa para Frente",
@@ -394,6 +400,7 @@ export const KEYMAP_PRESETS = {
         "tools.marquee": ["Shift+KeyV"],
         "tools.blade": ["KeyC"],
         "tools.blade_global": ["Shift+KeyC"],
+        "tools.slip": ["KeyY"],
         "tools.track_forward": ["KeyT"],
         "tools.track_backward": ["Shift+KeyT"],
         "tools.snapping": ["KeyS"],
@@ -456,6 +463,7 @@ export const KEYMAP_PRESETS = {
         "tools.marquee": ["Shift+KeyS"],
         "tools.blade": ["KeyC", "Shift+KeyR"],
         "tools.blade_global": ["Shift+KeyC"],
+        "tools.slip": ["KeyY"],
         "tools.track_forward": ["KeyM"],
         "tools.track_backward": ["Shift+KeyM"],
         "tools.snapping": ["F10", "KeyN"],
@@ -518,6 +526,7 @@ export const KEYMAP_PRESETS = {
         "tools.marquee": ["Shift+KeyV"],
         "tools.blade": ["KeyC"],
         "tools.blade_global": ["Shift+KeyC", "Ctrl+Shift+KeyK"],
+        "tools.slip": ["KeyY"],
         "tools.track_forward": ["KeyA"],
         "tools.track_backward": ["Shift+KeyA"],
         "tools.snapping": ["KeyS"],
@@ -580,6 +589,7 @@ export const KEYMAP_PRESETS = {
         "tools.marquee": ["Shift+KeyA"],
         "tools.blade": ["KeyB"],
         "tools.blade_global": ["Shift+KeyB", "Ctrl+Shift+Backslash"],
+        "tools.slip": ["Shift+KeyY", "KeyY"],
         "tools.track_forward": ["KeyY"],
         "tools.track_backward": ["Ctrl+KeyY"],
         "tools.snapping": ["KeyN"],
@@ -642,6 +652,7 @@ export const KEYMAP_PRESETS = {
         "tools.marquee": ["Shift+KeyA"],
         "tools.blade": ["KeyB"],
         "tools.blade_global": ["Shift+KeyB", "Cmd+Shift+KeyB", "Ctrl+Shift+KeyB"],
+        "tools.slip": ["KeyY"],
         "tools.track_forward": ["KeyP"],
         "tools.track_backward": ["Shift+KeyP"],
         "tools.snapping": ["KeyN"],

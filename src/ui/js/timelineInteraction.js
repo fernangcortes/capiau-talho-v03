@@ -50,6 +50,9 @@ const CURSOR_IN_OUT_SPAN = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.
 const CURSOR_BLADE_SINGLE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 4l7 7-2 2-7-7z" fill="%23f8fafc" stroke="%23000" stroke-width="3" stroke-linejoin="round"/><path d="M9 11l9 9 2-2-9-9z" fill="%23f59e0b" stroke="%23000" stroke-width="3" stroke-linejoin="round"/><path d="M4 4l7 7-2 2-7-7z" fill="%23f8fafc" stroke="%23f8fafc" stroke-width="1.2"/><path d="M9 11l9 9 2-2-9-9z" fill="%23f59e0b" stroke="%23f59e0b" stroke-width="1.2"/><circle cx="4" cy="4" r="1.5" fill="%23f59e0b"/></svg>') 4 4, crosshair`;
 const CURSOR_BLADE_ALL = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="4" y1="1" x2="4" y2="23" stroke="%23000" stroke-width="3" stroke-dasharray="3 2"/><line x1="4" y1="1" x2="4" y2="23" stroke="%23f59e0b" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M4 4l7 7-2 2-7-7z" fill="%23f8fafc" stroke="%23000" stroke-width="3" stroke-linejoin="round"/><path d="M9 11l9 9 2-2-9-9z" fill="%23f59e0b" stroke="%23000" stroke-width="3" stroke-linejoin="round"/><path d="M4 4l7 7-2 2-7-7z" fill="%23f8fafc" stroke="%23f8fafc" stroke-width="1.2"/><path d="M9 11l9 9 2-2-9-9z" fill="%23f59e0b" stroke="%23f59e0b" stroke-width="1.2"/><circle cx="4" cy="4" r="2" fill="%23f59e0b" stroke="%23000" stroke-width="1"/></svg>') 4 4, crosshair`;
 
+// Cursor SVG em alta definição para a Ferramenta Slip (Deslizar Conteúdo Interno - Y)
+const CURSOR_SLIP = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="4" y1="3" x2="4" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="3" x2="20" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="4" y1="3" x2="4" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><line x1="20" y1="3" x2="20" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><line x1="6" y1="12" x2="18" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="6" y1="12" x2="18" y2="12" stroke="%23fff" stroke-width="2" stroke-linecap="round"/><polygon points="9,8 5,12 9,16" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/><polygon points="15,8 19,12 15,16" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/></svg>') 12 12, ew-resize`;
+
 export class CapiauTimelineInteraction {
     constructor(renderer) {
         this.renderer = renderer;
@@ -66,6 +69,11 @@ export class CapiauTimelineInteraction {
         this.dragStartFadeDur = 0;
         this.dragStartTension = 0;
         this.dragFadeSide = "in";
+
+        // Estado para a ferramenta Slip (Deslizar Conteúdo Interno)
+        this.dragSlipLinked = true;
+        this.dragPartnerStartInFrame = null;
+        this.dragPartnerStartOutFrame = null;
 
         // Estado para arrasto múltiplo de clipes (Track Select e Multi-Select)
         this.dragInitialClipPositions = null; // Map<clipId, { startFrame, track, inFrame, outFrame, duration }>
@@ -146,6 +154,7 @@ export class CapiauTimelineInteraction {
         this.boundMouseLeave = () => {
             this.hideMarkerTooltip();
             this.hideFadeTooltip();
+            this.hideSlipTooltip();
             if (TIMELINE_STATE.hoveredMarkerId !== null) {
                 TIMELINE_STATE.hoveredMarkerId = null;
                 if (this.renderer) this.renderer.requestRedraw();
@@ -319,6 +328,13 @@ export class CapiauTimelineInteraction {
      */
     getBladeCursor(isShift = false) {
         return isShift ? CURSOR_BLADE_ALL : CURSOR_BLADE_SINGLE;
+    }
+
+    /**
+     * Retorna a string de cursor CSS para a Ferramenta Slip (Deslizar Conteúdo Interno).
+     */
+    getSlipCursor() {
+        return CURSOR_SLIP;
     }
 
     init() {
@@ -976,6 +992,50 @@ export class CapiauTimelineInteraction {
                 return;
             }
 
+            // Ferramenta: Deslizar Conteúdo Interno / Slip Tool (Y)
+            if (TIMELINE_STATE.activeTool === "slip") {
+                const hit = this.findClipAt(frame, track, y);
+                if (hit && hit.type === "clip") {
+                    const clip = hit.data;
+                    const clipTrack = TIMELINE_STATE.getTrack(clip.track);
+                    if (clipTrack && clipTrack.locked) {
+                        TIMELINE_STATE.selectClip(clip.id, false);
+                        TIMELINE_STATE.selectedTrack = track;
+                        this.syncPlayerToClip(clip);
+                        this.refreshClipInspector();
+                        this.renderer.requestRedraw();
+                        return;
+                    }
+
+                    TIMELINE_STATE.selectClip(clip.id, false);
+                    TIMELINE_STATE.selectedTrack = track;
+                    TIMELINE_STATE.clearSelectedGap();
+
+                    const cuts = STATE.activeTimelineCuts || [];
+                    const partner = clip.link_id
+                        ? cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id)
+                        : null;
+
+                    this.dragState = "slip";
+                    this.draggedClipId = clip.id;
+                    this.dragStartMouseX = e.clientX;
+                    this.dragStartMouseY = e.clientY;
+                    this.dragStartInFrame = clip.inFrame;
+                    this.dragStartOutFrame = clip.outFrame;
+                    this.dragStartClipFrame = clip.timelineStartFrame;
+                    this.dragSlipLinked = !e.altKey;
+                    this.dragPartnerStartInFrame = partner ? partner.inFrame : null;
+                    this.dragPartnerStartOutFrame = partner ? partner.outFrame : null;
+
+                    TIMELINE_HISTORY.begin();
+                    this.syncPlayerToClip(clip);
+                    this.showSlipTooltip(e.clientX, e.clientY, 0, TIMELINE_STATE.fps || 24);
+                    this.refreshClipInspector();
+                    this.renderer.requestRedraw();
+                }
+                return;
+            }
+
             const hit = this.findClipAt(frame, track, y);
 
             if (hit) {
@@ -1354,6 +1414,21 @@ export class CapiauTimelineInteraction {
                 return;
             }
 
+            // Se a ferramenta Slip estiver ativa, define o cursor apropriado
+            if (TIMELINE_STATE.activeTool === "slip") {
+                this.canvas.style.cursor = this.getSlipCursor();
+                this.hideMarkerTooltip();
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                if (TIMELINE_STATE.hoveredFadeHandle !== null) {
+                    TIMELINE_STATE.hoveredFadeHandle = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                return;
+            }
+
             this.hideMarkerTooltip();
             if (TIMELINE_STATE.hoveredMarkerId !== null) {
                 TIMELINE_STATE.hoveredMarkerId = null;
@@ -1398,6 +1473,8 @@ export class CapiauTimelineInteraction {
         } else if (!this.dragState) {
             if (TIMELINE_STATE.activeTool === "marquee") {
                 this.canvas.style.cursor = "crosshair";
+            } else if (TIMELINE_STATE.activeTool === "slip") {
+                this.canvas.style.cursor = this.getSlipCursor();
             } else if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
                 this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e.shiftKey);
             }
@@ -1563,6 +1640,33 @@ export class CapiauTimelineInteraction {
                 };
                 this.renderer.requestRedraw();
             }
+        }
+        else if (this.dragState === "slip" && this.draggedClipId) {
+            if (this.canvas) this.canvas.style.cursor = this.getSlipCursor();
+            const dx = e.clientX - this.dragStartMouseX;
+            const rawDelta = Math.round(dx / TIMELINE_STATE.zoom);
+            const fps = TIMELINE_STATE.fps || 24;
+            const slipLinked = !e.altKey;
+
+            const res = TIMELINE_STATE.slipClip(
+                this.draggedClipId,
+                rawDelta,
+                slipLinked,
+                this.dragStartInFrame,
+                this.dragStartOutFrame,
+                this.dragPartnerStartInFrame,
+                this.dragPartnerStartOutFrame
+            );
+
+            const actualDelta = res ? res.appliedDelta : rawDelta;
+            this.showSlipTooltip(e.clientX, e.clientY, actualDelta, fps, !slipLinked);
+
+            const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
+            if (clip) {
+                this.syncPlayerToClip(clip);
+            }
+
+            if (this.renderer) this.renderer.requestRedraw();
         }
         else if (this.dragState === "drag-clip" && this.draggedClipId) {
             const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
@@ -1735,9 +1839,22 @@ export class CapiauTimelineInteraction {
     onMouseUp(e) {
         this.hideMarkerTooltip();
         this.hideFadeTooltip();
+        this.hideSlipTooltip();
         if (this.renderer) {
             this.renderer.activeSnapFrame = null;
             this.renderer.dropIndicator = null;
+        }
+        if (this.dragState === "slip") {
+            TIMELINE_HISTORY.commit();
+            STATE.emit("timelineCutsUpdated");
+            this.dragState = null;
+            this.draggedClipId = null;
+            this.refreshClipInspector();
+            if (this.canvas) {
+                this.canvas.style.cursor = TIMELINE_STATE.activeTool === "slip" ? this.getSlipCursor() : "default";
+            }
+            if (this.renderer) this.renderer.requestRedraw();
+            return;
         }
         if (this.dragState === "marquee") {
             const wasMoved = this.marqueeState && Math.hypot(this.marqueeState.currentX - this.marqueeState.startX, this.marqueeState.currentY - this.marqueeState.startY) > 3;
@@ -2528,6 +2645,43 @@ export class CapiauTimelineInteraction {
 
     hideFadeTooltip() {
         const tip = document.getElementById("timeline-fade-tooltip");
+        if (tip) tip.style.display = "none";
+    }
+
+    /**
+     * Tooltip visual durante o arraste da Ferramenta Slip (Deslizar Conteúdo Interno).
+     */
+    showSlipTooltip(x, y, deltaFrames, fps = 24, isIndependent = false) {
+        let tip = document.getElementById("timeline-slip-tooltip");
+        if (!tip) {
+            tip = document.createElement("div");
+            tip.id = "timeline-slip-tooltip";
+            tip.style.position = "fixed";
+            tip.style.zIndex = "99999";
+            tip.style.pointerEvents = "none";
+            tip.style.background = "rgba(18, 18, 24, 0.95)";
+            tip.style.color = "#ffffff";
+            tip.style.border = "1px solid rgba(6, 182, 212, 0.5)";
+            tip.style.borderRadius = "4px";
+            tip.style.padding = "4px 8px";
+            tip.style.fontSize = "11px";
+            tip.style.fontFamily = "Outfit, sans-serif";
+            tip.style.backdropFilter = "blur(8px)";
+            tip.style.boxShadow = "0 4px 12px rgba(0,0,0,0.5)";
+            document.body.appendChild(tip);
+        }
+        const sign = deltaFrames > 0 ? "+" : (deltaFrames < 0 ? "" : "±");
+        const deltaSec = (deltaFrames / fps).toFixed(2);
+        const secSign = deltaFrames > 0 ? "+" : (deltaFrames < 0 ? "" : "±");
+        const label = isIndependent ? "Slip (Alt/J-L):" : "Slip:";
+        tip.innerHTML = `<span style="color:var(--color-cyan); font-weight:600;"><i class="fa-solid fa-arrows-left-right" style="margin-right:4px;"></i>${label}</span> <span style="font-family:monospace; font-weight:500;">${sign}${deltaFrames}f (${secSign}${deltaSec}s)</span>`;
+        tip.style.display = "block";
+        tip.style.left = `${x + 14}px`;
+        tip.style.top = `${y - 28}px`;
+    }
+
+    hideSlipTooltip() {
+        const tip = document.getElementById("timeline-slip-tooltip");
         if (tip) tip.style.display = "none";
     }
 
@@ -4027,7 +4181,14 @@ export class CapiauTimelineInteraction {
                 if (this.renderer) this.renderer.requestRedraw();
             };
         }
-        bindToolClick(toolButtons["slip"], "slip", "ew-resize");
+        if (toolButtons["slip"] && !toolButtons["slip"].__capiauToolBound) {
+            toolButtons["slip"].__capiauToolBound = true;
+            toolButtons["slip"].onclick = () => {
+                TIMELINE_STATE.setTool("slip");
+                if (this.canvas) this.canvas.style.cursor = this.getSlipCursor();
+                if (this.renderer) this.renderer.requestRedraw();
+            };
+        }
         bindToolClick(toolButtons["slide"], "slide", "ew-resize");
         bindToolClick(toolButtons["rolling"], "rolling", "col-resize");
         bindToolClick(toolButtons["rate-stretch"], "rate-stretch", "ew-resize");
@@ -8089,6 +8250,42 @@ export class CapiauTimelineInteraction {
                 e.preventDefault();
                 return;
             }
+            if (this.dragState === "slip") {
+                this.hideSlipTooltip();
+                if (this.draggedClipId && this.dragStartInFrame !== undefined) {
+                    const cuts = [...STATE.activeTimelineCuts];
+                    const clip = cuts.find(c => c.id === this.draggedClipId);
+                    if (clip) {
+                        const fps = TIMELINE_STATE.fps || 24;
+                        clip.inFrame = this.dragStartInFrame;
+                        clip.outFrame = this.dragStartOutFrame;
+                        clip.in = clip.inFrame / fps;
+                        clip.out = clip.outFrame / fps;
+                        if (clip.link_id && this.dragPartnerStartInFrame !== null) {
+                            const partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                            if (partner) {
+                                partner.inFrame = this.dragPartnerStartInFrame;
+                                partner.outFrame = this.dragPartnerStartOutFrame;
+                                partner.in = partner.inFrame / fps;
+                                partner.out = partner.outFrame / fps;
+                                const videoCut = (TIMELINE_STATE.trackKindOf(clip.track) === "video") ? clip : partner;
+                                const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : partner;
+                                if (videoCut && audioCut) {
+                                    audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+                                }
+                            }
+                        }
+                        STATE.activeTimelineCuts = cuts;
+                    }
+                }
+                TIMELINE_HISTORY.pending = null;
+                this.dragState = null;
+                this.draggedClipId = null;
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+                e.preventDefault();
+                return;
+            }
             let hadSelection = false;
             if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) {
                 TIMELINE_STATE.clearClipSelection();
@@ -8261,6 +8458,18 @@ export class CapiauTimelineInteraction {
                 if (this.renderer) this.renderer.requestRedraw();
                 this.refreshClipInspector();
             }
+            e.preventDefault();
+            return;
+        }
+
+        // Ferramenta Deslizar Conteúdo Interno / Slip Tool (Y)
+        if (KEYMAP_SERVICE.matches(e, "tools.slip")) {
+            TIMELINE_STATE.setTool("slip");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta Deslizar Conteúdo Interno / Slip (Y)", "info");
+            }
+            if (this.canvas) this.canvas.style.cursor = this.getSlipCursor();
+            if (this.renderer) this.renderer.requestRedraw();
             e.preventDefault();
             return;
         }

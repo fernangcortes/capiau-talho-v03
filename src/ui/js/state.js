@@ -190,14 +190,16 @@ class AppState extends EventEmitter {
                 timelineStartFrame: Math.max(0, Math.round(timelineStartFrame)),
                 // Mantém a chave em segundos sincronizada (evita valor obsoleto após drags)
                 timeline_start: Math.max(0, Math.round(timelineStartFrame)) / timelineFps,
-                link_id: cut.link_id || null
+                link_id: cut.link_id || null,
+                syncOffset: typeof cut.syncOffset === "number" ? cut.syncOffset : 0
             };
         });
 
         // ── Sincronia A/V: áudio vinculado é ancorado ao clipe de vídeo par ──
-        // Invariante: (timelineStartFrame - inFrame) do áudio == o do vídeo.
-        // Trims independentes do áudio produzem J/L-cuts sem perder o sync, e o
-        // ripple da pista magnética arrasta o áudio junto do vídeo.
+        // Invariante: (timelineStartFrame - inFrame) do áudio == o do vídeo + syncOffset.
+        // Trims independentes do áudio produzem J/L-cuts sem perder o sync,
+        // slips independentes preservam suas posições na timeline via syncOffset, e o
+        // ripple de inserções/cortes arrasta o áudio junto do vídeo.
         const videoByLink = {};
         this._activeTimelineCuts.forEach(c => {
             if (c.link_id && kindOf(c.track) === "video") videoByLink[c.link_id] = c;
@@ -206,7 +208,8 @@ class AppState extends EventEmitter {
             if (!c.link_id || kindOf(c.track) !== "audio") return;
             const v = videoByLink[c.link_id];
             if (!v) return;
-            let start = v.timelineStartFrame - v.inFrame + c.inFrame;
+            const syncOffset = typeof c.syncOffset === "number" ? c.syncOffset : 0;
+            let start = v.timelineStartFrame - v.inFrame + c.inFrame + syncOffset;
             if (start < 0) {
                 // Não existe timeline antes do 0: encurta a extensão do áudio
                 c.inFrame -= start;
