@@ -159,6 +159,12 @@ export const COMMANDS_CATALOG = [
         description: "Ativa a ferramenta de seleção padrão da timeline (Seta)"
     },
     {
+        id: "tools.marquee",
+        category: "tools",
+        label: "Seleção por Caixa / Retângulo (Marquee)",
+        description: "Ativa a ferramenta de seleção por retângulo (arraste para selecionar clipes e marcadores)"
+    },
+    {
         id: "tools.blade",
         category: "tools",
         label: "Ferramenta Lâmina / Gilete (Blade)",
@@ -385,6 +391,7 @@ export const KEYMAP_PRESETS = {
         "playback.next_edit_point": ["ArrowDown"],
 
         "tools.select": ["KeyV"],
+        "tools.marquee": ["Shift+KeyV"],
         "tools.blade": ["KeyC"],
         "tools.blade_global": ["Shift+KeyC"],
         "tools.track_forward": ["KeyT"],
@@ -446,6 +453,7 @@ export const KEYMAP_PRESETS = {
         "playback.next_edit_point": ["Alt+ArrowRight", "ArrowDown"],
 
         "tools.select": ["KeyS"],
+        "tools.marquee": ["Shift+KeyS"],
         "tools.blade": ["KeyC", "Shift+KeyR"],
         "tools.blade_global": ["Shift+KeyC"],
         "tools.track_forward": ["KeyM"],
@@ -507,6 +515,7 @@ export const KEYMAP_PRESETS = {
         "playback.next_edit_point": ["ArrowDown"],
 
         "tools.select": ["KeyV"],
+        "tools.marquee": ["Shift+KeyV"],
         "tools.blade": ["KeyC"],
         "tools.blade_global": ["Shift+KeyC", "Ctrl+Shift+KeyK"],
         "tools.track_forward": ["KeyA"],
@@ -568,6 +577,7 @@ export const KEYMAP_PRESETS = {
         "playback.next_edit_point": ["ArrowDown"],
 
         "tools.select": ["KeyA"],
+        "tools.marquee": ["Shift+KeyA"],
         "tools.blade": ["KeyB"],
         "tools.blade_global": ["Shift+KeyB", "Ctrl+Shift+Backslash"],
         "tools.track_forward": ["KeyY"],
@@ -629,6 +639,7 @@ export const KEYMAP_PRESETS = {
         "playback.next_edit_point": ["ArrowDown", "BracketRight"],
 
         "tools.select": ["KeyA"],
+        "tools.marquee": ["Shift+KeyA"],
         "tools.blade": ["KeyB"],
         "tools.blade_global": ["Shift+KeyB", "Cmd+Shift+KeyB", "Ctrl+Shift+KeyB"],
         "tools.track_forward": ["KeyP"],

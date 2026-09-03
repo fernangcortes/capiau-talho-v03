@@ -110,6 +110,7 @@ export class CapiauTimelineRenderer {
         this.audioDiagCount = -1; // Contagem de análises publicadas em STATE.audioDiag (-1 força 1º redraw)
         this.photoThumbCache = {}; // Cache de miniaturas (Image) de fotos por id
         this.videoThumbCache = {}; // Cache de miniaturas de vídeo: key "video_id_time" -> { img: Image, loaded: boolean, timestamp: float }
+        this.marqueeBox = null; // Caixa translúcida de seleção por retângulo: { x, y, width, height }
         this.init();
     }
 
@@ -350,6 +351,9 @@ export class CapiauTimelineRenderer {
 
         // Desenha marcadores na timeline
         this.drawMarkers();
+
+        // Desenha a caixa translúcida de seleção por retângulo (Marquee)
+        this.drawMarqueeBox();
 
         // Desenha o cursor do Playhead (currentTime)
         this.drawPlayhead();
@@ -1048,6 +1052,34 @@ export class CapiauTimelineRenderer {
                 ctx.restore();
             });
         }
+    }
+
+    /**
+     * Desenha a caixa de seleção retangular translúcida ciano (Marquee Box Selection).
+     */
+    drawMarqueeBox() {
+        if (!this.marqueeBox) return;
+        const ctx = this.ctx;
+        const { x, y, width, height } = this.marqueeBox;
+        if (width <= 0 || height <= 0) return;
+
+        ctx.save();
+        ctx.beginPath();
+        // Recorta estritamente na área de pistas (abaixo da régua) para não poluir os números de timecode
+        ctx.rect(0, this.rulerHeight, this.width, Math.max(0, this.height - this.rulerHeight));
+        ctx.clip();
+
+        // Fundo translúcido ciano suave
+        ctx.fillStyle = "rgba(6, 182, 212, 0.14)";
+        ctx.fillRect(x, y, width, height);
+
+        // Borda pontilhada / tracejada ciano vibrante
+        ctx.strokeStyle = "rgba(6, 182, 212, 0.95)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(x, y, width, height);
+        ctx.setLineDash([]);
+        ctx.restore();
     }
 
     /**

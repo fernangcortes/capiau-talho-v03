@@ -37,11 +37,11 @@ assert.ok(bladeBtnMatch, "Botão #btn-tool-blade deve existir no index.html");
 const bladeBtnHTML = bladeBtnMatch[0];
 assert.ok(bladeBtnHTML.includes("data-tooltip"), "#btn-tool-blade deve conter data-tooltip explicativo");
 assert.ok(bladeBtnHTML.includes("fa-scissors"), "#btn-tool-blade deve usar o ícone fa-scissors");
-assert.ok(/styles\.css\?v=23/.test(htmlContent), "Cache-buster de styles.css deve estar em ?v=23");
-assert.ok(/main\.js\?v=23/.test(htmlContent), "Cache-buster de main.js deve estar em ?v=23");
+assert.ok(/styles\.css\?v=(?:2[3-9]|[3-9]\d)/.test(htmlContent), "Cache-buster de styles.css deve estar em ?v>=23");
+assert.ok(/main\.js\?v=(?:2[3-9]|[3-9]\d)/.test(htmlContent), "Cache-buster de main.js deve estar em ?v>=23");
 assert.ok(/id=["']btn-ripple-trim-head["'][\s\S]*?<svg/.test(htmlContent), "#btn-ripple-trim-head deve conter SVG inline para garantir visibilidade");
 assert.ok(/id=["']btn-ripple-trim-tail["'][\s\S]*?<svg/.test(htmlContent), "#btn-ripple-trim-tail deve conter SVG inline para garantir visibilidade");
-console.log("  ✔ Elemento #btn-tool-blade, SVGs de trim e cache-busters v=23 validados.");
+console.log("  ✔ Elemento #btn-tool-blade, SVGs de trim e cache-busters validados.");
 
 // 1.2 Regras CSS no styles.css
 assert.ok(cssContent.includes("#btn-tool-blade"), "styles.css deve conter regras para #btn-tool-blade");

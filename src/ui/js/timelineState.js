@@ -1424,6 +1424,54 @@ export class CapiauTimelineState {
     }
 
     /**
+     * Aplica resultado de seleção por retângulo / caixa (Marquee Selection) aos conjuntos de seleção ativos.
+     * @param {Array<string>} clipIds IDs dos clipes interceptados pela caixa.
+     * @param {Array<string>} markerIds IDs dos marcadores interceptados pela caixa.
+     * @param {"replace"|"add"|"subtract"} mode Modo de combinação com a seleção inicial ("replace", "add", "subtract").
+     * @param {Set<string>|Array<string>|null} initialClipIds Seleção inicial de clipes no início do arraste.
+     * @param {Set<string>|Array<string>|null} initialMarkerIds Seleção inicial de marcadores no início do arraste.
+     */
+    applyMarqueeSelection(clipIds = [], markerIds = [], mode = "replace", initialClipIds = null, initialMarkerIds = null) {
+        const baseClips = initialClipIds ? new Set(initialClipIds) : new Set(this.selectedClipIds || []);
+        if (!initialClipIds && this.selectedClipId) baseClips.add(this.selectedClipId);
+
+        const baseMarkers = initialMarkerIds ? new Set(initialMarkerIds) : new Set(this.selectedMarkerIds || []);
+
+        let nextClips = new Set();
+        let nextMarkers = new Set();
+
+        if (mode === "add") {
+            nextClips = new Set([...baseClips, ...clipIds]);
+            nextMarkers = new Set([...baseMarkers, ...markerIds]);
+        } else if (mode === "subtract") {
+            nextClips = new Set(baseClips);
+            for (const cid of clipIds) nextClips.delete(cid);
+            nextMarkers = new Set(baseMarkers);
+            for (const mid of markerIds) nextMarkers.delete(mid);
+        } else {
+            // "replace"
+            nextClips = new Set(clipIds);
+            nextMarkers = new Set(markerIds);
+        }
+
+        this.selectedClipIds = nextClips;
+        this.selectedClipId = nextClips.size > 0 ? Array.from(nextClips)[0] : null;
+        if (this.selectedClipId) {
+            const cut = (STATE.activeTimelineCuts || []).find(c => c.id === this.selectedClipId);
+            if (cut && cut.track) this.selectedTrack = cut.track;
+        }
+        this.selectedMarkerIds = nextMarkers;
+        this.clearSelectedGap();
+        this.selectedGhostClipId = null;
+        STATE.emit("timelineSelectionChanged", this.selectedClipId);
+
+        return {
+            selectedClipIds: Array.from(nextClips),
+            selectedMarkerIds: Array.from(nextMarkers)
+        };
+    }
+
+    /**
      * Lift Delete de todos os clipes atualmente selecionados.
      */
     liftDeleteSelectedClips() {

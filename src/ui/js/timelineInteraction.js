@@ -72,6 +72,10 @@ export class CapiauTimelineInteraction {
         this.dragAnchorClip = null;
         this.dragMinStartFrame = 0;
 
+        // Estado para seleção por retângulo / caixa (Marquee Box Selection)
+        this.marqueeState = null; // { startX, startY, currentX, currentY, shiftKey, altKey, initialClips, initialMarkers }
+        this.marqueeCandidate = null; // candidato antes de ultrapassar o limiar de arrasto (4px)
+
         // Cache de diagnósticos de áudio já buscados, chave "video_id|in|out" (somente leitura)
         this.audioDiagCache = {};
 
@@ -460,6 +464,76 @@ export class CapiauTimelineInteraction {
     }
 
     /**
+     * Calcula a interseção matemática de uma caixa AABB com clipes e marcadores da timeline.
+     * @param {{ x1: number, x2: number, y1: number, y2: number }} box Coordenadas da caixa em pixels de canvas.
+     * @returns {{ clipIds: string[], markerIds: string[] }}
+     */
+    computeMarqueeIntersections(box) {
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+        const cuts = STATE.activeTimelineCuts || [];
+        const markers = TIMELINE_STATE.getMarkersSorted ? TIMELINE_STATE.getMarkersSorted() : (TIMELINE_STATE.markers || []);
+
+        const minX = Math.min(box.x1, box.x2);
+        const maxX = Math.max(box.x1, box.x2);
+        const minY = Math.min(box.y1, box.y2);
+        const maxY = Math.max(box.y1, box.y2);
+
+        const intersectedClipIds = new Set();
+        const intersectedMarkerIds = new Set();
+
+        // 1. Interseção com clipes (considera faixa de tempo e geometria vertical da pista)
+        for (const cut of cuts) {
+            const lane = this.renderer ? this.renderer.getLane(cut.track) : null;
+            if (!lane || (lane.track && lane.track.hidden)) continue;
+
+            const clipX1 = (cut.timelineStartFrame - scrollLeft) * zoom;
+            const clipWidth = (cut.outFrame - cut.inFrame) * zoom;
+            const clipX2 = clipX1 + clipWidth;
+            const clipY1 = lane.top;
+            const clipY2 = lane.top + lane.height;
+
+            // AABB 2D Overlap
+            const overlapX = clipX1 < maxX && clipX2 > minX;
+            const overlapY = clipY1 < maxY && clipY2 > minY;
+
+            if (overlapX && overlapY) {
+                intersectedClipIds.add(cut.id);
+            }
+        }
+
+        // 2. Interseção com marcadores (clip markers e ruler markers)
+        for (const marker of markers) {
+            const markerX = (marker.frame - scrollLeft) * zoom;
+            let markerY1 = 0;
+            let markerY2 = this.renderer ? this.renderer.rulerHeight : 30;
+
+            if (marker.clipId) {
+                const cut = cuts.find(c => String(c.id) === String(marker.clipId));
+                if (cut) {
+                    const lane = this.renderer ? this.renderer.getLane(cut.track) : null;
+                    if (lane) {
+                        markerY1 = lane.top;
+                        markerY2 = lane.top + 14;
+                    }
+                }
+            }
+
+            const mOverlapX = (markerX + 5 >= minX) && (markerX - 5 <= maxX);
+            const mOverlapY = (markerY2 >= minY) && (markerY1 <= maxY);
+
+            if (mOverlapX && mOverlapY) {
+                intersectedMarkerIds.add(marker.id);
+            }
+        }
+
+        return {
+            clipIds: Array.from(intersectedClipIds),
+            markerIds: Array.from(intersectedMarkerIds)
+        };
+    }
+
+    /**
      * Verifica se o mouse está sobre a borda esquerda ou direita de um clipe para trim.
      */
     checkTrimZone(x, clip) {
@@ -776,6 +850,28 @@ export class CapiauTimelineInteraction {
             return;
         }
 
+        // Ferramenta: Seleção por Caixa / Retângulo (Marquee Tool)
+        if (TIMELINE_STATE.activeTool === "marquee" && e.button === 0) {
+            this.dragState = "marquee";
+            const startY = Math.max(this.renderer ? this.renderer.rulerHeight : 30, y);
+            const initialClips = new Set(TIMELINE_STATE.selectedClipIds || []);
+            if (TIMELINE_STATE.selectedClipId) initialClips.add(TIMELINE_STATE.selectedClipId);
+            const initialMarkers = new Set(TIMELINE_STATE.selectedMarkerIds || []);
+
+            this.marqueeState = {
+                startX: x,
+                startY: startY,
+                currentX: x,
+                currentY: startY,
+                shiftKey: e.shiftKey,
+                altKey: e.altKey,
+                initialClips,
+                initialMarkers
+            };
+            if (this.canvas) this.canvas.style.cursor = "crosshair";
+            return;
+        }
+
         // 3. Clique nas trilhas
         if (track) {
             // Ferramenta: Lâmina / Gilete (C / Shift+C / Alt+C)
@@ -1011,12 +1107,57 @@ export class CapiauTimelineInteraction {
                     TIMELINE_STATE.selectGap(gap);
                 } else {
                     TIMELINE_STATE.clearSelectedGap();
-                    TIMELINE_STATE.clearClipSelection();
+                    if (!e.shiftKey && !e.altKey) {
+                        TIMELINE_STATE.clearClipSelection();
+                    }
                     TIMELINE_STATE.selectedGhostClipId = null;
+                }
+
+                if (e.button === 0) {
+                    const startY = Math.max(this.renderer ? this.renderer.rulerHeight : 30, y);
+                    const initialClips = new Set(TIMELINE_STATE.selectedClipIds || []);
+                    if (TIMELINE_STATE.selectedClipId) initialClips.add(TIMELINE_STATE.selectedClipId);
+                    const initialMarkers = new Set(TIMELINE_STATE.selectedMarkerIds || []);
+
+                    this.marqueeCandidate = {
+                        startX: x,
+                        startY: startY,
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        shiftKey: e.shiftKey,
+                        altKey: e.altKey,
+                        initialClips,
+                        initialMarkers
+                    };
                 }
             }
             this.refreshClipInspector();
             this.renderer.requestRedraw();
+        } else if (e.button === 0) {
+            // Clique em área vazia do canvas (abaixo de todas as pistas)
+            if (!e.shiftKey && !e.altKey) {
+                TIMELINE_STATE.clearSelectedGap();
+                TIMELINE_STATE.clearClipSelection();
+                TIMELINE_STATE.clearSelectedMarkers();
+                TIMELINE_STATE.selectedGhostClipId = null;
+            }
+            const startY = Math.max(this.renderer ? this.renderer.rulerHeight : 30, y);
+            const initialClips = new Set(TIMELINE_STATE.selectedClipIds || []);
+            if (TIMELINE_STATE.selectedClipId) initialClips.add(TIMELINE_STATE.selectedClipId);
+            const initialMarkers = new Set(TIMELINE_STATE.selectedMarkerIds || []);
+
+            this.marqueeCandidate = {
+                startX: x,
+                startY: startY,
+                clientX: e.clientX,
+                clientY: e.clientY,
+                shiftKey: e.shiftKey,
+                altKey: e.altKey,
+                initialClips,
+                initialMarkers
+            };
+            this.refreshClipInspector();
+            if (this.renderer) this.renderer.requestRedraw();
         }
     }
 
@@ -1160,6 +1301,21 @@ export class CapiauTimelineInteraction {
 
         // Atualiza cursores dinâmicos de trim, fades e tooltip com nome do arquivo
         if (!this.dragState && track) {
+            // Se a ferramenta Marquee estiver ativa, cursor crosshair!
+            if (TIMELINE_STATE.activeTool === "marquee") {
+                this.canvas.style.cursor = "crosshair";
+                this.hideMarkerTooltip();
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                if (TIMELINE_STATE.hoveredFadeHandle !== null) {
+                    TIMELINE_STATE.hoveredFadeHandle = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                return;
+            }
+
             // Se a ferramenta Lâmina estiver ativa, atualiza cursor e guia vertical tracejada âmbar
             if (TIMELINE_STATE.activeTool === "blade") {
                 this.canvas.style.cursor = this.getBladeCursor(e.shiftKey);
@@ -1240,7 +1396,9 @@ export class CapiauTimelineInteraction {
                 this.canvas.removeAttribute("title");
             }
         } else if (!this.dragState) {
-            if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
+            if (TIMELINE_STATE.activeTool === "marquee") {
+                this.canvas.style.cursor = "crosshair";
+            } else if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
                 this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e.shiftKey);
             }
             this.hideMarkerTooltip();
@@ -1255,12 +1413,60 @@ export class CapiauTimelineInteraction {
             this.canvas.removeAttribute("title");
         }
 
+        if (!this.dragState && this.marqueeCandidate) {
+            const dist = Math.hypot(e.clientX - this.marqueeCandidate.clientX, e.clientY - this.marqueeCandidate.clientY);
+            if (dist >= 4) {
+                this.dragState = "marquee";
+                this.marqueeState = this.marqueeCandidate;
+                this.marqueeCandidate = null;
+                TIMELINE_STATE.clearSelectedGap();
+                if (this.canvas) this.canvas.style.cursor = "crosshair";
+            }
+        }
+
         if (!this.dragState) {
             return;
         }
 
         // Processar arrastes baseados no estado
-        if (this.dragState === "drag-in-point") {
+        if (this.dragState === "marquee" && this.marqueeState) {
+            if (this.canvas) this.canvas.style.cursor = "crosshair";
+            const currentY = Math.max(this.renderer ? this.renderer.rulerHeight : 30, y);
+            this.marqueeState.currentX = x;
+            this.marqueeState.currentY = currentY;
+
+            const minX = Math.min(this.marqueeState.startX, x);
+            const maxX = Math.max(this.marqueeState.startX, x);
+            const minY = Math.min(this.marqueeState.startY, currentY);
+            const maxY = Math.max(this.marqueeState.startY, currentY);
+
+            if (this.renderer) {
+                this.renderer.marqueeBox = {
+                    x: minX,
+                    y: minY,
+                    width: maxX - minX,
+                    height: maxY - minY
+                };
+            }
+
+            const { clipIds, markerIds } = this.computeMarqueeIntersections({ x1: minX, x2: maxX, y1: minY, y2: maxY });
+
+            let mode = "replace";
+            if (e.shiftKey) mode = "add";
+            else if (e.altKey) mode = "subtract";
+
+            TIMELINE_STATE.applyMarqueeSelection(
+                clipIds,
+                markerIds,
+                mode,
+                this.marqueeState.initialClips,
+                this.marqueeState.initialMarkers
+            );
+
+            this.refreshClipInspector();
+            if (this.renderer) this.renderer.requestRedraw();
+        }
+        else if (this.dragState === "drag-in-point") {
             if (this.canvas) this.canvas.style.cursor = CURSOR_MARK_IN;
             const rawFrame = Math.max(0, Math.round(frame));
             const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
@@ -1533,6 +1739,30 @@ export class CapiauTimelineInteraction {
             this.renderer.activeSnapFrame = null;
             this.renderer.dropIndicator = null;
         }
+        if (this.dragState === "marquee") {
+            const wasMoved = this.marqueeState && Math.hypot(this.marqueeState.currentX - this.marqueeState.startX, this.marqueeState.currentY - this.marqueeState.startY) > 3;
+            if (!wasMoved && TIMELINE_STATE.activeTool === "marquee" && !e.shiftKey && !e.altKey) {
+                // Clique simples sem arraste na ferramenta marquee desmarca tudo
+                TIMELINE_STATE.clearClipSelection();
+                TIMELINE_STATE.clearSelectedMarkers();
+                TIMELINE_STATE.clearSelectedGap();
+            }
+            this.dragState = null;
+            this.marqueeState = null;
+            this.marqueeCandidate = null;
+            if (this.renderer) {
+                this.renderer.marqueeBox = null;
+                this.renderer.requestRedraw();
+            }
+            this.refreshClipInspector();
+            if (this.canvas) {
+                this.canvas.style.cursor = TIMELINE_STATE.activeTool === "marquee" ? "crosshair" : "default";
+            }
+            return;
+        }
+        if (this.marqueeCandidate) {
+            this.marqueeCandidate = null;
+        }
         if (this.dragState === "drag-in-point" || this.dragState === "drag-out-point" || this.dragState === "drag-in-out-span") {
             this.dragState = null;
             if (this.canvas) this.canvas.style.cursor = "default";
@@ -1588,7 +1818,9 @@ export class CapiauTimelineInteraction {
         this.dragInitialClipPositions = null;
         this.dragAnchorClip = null;
         if (this.canvas) {
-            if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
+            if (TIMELINE_STATE.activeTool === "marquee") {
+                this.canvas.style.cursor = "crosshair";
+            } else if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
                 this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e?.shiftKey || false);
             } else {
                 this.canvas.style.cursor = "default";
@@ -7846,8 +8078,31 @@ export class CapiauTimelineInteraction {
                 e.preventDefault();
                 return;
             }
+            if (this.dragState === "marquee") {
+                this.dragState = null;
+                this.marqueeState = null;
+                this.marqueeCandidate = null;
+                if (this.renderer) {
+                    this.renderer.marqueeBox = null;
+                    this.renderer.requestRedraw();
+                }
+                e.preventDefault();
+                return;
+            }
+            let hadSelection = false;
             if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) {
                 TIMELINE_STATE.clearClipSelection();
+                hadSelection = true;
+            }
+            if (TIMELINE_STATE.selectedMarkerIds && TIMELINE_STATE.selectedMarkerIds.size > 0) {
+                TIMELINE_STATE.clearSelectedMarkers();
+                hadSelection = true;
+            }
+            if (TIMELINE_STATE.selectedGap) {
+                TIMELINE_STATE.clearSelectedGap();
+                hadSelection = true;
+            }
+            if (hadSelection) {
                 this.refreshClipInspector();
                 if (this.renderer) this.renderer.requestRedraw();
                 e.preventDefault();
@@ -7966,6 +8221,18 @@ export class CapiauTimelineInteraction {
                 window.showToast("Ferramenta de Seleção", "info");
             }
             if (this.canvas) this.canvas.style.cursor = "default";
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // Ferramenta Seleção por Caixa / Retângulo (Marquee - Shift+V no CapIAu/Premiere, Shift+S no Kdenlive, Shift+A no DaVinci/FinalCut)
+        if (KEYMAP_SERVICE.matches(e, "tools.marquee")) {
+            TIMELINE_STATE.setTool("marquee");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta Seleção por Caixa / Retângulo (Marquee)", "info");
+            }
+            if (this.canvas) this.canvas.style.cursor = "crosshair";
             if (this.renderer) this.renderer.requestRedraw();
             e.preventDefault();
             return;
@@ -8108,11 +8375,17 @@ export class CapiauTimelineInteraction {
         }
 
         // Deletes (Apagar clipe selecionado, marcadores, gap ou ripple delete)
-        if (TIMELINE_STATE.selectedMarkerIds.size > 0 && (e.key === "Delete" || e.key === "Backspace" || KEYMAP_SERVICE.matches(e, "edit.lift_delete") || KEYMAP_SERVICE.matches(e, "edit.ripple_delete"))) {
+        const hasMarkers = TIMELINE_STATE.selectedMarkerIds && TIMELINE_STATE.selectedMarkerIds.size > 0;
+        const hasClips = (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) || !!selectedId;
+        const isDeleteKey = e.key === "Delete" || e.key === "Backspace" || KEYMAP_SERVICE.matches(e, "edit.lift_delete") || KEYMAP_SERVICE.matches(e, "edit.ripple_delete");
+
+        if (hasMarkers && isDeleteKey) {
             TIMELINE_STATE.removeSelectedMarkers();
-            if (this.renderer) this.renderer.requestRedraw();
-            e.preventDefault();
-            return;
+            if (!hasClips) {
+                if (this.renderer) this.renderer.requestRedraw();
+                e.preventDefault();
+                return;
+            }
         }
 
         if (TIMELINE_STATE.selectedGap && (e.key === "Delete" || e.key === "Backspace" || KEYMAP_SERVICE.matches(e, "edit.lift_delete") || KEYMAP_SERVICE.matches(e, "edit.ripple_delete"))) {
@@ -8139,7 +8412,7 @@ export class CapiauTimelineInteraction {
         }
 
         if (KEYMAP_SERVICE.matches(e, "edit.ripple_delete")) {
-            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1) {
+            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) {
                 TIMELINE_STATE.rippleDeleteSelectedClips();
                 this.refreshClipInspector();
                 if (this.renderer) this.renderer.requestRedraw();
@@ -8155,7 +8428,7 @@ export class CapiauTimelineInteraction {
         }
 
         if (KEYMAP_SERVICE.matches(e, "edit.lift_delete")) {
-            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1) {
+            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) {
                 TIMELINE_STATE.liftDeleteSelectedClips();
                 this.refreshClipInspector();
                 if (this.renderer) this.renderer.requestRedraw();
