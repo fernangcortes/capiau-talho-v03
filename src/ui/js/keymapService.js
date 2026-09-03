@@ -159,6 +159,18 @@ export const COMMANDS_CATALOG = [
         description: "Ativa a ferramenta de seleção padrão da timeline (Seta)"
     },
     {
+        id: "tools.blade",
+        category: "tools",
+        label: "Ferramenta Lâmina / Gilete (Blade)",
+        description: "Ativa a ferramenta de corte de precisão por cursor na trilha"
+    },
+    {
+        id: "tools.blade_global",
+        category: "tools",
+        label: "Lâmina Global na Agulha",
+        description: "Fatia todas as pistas destravadas na coordenada da agulha de reprodução"
+    },
+    {
         id: "tools.track_forward",
         category: "tools",
         label: "Selecionar Faixa para Frente",
@@ -373,6 +385,8 @@ export const KEYMAP_PRESETS = {
         "playback.next_edit_point": ["ArrowDown"],
 
         "tools.select": ["KeyV"],
+        "tools.blade": ["KeyC"],
+        "tools.blade_global": ["Shift+KeyC"],
         "tools.track_forward": ["KeyT"],
         "tools.track_backward": ["Shift+KeyT"],
         "tools.snapping": ["KeyS"],
@@ -432,6 +446,8 @@ export const KEYMAP_PRESETS = {
         "playback.next_edit_point": ["Alt+ArrowRight", "ArrowDown"],
 
         "tools.select": ["KeyS"],
+        "tools.blade": ["KeyC", "Shift+KeyR"],
+        "tools.blade_global": ["Shift+KeyC"],
         "tools.track_forward": ["KeyM"],
         "tools.track_backward": ["Shift+KeyM"],
         "tools.snapping": ["F10", "KeyN"],
@@ -491,12 +507,14 @@ export const KEYMAP_PRESETS = {
         "playback.next_edit_point": ["ArrowDown"],
 
         "tools.select": ["KeyV"],
+        "tools.blade": ["KeyC"],
+        "tools.blade_global": ["Shift+KeyC", "Ctrl+Shift+KeyK"],
         "tools.track_forward": ["KeyA"],
         "tools.track_backward": ["Shift+KeyA"],
         "tools.snapping": ["KeyS"],
         "tools.escape": ["Escape"],
 
-        "edit.split": ["Ctrl+KeyK", "KeyC"],
+        "edit.split": ["Ctrl+KeyK"],
         "edit.ripple_trim_head": ["KeyQ"],
         "edit.ripple_trim_tail": ["KeyW"],
         "edit.lift_delete": ["Backspace"],
@@ -550,12 +568,14 @@ export const KEYMAP_PRESETS = {
         "playback.next_edit_point": ["ArrowDown"],
 
         "tools.select": ["KeyA"],
+        "tools.blade": ["KeyB"],
+        "tools.blade_global": ["Shift+KeyB", "Ctrl+Shift+Backslash"],
         "tools.track_forward": ["KeyY"],
         "tools.track_backward": ["Ctrl+KeyY"],
         "tools.snapping": ["KeyN"],
         "tools.escape": ["Escape"],
 
-        "edit.split": ["Ctrl+Backslash", "KeyB"],
+        "edit.split": ["Ctrl+Backslash"],
         "edit.ripple_trim_head": ["Shift+BracketLeft", "KeyQ"],
         "edit.ripple_trim_tail": ["Shift+BracketRight", "KeyW"],
         "edit.lift_delete": ["Backspace"],
@@ -609,12 +629,14 @@ export const KEYMAP_PRESETS = {
         "playback.next_edit_point": ["ArrowDown", "BracketRight"],
 
         "tools.select": ["KeyA"],
+        "tools.blade": ["KeyB"],
+        "tools.blade_global": ["Shift+KeyB", "Cmd+Shift+KeyB", "Ctrl+Shift+KeyB"],
         "tools.track_forward": ["KeyP"],
         "tools.track_backward": ["Shift+KeyP"],
         "tools.snapping": ["KeyN"],
         "tools.escape": ["Escape"],
 
-        "edit.split": ["Cmd+KeyB", "KeyB"],
+        "edit.split": ["Cmd+KeyB"],
         "edit.ripple_trim_head": ["Alt+BracketLeft", "KeyQ"],
         "edit.ripple_trim_tail": ["Alt+BracketRight", "KeyW"],
         "edit.lift_delete": ["Delete"],

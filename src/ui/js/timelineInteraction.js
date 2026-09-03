@@ -46,6 +46,10 @@ const CURSOR_MARK_IN = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.o
 const CURSOR_MARK_OUT = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M13 4h5v16h-5M12 12H3M6 8l-4 4 4 4" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 4h5v16h-5M12 12H3M6 8l-4 4 4 4" fill="none" stroke="%23f43f5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 3h-5v4l5 5z" fill="%23f43f5e"/></svg>') 18 12, e-resize`;
 const CURSOR_IN_OUT_SPAN = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 6v12M20 6v12M4 12h16M7 9l-3 3 3 3M17 9l3 3-3 3" fill="none" stroke="%23000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 6v12M7 9l-3 3 3 3" fill="none" stroke="%2306b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 6v12M17 9l3 3-3 3" fill="none" stroke="%23f43f5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12h16" fill="none" stroke="%23e2e8f0" stroke-width="2" stroke-linecap="round"/></svg>') 12 12, grab`;
 
+// Cursores SVG em alta definição para a Ferramenta Lâmina / Gilete (Blade Tool C / Shift+C)
+const CURSOR_BLADE_SINGLE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 4l7 7-2 2-7-7z" fill="%23f8fafc" stroke="%23000" stroke-width="3" stroke-linejoin="round"/><path d="M9 11l9 9 2-2-9-9z" fill="%23f59e0b" stroke="%23000" stroke-width="3" stroke-linejoin="round"/><path d="M4 4l7 7-2 2-7-7z" fill="%23f8fafc" stroke="%23f8fafc" stroke-width="1.2"/><path d="M9 11l9 9 2-2-9-9z" fill="%23f59e0b" stroke="%23f59e0b" stroke-width="1.2"/><circle cx="4" cy="4" r="1.5" fill="%23f59e0b"/></svg>') 4 4, crosshair`;
+const CURSOR_BLADE_ALL = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="4" y1="1" x2="4" y2="23" stroke="%23000" stroke-width="3" stroke-dasharray="3 2"/><line x1="4" y1="1" x2="4" y2="23" stroke="%23f59e0b" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M4 4l7 7-2 2-7-7z" fill="%23f8fafc" stroke="%23000" stroke-width="3" stroke-linejoin="round"/><path d="M9 11l9 9 2-2-9-9z" fill="%23f59e0b" stroke="%23000" stroke-width="3" stroke-linejoin="round"/><path d="M4 4l7 7-2 2-7-7z" fill="%23f8fafc" stroke="%23f8fafc" stroke-width="1.2"/><path d="M9 11l9 9 2-2-9-9z" fill="%23f59e0b" stroke="%23f59e0b" stroke-width="1.2"/><circle cx="4" cy="4" r="2" fill="%23f59e0b" stroke="%23000" stroke-width="1"/></svg>') 4 4, crosshair`;
+
 export class CapiauTimelineInteraction {
     constructor(renderer) {
         this.renderer = renderer;
@@ -145,6 +149,10 @@ export class CapiauTimelineInteraction {
             if (TIMELINE_STATE.hoveredFadeHandle !== null) {
                 TIMELINE_STATE.hoveredFadeHandle = null;
                 if (this.renderer) this.renderer.requestRedraw();
+            }
+            if (this.renderer && this.renderer.bladeGuide) {
+                this.renderer.bladeGuide = null;
+                this.renderer.requestRedraw();
             }
             this.hideHoverPreview();
         };
@@ -300,6 +308,13 @@ export class CapiauTimelineInteraction {
             return isShift ? CURSOR_TRACK_BACKWARD_SINGLE : CURSOR_TRACK_BACKWARD_ALL;
         }
         return "default";
+    }
+
+    /**
+     * Retorna a string de cursor CSS para a Ferramenta Lâmina (Blade Tool).
+     */
+    getBladeCursor(isShift = false) {
+        return isShift ? CURSOR_BLADE_ALL : CURSOR_BLADE_SINGLE;
     }
 
     init() {
@@ -763,6 +778,48 @@ export class CapiauTimelineInteraction {
 
         // 3. Clique nas trilhas
         if (track) {
+            // Ferramenta: Lâmina / Gilete (C / Shift+C / Alt+C)
+            if (TIMELINE_STATE.activeTool === "blade" && e.button === 0) {
+                const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.ctrlKey;
+                const cutFrame = isSnapDisabled ? frame : this.snapFrame(frame, 8);
+
+                if (e.shiftKey) {
+                    // Lâmina Global: corta todas as faixas destravadas naquele frame
+                    const cuts = TIMELINE_STATE.splitAllTracksAtFrame(cutFrame);
+                    if (cuts && cuts.length > 0) {
+                        if (typeof window.showToast === "function") {
+                            window.showToast(`Lâmina Global: ${cuts.length} pistas divididas no frame ${cutFrame}`, "info");
+                        }
+                        if (this.renderer) this.renderer.requestRedraw();
+                        this.refreshClipInspector();
+                    }
+                } else {
+                    // Lâmina Simples:
+                    // Se Alt estiver pressionado (Alt + Clique): corta APENAS a pista clicada (splitLinked = false).
+                    // Conforme o padrão NLE para J/L-Cuts: a parte esquerda continua unida ao parceiro de áudio/vídeo,
+                    // e a parte direita gerada desune do resto do clipe (link_id: null), pronta para ser editada isoladamente.
+                    // Se Alt NÃO estiver pressionado: corta a pista e o parceiro vinculado simultaneamente (splitLinked = true).
+                    const splitLinked = !e.altKey;
+                    const hit = this.findClipAt(cutFrame, track, y) || this.findClipAt(frame, track, y);
+                    if (hit && hit.type === "clip") {
+                        const res = TIMELINE_STATE.splitClipAtFrame(hit.data.id, cutFrame, splitLinked);
+                        if (res) {
+                            if (typeof window.showToast === "function") {
+                                const msg = !splitLinked
+                                    ? `Corte J/L-Cut (Alt+C): pista fatiada individualmente (direita desunida)`
+                                    : (res.partnerRightClip
+                                        ? `Clipe e áudio vinculado fatiados no frame ${cutFrame} (C)`
+                                        : `Clipe fatiado no frame ${cutFrame} (C)`);
+                                window.showToast(msg, "info");
+                            }
+                            if (this.renderer) this.renderer.requestRedraw();
+                            this.refreshClipInspector();
+                        }
+                    }
+                }
+                return;
+            }
+
             // Ferramenta: Selecionar Faixa para Frente (T)
             if (TIMELINE_STATE.activeTool === "track-forward") {
                 const hit = this.findClipAt(frame, track, y);
@@ -1096,8 +1153,36 @@ export class CapiauTimelineInteraction {
             return;
         }
 
+        if (!this.dragState && TIMELINE_STATE.activeTool !== "blade" && this.renderer && this.renderer.bladeGuide) {
+            this.renderer.bladeGuide = null;
+            this.renderer.requestRedraw();
+        }
+
         // Atualiza cursores dinâmicos de trim, fades e tooltip com nome do arquivo
         if (!this.dragState && track) {
+            // Se a ferramenta Lâmina estiver ativa, atualiza cursor e guia vertical tracejada âmbar
+            if (TIMELINE_STATE.activeTool === "blade") {
+                this.canvas.style.cursor = this.getBladeCursor(e.shiftKey);
+                this.hideMarkerTooltip();
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                }
+                if (TIMELINE_STATE.hoveredFadeHandle !== null) {
+                    TIMELINE_STATE.hoveredFadeHandle = null;
+                }
+                const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.ctrlKey;
+                const cutFrame = isSnapDisabled ? frame : this.snapFrame(frame, 8);
+                if (this.renderer) {
+                    this.renderer.bladeGuide = {
+                        frame: cutFrame,
+                        track: track,
+                        allTracks: e.shiftKey
+                    };
+                    this.renderer.requestRedraw();
+                }
+                return;
+            }
+
             // Se a ferramenta de seleção de faixas estiver ativa, define o cursor apropriado
             if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
                 this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e.shiftKey);
@@ -3702,7 +3787,14 @@ export class CapiauTimelineInteraction {
 
         bindToolClick(toolButtons["select"], "select", "default");
         bindToolClick(toolButtons["marquee"], "marquee", "crosshair");
-        bindToolClick(toolButtons["blade"], "blade", "crosshair");
+        if (toolButtons["blade"] && !toolButtons["blade"].__capiauToolBound) {
+            toolButtons["blade"].__capiauToolBound = true;
+            toolButtons["blade"].onclick = () => {
+                TIMELINE_STATE.setTool("blade");
+                if (this.canvas) this.canvas.style.cursor = this.getBladeCursor(false);
+                if (this.renderer) this.renderer.requestRedraw();
+            };
+        }
         bindToolClick(toolButtons["slip"], "slip", "ew-resize");
         bindToolClick(toolButtons["slide"], "slide", "ew-resize");
         bindToolClick(toolButtons["rolling"], "rolling", "col-resize");
@@ -3791,6 +3883,17 @@ export class CapiauTimelineInteraction {
 
         STATE.on("timelineToolChanged", (tool) => {
             updateButtons(tool);
+            if (tool !== "blade" && this.renderer && this.renderer.bladeGuide) {
+                this.renderer.bladeGuide = null;
+                this.renderer.requestRedraw();
+            }
+            if (this.canvas) {
+                if (tool === "blade") {
+                    this.canvas.style.cursor = this.getBladeCursor(false);
+                } else if (tool === "select") {
+                    this.canvas.style.cursor = "default";
+                }
+            }
         });
 
         updateButtons(TIMELINE_STATE.activeTool);
@@ -7792,10 +7895,20 @@ export class CapiauTimelineInteraction {
             }
         }
 
-        // Alternância e cursores dinâmicos para ferramentas de faixa
-        if (e.key === "Shift" && (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward")) {
-            if (this.canvas && !this.dragState) {
-                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, true);
+        // Alternância e cursores dinâmicos para ferramentas de faixa e lâmina
+        if (e.key === "Shift") {
+            if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
+                if (this.canvas && !this.dragState) {
+                    this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, true);
+                }
+            } else if (TIMELINE_STATE.activeTool === "blade") {
+                if (this.canvas && !this.dragState) {
+                    this.canvas.style.cursor = this.getBladeCursor(true);
+                }
+                if (this.renderer && this.renderer.bladeGuide) {
+                    this.renderer.bladeGuide.allTracks = true;
+                    this.renderer.requestRedraw();
+                }
             }
         }
 
@@ -7858,6 +7971,33 @@ export class CapiauTimelineInteraction {
             return;
         }
 
+        // Ferramenta Lâmina / Gilete (C no CapIAu/Premiere/Kdenlive, B no DaVinci/FinalCut)
+        if (KEYMAP_SERVICE.matches(e, "tools.blade")) {
+            TIMELINE_STATE.setTool("blade");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta Lâmina / Gilete (C)", "info");
+            }
+            if (this.canvas) this.canvas.style.cursor = this.getBladeCursor(e.shiftKey);
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // Lâmina Global na Agulha (Shift+C / Ctrl+Shift+K)
+        if (KEYMAP_SERVICE.matches(e, "tools.blade_global")) {
+            const playhead = TIMELINE_STATE.playheadFrame || 0;
+            const cuts = TIMELINE_STATE.splitAllTracksAtFrame(playhead);
+            if (cuts && cuts.length > 0) {
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Lâmina Global: ${cuts.length} pistas divididas na agulha`, "info");
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+            }
+            e.preventDefault();
+            return;
+        }
+
         // Selecionar Faixa para Frente
         if (KEYMAP_SERVICE.matches(e, "tools.track_forward")) {
             TIMELINE_STATE.setTool("track-forward");
@@ -7909,10 +8049,22 @@ export class CapiauTimelineInteraction {
             return;
         }
 
-        // Split / Dividir clipe no Playhead
+        // Split / Dividir clipe no Playhead (Z no CapIAu, Ctrl+K no Premiere)
+        // Se Alt estiver pressionado, faz split individual desunindo a parte direita para J/L-Cut
         if (KEYMAP_SERVICE.matches(e, "edit.split")) {
             if (selectedId) {
-                TIMELINE_STATE.splitClip(selectedId, TIMELINE_STATE.playheadFrame);
+                const splitLinked = !e.altKey;
+                const res = TIMELINE_STATE.splitClipAtFrame(selectedId, TIMELINE_STATE.playheadFrame, splitLinked);
+                if (res) {
+                    if (typeof window.showToast === "function") {
+                        const msg = !splitLinked 
+                            ? "Dividir no Playhead (Alt+Corte): pista individual (J/L-Cut)"
+                            : "Dividir no Playhead (Z)";
+                        window.showToast(msg, "info");
+                    }
+                    if (this.renderer) this.renderer.requestRedraw();
+                    this.refreshClipInspector();
+                }
                 e.preventDefault();
                 return;
             }
@@ -8077,8 +8229,16 @@ export class CapiauTimelineInteraction {
 
     onKeyUp(e) {
         if (e.key === "Shift") {
-            if (this.canvas && !this.dragState && (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward")) {
-                this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, false);
+            if (this.canvas && !this.dragState) {
+                if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
+                    this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, false);
+                } else if (TIMELINE_STATE.activeTool === "blade") {
+                    this.canvas.style.cursor = this.getBladeCursor(false);
+                    if (this.renderer && this.renderer.bladeGuide) {
+                        this.renderer.bladeGuide.allTracks = false;
+                        this.renderer.requestRedraw();
+                    }
+                }
             }
         }
     }

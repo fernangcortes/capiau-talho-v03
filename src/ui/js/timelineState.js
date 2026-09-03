@@ -2855,41 +2855,54 @@ export class CapiauTimelineState {
     }
 
     /**
-     * Divide um clipe em dois no frame especificado (playhead).
+     * Divide um clipe específico no frame indicado (Lâmina / Blade Tool).
+     * @param {string} clipId ID do clipe a ser fatiado.
+     * @param {number} splitFrame Posição do frame onde o corte ocorrerá.
+     * @param {boolean} splitLinked Se true (padrão), fatia também o clipe parceiro vinculado (ex: áudio/vídeo).
+     * @returns {object|null} Retorna os clipes criados ou null se a operação não puder ser executada.
      */
-    splitClip(clipId, splitFrame) {
+    splitClipAtFrame(clipId, splitFrame, splitLinked = true) {
+        let result = null;
         TIMELINE_HISTORY.record(() => {
             const currentCuts = [...STATE.activeTimelineCuts];
             const targetIdx = currentCuts.findIndex(c => c.id === clipId);
             if (targetIdx === -1) return;
 
             const clip = currentCuts[targetIdx];
-            const fps = this.fps;
+            const track = this.getTrack(clip.track);
+            if (track && track.locked) return;
 
-            // Verifica se o frame intersecta o clipe
-            const startFrame = clip.timelineStartFrame || 0;
+            const fps = this.fps || 24;
+
+            // Verifica se o frame intersecta o clipe estritamente
+            const startFrame = clip.timelineStartFrame !== undefined ? clip.timelineStartFrame : Math.round((clip.timeline_start || 0) * fps);
             const durationFrames = clip.outFrame - clip.inFrame;
             const endFrame = startFrame + durationFrames;
 
             if (splitFrame <= startFrame || splitFrame >= endFrame) {
-                return; // Fora do clipe
+                return; // Ponto fora dos limites do clipe
             }
 
             // Descobrir se há clipe parceiro vinculado
-            const partner = clip.link_id 
+            const partner = (splitLinked && clip.link_id)
                 ? currentCuts.find(c => c.link_id === clip.link_id && c.id !== clip.id)
                 : null;
 
-            const newLinkPartner = clip.link_id ? `link_${Date.now()}_${Math.floor(Math.random()*900+100)}` : null;
+            const partnerTrack = partner ? this.getTrack(partner.track) : null;
+            const canSplitPartner = partner && (!partnerTrack || !partnerTrack.locked);
+
+            const newLinkPartner = (clip.link_id && canSplitPartner)
+                ? `link_${Date.now()}_${Math.floor(Math.random() * 900 + 100)}`
+                : null;
 
             const doSplit = (c, linkId) => {
-                const cStart = c.timelineStartFrame || 0;
+                const cStart = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
                 const offsetFrames = splitFrame - cStart;
-                
+
                 // Criar o segundo clipe (parte direita)
                 const secondClip = {
                     ...c,
-                    id: `cut_${Date.now()}_${Math.floor(Math.random()*900+100)}_${c.id.endsWith("_a") ? "a" : "v"}`,
+                    id: `cut_${Date.now()}_${Math.floor(Math.random() * 900 + 100)}_${c.id.endsWith("_a") ? "a" : "v"}`,
                     timelineStartFrame: splitFrame,
                     timeline_start: splitFrame / fps,
                     inFrame: c.inFrame + offsetFrames,
@@ -2902,15 +2915,98 @@ export class CapiauTimelineState {
                 c.out = c.outFrame / fps;
 
                 currentCuts.push(secondClip);
+                return secondClip;
             };
 
-            doSplit(clip, newLinkPartner);
-            if (partner) {
-                doSplit(partner, newLinkPartner);
+            const rightTarget = doSplit(clip, newLinkPartner);
+            let rightPartner = null;
+
+            if (canSplitPartner) {
+                const pStart = partner.timelineStartFrame !== undefined ? partner.timelineStartFrame : Math.round((partner.timeline_start || 0) * fps);
+                const pEnd = pStart + (partner.outFrame - partner.inFrame);
+                if (splitFrame > pStart && splitFrame < pEnd) {
+                    rightPartner = doSplit(partner, newLinkPartner);
+                }
+            }
+
+            STATE.activeTimelineCuts = currentCuts;
+            result = {
+                leftClip: clip,
+                rightClip: rightTarget,
+                partnerRightClip: rightPartner
+            };
+        });
+        return result;
+    }
+
+    /**
+     * Divide todos os clipes que interceptam o frame em todas as pistas destravadas (Lâmina Global / Shift+C).
+     * @param {number} splitFrame Frame onde o corte global ocorrerá.
+     * @returns {Array<object>} Lista dos novos clipes gerados no lado direito.
+     */
+    splitAllTracksAtFrame(splitFrame) {
+        let createdClips = [];
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = [...STATE.activeTimelineCuts];
+            const fps = this.fps || 24;
+
+            // Conjunto de IDs de pistas destravadas e ativas (não IA)
+            const unlockedTrackIds = new Set(
+                this.tracks.filter(t => !t.locked && t.kind !== "ai").map(t => t.id)
+            );
+
+            // Filtra clipes que cruzam o frame nas pistas destravadas
+            const targets = currentCuts.filter(c => {
+                if (!unlockedTrackIds.has(c.track)) return false;
+                const s = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+                const e = s + (c.outFrame - c.inFrame);
+                return splitFrame > s && splitFrame < e;
+            });
+
+            if (targets.length === 0) return;
+
+            // Mapa para compartilhar novos IDs de link entre parceiros divididos juntos
+            const linkMap = new Map();
+
+            for (const c of targets) {
+                const cStart = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+                const offsetFrames = splitFrame - cStart;
+
+                let newLinkId = null;
+                if (c.link_id) {
+                    if (!linkMap.has(c.link_id)) {
+                        linkMap.set(c.link_id, `link_${Date.now()}_${Math.floor(Math.random() * 900 + 100)}`);
+                    }
+                    newLinkId = linkMap.get(c.link_id);
+                }
+
+                const secondClip = {
+                    ...c,
+                    id: `cut_${Date.now()}_${Math.floor(Math.random() * 900 + 100)}_${c.id.endsWith("_a") ? "a" : "v"}`,
+                    timelineStartFrame: splitFrame,
+                    timeline_start: splitFrame / fps,
+                    inFrame: c.inFrame + offsetFrames,
+                    in: (c.inFrame + offsetFrames) / fps,
+                    link_id: newLinkId
+                };
+
+                c.outFrame = c.inFrame + offsetFrames;
+                c.out = c.outFrame / fps;
+
+                currentCuts.push(secondClip);
+                createdClips.push(secondClip);
             }
 
             STATE.activeTimelineCuts = currentCuts;
         });
+        return createdClips;
+    }
+
+    /**
+     * Divide um clipe em dois no frame especificado (mantido para compatibilidade com btn-split-playhead).
+     */
+    splitClip(clipId, splitFrame) {
+        return this.splitClipAtFrame(clipId, splitFrame, true);
     }
 
     /**

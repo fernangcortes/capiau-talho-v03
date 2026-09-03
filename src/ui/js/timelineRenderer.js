@@ -262,6 +262,7 @@ export class CapiauTimelineRenderer {
         this.activeSnapFrame = null;
         this.dropIndicator = null;
         this.hoveredGap = null;
+        this.bladeGuide = null; // { frame, track, allTracks }
 
         // Inicia o render loop
         this.renderLoop();
@@ -569,6 +570,45 @@ export class CapiauTimelineRenderer {
 
                     ctx.restore();
                 }
+            }
+        }
+
+        // 3. Guia da Ferramenta Lâmina / Gilete (Blade Tool - Linha vertical tracejada âmbar)
+        if (this.bladeGuide && this.bladeGuide.frame !== null && this.bladeGuide.frame !== undefined) {
+            const bladeX = (this.bladeGuide.frame - scrollLeft) * zoom;
+            if (bladeX >= 0 && bladeX <= this.width) {
+                ctx.save();
+                ctx.strokeStyle = "#f59e0b"; // Âmbar vibrante
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+
+                let topY = this.rulerHeight;
+                let botY = this.height;
+
+                if (!this.bladeGuide.allTracks && this.bladeGuide.track) {
+                    const lane = this.getLane(this.bladeGuide.track);
+                    if (lane) {
+                        topY = lane.top;
+                        botY = lane.top + lane.height;
+                    }
+                }
+
+                ctx.moveTo(bladeX, topY);
+                ctx.lineTo(bladeX, botY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Marcador indicador na ponta superior do corte
+                ctx.fillStyle = "#f59e0b";
+                ctx.beginPath();
+                ctx.moveTo(bladeX, topY + 1);
+                ctx.lineTo(bladeX - 4, topY + 6);
+                ctx.lineTo(bladeX + 4, topY + 6);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.restore();
             }
         }
     }
