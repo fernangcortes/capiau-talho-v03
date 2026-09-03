@@ -248,6 +248,21 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
   }
   ```
 
+### 12. Motor Global de Tooltips & Rolagem Fluida sem Scrollbars Visíveis
+* **Objetivo:** Garantir que tooltips nunca obstruam ferramentas de trabalho adjacentes e que sidebars e toolbars mantenham estética 100% clean sem barras de rolagem roubando pixels úteis.
+* **Diretrizes de Posicionamento Contextual de Tooltips (`#global-tooltip`):**
+  1. **Tool Strip Vertical da Timeline (`.timeline-actions-sidebar`):**
+     * O tooltip **deve aparecer obrigatoriamente à direita de toda a barra** (`left = sidebarRect.right + 10px`), alinhado verticalmente ao centro do botão.
+     * **Proibição Estrita:** O tooltip nunca deve se abrir centralizado sobre o botão ou à esquerda, pois isso encobre os botões da coluna adjacente (em modo 2 colunas) ou os botões vizinhos.
+  2. **Tool Strip Horizontal (Acima da Timeline):**
+     * O tooltip **deve abrir prioritariamente para cima** (`top = rect.top - height - 8px`), apontando em direção aos monitores superiores.
+     * **Justificativa NLE:** Abaixo da barra horizontal residem a régua de timecode (`00:00`), marcadores IN/OUT, agulha de reprodução e clipes da timeline. Abrir para cima preserva 100% da área de trabalho visual e de precisão desimpedida.
+  3. **Linhas Restauradoras de 4px (`.restore-line`):**
+     * Abrir à direita da linha vertical (`left = rect.right + 10px`), centralizado verticalmente.
+* **Scrollbars Ocultas & Rolagem Fluida por Interpolação Lerp:**
+  * Em barras de ferramentas e sidebars estreitas, a barra de rolagem visual deve ser ocultada (`scrollbar-width: none !important;` e `::-webkit-scrollbar { display: none !important; }`).
+  * O ouvinte de evento `wheel` deve capturar o delta normalizado (`deltaMode === 1 ? delta * 22 : ...`) e interpolar suavemente via `requestAnimationFrame` (`current + diff * 0.22`), eliminando trancos secos de linha no Windows.
+
 ---
 
 ## VI. Padrão Obrigatório de Tarefas em Segundo Plano & Feedback em Tempo Real (Background Tasks Standard)
