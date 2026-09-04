@@ -58,7 +58,7 @@ console.log("▶ Iniciando autoteste da Transição Limpa Trim -> Move (Mãozinh
 
 const { STATE } = await import("../src/ui/js/state.js");
 const { TIMELINE_STATE, TIMELINE_HISTORY } = await import("../src/ui/js/timelineState.js");
-const { CapiauTimelineInteraction } = await import("../src/ui/js/timelineInteraction.js");
+const { CapiauTimelineInteraction, CURSOR_TRIM_LEFT, CURSOR_TRIM_RIGHT, CURSOR_TRIM_BIDIRECTIONAL } = await import("../src/ui/js/timelineInteraction.js");
 
 const mockRenderer = {
     canvas: mockCanvas,
@@ -135,6 +135,46 @@ assert.equal(interaction.dragOriginalCuts, null, "dragOriginalCuts DEVE ser limp
 interaction.onMouseMove({ clientX: 160, clientY: 50, buttons: 0, preventDefault: () => {} });
 assert.equal(interaction.canvas.style.cursor, "grab", "Cursor no interior do clipe DEVE ser 'grab' (mãozinha)");
 console.log("  ✔ Saída automática da função trim para mãozinha ('grab') validada.");
+
+// 2.6 Validação de clipes unidos (costura compartilhada com ponta de seta pintada):
+console.log("\n2.6 Validando cursor com ponta de seta pintada para clipes unidos...");
+STATE.activeTimelineCuts = [
+    { id: "c1", track: "V1", timelineStartFrame: 0, inFrame: 0, outFrame: 100, mediaDurationFrames: 500 },
+    { id: "c2", track: "V1", timelineStartFrame: 100, inFrame: 0, outFrame: 100, mediaDurationFrames: 500 }
+];
+
+// 2.6.1 Hover 2px à esquerda da costura (x = 98): deve pintar a ponta esquerda (indica clipe c1)
+interaction.onMouseMove({ clientX: 98, clientY: 50, buttons: 0 });
+assert.equal(interaction.canvas.style.cursor, CURSOR_TRIM_LEFT, "Hover à esquerda da costura entre clipes unidos deve exibir ponta esquerda pintada (CURSOR_TRIM_LEFT)");
+
+// 2.6.2 Hover 2px à direita da costura (x = 102): deve pintar a ponta direita (indica clipe c2)
+interaction.onMouseMove({ clientX: 102, clientY: 50, buttons: 0 });
+assert.equal(interaction.canvas.style.cursor, CURSOR_TRIM_RIGHT, "Hover à direita da costura entre clipes unidos deve exibir ponta direita pintada (CURSOR_TRIM_RIGHT)");
+
+// 2.6.3 Click 2px à esquerda da costura (x = 98): deve iniciar trim-right de c1 (vídeo da esquerda)
+interaction.onMouseDown({ clientX: 98, clientY: 50, button: 0, shiftKey: false, altKey: false, ctrlKey: false, preventDefault: () => {} });
+assert.equal(interaction.dragState, "trim-right", "Click à esquerda deve iniciar trim-right");
+assert.equal(interaction.draggedClipId, "c1", "Clipe em trim deve ser c1 (vídeo da esquerda)");
+assert.equal(interaction.canvas.style.cursor, CURSOR_TRIM_LEFT, "Cursor durante o trim de c1 deve permanecer com ponta esquerda pintada");
+interaction.onMouseUp({ clientX: 98, clientY: 50, button: 0, preventDefault: () => {} });
+
+// 2.6.4 Click 2px à direita da costura (x = 102): deve iniciar trim-left de c2 (vídeo da direita)
+interaction.onMouseDown({ clientX: 102, clientY: 50, button: 0, shiftKey: false, altKey: false, ctrlKey: false, preventDefault: () => {} });
+assert.equal(interaction.dragState, "trim-left", "Click à direita deve iniciar trim-left");
+assert.equal(interaction.draggedClipId, "c2", "Clipe em trim deve ser c2 (vídeo da direita)");
+assert.equal(interaction.canvas.style.cursor, CURSOR_TRIM_RIGHT, "Cursor durante o trim de c2 deve permanecer com ponta direita pintada");
+interaction.onMouseUp({ clientX: 102, clientY: 50, button: 0, preventDefault: () => {} });
+
+// 2.6.5 Borda isolada (x = 0): clipe c1 não está unido à esquerda nesta borda, deve ser w-resize padrão
+interaction.onMouseMove({ clientX: 0, clientY: 50, buttons: 0 });
+assert.equal(interaction.canvas.style.cursor, "w-resize", "Borda isolada de clipe único deve exibir w-resize padrão");
+console.log("  ✔ Detecção de costura e setas pintadas para clipe da esquerda e direita validadas com sucesso.");
+
+// Restaura cuts originais para a seção 3
+STATE.activeTimelineCuts = [
+    { id: "v1", track: "V1", timelineStartFrame: 100, inFrame: 0, outFrame: 130, mediaDurationFrames: 500, link_id: "link_av_1" },
+    { id: "a1", track: "A1", timelineStartFrame: 100, inFrame: 0, outFrame: 130, mediaDurationFrames: 500, link_id: "link_av_1" }
+];
 
 // ── 3. Validação de Arraste Direto sem Clicar Fora ──
 console.log("\n3. Validando arraste do clipe imediatamente após o trim...");

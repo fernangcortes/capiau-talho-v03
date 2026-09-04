@@ -56,6 +56,15 @@ const CURSOR_SLIP = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/
 // Cursor SVG em alta definição para a Ferramenta Slide (Deslizar Posição na Timeline - U)
 const CURSOR_SLIDE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="3" y1="3" x2="3" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="21" y1="3" x2="21" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="3" y1="3" x2="3" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><line x1="21" y1="3" x2="21" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><rect x="8" y="6" width="8" height="12" rx="1" fill="%2306b6d4" fill-opacity="0.2" stroke="%23000" stroke-width="2.5"/><rect x="8" y="6" width="8" height="12" rx="1" fill="none" stroke="%2306b6d4" stroke-width="1.5"/><line x1="4" y1="12" x2="8" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="4" y1="12" x2="8" y2="12" stroke="%23fff" stroke-width="2" stroke-linecap="round"/><line x1="16" y1="12" x2="20" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="16" y1="12" x2="20" y2="12" stroke="%23fff" stroke-width="2" stroke-linecap="round"/><polygon points="4,12 7,9 7,15" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/><polygon points="20,12 17,9 17,15" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/></svg>') 12 12, ew-resize`;
 
+// Cursores SVG em alta definição para Trim de Clipes (Seleção V):
+// Quando há dois clipes unidos, a ponta de seta esquerda ou direita é pintada em ciano elétrico
+// para sinalizar visualmente ao editor exatamente qual clipe será manipulado no corte.
+export const CURSOR_TRIM_LEFT = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="12" y1="3" x2="12" y2="21" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="12" y1="3" x2="12" y2="21" stroke="%23ffffff" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="12" x2="20" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="12" y1="12" x2="20" y2="12" stroke="%23ffffff" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="12" x2="12" y2="12" stroke="%2306b6d4" stroke-width="2.2" stroke-linecap="round"/><polygon points="8,7 3,12 8,17" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/><polygon points="16,7 21,12 16,17" fill="%23ffffff" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/></svg>') 12 12, ew-resize`;
+
+export const CURSOR_TRIM_RIGHT = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="12" y1="3" x2="12" y2="21" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="12" y1="3" x2="12" y2="21" stroke="%23ffffff" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="12" x2="20" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="4" y1="12" x2="12" y2="12" stroke="%23ffffff" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="12" x2="20" y2="12" stroke="%2306b6d4" stroke-width="2.2" stroke-linecap="round"/><polygon points="8,7 3,12 8,17" fill="%23ffffff" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/><polygon points="16,7 21,12 16,17" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/></svg>') 12 12, ew-resize`;
+
+export const CURSOR_TRIM_BIDIRECTIONAL = "w-resize";
+
 export class CapiauTimelineInteraction {
     constructor(renderer) {
         this.renderer = renderer;
@@ -84,6 +93,7 @@ export class CapiauTimelineInteraction {
 
         // Estado para trim vinculado A/V (Trim Head / Tail com seleção normal V)
         this.dragTrimLinked = true;
+        this.dragTrimIsUnited = false;
         this.dragPartnerClipId = null;
         this.dragPartnerStartClipFrame = null;
 
@@ -583,6 +593,113 @@ export class CapiauTimelineInteraction {
         if (Math.abs(x - startX) <= tolerance) return "left";
         if (Math.abs(x - endX) <= tolerance) return "right";
         return null;
+    }
+
+    /**
+     * Determina com precisão de pixel qual clipe e borda estão sob o cursor para trim,
+     * resolvendo a fronteira exata entre clipes adjacentes (unidos).
+     * @param {number} x Coordenada X no canvas em pixels
+     * @param {string} track ID da pista
+     * @returns {{ clip: object, edge: "left"|"right", isUnited: boolean, activeSide: "left"|"right" } | null}
+     */
+    getTrimHit(x, track) {
+        if (!track) return null;
+        const trackObj = TIMELINE_STATE.getTrack(track);
+        if (trackObj && (trackObj.locked || trackObj.kind === "ai")) return null;
+
+        const cuts = STATE.activeTimelineCuts || [];
+        const trackCuts = cuts.filter(c => c.track === track);
+        if (trackCuts.length === 0) return null;
+
+        // Ordena por início na timeline
+        trackCuts.sort((a, b) => a.timelineStartFrame - b.timelineStartFrame);
+
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+        const tolerance = 6; // tolerância em pixels
+
+        // 1. Procura primeiro por costuras/junções entre clipes unidos
+        for (let i = 0; i < trackCuts.length - 1; i++) {
+            const clipA = trackCuts[i];
+            const clipB = trackCuts[i + 1];
+            const endFrameA = clipA.timelineStartFrame + (clipA.outFrame - clipA.inFrame);
+            const startFrameB = clipB.timelineStartFrame;
+
+            const endXA = (endFrameA - scrollLeft) * zoom;
+            const startXB = (startFrameB - scrollLeft) * zoom;
+
+            // Clipes unidos se a distância for <= 1 frame ou visualmente contíguos (<= 2px)
+            if (Math.abs(startFrameB - endFrameA) <= 1 || Math.abs(startXB - endXA) <= 2) {
+                const seamX = (endXA + startXB) / 2;
+                if (Math.abs(x - seamX) <= tolerance) {
+                    if (x < seamX) {
+                        // Cursor à esquerda da costura: manipula clipe da esquerda (Clip A, borda right)
+                        return {
+                            clip: clipA,
+                            edge: "right",
+                            isUnited: true,
+                            activeSide: "left"
+                        };
+                    } else {
+                        // Cursor à direita da costura: manipula clipe da direita (Clip B, borda left)
+                        return {
+                            clip: clipB,
+                            edge: "left",
+                            isUnited: true,
+                            activeSide: "right"
+                        };
+                    }
+                }
+            }
+        }
+
+        // 2. Se não estiver em uma costura unida, verifica bordas isoladas
+        let closest = null;
+        let minDistance = Infinity;
+
+        for (const clip of trackCuts) {
+            const startX = (clip.timelineStartFrame - scrollLeft) * zoom;
+            const endX = (clip.timelineStartFrame + (clip.outFrame - clip.inFrame) - scrollLeft) * zoom;
+
+            const distStart = Math.abs(x - startX);
+            if (distStart <= tolerance && distStart < minDistance) {
+                minDistance = distStart;
+                closest = {
+                    clip: clip,
+                    edge: "left",
+                    isUnited: false,
+                    activeSide: "right"
+                };
+            }
+
+            const distEnd = Math.abs(x - endX);
+            if (distEnd <= tolerance && distEnd < minDistance) {
+                minDistance = distEnd;
+                closest = {
+                    clip: clip,
+                    edge: "right",
+                    isUnited: false,
+                    activeSide: "left"
+                };
+            }
+        }
+
+        return closest;
+    }
+
+    /**
+     * Retorna a string de cursor CSS correspondente para trim.
+     * Quando há dois clipes unidos, retorna o cursor com a ponta de seta esquerda ou direita
+     * pintada de ciano elétrico indicando qual vídeo será manipulado.
+     * @param {"left"|"right"} activeSide Lado do clipe manipulado ("left" ou "right")
+     * @param {boolean} isUnited Se o clipe está unido a outro na costura
+     * @returns {string} String do cursor CSS
+     */
+    getTrimCursor(activeSide, isUnited = true) {
+        if (!isUnited) {
+            return CURSOR_TRIM_BIDIRECTIONAL;
+        }
+        return activeSide === "left" ? CURSOR_TRIM_LEFT : CURSOR_TRIM_RIGHT;
     }
 
     /**
@@ -1165,7 +1282,11 @@ export class CapiauTimelineInteraction {
                 return;
             }
 
-            const hit = this.findClipAt(frame, track, y);
+            let hit = this.findClipAt(frame, track, y);
+            const trimHit = this.getTrimHit(x, track);
+            if (!hit && trimHit) {
+                hit = { type: "clip", data: trimHit.clip };
+            }
 
             if (hit) {
                 if (hit.type === "clip") {
@@ -1182,7 +1303,7 @@ export class CapiauTimelineInteraction {
                     }
 
                     // Se clicou em um clipe que já faz parte de uma seleção múltipla, inicia arrasto em grupo (mesmo com Shift)
-                    if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1 && TIMELINE_STATE.selectedClipIds.has(clip.id)) {
+                    if (!trimHit && TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1 && TIMELINE_STATE.selectedClipIds.has(clip.id)) {
                         TIMELINE_HISTORY.begin();
                         this.dragState = "drag-selection";
                         if (this.canvas) this.canvas.style.cursor = "grabbing";
@@ -1250,8 +1371,10 @@ export class CapiauTimelineInteraction {
                         return;
                     }
 
+                    const targetClip = trimHit ? trimHit.clip : clip;
+
                     if (!e.shiftKey) {
-                        TIMELINE_STATE.selectClip(clip.id, false);
+                        TIMELINE_STATE.selectClip(targetClip.id, false);
                     }
                     TIMELINE_STATE.selectedTrack = track;
                     TIMELINE_STATE.clearSelectedGap();
@@ -1259,20 +1382,21 @@ export class CapiauTimelineInteraction {
                     // Abre a transação de histórico: o drag/trim vira 1 passo de undo
                     TIMELINE_HISTORY.begin();
 
-                    const trimEdge = this.checkTrimZone(x, clip);
+                    const trimEdge = trimHit ? trimHit.edge : this.checkTrimZone(x, clip);
 
                     if (trimEdge === "left" || trimEdge === "right") {
                         const cuts = STATE.activeTimelineCuts || [];
-                        const partner = (!e.altKey && clip.link_id)
-                            ? cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id)
+                        const partner = (!e.altKey && targetClip.link_id)
+                            ? cuts.find(c => c.id !== targetClip.id && c.link_id === targetClip.link_id)
                             : null;
 
-                        this.draggedClipId = clip.id;
+                        this.draggedClipId = targetClip.id;
                         this.dragStartMouseX = e.clientX;
-                        this.dragStartClipFrame = clip.timelineStartFrame;
-                        this.dragStartInFrame = clip.inFrame;
-                        this.dragStartOutFrame = clip.outFrame;
+                        this.dragStartClipFrame = targetClip.timelineStartFrame;
+                        this.dragStartInFrame = targetClip.inFrame;
+                        this.dragStartOutFrame = targetClip.outFrame;
                         this.dragTrimLinked = !e.altKey && !!partner;
+                        this.dragTrimIsUnited = trimHit ? trimHit.isUnited : false;
 
                         if (partner) {
                             this.dragPartnerClipId = partner.id;
@@ -1288,6 +1412,10 @@ export class CapiauTimelineInteraction {
 
                         this.dragState = trimEdge === "left" ? "trim-left" : "trim-right";
                         this.dragHasMoved = false;
+                        if (this.canvas) {
+                            const activeSide = trimHit ? trimHit.activeSide : (trimEdge === "left" ? "right" : "left");
+                            this.canvas.style.cursor = this.getTrimCursor(activeSide, this.dragTrimIsUnited);
+                        }
                     } else {
                         // Drag normal do clipe (com suporte a Shift para Sobrescrita e Ctrl para Ripple)
                         this.dragState = "drag-clip";
@@ -1620,15 +1748,24 @@ export class CapiauTimelineInteraction {
                     }
                 }
 
-                const edge = this.checkTrimZone(x, hit.data);
-                this.canvas.style.cursor = edge ? "w-resize" : "grab";
+                const trimHit = this.getTrimHit(x, track);
+                if (trimHit) {
+                    this.canvas.style.cursor = this.getTrimCursor(trimHit.activeSide, trimHit.isUnited);
+                } else {
+                    this.canvas.style.cursor = "grab";
+                }
             } else {
                 if (TIMELINE_STATE.hoveredFadeHandle !== null) {
                     TIMELINE_STATE.hoveredFadeHandle = null;
                     if (this.renderer) this.renderer.requestRedraw();
                 }
-                this.canvas.style.cursor = "default";
-                this.canvas.removeAttribute("title");
+                const trimHit = this.getTrimHit(x, track);
+                if (trimHit) {
+                    this.canvas.style.cursor = this.getTrimCursor(trimHit.activeSide, trimHit.isUnited);
+                } else {
+                    this.canvas.style.cursor = "default";
+                    this.canvas.removeAttribute("title");
+                }
             }
         } else if (!this.dragState) {
             if (TIMELINE_STATE.activeTool === "marquee") {
@@ -2026,6 +2163,7 @@ export class CapiauTimelineInteraction {
             }
         }
         else if (this.dragState === "trim-left" && this.draggedClipId) {
+            if (this.canvas) this.canvas.style.cursor = this.getTrimCursor("right", this.dragTrimIsUnited);
             const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
             const dx = e.clientX - this.dragStartMouseX;
             const rawDelta = Math.round(dx / TIMELINE_STATE.zoom);
@@ -2053,6 +2191,7 @@ export class CapiauTimelineInteraction {
             this.trimClipLeft(this.draggedClipId, deltaFrames, isRipple, trimLinked);
         }
         else if (this.dragState === "trim-right" && this.draggedClipId) {
+            if (this.canvas) this.canvas.style.cursor = this.getTrimCursor("left", this.dragTrimIsUnited);
             const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
             const dx = e.clientX - this.dragStartMouseX;
             const rawDelta = Math.round(dx / TIMELINE_STATE.zoom);
@@ -2347,6 +2486,7 @@ export class CapiauTimelineInteraction {
         // Fecha a transação do drag/trim (no-op se nada mudou)
         TIMELINE_HISTORY.commit();
         if (wasTrim) {
+            this.dragTrimIsUnited = false;
             STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
         }
         this.dragState = null;
@@ -2374,9 +2514,11 @@ export class CapiauTimelineInteraction {
                 const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);
                 if (track && y >= (this.renderer ? this.renderer.rulerHeight : 30)) {
                     const hit = this.findClipAt(frame, track, y);
-                    if (hit && hit.type === "clip") {
-                        const edge = this.checkTrimZone(x, hit.data);
-                        this.canvas.style.cursor = edge ? "w-resize" : "grab";
+                    const trimHit = this.getTrimHit(x, track);
+                    if (trimHit) {
+                        this.canvas.style.cursor = this.getTrimCursor(trimHit.activeSide, trimHit.isUnited);
+                    } else if (hit && hit.type === "clip") {
+                        this.canvas.style.cursor = "grab";
                     } else {
                         this.canvas.style.cursor = "default";
                     }
