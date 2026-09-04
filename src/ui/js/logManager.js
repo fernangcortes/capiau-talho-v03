@@ -111,7 +111,8 @@ class LogManager {
 
         // Log de alterações na timeline
         STATE.on("timelineCutsUpdated", (cuts) => {
-            this.log("Timeline", `Cortes atualizados. Total: ${cuts.length} clipes na timeline.`, "ACTION");
+            const list = cuts || (STATE.activeTimelineCuts || []);
+            this.log("Timeline", `Cortes atualizados. Total: ${list.length} clipes na timeline.`, "ACTION");
         });
 
         STATE.on("timelineTracksChanged", (tracks) => {

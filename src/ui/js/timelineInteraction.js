@@ -1185,6 +1185,7 @@ export class CapiauTimelineInteraction {
                     if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1 && TIMELINE_STATE.selectedClipIds.has(clip.id)) {
                         TIMELINE_HISTORY.begin();
                         this.dragState = "drag-selection";
+                        if (this.canvas) this.canvas.style.cursor = "grabbing";
                         this.dragStartMouseX = e.clientX;
                         this.dragStartMouseY = e.clientY;
                         this.dragLastMouseX = e.clientX;
@@ -1290,6 +1291,7 @@ export class CapiauTimelineInteraction {
                     } else {
                         // Drag normal do clipe (com suporte a Shift para Sobrescrita e Ctrl para Ripple)
                         this.dragState = "drag-clip";
+                        if (this.canvas) this.canvas.style.cursor = "grabbing";
                         this.draggedClipId = clip.id;
                         this.dragStartMouseX = e.clientX;
                         this.dragStartMouseY = e.clientY;
@@ -1756,6 +1758,7 @@ export class CapiauTimelineInteraction {
             TIMELINE_STATE.setScrollLeftFrame(this.dragStartClipFrame - deltaFrames);
         }
         else if (this.dragState === "drag-selection" && this.dragInitialClipPositions) {
+            if (this.canvas) this.canvas.style.cursor = "grabbing";
             if (Math.abs(e.clientX - this.dragStartMouseX) > 2 || Math.abs(e.clientY - this.dragStartMouseY) > 2) {
                 this.dragHasMoved = true;
             }
@@ -2161,7 +2164,7 @@ export class CapiauTimelineInteraction {
         }
         if (this.dragState === "slip") {
             TIMELINE_HISTORY.commit();
-            STATE.emit("timelineCutsUpdated");
+            STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
             this.dragState = null;
             this.draggedClipId = null;
             this.refreshClipInspector();
@@ -2259,7 +2262,7 @@ export class CapiauTimelineInteraction {
                 STATE.activeTimelineCuts = cuts;
             }
             TIMELINE_HISTORY.commit();
-            STATE.emit("timelineCutsUpdated");
+            STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
             this.dragState = null;
             this.dragInitialClipPositions = null;
             this.dragAnchorClip = null;
@@ -2340,8 +2343,12 @@ export class CapiauTimelineInteraction {
         this.dragDirection = 0;
         this.dragLastMouseX = null;
         this.dragHoppedPastClips = new Set();
+        const wasTrim = this.dragState === "trim-left" || this.dragState === "trim-right";
         // Fecha a transação do drag/trim (no-op se nada mudou)
         TIMELINE_HISTORY.commit();
+        if (wasTrim) {
+            STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        }
         this.dragState = null;
         this.draggedClipId = null;
         this.currentDragMode = null;
@@ -2353,6 +2360,7 @@ export class CapiauTimelineInteraction {
         this.dragPartnerStartClipFrame = null;
         this.dragPartnerStartInFrame = null;
         this.dragPartnerStartOutFrame = null;
+        this.dragOriginalCuts = null;
         if (this.canvas) {
             if (TIMELINE_STATE.activeTool === "marquee") {
                 this.canvas.style.cursor = "crosshair";
@@ -2362,6 +2370,19 @@ export class CapiauTimelineInteraction {
                 this.canvas.style.cursor = this.getSlideCursor();
             } else if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
                 this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e?.shiftKey || false);
+            } else if (e && typeof e.clientX === "number" && typeof e.clientY === "number") {
+                const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);
+                if (track && y >= (this.renderer ? this.renderer.rulerHeight : 30)) {
+                    const hit = this.findClipAt(frame, track, y);
+                    if (hit && hit.type === "clip") {
+                        const edge = this.checkTrimZone(x, hit.data);
+                        this.canvas.style.cursor = edge ? "w-resize" : "grab";
+                    } else {
+                        this.canvas.style.cursor = "default";
+                    }
+                } else {
+                    this.canvas.style.cursor = "default";
+                }
             } else {
                 this.canvas.style.cursor = "default";
             }
@@ -2988,7 +3009,7 @@ export class CapiauTimelineInteraction {
                 const dur = currentEff ? currentEff.duration_s : Math.min(1.0, clipDurS * 0.3);
                 this.setClipFade(clip.id, side, dur, p.id, 0);
                 TIMELINE_HISTORY.commit();
-                STATE.emit("timelineCutsUpdated");
+                STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
                 this.refreshClipInspector();
                 if (this.renderer) this.renderer.requestRedraw();
                 menu.remove();
@@ -3019,7 +3040,7 @@ export class CapiauTimelineInteraction {
             TIMELINE_HISTORY.begin();
             this.setClipFade(clip.id, side, 0);
             TIMELINE_HISTORY.commit();
-            STATE.emit("timelineCutsUpdated");
+            STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
             this.refreshClipInspector();
             if (this.renderer) this.renderer.requestRedraw();
             menu.remove();

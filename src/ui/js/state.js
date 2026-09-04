@@ -14,7 +14,13 @@ class EventEmitter {
 
     emit(event, data) {
         if (this.listeners[event]) {
-            this.listeners[event].forEach(cb => cb(data));
+            this.listeners[event].forEach(cb => {
+                try {
+                    cb(data);
+                } catch (err) {
+                    console.error(`[AppState] Erro no ouvinte do evento "${event}":`, err);
+                }
+            });
         }
     }
 }
