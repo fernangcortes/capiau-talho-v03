@@ -1,5 +1,5 @@
 // autoteste_clip_collision.mjs
-// Autoteste automatizado da Task 3.5: Prevenção de Sobreposição de Pistas & Modos de Movimentação
+// Autoteste automatizado das Tasks 3.5 & 3.6: Prevenção de Sobreposição de Pistas, Sobrescrita (Shift) & Inserção Ripple (Ctrl)
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -80,7 +80,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 
-console.log("▶ Iniciando autoteste da Task 3.5: Prevenção de Sobreposição & Modos de Movimentação...\n");
+console.log("▶ Iniciando autoteste das Tasks 3.5 & 3.6: Prevenção de Sobreposição, Sobrescrita (Shift) & Inserção Ripple (Ctrl)...\n");
 
 // ── 1. VALIDAÇÃO DE DOM E CACHE-BUSTERS NO INDEX.HTML ─────────────────
 console.log("1. Validando estrutura do DOM e cache-busters no index.html...");
@@ -520,6 +520,165 @@ assert.strictEqual(STATE.activeTimelineCuts.length, linkedOrigCuts.length, "Cort
 assert.strictEqual(STATE.activeTimelineCuts.find(c => c.id === "under_v").outFrame, 96, "Clipe subjacente deve ter duração original restaurada intacta.");
 console.log("  ✔ Escape cancela simulação imediatamente, esconde 2-Up e restaura a timeline intacta.");
 
+// ── 17. VALIDAÇÃO DE RIPPLE SWAP / REARRANGE EDIT (simulateRipple) ────
+console.log("\n17. Validando Ripple Swap / Rearrange Edit em Fileira Colada (simulateRipple)...");
+
+// A. Fileira contígua de clipes colados (caso real NLE):
+// Clipes colados: clip_a (0..48, dur 48), clip_b (48..144, dur 96), clip_c (144..192, dur 48). Duração total: 192 frames.
+const contiguousCuts = [
+    { id: "clip_a", track: "V1", inFrame: 0, outFrame: 48, timelineStartFrame: 0 },
+    { id: "clip_b", track: "V1", inFrame: 0, outFrame: 96, timelineStartFrame: 48 },
+    { id: "clip_c", track: "V1", inFrame: 0, outFrame: 48, timelineStartFrame: 144 }
+];
+
+// Movendo clip_c (144..192) para TRÁS, para o frame 48 (entre A e B):
+const simSwapBack = tState.simulateRipple("clip_c", 48, "V1", contiguousCuts, true);
+
+// Validação do Ripple Swap para trás:
+// clip_a permanece em 0..48
+// clip_c entra em 48..96 (duração 48)
+// clip_b (que estava em 48..144) é empurrado para 96..192 (duração 96)
+// Duração total: 192 frames (exatamente igual à original!)
+// Zero buracos vazios e cauda da timeline não é empurrada para a frente!
+const resA = simSwapBack.simulatedCuts.find(c => c.id === "clip_a");
+const resC = simSwapBack.simulatedCuts.find(c => c.id === "clip_c");
+const resB = simSwapBack.simulatedCuts.find(c => c.id === "clip_b");
+
+assert.ok(resA, "clip_a deve existir.");
+assert.strictEqual(resA.timelineStartFrame, 0, "clip_a deve permanecer em 0.");
+
+assert.ok(resC, "clip_c deve existir.");
+assert.strictEqual(resC.timelineStartFrame, 48, "clip_c deve ser inserido em 48.");
+assert.strictEqual(resC.outFrame - resC.inFrame, 48, "clip_c deve manter duração 48.");
+
+assert.ok(resB, "clip_b deve existir.");
+assert.strictEqual(resB.timelineStartFrame, 96, "clip_b deve começar exatamente onde clip_c termina (48 + 48 = 96).");
+assert.strictEqual(resB.timelineStartFrame + (resB.outFrame - resB.inFrame), 192, "Cauda da timeline NÃO deve ter sido empurrada para além de 192!");
+
+// Movendo clip_a (0..48) para a FRENTE, para depois de clip_b (frame 144):
+const simSwapForward = tState.simulateRipple("clip_a", 144, "V1", contiguousCuts, false);
+// clip_b recua para 0..96
+// clip_a entra em 96..144
+// clip_c permanece em 144..192
+const forB = simSwapForward.simulatedCuts.find(c => c.id === "clip_b");
+const forA = simSwapForward.simulatedCuts.find(c => c.id === "clip_a");
+const forC = simSwapForward.simulatedCuts.find(c => c.id === "clip_c");
+
+assert.strictEqual(forB.timelineStartFrame, 0, "clip_b deve recuar para 0 ocupando o espaço deixado por clip_a.");
+assert.strictEqual(forA.timelineStartFrame, 96, "clip_a deve ser inserido em 96.");
+assert.strictEqual(forC.timelineStartFrame, 144, "clip_c deve permanecer em 144.");
+
+// Validação com clipe externo (mídia vinda de fora da timeline):
+const extBase = [
+    { id: "c1", track: "V1", inFrame: 0, outFrame: 48, timelineStartFrame: 0 },
+    { id: "c2", track: "V1", inFrame: 0, outFrame: 48, timelineStartFrame: 48 }
+];
+const simExt = tState.simulateRipple("c_ext", 48, "V1", [
+    ...extBase,
+    { id: "c_ext", track: "V1", inFrame: 0, outFrame: 24, timelineStartFrame: undefined }
+]);
+const c2ExtMoved = simExt.simulatedCuts.find(c => c.id === "c2");
+assert.strictEqual(c2ExtMoved.timelineStartFrame, 72, "Mídia externa deve abrir espaço expandindo a timeline (48 + 24 = 72).");
+console.log("  ✔ simulateRipple troca posições sem buracos vazios e sem expandir a timeline indevidamente.");
+
+// ── 18. VALIDAÇÃO DOS METADADOS DO MONITOR 2-UP EM RIPPLE SWAP ───────
+console.log("\n18. Validando Metadados do Monitor 2-Up Contextual em Inserção Ripple...");
+
+// A. Movendo clip_c para trás (entre A e B com isMovingBackwards = true):
+// Emenda Head: Outgoing = clip_a na cauda (frame 47), Incoming = clip_c na cabeça (frame 0)
+assert.ok(simSwapBack.outgoingClip, "Outgoing clip deve existir.");
+assert.strictEqual(simSwapBack.outgoingClip.id, "clip_a", "Outgoing deve ser o clipe anterior (clip_a).");
+assert.strictEqual(simSwapBack.outgoingTime, (48 - 1) / 24, "Outgoing deve ser o último frame de clip_a.");
+
+assert.ok(simSwapBack.incomingClip, "Incoming clip deve existir.");
+assert.strictEqual(simSwapBack.incomingClip.id, "clip_c", "Incoming deve ser o clipe arrastado (clip_c).");
+assert.strictEqual(simSwapBack.incomingTime, 0, "Incoming time deve ser 0.");
+
+// B. Movendo clip_a para a frente (depois de clip_b com isMovingBackwards = false):
+// Emenda Tail: Outgoing = clip_a na cauda, Incoming = clip_c na cabeça
+assert.ok(simSwapForward.outgoingClip, "Outgoing clip deve existir.");
+assert.strictEqual(simSwapForward.outgoingClip.id, "clip_a", "Outgoing deve ser o clipe arrastado na cauda.");
+assert.strictEqual(simSwapForward.outgoingTime, (48 - 1) / 24, "Outgoing deve ser o último frame de clip_a.");
+
+assert.ok(simSwapForward.incomingClip, "Incoming clip deve existir.");
+assert.strictEqual(simSwapForward.incomingClip.id, "clip_c", "Incoming deve ser o clipe seguinte (clip_c).");
+assert.strictEqual(simSwapForward.incomingTime, 0, "Incoming time deve ser o início de clip_c.");
+console.log("  ✔ Monitor 2-Up exibe emendas Head e Tail contextuais precisas durante o Ripple Swap.");
+
+// ── 19. VALIDAÇÃO DE SINCRONIA ESTRI TA A/V COM splitLinkMap NO RIPPLE ─
+console.log("\n19. Validando Sincronia Estrita A/V com splitLinkMap em Inserção Ripple...");
+const linkedContiguousCuts = [
+    { id: "a_v", track: "V1", inFrame: 0, outFrame: 48, timelineStartFrame: 0, link_id: "link_a" },
+    { id: "a_a", track: "A1", inFrame: 0, outFrame: 48, timelineStartFrame: 0, link_id: "link_a" },
+    { id: "b_v", track: "V1", inFrame: 0, outFrame: 96, timelineStartFrame: 48, link_id: "link_b" },
+    { id: "b_a", track: "A1", inFrame: 0, outFrame: 96, timelineStartFrame: 48, link_id: "link_b" },
+    { id: "c_v", track: "V1", inFrame: 0, outFrame: 48, timelineStartFrame: 144, link_id: "link_c" },
+    { id: "c_a", track: "A1", inFrame: 0, outFrame: 48, timelineStartFrame: 144, link_id: "link_c" }
+];
+
+// Movendo o par c_v / c_a para trás entre a e b (frame 48)
+const simLinkedSwap = tState.simulateRipple("c_v", 48, "V1", linkedContiguousCuts, true);
+
+const resCv = simLinkedSwap.simulatedCuts.find(c => c.id === "c_v");
+const resCa = simLinkedSwap.simulatedCuts.find(c => c.id === "c_a");
+const resBv = simLinkedSwap.simulatedCuts.find(c => c.id === "b_v");
+const resBa = simLinkedSwap.simulatedCuts.find(c => c.id === "b_a");
+
+assert.strictEqual(resCv.timelineStartFrame, 48, "Vídeo c_v deve iniciar em 48.");
+assert.strictEqual(resCa.timelineStartFrame, 48, "Áudio c_a deve iniciar rigorosamente no mesmo frame 48!");
+assert.strictEqual(resBv.timelineStartFrame, 96, "Vídeo b_v empurrado deve começar em 96.");
+assert.strictEqual(resBa.timelineStartFrame, 96, "Áudio b_a empurrado deve começar rigorosamente no mesmo frame 96!");
+console.log("  ✔ Sincronia A/V preservada com alinhamento rigoroso em ambas as pistas no Ripple Swap.");
+
+// ── 20. VALIDAÇÃO DE COMMIT ATÔMICO E CANCELAMENTO EM RIPPLE ─────────
+console.log("\n20. Validando Cancelamento com Escape e Commit no mouseup em Ripple...");
+
+// A. Cancelamento com Escape
+STATE.activeTimelineCuts = JSON.parse(JSON.stringify(linkedContiguousCuts));
+interaction.dragState = "drag-clip";
+interaction.draggedClipId = "c_v";
+interaction.currentDragMode = "ripple";
+interaction.dragOriginalCuts = JSON.parse(JSON.stringify(linkedContiguousCuts));
+interaction.simulatedRippleResult = simLinkedSwap;
+STATE.activeTimelineCuts = simLinkedSwap.simulatedCuts;
+
+let ripPreviewHidden = false;
+globalThis.window.player = {
+    hide2UpPreview: () => { ripPreviewHidden = true; }
+};
+
+interaction.onKeyDown({ key: "Escape", preventDefault: () => {} });
+
+assert.strictEqual(interaction.dragState, null, "dragState deve ser resetado para null após Escape.");
+assert.strictEqual(ripPreviewHidden, true, "hide2UpPreview deve ser chamado ao cancelar.");
+assert.strictEqual(STATE.activeTimelineCuts.length, linkedContiguousCuts.length, "Cortes devem ser restaurados para a lista original.");
+assert.strictEqual(STATE.activeTimelineCuts.find(c => c.id === "c_v").timelineStartFrame, 144, "c_v deve voltar à posição 144 original.");
+assert.strictEqual(interaction.simulatedRippleResult, null, "simulatedRippleResult deve ser limpo.");
+
+// B. Commit atômico no mouseup
+STATE.activeTimelineCuts = JSON.parse(JSON.stringify(linkedContiguousCuts));
+interaction.dragState = "drag-clip";
+interaction.draggedClipId = "c_v";
+interaction.currentDragMode = "ripple";
+interaction.dragOriginalCuts = JSON.parse(JSON.stringify(linkedContiguousCuts));
+interaction.simulatedRippleResult = simLinkedSwap;
+interaction.dragHasMoved = true;
+interaction.dragStartClipFrame = 144;
+
+let historyCommitted = false;
+const origCommit = TIMELINE_HISTORY.commit;
+TIMELINE_HISTORY.commit = () => { historyCommitted = true; origCommit.call(TIMELINE_HISTORY); };
+
+interaction.onMouseUp({});
+
+assert.strictEqual(historyCommitted, true, "TIMELINE_HISTORY.commit deve ter sido chamado no mouseup.");
+assert.strictEqual(interaction.dragState, null, "dragState deve ser resetado após mouseup.");
+assert.strictEqual(STATE.activeTimelineCuts.find(c => c.id === "c_v").timelineStartFrame, 48, "c_v deve ter sua nova posição consolidada em 48.");
+assert.ok(TIMELINE_STATE.selectedClipIds.has("c_v"), "Clipe arrastado deve permanecer selecionado após soltar.");
+
+TIMELINE_HISTORY.commit = origCommit;
+console.log("  ✔ Escape descarta simulação e mouseup consolida corte atômico com histórico consistente.");
+
 console.log("\n============================================================");
-console.log("🎉 AUTOTESTE EXPANDIDO DA TASK 3.5 100% APROVADO (16 TESTES)! ");
+console.log("🎉 AUTOTESTE EXPANDIDO DA TASK 3.6 100% APROVADO (20 TESTES)! ");
 console.log("============================================================");

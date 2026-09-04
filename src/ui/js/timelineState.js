@@ -1624,6 +1624,217 @@ export class CapiauTimelineState {
     }
 
     /**
+     * Simula dinamicamente a inserção Ripple em tempo real (tecla Ctrl) sem alterar o estado persistente.
+     * Suporta Ripple Swap / Rearrange Edit para clipes já existentes na timeline (fechando o espaço na origem
+     * sem criar buracos vazios e sem expandir a timeline desnecessariamente).
+     * @param {string} draggedClipId - ID do clipe sendo arrastado.
+     * @param {number} targetStartFrame - Ponto de inserção magnética.
+     * @param {string|null} [targetTrack=null] - Pista destino sob o mouse.
+     * @param {Array<Object>|null} [sourceCuts=null] - Lista original de cortes intacta no início do arraste.
+     * @param {boolean} [isMovingBackwards=false] - Direção do mouse (true = recuo/esquerda, false = avanço/direita).
+     * @returns {{ simulatedCuts: Array<Object>, outgoingClip: Object|null, outgoingTime: number, incomingClip: Object|null, incomingTime: number }}
+     */
+    simulateRipple(draggedClipId, targetStartFrame, targetTrack = null, sourceCuts = null, isMovingBackwards = false) {
+        const rawSource = sourceCuts || STATE.activeTimelineCuts || [];
+        const base = rawSource.map(c => ({ ...c }));
+        const clip = base.find(c => c.id === draggedClipId);
+        if (!clip) return { simulatedCuts: base, outgoingClip: null, outgoingTime: 0, incomingClip: null, incomingTime: 0 };
+
+        const fps = this.fps || 24;
+        const clipKind = this.trackKindOf(clip.track);
+        let finalTrackId = clip.track;
+        if (targetTrack && targetTrack !== clip.track) {
+            const t = this.getTrack(targetTrack);
+            if (t && !t.locked && (t.kind || "video") === clipKind) {
+                finalTrackId = targetTrack;
+            }
+        }
+
+        const partner = clip.link_id
+            ? base.find(c => c.id !== clip.id && c.link_id === clip.link_id)
+            : null;
+
+        let partnerTrackId = partner ? partner.track : null;
+        if (clipKind === "video" && finalTrackId !== clip.track && partner) {
+            const newAudioTrack = this.pairedAudioTrackId(finalTrackId);
+            if (newAudioTrack) partnerTrackId = newAudioTrack;
+        }
+
+        const clipIn = clip.inFrame !== undefined ? clip.inFrame : Math.round(((clip.in || 0) * fps));
+        const clipOut = clip.outFrame !== undefined ? clip.outFrame : Math.round(((clip.out || 0) * fps));
+        const duration = Math.max(1, clipOut - clipIn);
+        const origTrack = clip.track;
+        const isFromTimeline = clip.timelineStartFrame !== undefined && clip.timelineStartFrame !== null && Number.isFinite(clip.timelineStartFrame);
+        const origStart = isFromTimeline ? clip.timelineStartFrame : 0;
+        const origEnd = origStart + duration;
+
+        const partnerIn = partner ? (partner.inFrame !== undefined ? partner.inFrame : Math.round(((partner.in || 0) * fps))) : 0;
+        const partnerOut = partner ? (partner.outFrame !== undefined ? partner.outFrame : Math.round(((partner.out || 0) * fps))) : 0;
+        const partnerDur = partner ? Math.max(1, partnerOut - partnerIn) : 0;
+        const origPartnerTrack = partner ? partner.track : null;
+        const isPartnerFromTimeline = partner && partner.timelineStartFrame !== undefined && partner.timelineStartFrame !== null && Number.isFinite(partner.timelineStartFrame);
+        const origPartnerStart = isPartnerFromTimeline ? partner.timelineStartFrame : 0;
+        const origPartnerEnd = origPartnerStart + partnerDur;
+
+        // FASE 1: RIPPLE EXTRACT NA ORIGEM (se o clipe já pertencia à timeline original)
+        // Extrai o clipe e fecha o buraco deixado por ele: clipes posteriores na pista de origem recuam
+        const compactedCuts = [];
+
+        for (const c of base) {
+            if (c.id === clip.id || (partner && c.id === partner.id)) {
+                // Não inclui os clipes arrastados na base compactada da fase 1
+                continue;
+            }
+
+            let cStart = c.timelineStartFrame ?? 0;
+
+            // Fecha o espaço na pista original do clipe
+            if (isFromTimeline && c.track === origTrack && cStart >= origEnd) {
+                cStart = Math.max(0, cStart - duration);
+                c.timelineStartFrame = cStart;
+                c.timeline_start = cStart / fps;
+            }
+
+            // Fecha o espaço na pista original do parceiro A/V
+            if (isFromTimeline && partner && isPartnerFromTimeline && c.track === origPartnerTrack && cStart >= origPartnerEnd) {
+                cStart = Math.max(0, cStart - partnerDur);
+                c.timelineStartFrame = cStart;
+                c.timeline_start = cStart / fps;
+            }
+
+            compactedCuts.push(c);
+        }
+
+        // FASE 2: MAPEAMENTO DE COORDENADA DE INSERÇÃO NA TIMELINE COMPACTADA
+        let insertFrame = Math.max(0, targetStartFrame);
+
+        if (isFromTimeline && finalTrackId === origTrack) {
+            if (targetStartFrame <= origStart) {
+                // Arrastando para trás (ou na mesma posição de início original):
+                insertFrame = targetStartFrame;
+            } else if (targetStartFrame < origEnd) {
+                // Dentro da zona original do clipe: volta para a posição original
+                insertFrame = origStart;
+            } else {
+                // Arrastando para a frente além da sua posição original:
+                // Como os clipes após origEnd recuaram duration na timeline compactada,
+                // compensamos duration para mapear sobre os mesmos clipes sem buracos
+                insertFrame = Math.max(origStart, targetStartFrame - duration);
+            }
+        }
+
+        insertFrame = Math.max(0, insertFrame);
+        const endFrame = insertFrame + duration;
+
+        // FASE 3: METADADOS DO MONITOR 2-UP CONTEXTUAL
+        const videoTrack = clipKind === "video" ? finalTrackId : (partner ? partner.track : finalTrackId);
+        const underlyingVideoCuts = compactedCuts.filter(c => c.track === videoTrack);
+
+        const draggedVideoClip = clipKind === "video" ? clip : partner;
+        const draggedInFrame = (draggedVideoClip && draggedVideoClip.inFrame !== undefined)
+            ? draggedVideoClip.inFrame
+            : Math.round(((draggedVideoClip && draggedVideoClip.in) || 0) * fps);
+        const draggedOutFrame = (draggedVideoClip && draggedVideoClip.outFrame !== undefined)
+            ? draggedVideoClip.outFrame
+            : (draggedInFrame + duration);
+
+        const draggedHeadTime = draggedInFrame / fps;
+        const draggedTailTime = Math.max(draggedInFrame, draggedOutFrame - 1) / fps;
+
+        const cutAtStart = underlyingVideoCuts.find(c => {
+            const cStart = c.timelineStartFrame || 0;
+            const cEnd = cStart + (c.outFrame - c.inFrame);
+            return cStart < insertFrame && cEnd > insertFrame;
+        });
+
+        const cutTouchingBefore = underlyingVideoCuts.find(c => {
+            const cEnd = (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame);
+            return cEnd === insertFrame;
+        });
+
+        const cutStartingAtStart = underlyingVideoCuts.find(c => (c.timelineStartFrame || 0) === insertFrame);
+
+        let outgoingClip = null;
+        let outgoingTime = 0;
+        let incomingClip = null;
+        let incomingTime = 0;
+
+        const hasLeftNeighbor = Boolean(cutAtStart || cutTouchingBefore);
+        const hasRightNeighbor = Boolean(cutAtStart || cutStartingAtStart);
+
+        let showHead = false;
+        if (hasLeftNeighbor && !hasRightNeighbor) {
+            showHead = true;
+        } else if (hasRightNeighbor && !hasLeftNeighbor) {
+            showHead = false;
+        } else if (hasLeftNeighbor && hasRightNeighbor) {
+            showHead = Boolean(isMovingBackwards);
+        } else {
+            showHead = Boolean(isMovingBackwards);
+        }
+
+        if (showHead) {
+            // Emenda Head (insertFrame):
+            if (cutAtStart) {
+                outgoingClip = cutAtStart;
+                const offset = insertFrame - (cutAtStart.timelineStartFrame || 0);
+                const cutFrame = cutAtStart.inFrame + Math.max(0, offset - 1);
+                outgoingTime = cutFrame / fps;
+            } else if (cutTouchingBefore) {
+                outgoingClip = cutTouchingBefore;
+                outgoingTime = Math.max(cutTouchingBefore.inFrame, cutTouchingBefore.outFrame - 1) / fps;
+            }
+            incomingClip = draggedVideoClip;
+            incomingTime = draggedHeadTime;
+        } else {
+            // Emenda Tail (endFrame):
+            outgoingClip = draggedVideoClip;
+            outgoingTime = draggedTailTime;
+
+            if (cutAtStart) {
+                incomingClip = cutAtStart;
+                const offset = insertFrame - (cutAtStart.timelineStartFrame || 0);
+                const cutFrame = cutAtStart.inFrame + offset;
+                incomingTime = cutFrame / fps;
+            } else if (cutStartingAtStart) {
+                incomingClip = cutStartingAtStart;
+                incomingTime = cutStartingAtStart.inFrame / fps;
+            }
+        }
+
+        // FASE 4: RIPPLE INSERT NA TIMELINE COMPACTADA
+        clip.timelineStartFrame = insertFrame;
+        clip.timeline_start = insertFrame / fps;
+        clip.track = finalTrackId;
+
+        if (partner) {
+            partner.timelineStartFrame = insertFrame;
+            partner.timeline_start = insertFrame / fps;
+            if (partnerTrackId) partner.track = partnerTrackId;
+        }
+
+        compactedCuts.push(clip);
+        if (partner) compactedCuts.push(partner);
+
+        const ignored = [clip.id];
+        if (partner) ignored.push(partner.id);
+
+        const splitLinkMap = new Map();
+        let cuts = this.rippleInsertTimeRange(finalTrackId, insertFrame, duration, ignored, compactedCuts, splitLinkMap);
+        if (partner) {
+            cuts = this.rippleInsertTimeRange(partnerTrackId || partner.track, insertFrame, partnerDur, ignored, cuts, splitLinkMap);
+        }
+
+        return {
+            simulatedCuts: cuts,
+            outgoingClip,
+            outgoingTime,
+            incomingClip,
+            incomingTime
+        };
+    }
+
+    /**
      * Abre espaço magnético (Ripple) inserindo durationFrames no ponto startFrame da pista.
      * Clipes subsequentes são empurrados e clipes cortados no meio são divididos.
      * Suporta encadeamento multipistas atômico via sourceCuts e preservação de vínculo A/V via splitLinkMap.
@@ -1646,13 +1857,19 @@ export class CapiauTimelineState {
                 continue;
             }
 
+            const cIn = c.inFrame !== undefined ? c.inFrame : Math.round(((c.in || 0) * fps));
+            const cOut = c.outFrame !== undefined ? c.outFrame : Math.round(((c.out || 0) * fps));
+            const cDur = Math.max(1, cOut - cIn);
             const cStart = c.timelineStartFrame || 0;
-            const cDur = c.outFrame - c.inFrame;
             const cEnd = cStart + cDur;
 
             if (cStart >= startFrame) {
                 newCuts.push({
                     ...c,
+                    inFrame: cIn,
+                    outFrame: cOut,
+                    in: c.in !== undefined ? c.in : cIn / fps,
+                    out: c.out !== undefined ? c.out : cOut / fps,
                     timelineStartFrame: cStart + durationFrames,
                     timeline_start: (cStart + durationFrames) / fps
                 });
@@ -1661,8 +1878,10 @@ export class CapiauTimelineState {
                 // Parte esquerda permanece
                 newCuts.push({
                     ...c,
-                    outFrame: c.inFrame + leftDur,
-                    out: (c.inFrame + leftDur) / fps
+                    inFrame: cIn,
+                    in: c.in !== undefined ? c.in : cIn / fps,
+                    outFrame: cIn + leftDur,
+                    out: (cIn + leftDur) / fps
                 });
 
                 // Parte direita empurrada: reutiliza stamp compartilhado via splitLinkMap
@@ -1683,8 +1902,10 @@ export class CapiauTimelineState {
                     id: `cut_${stamp}_${isAudio ? "a" : "v"}`,
                     timelineStartFrame: startFrame + durationFrames,
                     timeline_start: (startFrame + durationFrames) / fps,
-                    inFrame: c.inFrame + leftDur,
-                    in: (c.inFrame + leftDur) / fps,
+                    inFrame: cIn + leftDur,
+                    in: (cIn + leftDur) / fps,
+                    outFrame: cOut,
+                    out: c.out !== undefined ? c.out : cOut / fps,
                     link_id: c.link_id ? `link_${stamp}` : null
                 });
             } else {

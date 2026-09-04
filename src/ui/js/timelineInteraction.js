@@ -1157,6 +1157,7 @@ export class CapiauTimelineInteraction {
                         this.dragHasMoved = false;
                         this.dragOriginalCuts = JSON.parse(JSON.stringify(STATE.activeTimelineCuts || []));
                         this.simulatedOverwriteResult = null;
+                        this.simulatedRippleResult = null;
                     }
                     
                     // Sincroniza player com o início do clipe
@@ -1785,6 +1786,7 @@ export class CapiauTimelineInteraction {
             this.currentDragMode = mode;
 
             if (mode === "overwrite") {
+                this.simulatedRippleResult = null;
                 const isMovingBackwards = this.dragDirection < 0 || snappedStart < this.dragStartClipFrame;
                 // 1. Simulação Dinâmica Não-Destrutiva
                 const sim = TIMELINE_STATE.simulateOverwrite(this.draggedClipId, snappedStart, targetTrack, this.dragOriginalCuts, isMovingBackwards);
@@ -1802,11 +1804,31 @@ export class CapiauTimelineInteraction {
                     this.renderer.dropIndicator = null;
                     this.renderer.requestRedraw();
                 }
+            } else if (mode === "ripple") {
+                this.simulatedOverwriteResult = null;
+                const isMovingBackwards = this.dragDirection < 0 || snappedStart < this.dragStartClipFrame;
+                // 1. Simulação Dinâmica Não-Destrutiva de Ripple
+                const sim = TIMELINE_STATE.simulateRipple(this.draggedClipId, snappedStart, targetTrack, this.dragOriginalCuts, isMovingBackwards);
+                STATE.activeTimelineCuts = sim.simulatedCuts;
+                this.simulatedRippleResult = sim;
+
+                // 2. Monitor 2-Up Contextual (Tela Dupla para Inserção Ripple)
+                if (window.player) {
+                    window.player.show2UpPreview(sim.outgoingClip, sim.outgoingTime, sim.incomingClip, sim.incomingTime);
+                }
+
+                // 3. Drop indicator simplificado
+                if (this.renderer) {
+                    this.renderer.activeSnapFrame = snapGuideFrame;
+                    this.renderer.dropIndicator = null;
+                    this.renderer.requestRedraw();
+                }
             } else {
                 this.simulatedOverwriteResult = null;
+                this.simulatedRippleResult = null;
                 if (window.player) window.player.hide2UpPreview();
 
-                // Se estava em overwrite simulado e voltou para clamp, restaura a timeline antes do cálculo de clamp
+                // Se estava em overwrite/ripple simulado e voltou para clamp, restaura a timeline antes do cálculo de clamp
                 if (this.dragOriginalCuts) {
                     STATE.activeTimelineCuts = JSON.parse(JSON.stringify(this.dragOriginalCuts));
                 }
@@ -2094,25 +2116,26 @@ export class CapiauTimelineInteraction {
             this.simulatedOverwriteResult = null;
             this.dragOriginalCuts = null;
         } else if (this.dragState === "drag-clip" && this.draggedClipId && this.currentDragMode === "ripple") {
-            // No modo ripple, aplica o empurrão UMA ÚNICA VEZ ao soltar
-            const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
-            if (clip) {
-                const ignored = [clip.id];
-                if (clip.link_id) {
-                    const partner = STATE.activeTimelineCuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
-                    if (partner) ignored.push(partner.id);
+            if (this.dragHasMoved) {
+                if (this.simulatedRippleResult && this.simulatedRippleResult.simulatedCuts) {
+                    STATE.activeTimelineCuts = this.simulatedRippleResult.simulatedCuts;
+                } else if (this.dragOriginalCuts) {
+                    const origClip = this.dragOriginalCuts.find(c => c.id === this.draggedClipId);
+                    const curClip = (STATE.activeTimelineCuts || []).find(c => c.id === this.draggedClipId);
+                    const targetTrack = curClip ? curClip.track : (origClip ? origClip.track : null);
+                    const targetStart = curClip ? curClip.timelineStartFrame : (origClip ? origClip.timelineStartFrame : 0);
+                    const isMovingBackwards = targetStart < this.dragStartClipFrame;
+                    const sim = TIMELINE_STATE.simulateRipple(this.draggedClipId, targetStart, targetTrack, this.dragOriginalCuts, isMovingBackwards);
+                    STATE.activeTimelineCuts = sim.simulatedCuts;
                 }
-                const dur = clip.outFrame - clip.inFrame;
-                let cuts = TIMELINE_STATE.rippleInsertTimeRange(clip.track, clip.timelineStartFrame, dur, ignored);
-                if (clip.link_id) {
-                    const partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
-                    if (partner) {
-                        const pDur = partner.outFrame - partner.inFrame;
-                        cuts = TIMELINE_STATE.rippleInsertTimeRange(partner.track, partner.timelineStartFrame, pDur, ignored);
-                    }
-                }
-                STATE.activeTimelineCuts = cuts;
+                TIMELINE_STATE.clearClipSelection();
+                TIMELINE_STATE.selectClip(this.draggedClipId);
+            } else if (this.dragOriginalCuts) {
+                // Se clicou sem mover, restaura a timeline original intacta
+                STATE.activeTimelineCuts = JSON.parse(JSON.stringify(this.dragOriginalCuts));
             }
+            this.simulatedRippleResult = null;
+            this.dragOriginalCuts = null;
         }
 
         // Se clicou com Shift sem mover o mouse, trata como toggle de seleção cumulativa
@@ -8637,6 +8660,7 @@ export class CapiauTimelineInteraction {
                 this.currentDragMode = null;
                 this.dragOriginalCuts = null;
                 this.simulatedOverwriteResult = null;
+                this.simulatedRippleResult = null;
                 this.dragHasMoved = false;
                 this.dragDirection = 0;
                 this.dragLastMouseX = null;
