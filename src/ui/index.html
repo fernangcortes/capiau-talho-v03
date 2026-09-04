@@ -19,7 +19,7 @@
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Customizados -->
-    <link rel="stylesheet" href="styles.css?v=25">
+    <link rel="stylesheet" href="styles.css?v=31">
 </head>
 <body>
     <div class="app-container">
@@ -941,7 +941,36 @@
                                 <div class="toolbar-divider"></div>
 
                                 <!-- Grupo 1: Seleção -->
-                                <button id="btn-tool-select" class="btn-toolbar-action active" data-tooltip="Ferramenta de Seleção (V)"><i class="fa-solid fa-arrow-pointer"></i></button>
+                                <div class="toolbar-tool-wrapper" id="tool-select-wrapper">
+                                    <button id="btn-tool-select" class="btn-toolbar-action active" data-tooltip="Ferramenta de Seleção (V) [Bloqueio Físico]">
+                                        <i class="fa-solid fa-arrow-pointer"></i>
+                                        <span class="flyout-indicator"></span>
+                                    </button>
+                                    <div class="toolbar-submenu-flyout" id="flyout-collision-modes">
+                                        <button class="btn-toolbar-action btn-collision-mode active" id="btn-collision-clamp" data-mode="clamp" data-tooltip="Bloqueio Físico / Colisão Sólida (Padrão)">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+                                                <rect x="3" y="5" width="7" height="14" rx="1"></rect>
+                                                <rect x="14" y="5" width="7" height="14" rx="1"></rect>
+                                                <line x1="12" y1="3" x2="12" y2="21" stroke-dasharray="2 2"></line>
+                                            </svg>
+                                        </button>
+                                        <button class="btn-toolbar-action btn-collision-mode" id="btn-collision-overwrite" data-mode="overwrite" data-tooltip="Sobrescrita / Overwrite [Shift ao arrastar]">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+                                                <rect x="3" y="4" width="12" height="10" rx="1"></rect>
+                                                <rect x="9" y="10" width="12" height="10" rx="1" stroke-dasharray="2 2"></rect>
+                                                <line x1="13" y1="13" x2="17" y2="17"></line>
+                                                <line x1="17" y1="13" x2="13" y2="17"></line>
+                                            </svg>
+                                        </button>
+                                        <button class="btn-toolbar-action btn-collision-mode" id="btn-collision-ripple" data-mode="ripple" data-tooltip="Inserção Ripple [Ctrl ao arrastar]">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+                                                <line x1="12" y1="3" x2="12" y2="21"></line>
+                                                <polyline points="8 7 3 12 8 17"></polyline>
+                                                <polyline points="16 7 21 12 16 17"></polyline>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                                 <button id="btn-tool-marquee" class="btn-toolbar-action" data-tooltip="Seleção por Caixa / Retângulo (Marquee) [Shift + V]"><i class="fa-solid fa-vector-square"></i></button>
 
                                 <div class="toolbar-divider"></div>
@@ -2822,7 +2851,7 @@
     </div>
 
     <!-- Lógica da Aplicação -->
-    <script type="module" src="js/main.js?v=26"></script>
+    <script type="module" src="js/main.js?v=31"></script>
 </body>
 </html>
 

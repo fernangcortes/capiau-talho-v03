@@ -1052,21 +1052,15 @@ export class CapiauTimelineInteraction {
                         return;
                     }
 
-                    // Se pressionou Shift no modo normal de seleção, alterna seleção cumulativa
-                    if (e.shiftKey) {
-                        TIMELINE_STATE.toggleClipSelection(clip.id);
-                        this.syncPlayerToClip(clip);
-                        this.refreshClipInspector();
-                        this.renderer.requestRedraw();
-                        return;
-                    }
-
-                    // Se clicou em um clipe que já faz parte de uma seleção múltipla, inicia arrasto em grupo
+                    // Se clicou em um clipe que já faz parte de uma seleção múltipla, inicia arrasto em grupo (mesmo com Shift)
                     if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1 && TIMELINE_STATE.selectedClipIds.has(clip.id)) {
                         TIMELINE_HISTORY.begin();
                         this.dragState = "drag-selection";
                         this.dragStartMouseX = e.clientX;
                         this.dragStartMouseY = e.clientY;
+                        this.dragLastMouseX = e.clientX;
+                        this.dragDirection = 0;
+                        this.dragHasMoved = false;
                         this.dragAnchorClip = clip;
                         this.dragInitialClipPositions = new Map();
                         const cuts = STATE.activeTimelineCuts || [];
@@ -1087,6 +1081,15 @@ export class CapiauTimelineInteraction {
                         this.refreshClipInspector();
                         this.renderer.requestRedraw();
                         return;
+                    }
+
+                    // Se pressionou Shift num clipe individual, preparamos para arrastar em modo Sobrescrita
+                    // (caso seja apenas um clique sem arrastar, fazemos o toggle de seleção no onMouseUp)
+                    if (e.shiftKey) {
+                        this.pendingShiftToggleClipId = clip.id;
+                    } else {
+                        this.pendingShiftToggleClipId = null;
+                        TIMELINE_STATE.selectClip(clip.id, false);
                     }
 
                     // Checa se clicou em um puxador de Fade In / Fade Out ou Ponto de Curva
@@ -1117,7 +1120,9 @@ export class CapiauTimelineInteraction {
                         return;
                     }
 
-                    TIMELINE_STATE.selectClip(clip.id, false);
+                    if (!e.shiftKey) {
+                        TIMELINE_STATE.selectClip(clip.id, false);
+                    }
                     TIMELINE_STATE.selectedTrack = track;
                     TIMELINE_STATE.clearSelectedGap();
 
@@ -1132,17 +1137,26 @@ export class CapiauTimelineInteraction {
                         this.dragStartMouseX = e.clientX;
                         this.dragStartClipFrame = clip.timelineStartFrame;
                         this.dragStartInFrame = clip.inFrame;
+                        this.dragHasMoved = false;
                     } else if (trimEdge === "right") {
                         this.dragState = "trim-right";
                         this.draggedClipId = clip.id;
                         this.dragStartMouseX = e.clientX;
                         this.dragStartOutFrame = clip.outFrame;
+                        this.dragHasMoved = false;
                     } else {
-                        // Drag normal do clipe
+                        // Drag normal do clipe (com suporte a Shift para Sobrescrita e Ctrl para Ripple)
                         this.dragState = "drag-clip";
                         this.draggedClipId = clip.id;
                         this.dragStartMouseX = e.clientX;
+                        this.dragStartMouseY = e.clientY;
+                        this.dragLastMouseX = e.clientX;
+                        this.dragDirection = 0;
+                        this.dragHoppedPastClips = new Set();
                         this.dragStartClipFrame = clip.timelineStartFrame;
+                        this.dragHasMoved = false;
+                        this.dragOriginalCuts = JSON.parse(JSON.stringify(STATE.activeTimelineCuts || []));
+                        this.simulatedOverwriteResult = null;
                     }
                     
                     // Sincroniza player com o início do clipe
@@ -1596,15 +1610,69 @@ export class CapiauTimelineInteraction {
             TIMELINE_STATE.setScrollLeftFrame(this.dragStartClipFrame - deltaFrames);
         }
         else if (this.dragState === "drag-selection" && this.dragInitialClipPositions) {
+            if (Math.abs(e.clientX - this.dragStartMouseX) > 2 || Math.abs(e.clientY - this.dragStartMouseY) > 2) {
+                this.dragHasMoved = true;
+            }
+
             const dx = e.clientX - this.dragStartMouseX;
             const rawDelta = Math.round(dx / TIMELINE_STATE.zoom);
             const minPossibleDelta = -this.dragMinStartFrame;
             let deltaFrames = Math.max(minPossibleDelta, rawDelta);
             let snapGuideFrame = null;
 
+            let mode = TIMELINE_STATE.dragCollisionMode || "clamp";
+            if (e.shiftKey) mode = "overwrite";
+            else if (e.ctrlKey || e.metaKey) mode = "ripple";
+            this.currentDragMode = mode;
+
+            // Mudança vertical de pistas para a seleção inteira (Item 6)
+            let trackDelta = 0;
+            if (this.dragAnchorClip && track) {
+                const allTracks = TIMELINE_STATE.tracks || [];
+                const anchorKind = TIMELINE_STATE.trackKindOf(this.dragAnchorClip.track);
+                const sameKindTracks = allTracks.filter(t => (t.kind || "video") === anchorKind && !t.locked).map(t => t.id);
+                const fromIdx = sameKindTracks.indexOf(this.dragAnchorClip.track);
+                const toIdx = sameKindTracks.indexOf(track);
+                if (fromIdx !== -1 && toIdx !== -1) {
+                    trackDelta = toIdx - fromIdx;
+                }
+            }
+
+            // No modo clamp (bloqueio sólido), calcula a barreira física contra clipes fixos das pistas
+            if (mode === "clamp") {
+                const cuts = STATE.activeTimelineCuts || [];
+                const selectedIds = new Set(this.dragInitialClipPositions.keys());
+                let allowedMinDelta = minPossibleDelta;
+                let allowedMaxDelta = Infinity;
+
+                for (const [clipId, initPos] of this.dragInitialClipPositions.entries()) {
+                    const cDur = initPos.duration;
+                    const cStart = initPos.startFrame;
+                    const cEnd = cStart + cDur;
+                    const curTrack = this.resolveGroupTargetTrack(initPos.track, trackDelta);
+                    const trackCuts = cuts.filter(x => x.track === curTrack && !selectedIds.has(x.id));
+
+                    for (const other of trackCuts) {
+                        const oStart = other.timelineStartFrame || 0;
+                        const oEnd = oStart + (other.outFrame - other.inFrame);
+
+                        // Vizinho à esquerda
+                        if (oEnd <= cStart) {
+                            allowedMinDelta = Math.max(allowedMinDelta, oEnd - cStart);
+                        }
+                        // Vizinho à direita
+                        if (oStart >= cEnd) {
+                            allowedMaxDelta = Math.min(allowedMaxDelta, oStart - cEnd);
+                        }
+                    }
+                }
+
+                deltaFrames = Math.max(allowedMinDelta, Math.min(allowedMaxDelta, deltaFrames));
+            }
+
             // Snapping magnético contra playhead, marcadores e clipes fora da seleção
             const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
-            if (!isSnapDisabled) {
+            if (!isSnapDisabled && mode !== "clamp") {
                 const ignoredIds = Array.from(this.dragInitialClipPositions.keys());
                 const cuts = STATE.activeTimelineCuts || [];
                 for (const cid of Array.from(this.dragInitialClipPositions.keys())) {
@@ -1625,6 +1693,7 @@ export class CapiauTimelineInteraction {
                 if (cut) {
                     cut.timelineStartFrame = Math.max(0, initPos.startFrame + deltaFrames);
                     cut.timeline_start = cut.timelineStartFrame / (TIMELINE_STATE.fps || 24);
+                    cut.track = this.resolveGroupTargetTrack(initPos.track, trackDelta);
                 }
             }
             STATE.activeTimelineCuts = cuts;
@@ -1633,9 +1702,9 @@ export class CapiauTimelineInteraction {
                 const leadingFrame = Math.max(0, this.dragMinStartFrame + deltaFrames);
                 this.renderer.activeSnapFrame = snapGuideFrame;
                 this.renderer.dropIndicator = {
-                    type: "overwrite",
+                    type: mode,
                     frame: leadingFrame,
-                    trackId: this.dragAnchorClip ? this.dragAnchorClip.track : "V1",
+                    trackId: this.dragAnchorClip ? this.resolveGroupTargetTrack(this.dragAnchorClip.track, trackDelta) : "V1",
                     durationFrames: 0
                 };
                 this.renderer.requestRedraw();
@@ -1669,7 +1738,17 @@ export class CapiauTimelineInteraction {
             if (this.renderer) this.renderer.requestRedraw();
         }
         else if (this.dragState === "drag-clip" && this.draggedClipId) {
-            const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
+            if (Math.abs(e.clientX - this.dragStartMouseX) > 2 || Math.abs(e.clientY - this.dragStartMouseY) > 2) {
+                this.dragHasMoved = true;
+            }
+
+            const mouseDeltaX = e.clientX - (this.dragLastMouseX !== null ? this.dragLastMouseX : e.clientX);
+            if (mouseDeltaX > 1) this.dragDirection = 1;
+            else if (mouseDeltaX < -1) this.dragDirection = -1;
+            this.dragLastMouseX = e.clientX;
+
+            const baseCuts = this.dragOriginalCuts || STATE.activeTimelineCuts || [];
+            const clip = baseCuts.find(c => c.id === this.draggedClipId);
             const dx = e.clientX - this.dragStartMouseX;
             const deltaFrames = Math.round(dx / TIMELINE_STATE.zoom);
             const rawStart = Math.max(0, this.dragStartClipFrame + deltaFrames);
@@ -1682,7 +1761,7 @@ export class CapiauTimelineInteraction {
             if (!isSnapDisabled && clip) {
                 const ignoredIds = [clip.id];
                 if (clip.link_id) {
-                    const partner = STATE.activeTimelineCuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                    const partner = baseCuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
                     if (partner) ignoredIds.push(partner.id);
                 }
                 const snapRes = this.snapClip(rawStart, clipDuration, 8, ignoredIds);
@@ -1697,18 +1776,53 @@ export class CapiauTimelineInteraction {
                 targetTrack = track;
             }
 
-            const isInsert = e.ctrlKey || e.metaKey;
-            if (this.renderer && clip) {
-                this.renderer.activeSnapFrame = snapGuideFrame;
-                this.renderer.dropIndicator = {
-                    type: isInsert ? "insert" : "overwrite",
-                    frame: snappedStart,
-                    trackId: targetTrack || clip.track,
-                    durationFrames: clipDuration
-                };
+            let mode = TIMELINE_STATE.dragCollisionMode || "clamp";
+            if (e.shiftKey) {
+                mode = "overwrite";
+            } else if (e.ctrlKey || e.metaKey) {
+                mode = "ripple";
             }
+            this.currentDragMode = mode;
 
-            this.moveClip(this.draggedClipId, snappedStart, targetTrack, isInsert);
+            if (mode === "overwrite") {
+                const isMovingBackwards = this.dragDirection < 0 || snappedStart < this.dragStartClipFrame;
+                // 1. Simulação Dinâmica Não-Destrutiva
+                const sim = TIMELINE_STATE.simulateOverwrite(this.draggedClipId, snappedStart, targetTrack, this.dragOriginalCuts, isMovingBackwards);
+                STATE.activeTimelineCuts = sim.simulatedCuts;
+                this.simulatedOverwriteResult = sim;
+
+                // 2. Monitor 2-Up Contextual (Tela Dupla)
+                if (window.player) {
+                    window.player.show2UpPreview(sim.outgoingClip, sim.outgoingTime, sim.incomingClip, sim.incomingTime);
+                }
+
+                // 3. Drop indicator simplificado (sem caixa roxa sobreposta)
+                if (this.renderer) {
+                    this.renderer.activeSnapFrame = snapGuideFrame;
+                    this.renderer.dropIndicator = null;
+                    this.renderer.requestRedraw();
+                }
+            } else {
+                this.simulatedOverwriteResult = null;
+                if (window.player) window.player.hide2UpPreview();
+
+                // Se estava em overwrite simulado e voltou para clamp, restaura a timeline antes do cálculo de clamp
+                if (this.dragOriginalCuts) {
+                    STATE.activeTimelineCuts = JSON.parse(JSON.stringify(this.dragOriginalCuts));
+                }
+
+                if (this.renderer && clip) {
+                    this.renderer.activeSnapFrame = snapGuideFrame;
+                    this.renderer.dropIndicator = {
+                        type: mode,
+                        frame: snappedStart,
+                        trackId: targetTrack || clip.track,
+                        durationFrames: clipDuration
+                    };
+                }
+
+                this.moveClip(this.draggedClipId, snappedStart, targetTrack, mode);
+            }
         }
         else if (this.dragState === "trim-left" && this.draggedClipId) {
             const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
@@ -1906,12 +2020,40 @@ export class CapiauTimelineInteraction {
             return;
         }
         if (this.dragState === "drag-selection") {
+            if (this.currentDragMode === "overwrite" && this.dragInitialClipPositions) {
+                let cuts = [...STATE.activeTimelineCuts];
+                const selIds = Array.from(this.dragInitialClipPositions.keys());
+                for (const clipId of selIds) {
+                    const c = cuts.find(x => x.id === clipId);
+                    if (c) {
+                        const cDur = c.outFrame - c.inFrame;
+                        cuts = TIMELINE_STATE.overwriteTimeRange(c.track, c.timelineStartFrame, cDur, selIds);
+                    }
+                }
+                STATE.activeTimelineCuts = cuts;
+            } else if (this.currentDragMode === "ripple" && this.dragInitialClipPositions) {
+                let cuts = [...STATE.activeTimelineCuts];
+                const selIds = Array.from(this.dragInitialClipPositions.keys());
+                for (const clipId of selIds) {
+                    const c = cuts.find(x => x.id === clipId);
+                    if (c) {
+                        const cDur = c.outFrame - c.inFrame;
+                        cuts = TIMELINE_STATE.rippleInsertTimeRange(c.track, c.timelineStartFrame, cDur, selIds);
+                    }
+                }
+                STATE.activeTimelineCuts = cuts;
+            }
             TIMELINE_HISTORY.commit();
             STATE.emit("timelineCutsUpdated");
             this.dragState = null;
             this.dragInitialClipPositions = null;
             this.dragAnchorClip = null;
             this.draggedClipId = null;
+            this.currentDragMode = null;
+            this.dragHasMoved = false;
+            this.dragDirection = 0;
+            this.dragLastMouseX = null;
+            this.dragHoppedPastClips = new Set();
             this.refreshClipInspector();
             if (this.canvas) {
                 if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
@@ -1927,10 +2069,66 @@ export class CapiauTimelineInteraction {
             TIMELINE_STATE.hoveredMarkerId = null;
             if (this.renderer) this.renderer.requestRedraw();
         }
+        if (window.player) window.player.hide2UpPreview();
+
+        // Se foi um drag no modo overwrite, consolida o corte simulado atômico
+        if (this.dragState === "drag-clip" && this.draggedClipId && this.currentDragMode === "overwrite") {
+            if (this.dragHasMoved) {
+                if (this.simulatedOverwriteResult && this.simulatedOverwriteResult.simulatedCuts) {
+                    STATE.activeTimelineCuts = this.simulatedOverwriteResult.simulatedCuts;
+                } else if (this.dragOriginalCuts) {
+                    const origClip = this.dragOriginalCuts.find(c => c.id === this.draggedClipId);
+                    const curClip = (STATE.activeTimelineCuts || []).find(c => c.id === this.draggedClipId);
+                    const targetTrack = curClip ? curClip.track : (origClip ? origClip.track : null);
+                    const targetStart = curClip ? curClip.timelineStartFrame : (origClip ? origClip.timelineStartFrame : 0);
+                    const isMovingBackwards = targetStart < this.dragStartClipFrame;
+                    const sim = TIMELINE_STATE.simulateOverwrite(this.draggedClipId, targetStart, targetTrack, this.dragOriginalCuts, isMovingBackwards);
+                    STATE.activeTimelineCuts = sim.simulatedCuts;
+                }
+                TIMELINE_STATE.clearClipSelection();
+                TIMELINE_STATE.selectClip(this.draggedClipId);
+            } else if (this.dragOriginalCuts) {
+                // Se clicou sem mover, restaura a timeline original intacta
+                STATE.activeTimelineCuts = JSON.parse(JSON.stringify(this.dragOriginalCuts));
+            }
+            this.simulatedOverwriteResult = null;
+            this.dragOriginalCuts = null;
+        } else if (this.dragState === "drag-clip" && this.draggedClipId && this.currentDragMode === "ripple") {
+            // No modo ripple, aplica o empurrão UMA ÚNICA VEZ ao soltar
+            const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
+            if (clip) {
+                const ignored = [clip.id];
+                if (clip.link_id) {
+                    const partner = STATE.activeTimelineCuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                    if (partner) ignored.push(partner.id);
+                }
+                const dur = clip.outFrame - clip.inFrame;
+                let cuts = TIMELINE_STATE.rippleInsertTimeRange(clip.track, clip.timelineStartFrame, dur, ignored);
+                if (clip.link_id) {
+                    const partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                    if (partner) {
+                        const pDur = partner.outFrame - partner.inFrame;
+                        cuts = TIMELINE_STATE.rippleInsertTimeRange(partner.track, partner.timelineStartFrame, pDur, ignored);
+                    }
+                }
+                STATE.activeTimelineCuts = cuts;
+            }
+        }
+
+        // Se clicou com Shift sem mover o mouse, trata como toggle de seleção cumulativa
+        if (this.pendingShiftToggleClipId && !this.dragHasMoved) {
+            TIMELINE_STATE.toggleClipSelection(this.pendingShiftToggleClipId);
+        }
+        this.pendingShiftToggleClipId = null;
+        this.dragHasMoved = false;
+        this.dragDirection = 0;
+        this.dragLastMouseX = null;
+        this.dragHoppedPastClips = new Set();
         // Fecha a transação do drag/trim (no-op se nada mudou)
         TIMELINE_HISTORY.commit();
         this.dragState = null;
         this.draggedClipId = null;
+        this.currentDragMode = null;
         this.mouseDownClip = null;
         this.dragInitialClipPositions = null;
         this.dragAnchorClip = null;
@@ -2758,7 +2956,6 @@ export class CapiauTimelineInteraction {
             this.renderer.dropIndicator = null;
         }
 
-        const isInsert = e.ctrlKey || e.metaKey;
         const fps = (TIMELINE_STATE && TIMELINE_STATE.fps) ? TIMELINE_STATE.fps : 24;
 
         let inTime = 0.0;
@@ -2797,6 +2994,18 @@ export class CapiauTimelineInteraction {
             snappedFrame = snapRes.snappedStart;
         }
 
+        let mode = TIMELINE_STATE.dragCollisionMode || "clamp";
+        if (e.shiftKey) mode = "overwrite";
+        else if (e.ctrlKey || e.metaKey) mode = "ripple";
+
+        if (mode === "clamp") {
+            snappedFrame = this.calculateClampedStart(targetTrack, snappedFrame, effDurFrames, []);
+        } else if (mode === "overwrite") {
+            const cuts = TIMELINE_STATE.overwriteTimeRange(targetTrack, snappedFrame, effDurFrames, []);
+            STATE.activeTimelineCuts = cuts;
+        }
+
+        const isInsert = mode === "ripple";
         if (isInsert) {
             const inFrame = secondsToFrames(inTime, fps);
             const outFrame = secondsToFrames(outTime, fps);
@@ -3175,7 +3384,8 @@ export class CapiauTimelineInteraction {
         this.renderAdjustmentsPanel(clip);
 
         // Abre automaticamente a aba de ajustes no menu esquerdo
-        const tabBtn = this.canvas.ownerDocument.querySelector('.tab-btn[data-tab="tab-adjustments"]');
+        const doc = (this.canvas && this.canvas.ownerDocument) || document;
+        const tabBtn = doc ? doc.querySelector('.tab-btn[data-tab="tab-adjustments"]') : null;
         if (tabBtn) {
             if (tabBtn.style.display === "none") {
                 setTabVisibility("tab-adjustments", true);
@@ -4274,6 +4484,125 @@ export class CapiauTimelineInteraction {
             };
         }
 
+        // Submenu de Modos de Colisão de Pistas (Task 3.5)
+        const collisionButtons = {
+            "clamp": doc.getElementById("btn-collision-clamp"),
+            "overwrite": doc.getElementById("btn-collision-overwrite"),
+            "ripple": doc.getElementById("btn-collision-ripple")
+        };
+        const flyout = doc.getElementById("flyout-collision-modes");
+        const selectBtn = toolButtons["select"];
+
+        const updateCollisionUI = (mode) => {
+            const currentMode = mode || TIMELINE_STATE.dragCollisionMode || "clamp";
+            for (const [mKey, btn] of Object.entries(collisionButtons)) {
+                if (btn) btn.classList.toggle("active", currentMode === mKey);
+            }
+            if (selectBtn) {
+                const modeLabels = {
+                    "clamp": "Bloqueio Físico (Padrão)",
+                    "overwrite": "Sobrescrita [Shift]",
+                    "ripple": "Inserção Ripple [Ctrl]"
+                };
+                selectBtn.setAttribute("data-tooltip", `Ferramenta de Seleção (V) [Modo: ${modeLabels[currentMode] || currentMode}]`);
+            }
+        };
+
+        if (flyout && typeof document !== "undefined" && flyout.parentNode !== document.body) {
+            document.body.appendChild(flyout);
+        }
+
+        const positionAndShowFlyout = () => {
+            if (!flyout || !selectBtn) return;
+            const rect = selectBtn.getBoundingClientRect();
+            flyout.style.left = `${Math.round(rect.right + 6)}px`;
+            flyout.style.top = `${Math.round(rect.top + (rect.height / 2) - 16)}px`;
+            flyout.classList.add("show");
+        };
+
+        const hideFlyout = () => {
+            if (flyout) flyout.classList.remove("show");
+        };
+
+        let flyoutHideTimer = null;
+        const scheduleHideFlyout = () => {
+            if (flyoutHideTimer) clearTimeout(flyoutHideTimer);
+            flyoutHideTimer = setTimeout(() => hideFlyout(), 250);
+        };
+        const cancelHideFlyout = () => {
+            if (flyoutHideTimer) {
+                clearTimeout(flyoutHideTimer);
+                flyoutHideTimer = null;
+            }
+        };
+
+        const wrapper = doc.getElementById("tool-select-wrapper");
+        if (wrapper && !wrapper.__capiauFlyoutHoverBound) {
+            wrapper.__capiauFlyoutHoverBound = true;
+            wrapper.addEventListener("mouseenter", () => {
+                cancelHideFlyout();
+                positionAndShowFlyout();
+            });
+            wrapper.addEventListener("mouseleave", () => {
+                scheduleHideFlyout();
+            });
+        }
+
+        if (flyout && !flyout.__capiauFlyoutHoverBound) {
+            flyout.__capiauFlyoutHoverBound = true;
+            flyout.addEventListener("mouseenter", () => {
+                cancelHideFlyout();
+            });
+            flyout.addEventListener("mouseleave", () => {
+                scheduleHideFlyout();
+            });
+        }
+
+        for (const [mKey, btn] of Object.entries(collisionButtons)) {
+            if (btn && !btn.__capiauCollisionBound) {
+                btn.__capiauCollisionBound = true;
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    TIMELINE_STATE.setDragCollisionMode(mKey);
+                    updateCollisionUI(mKey);
+                    hideFlyout();
+                    if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                        const toastLabels = {
+                            "clamp": "Modo de Movimentação: Bloqueio Físico / Colisão Sólida",
+                            "overwrite": "Modo de Movimentação: Sobrescrita / Overwrite",
+                            "ripple": "Modo de Movimentação: Inserção Ripple"
+                        };
+                        window.showToast(toastLabels[mKey], "info");
+                    }
+                };
+            }
+        }
+
+        if (selectBtn && !selectBtn.__capiauFlyoutBound) {
+            selectBtn.__capiauFlyoutBound = true;
+            selectBtn.addEventListener("contextmenu", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                cancelHideFlyout();
+                if (flyout && flyout.classList.contains("show")) {
+                    hideFlyout();
+                } else {
+                    positionAndShowFlyout();
+                }
+            });
+        }
+
+        if (typeof document !== "undefined") {
+            document.addEventListener("click", (e) => {
+                if (flyout && flyout.classList.contains("show") && !flyout.contains(e.target) && (!selectBtn || !selectBtn.contains(e.target))) {
+                    hideFlyout();
+                }
+            });
+        }
+
+        STATE.on("timelineCollisionModeChanged", (mode) => updateCollisionUI(mode));
+        updateCollisionUI(TIMELINE_STATE.dragCollisionMode);
+
         STATE.on("timelineToolChanged", (tool) => {
             updateButtons(tool);
             if (tool !== "blade" && this.renderer && this.renderer.bladeGuide) {
@@ -4422,7 +4751,8 @@ export class CapiauTimelineInteraction {
     }
 
     renderAdjustmentsPanel(clip) {
-        const container = this.canvas.ownerDocument.getElementById("adjustments-panel-content");
+        const doc = (this.canvas && this.canvas.ownerDocument) || document;
+        const container = doc ? doc.getElementById("adjustments-panel-content") : null;
         if (!container) return;
 
         const roundVal = (v) => {
@@ -4520,12 +4850,16 @@ export class CapiauTimelineInteraction {
 
             const fpsSelect = container.querySelector("#seq-fps");
             if (fpsSelect) {
-                const exists = Array.from(fpsSelect.options).some(opt => parseFloat(opt.value) === TIMELINE_STATE.fps);
+                const optionsList = fpsSelect.options ? Array.from(fpsSelect.options) : [];
+                const exists = optionsList.some(opt => parseFloat(opt.value) === TIMELINE_STATE.fps);
                 if (!exists) {
-                    const opt = this.canvas.ownerDocument.createElement("option");
-                    opt.value = TIMELINE_STATE.fps;
-                    opt.textContent = `${TIMELINE_STATE.fps} fps`;
-                    fpsSelect.appendChild(opt);
+                    const doc = (this.canvas && this.canvas.ownerDocument) || document;
+                    const opt = doc.createElement ? doc.createElement("option") : null;
+                    if (opt) {
+                        opt.value = TIMELINE_STATE.fps;
+                        opt.textContent = `${TIMELINE_STATE.fps} fps`;
+                        fpsSelect.appendChild(opt);
+                    }
                 }
                 fpsSelect.value = TIMELINE_STATE.fps;
             }
@@ -4533,23 +4867,29 @@ export class CapiauTimelineInteraction {
             const widthInput = container.querySelector("#seq-width");
             const heightInput = container.querySelector("#seq-height");
             const updateDimInputsState = () => {
+                if (!presetSelect || !widthInput || !heightInput) return;
                 if (presetSelect.value === "custom") {
-                    widthInput.removeAttribute("disabled");
-                    heightInput.removeAttribute("disabled");
-                    widthInput.style.opacity = "1";
-                    heightInput.style.opacity = "1";
+                    if (widthInput.removeAttribute) widthInput.removeAttribute("disabled");
+                    if (heightInput.removeAttribute) heightInput.removeAttribute("disabled");
+                    if (widthInput.style) widthInput.style.opacity = "1";
+                    if (heightInput.style) heightInput.style.opacity = "1";
                 } else {
-                    widthInput.setAttribute("disabled", "true");
-                    heightInput.setAttribute("disabled", "true");
-                    widthInput.style.opacity = "0.5";
-                    heightInput.style.opacity = "0.5";
-                    const [w, h] = presetSelect.value.split("x").map(Number);
-                    widthInput.value = w;
-                    heightInput.value = h;
+                    if (widthInput.setAttribute) widthInput.setAttribute("disabled", "true");
+                    if (heightInput.setAttribute) heightInput.setAttribute("disabled", "true");
+                    if (widthInput.style) widthInput.style.opacity = "0.5";
+                    if (heightInput.style) heightInput.style.opacity = "0.5";
+                    const parts = (presetSelect.value || "").split("x").map(Number);
+                    if (parts.length === 2) {
+                        widthInput.value = parts[0];
+                        heightInput.value = parts[1];
+                    }
                 }
             };
-            updateDimInputsState();
+            if (presetSelect && widthInput && heightInput) {
+                updateDimInputsState();
+            }
             const applySettings = () => {
+                if (!widthInput || !heightInput) return;
                 let wVal = parseInt(widthInput.value) || 1920;
                 let hVal = parseInt(heightInput.value) || 1080;
                 const w = wVal % 2 === 0 ? wVal : wVal + 1;
@@ -4561,11 +4901,12 @@ export class CapiauTimelineInteraction {
                 const aspectSpan = container.querySelector("#seq-aspect-ratio");
                 if (aspectSpan) aspectSpan.textContent = getAspectRatioText(w, h);
             };
-            presetSelect.onchange = () => { updateDimInputsState(); applySettings(); };
-            widthInput.onchange = applySettings;
-            heightInput.onchange = applySettings;
-            fpsSelect.onchange = applySettings;
-            const searchInput = this.canvas.ownerDocument.getElementById("adjustments-search-input");
+            if (presetSelect) presetSelect.onchange = () => { updateDimInputsState(); applySettings(); };
+            if (widthInput) widthInput.onchange = applySettings;
+            if (heightInput) heightInput.onchange = applySettings;
+            if (fpsSelect) fpsSelect.onchange = applySettings;
+            const doc = (this.canvas && this.canvas.ownerDocument) || document;
+            const searchInput = doc ? doc.getElementById("adjustments-search-input") : null;
             if (searchInput && searchInput.value) { this._filterAdjustmentsBySearch(searchInput.value); }
             return;
         }
@@ -8286,6 +8627,30 @@ export class CapiauTimelineInteraction {
                 e.preventDefault();
                 return;
             }
+            if (this.dragState === "drag-clip") {
+                if (window.player) window.player.hide2UpPreview();
+                if (this.dragOriginalCuts) {
+                    STATE.activeTimelineCuts = JSON.parse(JSON.stringify(this.dragOriginalCuts));
+                }
+                this.dragState = null;
+                this.draggedClipId = null;
+                this.currentDragMode = null;
+                this.dragOriginalCuts = null;
+                this.simulatedOverwriteResult = null;
+                this.dragHasMoved = false;
+                this.dragDirection = 0;
+                this.dragLastMouseX = null;
+                this.dragHoppedPastClips = new Set();
+                TIMELINE_HISTORY.pending = null;
+                if (this.renderer) {
+                    this.renderer.activeSnapFrame = null;
+                    this.renderer.dropIndicator = null;
+                    this.renderer.requestRedraw();
+                }
+                this.refreshClipInspector();
+                e.preventDefault();
+                return;
+            }
             let hadSelection = false;
             if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) {
                 TIMELINE_STATE.clearClipSelection();
@@ -8767,10 +9132,143 @@ export class CapiauTimelineInteraction {
         }
     }
 
-    moveClip(clipId, targetStartFrame, targetTrack, isInsertMode = false) {
+    /**
+     * Resolve a pista alvo para um clipe dentro de uma seleção múltipla que está mudando de pistas.
+     * @param {string} origTrack - ID original da pista (ex: 'V1', 'A1').
+     * @param {number} trackDelta - Deslocamento vertical (+1 para pista superior/seguinte, -1 para anterior).
+     * @returns {string} ID da nova pista ou pista original se atingir os limites ou estiver travada.
+     */
+    resolveGroupTargetTrack(origTrack, trackDelta) {
+        if (!trackDelta) return origTrack;
+        const allTracks = TIMELINE_STATE.tracks || [];
+        const kind = TIMELINE_STATE.trackKindOf(origTrack);
+        const tracksOfKind = allTracks.filter(t => (t.kind || "video") === kind);
+        const curIdx = tracksOfKind.findIndex(t => t.id === origTrack);
+        if (curIdx === -1) return origTrack;
+        const targetIdx = curIdx + trackDelta;
+        if (targetIdx >= 0 && targetIdx < tracksOfKind.length) {
+            const target = tracksOfKind[targetIdx];
+            if (!target.locked) return target.id;
+        }
+        return origTrack;
+    }
+
+    /**
+     * Calcula o frame inicial travado (clamped) de um clipe para garantir que ele
+     * NUNCA entre dentro de outro clipe na mesma pista (Bloqueio Físico NLE).
+     * Inclui histerese direcional (directional latch) para garantir que após pular um obstáculo,
+     * o clipe não oscile nem pisque na posição inicial até que o usuário reverta a direção do mouse.
+     * @param {string} trackId - ID da pista.
+     * @param {number} desiredStart - Ponto desejado de início em frames.
+     * @param {number} duration - Duração do clipe em frames.
+     * @param {string[]} [ignoredClipIds=[]] - Clipes ignorados.
+     * @returns {number} Frame inicial ajustado respeitando as barreiras sólidas.
+     */
+    calculateClampedStart(trackId, desiredStart, duration, ignoredClipIds = []) {
+        const gaps = TIMELINE_STATE.getTrackGaps(trackId, ignoredClipIds, true);
+        const cuts = (STATE.activeTimelineCuts || [])
+            .filter(c => c.track === trackId && !ignoredClipIds.includes(c.id))
+            .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+
+        if (!cuts.length) {
+            return Math.max(0, desiredStart);
+        }
+
+        let effectiveStart = desiredStart;
+
+        // 1. Aplica histerese direcional (latch) para obstáculos já ultrapassados (evita oscilação/flicker)
+        if (this.dragHoppedPastClips && this.dragHoppedPastClips.size > 0) {
+            for (const c of cuts) {
+                if (this.dragHoppedPastClips.has(c.id)) {
+                    const cStart = c.timelineStartFrame || 0;
+                    const cEnd = cStart + (c.outFrame - c.inFrame);
+                    const cCenter = (cStart + cEnd) / 2;
+                    const curCenter = effectiveStart + duration / 2;
+
+                    if (this.dragDirection >= 0) {
+                        // Continuando para a direita: não permite recuar para antes do obstáculo
+                        if (effectiveStart < cEnd) {
+                            effectiveStart = cEnd;
+                        }
+                    } else if (this.dragDirection < 0) {
+                        // Mudou de direção para a esquerda: se puxar além do centro de volta, libera o latch
+                        if (curCenter < cCenter) {
+                            this.dragHoppedPastClips.delete(c.id);
+                        } else if (effectiveStart < cEnd) {
+                            effectiveStart = cEnd;
+                        }
+                    }
+                }
+            }
+        }
+
+        const desiredCenter = effectiveStart + duration / 2;
+
+        // 2. Verifica se cai perfeitamente dentro de um gap que acomoda a duração
+        for (const g of gaps) {
+            if (g.durationFrames >= duration) {
+                if (effectiveStart >= g.startFrame && effectiveStart + duration <= g.endFrame) {
+                    return effectiveStart;
+                }
+                if (desiredCenter >= g.startFrame && desiredCenter <= g.endFrame) {
+                    return Math.max(g.startFrame, Math.min(g.endFrame - duration, effectiveStart));
+                }
+            }
+        }
+
+        // 3. Se colidindo com um clipe: decide entre esquerda ou pulo para direita
+        for (let i = 0; i < cuts.length; i++) {
+            const c = cuts[i];
+            const cStart = c.timelineStartFrame || 0;
+            const cEnd = cStart + (c.outFrame - c.inFrame);
+            const cCenter = (cStart + cEnd) / 2;
+
+            if (effectiveStart < cEnd && (effectiveStart + duration) > cStart) {
+                if (desiredCenter >= cCenter) {
+                    // Pulo magnético para a direita
+                    if (this.dragHoppedPastClips) this.dragHoppedPastClips.add(c.id);
+                    const candidate = gaps.find(g => g.startFrame >= cEnd && g.durationFrames >= duration);
+                    if (candidate) {
+                        return Math.min(candidate.endFrame - duration, Math.max(candidate.startFrame, cEnd));
+                    }
+                    return cEnd;
+                } else {
+                    // Trava sólida à esquerda do obstáculo
+                    const candidate = [...gaps].reverse().find(g => g.endFrame <= cStart && g.durationFrames >= duration);
+                    if (candidate) {
+                        return Math.min(candidate.endFrame - duration, Math.max(candidate.startFrame, cStart - duration));
+                    }
+                    return Math.max(0, cStart - duration);
+                }
+            }
+        }
+
+        const fittingGaps = gaps.filter(g => g.durationFrames >= duration);
+        if (!fittingGaps.length) return Math.max(0, effectiveStart);
+
+        let bestGap = fittingGaps[0];
+        let minDistance = Infinity;
+        for (const g of fittingGaps) {
+            const dist = Math.abs(effectiveStart - g.startFrame);
+            if (dist < minDistance) {
+                minDistance = dist;
+                bestGap = g;
+            }
+        }
+        return Math.max(bestGap.startFrame, Math.min(bestGap.endFrame - duration, effectiveStart));
+    }
+
+    moveClip(clipId, targetStartFrame, targetTrack, modeOrInsert = null) {
         const cuts = [...STATE.activeTimelineCuts];
         const clip = cuts.find(c => c.id === clipId);
         if (!clip) return;
+
+        let effectiveMode = TIMELINE_STATE.dragCollisionMode || "clamp";
+        if (typeof modeOrInsert === "string") {
+            effectiveMode = modeOrInsert;
+        } else if (modeOrInsert === true) {
+            effectiveMode = "ripple";
+        }
 
         const clipKind = TIMELINE_STATE.trackKindOf(clip.track);
 
@@ -8785,32 +9283,10 @@ export class CapiauTimelineInteraction {
         const finalTrack = TIMELINE_STATE.getTrack(finalTrackId);
         if (finalTrack && finalTrack.locked) return;
 
-        const oldStart = clip.timelineStartFrame || 0;
-        const delta = targetStartFrame - oldStart;
         const duration = clip.outFrame - clip.inFrame;
+        const fps = TIMELINE_STATE.fps || 24;
 
-        if (clipKind === "audio") {
-            if (clip.link_id) {
-                // Áudio vinculado: o vídeo par também se move pelo delta
-                const partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id &&
-                    TIMELINE_STATE.trackKindOf(c.track) === "video");
-                if (partner) {
-                    const partnerTrack = TIMELINE_STATE.getTrack(partner.track);
-                    if (partnerTrack && !partnerTrack.locked) {
-                        partner.timelineStartFrame = Math.max(0, (partner.timelineStartFrame || 0) + delta);
-                        partner.timeline_start = partner.timelineStartFrame / TIMELINE_STATE.fps;
-                    }
-                }
-            }
-            clip.track = finalTrackId;
-            clip.timelineStartFrame = Math.max(0, targetStartFrame);
-            clip.timeline_start = clip.timelineStartFrame / TIMELINE_STATE.fps;
-            STATE.activeTimelineCuts = cuts;
-            return;
-        }
-
-        // Clipe de vídeo: se tiver áudio vinculado e a pista de vídeo mudou, atualiza a pista do áudio
-        if (finalTrackId !== clip.track) {
+        if (clipKind === "video" && finalTrackId !== clip.track) {
             clip.track = finalTrackId;
             if (clip.link_id) {
                 const partnerAudio = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id &&
@@ -8820,34 +9296,38 @@ export class CapiauTimelineInteraction {
                     if (newAudioTrack) partnerAudio.track = newAudioTrack;
                 }
             }
+        } else {
+            clip.track = finalTrackId;
         }
 
-        if (isInsertMode) {
-            // Ripple Insert: empurra clipes posteriores nas pistas com Sync Lock
-            const syncTracks = TIMELINE_STATE.getSyncLockedTrackIds();
-            cuts.forEach(c => {
-                if (c.id !== clip.id && c.link_id !== clip.link_id &&
-                    syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= targetStartFrame) {
-                    c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) + duration);
-                    c.timeline_start = c.timelineStartFrame / TIMELINE_STATE.fps;
-                }
-            });
-        }
+        const partner = clip.link_id
+            ? cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id)
+            : null;
 
-        clip.timelineStartFrame = Math.max(0, targetStartFrame);
-        clip.timeline_start = clip.timelineStartFrame / TIMELINE_STATE.fps;
+        let finalStart = Math.max(0, targetStartFrame);
 
-        // Move o áudio vinculado junto
-        if (clip.link_id) {
-            const partnerAudio = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id &&
-                TIMELINE_STATE.trackKindOf(c.track) === "audio");
-            if (partnerAudio) {
-                partnerAudio.timelineStartFrame = Math.max(0, (partnerAudio.timelineStartFrame || 0) + delta);
-                partnerAudio.timeline_start = partnerAudio.timelineStartFrame / TIMELINE_STATE.fps;
+        if (effectiveMode === "clamp") {
+            const ignored = [clip.id];
+            if (partner) ignored.push(partner.id);
+
+            finalStart = this.calculateClampedStart(clip.track, finalStart, duration, ignored);
+
+            if (partner) {
+                const partnerDur = partner.outFrame - partner.inFrame;
+                finalStart = this.calculateClampedStart(partner.track, finalStart, partnerDur, ignored);
             }
         }
 
+        clip.timelineStartFrame = finalStart;
+        clip.timeline_start = finalStart / fps;
+
+        if (partner) {
+            partner.timelineStartFrame = finalStart;
+            partner.timeline_start = finalStart / fps;
+        }
+
         STATE.activeTimelineCuts = cuts;
+        return finalStart;
     }
 
     trimClipLeft(clipId, deltaFrames, isRipple = false) {
@@ -8855,27 +9335,41 @@ export class CapiauTimelineInteraction {
         const clip = cuts.find(c => c.id === clipId);
         if (!clip) return;
 
-        const maxStart = clip.outFrame - 12; // Mínimo de 12 frames de duração
-        const targetIn = Math.min(maxStart, Math.max(0, this.dragStartInFrame + deltaFrames));
-        const actualDelta = targetIn - this.dragStartInFrame;
-        const fps = TIMELINE_STATE.fps;
+        const fps = TIMELINE_STATE.fps || 24;
+        const ignored = [clip.id];
+        let partner = null;
+        if (clip.link_id) {
+            partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+            if (partner) ignored.push(partner.id);
+        }
+
+        // Barreira física sólida contra vizinho anterior na pista (Bloqueio Físico NLE)
+        const neighbors = TIMELINE_STATE.getTrackClipNeighbors(clip.track, this.dragStartClipFrame, ignored);
+        let minAllowedStart = neighbors.prevEnd;
+        if (partner) {
+            const pNeighbors = TIMELINE_STATE.getTrackClipNeighbors(partner.track, this.dragStartClipFrame, ignored);
+            minAllowedStart = Math.max(minAllowedStart, pNeighbors.prevEnd);
+        }
+
+        const minDeltaFromNeighbor = minAllowedStart - this.dragStartClipFrame;
+        const minDelta = Math.max(-this.dragStartInFrame, minDeltaFromNeighbor);
+        const maxDelta = (clip.outFrame - 12) - this.dragStartInFrame;
+        const actualDelta = Math.min(maxDelta, Math.max(minDelta, deltaFrames));
+
+        const targetIn = this.dragStartInFrame + actualDelta;
+        const targetStart = Math.max(minAllowedStart, this.dragStartClipFrame + actualDelta);
 
         clip.inFrame = targetIn;
         clip.in = targetIn / fps;
-
-        const targetStart = Math.max(0, this.dragStartClipFrame + actualDelta);
         clip.timelineStartFrame = targetStart;
         clip.timeline_start = targetStart / fps;
 
         // Se o áudio estiver vinculado e o usuário estiver trimando o vídeo
-        if (clip.link_id) {
-            const partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
-            if (partner && partner.inFrame === this.dragStartInFrame) {
-                partner.inFrame = targetIn;
-                partner.in = targetIn / fps;
-                partner.timelineStartFrame = targetStart;
-                partner.timeline_start = targetStart / fps;
-            }
+        if (partner && partner.inFrame === this.dragStartInFrame) {
+            partner.inFrame = targetIn;
+            partner.in = targetIn / fps;
+            partner.timelineStartFrame = targetStart;
+            partner.timeline_start = targetStart / fps;
         }
 
         if (isRipple && actualDelta !== 0) {
@@ -8897,20 +9391,34 @@ export class CapiauTimelineInteraction {
         const clip = cuts.find(c => c.id === clipId);
         if (!clip) return;
 
-        const minOut = clip.inFrame + 12; // Mínimo de 12 frames
-        const targetOut = Math.max(minOut, this.dragStartOutFrame + deltaFrames);
-        const actualDelta = targetOut - this.dragStartOutFrame;
-        const fps = TIMELINE_STATE.fps;
+        const fps = TIMELINE_STATE.fps || 24;
+        const initialEnd = (clip.timelineStartFrame || 0) + (this.dragStartOutFrame - clip.inFrame);
+        const ignored = [clip.id];
+        let partner = null;
+        if (clip.link_id) {
+            partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+            if (partner) ignored.push(partner.id);
+        }
 
+        // Barreira física sólida contra vizinho posterior na pista (Bloqueio Físico NLE)
+        const neighbors = TIMELINE_STATE.getTrackClipNeighbors(clip.track, initialEnd, ignored);
+        let maxAllowedEnd = neighbors.nextStart;
+        if (partner) {
+            const pNeighbors = TIMELINE_STATE.getTrackClipNeighbors(partner.track, initialEnd, ignored);
+            maxAllowedEnd = Math.min(maxAllowedEnd, pNeighbors.nextStart);
+        }
+
+        const maxDeltaFromNeighbor = maxAllowedEnd === Infinity ? Infinity : (maxAllowedEnd - initialEnd);
+        const minDelta = (clip.inFrame + 12) - this.dragStartOutFrame;
+        const actualDelta = Math.max(minDelta, Math.min(maxDeltaFromNeighbor, deltaFrames));
+
+        const targetOut = this.dragStartOutFrame + actualDelta;
         clip.outFrame = targetOut;
         clip.out = targetOut / fps;
 
-        if (clip.link_id) {
-            const partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
-            if (partner && partner.outFrame === this.dragStartOutFrame) {
-                partner.outFrame = targetOut;
-                partner.out = targetOut / fps;
-            }
+        if (partner && partner.outFrame === this.dragStartOutFrame) {
+            partner.outFrame = targetOut;
+            partner.out = targetOut / fps;
         }
 
         if (isRipple && actualDelta !== 0) {

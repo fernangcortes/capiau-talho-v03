@@ -3680,6 +3680,178 @@ export class ProgramPlayer {
         document.addEventListener("mousemove", onMouseMove);
         document.addEventListener("mouseup", onMouseUp);
     }
+
+    /**
+     * Exibe o monitor 2-Up (Tela Dupla) contextual para Outgoing (cauda) e Incoming (cabeça).
+     * @param {Object} outgoingClip - Corte do clipe que está sendo movido/cortado.
+     * @param {number} outgoingTime - Ponto de corte do clipe saindo (em segundos).
+     * @param {Object} incomingClip - Corte do clipe subjacente recebendo o corte (ou null se espaço vazio).
+     * @param {number} incomingTime - Ponto de corte do clipe entrando (em segundos).
+     */
+    show2UpPreview(outgoingClip, outgoingTime, incomingClip, incomingTime) {
+        let overlay = document.getElementById("nle-2up-overlay");
+        const targetContainer = document.fullscreenElement 
+            || this.el("program-player-viewport") 
+            || this.el("program-video-wrapper") 
+            || this.el("program-player-panel") 
+            || document.body;
+
+        if (!overlay) {
+            overlay = document.createElement("div");
+            overlay.id = "nle-2up-overlay";
+            overlay.innerHTML = `
+                <div class="nle-2up-col outgoing">
+                    <div class="nle-2up-badge outgoing">
+                        <span>OUTGOING (TAIL)</span>
+                        <span class="nle-2up-tc" id="nle-2up-outgoing-tc">00:00:00:00</span>
+                    </div>
+                    <video id="nle-2up-outgoing-vid" preload="auto" playsinline muted style="max-width:100%; max-height:100%; object-fit:contain;"></video>
+                    <img id="nle-2up-outgoing-img" style="display:none; max-width:100%; max-height:100%; object-fit:contain;" />
+                    <div id="nle-2up-outgoing-empty" style="display:none; color:var(--text-muted); font-size:12px; font-family:'Outfit',sans-serif;">Espaço Vazio</div>
+                </div>
+                <div class="nle-2up-col incoming">
+                    <div class="nle-2up-badge incoming">
+                        <span>INCOMING (HEAD)</span>
+                        <span class="nle-2up-tc" id="nle-2up-incoming-tc">00:00:00:00</span>
+                    </div>
+                    <video id="nle-2up-incoming-vid" preload="auto" playsinline muted style="max-width:100%; max-height:100%; object-fit:contain;"></video>
+                    <img id="nle-2up-incoming-img" style="display:none; max-width:100%; max-height:100%; object-fit:contain;" />
+                    <div id="nle-2up-incoming-empty" style="display:none; color:var(--text-muted); font-size:12px; font-family:'Outfit',sans-serif;">Espaço Vazio</div>
+                </div>
+            `;
+            targetContainer.appendChild(overlay);
+        } else if (overlay.parentElement !== targetContainer) {
+            targetContainer.appendChild(overlay);
+        }
+
+        overlay.classList.add("active");
+        overlay.style.display = "flex";
+
+        const fps = TIMELINE_STATE?.fps || 24;
+
+        // Helper seguro de seek contínuo para players de monitor duplo (evita travar em frame 0)
+        const updateVideoElement = (vid, src, targetTime) => {
+            if (!vid || !src) return;
+            vid.preload = "auto";
+            vid.muted = true;
+            vid.playsInline = true;
+
+            const timeToSeek = Math.max(0, isNaN(targetTime) ? 0 : targetTime);
+
+            if (vid.dataset.loadedSrc !== src) {
+                vid.src = src;
+                vid.dataset.loadedSrc = src;
+                vid._pendingSeekTarget = timeToSeek;
+                vid.load();
+            } else {
+                vid._pendingSeekTarget = timeToSeek;
+            }
+
+            if (!vid._seekBound) {
+                vid._seekBound = true;
+                vid.addEventListener("seeked", () => {
+                    if (vid._pendingSeekTarget !== null && vid._pendingSeekTarget !== undefined) {
+                        const target = vid._pendingSeekTarget;
+                        vid._pendingSeekTarget = null;
+                        const fpsVal = TIMELINE_STATE?.fps || 24;
+                        if (Math.abs(vid.currentTime - target) > (0.5 / fpsVal)) {
+                            vid.currentTime = Math.max(0, target);
+                        }
+                    }
+                });
+                vid.addEventListener("loadedmetadata", () => {
+                    const target = vid._pendingSeekTarget !== null && vid._pendingSeekTarget !== undefined
+                        ? vid._pendingSeekTarget
+                        : timeToSeek;
+                    vid.currentTime = Math.max(0, target);
+                });
+            }
+
+            if (vid.readyState >= 1) {
+                if (!vid.seeking) {
+                    if (Math.abs(vid.currentTime - timeToSeek) > (0.5 / fps)) {
+                        vid.currentTime = timeToSeek;
+                    }
+                }
+            }
+            vid.style.display = "block";
+        };
+
+        // 1. Configura Outgoing (Esquerda)
+        const outTc = overlay.querySelector("#nle-2up-outgoing-tc");
+        const outVid = overlay.querySelector("#nle-2up-outgoing-vid");
+        const outImg = overlay.querySelector("#nle-2up-outgoing-img");
+        const outEmpty = overlay.querySelector("#nle-2up-outgoing-empty");
+
+        if (outgoingClip) {
+            if (outTc) outTc.textContent = formatTimecode(outgoingTime, fps);
+            if (outEmpty) outEmpty.style.display = "none";
+
+            if (outgoingClip.type === "photo") {
+                const photo = (STATE.allPhotos || []).find(p => String(p.id) === String(outgoingClip.photo_id));
+                const src = photo ? ((photo.proxy_path && (photo.proxy_path.startsWith('/') || photo.proxy_path.startsWith('http'))) ? photo.proxy_path : `/api/photo/${photo.id}/file`) : "";
+                if (outImg) {
+                    outImg.src = src;
+                    outImg.style.display = "block";
+                }
+                if (outVid) outVid.style.display = "none";
+            } else {
+                const src = this._videoSrcForCut(outgoingClip);
+                if (outImg) outImg.style.display = "none";
+                updateVideoElement(outVid, src, outgoingTime);
+            }
+        } else {
+            if (outTc) outTc.textContent = "--:--:--:--";
+            if (outVid) outVid.style.display = "none";
+            if (outImg) outImg.style.display = "none";
+            if (outEmpty) outEmpty.style.display = "block";
+        }
+
+        // 2. Configura Incoming (Direita)
+        const inTc = overlay.querySelector("#nle-2up-incoming-tc");
+        const inVid = overlay.querySelector("#nle-2up-incoming-vid");
+        const inImg = overlay.querySelector("#nle-2up-incoming-img");
+        const inEmpty = overlay.querySelector("#nle-2up-incoming-empty");
+
+        if (incomingClip) {
+            if (inTc) inTc.textContent = formatTimecode(incomingTime, fps);
+            if (inEmpty) inEmpty.style.display = "none";
+
+            if (incomingClip.type === "photo") {
+                const photo = (STATE.allPhotos || []).find(p => String(p.id) === String(incomingClip.photo_id));
+                const src = photo ? ((photo.proxy_path && (photo.proxy_path.startsWith('/') || photo.proxy_path.startsWith('http'))) ? photo.proxy_path : `/api/photo/${photo.id}/file`) : "";
+                if (inImg) {
+                    inImg.src = src;
+                    inImg.style.display = "block";
+                }
+                if (inVid) inVid.style.display = "none";
+            } else {
+                const src = this._videoSrcForCut(incomingClip);
+                if (inImg) inImg.style.display = "none";
+                updateVideoElement(inVid, src, incomingTime);
+            }
+        } else {
+            if (inTc) inTc.textContent = "--:--:--:--";
+            if (inVid) inVid.style.display = "none";
+            if (inImg) inImg.style.display = "none";
+            if (inEmpty) inEmpty.style.display = "block";
+        }
+    }
+
+    /**
+     * Oculta o monitor 2-Up e pausa os vídeos do overlay para liberar decoder.
+     */
+    hide2UpPreview() {
+        const overlay = document.getElementById("nle-2up-overlay");
+        if (overlay) {
+            overlay.classList.remove("active");
+            overlay.style.display = "none";
+            const vids = overlay.querySelectorAll("video");
+            vids.forEach(v => {
+                try { v.pause(); } catch (_) {}
+            });
+        }
+    }
 }
 
 /**
@@ -4007,6 +4179,18 @@ export class VideoPlayer {
 
     loadPhoto(photo) {
         this.sourcePlayer.loadPhoto(photo);
+    }
+
+    show2UpPreview(outgoingClip, outgoingTime, incomingClip, incomingTime) {
+        if (this.programPlayer) {
+            this.programPlayer.show2UpPreview(outgoingClip, outgoingTime, incomingClip, incomingTime);
+        }
+    }
+
+    hide2UpPreview() {
+        if (this.programPlayer) {
+            this.programPlayer.hide2UpPreview();
+        }
     }
 }
 

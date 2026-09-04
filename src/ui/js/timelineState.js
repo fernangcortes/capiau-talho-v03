@@ -242,6 +242,40 @@ export class CapiauTimelineState {
 
         // Manipulador de Fade ativo no hover ({ clipId, side: "in"|"out", type: "duration"|"curve" })
         this.hoveredFadeHandle = null;
+
+        // Modo de Colisão e Movimentação na Mesma Pista (Task 3.5):
+        // "clamp" (Bloqueio Físico rígido - Padrão), "overwrite" (Sobrescrita / Shift), "ripple" (Inserção Magnética / Ctrl)
+        this._dragCollisionMode = this.loadDragCollisionMode();
+    }
+
+    /** Carrega a preferência de modo de colisão do localStorage (default: 'clamp'). */
+    loadDragCollisionMode() {
+        try {
+            if (typeof localStorage !== "undefined") {
+                const saved = localStorage.getItem("capiau_collision_mode_v1");
+                if (saved && ["clamp", "overwrite", "ripple"].includes(saved)) {
+                    return saved;
+                }
+            }
+        } catch (_) {}
+        return "clamp";
+    }
+
+    /** Modo de colisão ativo. */
+    get dragCollisionMode() {
+        return this._dragCollisionMode || "clamp";
+    }
+
+    /** Define e persiste o modo de colisão de pistas. */
+    setDragCollisionMode(mode) {
+        if (!["clamp", "overwrite", "ripple"].includes(mode)) return;
+        this._dragCollisionMode = mode;
+        try {
+            if (typeof localStorage !== "undefined") {
+                localStorage.setItem("capiau_collision_mode_v1", mode);
+            }
+        } catch (_) {}
+        STATE.emit("timelineCollisionModeChanged", mode);
     }
 
     /** Atalho reativo para a lista ativa de cortes na timeline. */
@@ -1223,14 +1257,26 @@ export class CapiauTimelineState {
     /**
      * Retorna a lista ordenada de gaps (espaços vazios) em uma pista.
      * @param {string} trackId - ID da pista.
+     * @param {string[]} [ignoredClipIds=[]] - IDs de clipes a ignorar (ex: clipe em arraste).
+     * @param {boolean} [includeEndGap=false] - Se true, inclui o gap infinito além do último clipe.
      * @returns {Array<{ trackId: string, startFrame: number, endFrame: number, durationFrames: number }>}
      */
-    getTrackGaps(trackId) {
+    getTrackGaps(trackId, ignoredClipIds = [], includeEndGap = false) {
         const cuts = (STATE.activeTimelineCuts || [])
-            .filter(c => c.track === trackId)
+            .filter(c => c.track === trackId && !ignoredClipIds.includes(c.id))
             .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
 
-        if (!cuts.length) return [];
+        if (!cuts.length) {
+            if (includeEndGap) {
+                return [{
+                    trackId,
+                    startFrame: 0,
+                    endFrame: Infinity,
+                    durationFrames: Infinity
+                }];
+            }
+            return [];
+        }
         const gaps = [];
 
         // Gap inicial (se o primeiro clipe não começa no frame 0)
@@ -1261,6 +1307,17 @@ export class CapiauTimelineState {
             }
         }
 
+        if (includeEndGap) {
+            const lastCut = cuts[cuts.length - 1];
+            const lastEnd = (lastCut.timelineStartFrame || 0) + (lastCut.outFrame - lastCut.inFrame);
+            gaps.push({
+                trackId,
+                startFrame: lastEnd,
+                endFrame: Infinity,
+                durationFrames: Infinity
+            });
+        }
+
         return gaps;
     }
 
@@ -1271,6 +1328,371 @@ export class CapiauTimelineState {
         if (!trackId) return null;
         const gaps = this.getTrackGaps(trackId);
         return gaps.find(g => frame >= g.startFrame && frame < g.endFrame) || null;
+    }
+
+    /**
+     * Localiza os vizinhos imediatos de uma coordenada de tempo em uma pista.
+     * @param {string} trackId - ID da pista.
+     * @param {number} frame - Coordenada temporal de referência.
+     * @param {string[]} [ignoredClipIds=[]] - Clipes ignorados no cálculo.
+     * @returns {{ prevClip: Object|null, nextClip: Object|null, prevEnd: number, nextStart: number }}
+     */
+    getTrackClipNeighbors(trackId, frame, ignoredClipIds = []) {
+        const cuts = (STATE.activeTimelineCuts || [])
+            .filter(c => c.track === trackId && !ignoredClipIds.includes(c.id))
+            .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+
+        let prevClip = null;
+        let nextClip = null;
+        let prevEnd = 0;
+        let nextStart = Infinity;
+
+        for (const c of cuts) {
+            const cStart = c.timelineStartFrame || 0;
+            const cDur = c.outFrame - c.inFrame;
+            const cEnd = cStart + cDur;
+
+            if (cEnd <= frame) {
+                prevClip = c;
+                prevEnd = Math.max(prevEnd, cEnd);
+            } else if (cStart >= frame) {
+                if (!nextClip || cStart < nextStart) {
+                    nextClip = c;
+                    nextStart = cStart;
+                }
+            }
+        }
+
+        return { prevClip, nextClip, prevEnd, nextStart };
+    }
+
+    /**
+     * Remove ou fatia clipes existentes no intervalo [startFrame, startFrame + durationFrames] da pista especificada.
+     * Suporta encadeamento multipistas atômico via sourceCuts e preservação de vínculo A/V via splitLinkMap.
+     * @param {string} trackId - ID da pista.
+     * @param {number} startFrame - Frame inicial da sobrescrita.
+     * @param {number} durationFrames - Duração em frames.
+     * @param {string[]} [ignoredClipIds=[]] - IDs de clipes a ignorar.
+     * @param {Array<Object>|null} [sourceCuts=null] - Lista base de cortes (se omitida, usa STATE.activeTimelineCuts).
+     * @param {Map<string, string>|null} [splitLinkMap=null] - Mapa compartilhado para sincronizar link_id em splits A/V.
+     * @returns {Array<Object>} Lista atualizada de cortes.
+     */
+    overwriteTimeRange(trackId, startFrame, durationFrames, ignoredClipIds = [], sourceCuts = null, splitLinkMap = null) {
+        const cuts = sourceCuts || STATE.activeTimelineCuts || [];
+        const endFrame = startFrame + durationFrames;
+        const fps = this.fps || 24;
+        const newCuts = [];
+
+        for (const c of cuts) {
+            if (c.track !== trackId || ignoredClipIds.includes(c.id)) {
+                newCuts.push(c);
+                continue;
+            }
+
+            const cStart = c.timelineStartFrame || 0;
+            const cDur = c.outFrame - c.inFrame;
+            const cEnd = cStart + cDur;
+
+            // Se não há interseção, mantém intacto
+            if (cEnd <= startFrame || cStart >= endFrame) {
+                newCuts.push(c);
+                continue;
+            }
+
+            // Caso 1: Totalmente encoberto -> removido
+            if (cStart >= startFrame && cEnd <= endFrame) {
+                continue;
+            }
+
+            // Caso 2: Novo clipe cai no meio de c -> fatia em dois (esquerda e direita)
+            if (cStart < startFrame && cEnd > endFrame) {
+                const leftDur = startFrame - cStart;
+                const rightOffset = endFrame - cStart;
+
+                // Parte esquerda
+                newCuts.push({
+                    ...c,
+                    outFrame: c.inFrame + leftDur,
+                    out: (c.inFrame + leftDur) / fps
+                });
+
+                // Parte direita: reutiliza stamp compartilhado via splitLinkMap para par A/V
+                let stamp = null;
+                if (c.link_id && splitLinkMap) {
+                    if (splitLinkMap.has(c.link_id)) {
+                        stamp = splitLinkMap.get(c.link_id);
+                    } else {
+                        stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                        splitLinkMap.set(c.link_id, stamp);
+                    }
+                } else {
+                    stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                }
+                const isAudio = this.trackKindOf(trackId) === "audio";
+                newCuts.push({
+                    ...c,
+                    id: `cut_${stamp}_${isAudio ? "a" : "v"}`,
+                    timelineStartFrame: endFrame,
+                    timeline_start: endFrame / fps,
+                    inFrame: c.inFrame + rightOffset,
+                    in: (c.inFrame + rightOffset) / fps,
+                    link_id: c.link_id ? `link_${stamp}` : null
+                });
+                continue;
+            }
+
+            // Caso 3: Cobre a cauda de c -> tail trim
+            if (cStart < startFrame && cEnd <= endFrame) {
+                const leftDur = startFrame - cStart;
+                newCuts.push({
+                    ...c,
+                    outFrame: c.inFrame + leftDur,
+                    out: (c.inFrame + leftDur) / fps
+                });
+                continue;
+            }
+
+            // Caso 4: Cobre a cabeça de c -> head trim
+            if (cStart >= startFrame && cEnd > endFrame) {
+                const offset = endFrame - cStart;
+                newCuts.push({
+                    ...c,
+                    timelineStartFrame: endFrame,
+                    timeline_start: endFrame / fps,
+                    inFrame: c.inFrame + offset,
+                    in: (c.inFrame + offset) / fps
+                });
+                continue;
+            }
+        }
+
+        return newCuts;
+    }
+
+    /**
+     * Simula dinamicamente e sem destruir o estado o resultado de uma sobrescrita em tempo real.
+     * Retorna os cortes simulados e os dados dos clipes Outgoing e Incoming para o preview 2-Up.
+     * @param {string} draggedClipId - ID do clipe sendo arrastado.
+     * @param {number} targetStartFrame - Ponto de início simulado na timeline.
+     * @param {string} targetTrack - Pista de destino simulada.
+     * @param {Array<Object>|null} [sourceCuts=null] - Lista base de cortes intacta antes do arraste.
+     * @returns {{ simulatedCuts: Array<Object>, outgoingClip: Object|null, outgoingTime: number, incomingClip: Object|null, incomingTime: number }}
+     */
+    simulateOverwrite(draggedClipId, targetStartFrame, targetTrack = null, sourceCuts = null, isMovingBackwards = false) {
+        const base = (sourceCuts || STATE.activeTimelineCuts || []).map(c => ({ ...c }));
+        const clip = base.find(c => c.id === draggedClipId);
+        if (!clip) return { simulatedCuts: base, outgoingClip: null, outgoingTime: 0, incomingClip: null, incomingTime: 0 };
+
+        const fps = this.fps || 24;
+        const clipKind = this.trackKindOf(clip.track);
+        let finalTrackId = clip.track;
+        if (targetTrack && targetTrack !== clip.track) {
+            const t = this.getTrack(targetTrack);
+            if (t && !t.locked && (t.kind || "video") === clipKind) {
+                finalTrackId = targetTrack;
+            }
+        }
+
+        const partner = clip.link_id
+            ? base.find(c => c.id !== clip.id && c.link_id === clip.link_id)
+            : null;
+
+        let partnerTrackId = partner ? partner.track : null;
+        if (clipKind === "video" && finalTrackId !== clip.track && partner) {
+            const newAudioTrack = this.pairedAudioTrackId(finalTrackId);
+            if (newAudioTrack) partnerTrackId = newAudioTrack;
+        }
+
+        const duration = clip.outFrame - clip.inFrame;
+        const finalStart = Math.max(0, targetStartFrame);
+        const endFrame = finalStart + duration;
+
+        clip.timelineStartFrame = finalStart;
+        clip.timeline_start = finalStart / fps;
+        clip.track = finalTrackId;
+
+        if (partner) {
+            partner.timelineStartFrame = finalStart;
+            partner.timeline_start = finalStart / fps;
+            if (partnerTrackId) partner.track = partnerTrackId;
+        }
+
+        const ignored = [clip.id];
+        if (partner) ignored.push(partner.id);
+
+        // Identifica o clipe subjacente na pista de vídeo que será cortado para o 2-Up
+        const videoTrack = clipKind === "video" ? finalTrackId : (partner ? partner.track : finalTrackId);
+        const underlyingVideoCuts = base.filter(c => c.track === videoTrack && !ignored.includes(c.id));
+
+        const draggedVideoClip = clipKind === "video" ? clip : partner;
+        const draggedInFrame = (draggedVideoClip && draggedVideoClip.inFrame !== undefined)
+            ? draggedVideoClip.inFrame
+            : Math.round(((draggedVideoClip && draggedVideoClip.in) || 0) * fps);
+        const draggedOutFrame = (draggedVideoClip && draggedVideoClip.outFrame !== undefined)
+            ? draggedVideoClip.outFrame
+            : (draggedInFrame + duration);
+
+        const draggedHeadTime = draggedInFrame / fps;
+        const draggedTailTime = Math.max(draggedInFrame, draggedOutFrame - 1) / fps;
+
+        // 1. Procura colisão na cabeça (finalStart): clipe anterior cuja cauda é cortada em finalStart
+        const cutAtHead = underlyingVideoCuts.find(c => {
+            const cStart = c.timelineStartFrame || 0;
+            const cEnd = cStart + (c.outFrame - c.inFrame);
+            return cStart < finalStart && cEnd > finalStart;
+        });
+
+        // 2. Procura colisão na cauda (endFrame): clipe seguinte cuja cabeça é cortada em endFrame
+        const cutAtTail = underlyingVideoCuts.find(c => {
+            const cStart = c.timelineStartFrame || 0;
+            const cEnd = cStart + (c.outFrame - c.inFrame);
+            return cStart < endFrame && cEnd > endFrame;
+        });
+
+        let outgoingClip = null;
+        let outgoingTime = 0;
+        let incomingClip = null;
+        let incomingTime = 0;
+
+        let isBackwards = false;
+        if (cutAtHead && !cutAtTail) {
+            isBackwards = true;
+        } else if (cutAtTail && !cutAtHead) {
+            isBackwards = false;
+        } else {
+            isBackwards = Boolean(isMovingBackwards);
+        }
+
+        if (isBackwards) {
+            // Emenda no início do clipe arrastado (finalStart):
+            // Lado Esquerdo (Outgoing): clipe anterior aparado na cauda em finalStart
+            if (cutAtHead) {
+                outgoingClip = cutAtHead;
+                const offset = finalStart - (cutAtHead.timelineStartFrame || 0);
+                const cutFrame = cutAtHead.inFrame + Math.max(0, offset - 1);
+                outgoingTime = cutFrame / fps;
+            } else {
+                const prevCut = underlyingVideoCuts.find(c => {
+                    const cEnd = (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame);
+                    return cEnd === finalStart;
+                });
+                if (prevCut) {
+                    outgoingClip = prevCut;
+                    outgoingTime = Math.max(prevCut.inFrame, prevCut.outFrame - 1) / fps;
+                }
+            }
+
+            // Lado Direito (Incoming): o clipe arrastado começando no seu inFrame (cabeça com corte preservado!)
+            incomingClip = draggedVideoClip;
+            incomingTime = draggedHeadTime;
+        } else {
+            // Emenda no final do clipe arrastado (endFrame):
+            // Lado Esquerdo (Outgoing): o clipe arrastado terminando na sua cauda
+            outgoingClip = draggedVideoClip;
+            outgoingTime = draggedTailTime;
+
+            // Lado Direito (Incoming): clipe seguinte começando ou continuando em endFrame
+            if (cutAtTail) {
+                incomingClip = cutAtTail;
+                const offset = endFrame - (cutAtTail.timelineStartFrame || 0);
+                const cutFrame = cutAtTail.inFrame + offset;
+                incomingTime = cutFrame / fps;
+            } else {
+                const nextCut = underlyingVideoCuts.find(c => (c.timelineStartFrame || 0) === endFrame);
+                if (nextCut) {
+                    incomingClip = nextCut;
+                    incomingTime = nextCut.inFrame / fps;
+                }
+            }
+        }
+
+        // Aplica o corte simulado atômico em todas as pistas
+        const splitLinkMap = new Map();
+        let cuts = this.overwriteTimeRange(clip.track, finalStart, duration, ignored, base, splitLinkMap);
+        if (partner) {
+            const pDur = partner.outFrame - partner.inFrame;
+            cuts = this.overwriteTimeRange(partner.track, finalStart, pDur, ignored, cuts, splitLinkMap);
+        }
+
+        return {
+            simulatedCuts: cuts,
+            outgoingClip,
+            outgoingTime,
+            incomingClip,
+            incomingTime
+        };
+    }
+
+    /**
+     * Abre espaço magnético (Ripple) inserindo durationFrames no ponto startFrame da pista.
+     * Clipes subsequentes são empurrados e clipes cortados no meio são divididos.
+     * Suporta encadeamento multipistas atômico via sourceCuts e preservação de vínculo A/V via splitLinkMap.
+     * @param {string} trackId - ID da pista.
+     * @param {number} startFrame - Ponto de inserção.
+     * @param {number} durationFrames - Quantidade de frames a abrir.
+     * @param {string[]} [ignoredClipIds=[]] - Clipes a ignorar.
+     * @param {Array<Object>|null} [sourceCuts=null] - Lista base de cortes.
+     * @param {Map<string, string>|null} [splitLinkMap=null] - Mapa compartilhado para sincronizar link_id em splits A/V.
+     * @returns {Array<Object>} Lista atualizada de cortes.
+     */
+    rippleInsertTimeRange(trackId, startFrame, durationFrames, ignoredClipIds = [], sourceCuts = null, splitLinkMap = null) {
+        const cuts = sourceCuts || STATE.activeTimelineCuts || [];
+        const fps = this.fps || 24;
+        const newCuts = [];
+
+        for (const c of cuts) {
+            if (c.track !== trackId || ignoredClipIds.includes(c.id)) {
+                newCuts.push(c);
+                continue;
+            }
+
+            const cStart = c.timelineStartFrame || 0;
+            const cDur = c.outFrame - c.inFrame;
+            const cEnd = cStart + cDur;
+
+            if (cStart >= startFrame) {
+                newCuts.push({
+                    ...c,
+                    timelineStartFrame: cStart + durationFrames,
+                    timeline_start: (cStart + durationFrames) / fps
+                });
+            } else if (cStart < startFrame && cEnd > startFrame) {
+                const leftDur = startFrame - cStart;
+                // Parte esquerda permanece
+                newCuts.push({
+                    ...c,
+                    outFrame: c.inFrame + leftDur,
+                    out: (c.inFrame + leftDur) / fps
+                });
+
+                // Parte direita empurrada: reutiliza stamp compartilhado via splitLinkMap
+                let stamp = null;
+                if (c.link_id && splitLinkMap) {
+                    if (splitLinkMap.has(c.link_id)) {
+                        stamp = splitLinkMap.get(c.link_id);
+                    } else {
+                        stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                        splitLinkMap.set(c.link_id, stamp);
+                    }
+                } else {
+                    stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                }
+                const isAudio = this.trackKindOf(trackId) === "audio";
+                newCuts.push({
+                    ...c,
+                    id: `cut_${stamp}_${isAudio ? "a" : "v"}`,
+                    timelineStartFrame: startFrame + durationFrames,
+                    timeline_start: (startFrame + durationFrames) / fps,
+                    inFrame: c.inFrame + leftDur,
+                    in: (c.inFrame + leftDur) / fps,
+                    link_id: c.link_id ? `link_${stamp}` : null
+                });
+            } else {
+                newCuts.push(c);
+            }
+        }
+
+        return newCuts;
     }
 
     // ── FERRAMENTAS DE EDIÇÃO E SELEÇÃO (NLE TOOLS) ───────────────────
@@ -2261,6 +2683,51 @@ export class CapiauTimelineState {
 
         startFrame = Math.max(0, Math.round(startFrame));
 
+        // Prevenção de Sobreposição na Ingestão (Task 3.5):
+        // Se estiver em modo clamp e inserindo na agulha, nunca coloca um clipe em cima de outro.
+        if (this.dragCollisionMode === "clamp" && (mode === "playhead" || mode === "overlay")) {
+            const hasCollision = (tId, sf, dur) => {
+                const cutsOnTrack = currentCuts.filter(c => c.track === tId);
+                return cutsOnTrack.some(c => {
+                    const cStart = c.timelineStartFrame || 0;
+                    const cEnd = cStart + (c.outFrame - c.inFrame);
+                    return sf < cEnd && (sf + dur) > cStart;
+                });
+            };
+
+            const audioTId = isVideo ? this.pairedAudioTrackId(track) : null;
+            const isCollision = hasCollision(track, startFrame, durFrames) ||
+                (audioTId && hasCollision(audioTId, startFrame, durFrames));
+
+            if (isCollision) {
+                // 1. Tenta achar uma pista de vídeo alternativa livre no ponto da agulha
+                let placedOnAlternative = false;
+                for (const altTrack of videoTracks) {
+                    const altAudio = this.pairedAudioTrackId(altTrack.id);
+                    if (!hasCollision(altTrack.id, startFrame, durFrames) &&
+                        (!altAudio || !hasCollision(altAudio, startFrame, durFrames))) {
+                        track = altTrack.id;
+                        placedOnAlternative = true;
+                        break;
+                    }
+                }
+
+                // 2. Se todas as pistas estiverem ocupadas no ponto da agulha:
+                if (!placedOnAlternative) {
+                    // Busca o primeiro gap disponível a partir da agulha que caiba o clipe
+                    const gaps = this.getTrackGaps(track, [], true);
+                    const gapAfterPlayhead = gaps.find(g => g.startFrame >= startFrame && g.durationFrames >= durFrames);
+                    if (gapAfterPlayhead) {
+                        startFrame = gapAfterPlayhead.startFrame;
+                    } else {
+                        // Sem gaps suficientes: posiciona no final da timeline nessa pista
+                        const trackCuts = currentCuts.filter(c => c.track === track);
+                        startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+                    }
+                }
+            }
+        }
+
         // 4. Executa a Ingestão com Histórico (Undo/Redo)
         const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
         const audioTrackId = isVideo ? this.pairedAudioTrackId(track) : null;
@@ -2373,13 +2840,19 @@ export class CapiauTimelineState {
             STATE.activeTimelineCuts = workingCuts;
         });
 
-        // 5. Ajuste da Agulha (Playhead)
+        // 5. Ajuste da Agulha (Playhead), Seleção e Centralização
+        if (createdCut) {
+            this.selectedClipId = createdCut.id;
+            this.selectedClipIds = new Set([createdCut.id]);
+            this.selectedTrack = track;
+            STATE.emit("timelineClipSelected", createdCut.id);
+        }
+
         if (typeof this.setPlayheadFrame === "function") {
-            if (setPlayheadAtStart) {
-                this.setPlayheadFrame(startFrame);
-            } else {
-                this.setPlayheadFrame(startFrame + durFrames);
-            }
+            this.setPlayheadFrame(startFrame);
+        }
+        if (typeof window !== "undefined" && window.TIMELINE_INTERACTION && typeof window.TIMELINE_INTERACTION.ensureFrameVisible === "function") {
+            window.TIMELINE_INTERACTION.ensureFrameVisible(startFrame);
         }
 
         // 6. Foco e Notificação
@@ -2458,9 +2931,39 @@ export class CapiauTimelineState {
 
         // Se timelineStartFrame não foi passado, anexa ao final dos clipes existentes na pista
         let startFrame = timelineStartFrame;
+        const trackCuts = (STATE.activeTimelineCuts || []).filter(c => c.track === track);
+        const durFrames = outFrame - inFrame;
+
         if (startFrame === null || startFrame === undefined) {
-            const trackCuts = (STATE.activeTimelineCuts || []).filter(c => c.track === track);
             startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+        } else if (this.dragCollisionMode === "clamp") {
+            const hasCollision = trackCuts.some(c => {
+                const cStart = c.timelineStartFrame || 0;
+                const cEnd = cStart + (c.outFrame - c.inFrame);
+                return startFrame < cEnd && (startFrame + durFrames) > cStart;
+            });
+            if (hasCollision) {
+                // Tenta achar outra pista de vídeo livre no mesmo startFrame
+                const videoTracks = this.getVideoTracks().filter(t => !t.locked);
+                let placed = false;
+                for (const alt of videoTracks) {
+                    const altCuts = (STATE.activeTimelineCuts || []).filter(c => c.track === alt.id);
+                    if (!altCuts.some(c => startFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame)) && (startFrame + durFrames) > c.timelineStartFrame)) {
+                        track = alt.id;
+                        placed = true;
+                        break;
+                    }
+                }
+                if (!placed) {
+                    const gaps = this.getTrackGaps(track, [], true);
+                    const fitGap = gaps.find(g => g.startFrame >= startFrame && g.durationFrames >= durFrames);
+                    if (fitGap) {
+                        startFrame = fitGap.startFrame;
+                    } else {
+                        startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+                    }
+                }
+            }
         }
 
         const newCut = {
@@ -2498,6 +3001,15 @@ export class CapiauTimelineState {
 
             // Atualiza o estado global reativo
             STATE.activeTimelineCuts = currentCuts;
+            this.selectedClipId = newCut.id;
+            this.selectedClipIds = new Set([newCut.id]);
+            this.selectedTrack = track;
+            if (typeof this.setPlayheadFrame === "function") {
+                this.setPlayheadFrame(Math.max(0, Math.round(startFrame)));
+            }
+            if (typeof window !== "undefined" && window.TIMELINE_INTERACTION && typeof window.TIMELINE_INTERACTION.ensureFrameVisible === "function") {
+                window.TIMELINE_INTERACTION.ensureFrameVisible(Math.max(0, Math.round(startFrame)));
+            }
         });
         return newCut;
     }

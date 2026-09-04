@@ -5840,6 +5840,139 @@ select option, .nle-select option {
     text-shadow: 0 0 8px var(--color-cyan);
 }
 
+/* Submenu Flyout de Modos de Colisão (Task 3.5) */
+.toolbar-tool-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flyout-indicator {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 0 4px 4px;
+    border-color: transparent transparent var(--text-muted) transparent;
+    pointer-events: none;
+    transition: border-color var(--transition-fast);
+}
+
+.btn-toolbar-action:hover .flyout-indicator,
+.btn-toolbar-action.active .flyout-indicator {
+    border-color: transparent transparent var(--color-cyan) transparent;
+}
+
+.toolbar-submenu-flyout {
+    position: fixed;
+    background: rgba(15, 23, 42, 0.96);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    padding: 3px;
+    display: none;
+    flex-direction: row;
+    gap: 3px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75), 0 0 12px rgba(6, 182, 212, 0.3);
+    z-index: 999999;
+    pointer-events: auto;
+}
+
+.toolbar-submenu-flyout.show {
+    display: flex !important;
+}
+
+.btn-collision-mode {
+    width: 26px !important;
+    height: 26px !important;
+    padding: 0 !important;
+}
+
+.btn-collision-mode.active {
+    color: var(--color-cyan) !important;
+    background: rgba(6, 182, 212, 0.22) !important;
+    border: 1px solid rgba(6, 182, 212, 0.5) !important;
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.35);
+}
+
+/* NLE 2-Up Split Preview Overlay (Sobrescrita & Trim Dinâmico) */
+#nle-2up-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+    flex-direction: row;
+    background: #09090d;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+#nle-2up-overlay.active {
+    display: flex !important;
+}
+
+.nle-2up-col {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #09090d;
+    overflow: hidden;
+}
+
+.nle-2up-col.outgoing {
+    border-right: 1px solid rgba(6, 182, 212, 0.4);
+}
+
+.nle-2up-col canvas {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+.nle-2up-badge {
+    position: absolute;
+    top: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    backdrop-filter: blur(8px);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nle-2up-badge.outgoing {
+    left: 10px;
+    background: rgba(139, 92, 246, 0.25);
+    border: 1px solid rgba(139, 92, 246, 0.6);
+    color: #c4b5fd;
+}
+
+.nle-2up-badge.incoming {
+    right: 10px;
+    background: rgba(6, 182, 212, 0.25);
+    border: 1px solid rgba(6, 182, 212, 0.6);
+    color: #67e8f9;
+}
+
+.nle-2up-tc {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    opacity: 0.9;
+}
+
 /* NLE Editing Tools hover states */
 #btn-tool-select:hover {
     color: var(--color-cyan);

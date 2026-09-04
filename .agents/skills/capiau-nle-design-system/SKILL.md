@@ -281,3 +281,32 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
   4. **Feedback e Redirecionamento na UI:** Ao acionar qualquer processo em lote a partir de menus ou botões, a interface deve:
      * Emitir um toast com `window.showToast(...)`.
      * Alternar automaticamente para a aba de Tarefas (`window.openTasksDrawerAndSwitchTab()`) para que o editor veja imediatamente a barra de progresso viva e o streaming de logs.
+
+---
+
+## VII. Menus Flutuantes Desacoplados de Ferramentas (Tool Submenu Flyouts)
+
+### 13. Padrão Arquitetural para Submenus Flutuantes de Botões na Barra de Ferramentas
+* **Objetivo:** Permitir que ferramentas da toolbar vertical (ex: Seleção `V`, Lâmina `C`, Marquee, etc.) exponham submodos ou ferramentas secundárias em um flyout compacto sem sofrer cortes de layout.
+* **Regra Crítica — Desacoplamento do DOM (Bypass de `overflow-x: hidden`):**
+  * Barras de ferramentas verticais (como `.timeline-actions-sidebar`) possuem largura fixa estreita (36px) e `overflow-x: hidden !important;`.
+  * **PROIBIÇÃO ESTRITA:** Submenus nunca devem ser inseridos com `position: absolute` aninhados dentro do botão ou do wrapper da sidebar. Eles serão fisicamente cortados pelo motor de renderização do navegador e permanecerão invisíveis.
+  * **DIRETRIZ OBRIGATÓRIA:** O elemento do submenu (`.toolbar-submenu-flyout`) deve ser acoplado diretamente à raiz do documento (`document.body.appendChild(flyout)`), utilizando `position: fixed; z-index: 999999;`.
+* **Cálculo de Coordenadas em Tempo Real:**
+  * No evento de acionamento (`mouseenter` ou `contextmenu` do botão disparador), o script calcula as coordenadas absolutas via `button.getBoundingClientRect()`:
+    ```javascript
+    const rect = triggerBtn.getBoundingClientRect();
+    flyout.style.top = `${rect.top}px`;
+    flyout.style.left = `${rect.right + 6}px`;
+    ```
+* **Eventos de Disparo & Tolerância Suave (Debounce de Fechamento):**
+  * **Hover:** Abre no `mouseenter` do botão disparador. Um `setTimeout` com debounce de 250ms evita que o menu feche enquanto o usuário move o cursor do botão para dentro do flyout.
+  * **Hover no Flyout:** Ao entrar no flyout (`mouseenter`), o timer de fechamento é cancelado (`clearTimeout`). Ao sair (`mouseleave`), agenda o fechamento em 250ms.
+  * **Clique com Botão Direito (`contextmenu`):** Alterna a visibilidade imediatamente (`toggle`) e previne o menu de contexto padrão do navegador (`e.preventDefault()`).
+  * **Escape & Clique Externo:** Ouvintes globais em `window` fecham o flyout ao pressionar `Escape` ou ao clicar fora (`mousedown`).
+* **Padrão Visual Glassmorphism:**
+  * Fundo escuro translúcido com desfoque de alta fidelidade: `background: rgba(18, 18, 24, 0.95); backdrop-filter: blur(12px);`.
+  * Borda sutil de 1px (`rgba(255, 255, 255, 0.08)` ou `rgba(6, 182, 212, 0.3)`).
+  * Sombra pronunciada para destacar da timeline: `box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75);`.
+  * Botões internos com ícones vetoriais SVG (line art 18x18px), glow ciano no estado `.active` e tooltips contextuais descritivos.
+  * Indicador no botão pai: um pequeno triângulo sutil no canto inferior direito (`.flyout-indicator`) sinalizando ao usuário a existência de subopções.
