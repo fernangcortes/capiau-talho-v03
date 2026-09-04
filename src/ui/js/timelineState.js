@@ -2725,17 +2725,56 @@ export class CapiauTimelineState {
     // ── CLIPES ──────────────────────────────────────────────────────────
 
     /**
-     * Inicializa a lista de cortes com frames calculados se ainda não existirem.
-     *
+     * Retorna a duração máxima em frames da mídia bruta do clipe.
+     * Para mídias com fim determinado (vídeo, áudio), retorna o número total de frames.
+     * Para fotos e títulos (geradores estáticos), retorna Infinity.
+     * @param {Object} clip - Corte da timeline.
+     * @returns {number} Duração máxima em frames ou Infinity.
+     */
+    getMaxMediaFrames(clip) {
+        if (!clip) return Infinity;
+        if (clip.type === "photo" || clip.photo_id || clip.type === "text" || clip.textCategory) {
+            return Infinity;
+        }
+        const fps = this.fps || 24;
+        if (clip.mediaDurationFrames !== undefined && clip.mediaDurationFrames !== null && Number.isFinite(clip.mediaDurationFrames)) {
+            return clip.mediaDurationFrames;
+        }
+        if (clip.sourceDuration !== undefined && clip.sourceDuration !== null && Number.isFinite(clip.sourceDuration)) {
+            return Math.round(clip.sourceDuration * fps);
+        }
+        if (clip.media_duration !== undefined && clip.media_duration !== null && Number.isFinite(clip.media_duration)) {
+            return Math.round(clip.media_duration * fps);
+        }
+        if (clip.video_id && typeof STATE !== "undefined" && Array.isArray(STATE.allVideos)) {
+            const v = STATE.allVideos.find(vid => String(vid.id) === String(clip.video_id));
+            if (v && v.duration && Number.isFinite(v.duration)) {
+                return Math.round(v.duration * fps);
+            }
+        }
+        return Infinity;
+    }
+
+    /**
+     * Garante que cortes vindos do JSON de salvamento ou de arrays dinâmicos
+     * tenham sempre inFrame e outFrame inteiros válidos, in e out consistentes em segundos,
+     * e respeitem rigidamente os limites de mídia bruta para evitar quadros congelados.
+     * 
      * IMPORTANTE: frames de clipe são SEMPRE em fps da TIMELINE (não do vídeo fonte).
      * Misturar unidades fazia clipes de vídeos 30fps ocuparem mais timeline do que
      * têm de mídia (fim congelado) e desalinhava o playhead do Program.
      */
     conformCuts(cuts) {
-        const fps = this.fps;
+        const fps = this.fps || 24;
         return cuts.map((cut, index) => {
-            const inFrame = cut.inFrame !== undefined ? cut.inFrame : secondsToFrames(cut.in, fps);
-            const outFrame = cut.outFrame !== undefined ? cut.outFrame : secondsToFrames(cut.out, fps);
+            let inFrame = cut.inFrame !== undefined ? cut.inFrame : secondsToFrames(cut.in, fps);
+            let outFrame = cut.outFrame !== undefined ? cut.outFrame : secondsToFrames(cut.out, fps);
+
+            const maxMedia = this.getMaxMediaFrames(cut);
+            if (Number.isFinite(maxMedia) && maxMedia > 0) {
+                if (outFrame > maxMedia) outFrame = maxMedia;
+            }
+            if (inFrame < 0) inFrame = 0;
 
             const isText = cut.type === "text";
             const defaultTrack = isText ? "T1" : "V1";
@@ -3860,24 +3899,7 @@ export class CapiauTimelineState {
             const duration = refOut - refIn;
             if (duration <= 0) return;
 
-            const getMaxMediaFrames = (c) => {
-                if (c.mediaDurationFrames !== undefined && c.mediaDurationFrames !== null) {
-                    return c.mediaDurationFrames;
-                }
-                if (c.sourceDuration !== undefined && c.sourceDuration !== null) {
-                    return Math.round(c.sourceDuration * fps);
-                }
-                if (c.media_duration !== undefined && c.media_duration !== null) {
-                    return Math.round(c.media_duration * fps);
-                }
-                if (c.video_id && typeof STATE !== "undefined" && Array.isArray(STATE.allVideos)) {
-                    const v = STATE.allVideos.find(vid => String(vid.id) === String(c.video_id));
-                    if (v && v.duration) return Math.round(v.duration * fps);
-                }
-                return Infinity;
-            };
-
-            const maxMediaFrames = getMaxMediaFrames(clip);
+            const maxMediaFrames = this.getMaxMediaFrames(clip);
 
             // Limites do clipe principal:
             // newIn = refIn + delta >= 0 => delta >= -refIn
@@ -3898,7 +3920,7 @@ export class CapiauTimelineState {
                     } else {
                         partnerRefIn = (partnerBaseIn !== null && partnerBaseIn !== undefined) ? partnerBaseIn : partner.inFrame;
                         partnerRefOut = (partnerBaseOut !== null && partnerBaseOut !== undefined) ? partnerBaseOut : partner.outFrame;
-                        const partnerMaxFrames = getMaxMediaFrames(partner);
+                        const partnerMaxFrames = this.getMaxMediaFrames(partner);
 
                         minDelta = Math.max(minDelta, -partnerRefIn);
                         if (Number.isFinite(partnerMaxFrames)) {
@@ -3970,6 +3992,7 @@ export class CapiauTimelineState {
 
         return result;
     }
+
 }
 
 export const TIMELINE_STATE = new CapiauTimelineState();

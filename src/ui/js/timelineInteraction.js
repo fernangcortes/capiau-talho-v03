@@ -75,6 +75,13 @@ export class CapiauTimelineInteraction {
         this.dragPartnerStartInFrame = null;
         this.dragPartnerStartOutFrame = null;
 
+        // Estado para trim vinculado A/V (Trim Head / Tail com seleção normal V)
+        this.dragTrimLinked = true;
+        this.dragPartnerClipId = null;
+        this.dragPartnerStartClipFrame = null;
+        this.dragPartnerStartInFrame = null;
+        this.dragPartnerStartOutFrame = null;
+
         // Estado para arrasto múltiplo de clipes (Track Select e Multi-Select)
         this.dragInitialClipPositions = null; // Map<clipId, { startFrame, track, inFrame, outFrame, duration }>
         this.dragAnchorClip = null;
@@ -1131,18 +1138,32 @@ export class CapiauTimelineInteraction {
 
                     const trimEdge = this.checkTrimZone(x, clip);
 
-                    if (trimEdge === "left") {
-                        this.dragState = "trim-left";
+                    if (trimEdge === "left" || trimEdge === "right") {
+                        const cuts = STATE.activeTimelineCuts || [];
+                        const partner = (!e.altKey && clip.link_id)
+                            ? cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id)
+                            : null;
+
                         this.draggedClipId = clip.id;
                         this.dragStartMouseX = e.clientX;
                         this.dragStartClipFrame = clip.timelineStartFrame;
                         this.dragStartInFrame = clip.inFrame;
-                        this.dragHasMoved = false;
-                    } else if (trimEdge === "right") {
-                        this.dragState = "trim-right";
-                        this.draggedClipId = clip.id;
-                        this.dragStartMouseX = e.clientX;
                         this.dragStartOutFrame = clip.outFrame;
+                        this.dragTrimLinked = !e.altKey && !!partner;
+
+                        if (partner) {
+                            this.dragPartnerClipId = partner.id;
+                            this.dragPartnerStartClipFrame = partner.timelineStartFrame;
+                            this.dragPartnerStartInFrame = partner.inFrame;
+                            this.dragPartnerStartOutFrame = partner.outFrame;
+                        } else {
+                            this.dragPartnerClipId = null;
+                            this.dragPartnerStartClipFrame = null;
+                            this.dragPartnerStartInFrame = null;
+                            this.dragPartnerStartOutFrame = null;
+                        }
+
+                        this.dragState = trimEdge === "left" ? "trim-left" : "trim-right";
                         this.dragHasMoved = false;
                     } else {
                         // Drag normal do clipe (com suporte a Shift para Sobrescrita e Ctrl para Ripple)
@@ -1870,7 +1891,8 @@ export class CapiauTimelineInteraction {
 
             if (this.renderer) this.renderer.activeSnapFrame = snapGuideFrame;
             const isRipple = e.ctrlKey || e.metaKey;
-            this.trimClipLeft(this.draggedClipId, deltaFrames, isRipple);
+            const trimLinked = !e.altKey;
+            this.trimClipLeft(this.draggedClipId, deltaFrames, isRipple, trimLinked);
         }
         else if (this.dragState === "trim-right" && this.draggedClipId) {
             const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
@@ -1897,7 +1919,8 @@ export class CapiauTimelineInteraction {
 
             if (this.renderer) this.renderer.activeSnapFrame = snapGuideFrame;
             const isRipple = e.ctrlKey || e.metaKey;
-            this.trimClipRight(this.draggedClipId, deltaFrames, isRipple);
+            const trimLinked = !e.altKey;
+            this.trimClipRight(this.draggedClipId, deltaFrames, isRipple, trimLinked);
         }
         else if ((this.dragState === "fade-in-drag" || this.dragState === "fade-out-drag") && this.draggedClipId) {
             const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
@@ -2147,6 +2170,11 @@ export class CapiauTimelineInteraction {
         this.dragDirection = 0;
         this.dragLastMouseX = null;
         this.dragHoppedPastClips = new Set();
+        this.dragTrimLinked = true;
+        this.dragPartnerClipId = null;
+        this.dragPartnerStartClipFrame = null;
+        this.dragPartnerStartInFrame = null;
+        this.dragPartnerStartOutFrame = null;
         // Fecha a transação do drag/trim (no-op se nada mudou)
         TIMELINE_HISTORY.commit();
         this.dragState = null;
@@ -9354,7 +9382,7 @@ export class CapiauTimelineInteraction {
         return finalStart;
     }
 
-    trimClipLeft(clipId, deltaFrames, isRipple = false) {
+    trimClipLeft(clipId, deltaFrames, isRipple = false, trimLinked = true) {
         const cuts = [...STATE.activeTimelineCuts];
         const clip = cuts.find(c => c.id === clipId);
         if (!clip) return;
@@ -9362,45 +9390,72 @@ export class CapiauTimelineInteraction {
         const fps = TIMELINE_STATE.fps || 24;
         const ignored = [clip.id];
         let partner = null;
-        if (clip.link_id) {
+        if (trimLinked && clip.link_id) {
             partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
             if (partner) ignored.push(partner.id);
         }
 
+        const baseStart = (this.dragStartClipFrame !== null && this.dragStartClipFrame !== undefined) ? this.dragStartClipFrame : (clip.timelineStartFrame || 0);
+        const baseIn = (this.dragStartInFrame !== null && this.dragStartInFrame !== undefined) ? this.dragStartInFrame : (clip.inFrame || 0);
+
+        const partnerBaseStart = (this.dragPartnerStartClipFrame !== null && this.dragPartnerStartClipFrame !== undefined) ? this.dragPartnerStartClipFrame : (partner ? partner.timelineStartFrame || 0 : null);
+        const partnerBaseIn = (this.dragPartnerStartInFrame !== null && this.dragPartnerStartInFrame !== undefined) ? this.dragPartnerStartInFrame : (partner ? partner.inFrame || 0 : null);
+
         // Barreira física sólida contra vizinho anterior na pista (Bloqueio Físico NLE)
-        const neighbors = TIMELINE_STATE.getTrackClipNeighbors(clip.track, this.dragStartClipFrame, ignored);
+        const neighbors = TIMELINE_STATE.getTrackClipNeighbors(clip.track, baseStart, ignored);
         let minAllowedStart = neighbors.prevEnd;
-        if (partner) {
-            const pNeighbors = TIMELINE_STATE.getTrackClipNeighbors(partner.track, this.dragStartClipFrame, ignored);
+        if (partner && partnerBaseStart !== null) {
+            const pNeighbors = TIMELINE_STATE.getTrackClipNeighbors(partner.track, partnerBaseStart, ignored);
             minAllowedStart = Math.max(minAllowedStart, pNeighbors.prevEnd);
         }
 
-        const minDeltaFromNeighbor = minAllowedStart - this.dragStartClipFrame;
-        const minDelta = Math.max(-this.dragStartInFrame, minDeltaFromNeighbor);
-        const maxDelta = (clip.outFrame - 12) - this.dragStartInFrame;
+        const minDeltaFromNeighbor = minAllowedStart - baseStart;
+
+        // Clamping à mídia interna (inFrame não pode ser menor que 0)
+        let minDeltaFromMedia = -baseIn;
+        if (partner && partnerBaseIn !== null) {
+            minDeltaFromMedia = Math.max(minDeltaFromMedia, -partnerBaseIn);
+        }
+
+        const minDelta = Math.max(minDeltaFromMedia, minDeltaFromNeighbor);
+
+        // Clamping ao encolher: clipe deve ter pelo menos 1 frame de duração
+        let maxDelta = (clip.outFrame - 1) - baseIn;
+        if (partner && partnerBaseIn !== null) {
+            const pMaxDelta = (partner.outFrame - 1) - partnerBaseIn;
+            maxDelta = Math.min(maxDelta, pMaxDelta);
+        }
+
         const actualDelta = Math.min(maxDelta, Math.max(minDelta, deltaFrames));
 
-        const targetIn = this.dragStartInFrame + actualDelta;
-        const targetStart = Math.max(minAllowedStart, this.dragStartClipFrame + actualDelta);
+        const targetIn = baseIn + actualDelta;
+        const targetStart = Math.max(minAllowedStart, baseStart + actualDelta);
 
         clip.inFrame = targetIn;
         clip.in = targetIn / fps;
         clip.timelineStartFrame = targetStart;
         clip.timeline_start = targetStart / fps;
 
-        // Se o áudio estiver vinculado e o usuário estiver trimando o vídeo
-        if (partner && partner.inFrame === this.dragStartInFrame) {
-            partner.inFrame = targetIn;
-            partner.in = targetIn / fps;
-            partner.timelineStartFrame = targetStart;
-            partner.timeline_start = targetStart / fps;
+        if (partner && partnerBaseIn !== null && partnerBaseStart !== null) {
+            const partnerTargetIn = partnerBaseIn + actualDelta;
+            const partnerTargetStart = Math.max(0, partnerBaseStart + actualDelta);
+            partner.inFrame = partnerTargetIn;
+            partner.in = partnerTargetIn / fps;
+            partner.timelineStartFrame = partnerTargetStart;
+            partner.timeline_start = partnerTargetStart / fps;
+
+            const videoCut = (TIMELINE_STATE.trackKindOf(clip.track) === "video") ? clip : partner;
+            const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : partner;
+            if (videoCut && audioCut) {
+                audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+            }
         }
 
         if (isRipple && actualDelta !== 0) {
             const syncTracks = TIMELINE_STATE.getSyncLockedTrackIds();
             cuts.forEach(c => {
                 if (c.id !== clip.id && (!clip.link_id || c.link_id !== clip.link_id) &&
-                    syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= this.dragStartClipFrame) {
+                    syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= baseStart) {
                     c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) - actualDelta);
                     c.timeline_start = c.timelineStartFrame / fps;
                 }
@@ -9410,44 +9465,77 @@ export class CapiauTimelineInteraction {
         STATE.activeTimelineCuts = cuts;
     }
 
-    trimClipRight(clipId, deltaFrames, isRipple = false) {
+    trimClipRight(clipId, deltaFrames, isRipple = false, trimLinked = true) {
         const cuts = [...STATE.activeTimelineCuts];
         const clip = cuts.find(c => c.id === clipId);
         if (!clip) return;
 
         const fps = TIMELINE_STATE.fps || 24;
-        const initialEnd = (clip.timelineStartFrame || 0) + (this.dragStartOutFrame - clip.inFrame);
         const ignored = [clip.id];
         let partner = null;
-        if (clip.link_id) {
+        if (trimLinked && clip.link_id) {
             partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
             if (partner) ignored.push(partner.id);
         }
 
+        const baseStart = (this.dragStartClipFrame !== null && this.dragStartClipFrame !== undefined) ? this.dragStartClipFrame : (clip.timelineStartFrame || 0);
+        const baseOut = (this.dragStartOutFrame !== null && this.dragStartOutFrame !== undefined) ? this.dragStartOutFrame : (clip.outFrame || 0);
+
+        const partnerBaseStart = (this.dragPartnerStartClipFrame !== null && this.dragPartnerStartClipFrame !== undefined) ? this.dragPartnerStartClipFrame : (partner ? partner.timelineStartFrame || 0 : null);
+        const partnerBaseOut = (this.dragPartnerStartOutFrame !== null && this.dragPartnerStartOutFrame !== undefined) ? this.dragPartnerStartOutFrame : (partner ? partner.outFrame || 0 : null);
+
+        const initialEnd = baseStart + (baseOut - clip.inFrame);
+
         // Barreira física sólida contra vizinho posterior na pista (Bloqueio Físico NLE)
         const neighbors = TIMELINE_STATE.getTrackClipNeighbors(clip.track, initialEnd, ignored);
         let maxAllowedEnd = neighbors.nextStart;
-        if (partner) {
-            const pNeighbors = TIMELINE_STATE.getTrackClipNeighbors(partner.track, initialEnd, ignored);
+        if (partner && partnerBaseOut !== null && partnerBaseStart !== null) {
+            const partnerInitialEnd = partnerBaseStart + (partnerBaseOut - partner.inFrame);
+            const pNeighbors = TIMELINE_STATE.getTrackClipNeighbors(partner.track, partnerInitialEnd, ignored);
             maxAllowedEnd = Math.min(maxAllowedEnd, pNeighbors.nextStart);
         }
 
         const maxDeltaFromNeighbor = maxAllowedEnd === Infinity ? Infinity : (maxAllowedEnd - initialEnd);
-        const minDelta = (clip.inFrame + 12) - this.dragStartOutFrame;
-        const actualDelta = Math.max(minDelta, Math.min(maxDeltaFromNeighbor, deltaFrames));
 
-        const targetOut = this.dragStartOutFrame + actualDelta;
+        // Clamping à duração real da mídia física (impede estender além do arquivo repetindo frames ou áudio piscando)
+        const clipMax = TIMELINE_STATE.getMaxMediaFrames(clip);
+        let maxDeltaFromMedia = Number.isFinite(clipMax) ? (clipMax - baseOut) : Infinity;
+        if (partner && partnerBaseOut !== null) {
+            const partnerMax = TIMELINE_STATE.getMaxMediaFrames(partner);
+            const partnerDeltaMedia = Number.isFinite(partnerMax) ? (partnerMax - partnerBaseOut) : Infinity;
+            maxDeltaFromMedia = Math.min(maxDeltaFromMedia, partnerDeltaMedia);
+        }
+
+        const maxDelta = Math.min(maxDeltaFromNeighbor, maxDeltaFromMedia);
+
+        // Limite inferior ao encolher: clipe deve manter pelo menos 1 frame de duração
+        let minDelta = (clip.inFrame + 1) - baseOut;
+        if (partner && partnerBaseOut !== null) {
+            const pMinDelta = (partner.inFrame + 1) - partnerBaseOut;
+            minDelta = Math.max(minDelta, pMinDelta);
+        }
+
+        const actualDelta = Math.max(minDelta, Math.min(maxDelta, deltaFrames));
+
+        const targetOut = baseOut + actualDelta;
         clip.outFrame = targetOut;
         clip.out = targetOut / fps;
 
-        if (partner && partner.outFrame === this.dragStartOutFrame) {
-            partner.outFrame = targetOut;
-            partner.out = targetOut / fps;
+        if (partner && partnerBaseOut !== null) {
+            const partnerTargetOut = partnerBaseOut + actualDelta;
+            partner.outFrame = partnerTargetOut;
+            partner.out = partnerTargetOut / fps;
+
+            const videoCut = (TIMELINE_STATE.trackKindOf(clip.track) === "video") ? clip : partner;
+            const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : partner;
+            if (videoCut && audioCut) {
+                audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+            }
         }
 
         if (isRipple && actualDelta !== 0) {
             const syncTracks = TIMELINE_STATE.getSyncLockedTrackIds();
-            const boundary = (clip.timelineStartFrame || 0) + (this.dragStartOutFrame - clip.inFrame);
+            const boundary = baseStart + (baseOut - clip.inFrame);
             cuts.forEach(c => {
                 if (c.id !== clip.id && (!clip.link_id || c.link_id !== clip.link_id) &&
                     syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= boundary - 1) {
