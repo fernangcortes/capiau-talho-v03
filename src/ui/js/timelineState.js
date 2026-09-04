@@ -3993,6 +3993,229 @@ export class CapiauTimelineState {
         return result;
     }
 
+    /**
+     * Move a posição física do clipe na timeline mantendo seu conteúdo (in/out) e duração intactos,
+     * compensando o movimento ajustando simultaneamente o OUT do vizinho anterior e o IN do vizinho posterior.
+     * A duração total da timeline não se altera.
+     * 
+     * @param {string} clipId ID do clipe a ser deslizado.
+     * @param {number} deltaFrames Deslocamento relativo em frames (positivo avança na timeline, negativo recua).
+     * @param {boolean} [slideLinked=true] Se true, move também o par A/V vinculado sincronizadamente.
+     * @param {Object|null} [baseRef=null] Referência original para arrasto contínuo estável.
+     * @returns {Object|null} Metadados do resultado do slide ou null se a operação não puder ser executada.
+     */
+    slideClip(clipId, deltaFrames, slideLinked = true, baseRef = null) {
+        if (!clipId) return null;
+
+        let result = null;
+        const doSlide = () => {
+            const cuts = [...STATE.activeTimelineCuts];
+            const clip = cuts.find(c => c.id === clipId);
+            if (!clip) return;
+
+            const trackObj = this.getTrack(clip.track);
+            if (trackObj && trackObj.locked) return;
+
+            const fps = this.fps || 24;
+
+            // Clipes na mesma pista ordenados
+            const cutsOnTrack = cuts
+                .filter(c => c.track === clip.track)
+                .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+            const clipIdx = cutsOnTrack.findIndex(c => c.id === clip.id);
+            if (clipIdx <= 0 || clipIdx >= cutsOnTrack.length - 1) {
+                // Não tem vizinho anterior ou posterior na mesma pista
+                return;
+            }
+
+            const leftClip = cutsOnTrack[clipIdx - 1];
+            const rightClip = cutsOnTrack[clipIdx + 1];
+
+            const refClipStart = (baseRef && baseRef.clipStart !== undefined && baseRef.clipStart !== null)
+                ? baseRef.clipStart : clip.timelineStartFrame;
+            const refLeftOut = (baseRef && baseRef.leftOut !== undefined && baseRef.leftOut !== null)
+                ? baseRef.leftOut : leftClip.outFrame;
+            const refLeftIn = (baseRef && baseRef.leftIn !== undefined && baseRef.leftIn !== null)
+                ? baseRef.leftIn : leftClip.inFrame;
+            const refLeftStart = (baseRef && baseRef.leftStart !== undefined && baseRef.leftStart !== null)
+                ? baseRef.leftStart : leftClip.timelineStartFrame;
+            const refRightIn = (baseRef && baseRef.rightIn !== undefined && baseRef.rightIn !== null)
+                ? baseRef.rightIn : rightClip.inFrame;
+            const refRightOut = (baseRef && baseRef.rightOut !== undefined && baseRef.rightOut !== null)
+                ? baseRef.rightOut : rightClip.outFrame;
+            const refRightStart = (baseRef && baseRef.rightStart !== undefined && baseRef.rightStart !== null)
+                ? baseRef.rightStart : rightClip.timelineStartFrame;
+
+            const clipDur = clip.outFrame - clip.inFrame;
+            const leftDur = refLeftOut - refLeftIn;
+            const rightDur = refRightOut - refRightIn;
+
+            if (clipDur <= 0 || leftDur <= 0 || rightDur <= 0) return;
+
+            const maxLeftMedia = this.getMaxMediaFrames(leftClip);
+            const minDur = 1;
+
+            // Limites do clipe principal:
+            // delta > 0 (direita):
+            // - Left expande: refLeftOut + delta <= maxLeftMedia => delta <= maxLeftMedia - refLeftOut
+            // - Right encolhe: rightDur - delta >= minDur => delta <= rightDur - minDur
+            let maxDelta = Math.min(
+                Number.isFinite(maxLeftMedia) ? (maxLeftMedia - refLeftOut) : Infinity,
+                rightDur - minDur
+            );
+
+            // delta < 0 (esquerda):
+            // - Left encolhe: leftDur + delta >= minDur => delta >= minDur - leftDur
+            // - Right expande: refRightIn + delta >= 0 => delta >= -refRightIn
+            let minDelta = Math.max(
+                minDur - leftDur,
+                -refRightIn
+            );
+
+            // Parceiro vinculado (áudio/vídeo)
+            let partner = null;
+            let partnerLeft = null;
+            let partnerRight = null;
+            let refPartnerClipStart = 0;
+            let refPartnerLeftOut = 0;
+            let refPartnerLeftIn = 0;
+            let refPartnerLeftStart = 0;
+            let refPartnerRightIn = 0;
+            let refPartnerRightOut = 0;
+            let refPartnerRightStart = 0;
+
+            if (slideLinked && clip.link_id) {
+                partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                if (partner) {
+                    const pTrack = this.getTrack(partner.track);
+                    if (pTrack && pTrack.locked) {
+                        partner = null;
+                    } else {
+                        const pCuts = cuts
+                            .filter(c => c.track === partner.track)
+                            .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+                        const pIdx = pCuts.findIndex(c => c.id === partner.id);
+                        if (pIdx > 0 && pIdx < pCuts.length - 1) {
+                            partnerLeft = pCuts[pIdx - 1];
+                            partnerRight = pCuts[pIdx + 1];
+
+                            refPartnerClipStart = (baseRef && baseRef.partnerClipStart !== undefined && baseRef.partnerClipStart !== null)
+                                ? baseRef.partnerClipStart : partner.timelineStartFrame;
+                            refPartnerLeftOut = (baseRef && baseRef.partnerLeftOut !== undefined && baseRef.partnerLeftOut !== null)
+                                ? baseRef.partnerLeftOut : partnerLeft.outFrame;
+                            refPartnerLeftIn = (baseRef && baseRef.partnerLeftIn !== undefined && baseRef.partnerLeftIn !== null)
+                                ? baseRef.partnerLeftIn : partnerLeft.inFrame;
+                            refPartnerLeftStart = (baseRef && baseRef.partnerLeftStart !== undefined && baseRef.partnerLeftStart !== null)
+                                ? baseRef.partnerLeftStart : partnerLeft.timelineStartFrame;
+                            refPartnerRightIn = (baseRef && baseRef.partnerRightIn !== undefined && baseRef.partnerRightIn !== null)
+                                ? baseRef.partnerRightIn : partnerRight.inFrame;
+                            refPartnerRightOut = (baseRef && baseRef.partnerRightOut !== undefined && baseRef.partnerRightOut !== null)
+                                ? baseRef.partnerRightOut : partnerRight.outFrame;
+                            refPartnerRightStart = (baseRef && baseRef.partnerRightStart !== undefined && baseRef.partnerRightStart !== null)
+                                ? baseRef.partnerRightStart : partnerRight.timelineStartFrame;
+
+                            const pLeftDur = refPartnerLeftOut - refPartnerLeftIn;
+                            const pRightDur = refPartnerRightOut - refPartnerRightIn;
+                            const maxPartnerLeftMedia = this.getMaxMediaFrames(partnerLeft);
+
+                            if (pLeftDur > 0 && pRightDur > 0) {
+                                maxDelta = Math.min(
+                                    maxDelta,
+                                    Number.isFinite(maxPartnerLeftMedia) ? (maxPartnerLeftMedia - refPartnerLeftOut) : Infinity,
+                                    pRightDur - minDur
+                                );
+                                minDelta = Math.max(
+                                    minDelta,
+                                    minDur - pLeftDur,
+                                    -refPartnerRightIn
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (minDelta > maxDelta) {
+                return;
+            }
+
+            const clampedDelta = Math.max(minDelta, Math.min(maxDelta, deltaFrames));
+
+            // Aplica ao clipe principal e seus vizinhos
+            clip.timelineStartFrame = refClipStart + clampedDelta;
+            clip.timeline_start = clip.timelineStartFrame / fps;
+
+            leftClip.outFrame = refLeftOut + clampedDelta;
+            leftClip.out = leftClip.outFrame / fps;
+
+            rightClip.inFrame = refRightIn + clampedDelta;
+            rightClip.in = rightClip.inFrame / fps;
+            rightClip.timelineStartFrame = refRightStart + clampedDelta;
+            rightClip.timeline_start = rightClip.timelineStartFrame / fps;
+
+            if (partner && partnerLeft && partnerRight) {
+                partner.timelineStartFrame = refPartnerClipStart + clampedDelta;
+                partner.timeline_start = partner.timelineStartFrame / fps;
+
+                partnerLeft.outFrame = refPartnerLeftOut + clampedDelta;
+                partnerLeft.out = partnerLeft.outFrame / fps;
+
+                partnerRight.inFrame = refPartnerRightIn + clampedDelta;
+                partnerRight.in = partnerRight.inFrame / fps;
+                partnerRight.timelineStartFrame = refPartnerRightStart + clampedDelta;
+                partnerRight.timeline_start = partnerRight.timelineStartFrame / fps;
+
+                const videoCut = (this.trackKindOf(clip.track) === "video") ? clip : partner;
+                const audioCut = (this.trackKindOf(clip.track) === "audio") ? clip : partner;
+                if (videoCut && audioCut) {
+                    audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+                }
+            } else if (clip.link_id) {
+                // Modo independente (Alt)
+                const other = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                if (other) {
+                    const videoCut = (this.trackKindOf(clip.track) === "video") ? clip : other;
+                    const audioCut = (this.trackKindOf(clip.track) === "audio") ? clip : other;
+                    if (videoCut && audioCut) {
+                        audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+                    }
+                }
+            }
+
+            STATE.activeTimelineCuts = cuts;
+            result = {
+                clipId: clip.id,
+                appliedDelta: clampedDelta,
+                timelineStartFrame: clip.timelineStartFrame,
+                inFrame: clip.inFrame,
+                outFrame: clip.outFrame,
+                duration: clipDur,
+                leftClipId: leftClip.id,
+                leftClip: leftClip,
+                leftOutFrame: leftClip.outFrame,
+                leftDuration: leftClip.outFrame - leftClip.inFrame,
+                rightClipId: rightClip.id,
+                rightClip: rightClip,
+                rightInFrame: rightClip.inFrame,
+                rightTimelineStartFrame: rightClip.timelineStartFrame,
+                rightDuration: rightClip.outFrame - rightClip.inFrame,
+                partnerClipId: partner ? partner.id : null,
+                partnerTimelineStartFrame: partner ? partner.timelineStartFrame : null,
+                partnerLeftClipId: partnerLeft ? partnerLeft.id : null,
+                partnerLeftOutFrame: partnerLeft ? partnerLeft.outFrame : null,
+                partnerRightClipId: partnerRight ? partnerRight.id : null,
+                partnerRightInFrame: partnerRight ? partnerRight.inFrame : null
+            };
+        };
+
+        if (TIMELINE_HISTORY.pending) {
+            doSlide();
+        } else {
+            TIMELINE_HISTORY.record(doSlide);
+        }
+
+        return result;
+    }
 }
 
 export const TIMELINE_STATE = new CapiauTimelineState();

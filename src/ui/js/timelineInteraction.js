@@ -53,13 +53,16 @@ const CURSOR_BLADE_ALL = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3
 // Cursor SVG em alta definição para a Ferramenta Slip (Deslizar Conteúdo Interno - Y)
 const CURSOR_SLIP = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="4" y1="3" x2="4" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="3" x2="20" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="4" y1="3" x2="4" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><line x1="20" y1="3" x2="20" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><line x1="6" y1="12" x2="18" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="6" y1="12" x2="18" y2="12" stroke="%23fff" stroke-width="2" stroke-linecap="round"/><polygon points="9,8 5,12 9,16" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/><polygon points="15,8 19,12 15,16" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/></svg>') 12 12, ew-resize`;
 
+// Cursor SVG em alta definição para a Ferramenta Slide (Deslizar Posição na Timeline - U)
+const CURSOR_SLIDE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="3" y1="3" x2="3" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="21" y1="3" x2="21" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="3" y1="3" x2="3" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><line x1="21" y1="3" x2="21" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><rect x="8" y="6" width="8" height="12" rx="1" fill="%2306b6d4" fill-opacity="0.2" stroke="%23000" stroke-width="2.5"/><rect x="8" y="6" width="8" height="12" rx="1" fill="none" stroke="%2306b6d4" stroke-width="1.5"/><line x1="4" y1="12" x2="8" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="4" y1="12" x2="8" y2="12" stroke="%23fff" stroke-width="2" stroke-linecap="round"/><line x1="16" y1="12" x2="20" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="16" y1="12" x2="20" y2="12" stroke="%23fff" stroke-width="2" stroke-linecap="round"/><polygon points="4,12 7,9 7,15" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/><polygon points="20,12 17,9 17,15" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/></svg>') 12 12, ew-resize`;
+
 export class CapiauTimelineInteraction {
     constructor(renderer) {
         this.renderer = renderer;
         this.canvas = renderer.canvas;
         
         // Estado local de interação
-        this.dragState = null; // null, "scrub", "drag-clip", "drag-selection", "trim-left", "trim-right", "pan", "fade-in-drag", "fade-out-drag", "fade-in-curve", "fade-out-curve"
+        this.dragState = null; // null, "scrub", "drag-clip", "drag-selection", "trim-left", "trim-right", "pan", "fade-in-drag", "fade-out-drag", "fade-in-curve", "fade-out-curve", "slip", "slide"
         this.draggedClipId = null;
         this.dragStartMouseX = 0;
         this.dragStartMouseY = 0;
@@ -75,12 +78,14 @@ export class CapiauTimelineInteraction {
         this.dragPartnerStartInFrame = null;
         this.dragPartnerStartOutFrame = null;
 
+        // Estado para a ferramenta Slide (Deslizar Posição na Timeline)
+        this.dragSlideLinked = true;
+        this.dragSlideBase = null;
+
         // Estado para trim vinculado A/V (Trim Head / Tail com seleção normal V)
         this.dragTrimLinked = true;
         this.dragPartnerClipId = null;
         this.dragPartnerStartClipFrame = null;
-        this.dragPartnerStartInFrame = null;
-        this.dragPartnerStartOutFrame = null;
 
         // Estado para arrasto múltiplo de clipes (Track Select e Multi-Select)
         this.dragInitialClipPositions = null; // Map<clipId, { startFrame, track, inFrame, outFrame, duration }>
@@ -342,6 +347,13 @@ export class CapiauTimelineInteraction {
      */
     getSlipCursor() {
         return CURSOR_SLIP;
+    }
+
+    /**
+     * Retorna a string de cursor CSS para a Ferramenta Slide (Deslizar Posição na Timeline).
+     */
+    getSlideCursor() {
+        return CURSOR_SLIDE;
     }
 
     init() {
@@ -1043,6 +1055,116 @@ export class CapiauTimelineInteraction {
                 return;
             }
 
+            // Ferramenta: Deslizar Posição na Timeline / Slide Tool (U)
+            if (TIMELINE_STATE.activeTool === "slide") {
+                const hit = this.findClipAt(frame, track, y);
+                if (hit && hit.type === "clip") {
+                    const clip = hit.data;
+                    const clipTrack = TIMELINE_STATE.getTrack(clip.track);
+                    if (clipTrack && clipTrack.locked) {
+                        TIMELINE_STATE.selectClip(clip.id, false);
+                        TIMELINE_STATE.selectedTrack = track;
+                        this.syncPlayerToClip(clip);
+                        this.refreshClipInspector();
+                        this.renderer.requestRedraw();
+                        return;
+                    }
+
+                    TIMELINE_STATE.selectClip(clip.id, false);
+                    TIMELINE_STATE.selectedTrack = track;
+                    TIMELINE_STATE.clearSelectedGap();
+
+                    const cuts = STATE.activeTimelineCuts || [];
+                    const cutsOnTrack = cuts
+                        .filter(c => c.track === clip.track)
+                        .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+                    const clipIdx = cutsOnTrack.findIndex(c => c.id === clip.id);
+                    if (clipIdx <= 0 || clipIdx >= cutsOnTrack.length - 1) {
+                        if (typeof window.showToast === "function") {
+                            window.showToast("Ferramenta Slide requer clipes adjacentes anterior e posterior.", "warn");
+                        }
+                        this.syncPlayerToClip(clip);
+                        this.refreshClipInspector();
+                        this.renderer.requestRedraw();
+                        return;
+                    }
+
+                    const leftClip = cutsOnTrack[clipIdx - 1];
+                    const rightClip = cutsOnTrack[clipIdx + 1];
+
+                    this.dragState = "slide";
+                    this.draggedClipId = clip.id;
+                    this.dragStartMouseX = e.clientX;
+                    this.dragStartMouseY = e.clientY;
+                    this.dragStartClipFrame = clip.timelineStartFrame;
+                    this.dragSlideLinked = !e.altKey;
+
+                    this.dragSlideBase = {
+                        clipStart: clip.timelineStartFrame,
+                        leftClipId: leftClip.id,
+                        leftOut: leftClip.outFrame,
+                        leftIn: leftClip.inFrame,
+                        leftStart: leftClip.timelineStartFrame,
+                        rightClipId: rightClip.id,
+                        rightIn: rightClip.inFrame,
+                        rightOut: rightClip.outFrame,
+                        rightStart: rightClip.timelineStartFrame,
+                        partnerClipId: null,
+                        partnerClipStart: null,
+                        partnerLeftClipId: null,
+                        partnerLeftOut: null,
+                        partnerLeftIn: null,
+                        partnerLeftStart: null,
+                        partnerRightClipId: null,
+                        partnerRightIn: null,
+                        partnerRightOut: null,
+                        partnerRightStart: null
+                    };
+
+                    if (this.dragSlideLinked && clip.link_id) {
+                        const partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                        if (partner) {
+                            const pTrack = TIMELINE_STATE.getTrack(partner.track);
+                            if (!pTrack || !pTrack.locked) {
+                                const pCuts = cuts
+                                    .filter(c => c.track === partner.track)
+                                    .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+                                const pIdx = pCuts.findIndex(c => c.id === partner.id);
+                                if (pIdx > 0 && pIdx < pCuts.length - 1) {
+                                    const pLeft = pCuts[pIdx - 1];
+                                    const pRight = pCuts[pIdx + 1];
+                                    this.dragSlideBase.partnerClipId = partner.id;
+                                    this.dragSlideBase.partnerClipStart = partner.timelineStartFrame;
+                                    this.dragSlideBase.partnerLeftClipId = pLeft.id;
+                                    this.dragSlideBase.partnerLeftOut = pLeft.outFrame;
+                                    this.dragSlideBase.partnerLeftIn = pLeft.inFrame;
+                                    this.dragSlideBase.partnerLeftStart = pLeft.timelineStartFrame;
+                                    this.dragSlideBase.partnerRightClipId = pRight.id;
+                                    this.dragSlideBase.partnerRightIn = pRight.inFrame;
+                                    this.dragSlideBase.partnerRightOut = pRight.outFrame;
+                                    this.dragSlideBase.partnerRightStart = pRight.timelineStartFrame;
+                                }
+                            }
+                        }
+                    }
+
+                    TIMELINE_HISTORY.begin();
+                    this.syncPlayerToClip(clip);
+                    const fps = TIMELINE_STATE.fps || 24;
+                    this.showSlideTooltip(e.clientX, e.clientY, 0, fps);
+
+                    if (window.player) {
+                        const outgoingTime = (leftClip.outFrame || 0) / fps;
+                        const incomingTime = (rightClip.inFrame || 0) / fps;
+                        window.player.show2UpPreview(leftClip, outgoingTime, rightClip, incomingTime);
+                    }
+
+                    this.refreshClipInspector();
+                    this.renderer.requestRedraw();
+                }
+                return;
+            }
+
             const hit = this.findClipAt(frame, track, y);
 
             if (hit) {
@@ -1511,6 +1633,8 @@ export class CapiauTimelineInteraction {
                 this.canvas.style.cursor = "crosshair";
             } else if (TIMELINE_STATE.activeTool === "slip") {
                 this.canvas.style.cursor = this.getSlipCursor();
+            } else if (TIMELINE_STATE.activeTool === "slide") {
+                this.canvas.style.cursor = this.getSlideCursor();
             } else if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
                 this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e.shiftKey);
             }
@@ -1759,7 +1883,38 @@ export class CapiauTimelineInteraction {
 
             if (this.renderer) this.renderer.requestRedraw();
         }
+        else if (this.dragState === "slide" && this.draggedClipId) {
+            if (this.canvas) this.canvas.style.cursor = this.getSlideCursor();
+            const dx = e.clientX - this.dragStartMouseX;
+            const rawDelta = Math.round(dx / TIMELINE_STATE.zoom);
+            const fps = TIMELINE_STATE.fps || 24;
+            const slideLinked = !e.altKey;
+
+            const res = TIMELINE_STATE.slideClip(
+                this.draggedClipId,
+                rawDelta,
+                slideLinked,
+                this.dragSlideBase
+            );
+
+            const actualDelta = res ? res.appliedDelta : rawDelta;
+            this.showSlideTooltip(e.clientX, e.clientY, actualDelta, fps, !slideLinked);
+
+            const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
+            if (clip) {
+                this.syncPlayerToClip(clip);
+            }
+
+            if (res && window.player && res.leftClip && res.rightClip) {
+                const outgoingTime = (res.leftClip.outFrame || 0) / fps;
+                const incomingTime = (res.rightClip.inFrame || 0) / fps;
+                window.player.show2UpPreview(res.leftClip, outgoingTime, res.rightClip, incomingTime);
+            }
+
+            if (this.renderer) this.renderer.requestRedraw();
+        }
         else if (this.dragState === "drag-clip" && this.draggedClipId) {
+            if (this.canvas) this.canvas.style.cursor = "grabbing";
             if (Math.abs(e.clientX - this.dragStartMouseX) > 2 || Math.abs(e.clientY - this.dragStartMouseY) > 2) {
                 this.dragHasMoved = true;
             }
@@ -1999,6 +2154,7 @@ export class CapiauTimelineInteraction {
         this.hideMarkerTooltip();
         this.hideFadeTooltip();
         this.hideSlipTooltip();
+        this.hideSlideTooltip();
         if (this.renderer) {
             this.renderer.activeSnapFrame = null;
             this.renderer.dropIndicator = null;
@@ -2012,6 +2168,20 @@ export class CapiauTimelineInteraction {
             if (this.canvas) {
                 this.canvas.style.cursor = TIMELINE_STATE.activeTool === "slip" ? this.getSlipCursor() : "default";
             }
+            if (this.renderer) this.renderer.requestRedraw();
+            return;
+        }
+        if (this.dragState === "slide") {
+            TIMELINE_HISTORY.commit();
+            STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+            this.dragState = null;
+            this.draggedClipId = null;
+            this.dragSlideBase = null;
+            this.refreshClipInspector();
+            if (this.canvas) {
+                this.canvas.style.cursor = TIMELINE_STATE.activeTool === "slide" ? this.getSlideCursor() : "default";
+            }
+            if (window.player) window.player.hide2UpPreview();
             if (this.renderer) this.renderer.requestRedraw();
             return;
         }
@@ -2056,7 +2226,7 @@ export class CapiauTimelineInteraction {
         }
         if (this.dragState && this.dragState.startsWith("fade-")) {
             TIMELINE_HISTORY.commit();
-            STATE.emit("timelineCutsUpdated");
+            STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
             this.dragState = null;
             this.draggedClipId = null;
             this.refreshClipInspector();
@@ -2170,11 +2340,6 @@ export class CapiauTimelineInteraction {
         this.dragDirection = 0;
         this.dragLastMouseX = null;
         this.dragHoppedPastClips = new Set();
-        this.dragTrimLinked = true;
-        this.dragPartnerClipId = null;
-        this.dragPartnerStartClipFrame = null;
-        this.dragPartnerStartInFrame = null;
-        this.dragPartnerStartOutFrame = null;
         // Fecha a transação do drag/trim (no-op se nada mudou)
         TIMELINE_HISTORY.commit();
         this.dragState = null;
@@ -2183,9 +2348,18 @@ export class CapiauTimelineInteraction {
         this.mouseDownClip = null;
         this.dragInitialClipPositions = null;
         this.dragAnchorClip = null;
+        this.dragTrimLinked = true;
+        this.dragPartnerClipId = null;
+        this.dragPartnerStartClipFrame = null;
+        this.dragPartnerStartInFrame = null;
+        this.dragPartnerStartOutFrame = null;
         if (this.canvas) {
             if (TIMELINE_STATE.activeTool === "marquee") {
                 this.canvas.style.cursor = "crosshair";
+            } else if (TIMELINE_STATE.activeTool === "slip") {
+                this.canvas.style.cursor = this.getSlipCursor();
+            } else if (TIMELINE_STATE.activeTool === "slide") {
+                this.canvas.style.cursor = this.getSlideCursor();
             } else if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
                 this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e?.shiftKey || false);
             } else {
@@ -2931,6 +3105,43 @@ export class CapiauTimelineInteraction {
 
     hideSlipTooltip() {
         const tip = document.getElementById("timeline-slip-tooltip");
+        if (tip) tip.style.display = "none";
+    }
+
+    /**
+     * Tooltip visual durante o arraste da Ferramenta Slide (Deslizar Posição na Timeline).
+     */
+    showSlideTooltip(x, y, deltaFrames, fps = 24, isIndependent = false) {
+        let tip = document.getElementById("timeline-slide-tooltip");
+        if (!tip) {
+            tip = document.createElement("div");
+            tip.id = "timeline-slide-tooltip";
+            tip.style.position = "fixed";
+            tip.style.zIndex = "99999";
+            tip.style.pointerEvents = "none";
+            tip.style.background = "rgba(18, 18, 24, 0.95)";
+            tip.style.color = "#ffffff";
+            tip.style.border = "1px solid rgba(168, 85, 247, 0.6)";
+            tip.style.borderRadius = "4px";
+            tip.style.padding = "4px 8px";
+            tip.style.fontSize = "11px";
+            tip.style.fontFamily = "Outfit, sans-serif";
+            tip.style.backdropFilter = "blur(8px)";
+            tip.style.boxShadow = "0 4px 12px rgba(0,0,0,0.5)";
+            document.body.appendChild(tip);
+        }
+        const sign = deltaFrames > 0 ? "+" : (deltaFrames < 0 ? "" : "±");
+        const deltaSec = (deltaFrames / fps).toFixed(2);
+        const secSign = deltaFrames > 0 ? "+" : (deltaFrames < 0 ? "" : "±");
+        const label = isIndependent ? "Slide (Alt/J-L):" : "Slide:";
+        tip.innerHTML = `<span style="color:#c084fc; font-weight:600;"><i class="fa-solid fa-arrows-left-right-to-line" style="margin-right:4px;"></i>${label}</span> <span style="font-family:monospace; font-weight:500;">${sign}${deltaFrames}f (${secSign}${deltaSec}s)</span>`;
+        tip.style.display = "block";
+        tip.style.left = `${x + 14}px`;
+        tip.style.top = `${y - 28}px`;
+    }
+
+    hideSlideTooltip() {
+        const tip = document.getElementById("timeline-slide-tooltip");
         if (tip) tip.style.display = "none";
     }
 
@@ -4450,7 +4661,14 @@ export class CapiauTimelineInteraction {
                 if (this.renderer) this.renderer.requestRedraw();
             };
         }
-        bindToolClick(toolButtons["slide"], "slide", "ew-resize");
+        if (toolButtons["slide"] && !toolButtons["slide"].__capiauToolBound) {
+            toolButtons["slide"].__capiauToolBound = true;
+            toolButtons["slide"].onclick = () => {
+                TIMELINE_STATE.setTool("slide");
+                if (this.canvas) this.canvas.style.cursor = this.getSlideCursor();
+                if (this.renderer) this.renderer.requestRedraw();
+            };
+        }
         bindToolClick(toolButtons["rolling"], "rolling", "col-resize");
         bindToolClick(toolButtons["rate-stretch"], "rate-stretch", "ew-resize");
         bindToolClick(toolButtons["hand"], "hand", "grab");
@@ -8678,6 +8896,71 @@ export class CapiauTimelineInteraction {
                 e.preventDefault();
                 return;
             }
+            if (this.dragState === "slide") {
+                this.hideSlideTooltip();
+                if (window.player) window.player.hide2UpPreview();
+                if (this.dragSlideBase && this.draggedClipId) {
+                    const cuts = [...STATE.activeTimelineCuts];
+                    const clip = cuts.find(c => c.id === this.draggedClipId);
+                    const left = cuts.find(c => c.id === this.dragSlideBase.leftClipId);
+                    const right = cuts.find(c => c.id === this.dragSlideBase.rightClipId);
+                    const fps = TIMELINE_STATE.fps || 24;
+                    if (clip) {
+                        clip.timelineStartFrame = this.dragSlideBase.clipStart;
+                        clip.timeline_start = clip.timelineStartFrame / fps;
+                    }
+                    if (left) {
+                        left.outFrame = this.dragSlideBase.leftOut;
+                        left.inFrame = this.dragSlideBase.leftIn;
+                        left.timelineStartFrame = this.dragSlideBase.leftStart;
+                        left.out = left.outFrame / fps;
+                        left.in = left.inFrame / fps;
+                        left.timeline_start = left.timelineStartFrame / fps;
+                    }
+                    if (right) {
+                        right.inFrame = this.dragSlideBase.rightIn;
+                        right.outFrame = this.dragSlideBase.rightOut;
+                        right.timelineStartFrame = this.dragSlideBase.rightStart;
+                        right.in = right.inFrame / fps;
+                        right.out = right.outFrame / fps;
+                        right.timeline_start = right.timelineStartFrame / fps;
+                    }
+                    if (this.dragSlideBase.partnerClipId) {
+                        const pClip = cuts.find(c => c.id === this.dragSlideBase.partnerClipId);
+                        const pLeft = cuts.find(c => c.id === this.dragSlideBase.partnerLeftClipId);
+                        const pRight = cuts.find(c => c.id === this.dragSlideBase.partnerRightClipId);
+                        if (pClip) {
+                            pClip.timelineStartFrame = this.dragSlideBase.partnerClipStart;
+                            pClip.timeline_start = pClip.timelineStartFrame / fps;
+                        }
+                        if (pLeft) {
+                            pLeft.outFrame = this.dragSlideBase.partnerLeftOut;
+                            pLeft.inFrame = this.dragSlideBase.partnerLeftIn;
+                            pLeft.timelineStartFrame = this.dragSlideBase.partnerLeftStart;
+                            pLeft.out = pLeft.outFrame / fps;
+                            pLeft.in = pLeft.inFrame / fps;
+                            pLeft.timeline_start = pLeft.timelineStartFrame / fps;
+                        }
+                        if (pRight) {
+                            pRight.inFrame = this.dragSlideBase.partnerRightIn;
+                            pRight.outFrame = this.dragSlideBase.partnerRightOut;
+                            pRight.timelineStartFrame = this.dragSlideBase.partnerRightStart;
+                            pRight.in = pRight.inFrame / fps;
+                            pRight.out = pRight.outFrame / fps;
+                            pRight.timeline_start = pRight.timelineStartFrame / fps;
+                        }
+                    }
+                    STATE.activeTimelineCuts = cuts;
+                }
+                TIMELINE_HISTORY.pending = null;
+                this.dragState = null;
+                this.draggedClipId = null;
+                this.dragSlideBase = null;
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+                e.preventDefault();
+                return;
+            }
             if (this.dragState === "drag-clip") {
                 if (window.player) window.player.hide2UpPreview();
                 if (this.dragOriginalCuts) {
@@ -8886,6 +9169,18 @@ export class CapiauTimelineInteraction {
                 window.showToast("Ferramenta Deslizar Conteúdo Interno / Slip (Y)", "info");
             }
             if (this.canvas) this.canvas.style.cursor = this.getSlipCursor();
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // Ferramenta Deslizar Posição na Timeline / Slide Tool (U)
+        if (KEYMAP_SERVICE.matches(e, "tools.slide")) {
+            TIMELINE_STATE.setTool("slide");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta Deslizar Posição / Slide (U)", "info");
+            }
+            if (this.canvas) this.canvas.style.cursor = this.getSlideCursor();
             if (this.renderer) this.renderer.requestRedraw();
             e.preventDefault();
             return;
