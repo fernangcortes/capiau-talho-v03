@@ -335,5 +335,91 @@ async function rodar(player, corte, vezes = 1) {
     TIMELINE_STATE.tracks[0].volume = 1.0;
 }
 
-console.log(falhas === 0 ? "\nTODOS OS AUTOTESTES F4 PASSARAM" : `\n${falhas} VERIFICACOES FALHARAM`);
+// ─────────── T5: transição de corte contíguo (razor cut) e salto (jump cut) no mesmo arquivo ───────────
+{
+    criados = [];
+    eventos.length = 0;
+    const player = new ProgramPlayer();
+    player.isPlaying = true;
+    player.playbackSpeed = 1.0;
+
+    // c1: 0 a 240f (10s a 20s no arquivo 6)
+    // c2: 240 a 480f (20s a 30s no arquivo 6 - corte contíguo perfeito)
+    // c3: 480 a 720f (50s a 60s no arquivo 6 - jump cut de 20s no mesmo arquivo)
+    const c1 = { id: "c1", track: "t1", video_id: "6", in: 10.0, inFrame: 240, outFrame: 480, timelineStartFrame: 0 };
+    const c2 = { id: "c2", track: "t1", video_id: "6", in: 20.0, inFrame: 480, outFrame: 720, timelineStartFrame: 240 };
+    const c3 = { id: "c3", track: "t1", video_id: "6", in: 50.0, inFrame: 1200, outFrame: 1440, timelineStartFrame: 480 };
+
+    stateStub.activeTimelineCuts = [c1, c2, c3];
+
+    // Inicia tocando em c1 (frame 200 = 8.33s na timeline, 18.33s no arquivo)
+    player.syncAudioTracks([c1, c2, c3], 200);
+    const el = player.audioPool["t1"];
+    verificar(!!el && !el.paused, "T5: c1 tocando no ar");
+    verificar(el.dataset.activeClipId === "c1", "T5: activeClipId inicial c1");
+    const loadCallsAntes = el.loadCalls;
+
+    // Simula reprodução contínua chegando exatamente na emenda com c2 (frame 240, arquivo em 20.0s)
+    el.currentTime = 20.0;
+    player.syncAudioTracks([c1, c2, c3], 240);
+
+    verificar(el.dataset.activeClipId === "c2", "T5: corte contíguo virou para c2");
+    verificar(el.loadCalls === loadCallsAntes, "T5: corte contíguo NÃO recarregou mídia (zero silêncio)");
+    verificar(Math.abs(el.currentTime - 20.0) < 1e-6, "T5: corte contíguo manteve currentTime sem seek duro forçado");
+    verificar(!el.paused, "T5: segue tocando ininterruptamente através do corte contíguo");
+
+    // Agora cruza para c3 (frame 480 - jump cut no mesmo arquivo de 30s para 50s)
+    el.currentTime = 30.0; // fim de c2
+    player.syncAudioTracks([c1, c2, c3], 480);
+
+    verificar(el.dataset.activeClipId === "c3", "T5: virou para c3 no jump cut");
+    verificar(Math.abs(el.currentTime - 50.0) < 1e-6, "T5: jump cut executou seek inicial para a nova posição (50s)");
+    verificar(!el.paused, "T5: segue tocando no jump cut");
+
+    // Próximo frame com seek assíncrono em andamento: não deve disparar novo seek (sem loop)
+    el.seeking = true;
+    el.currentTime = 30.0; // browser ainda não terminou de buscar
+    player.syncAudioTracks([c1, c2, c3], 481);
+    verificar(el.currentTime === 30.0, "T5: el.seeking protege contra seek-loop a cada frame");
+    el.seeking = false;
+}
+
+// ─────────── T6: transição de corte entre arquivos diferentes e pré-carga ───────────
+{
+    criados = [];
+    eventos.length = 0;
+    if (!stateStub.allVideos.find(v => v.id === "7")) {
+        stateStub.allVideos.push({ id: "7", proxy_path: "/proxies/v7.mp4", filepath: "F:/outro.mp4", filename: "outro.mp4" });
+    }
+
+    const player = new ProgramPlayer();
+    player.isPlaying = true;
+    player.playbackSpeed = 1.0;
+
+    const ca = { id: "ca", track: "t1", video_id: "6", in: 0.0, inFrame: 0, outFrame: 100, timelineStartFrame: 0 };
+    const cb = { id: "cb", track: "t1", video_id: "7", in: 5.0, inFrame: 120, outFrame: 220, timelineStartFrame: 100 };
+    stateStub.activeTimelineCuts = [ca, cb];
+
+    // Reproduzindo em ca no frame 50
+    player.syncAudioTracks([ca, cb], 50);
+    const principal = player.audioPool["t1"];
+    verificar(principal.dataset.loadedSrc === "/proxies/v6.mp4", "T6: principal carregado com video 6");
+
+    // Pré-carrega próximo corte em frame 80 (dentro da janela de 3s)
+    player._preloadUpcomingAudio([ca, cb], 80);
+    const par = player._paresAudio ? player._paresAudio["t1"] : null;
+    const reserva = (par && par.a === principal) ? par.b : (par ? par.a : null);
+    verificar(!!reserva, "T6: reserva criado para a pista");
+    verificar(reserva.dataset.loadedSrc === "/proxies/v7.mp4", "T6: reserva pré-carregado com a nova fonte v7");
+    verificar(reserva.dataset.activeClipId === "cb", "T6: reserva marcado para o corte cb");
+
+    // Playhead atinge o corte cb (frame 100)
+    player.syncAudioTracks([ca, cb], 100);
+    const novoNoAr = player.audioPool["t1"];
+    verificar(novoNoAr === reserva, "T6: reserva promovido instantaneamente no corte cb");
+    verificar(novoNoAr.dataset.loadedSrc === "/proxies/v7.mp4", "T6: áudio no ar é o arquivo novo v7");
+    verificar(!novoNoAr.paused, "T6: arquivo novo entra tocando sem silêncio");
+}
+
+console.log(falhas === 0 ? "\nTODOS OS AUTOTESTES F4 E TRANSIÇÃO DE ÁUDIO PASSARAM" : `\n${falhas} VERIFICACOES FALHARAM`);
 process.exit(falhas === 0 ? 0 : 1);
