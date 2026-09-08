@@ -86,6 +86,7 @@
         // Mapeamento de títulos e identificadores de janela fixos
         const TITLE_MAP = {
             "sidebar-left": "CapIAu-Talho — Biblioteca",
+            "inspector-panel": "CapIAu-Talho — Ajustes & Efeitos",
             "sidebar-right": "CapIAu-Talho — Painel Lateral",
             "timeline-panel": "CapIAu-Talho — Linha do Tempo",
             "source-player-panel": "CapIAu-Talho — Player de Origem",
@@ -94,6 +95,7 @@
         
         function getExpectedWindowName(panel) {
             if (panel === "sidebar-left") return "CapIAu_Library_Window";
+            if (panel === "inspector-panel") return "CapIAu_Inspector_Window";
             if (panel === "sidebar-right") return "CapIAu_RightSidebar_Window";
             if (panel === "timeline-panel") return "CapIAu_Timeline_Window";
             if (panel === "source-player-panel") return "CapIAu_SourcePlayer_Window";
@@ -214,6 +216,14 @@
                     console.log("[Popout] Opener desconectado. Recarregando panel.html para restabelecer vínculo...");
                     window.location.reload();
                 }
+            } else if (data.type === "WORKSPACE_CHANGED") {
+                console.log(`[Popout] Mudança de workspace recebida: ${data.workspace}`);
+                if (data.isStudio) {
+                    document.body.classList.add("studio");
+                } else {
+                    document.body.classList.remove("studio");
+                }
+                window.dispatchEvent(new Event("resize"));
             }
         });
 

@@ -2,6 +2,7 @@
 import { STATE } from "./state.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds, framesToTimecode, evaluateFadeCurve, FADE_CURVE_PRESETS } from "./timelineState.js";
 import { setTabVisibility } from "./tabsCustomization.js";
+import { getActiveElement, getActiveQuerySelector } from "./workspaceManager.js";
 import {
     hasKeyframes,
     getKeyframeAt,
@@ -4134,24 +4135,30 @@ export class CapiauTimelineInteraction {
     }
 
     showClipInspector(clip) {
-        // Renderiza o painel de ajustes na aba correspondente
+        // Renderiza o painel de ajustes no Inspetor
         this.renderAdjustmentsPanel(clip);
 
-        // Abre automaticamente a aba de ajustes no menu esquerdo
-        const doc = (this.canvas && this.canvas.ownerDocument) || document;
-        const tabBtn = doc ? doc.querySelector('.tab-btn[data-tab="tab-adjustments"]') : null;
-        if (tabBtn) {
-            if (tabBtn.style.display === "none") {
-                setTabVisibility("tab-adjustments", true);
-            }
-            if (!tabBtn.classList.contains("active")) {
-                tabBtn.click();
-                try { tabBtn.blur(); } catch (_) {}
+        const inspectorPanel = getActiveElement("inspector-panel");
+        const reopenInspector = document.getElementById("reopen-inspector");
+
+        // Opção 2.B aprovada pelo usuário: Silencioso se Fechado.
+        // Se o painel estiver colapsado (e na janela principal), sinaliza updates na linha restauradora sem forçar abertura
+        if (inspectorPanel && inspectorPanel.classList.contains("collapsed")) {
+            if (reopenInspector) {
+                reopenInspector.classList.add("has-updates");
             }
         }
-        if (typeof window.expandLeftPanel === "function") {
-            window.expandLeftPanel();
-        }
+    }
+
+    onInspectorPopoutReady(win) {
+        if (!win || !win.document) return;
+        this.initAdjustmentsToolbar(win.document);
+        this.refreshClipInspector();
+    }
+
+    onInspectorPopoutRestored() {
+        this.initAdjustmentsToolbar(document);
+        this.refreshClipInspector();
     }
 
     _getSameMediaVideoCuts(clip, cuts = (STATE.activeTimelineCuts || [])) {
@@ -4509,6 +4516,14 @@ export class CapiauTimelineInteraction {
 
     // ==================== ABA DE AJUSTES RETRÁTIL, REORDENÁVEL & BUSCA SEMÂNTICA ====================
 
+    _getAdjustmentsDoc() {
+        const container = getActiveElement("adjustments-panel-content");
+        if (container && container.ownerDocument) {
+            return container.ownerDocument;
+        }
+        return (this.canvas && this.canvas.ownerDocument) || document;
+    }
+
     _normalizeSearchText(str) {
         return String(str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
     }
@@ -4685,12 +4700,21 @@ export class CapiauTimelineInteraction {
     }
 
     _filterAdjustmentsBySearch(query) {
-        const doc = (this.canvas && this.canvas.ownerDocument) || document;
-        const container = doc.getElementById("adjustments-panel-content");
+        const container = getActiveElement("adjustments-panel-content");
         if (!container) return;
+        const doc = container.ownerDocument || document;
 
         const cleanQuery = this._normalizeSearchText(query);
         const states = this._getAdjustmentAccordionStates();
+        const activeCat = this.activeAdjustmentCategory || "all";
+
+        const categorySections = {
+            video: ["transform", "crop", "ken_burns", "sequence_settings"],
+            audio: ["volume", "audio_eq", "audio_dynamics", "audio_diag", "audio_render", "audio_render_resultado"],
+            color: ["color"],
+            fades: ["fades"],
+            text: ["text_style", "transform", "fades"]
+        };
 
         const map = {
             transform: {
@@ -4797,8 +4821,13 @@ export class CapiauTimelineInteraction {
         if (cleanQuery === "") {
             if (noResultsEl) noResultsEl.remove();
             container.querySelectorAll(".adjustments-section").forEach(section => {
-                section.style.display = "";
                 const sectionId = section.dataset.sectionId;
+                const matchesCategory = (activeCat === "all") || (categorySections[activeCat] && categorySections[activeCat].includes(sectionId));
+                if (!matchesCategory) {
+                    section.style.display = "none";
+                    return;
+                }
+                section.style.display = "";
                 const isOpen = states[sectionId] !== false;
                 const body = section.querySelector(".adjustments-section-body");
                 if (body) body.style.display = isOpen ? "" : "none";
@@ -4818,6 +4847,12 @@ export class CapiauTimelineInteraction {
         let totalMatchedSections = 0;
         container.querySelectorAll(".adjustments-section").forEach(section => {
             const sectionId = section.dataset.sectionId;
+            const matchesCategory = (activeCat === "all") || (categorySections[activeCat] && categorySections[activeCat].includes(sectionId));
+            if (!matchesCategory) {
+                section.style.display = "none";
+                return;
+            }
+
             const entry = map[sectionId];
             if (!entry) {
                 section.style.display = "";
@@ -5017,8 +5052,7 @@ export class CapiauTimelineInteraction {
     }
 
     expandAllAdjustmentsSections() {
-        const doc = (this.canvas && this.canvas.ownerDocument) || document;
-        const container = doc.getElementById("adjustments-panel-content");
+        const container = getActiveElement("adjustments-panel-content");
         if (!container) return;
 
         this._setAllAdjustmentAccordionStates(true);
@@ -5031,8 +5065,7 @@ export class CapiauTimelineInteraction {
     }
 
     collapseAllAdjustmentsSections() {
-        const doc = (this.canvas && this.canvas.ownerDocument) || document;
-        const container = doc.getElementById("adjustments-panel-content");
+        const container = getActiveElement("adjustments-panel-content");
         if (!container) return;
 
         this._setAllAdjustmentAccordionStates(false);
@@ -5427,14 +5460,30 @@ export class CapiauTimelineInteraction {
         updateButtons(TIMELINE_STATE.activeTool);
     }
 
-    initAdjustmentsToolbar() {
-        const doc = (this.canvas && this.canvas.ownerDocument) || document;
+    initAdjustmentsToolbar(targetDoc) {
+        const doc = targetDoc || this._getAdjustmentsDoc();
+        if (!doc) return;
         const searchInput = doc.getElementById("adjustments-search-input");
         const clearBtn = doc.getElementById("btn-clear-adj-search");
         const expandAllBtn = doc.getElementById("btn-adj-expand-all");
         const collapseAllBtn = doc.getElementById("btn-adj-collapse-all");
         const resetAllBtn = doc.getElementById("btn-adj-reset-all");
         const resetOrderBtn = doc.getElementById("btn-adj-reset-order");
+        const chipContainer = doc.getElementById("adj-category-chips");
+
+        if (chipContainer && !chipContainer.__capiauChipsBound) {
+            chipContainer.__capiauChipsBound = true;
+            chipContainer.querySelectorAll(".adj-chip").forEach(chip => {
+                chip.onclick = () => {
+                    chipContainer.querySelectorAll(".adj-chip").forEach(c => c.classList.remove("active"));
+                    chip.classList.add("active");
+                    this.activeAdjustmentCategory = chip.dataset.category || "all";
+                    const currentSearch = doc.getElementById("adjustments-search-input");
+                    const query = currentSearch ? currentSearch.value : "";
+                    this._filterAdjustmentsBySearch(query);
+                };
+            });
+        }
 
         if (searchInput && !searchInput.__capiauAdjSearchBound) {
             searchInput.__capiauAdjSearchBound = true;
@@ -5557,9 +5606,9 @@ export class CapiauTimelineInteraction {
     }
 
     renderAdjustmentsPanel(clip) {
-        const doc = (this.canvas && this.canvas.ownerDocument) || document;
-        const container = doc ? doc.getElementById("adjustments-panel-content") : null;
+        const container = getActiveElement("adjustments-panel-content");
         if (!container) return;
+        const doc = container.ownerDocument || document;
 
         const roundVal = (v) => {
             if (v === undefined || v === null) return 0;
@@ -5659,7 +5708,6 @@ export class CapiauTimelineInteraction {
                 const optionsList = fpsSelect.options ? Array.from(fpsSelect.options) : [];
                 const exists = optionsList.some(opt => parseFloat(opt.value) === TIMELINE_STATE.fps);
                 if (!exists) {
-                    const doc = (this.canvas && this.canvas.ownerDocument) || document;
                     const opt = doc.createElement ? doc.createElement("option") : null;
                     if (opt) {
                         opt.value = TIMELINE_STATE.fps;
@@ -5711,9 +5759,11 @@ export class CapiauTimelineInteraction {
             if (widthInput) widthInput.onchange = applySettings;
             if (heightInput) heightInput.onchange = applySettings;
             if (fpsSelect) fpsSelect.onchange = applySettings;
-            const doc = (this.canvas && this.canvas.ownerDocument) || document;
+
+            this.initAdjustmentsToolbar(doc);
             const searchInput = doc ? doc.getElementById("adjustments-search-input") : null;
-            if (searchInput && searchInput.value) { this._filterAdjustmentsBySearch(searchInput.value); }
+            const query = searchInput ? searchInput.value : "";
+            this._filterAdjustmentsBySearch(query);
             return;
         }
 
@@ -6523,11 +6573,13 @@ export class CapiauTimelineInteraction {
         // N2: montar ícones de explicação do glossário
         this._montarIconesExplica(container).catch((err) => console.error("[timeline] falha ao montar os ícones de explicação:", err));
 
-        // Re-aplica busca se houver termo no input
-        const searchInput = this.canvas.ownerDocument.getElementById("adjustments-search-input");
-        if (searchInput && searchInput.value) {
-            this._filterAdjustmentsBySearch(searchInput.value);
-        }
+        // Inicializa listeners da toolbar (chips, busca, etc.) no doc do container
+        this.initAdjustmentsToolbar(doc);
+
+        // Re-aplica busca e filtro de categoria
+        const searchInput = doc ? doc.getElementById("adjustments-search-input") : null;
+        const query = searchInput ? searchInput.value : "";
+        this._filterAdjustmentsBySearch(query);
     }
     _audioDiagEsc(s) {
         return String(s === undefined || s === null ? "" : s)
@@ -7069,8 +7121,8 @@ export class CapiauTimelineInteraction {
 
     /** Repinta só o corpo do RESULTADO no DOM vivo (o painel pode ter sido redesenhado). */
     _pintarResultado(alvoClipId, progresso, erroRede) {
-        const doc = (this.canvas && this.canvas.ownerDocument) || document;
-        const body = doc.getElementById("adj-ar-resultado-body");
+        const doc = this._getAdjustmentsDoc();
+        const body = doc ? doc.getElementById("adj-ar-resultado-body") : null;
         if (!body || body.dataset.alvo !== String(alvoClipId)) return;
         const alvo = STATE.activeTimelineCuts.find(c => String(c.id) === String(alvoClipId));
         const efeito = alvo && Array.isArray(alvo.effects) ? alvo.effects.find(e => e.type === "audio_render") : null;
@@ -7079,8 +7131,8 @@ export class CapiauTimelineInteraction {
 
     /** F4: o player registrou falha da fonte tratada; A/B volta para Original na tela. */
     _refletirFalhaFonteTratada(registro) {
-        const doc = (this.canvas && this.canvas.ownerDocument) || document;
-        const body = doc.getElementById("adj-ar-resultado-body");
+        const doc = this._getAdjustmentsDoc();
+        const body = doc ? doc.getElementById("adj-ar-resultado-body") : null;
         if (!body || !registro || body.dataset.alvo !== String(registro.clipId)) return;
         const original = body.querySelector('input[name="adj-ar-ab"][value="original"]');
         if (original) original.checked = true;
@@ -7604,8 +7656,8 @@ export class CapiauTimelineInteraction {
 
     /** Repinta o bloco de cota conforme o motor marcado AGORA (sem rede). */
     _pintarCotaAuphonic() {
-        const doc = (this.canvas && this.canvas.ownerDocument) || document;
-        const saida = doc.getElementById("adj-ar-cota-out");
+        const doc = this._getAdjustmentsDoc();
+        const saida = doc ? doc.getElementById("adj-ar-cota-out") : null;
         if (!saida) return;
         const sel = doc.querySelector('input[name="adj-ar-motor"]:checked');
         if (!sel || sel.value !== "auphonic") { saida.innerHTML = ""; return; }
@@ -7625,8 +7677,8 @@ export class CapiauTimelineInteraction {
      *  Consulta leve ao mostrar a seção, com cache curto; nunca submete nada. */
     async _atualizarRadioAuphonic() {
         const pintar = (cota) => {
-            const doc = (this.canvas && this.canvas.ownerDocument) || document;
-            const radio = doc.querySelector('input[name="adj-ar-motor"][value="auphonic"]');
+            const doc = this._getAdjustmentsDoc();
+            const radio = doc ? doc.querySelector('input[name="adj-ar-motor"][value="auphonic"]') : null;
             if (!radio) return;
             const estado = this._estadoRadioAuphonic(cota);
             const label = radio.closest("label");
@@ -7826,10 +7878,10 @@ export class CapiauTimelineInteraction {
     /** Mostra a área SÓ com motor Auphonic marcado E grade válida em mãos; pinta
      *  conteúdo, seta e contador de manuais. Sem rede. */
     _pintarAjustesNuvem() {
-        const doc = (this.canvas && this.canvas.ownerDocument) || document;
-        const wrap = doc.getElementById("adj-ar-nuvem-wrap");
+        const doc = this._getAdjustmentsDoc();
+        const wrap = doc ? doc.getElementById("adj-ar-nuvem-wrap") : null;
         if (!wrap) return;
-        const sel = doc.querySelector('input[name="adj-ar-motor"]:checked');
+        const sel = doc ? doc.querySelector('input[name="adj-ar-motor"]:checked') : null;
         const visivel = !!sel && sel.value === "auphonic" && this._camposNuvemCache !== null;
         wrap.style.display = visivel ? "block" : "none";
         if (!visivel) return;
