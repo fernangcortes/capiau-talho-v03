@@ -1117,11 +1117,11 @@ button {
 #media-tree-list .media-card.tree-file-item,
 .library-tree-list .media-card.tree-file-item {
     content-visibility: auto;
-    contain-intrinsic-size: auto calc(var(--thumb-height, 45px) + 14px);
+    contain-intrinsic-size: var(--card-estimated-height, 60px);
 }
 #media-tree-list.view-mode-grid .media-card.tree-file-item,
 .library-tree-list.view-mode-grid .media-card.tree-file-item {
-    contain-intrinsic-size: auto calc(var(--thumb-width, 130px) * 0.5625 + 70px);
+    contain-intrinsic-size: var(--grid-card-estimated-height, 120px);
 }
 
 /* Modo Lista (Árvore) de Fotos e Vídeos - Layout adaptativo inteligente com Título, Metadados, Sinopse e Tags */
@@ -1334,6 +1334,7 @@ button {
 /* ── ADAPTAÇÃO INTELIGENTE POR ZOOM TIERS ───────────────────────── */
 /* Tier XS: zoom < 55px -> modo ultra-compacto (1 linha por mídia) */
 .zoom-xs:not(.view-mode-grid) .media-card.tree-file-item {
+    contain-intrinsic-size: var(--card-estimated-height, 30px);
     min-height: 28px !important;
     padding: 2px 6px !important;
     gap: 6px !important;
@@ -1344,6 +1345,9 @@ button {
 }
 
 /* Tier SM: 55px <= zoom < 90px -> 1 linha de sinopse, tags ocultas */
+.zoom-sm:not(.view-mode-grid) .media-card.tree-file-item {
+    contain-intrinsic-size: var(--card-estimated-height, 60px);
+}
 .zoom-sm:not(.view-mode-grid) .media-card.tree-file-item .media-desc-text {
     -webkit-line-clamp: 1 !important;
 }
@@ -1352,6 +1356,9 @@ button {
 }
 
 /* Tier MD: 90px <= zoom < 140px -> 2 linhas de sinopse + 1 linha de tags */
+.zoom-md:not(.view-mode-grid) .media-card.tree-file-item {
+    contain-intrinsic-size: var(--card-estimated-height, 105px);
+}
 .zoom-md:not(.view-mode-grid) .media-card.tree-file-item .media-desc-text {
     -webkit-line-clamp: 2 !important;
 }
@@ -1361,6 +1368,9 @@ button {
 }
 
 /* Tier LG: 140px <= zoom < 210px -> 3 linhas de sinopse + tags completas (zoom 170px) */
+.zoom-lg:not(.view-mode-grid) .media-card.tree-file-item {
+    contain-intrinsic-size: var(--card-estimated-height, 155px);
+}
 .zoom-lg:not(.view-mode-grid) .media-card.tree-file-item .media-info h4 {
     font-size: 12px !important;
 }
@@ -1371,6 +1381,9 @@ button {
 }
 
 /* Tier XL: zoom >= 210px -> sinopse expandida até 5 linhas + tags ricas */
+.zoom-xl:not(.view-mode-grid) .media-card.tree-file-item {
+    contain-intrinsic-size: var(--card-estimated-height, 215px);
+}
 .zoom-xl:not(.view-mode-grid) .media-card.tree-file-item .media-info h4 {
     font-size: 13px !important;
 }

@@ -382,6 +382,14 @@ export function escapeHtml(str) {
         .replace(/'/g, "&#039;");
 }
 
+export function getEstimatedCardHeight(numericVal) {
+    if (numericVal < 55) return 30;
+    if (numericVal < 90) return Math.max(Math.round(numericVal * 9 / 16) + 12, 58);
+    if (numericVal < 140) return Math.max(Math.round(numericVal * 9 / 16) + 32, 100);
+    if (numericVal < 210) return Math.max(Math.round(numericVal * 9 / 16) + 48, 145);
+    return Math.max(Math.round(numericVal * 9 / 16) + 65, 205);
+}
+
 export function updateZoomTier(listEl, zoomVal) {
     if (!listEl) return;
     listEl.classList.remove("zoom-xs", "zoom-sm", "zoom-md", "zoom-lg", "zoom-xl");
@@ -396,6 +404,10 @@ export function updateZoomTier(listEl, zoomVal) {
     } else {
         listEl.classList.add("zoom-xl");
     }
+    const cardEst = getEstimatedCardHeight(zoomVal);
+    const gridEst = Math.round(zoomVal * 9 / 16) + 45;
+    listEl.style.setProperty("--card-estimated-height", `${cardEst}px`);
+    listEl.style.setProperty("--grid-card-estimated-height", `${gridEst}px`);
 }
 
 export function getAllLibraryDocuments() {
@@ -3017,7 +3029,7 @@ function appendChildrenChunked(node, keys, container, childDepth) {
 }
 
 /** Garante que todos os blocos pendentes entraram no DOM (revelar item, exportar, etc). */
-function flushAllPendingChunks(root) {
+export function flushAllPendingChunks(root) {
     const scope = root || document.getElementById("media-tree-list");
     if (!scope) return;
     if (typeof scope._flushAllChunks === "function") scope._flushAllChunks();
@@ -3025,6 +3037,7 @@ function flushAllPendingChunks(root) {
         if (typeof el._flushAllChunks === "function") el._flushAllChunks();
     });
 }
+window.flushAllPendingChunks = flushAllPendingChunks;
 
 function populateFolderChildren(node, folderChildren, depth) {
     materializeSmartBinChildren(node);
@@ -7963,8 +7976,8 @@ export class LibraryScrollIndexTracker {
             return;
         }
 
-        // Se o mouse estiver sobre o tooltip, mantém o tooltip exibido no item atual
-        if (isInsideTooltip && !isInsideGutter) {
+        // Se o mouse estiver sobre o tooltip, mantém o tooltip travado no item atual
+        if (isInsideTooltip) {
             return;
         }
 
@@ -7985,9 +7998,7 @@ export class LibraryScrollIndexTracker {
 
         if (this.isPointerDownOnGutter) {
             if (this.currentTargetItem) {
-                const itemRect = this.currentTargetItem.getBoundingClientRect();
-                const targetScroll = (itemRect.top - rect.top) + container.scrollTop;
-                container.scrollTop = Math.max(0, targetScroll - 4);
+                this.navigateToItem(this.currentTargetItem, false);
             } else {
                 const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
                 container.scrollTop = targetScrollTop;
@@ -7998,6 +8009,37 @@ export class LibraryScrollIndexTracker {
     handlePointerLeave() {
         this.isPointerDownOnGutter = false;
         this.hide();
+    }
+
+    navigateToItem(item, smooth = true) {
+        if (!item) return;
+        const container = this.getScrollContainer();
+        if (!container) return;
+
+        if (typeof flushAllPendingChunks === "function") {
+            flushAllPendingChunks();
+        }
+
+        const triggerHighlight = () => {
+            item.classList.remove("reveal-pulse");
+            void item.offsetWidth;
+            item.classList.add("reveal-pulse");
+            setTimeout(() => {
+                if (item && item.isConnected) {
+                    item.classList.remove("reveal-pulse");
+                }
+            }, 1600);
+        };
+
+        try {
+            item.scrollIntoView({ block: "center", behavior: smooth ? "smooth" : "auto" });
+        } catch (err) {
+            const rect = container.getBoundingClientRect();
+            const itemRect = item.getBoundingClientRect();
+            const targetScroll = (itemRect.top - rect.top) + container.scrollTop - (rect.height / 2);
+            container.scrollTop = Math.max(0, targetScroll);
+        }
+        triggerHighlight();
     }
 
     handlePointerDown(e) {
@@ -8013,10 +8055,7 @@ export class LibraryScrollIndexTracker {
         // Se o clique ocorreu dentro do tooltip visível -> "Clique: Ir" para o item
         if (this.tooltipEl && this.tooltipEl.classList.contains("visible") && e.target && this.tooltipEl.contains(e.target)) {
             if (this.currentTargetItem) {
-                const rect = container.getBoundingClientRect();
-                const itemRect = this.currentTargetItem.getBoundingClientRect();
-                const targetScroll = (itemRect.top - rect.top) + container.scrollTop;
-                container.scrollTo({ top: Math.max(0, targetScroll - 4), behavior: "smooth" });
+                this.navigateToItem(this.currentTargetItem, true);
             }
             return;
         }
@@ -8037,9 +8076,7 @@ export class LibraryScrollIndexTracker {
             this.updateAtRatio(ratio, e, activeTab);
 
             if (this.currentTargetItem) {
-                const itemRect = this.currentTargetItem.getBoundingClientRect();
-                const targetScroll = (itemRect.top - rect.top) + container.scrollTop;
-                container.scrollTo({ top: Math.max(0, targetScroll - 4), behavior: "smooth" });
+                this.navigateToItem(this.currentTargetItem, true);
             } else {
                 const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
                 container.scrollTo({ top: targetScrollTop, behavior: "smooth" });
@@ -8128,8 +8165,15 @@ export class LibraryScrollIndexTracker {
         const container = this.getScrollContainer();
         if (!container) return;
 
+        const containerRect = container.getBoundingClientRect();
+
         const activeTabEl = doc.getElementById(activeTabId);
         if (!activeTabEl) return;
+
+        // Garante que blocos pendentes entraram no DOM antes de indexar
+        if (typeof flushAllPendingChunks === "function") {
+            flushAllPendingChunks(activeTabEl);
+        }
 
         // Apenas itens visíveis (ignora pastas recolhidas cujo offsetParent é null)
         const items = Array.from(activeTabEl.querySelectorAll(".tree-folder-header, .tree-file-item, .media-card")).filter(el => el.offsetParent !== null);
@@ -8138,27 +8182,10 @@ export class LibraryScrollIndexTracker {
             return;
         }
 
-        const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
-        const containerRect = container.getBoundingClientRect();
-        const currentScrollTop = container.scrollTop;
-
-        // Encontra o item cuja posição vertical real no conteúdo é mais próxima da calculada
-        let bestItem = null;
-        let bestDist = Infinity;
-
-        for (const item of items) {
-            const itemRect = item.getBoundingClientRect();
-            const itemAbsoluteTop = (itemRect.top - containerRect.top) + currentScrollTop;
-            const dist = Math.abs(itemAbsoluteTop - targetScrollTop);
-            if (dist < bestDist) {
-                bestDist = dist;
-                bestItem = item;
-            }
-        }
-
-        if (!bestItem) {
-            bestItem = items[Math.min(items.length - 1, Math.floor(ratio * items.length))];
-        }
+        // Mapeamento proporcional direto por índice: 0% = primeiro item, 100% = último item da lista.
+        // Totalmente imune ao zoom das mídias ou à altura do viewport.
+        const targetIndex = Math.max(0, Math.min(items.length - 1, Math.round(ratio * (items.length - 1))));
+        const bestItem = items[targetIndex] || items[0];
 
         this.renderItemData(bestItem, items, activeTabId);
         this.positionTooltip(mouseEvent, containerRect);
