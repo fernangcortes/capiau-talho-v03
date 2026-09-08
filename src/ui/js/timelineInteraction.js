@@ -903,6 +903,14 @@ export class CapiauTimelineInteraction {
         if (e.button === 0 || e.button === 1) {
             e.preventDefault();
         }
+
+        // Restaura foco na timeline e desativa foco preso em inputs/sliders/botões
+        if (document.activeElement && document.activeElement !== document.body && document.activeElement !== this.canvas) {
+            try { document.activeElement.blur(); } catch (_) {}
+        }
+        if (this.canvas && typeof this.canvas.focus === "function") {
+            try { this.canvas.focus(); } catch (_) {}
+        }
         
         const { x, y, frame, track } = this.getCoordinates(e.clientX, e.clientY);
         this.hideHoverPreview();
@@ -2320,6 +2328,7 @@ export class CapiauTimelineInteraction {
             this.draggedClipId = null;
             this.dragSlideBase = null;
             this.refreshClipInspector();
+            this.hideSlideTooltip();
             if (this.canvas) {
                 this.canvas.style.cursor = TIMELINE_STATE.activeTool === "slide" ? this.getSlideCursor() : "default";
             }
@@ -3817,6 +3826,7 @@ export class CapiauTimelineInteraction {
             }
             if (!tabBtn.classList.contains("active")) {
                 tabBtn.click();
+                try { tabBtn.blur(); } catch (_) {}
             }
         }
         if (typeof window.expandLeftPanel === "function") {
@@ -4795,6 +4805,15 @@ export class CapiauTimelineInteraction {
             }
         };
 
+        const refocusTimeline = (btn) => {
+            if (btn) {
+                try { btn.blur(); } catch (_) {}
+            }
+            if (this.canvas && typeof this.canvas.focus === "function") {
+                try { this.canvas.focus(); } catch (_) {}
+            }
+        };
+
         const bindToolClick = (btn, toolName, cursorStyle) => {
             if (btn && !btn.__capiauToolBound) {
                 btn.__capiauToolBound = true;
@@ -4802,6 +4821,7 @@ export class CapiauTimelineInteraction {
                     TIMELINE_STATE.setTool(toolName);
                     if (this.canvas && cursorStyle) this.canvas.style.cursor = cursorStyle;
                     if (this.renderer) this.renderer.requestRedraw();
+                    refocusTimeline(btn);
                 };
             }
         };
@@ -4814,6 +4834,7 @@ export class CapiauTimelineInteraction {
                 TIMELINE_STATE.setTool("blade");
                 if (this.canvas) this.canvas.style.cursor = this.getBladeCursor(false);
                 if (this.renderer) this.renderer.requestRedraw();
+                refocusTimeline(toolButtons["blade"]);
             };
         }
         if (toolButtons["slip"] && !toolButtons["slip"].__capiauToolBound) {
@@ -4822,6 +4843,7 @@ export class CapiauTimelineInteraction {
                 TIMELINE_STATE.setTool("slip");
                 if (this.canvas) this.canvas.style.cursor = this.getSlipCursor();
                 if (this.renderer) this.renderer.requestRedraw();
+                refocusTimeline(toolButtons["slip"]);
             };
         }
         if (toolButtons["slide"] && !toolButtons["slide"].__capiauToolBound) {
@@ -4830,6 +4852,7 @@ export class CapiauTimelineInteraction {
                 TIMELINE_STATE.setTool("slide");
                 if (this.canvas) this.canvas.style.cursor = this.getSlideCursor();
                 if (this.renderer) this.renderer.requestRedraw();
+                refocusTimeline(toolButtons["slide"]);
             };
         }
         bindToolClick(toolButtons["rolling"], "rolling", "col-resize");
@@ -4843,6 +4866,7 @@ export class CapiauTimelineInteraction {
                 TIMELINE_STATE.setTool("track-forward");
                 if (this.canvas) this.canvas.style.cursor = this.getTrackSelectCursor("track-forward", false);
                 if (this.renderer) this.renderer.requestRedraw();
+                refocusTimeline(toolButtons["track-forward"]);
             };
         }
 
@@ -4852,6 +4876,7 @@ export class CapiauTimelineInteraction {
                 TIMELINE_STATE.setTool("track-backward");
                 if (this.canvas) this.canvas.style.cursor = this.getTrackSelectCursor("track-backward", false);
                 if (this.renderer) this.renderer.requestRedraw();
+                refocusTimeline(toolButtons["track-backward"]);
             };
         }
 
@@ -4867,6 +4892,7 @@ export class CapiauTimelineInteraction {
                     if (this.renderer) this.renderer.requestRedraw();
                     this.refreshClipInspector();
                 }
+                refocusTimeline(btnRippleTrimHead);
             };
         }
 
@@ -4882,6 +4908,7 @@ export class CapiauTimelineInteraction {
                     if (this.renderer) this.renderer.requestRedraw();
                     this.refreshClipInspector();
                 }
+                refocusTimeline(btnRippleTrimTail);
             };
         }
 
@@ -4913,6 +4940,7 @@ export class CapiauTimelineInteraction {
                 }
                 if (this.renderer) this.renderer.requestRedraw();
                 this.refreshClipInspector();
+                refocusTimeline(btnSplitPlayhead);
             };
         }
 
@@ -5044,7 +5072,19 @@ export class CapiauTimelineInteraction {
             if (this.canvas) {
                 if (tool === "blade") {
                     this.canvas.style.cursor = this.getBladeCursor(false);
-                } else if (tool === "select") {
+                } else if (tool === "slip") {
+                    this.canvas.style.cursor = this.getSlipCursor();
+                } else if (tool === "slide") {
+                    this.canvas.style.cursor = this.getSlideCursor();
+                } else if (tool === "marquee") {
+                    this.canvas.style.cursor = "crosshair";
+                } else if (tool === "hand") {
+                    this.canvas.style.cursor = "grab";
+                } else if (tool === "zoom") {
+                    this.canvas.style.cursor = "zoom-in";
+                } else if (tool === "track-forward" || tool === "track-backward") {
+                    this.canvas.style.cursor = this.getTrackSelectCursor(tool, false);
+                } else {
                     this.canvas.style.cursor = "default";
                 }
             }
@@ -8981,10 +9021,21 @@ export class CapiauTimelineInteraction {
     }
 
     onKeyDown(e) {
-        // Ignora atalhos se o usuário estiver digitando em campos de formulário
-        const activeTag = document.activeElement?.tagName;
-        if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT" || document.activeElement?.isContentEditable) {
+        // Ignora atalhos se o usuário estiver digitando em campos de formulário de texto
+        const activeEl = document.activeElement;
+        const activeTag = activeEl?.tagName;
+        const isTextInput = (activeTag === "INPUT" && activeEl.type !== "range") ||
+                            activeTag === "TEXTAREA" ||
+                            activeTag === "SELECT" ||
+                            activeEl?.isContentEditable;
+        if (isTextInput) {
             return;
+        }
+        if (activeTag === "INPUT" && activeEl.type === "range") {
+            try { activeEl.blur(); } catch (_) {}
+        }
+        if (activeTag === "BUTTON") {
+            try { activeEl.blur(); } catch (_) {}
         }
 
         // Se houver modal aberto na aplicação, ignora atalhos da timeline

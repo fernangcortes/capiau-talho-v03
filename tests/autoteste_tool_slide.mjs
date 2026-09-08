@@ -128,7 +128,7 @@ const { STATE } = await import("../src/ui/js/state.js");
 const { TIMELINE_STATE, TIMELINE_HISTORY } = await import("../src/ui/js/timelineState.js");
 const { CapiauTimelineInteraction } = await import("../src/ui/js/timelineInteraction.js");
 
-const interaction = new CapiauTimelineInteraction({ rulerHeight: 30, requestRedraw: () => {} }, null);
+const interaction = new CapiauTimelineInteraction({ rulerHeight: 30, requestRedraw: () => {}, getTrackAtY: () => null }, null);
 
 TIMELINE_STATE.fps = 24;
 TIMELINE_STATE.setTracks([
@@ -401,6 +401,98 @@ assert.ok(slideCursorStr.includes("data:image/svg+xml"), "getSlideCursor deve re
 assert.ok(typeof interaction.showSlideTooltip === "function", "interaction.showSlideTooltip deve existir");
 assert.ok(typeof interaction.hideSlideTooltip === "function", "interaction.hideSlideTooltip deve existir");
 console.log("  ✔ Métodos de cursor e tooltips da Ferramenta Slide validados com sucesso.");
+
+// ── 8. Validação de Desbloqueio de Foco e Atalhos (Timeline Canvas, Sliders e Botões) ──
+console.log("\n8. Validando desbloqueio de foco (Canvas tabindex='0', sliders de range e botões)...");
+
+// 8.1 Validação do atributo tabindex="0" no canvas do index.html
+assert.ok(
+    /<canvas[^>]*id=["']timeline-canvas["'][^>]*tabindex=["']0["']/.test(htmlContent),
+    "Elemento #timeline-canvas deve conter tabindex='0' para aceitar foco de teclado nativo"
+);
+assert.ok(
+    /#timeline-canvas:focus\s*\{\s*outline:\s*none\s*!important;\s*\}/.test(cssContent),
+    "CSS deve definir outline: none !important para #timeline-canvas:focus prevenindo bordas indesejadas"
+);
+console.log("  ✔ Canvas com tabindex='0' e outline: none no foco validados no HTML/CSS.");
+
+// 8.2 Simulação de atalho U com slider focado
+let blurredInput = false;
+const mockRangeInput = {
+    tagName: "INPUT",
+    type: "range",
+    blur: () => { blurredInput = true; }
+};
+globalThis.document.activeElement = mockRangeInput;
+
+TIMELINE_STATE.setTool("select");
+assert.equal(TIMELINE_STATE.activeTool, "select");
+
+// Simula evento de tecla U (KeyU) chamando onKeyDown do interaction
+interaction.onKeyDown({
+    key: "u",
+    code: "KeyU",
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    preventDefault: () => {}
+});
+
+assert.equal(TIMELINE_STATE.activeTool, "slide", "Atalho 'U' deve ativar a ferramenta Slide mesmo com input range focado");
+assert.ok(blurredInput, "Input de range focado deve ser automaticamente desmarcado (blur) ao pressionar atalho");
+console.log("  ✔ Atalho 'U' executa e desfoca input range com sucesso.");
+
+// 8.3 Simulação de atalho V para voltar a Seleção
+let blurredButton = false;
+const mockButton = {
+    tagName: "BUTTON",
+    type: "button",
+    blur: () => { blurredButton = true; }
+};
+globalThis.document.activeElement = mockButton;
+
+interaction.onKeyDown({
+    key: "v",
+    code: "KeyV",
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    preventDefault: () => {}
+});
+
+assert.equal(TIMELINE_STATE.activeTool, "select", "Atalho 'V' deve retornar à ferramenta Seleção");
+assert.ok(blurredButton, "Botão focado deve ser automaticamente desmarcado (blur)");
+console.log("  ✔ Atalho 'V' executa e desfoca botão com sucesso.");
+
+// 8.4 Simulação de clique na timeline (onMouseDown) restaurando foco
+let canvasFocused = false;
+let inputBlurredOnDown = false;
+const mockActiveInput = {
+    tagName: "INPUT",
+    type: "range",
+    blur: () => { inputBlurredOnDown = true; }
+};
+globalThis.document.activeElement = mockActiveInput;
+
+interaction.canvas = {
+    ownerDocument: globalThis.document,
+    focus: () => { canvasFocused = true; },
+    style: {},
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 400 })
+};
+
+interaction.onMouseDown({
+    clientX: 50,
+    clientY: 50,
+    button: 0,
+    preventDefault: () => {}
+});
+
+assert.ok(inputBlurredOnDown, "onMouseDown na timeline deve tirar o foco de qualquer elemento ativo");
+assert.ok(canvasFocused, "onMouseDown na timeline deve dar foco ao canvas da timeline");
+console.log("  ✔ onMouseDown restaura foco imediato no canvas da timeline e desfaz focus trapping.");
 
 console.log("\n============================================================");
 console.log("🎉 AUTOTESTE DA TASK 4 (SLIDE TOOL — U) 100% APROVADO!");

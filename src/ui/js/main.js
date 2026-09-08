@@ -2612,6 +2612,21 @@ window.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // Libera foco automático de sliders e botões de ação para prevenir sequestro de atalhos da timeline
+    document.addEventListener("pointerup", (e) => {
+        if (e.target && e.target.tagName === "INPUT" && e.target.type === "range") {
+            try { e.target.blur(); } catch (_) {}
+        }
+    });
+    document.addEventListener("click", (e) => {
+        const btn = e.target && typeof e.target.closest === "function"
+            ? e.target.closest("button.btn-toolbar-action, button.btn-header-flat, button.tab-btn, button.btn-player-action")
+            : null;
+        if (btn) {
+            try { btn.blur(); } catch (_) {}
+        }
+    });
+
     // Inicializa status S3 e atualiza a cada 60 segundos
     updateS3Status();
     setInterval(updateS3Status, 60000);

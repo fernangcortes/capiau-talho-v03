@@ -2348,6 +2348,11 @@ button {
     -webkit-user-select: none;
     -webkit-user-drag: none;
     touch-action: none;
+    outline: none !important;
+}
+
+#timeline-canvas:focus {
+    outline: none !important;
 }
 
 .track-row {

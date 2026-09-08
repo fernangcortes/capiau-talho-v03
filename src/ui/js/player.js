@@ -4011,8 +4011,19 @@ export class VideoPlayer {
 
     // Atalhos de teclado compartilhados
     handleGlobalKeyboard(e) {
-        const activeTag = document.activeElement?.tagName?.toLowerCase();
-        if (activeTag === "input" || activeTag === "textarea" || activeTag === "select" || document.activeElement?.isContentEditable) return;
+        const activeEl = document.activeElement;
+        const activeTag = activeEl?.tagName?.toLowerCase();
+        const isTextInput = (activeTag === "input" && activeEl.type !== "range") ||
+                            activeTag === "textarea" ||
+                            activeTag === "select" ||
+                            activeEl?.isContentEditable;
+        if (isTextInput) return;
+        if (activeTag === "input" && activeEl.type === "range") {
+            try { activeEl.blur(); } catch (_) {}
+        }
+        if (activeTag === "button") {
+            try { activeEl.blur(); } catch (_) {}
+        }
 
         // Se houver qualquer modal aberto, ignora atalhos globais do player principal
         if (window.isAnyModalOpen && window.isAnyModalOpen()) {
