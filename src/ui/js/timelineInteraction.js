@@ -56,6 +56,9 @@ const CURSOR_SLIP = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/
 // Cursor SVG em alta definição para a Ferramenta Slide (Deslizar Posição na Timeline - U)
 const CURSOR_SLIDE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="3" y1="3" x2="3" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="21" y1="3" x2="21" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="3" y1="3" x2="3" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><line x1="21" y1="3" x2="21" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><rect x="8" y="6" width="8" height="12" rx="1" fill="%2306b6d4" fill-opacity="0.2" stroke="%23000" stroke-width="2.5"/><rect x="8" y="6" width="8" height="12" rx="1" fill="none" stroke="%2306b6d4" stroke-width="1.5"/><line x1="4" y1="12" x2="8" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="4" y1="12" x2="8" y2="12" stroke="%23fff" stroke-width="2" stroke-linecap="round"/><line x1="16" y1="12" x2="20" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="16" y1="12" x2="20" y2="12" stroke="%23fff" stroke-width="2" stroke-linecap="round"/><polygon points="4,12 7,9 7,15" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/><polygon points="20,12 17,9 17,15" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/></svg>') 12 12, ew-resize`;
 
+// Cursor SVG em alta definição para a Ferramenta Rolling Edit (Corte Contínuo Adjacente - N)
+export const CURSOR_ROLLING = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="11" y1="3" x2="11" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="13" y1="3" x2="13" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="11" y1="12" x2="5" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="13" y1="12" x2="19" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="11" y1="3" x2="11" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><line x1="13" y1="3" x2="13" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><line x1="11" y1="12" x2="5" y2="12" stroke="%23fff" stroke-width="1.8" stroke-linecap="round"/><line x1="13" y1="12" x2="19" y2="12" stroke="%23fff" stroke-width="1.8" stroke-linecap="round"/><polygon points="8,8 4,12 8,16" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/><polygon points="16,8 20,12 16,16" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/></svg>') 12 12, ew-resize`;
+
 // Cursores SVG em alta definição para Trim de Clipes (Seleção V):
 // Quando há dois clipes unidos, a ponta de seta esquerda ou direita é pintada em ciano elétrico
 // para sinalizar visualmente ao editor exatamente qual clipe será manipulado no corte.
@@ -90,6 +93,11 @@ export class CapiauTimelineInteraction {
         // Estado para a ferramenta Slide (Deslizar Posição na Timeline)
         this.dragSlideLinked = true;
         this.dragSlideBase = null;
+
+        // Estado para a ferramenta Rolling Edit (Corte Contínuo Adjacente)
+        this.dragRollingLinked = true;
+        this.dragRollingBase = null;
+        this.dragRollingSeamFrame = null;
 
         // Estado para trim vinculado A/V (Trim Head / Tail com seleção normal V)
         this.dragTrimLinked = true;
@@ -189,6 +197,11 @@ export class CapiauTimelineInteraction {
                 this.renderer.bladeGuide = null;
                 this.renderer.requestRedraw();
             }
+            if (this.renderer && this.renderer.rollingGuide) {
+                this.renderer.rollingGuide = null;
+                this.renderer.requestRedraw();
+            }
+            this.hideRollingTooltip();
             this.hideHoverPreview();
         };
         this.boundWindowMouseMove = (e) => {
@@ -364,6 +377,13 @@ export class CapiauTimelineInteraction {
      */
     getSlideCursor() {
         return CURSOR_SLIDE;
+    }
+
+    /**
+     * Retorna a string de cursor CSS para a Ferramenta Rolling Edit (Corte Contínuo Adjacente).
+     */
+    getRollingCursor() {
+        return CURSOR_ROLLING;
     }
 
     init() {
@@ -592,6 +612,53 @@ export class CapiauTimelineInteraction {
         
         if (Math.abs(x - startX) <= tolerance) return "left";
         if (Math.abs(x - endX) <= tolerance) return "right";
+        return null;
+    }
+
+    /**
+     * Encontra uma costura/emenda entre dois clipes contíguos na pista informada, dentro da tolerância em pixels.
+     * @param {number} x Coordenada X do mouse no canvas.
+     * @param {string} track ID da pista.
+     * @returns {{ leftClip: Object, rightClip: Object, seamX: number, seamFrame: number, track: string }|null}
+     */
+    getRollingHit(x, track, tolerance = 8) {
+        if (!track) return null;
+        const trackObj = TIMELINE_STATE.getTrack(track);
+        if (trackObj && (trackObj.locked || trackObj.kind === "ai")) return null;
+
+        const cuts = STATE.activeTimelineCuts || [];
+        const trackCuts = cuts.filter(c => c.track === track);
+        if (trackCuts.length < 2) return null;
+
+        trackCuts.sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+
+        const zoom = TIMELINE_STATE.zoom;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
+        const tol = (typeof tolerance === "number") ? tolerance : 8;
+
+        for (let i = 0; i < trackCuts.length - 1; i++) {
+            const clipA = trackCuts[i];
+            const clipB = trackCuts[i + 1];
+            const endFrameA = (clipA.timelineStartFrame || 0) + ((clipA.outFrame || 0) - (clipA.inFrame || 0));
+            const startFrameB = (clipB.timelineStartFrame || 0);
+
+            const endXA = (endFrameA - scrollLeft) * zoom;
+            const startXB = (startFrameB - scrollLeft) * zoom;
+
+            // Clipes são considerados contíguos se a distância for <= 1 frame ou visualmente contíguos (<= 2px)
+            if (Math.abs(startFrameB - endFrameA) <= 1 || Math.abs(startXB - endXA) <= 2) {
+                const seamX = (endXA + startXB) / 2;
+                if (Math.abs(x - seamX) <= tol) {
+                    return {
+                        leftClip: clipA,
+                        rightClip: clipB,
+                        seamX,
+                        seamFrame: startFrameB,
+                        track
+                    };
+                }
+            }
+        }
         return null;
     }
 
@@ -1290,6 +1357,114 @@ export class CapiauTimelineInteraction {
                 return;
             }
 
+            // Ferramenta: Corte Contínuo Adjacente / Rolling Edit (N)
+            if (TIMELINE_STATE.activeTool === "rolling") {
+                const rollingHit = this.getRollingHit(x, track, 8);
+                if (rollingHit) {
+                    const { leftClip, rightClip } = rollingHit;
+                    const clipTrack = TIMELINE_STATE.getTrack(leftClip.track);
+                    if (clipTrack && clipTrack.locked) {
+                        TIMELINE_STATE.selectClip(leftClip.id, false);
+                        TIMELINE_STATE.selectedTrack = track;
+                        this.updatePlayhead(rollingHit.seamFrame);
+                        this.refreshClipInspector();
+                        this.renderer.requestRedraw();
+                        return;
+                    }
+
+                    this.dragState = "rolling";
+                    this.dragStartMouseX = e.clientX;
+                    this.dragStartMouseY = e.clientY;
+                    this.dragRollingSeamFrame = rollingHit.seamFrame;
+                    this.dragRollingLinked = !e.altKey;
+
+                    this.updatePlayhead(rollingHit.seamFrame);
+
+                    const cuts = STATE.activeTimelineCuts || [];
+                    let partnerA = null;
+                    let partnerB = null;
+
+                    if (this.dragRollingLinked) {
+                        if (leftClip.link_id) {
+                            partnerA = cuts.find(c => c.id !== leftClip.id && c.link_id === leftClip.link_id);
+                        }
+                        if (rightClip.link_id) {
+                            partnerB = cuts.find(c => c.id !== rightClip.id && c.link_id === rightClip.link_id);
+                        }
+                    }
+
+                    this.dragRollingBase = {
+                        leftClipId: leftClip.id,
+                        leftStart: leftClip.timelineStartFrame,
+                        leftIn: leftClip.inFrame,
+                        leftOut: leftClip.outFrame,
+                        leftDuration: leftClip.outFrame - leftClip.inFrame,
+                        rightClipId: rightClip.id,
+                        rightStart: rightClip.timelineStartFrame,
+                        rightIn: rightClip.inFrame,
+                        rightOut: rightClip.outFrame,
+                        rightDuration: rightClip.outFrame - rightClip.inFrame,
+                        partnerLeftClipId: (partnerA && partnerB && partnerA.track === partnerB.track) ? partnerA.id : null,
+                        partnerLeftStart: (partnerA && partnerB && partnerA.track === partnerB.track) ? partnerA.timelineStartFrame : null,
+                        partnerLeftIn: (partnerA && partnerB && partnerA.track === partnerB.track) ? partnerA.inFrame : null,
+                        partnerLeftOut: (partnerA && partnerB && partnerA.track === partnerB.track) ? partnerA.outFrame : null,
+                        partnerRightClipId: (partnerA && partnerB && partnerA.track === partnerB.track) ? partnerB.id : null,
+                        partnerRightStart: (partnerA && partnerB && partnerA.track === partnerB.track) ? partnerB.timelineStartFrame : null,
+                        partnerRightIn: (partnerA && partnerB && partnerA.track === partnerB.track) ? partnerB.inFrame : null,
+                        partnerRightOut: (partnerA && partnerB && partnerA.track === partnerB.track) ? partnerB.outFrame : null,
+                        track: leftClip.track
+                    };
+
+                    TIMELINE_HISTORY.begin();
+                    const fps = TIMELINE_STATE.fps || 24;
+                    this.showRollingTooltip(e.clientX, e.clientY, 0, fps, !this.dragRollingLinked);
+
+                    if (window.player) {
+                        const outgoingTime = Math.max(0, (leftClip.outFrame - 1)) / fps;
+                        const incomingTime = Math.max(0, (rightClip.inFrame)) / fps;
+                        window.player.show2UpPreview(leftClip, outgoingTime, rightClip, incomingTime);
+                    }
+
+                    if (this.renderer) {
+                        this.renderer.rollingGuide = {
+                            frame: rollingHit.seamFrame,
+                            track: track
+                        };
+                        this.renderer.requestRedraw();
+                    }
+                    return;
+                }
+
+                // Clicou fora de uma emenda contígua com a ferramenta Rolling (N):
+                // 1. Move a agulha de reprodução (Playhead) para o frame clicado e atualiza o player
+                this.updatePlayhead(frame);
+
+                // 2. Se clicou sobre um clipe, seleciona-o e sincroniza inspetor/player
+                const hit = this.findClipAt(frame, track, y);
+                if (hit && hit.type === "clip") {
+                    const clip = hit.data;
+                    TIMELINE_STATE.selectClip(clip.id, e.shiftKey);
+                    TIMELINE_STATE.selectedTrack = track;
+                    this.syncPlayerToClip(clip);
+                    this.refreshClipInspector();
+                } else {
+                    const gap = TIMELINE_STATE.getGapAt(frame, track);
+                    if (gap) {
+                        TIMELINE_STATE.selectGap(gap);
+                    } else if (!e.shiftKey && !e.altKey) {
+                        TIMELINE_STATE.clearClipSelection();
+                        TIMELINE_STATE.clearSelectedGap();
+                    }
+                    this.refreshClipInspector();
+                }
+
+                // 3. Ativa scrubbing contínuo da agulha ao arrastar fora de emenda
+                this.dragState = "scrub";
+                if (this.canvas) this.canvas.style.cursor = CURSOR_PLAYHEAD;
+                if (this.renderer) this.renderer.requestRedraw();
+                return;
+            }
+
             let hit = this.findClipAt(frame, track, y);
             const trimHit = this.getTrimHit(x, track);
             if (!hit && trimHit) {
@@ -1491,6 +1666,20 @@ export class CapiauTimelineInteraction {
             this.renderer.requestRedraw();
         } else if (e.button === 0) {
             // Clique em área vazia do canvas (abaixo de todas as pistas)
+            if (TIMELINE_STATE.activeTool === "rolling") {
+                this.updatePlayhead(frame);
+                if (!e.shiftKey && !e.altKey) {
+                    TIMELINE_STATE.clearSelectedGap();
+                    TIMELINE_STATE.clearClipSelection();
+                    TIMELINE_STATE.clearSelectedMarkers();
+                    TIMELINE_STATE.selectedGhostClipId = null;
+                }
+                this.dragState = "scrub";
+                if (this.canvas) this.canvas.style.cursor = CURSOR_PLAYHEAD;
+                if (this.renderer) this.renderer.requestRedraw();
+                return;
+            }
+
             if (!e.shiftKey && !e.altKey) {
                 TIMELINE_STATE.clearSelectedGap();
                 TIMELINE_STATE.clearClipSelection();
@@ -1654,6 +1843,10 @@ export class CapiauTimelineInteraction {
             this.renderer.bladeGuide = null;
             this.renderer.requestRedraw();
         }
+        if (!this.dragState && TIMELINE_STATE.activeTool !== "rolling" && this.renderer && this.renderer.rollingGuide) {
+            this.renderer.rollingGuide = null;
+            this.renderer.requestRedraw();
+        }
 
         // Atualiza cursores dinâmicos de trim, fades e tooltip com nome do arquivo
         if (!this.dragState && track) {
@@ -1725,6 +1918,35 @@ export class CapiauTimelineInteraction {
                 return;
             }
 
+            // Se a ferramenta Rolling Edit estiver ativa, detecta costura adjacente
+            if (TIMELINE_STATE.activeTool === "rolling") {
+                this.hideMarkerTooltip();
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                }
+                if (TIMELINE_STATE.hoveredFadeHandle !== null) {
+                    TIMELINE_STATE.hoveredFadeHandle = null;
+                }
+                const rollingHit = this.getRollingHit(x, track, 8);
+                if (rollingHit) {
+                    this.canvas.style.cursor = this.getRollingCursor();
+                    if (this.renderer) {
+                        this.renderer.rollingGuide = {
+                            frame: rollingHit.seamFrame,
+                            track: track
+                        };
+                        this.renderer.requestRedraw();
+                    }
+                } else {
+                    this.canvas.style.cursor = "default";
+                    if (this.renderer && this.renderer.rollingGuide) {
+                        this.renderer.rollingGuide = null;
+                        this.renderer.requestRedraw();
+                    }
+                }
+                return;
+            }
+
             this.hideMarkerTooltip();
             if (TIMELINE_STATE.hoveredMarkerId !== null) {
                 TIMELINE_STATE.hoveredMarkerId = null;
@@ -1782,6 +2004,12 @@ export class CapiauTimelineInteraction {
                 this.canvas.style.cursor = this.getSlipCursor();
             } else if (TIMELINE_STATE.activeTool === "slide") {
                 this.canvas.style.cursor = this.getSlideCursor();
+            } else if (TIMELINE_STATE.activeTool === "rolling") {
+                this.canvas.style.cursor = this.getRollingCursor();
+                if (this.renderer && this.renderer.rollingGuide) {
+                    this.renderer.rollingGuide = null;
+                    this.renderer.requestRedraw();
+                }
             } else if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
                 this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e.shiftKey);
             }
@@ -2061,6 +2289,39 @@ export class CapiauTimelineInteraction {
 
             if (this.renderer) this.renderer.requestRedraw();
         }
+        else if (this.dragState === "rolling" && this.dragRollingBase) {
+            if (this.canvas) this.canvas.style.cursor = this.getRollingCursor();
+            const dx = e.clientX - this.dragStartMouseX;
+            const rawDelta = Math.round(dx / TIMELINE_STATE.zoom);
+            const fps = TIMELINE_STATE.fps || 24;
+            const syncLinked = !e.altKey;
+
+            const res = TIMELINE_STATE.rollingEdit(
+                this.dragRollingBase.leftClipId,
+                this.dragRollingBase.rightClipId,
+                rawDelta,
+                syncLinked,
+                this.dragRollingBase
+            );
+
+            const actualDelta = res ? res.appliedDelta : rawDelta;
+            this.showRollingTooltip(e.clientX, e.clientY, actualDelta, fps, !syncLinked);
+
+            if (this.renderer) {
+                this.renderer.rollingGuide = {
+                    frame: this.dragRollingSeamFrame + actualDelta,
+                    track: this.dragRollingBase.track
+                };
+            }
+
+            if (res && window.player && res.leftClip && res.rightClip) {
+                const outgoingTime = Math.max(0, (res.leftClip.outFrame - 1)) / fps;
+                const incomingTime = Math.max(0, (res.rightClip.inFrame)) / fps;
+                window.player.show2UpPreview(res.leftClip, outgoingTime, res.rightClip, incomingTime);
+            }
+
+            if (this.renderer) this.renderer.requestRedraw();
+        }
         else if (this.dragState === "drag-clip" && this.draggedClipId) {
             if (this.canvas) this.canvas.style.cursor = "grabbing";
             if (Math.abs(e.clientX - this.dragStartMouseX) > 2 || Math.abs(e.clientY - this.dragStartMouseY) > 2) {
@@ -2305,6 +2566,7 @@ export class CapiauTimelineInteraction {
         this.hideFadeTooltip();
         this.hideSlipTooltip();
         this.hideSlideTooltip();
+        this.hideRollingTooltip();
         if (this.renderer) {
             this.renderer.activeSnapFrame = null;
             this.renderer.dropIndicator = null;
@@ -2334,6 +2596,23 @@ export class CapiauTimelineInteraction {
             }
             if (window.player) window.player.hide2UpPreview();
             if (this.renderer) this.renderer.requestRedraw();
+            return;
+        }
+        if (this.dragState === "rolling") {
+            TIMELINE_HISTORY.commit();
+            STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+            this.dragState = null;
+            this.dragRollingBase = null;
+            this.refreshClipInspector();
+            this.hideRollingTooltip();
+            if (this.canvas) {
+                this.canvas.style.cursor = TIMELINE_STATE.activeTool === "rolling" ? this.getRollingCursor() : "default";
+            }
+            if (window.player) window.player.hide2UpPreview();
+            if (this.renderer) {
+                this.renderer.rollingGuide = null;
+                this.renderer.requestRedraw();
+            }
             return;
         }
         if (this.dragState === "marquee") {
@@ -2517,6 +2796,10 @@ export class CapiauTimelineInteraction {
                 this.canvas.style.cursor = this.getSlipCursor();
             } else if (TIMELINE_STATE.activeTool === "slide") {
                 this.canvas.style.cursor = this.getSlideCursor();
+            } else if (TIMELINE_STATE.activeTool === "rolling") {
+                const { x, track } = (e && typeof e.clientX === "number") ? this.getCoordinates(e.clientX, e.clientY) : { x: null, track: null };
+                const rollingHit = (x !== null && track) ? this.getRollingHit(x, track, 8) : null;
+                this.canvas.style.cursor = rollingHit ? this.getRollingCursor() : "default";
             } else if (TIMELINE_STATE.activeTool === "track-forward" || TIMELINE_STATE.activeTool === "track-backward") {
                 this.canvas.style.cursor = this.getTrackSelectCursor(TIMELINE_STATE.activeTool, e?.shiftKey || false);
             } else if (e && typeof e.clientX === "number" && typeof e.clientY === "number") {
@@ -3314,6 +3597,43 @@ export class CapiauTimelineInteraction {
 
     hideSlideTooltip() {
         const tip = document.getElementById("timeline-slide-tooltip");
+        if (tip) tip.style.display = "none";
+    }
+
+    /**
+     * Tooltip visual durante o arraste da Ferramenta Rolling Edit (Corte Contínuo Adjacente).
+     */
+    showRollingTooltip(x, y, deltaFrames, fps = 24, isIndependent = false) {
+        let tip = document.getElementById("timeline-rolling-tooltip");
+        if (!tip) {
+            tip = document.createElement("div");
+            tip.id = "timeline-rolling-tooltip";
+            tip.style.position = "fixed";
+            tip.style.zIndex = "99999";
+            tip.style.pointerEvents = "none";
+            tip.style.background = "rgba(18, 18, 24, 0.95)";
+            tip.style.color = "#ffffff";
+            tip.style.border = "1px solid rgba(6, 182, 212, 0.7)";
+            tip.style.borderRadius = "4px";
+            tip.style.padding = "4px 8px";
+            tip.style.fontSize = "11px";
+            tip.style.fontFamily = "Outfit, sans-serif";
+            tip.style.backdropFilter = "blur(8px)";
+            tip.style.boxShadow = "0 4px 14px rgba(0,0,0,0.6), 0 0 10px rgba(6, 182, 212, 0.25)";
+            document.body.appendChild(tip);
+        }
+        const sign = deltaFrames > 0 ? "+" : (deltaFrames < 0 ? "" : "±");
+        const deltaSec = (deltaFrames / fps).toFixed(2);
+        const secSign = deltaFrames > 0 ? "+" : (deltaFrames < 0 ? "" : "±");
+        const label = isIndependent ? "Rolling (Alt/J-L):" : "Rolling Edit:";
+        tip.innerHTML = `<span style="color:#06b6d4; font-weight:600;"><i class="fa-solid fa-arrows-split-up-and-left" style="margin-right:4px;"></i>${label}</span> <span style="font-family:monospace; font-weight:500;">${sign}${deltaFrames}f (${secSign}${deltaSec}s)</span>`;
+        tip.style.display = "block";
+        tip.style.left = `${x + 14}px`;
+        tip.style.top = `${y - 28}px`;
+    }
+
+    hideRollingTooltip() {
+        const tip = document.getElementById("timeline-rolling-tooltip");
         if (tip) tip.style.display = "none";
     }
 
@@ -4855,7 +5175,15 @@ export class CapiauTimelineInteraction {
                 refocusTimeline(toolButtons["slide"]);
             };
         }
-        bindToolClick(toolButtons["rolling"], "rolling", "col-resize");
+        if (toolButtons["rolling"] && !toolButtons["rolling"].__capiauToolBound) {
+            toolButtons["rolling"].__capiauToolBound = true;
+            toolButtons["rolling"].onclick = () => {
+                TIMELINE_STATE.setTool("rolling");
+                if (this.canvas) this.canvas.style.cursor = "default";
+                if (this.renderer) this.renderer.requestRedraw();
+                refocusTimeline(toolButtons["rolling"]);
+            };
+        }
         bindToolClick(toolButtons["rate-stretch"], "rate-stretch", "ew-resize");
         bindToolClick(toolButtons["hand"], "hand", "grab");
         bindToolClick(toolButtons["zoom"], "zoom", "zoom-in");
@@ -5069,6 +5397,10 @@ export class CapiauTimelineInteraction {
                 this.renderer.bladeGuide = null;
                 this.renderer.requestRedraw();
             }
+            if (tool !== "rolling" && this.renderer && this.renderer.rollingGuide) {
+                this.renderer.rollingGuide = null;
+                this.renderer.requestRedraw();
+            }
             if (this.canvas) {
                 if (tool === "blade") {
                     this.canvas.style.cursor = this.getBladeCursor(false);
@@ -5076,6 +5408,8 @@ export class CapiauTimelineInteraction {
                     this.canvas.style.cursor = this.getSlipCursor();
                 } else if (tool === "slide") {
                     this.canvas.style.cursor = this.getSlideCursor();
+                } else if (tool === "rolling") {
+                    this.canvas.style.cursor = "default";
                 } else if (tool === "marquee") {
                     this.canvas.style.cursor = "crosshair";
                 } else if (tool === "hand") {
@@ -9175,6 +9509,69 @@ export class CapiauTimelineInteraction {
                 e.preventDefault();
                 return;
             }
+            if (this.dragState === "rolling") {
+                this.hideRollingTooltip();
+                if (window.player) window.player.hide2UpPreview();
+                if (this.dragRollingBase) {
+                    const cuts = [...STATE.activeTimelineCuts];
+                    const left = cuts.find(c => c.id === this.dragRollingBase.leftClipId);
+                    const right = cuts.find(c => c.id === this.dragRollingBase.rightClipId);
+                    const fps = TIMELINE_STATE.fps || 24;
+                    if (left) {
+                        left.outFrame = this.dragRollingBase.leftOut;
+                        left.inFrame = this.dragRollingBase.leftIn;
+                        left.timelineStartFrame = this.dragRollingBase.leftStart;
+                        left.out = left.outFrame / fps;
+                        left.in = left.inFrame / fps;
+                        left.timeline_start = left.timelineStartFrame / fps;
+                    }
+                    if (right) {
+                        right.inFrame = this.dragRollingBase.rightIn;
+                        right.outFrame = this.dragRollingBase.rightOut;
+                        right.timelineStartFrame = this.dragRollingBase.rightStart;
+                        right.in = right.inFrame / fps;
+                        right.out = right.outFrame / fps;
+                        right.timeline_start = right.timelineStartFrame / fps;
+                    }
+                    if (this.dragRollingBase.partnerLeftClipId && this.dragRollingBase.partnerRightClipId) {
+                        const pLeft = cuts.find(c => c.id === this.dragRollingBase.partnerLeftClipId);
+                        const pRight = cuts.find(c => c.id === this.dragRollingBase.partnerRightClipId);
+                        if (pLeft) {
+                            pLeft.outFrame = this.dragRollingBase.partnerLeftOut;
+                            pLeft.inFrame = this.dragRollingBase.partnerLeftIn;
+                            pLeft.timelineStartFrame = this.dragRollingBase.partnerLeftStart;
+                            pLeft.out = pLeft.outFrame / fps;
+                            pLeft.in = pLeft.inFrame / fps;
+                            pLeft.timeline_start = pLeft.timelineStartFrame / fps;
+                        }
+                        if (pRight) {
+                            pRight.inFrame = this.dragRollingBase.partnerRightIn;
+                            pRight.outFrame = this.dragRollingBase.partnerRightOut;
+                            pRight.timelineStartFrame = this.dragRollingBase.partnerRightStart;
+                            pRight.in = pRight.inFrame / fps;
+                            pRight.out = pRight.outFrame / fps;
+                            pRight.timeline_start = pRight.timelineStartFrame / fps;
+                        }
+                    }
+                    STATE.activeTimelineCuts = cuts;
+                }
+                TIMELINE_HISTORY.pending = null;
+                this.dragState = null;
+                this.dragRollingBase = null;
+                if (this.renderer) {
+                    this.renderer.rollingGuide = null;
+                    this.renderer.requestRedraw();
+                }
+                this.refreshClipInspector();
+                e.preventDefault();
+                return;
+            }
+            if (this.dragState === "scrub") {
+                this.dragState = null;
+                if (this.canvas) this.canvas.style.cursor = "default";
+                e.preventDefault();
+                return;
+            }
             if (this.dragState === "drag-clip") {
                 if (window.player) window.player.hide2UpPreview();
                 if (this.dragOriginalCuts) {
@@ -9395,6 +9792,24 @@ export class CapiauTimelineInteraction {
                 window.showToast("Ferramenta Deslizar Posição / Slide (U)", "info");
             }
             if (this.canvas) this.canvas.style.cursor = this.getSlideCursor();
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // Ferramenta Corte Contínuo Adjacente / Rolling Edit (N)
+        if (KEYMAP_SERVICE.matches(e, "tools.rolling")) {
+            if (TIMELINE_STATE.selectedGhostClipId) {
+                TIMELINE_STATE.rejectGhostSuggestion(TIMELINE_STATE.selectedGhostClipId);
+                TIMELINE_STATE.selectedGhostClipId = null;
+                e.preventDefault();
+                return;
+            }
+            TIMELINE_STATE.setTool("rolling");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta Corte Contínuo / Rolling Edit (N)", "info");
+            }
+            if (this.canvas) this.canvas.style.cursor = "default";
             if (this.renderer) this.renderer.requestRedraw();
             e.preventDefault();
             return;

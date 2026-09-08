@@ -264,6 +264,7 @@ export class CapiauTimelineRenderer {
         this.dropIndicator = null;
         this.hoveredGap = null;
         this.bladeGuide = null; // { frame, track, allTracks }
+        this.rollingGuide = null; // { frame, track }
 
         // Inicia o render loop
         this.renderLoop();
@@ -611,6 +612,44 @@ export class CapiauTimelineRenderer {
                 ctx.lineTo(bladeX + 4, topY + 6);
                 ctx.closePath();
                 ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // 4. Guia da Ferramenta Rolling Edit (Linha dupla vertical ciano sobre a emenda)
+        if (this.rollingGuide && this.rollingGuide.frame !== null && this.rollingGuide.frame !== undefined) {
+            const seamX = (this.rollingGuide.frame - scrollLeft) * zoom;
+            if (seamX >= 0 && seamX <= this.width) {
+                ctx.save();
+                let topY = this.rulerHeight;
+                let botY = this.height;
+
+                if (this.rollingGuide.track) {
+                    const lane = this.getLane(this.rollingGuide.track);
+                    if (lane) {
+                        topY = lane.top;
+                        botY = lane.top + lane.height;
+                    }
+                }
+
+                ctx.shadowColor = "rgba(6, 182, 212, 0.6)";
+                ctx.shadowBlur = 6;
+
+                // Duas linhas verticais paralelas ciano (#00e5ff)
+                ctx.strokeStyle = "#00e5ff";
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(seamX - 2, topY);
+                ctx.lineTo(seamX - 2, botY);
+                ctx.moveTo(seamX + 2, topY);
+                ctx.lineTo(seamX + 2, botY);
+                ctx.stroke();
+
+                // Colchetes / abas indicativas no topo e base da emenda
+                ctx.fillStyle = "#00e5ff";
+                ctx.fillRect(seamX - 4, topY, 8, 3);
+                ctx.fillRect(seamX - 4, botY - 3, 8, 3);
 
                 ctx.restore();
             }

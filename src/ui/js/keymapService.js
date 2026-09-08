@@ -189,6 +189,12 @@ export const COMMANDS_CATALOG = [
         description: "Move o clipe na timeline mantendo seu conteúdo intacto e compensando nos vizinhos adjacentes"
     },
     {
+        id: "tools.rolling",
+        category: "tools",
+        label: "Corte Contínuo Adjacente (Rolling Edit)",
+        description: "Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência"
+    },
+    {
         id: "tools.track_forward",
         category: "tools",
         label: "Selecionar Faixa para Frente",
@@ -408,6 +414,7 @@ export const KEYMAP_PRESETS = {
         "tools.blade_global": ["Shift+KeyC"],
         "tools.slip": ["KeyY"],
         "tools.slide": ["KeyU"],
+        "tools.rolling": ["KeyN"],
         "tools.track_forward": ["KeyT"],
         "tools.track_backward": ["Shift+KeyT"],
         "tools.snapping": ["KeyS"],
@@ -472,9 +479,10 @@ export const KEYMAP_PRESETS = {
         "tools.blade_global": ["Shift+KeyC"],
         "tools.slip": ["KeyY"],
         "tools.slide": ["KeyU"],
+        "tools.rolling": ["KeyN"],
         "tools.track_forward": ["KeyM"],
         "tools.track_backward": ["Shift+KeyM"],
-        "tools.snapping": ["F10", "KeyN"],
+        "tools.snapping": ["F10", "KeyS"],
         "tools.escape": ["Escape"],
 
         "edit.split": ["Shift+KeyR", "KeyX"],
@@ -536,6 +544,7 @@ export const KEYMAP_PRESETS = {
         "tools.blade_global": ["Shift+KeyC", "Ctrl+Shift+KeyK"],
         "tools.slip": ["KeyY"],
         "tools.slide": ["KeyU"],
+        "tools.rolling": ["KeyN"],
         "tools.track_forward": ["KeyA"],
         "tools.track_backward": ["Shift+KeyA"],
         "tools.snapping": ["KeyS"],
@@ -600,9 +609,10 @@ export const KEYMAP_PRESETS = {
         "tools.blade_global": ["Shift+KeyB", "Ctrl+Shift+Backslash"],
         "tools.slip": ["Shift+KeyY", "KeyY"],
         "tools.slide": ["KeyU"],
+        "tools.rolling": ["KeyN", "KeyT"],
         "tools.track_forward": ["KeyY"],
         "tools.track_backward": ["Ctrl+KeyY"],
-        "tools.snapping": ["KeyN"],
+        "tools.snapping": ["Shift+KeyN", "KeyS"],
         "tools.escape": ["Escape"],
 
         "edit.split": ["Ctrl+Backslash"],
@@ -664,9 +674,10 @@ export const KEYMAP_PRESETS = {
         "tools.blade_global": ["Shift+KeyB", "Cmd+Shift+KeyB", "Ctrl+Shift+KeyB"],
         "tools.slip": ["KeyY"],
         "tools.slide": ["KeyU"],
+        "tools.rolling": ["KeyN", "KeyT"],
         "tools.track_forward": ["KeyP"],
         "tools.track_backward": ["Shift+KeyP"],
-        "tools.snapping": ["KeyN"],
+        "tools.snapping": ["Shift+KeyN", "KeyS"],
         "tools.escape": ["Escape"],
 
         "edit.split": ["Cmd+KeyB"],
