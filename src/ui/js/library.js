@@ -8044,7 +8044,7 @@ export class LibraryScrollIndexTracker {
             return;
         }
 
-        // Rolagem suave personalizada com desaceleração elegante (Ease-Out Quartic)
+        // Rolagem suave personalizada com desaceleração elegante (Ease-Out Quartic, 1s)
         const containerRect = container.getBoundingClientRect();
         const itemRect = item.getBoundingClientRect();
         const itemCenter = (itemRect.top - containerRect.top) + container.scrollTop + (itemRect.height / 2);
@@ -8052,7 +8052,7 @@ export class LibraryScrollIndexTracker {
         const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
         const targetScroll = Math.max(0, Math.min(maxScroll, desiredScrollTop));
 
-        this.smoothScrollTo(container, targetScroll, 340, () => {
+        this.smoothScrollTo(container, targetScroll, 1000, () => {
             if (item && item.isConnected) {
                 const cRect = container.getBoundingClientRect();
                 const iRect = item.getBoundingClientRect();
@@ -8067,7 +8067,7 @@ export class LibraryScrollIndexTracker {
         });
     }
 
-    smoothScrollTo(container, targetY, duration = 340, onComplete = null) {
+    smoothScrollTo(container, targetY, duration = 1000, onComplete = null) {
         const startY = container.scrollTop;
         const diff = targetY - startY;
 
@@ -8083,8 +8083,22 @@ export class LibraryScrollIndexTracker {
         }
 
         const startTime = performance.now();
-        // Curva de desaceleração suave e rápida: Ease-Out Quartic
+        // Curva de desaceleração suave: Ease-Out Quartic
         const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
+
+        const cancelOnUserInteraction = () => {
+            if (container._scrollAnimId) {
+                cancelAnimationFrame(container._scrollAnimId);
+                container._scrollAnimId = null;
+                cleanup();
+            }
+        };
+        const cleanup = () => {
+            container.removeEventListener("wheel", cancelOnUserInteraction);
+            container.removeEventListener("pointerdown", cancelOnUserInteraction);
+        };
+        container.addEventListener("wheel", cancelOnUserInteraction, { passive: true, once: true });
+        container.addEventListener("pointerdown", cancelOnUserInteraction, { passive: true, once: true });
 
         const step = (currentTime) => {
             const elapsed = currentTime - startTime;
@@ -8098,6 +8112,7 @@ export class LibraryScrollIndexTracker {
             } else {
                 container.scrollTop = targetY;
                 container._scrollAnimId = null;
+                cleanup();
                 if (onComplete) onComplete();
             }
         };
