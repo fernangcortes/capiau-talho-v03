@@ -8031,15 +8031,78 @@ export class LibraryScrollIndexTracker {
             }, 1600);
         };
 
-        try {
-            item.scrollIntoView({ block: "center", behavior: smooth ? "smooth" : "auto" });
-        } catch (err) {
-            const rect = container.getBoundingClientRect();
-            const itemRect = item.getBoundingClientRect();
-            const targetScroll = (itemRect.top - rect.top) + container.scrollTop - (rect.height / 2);
-            container.scrollTop = Math.max(0, targetScroll);
+        if (!smooth) {
+            try {
+                item.scrollIntoView({ block: "center", behavior: "auto" });
+            } catch (err) {
+                const rect = container.getBoundingClientRect();
+                const itemRect = item.getBoundingClientRect();
+                const targetScroll = (itemRect.top - rect.top) + container.scrollTop - (rect.height / 2);
+                container.scrollTop = Math.max(0, targetScroll);
+            }
+            triggerHighlight();
+            return;
         }
-        triggerHighlight();
+
+        // Rolagem suave personalizada com desaceleração elegante (Ease-Out Quartic)
+        const containerRect = container.getBoundingClientRect();
+        const itemRect = item.getBoundingClientRect();
+        const itemCenter = (itemRect.top - containerRect.top) + container.scrollTop + (itemRect.height / 2);
+        const desiredScrollTop = itemCenter - (containerRect.height / 2);
+        const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+        const targetScroll = Math.max(0, Math.min(maxScroll, desiredScrollTop));
+
+        this.smoothScrollTo(container, targetScroll, 340, () => {
+            if (item && item.isConnected) {
+                const cRect = container.getBoundingClientRect();
+                const iRect = item.getBoundingClientRect();
+                const currentCenter = iRect.top + (iRect.height / 2);
+                const contCenter = cRect.top + (cRect.height / 2);
+                const diff = currentCenter - contCenter;
+                if (Math.abs(diff) > 8) {
+                    container.scrollTop = Math.max(0, Math.min(container.scrollHeight - container.clientHeight, container.scrollTop + diff));
+                }
+            }
+            triggerHighlight();
+        });
+    }
+
+    smoothScrollTo(container, targetY, duration = 340, onComplete = null) {
+        const startY = container.scrollTop;
+        const diff = targetY - startY;
+
+        if (container._scrollAnimId) {
+            cancelAnimationFrame(container._scrollAnimId);
+            container._scrollAnimId = null;
+        }
+
+        if (Math.abs(diff) < 2) {
+            container.scrollTop = targetY;
+            if (onComplete) onComplete();
+            return;
+        }
+
+        const startTime = performance.now();
+        // Curva de desaceleração suave e rápida: Ease-Out Quartic
+        const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
+
+        const step = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(1, elapsed / duration);
+            const eased = easeOutQuart(progress);
+
+            container.scrollTop = startY + (diff * eased);
+
+            if (progress < 1) {
+                container._scrollAnimId = requestAnimationFrame(step);
+            } else {
+                container.scrollTop = targetY;
+                container._scrollAnimId = null;
+                if (onComplete) onComplete();
+            }
+        };
+
+        container._scrollAnimId = requestAnimationFrame(step);
     }
 
     handlePointerDown(e) {

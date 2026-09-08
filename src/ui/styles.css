@@ -3115,16 +3115,36 @@ button {
     text-shadow: 0 0 8px var(--color-cyan) !important;
 }
 
-/* Pulso ao revelar uma mídia vinda do clique numa tarefa */
+/* Destaque suave em pulso ciano ao revelar uma mídia (fade in e fade out) */
 @keyframes reveal-pulse-kf {
-    0% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.55); }
-    100% { box-shadow: 0 0 0 10px rgba(6, 182, 212, 0); }
+    0% {
+        outline: 2px solid rgba(6, 182, 212, 0);
+        outline-offset: -1px;
+        background-color: transparent;
+        box-shadow: 0 0 0 0 rgba(6, 182, 212, 0);
+    }
+    20% {
+        outline: 2px solid rgba(6, 182, 212, 0.95);
+        outline-offset: -1px;
+        background-color: rgba(6, 182, 212, 0.16);
+        box-shadow: 0 0 16px rgba(6, 182, 212, 0.5), inset 0 0 8px rgba(6, 182, 212, 0.22);
+    }
+    60% {
+        outline: 2px solid rgba(6, 182, 212, 0.7);
+        outline-offset: -1px;
+        background-color: rgba(6, 182, 212, 0.09);
+        box-shadow: 0 0 12px rgba(6, 182, 212, 0.35);
+    }
+    100% {
+        outline: 2px solid rgba(6, 182, 212, 0);
+        outline-offset: -1px;
+        background-color: transparent;
+        box-shadow: 0 0 0 0 rgba(6, 182, 212, 0);
+    }
 }
 .reveal-pulse {
-    animation: reveal-pulse-kf 1.4s ease-out 1;
-    outline: 2px solid var(--color-cyan);
-    outline-offset: -1px;
-    border-radius: 6px;
+    animation: reveal-pulse-kf 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+    border-radius: 6px !important;
 }
 
 /* ── TYPING INDICATOR ───────────────────────────────────────────────── */
