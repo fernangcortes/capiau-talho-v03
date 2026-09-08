@@ -1608,11 +1608,13 @@ window.addEventListener("DOMContentLoaded", () => {
             globalTooltip.id = "global-tooltip";
             doc.body.appendChild(globalTooltip);
         }
+        globalTooltip.style.display = "";
 
         // Eventos mouseover/mouseout delegados para exibir e posicionar a tooltip global
         doc.body.addEventListener("mouseover", (e) => {
             const target = e.target.closest("[data-tooltip]");
             if (!target) return;
+            globalTooltip.style.display = "";
 
             // Sliders de controle na sidebar esquerda só exibem tooltip no estado mínimo (.sidebar-minimal), pois nos outros estados os valores/rótulos já aparecem na tela
             const sidebarLeft = target.closest("#sidebar-left");
@@ -1859,14 +1861,17 @@ window.addEventListener("DOMContentLoaded", () => {
 
     // ── CONFIGURAÇÃO DE SIDEBARS RETRÁTEIS ──
     const sidebarLeft = document.getElementById("sidebar-left");
+    const sidebarInspector = document.getElementById("inspector-panel");
     const sidebarRight = document.getElementById("sidebar-right");
     const timelinePanel = document.getElementById("timeline-panel");
     
     const toggleLeft = document.getElementById("toggle-left");
+    const toggleInspector = document.getElementById("toggle-inspector");
     const toggleRight = document.getElementById("toggle-right");
     const toggleTimeline = document.getElementById("toggle-timeline");
     
     const reopenLeft = document.getElementById("reopen-left");
+    const reopenInspector = document.getElementById("reopen-inspector");
     const reopenRight = document.getElementById("reopen-right");
     const reopenTimeline = document.getElementById("reopen-timeline");
 
@@ -1878,6 +1883,10 @@ window.addEventListener("DOMContentLoaded", () => {
             }
             sidebarLeft.classList.add("collapsed");
             reopenLeft.style.display = "block";
+            window.dispatchEvent(new Event("resize"));
+        } else if (side === "inspector" && sidebarInspector && reopenInspector) {
+            sidebarInspector.classList.add("collapsed");
+            reopenInspector.style.display = "block";
             window.dispatchEvent(new Event("resize"));
         } else if (side === "right" && sidebarRight && reopenRight) {
             sidebarRight.classList.add("collapsed");
@@ -1895,6 +1904,11 @@ window.addEventListener("DOMContentLoaded", () => {
             sidebarLeft.classList.remove("collapsed");
             reopenLeft.style.display = "none";
             window.dispatchEvent(new Event("resize"));
+        } else if (side === "inspector" && sidebarInspector && reopenInspector) {
+            sidebarInspector.classList.remove("collapsed");
+            reopenInspector.style.display = "none";
+            reopenInspector.classList.remove("has-updates");
+            window.dispatchEvent(new Event("resize"));
         } else if (side === "right" && sidebarRight && reopenRight) {
             sidebarRight.classList.remove("collapsed");
             reopenRight.style.display = "none";
@@ -1909,13 +1923,16 @@ window.addEventListener("DOMContentLoaded", () => {
     // Fluxos que entregam resultado nos painéis laterais precisam
     // poder revelá-los: resultado renderizado em painel recolhido = "não aconteceu nada".
     window.expandLeftPanel = () => expandSidebar("left");
+    window.expandInspectorPanel = () => expandSidebar("inspector");
     window.expandRightPanel = () => expandSidebar("right");
 
     if (toggleLeft) toggleLeft.addEventListener("click", () => collapseSidebar("left"));
+    if (toggleInspector) toggleInspector.addEventListener("click", () => collapseSidebar("inspector"));
     if (toggleRight) toggleRight.addEventListener("click", () => collapseSidebar("right"));
     if (toggleTimeline) toggleTimeline.addEventListener("click", () => collapseSidebar("timeline"));
     
     if (reopenLeft) reopenLeft.addEventListener("click", () => expandSidebar("left"));
+    if (reopenInspector) reopenInspector.addEventListener("click", () => expandSidebar("inspector"));
     if (reopenRight) reopenRight.addEventListener("click", () => expandSidebar("right"));
     if (reopenTimeline) reopenTimeline.addEventListener("click", () => expandSidebar("timeline"));
 
@@ -2527,17 +2544,8 @@ window.addEventListener("DOMContentLoaded", () => {
             interaction.refreshClipInspector();
         }
 
-        // Garante que o painel lateral esquerdo seja aberto/expandido se estiver recolhido
-        expandSidebar("left");
-
-        // Localiza o botão da aba Ajustes, garante visibilidade e ativa
-        const tabBtn = document.querySelector('.tab-btn[data-tab="tab-adjustments"]');
-        if (tabBtn) {
-            if (tabBtn.style.display === "none") {
-                setTabVisibility("tab-adjustments", true);
-            }
-            tabBtn.click();
-        }
+        // Garante que o painel Inspetor de Ajustes & Efeitos seja aberto/expandido se estiver recolhido
+        expandSidebar("inspector");
     };
 
     const btnSeqSettingsProgram = document.getElementById("btn-seq-settings-program");

@@ -3,11 +3,23 @@ import { KEYMAP_SERVICE } from "./keymapService.js";
 
 window.popoutWindows = {};
 
+export const DEFAULT_POPOUT_TITLES = {
+    "sidebar-left": "Destacar Biblioteca",
+    "inspector-panel": "Destacar Ajustes & Efeitos",
+    "sidebar-right": "Destacar Painel Lateral",
+    "timeline-panel": "Destacar em Janela Flutuante",
+    "source-player-panel": "Destacar Player",
+    "program-player-panel": "Destacar Player"
+};
+
+export const DEFAULT_POPOUT_HTML = '<i class="fa-solid fa-up-right-from-square"></i>';
+
 /**
  * Retorna o nome fixo da janela popout para reutilização multi-monitor.
  */
 export function getPopoutWindowName(panelId) {
     if (panelId === "sidebar-left") return "CapIAu_Library_Window";
+    if (panelId === "inspector-panel") return "CapIAu_Inspector_Window";
     if (panelId === "sidebar-right") return "CapIAu_RightSidebar_Window";
     if (panelId === "timeline-panel") return "CapIAu_Timeline_Window";
     if (panelId === "source-player-panel") return "CapIAu_SourcePlayer_Window";
@@ -17,6 +29,7 @@ export function getPopoutWindowName(panelId) {
 
 export function getPanelIdFromWindowName(windowName) {
     if (windowName === "CapIAu_Library_Window") return "sidebar-left";
+    if (windowName === "CapIAu_Inspector_Window") return "inspector-panel";
     if (windowName === "CapIAu_RightSidebar_Window") return "sidebar-right";
     if (windowName === "CapIAu_Timeline_Window") return "timeline-panel";
     if (windowName === "CapIAu_SourcePlayer_Window") return "source-player-panel";
@@ -64,6 +77,56 @@ export class WorkspaceManager {
         this.originalNextSiblings = {};
         this.monitorsLayout = localStorage.getItem("capiau_monitors_layout") || "side-by-side";
         this.timelinePosition = localStorage.getItem("capiau_timeline_position") || "center";
+        this.defaultColumnOrder = ["sidebar-left", "inspector-panel", "center-stage", "sidebar-right"];
+        this.columnOrder = [...this.defaultColumnOrder];
+        const savedOrder = localStorage.getItem("capiau_column_order");
+        if (savedOrder) {
+            try {
+                const parsed = JSON.parse(savedOrder);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    this.columnOrder = parsed;
+                }
+            } catch (e) {}
+        }
+
+        this.pendingColumnOrder = [...this.columnOrder];
+        this.pendingTimelinePosition = this.timelinePosition;
+        this.pendingMonitorsLayout = this.monitorsLayout;
+
+        this.columnMetadata = {
+            "sidebar-left": { title: "Biblioteca / Mídia", icon: "fa-folder-open", desc: "Mídias, pastas e bins do projeto" },
+            "inspector-panel": { title: "Inspetor / Efeitos", icon: "fa-sliders", desc: "Propriedades, transformações e ajustes" },
+            "center-stage": { title: "Monitores & Preview", icon: "fa-desktop", desc: "Source Player, Program Player e Timeline Central" },
+            "sidebar-right": { title: "Ferramentas / Painel Direito", icon: "fa-toolbox", desc: "Ferramentas secundárias, exportação e IA" }
+        };
+
+        this.workspacePresets = {
+            "default": {
+                name: "Padrão",
+                columns: ["sidebar-left", "inspector-panel", "center-stage", "sidebar-right"],
+                timeline: "center",
+                monitors: "side-by-side"
+            },
+            "inspector-right": {
+                name: "Inspetor à Direita",
+                columns: ["sidebar-left", "center-stage", "inspector-panel", "sidebar-right"],
+                timeline: "center",
+                monitors: "side-by-side"
+            },
+            "decupagem": {
+                name: "Foco em Decupagem",
+                columns: ["sidebar-left", "center-stage", "sidebar-right", "inspector-panel"],
+                timeline: "center",
+                monitors: "side-by-side"
+            },
+            "montagem": {
+                name: "Foco em Montagem",
+                columns: ["sidebar-left", "inspector-panel", "center-stage", "sidebar-right"],
+                timeline: "bottom-full",
+                monitors: "stacked"
+            }
+        };
+
         this.init();
     }
 
@@ -89,6 +152,7 @@ export class WorkspaceManager {
         // Vincula cliques de pop-out nos cabeçalhos dos painéis
         const popoutButtons = [
             { btnId: "btn-popout-library", panelId: "sidebar-left" },
+            { btnId: "btn-popout-inspector", panelId: "inspector-panel" },
             { btnId: "btn-popout-right", panelId: "sidebar-right" },
             { btnId: "btn-popout-timeline", panelId: "timeline-panel" },
             { btnId: "btn-popout-source", panelId: "source-player-panel" },
@@ -98,12 +162,19 @@ export class WorkspaceManager {
         popoutButtons.forEach(({ btnId, panelId }) => {
             const btn = document.getElementById(btnId);
             if (btn) {
-                btn.addEventListener("click", (e) => {
+                btn.onclick = (e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     this.togglePopout(panelId);
-                });
+                };
             }
         });
+
+        // Garante que o tooltip global não tenha display: none residual
+        const globalTipInit = document.getElementById("global-tooltip");
+        if (globalTipInit) {
+            globalTipInit.style.display = "";
+        }
 
         // Atalhos de maximização local de players (Source / Program)
         const btnExpandSource = document.getElementById("btn-expand-source");
@@ -376,8 +447,92 @@ export class WorkspaceManager {
         // Inicializa os divisores de tela ajustáveis (Splitters)
         this.reinitSplitters();
 
+        // Atualiza a direcionalidade inteligente dos botões das colunas
+        this.updateAllPanelsDockDirection();
+
         this.initMaximizeButtons();
         this.initSidebarObservers();
+
+        // Vincula controles do Modal de Configuração de Workspace (Drag & Drop e Presets)
+        const btnConfigWorkspace = document.getElementById("btn-config-workspace");
+        if (btnConfigWorkspace) {
+            btnConfigWorkspace.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.openConfigWorkspaceModal();
+            });
+        }
+
+        const btnCloseConfigModal = document.getElementById("btn-close-config-workspace-modal");
+        if (btnCloseConfigModal) {
+            btnCloseConfigModal.addEventListener("click", () => this.closeConfigWorkspaceModal());
+        }
+
+        const configModalOverlay = document.getElementById("workspace-config-modal");
+        if (configModalOverlay) {
+            configModalOverlay.addEventListener("click", (e) => {
+                if (e.target === configModalOverlay) this.closeConfigWorkspaceModal();
+            });
+        }
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && configModalOverlay && configModalOverlay.style.display === "flex") {
+                this.closeConfigWorkspaceModal();
+            }
+        });
+
+        // Presets Rápidos dentro da modal
+        const presetButtons = document.querySelectorAll(".ws-preset-btn");
+        presetButtons.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const presetKey = btn.getAttribute("data-preset");
+                if (presetKey) this.applyConfigPreset(presetKey);
+            });
+        });
+
+        // Opções de Disposição (Timeline e Monitores) na modal
+        const timelineButtons = document.querySelectorAll(".ws-layout-option-btn[data-timeline-pos]");
+        timelineButtons.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const pos = btn.getAttribute("data-timeline-pos");
+                if (pos) {
+                    this.pendingTimelinePosition = pos;
+                    this.updateConfigModalLayoutButtons();
+                }
+            });
+        });
+
+        const monitorsButtons = document.querySelectorAll(".ws-layout-option-btn[data-monitors-layout]");
+        monitorsButtons.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const layout = btn.getAttribute("data-monitors-layout");
+                if (layout) {
+                    this.pendingMonitorsLayout = layout;
+                    this.updateConfigModalLayoutButtons();
+                }
+            });
+        });
+
+        const btnResetConfig = document.getElementById("btn-reset-workspace-config");
+        if (btnResetConfig) {
+            btnResetConfig.addEventListener("click", () => {
+                this.applyConfigPreset("default");
+            });
+        }
+
+        const btnSaveAsNew = document.getElementById("btn-save-as-new-workspace");
+        if (btnSaveAsNew) {
+            btnSaveAsNew.addEventListener("click", () => {
+                this.applyActiveConfigFromModal(false);
+                this.promptSaveWorkspace();
+            });
+        }
+
+        const btnApplyConfig = document.getElementById("btn-apply-workspace-config");
+        if (btnApplyConfig) {
+            btnApplyConfig.addEventListener("click", () => {
+                this.applyActiveConfigFromModal(true);
+            });
+        }
 
         // Expõe helpers globais no objeto window
         window.workspaceManager = this;
@@ -385,6 +540,10 @@ export class WorkspaceManager {
         window.setTimelinePosition = (pos) => this.setTimelinePosition(pos);
         window.toggleMonitorsLayout = () => this.toggleMonitorsLayout();
         window.toggleTimelinePosition = () => this.toggleTimelinePosition();
+        window.applyColumnsOrder = (order, persist) => this.applyColumnsOrder(order, persist);
+        window.updatePanelDockDirection = (panelId, side) => this.updatePanelDockDirection(panelId, side);
+        window.openConfigWorkspaceModal = () => this.openConfigWorkspaceModal();
+        window.closeConfigWorkspaceModal = () => this.closeConfigWorkspaceModal();
 
         // Carrega opções e restaura a workspace ativa salva
         this.updateWorkspaceSelectUI();
@@ -515,6 +674,395 @@ export class WorkspaceManager {
     }
 
     /**
+     * Atualiza a direcionalidade inteligente do botão de recolher e das classes do painel.
+     * @param {string} panelId 
+     * @param {"left" | "right"} side 
+     */
+    updatePanelDockDirection(panelId, side) {
+        if (!panelId || panelId === "center-stage") return;
+        const panel = document.getElementById(panelId) || this.poppedElements?.[panelId] || getActiveElement(panelId);
+        if (!panel) return;
+
+        const isLeft = side === "left";
+        panel.classList.toggle("dock-left", isLeft);
+        panel.classList.toggle("dock-right", !isLeft);
+
+        const toggleBtn = panel.querySelector(".btn-toggle-sidebar");
+        if (toggleBtn) {
+            const header = panel.querySelector(".sidebar-header");
+            if (header && toggleBtn.parentElement !== header) {
+                header.insertBefore(toggleBtn, header.firstChild);
+            }
+            toggleBtn.innerHTML = isLeft 
+                ? `<i class="fa-solid fa-chevron-left"></i>` 
+                : `<i class="fa-solid fa-chevron-right"></i>`;
+            const title = isLeft ? "Recolher Painel (Esquerda)" : "Recolher Painel (Direita)";
+            toggleBtn.title = title;
+            toggleBtn.setAttribute("data-tooltip", title);
+        }
+    }
+
+    /**
+     * Atualiza a direcionalidade de todos os painéis com base na ordem ativa das colunas.
+     */
+    updateAllPanelsDockDirection() {
+        const centerIndex = this.columnOrder.indexOf("center-stage");
+        if (centerIndex === -1) return;
+
+        this.columnOrder.forEach((colId, idx) => {
+            if (colId === "center-stage") return;
+            const side = idx < centerIndex ? "left" : "right";
+            this.updatePanelDockDirection(colId, side);
+        });
+    }
+
+    /**
+     * Aplica uma nova ordem de colunas superiores, atualizando DOM, divisores e persistência.
+     * @param {string[]} newOrder
+     * @param {boolean} [persist=true]
+     */
+    applyColumnsOrder(newOrder, persist = true) {
+        if (!Array.isArray(newOrder) || newOrder.length === 0) return;
+        this.columnOrder = [...newOrder];
+        if (persist) {
+            try {
+                localStorage.setItem("capiau_column_order", JSON.stringify(this.columnOrder));
+            } catch (e) {}
+        }
+
+        const isBottomFull = this.timelinePosition === "bottom-full";
+        const workspace = document.querySelector(".workspace");
+        const topContainer = (isBottomFull ? this.studioTop : workspace) || workspace;
+
+        if (topContainer) {
+            this.arrangeTopColumns(topContainer);
+        }
+        this.updateAllPanelsDockDirection();
+        this.reinitSplitters();
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
+    }
+
+    /**
+     * Abre o modal interativo de configuração de workspace e posições das colunas.
+     */
+    openConfigWorkspaceModal() {
+        const modal = document.getElementById("workspace-config-modal");
+        if (!modal) return;
+
+        // Clona o estado atual para modificações pendentes
+        this.pendingColumnOrder = [...this.columnOrder];
+        this.pendingTimelinePosition = this.timelinePosition;
+        this.pendingMonitorsLayout = this.monitorsLayout;
+
+        this.renderConfigCardsTrack();
+        this.updateConfigModalLayoutButtons();
+
+        modal.style.display = "flex";
+    }
+
+    /**
+     * Fecha o modal de configuração de workspace.
+     */
+    closeConfigWorkspaceModal() {
+        const modal = document.getElementById("workspace-config-modal");
+        if (modal) modal.style.display = "none";
+    }
+
+    /**
+     * Retorna a chave do preset ativo se o estado pendente coincidir com algum preset pré-definido.
+     */
+    getActivePresetKey() {
+        for (const [key, preset] of Object.entries(this.workspacePresets)) {
+            const sameCols = preset.columns.length === this.pendingColumnOrder.length &&
+                preset.columns.every((col, i) => col === this.pendingColumnOrder[i]);
+            const sameTimeline = preset.timeline === this.pendingTimelinePosition;
+            const sameMonitors = preset.monitors === this.pendingMonitorsLayout;
+            if (sameCols && sameTimeline && sameMonitors) {
+                return key;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Atualiza os botões de presets e de opções de layout dentro da modal.
+     */
+    updateConfigModalLayoutButtons() {
+        const activePreset = this.getActivePresetKey();
+        const presetButtons = document.querySelectorAll(".ws-preset-btn");
+        presetButtons.forEach(btn => {
+            btn.classList.toggle("active", btn.getAttribute("data-preset") === activePreset);
+        });
+
+        const timelineButtons = document.querySelectorAll(".ws-layout-option-btn[data-timeline-pos]");
+        timelineButtons.forEach(btn => {
+            btn.classList.toggle("active", btn.getAttribute("data-timeline-pos") === this.pendingTimelinePosition);
+        });
+
+        const monitorsButtons = document.querySelectorAll(".ws-layout-option-btn[data-monitors-layout]");
+        monitorsButtons.forEach(btn => {
+            btn.classList.toggle("active", btn.getAttribute("data-monitors-layout") === this.pendingMonitorsLayout);
+        });
+    }
+
+    /**
+     * Aplica um preset rápido na modal (sem fechar imediatamente).
+     * @param {string} presetKey 
+     */
+    applyConfigPreset(presetKey) {
+        const preset = this.workspacePresets[presetKey];
+        if (!preset) return;
+        this.pendingColumnOrder = [...preset.columns];
+        this.pendingTimelinePosition = preset.timeline;
+        this.pendingMonitorsLayout = preset.monitors;
+        this.renderConfigCardsTrack();
+    }
+
+    /**
+     * Renderiza os cards das colunas no trilho horizontal (#workspace-cards-track)
+     * com base em this.pendingColumnOrder, exibindo os badges de dock e botões de nudge.
+     */
+    renderConfigCardsTrack() {
+        const track = document.getElementById("workspace-cards-track");
+        if (!track) return;
+
+        track.innerHTML = "";
+        const centerIndex = this.pendingColumnOrder.indexOf("center-stage");
+
+        this.pendingColumnOrder.forEach((colId, idx) => {
+            const meta = this.columnMetadata[colId] || { title: colId, icon: "fa-columns", desc: "" };
+            let badgeClass = "";
+            let badgeIcon = "";
+            let badgeText = "";
+
+            if (colId === "center-stage") {
+                badgeClass = "badge-center";
+                badgeIcon = "fa-anchor";
+                badgeText = "Centro (Âncora)";
+            } else if (centerIndex !== -1 && idx < centerIndex) {
+                badgeClass = "badge-dock-left";
+                badgeIcon = "fa-arrow-left";
+                badgeText = "Dock: Esquerda ◀";
+            } else {
+                badgeClass = "badge-dock-right";
+                badgeIcon = "fa-arrow-right";
+                badgeText = "Dock: Direita ▶";
+            }
+
+            const card = document.createElement("div");
+            card.className = "ws-card";
+            card.setAttribute("draggable", "true");
+            card.setAttribute("data-id", colId);
+            card.setAttribute("data-index", String(idx));
+
+            card.innerHTML = `
+                <div class="ws-card-header">
+                    <span class="ws-card-title">
+                        <i class="fa-solid ${meta.icon}"></i> ${meta.title}
+                    </span>
+                    <i class="fa-solid fa-grip-lines ws-card-drag-handle" title="Arraste para mover"></i>
+                </div>
+                <div class="ws-badge ${badgeClass}">
+                    <i class="fa-solid ${badgeIcon}"></i> <span>${badgeText}</span>
+                </div>
+                <div style="font-size: 10px; color: var(--text-muted); line-height: 1.3; min-height: 26px;">
+                    ${meta.desc}
+                </div>
+                <div class="ws-card-footer">
+                    <button type="button" class="btn-card-nudge" data-dir="left" data-index="${idx}" ${idx === 0 ? "disabled" : ""} title="Mover para a esquerda">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <span style="font-size: 10px; color: var(--text-muted); font-weight: 500;">Posição ${idx + 1}</span>
+                    <button type="button" class="btn-card-nudge" data-dir="right" data-index="${idx}" ${idx === this.pendingColumnOrder.length - 1 ? "disabled" : ""} title="Mover para a direita">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+            `;
+
+            track.appendChild(card);
+        });
+
+        this.bindConfigCardsEvents();
+        this.updateConfigModalLayoutButtons();
+    }
+
+    /**
+     * Vincula eventos de Drag and Drop HTML5 e botões de nudge nos cards da modal.
+     */
+    bindConfigCardsEvents() {
+        const track = document.getElementById("workspace-cards-track");
+        if (!track) return;
+
+        let draggedIdx = null;
+
+        const cards = track.querySelectorAll(".ws-card");
+        cards.forEach(card => {
+            card.addEventListener("dragstart", (e) => {
+                draggedIdx = Number(card.getAttribute("data-index"));
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(draggedIdx));
+                card.classList.add("dragging");
+            });
+
+            card.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                const targetIdx = Number(card.getAttribute("data-index"));
+                if (draggedIdx === null || draggedIdx === targetIdx) return;
+
+                const rect = card.getBoundingClientRect();
+                const midpoint = rect.left + rect.width / 2;
+                if (e.clientX < midpoint) {
+                    card.classList.add("drop-target-left");
+                    card.classList.remove("drop-target-right");
+                } else {
+                    card.classList.add("drop-target-right");
+                    card.classList.remove("drop-target-left");
+                }
+            });
+
+            card.addEventListener("dragleave", () => {
+                card.classList.remove("drop-target-left", "drop-target-right");
+            });
+
+            card.addEventListener("drop", (e) => {
+                e.preventDefault();
+                card.classList.remove("drop-target-left", "drop-target-right");
+                const targetIdx = Number(card.getAttribute("data-index"));
+                if (draggedIdx === null || draggedIdx === targetIdx) return;
+
+                const rect = card.getBoundingClientRect();
+                const insertAfter = e.clientX >= (rect.left + rect.width / 2);
+
+                const item = this.pendingColumnOrder.splice(draggedIdx, 1)[0];
+                let newPos = targetIdx;
+                if (draggedIdx < targetIdx) {
+                    newPos = insertAfter ? targetIdx : targetIdx - 1;
+                } else {
+                    newPos = insertAfter ? targetIdx + 1 : targetIdx;
+                }
+                newPos = Math.max(0, Math.min(this.pendingColumnOrder.length, newPos));
+                this.pendingColumnOrder.splice(newPos, 0, item);
+
+                draggedIdx = null;
+                this.renderConfigCardsTrack();
+            });
+
+            card.addEventListener("dragend", () => {
+                draggedIdx = null;
+                track.querySelectorAll(".ws-card").forEach(c => {
+                    c.classList.remove("dragging", "drop-target-left", "drop-target-right");
+                });
+            });
+        });
+
+        // Botões Nudge ◀ e ▶
+        track.querySelectorAll(".btn-card-nudge").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const idx = Number(btn.getAttribute("data-index"));
+                const dir = btn.getAttribute("data-dir");
+                const newIdx = dir === "left" ? idx - 1 : idx + 1;
+                if (newIdx >= 0 && newIdx < this.pendingColumnOrder.length) {
+                    const temp = this.pendingColumnOrder[idx];
+                    this.pendingColumnOrder[idx] = this.pendingColumnOrder[newIdx];
+                    this.pendingColumnOrder[newIdx] = temp;
+                    this.renderConfigCardsTrack();
+                }
+            });
+        });
+    }
+
+    /**
+     * Aplica as alterações configuradas na modal no workspace ativo atual.
+     * @param {boolean} [showToast=true] 
+     */
+    applyActiveConfigFromModal(showToast = true) {
+        this.setTimelinePosition(this.pendingTimelinePosition, true);
+        this.setMonitorsLayout(this.pendingMonitorsLayout, true);
+        this.applyColumnsOrder(this.pendingColumnOrder, true);
+        this.closeConfigWorkspaceModal();
+        if (showToast && window.showToast) {
+            window.showToast("Layout do Workspace atualizado com sucesso!", "success");
+        }
+    }
+
+    /**
+     * Organiza as colunas superiores dentro do contêiner especificado (studioTop ou workspace),
+     * respeitando rigorosamente this.columnOrder e posicionando as linhas restauradoras
+     * de acordo com a direcionalidade (à esquerda se dock-left, à direita se dock-right).
+     * @param {HTMLElement} targetContainer
+     */
+    arrangeTopColumns(targetContainer) {
+        if (!targetContainer) return;
+
+        const defaultOrder = ["sidebar-left", "inspector-panel", "center-stage", "sidebar-right"];
+        const order = Array.isArray(this.columnOrder) && this.columnOrder.length > 0
+            ? this.columnOrder
+            : defaultOrder;
+
+        const reopenMap = {
+            "sidebar-left": "reopen-left",
+            "inspector-panel": "reopen-inspector",
+            "sidebar-right": "reopen-right"
+        };
+
+        const centerIndex = order.indexOf("center-stage");
+        const workspace = document.querySelector(".workspace");
+
+        // Helper seguro que localiza os elementos mesmo se estiverem dentro de studioTop, workspace ou document
+        const findColumnElement = (id) => {
+            if (id === "center-stage") {
+                return (targetContainer && targetContainer.querySelector(".center-stage"))
+                    || (workspace && workspace.querySelector(".center-stage"))
+                    || (this.studioTop && this.studioTop.querySelector(".center-stage"))
+                    || document.querySelector(".center-stage");
+            }
+            return (targetContainer && targetContainer.querySelector(`#${id}`))
+                || (workspace && workspace.querySelector(`#${id}`))
+                || (this.studioTop && this.studioTop.querySelector(`#${id}`))
+                || document.getElementById(id)
+                || this.poppedElements?.[id];
+        };
+
+        order.forEach((colId, index) => {
+            if (colId === "center-stage") {
+                const centerEl = findColumnElement("center-stage");
+                if (centerEl) {
+                    targetContainer.appendChild(centerEl);
+                }
+                return;
+            }
+
+            const isPopped = !!(window.popoutWindows?.[colId] && !window.popoutWindows[colId].closed);
+            const colEl = findColumnElement(colId);
+            const reopenId = reopenMap[colId];
+            const reopenEl = reopenId ? findColumnElement(reopenId) : null;
+
+            const isLeft = centerIndex !== -1 ? index < centerIndex : true;
+            this.updatePanelDockDirection(colId, isLeft ? "left" : "right");
+
+            if (isLeft) {
+                // Linha restauradora posicionada à esquerda do painel
+                if (reopenEl) {
+                    targetContainer.appendChild(reopenEl);
+                }
+                if (colEl && !isPopped) {
+                    targetContainer.appendChild(colEl);
+                }
+            } else {
+                // Linha restauradora posicionada à direita do painel
+                if (colEl && !isPopped) {
+                    targetContainer.appendChild(colEl);
+                }
+                if (reopenEl) {
+                    targetContainer.appendChild(reopenEl);
+                }
+            }
+        });
+    }
+
+    /**
      * Altera a posição da Timeline (entre menus laterais no centro vs faixa inferior de largura total).
      * @param {"center" | "bottom-full"} position 
      * @param {boolean} [skipSplitterReinit=false]
@@ -525,42 +1073,38 @@ export class WorkspaceManager {
         localStorage.setItem("capiau_timeline_position", position);
 
         const workspace = document.querySelector(".workspace");
-        const sidebarLeft = document.getElementById("sidebar-left");
-        const centerStage = document.querySelector(".center-stage");
-        const sidebarRight = document.getElementById("sidebar-right");
-        const timelinePanel = document.getElementById("timeline-panel");
-        const reopenLeft = document.getElementById("reopen-left");
-        const reopenRight = document.getElementById("reopen-right");
-        const reopenTimeline = document.getElementById("reopen-timeline");
-
         if (!workspace) return;
 
-        const isLeftPopped = !!(window.popoutWindows?.["sidebar-left"] && !window.popoutWindows["sidebar-left"].closed);
-        const isRightPopped = !!(window.popoutWindows?.["sidebar-right"] && !window.popoutWindows["sidebar-right"].closed);
         const isTimelinePopped = !!(window.popoutWindows?.["timeline-panel"] && !window.popoutWindows["timeline-panel"].closed);
+
+        // Helper para localizar elementos com segurança onde quer que estejam
+        const findElement = (id) => {
+            return (workspace && workspace.querySelector(`#${id}`))
+                || (this.studioTop && this.studioTop.querySelector(`#${id}`))
+                || document.getElementById(id);
+        };
+
+        const timelinePanel = findElement("timeline-panel");
+        const reopenTimeline = findElement("reopen-timeline");
 
         if (position === "bottom-full") {
             if (!this.studioTop) {
                 this.studioTop = document.createElement("div");
                 this.studioTop.className = "studio-top";
             }
-            // Agrupa as colunas superiores dentro de studioTop
-            if (sidebarLeft && !isLeftPopped && sidebarLeft.ownerDocument === document) {
-                this.studioTop.appendChild(sidebarLeft);
+            // 1. Garante que studioTop está inserido no workspace
+            if (this.studioTop.parentNode !== workspace) {
+                workspace.appendChild(this.studioTop);
             }
-            if (reopenLeft && reopenLeft.ownerDocument === document) this.studioTop.appendChild(reopenLeft);
-            if (centerStage && centerStage.ownerDocument === document) this.studioTop.appendChild(centerStage);
-            if (sidebarRight && !isRightPopped && sidebarRight.ownerDocument === document) {
-                this.studioTop.appendChild(sidebarRight);
-            }
-            if (reopenRight && reopenRight.ownerDocument === document) this.studioTop.appendChild(reopenRight);
 
-            // Timeline no workspace abaixo de studioTop (full-width)
-            workspace.appendChild(this.studioTop);
-            if (timelinePanel && !isTimelinePopped && timelinePanel.ownerDocument === document) {
+            // 2. Agrupa as colunas superiores dentro de studioTop na ordem de columnOrder
+            this.arrangeTopColumns(this.studioTop);
+
+            // 3. Timeline no workspace abaixo de studioTop (full-width)
+            if (timelinePanel && !isTimelinePopped) {
                 workspace.appendChild(timelinePanel);
             }
-            if (reopenTimeline && reopenTimeline.ownerDocument === document) {
+            if (reopenTimeline) {
                 workspace.appendChild(reopenTimeline);
             }
 
@@ -569,25 +1113,26 @@ export class WorkspaceManager {
                 document.body.classList.add("studio");
             }
         } else {
-            // Timeline volta para dentro do center-stage
-            if (centerStage && timelinePanel && !isTimelinePopped && timelinePanel.ownerDocument === document) {
-                centerStage.appendChild(timelinePanel);
-            }
-            if (reopenTimeline && reopenTimeline.ownerDocument === document && centerStage) {
-                centerStage.appendChild(reopenTimeline);
+            // position === "center":
+            // 1. Move todas as colunas superiores de volta para o workspace
+            this.arrangeTopColumns(workspace);
+
+            // 2. Localiza o centerStage agora garantidamente dentro de workspace
+            const currentCenterStage = (workspace && workspace.querySelector(".center-stage"))
+                || (this.studioTop && this.studioTop.querySelector(".center-stage"))
+                || document.querySelector(".center-stage");
+
+            // 3. Move timelinePanel e reopenTimeline para dentro do centerStage
+            if (currentCenterStage) {
+                if (timelinePanel && !isTimelinePopped) {
+                    currentCenterStage.appendChild(timelinePanel);
+                }
+                if (reopenTimeline) {
+                    currentCenterStage.appendChild(reopenTimeline);
+                }
             }
 
-            // Restaura ordem original no workspace
-            if (sidebarLeft && !isLeftPopped && sidebarLeft.ownerDocument === document) {
-                workspace.appendChild(sidebarLeft);
-            }
-            if (reopenLeft && reopenLeft.ownerDocument === document) workspace.appendChild(reopenLeft);
-            if (centerStage && centerStage.ownerDocument === document) workspace.appendChild(centerStage);
-            if (sidebarRight && !isRightPopped && sidebarRight.ownerDocument === document) {
-                workspace.appendChild(sidebarRight);
-            }
-            if (reopenRight && reopenRight.ownerDocument === document) workspace.appendChild(reopenRight);
-
+            // 4. Somente após todos os filhos terem sido transferidos para o workspace / centerStage, remove studioTop
             if (this.studioTop && this.studioTop.parentNode) {
                 this.studioTop.remove();
             }
@@ -644,28 +1189,84 @@ export class WorkspaceManager {
         const timelineWrapper = document.querySelector(".timeline-canvas-wrapper");
         const topContainer = isBottomFull ? this.studioTop : workspace;
 
+        if (centerStage) {
+            centerStage.style.removeProperty("width");
+            centerStage.style.flex = "1 1 0%";
+        }
+
         if (topContainer) {
-            // 1. Sidebar Esquerda <-> Center Stage
-            SplitterHelper.initSplitter(topContainer, "#sidebar-left", ".center-stage", {
-                direction: "horizontal",
-                resizeTarget: "left",
-                unit: isBottomFull ? "%" : "px",
-                minVal: isBottomFull ? 25 : 200,
-                maxVal: isBottomFull ? 90 : 1000,
-                defaultVal: isBottomFull ? 60 : 350,
-                className: isBottomFull ? "splitter-studio-lib" : "splitter-sidebar-left"
+            // Garante que a ordem visual e de DOM das colunas superiores esteja correta
+            this.arrangeTopColumns(topContainer);
+
+            // Identifica as colunas ativas atualmente presentes em topContainer (não destacadas em popout)
+            const activeCols = this.columnOrder.filter(colId => {
+                const el = colId === "center-stage" 
+                    ? topContainer.querySelector(".center-stage")
+                    : topContainer.querySelector(`#${colId}`);
+                const isPopped = !!(window.popoutWindows?.[colId] && !window.popoutWindows[colId].closed);
+                return el && !isPopped && el.parentNode === topContainer;
             });
 
-            // 2. Center Stage <-> Sidebar Direita
-            SplitterHelper.initSplitter(topContainer, ".center-stage", "#sidebar-right", {
-                direction: "horizontal",
-                resizeTarget: "right",
-                unit: "px",
-                minVal: 220,
-                maxVal: 1000,
-                defaultVal: 320,
-                className: isBottomFull ? "splitter-studio-right" : "splitter-sidebar-right"
-            });
+            const centerIndex = activeCols.indexOf("center-stage");
+
+            // Instancia os divisores dinamicamente entre cada par de colunas adjacentes ativas
+            for (let i = 0; i < activeCols.length - 1; i++) {
+                const colA = activeCols[i];
+                const colB = activeCols[i + 1];
+                const leftSelector = colA === "center-stage" ? ".center-stage" : `#${colA}`;
+                const rightSelector = colB === "center-stage" ? ".center-stage" : `#${colB}`;
+
+                let resizeTarget = "left";
+                let targetCol = colA;
+
+                if (centerIndex !== -1) {
+                    if (i + 1 <= centerIndex) {
+                        resizeTarget = "left";
+                        targetCol = colA;
+                    } else if (i >= centerIndex) {
+                        resizeTarget = "right";
+                        targetCol = colB;
+                    } else if (colB === "center-stage") {
+                        resizeTarget = "left";
+                        targetCol = colA;
+                    } else if (colA === "center-stage") {
+                        resizeTarget = "right";
+                        targetCol = colB;
+                    }
+                }
+
+                let minVal = 200;
+                let maxVal = 800;
+                let defaultVal = 340;
+                let className = `splitter-${targetCol}`;
+
+                if (targetCol === "sidebar-left") {
+                    minVal = 200;
+                    maxVal = 900;
+                    defaultVal = 350;
+                    className = isBottomFull ? "splitter-studio-lib splitter-sidebar-left" : "splitter-sidebar-left";
+                } else if (targetCol === "inspector-panel") {
+                    minVal = 240;
+                    maxVal = 800;
+                    defaultVal = 340;
+                    className = "splitter-inspector";
+                } else if (targetCol === "sidebar-right") {
+                    minVal = 220;
+                    maxVal = 800;
+                    defaultVal = 320;
+                    className = isBottomFull ? "splitter-studio-right splitter-sidebar-right" : "splitter-sidebar-right";
+                }
+
+                SplitterHelper.initSplitter(topContainer, leftSelector, rightSelector, {
+                    direction: "horizontal",
+                    resizeTarget: resizeTarget,
+                    unit: "px",
+                    minVal: minVal,
+                    maxVal: maxVal,
+                    defaultVal: defaultVal,
+                    className: className
+                });
+            }
         }
 
         if (isBottomFull) {
@@ -816,11 +1417,12 @@ export class WorkspaceManager {
         const monitorsLayout = this.monitorsLayout || (isStudio ? "stacked" : "side-by-side");
         const timelinePosition = this.timelinePosition || (isStudio ? "bottom-full" : "center");
 
-        const sidebarLeft = document.getElementById("sidebar-left");
-        const sidebarRight = document.getElementById("sidebar-right");
-        const timelinePanel = document.getElementById("timeline-panel");
-        const sourcePanel = document.getElementById("source-player-panel");
-        const programPanel = document.getElementById("program-player-panel");
+        const sidebarLeft = getActiveElement("sidebar-left") || this.poppedElements?.["sidebar-left"] || document.getElementById("sidebar-left");
+        const inspectorPanel = getActiveElement("inspector-panel") || this.poppedElements?.["inspector-panel"] || document.getElementById("inspector-panel");
+        const sidebarRight = getActiveElement("sidebar-right") || this.poppedElements?.["sidebar-right"] || document.getElementById("sidebar-right");
+        const timelinePanel = getActiveElement("timeline-panel") || this.poppedElements?.["timeline-panel"] || document.getElementById("timeline-panel");
+        const sourcePanel = getActiveElement("source-player-panel") || this.poppedElements?.["source-player-panel"] || document.getElementById("source-player-panel");
+        const programPanel = getActiveElement("program-player-panel") || this.poppedElements?.["program-player-panel"] || document.getElementById("program-player-panel");
         const appContainer = document.querySelector(".app-container");
         const timelineActions = document.getElementById("timeline-actions-sidebar");
         const timelineHeaders = document.getElementById("timeline-headers-sidebar");
@@ -862,8 +1464,11 @@ export class WorkspaceManager {
             isStudio: isStudio,
             monitorsLayout: monitorsLayout,
             timelinePosition: timelinePosition,
+            columnOrder: [...this.columnOrder],
+            popouts: Object.keys(window.popoutWindows || {}).filter(k => window.popoutWindows[k] && !window.popoutWindows[k].closed),
             splitters: {
                 "layout-dim-splitter-sidebar-left": getDim("layout-dim-splitter-sidebar-left"),
+                "layout-dim-splitter-inspector": getDim("layout-dim-splitter-inspector"),
                 "layout-dim-splitter-sidebar-right": getDim("layout-dim-splitter-sidebar-right"),
                 "layout-dim-splitter-timeline": getDim("layout-dim-splitter-timeline"),
                 "layout-dim-splitter-players": getDim("layout-dim-splitter-players"),
@@ -875,6 +1480,7 @@ export class WorkspaceManager {
             },
             collapsed: {
                 sidebarLeft: sidebarLeft ? sidebarLeft.classList.contains("collapsed") : false,
+                inspectorPanel: inspectorPanel ? inspectorPanel.classList.contains("collapsed") : false,
                 sidebarRight: sidebarRight ? sidebarRight.classList.contains("collapsed") : false,
                 timelinePanel: timelinePanel ? timelinePanel.classList.contains("collapsed") : false,
                 header: appContainer ? appContainer.classList.contains("header-collapsed") : false,
@@ -885,6 +1491,7 @@ export class WorkspaceManager {
             maximized: {
                 sourcePlayer: sourcePanel ? sourcePanel.classList.contains("maximized") : false,
                 programPlayer: programPanel ? programPanel.classList.contains("maximized") : false,
+                inspectorPanel: inspectorPanel ? inspectorPanel.classList.contains("sidebar-maximized") : false,
                 sidebarRight: sidebarRight ? sidebarRight.classList.contains("sidebar-maximized") : false
             },
             tabs: {
@@ -1024,6 +1631,10 @@ export class WorkspaceManager {
             this.setTimelinePosition(wantTimelinePosition, true);
             this.setMonitorsLayout(wantMonitorsLayout, true);
 
+            if (customConfig.columnOrder && Array.isArray(customConfig.columnOrder) && customConfig.columnOrder.length > 0) {
+                this.applyColumnsOrder(customConfig.columnOrder, true);
+            }
+
             // Restaura dimensões gravadas nos Splitters
             if (customConfig.splitters) {
                 for (const key in customConfig.splitters) {
@@ -1086,6 +1697,18 @@ export class WorkspaceManager {
                         if (toggleLeft) toggleLeft.click(); else sidebarLeft.classList.add("collapsed");
                     } else if (!c.sidebarLeft && isCollapsed) {
                         if (reopenLeft) reopenLeft.click(); else sidebarLeft.classList.remove("collapsed");
+                    }
+                }
+
+                const inspectorPanel = document.getElementById("inspector-panel");
+                const toggleInspector = document.getElementById("toggle-inspector");
+                const reopenInspector = document.getElementById("reopen-inspector");
+                if (inspectorPanel && reopenInspector) {
+                    const isCollapsed = inspectorPanel.classList.contains("collapsed");
+                    if (c.inspectorPanel && !isCollapsed) {
+                        if (toggleInspector) toggleInspector.click(); else inspectorPanel.classList.add("collapsed");
+                    } else if (!c.inspectorPanel && isCollapsed) {
+                        if (reopenInspector) reopenInspector.click(); else inspectorPanel.classList.remove("collapsed");
                     }
                 }
 
@@ -1257,6 +1880,13 @@ export class WorkspaceManager {
             }
         } else {
             // Presets Nativos / Estáticos
+            const preset = this.workspacePresets[ws];
+            if (preset) {
+                this.setTimelinePosition(preset.timeline, true);
+                this.setMonitorsLayout(preset.monitors, true);
+                this.applyColumnsOrder(preset.columns, true);
+            }
+
             if (ws === "montagem") {
                 const left = document.getElementById("sidebar-left");
                 if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left")?.click();
@@ -1267,8 +1897,6 @@ export class WorkspaceManager {
                     const reopen = document.getElementById("reopen-timeline");
                     if (reopen) reopen.click();
                 }
-                this.setTimelinePosition("bottom-full", true);
-                this.setMonitorsLayout("stacked", true);
                 this.reinitSplitters();
             }
             else if (ws === "default") {
@@ -1285,10 +1913,15 @@ export class WorkspaceManager {
                 if (programPanel && programPanel.classList.contains("maximized")) {
                     document.getElementById("btn-expand-program")?.click();
                 }
-                this.setTimelinePosition("center", true);
-                this.setMonitorsLayout("side-by-side", true);
                 this.reinitSplitters();
             } 
+            else if (ws === "inspector-right") {
+                const left = document.getElementById("sidebar-left");
+                const right = document.getElementById("sidebar-right");
+                if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left")?.click();
+                if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right")?.click();
+                this.reinitSplitters();
+            }
             else if (ws === "decupagem") {
                 const sourcePanel = document.getElementById("source-player-panel");
                 if (sourcePanel && !sourcePanel.classList.contains("maximized")) {
@@ -1298,8 +1931,6 @@ export class WorkspaceManager {
                 if (left && left.classList.contains("collapsed")) document.getElementById("toggle-left")?.click();
                 const right = document.getElementById("sidebar-right");
                 if (right && right.classList.contains("collapsed")) document.getElementById("toggle-right")?.click();
-                this.setTimelinePosition("center", true);
-                this.setMonitorsLayout("side-by-side", true);
                 this.reinitSplitters();
             }
             else if (ws === "multitela") {
@@ -1312,65 +1943,97 @@ export class WorkspaceManager {
         // Armazena a workspace ativa e atualiza a UI
         localStorage.setItem("capiau_active_workspace", ws);
         this.updateWorkspaceSelectUI();
+
+        // Notifica todas as janelas destacadas sobre a mudança de workspace
+        try {
+            this.channel.postMessage({
+                type: "WORKSPACE_CHANGED",
+                workspace: ws,
+                columnOrder: [...this.columnOrder],
+                timelinePosition: this.timelinePosition,
+                monitorsLayout: this.monitorsLayout,
+                isStudio: document.body.classList.contains("studio"),
+                timestamp: Date.now()
+            });
+        } catch (e) {}
+
         setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
     }
 
     togglePopout(panelId) {
-        if (window.popoutWindows[panelId] && !window.popoutWindows[panelId].closed) {
-            // Se já está aberto, fecha o popout (restaurando localmente)
-            try {
-                window.popoutWindows[panelId].close();
-            } catch (e) {}
+        const win = window.popoutWindows[panelId];
+        const isPoppedWindowOpen = win && !win.closed;
+        const localPanel = this.poppedElements[panelId] || document.getElementById(panelId);
+        const isDetached = localPanel && (localPanel.ownerDocument !== document || !document.body.contains(localPanel));
+
+        if (isPoppedWindowOpen || isDetached) {
+            // Se já está aberto ou destacado externamente, fecha o popout e restaura no editor principal
+            if (win) {
+                try {
+                    win.close();
+                } catch (e) {}
+            }
             this.restorePanel(panelId);
-        } else {
-            const winName = getPopoutWindowName(panelId);
-            
-            // Lê dimensões e coordenadas salvas no localStorage
-            let width = panelId.includes("player") ? 640 : 800;
-            let height = panelId.includes("player") ? 480 : 600;
-            let left = null;
-            let top = null;
-            
-            try {
-                const rawBounds = localStorage.getItem(`capiau_popout_bounds_${panelId}`);
-                if (rawBounds) {
-                    const b = JSON.parse(rawBounds);
-                    if (b && typeof b === "object") {
-                        const w = b.outerWidth || b.width;
-                        const h = b.outerHeight || b.height;
-                        if (w > 150 && h > 150) {
-                            width = w;
-                            height = h;
-                        }
-                        const x = b.screenX !== undefined ? b.screenX : b.left;
-                        const y = b.screenY !== undefined ? b.screenY : b.top;
-                        if (x !== undefined && y !== undefined && !isNaN(x) && !isNaN(y)) {
-                            left = x;
-                            top = y;
-                        }
+            return;
+        }
+
+        const winName = getPopoutWindowName(panelId);
+        
+        // Lê dimensões e coordenadas salvas no localStorage
+        let width = panelId.includes("player") ? 640 : 800;
+        let height = panelId.includes("player") ? 480 : 600;
+        let left = null;
+        let top = null;
+        
+        try {
+            const rawBounds = localStorage.getItem(`capiau_popout_bounds_${panelId}`);
+            if (rawBounds) {
+                const b = JSON.parse(rawBounds);
+                if (b && typeof b === "object") {
+                    const w = b.outerWidth || b.width;
+                    const h = b.outerHeight || b.height;
+                    if (w > 150 && h > 150) {
+                        width = w;
+                        height = h;
+                    }
+                    const x = b.screenX !== undefined ? b.screenX : b.left;
+                    const y = b.screenY !== undefined ? b.screenY : b.top;
+                    if (x !== undefined && y !== undefined && !isNaN(x) && !isNaN(y)) {
+                        left = x;
+                        top = y;
                     }
                 }
-            } catch (e) {
-                console.warn("[WorkspaceManager] Erro ao ler bounds salvos:", e);
             }
-            
-            let features = `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`;
-            if (left !== null && top !== null) {
-                features += `,left=${left},top=${top},screenX=${left},screenY=${top}`;
-            }
-            
-            const popup = window.open(
-                `panel.html?panel=${panelId}`,
-                winName,
-                features
-            );
-            
-            if (popup) {
-                window.popoutWindows[panelId] = popup;
-                localStorage.setItem(`capiau_popout_active_${panelId}`, "true");
-            } else {
-                alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
-            }
+        } catch (e) {
+            console.warn("[WorkspaceManager] Erro ao ler bounds salvos:", e);
+        }
+        
+        let features = `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`;
+        if (left !== null && top !== null) {
+            features += `,left=${left},top=${top},screenX=${left},screenY=${top}`;
+        }
+        
+        const popup = window.open(
+            `panel.html?panel=${panelId}`,
+            winName,
+            features
+        );
+        
+        if (popup) {
+            window.popoutWindows[panelId] = popup;
+            localStorage.setItem(`capiau_popout_active_${panelId}`, "true");
+
+            // Monitoramento de segurança caso o popout seja fechado sem disparo de eventos
+            const checkClosedTimer = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(checkClosedTimer);
+                    if (window.popoutWindows[panelId]) {
+                        this.restorePanel(panelId);
+                    }
+                }
+            }, 500);
+        } else {
+            alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
         }
     }
 
@@ -1422,12 +2085,31 @@ export class WorkspaceManager {
             container.appendChild(localPanel);
             localPanel.classList.remove("popped-out-hidden");
             
-            // Oculta o botão de pop-out para evitar redundância na janela destacada
+            // Transforma o botão de pop-out em botão de reanexação na janela destacada
             const popBtn = localPanel.querySelector('[id*="popout"]');
-            if (popBtn) popBtn.style.display = "none";
+            if (popBtn) {
+                const currentTooltip = popBtn.getAttribute("data-orig-tooltip") || popBtn.getAttribute("data-tooltip") || popBtn.title || DEFAULT_POPOUT_TITLES[panelId] || "Destacar Painel";
+                const currentHtml = popBtn.getAttribute("data-orig-html") || (popBtn.innerHTML.includes("fa-up-right-from-square") ? popBtn.innerHTML : DEFAULT_POPOUT_HTML);
+
+                popBtn.setAttribute("data-orig-tooltip", currentTooltip);
+                popBtn.setAttribute("data-orig-html", currentHtml);
+                popBtn.title = "Reanexar ao Editor Principal";
+                popBtn.setAttribute("data-tooltip", "Reanexar ao Editor Principal");
+                popBtn.innerHTML = '<i class="fa-solid fa-down-left-and-up-right-to-center"></i>';
+                popBtn.style.display = "";
+                popBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.togglePopout(panelId);
+                };
+            }
         }
 
         localStorage.setItem(`capiau_popout_active_${panelId}`, "true");
+
+        // Reorganiza os divisores e atualiza o layout do editor principal imediatamente após a remoção do painel
+        this.reinitSplitters();
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
 
         // Inicializa motor global de tooltips na janela destacada
         if (typeof window.initGlobalTooltips === "function") {
@@ -1456,6 +2138,16 @@ export class WorkspaceManager {
                         if (typeof window.libraryInstance.onPopoutReady === "function") {
                             window.libraryInstance.onPopoutReady(win);
                         }
+                    }
+                }, 100);
+            }
+        } else if (panelId === "inspector-panel") {
+            if (window.timelineInteraction && typeof window.timelineInteraction.onInspectorPopoutReady === "function") {
+                window.timelineInteraction.onInspectorPopoutReady(win);
+            } else {
+                setTimeout(() => {
+                    if (window.timelineInteraction && typeof window.timelineInteraction.onInspectorPopoutReady === "function") {
+                        window.timelineInteraction.onInspectorPopoutReady(win);
                     }
                 }, 100);
             }
@@ -1493,10 +2185,18 @@ export class WorkspaceManager {
 
     restorePanel(panelId) {
         console.log(`[WorkspaceManager] Restaurando painel localmente: ${panelId}`);
+        if (window.popoutWindows[panelId]) {
+            delete window.popoutWindows[panelId];
+        }
+        localStorage.removeItem(`capiau_popout_active_${panelId}`);
+
         const localPanel = this.poppedElements[panelId] || document.getElementById(panelId);
-        const parent = this.originalParents[panelId];
-        
-        if (localPanel) {
+        if (!localPanel) return;
+
+        // Se o painel já está no documento principal e conectado, apenas garante limpeza visual e de tooltips
+        const isAlreadyRestored = localPanel.ownerDocument === document && document.body.contains(localPanel);
+
+        if (!isAlreadyRestored) {
             // Pausa e descarrega qualquer player de vídeo dentro do painel para evitar áudio fantasma
             try {
                 const videos = localPanel.querySelectorAll("video");
@@ -1513,18 +2213,15 @@ export class WorkspaceManager {
             document.adoptNode(localPanel);
 
             const workspace = document.querySelector(".workspace");
-            const topContainer = document.querySelector(".studio-top") || workspace;
+            const topContainer = (this.timelinePosition === "bottom-full" ? this.studioTop : workspace) || workspace;
 
-            if (panelId === "sidebar-left") {
-                const centerStage = topContainer?.querySelector(".center-stage");
-                if (centerStage && centerStage.parentNode === topContainer) {
-                    topContainer.insertBefore(localPanel, centerStage);
-                } else if (topContainer) {
-                    topContainer.prepend(localPanel);
-                }
-            } else if (panelId === "sidebar-right") {
+            if (this.columnOrder.includes(panelId)) {
                 if (topContainer) {
                     topContainer.appendChild(localPanel);
+                    this.arrangeTopColumns(topContainer);
+                }
+                if (panelId === "inspector-panel" && window.timelineInteraction && typeof window.timelineInteraction.onInspectorPopoutRestored === "function") {
+                    window.timelineInteraction.onInspectorPopoutRestored();
                 }
             } else if (panelId === "timeline-panel") {
                 if (this.timelinePosition === "bottom-full" && workspace) {
@@ -1544,7 +2241,8 @@ export class WorkspaceManager {
             } else if (panelId === "program-player-panel") {
                 const monitors = document.querySelector(".monitors-container");
                 if (monitors) monitors.appendChild(localPanel);
-            } else if (parent) {
+            } else if (this.originalParents[panelId]) {
+                const parent = this.originalParents[panelId];
                 const sibling = this.originalNextSiblings[panelId];
                 if (sibling && sibling.parentNode === parent) {
                     parent.insertBefore(localPanel, sibling);
@@ -1552,40 +2250,63 @@ export class WorkspaceManager {
                     parent.appendChild(localPanel);
                 }
             }
-
-            localPanel.classList.remove("popped-out-hidden");
-            
-            // Restaura a exibição do botão de pop-out
-            const popBtn = localPanel.querySelector('[id*="popout"]');
-            if (popBtn) popBtn.style.display = "";
         }
+
+        localPanel.classList.remove("popped-out-hidden");
         
-        if (window.popoutWindows[panelId]) {
-            delete window.popoutWindows[panelId];
+        // Restaura a exibição e comportamento original do botão de pop-out
+        const popBtn = localPanel.querySelector('[id*="popout"]');
+        if (popBtn) {
+            const origTooltip = popBtn.getAttribute("data-orig-tooltip") || DEFAULT_POPOUT_TITLES[panelId] || "Destacar Painel";
+            const origHtml = popBtn.getAttribute("data-orig-html") || DEFAULT_POPOUT_HTML;
+
+            popBtn.title = origTooltip;
+            popBtn.setAttribute("data-tooltip", origTooltip);
+            popBtn.innerHTML = origHtml;
+            popBtn.removeAttribute("data-orig-tooltip");
+            popBtn.removeAttribute("data-orig-html");
+            popBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout(panelId);
+            };
+            popBtn.style.display = "";
         }
 
-        localStorage.removeItem(`capiau_popout_active_${panelId}`);
+        // Esconde tooltip ativa de forma segura (sem display: none inline)
+        const globalTip = document.getElementById("global-tooltip");
+        if (globalTip) {
+            globalTip.classList.remove("visible");
+            globalTip.classList.remove("media-desc-tooltip");
+            globalTip.style.display = "";
+        }
 
-        // Se for a biblioteca de mídias, restaura o tracker do índice de rolagem para a janela principal
-        if (panelId === "sidebar-left") {
-            if (window.libraryScrollIndex) {
-                window.libraryScrollIndex.attachToWindow(window);
-            } else if (window.libraryManager?.scrollIndexTracker) {
-                window.libraryManager.scrollIndexTracker.attachToWindow(window);
-            }
-            if (window.libraryInstance) {
-                window.libraryInstance.attachScrollListener(document.querySelector("#sidebar-left .sidebar-content.scrollable"));
-                const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id || "tab-media";
-                window.libraryInstance.restoreTabScrollPosition(activeTab, document.querySelector("#sidebar-left .sidebar-content.scrollable"));
-                if (typeof window.libraryInstance.onPopoutRestored === "function") {
-                    window.libraryInstance.onPopoutRestored();
+        if (!isAlreadyRestored) {
+            // Se for a biblioteca de mídias, restaura o tracker do índice de rolagem para a janela principal
+            if (panelId === "sidebar-left") {
+                if (window.libraryScrollIndex) {
+                    window.libraryScrollIndex.attachToWindow(window);
+                } else if (window.libraryManager?.scrollIndexTracker) {
+                    window.libraryManager.scrollIndexTracker.attachToWindow(window);
+                }
+                if (window.libraryInstance) {
+                    window.libraryInstance.attachScrollListener(document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                    const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id || "tab-media";
+                    window.libraryInstance.restoreTabScrollPosition(activeTab, document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                    if (typeof window.libraryInstance.onPopoutRestored === "function") {
+                        window.libraryInstance.onPopoutRestored();
+                    }
                 }
             }
-        }
 
-        // Se for a timeline, restaura o canvas de volta para a janela principal
-        if (panelId === "timeline-panel") {
-            this.restoreTimelineCanvasLocal();
+            // Se for a timeline, restaura o canvas de volta para a janela principal
+            if (panelId === "timeline-panel") {
+                this.restoreTimelineCanvasLocal();
+            }
+
+            // Reconstrói os splitters para conectar o painel restaurado
+            this.reinitSplitters();
+            setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
         }
     }
 
@@ -1626,6 +2347,21 @@ export class WorkspaceManager {
             });
         }
 
+        const btnMaxInspector = document.getElementById("btn-maximize-inspector");
+        const inspectorPanel = document.getElementById("inspector-panel");
+        if (btnMaxInspector && inspectorPanel) {
+            btnMaxInspector.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const isMax = inspectorPanel.classList.toggle("sidebar-maximized");
+                btnMaxInspector.innerHTML = isMax 
+                    ? `<i class="fa-solid fa-compress"></i>` 
+                    : `<i class="fa-solid fa-expand"></i>`;
+                btnMaxInspector.title = isMax ? "Restaurar Painel" : "Maximizar Painel";
+                
+                window.dispatchEvent(new Event("resize"));
+            });
+        }
+
         const btnMaxRight = document.getElementById("btn-maximize-right");
         const sidebarRight = document.getElementById("sidebar-right");
         if (btnMaxRight && sidebarRight) {
@@ -1643,7 +2379,11 @@ export class WorkspaceManager {
     }
 
     initSidebarObservers() {
-        const sidebars = [document.getElementById("sidebar-left"), document.getElementById("sidebar-right")];
+        const sidebars = [
+            document.getElementById("sidebar-left"),
+            document.getElementById("inspector-panel"),
+            document.getElementById("sidebar-right")
+        ].filter(Boolean);
         const observer = new ResizeObserver(entries => {
             for (let entry of entries) {
                 const el = entry.target;
@@ -1725,11 +2465,13 @@ export class SplitterHelper {
         // Define tamanho inicial baseado na unidade e no alvo
         if (unit === "px") {
             const targetEl = resizeTarget === "left" ? leftEl : rightEl;
-            targetEl.style.flex = `0 0 ${defaultVal}px`;
-            if (direction === "horizontal") {
-                targetEl.style.width = `${defaultVal}px`;
-            } else {
-                targetEl.style.height = `${defaultVal}px`;
+            if (targetEl && !targetEl.classList.contains("center-stage")) {
+                targetEl.style.flex = `0 0 ${defaultVal}px`;
+                if (direction === "horizontal") {
+                    targetEl.style.width = `${defaultVal}px`;
+                } else {
+                    targetEl.style.height = `${defaultVal}px`;
+                }
             }
         } else {
             // Percentual
@@ -1779,8 +2521,10 @@ export class SplitterHelper {
                         if (val > maxVal) val = maxVal;
                         
                         const targetEl = resizeTarget === "left" ? leftEl : rightEl;
-                        targetEl.style.width = `${val}px`;
-                        targetEl.style.flex = `0 0 ${val}px`;
+                        if (targetEl && !targetEl.classList.contains("center-stage")) {
+                            targetEl.style.width = `${val}px`;
+                            targetEl.style.flex = `0 0 ${val}px`;
+                        }
                     } else {
                         // vertical px
                         if (resizeTarget === "left") {

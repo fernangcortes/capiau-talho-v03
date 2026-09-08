@@ -450,7 +450,7 @@ button {
 }
 
 /* ── RETRACTABLE SIDEBARS ────────────────────────────────────────────── */
-.sidebar-left, .sidebar-right {
+.sidebar-left, .sidebar-right, .sidebar-inspector {
     display: flex;
     flex-direction: column;
     width: 350px;
@@ -460,7 +460,7 @@ button {
     flex-shrink: 0;
 }
 
-.sidebar-left.collapsed, .sidebar-right.collapsed {
+.sidebar-left.collapsed, .sidebar-right.collapsed, .sidebar-inspector.collapsed {
     width: 0px !important;
     flex-basis: 0px !important;
     min-width: 0px !important;
@@ -472,7 +472,7 @@ button {
 }
 
 /* Suporte para ocultar sidebars maximizados quando recolhidos */
-.sidebar-left.sidebar-maximized.collapsed, .sidebar-right.sidebar-maximized.collapsed {
+.sidebar-left.sidebar-maximized.collapsed, .sidebar-right.sidebar-maximized.collapsed, .sidebar-inspector.sidebar-maximized.collapsed {
     display: none !important;
 }
 
@@ -499,16 +499,70 @@ button {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.sidebar-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
 }
 
 .btn-toggle-sidebar {
-    background: transparent;
+    background: transparent !important;
+    border: none !important;
     color: var(--text-muted);
-    font-size: 14px;
+    font-size: 13px;
     padding: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: color 0.2s, transform 0.2s;
 }
 .btn-toggle-sidebar:hover {
-    color: var(--text-primary);
+    color: var(--color-cyan);
+    transform: scale(1.08);
+}
+
+/* ── DIRECIONALIDADE INTELIGENTE DOS BOTÕES DE RECOLHER (REGRA 5) ── */
+.dock-left .sidebar-header .btn-toggle-sidebar {
+    order: -1;
+    margin-right: 6px;
+    margin-left: 0;
+}
+
+.dock-left .sidebar-header h2 {
+    order: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dock-left .sidebar-header .sidebar-header-actions,
+.dock-left .sidebar-header > div:not(h2):not(.btn-toggle-sidebar) {
+    order: 1;
+    margin-left: auto;
+}
+
+.dock-right .sidebar-header h2 {
+    order: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dock-right .sidebar-header .sidebar-header-actions,
+.dock-right .sidebar-header > div:not(h2):not(.btn-toggle-sidebar) {
+    order: 1;
+    margin-left: auto;
+}
+
+.dock-right .sidebar-header .btn-toggle-sidebar {
+    order: 2;
+    margin-left: 6px;
+    margin-right: 0;
 }
 
 /* Tab selector */
@@ -571,6 +625,7 @@ button {
 
 /* ── SIDEBAR RESTORE LINES (IN FLOW FLEXBOX) ────────────────────────── */
 .left-restore-line,
+.inspector-restore-line,
 .right-restore-line {
     display: none; /* Controlled dynamically by JS */
     width: 4px;
@@ -591,6 +646,30 @@ button {
     box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
 }
 
+/* Cyan for Inspector Sidebar (Adjustments & Effects) */
+.inspector-restore-line {
+    background: rgba(6, 182, 212, 0.15);
+    border-left: 1px solid rgba(6, 182, 212, 0.3);
+    border-right: 1px solid rgba(6, 182, 212, 0.3);
+}
+.inspector-restore-line:hover {
+    background: rgba(6, 182, 212, 0.85);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
+}
+.inspector-restore-line.has-updates {
+    animation: inspectorPulse 1.5s infinite alternate;
+}
+@keyframes inspectorPulse {
+    from {
+        background: rgba(6, 182, 212, 0.25);
+        box-shadow: 0 0 4px rgba(6, 182, 212, 0.3);
+    }
+    to {
+        background: rgba(6, 182, 212, 0.9);
+        box-shadow: 0 0 14px rgba(6, 182, 212, 0.8);
+    }
+}
+
 /* Violet for Right Sidebar (AI/Transcription) */
 .right-restore-line {
     background: rgba(139, 92, 246, 0.15);
@@ -601,12 +680,63 @@ button {
     box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
 }
 
-/* Adjustments for borders to separate sidebars when docked in workspace */
-.workspace > .sidebar-left {
+/* Adjustments for borders to separate sidebars when docked in workspace or studio-top */
+.workspace > .sidebar-left,
+.studio-top > .sidebar-left {
     border-right: 1px solid var(--border-glass) !important;
 }
-.workspace > .sidebar-right {
+.workspace > .sidebar-inspector,
+.studio-top > .sidebar-inspector {
     border-left: 1px solid var(--border-glass) !important;
+    border-right: 1px solid var(--border-glass) !important;
+}
+.workspace > .sidebar-right,
+.studio-top > .sidebar-right {
+    border-left: 1px solid var(--border-glass) !important;
+}
+
+/* Scrollbars invisíveis para a sidebar de ajustes */
+.sidebar-inspector, .sidebar-inspector .scrollable, .sidebar-inspector .sidebar-content {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+.sidebar-inspector::-webkit-scrollbar, .sidebar-inspector .scrollable::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+}
+
+/* Chips de categorias de ajustes (Sub-Abas Híbridas) */
+.adj-category-chips {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    width: 100%;
+}
+.adj-chip {
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-glass);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+.adj-chip:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+    border-color: rgba(6, 182, 212, 0.4);
+}
+.adj-chip.active {
+    background: rgba(6, 182, 212, 0.15);
+    color: var(--color-cyan);
+    border-color: rgba(6, 182, 212, 0.5);
+    font-weight: 600;
 }
 
 /* ── MEDIA CARDS (LISTS) ────────────────────────────────────────────── */
@@ -1633,9 +1763,10 @@ button {
 .center-stage {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1 1 0% !important;
     gap: 0;
-    min-width: 0; /* Permite encolhimento correto */
+    min-width: 260px !important;
+    min-height: 180px !important;
 }
 
 .player-panel {
@@ -5006,8 +5137,29 @@ mark.search-highlight {
 }
 
 /* Ocultação de splitters quando os painéis estão colapsados ou maximizados */
-.workspace:has(#sidebar-left.collapsed) .splitter-sidebar-left { display: none !important; }
-.workspace:has(#sidebar-right.collapsed) .splitter-sidebar-right { display: none !important; }
+.workspace:has(#sidebar-left.collapsed) .splitter-sidebar-left,
+.workspace:has(#sidebar-left.collapsed) .splitter-studio-lib,
+.studio-top:has(#sidebar-left.collapsed) .splitter-sidebar-left,
+.studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib,
+#sidebar-left.collapsed + .splitter-sidebar-left,
+#sidebar-left.collapsed + .splitter-studio-lib,
+#sidebar-left.collapsed ~ .splitter-sidebar-left,
+#sidebar-left.collapsed ~ .splitter-studio-lib { display: none !important; }
+
+.workspace:has(#inspector-panel.collapsed) .splitter-inspector,
+.studio-top:has(#inspector-panel.collapsed) .splitter-inspector,
+#inspector-panel.collapsed + .splitter-inspector,
+#inspector-panel.collapsed ~ .splitter-inspector { display: none !important; }
+
+.workspace:has(#sidebar-right.collapsed) .splitter-sidebar-right,
+.workspace:has(#sidebar-right.collapsed) .splitter-studio-right,
+.studio-top:has(#sidebar-right.collapsed) .splitter-sidebar-right,
+.studio-top:has(#sidebar-right.collapsed) .splitter-studio-right,
+#sidebar-right.collapsed + .splitter-sidebar-right,
+#sidebar-right.collapsed + .splitter-studio-right,
+#sidebar-right.collapsed ~ .splitter-sidebar-right,
+#sidebar-right.collapsed ~ .splitter-studio-right { display: none !important; }
+
 .center-stage:has(#timeline-panel.collapsed) .splitter-timeline { display: none !important; }
 .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline { display: none !important; }
 .monitors-container:has(.player-panel.maximized) .splitter-players,
@@ -5028,6 +5180,7 @@ body.layout-resizing .timeline-panel,
 body.layout-resizing .timeline-headers-sidebar,
 body.layout-resizing .timeline-header-track,
 body.layout-resizing .sidebar-left,
+body.layout-resizing .sidebar-inspector,
 body.layout-resizing .sidebar-right,
 body.layout-resizing .player-panel {
     transition: none !important;
@@ -5035,6 +5188,7 @@ body.layout-resizing .player-panel {
 
 /* Flat layout sem espaçamento e cantos arredondados quando ancorados no workspace */
 .workspace > .sidebar-left,
+.workspace > .sidebar-inspector,
 .workspace > .sidebar-right,
 .workspace .player-panel,
 .workspace .timeline-panel {
@@ -5135,22 +5289,28 @@ body.studio .studio-top {
 
 body.layout-timeline-bottom .studio-top > .center-stage,
 body.studio .studio-top > .center-stage {
-    min-width: 0;
+    min-width: 260px !important;
+    min-height: 180px !important;
     height: 100%;
-    flex: 1;
+    flex: 1 1 0% !important;
 }
 
 body.layout-timeline-bottom .studio-top > .sidebar-left,
+body.layout-timeline-bottom .studio-top > .sidebar-inspector,
 body.layout-timeline-bottom .studio-top > .sidebar-right,
 body.studio .studio-top > .sidebar-left,
+body.studio .studio-top > .sidebar-inspector,
 body.studio .studio-top > .sidebar-right {
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
+    height: 100% !important;
 }
 
 body.layout-timeline-bottom .studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib,
 body.studio .studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib { display: none !important; }
+body.layout-timeline-bottom .studio-top:has(#inspector-panel.collapsed) .splitter-inspector,
+body.studio .studio-top:has(#inspector-panel.collapsed) .splitter-inspector { display: none !important; }
 body.layout-timeline-bottom .studio-top:has(#sidebar-right.collapsed) .splitter-studio-right,
 body.studio .studio-top:has(#sidebar-right.collapsed) .splitter-studio-right { display: none !important; }
 body.layout-timeline-bottom .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline,
@@ -5161,7 +5321,6 @@ body.layout-monitors-stacked .monitors-container,
 .monitors-container.stacked {
     flex-direction: column !important;
     width: 100% !important;
-    height: 100% !important;
     min-height: 0 !important;
     flex: 1 1 auto !important;
 }
@@ -5219,8 +5378,21 @@ body.layout-monitors-side-by-side .monitors-container,
 .monitors-container.side-by-side {
     flex-direction: row !important;
     width: 100% !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+}
+
+/* Quando a timeline está na faixa de baixo (layout estúdio / full-width), os monitores preenchem 100% de .center-stage */
+body.layout-timeline-bottom .center-stage > .monitors-container,
+body.studio .center-stage > .monitors-container {
     height: 100% !important;
-    flex: 1 !important;
+}
+
+/* Quando a timeline está entre menus (posição center), os monitores compartilham a altura vertical com a timeline */
+body:not(.layout-timeline-bottom) .center-stage > .monitors-container {
+    height: auto !important;
+    flex: 1 1 0% !important;
+    min-height: 180px !important;
 }
 
 body.layout-monitors-side-by-side .player-panel,
@@ -10855,4 +11027,211 @@ input[type="number"] {
     backdrop-filter: blur(8px);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 10px rgba(6, 182, 212, 0.25);
     display: none;
+}
+
+/* ── MODAL DE CONFIGURAÇÃO DE WORKSPACE COM DRAG & DROP ───────────────── */
+.workspace-cards-track {
+    display: flex;
+    gap: 10px;
+    padding: 14px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 10px;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    min-height: 125px;
+    align-items: stretch;
+    box-sizing: border-box;
+}
+
+.ws-card {
+    flex: 1;
+    min-width: 140px;
+    background: rgba(20, 18, 26, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px 10px 8px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s, opacity 0.2s;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.ws-card:hover {
+    border-color: rgba(6, 182, 212, 0.5);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+    transform: translateY(-2px);
+}
+
+.ws-card:active {
+    cursor: grabbing;
+}
+
+.ws-card.dragging {
+    opacity: 0.4;
+    transform: scale(0.95);
+    border-style: dashed !important;
+    border-color: var(--color-cyan) !important;
+    box-shadow: 0 0 16px rgba(6, 182, 212, 0.4);
+}
+
+.ws-card.drop-target-left {
+    border-left: 3px solid var(--color-cyan) !important;
+    box-shadow: -4px 0 12px rgba(6, 182, 212, 0.6);
+}
+
+.ws-card.drop-target-right {
+    border-right: 3px solid var(--color-cyan) !important;
+    box-shadow: 4px 0 12px rgba(6, 182, 212, 0.6);
+}
+
+.ws-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.ws-card-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ws-card-drag-handle {
+    color: var(--text-muted);
+    font-size: 10px;
+    opacity: 0.6;
+}
+
+.ws-badge {
+    font-size: 9.5px;
+    font-weight: 600;
+    padding: 4px 6px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.ws-badge.badge-dock-left {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.ws-badge.badge-dock-right {
+    background: rgba(139, 92, 246, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(139, 92, 246, 0.35);
+}
+
+.ws-badge.badge-center {
+    background: rgba(6, 182, 212, 0.15);
+    color: var(--color-cyan);
+    border: 1px solid rgba(6, 182, 212, 0.35);
+}
+
+.ws-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.btn-card-nudge {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    width: 24px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-card-nudge:hover:not(:disabled) {
+    background: rgba(6, 182, 212, 0.2);
+    color: #fff;
+    border-color: rgba(6, 182, 212, 0.4);
+}
+
+.btn-card-nudge:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+}
+
+/* Presets Rápidos */
+.ws-preset-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-glass);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s ease;
+}
+
+.ws-preset-btn:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(168, 85, 247, 0.4);
+    transform: translateY(-1px);
+}
+
+.ws-preset-btn.active {
+    background: rgba(168, 85, 247, 0.18);
+    border-color: rgba(168, 85, 247, 0.6);
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.25);
+}
+
+/* Opções de Disposição (Timeline e Monitores) */
+.ws-layout-option-btn {
+    flex: 1;
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-glass);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.ws-layout-option-btn:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+}
+
+.ws-layout-option-btn.active {
+    background: rgba(6, 182, 212, 0.15);
+    border-color: rgba(6, 182, 212, 0.5);
+    color: var(--color-cyan);
+    font-weight: 600;
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
 }
