@@ -181,6 +181,14 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   - **Lift Delete (`Delete`) vs. Ripple Delete (`Shift + Delete`):** Escolha se a exclusão de um clipe
     deve preservar o buraco intacto ou fechar a timeline puxando os cortes seguintes.
 
+- **Suíte Clássica de Ferramentas NLE de Precisão (Tool Strip Vertical).** Barra lateral ergonômica com layout *seamless*, cursores temáticos em SVG e paridade com os principais NLEs de mercado:
+  - **Lâmina / Gilete (`C`):** Divide o clipe no cursor com precisão cirúrgica ou fatia todas as pistas destravadas na agulha com **`Shift + C`**.
+  - **Seleção por Caixa / Retângulo (Marquee):** Arraste pontilhado fluido para seleção e movimentação de múltiplos clipes e marcadores em bloco.
+  - **Deslizar Conteúdo Interno / Slip Tool (`Y`):** Desliza o trecho interno da mídia bruta preservando a posição e a duração física na timeline rigorosamente inalteradas, com suporte a cortes J/L com **`Alt`**.
+  - **Deslocamento com Compensação / Slide Tool (`U`):** Move a posição do clipe na timeline compensando simetricamente nos vizinhos adjacentes, com monitor 2-Up ao vivo e clamping de mídia.
+  - **Corte Contínuo Adjacente / Rolling Edit Tool (`N`):** Ajusta o ponto de emenda entre clipes colados mantendo a duração total da sequência estática ($\text{Dur}_A + \text{Dur}_B = \text{constante}$), com projeção 2-Up das saídas/entradas, cortes assimétricos J/L com **`Alt`** e suporte ergonômico a seek e *scrubbing* fora de emenda.
+  - **Prevenção Física de Sobreposição & Modos de Movimentação:** Bloqueio magnético anti-invasão (*Clamp*), modo *Overwrite* com **`Shift`** e modo *Ripple Insert* atômico com **`Ctrl`**.
+
 - **Agente editor com ferramentas (IA copiloto).** Um agente conversacional analisa o roteiro e a
   timeline ativa e propõe cortes por *function-calling*. Edições simples são aplicadas direto (com
   undo/redo); edições complexas ou em lote viram rascunhos visuais (*ghost clips*) para aprovação.
@@ -223,7 +231,7 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   O desenho preserva **mínimo e máximo** de cada balde em vez de tirar média: um estalo, uma
   plosiva ou um clique de microfone continuam visíveis com a timeline toda afastada — com média
   aritmética eles desapareceriam justamente no zoom em que você procura por eles. O botão **Ondas**
-  gera as formas de todo o projeto de uma vez.
+- **Workspaces Dinâmicas, Drag & Drop e Multi-Monitor.** Reorganização modular das colunas superiores via Drag & Drop HTML5 e botões de nudge (`◀` / `▶`) através do modal visual de workspaces (`#btn-config-workspace`), permitindo posicionar livremente Biblioteca, Inspetor de Ajustes & Efeitos, Monitores e Painel Lateral. Inclui 4 presets rápidos (*Padrão*, *Inspetor à Direita*, *Foco em Decupagem* e *Foco em Montagem*), salvamento de workspaces customizadas no `localStorage` com `Ctrl+Shift+S`, botões direcionais inteligentes de recolhimento (`.dock-left` / `.dock-right`) com linhas restauradoras de 4px, layout elástico imune a telas pretas, desacoplamento independente de Monitores/Timeline e suporte multi-monitor completo com janelas destacadas externas e reanexação determinística com um clique.
 
 ### 📝 Títulos, legendas e animação (Titler NLE) <a id="titulos-legendas-e-animacao-titler-nle"></a>
 

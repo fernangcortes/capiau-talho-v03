@@ -726,6 +726,43 @@ controles intuitivos rápidos:
 - **Desacoplamento e Persistência:**
   - Ambas as opções funcionam de forma totalmente independente em qualquer workspace ativa (Padrão, Montagem, Decupagem ou personalizadas), sendo salvas automaticamente no `localStorage` e nos presets customizados de workspace.
 
+### 🗂️ Gestão e Reorganização de Workspaces (Modal Visual, Drag & Drop e Nudge)
+
+O CapIAu-Talho dispõe de um sistema flexível e robusto de **Workspaces Modulares**, permitindo reorganizar as colunas superiores da interface com precisão cirúrgica:
+
+1. **Modal de Configuração de Workspace (`#btn-config-workspace`):**
+   - No cabeçalho superior, ao lado do seletor de workspaces, clique no botão de controles deslizantes (<i class="fa-solid fa-sliders"></i>) para abrir o modal visual de configuração.
+   - O trilho de cartões interativos exibe a sequência física das colunas: **Biblioteca de Mídias**, **Ajustes & Efeitos (Inspetor)**, **Preview & Program (Monitores)** e **Painel Lateral (Transcrição/Áudio/Rostos)**.
+
+2. **Reordenação com Drag & Drop e Botões de Nudge (`◀` e `▶`):**
+   - **Arraste Livre:** Clique e arraste qualquer cartão para soltá-lo na posição desejada.
+   - **Botões de Nudge:** Use os botões `◀` e `▶` nos cartões para deslocar colunas uma a uma — ideal para touchpads e trackballs.
+   - **Badges de Ancoragem:** Cada cartão indica em tempo real sua direção de recolhimento:
+     - `Dock: Esquerda ◀` (para painéis posicionados antes do Preview).
+     - `Centro (Âncora)` (para o contêiner central dos monitores).
+     - `Dock: Direita ▶` (para painéis posicionados após o Preview).
+
+3. **Presets Rápidos de 1 Clique:**
+   - **Padrão:** `Biblioteca ➔ Ajustes & Efeitos ➔ Monitores ➔ Painel Lateral` (Timeline entre menus e Monitores lado a lado).
+   - **Inspetor à Direita:** `Biblioteca ➔ Monitores ➔ Ajustes & Efeitos ➔ Painel Lateral` (Inspetor adjacente às ferramentas de corte).
+   - **Foco em Decupagem:** Monitores empilhados para visualização ampla da biblioteca e metadados.
+   - **Foco em Montagem:** Timeline na faixa de baixo em largura total (100% de tela) para sequências longas.
+
+4. **Workspaces Personalizadas:**
+   - Clique em **"Salvar Posição como Nova Workspace..."** ou use o atalho **`Ctrl + Shift + S`** a qualquer momento para dar um nome exclusivo ao seu layout.
+   - Alterne instantaneamente entre suas workspaces pelo menu dropdown no cabeçalho.
+   - É possível renomear ou excluir workspaces customizadas a qualquer momento.
+
+5. **Motor de Direcionalidade Inteligente dos Botões de Recolher:**
+   - Quando um painel reside à esquerda do Preview, seu botão de recolher migra automaticamente para o **canto esquerdo** do cabeçalho com chevron apontando para a esquerda (`<`), colapsando em uma **linha restauradora ciano de 4px** na borda esquerda.
+   - Quando movido para a direita do Preview, seu botão de recolher migra automaticamente para o **canto direito** com chevron apontando para a direita (`>`), colapsando na borda direita.
+   - A área central dos monitores expande-se elasticamente (`flex: 1 1 0%`), mantendo o vídeo e a timeline sempre visíveis e eliminando completamente bugs de tela preta.
+
+6. **Janelas Destacadas Multi-Monitor (Popouts) & Botão Reanexar:**
+   - Qualquer painel (`Biblioteca`, `Ajustes & Efeitos`, `Painel Lateral`, `Timeline` ou `Players`) pode ser destacado para um segundo monitor clicando no botão de destaque (<i class="fa-solid fa-up-right-from-square"></i>).
+   - Na janela destacada externa, o botão transforma-se dinamicamente em **"Reanexar ao Editor Principal"** (<i class="fa-solid fa-down-left-and-up-right-to-center"></i>).
+   - Ao clicar em Reanexar (ou fechar a janela externa), o painel retorna instantaneamente para o editor principal em sua posição exata definida pela `columnOrder`, sem desvios de tela ou duplicação de janelas.
+
 - **Altura das Pistas:** Tanto no layout Padrão quanto no Estúdio, você
   pode ajustar a altura das trilhas da timeline de duas formas:
 
@@ -954,11 +991,14 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | | **`Botão Direito ➔ Substituir`** | Substituir clipe selecionado na timeline |
 | **Edição & Ferramentas NLE** | **`Z`** *(ou `Shift+R`/`Ctrl+K`/`B`)* | Dividir clipe na agulha (*Split*) |
 | | **`V`** | Ferramenta de Seleção Padrão |
+| | **`C`** *(ou `B` no Resolve/Final Cut)* | Ferramenta Lâmina / Gilete (*Blade Tool* - corte simples ou `Shift+C` global) |
+| | **`Y`** *(ou `Shift+Y` no Resolve)* | Deslizar Conteúdo Interno (*Slip Tool* - mantém tamanho na timeline) |
+| | **`U`** | Deslocamento com Compensação (*Slide Tool* - ajusta vizinhos adjacentes) |
+| | **`N`** *(ou `T` no Resolve/Final Cut)* | Corte Contínuo Adjacente (*Rolling Edit Tool* - ajusta emenda com tempo constante) |
 | | **`T` / `Shift + T`** | Selecionar Faixa para Frente / Trás (*Shift = 1 faixa*) |
 | | **`Q` / `W`** | Ripple Delete até a agulha (Início→Agulha / Agulha→Fim) |
 | | **`Delete` / `Backspace`** | Lift Delete (clipe) ou Ripple Delete (espaço/gap) |
 | | **`Shift + Delete`** | Ripple Delete de clipe selecionado |
-| | **`U`** | Desvincular / Vincular par de áudio e vídeo |
 | | **`S`** *(ou `F10`/`N`)* | Alternar Snapping magnético global |
 | | **`Alt + ←` / `Alt + →`** | Ajustar ponto de entrada (Trim In em 1 frame) |
 | | **`Shift + ←` / `Shift + →`** | Ajustar ponto de saída (Trim Out em 1 frame) |
