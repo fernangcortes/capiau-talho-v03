@@ -4053,6 +4053,13 @@ export class LibraryManager {
             const target = e.target;
             if (!target) return;
 
+            // Se o ponteiro estiver em hover no índice (calha ou tooltip), delega para o índice
+            const scrollIndex = this.scrollIndexTracker || window.libraryScrollIndex;
+            if (scrollIndex && typeof scrollIndex.isPointerOnIndex === "function" && scrollIndex.isPointerOnIndex(e)) {
+                scrollIndex.handleWheel(e);
+                return;
+            }
+
             // Verifica se o evento ocorreu dentro do container/grid da Biblioteca de Mídias
             const isInsideMedia = target.closest("#tab-media, #media-tree-list, #video-list, #photo-list, .library-tree-list, .media-card, .zoom-container, #library-zoom-slider");
             if (!isInsideMedia) {
@@ -7839,6 +7846,11 @@ export class LibraryScrollIndexTracker {
             this.resizeObserver.observe(this.tooltipEl);
         }
 
+        if (!el._hasScrollIndexWheel) {
+            el._hasScrollIndexWheel = true;
+            el.addEventListener("wheel", this._onWheel, { passive: false });
+        }
+
         return el;
     }
 
@@ -7848,6 +7860,53 @@ export class LibraryScrollIndexTracker {
 
     isAnyModalOpen() {
         return isAnyModalOpen(this.activeDoc || document);
+    }
+
+    isPointerOnIndex(e) {
+        if (!this.isEnabled) return false;
+        if (!e) return false;
+
+        const doc = this.activeDoc || document;
+        if (this.isAnyModalOpen() || doc.querySelector(".custom-context-menu")) return false;
+
+        const container = this.getScrollContainer();
+        if (!container) return false;
+
+        const activeTab = doc.querySelector("#sidebar-left .tab-content.active")?.id;
+        if (activeTab !== "tab-media" && activeTab !== "tab-videos" && activeTab !== "tab-photos") {
+            return false;
+        }
+
+        // Se a lista não tiver barra de rolagem (overflow), não há índice ativo
+        if (container.scrollHeight <= container.clientHeight + 8) {
+            return false;
+        }
+
+        // 1. Hover sobre o tooltip do índice
+        if (this.tooltipEl && this.tooltipEl.classList.contains("visible")) {
+            if (e.target && this.tooltipEl.contains(e.target)) {
+                return true;
+            }
+            const tRect = this.tooltipEl.getBoundingClientRect();
+            if (
+                e.clientX >= tRect.left - 6 && e.clientX <= tRect.right + 6 &&
+                e.clientY >= tRect.top - 6 && e.clientY <= tRect.bottom + 6
+            ) {
+                return true;
+            }
+        }
+
+        // 2. Hover sobre a calha de rolagem (gutter do índice)
+        const rect = container.getBoundingClientRect();
+        const isInsideGutter = (
+            e.clientX >= rect.right - 20 && e.clientX <= rect.right + 8 &&
+            e.clientY >= rect.top && e.clientY <= rect.bottom
+        );
+        if (isInsideGutter) {
+            return true;
+        }
+
+        return false;
     }
 
     handlePointerMove(e) {
@@ -7883,15 +7942,33 @@ export class LibraryScrollIndexTracker {
         }
 
         const rect = container.getBoundingClientRect();
-        // Área da calha da barra (últimos 16px da borda direita da lista)
-        const isInsideGutter = (e.clientX >= rect.right - 16 && e.clientX <= rect.right + 4 && e.clientY >= rect.top && e.clientY <= rect.bottom);
+        // Área da calha da barra (últimos 20px da borda direita da lista)
+        const isInsideGutter = (e.clientX >= rect.right - 20 && e.clientX <= rect.right + 8 && e.clientY >= rect.top && e.clientY <= rect.bottom);
 
-        if (!isInsideGutter) {
+        let isInsideTooltip = false;
+        if (this.tooltipEl && this.tooltipEl.classList.contains("visible")) {
+            if (e.target && this.tooltipEl.contains(e.target)) {
+                isInsideTooltip = true;
+            } else {
+                const tRect = this.tooltipEl.getBoundingClientRect();
+                isInsideTooltip = (
+                    e.clientX >= tRect.left - 6 && e.clientX <= tRect.right + 6 &&
+                    e.clientY >= tRect.top - 6 && e.clientY <= tRect.bottom + 6
+                );
+            }
+        }
+
+        if (!isInsideGutter && !isInsideTooltip) {
             this.hide();
             return;
         }
 
-        // Verificação de hit-test no DOM
+        // Se o mouse estiver sobre o tooltip, mantém o tooltip exibido no item atual
+        if (isInsideTooltip && !isInsideGutter) {
+            return;
+        }
+
+        // Verificação de hit-test no DOM quando na calha
         const hitEl = doc.elementFromPoint(e.clientX, e.clientY);
         if (!hitEl || (!container.contains(hitEl) && hitEl !== container && !hitEl.closest("#sidebar-left"))) {
             this.hide();
@@ -7933,8 +8010,19 @@ export class LibraryScrollIndexTracker {
         const activeTab = doc.querySelector("#sidebar-left .tab-content.active")?.id;
         if (activeTab !== "tab-media" && activeTab !== "tab-videos" && activeTab !== "tab-photos") return;
         
+        // Se o clique ocorreu dentro do tooltip visível -> "Clique: Ir" para o item
+        if (this.tooltipEl && this.tooltipEl.classList.contains("visible") && e.target && this.tooltipEl.contains(e.target)) {
+            if (this.currentTargetItem) {
+                const rect = container.getBoundingClientRect();
+                const itemRect = this.currentTargetItem.getBoundingClientRect();
+                const targetScroll = (itemRect.top - rect.top) + container.scrollTop;
+                container.scrollTo({ top: Math.max(0, targetScroll - 4), behavior: "smooth" });
+            }
+            return;
+        }
+
         const rect = container.getBoundingClientRect();
-        const isInsideGutter = (e.clientX >= rect.right - 16 && e.clientX <= rect.right + 4 && e.clientY >= rect.top && e.clientY <= rect.bottom);
+        const isInsideGutter = (e.clientX >= rect.right - 20 && e.clientX <= rect.right + 8 && e.clientY >= rect.top && e.clientY <= rect.bottom);
         if (isInsideGutter) {
             const hitEl = doc.elementFromPoint(e.clientX, e.clientY);
             if (!hitEl || (!container.contains(hitEl) && hitEl !== container && !hitEl.closest("#sidebar-left"))) {
@@ -7968,17 +8056,38 @@ export class LibraryScrollIndexTracker {
             this.hide();
             return;
         }
-        if (e.shiftKey && this.tooltipEl && this.tooltipEl.classList.contains("visible")) {
-            e.preventDefault();
-            e.stopPropagation();
-            const delta = e.deltaY < 0 ? 12 : -12;
-            this.thumbWidth = Math.max(80, Math.min(240, this.thumbWidth + delta));
+        if (!e.shiftKey) return;
+        if (!this.isPointerOnIndex(e)) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const rawDelta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+        if (rawDelta === 0) return;
+
+        const delta = rawDelta < 0 ? 12 : -12;
+        this.thumbWidth = Math.max(80, Math.min(260, this.thumbWidth + delta));
+        if (this.tooltipEl) {
             this.tooltipEl.style.setProperty("--scroll-thumb-width", `${this.thumbWidth}px`);
-            localStorage.setItem("library_scroll_preview_thumb_width", this.thumbWidth);
-            if (this.lastHoverEvent) {
-                const container = this.getScrollContainer();
-                if (container) this.positionTooltip(this.lastHoverEvent, container.getBoundingClientRect());
+        }
+        localStorage.setItem("library_scroll_preview_thumb_width", this.thumbWidth);
+
+        // Se ainda não tinha item renderizado, renderiza a partir da posição do cursor
+        if (!this.currentTargetItem) {
+            const container = this.getScrollContainer();
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+                const doc = this.activeDoc || document;
+                const activeTab = doc.querySelector("#sidebar-left .tab-content.active")?.id || "tab-media";
+                this.updateAtRatio(ratio, e, activeTab);
             }
+        }
+
+        let hoverEvent = this.lastHoverEvent || e;
+        const container = this.getScrollContainer();
+        if (container) {
+            this.positionTooltip(hoverEvent, container.getBoundingClientRect());
         }
     }
 

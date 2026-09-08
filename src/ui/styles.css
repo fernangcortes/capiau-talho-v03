@@ -8509,7 +8509,7 @@ input[type="number"] {
     flex-direction: column;
     width: calc(var(--scroll-thumb-width) + 160px);
     min-width: 270px;
-    max-width: 440px;
+    max-width: 480px;
     max-height: calc(100vh - 20px);
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -8539,6 +8539,8 @@ input[type="number"] {
     display: flex;
     opacity: 1;
     transform: scale(1);
+    pointer-events: auto;
+    cursor: pointer;
 }
 
 .scroll-index-top {
