@@ -87,7 +87,7 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 | **`Delete` / `Backspace`** | **Lift Delete / Deletar Gap / Ghost** | **Em clipe:** Apaga o clipe mantendo o Gap vazio.<br>**Em Gap:** Fecha o espaço vazio puxando os clipes.<br>**Em Ghost:** Rejeita sugestão de IA. |
 | **`Shift + Delete`** | **Ripple Delete de Clipe** | Apaga o clipe selecionado e fecha o espaço vazio imediatamente. |
 | **`Alt + Delete`** | **Apagar Faixa Única** | Apaga apenas o vídeo ou o áudio do clipe selecionado, desvinculando o par temporariamente. |
-| **`U`** | **Desvincular / Vincular Par A/V** | Desvincula o par áudio/vídeo do clipe para possibilitar cortes L-Cut e J-Cut. |
+| **`Alt + Clique`** | **Seleção A/V Independente** | Seleciona apenas a pista clicada de um par vinculado para cortes L-Cut e J-Cut. |
 | **`Ctrl + Arraste`** | **Ripple Insert** | Insere mídia abrindo espaço e empurrando os cortes à direita nas pistas sincronizadas. |
 | **`Ctrl + Trim`** | **Ripple Trim** | Ajusta as bordas de entrada/saída compensando o tempo nas pistas sincronizadas. |
 
@@ -98,6 +98,11 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 | Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
 | **`V`** *(ou `S` no Kdenlive / `A` no Resolve)* | **Ferramenta de Seleção** | Retorna ao cursor padrão de seleção e arraste. |
+| **`C`** *(ou `B` no Resolve/Final Cut)* | **Ferramenta Lâmina / Gilete (Blade)** | Divide o clipe clicado no frame exato (`Shift+C` fatia todas as pistas destravadas na agulha). |
+| **`Y`** *(ou `Shift+Y` no Resolve)* | **Deslizar Conteúdo Interno (Slip Tool)** | Desliza os pontos IN e OUT da mídia bruta mantendo a posição e duração na timeline intactas. |
+| **`U`** | **Deslocamento com Compensação (Slide Tool)** | Move a posição do clipe compensando simetricamente nos vizinhos adjacentes. |
+| **`N`** *(ou `T` no Resolve/Final Cut)* | **Corte Contínuo Adjacente (Rolling Edit)** | Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência. |
+| **`Arraste Livre`** | **Seleção por Retângulo (Marquee)** | Abre caixa pontilhada para selecionar múltiplos clipes e marcadores em bloco. |
 | **`T`** *(ou `A` no Premiere)* | **Selecionar Faixa para Frente** | Seleciona todos os clipes à direita em todas as faixas ativas (*Shift = 1 faixa*). |
 | **`Shift + T`** *(ou `Shift+A`)* | **Selecionar Faixa para Trás** | Seleciona todos os clipes à esquerda em todas as faixas ativas (*Shift = 1 faixa*). |
 | **`S`** *(ou `F10` / `N`)* | **Alternar Snapping Magnético** | Liga ou desliga o magnetismo da timeline com guias visuais no Canvas. |
