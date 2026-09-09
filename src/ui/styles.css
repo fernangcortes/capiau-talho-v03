@@ -10942,11 +10942,14 @@ input[type="number"] {
 
 /* ── MODAL FULLSCREEN / EXPANDIDO ────────────────────────────────────── */
 .modal-fullscreen-container {
-    width: 96vw !important;
-    max-width: 1440px !important;
-    height: 92vh !important;
-    max-height: 94vh !important;
-    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: 12px 18px !important;
+    box-sizing: border-box !important;
 }
 
 .modal-fullscreen-container.is-maximized {
@@ -10955,7 +10958,9 @@ input[type="number"] {
     height: 100vh !important;
     max-height: 100vh !important;
     border-radius: 0 !important;
-    padding: 16px 24px !important;
+    border: none !important;
+    padding: 12px 18px !important;
+    box-sizing: border-box !important;
 }
 
 /* ── TECLADO ESQUEMÁTICO REAL RESPONSIVO ──────────────────────────── */
@@ -10966,6 +10971,8 @@ input[type="number"] {
         linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
     background-size: 20px 20px;
     width: 100%;
+    max-width: 1260px;
+    margin: 0 auto;
     box-sizing: border-box;
 }
 
@@ -10982,7 +10989,7 @@ input[type="number"] {
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     color: #cbd5e1;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 700;
     position: relative;
     cursor: pointer;
@@ -10993,8 +11000,8 @@ input[type="number"] {
 }
 
 .modal-fullscreen-container.is-maximized .vk-keycap {
-    height: 44px;
-    font-size: 12.5px;
+    height: 38px;
+    font-size: 11px;
 }
 
 .vk-keycap:hover {
@@ -11037,6 +11044,29 @@ input[type="number"] {
 .vk-cat-markers { background: rgba(56, 189, 248, 0.22) !important; border-color: rgba(56, 189, 248, 0.5) !important; color: #7dd3fc !important; }
 .vk-cat-ai { background: rgba(236, 72, 153, 0.25) !important; border-color: rgba(236, 72, 153, 0.55) !important; color: #f472b6 !important; }
 .vk-cat-canvas_history { background: rgba(100, 116, 139, 0.3) !important; border-color: rgba(148, 163, 184, 0.45) !important; color: #e2e8f0 !important; }
+.vk-cat-workspace_numpad { background: rgba(16, 185, 129, 0.22) !important; border-color: rgba(16, 185, 129, 0.5) !important; color: #6ee7b7 !important; }
+
+/* ── GRID DO TECLADO NUMÉRICO (NUMPAD 100%) ────────────────────────── */
+.vk-numpad-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(5, 38px);
+    gap: 4px;
+    flex: 1;
+}
+
+.modal-fullscreen-container.is-maximized .vk-numpad-grid {
+    grid-template-rows: repeat(5, 38px);
+}
+
+.modal-fullscreen-container.is-maximized #vk-numpad-header {
+    height: 38px !important;
+    font-size: 10px !important;
+}
+
+.vk-numpad-grid .vk-keycap {
+    height: 100%;
+}
 
 /* Larguras flex proporcionais para preencher 100% da largura disponível */
 .vk-w-1u   { flex: 1; min-width: 0; }

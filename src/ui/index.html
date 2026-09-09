@@ -2405,9 +2405,9 @@
     </div>
 
     <!-- Modal de Ajuda de Atalhos e Manual -->
-    <div id="modal-timeline-help" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 11000; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
-        <div id="modal-timeline-help-card" class="glassmorphism modal-fullscreen-container" style="background: rgba(15, 23, 42, 0.98); border: 1px solid var(--border-glass); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow-y: hidden; box-sizing: border-box;">
-            <!-- Cabeçalho com Título, Seletor de Perfil NLE, Maximize e Fechar -->
+    <div id="modal-timeline-help" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #080c16; z-index: 11000; align-items: stretch; justify-content: stretch;">
+        <div id="modal-timeline-help-card" class="modal-fullscreen-container is-maximized" style="background: rgba(11, 17, 32, 0.99); width: 100vw; height: 100vh; border: none; border-radius: 0; padding: 12px 18px; display: flex; flex-direction: column; gap: 8px; position: relative; overflow-y: hidden; box-sizing: border-box;">
+            <!-- Cabeçalho com Título, Seletor de Perfil NLE e Fechar -->
             <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; flex-shrink: 0; gap: 15px; flex-wrap: wrap;">
                 <h3 style="color: var(--color-cyan); margin: 0; font-family: var(--font-heading); display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700;">
                     <i class="fa-solid fa-keyboard" style="color: var(--color-cyan);"></i> Atalhos & Perfis de Teclado (NLE)
@@ -2424,7 +2424,6 @@
                             <option value="custom">⚙️ Personalizado (Custom)</option>
                         </select>
                     </div>
-                    <button id="btn-maximize-help" style="border: none; background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-size: 13px; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Alternar Tela Cheia"><i class="fa-solid fa-expand"></i></button>
                     <button id="btn-close-help" style="border: none; background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-size: 15px; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
@@ -2445,13 +2444,14 @@
             <!-- TAB 1: Teclado Visual & Índice Esquemático -->
             <div id="container-keymap-virtual" style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow: hidden;">
                 <!-- Barra de Camadas de Modificadores e Legenda -->
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; flex-shrink: 0;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; flex-shrink: 0; width: 100%; max-width: 1260px; margin: 0 auto;">
                     <div style="display: flex; align-items: center; gap: 5px;">
                         <span style="font-size: 10px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase;">Camada:</span>
                         <button class="vk-mod-btn active" data-layer="none" style="padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(6,182,212,0.2); border: 1px solid var(--color-cyan); color: var(--color-cyan); cursor: pointer;">Padrão</button>
                         <button class="vk-mod-btn" data-layer="shift" style="padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-secondary); cursor: pointer;">+ Shift</button>
                         <button class="vk-mod-btn" data-layer="ctrl" style="padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-secondary); cursor: pointer;">+ Ctrl</button>
                         <button class="vk-mod-btn" data-layer="alt" style="padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-secondary); cursor: pointer;">+ Alt</button>
+                        <button class="vk-mod-btn" data-layer="ctrl-alt" style="padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-secondary); cursor: pointer;" title="Exibir atalhos de slots de Workspaces (Ctrl+Alt+1..9)">+ Ctrl+Alt (Slots)</button>
                     </div>
 
                     <!-- Legenda de Cores -->
@@ -2461,13 +2461,14 @@
                         <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(139,92,246,0.6); border: 1px solid var(--color-violet); display: inline-block;"></span> Cortes/Split</span>
                         <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(56,189,248,0.6); border: 1px solid var(--color-sky); display: inline-block;"></span> Marcadores</span>
                         <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(236,72,153,0.6); border: 1px solid #ec4899; display: inline-block;"></span> IA</span>
+                        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(16,185,129,0.6); border: 1px solid #10b981; display: inline-block;"></span> Layout / Numpad</span>
                     </div>
                 </div>
 
                 <!-- Teclado Visual 1:1 com Grid de Blueprint -->
-                <div class="vk-blueprint-box" style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); display: flex; gap: 14px; justify-content: space-between; flex-shrink: 0; box-shadow: inset 0 2px 8px rgba(0,0,0,0.6); width: 100%; box-sizing: border-box;">
+                <div class="vk-blueprint-box" style="padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); display: flex; gap: 14px; width: 100%; max-width: 1260px; margin: 0 auto; box-sizing: border-box; flex-shrink: 0; box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);">
                     <!-- Bloco Alfanumérico Principal (15u) -->
-                    <div id="vk-main-keypad" style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0;">
+                    <div id="vk-main-keypad" style="display: flex; flex-direction: column; gap: 4px; flex: 15; min-width: 0;">
                         <!-- Linha F: Esc + F1..F12 -->
                         <div style="display: flex; gap: 4px; margin-bottom: 2px;">
                             <div class="vk-keycap vk-w-1u" data-code="Escape">Esc</div>
@@ -2567,18 +2568,24 @@
                         </div>
                     </div>
 
-                    <!-- Bloco de Navegação & Setas -->
-                    <div style="display: flex; flex-direction: column; justify-content: space-between; width: 120px; flex-shrink: 0; border-left: 1px solid rgba(255,255,255,0.08); padding-left: 12px;">
+                    <!-- Bloco de Navegação & Setas (3u) -->
+                    <div id="vk-nav-keypad" style="display: flex; flex-direction: column; justify-content: space-between; flex: 3.2; min-width: 0; border-left: 1px solid rgba(255,255,255,0.08); padding-left: 10px;">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
-                            <div style="display: flex; gap: 4px;">
-                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="Insert">Ins</div>
-                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="Home">Hom</div>
-                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="PageUp">PgU</div>
+                            <!-- Top Row Nav alinhado com Linha F -->
+                            <div style="display: flex; gap: 4px; margin-bottom: 2px;">
+                                <div class="vk-keycap vk-w-1u" style="font-size: 10px;" data-code="PrintScreen">PrtSc</div>
+                                <div class="vk-keycap vk-w-1u" style="font-size: 10px;" data-code="ScrollLock">ScrLk</div>
+                                <div class="vk-keycap vk-w-1u" style="font-size: 10px;" data-code="Pause">Pause</div>
                             </div>
                             <div style="display: flex; gap: 4px;">
-                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="Delete">Del</div>
-                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="End">End</div>
-                                <div class="vk-keycap vk-w-1u" style="font-size: 9.5px;" data-code="PageDown">PgD</div>
+                                <div class="vk-keycap vk-w-1u" style="font-size: 10.5px;" data-code="Insert">Ins</div>
+                                <div class="vk-keycap vk-w-1u" style="font-size: 10.5px;" data-code="Home">Hom</div>
+                                <div class="vk-keycap vk-w-1u" style="font-size: 10.5px;" data-code="PageUp">PgU</div>
+                            </div>
+                            <div style="display: flex; gap: 4px;">
+                                <div class="vk-keycap vk-w-1u" style="font-size: 10.5px;" data-code="Delete">Del</div>
+                                <div class="vk-keycap vk-w-1u" style="font-size: 10.5px;" data-code="End">End</div>
+                                <div class="vk-keycap vk-w-1u" style="font-size: 10.5px;" data-code="PageDown">PgD</div>
                             </div>
                         </div>
 
@@ -2586,20 +2593,58 @@
                         <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
                             <div style="display: flex; gap: 4px; width: 100%;">
                                 <div class="vk-w-1u" style="visibility: hidden; pointer-events: none;"></div>
-                                <div class="vk-keycap vk-w-1u" data-code="ArrowUp"><i class="fa-solid fa-caret-up" style="font-size: 13px;"></i></div>
+                                <div class="vk-keycap vk-w-1u" data-code="ArrowUp"><i class="fa-solid fa-caret-up" style="font-size: 14px;"></i></div>
                                 <div class="vk-w-1u" style="visibility: hidden; pointer-events: none;"></div>
                             </div>
                             <div style="display: flex; gap: 4px; width: 100%;">
-                                <div class="vk-keycap vk-w-1u" data-code="ArrowLeft"><i class="fa-solid fa-caret-left" style="font-size: 13px;"></i></div>
-                                <div class="vk-keycap vk-w-1u" data-code="ArrowDown"><i class="fa-solid fa-caret-down" style="font-size: 13px;"></i></div>
-                                <div class="vk-keycap vk-w-1u" data-code="ArrowRight"><i class="fa-solid fa-caret-right" style="font-size: 13px;"></i></div>
+                                <div class="vk-keycap vk-w-1u" data-code="ArrowLeft"><i class="fa-solid fa-caret-left" style="font-size: 14px;"></i></div>
+                                <div class="vk-keycap vk-w-1u" data-code="ArrowDown"><i class="fa-solid fa-caret-down" style="font-size: 14px;"></i></div>
+                                <div class="vk-keycap vk-w-1u" data-code="ArrowRight"><i class="fa-solid fa-caret-right" style="font-size: 14px;"></i></div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Bloco Teclado Numérico (Numpad 100% - 4u) -->
+                    <div id="vk-numpad-keypad" style="display: flex; flex-direction: column; flex: 4.2; min-width: 0; border-left: 1px solid rgba(255,255,255,0.08); padding-left: 10px;">
+                        <!-- Header Numpad alinhado com Linha F -->
+                        <div id="vk-numpad-header" style="display: flex; align-items: center; justify-content: center; height: 38px; margin-bottom: 2px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 5px; font-size: 10px; font-weight: 700; color: #6ee7b7; letter-spacing: 0.5px; text-transform: uppercase;">
+                            <i class="fa-solid fa-table-columns" style="margin-right: 5px;"></i> NUMPAD
+                        </div>
+
+                        <!-- Grid Numpad (5 Linhas x 4 Colunas) -->
+                        <div class="vk-numpad-grid">
+                            <!-- Linha 1: NumLock, /, *, - -->
+                            <div class="vk-keycap" data-code="NumLock" style="font-size: 10px;">Num</div>
+                            <div class="vk-keycap" data-code="NumpadDivide">/</div>
+                            <div class="vk-keycap" data-code="NumpadMultiply">*</div>
+                            <div class="vk-keycap" data-code="NumpadSubtract">-</div>
+
+                            <!-- Linha 2: 7, 8, 9, + (span 2 linhas) -->
+                            <div class="vk-keycap" data-code="Numpad7">7</div>
+                            <div class="vk-keycap" data-code="Numpad8">8</div>
+                            <div class="vk-keycap" data-code="Numpad9">9</div>
+                            <div class="vk-keycap" data-code="NumpadAdd" style="grid-row: span 2;">+</div>
+
+                            <!-- Linha 3: 4, 5, 6 -->
+                            <div class="vk-keycap" data-code="Numpad4">4</div>
+                            <div class="vk-keycap" data-code="Numpad5">5</div>
+                            <div class="vk-keycap" data-code="Numpad6">6</div>
+
+                            <!-- Linha 4: 1, 2, 3, Enter (span 2 linhas) -->
+                            <div class="vk-keycap" data-code="Numpad1">1</div>
+                            <div class="vk-keycap" data-code="Numpad2">2</div>
+                            <div class="vk-keycap" data-code="Numpad3">3</div>
+                            <div class="vk-keycap" data-code="NumpadEnter" style="grid-row: span 2; font-size: 10px;">↵ Ent</div>
+
+                            <!-- Linha 5: 0 (span 2 cols), . -->
+                            <div class="vk-keycap" data-code="Numpad0" style="grid-column: span 2;">0</div>
+                            <div class="vk-keycap" data-code="NumpadDecimal">.</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Índice Esquemático do Manual (3 Colunas com Expansão Natural) -->
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; min-height: 0;">
+                <!-- Índice Esquemático do Manual (4 Colunas com Expansão Natural) -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; flex: 1; min-height: 0;">
                     <!-- Coluna A: Reprodução & Shuttle -->
                     <div style="background: rgba(10, 15, 26, 0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; min-height: 0; height: 100%; box-sizing: border-box;">
                         <div style="display: flex; align-items: center; gap: 6px; color: var(--color-cyan); font-family: monospace; font-size: 11px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 4px; flex-shrink: 0;">
@@ -2619,9 +2664,17 @@
                     <!-- Coluna C: Ferramentas, Marcadores & IA -->
                     <div style="background: rgba(10, 15, 26, 0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; min-height: 0; height: 100%; box-sizing: border-box;">
                         <div style="display: flex; align-items: center; gap: 6px; color: var(--color-amber); font-family: monospace; font-size: 11px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 4px; flex-shrink: 0;">
-                            <i class="fa-solid fa-toolbox" style="font-size: 9px;"></i> SEÇÃO C · FERRAMENTAS, IA & MARCADORES
+                            <i class="fa-solid fa-toolbox" style="font-size: 9px;"></i> SEÇÃO C · FERRAMENTAS & IA
                         </div>
                         <div id="vk-schematic-list-tools" style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px;"></div>
+                    </div>
+
+                    <!-- Coluna D: Layout & Workspace (Numpad) -->
+                    <div style="background: rgba(10, 15, 26, 0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; min-height: 0; height: 100%; box-sizing: border-box;">
+                        <div style="display: flex; align-items: center; gap: 6px; color: #10b981; font-family: monospace; font-size: 11px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 4px; flex-shrink: 0;">
+                            <i class="fa-solid fa-table-columns" style="font-size: 9px;"></i> SEÇÃO D · LAYOUT & WORKSPACE (NUMPAD)
+                        </div>
+                        <div id="vk-schematic-list-workspace" style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px;"></div>
                     </div>
                 </div>
 
@@ -2689,6 +2742,7 @@
                     <button class="keymap-pill-filter" data-category="markers">Marcadores</button>
                     <button class="keymap-pill-filter" data-category="ai">Assistência IA</button>
                     <button class="keymap-pill-filter" data-category="canvas_history">Canvas & Histórico</button>
+                    <button class="keymap-pill-filter" data-category="workspace_numpad">Layout & Numpad</button>
                 </div>
 
                 <!-- Tabela de Comandos Scrollável -->

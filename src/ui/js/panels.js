@@ -3792,7 +3792,7 @@ export class PanelsManager {
             // Limpa classes anteriores de categorias
             keyEl.classList.remove(
                 "vk-cat-playback", "vk-cat-tools", "vk-cat-edit", 
-                "vk-cat-markers", "vk-cat-ai", "vk-cat-canvas_history"
+                "vk-cat-markers", "vk-cat-ai", "vk-cat-canvas_history", "vk-cat-workspace_numpad"
             );
 
             // Remove ponto indicador antigo se existir
@@ -3803,6 +3803,7 @@ export class PanelsManager {
             if (activeLayer === "shift") combo = "Shift+" + code;
             else if (activeLayer === "ctrl") combo = "Ctrl+" + code;
             else if (activeLayer === "alt") combo = "Alt+" + code;
+            else if (activeLayer === "ctrl-alt") combo = "Ctrl+Alt+" + code;
 
             const cmd = reverseMap[combo] || (activeLayer === "none" ? reverseMap[code] : null);
 
@@ -3815,6 +3816,7 @@ export class PanelsManager {
                 else if (cmd.category === "edit") dot.style.backgroundColor = "var(--color-violet)";
                 else if (cmd.category === "markers") dot.style.backgroundColor = "var(--color-sky)";
                 else if (cmd.category === "ai") dot.style.backgroundColor = "#ec4899";
+                else if (cmd.category === "workspace_numpad") dot.style.backgroundColor = "#10b981";
                 else dot.style.backgroundColor = "#94a3b8";
                 keyEl.appendChild(dot);
             }
@@ -3827,12 +3829,14 @@ export class PanelsManager {
         const listPlayback = document.getElementById("vk-schematic-list-playback");
         const listEdit = document.getElementById("vk-schematic-list-edit");
         const listTools = document.getElementById("vk-schematic-list-tools");
+        const listWorkspace = document.getElementById("vk-schematic-list-workspace");
 
         if (!listPlayback || !listEdit || !listTools) return;
 
         listPlayback.innerHTML = "";
         listEdit.innerHTML = "";
         listTools.innerHTML = "";
+        if (listWorkspace) listWorkspace.innerHTML = "";
 
         if (!reverseMap) {
             reverseMap = KEYMAP_SERVICE.getReverseBindingMap();
@@ -3848,9 +3852,16 @@ export class PanelsManager {
             const cleanKey = KEYMAP_SERVICE.formatCombo(combo);
             const cmdName = cmd.label || cmd.name || cmd.id;
 
+            let badgeColor = "var(--color-cyan)";
+            if (cmd.category === "edit") badgeColor = "var(--color-violet)";
+            else if (cmd.category === "tools") badgeColor = "var(--color-amber)";
+            else if (cmd.category === "workspace_numpad") badgeColor = "#34d399";
+            else if (cmd.category === "markers") badgeColor = "var(--color-sky)";
+            else if (cmd.category === "ai") badgeColor = "#ec4899";
+
             item.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-                    <kbd style="padding: 1px 5px; border-radius: 3px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.12); font-family: monospace; font-weight: 700; font-size: 10px; color: var(--color-cyan); white-space: nowrap;">${cleanKey}</kbd>
+                    <kbd style="padding: 1px 5px; border-radius: 3px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.12); font-family: monospace; font-weight: 700; font-size: 10px; color: ${badgeColor}; white-space: nowrap;">${cleanKey}</kbd>
                     <span style="font-weight: 600; color: rgba(255,255,255,0.9); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cmdName}</span>
                 </div>
                 <span style="font-size: 9px; color: var(--text-muted); font-family: monospace; margin-left: 4px;">→</span>
@@ -3871,6 +3882,8 @@ export class PanelsManager {
                 listPlayback.appendChild(item);
             } else if (cmd.category === "edit") {
                 listEdit.appendChild(item);
+            } else if (cmd.category === "workspace_numpad") {
+                if (listWorkspace) listWorkspace.appendChild(item);
             } else {
                 listTools.appendChild(item);
             }
@@ -3931,21 +3944,7 @@ export class PanelsManager {
         // Botões de camada de modificadores
         document.querySelectorAll(".vk-mod-btn").forEach(btn => {
             btn.addEventListener("click", () => {
-                this._vkActiveLayer = btn.dataset.layer || "none";
-                document.querySelectorAll(".vk-mod-btn").forEach(b => {
-                    if (b === btn) {
-                        b.classList.add("active");
-                        b.style.background = "rgba(6,182,212,0.2)";
-                        b.style.borderColor = "var(--color-cyan)";
-                        b.style.color = "var(--color-cyan)";
-                    } else {
-                        b.classList.remove("active");
-                        b.style.background = "rgba(255,255,255,0.04)";
-                        b.style.borderColor = "rgba(255,255,255,0.08)";
-                        b.style.color = "var(--text-secondary)";
-                    }
-                });
-                this.renderVirtualKeyboardUI();
+                this.setVirtualKeyboardLayer(btn.dataset.layer || "none");
             });
         });
 
@@ -3958,6 +3957,7 @@ export class PanelsManager {
                 if (activeLayer === "shift") combo = "Shift+" + code;
                 else if (activeLayer === "ctrl") combo = "Ctrl+" + code;
                 else if (activeLayer === "alt") combo = "Alt+" + code;
+                else if (activeLayer === "ctrl-alt") combo = "Ctrl+Alt+" + code;
 
                 const reverseMap = KEYMAP_SERVICE.getReverseBindingMap();
                 const cmd = reverseMap[combo] || (activeLayer === "none" ? reverseMap[code] : null);
@@ -3992,6 +3992,7 @@ export class PanelsManager {
                 if (activeLayer === "shift") combo = "Shift+" + code;
                 else if (activeLayer === "ctrl") combo = "Ctrl+" + code;
                 else if (activeLayer === "alt") combo = "Alt+" + code;
+                else if (activeLayer === "ctrl-alt") combo = "Ctrl+Alt+" + code;
 
                 const reverseMap = KEYMAP_SERVICE.getReverseBindingMap();
                 const cmd = reverseMap[combo] || (activeLayer === "none" ? reverseMap[code] : null);
@@ -4010,7 +4011,9 @@ export class PanelsManager {
             if (e.target && e.target.tagName === "INPUT") return;
 
             // Atualiza camada de modificadores
-            if (e.shiftKey && this._vkActiveLayer !== "shift") {
+            if (e.ctrlKey && e.altKey) {
+                if (this._vkActiveLayer !== "ctrl-alt") this.setVirtualKeyboardLayer("ctrl-alt");
+            } else if (e.shiftKey && this._vkActiveLayer !== "shift") {
                 this.setVirtualKeyboardLayer("shift");
             } else if ((e.ctrlKey || e.metaKey) && this._vkActiveLayer !== "ctrl") {
                 this.setVirtualKeyboardLayer("ctrl");
@@ -4072,7 +4075,8 @@ export class PanelsManager {
             edit: "fa-scissors",
             markers: "fa-bookmark",
             ai: "fa-wand-magic-sparkles",
-            canvas_history: "fa-sliders"
+            canvas_history: "fa-sliders",
+            workspace_numpad: "fa-table-columns"
         };
 
         const activePreset = KEYMAP_SERVICE.getActivePreset();
@@ -4091,14 +4095,18 @@ export class PanelsManager {
                 <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
                     <i class="fa-solid ${icon}" style="color: var(--color-cyan); font-size: 10px;"></i> ${catTitle}
                 </h4>
-                <div style="display: grid; grid-template-columns: 160px 1fr; gap: 6px; font-size: 11.5px; align-items: center;">
+                <div style="display: grid; grid-template-columns: minmax(190px, 240px) 1fr; gap: 8px 12px; font-size: 11.5px; align-items: start;">
             `;
 
             cmds.forEach(cmd => {
                 const badgesHtml = KEYMAP_SERVICE.getShortcutBadgesHTML(cmd.id);
+                const cmdName = cmd.label || cmd.name || cmd.id;
                 html += `
                     <div>${badgesHtml}</div>
-                    <div style="color: rgba(255,255,255,0.85);">${cmd.description}</div>
+                    <div>
+                        <strong style="color: #fff; display: block; font-size: 11.5px; margin-bottom: 2px;">${cmdName}</strong>
+                        <span style="color: rgba(255,255,255,0.7); font-size: 11px; line-height: 1.4; display: block;">${cmd.description}</span>
+                    </div>
                 `;
             });
 
@@ -4108,11 +4116,11 @@ export class PanelsManager {
             `;
         });
 
-        // 7. Pistas Dinâmicas (Multipista)
+        // 8. Pistas Dinâmicas (Multipista)
         html += `
         <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
             <h4 style="color: #fff; margin: 0 0 6px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                <i class="fa-solid fa-layer-group" style="color: var(--color-cyan); font-size: 10px;"></i> 7. Pistas Dinâmicas (Multipista)
+                <i class="fa-solid fa-layer-group" style="color: var(--color-cyan); font-size: 10px;"></i> 8. Pistas Dinâmicas (Multipista)
             </h4>
             <p style="margin: 0; font-size: 11.5px; color: rgba(255,255,255,0.85); line-height: 1.5;">
                 Crie quantas pistas precisar pelo botão <strong>+</strong> no topo da sidebar de trilhas. Cada faixa possui <strong>volume, mute, trava (cadeado)</strong> e o modo <strong>ímã <i class="fa-solid fa-magnet" style="font-size: 9px;"></i></strong>: faixas magnéticas mantêm clipes grudados em sequência contínua; faixas livres permitem posicionamento em qualquer ponto no tempo.
