@@ -2996,6 +2996,21 @@
                 <div style="display: flex; flex-direction: column; gap: 8px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">
                     <label for="modal-input-new-ws-name" style="font-size: 11px; font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Criar Nova Workspace Customizada</label>
                     <input type="text" id="modal-input-new-ws-name" placeholder="Digite o nome da nova workspace..." style="width: 100%; padding: 8px 10px; font-size: 12px; background: rgba(10, 10, 15, 0.8); color: #fff; border: 1px solid var(--border-glass); border-radius: 6px; outline: none; box-sizing: border-box;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px;">
+                        <label for="modal-select-slot" style="font-size: 11px; color: var(--text-secondary);"><i class="fa-solid fa-keyboard" style="color: #c084fc; margin-right: 4px;"></i>Vincular a Slot Rápido:</label>
+                        <select id="modal-select-slot" class="nle-select" style="padding: 4px 8px; font-size: 11px; background: rgba(10, 10, 15, 0.8); color: #fff; border: 1px solid var(--border-glass); border-radius: 6px; cursor: pointer;">
+                            <option value="">Nenhum (Sem tecla rápida)</option>
+                            <option value="1">Slot 1 (Ctrl + Alt + 1)</option>
+                            <option value="2">Slot 2 (Ctrl + Alt + 2)</option>
+                            <option value="3">Slot 3 (Ctrl + Alt + 3)</option>
+                            <option value="4">Slot 4 (Ctrl + Alt + 4)</option>
+                            <option value="5">Slot 5 (Ctrl + Alt + 5)</option>
+                            <option value="6">Slot 6 (Ctrl + Alt + 6)</option>
+                            <option value="7">Slot 7 (Ctrl + Alt + 7)</option>
+                            <option value="8">Slot 8 (Ctrl + Alt + 8)</option>
+                            <option value="9">Slot 9 (Ctrl + Alt + 9)</option>
+                        </select>
+                    </div>
                     <button id="btn-modal-do-save-new" class="btn-primary" style="margin-top: 4px; background: rgba(6, 182, 212, 0.25); border: 1px solid rgba(6, 182, 212, 0.5); color: #cff4fc; font-weight: 600; font-size: 12px; padding: 8px; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                         <i class="fa-solid fa-plus"></i> Salvar Como Nova Workspace
                     </button>

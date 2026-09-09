@@ -19,7 +19,8 @@ export const COMMAND_CATEGORIES = {
     edit: { label: "3. Edição, Cortes & Trims", icon: "fa-scissors" },
     markers: { label: "4. Marcadores", icon: "fa-bookmark" },
     ai: { label: "5. Assistência de IA & Tomadas", icon: "fa-wand-magic-sparkles" },
-    canvas_history: { label: "6. Canvas, Zoom & Histórico", icon: "fa-sliders" }
+    canvas_history: { label: "6. Canvas, Zoom & Histórico", icon: "fa-sliders" },
+    workspace_numpad: { label: "7. Layout & Workspace (Numpad)", icon: "fa-table-columns" }
 };
 
 export const COMMANDS_CATALOG = [
@@ -369,7 +370,202 @@ export const COMMANDS_CATALOG = [
         category: "canvas_history",
         label: "Salvar Preset de Workspace",
         description: "Abre o diálogo para salvar o layout visual atual da interface"
-    }
+    },
+
+    // ── LAYOUT & WORKSPACE (NUMPAD & SLOTS) ──────────────────────────────────
+    {
+        id: "workspace.numpad_1",
+        category: "workspace_numpad",
+        label: "Timeline: Expansão Direcional Esquerda",
+        description: "Alterna a expansão da timeline sob a sidebar esquerda (bottom-left ↔ center)"
+    },
+    {
+        id: "workspace.alt_numpad_1",
+        category: "workspace_numpad",
+        label: "Timeline: Toggle Cabeçalho de Pistas",
+        description: "Oculta ou exibe a área de faixas e timecode da timeline (Track Headers)"
+    },
+    {
+        id: "workspace.numpad_2",
+        category: "workspace_numpad",
+        label: "Timeline: Alternar Centro ↔ Faixa Total",
+        description: "Alterna a timeline entre entre menus (center) e largura total na base (bottom-full)"
+    },
+    {
+        id: "workspace.alt_numpad_2",
+        category: "workspace_numpad",
+        label: "Timeline: Recolher / Restaurar Verticalmente",
+        description: "Recolhe ou expande o painel da timeline para a linha restauradora na base"
+    },
+    {
+        id: "workspace.ctrl_numpad_2",
+        category: "workspace_numpad",
+        label: "Timeline: Destacar / Reanexar Janela",
+        description: "Abre a timeline em janela flutuante para o segundo monitor ou a reanexa"
+    },
+    {
+        id: "workspace.numpad_3",
+        category: "workspace_numpad",
+        label: "Timeline: Expansão Direcional Direita",
+        description: "Alterna a expansão da timeline sob a sidebar direita (bottom-right ↔ center)"
+    },
+    {
+        id: "workspace.alt_numpad_3",
+        category: "workspace_numpad",
+        label: "Timeline: Toggle Barra de Ferramentas",
+        description: "Recolhe ou expande a barra vertical de ferramentas de corte (V, C, Trims)"
+    },
+    {
+        id: "workspace.numpad_4",
+        category: "workspace_numpad",
+        label: "Biblioteca: Ocultar / Exibir",
+        description: "Recolhe ou expande a sidebar esquerda (Biblioteca de mídias, temas, rostos)"
+    },
+    {
+        id: "workspace.alt_numpad_4",
+        category: "workspace_numpad",
+        label: "Biblioteca: Layout Estúdio (Maximizar)",
+        description: "Maximiza a biblioteca no layout estúdio com timeline e players empilhados"
+    },
+    {
+        id: "workspace.ctrl_numpad_4",
+        category: "workspace_numpad",
+        label: "Biblioteca: Destacar / Reanexar Janela",
+        description: "Abre a biblioteca em janela flutuante externa ou a reanexa"
+    },
+    {
+        id: "workspace.numpad_5",
+        category: "workspace_numpad",
+        label: "Inspetor: Ocultar / Exibir",
+        description: "Recolhe ou expande o painel de Ajustes & Efeitos (Inspetor)"
+    },
+    {
+        id: "workspace.alt_numpad_5",
+        category: "workspace_numpad",
+        label: "Inspetor: Maximizar / Restaurar",
+        description: "Maximiza o painel de Ajustes & Efeitos no espaço disponível"
+    },
+    {
+        id: "workspace.ctrl_numpad_5",
+        category: "workspace_numpad",
+        label: "Inspetor: Destacar / Reanexar Janela",
+        description: "Abre o Inspetor em janela flutuante externa ou o reanexa"
+    },
+    {
+        id: "workspace.numpad_6",
+        category: "workspace_numpad",
+        label: "Painel Direito: Ocultar / Exibir",
+        description: "Recolhe ou expande a sidebar direita (Transcrição, Visão IA, Tarefas, Logs)"
+    },
+    {
+        id: "workspace.alt_numpad_6",
+        category: "workspace_numpad",
+        label: "Painel Direito: Maximizar / Restaurar",
+        description: "Maximiza a sidebar direita no espaço disponível"
+    },
+    {
+        id: "workspace.ctrl_numpad_6",
+        category: "workspace_numpad",
+        label: "Painel Direito: Destacar / Reanexar Janela",
+        description: "Abre a sidebar direita em janela flutuante externa ou a reanexa"
+    },
+    {
+        id: "workspace.numpad_7",
+        category: "workspace_numpad",
+        label: "Source Player: Ocultar / Exibir",
+        description: "Oculta ou exibe o monitor de origem (Source Player)"
+    },
+    {
+        id: "workspace.alt_numpad_7",
+        category: "workspace_numpad",
+        label: "Source Player: Maximizar / Restaurar",
+        description: "Maximiza o monitor de origem no palco central"
+    },
+    {
+        id: "workspace.ctrl_numpad_7",
+        category: "workspace_numpad",
+        label: "Source Player: Destacar / Reanexar Janela",
+        description: "Abre o monitor de origem em janela flutuante externa ou o reanexa"
+    },
+    {
+        id: "workspace.numpad_8",
+        category: "workspace_numpad",
+        label: "Header Geral: Ocultar / Exibir",
+        description: "Recolhe ou expande o cabeçalho superior da aplicação para ganhar espaço vertical"
+    },
+    {
+        id: "workspace.numpad_9",
+        category: "workspace_numpad",
+        label: "Program Player: Ocultar / Exibir",
+        description: "Oculta ou exibe o monitor de programa (Program Player)"
+    },
+    {
+        id: "workspace.alt_numpad_9",
+        category: "workspace_numpad",
+        label: "Program Player: Maximizar / Restaurar",
+        description: "Maximiza o monitor de programa no palco central"
+    },
+    {
+        id: "workspace.ctrl_numpad_9",
+        category: "workspace_numpad",
+        label: "Program Player: Destacar / Reanexar Janela",
+        description: "Abre o monitor de programa em janela flutuante externa ou o reanexa"
+    },
+    {
+        id: "workspace.numpad_0",
+        category: "workspace_numpad",
+        label: "Modo Foco / Cinema / Zen",
+        description: "Macro global: recolhe ou restaura Header e todas as Sidebars simultaneamente"
+    },
+    {
+        id: "workspace.numpad_decimal",
+        category: "workspace_numpad",
+        label: "Timeline: Toggle Cabeçalho Superior",
+        description: "Recolhe ou restaura a barra superior de nome, zoom e sequência da timeline"
+    },
+    {
+        id: "workspace.numpad_add",
+        category: "workspace_numpad",
+        label: "Timeline: Aumentar Altura das Pistas",
+        description: "Aumenta a altura das faixas de áudio e vídeo na timeline (+10px)"
+    },
+    {
+        id: "workspace.numpad_subtract",
+        category: "workspace_numpad",
+        label: "Timeline: Diminuir Altura das Pistas",
+        description: "Diminui a altura das faixas de áudio e vídeo na timeline (-10px)"
+    },
+    {
+        id: "workspace.numpad_divide",
+        category: "workspace_numpad",
+        label: "Monitores: Alternar Lado a Lado / Empilhados",
+        description: "Alterna a disposição dos monitores entre horizontal e vertical"
+    },
+    {
+        id: "workspace.numpad_multiply",
+        category: "workspace_numpad",
+        label: "Monitores: Swap / Alternar Foco",
+        description: "Alterna o foco ativo entre o Monitor Source e o Monitor Program"
+    },
+    {
+        id: "workspace.numpad_enter",
+        category: "workspace_numpad",
+        label: "Maximizar / Restaurar Painel sob Foco",
+        description: "Maximiza ou restaura o painel ativo ou sob o cursor"
+    },
+    // Slots de Workspace 1 a 9
+    ...Array.from({ length: 9 }, (_, i) => ({
+        id: `workspace.load_slot_${i + 1}`,
+        category: "workspace_numpad",
+        label: `Workspace: Carregar Slot ${i + 1}`,
+        description: `Carrega instantaneamente o layout salvo no slot numérico ${i + 1} (Ctrl + Alt + ${i + 1})`
+    })),
+    ...Array.from({ length: 9 }, (_, i) => ({
+        id: `workspace.save_slot_${i + 1}`,
+        category: "workspace_numpad",
+        label: `Workspace: Salvar no Slot ${i + 1}`,
+        description: `Grava a disposição atual diretamente no slot numérico ${i + 1} (Ctrl + Alt + Shift + ${i + 1})`
+    }))
 ];
 
 // Normaliza propriedades name e label para interoperabilidade total
@@ -446,7 +642,59 @@ export const KEYMAP_PRESETS = {
 
         "history.undo": ["Ctrl+KeyZ"],
         "history.redo": ["Ctrl+Shift+KeyZ", "Ctrl+KeyY"],
-        "workspace.save": ["Ctrl+Shift+KeyS"]
+        "workspace.save": ["Ctrl+Shift+KeyS"],
+
+        // Layout & Workspace (Numpad & Slots)
+        "workspace.numpad_1": ["Numpad1"],
+        "workspace.alt_numpad_1": ["Alt+Numpad1"],
+        "workspace.numpad_2": ["Numpad2"],
+        "workspace.alt_numpad_2": ["Alt+Numpad2"],
+        "workspace.ctrl_numpad_2": ["Ctrl+Numpad2"],
+        "workspace.numpad_3": ["Numpad3"],
+        "workspace.alt_numpad_3": ["Alt+Numpad3"],
+        "workspace.numpad_4": ["Numpad4"],
+        "workspace.alt_numpad_4": ["Alt+Numpad4"],
+        "workspace.ctrl_numpad_4": ["Ctrl+Numpad4"],
+        "workspace.numpad_5": ["Numpad5"],
+        "workspace.alt_numpad_5": ["Alt+Numpad5"],
+        "workspace.ctrl_numpad_5": ["Ctrl+Numpad5"],
+        "workspace.numpad_6": ["Numpad6"],
+        "workspace.alt_numpad_6": ["Alt+Numpad6"],
+        "workspace.ctrl_numpad_6": ["Ctrl+Numpad6"],
+        "workspace.numpad_7": ["Numpad7"],
+        "workspace.alt_numpad_7": ["Alt+Numpad7"],
+        "workspace.ctrl_numpad_7": ["Ctrl+Numpad7"],
+        "workspace.numpad_8": ["Numpad8"],
+        "workspace.numpad_9": ["Numpad9"],
+        "workspace.alt_numpad_9": ["Alt+Numpad9"],
+        "workspace.ctrl_numpad_9": ["Ctrl+Numpad9"],
+        "workspace.numpad_0": ["Numpad0"],
+        "workspace.numpad_decimal": ["NumpadDecimal"],
+        "workspace.numpad_add": ["NumpadAdd"],
+        "workspace.numpad_subtract": ["NumpadSubtract"],
+        "workspace.numpad_divide": ["NumpadDivide"],
+        "workspace.numpad_multiply": ["NumpadMultiply"],
+        "workspace.numpad_enter": ["NumpadEnter"],
+
+        // Slots de Workspace 1 a 9
+        "workspace.load_slot_1": ["Ctrl+Alt+Digit1", "Ctrl+Alt+Numpad1"],
+        "workspace.save_slot_1": ["Ctrl+Alt+Shift+Digit1", "Ctrl+Alt+Shift+Numpad1"],
+        "workspace.load_slot_2": ["Ctrl+Alt+Digit2", "Ctrl+Alt+Numpad2"],
+        "workspace.save_slot_2": ["Ctrl+Alt+Shift+Digit2", "Ctrl+Alt+Shift+Numpad2"],
+        "workspace.load_slot_3": ["Ctrl+Alt+Digit3", "Ctrl+Alt+Numpad3"],
+        "workspace.save_slot_3": ["Ctrl+Alt+Shift+Digit3", "Ctrl+Alt+Shift+Numpad3"],
+        "workspace.load_slot_4": ["Ctrl+Alt+Digit4", "Ctrl+Alt+Numpad4"],
+        "workspace.save_slot_4": ["Ctrl+Alt+Shift+Digit4", "Ctrl+Alt+Shift+Numpad4"],
+        "workspace.load_slot_5": ["Ctrl+Alt+Digit5", "Ctrl+Alt+Numpad5"],
+        "workspace.save_slot_5": ["Ctrl+Alt+Shift+Digit5", "Ctrl+Alt+Shift+Numpad5"],
+        "workspace.load_slot_6": ["Ctrl+Alt+Digit6", "Ctrl+Alt+Numpad6"],
+        "workspace.save_slot_6": ["Ctrl+Alt+Shift+Digit6", "Ctrl+Alt+Shift+Numpad6"],
+        "workspace.load_slot_7": ["Ctrl+Alt+Digit7", "Ctrl+Alt+Numpad7"],
+        "workspace.save_slot_7": ["Ctrl+Alt+Shift+Digit7", "Ctrl+Alt+Shift+Numpad7"],
+        "workspace.load_slot_8": ["Ctrl+Alt+Digit8", "Ctrl+Alt+Numpad8"],
+        "workspace.save_slot_8": ["Ctrl+Alt+Shift+Digit8", "Ctrl+Alt+Shift+Numpad8"],
+        "workspace.load_slot_9": ["Ctrl+Alt+Digit9", "Ctrl+Alt+Numpad9"],
+        "workspace.save_slot_9": ["Ctrl+Alt+Shift+Digit9", "Ctrl+Alt+Shift+Numpad9"]
     },
 
     // 2. Kdenlive (Padrão Clássico Open-Source)
@@ -940,6 +1188,10 @@ class KeymapService {
             if (targetKey === "F9" && (eventCode === "F9" || eventKey === "F9")) return true;
             if (targetKey === "NumpadMultiply" && (eventCode === "NumpadMultiply" || eventKey === "*")) return true;
             if (targetKey === "Backslash" && (eventCode === "Backslash" || eventKey === "\\")) return true;
+
+            // Normalização de Numpad e Digit
+            if (targetKey.startsWith("Numpad") && eventCode === targetKey) return true;
+            if (targetKey.startsWith("Digit") && (eventCode === targetKey || eventKey === targetKey.substring(5))) return true;
         }
 
         return false;
@@ -954,6 +1206,15 @@ class KeymapService {
         if (!key) return "";
         if (key.startsWith("Key")) return key.substring(3).toUpperCase();
         if (key.startsWith("Digit")) return key.substring(5);
+        if (key.startsWith("Numpad")) {
+            if (key === "NumpadDecimal") return "Num .";
+            if (key === "NumpadAdd") return "Num +";
+            if (key === "NumpadSubtract") return "Num -";
+            if (key === "NumpadMultiply") return "Num *";
+            if (key === "NumpadDivide") return "Num /";
+            if (key === "NumpadEnter") return "Num Enter";
+            return "Num " + key.substring(6);
+        }
         if (key === "ArrowLeft") return "←";
         if (key === "ArrowRight") return "→";
         if (key === "ArrowUp") return "↑";
@@ -967,7 +1228,6 @@ class KeymapService {
         if (key === "Comma") return ",";
         if (key === "Period") return ".";
         if (key === "Backslash") return "\\";
-        if (key === "NumpadMultiply") return "Num *";
         return key;
     }
 

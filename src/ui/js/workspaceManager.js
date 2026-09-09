@@ -82,6 +82,8 @@ export class WorkspaceManager {
             : (savedTimelinePos === "bottom" ? "bottom-full" : "center");
         this.studioTop = null;
         this.compoundStage = null;
+        this.isZenMode = false;
+        this.preZenState = null;
         this.defaultColumnOrder = ["sidebar-left", "inspector-panel", "center-stage", "sidebar-right"];
         this.columnOrder = [...this.defaultColumnOrder];
         const savedOrder = localStorage.getItem("capiau_column_order");
@@ -378,6 +380,10 @@ export class WorkspaceManager {
                     const ws = customWorkspaces[selectOverwrite.value];
                     if (ws) {
                         this.saveCustomWorkspace(ws.name, ws.id);
+                        const selectSlot = document.getElementById("modal-select-slot");
+                        if (selectSlot && selectSlot.value) {
+                            this.saveWorkspaceSlot(selectSlot.value, ws.id);
+                        }
                         this.closeSaveWorkspaceModal();
                     }
                 }
@@ -391,6 +397,10 @@ export class WorkspaceManager {
             if (inputNewName && inputNewName.value.trim()) {
                 const newId = `custom_${Date.now()}`;
                 this.saveCustomWorkspace(inputNewName.value.trim(), newId);
+                const selectSlot = document.getElementById("modal-select-slot");
+                if (selectSlot && selectSlot.value) {
+                    this.saveWorkspaceSlot(selectSlot.value, newId);
+                }
                 this.closeSaveWorkspaceModal();
             } else {
                 alert("Por favor, digite um nome para a nova workspace.");
@@ -497,6 +507,7 @@ export class WorkspaceManager {
 
         this.initMaximizeButtons();
         this.initSidebarObservers();
+        this.initNumpadAndWorkspaceShortcuts();
 
         // Vincula controles do Modal de Configuração de Workspace (Drag & Drop e Presets)
         const btnConfigWorkspace = document.getElementById("btn-config-workspace");
@@ -587,6 +598,10 @@ export class WorkspaceManager {
         window.toggleTimelinePosition = () => this.toggleTimelinePosition();
         window.toggleTimelineExpandLeft = () => this.toggleTimelineExpandLeft();
         window.toggleTimelineExpandRight = () => this.toggleTimelineExpandRight();
+        window.toggleZenMode = () => this.toggleZenMode();
+        window.adjustTrackHeight = (delta) => this.adjustTrackHeight(delta);
+        window.loadWorkspaceSlot = (slot) => this.loadWorkspaceSlot(slot);
+        window.saveWorkspaceSlot = (slot, id) => this.saveWorkspaceSlot(slot, id);
         window.applyColumnsOrder = (order, persist) => this.applyColumnsOrder(order, persist);
         window.updatePanelDockDirection = (panelId, side) => this.updatePanelDockDirection(panelId, side);
         window.openConfigWorkspaceModal = () => this.openConfigWorkspaceModal();
@@ -1825,12 +1840,107 @@ export class WorkspaceManager {
         }
     }
 
+    getWorkspaceSlots() {
+        try {
+            const data = localStorage.getItem("capiau_workspace_slots");
+            if (data) return JSON.parse(data);
+        } catch (err) {
+            console.error("[WorkspaceManager] Erro ao ler capiau_workspace_slots:", err);
+        }
+        return {
+            "1": "default",
+            "2": "decupagem",
+            "3": "montagem",
+            "4": "multitela"
+        };
+    }
+
+    saveWorkspaceSlotsDict(dict) {
+        try {
+            localStorage.setItem("capiau_workspace_slots", JSON.stringify(dict));
+        } catch (err) {
+            console.error("[WorkspaceManager] Erro ao gravar capiau_workspace_slots:", err);
+        }
+    }
+
+    saveWorkspaceSlot(slotNum, wsId = null) {
+        const slotKey = String(slotNum);
+        const slots = this.getWorkspaceSlots();
+
+        if (!wsId) {
+            const activeWs = localStorage.getItem("capiau_active_workspace") || "default";
+            const customWorkspaces = this.getCustomWorkspaces();
+            let targetId = `custom_slot_${slotKey}`;
+            let name = `Slot ${slotKey}`;
+            if (activeWs && customWorkspaces[activeWs]) {
+                targetId = activeWs;
+                name = customWorkspaces[activeWs].name;
+                this.saveCustomWorkspace(name, targetId);
+            } else {
+                this.saveCustomWorkspace(name, targetId);
+            }
+            wsId = targetId;
+        }
+
+        slots[slotKey] = wsId;
+        this.saveWorkspaceSlotsDict(slots);
+        this.updateWorkspaceSelectUI();
+
+        const customWorkspaces = this.getCustomWorkspaces();
+        const wsName = customWorkspaces[wsId]?.name || this.workspacePresets[wsId]?.name || wsId;
+        if (window.showToast) {
+            window.showToast(`Layout salvo no Slot ${slotKey} (${wsName})!`, "success");
+        }
+        return true;
+    }
+
+    loadWorkspaceSlot(slotNum) {
+        const slotKey = String(slotNum);
+        const slots = this.getWorkspaceSlots();
+        const wsId = slots[slotKey];
+
+        if (!wsId) {
+            if (window.showToast) {
+                window.showToast(`Slot ${slotKey}: Nenhuma workspace vinculada`, "info");
+            }
+            return false;
+        }
+
+        this.applyWorkspace(wsId);
+        const selectWorkspace = document.getElementById("select-workspace");
+        if (selectWorkspace) {
+            selectWorkspace.value = wsId;
+        }
+        const customWorkspaces = this.getCustomWorkspaces();
+        const wsName = customWorkspaces[wsId]?.name || this.workspacePresets[wsId]?.name || wsId;
+        if (window.showToast) {
+            window.showToast(`Slot ${slotKey} carregado: ${wsName}`, "success");
+        }
+        return true;
+    }
+
     updateWorkspaceSelectUI() {
         const selectWorkspace = document.getElementById("select-workspace");
         const optgroupCustom = document.getElementById("optgroup-custom-workspaces");
         if (!selectWorkspace) return;
 
         const customWorkspaces = this.getCustomWorkspaces();
+        const slots = this.getWorkspaceSlots();
+        const idToSlot = {};
+        for (const s in slots) {
+            idToSlot[slots[s]] = s;
+        }
+
+        // Atualiza textos dos presets padrão com indicador [1], [2], etc.
+        const presetOptions = selectWorkspace.querySelectorAll("optgroup:not(#optgroup-custom-workspaces) option");
+        presetOptions.forEach(opt => {
+            const baseName = opt.value === "default" ? "Padrão"
+                : opt.value === "decupagem" ? "Decupagem"
+                : opt.value === "montagem" ? "Estúdio"
+                : opt.value === "multitela" ? "Multi-Tela" : opt.value;
+            const s = idToSlot[opt.value];
+            opt.textContent = s ? `[${s}] Workspace: ${baseName}` : `Workspace: ${baseName}`;
+        });
 
         if (optgroupCustom) {
             optgroupCustom.innerHTML = "";
@@ -1843,7 +1953,8 @@ export class WorkspaceManager {
                     const ws = customWorkspaces[id];
                     const opt = document.createElement("option");
                     opt.value = id;
-                    opt.textContent = `Workspace: ${ws.name}`;
+                    const s = idToSlot[id];
+                    opt.textContent = s ? `[${s}] Workspace: ${ws.name}` : `Workspace: ${ws.name}`;
                     optgroupCustom.appendChild(opt);
                 });
             }
@@ -2871,6 +2982,621 @@ export class WorkspaceManager {
         });
         sidebars.forEach(s => {
             if (s) observer.observe(s);
+        });
+    }
+
+    /**
+     * Alterna o Cabeçalho Global do aplicativo
+     */
+    toggleHeader() {
+        const app = document.querySelector(".app-container");
+        const reopen = document.getElementById("header-restore-trigger");
+        const collapseBtn = document.getElementById("btn-collapse-header");
+        if (app && app.classList.contains("header-collapsed")) {
+            if (reopen) reopen.click(); else app.classList.remove("header-collapsed");
+            if (window.showToast) window.showToast("Cabeçalho: Visível", "info");
+        } else if (app) {
+            if (collapseBtn) collapseBtn.click(); else app.classList.add("header-collapsed");
+            if (window.showToast) window.showToast("Cabeçalho: Oculto", "info");
+        }
+    }
+
+    /**
+     * Alterna a Biblioteca (Sidebar Esquerda)
+     */
+    toggleLibrary() {
+        const lib = document.getElementById("sidebar-left");
+        const reopen = document.getElementById("reopen-left");
+        const toggleBtn = document.getElementById("toggle-left");
+        if (lib && lib.classList.contains("collapsed")) {
+            if (reopen) reopen.click(); else lib.classList.remove("collapsed");
+            if (window.showToast) window.showToast("Biblioteca: Visível", "info");
+        } else if (lib) {
+            if (toggleBtn) toggleBtn.click(); else lib.classList.add("collapsed");
+            if (window.showToast) window.showToast("Biblioteca: Oculta", "info");
+        }
+    }
+
+    /**
+     * Alterna a Biblioteca em Modo Estúdio Maximizado
+     */
+    maximizeLibraryStudio() {
+        const btn = document.getElementById("btn-maximize-library");
+        if (btn) {
+            btn.click();
+        } else {
+            const isStudio = this.timelinePosition === "bottom-full" && this.monitorsLayout === "stacked";
+            this.applyStudio(!isStudio);
+        }
+    }
+
+    /**
+     * Alterna o Inspetor de Propriedades e Efeitos
+     */
+    toggleInspector() {
+        const insp = document.getElementById("inspector-panel");
+        const reopen = document.getElementById("reopen-inspector");
+        const toggleBtn = document.getElementById("toggle-inspector");
+        if (insp && insp.classList.contains("collapsed")) {
+            if (reopen) reopen.click(); else insp.classList.remove("collapsed");
+            if (window.showToast) window.showToast("Inspetor: Visível", "info");
+        } else if (insp) {
+            if (toggleBtn) toggleBtn.click(); else insp.classList.add("collapsed");
+            if (window.showToast) window.showToast("Inspetor: Oculto", "info");
+        }
+    }
+
+    /**
+     * Maximiza ou restaura o Inspetor de Propriedades
+     */
+    maximizeInspector() {
+        const btn = document.getElementById("btn-maximize-inspector");
+        if (btn) {
+            btn.click();
+        } else {
+            const insp = document.getElementById("inspector-panel");
+            if (insp) {
+                const isMax = insp.classList.toggle("sidebar-maximized");
+                window.dispatchEvent(new Event("resize"));
+                if (window.showToast) window.showToast(isMax ? "Inspetor: Maximizado" : "Inspetor: Restaurado", "info");
+            }
+        }
+    }
+
+    /**
+     * Alterna o Painel Lateral Direito (Ferramentas, IA, Exportação)
+     */
+    toggleRightSidebar() {
+        const r = document.getElementById("sidebar-right");
+        const reopen = document.getElementById("reopen-right");
+        const toggleBtn = document.getElementById("toggle-right");
+        if (r && r.classList.contains("collapsed")) {
+            if (reopen) reopen.click(); else r.classList.remove("collapsed");
+            if (window.showToast) window.showToast("Painel Direito: Visível", "info");
+        } else if (r) {
+            if (toggleBtn) toggleBtn.click(); else r.classList.add("collapsed");
+            if (window.showToast) window.showToast("Painel Direito: Oculto", "info");
+        }
+    }
+
+    /**
+     * Maximiza ou restaura o Painel Lateral Direito
+     */
+    maximizeRightSidebar() {
+        const btn = document.getElementById("btn-maximize-right");
+        if (btn) {
+            btn.click();
+        } else {
+            const r = document.getElementById("sidebar-right");
+            if (r) {
+                const isMax = r.classList.toggle("sidebar-maximized");
+                window.dispatchEvent(new Event("resize"));
+                if (window.showToast) window.showToast(isMax ? "Painel Direito: Maximizado" : "Painel Direito: Restaurado", "info");
+            }
+        }
+    }
+
+    /**
+     * Alterna a visibilidade do Source Player
+     */
+    toggleSourcePlayer() {
+        const panel = document.getElementById("source-player-panel");
+        if (!panel) return;
+        const isHidden = panel.style.display === "none";
+        panel.style.display = isHidden ? "" : "none";
+        this.reinitSplitters();
+        window.dispatchEvent(new Event("resize"));
+        if (window.showToast) {
+            window.showToast(isHidden ? "Source Player: Visível" : "Source Player: Oculto", "info");
+        }
+    }
+
+    /**
+     * Maximiza ou restaura o Source Player
+     */
+    maximizeSourcePlayer() {
+        const btn = document.getElementById("btn-expand-source");
+        if (btn) btn.click();
+    }
+
+    /**
+     * Alterna a visibilidade do Program Player
+     */
+    toggleProgramPlayer() {
+        const panel = document.getElementById("program-player-panel");
+        if (!panel) return;
+        const isHidden = panel.style.display === "none";
+        panel.style.display = isHidden ? "" : "none";
+        this.reinitSplitters();
+        window.dispatchEvent(new Event("resize"));
+        if (window.showToast) {
+            window.showToast(isHidden ? "Program Player: Visível" : "Program Player: Oculto", "info");
+        }
+    }
+
+    /**
+     * Maximiza ou restaura o Program Player
+     */
+    maximizeProgramPlayer() {
+        const btn = document.getElementById("btn-expand-program");
+        if (btn) btn.click();
+    }
+
+    /**
+     * Alterna o foco ativo ou faz swap entre os players Source e Program
+     */
+    swapMonitorsFocus() {
+        const src = document.getElementById("source-player-panel");
+        const prg = document.getElementById("program-player-panel");
+        const btnExpandSource = document.getElementById("btn-expand-source");
+        const btnExpandProgram = document.getElementById("btn-expand-program");
+
+        if (src && src.classList.contains("maximized")) {
+            if (btnExpandSource) btnExpandSource.click();
+            if (btnExpandProgram) btnExpandProgram.click();
+            window.activeFocusedPlayer = "program";
+            if (window.showToast) window.showToast("Foco: Program Player", "info");
+            return;
+        }
+        if (prg && prg.classList.contains("maximized")) {
+            if (btnExpandProgram) btnExpandProgram.click();
+            if (btnExpandSource) btnExpandSource.click();
+            window.activeFocusedPlayer = "source";
+            if (window.showToast) window.showToast("Foco: Source Player", "info");
+            return;
+        }
+
+        window.activeFocusedPlayer = (window.activeFocusedPlayer === "source" ? "program" : "source");
+        const targetWrapper = document.getElementById(window.activeFocusedPlayer === "source" ? "source-video-wrapper" : "program-video-wrapper");
+        if (targetWrapper && typeof targetWrapper.focus === "function") {
+            targetWrapper.focus();
+        }
+        if (window.showToast) {
+            window.showToast(`Foco: ${window.activeFocusedPlayer === "source" ? "Source Player" : "Program Player"}`, "info");
+        }
+    }
+
+    /**
+     * Alterna o Cabeçalho de Pistas da Timeline (Track Headers)
+     */
+    toggleTrackHeaders() {
+        const sidebar = document.getElementById("timeline-headers-sidebar");
+        const reopen = document.getElementById("reopen-headers");
+        const toggleBtn = document.getElementById("btn-toggle-headers");
+        if (sidebar && sidebar.classList.contains("collapsed")) {
+            if (reopen) reopen.click(); else sidebar.classList.remove("collapsed");
+            if (window.showToast) window.showToast("Cabeçalhos de Pista: Visíveis", "info");
+        } else if (sidebar) {
+            if (toggleBtn) toggleBtn.click(); else sidebar.classList.add("collapsed");
+            if (window.showToast) window.showToast("Cabeçalhos de Pista: Ocultos", "info");
+        }
+    }
+
+    /**
+     * Alterna a visibilidade vertical do painel inteiro da Timeline
+     */
+    toggleTimelinePanelVertical() {
+        const timeline = document.getElementById("timeline-panel");
+        const reopen = document.getElementById("reopen-timeline");
+        const toggleBtn = document.getElementById("toggle-timeline");
+        if (timeline && timeline.classList.contains("collapsed")) {
+            if (reopen) reopen.click(); else timeline.classList.remove("collapsed");
+            if (window.showToast) window.showToast("Painel da Timeline: Visível", "info");
+        } else if (timeline) {
+            if (toggleBtn) toggleBtn.click(); else timeline.classList.add("collapsed");
+            if (window.showToast) window.showToast("Painel da Timeline: Oculto", "info");
+        }
+    }
+
+    /**
+     * Alterna a Barra de Ferramentas da Timeline (Toolbar)
+     */
+    toggleTimelineToolbar() {
+        const toolbar = document.getElementById("timeline-actions-sidebar");
+        const reopen = document.getElementById("reopen-toolbar");
+        const toggleBtn = document.getElementById("btn-toggle-toolbar");
+        if (toolbar && toolbar.classList.contains("collapsed")) {
+            if (reopen) reopen.click(); else toolbar.classList.remove("collapsed");
+            if (window.showToast) window.showToast("Barra de Ferramentas: Visível", "info");
+        } else if (toolbar) {
+            if (toggleBtn) toggleBtn.click(); else toolbar.classList.add("collapsed");
+            if (window.showToast) window.showToast("Barra de Ferramentas: Oculta", "info");
+        }
+    }
+
+    /**
+     * Alterna o Cabeçalho Superior da Timeline (Barra de ferramentas de zoom, timecode, etc.)
+     */
+    toggleTimelineHeader() {
+        const headerBar = document.getElementById("timeline-header-bar");
+        const reopen = document.getElementById("reopen-timeline-header");
+        const toggleBtn = document.getElementById("btn-toggle-timeline-header");
+        if (headerBar && headerBar.classList.contains("collapsed")) {
+            if (reopen) reopen.click(); else headerBar.classList.remove("collapsed");
+            if (window.showToast) window.showToast("Cabeçalho da Timeline: Visível", "info");
+        } else if (headerBar) {
+            if (toggleBtn) toggleBtn.click(); else headerBar.classList.add("collapsed");
+            if (window.showToast) window.showToast("Cabeçalho da Timeline: Oculto", "info");
+        }
+    }
+
+    /**
+     * Ajusta a altura das pistas da timeline incrementando ou decrementando delta px
+     */
+    adjustTrackHeight(delta) {
+        const slider = getActiveElement("track-height-slider");
+        if (!slider) return;
+        const current = parseInt(slider.value, 10) || 100;
+        const min = parseInt(slider.min, 10) || 50;
+        const max = parseInt(slider.max, 10) || 170;
+        const newVal = Math.max(min, Math.min(max, current + delta));
+        if (newVal !== current) {
+            slider.value = String(newVal);
+            slider.dispatchEvent(new Event("input", { bubbles: true }));
+            slider.dispatchEvent(new Event("change", { bubbles: true }));
+            if (window.showToast) {
+                window.showToast(`Altura das Pistas: ${newVal}%`, "info");
+            }
+        }
+    }
+
+    /**
+     * Alterna o Modo Zen / Cinema:
+     * Oculta Header e todas as sidebars laterais para máxima imersão;
+     * No segundo toque, restaura fielmente o estado anterior de cada elemento.
+     */
+    toggleZenMode() {
+        const app = document.querySelector(".app-container");
+        const lib = document.getElementById("sidebar-left");
+        const insp = document.getElementById("inspector-panel");
+        const right = document.getElementById("sidebar-right");
+
+        if (this.isZenMode) {
+            // Restaurar estado anterior
+            if (this.preZenState) {
+                if (app && !this.preZenState.header && app.classList.contains("header-collapsed")) {
+                    const r = document.getElementById("header-restore-trigger");
+                    if (r) r.click(); else app.classList.remove("header-collapsed");
+                }
+                if (lib && !this.preZenState.sidebarLeft && lib.classList.contains("collapsed")) {
+                    const r = document.getElementById("reopen-left");
+                    if (r) r.click(); else lib.classList.remove("collapsed");
+                }
+                if (insp && !this.preZenState.inspector && insp.classList.contains("collapsed")) {
+                    const r = document.getElementById("reopen-inspector");
+                    if (r) r.click(); else insp.classList.remove("collapsed");
+                }
+                if (right && !this.preZenState.sidebarRight && right.classList.contains("collapsed")) {
+                    const r = document.getElementById("reopen-right");
+                    if (r) r.click(); else right.classList.remove("collapsed");
+                }
+            }
+            this.isZenMode = false;
+            this.preZenState = null;
+            if (window.showToast) window.showToast("Modo Zen: Desativado", "info");
+        } else {
+            // Ativar Zen: memoriza visibilidade atual e fecha tudo
+            this.preZenState = {
+                header: app ? app.classList.contains("header-collapsed") : false,
+                sidebarLeft: lib ? lib.classList.contains("collapsed") : false,
+                inspector: insp ? insp.classList.contains("collapsed") : false,
+                sidebarRight: right ? right.classList.contains("collapsed") : false
+            };
+            if (app && !app.classList.contains("header-collapsed")) {
+                const b = document.getElementById("btn-collapse-header");
+                if (b) b.click(); else app.classList.add("header-collapsed");
+            }
+            if (lib && !lib.classList.contains("collapsed")) {
+                const b = document.getElementById("toggle-left");
+                if (b) b.click(); else lib.classList.add("collapsed");
+            }
+            if (insp && !insp.classList.contains("collapsed")) {
+                const b = document.getElementById("toggle-inspector");
+                if (b) b.click(); else insp.classList.add("collapsed");
+            }
+            if (right && !right.classList.contains("collapsed")) {
+                const b = document.getElementById("toggle-right");
+                if (b) b.click(); else right.classList.add("collapsed");
+            }
+            this.isZenMode = true;
+            if (window.showToast) window.showToast("Modo Zen: Ativado (Foco Total)", "info");
+        }
+        this.reinitSplitters();
+        window.dispatchEvent(new Event("resize"));
+    }
+
+    /**
+     * Maximiza o painel sob o cursor do mouse ou com foco ativo
+     */
+    maximizeFocusedOrHovered() {
+        let target = null;
+        try {
+            target = document.querySelector("#source-player-panel:hover, #program-player-panel:hover, #timeline-panel:hover, #inspector-panel:hover, #sidebar-left:hover, #sidebar-right:hover");
+        } catch (e) {}
+
+        if (!target && document.activeElement) {
+            target = document.activeElement.closest("#source-player-panel, #program-player-panel, #timeline-panel, #inspector-panel, #sidebar-left, #sidebar-right");
+        }
+
+        if (target) {
+            if (target.id === "source-player-panel") {
+                this.maximizeSourcePlayer();
+                return;
+            }
+            if (target.id === "program-player-panel") {
+                this.maximizeProgramPlayer();
+                return;
+            }
+            if (target.id === "inspector-panel") {
+                this.maximizeInspector();
+                return;
+            }
+            if (target.id === "sidebar-left") {
+                this.maximizeLibraryStudio();
+                return;
+            }
+            if (target.id === "sidebar-right") {
+                this.maximizeRightSidebar();
+                return;
+            }
+            if (target.id === "timeline-panel") {
+                this.toggleTimelinePosition();
+                return;
+            }
+        }
+        // Fallback: maximiza o program player
+        this.maximizeProgramPlayer();
+    }
+
+    /**
+     * Inicializa os ouvintes de teclado para atalhos Numpad e Slots de Workspace
+     */
+    initNumpadAndWorkspaceShortcuts() {
+        window.addEventListener("keydown", (e) => {
+            // Ignora atalhos se o foco estiver em campos de digitação
+            const target = e.target;
+            if (target) {
+                const tag = target.tagName;
+                if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable) {
+                    return;
+                }
+            }
+
+            // 1. Slots de Workspace: Salvar (Ctrl + Alt + Shift + [1-9])
+            if (e.ctrlKey && e.altKey && e.shiftKey) {
+                for (let i = 1; i <= 9; i++) {
+                    if (e.code === `Digit${i}` || e.code === `Numpad${i}` || KEYMAP_SERVICE.matches(e, `workspace.save_slot_${i}`)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.saveWorkspaceSlot(i);
+                        return;
+                    }
+                }
+            }
+
+            // 2. Slots de Workspace: Carregar (Ctrl + Alt + [1-9])
+            if (e.ctrlKey && e.altKey && !e.shiftKey) {
+                for (let i = 1; i <= 9; i++) {
+                    if (e.code === `Digit${i}` || e.code === `Numpad${i}` || KEYMAP_SERVICE.matches(e, `workspace.load_slot_${i}`)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.loadWorkspaceSlot(i);
+                        return;
+                    }
+                }
+            }
+
+            // 3. Alt + Numpad
+            if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
+                if (e.code === "Numpad1" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_1")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleTrackHeaders();
+                    return;
+                }
+                if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_2")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleTimelinePanelVertical();
+                    return;
+                }
+                if (e.code === "Numpad3" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_3")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleTimelineToolbar();
+                    return;
+                }
+                if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_4")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.maximizeLibraryStudio();
+                    return;
+                }
+                if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_5")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.maximizeInspector();
+                    return;
+                }
+                if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_6")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.maximizeRightSidebar();
+                    return;
+                }
+                if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_7")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.maximizeSourcePlayer();
+                    return;
+                }
+                if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_9")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.maximizeProgramPlayer();
+                    return;
+                }
+            }
+
+            // 4. Ctrl + Numpad (Destacar / Popout)
+            if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+                if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_2")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.togglePopout("timeline-panel");
+                    return;
+                }
+                if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_4")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.togglePopout("sidebar-left");
+                    return;
+                }
+                if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_5")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.togglePopout("inspector-panel");
+                    return;
+                }
+                if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_6")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.togglePopout("sidebar-right");
+                    return;
+                }
+                if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_7")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.togglePopout("source-player-panel");
+                    return;
+                }
+                if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_9")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.togglePopout("program-player-panel");
+                    return;
+                }
+            }
+
+            // 5. Teclas Simples do Numpad (sem modificadores)
+            if (!e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+                if (e.code === "Numpad1" || KEYMAP_SERVICE.matches(e, "workspace.numpad_1")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleTimelineExpandLeft();
+                    return;
+                }
+                if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.numpad_2")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleTimelinePosition();
+                    return;
+                }
+                if (e.code === "Numpad3" || KEYMAP_SERVICE.matches(e, "workspace.numpad_3")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleTimelineExpandRight();
+                    return;
+                }
+                if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.numpad_4")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleLibrary();
+                    return;
+                }
+                if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.numpad_5")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleInspector();
+                    return;
+                }
+                if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.numpad_6")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleRightSidebar();
+                    return;
+                }
+                if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.numpad_7")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleSourcePlayer();
+                    return;
+                }
+                if (e.code === "Numpad8" || KEYMAP_SERVICE.matches(e, "workspace.numpad_8")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleHeader();
+                    return;
+                }
+                if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.numpad_9")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleProgramPlayer();
+                    return;
+                }
+                if (e.code === "Numpad0" || KEYMAP_SERVICE.matches(e, "workspace.numpad_0")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleZenMode();
+                    return;
+                }
+                if (e.code === "NumpadDecimal" || KEYMAP_SERVICE.matches(e, "workspace.numpad_decimal")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleTimelineHeader();
+                    return;
+                }
+                if (e.code === "NumpadAdd" || KEYMAP_SERVICE.matches(e, "workspace.numpad_add")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.adjustTrackHeight(10);
+                    return;
+                }
+                if (e.code === "NumpadSubtract" || KEYMAP_SERVICE.matches(e, "workspace.numpad_subtract")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.adjustTrackHeight(-10);
+                    return;
+                }
+                if (e.code === "NumpadDivide" || KEYMAP_SERVICE.matches(e, "workspace.numpad_divide")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleMonitorsLayout();
+                    return;
+                }
+                if (e.code === "NumpadMultiply" || KEYMAP_SERVICE.matches(e, "workspace.numpad_multiply")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.swapMonitorsFocus();
+                    return;
+                }
+                if (e.code === "NumpadEnter" || KEYMAP_SERVICE.matches(e, "workspace.numpad_enter")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.maximizeFocusedOrHovered();
+                    return;
+                }
+            }
         });
     }
 }

@@ -718,10 +718,12 @@ controles intuitivos rápidos:
   - **Empilhados (`stacked`):** Source no topo e Program na base. Neste formato, cabeçalhos e controles de transporte flutuam no *hover* do mouse (`position: absolute`), permitindo aproveitamento de 100% da área útil do vídeo.
   - Alterne instantaneamente pelo seletor no Header (`Monitores`) ou pelos botões nos cabeçalhos dos players.
 
-- **Posição da Linha do Tempo (Timeline):**
-  - **Entre os Menus Laterais (`center`):** Timeline contida na coluna central, com as barras laterais estendidas verticalmente.
-  - **Faixa de Baixo (`bottom-full`):** Timeline estendida em 100% de largura total no rodapé da janela, posicionando Biblioteca, Players e Transcrição/Inspetor na linha superior (`.studio-top`).
-  - Alterne pelo seletor no Header (`Timeline`), pelo botão no topo da barra de ferramentas da timeline ou pelo checkbox nas opções de visualização da timeline.
+- **Posição e Expansão Direcional da Linha do Tempo (Timeline):**
+  - **Entre os Menus Laterais (`center`):** Timeline contida estritamente na coluna central, com as barras laterais estendidas verticalmente.
+  - **Expandida para a Esquerda (`bottom-left`):** Timeline passa por baixo dos menus esquerdos (Biblioteca e Inspetor), mantendo o painel direito estendido até a base.
+  - **Expandida para a Direita (`bottom-right`):** Timeline passa por baixo do menu lateral direito, mantendo os painéis esquerdos estendidos verticalmente.
+  - **Faixa de Baixo Completa (`bottom-full`):** Timeline estendida em 100% de largura total no rodapé da janela (Modo Estúdio panorâmico).
+  - Alterne dinamicamente pelos botões com setas direcionais (<i class="fa-solid fa-arrow-left"></i> / <i class="fa-solid fa-arrow-right"></i>) no Header, pelo modal de configuração de workspace ou pelas teclas rápidas do teclado numérico (**`Numpad 1`**, **`Numpad 2`** e **`Numpad 3`**).
 
 - **Desacoplamento e Persistência:**
   - Ambas as opções funcionam de forma totalmente independente em qualquer workspace ativa (Padrão, Montagem, Decupagem ou personalizadas), sendo salvas automaticamente no `localStorage` e nos presets customizados de workspace.
@@ -748,10 +750,10 @@ O CapIAu-Talho dispõe de um sistema flexível e robusto de **Workspaces Modular
    - **Foco em Decupagem:** Monitores empilhados para visualização ampla da biblioteca e metadados.
    - **Foco em Montagem:** Timeline na faixa de baixo em largura total (100% de tela) para sequências longas.
 
-4. **Workspaces Personalizadas:**
-   - Clique em **"Salvar Posição como Nova Workspace..."** ou use o atalho **`Ctrl + Shift + S`** a qualquer momento para dar um nome exclusivo ao seu layout.
-   - Alterne instantaneamente entre suas workspaces pelo menu dropdown no cabeçalho.
-   - É possível renomear ou excluir workspaces customizadas a qualquer momento.
+4. **Workspaces Personalizadas & Slots Numéricos Rápidos (1 a 9):**
+   - **Gravação Rápida por Atalho:** Pressione **`Ctrl + Alt + Shift + [1-9]`** para salvar o layout exato atual instantaneamente no slot numérico correspondente.
+   - **Carregamento Instantâneo:** Pressione **`Ctrl + Alt + [1-9]`** a qualquer momento para alternar instantaneamente para o layout gravado naquele slot.
+   - **Vinculação Visual:** No modal de salvamento de workspace, selecione o slot desejado no dropdown *"Vincular a Slot Rápido"*. Os slots configurados são identificados visualmente com badges como `[1] Workspace: Padrão`, `[2] Workspace: Decupagem`, etc., tanto no seletor do cabeçalho quanto nos menus.
 
 5. **Motor de Direcionalidade Inteligente dos Botões de Recolher:**
    - Quando um painel reside à esquerda do Preview, seu botão de recolher migra automaticamente para o **canto esquerdo** do cabeçalho com chevron apontando para a esquerda (`<`), colapsando em uma **linha restauradora ciano de 4px** na borda esquerda.
@@ -759,9 +761,13 @@ O CapIAu-Talho dispõe de um sistema flexível e robusto de **Workspaces Modular
    - A área central dos monitores expande-se elasticamente (`flex: 1 1 0%`), mantendo o vídeo e a timeline sempre visíveis e eliminando completamente bugs de tela preta.
 
 6. **Janelas Destacadas Multi-Monitor (Popouts) & Botão Reanexar:**
-   - Qualquer painel (`Biblioteca`, `Ajustes & Efeitos`, `Painel Lateral`, `Timeline` ou `Players`) pode ser destacado para um segundo monitor clicando no botão de destaque (<i class="fa-solid fa-up-right-from-square"></i>).
+   - Qualquer painel (`Biblioteca`, `Ajustes & Efeitos`, `Painel Lateral`, `Timeline` ou `Players`) pode ser destacado para um segundo monitor clicando no botão de destaque (<i class="fa-solid fa-up-right-from-square"></i>) ou via atalhos **`Ctrl + Numpad [2, 4, 5, 6, 7, 9]`**.
    - Na janela destacada externa, o botão transforma-se dinamicamente em **"Reanexar ao Editor Principal"** (<i class="fa-solid fa-down-left-and-up-right-to-center"></i>).
    - Ao clicar em Reanexar (ou fechar a janela externa), o painel retorna instantaneamente para o editor principal em sua posição exata definida pela `columnOrder`, sem desvios de tela ou duplicação de janelas.
+
+7. **Modo Zen / Cinema (`Numpad 0`):**
+   - Pressione **`Numpad 0`** para ocultar com um único toque o cabeçalho superior e todas as barras laterais, deixando apenas os monitores e a timeline visíveis para visualização de corte em tela limpa.
+   - Pressione **`Numpad 0`** novamente para restaurar fielmente o estado anterior exato de cada componente.
 
 - **Altura das Pistas:** Tanto no layout Padrão quanto no Estúdio, você
   pode ajustar a altura das trilhas da timeline de duas formas:
@@ -1012,6 +1018,38 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | | **`Enter` / `Y`** | Aceitar sugestão da IA (*Ghost Clip*) |
 | | **`Del` (sobre Ghost)** | Rejeitar sugestão da IA |
 | | **`Esc`** | Fechar modais, desmarcar ou sair de campos de texto |
+| **Layout & Workspace (Numpad)** | **`Numpad 1`** | Timeline: Alternar expansão para a esquerda (`bottom-left` $\leftrightarrow$ `center`) |
+| | **`Alt + Numpad 1`** | Timeline: Alternar cabeçalhos de pistas (*Track Headers*) |
+| | **`Numpad 2`** | Timeline: Alternar entre largura total (`bottom-full`) e entre menus (`center`) |
+| | **`Alt + Numpad 2`** | Timeline: Alternar recolhimento vertical da área inteira da timeline |
+| | **`Ctrl + Numpad 2`** | Timeline: Destacar em janela externa flutuante (*Popout*) / Reanexar |
+| | **`Numpad 3`** | Timeline: Alternar expansão para a direita (`bottom-right` $\leftrightarrow$ `center`) |
+| | **`Alt + Numpad 3`** | Timeline: Alternar barra de ferramentas da timeline (*Toolbar*) |
+| | **`Numpad 4`** | Biblioteca: Alternar visibilidade (recolher/expandir sidebar esquerda) |
+| | **`Alt + Numpad 4`** | Biblioteca: Maximizar em Modo Estúdio completo |
+| | **`Ctrl + Numpad 4`** | Biblioteca: Destacar em janela externa flutuante (*Popout*) / Reanexar |
+| | **`Numpad 5`** | Inspetor: Alternar visibilidade de Ajustes e Efeitos |
+| | **`Alt + Numpad 5`** | Inspetor: Maximizar / Restaurar largura do painel |
+| | **`Ctrl + Numpad 5`** | Inspetor: Destacar em janela externa flutuante (*Popout*) / Reanexar |
+| | **`Numpad 6`** | Painel Direito: Alternar visibilidade (Ferramentas, IA, Exportação) |
+| | **`Alt + Numpad 6`** | Painel Direito: Maximizar / Restaurar largura do painel |
+| | **`Ctrl + Numpad 6`** | Painel Direito: Destacar em janela externa flutuante (*Popout*) / Reanexar |
+| | **`Numpad 7`** | Source Player: Alternar visibilidade do player |
+| | **`Alt + Numpad 7`** | Source Player: Maximizar / Restaurar monitor |
+| | **`Ctrl + Numpad 7`** | Source Player: Destacar em janela externa flutuante (*Popout*) / Reanexar |
+| | **`Numpad 8`** | Cabeçalho: Alternar visibilidade do cabeçalho superior (*Header*) |
+| | **`Numpad 9`** | Program Player: Alternar visibilidade do player |
+| | **`Alt + Numpad 9`** | Program Player: Maximizar / Restaurar monitor |
+| | **`Ctrl + Numpad 9`** | Program Player: Destacar em janela externa flutuante (*Popout*) / Reanexar |
+| | **`Numpad 0`** | Modo Zen / Cinema: Ocultar/restaurar cabeçalho e todas as barras laterais |
+| | **`Numpad .`** | Timeline: Alternar cabeçalho superior (barra de timecode, zoom e sliders) |
+| | **`Numpad +`** | Timeline: Aumentar altura das pistas (+10%) |
+| | **`Numpad -`** | Timeline: Reduzir altura das pistas (-10%) |
+| | **`Numpad /`** | Monitores: Alternar disposição Lado a Lado $\leftrightarrow$ Empilhados |
+| | **`Numpad *`** | Monitores: Alternar foco ativo / Fazer swap entre Source e Program Player |
+| | **`Numpad Enter`** | Painel: Maximizar/restaurar painel focado ou sob o cursor do mouse |
+| **Slots de Workspace** | **`Ctrl + Alt + [1-9]`** | Carregar instantaneamente a workspace vinculada ao Slot numérico [1..9] |
+| | **`Ctrl + Alt + Shift + [1-9]`** | Salvar e vincular o layout exato atual ao Slot numérico [1..9] |
 
 ---
 
