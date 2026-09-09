@@ -18,6 +18,7 @@ export const DEFAULT_POPOUT_HTML = '<i class="fa-solid fa-up-right-from-square">
  * Retorna o nome fixo da janela popout para reutilização multi-monitor.
  */
 export function getPopoutWindowName(panelId) {
+    if (panelId === "dual-sidebar") return "CapIAu_DualSidebar_Window";
     if (panelId === "sidebar-left") return "CapIAu_Library_Window";
     if (panelId === "inspector-panel") return "CapIAu_Inspector_Window";
     if (panelId === "sidebar-right") return "CapIAu_RightSidebar_Window";
@@ -28,6 +29,7 @@ export function getPopoutWindowName(panelId) {
 }
 
 export function getPanelIdFromWindowName(windowName) {
+    if (windowName === "CapIAu_DualSidebar_Window") return "dual-sidebar";
     if (windowName === "CapIAu_Library_Window") return "sidebar-left";
     if (windowName === "CapIAu_Inspector_Window") return "inspector-panel";
     if (windowName === "CapIAu_RightSidebar_Window") return "sidebar-right";
@@ -176,6 +178,9 @@ export class WorkspaceManager {
                 };
             }
         });
+
+        // Inicializa controles e modal de menus duplos destacados (Multi-Monitor)
+        this.initDualPopoutModal();
 
         // Garante que o tooltip global não tenha display: none residual
         const globalTipInit = document.getElementById("global-tooltip");
@@ -606,6 +611,10 @@ export class WorkspaceManager {
         window.updatePanelDockDirection = (panelId, side) => this.updatePanelDockDirection(panelId, side);
         window.openConfigWorkspaceModal = () => this.openConfigWorkspaceModal();
         window.closeConfigWorkspaceModal = () => this.closeConfigWorkspaceModal();
+        window.openDualPopout = (p1, p2, layout) => this.openDualPopout(p1, p2, layout);
+        window.restoreDualPopout = (p1, p2) => this.restoreDualPopout(p1, p2);
+        window.openDualPopoutModal = (p1, p2) => this.openDualPopoutModal(p1, p2);
+        window.closeDualPopoutModal = () => this.closeDualPopoutModal();
 
         // Carrega opções e restaura a workspace ativa salva
         this.updateWorkspaceSelectUI();
@@ -868,6 +877,167 @@ export class WorkspaceManager {
      */
     closeConfigWorkspaceModal() {
         const modal = document.getElementById("workspace-config-modal");
+        if (modal) modal.style.display = "none";
+    }
+
+    /**
+     * Inicializa os ouvintes do modal e botões de Menus Duplos Destacados (Multi-Monitor).
+     */
+    initDualPopoutModal() {
+        const btnDualPopout = document.getElementById("btn-dual-sidebar-popout");
+        const modal = document.getElementById("modal-dual-sidebar-popout");
+        const btnClose = document.getElementById("btn-close-dual-popout-modal");
+        const btnCancel = document.getElementById("btn-cancel-dual-popout");
+        const btnConfirm = document.getElementById("btn-confirm-dual-popout");
+        const select1 = document.getElementById("select-dual-panel-1");
+        const select2 = document.getElementById("select-dual-panel-2");
+        const btnSide = document.getElementById("btn-choice-side-by-side");
+        const btnStacked = document.getElementById("btn-choice-stacked");
+
+        const btnDualLib = document.getElementById("btn-dual-popout-library");
+        const btnDualInsp = document.getElementById("btn-dual-popout-inspector");
+        const btnDualRight = document.getElementById("btn-dual-popout-right");
+
+        const presetInspRight = document.getElementById("btn-dual-preset-inspector-right");
+        const presetLibInsp = document.getElementById("btn-dual-preset-library-inspector");
+        const presetLibRight = document.getElementById("btn-dual-preset-library-right");
+
+        this.pendingDualLayout = localStorage.getItem("capiau_dual_layout") || "side-by-side";
+
+        const updateLayoutChoiceUI = () => {
+            if (this.pendingDualLayout === "stacked") {
+                btnStacked?.classList.add("active");
+                btnSide?.classList.remove("active");
+            } else {
+                btnSide?.classList.add("active");
+                btnStacked?.classList.remove("active");
+            }
+        };
+
+        const updatePresetActiveUI = () => {
+            const v1 = select1?.value;
+            const v2 = select2?.value;
+            const isInspRight = (v1 === "inspector-panel" && v2 === "sidebar-right") || (v1 === "sidebar-right" && v2 === "inspector-panel");
+            const isLibInsp = (v1 === "sidebar-left" && v2 === "inspector-panel") || (v1 === "inspector-panel" && v2 === "sidebar-left");
+            const isLibRight = (v1 === "sidebar-left" && v2 === "sidebar-right") || (v1 === "sidebar-right" && v2 === "sidebar-left");
+
+            presetInspRight?.classList.toggle("active", isInspRight);
+            presetLibInsp?.classList.toggle("active", isLibInsp);
+            presetLibRight?.classList.toggle("active", isLibRight);
+        };
+
+        btnSide?.addEventListener("click", () => {
+            this.pendingDualLayout = "side-by-side";
+            updateLayoutChoiceUI();
+        });
+        btnStacked?.addEventListener("click", () => {
+            this.pendingDualLayout = "stacked";
+            updateLayoutChoiceUI();
+        });
+
+        presetInspRight?.addEventListener("click", () => {
+            if (select1) select1.value = "inspector-panel";
+            if (select2) select2.value = "sidebar-right";
+            updatePresetActiveUI();
+        });
+        presetLibInsp?.addEventListener("click", () => {
+            if (select1) select1.value = "sidebar-left";
+            if (select2) select2.value = "inspector-panel";
+            updatePresetActiveUI();
+        });
+        presetLibRight?.addEventListener("click", () => {
+            if (select1) select1.value = "sidebar-left";
+            if (select2) select2.value = "sidebar-right";
+            updatePresetActiveUI();
+        });
+
+        select1?.addEventListener("change", updatePresetActiveUI);
+        select2?.addEventListener("change", updatePresetActiveUI);
+
+        btnDualPopout?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.openDualPopoutModal("inspector-panel", "sidebar-right");
+        });
+
+        btnDualLib?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.openDualPopoutModal("sidebar-left", "inspector-panel");
+        });
+
+        btnDualInsp?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.openDualPopoutModal("inspector-panel", "sidebar-right");
+        });
+
+        btnDualRight?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.openDualPopoutModal("inspector-panel", "sidebar-right");
+        });
+
+        btnClose?.addEventListener("click", () => this.closeDualPopoutModal());
+        btnCancel?.addEventListener("click", () => this.closeDualPopoutModal());
+
+        modal?.addEventListener("click", (e) => {
+            if (e.target === modal) this.closeDualPopoutModal();
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && modal && modal.style.display === "flex") {
+                this.closeDualPopoutModal();
+            }
+        });
+
+        btnConfirm?.addEventListener("click", () => {
+            const p1 = select1?.value;
+            const p2 = select2?.value;
+            if (!p1 || !p2 || p1 === p2) {
+                alert("Por favor, selecione dois menus laterais diferentes para destacar juntos.");
+                return;
+            }
+            const layout = this.pendingDualLayout || "side-by-side";
+            this.closeDualPopoutModal();
+            this.openDualPopout(p1, p2, layout);
+        });
+    }
+
+    openDualPopoutModal(p1 = "inspector-panel", p2 = "sidebar-right") {
+        const modal = document.getElementById("modal-dual-sidebar-popout");
+        const select1 = document.getElementById("select-dual-panel-1");
+        const select2 = document.getElementById("select-dual-panel-2");
+        const btnSide = document.getElementById("btn-choice-side-by-side");
+        const btnStacked = document.getElementById("btn-choice-stacked");
+        const presetInspRight = document.getElementById("btn-dual-preset-inspector-right");
+        const presetLibInsp = document.getElementById("btn-dual-preset-library-inspector");
+        const presetLibRight = document.getElementById("btn-dual-preset-library-right");
+
+        if (!modal) return;
+        if (select1) select1.value = p1;
+        if (select2) select2.value = p2;
+
+        this.pendingDualLayout = localStorage.getItem("capiau_dual_layout") || "side-by-side";
+        if (this.pendingDualLayout === "stacked") {
+            btnStacked?.classList.add("active");
+            btnSide?.classList.remove("active");
+        } else {
+            btnSide?.classList.add("active");
+            btnStacked?.classList.remove("active");
+        }
+
+        const v1 = select1?.value;
+        const v2 = select2?.value;
+        const isInspRight = (v1 === "inspector-panel" && v2 === "sidebar-right") || (v1 === "sidebar-right" && v2 === "inspector-panel");
+        const isLibInsp = (v1 === "sidebar-left" && v2 === "inspector-panel") || (v1 === "inspector-panel" && v2 === "sidebar-left");
+        const isLibRight = (v1 === "sidebar-left" && v2 === "sidebar-right") || (v1 === "sidebar-right" && v2 === "sidebar-left");
+
+        presetInspRight?.classList.toggle("active", isInspRight);
+        presetLibInsp?.classList.toggle("active", isLibInsp);
+        presetLibRight?.classList.toggle("active", isLibRight);
+
+        modal.style.display = "flex";
+    }
+
+    closeDualPopoutModal() {
+        const modal = document.getElementById("modal-dual-sidebar-popout");
         if (modal) modal.style.display = "none";
     }
 
@@ -2604,6 +2774,311 @@ export class WorkspaceManager {
         this.attachPanelToPopout(panelId, win);
     }
 
+    openDualPopout(panelId1, panelId2, layout = "side-by-side") {
+        if (!panelId1 || !panelId2 || panelId1 === panelId2) {
+            alert("Selecione dois menus laterais diferentes para destacar juntos.");
+            return;
+        }
+
+        const dualWin = window.popoutWindows["dual-sidebar"];
+        if (dualWin && !dualWin.closed) {
+            dualWin.focus();
+            return;
+        }
+
+        // Se algum dos painéis já estiver destacado individualmente, fecha e restaura antes
+        if (window.popoutWindows[panelId1] && !window.popoutWindows[panelId1].closed && window.popoutWindows[panelId1] !== dualWin) {
+            try { window.popoutWindows[panelId1].close(); } catch (e) {}
+            this.restorePanel(panelId1);
+        }
+        if (window.popoutWindows[panelId2] && !window.popoutWindows[panelId2].closed && window.popoutWindows[panelId2] !== dualWin) {
+            try { window.popoutWindows[panelId2].close(); } catch (e) {}
+            this.restorePanel(panelId2);
+        }
+
+        // Lê bounds salvos no localStorage para janela dupla
+        let width = layout === "stacked" ? 640 : 1020;
+        let height = layout === "stacked" ? 920 : 760;
+        let left = null;
+        let top = null;
+
+        try {
+            const rawBounds = localStorage.getItem("capiau_popout_bounds_dual");
+            if (rawBounds) {
+                const b = JSON.parse(rawBounds);
+                if (b && typeof b === "object") {
+                    const w = b.outerWidth || b.width;
+                    const h = b.outerHeight || b.height;
+                    if (w > 200 && h > 200) {
+                        width = w;
+                        height = h;
+                    }
+                    const x = b.screenX !== undefined ? b.screenX : b.left;
+                    const y = b.screenY !== undefined ? b.screenY : b.top;
+                    if (x !== undefined && y !== undefined && !isNaN(x) && !isNaN(y)) {
+                        left = x;
+                        top = y;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("[WorkspaceManager] Erro ao ler bounds salvos para dual:", e);
+        }
+
+        let features = `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`;
+        if (left !== null && top !== null) {
+            features += `,left=${left},top=${top},screenX=${left},screenY=${top}`;
+        }
+
+        const popup = window.open(
+            `panel.html?panels=${panelId1},${panelId2}&layout=${layout}`,
+            "CapIAu_DualSidebar_Window",
+            features
+        );
+
+        if (popup) {
+            window.popoutWindows[panelId1] = popup;
+            window.popoutWindows[panelId2] = popup;
+            window.popoutWindows["dual-sidebar"] = popup;
+            localStorage.setItem(`capiau_popout_active_${panelId1}`, "true");
+            localStorage.setItem(`capiau_popout_active_${panelId2}`, "true");
+            localStorage.setItem("capiau_dual_popout_active", "true");
+            localStorage.setItem("capiau_dual_popout_panels", `${panelId1},${panelId2}`);
+            localStorage.setItem("capiau_dual_popout_layout", layout);
+
+            // Monitoramento de segurança caso a janela seja fechada diretamente
+            const checkClosedTimer = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(checkClosedTimer);
+                    if (window.popoutWindows["dual-sidebar"] === popup) {
+                        this.restoreDualPopout(panelId1, panelId2);
+                    }
+                }
+            }, 500);
+        } else {
+            alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
+        }
+    }
+
+    registerDualPopout(panels, win, layout) {
+        if (!win || win.closed || !Array.isArray(panels) || panels.length < 2) return;
+        window.popoutWindows[panels[0]] = win;
+        window.popoutWindows[panels[1]] = win;
+        window.popoutWindows["dual-sidebar"] = win;
+        this.attachDualPanelsToPopout(panels[0], panels[1], win, layout);
+    }
+
+    attachDualPanelsToPopout(panelId1, panelId2, win, layout) {
+        if (!win || win.closed || !win.document) return;
+
+        const p1 = document.getElementById(panelId1) || this.poppedElements[panelId1];
+        const p2 = document.getElementById(panelId2) || this.poppedElements[panelId2];
+        if (!p1 || !p2) {
+            console.warn(`[WorkspaceManager] Painéis duplos '${panelId1}' e/ou '${panelId2}' não encontrados.`);
+            return;
+        }
+
+        // Salva nós de origem no DOM principal
+        if (p1.ownerDocument === document) {
+            this.poppedElements[panelId1] = p1;
+            this.originalParents[panelId1] = p1.parentNode;
+            this.originalNextSiblings[panelId1] = p1.nextSibling;
+        }
+        if (p2.ownerDocument === document) {
+            this.poppedElements[panelId2] = p2;
+            this.originalParents[panelId2] = p2.parentNode;
+            this.originalNextSiblings[panelId2] = p2.nextSibling;
+        }
+
+        const slot1 = win.document.getElementById("dual-slot-1");
+        const slot2 = win.document.getElementById("dual-slot-2");
+        if (slot1 && slot2) {
+            slot1.innerHTML = "";
+            p1.classList.remove("collapsed");
+            p1.classList.remove("popped-out-hidden");
+            win.document.adoptNode(p1);
+            slot1.appendChild(p1);
+
+            slot2.innerHTML = "";
+            p2.classList.remove("collapsed");
+            p2.classList.remove("popped-out-hidden");
+            win.document.adoptNode(p2);
+            slot2.appendChild(p2);
+
+            // Esconde linhas restauradoras do editor principal para evitar falso estado recolhido
+            const r1 = document.getElementById("reopen-left");
+            const r2 = document.getElementById("reopen-inspector");
+            const r3 = document.getElementById("reopen-right");
+            [panelId1, panelId2].forEach(pid => {
+                if (pid === "sidebar-left" && r1) r1.style.display = "none";
+                if (pid === "inspector-panel" && r2) r2.style.display = "none";
+                if (pid === "sidebar-right" && r3) r3.style.display = "none";
+            });
+
+            // Configura botões de popout e toggle nos cabeçalhos dos dois painéis
+            [p1, p2].forEach((panelEl, idx) => {
+                const currentId = idx === 0 ? panelId1 : panelId2;
+                const popBtn = panelEl.querySelector('[id*="popout"]');
+                if (popBtn) {
+                    popBtn.setAttribute("data-orig-tooltip", popBtn.getAttribute("data-tooltip") || popBtn.title || DEFAULT_POPOUT_TITLES[currentId] || "Destacar");
+                    popBtn.setAttribute("data-orig-html", popBtn.innerHTML);
+                    popBtn.title = "Reanexar ao Editor Principal";
+                    popBtn.setAttribute("data-tooltip", "Reanexar ao Editor Principal");
+                    popBtn.innerHTML = '<i class="fa-solid fa-down-left-and-up-right-to-center"></i>';
+                    popBtn.onclick = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.restoreDualPopout(panelId1, panelId2);
+                    };
+                }
+
+                // Clona o botão de recolher para desacoplar listeners do documento principal
+                const oldToggleBtn = panelEl.querySelector('.btn-toggle-sidebar') || panelEl.querySelector('[id*="toggle-"]');
+                if (oldToggleBtn) {
+                    const toggleBtn = oldToggleBtn.cloneNode(true);
+                    oldToggleBtn.parentNode.replaceChild(toggleBtn, oldToggleBtn);
+
+                    if (idx === 0) {
+                        panelEl.classList.remove("dock-right");
+                        panelEl.classList.add("dock-left");
+                        const isStacked = layout === "stacked";
+                        toggleBtn.innerHTML = isStacked ? '<i class="fa-solid fa-chevron-up"></i>' : '<i class="fa-solid fa-chevron-left"></i>';
+                        const tip = isStacked ? "Recolher Painel (Cima)" : "Recolher Painel (Esquerda)";
+                        toggleBtn.title = tip;
+                        toggleBtn.setAttribute("data-tooltip", tip);
+                    } else {
+                        panelEl.classList.remove("dock-left");
+                        panelEl.classList.add("dock-right");
+                        const isStacked = layout === "stacked";
+                        toggleBtn.innerHTML = isStacked ? '<i class="fa-solid fa-chevron-down"></i>' : '<i class="fa-solid fa-chevron-right"></i>';
+                        const tip = isStacked ? "Recolher Painel (Baixo)" : "Recolher Painel (Direita)";
+                        toggleBtn.title = tip;
+                        toggleBtn.setAttribute("data-tooltip", tip);
+                    }
+
+                    toggleBtn.addEventListener("click", (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        const slotBtnId = idx === 0 ? "btn-toggle-slot-1" : "btn-toggle-slot-2";
+                        win.document.getElementById(slotBtnId)?.click();
+                    });
+                }
+            });
+        }
+
+        localStorage.setItem(`capiau_popout_active_${panelId1}`, "true");
+        localStorage.setItem(`capiau_popout_active_${panelId2}`, "true");
+        localStorage.setItem("capiau_dual_popout_active", "true");
+
+        // Reorganiza os divisores e atualiza o layout do editor principal imediatamente
+        this.reinitSplitters();
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 40);
+
+        // Inicializa motor global de tooltips na janela destacada
+        if (typeof window.initGlobalTooltips === "function") {
+            window.initGlobalTooltips(win.document, win);
+        }
+
+        // Hooks específicos de cada painel
+        [panelId1, panelId2].forEach(panelId => {
+            if (panelId === "sidebar-left") {
+                if (window.libraryScrollIndex) {
+                    window.libraryScrollIndex.attachToWindow(win);
+                } else if (window.libraryManager?.scrollIndexTracker) {
+                    window.libraryManager.scrollIndexTracker.attachToWindow(win);
+                }
+                if (window.libraryInstance) {
+                    window.libraryInstance.attachScrollListener(win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                    const activeTab = win.document.querySelector("#sidebar-left .tab-content.active")?.id || "tab-media";
+                    window.libraryInstance.restoreTabScrollPosition(activeTab, win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
+                    if (typeof window.libraryInstance.onPopoutReady === "function") {
+                        window.libraryInstance.onPopoutReady(win);
+                    }
+                }
+            } else if (panelId === "inspector-panel") {
+                if (window.timelineInteraction && typeof window.timelineInteraction.onInspectorPopoutReady === "function") {
+                    window.timelineInteraction.onInspectorPopoutReady(win);
+                }
+            }
+        });
+
+        // Escuta atalhos de teclado no popout e redireciona para o player principal
+        if (!win._hasWorkspaceKeyHandler) {
+            win._hasWorkspaceKeyHandler = true;
+            win.addEventListener("keydown", (e) => {
+                const activeTag = win.document.activeElement?.tagName?.toLowerCase();
+                if (activeTag === "input" || activeTag === "textarea") return;
+                
+                if (window.player && typeof window.player.handleGlobalKeyboard === "function") {
+                    window.player.handleGlobalKeyboard(e);
+                }
+            });
+            win.addEventListener("keyup", (e) => {
+                if (e.code === "KeyK" && window.player) {
+                    window.player.isKeyKDown = false;
+                }
+            });
+        }
+
+        try {
+            this.channel.postMessage({
+                type: "DUAL_POPOUT_ACK",
+                panels: [panelId1, panelId2]
+            });
+        } catch (e) {}
+    }
+
+    restoreDualPopout(panelId1, panelId2) {
+        console.log(`[WorkspaceManager] Restaurando painéis duplos: ${panelId1} + ${panelId2}`);
+        const win = window.popoutWindows["dual-sidebar"] || window.popoutWindows[panelId1] || window.popoutWindows[panelId2];
+        if (win && !win.closed) {
+            try { win.close(); } catch (e) {}
+        }
+        delete window.popoutWindows["dual-sidebar"];
+        localStorage.removeItem("capiau_dual_popout_active");
+        localStorage.removeItem("capiau_dual_popout_panels");
+
+        if (panelId1) {
+            delete window.popoutWindows[panelId1];
+            this.restorePanel(panelId1);
+        }
+        if (panelId2) {
+            delete window.popoutWindows[panelId2];
+            this.restorePanel(panelId2);
+        }
+
+        this.rebindMainSidebarToggles();
+        this.updateAllPanelsDockDirection();
+        this.reinitSplitters();
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 40);
+        if (window.showToast) window.showToast("Menus laterais reanexados ao editor principal", "info");
+    }
+
+    rebindMainSidebarToggles() {
+        const toggleLeft = document.getElementById("toggle-left");
+        if (toggleLeft) {
+            toggleLeft.onclick = (e) => {
+                e.preventDefault();
+                if (window.collapseSidebar) window.collapseSidebar("left");
+            };
+        }
+        const toggleInspector = document.getElementById("toggle-inspector");
+        if (toggleInspector) {
+            toggleInspector.onclick = (e) => {
+                e.preventDefault();
+                if (window.collapseSidebar) window.collapseSidebar("inspector");
+            };
+        }
+        const toggleRight = document.getElementById("toggle-right");
+        if (toggleRight) {
+            toggleRight.onclick = (e) => {
+                e.preventDefault();
+                if (window.collapseSidebar) window.collapseSidebar("right");
+            };
+        }
+    }
+
     handleMessage(e) {
         const data = e.data;
         if (!data || !data.type) return;
@@ -2617,8 +3092,20 @@ export class WorkspaceManager {
                 this.attachPanelToPopout(panelId, win);
             }
         }
+        else if (data.type === "DUAL_POPOUT_READY") {
+            const panels = data.panels || [];
+            console.log(`[WorkspaceManager] Pop-out duplo sinalizado: ${panels.join(" + ")}`);
+            const win = window.popoutWindows["dual-sidebar"] || window.popoutWindows[panels[0]] || window.popoutWindows[panels[1]];
+            if (win && !win.closed) {
+                this.attachDualPanelsToPopout(panels[0], panels[1], win, data.layout);
+            }
+        }
         else if (data.type === "POPOUT_CLOSED") {
             this.restorePanel(data.panel);
+        }
+        else if (data.type === "DUAL_POPOUT_CLOSED") {
+            const panels = data.panels || [];
+            this.restoreDualPopout(panels[0], panels[1]);
         }
     }
 

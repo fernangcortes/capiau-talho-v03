@@ -99,6 +99,13 @@
                         <option value="bottom-full">Timeline: Faixa de baixo (Total)</option>
                     </select>
                 </div>
+
+                <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.15);"></div>
+
+                <!-- Botão de Destacar Menus Duplos (Multi-Monitor) -->
+                <button id="btn-dual-sidebar-popout" class="btn-icon" data-tooltip="Destacar Menus Laterais Juntos em Nova Janela (Multi-Monitor)" style="color: #c084fc;">
+                    <i class="fa-solid fa-table-columns"></i>
+                </button>
             </div>
             
             <div class="search-area glassmorphism">
@@ -177,6 +184,7 @@
                         <button id="btn-toggle-library-filters" class="btn-icon" title="Ocultar Filtros/Abas" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-eye"></i></button>
                         <button id="btn-maximize-library" class="btn-icon" title="Layout Estúdio (biblioteca + players + timeline)" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-expand"></i></button>
                         <button id="btn-popout-library" class="btn-icon" title="Destacar Biblioteca" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
+                        <button id="btn-dual-popout-library" class="btn-icon" data-tooltip="Destacar em Janela Dupla (com Ajustes ou Falas)" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-table-columns"></i></button>
                     </div>
                 </div>
                 
@@ -661,6 +669,7 @@
                     <div class="sidebar-header-actions" style="display: flex; gap: 8px; align-items: center;">
                         <button id="btn-maximize-inspector" class="btn-icon" title="Maximizar Inspetor" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-expand"></i></button>
                         <button id="btn-popout-inspector" class="btn-icon" title="Destacar Ajustes & Efeitos" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
+                        <button id="btn-dual-popout-inspector" class="btn-icon" data-tooltip="Destacar em Janela Dupla (com Falas ou Biblioteca)" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-table-columns"></i></button>
                     </div>
                 </div>
 
@@ -1118,6 +1127,7 @@
                     <div class="sidebar-header-actions" style="display: flex; gap: 8px; align-items: center;">
                         <button id="btn-maximize-right" class="btn-icon" title="Maximizar Painel" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-expand"></i></button>
                         <button id="btn-popout-right" class="btn-icon" title="Destacar Painel Lateral" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-up-right-from-square"></i></button>
+                        <button id="btn-dual-popout-right" class="btn-icon" data-tooltip="Destacar em Janela Dupla (com Ajustes ou Biblioteca)" style="font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-table-columns"></i></button>
                     </div>
                 </div>
                 
@@ -3010,6 +3020,105 @@
                         <i class="fa-solid fa-check"></i> Aplicar no Workspace Ativo
                     </button>
                 </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal Interativo de Menus Duplos Destacados (Multi-Monitor) -->
+    <div id="modal-dual-sidebar-popout" class="modal-overlay" style="display: none; background: rgba(10, 8, 14, 0.85); backdrop-filter: blur(14px); position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; align-items: center; justify-content: center; z-index: 10600;">
+        <div class="modal-content glassmorphism" style="width: 580px; max-width: 95vw; display: flex; flex-direction: column; padding: 22px; gap: 16px; border: 1px solid rgba(168, 85, 247, 0.45); border-radius: 14px; background: rgba(18, 18, 24, 0.98); box-shadow: 0 16px 48px rgba(0,0,0,0.85);">
+            
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 34px; height: 34px; border-radius: 8px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-table-columns" style="color: #c084fc; font-size: 15px;"></i>
+                    </div>
+                    <div>
+                        <h3 style="color: #fff; margin: 0; font-family: var(--font-heading); font-size: 15px; font-weight: 600;">
+                            Destacar Menus Laterais (Multi-Monitor)
+                        </h3>
+                        <span style="color: var(--text-secondary); font-size: 11px;">Abra dois menus juntos em uma única janela para seu segundo monitor.</span>
+                    </div>
+                </div>
+                <button id="btn-close-dual-popout-modal" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 18px; padding: 4px 8px; border-radius: 4px; transition: color 0.2s;" title="Fechar (Esc)">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Presets Rápidos -->
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 11px; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Combinações Recomendadas
+                </label>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                    <button class="dual-preset-btn active" id="btn-dual-preset-inspector-right" type="button">
+                        <div style="font-weight: 600; display: flex; align-items: center; gap: 6px; font-size: 11px; color: #f8fafc;"><i class="fa-solid fa-star" style="color: #fbbf24;"></i> Ajustes + Falas</div>
+                        <span style="font-size: 9px; opacity: 0.8; color: var(--text-secondary);">Edição & Transcrição</span>
+                    </button>
+                    <button class="dual-preset-btn" id="btn-dual-preset-library-inspector" type="button">
+                        <div style="font-weight: 600; display: flex; align-items: center; gap: 6px; font-size: 11px; color: #f8fafc;"><i class="fa-solid fa-sliders" style="color: var(--color-cyan);"></i> Biblioteca + Ajustes</div>
+                        <span style="font-size: 9px; opacity: 0.8; color: var(--text-secondary);">Mídias & Correções</span>
+                    </button>
+                    <button class="dual-preset-btn" id="btn-dual-preset-library-right" type="button">
+                        <div style="font-weight: 600; display: flex; align-items: center; gap: 6px; font-size: 11px; color: #f8fafc;"><i class="fa-solid fa-folder-open" style="color: #34d399;"></i> Biblioteca + Falas</div>
+                        <span style="font-size: 9px; opacity: 0.8; color: var(--text-secondary);">Decupagem Completa</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Seleção Customizada de Menus -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Primeiro Menu Lateral:</label>
+                    <select id="select-dual-panel-1" class="nle-select" style="width: 100%; height: 32px; font-size: 11px;">
+                        <option value="inspector-panel" selected>Ajustes & Efeitos</option>
+                        <option value="sidebar-right">Transcrição & Falas</option>
+                        <option value="sidebar-left">Biblioteca de Mídias</option>
+                    </select>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Segundo Menu Lateral:</label>
+                    <select id="select-dual-panel-2" class="nle-select" style="width: 100%; height: 32px; font-size: 11px;">
+                        <option value="sidebar-right" selected>Transcrição & Falas</option>
+                        <option value="inspector-panel">Ajustes & Efeitos</option>
+                        <option value="sidebar-left">Biblioteca de Mídias</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Modo de Disposição (Lado a Lado vs Empilhados) -->
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 11px; font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-table-cells-large"></i> Disposição Inicial da Janela
+                </label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button class="dual-layout-choice-btn active" id="btn-choice-side-by-side" type="button">
+                        <i class="fa-solid fa-table-columns" style="font-size: 18px; color: var(--color-cyan);"></i>
+                        <div>
+                            <div style="font-weight: 600; font-size: 12px; color: #fff;">Lado a Lado (Horizontal)</div>
+                            <div style="font-size: 10px; color: var(--text-secondary);">Dois menus em colunas ajustáveis</div>
+                        </div>
+                    </button>
+                    <button class="dual-layout-choice-btn" id="btn-choice-stacked" type="button">
+                        <i class="fa-solid fa-bars" style="font-size: 18px; color: #c084fc;"></i>
+                        <div>
+                            <div style="font-weight: 600; font-size: 12px; color: #fff;">Empilhados (Vertical)</div>
+                            <div style="font-size: 10px; color: var(--text-secondary);">Dois menus em linhas ajustáveis</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Footer / Ações -->
+            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-glass); padding-top: 12px; margin-top: 4px;">
+                <button id="btn-cancel-dual-popout" class="btn-outline" style="font-size: 11px; padding: 6px 14px; color: var(--text-secondary);">
+                    Cancelar
+                </button>
+                <button id="btn-confirm-dual-popout" class="btn-primary" style="font-size: 12px; font-weight: 600; padding: 8px 18px; display: flex; align-items: center; gap: 8px; background: rgba(168, 85, 247, 0.25); border: 1px solid rgba(168, 85, 247, 0.6); color: #f3e8ff; cursor: pointer;">
+                    <i class="fa-solid fa-up-right-from-square"></i> Abrir Janela Destacada
+                </button>
             </div>
 
         </div>

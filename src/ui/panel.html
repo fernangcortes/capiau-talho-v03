@@ -24,18 +24,23 @@
             padding: 0;
             background: #0b0f19;
             color: #f8fafc;
-            overflow: auto;
+            overflow: hidden;
             height: 100vh;
+            width: 100vw;
             box-sizing: border-box;
             font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
         }
+
+        /* ── SINGLE PANEL CONTAINER (RETROCOMPATIBILIDADE) ── */
         #panel-container {
             width: 100%;
             height: 100%;
             display: flex;
             flex-direction: column;
+            overflow: auto;
         }
-        /* Estilos específicos para painéis destacados */
         #panel-container > section, #panel-container > aside {
             height: 100% !important;
             width: 100% !important;
@@ -52,6 +57,198 @@
             height: 100% !important;
             flex: 1 !important;
         }
+
+        /* ── DUAL PANEL WORKSPACE & TOOLBAR ── */
+        #dual-popout-toolbar {
+            height: 32px;
+            background: rgba(15, 18, 28, 0.96);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 8px;
+            box-sizing: border-box;
+            z-index: 200;
+            flex-shrink: 0;
+            user-select: none;
+        }
+        .dual-toolbar-section {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .dual-btn-group {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+            border-radius: 5px;
+            padding: 2px;
+            gap: 2px;
+        }
+        .dual-tool-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary, #94a3b8);
+            border-radius: 4px;
+            width: 26px;
+            height: 24px;
+            padding: 0;
+            font-size: 11px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.18s ease;
+        }
+        .dual-tool-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.08);
+            transform: scale(1.05);
+        }
+        .dual-tool-btn.active {
+            background: rgba(6, 182, 212, 0.22);
+            color: #38bdf8;
+            border: 1px solid rgba(6, 182, 212, 0.45);
+            box-shadow: 0 0 8px rgba(6, 182, 212, 0.25);
+        }
+        .dual-tool-btn.collapsed-pill {
+            opacity: 0.45;
+            color: var(--text-muted, #64748b);
+        }
+        .dual-tool-btn.btn-reattach {
+            color: #22d3ee;
+            background: rgba(6, 182, 212, 0.12);
+            border: 1px solid rgba(6, 182, 212, 0.35);
+        }
+        .dual-tool-btn.btn-reattach:hover {
+            background: rgba(6, 182, 212, 0.25);
+            color: #fff;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.4);
+        }
+        .dual-v-divider {
+            width: 1px;
+            height: 14px;
+            background: rgba(255, 255, 255, 0.12);
+            margin: 0 2px;
+        }
+
+        #dual-workspace {
+            width: 100vw;
+            height: calc(100vh - 32px);
+            display: flex;
+            overflow: hidden;
+            position: relative;
+            background: #090d16;
+        }
+        #dual-workspace.layout-side-by-side {
+            flex-direction: row;
+        }
+        #dual-workspace.layout-stacked {
+            flex-direction: column;
+        }
+
+        .dual-panel-slot {
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            background: #0b0f19;
+            min-width: 0;
+            min-height: 0;
+        }
+        .dual-panel-slot > section,
+        .dual-panel-slot > aside {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            flex: 1 1 100% !important;
+            border: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+        }
+        /* No workspace dual, painéis adotados nunca devem ficar invisíveis por causa de .collapsed */
+        .dual-panel-slot > section.collapsed,
+        .dual-panel-slot > aside.collapsed {
+            width: 100% !important;
+            flex-basis: auto !important;
+            min-width: 0px !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            display: flex !important;
+        }
+
+        /* ── DUAL SPLITTER (LADO A LADO vs EMPILHADOS) ── */
+        .dual-splitter {
+            background: rgba(255, 255, 255, 0.07);
+            flex-shrink: 0;
+            z-index: 50;
+            transition: background 0.18s, box-shadow 0.18s;
+            position: relative;
+        }
+        #dual-workspace.layout-side-by-side .dual-splitter {
+            width: 4px;
+            height: 100%;
+            cursor: col-resize;
+            border-left: 1px solid rgba(255, 255, 255, 0.08);
+            border-right: 1px solid rgba(0, 0, 0, 0.5);
+        }
+        #dual-workspace.layout-stacked .dual-splitter {
+            width: 100%;
+            height: 4px;
+            cursor: row-resize;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+        }
+        .dual-splitter:hover, .dual-splitter.active {
+            background: var(--color-cyan, #06b6d4) !important;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.7) !important;
+        }
+
+        /* ── LINHAS RESTAURADORAS CONFORME CAPIAU-NLE-DESIGN-SYSTEM ── */
+        /* Largura/Altura fixas SEM transição no hover para prevenir flicker */
+        .dual-restore-line {
+            background: rgba(139, 92, 246, 0.18);
+            border-right: 1px solid rgba(139, 92, 246, 0.35);
+            cursor: pointer;
+            z-index: 100;
+            flex-shrink: 0;
+            transition: background 0.2s, box-shadow 0.2s; /* SEM width/height */
+        }
+        #dual-workspace.layout-side-by-side .dual-restore-line {
+            width: 4px;
+            height: 100%;
+        }
+        #dual-workspace.layout-side-by-side #dual-restore-line-2 {
+            border-right: none;
+            border-left: 1px solid rgba(6, 182, 212, 0.35);
+        }
+        #dual-workspace.layout-stacked .dual-restore-line {
+            width: 100%;
+            height: 4px;
+            border-right: none;
+            border-bottom: 1px solid rgba(139, 92, 246, 0.35);
+        }
+        #dual-workspace.layout-stacked #dual-restore-line-2 {
+            border-bottom: none;
+            border-top: 1px solid rgba(6, 182, 212, 0.35);
+        }
+        .dual-restore-line:hover {
+            background: rgba(139, 92, 246, 0.9) !important;
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.8) !important;
+        }
+        .dual-restore-line.cyan-theme {
+            background: rgba(6, 182, 212, 0.18);
+            border-color: rgba(6, 182, 212, 0.35);
+        }
+        .dual-restore-line.cyan-theme:hover {
+            background: rgba(6, 182, 212, 0.9) !important;
+            box-shadow: 0 0 12px rgba(6, 182, 212, 0.8) !important;
+        }
+
         .popout-loading-state {
             display: flex;
             flex-direction: column;
@@ -65,8 +262,82 @@
     </style>
 </head>
 <body>
+    <!-- ── BARRA SUPERIOR PARA JANELAS DUPLAS ── -->
+    <header id="dual-popout-toolbar" style="display: none;">
+        <div class="dual-toolbar-section">
+            <button id="dual-header-badge" class="dual-tool-btn" data-tooltip="CapIAu-Talho — Menus Duplos" style="cursor: default; color: #c084fc;">
+                <i class="fa-solid fa-clapperboard"></i>
+            </button>
+        </div>
+
+        <div class="dual-toolbar-section">
+            <!-- Alternador de Disposição (Lado a Lado vs Empilhados) -->
+            <div class="dual-btn-group">
+                <button id="btn-layout-side-by-side" class="dual-tool-btn active" data-tooltip="Disposição: Lado a Lado (Horizontal)">
+                    <i class="fa-solid fa-table-columns"></i>
+                </button>
+                <button id="btn-layout-stacked" class="dual-tool-btn" data-tooltip="Disposição: Empilhados (Vertical)">
+                    <i class="fa-solid fa-grip-lines"></i>
+                </button>
+            </div>
+
+            <div class="dual-v-divider"></div>
+
+            <!-- Reset Splitter 50/50 -->
+            <button id="btn-reset-splitter" class="dual-tool-btn" data-tooltip="Resetar proporção da divisão (50% / 50%)">
+                <i class="fa-solid fa-arrows-split-up-and-left"></i>
+            </button>
+
+            <div class="dual-v-divider"></div>
+
+            <!-- Botões Retráteis dos Menus Individuais (Line-Icons com Tooltips Dinâmicos) -->
+            <div class="dual-btn-group" id="dual-visibility-group">
+                <button id="btn-toggle-slot-1" class="dual-tool-btn active" data-tooltip="Mostrar/Recolher Painel 1">
+                    <i class="fa-solid fa-eye"></i>
+                </button>
+                <button id="btn-toggle-slot-2" class="dual-tool-btn active" data-tooltip="Mostrar/Recolher Painel 2">
+                    <i class="fa-solid fa-eye"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="dual-toolbar-section">
+            <button id="btn-reattach-dual" class="dual-tool-btn btn-reattach" data-tooltip="Reanexar ambos os menus ao Editor Principal">
+                <i class="fa-solid fa-down-left-and-up-right-to-center"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ── ESPAÇO DE TRABALHO DUPLO ── -->
+    <main id="dual-workspace" class="layout-side-by-side" style="display: none;">
+        <!-- Linha Restauradora do Painel 1 (Borda Externa: Esquerda / Cima) -->
+        <div id="dual-restore-line-1" class="dual-restore-line" style="display: none;" data-tooltip="Restaurar Painel 1"></div>
+
+        <!-- Slot 1 -->
+        <div id="dual-slot-1" class="dual-panel-slot">
+            <div class="popout-loading-state" id="dual-loader-1">
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: var(--color-cyan);"></i>
+                <p style="margin-top: 10px; font-size: 12px; color: var(--text-secondary);">Sincronizando Menu 1...</p>
+            </div>
+        </div>
+
+        <!-- Divisor Arrastável entre Slot 1 e Slot 2 -->
+        <div id="dual-splitter" class="dual-splitter" data-tooltip="Arraste para redimensionar (duplo clique para 50/50)"></div>
+
+        <!-- Slot 2 -->
+        <div id="dual-slot-2" class="dual-panel-slot">
+            <div class="popout-loading-state" id="dual-loader-2">
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: #c084fc;"></i>
+                <p style="margin-top: 10px; font-size: 12px; color: var(--text-secondary);">Sincronizando Menu 2...</p>
+            </div>
+        </div>
+
+        <!-- Linha Restauradora do Painel 2 (Borda Externa: Direita / Baixo) -->
+        <div id="dual-restore-line-2" class="dual-restore-line cyan-theme" style="display: none;" data-tooltip="Restaurar Painel 2"></div>
+    </main>
+
+    <!-- ── CONTAINER TRADICIONAL (PAINEL ÚNICO) ── -->
     <div id="panel-container">
-        <!-- O conteúdo será injetado dinamicamente via adoptNode -->
         <div class="popout-loading-state" id="popout-loader">
             <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 28px; color: var(--color-cyan);"></i>
             <p style="margin-top: 15px; font-size: 13px; color: var(--text-secondary); font-weight: 500;">
@@ -79,40 +350,52 @@
     </div>
     
     <script type="module">
-        // Captura o tipo de painel pela URL
+        // ── CAPTURA E ANÁLISE DE PARÂMETROS DA URL ──
         const params = new URLSearchParams(window.location.search);
-        const panelName = params.get("panel") || "sidebar-left";
+        const panelsParam = params.get("panels") || params.get("panel") || "sidebar-left";
+        const rawPanelList = panelsParam.split(",").map(p => p.trim()).filter(Boolean);
+        const isDual = rawPanelList.length >= 2;
+        const panel1Name = rawPanelList[0];
+        const panel2Name = rawPanelList[1] || null;
+        const initialLayoutParam = params.get("layout") || localStorage.getItem("capiau_dual_layout") || "side-by-side";
         
-        // Mapeamento de títulos e identificadores de janela fixos
+        // Mapeamento de títulos e nomes amigáveis
         const TITLE_MAP = {
-            "sidebar-left": "CapIAu-Talho — Biblioteca",
-            "inspector-panel": "CapIAu-Talho — Ajustes & Efeitos",
-            "sidebar-right": "CapIAu-Talho — Painel Lateral",
-            "timeline-panel": "CapIAu-Talho — Linha do Tempo",
-            "source-player-panel": "CapIAu-Talho — Player de Origem",
-            "program-player-panel": "CapIAu-Talho — Player de Programa"
+            "sidebar-left": "Biblioteca",
+            "inspector-panel": "Ajustes & Efeitos",
+            "sidebar-right": "Transcrição & Falas",
+            "timeline-panel": "Linha do Tempo",
+            "source-player-panel": "Player de Origem",
+            "program-player-panel": "Player de Programa"
         };
         
-        function getExpectedWindowName(panel) {
-            if (panel === "sidebar-left") return "CapIAu_Library_Window";
-            if (panel === "inspector-panel") return "CapIAu_Inspector_Window";
-            if (panel === "sidebar-right") return "CapIAu_RightSidebar_Window";
-            if (panel === "timeline-panel") return "CapIAu_Timeline_Window";
-            if (panel === "source-player-panel") return "CapIAu_SourcePlayer_Window";
-            if (panel === "program-player-panel") return "CapIAu_ProgramPlayer_Window";
-            return `CapIAu_${panel.replace(/-/g, "_")}_Window`;
+        function getExpectedWindowName() {
+            if (isDual) return "CapIAu_DualSidebar_Window";
+            if (panel1Name === "sidebar-left") return "CapIAu_Library_Window";
+            if (panel1Name === "inspector-panel") return "CapIAu_Inspector_Window";
+            if (panel1Name === "sidebar-right") return "CapIAu_RightSidebar_Window";
+            if (panel1Name === "timeline-panel") return "CapIAu_Timeline_Window";
+            if (panel1Name === "source-player-panel") return "CapIAu_SourcePlayer_Window";
+            if (panel1Name === "program-player-panel") return "CapIAu_ProgramPlayer_Window";
+            return `CapIAu_${panel1Name.replace(/-/g, "_")}_Window`;
         }
 
-        // Define o título da página e garante o nome fixo no Window object
-        document.title = TITLE_MAP[panelName] || `CapIAu-Talho — Painel: ${panelName.toUpperCase().replace("-PANEL", "")}`;
-        const expectedWindowName = getExpectedWindowName(panelName);
-        if (!window.name || window.name !== expectedWindowName) {
-            window.name = expectedWindowName;
+        // Configuração do Título da Janela
+        if (isDual) {
+            document.title = `CapIAu-Talho — Menus Laterais: ${TITLE_MAP[panel1Name] || panel1Name} + ${TITLE_MAP[panel2Name] || panel2Name}`;
+        } else {
+            document.title = `CapIAu-Talho — ${TITLE_MAP[panel1Name] || panel1Name.toUpperCase().replace("-PANEL", "")}`;
+        }
+        
+        const expectedWinName = getExpectedWindowName();
+        if (!window.name || window.name !== expectedWinName) {
+            window.name = expectedWinName;
         }
 
-        // ── PERSISTÊNCIA E RESTAURAÇÃO DE BOUNDS (COORDENADAS E DIMENSÕES) ──
+        // ── RESTAURAÇÃO DE BOUNDS (COORDENADAS E DIMENSÕES) ──
+        const boundsStorageKey = isDual ? "capiau_popout_bounds_dual" : `capiau_popout_bounds_${panel1Name}`;
         try {
-            const rawBounds = localStorage.getItem(`capiau_popout_bounds_${panelName}`);
+            const rawBounds = localStorage.getItem(boundsStorageKey);
             if (rawBounds) {
                 const b = JSON.parse(rawBounds);
                 if (b && typeof b === "object") {
@@ -120,7 +403,7 @@
                     const y = b.screenY !== undefined ? b.screenY : b.top;
                     const w = b.outerWidth || b.width;
                     const h = b.outerHeight || b.height;
-                    if (w > 150 && h > 150) {
+                    if (w > 200 && h > 200) {
                         if (x !== undefined && y !== undefined && !isNaN(x) && !isNaN(y)) {
                             window.moveTo(x, y);
                         }
@@ -133,7 +416,7 @@
         }
 
         function saveCurrentBounds() {
-            if (window.outerWidth < 100 || window.outerHeight < 100) return;
+            if (window.outerWidth < 120 || window.outerHeight < 120) return;
             const screenX = window.screenX !== undefined ? window.screenX : window.screenLeft;
             const screenY = window.screenY !== undefined ? window.screenY : window.screenTop;
             const bounds = {
@@ -152,7 +435,7 @@
                 updatedAt: Date.now()
             };
             try {
-                localStorage.setItem(`capiau_popout_bounds_${panelName}`, JSON.stringify(bounds));
+                localStorage.setItem(boundsStorageKey, JSON.stringify(bounds));
             } catch (e) {}
         }
 
@@ -162,25 +445,312 @@
             resizeTimeout = setTimeout(saveCurrentBounds, 250);
         });
         window.addEventListener("pagehide", saveCurrentBounds);
-        // Intervalo periódico para capturar movimentação de tela/monitor sem evento nativo 'move'
-        setInterval(saveCurrentBounds, 2500);
+        setInterval(saveCurrentBounds, 3000);
 
-        // ── COMUNICAÇÃO BIDIRECIONAL & HANDSHAKE VIA BROADCASTCHANNEL ──
+        // ── GERENCIAMENTO DO MODO DUAL ──
+        let currentLayout = initialLayoutParam === "stacked" ? "stacked" : "side-by-side";
+        let isSlot1Collapsed = false;
+        let isSlot2Collapsed = false;
+
+        const dualToolbar = document.getElementById("dual-popout-toolbar");
+        const dualWorkspace = document.getElementById("dual-workspace");
+        const singleContainer = document.getElementById("panel-container");
+        const dualSplitter = document.getElementById("dual-splitter");
+        const dualSlot1 = document.getElementById("dual-slot-1");
+        const dualSlot2 = document.getElementById("dual-slot-2");
+        const restoreLine1 = document.getElementById("dual-restore-line-1");
+        const restoreLine2 = document.getElementById("dual-restore-line-2");
+
+        const btnLayoutSide = document.getElementById("btn-layout-side-by-side");
+        const btnLayoutStacked = document.getElementById("btn-layout-stacked");
+        const btnToggleSlot1 = document.getElementById("btn-toggle-slot-1");
+        const btnToggleSlot2 = document.getElementById("btn-toggle-slot-2");
+        const labelToggleSlot1 = document.getElementById("label-toggle-slot-1");
+        const labelToggleSlot2 = document.getElementById("label-toggle-slot-2");
+        const btnResetSplitter = document.getElementById("btn-reset-splitter");
+        const btnReattachDual = document.getElementById("btn-reattach-dual");
+        const dualHeaderBadge = document.getElementById("dual-header-badge");
+
+        if (isDual) {
+            singleContainer.style.display = "none";
+            dualToolbar.style.display = "flex";
+            dualWorkspace.style.display = "flex";
+
+            const name1 = TITLE_MAP[panel1Name] || panel1Name;
+            const name2 = TITLE_MAP[panel2Name] || panel2Name;
+            if (dualHeaderBadge) dualHeaderBadge.setAttribute("data-tooltip", `CapIAu-Talho — Menus Duplos: ${name1} + ${name2}`);
+            if (btnToggleSlot1) btnToggleSlot1.setAttribute("data-tooltip", `Recolher ${name1}`);
+            if (btnToggleSlot2) btnToggleSlot2.setAttribute("data-tooltip", `Recolher ${name2}`);
+            if (restoreLine1) restoreLine1.setAttribute("data-tooltip", `Expandir ${name1}`);
+            if (restoreLine2) restoreLine2.setAttribute("data-tooltip", `Expandir ${name2}`);
+
+            // Cores temáticas das linhas restauradoras conforme grupo funcional
+            if (panel1Name === "inspector-panel") {
+                restoreLine1.style.background = "rgba(244, 63, 94, 0.18)";
+                restoreLine1.style.borderColor = "rgba(244, 63, 94, 0.35)";
+            } else if (panel1Name === "sidebar-left") {
+                restoreLine1.style.background = "rgba(16, 185, 129, 0.18)";
+                restoreLine1.style.borderColor = "rgba(16, 185, 129, 0.35)";
+            }
+            if (panel2Name === "sidebar-right") {
+                restoreLine2.classList.add("cyan-theme");
+            }
+
+            // Direcionalidade das setas nos cantos externos dos painéis adotados
+            function updateAdoptedPanelsDockDirection() {
+                const p1 = dualSlot1.firstElementChild;
+                const p2 = dualSlot2.firstElementChild;
+                const isStacked = currentLayout === "stacked";
+
+                if (p1 && p1.id !== "dual-loader-1") {
+                    p1.classList.remove("dock-right");
+                    p1.classList.add("dock-left");
+                    const btn1 = p1.querySelector(".btn-toggle-sidebar") || p1.querySelector('[id*="toggle-"]');
+                    if (btn1) {
+                        const iconClass = isStacked ? "fa-solid fa-chevron-up" : "fa-solid fa-chevron-left";
+                        btn1.innerHTML = `<i class="${iconClass}"></i>`;
+                        const tip1 = isStacked ? `Recolher ${name1} (Cima)` : `Recolher ${name1} (Esquerda)`;
+                        btn1.title = tip1;
+                        btn1.setAttribute("data-tooltip", tip1);
+                    }
+                }
+                if (p2 && p2.id !== "dual-loader-2") {
+                    p2.classList.remove("dock-left");
+                    p2.classList.add("dock-right");
+                    const btn2 = p2.querySelector(".btn-toggle-sidebar") || p2.querySelector('[id*="toggle-"]');
+                    if (btn2) {
+                        const iconClass = isStacked ? "fa-solid fa-chevron-down" : "fa-solid fa-chevron-right";
+                        btn2.innerHTML = `<i class="${iconClass}"></i>`;
+                        const tip2 = isStacked ? `Recolher ${name2} (Baixo)` : `Recolher ${name2} (Direita)`;
+                        btn2.title = tip2;
+                        btn2.setAttribute("data-tooltip", tip2);
+                    }
+                }
+            }
+
+            const slotObserver = new MutationObserver(() => {
+                updateAdoptedPanelsDockDirection();
+            });
+            slotObserver.observe(dualSlot1, { childList: true });
+            slotObserver.observe(dualSlot2, { childList: true });
+
+            // Proporções salvas
+            function getSavedRatio(layout) {
+                const key = `capiau_dual_ratio_${layout}`;
+                const saved = localStorage.getItem(key);
+                if (saved !== null) {
+                    const val = parseFloat(saved);
+                    if (!isNaN(val) && val >= 15 && val <= 85) return val;
+                }
+                return 50;
+            }
+
+            function applyRatio(pct) {
+                if (isSlot1Collapsed || isSlot2Collapsed) return;
+                const clamped = Math.max(15, Math.min(85, pct));
+                dualSlot1.style.flex = `0 0 ${clamped}%`;
+                dualSlot2.style.flex = `1 1 0%`;
+                localStorage.setItem(`capiau_dual_ratio_${currentLayout}`, clamped.toFixed(2));
+                window.dispatchEvent(new Event("resize"));
+            }
+
+            function applyLayout(layout) {
+                currentLayout = layout === "stacked" ? "stacked" : "side-by-side";
+                localStorage.setItem("capiau_dual_layout", currentLayout);
+
+                if (currentLayout === "side-by-side") {
+                    dualWorkspace.classList.add("layout-side-by-side");
+                    dualWorkspace.classList.remove("layout-stacked");
+                    btnLayoutSide?.classList.add("active");
+                    btnLayoutStacked?.classList.remove("active");
+                } else {
+                    dualWorkspace.classList.add("layout-stacked");
+                    dualWorkspace.classList.remove("layout-side-by-side");
+                    btnLayoutStacked?.classList.add("active");
+                    btnLayoutSide?.classList.remove("active");
+                }
+
+                if (!isSlot1Collapsed && !isSlot2Collapsed) {
+                    applyRatio(getSavedRatio(currentLayout));
+                }
+                updateAdoptedPanelsDockDirection();
+                window.dispatchEvent(new Event("resize"));
+            }
+
+            btnLayoutSide?.addEventListener("click", () => applyLayout("side-by-side"));
+            btnLayoutStacked?.addEventListener("click", () => applyLayout("stacked"));
+            btnResetSplitter?.addEventListener("click", () => applyRatio(50));
+
+            // ── LÓGICA DE RETRAÇÃO (SHOW / HIDE DOS MENUS) ──
+            function updateRetractionUI() {
+                // Estado 1: Ambos recolhidos
+                if (isSlot1Collapsed && isSlot2Collapsed) {
+                    dualSlot1.style.display = "none";
+                    dualSlot2.style.display = "none";
+                    dualSplitter.style.display = "none";
+                    restoreLine1.style.display = "block";
+                    restoreLine2.style.display = "block";
+                    btnToggleSlot1?.classList.add("collapsed-pill");
+                    btnToggleSlot1?.setAttribute("data-tooltip", `Expandir ${name1}`);
+                    if (btnToggleSlot1) btnToggleSlot1.innerHTML = '<i class="fa-regular fa-eye-slash"></i>';
+                    btnToggleSlot2?.classList.add("collapsed-pill");
+                    btnToggleSlot2?.setAttribute("data-tooltip", `Expandir ${name2}`);
+                    if (btnToggleSlot2) btnToggleSlot2.innerHTML = '<i class="fa-regular fa-eye-slash"></i>';
+                }
+                // Estado 2: Apenas Slot 1 recolhido
+                else if (isSlot1Collapsed) {
+                    dualSlot1.style.display = "none";
+                    restoreLine1.style.display = "block";
+                    dualSlot2.style.display = "flex";
+                    dualSlot2.style.flex = "1 1 100%";
+                    dualSplitter.style.display = "none";
+                    restoreLine2.style.display = "none";
+                    btnToggleSlot1?.classList.add("collapsed-pill");
+                    btnToggleSlot1?.setAttribute("data-tooltip", `Expandir ${name1}`);
+                    if (btnToggleSlot1) btnToggleSlot1.innerHTML = '<i class="fa-regular fa-eye-slash"></i>';
+                    btnToggleSlot2?.classList.remove("collapsed-pill");
+                    btnToggleSlot2?.setAttribute("data-tooltip", `Recolher ${name2}`);
+                    if (btnToggleSlot2) btnToggleSlot2.innerHTML = '<i class="fa-solid fa-eye"></i>';
+                }
+                // Estado 3: Apenas Slot 2 recolhido
+                else if (isSlot2Collapsed) {
+                    dualSlot2.style.display = "none";
+                    restoreLine2.style.display = "block";
+                    dualSlot1.style.display = "flex";
+                    dualSlot1.style.flex = "1 1 100%";
+                    dualSplitter.style.display = "none";
+                    restoreLine1.style.display = "none";
+                    btnToggleSlot2?.classList.add("collapsed-pill");
+                    btnToggleSlot2?.setAttribute("data-tooltip", `Expandir ${name2}`);
+                    if (btnToggleSlot2) btnToggleSlot2.innerHTML = '<i class="fa-regular fa-eye-slash"></i>';
+                    btnToggleSlot1?.classList.remove("collapsed-pill");
+                    btnToggleSlot1?.setAttribute("data-tooltip", `Recolher ${name1}`);
+                    if (btnToggleSlot1) btnToggleSlot1.innerHTML = '<i class="fa-solid fa-eye"></i>';
+                }
+                // Estado 4: Ambos visíveis
+                else {
+                    dualSlot1.style.display = "flex";
+                    dualSlot2.style.display = "flex";
+                    dualSplitter.style.display = "block";
+                    restoreLine1.style.display = "none";
+                    restoreLine2.style.display = "none";
+                    btnToggleSlot1?.classList.remove("collapsed-pill");
+                    btnToggleSlot1?.setAttribute("data-tooltip", `Recolher ${name1}`);
+                    if (btnToggleSlot1) btnToggleSlot1.innerHTML = '<i class="fa-solid fa-eye"></i>';
+                    btnToggleSlot2?.classList.remove("collapsed-pill");
+                    btnToggleSlot2?.setAttribute("data-tooltip", `Recolher ${name2}`);
+                    if (btnToggleSlot2) btnToggleSlot2.innerHTML = '<i class="fa-solid fa-eye"></i>';
+                    applyRatio(getSavedRatio(currentLayout));
+                }
+
+                // Garante que os painéis adotados nunca fiquem marcados com .collapsed dentro dos slots da multijanela
+                const p1 = dualSlot1.firstElementChild;
+                const p2 = dualSlot2.firstElementChild;
+                if (p1 && p1.classList.contains("collapsed")) p1.classList.remove("collapsed");
+                if (p2 && p2.classList.contains("collapsed")) p2.classList.remove("collapsed");
+
+                updateAdoptedPanelsDockDirection();
+                window.dispatchEvent(new Event("resize"));
+            }
+
+            btnToggleSlot1?.addEventListener("click", () => {
+                isSlot1Collapsed = !isSlot1Collapsed;
+                updateRetractionUI();
+            });
+
+            btnToggleSlot2?.addEventListener("click", () => {
+                isSlot2Collapsed = !isSlot2Collapsed;
+                updateRetractionUI();
+            });
+
+            restoreLine1?.addEventListener("click", () => {
+                isSlot1Collapsed = false;
+                updateRetractionUI();
+            });
+
+            restoreLine2?.addEventListener("click", () => {
+                isSlot2Collapsed = false;
+                updateRetractionUI();
+            });
+
+            // ── DRAG & DROP DO DIVISOR (SPLITTER) ──
+            let isDraggingSplitter = false;
+
+            dualSplitter?.addEventListener("mousedown", (e) => {
+                e.preventDefault();
+                isDraggingSplitter = true;
+                dualSplitter.classList.add("active");
+                document.body.style.userSelect = "none";
+
+                const overlay = document.createElement("div");
+                overlay.style.position = "fixed";
+                overlay.style.top = "0";
+                overlay.style.left = "0";
+                overlay.style.width = "100vw";
+                overlay.style.height = "100vh";
+                overlay.style.zIndex = "99999";
+                overlay.style.cursor = currentLayout === "side-by-side" ? "col-resize" : "row-resize";
+                document.body.appendChild(overlay);
+
+                const onMouseMove = (moveEvent) => {
+                    if (!isDraggingSplitter) return;
+                    const rect = dualWorkspace.getBoundingClientRect();
+                    let pct;
+                    if (currentLayout === "side-by-side") {
+                        const offsetX = moveEvent.clientX - rect.left;
+                        pct = (offsetX / rect.width) * 100;
+                    } else {
+                        const offsetY = moveEvent.clientY - rect.top;
+                        pct = (offsetY / rect.height) * 100;
+                    }
+                    applyRatio(pct);
+                };
+
+                const onMouseUp = () => {
+                    isDraggingSplitter = false;
+                    dualSplitter.classList.remove("active");
+                    document.body.style.userSelect = "";
+                    overlay.remove();
+                    window.removeEventListener("mousemove", onMouseMove);
+                    window.removeEventListener("mouseup", onMouseUp);
+                    window.dispatchEvent(new Event("resize"));
+                };
+
+                window.addEventListener("mousemove", onMouseMove);
+                window.addEventListener("mouseup", onMouseUp);
+            });
+
+            dualSplitter?.addEventListener("dblclick", () => {
+                applyRatio(50);
+            });
+
+            // Aplica layout inicial
+            applyLayout(currentLayout);
+        }
+
+        // ── COMUNICAÇÃO BIDIRECIONAL VIA BROADCASTCHANNEL ──
         const channel = new BroadcastChannel("capiau-workspace-sync");
 
         function connectToMainEditor() {
             let connected = false;
             try {
                 if (window.opener && !window.opener.closed) {
-                    if (window.opener.workspaceManager && typeof window.opener.workspaceManager.registerPopout === "function") {
-                        window.opener.workspaceManager.registerPopout(panelName, window);
-                        connected = true;
-                    } else if (window.opener.popoutWindows) {
-                        window.opener.popoutWindows[panelName] = window;
-                        if (window.opener.workspaceManager && typeof window.opener.workspaceManager.attachPanelToPopout === "function") {
-                            window.opener.workspaceManager.attachPanelToPopout(panelName, window);
+                    if (isDual) {
+                        if (window.opener.workspaceManager && typeof window.opener.workspaceManager.registerDualPopout === "function") {
+                            window.opener.workspaceManager.registerDualPopout([panel1Name, panel2Name], window, currentLayout);
+                            connected = true;
                         }
-                        connected = true;
+                    } else {
+                        if (window.opener.workspaceManager && typeof window.opener.workspaceManager.registerPopout === "function") {
+                            window.opener.workspaceManager.registerPopout(panel1Name, window);
+                            connected = true;
+                        } else if (window.opener.popoutWindows) {
+                            window.opener.popoutWindows[panel1Name] = window;
+                            if (window.opener.workspaceManager && typeof window.opener.workspaceManager.attachPanelToPopout === "function") {
+                                window.opener.workspaceManager.attachPanelToPopout(panel1Name, window);
+                            }
+                            connected = true;
+                        }
                     }
                 }
             } catch (err) {
@@ -188,36 +758,43 @@
             }
 
             // Notifica também pelo BroadcastChannel
-            channel.postMessage({
-                type: "POPOUT_READY",
-                panel: panelName,
-                windowName: window.name,
-                timestamp: Date.now()
-            });
+            if (isDual) {
+                channel.postMessage({
+                    type: "DUAL_POPOUT_READY",
+                    panels: [panel1Name, panel2Name],
+                    layout: currentLayout,
+                    windowName: window.name,
+                    timestamp: Date.now()
+                });
+            } else {
+                channel.postMessage({
+                    type: "POPOUT_READY",
+                    panel: panel1Name,
+                    windowName: window.name,
+                    timestamp: Date.now()
+                });
+            }
 
             return connected;
         }
 
-        // Emite sinal inicial e registra esta janela no editor principal
+        // Handshakes iniciais com retries
         connectToMainEditor();
         setTimeout(connectToMainEditor, 150);
         setTimeout(connectToMainEditor, 500);
 
-        // Escuta handshakes da janela principal (ex: após refresh/Ctrl+F5 no app principal)
+        // Ouvinte de mensagens do BroadcastChannel
         channel.addEventListener("message", (e) => {
             const data = e.data;
             if (!data) return;
             if (data.type === "MAIN_HANDSHAKE") {
-                console.log(`[Popout] Handshake recebido do editor principal para '${panelName}'. Reconectando...`);
+                console.log(`[Popout] Handshake recebido do editor principal. Reconectando...`);
                 const ok = connectToMainEditor();
-                // Caso o vínculo do opener tenha sido cortado pelo navegador durante o refresh,
-                // recarrega a página do popout no mesmo URL mantendo estilos e posição
                 if (!ok && (!window.opener || window.opener.closed)) {
                     console.log("[Popout] Opener desconectado. Recarregando panel.html para restabelecer vínculo...");
                     window.location.reload();
                 }
             } else if (data.type === "WORKSPACE_CHANGED") {
-                console.log(`[Popout] Mudança de workspace recebida: ${data.workspace}`);
                 if (data.isStudio) {
                     document.body.classList.add("studio");
                 } else {
@@ -227,38 +804,39 @@
             }
         });
 
-        // Monitora redimensionamento do painel para aplicar classes responsivas (wide/narrow)
-        const container = document.getElementById("panel-container");
-        const observer = new ResizeObserver(entries => {
-            for (let entry of entries) {
-                const width = entry.contentRect.width;
-                if (width >= 550) {
-                    container.classList.add("wide-layout");
-                    container.classList.remove("narrow-layout");
-                    if (container.firstElementChild && container.firstElementChild.id !== "popout-loader") {
-                        container.firstElementChild.classList.add("wide-layout");
-                        container.firstElementChild.classList.remove("narrow-layout");
-                    }
-                } else {
-                    container.classList.add("narrow-layout");
-                    container.classList.remove("wide-layout");
-                    if (container.firstElementChild && container.firstElementChild.id !== "popout-loader") {
-                        container.firstElementChild.classList.add("narrow-layout");
-                        container.firstElementChild.classList.remove("wide-layout");
-                    }
+        // Reanexação pelo botão do toolbar dual
+        btnReattachDual?.addEventListener("click", () => {
+            try {
+                if (window.opener && !window.opener.closed && window.opener.workspaceManager) {
+                    window.opener.workspaceManager.restoreDualPopout(panel1Name, panel2Name);
+                    window.close();
+                    return;
                 }
-            }
-        });
-        observer.observe(container);
+            } catch (e) {}
 
-        // Notifica a janela principal ao fechar a janela destacada
+            channel.postMessage({
+                type: "DUAL_POPOUT_CLOSED",
+                panels: [panel1Name, panel2Name]
+            });
+            window.close();
+        });
+
+        // Fechamento da janela destacada
         window.addEventListener("beforeunload", () => {
             saveCurrentBounds();
-            channel.postMessage({
-                type: "POPOUT_CLOSED",
-                panel: panelName
-            });
+            if (isDual) {
+                channel.postMessage({
+                    type: "DUAL_POPOUT_CLOSED",
+                    panels: [panel1Name, panel2Name]
+                });
+            } else {
+                channel.postMessage({
+                    type: "POPOUT_CLOSED",
+                    panel: panel1Name
+                });
+            }
         });
     </script>
 </body>
 </html>
+

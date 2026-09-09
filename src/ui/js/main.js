@@ -1877,6 +1877,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     const collapseSidebar = (side) => {
         if (side === "left" && sidebarLeft && reopenLeft) {
+            if (sidebarLeft.ownerDocument !== document) return;
             // Se o inspetor estiver aberto, fecha primeiro para restaurar players
             if (window.libraryManager && window.libraryManager.mediaInspectorActive) {
                 window.libraryManager.closeMediaInspector();
@@ -1885,14 +1886,17 @@ window.addEventListener("DOMContentLoaded", () => {
             reopenLeft.style.display = "block";
             window.dispatchEvent(new Event("resize"));
         } else if (side === "inspector" && sidebarInspector && reopenInspector) {
+            if (sidebarInspector.ownerDocument !== document) return;
             sidebarInspector.classList.add("collapsed");
             reopenInspector.style.display = "block";
             window.dispatchEvent(new Event("resize"));
         } else if (side === "right" && sidebarRight && reopenRight) {
+            if (sidebarRight.ownerDocument !== document) return;
             sidebarRight.classList.add("collapsed");
             reopenRight.style.display = "block";
             window.dispatchEvent(new Event("resize"));
         } else if (side === "timeline" && timelinePanel && reopenTimeline) {
+            if (timelinePanel.ownerDocument !== document) return;
             timelinePanel.classList.add("collapsed");
             reopenTimeline.style.display = "block";
             window.dispatchEvent(new Event("resize"));
@@ -1901,19 +1905,23 @@ window.addEventListener("DOMContentLoaded", () => {
     
     const expandSidebar = (side) => {
         if (side === "left" && sidebarLeft && reopenLeft) {
+            if (sidebarLeft.ownerDocument !== document) return;
             sidebarLeft.classList.remove("collapsed");
             reopenLeft.style.display = "none";
             window.dispatchEvent(new Event("resize"));
         } else if (side === "inspector" && sidebarInspector && reopenInspector) {
+            if (sidebarInspector.ownerDocument !== document) return;
             sidebarInspector.classList.remove("collapsed");
             reopenInspector.style.display = "none";
             reopenInspector.classList.remove("has-updates");
             window.dispatchEvent(new Event("resize"));
         } else if (side === "right" && sidebarRight && reopenRight) {
+            if (sidebarRight.ownerDocument !== document) return;
             sidebarRight.classList.remove("collapsed");
             reopenRight.style.display = "none";
             window.dispatchEvent(new Event("resize"));
         } else if (side === "timeline" && timelinePanel && reopenTimeline) {
+            if (timelinePanel.ownerDocument !== document) return;
             timelinePanel.classList.remove("collapsed");
             reopenTimeline.style.display = "none";
             window.dispatchEvent(new Event("resize"));
@@ -1922,6 +1930,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
     // Fluxos que entregam resultado nos painéis laterais precisam
     // poder revelá-los: resultado renderizado em painel recolhido = "não aconteceu nada".
+    window.collapseSidebar = collapseSidebar;
+    window.expandSidebar = expandSidebar;
     window.expandLeftPanel = () => expandSidebar("left");
     window.expandInspectorPanel = () => expandSidebar("inspector");
     window.expandRightPanel = () => expandSidebar("right");
