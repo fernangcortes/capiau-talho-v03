@@ -737,11 +737,14 @@ export class CapiauTimelineState {
      */
     removeSelectedMarkers() {
         if (this.selectedMarkerIds.size === 0) return 0;
-        const count = this.selectedMarkerIds.size;
-        const idsToRemove = new Set(this.selectedMarkerIds);
-        this.markers = this.markers.filter(m => !idsToRemove.has(m.id));
-        this.selectedMarkerIds.clear();
-        STATE.emit("timelineMarkersChanged", this.markers);
+        let count = 0;
+        TIMELINE_HISTORY.record(() => {
+            count = this.selectedMarkerIds.size;
+            const idsToRemove = new Set(this.selectedMarkerIds);
+            this.markers = this.markers.filter(m => !idsToRemove.has(m.id));
+            this.selectedMarkerIds.clear();
+            STATE.emit("timelineMarkersChanged", this.markers);
+        });
         return count;
     }
 
@@ -820,19 +823,22 @@ export class CapiauTimelineState {
             }
         }
 
-        const marker = {
-            id,
-            frame: Math.max(0, Math.round(frame)),
-            label: finalLabel,
-            color: color || "#06b6d4",
-            comment: comment || "",
-            clipId: finalClipId,
-            offsetFrame: finalOffset
-        };
+        let marker = null;
+        TIMELINE_HISTORY.record(() => {
+            marker = {
+                id,
+                frame: Math.max(0, Math.round(frame)),
+                label: finalLabel,
+                color: color || "#06b6d4",
+                comment: comment || "",
+                clipId: finalClipId,
+                offsetFrame: finalOffset
+            };
 
-        this.markers.push(marker);
-        this.selectMarker(id, false);
-        STATE.emit("timelineMarkersChanged", this.markers);
+            this.markers.push(marker);
+            this.selectMarker(id, false);
+            STATE.emit("timelineMarkersChanged", this.markers);
+        });
         return marker;
     }
 
@@ -843,43 +849,45 @@ export class CapiauTimelineState {
         const marker = this.getMarker(id);
         if (!marker) return null;
 
-        if (updates.frame !== undefined) {
-            marker.frame = Math.max(0, Math.round(updates.frame));
-            if (marker.clipId) {
-                const cuts = STATE.activeTimelineCuts || [];
-                let cut = cuts.find(c => String(c.id) === String(marker.clipId));
-                if (!cut) {
-                    cut = cuts.find(c => marker.frame >= c.timelineStartFrame && marker.frame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
-                    if (cut) marker.clipId = cut.id;
-                }
-                if (cut) {
-                    marker.offsetFrame = Math.max(0, Math.round(marker.frame - cut.timelineStartFrame));
+        TIMELINE_HISTORY.record(() => {
+            if (updates.frame !== undefined) {
+                marker.frame = Math.max(0, Math.round(updates.frame));
+                if (marker.clipId) {
+                    const cuts = STATE.activeTimelineCuts || [];
+                    let cut = cuts.find(c => String(c.id) === String(marker.clipId));
+                    if (!cut) {
+                        cut = cuts.find(c => marker.frame >= c.timelineStartFrame && marker.frame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
+                        if (cut) marker.clipId = cut.id;
+                    }
+                    if (cut) {
+                        marker.offsetFrame = Math.max(0, Math.round(marker.frame - cut.timelineStartFrame));
+                    }
                 }
             }
-        }
-        if (updates.label !== undefined) marker.label = updates.label;
-        if (updates.color !== undefined) marker.color = updates.color;
-        if (updates.comment !== undefined) marker.comment = updates.comment;
+            if (updates.label !== undefined) marker.label = updates.label;
+            if (updates.color !== undefined) marker.color = updates.color;
+            if (updates.comment !== undefined) marker.comment = updates.comment;
 
-        if (updates.clipId !== undefined) {
-            marker.clipId = updates.clipId;
-            if (updates.clipId) {
-                const cuts = STATE.activeTimelineCuts || [];
-                let cut = cuts.find(c => String(c.id) === String(updates.clipId));
-                if (!cut) {
-                    const searchFrame = updates.frame !== undefined ? updates.frame : marker.frame;
-                    cut = cuts.find(c => searchFrame >= c.timelineStartFrame && searchFrame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
-                    if (cut) marker.clipId = cut.id;
+            if (updates.clipId !== undefined) {
+                marker.clipId = updates.clipId;
+                if (updates.clipId) {
+                    const cuts = STATE.activeTimelineCuts || [];
+                    let cut = cuts.find(c => String(c.id) === String(updates.clipId));
+                    if (!cut) {
+                        const searchFrame = updates.frame !== undefined ? updates.frame : marker.frame;
+                        cut = cuts.find(c => searchFrame >= c.timelineStartFrame && searchFrame <= c.timelineStartFrame + (c.outFrame - c.inFrame));
+                        if (cut) marker.clipId = cut.id;
+                    }
+                    if (cut) {
+                        marker.offsetFrame = updates.offsetFrame !== undefined ? updates.offsetFrame : Math.max(0, Math.round((updates.frame !== undefined ? updates.frame : marker.frame) - cut.timelineStartFrame));
+                    }
+                } else {
+                    marker.offsetFrame = null;
                 }
-                if (cut) {
-                    marker.offsetFrame = updates.offsetFrame !== undefined ? updates.offsetFrame : Math.max(0, Math.round((updates.frame !== undefined ? updates.frame : marker.frame) - cut.timelineStartFrame));
-                }
-            } else {
-                marker.offsetFrame = null;
             }
-        }
 
-        STATE.emit("timelineMarkersChanged", this.markers);
+            STATE.emit("timelineMarkersChanged", this.markers);
+        });
         return marker;
     }
 
@@ -889,9 +897,12 @@ export class CapiauTimelineState {
     removeMarker(id) {
         const idx = this.markers.findIndex(m => m.id === id);
         if (idx !== -1) {
-            const removed = this.markers.splice(idx, 1)[0];
-            this.selectedMarkerIds.delete(id);
-            STATE.emit("timelineMarkersChanged", this.markers);
+            let removed = null;
+            TIMELINE_HISTORY.record(() => {
+                removed = this.markers.splice(idx, 1)[0];
+                this.selectedMarkerIds.delete(id);
+                STATE.emit("timelineMarkersChanged", this.markers);
+            });
             return removed;
         }
         return null;
@@ -4454,7 +4465,9 @@ class TimelineHistory {
             activeTool: TIMELINE_STATE.activeTool || "select",
             selectedGhostClipId: TIMELINE_STATE.selectedGhostClipId,
             inFrame: TIMELINE_STATE.inFrame,
-            outFrame: TIMELINE_STATE.outFrame
+            outFrame: TIMELINE_STATE.outFrame,
+            markers: TIMELINE_STATE.markers || [],
+            selectedMarkerIds: Array.from(TIMELINE_STATE.selectedMarkerIds || [])
         }));
     }
 
@@ -4502,6 +4515,11 @@ class TimelineHistory {
         TIMELINE_STATE.ghostTrack = snap.ghosts || [];
         if (snap.inFrame !== undefined) TIMELINE_STATE.inFrame = snap.inFrame;
         if (snap.outFrame !== undefined) TIMELINE_STATE.outFrame = snap.outFrame;
+        if (snap.markers !== undefined) {
+            TIMELINE_STATE.markers = JSON.parse(JSON.stringify(snap.markers));
+            TIMELINE_STATE.selectedMarkerIds = new Set(snap.selectedMarkerIds || []);
+            STATE.emit("timelineMarkersChanged", TIMELINE_STATE.markers);
+        }
         STATE.emit("timelineInOutChanged", { inFrame: TIMELINE_STATE.inFrame, outFrame: TIMELINE_STATE.outFrame });
         STATE.emit("timelineGhostUpdated", TIMELINE_STATE.ghostTrack);
         STATE.emit("timelineRestored");

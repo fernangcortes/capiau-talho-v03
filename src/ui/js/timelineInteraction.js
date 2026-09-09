@@ -429,6 +429,14 @@ export class CapiauTimelineInteraction {
 
         // Ouvir restauração do histórico (undo/redo) para sincronizar o painel
         STATE.on("timelineRestored", () => {
+            const doc = this.canvas ? this.canvas.ownerDocument : document;
+            const modalMarker = doc.getElementById("modal-edit-marker");
+            if (modalMarker && modalMarker.style.display !== "none") {
+                const markerId = modalMarker.dataset.markerId;
+                if (!markerId || !TIMELINE_STATE.getMarker(markerId)) {
+                    modalMarker.style.display = "none";
+                }
+            }
             this.refreshClipInspector();
             if (this.renderer) {
                 this.renderer.requestRedraw();
@@ -1045,6 +1053,7 @@ export class CapiauTimelineInteraction {
                 this.dragState = "drag-marker";
                 this.draggedMarkerId = hitMarker.id;
                 TIMELINE_STATE.hoveredMarkerId = hitMarker.id;
+                TIMELINE_HISTORY.begin();
                 this.updatePlayhead(hitMarker.frame);
                 this.hideMarkerTooltip();
                 return;
@@ -2648,10 +2657,12 @@ export class CapiauTimelineInteraction {
             return;
         }
         if (this.dragState === "drag-marker") {
+            TIMELINE_HISTORY.commit();
             this.dragState = null;
             this.draggedMarkerId = null;
             TIMELINE_STATE.hoveredMarkerId = null;
             if (this.canvas) this.canvas.style.cursor = "default";
+            if (window.triggerAutosave) window.triggerAutosave();
             if (this.renderer) this.renderer.requestRedraw();
             return;
         }
@@ -4015,6 +4026,8 @@ export class CapiauTimelineInteraction {
 
         modal.dataset.markerId = marker.id;
         modal.dataset.userChoice = "";
+        modal.dataset.initialLabel = marker.label || "";
+        modal.dataset.initialComment = marker.comment || "";
         const inputLabel = doc.getElementById("marker-edit-label");
         const inputComment = doc.getElementById("marker-edit-comment");
         const timecodeEl = doc.getElementById("marker-edit-timecode");
@@ -9424,7 +9437,7 @@ export class CapiauTimelineInteraction {
             try { activeEl.blur(); } catch (_) {}
         }
 
-        // Se houver modal aberto na aplicação, ignora atalhos da timeline
+        // Se houver modal aberto na aplicação, trata atalhos contextuais ou ignora atalhos da timeline
         if (window.isAnyModalOpen && window.isAnyModalOpen()) {
             const popup = this.canvas ? this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup") : document.querySelector("#timeline-alternatives-popup");
             if (e.key === "Escape" && popup && popup.style.display === "flex") {
@@ -9433,10 +9446,24 @@ export class CapiauTimelineInteraction {
                 return;
             }
             const modalMarker = this.canvas ? this.canvas.ownerDocument.getElementById("modal-edit-marker") : document.getElementById("modal-edit-marker");
-            if (e.key === "Escape" && modalMarker && modalMarker.style.display !== "none") {
-                modalMarker.style.display = "none";
-                e.preventDefault();
-                return;
+            if (modalMarker && modalMarker.style.display !== "none") {
+                if (e.key === "Escape") {
+                    modalMarker.style.display = "none";
+                    e.preventDefault();
+                    return;
+                }
+                if (KEYMAP_SERVICE.matches(e, "history.undo")) {
+                    modalMarker.style.display = "none";
+                    TIMELINE_HISTORY.undo();
+                    e.preventDefault();
+                    return;
+                }
+                if (KEYMAP_SERVICE.matches(e, "history.redo")) {
+                    modalMarker.style.display = "none";
+                    TIMELINE_HISTORY.redo();
+                    e.preventDefault();
+                    return;
+                }
             }
             return;
         }

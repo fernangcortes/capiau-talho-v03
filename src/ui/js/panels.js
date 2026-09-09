@@ -435,7 +435,7 @@ export class PanelsManager {
                 closeModal();
             };
 
-            if (btnCloseModal) btnCloseModal.addEventListener("click", saveMarker);
+            if (btnCloseModal) btnCloseModal.addEventListener("click", closeModal);
 
             // Seleção de cores
             colorSwatches.forEach(swatch => {
@@ -464,19 +464,54 @@ export class PanelsManager {
                 });
             }
 
-            // Teclas nos inputs (Enter salva, Escape salva e fecha)
+            // Teclas nos inputs (Enter salva, Escape fecha, Ctrl+Z desfaz se inalterado)
             const handleInputKey = (e) => {
                 if (e.key === "Enter") {
                     e.preventDefault();
                     saveMarker();
                 } else if (e.key === "Escape") {
                     e.preventDefault();
-                    saveMarker();
+                    closeModal();
+                } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+                    const initialLabel = modalEditMarker.dataset.initialLabel || "";
+                    const initialComment = modalEditMarker.dataset.initialComment || "";
+                    if (inputLabel.value === initialLabel && inputComment.value === initialComment) {
+                        e.preventDefault();
+                        closeModal();
+                        TIMELINE_HISTORY.undo();
+                    }
+                } else if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "z")) {
+                    const initialLabel = modalEditMarker.dataset.initialLabel || "";
+                    const initialComment = modalEditMarker.dataset.initialComment || "";
+                    if (inputLabel.value === initialLabel && inputComment.value === initialComment) {
+                        e.preventDefault();
+                        closeModal();
+                        TIMELINE_HISTORY.redo();
+                    }
                 }
             };
 
             if (inputLabel) inputLabel.addEventListener("keydown", handleInputKey);
             if (inputComment) inputComment.addEventListener("keydown", handleInputKey);
+
+            // Fechar e salvar ao clicar fora do modal de edição de marcador
+            document.addEventListener("mousedown", (e) => {
+                if (modalEditMarker.style.display !== "none") {
+                    if (!modalEditMarker.contains(e.target) && !e.target.closest("#btn-add-marker")) {
+                        saveMarker();
+                    }
+                }
+            });
+
+            // Fechar modal caso o marcador seja removido por histórico (Undo/Redo)
+            STATE.on("timelineRestored", () => {
+                if (modalEditMarker.style.display !== "none") {
+                    const markerId = modalEditMarker.dataset.markerId;
+                    if (!markerId || !TIMELINE_STATE.getMarker(markerId)) {
+                        modalEditMarker.style.display = "none";
+                    }
+                }
+            });
 
             // Navegação de cor via setas no colorPicker
             if (colorPicker) {
@@ -492,9 +527,12 @@ export class PanelsManager {
                         e.preventDefault();
                         const prevIndex = (currentIndex - 1 + swatches.length) % swatches.length;
                         swatches[prevIndex].click();
-                    } else if (e.key === "Enter" || e.key === "Escape") {
+                    } else if (e.key === "Enter") {
                         e.preventDefault();
                         saveMarker();
+                    } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        closeModal();
                     }
                 });
             }
