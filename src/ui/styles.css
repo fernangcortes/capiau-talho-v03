@@ -2368,6 +2368,10 @@ button {
     color: #fff;
     text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
 }
+.btn-header-flat.active {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
+}
 
 .header-v-divider {
     width: 1px;
@@ -5194,7 +5198,10 @@ mark.search-highlight {
 #sidebar-right.collapsed ~ .splitter-studio-right { display: none !important; }
 
 .center-stage:has(#timeline-panel.collapsed) .splitter-timeline { display: none !important; }
-.workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline { display: none !important; }
+.workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline,
+.compound-stage:has(#timeline-panel.collapsed) .splitter-studio-timeline,
+#timeline-panel.collapsed + .splitter-studio-timeline,
+#timeline-panel.collapsed ~ .splitter-studio-timeline { display: none !important; }
 .monitors-container:has(.player-panel.maximized) .splitter-players,
 .monitors-container:has(.player-panel.maximized) .splitter-studio-players,
 .monitors-container:has(.player-panel.maximized) .splitter-players-v { display: none !important; }
@@ -5209,6 +5216,7 @@ body.layout-resizing {
 body.layout-resizing .workspace,
 body.layout-resizing .workspace > div,
 body.layout-resizing .workspace > section,
+body.layout-resizing .compound-stage,
 body.layout-resizing .timeline-panel,
 body.layout-resizing .timeline-headers-sidebar,
 body.layout-resizing .timeline-header-track,
@@ -5224,7 +5232,8 @@ body.layout-resizing .player-panel {
 .workspace > .sidebar-inspector,
 .workspace > .sidebar-right,
 .workspace .player-panel,
-.workspace .timeline-panel {
+.workspace .timeline-panel,
+.compound-stage > .timeline-panel {
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
@@ -5305,47 +5314,60 @@ body.layout-resizing .player-panel {
    ── MODOS DE LAYOUT DESACOPLADOS (TIMELINE E MONITORES) ──
    ========================================================================== */
 
-/* 1. Posicionamento da Timeline: Na Faixa de Baixo (Full-Width) */
+/* 1. Posicionamento da Timeline: Na Faixa de Baixo (Full-Width ou Lateral) */
 body.layout-timeline-bottom .workspace,
 body.studio .workspace {
     flex-direction: column !important;
 }
 
-body.layout-timeline-bottom .studio-top,
-body.studio .studio-top {
+body.layout-timeline-bottom-left .workspace,
+body.layout-timeline-bottom-right .workspace {
+    flex-direction: row !important;
+}
+
+.compound-stage {
     display: flex;
-    flex: 1;
+    flex-direction: column;
+    flex: 1 1 0%;
+    min-width: 0;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+body.layout-timeline-bottom .studio-top,
+body.studio .studio-top,
+.compound-stage > .studio-top {
+    display: flex;
+    flex: 1 1 0%;
     min-height: 0;
     width: 100%;
     position: relative;
 }
 
-body.layout-timeline-bottom .studio-top > .center-stage,
-body.studio .studio-top > .center-stage {
+.studio-top > .center-stage {
     min-width: 260px !important;
     min-height: 180px !important;
     height: 100%;
     flex: 1 1 0% !important;
 }
 
-body.layout-timeline-bottom .studio-top > .sidebar-left,
-body.layout-timeline-bottom .studio-top > .sidebar-inspector,
-body.layout-timeline-bottom .studio-top > .sidebar-right,
-body.studio .studio-top > .sidebar-left,
-body.studio .studio-top > .sidebar-inspector,
-body.studio .studio-top > .sidebar-right {
+.studio-top > .sidebar-left,
+.studio-top > .sidebar-inspector,
+.studio-top > .sidebar-right {
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
     height: 100% !important;
 }
 
-body.layout-timeline-bottom .studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib,
-body.studio .studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib { display: none !important; }
-body.layout-timeline-bottom .studio-top:has(#inspector-panel.collapsed) .splitter-inspector,
-body.studio .studio-top:has(#inspector-panel.collapsed) .splitter-inspector { display: none !important; }
-body.layout-timeline-bottom .studio-top:has(#sidebar-right.collapsed) .splitter-studio-right,
-body.studio .studio-top:has(#sidebar-right.collapsed) .splitter-studio-right { display: none !important; }
+.studio-top:has(#sidebar-left.collapsed) .splitter-studio-lib,
+.studio-top:has(#sidebar-left.collapsed) .splitter-sidebar-left { display: none !important; }
+.studio-top:has(#inspector-panel.collapsed) .splitter-inspector { display: none !important; }
+.studio-top:has(#sidebar-right.collapsed) .splitter-studio-right,
+.studio-top:has(#sidebar-right.collapsed) .splitter-sidebar-right { display: none !important; }
+.compound-stage:has(#timeline-panel.collapsed) .splitter-studio-timeline,
+.workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline,
 body.layout-timeline-bottom .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline,
 body.studio .workspace:has(#timeline-panel.collapsed) .splitter-studio-timeline { display: none !important; }
 
@@ -5415,14 +5437,17 @@ body.layout-monitors-side-by-side .monitors-container,
     min-height: 0 !important;
 }
 
-/* Quando a timeline está na faixa de baixo (layout estúdio / full-width), os monitores preenchem 100% de .center-stage */
+/* Quando a timeline está na faixa de baixo ou expandida lateralmente, os monitores preenchem 100% de .center-stage */
 body.layout-timeline-bottom .center-stage > .monitors-container,
+body.layout-timeline-bottom-left .center-stage > .monitors-container,
+body.layout-timeline-bottom-right .center-stage > .monitors-container,
+body.layout-timeline-expanded .center-stage > .monitors-container,
 body.studio .center-stage > .monitors-container {
     height: 100% !important;
 }
 
 /* Quando a timeline está entre menus (posição center), os monitores compartilham a altura vertical com a timeline */
-body:not(.layout-timeline-bottom) .center-stage > .monitors-container {
+body:not(.layout-timeline-expanded):not(.layout-timeline-bottom):not(.layout-timeline-bottom-left):not(.layout-timeline-bottom-right):not(.studio) .center-stage > .monitors-container {
     height: auto !important;
     flex: 1 1 0% !important;
     min-height: 180px !important;

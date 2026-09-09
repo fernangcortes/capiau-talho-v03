@@ -92,9 +92,11 @@
                 <!-- Seletor de Posição da Timeline -->
                 <div style="display: flex; align-items: center; gap: 4px;" data-tooltip="Posição da Linha do Tempo">
                     <i id="icon-timeline-position" class="fa-solid fa-arrows-left-right-to-line" style="color: #c084fc; font-size: 11px;"></i>
-                    <select id="select-timeline-position" style="color: #c084fc; max-width: 145px; background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; cursor: pointer;">
+                    <select id="select-timeline-position" style="color: #c084fc; max-width: 175px; background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; cursor: pointer;">
                         <option value="center">Timeline: Entre menus</option>
-                        <option value="bottom-full">Timeline: Faixa de baixo</option>
+                        <option value="bottom-left">Timeline: Abaixo da esquerda</option>
+                        <option value="bottom-right">Timeline: Abaixo da direita</option>
+                        <option value="bottom-full">Timeline: Faixa de baixo (Total)</option>
                     </select>
                 </div>
             </div>
@@ -943,7 +945,9 @@
                         <!-- Direita: Layout & Janela -->
                         <div class="timeline-header-right">
                             <button id="btn-cycle-columns" class="btn-header-flat" data-tooltip="Alternar Colunas da Tool Strip (1 ou 2)"><i class="fa-solid fa-table-cells-large"></i></button>
+                            <button id="btn-timeline-expand-left" class="btn-header-flat" data-tooltip="Expandir Timeline para a Esquerda (abaixo do menu esquerdo)"><i class="fa-solid fa-arrow-left"></i></button>
                             <button id="btn-toggle-timeline-position" class="btn-header-flat" data-tooltip="Alternar Posição da Timeline (Entre Menus / Faixa de Baixo)"><i class="fa-solid fa-window-maximize"></i></button>
+                            <button id="btn-timeline-expand-right" class="btn-header-flat" data-tooltip="Expandir Timeline para a Direita (abaixo do menu direito)"><i class="fa-solid fa-arrow-right"></i></button>
                             <button id="btn-popout-timeline" class="btn-header-flat" data-tooltip="Destacar em Janela Flutuante"><i class="fa-solid fa-up-right-from-square"></i></button>
                             <button id="btn-timeline-help" class="btn-header-flat" data-tooltip="Guia e Cheat Sheet de Atalhos"><i class="fa-solid fa-keyboard"></i></button>
                             <button id="btn-toggle-timeline-header" class="btn-header-flat" data-tooltip="Recolher Cabeçalho da Timeline"><i class="fa-solid fa-chevron-up"></i></button>
@@ -1048,6 +1052,12 @@
                                 </label>
                                 <label style="display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-family: Inter, sans-serif; user-select: none;">
                                     <input type="checkbox" id="chk-timeline-toolbar-top" style="accent-color: var(--color-cyan);"> Barra no topo (entre timeline e players)
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-family: Inter, sans-serif; user-select: none;">
+                                    <input type="checkbox" id="chk-timeline-expand-left" style="accent-color: var(--color-cyan);"> Expandir abaixo do menu esquerdo
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-family: Inter, sans-serif; user-select: none;">
+                                    <input type="checkbox" id="chk-timeline-expand-right" style="accent-color: var(--color-cyan);"> Expandir abaixo do menu direito
                                 </label>
                                 <label style="display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-family: Inter, sans-serif; user-select: none;">
                                     <input type="checkbox" id="chk-timeline-bottom-full" style="accent-color: var(--color-cyan);"> Timeline na faixa de baixo (largura total)
@@ -2901,12 +2911,18 @@
                     <label style="font-size: 11px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
                         <i class="fa-solid fa-arrows-left-right-to-line" style="color: #c084fc;"></i> Posição da Timeline
                     </label>
-                    <div style="display: flex; gap: 6px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
                         <button type="button" class="ws-layout-option-btn active" id="btn-opt-timeline-center" data-timeline-pos="center">
-                            <i class="fa-solid fa-arrows-left-right-to-line"></i> Entre os Menus
+                            <i class="fa-solid fa-arrows-left-right-to-line"></i> Entre Menus
+                        </button>
+                        <button type="button" class="ws-layout-option-btn" id="btn-opt-timeline-bottom-left" data-timeline-pos="bottom-left">
+                            <i class="fa-solid fa-arrow-left"></i> Sob Esquerda
+                        </button>
+                        <button type="button" class="ws-layout-option-btn" id="btn-opt-timeline-bottom-right" data-timeline-pos="bottom-right">
+                            <i class="fa-solid fa-arrow-right"></i> Sob Direita
                         </button>
                         <button type="button" class="ws-layout-option-btn" id="btn-opt-timeline-bottom" data-timeline-pos="bottom-full">
-                            <i class="fa-solid fa-window-maximize"></i> Faixa de Baixo
+                            <i class="fa-solid fa-window-maximize"></i> Largura Total
                         </button>
                     </div>
                 </div>

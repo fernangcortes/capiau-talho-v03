@@ -1078,7 +1078,7 @@ export class PanelsManager {
             }
             // No Estúdio / Timeline inferior a biblioteca ocupa porcentagem larga e não sobra espaço; encolhe-a
             // temporariamente para o inspetor respirar (restaurada ao fechar).
-            if ((document.body.classList.contains("studio") || document.body.classList.contains("layout-timeline-bottom")) && this._inspectorPrevLib === undefined) {
+            if ((document.body.classList.contains("studio") || document.body.classList.contains("layout-timeline-bottom") || document.body.classList.contains("layout-timeline-expanded")) && this._inspectorPrevLib === undefined) {
                 const lib = document.getElementById("sidebar-left");
                 if (lib) {
                     this._inspectorPrevLib = { flex: lib.style.flex, width: lib.style.width };
