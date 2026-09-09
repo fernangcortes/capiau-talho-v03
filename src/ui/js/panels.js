@@ -2995,15 +2995,15 @@ export class PanelsManager {
      * na sidebar da timeline, espelhando TIMELINE_STATE.tracks.
      * Utiliza atualização in-place quando a lista de pistas não mudou, evitando reconstruções pesadas de DOM.
      */
-    renderTrackHeaders() {
+    renderTrackHeaders(forceRebuild = false) {
         const container = getActiveElement("timeline-track-headers");
         if (!container) return;
-        const doc = container.ownerDocument;
+        const doc = container.ownerDocument || document;
         let inner = container.querySelector("#timeline-track-headers-inner");
 
         const tracks = TIMELINE_STATE.tracks;
         const existingRows = inner ? Array.from(inner.children) : [];
-        const canUpdateInPlace = inner && existingRows.length === tracks.length && tracks.every((t, i) => {
+        const canUpdateInPlace = !forceRebuild && inner && (inner.ownerDocument === doc) && existingRows.length === tracks.length && tracks.every((t, i) => {
             const row = existingRows[i];
             const wasHidden = row.classList.contains("restore-line");
             const isHidden = !!t.hidden;
@@ -3037,9 +3037,10 @@ export class PanelsManager {
         inner.style.transform = `translateY(${-TIMELINE_STATE.scrollTop}px)`;
 
         tracks.forEach(track => {
+            const trackId = String(track.id);
             const h = TIMELINE_STATE.trackHeight(track);
             const row = doc.createElement("div");
-            row.dataset.trackId = track.id;
+            row.dataset.trackId = trackId;
 
             if (track.hidden) {
                 row.className = "timeline-header-track restore-line";
@@ -3047,7 +3048,7 @@ export class PanelsManager {
                 row.setAttribute("data-tooltip", `Expandir pista ${track.id} (${track.name})`);
                 
                 row.addEventListener("click", () => {
-                    TIMELINE_STATE.toggleTrackVisibility(track.id);
+                    TIMELINE_STATE.toggleTrackVisibility(trackId);
                 });
                 
                 row.addEventListener("mouseenter", () => {
@@ -3080,12 +3081,16 @@ export class PanelsManager {
                     e.preventDefault();
                     e.stopPropagation();
                 }
-                delete track.heightPx;
+                const liveTrack = TIMELINE_STATE.getTrack(trackId);
+                if (liveTrack) {
+                    delete liveTrack.heightPx;
+                }
                 TIMELINE_STATE.clampScrollTop();
                 STATE.emit("timelineTracksChanged", TIMELINE_STATE.tracks);
             };
 
             resizeHandle.addEventListener("mousedown", (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 const now = Date.now();
                 if (now - lastClickTime < 380) {
@@ -3095,8 +3100,10 @@ export class PanelsManager {
                 }
                 lastClickTime = now;
 
+                const currentDoc = resizeHandle.ownerDocument || document;
+                const liveTrack = TIMELINE_STATE.getTrack(trackId) || track;
                 const startY = e.clientY;
-                const startH = TIMELINE_STATE.trackHeight(track);
+                const startH = TIMELINE_STATE.trackHeight(liveTrack);
                 const currentScale = TIMELINE_STATE.trackHeightScale || 1.0;
                 let isDragging = false;
 
@@ -3105,17 +3112,18 @@ export class PanelsManager {
                     if (!isDragging && Math.abs(delta) < 3) return;
                     if (!isDragging) {
                         isDragging = true;
-                        doc.body.classList.add("layout-resizing");
+                        currentDoc.body.classList.add("layout-resizing");
                     }
                     const nh = Math.min(240, Math.max(22, startH + delta));
-                    track.heightPx = Math.round(nh / currentScale);
+                    const currentLiveTrack = TIMELINE_STATE.getTrack(trackId) || liveTrack;
+                    currentLiveTrack.heightPx = Math.round(nh / currentScale);
                     row.style.height = `${nh}px`;
                     
                     const isCompact = nh < 40;
                     const wasCompact = row.dataset.compact === "true";
                     if (isCompact !== wasCompact) {
                         row.dataset.compact = isCompact ? "true" : "false";
-                        this.renderTrackRowContent(row, track, nh);
+                        this.renderTrackRowContent(row, currentLiveTrack, nh);
                     }
 
                     TIMELINE_STATE.clampScrollTop();
@@ -3123,16 +3131,16 @@ export class PanelsManager {
                 };
 
                 const onUp = () => {
-                    doc.body.classList.remove("layout-resizing");
-                    doc.removeEventListener("mousemove", onMove);
-                    doc.removeEventListener("mouseup", onUp);
+                    currentDoc.body.classList.remove("layout-resizing");
+                    currentDoc.removeEventListener("mousemove", onMove);
+                    currentDoc.removeEventListener("mouseup", onUp);
                     if (isDragging) {
                         TIMELINE_STATE.clampScrollTop();
                         STATE.emit("timelineTracksChanged", TIMELINE_STATE.tracks);
                     }
                 };
-                doc.addEventListener("mousemove", onMove);
-                doc.addEventListener("mouseup", onUp);
+                currentDoc.addEventListener("mousemove", onMove);
+                currentDoc.addEventListener("mouseup", onUp);
             });
 
             resizeHandle.addEventListener("dblclick", resetTrackHeight);
@@ -3281,7 +3289,8 @@ export class PanelsManager {
                     if (volumeEl) volumeEl.value = 1.0;
                     TIMELINE_STATE.setTrackVolume(track.id, 1.0);
                     updateVolumeTooltip(1.0);
-                    if (track.muted) TIMELINE_STATE.toggleTrackMute(track.id);
+                    const liveTrack = TIMELINE_STATE.getTrack(track.id) || track;
+                    if (liveTrack.muted) TIMELINE_STATE.toggleTrackMute(track.id);
                 });
             }
 

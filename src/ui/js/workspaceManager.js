@@ -1263,8 +1263,8 @@ export class WorkspaceManager {
             }
 
             // Inserção no workspace: compoundStage na esquerda, colunas direitas na direita
-            if (this.compoundStage.parentNode !== workspace) {
-                workspace.appendChild(this.compoundStage);
+            if (workspace.firstChild !== this.compoundStage) {
+                workspace.prepend(this.compoundStage);
             }
             this.arrangeColumnsIntoContainer(workspace, rightCols);
 
@@ -1295,10 +1295,8 @@ export class WorkspaceManager {
             // Colunas esquerdas diretamente no workspace à esquerda
             this.arrangeColumnsIntoContainer(workspace, leftCols);
 
-            // Inserção no workspace: compoundStage logo após as colunas esquerdas
-            if (this.compoundStage.parentNode !== workspace) {
-                workspace.appendChild(this.compoundStage);
-            }
+            // Inserção no workspace: compoundStage garantidamente após as colunas esquerdas
+            workspace.appendChild(this.compoundStage);
 
             // Colunas centro e direita dentro de studioTop (no compoundStage)
             this.arrangeColumnsIntoContainer(this.studioTop, rightCols);
@@ -1355,6 +1353,13 @@ export class WorkspaceManager {
 
         if (!skipSplitterReinit) {
             this.reinitSplitters();
+        }
+        if (window.timelineRenderer) {
+            window.timelineRenderer.resize();
+            window.timelineRenderer.requestRedraw();
+        }
+        if (window.panelsManager) {
+            window.panelsManager.renderTrackHeaders(true);
         }
         setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
     }
@@ -2781,6 +2786,9 @@ export class WorkspaceManager {
         if (localCanvas && window.timelineRenderer && window.timelineInteraction) {
             window.timelineRenderer.setCanvas(localCanvas);
             window.timelineInteraction.setCanvas(localCanvas);
+        }
+        if (window.panelsManager) {
+            window.panelsManager.renderTrackHeaders(true);
         }
     }
 

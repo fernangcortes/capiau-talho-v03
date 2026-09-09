@@ -50,6 +50,17 @@ class MockElement {
     removeAttribute(name) {
         delete this.attributes[name];
     }
+    get firstChild() {
+        return this.children.length > 0 ? this.children[0] : null;
+    }
+    prepend(child) {
+        if (child.parentNode) {
+            child.parentNode.removeChild(child);
+        }
+        this.children.unshift(child);
+        child.parentNode = this;
+        return child;
+    }
     appendChild(child) {
         if (child.parentNode) {
             child.parentNode.removeChild(child);
@@ -245,8 +256,8 @@ class WorkspaceManagerSimulator {
             if (timelinePanel) this.compoundStage.appendChild(timelinePanel);
             if (reopenTimeline) this.compoundStage.appendChild(reopenTimeline);
 
-            if (this.compoundStage.parentNode !== workspace) {
-                workspace.appendChild(this.compoundStage);
+            if (workspace.firstChild !== this.compoundStage) {
+                workspace.prepend(this.compoundStage);
             }
             this.arrangeColumnsIntoContainer(workspace, rightCols);
 
@@ -268,9 +279,8 @@ class WorkspaceManagerSimulator {
 
             this.arrangeColumnsIntoContainer(workspace, leftCols);
 
-            if (this.compoundStage.parentNode !== workspace) {
-                workspace.appendChild(this.compoundStage);
-            }
+            // Inserção no workspace: compoundStage garantidamente após as colunas esquerdas
+            workspace.appendChild(this.compoundStage);
 
             this.arrangeColumnsIntoContainer(this.studioTop, rightCols);
 
@@ -511,6 +521,34 @@ assert.strictEqual(sim.compoundStage.style.flex, "1 1 0%", "compound-stage deve 
 const mockSplitterTarget = sim.compoundStage;
 const isProtected = mockSplitterTarget.classList.contains("center-stage") || mockSplitterTarget.classList.contains("compound-stage");
 assert.ok(isProtected, "compound-stage deve ser explicitamente protegido contra atribuição de largura fixa em SplitterHelper");
-console.log("✓ Teste 8: Proteção de flexibilidade de compound-stage em redimensionamentos validada");
+// =========================================================================
+// TESTE 9: Validação da Ordem Exata de Filhos no Workspace em Transições Consecutivas
+// =========================================================================
+// Inicia em bottom-left
+sim.setTimelinePosition("bottom-left");
+let wsChildren = sim.workspace.children.map(c => c.id || c.className);
+assert.strictEqual(wsChildren[0], "compound-stage", "Em bottom-left, compound-stage deve ser o 1º filho de workspace");
+assert.ok(wsChildren.indexOf("compound-stage") < wsChildren.indexOf("sidebar-right"), "compound-stage deve vir antes de sidebar-right");
 
-console.log("\nTODOS OS 8 TESTES DE EXPANSÃO DIRECIONAL DA TIMELINE PASSARAM COM SUCESSO!");
+// Transição direta para bottom-right (cenário que antes invertia o layout se compoundStage já estivesse no workspace)
+sim.setTimelinePosition("bottom-right");
+wsChildren = sim.workspace.children.map(c => c.id || c.className);
+const idxLeft = wsChildren.indexOf("sidebar-left");
+const idxInsp = wsChildren.indexOf("inspector-panel");
+const idxCompound = wsChildren.indexOf("compound-stage");
+
+assert.ok(idxLeft !== -1, "sidebar-left deve estar no workspace em bottom-right");
+assert.ok(idxInsp !== -1, "inspector-panel deve estar no workspace em bottom-right");
+assert.ok(idxCompound !== -1, "compound-stage deve estar no workspace em bottom-right");
+assert.ok(idxLeft < idxInsp, "sidebar-left deve vir antes de inspector-panel");
+assert.ok(idxInsp < idxCompound, "compound-stage deve vir DEPOIS de inspector-panel em bottom-right!");
+
+// Retorno direto para bottom-left
+sim.setTimelinePosition("bottom-left");
+wsChildren = sim.workspace.children.map(c => c.id || c.className);
+assert.strictEqual(wsChildren[0], "compound-stage", "Ao retornar a bottom-left, compound-stage deve voltar a ser o 1º filho de workspace");
+assert.ok(wsChildren.indexOf("compound-stage") < wsChildren.indexOf("sidebar-right"), "compound-stage deve vir antes de sidebar-right");
+
+console.log("✓ Teste 9: Ordem exata de reparenting no workspace validada sem inversão de colunas em transições reversíveis");
+
+console.log("\nTODOS OS 9 TESTES DE EXPANSÃO DIRECIONAL DA TIMELINE PASSARAM COM SUCESSO!");
