@@ -23,13 +23,15 @@ Você pode alternar o perfil ativo a qualquer momento através do menu **Perfil*
 
 No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado Visual & Índice Esquemático** oferece uma experiência interativa completa:
 
-* **Proporções Mecânicas 1:1 (ANSI TKL)**: Keycaps físicos proporcionais com pontos coloridos por categoria de função.
-* **Destaque Bidirecional**:
-  * Passar o mouse no **Teclado** ➔ Ilumina a linha correspondente nas 3 colunas esquemáticas abaixo e rola até ela.
-  * Passar o mouse no **Índice** ➔ Ilumina a tecla correspondente no teclado virtual.
-* **Camadas de Modificadores**: Alterne entre as camadas `Padrão`, `+ Shift`, `+ Ctrl` e `+ Alt` ou segure os modificadores no teclado físico para visualizar funções secundárias.
+* **Abertura Direta em Tela Cheia (100% Fullscreen)**: O modal abre instantaneamente em `100vw × 100vh` sem bordas ou compressão inicial, aproveitando a resolução máxima do monitor sem necessidade de botões de maximizar.
+* **Proporções Mecânicas 1:1 Calibradas (ANSI 100% com Numpad)**: Keycaps físicos com proporção geométrica balanceada entre os três blocos (Alfanumérico `flex: 15`, Navegação `flex: 3.2` e Teclado Numérico `flex: 4.2`), impedindo o achatamento ou estiramento de teclas (`PrtSc`, `ScrLk`, `Pause`, setas e numpad).
+* **Cluster Numérico Físico (Numpad 100%)**: Bloco dedicado de 5 linhas × 4 colunas mapeado para comandos espaciais de layout e manipulação de pistas.
+* **Destaque Bidirecional em 4 Colunas**:
+  * Passar o mouse no **Teclado** ➔ Ilumina a linha correspondente nas 4 colunas esquemáticas abaixo (*A. Reprodução*, *B. Edição*, *C. Ferramentas & IA*, *D. Layout & Workspace*) e rola até ela.
+  * Passar o mouse no **Índice Esquemático** ➔ Ilumina a tecla correspondente no teclado virtual.
+* **Camadas de Modificadores Completas**: Alterne entre as camadas `Padrão`, `+ Shift`, `+ Ctrl`, `+ Alt` e `+ Ctrl+Alt` (ou segure os modificadores no teclado físico para alternância instantânea).
 * **Live Testing HUD**: Digite qualquer tecla física com o modal aberto para testar atalhos ao vivo com feedback de iluminação neon e descrição instantânea.
-* **Modo Tela Cheia (Fullscreen)**: Clique no botão <i class="fa-solid fa-expand"></i> para expandir o modal para `100vw × 100vh`, ocupando toda a tela com visibilidade total dos comandos.
+* **Filtros por Categoria**: Tabela com botões pílula incluindo a nova categoria **Layout & Numpad**.
 
 ---
 
@@ -137,6 +139,57 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 | **`Ctrl + Z`** | **Desfazer (Undo)** | Desfaz a última ação realizada na timeline. |
 | **`Ctrl + Y`** *(ou `Ctrl+Shift+Z`)* | **Refazer (Redo)** | Refaz a ação desfeita. |
 | **`Esc`** | **Fechar / Cancelar** | Fecha modais, limpa seleções e conclui edições de texto. |
+
+---
+
+## 🎹 9. Atalhos Espaciais do Teclado Numérico (Numpad)
+
+O teclado numérico físico espelha intuitivamente a geometria dos painéis e quadrantes da workspace do CapIAu:
+
+| Tecla / Combinação | Ação NLE | Descrição do Comportamento |
+| :--- | :--- | :--- |
+| **`Numpad 1`** | **Timeline: Expandir Esquerda** | Alterna expansão da timeline sob a biblioteca (`bottom-left` $\leftrightarrow$ `center`). |
+| **`Alt + Numpad 1`** | **Timeline: Cabeçalhos de Pistas** | Alterna visibilidade dos cabeçalhos das trilhas (*Track Headers* / controles de Mute, Lock, Magnet). |
+| **`Numpad 2`** | **Timeline: Faixa de Baixo Completa** | Alterna timeline em largura total de rodapé (`bottom-full` $\leftrightarrow$ `center`). |
+| **`Alt + Numpad 2`** | **Timeline: Régua de Tempo** | Alterna visibilidade da régua de tempo (*Ruler*) e marcadores de tempo da timeline. |
+| **`Ctrl + Numpad 2`** | **Timeline: Destacar / Popout** | Destaca a timeline para uma janela externa independente (ou reanexa). |
+| **`Numpad 3`** | **Timeline: Expandir Direita** | Alterna expansão da timeline sob o painel direito (`bottom-right` $\leftrightarrow$ `center`). |
+| **`Alt + Numpad 3`** | **Timeline: Minimapa** | Alterna visibilidade do minimapa de navegação panorâmica da timeline. |
+| **`Numpad 4`** | **Biblioteca: Ocultar / Mostrar** | Recolhe ou restaura a barra lateral esquerda da biblioteca de mídias. |
+| **`Alt + Numpad 4`** | **Biblioteca: Modo Estúdio** | Maximiza a biblioteca com monitores empilhados e visualização ampla de arquivos. |
+| **`Ctrl + Numpad 4`** | **Biblioteca: Destacar / Popout** | Destaca a biblioteca para monitor secundário (ou reanexa). |
+| **`Numpad 5`** | **Reanexar Janelas Destacadas** | Reanexa todas as janelas externas (popouts) de volta ao editor principal. |
+| **`Alt + Numpad 5`** | **Inspetor: Maximizar / Restaurar** | Maximiza ou restaura a largura horizontal do painel de ajustes e efeitos. |
+| **`Ctrl + Numpad 5`** | **Inspetor: Destacar / Popout** | Destaca o inspetor para monitor secundário (ou reanexa). |
+| **`Numpad 6`** | **Painel Direito: Ocultar / Mostrar** | Recolhe ou restaura a barra lateral direita de transcrição, IA e ferramentas. |
+| **`Alt + Numpad 6`** | **Painel Direito: Maximizar** | Maximiza ou restaura a largura horizontal do painel lateral direito. |
+| **`Ctrl + Numpad 6`** | **Painel Direito: Destacar / Popout** | Destaca o painel direito para monitor secundário (ou reanexa). |
+| **`Numpad 7`** | **Header Superior: Ocultar / Mostrar** | Recolhe ou restaura a barra de menu e ferramentas globais do topo. |
+| **`Alt + Numpad 7`** | **Source Player: Maximizar** | Expande o monitor Source para o tamanho máximo do contêiner. |
+| **`Ctrl + Numpad 7`** | **Source Player: Destacar / Popout** | Destaca o monitor Source para janela externa (ou reanexa). |
+| **`Numpad 8`** | **Barra de Ferramentas: Ocultar / Mostrar** | Recolhe ou restaura a barra de ferramentas da timeline (*Toolbar*). |
+| **`Numpad 9`** | **Monitores: Alternar Visualização** | Cicla a exibição dos monitores: *Source* $\rightarrow$ *Program* $\rightarrow$ *Ambos*. |
+| **`Alt + Numpad 9`** | **Program Player: Maximizar** | Expande o monitor Program para o tamanho máximo do contêiner. |
+| **`Ctrl + Numpad 9`** | **Program Player: Destacar / Popout** | Destaca o monitor Program para janela externa (ou reanexa). |
+| **`Numpad 0`** | **Modo Zen / Cinema** | Macro de 1 toque: oculta cabeçalho e todas as sidebars; 2º toque restaura o estado exato anterior. |
+| **`Numpad .`** | **Timeline: Barra Superior** | Recolhe ou restaura a barra com timecode, sliders de zoom e opções de pista. |
+| **`Alt + Numpad .`** | **Timeline: Barra de Status** | Recolhe ou restaura a barra inferior de status da timeline. |
+| **`Numpad +`** | **Aumentar Altura das Trilhas** | Incrementa a escala vertical das faixas da timeline (+8px). |
+| **`Numpad -`** | **Diminuir Altura das Trilhas** | Decrementa a escala vertical das faixas da timeline (-8px). |
+| **`Numpad /`** | **Monitores: Disposição** | Alterna entre layout Lado a Lado (`side-by-side`) e Empilhados (`stacked`). |
+| **`Numpad *`** | **Monitores: Swap / Trocar Foco** | Alterna o foco ativo ou inverte a posição/maximização entre Source e Program. |
+| **`Numpad Enter`** | **Maximizar Painel Ativo** | Maximiza o painel focado ou sob o cursor do mouse na área do editor. |
+
+---
+
+## 🗂️ 10. Slots Numéricos Rápidos de Workspace (1 a 9)
+
+O CapIAu permite salvar layouts completos da workspace vinculados a posições numéricas rápidas de `1` a `9`:
+
+| Tecla / Combinação | Ação | Descrição |
+| :--- | :--- | :--- |
+| **`Ctrl + Alt + [1-9]`** | **Carregar Slot Numérico** | Carrega instantaneamente o layout de workspace vinculado ao slot numérico (1 a 9). |
+| **`Ctrl + Alt + Shift + [1-9]`** | **Salvar Layout no Slot** | Salva e vincula a disposição exata atual de painéis, larguras e monitores ao slot correspondente (1 a 9). |
 
 ---
 
