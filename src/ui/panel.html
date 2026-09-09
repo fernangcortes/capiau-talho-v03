@@ -249,6 +249,36 @@
             box-shadow: 0 0 12px rgba(6, 182, 212, 0.8) !important;
         }
 
+        /* ── CABEÇALHO RETRÁTIL NA JANELA MULTI-PAINEL (CAPIAU-NLE-DESIGN-SYSTEM) ── */
+        body.dual-header-collapsed #dual-popout-toolbar {
+            height: 0 !important;
+            min-height: 0 !important;
+            max-height: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border-bottom: none !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            overflow: hidden !important;
+        }
+        body.dual-header-collapsed #dual-workspace {
+            height: calc(100vh - 4px) !important;
+        }
+        .dual-header-restore-line {
+            width: 100%;
+            height: 4px;
+            background: rgba(139, 92, 246, 0.22);
+            border-bottom: 1px solid rgba(139, 92, 246, 0.4);
+            cursor: pointer;
+            z-index: 250;
+            flex-shrink: 0;
+            transition: background 0.2s, box-shadow 0.2s; /* SEM height/width para evitar layout flicker */
+        }
+        .dual-header-restore-line:hover {
+            background: rgba(139, 92, 246, 0.9) !important;
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.8) !important;
+        }
+
         .popout-loading-state {
             display: flex;
             flex-direction: column;
@@ -305,8 +335,14 @@
             <button id="btn-reattach-dual" class="dual-tool-btn btn-reattach" data-tooltip="Reanexar ambos os menus ao Editor Principal">
                 <i class="fa-solid fa-down-left-and-up-right-to-center"></i>
             </button>
+            <button id="btn-collapse-dual-header" class="dual-tool-btn" data-tooltip="Ocultar cabeçalho (expandir espaço vertical)">
+                <i class="fa-solid fa-chevron-up"></i>
+            </button>
         </div>
     </header>
+
+    <!-- Linha Restauradora do Cabeçalho da Janela Dupla (Fluxo Flex, 4px, Anti-Flicker) -->
+    <div id="dual-header-restore-line" class="dual-header-restore-line" data-tooltip="Expandir cabeçalho" style="display: none;"></div>
 
     <!-- ── ESPAÇO DE TRABALHO DUPLO ── -->
     <main id="dual-workspace" class="layout-side-by-side" style="display: none;">
@@ -469,6 +505,8 @@
         const labelToggleSlot2 = document.getElementById("label-toggle-slot-2");
         const btnResetSplitter = document.getElementById("btn-reset-splitter");
         const btnReattachDual = document.getElementById("btn-reattach-dual");
+        const btnCollapseDualHeader = document.getElementById("btn-collapse-dual-header");
+        const dualHeaderRestoreLine = document.getElementById("dual-header-restore-line");
         const dualHeaderBadge = document.getElementById("dual-header-badge");
 
         if (isDual) {
@@ -726,6 +764,48 @@
 
             // Aplica layout inicial
             applyLayout(currentLayout);
+
+            // ── CONTROLE DO CABEÇALHO RETRÁTIL DA MULTIJANELA (CAPIAU-NLE-DESIGN-SYSTEM) ──
+            function setDualHeaderCollapsed(collapsed) {
+                if (collapsed) {
+                    document.body.classList.add("dual-header-collapsed");
+                    if (dualHeaderRestoreLine) dualHeaderRestoreLine.style.display = "block";
+                    try { localStorage.setItem("capiau_dual_header_collapsed", "true"); } catch (e) {}
+                } else {
+                    document.body.classList.remove("dual-header-collapsed");
+                    if (dualHeaderRestoreLine) dualHeaderRestoreLine.style.display = "none";
+                    try { localStorage.setItem("capiau_dual_header_collapsed", "false"); } catch (e) {}
+                }
+                window.dispatchEvent(new Event("resize"));
+            }
+
+            btnCollapseDualHeader?.addEventListener("click", () => {
+                setDualHeaderCollapsed(true);
+            });
+
+            dualHeaderRestoreLine?.addEventListener("click", () => {
+                setDualHeaderCollapsed(false);
+            });
+
+            // Atalho: duplo clique no espaço vazio do toolbar também recolhe o cabeçalho
+            dualToolbar?.addEventListener("dblclick", (e) => {
+                if (e.target.closest("button") || e.target.closest(".dual-splitter") || e.target.closest(".dual-btn-group")) return;
+                setDualHeaderCollapsed(true);
+            });
+
+            // Atalho de teclado: Ctrl + Shift + H (Ocultar / Mostrar Cabeçalho)
+            window.addEventListener("keydown", (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "h") {
+                    e.preventDefault();
+                    const isCollapsed = document.body.classList.contains("dual-header-collapsed");
+                    setDualHeaderCollapsed(!isCollapsed);
+                }
+            });
+
+            // Restaura estado salvo de recolhimento do cabeçalho
+            if (localStorage.getItem("capiau_dual_header_collapsed") === "true") {
+                setDualHeaderCollapsed(true);
+            }
         }
 
         // ── COMUNICAÇÃO BIDIRECIONAL VIA BROADCASTCHANNEL ──
@@ -836,7 +916,43 @@
                 });
             }
         });
+
+        // ── MOTOR DE TOOLTIPS GLOBAIS (CAPIAU-NLE-DESIGN-SYSTEM) ──
+        try {
+            if (window.opener && typeof window.opener.initGlobalTooltips === "function") {
+                window.opener.initGlobalTooltips(document, window);
+            }
+        } catch (e) {}
+
+        const fallbackTip = document.getElementById("global-tooltip");
+        if (fallbackTip) {
+            document.body.addEventListener("mouseover", (e) => {
+                const target = e.target.closest("[data-tooltip]");
+                if (!target) return;
+                const text = target.getAttribute("data-tooltip");
+                if (!text) return;
+                fallbackTip.textContent = text;
+                fallbackTip.classList.add("visible");
+                const rect = target.getBoundingClientRect();
+                const tipWidth = fallbackTip.offsetWidth || 120;
+                let left = rect.left + rect.width / 2 - tipWidth / 2;
+                left = Math.max(8, Math.min(window.innerWidth - tipWidth - 8, left));
+                let top = rect.bottom + 6;
+                if (top + 30 > window.innerHeight) {
+                    top = Math.max(8, rect.top - 28);
+                }
+                fallbackTip.style.left = `${left}px`;
+                fallbackTip.style.top = `${top}px`;
+            });
+            document.body.addEventListener("mouseout", (e) => {
+                const target = e.target.closest("[data-tooltip]");
+                if (!target) return;
+                fallbackTip.classList.remove("visible");
+            });
+        }
     </script>
+    <!-- Elemento para o Motor de Tooltips Globais -->
+    <div id="global-tooltip"></div>
 </body>
 </html>
 
