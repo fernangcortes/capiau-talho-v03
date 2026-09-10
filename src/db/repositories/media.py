@@ -60,7 +60,7 @@ class MediaRepository:
     _COLUNAS_COR_VIDEO = (
         "color_range", "color_space", "color_transfer", "color_primaries",
         "pix_fmt", "field_order", "color_profile", "color_profile_origem",
-        "proxy_color_range", "proxy_pix_fmt",
+        "proxy_color_range", "proxy_pix_fmt", "palette_temp", "palette_hex",
     )
     _COLUNAS_COR_PHOTO = (
         "color_profile", "color_profile_origem", "raw_params_json",

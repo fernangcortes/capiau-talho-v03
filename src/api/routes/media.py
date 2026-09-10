@@ -1457,6 +1457,21 @@ def set_video_thumbnail(video_id: int, timestamp: float = Query(...), conn: sqli
         try:
             cursor = conn.cursor()
             cursor.execute("UPDATE video SET created_at = CURRENT_TIMESTAMP WHERE id = ?", (video_id,))
+            from src.vision.palette import classify_palette_file
+            import json as _json
+            pal = classify_palette_file(thumb_path)
+            if pal:
+                cursor.execute(
+                    "UPDATE video SET palette_temp = ?, palette_hex = ? WHERE id = ?",
+                    (pal["palette_temp"], _json.dumps(pal["palette_hex"]), video_id)
+                )
+                conn.commit()
+                return {
+                    "status": "success",
+                    "message": "Miniatura atualizada com sucesso.",
+                    "palette_temp": pal["palette_temp"],
+                    "palette_hex": pal["palette_hex"]
+                }
         except Exception:
             pass
         return {"status": "success", "message": "Miniatura atualizada com sucesso."}

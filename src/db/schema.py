@@ -519,6 +519,8 @@ def init_db(db_path: Path = None):
             ("proxy_color_range", "TEXT"),
             ("proxy_pix_fmt", "TEXT"),
             ("color_auditado_em", "TIMESTAMP"),
+            ("palette_temp", "TEXT"),
+            ("palette_hex", "TEXT"),
         ):
             if _col not in video_cols:
                 cursor.execute(f"ALTER TABLE video ADD COLUMN {_col} {_tipo}")

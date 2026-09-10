@@ -385,9 +385,31 @@ def backfill_palette(project_id: int):
             except Exception as e:
                 print(f"[Palette] Falha ao facetar '{temp}' no indice visual: {e}")
 
+    # Backfill para vídeos a partir das miniaturas locais
+    video_updates = []
+    with get_db() as conn:
+        videos = [dict(r) for r in conn.execute(
+            "SELECT id FROM video WHERE project_id = ? ORDER BY id", (project_id,))]
+
+    for v in videos:
+        thumb = _CONFIG.THUMBNAILS_DIR / f"thumb_{v['id']}.jpg"
+        if not thumb.exists():
+            continue
+        palette = classify_palette_file(thumb)
+        if not palette:
+            continue
+        video_updates.append((palette["palette_temp"], _json.dumps(palette["palette_hex"]), v["id"]))
+
+    if video_updates:
+        with get_db() as conn:
+            conn.executemany(
+                "UPDATE video SET palette_temp = ?, palette_hex = ? WHERE id = ?", video_updates)
+            conn.commit()
+
     return {
         "status": "success",
         "photos_updated": len(updates),
+        "videos_updated": len(video_updates),
         "missing_proxy": missing_proxy,
         "distribution": dict(sorted(distribution.items(), key=lambda kv: -kv[1])),
     }
