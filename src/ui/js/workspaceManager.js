@@ -905,8 +905,8 @@ export class WorkspaceManager {
     evaluateAutoMonitorsLayout(skipSplitterReinit = false) {
         if (this.monitorsLayout !== "auto") return;
 
-        // Proteção: não altera durante arraste ativo do divisor interno entre monitores
-        if (document.querySelector(".splitter-players.active, .splitter-studio-players.active")) {
+        // Proteção: não altera durante arraste ativo de qualquer divisor ou redimensionamento de layout
+        if (document.body.classList.contains("layout-resizing") || document.querySelector(".panel-splitter.active, .panel-splitter-v.active, .splitter-players.active, .splitter-studio-players.active")) {
             return;
         }
 
@@ -4667,7 +4667,10 @@ export class SplitterHelper {
             overlay.style.cursor = direction === "horizontal" ? "col-resize" : "row-resize";
             container.ownerDocument.body.appendChild(overlay);
 
-            const handleMouseMove = (moveEvent) => {
+            let moveRaf = null;
+            let pendingMoveEvent = null;
+
+            const applyMove = (moveEvent) => {
                 if (!isDragging) return;
 
                 if (unit === "px") {
@@ -4724,7 +4727,28 @@ export class SplitterHelper {
                 window.dispatchEvent(new Event("resize"));
             };
 
+            const handleMouseMove = (moveEvent) => {
+                if (!isDragging) return;
+                pendingMoveEvent = moveEvent;
+                if (!moveRaf) {
+                    moveRaf = requestAnimationFrame(() => {
+                        moveRaf = null;
+                        if (isDragging && pendingMoveEvent) {
+                            applyMove(pendingMoveEvent);
+                        }
+                    });
+                }
+            };
+
             const handleMouseUp = () => {
+                if (moveRaf) {
+                    cancelAnimationFrame(moveRaf);
+                    moveRaf = null;
+                }
+                if (pendingMoveEvent) {
+                    applyMove(pendingMoveEvent);
+                    pendingMoveEvent = null;
+                }
                 isDragging = false;
                 splitter.classList.remove("active");
                 container.ownerDocument.body.classList.remove("layout-resizing");

@@ -187,7 +187,7 @@ export class CapiauTimelineRenderer {
         if (this.canvas) {
             const oldWin = this.canvas.ownerDocument.defaultView || window;
             oldWin.removeEventListener("resize", this.boundResize);
-            if (this.resizeObserver) {
+            if (this.resizeObserver && this.canvas.parentNode) {
                 this.resizeObserver.unobserve(this.canvas.parentNode);
             }
         }
@@ -199,7 +199,7 @@ export class CapiauTimelineRenderer {
         const newWin = canvas.ownerDocument.defaultView || window;
         newWin.addEventListener("resize", this.boundResize);
 
-        if (this.resizeObserver) {
+        if (this.resizeObserver && this.canvas.parentNode) {
             this.resizeObserver.observe(this.canvas.parentNode);
         }
 
@@ -210,11 +210,7 @@ export class CapiauTimelineRenderer {
     init() {
         this.boundResize = () => {
             this.resize();
-            this.requestRedraw();
         };
-
-        // Ajustar tamanho do Canvas e High-DPI
-        this.resize();
 
         const win = this.canvas ? (this.canvas.ownerDocument.defaultView || window) : window;
         win.addEventListener("resize", this.boundResize);
@@ -222,14 +218,13 @@ export class CapiauTimelineRenderer {
         // ResizeObserver para detectar mudanças de tamanho do contêiner da timeline
         this.resizeObserver = new ResizeObserver(() => {
             this.resize();
-            this.requestRedraw();
         });
-        if (this.canvas) {
-            if (this.canvas.parentNode) this.resizeObserver.observe(this.canvas.parentNode);
-            this.resizeObserver.observe(this.canvas);
-            const timelinePanel = this.canvas.closest("#timeline-panel");
-            if (timelinePanel) this.resizeObserver.observe(timelinePanel);
+        if (this.canvas && this.canvas.parentNode) {
+            this.resizeObserver.observe(this.canvas.parentNode);
         }
+
+        // Ajustar tamanho do Canvas e High-DPI inicial
+        this.resize();
 
         STATE.on("leftTabChanged", () => {
             requestAnimationFrame(() => this.resize());
@@ -272,20 +267,37 @@ export class CapiauTimelineRenderer {
 
     /**
      * Ajusta a resolução lógica do canvas baseado no tamanho real e pixelRatio do dispositivo.
+     * Implementa guarda de dimensão e redesenho síncrono para eliminar piscamento e preservar
+     * 100% da fidelidade temporal (sem estiramento CSS) durante redimensionamentos verticais e horizontais.
      */
     resize() {
+        if (!this.canvas || !this.canvas.parentNode) return;
         const rect = this.canvas.parentNode.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const targetW = Math.round(rect.width * dpr);
+        const targetH = Math.round((rect.height || 200) * dpr);
+
         this.width = rect.width;
         this.height = rect.height || 200; // Altura padrão do wrapper
         const viewportH = Math.max(0, this.height - this.rulerHeight);
         TIMELINE_STATE.clampScrollTop(viewportH);
 
-        const dpr = window.devicePixelRatio || 1;
-        this.canvas.width = this.width * dpr;
-        this.canvas.height = this.height * dpr;
+        // Guarda de Dimensões Reais: se a resolução física do canvas não mudou, não reseta a GPU
+        if (this.canvas.width === targetW && this.canvas.height === targetH) {
+            this.requestRedraw();
+            return;
+        }
 
+        // Atualiza a resolução do canvas e reconstrói a escala DPR
+        this.canvas.width = targetW;
+        this.canvas.height = targetH;
         this.ctx.scale(dpr, dpr);
-        this.requestRedraw();
+
+        // Redesenho síncrono imediato: garante que o canvas nunca seja entregue vazio/transparente
+        this.draw();
+        this.isDirty = false;
     }
 
     /**

@@ -73,11 +73,30 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
   * **Nunca usar `position: absolute`** — isso causa sobreposições, problemas de z-index e inacessibilidade quando múltiplos painéis estão colapsados simultaneamente.
   * O painel colapsado deve usar `width: 0px !important; opacity: 0; pointer-events: none;` com transição suave.
 
+### 3. Motor de Divisores (Splitters) e Redimensionamento Contínuo de Canvas (Anti-Flicker & Anti-Stretch)
+* **Objetivo:** Permitir redimensionamento contínuo fluido (vertical e horizontal) de painéis e timelines sem que o canvas de edição pisque, suma ou sofra estiramento (stretch) bitmap.
+* **Diretrizes Arquiteturais Mandatórias:**
+  1. **Preservação de Escala 1:1 (Anti-Stretch):**
+     * O buffer interno do `<canvas>` (`width` e `height`) deve sempre acompanhar rigorosamente os pixels físicos reais da viewport (`rect.width * dpr` e `rect.height * dpr`).
+     * **PROIBIÇÃO ESTRITA:** Nunca congele o buffer do canvas durante o arrasto permitindo que o CSS o estique. Isso deforma textos, formas e descalibra a precisão temporal matemática de frames e réguas.
+  2. **Redesenho Síncrono Imediato (Anti-Blank Frame):**
+     * Como a especificação HTML5 do Canvas limpa imediatamente a memória da GPU para transparente ao reatribuir `width` ou `height`, o método `resize()` **DEVE chamar `this.draw()` de forma síncrona** logo após o `ctx.scale(dpr, dpr)`.
+     * Nunca dependa apenas de `requestRedraw()` assíncrono durante redimensionamentos contínuos.
+  3. **Guarda de Dimensões Reais:**
+     * Antes de reatribuir `canvas.width` ou `canvas.height`, calcule `targetW = Math.round(rect.width * dpr)` e `targetH = Math.round(rect.height * dpr)`. Se forem idênticos aos atuais, **não toque no canvas**.
+  4. **Throttling via `requestAnimationFrame` no Splitter:**
+     * Ouvintes de `mousemove` em divisores arrastáveis devem coalescer atualizações dentro de um `requestAnimationFrame`, sincronizando o layout com a taxa nativa do monitor (60/120/144 Hz) e evitando layout thrashing.
+  5. **Desacoplamento do `ResizeObserver`:**
+     * O `ResizeObserver` deve monitorar unicamente o elemento pai direto (`.timeline-canvas-container`).
+     * **NUNCA observar a própria tag `<canvas>`**, pois alterar seus atributos físicos dispara novos eventos de resize em cascata.
+  6. **Proteção contra Inversão de DOM (`layout-resizing`):**
+     * Enquanto qualquer divisor estiver sendo arrastado (classe `body.layout-resizing`), motores de ajuste automático de layout (como alternar monitores entre lado a lado e empilhados) devem ser estritamente bloqueados até o `mouseup`.
+
 ---
 
 ## II. Diretrizes dos Menus Laterais (Sidebars)
 
-### 3. Layout Adaptativo de 3 Níveis & Estabilidade Vertical
+### 4. Layout Adaptativo de 3 Níveis & Estabilidade Vertical
 * **Objetivo:** Responder reativamente à largura horizontal das abas laterais mantendo a estabilidade vertical absoluta e evitando quebras de texto em múltiplas linhas.
 * **Estados e Limites:**
   1. **Normal (Largura $\ge 320\text{px}$):** Exibe ícones e textos lado a lado. Sliders expandem-se de forma ampla (`width: 180px - 240px`).
@@ -100,7 +119,7 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
     ```
   * A funcionalidade de rolagem via wheel, trackpad e touch permanece 100% funcional.
 
-### 4. Abas Customizáveis dos Menus Laterais (Sidebar Tabs)
+### 5. Abas Customizáveis dos Menus Laterais (Sidebar Tabs)
 * **Objetivo:** Permitir ao usuário reordenar as abas livremente por arrasto (drag and drop) e controlar a visibilidade de cada uma (show/hide), mantendo a integridade da interface clássica de edição.
 * **Diretrizes:**
   * **Visualização Baseada em Estados (3 Níveis):**
@@ -120,7 +139,7 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
     * A visibilidade deve ser persistida com chaves `left-tabs-visibility` e `right-tabs-visibility`.
     * **Troca de Foco:** Se o usuário desativar a visibilidade da aba que está ativa no momento, a aplicação deve selecionar reativamente a primeira aba visível restante no menu correspondente.
 
-### 5. Botões de Ação Flat na Sidebar
+### 6. Botões de Ação Flat na Sidebar
 * **Objetivo:** Manter a interface limpa e profissional nas barras laterais, removendo caixas (boxes) dos botões de ação e ferramentas.
 * **Diretrizes:**
   * Botões de ação rápida nas sidebars (como os de Transcrição e Chat) e nos rodapés dos players (Play, IN/OUT, Inserir) não devem ter caixas sólidas, bordas ou preenchimentos opacos.
@@ -134,14 +153,14 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
 
 ## III. Componentes de Controle & Ação (UI Controls & Behavior)
 
-### 6. Caixas de Seleção Premium (Selects & Options)
+### 7. Caixas de Seleção Premium (Selects & Options)
 * **Objetivo:** Evitar que o Windows ou navegadores renderizem menus suspensos brancos e boxy que contrastam com o tema dark/glassmorphic.
 * **Diretrizes:**
   * Todos os `<select>` nativos ou com a classe `.nle-select` devem usar fundo escuro translúcido, bordas glass, fonte `Outfit` e um chevron de seta em SVG customizado integrado ao background (roxo por padrão, ciano para resolução).
   * **Elemento Option:** Estilizar obrigatoriamente a tag `select option` globalmente com fundo escuro (`background-color: #121218 !important`) e texto claro (`color: #e2e8f0 !important`).
   * **Selects Aninhados:** Elementos de seleção contidos dentro de outros wrappers glassmorphic (como as classes `.project-area`, `.search-area` ou `.dropdown-wrapper`) devem ser transparentes e sem borda para evitar caixas e contornos duplicados.
 
-### 7. Motor de Tooltips Globais (JavaScript)
+### 8. Motor de Tooltips Globais (JavaScript)
 * **Objetivo:** Impedir que tooltips nativas do navegador (`title`) apareçam e garantir que tooltips customizadas nunca cortem nas laterais ou fiquem atrás de painéis com `overflow: hidden`.
 * **Diretrizes:**
   * **Sem Pseudo-Elementos:** Não utilizar tooltips baseadas em CSS pseudo-elementos (`::after`) em elementos móveis, pois eles serão fisicamente cortados pelas bordas do painel pai.
@@ -151,14 +170,14 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
     * **Horizontal:** Caso atinja os cantos laterais esquerdo ou direito do navegador, o script limita seu valor horizontal em pixels para mantê-la visível na tela.
   * **Injeção Dinâmica, Sliders & Abas:** O `MutationObserver` em `main.js` intercepta qualquer injeção HTML dinâmica e converte automaticamente tags `title` em atributos `data-tooltip`. Para sliders de controle (`input[type="range"]`), a tooltip deve ser exibida **exclusivamente no estado mínimo** (largura $< 240\text{px}$) onde os nomes dos efeitos são ocultados. Para abas da biblioteca e sidebars (`.tab-btn`), as tooltips são mantidas **exclusivamente nos estágios compacto e mínimo** (onde são exibidos apenas os ícones de linha). No estágio normal (largura $\ge 320\text{px}$), onde os nomes das abas (ex: "Vídeos", "Fotos", "Temas") já são totalmente visíveis por extenso, as tooltips são dispensadas.
 
-### 8. Sliders de Controle Proporcionais (Range Inputs)
+### 9. Sliders de Controle Proporcionais (Range Inputs)
 * **Objetivo:** Oferecer precisão de ajuste proporcional à largura disponível do painel, garantindo responsividade sem sacrificar usabilidade.
 * **Diretrizes de Dimensionamento:**
   * **Estado Normal ($\ge 320\text{px}$):** Sliders amplos com `width: 180px` a `240px` (`flex: 1`), aproveitando a largura expansiva do menu.
   * **Estado Compacto ($240\text{px} >$ Largura $\ge 240\text{px}$):** Sliders médios com `width: 115px` a `135px`, mantendo os rótulos de efeito visíveis à esquerda.
   * **Estado Mínimo (Largura $< 240\text{px}$):** Sliders compactos com `max-width: 120px` centralizados e rótulos ocultados.
 
-### 9. Entradas Numéricas Flat & Steppers Minimalistas (Number Inputs)
+### 10. Entradas Numéricas Flat & Steppers Minimalistas (Number Inputs)
 * **Objetivo:** Eliminar caixas opacas e botões de incremento brancos do navegador, criando controles numéricos integrados ao tema dark.
 * **Diretrizes:**
   * **Remoção de Spin-Buttons Nativos:** Ocultar obrigatoriamente os botões nativos dos navegadores:
@@ -178,7 +197,7 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
 
 ## IV. Reprodutor de Vídeo (Video Player)
 
-### 10. Players Limpos com Controles em Hover
+### 11. Players Limpos com Controles em Hover
 * **Objetivo:** Sempre que um player de vídeo (`.player-panel`) for construído ou reaproveitado em um layout novo, ele deve priorizar a exibição do vídeo — cabeçalho e barra de controles não devem competir visualmente com a imagem quando o usuário não está interagindo com aquele player específico.
 * **Diretrizes:**
   * O contêiner do player (`.player-panel`) precisa de `position: relative;` para servir de referência aos overlays.
@@ -193,7 +212,7 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
 
 ## V. Animações de Botão, Spinners & Notificações (Animations & Feedback)
 
-### 11. Animação de Botões de Ação com Spinner em Linha & Toast NLE
+### 12. Animação de Botões de Ação com Spinner em Linha & Toast NLE
 * **Objetivo:** Fornecer feedback visual tátil instantâneo durante operações assíncronas (como definir miniatura, exportar, reprocessar ou salvar), transformando ícones flat de linha em spinners com transições suaves e avisos em estilo glassmorphism.
 * **Diretrizes de Micro-Interação:**
   1. **Animação de Clique (Pulse):** Ao clicar no botão, ele aplica imediatamente uma animação sutil de compressão e expansão (`transform: scale(0.85)` → `scale(1)` em 250ms) via classe `.btn-thumb-click-pulse`.
@@ -248,7 +267,7 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
   }
   ```
 
-### 12. Motor Global de Tooltips & Rolagem Fluida sem Scrollbars Visíveis
+### 13. Motor Global de Tooltips & Rolagem Fluida sem Scrollbars Visíveis
 * **Objetivo:** Garantir que tooltips nunca obstruam ferramentas de trabalho adjacentes e que sidebars e toolbars mantenham estética 100% clean sem barras de rolagem roubando pixels úteis.
 * **Diretrizes de Posicionamento Contextual de Tooltips (`#global-tooltip`):**
   1. **Tool Strip Vertical da Timeline (`.timeline-actions-sidebar`):**
@@ -286,7 +305,7 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
 
 ## VII. Menus Flutuantes Desacoplados de Ferramentas (Tool Submenu Flyouts)
 
-### 13. Padrão Arquitetural para Submenus Flutuantes de Botões na Barra de Ferramentas
+### 14. Padrão Arquitetural para Submenus Flutuantes de Botões na Barra de Ferramentas
 * **Objetivo:** Permitir que ferramentas da toolbar vertical (ex: Seleção `V`, Lâmina `C`, Marquee, etc.) exponham submodos ou ferramentas secundárias em um flyout compacto sem sofrer cortes de layout.
 * **Regra Crítica — Desacoplamento do DOM (Bypass de `overflow-x: hidden`):**
   * Barras de ferramentas verticais (como `.timeline-actions-sidebar`) possuem largura fixa estreita (36px) e `overflow-x: hidden !important;`.
@@ -315,7 +334,7 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
 
 ## VIII. Gesto Universal de Duplo Clique para Retração Rápida (Double-Click Collapse Standard)
 
-### 14. Padrão Obrigatório de Duplo Clique para Criação de Barras, Cabeçalhos e Abas
+### 15. Padrão Obrigatório de Duplo Clique para Criação de Barras, Cabeçalhos e Abas
 * **Princípio Fundamental:** Qualquer barra, cabeçalho de aplicação (`.header`), cabeçalho de painel/sidebar (`.sidebar-header`), cabeçalho de pistas (`.timeline-headers-sidebar`), barra de ferramentas (`.timeline-actions-sidebar`), barra superior da timeline (`#timeline-header-bar`), ou contêiner de abas (Biblioteca, Ajustes, Falas, etc.) **DEVE suportar o gesto universal de duplo clique no espaço vazio** para recolher (colapsar) a respectiva barra ou painel instantaneamente.
 * **Pareamento Obrigatório com Linhas Restauradoras de 4px (`.restore-line`):**
   * Todo elemento que implementa retração por duplo clique DEVE possuir sua respectiva linha restauradora de 4px integrada ao fluxo flexbox (conforme Seção I, Item 2), garantindo que o usuário possa reabri-lo com um simples clique na borda luminosa.
