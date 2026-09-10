@@ -1,21 +1,27 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { parseQuery, evaluateAST } from "./searchParser.js";
+import { getActiveElement } from "./workspaceManager.js";
 
 export class FaceManager {
-    static init() {
-        const btnCluster = document.getElementById("btn-cluster-faces");
-        if (btnCluster) {
+    static bindToolbarEvents(rootDoc = null) {
+        const doc = rootDoc || (getActiveElement("sidebar-left")?.ownerDocument) || document;
+
+        const btnCluster = doc.getElementById("btn-cluster-faces") || getActiveElement("btn-cluster-faces");
+        if (btnCluster && !btnCluster._hasFaceClusterListener) {
+            btnCluster._hasFaceClusterListener = true;
             btnCluster.addEventListener("click", () => this.triggerClustering());
         }
 
-        // Setup clustering settings toggle
-        const toggle = document.getElementById("clustering-settings-toggle");
-        const panel = document.getElementById("clustering-settings-panel");
-        if (toggle && panel) {
+        const toggle = doc.getElementById("clustering-settings-toggle") || getActiveElement("clustering-settings-toggle");
+        const panel = doc.getElementById("clustering-settings-panel") || getActiveElement("clustering-settings-panel");
+        if (toggle && panel && !toggle._hasFaceToggleListener) {
+            toggle._hasFaceToggleListener = true;
             toggle.addEventListener("click", () => {
-                const isOpen = panel.style.display === "flex";
-                panel.style.display = isOpen ? "none" : "flex";
+                const curPanel = doc.getElementById("clustering-settings-panel") || getActiveElement("clustering-settings-panel");
+                if (!curPanel) return;
+                const isOpen = curPanel.style.display === "flex";
+                curPanel.style.display = isOpen ? "none" : "flex";
                 const icon = toggle.querySelector(".toggle-icon");
                 if (icon) {
                     icon.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
@@ -23,23 +29,65 @@ export class FaceManager {
             });
         }
 
-        // Setup slider value listener
-        const epsInput = document.getElementById("input-clustering-eps");
-        const epsVal = document.getElementById("val-clustering-eps");
-        if (epsInput && epsVal) {
+        const epsInput = doc.getElementById("input-clustering-eps") || getActiveElement("input-clustering-eps");
+        const epsVal = doc.getElementById("val-clustering-eps") || getActiveElement("val-clustering-eps");
+        if (epsInput && epsVal && !epsInput._hasFaceEpsListener) {
+            epsInput._hasFaceEpsListener = true;
             epsInput.addEventListener("input", () => {
-                epsVal.textContent = epsInput.value;
+                const curVal = doc.getElementById("val-clustering-eps") || getActiveElement("val-clustering-eps");
+                if (curVal) curVal.textContent = epsInput.value;
             });
             epsInput.addEventListener("dblclick", () => {
                 epsInput.value = 0.38;
-                epsVal.textContent = "0.38";
+                const curVal = doc.getElementById("val-clustering-eps") || getActiveElement("val-clustering-eps");
+                if (curVal) curVal.textContent = "0.38";
             });
         }
 
-        const btnSyncEnrich = document.getElementById("btn-sync-enrich");
-        if (btnSyncEnrich) {
+        const btnSyncEnrich = doc.getElementById("btn-sync-enrich") || getActiveElement("btn-sync-enrich");
+        if (btnSyncEnrich && !btnSyncEnrich._hasFaceSyncListener) {
+            btnSyncEnrich._hasFaceSyncListener = true;
             btnSyncEnrich.addEventListener("click", () => this.triggerManualEnrichment());
         }
+
+        const btnFullscreen = doc.getElementById("btn-fullscreen-faces") || getActiveElement("btn-fullscreen-faces");
+        if (btnFullscreen && !btnFullscreen._hasFaceFsListener) {
+            btnFullscreen._hasFaceFsListener = true;
+            btnFullscreen.addEventListener("click", () => this.openFullscreenDisambiguation());
+        }
+
+        const btnManageNames = doc.getElementById("btn-manage-names") || getActiveElement("btn-manage-names");
+        if (btnManageNames && !btnManageNames._hasFaceManageListener) {
+            btnManageNames._hasFaceManageListener = true;
+            btnManageNames.addEventListener("click", () => this.openNamesManagerModal());
+        }
+    }
+
+    static onPopoutReady(win) {
+        if (!win || !win.document) return;
+        this.bindToolbarEvents(win.document);
+        this.updateSpeakersDatalist(this.allSpeakers || []);
+        const activeTab = win.document.querySelector("#sidebar-left .tab-content.active")?.id;
+        if (activeTab === "tab-faces" || !this.allClusters) {
+            this.loadFaceClusters();
+        } else {
+            this.renderFaceClusters();
+        }
+    }
+
+    static onPopoutRestored() {
+        this.bindToolbarEvents(document);
+        this.updateSpeakersDatalist(this.allSpeakers || []);
+        const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id;
+        if (activeTab === "tab-faces" || !this.allClusters) {
+            this.loadFaceClusters();
+        } else {
+            this.renderFaceClusters();
+        }
+    }
+
+    static init() {
+        this.bindToolbarEvents(document);
 
         // Atalhos de teclado: busca rápida + Inspetor de Rosto (atalho 'a')
         document.addEventListener("keydown", (e) => {
@@ -159,11 +207,6 @@ export class FaceManager {
 
 
 
-        const btnFullscreen = document.getElementById("btn-fullscreen-faces");
-        if (btnFullscreen) {
-            btnFullscreen.addEventListener("click", () => this.openFullscreenDisambiguation());
-        }
-
         const btnCloseFullscreen = document.getElementById("btn-close-fullscreen-faces");
         if (btnCloseFullscreen) {
             btnCloseFullscreen.addEventListener("click", () => this.closeFullscreenDisambiguation());
@@ -230,11 +273,6 @@ export class FaceManager {
         }
 
         // --- Names Manager Bindings ---
-        const btnManageNames = document.getElementById("btn-manage-names");
-        if (btnManageNames) {
-            btnManageNames.addEventListener("click", () => this.openNamesManagerModal());
-        }
-
         const btnCloseNamesManager = document.getElementById("btn-close-names-manager");
         if (btnCloseNamesManager) {
             btnCloseNamesManager.addEventListener("click", () => this.closeNamesManagerModal());
@@ -266,9 +304,21 @@ export class FaceManager {
 
         // Listen for project change to load face clusters
         STATE.on("projectChanged", () => {
+            this.allClusters = null;
             this.loadFaceClusters();
             this.closeFullscreenDisambiguation();
             this.closeGroupManagerModal();
+        });
+
+        // Listen for tab switch to tab-faces to ensure data is loaded and rendered
+        STATE.on("leftTabChanged", (tabId) => {
+            if (tabId === "tab-faces") {
+                if (!this.allClusters) {
+                    this.loadFaceClusters();
+                } else {
+                    this.renderFaceClusters();
+                }
+            }
         });
         
         // Initial load
@@ -277,12 +327,12 @@ export class FaceManager {
 
 
     static async triggerClustering() {
-        const btnCluster = document.getElementById("btn-cluster-faces");
+        const btnCluster = getActiveElement("btn-cluster-faces");
         if (!btnCluster) return;
 
-        const epsInput = document.getElementById("input-clustering-eps");
-        const minSamplesInput = document.getElementById("input-clustering-min-samples");
-        const lockChk = document.getElementById("chk-clustering-lock-labeled");
+        const epsInput = getActiveElement("input-clustering-eps");
+        const minSamplesInput = getActiveElement("input-clustering-min-samples");
+        const lockChk = getActiveElement("chk-clustering-lock-labeled");
 
         const eps = epsInput ? parseFloat(epsInput.value) : 0.38;
         const minSamples = minSamplesInput ? parseInt(minSamplesInput.value) : 3;
@@ -307,7 +357,7 @@ export class FaceManager {
     }
 
     static async triggerManualEnrichment() {
-        const btnSync = document.getElementById("btn-sync-enrich");
+        const btnSync = getActiveElement("btn-sync-enrich");
         if (!btnSync) return;
 
         const projectId = STATE.currentProjectId;
@@ -346,15 +396,15 @@ export class FaceManager {
     }
 
     static async loadFaceClusters() {
-        const container = document.getElementById("face-clusters-list");
-        if (!container) return;
-
-        container.innerHTML = '<div class="empty-state-text"><i class="fa-solid fa-spinner fa-spin"></i> Carregando grupos de rostos...</div>';
+        const container = getActiveElement("face-clusters-list");
+        if (container) {
+            container.innerHTML = '<div class="empty-state-text"><i class="fa-solid fa-spinner fa-spin"></i> Carregando grupos de rostos...</div>';
+        }
 
         try {
             const projectId = STATE.currentProjectId;
             if (!projectId) {
-                container.innerHTML = '<div class="empty-state-text">Selecione um projeto ativo.</div>';
+                if (container) container.innerHTML = '<div class="empty-state-text">Selecione um projeto ativo.</div>';
                 return;
             }
 
@@ -372,12 +422,15 @@ export class FaceManager {
             this.renderFaceClusters();
         } catch (e) {
             console.error("[FaceManager] Error loading face clusters:", e);
-            container.innerHTML = '<div class="empty-state-text">Erro ao carregar os grupos de rostos.</div>';
+            const currentContainer = getActiveElement("face-clusters-list");
+            if (currentContainer) {
+                currentContainer.innerHTML = '<div class="empty-state-text">Erro ao carregar os grupos de rostos.</div>';
+            }
         }
     }
 
     static renderFaceClusters() {
-        const container = document.getElementById("face-clusters-list");
+        const container = getActiveElement("face-clusters-list");
         if (!container) return;
 
         const clusters = this.allClusters || [];
@@ -388,7 +441,7 @@ export class FaceManager {
             return;
         }
 
-        const searchInput = document.getElementById("library-search-input");
+        const searchInput = getActiveElement("library-search-input");
         const query = searchInput ? searchInput.value.trim() : "";
         
         let filtered = clusters;
@@ -404,8 +457,10 @@ export class FaceManager {
             return;
         }
 
+        const doc = container.ownerDocument || document;
+
         filtered.forEach(cluster => {
-            const card = document.createElement("div");
+            const card = doc.createElement("div");
             card.className = "face-cluster-card";
             card.dataset.clusterId = cluster.cluster_id;
 
@@ -484,22 +539,38 @@ export class FaceManager {
     }
 
     static updateSpeakersDatalist(speakers) {
-        let datalist = document.getElementById("speakers-datalist");
-        if (!datalist) {
-            datalist = document.createElement("datalist");
-            datalist.id = "speakers-datalist";
-            document.body.appendChild(datalist);
-        }
-        datalist.innerHTML = "";
-        
-        // Remove duplicates and placeholders
-        const cleanSpeakers = Array.from(new Set(speakers))
-            .filter(s => s && !s.startsWith("Pessoa Desconhecida") && !s.startsWith("SPEAKER_"));
+        if (speakers) this.allSpeakers = speakers;
+        const targetSpeakers = this.allSpeakers || [];
 
-        cleanSpeakers.forEach(speaker => {
-            const option = document.createElement("option");
-            option.value = speaker;
-            datalist.appendChild(option);
+        const docs = [document];
+        for (const name in window.popoutWindows) {
+            const win = window.popoutWindows[name];
+            if (win && !win.closed && win.document && !docs.includes(win.document)) {
+                docs.push(win.document);
+            }
+        }
+
+        docs.forEach(doc => {
+            try {
+                let datalist = doc.getElementById("speakers-datalist");
+                if (!datalist) {
+                    datalist = doc.createElement("datalist");
+                    datalist.id = "speakers-datalist";
+                    doc.body.appendChild(datalist);
+                }
+                datalist.innerHTML = "";
+                
+                const cleanSpeakers = Array.from(new Set(targetSpeakers))
+                    .filter(s => s && !s.startsWith("Pessoa Desconhecida") && !s.startsWith("SPEAKER_"));
+
+                cleanSpeakers.forEach(speaker => {
+                    const option = doc.createElement("option");
+                    option.value = speaker;
+                    datalist.appendChild(option);
+                });
+            } catch (err) {
+                console.warn("[FaceManager] Erro ao sincronizar speakers-datalist:", err);
+            }
         });
     }
 
@@ -510,6 +581,8 @@ export class FaceManager {
         const infoText = document.getElementById("disambiguation-info-text");
         
         if (!modal || !grid || !infoText) return;
+
+        try { window.focus(); } catch (e) {}
 
         infoText.textContent = `O nome "${targetName}" já está associado a outro grupo de rostos (Grupo ${existingClusterId + 1}). Escolha os rostos do Grupo ${currentClusterId + 1} abaixo que pertencem a "${targetName}" para fazer a reassociação, ou clique em "Fusão Total" para unir os grupos por completo.`;
         grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Carregando rostos...</div>';
@@ -638,6 +711,8 @@ export class FaceManager {
         const grid = document.getElementById("fullscreen-faces-grid");
         if (!modal || !grid) return;
         
+        try { window.focus(); } catch (e) {}
+
         modal.style.display = "flex";
         grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">Carregando rostos do projeto...</p></div>';
         
@@ -1249,6 +1324,8 @@ export class FaceManager {
         
         if (!modal || !grid) return;
         
+        try { window.focus(); } catch (e) {}
+
         modal.style.display = "flex";
         if (bulkBar) bulkBar.style.display = "none";
         
@@ -1616,6 +1693,7 @@ export class FaceManager {
     static async openNamesManagerModal() {
         const modal = document.getElementById("names-manager-modal");
         if (modal) {
+            try { window.focus(); } catch (e) {}
             modal.style.display = "flex";
             const searchInput = document.getElementById("names-manager-search");
             if (searchInput) searchInput.value = "";

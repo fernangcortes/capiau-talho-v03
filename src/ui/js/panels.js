@@ -83,7 +83,22 @@ export class PanelsManager {
             this.syncTimelineVideoThumbnails(cuts);
         });
         STATE.on("scissorsModeChanged", (active) => this.toggleScissorsUI(active));
-        STATE.on("projectChanged", () => this.loadThemes());
+        STATE.on("projectChanged", () => {
+            this.allThemes = null;
+            this.loadThemes();
+        });
+        STATE.on("leftTabChanged", (tabId) => {
+            if (tabId === "tab-themes") {
+                if (!this.allThemes) {
+                    this.loadThemes();
+                } else {
+                    this.renderThemesList();
+                }
+            }
+        });
+        if (STATE.currentProjectId) {
+            this.loadThemes();
+        }
         STATE.on("videoFacesUpdated", (videoId) => {
             if (STATE.activeVideo && STATE.activeVideo.id === videoId) {
                 this.renderVision(STATE.activeVisionFrames);
@@ -1888,23 +1903,55 @@ export class PanelsManager {
         }
     }
 
+    getThemesContainer() {
+        return getActiveElement("theme-list") || this.themesContainer;
+    }
+
+    onLibraryPopoutReady(win) {
+        if (!win || !win.document) return;
+        this.themesContainer = win.document.getElementById("theme-list") || this.getThemesContainer();
+        const activeTab = win.document.querySelector("#sidebar-left .tab-content.active")?.id;
+        if (activeTab === "tab-themes" || !this.allThemes) {
+            this.loadThemes();
+        } else {
+            this.renderThemesList();
+        }
+    }
+
+    onLibraryPopoutRestored() {
+        this.themesContainer = document.getElementById("theme-list") || this.getThemesContainer();
+        const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id;
+        if (activeTab === "tab-themes" || !this.allThemes) {
+            this.loadThemes();
+        } else {
+            this.renderThemesList();
+        }
+    }
+
     async loadThemes() {
-        if (!this.themesContainer) return;
+        const container = this.getThemesContainer();
+        if (container) {
+            container.innerHTML = `<div class="empty-state-text"><i class="fa-solid fa-spinner fa-spin"></i> Carregando temas...</div>`;
+        }
         try {
             const data = await CapIAuAPI.fetchThemes(STATE.currentProjectId);
             this.allThemes = data.themes || [];
             this.renderThemesList();
         } catch (e) {
-            this.themesContainer.innerHTML = `<div class="empty-state-text">Erro ao carregar temas.</div>`;
+            const curContainer = this.getThemesContainer();
+            if (curContainer) {
+                curContainer.innerHTML = `<div class="empty-state-text">Erro ao carregar temas.</div>`;
+            }
         }
     }
 
     renderThemesList() {
-        if (!this.themesContainer) return;
-        this.themesContainer.innerHTML = "";
+        const container = this.getThemesContainer();
+        if (!container) return;
+        container.innerHTML = "";
         const themes = this.allThemes || [];
         
-        const searchInput = document.getElementById("library-search-input");
+        const searchInput = getActiveElement("library-search-input");
         const query = searchInput ? searchInput.value.trim() : "";
         
         let filtered = themes;
@@ -1916,16 +1963,18 @@ export class PanelsManager {
         }
         
         if (filtered.length === 0) {
-            this.themesContainer.innerHTML = `
+            container.innerHTML = `
                 <div style="color:var(--text-muted); font-size:11px; padding:12px; text-align:center;">
                     Nenhum tema encontrado.
                 </div>
             `;
             return;
         }
+
+        const doc = container.ownerDocument || document;
         
         filtered.forEach(t => {
-            const card = document.createElement("div");
+            const card = doc.createElement("div");
             card.className = "media-card";
             card.style.flexDirection = "column";
             card.style.alignItems = "flex-start";
@@ -1974,7 +2023,7 @@ export class PanelsManager {
                             return;
                         }
                         segments.forEach(seg => {
-                            const item = document.createElement("div");
+                            const item = doc.createElement("div");
                             item.style.cssText = "display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 5px; cursor: pointer; transition: background 0.15s;";
                             const isPhoto = seg.photo_id !== null && seg.photo_id !== undefined;
                             const mediaLabel = isPhoto

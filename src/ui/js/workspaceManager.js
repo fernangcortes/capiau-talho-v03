@@ -3707,6 +3707,15 @@ export class WorkspaceManager {
                         window.libraryInstance.onPopoutReady(win);
                     }
                 }
+                if (window.FaceManager && typeof window.FaceManager.onPopoutReady === "function") {
+                    window.FaceManager.onPopoutReady(win);
+                }
+                if (window.panelsManager && typeof window.panelsManager.onLibraryPopoutReady === "function") {
+                    window.panelsManager.onLibraryPopoutReady(win);
+                }
+                if (window.TITLES_TAB && typeof window.TITLES_TAB.onPopoutReady === "function") {
+                    window.TITLES_TAB.onPopoutReady(win);
+                }
             } else if (panelId === "inspector-panel") {
                 if (window.timelineInteraction && typeof window.timelineInteraction.onInspectorPopoutReady === "function") {
                     window.timelineInteraction.onInspectorPopoutReady(win);
@@ -3900,6 +3909,26 @@ export class WorkspaceManager {
                     }
                 }, 100);
             }
+            if (window.FaceManager && typeof window.FaceManager.onPopoutReady === "function") {
+                window.FaceManager.onPopoutReady(win);
+            }
+            if (window.panelsManager && typeof window.panelsManager.onLibraryPopoutReady === "function") {
+                window.panelsManager.onLibraryPopoutReady(win);
+            }
+            if (window.TITLES_TAB && typeof window.TITLES_TAB.onPopoutReady === "function") {
+                window.TITLES_TAB.onPopoutReady(win);
+            }
+            setTimeout(() => {
+                if (window.FaceManager && typeof window.FaceManager.onPopoutReady === "function") {
+                    window.FaceManager.onPopoutReady(win);
+                }
+                if (window.panelsManager && typeof window.panelsManager.onLibraryPopoutReady === "function") {
+                    window.panelsManager.onLibraryPopoutReady(win);
+                }
+                if (window.TITLES_TAB && typeof window.TITLES_TAB.onPopoutReady === "function") {
+                    window.TITLES_TAB.onPopoutReady(win);
+                }
+            }, 100);
         } else if (panelId === "inspector-panel") {
             if (window.timelineInteraction && typeof window.timelineInteraction.onInspectorPopoutReady === "function") {
                 window.timelineInteraction.onInspectorPopoutReady(win);
@@ -4059,6 +4088,15 @@ export class WorkspaceManager {
                     if (typeof window.libraryInstance.onPopoutRestored === "function") {
                         window.libraryInstance.onPopoutRestored();
                     }
+                }
+                if (window.FaceManager && typeof window.FaceManager.onPopoutRestored === "function") {
+                    window.FaceManager.onPopoutRestored();
+                }
+                if (window.panelsManager && typeof window.panelsManager.onLibraryPopoutRestored === "function") {
+                    window.panelsManager.onLibraryPopoutRestored();
+                }
+                if (window.TITLES_TAB && typeof window.TITLES_TAB.onPopoutRestored === "function") {
+                    window.TITLES_TAB.onPopoutRestored();
                 }
             }
 

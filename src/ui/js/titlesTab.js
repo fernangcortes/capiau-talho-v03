@@ -5,6 +5,7 @@ import { TEXT_PRESETS, createTextClipFromPreset } from "./textPresets.js";
 import { TEXT_AI_ENGINE } from "./textAIEngine.js";
 import { FONT_MODAL } from "./fontCatalogModal.js";
 import { CREDITS_NORMALIZER } from "./creditsNormalizer.js";
+import { getActiveElement } from "./workspaceManager.js";
 
 export class TitlesTabManager {
     constructor() {
@@ -12,15 +13,34 @@ export class TitlesTabManager {
         this.containerEl = null;
     }
 
-    init() {
-        this.containerEl = document.getElementById("tab-titles");
-        if (!this.containerEl) return;
+    getContainer() {
+        return getActiveElement("tab-titles") || this.containerEl;
+    }
 
+    onPopoutReady(win) {
+        if (!win || !win.document) return;
+        this.containerEl = win.document.getElementById("tab-titles") || this.getContainer();
+        this.render();
+    }
+
+    onPopoutRestored() {
+        this.containerEl = document.getElementById("tab-titles") || this.getContainer();
+        this.render();
+    }
+
+    init() {
+        this.containerEl = this.getContainer();
         this.render();
 
         // Reage a mudanças de sugestão da IA no playhead
         TEXT_AI_ENGINE.onSuggestion(() => this.renderAISuggestionCard());
         STATE.on("textAIReactiveToggled", () => this.renderAISuggestionCard());
+
+        STATE.on("leftTabChanged", (tabId) => {
+            if (tabId === "tab-titles") {
+                this.render();
+            }
+        });
     }
 
     setFilter(category) {
@@ -29,6 +49,7 @@ export class TitlesTabManager {
     }
 
     render() {
+        this.containerEl = this.getContainer();
         if (!this.containerEl) return;
 
         this.containerEl.innerHTML = `
