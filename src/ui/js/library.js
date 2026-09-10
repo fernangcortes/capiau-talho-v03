@@ -2971,6 +2971,9 @@ function appendChildrenChunked(node, keys, container, childDepth) {
     if (keys.length <= RENDER_CHUNK_SIZE) {
         renderRange(0, keys.length);
         container._flushAllChunks = null;
+        if (window.libraryScrollIndex && typeof window.libraryScrollIndex.requestRibbonRedraw === "function") {
+            window.libraryScrollIndex.requestRibbonRedraw();
+        }
         return;
     }
 
@@ -2997,6 +3000,9 @@ function appendChildrenChunked(node, keys, container, childDepth) {
         }
         pendingChunkJobs.delete(job);
         container._flushAllChunks = null;
+        if (window.libraryScrollIndex && typeof window.libraryScrollIndex.requestRibbonRedraw === "function") {
+            window.libraryScrollIndex.requestRibbonRedraw();
+        }
     };
 
     const job = { cancel: () => { parar(); container._flushAllChunks = null; } };
@@ -5198,6 +5204,10 @@ export class LibraryManager {
             const photos = await CapIAuAPI.fetchPhotos(projectId);
             STATE.allPhotos = photos;
             this.scheduleRenderMedia();
+            if (window.libraryScrollIndex) {
+                window.libraryScrollIndex.colorExtractor?.initForProject(projectId);
+                window.libraryScrollIndex.requestRibbonRedraw();
+            }
             await this.loadDocuments();
             this.checkFailedMediaCount();
         } catch (e) {
@@ -7614,6 +7624,7 @@ window.setVideoThumbnail = async function(videoId, timestamp, triggerBtn = null)
             method: "POST"
         });
         if (response.ok) {
+            const respData = await response.json().catch(() => ({}));
             const ver = Date.now();
             if (STATE.activeVideo && STATE.activeVideo.id === videoId) {
                 STATE.activeVideo._thumbVersion = ver;
@@ -7621,6 +7632,19 @@ window.setVideoThumbnail = async function(videoId, timestamp, triggerBtn = null)
             const target = (STATE.allVideos || []).find(v => v.id === videoId);
             if (target) {
                 target._thumbVersion = ver;
+                if (respData.palette_hex) {
+                    target.palette_hex = respData.palette_hex;
+                    target.palette_temp = respData.palette_temp;
+                }
+            }
+            if (window.libraryScrollIndex?.colorExtractor) {
+                window.libraryScrollIndex.colorExtractor.invalidateMedia("vid", videoId);
+                if (respData.palette_hex) {
+                    const best = window.libraryScrollIndex.colorExtractor.getBestPaletteColor(respData.palette_hex);
+                    if (best) window.libraryScrollIndex.colorExtractor.cache.set(`vid_${videoId}`, best);
+                    window.libraryScrollIndex.colorExtractor.scheduleSaveToStorage();
+                }
+                window.libraryScrollIndex.requestRibbonRedraw();
             }
 
             // Atualiza diretamente os cards da biblioteca sem recriar o DOM nem resetar o scroll em todas as janelas (principal e destacadas)
@@ -7709,6 +7733,383 @@ window.setVideoThumbnail = async function(videoId, timestamp, triggerBtn = null)
 window.setCustomThumbnail = window.setVideoThumbnail;
 
 /**
+ * Extrator e cache de cores dominantes para mídias da biblioteca.
+ * Extrai amostras ponderadas de miniaturas via offscreen canvas 16x16 ou aproveita metadados de paleta.
+ */
+class MediaColorExtractor {
+    constructor() {
+        this.cache = new Map();
+        this.offscreenCanvas = null;
+        this.offscreenCtx = null;
+        this._storageSaveTimer = null;
+        this._currentProjectId = null;
+        this.initForProject();
+    }
+
+    initForProject(projectId = null) {
+        if (!projectId) {
+            projectId = (typeof getActiveProjectId === "function" ? getActiveProjectId() : (window.STATE?.currentProjectId || 1));
+        }
+        this._currentProjectId = projectId;
+        try {
+            const raw = localStorage.getItem(`capiau_media_colors_proj_${projectId}`);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === "object") {
+                    for (const [k, v] of Object.entries(parsed)) {
+                        if (typeof v === "string" && v.startsWith("#")) {
+                            this.cache.set(k, v);
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("[MediaColorExtractor] Falha ao carregar cache do localStorage:", e);
+        }
+    }
+
+    scheduleSaveToStorage() {
+        if (this._storageSaveTimer) return;
+        this._storageSaveTimer = setTimeout(() => {
+            this._storageSaveTimer = null;
+            const projectId = this._currentProjectId || (typeof getActiveProjectId === "function" ? getActiveProjectId() : (window.STATE?.currentProjectId || 1));
+            try {
+                const obj = {};
+                let count = 0;
+                for (const [k, v] of this.cache.entries()) {
+                    obj[k] = v;
+                    if (++count > 4000) break;
+                }
+                localStorage.setItem(`capiau_media_colors_proj_${projectId}`, JSON.stringify(obj));
+            } catch (e) {
+                console.warn("[MediaColorExtractor] Falha ao salvar cache no localStorage:", e);
+            }
+        }, 300);
+    }
+
+    invalidateMedia(type, id) {
+        const key = `${type}_${id}`;
+        this.cache.delete(key);
+        this.scheduleSaveToStorage();
+    }
+
+    getBestPaletteColor(paletteData) {
+        if (!paletteData) return null;
+        let list = paletteData;
+        if (typeof list === "string") {
+            try { list = JSON.parse(list); } catch (e) { list = [list]; }
+        }
+        if (!Array.isArray(list) || list.length === 0) return null;
+        const cleanList = list.filter(c => typeof c === "string" && c.startsWith("#"));
+        if (cleanList.length === 0) return null;
+        if (cleanList.length === 1) return cleanList[0];
+
+        // Avalia luminosidade e saturação para evitar letterbox preto (<20) ou estouro de branco (>245)
+        let bestColor = null;
+        let bestScore = -1;
+
+        for (const hex of cleanList) {
+            const clean = hex.replace("#", "");
+            const val = parseInt(clean.length === 3 ? clean.split("").map(ch => ch + ch).join("") : clean, 16) || 0;
+            const r = (val >> 16) & 255;
+            const g = (val >> 8) & 255;
+            const b = val & 255;
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            
+            // Rejeita letterbox preto e estouro de branco puro
+            if (lum < 20 || lum > 245) continue;
+            
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const sat = max > 0 ? (max - min) / max : 0;
+            const lumMidWeight = 1 - Math.abs(lum - 128) / 128;
+            const score = sat * 2.2 + lumMidWeight * 0.8;
+            
+            if (score > bestScore) {
+                bestScore = score;
+                bestColor = hex;
+            }
+        }
+        return bestColor || cleanList[0];
+    }
+
+    getOffscreenCtx() {
+        if (!this.offscreenCtx && typeof document !== "undefined") {
+            this.offscreenCanvas = document.createElement("canvas");
+            this.offscreenCanvas.width = 16;
+            this.offscreenCanvas.height = 16;
+            this.offscreenCtx = this.offscreenCanvas.getContext("2d", { willReadFrequently: true });
+        }
+        return this.offscreenCtx;
+    }
+
+    getColor(itemEl, allVideos, allPhotos) {
+        if (!itemEl) return "#64748b";
+
+        // Caso 1: Pasta (Diretório / Bin)
+        if (itemEl.classList.contains("tree-folder-header")) {
+            const folderPath = itemEl.dataset?.folderPath || itemEl.getAttribute("data-folder-path") || "";
+            if (folderPath && virtualFolderColors && virtualFolderColors[folderPath]) {
+                return virtualFolderColors[folderPath];
+            }
+            const folderName = itemEl.querySelector(".folder-name")?.textContent?.trim() || "";
+            if (folderName && virtualFolderColors && virtualFolderColors[folderName]) {
+                return virtualFolderColors[folderName];
+            }
+
+            // Agregação: busca mídias pertencentes a esta pasta
+            const folderVideos = (allVideos || []).filter(v => (v.virtual_folder || "root") === folderName || (v.virtual_folder || "root") === folderPath);
+            if (folderVideos.length > 0) {
+                for (const v of folderVideos) {
+                    const c = this.getVideoColor(v);
+                    if (c && c !== "#475569" && c !== "#64748b") return c;
+                }
+            }
+            return "#8b5cf6"; // Violeta padrão do CapIAu para pastas
+        }
+
+        // Caso 2: Vídeo
+        if (itemEl.hasAttribute("data-video-id")) {
+            const vidId = parseInt(itemEl.getAttribute("data-video-id"), 10);
+            const video = (allVideos || []).find(v => v.id === vidId);
+            return this.getVideoColor(video, itemEl);
+        }
+
+        // Caso 3: Foto
+        if (itemEl.hasAttribute("data-photo-id")) {
+            const photoId = parseInt(itemEl.getAttribute("data-photo-id"), 10);
+            const photo = (allPhotos || []).find(p => p.id === photoId);
+            return this.getPhotoColor(photo, itemEl);
+        }
+
+        return "#64748b";
+    }
+
+    getVideoColor(video, itemEl = null) {
+        if (!video) return "#64748b";
+        const key = `vid_${video.id}`;
+        if (this.cache.has(key)) return this.cache.get(key);
+
+        // 1. Metadados salvos no banco (palette_hex)
+        if (video.palette_hex) {
+            const bestHex = this.getBestPaletteColor(video.palette_hex);
+            if (bestHex) {
+                this.cache.set(key, bestHex);
+                this.scheduleSaveToStorage();
+                return bestHex;
+            }
+        }
+
+        // 2. Extração via miniatura carregada no DOM
+        if (itemEl) {
+            const img = itemEl.querySelector("img");
+            if (img && img.complete && img.naturalWidth > 0) {
+                const hex = this.sampleImageColor(img);
+                if (hex) {
+                    this.cache.set(key, hex);
+                    this.scheduleSaveToStorage();
+                    return hex;
+                }
+            } else if (img && !img._colorExtractScheduled) {
+                img._colorExtractScheduled = true;
+                img.addEventListener("load", () => {
+                    const hex = this.sampleImageColor(img);
+                    if (hex) {
+                        this.cache.set(key, hex);
+                        this.scheduleSaveToStorage();
+                        if (window.libraryScrollIndex && typeof window.libraryScrollIndex.requestRibbonRedraw === "function") {
+                            window.libraryScrollIndex.requestRibbonRedraw();
+                        }
+                    }
+                }, { once: true });
+            }
+        }
+
+        // 3. Estimativa por categoria / tipo
+        const isInterview = video.video_type === "interview";
+        const fallback = isInterview ? "#d97706" : "#475569";
+        return fallback;
+    }
+
+    getPhotoColor(photo, itemEl = null) {
+        if (!photo) return "#64748b";
+        const key = `photo_${photo.id}`;
+        if (this.cache.has(key)) return this.cache.get(key);
+
+        if (photo.palette_hex) {
+            const bestHex = this.getBestPaletteColor(photo.palette_hex);
+            if (bestHex) {
+                this.cache.set(key, bestHex);
+                this.scheduleSaveToStorage();
+                return bestHex;
+            }
+        }
+
+        if (itemEl) {
+            const img = itemEl.querySelector("img");
+            if (img && img.complete && img.naturalWidth > 0) {
+                const hex = this.sampleImageColor(img);
+                if (hex) {
+                    this.cache.set(key, hex);
+                    this.scheduleSaveToStorage();
+                    return hex;
+                }
+            } else if (img && !img._colorExtractScheduled) {
+                img._colorExtractScheduled = true;
+                img.addEventListener("load", () => {
+                    const hex = this.sampleImageColor(img);
+                    if (hex) {
+                        this.cache.set(key, hex);
+                        this.scheduleSaveToStorage();
+                        if (window.libraryScrollIndex && typeof window.libraryScrollIndex.requestRibbonRedraw === "function") {
+                            window.libraryScrollIndex.requestRibbonRedraw();
+                        }
+                    }
+                }, { once: true });
+            }
+        }
+
+        return "#10b981"; // Esmeralda padrão de foto
+    }
+
+    sampleImageColor(img) {
+        try {
+            const ctx = this.getOffscreenCtx();
+            if (!ctx || !img.naturalWidth || !img.naturalHeight) return null;
+            ctx.clearRect(0, 0, 16, 16);
+            ctx.drawImage(img, 0, 0, 16, 16);
+            const data = ctx.getImageData(0, 0, 16, 16).data;
+            let rSum = 0, gSum = 0, bSum = 0, validWeight = 0;
+            let allR = 0, allG = 0, allB = 0, allCount = 0;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const a = data[i + 3];
+                if (a < 128) continue;
+
+                allR += r;
+                allG += g;
+                allB += b;
+                allCount++;
+
+                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                // Ignora letterbox preto (<18) e estouro de branco puro (>248)
+                if (lum > 18 && lum < 248) {
+                    const max = Math.max(r, g, b);
+                    const min = Math.min(r, g, b);
+                    const sat = max > 0 ? (max - min) / max : 0;
+                    const weight = 1 + sat * 1.5;
+
+                    rSum += r * weight;
+                    gSum += g * weight;
+                    bSum += b * weight;
+                    validWeight += weight;
+                }
+            }
+
+            if (validWeight > 0) {
+                const finalR = Math.round(rSum / validWeight);
+                const finalG = Math.round(gSum / validWeight);
+                const finalB = Math.round(bSum / validWeight);
+                return `#${((1 << 24) + (finalR << 16) + (finalG << 8) + finalB).toString(16).slice(1)}`;
+            } else if (allCount > 0) {
+                const finalR = Math.round(allR / allCount);
+                const finalG = Math.round(allG / allCount);
+                const finalB = Math.round(allB / allCount);
+                return `#${((1 << 24) + (finalR << 16) + (finalG << 8) + finalB).toString(16).slice(1)}`;
+            }
+            return "#475569";
+        } catch (err) {
+            return null;
+        }
+    }
+}
+
+/**
+ * Coalesce itens adjacentes que compartilham cores similares em blocos contíguos de cena.
+ */
+function coalesceColorBlocks(itemsWithColors) {
+    if (!itemsWithColors || itemsWithColors.length === 0) return [];
+
+    const hexToRgb = (hex) => {
+        const clean = (hex || "#64748b").replace("#", "");
+        const val = parseInt(clean.length === 3 ? clean.split("").map(c => c + c).join("") : clean, 16) || 0;
+        return [(val >> 16) & 255, (val >> 8) & 255, val & 255];
+    };
+
+    const colorDistance = (c1, c2) => {
+        const [r1, g1, b1] = hexToRgb(c1);
+        const [r2, g2, b2] = hexToRgb(c2);
+        const dr = r1 - r2;
+        const dg = g1 - g2;
+        const db = b1 - b2;
+        return Math.sqrt(0.30 * dr * dr + 0.59 * dg * dg + 0.11 * db * db);
+    };
+
+    const blocks = [];
+    let currentBlock = {
+        color: itemsWithColors[0].color,
+        count: 1,
+        startIndex: 0,
+        endIndex: 0,
+        items: [itemsWithColors[0]]
+    };
+
+    for (let i = 1; i < itemsWithColors.length; i++) {
+        const curr = itemsWithColors[i];
+        const dist = colorDistance(currentBlock.color, curr.color);
+        // Tolerância de proximidade cromática para agrupar na mesma cena
+        if (dist <= 52) {
+            currentBlock.count++;
+            currentBlock.endIndex = i;
+            currentBlock.items.push(curr);
+        } else {
+            blocks.push(currentBlock);
+            currentBlock = {
+                color: curr.color,
+                count: 1,
+                startIndex: i,
+                endIndex: i,
+                items: [curr]
+            };
+        }
+    }
+    blocks.push(currentBlock);
+
+    // Suavização de ruído: se um micro-bloco de 1 clipe estiver entre dois blocos com cor similar, mescla
+    if (blocks.length >= 3) {
+        for (let i = 1; i < blocks.length - 1; i++) {
+            if (blocks[i].count <= 1 && colorDistance(blocks[i - 1].color, blocks[i + 1].color) < 36) {
+                blocks[i - 1].count += blocks[i].count + blocks[i + 1].count;
+                blocks[i - 1].endIndex = blocks[i + 1].endIndex;
+                blocks.splice(i, 2);
+                i--;
+            }
+        }
+    }
+
+    return blocks;
+}
+
+/**
+ * Calcula cor complementar no espaço RGB para iluminação de contraste reativo.
+ */
+function getComplementaryColor(hex) {
+    if (!hex || typeof hex !== "string" || !hex.startsWith("#")) return "#38bdf8";
+    const clean = hex.replace("#", "");
+    const val = parseInt(clean.length === 3 ? clean.split("").map(c => c + c).join("") : clean, 16) || 0;
+    const r = (val >> 16) & 255;
+    const g = (val >> 8) & 255;
+    const b = val & 255;
+    const cr = 255 - r;
+    const cg = 255 - g;
+    const cb = 255 - b;
+    return `#${((1 << 24) + (cr << 16) + (cg << 8) + cb).toString(16).slice(1)}`;
+}
+
+/**
  * Motor de Índice Temático Inteligente e Pré-visualização ao passar o mouse na barra de rolagem (Scroll Peeker).
  */
 export class LibraryScrollIndexTracker {
@@ -7743,6 +8144,20 @@ export class LibraryScrollIndexTracker {
         this.dwellDelay = parseInt(localStorage.getItem("library_scroll_index_dwell") || "1000", 10);
         this.thumbWidth = parseInt(localStorage.getItem("library_scroll_preview_thumb_width") || "128", 10);
 
+        // Fita Cromática (Scene Color Minimap) e Cursor Seletor Premium
+        this.colorExtractor = new MediaColorExtractor();
+        this.isRibbonEnabled = localStorage.getItem("library_scroll_color_ribbon_enabled") !== "false";
+        this.ribbonStyle = localStorage.getItem("library_scroll_color_ribbon_style") || "blocks";
+        this.cursorMode = localStorage.getItem("library_scroll_ribbon_cursor_mode") || "negative";
+        this.ribbonCanvas = null;
+        this.ribbonCtx = null;
+        this.cursorEl = null;
+        this._currentRibbonItemsWithColors = [];
+        this._ribbonRafId = null;
+        this.containerObserver = null;
+        this.containerResizeObserver = null;
+        this._stateEventsBound = false;
+
         this.activeWindow = null;
         this.activeDoc = null;
 
@@ -7751,7 +8166,10 @@ export class LibraryScrollIndexTracker {
         this._onPointerLeave = () => this.handlePointerLeave();
         this._onPointerUp = () => this.handlePointerUp();
         this._onWheel = (e) => this.handleWheel(e);
-        this._onResize = () => this.hide();
+        this._onResize = () => {
+            this.hide();
+            this.requestRibbonRedraw();
+        };
 
         this.init();
     }
@@ -7776,6 +8194,16 @@ export class LibraryScrollIndexTracker {
             this.resizeObserver = null;
         }
 
+        if (this.containerObserver) {
+            try { this.containerObserver.disconnect(); } catch (err) {}
+            this.containerObserver = null;
+        }
+
+        if (this.containerResizeObserver) {
+            try { this.containerResizeObserver.disconnect(); } catch (err) {}
+            this.containerResizeObserver = null;
+        }
+
         // Se já estava anexado a uma janela anterior, remove listeners antigos
         if (this.activeDoc && this.activeWindow) {
             try {
@@ -7793,9 +8221,67 @@ export class LibraryScrollIndexTracker {
         this.activeWindow = win;
         this.activeDoc = win.document;
         this.scrollContainer = null;
+        this.ribbonCanvas = null;
+        this.ribbonCtx = null;
         this.hide();
 
         this.ensureTooltipElement();
+        this.ensureRibbonElement();
+        this.ensureCursorElement();
+        this.bindSettings();
+
+        const container = this.getScrollContainer();
+        if (container) {
+            if (!container._ribbonScrollAttached) {
+                container._ribbonScrollAttached = true;
+                container.addEventListener("scroll", () => {
+                    this.updateCursorPosition();
+                }, { passive: true });
+            }
+            if (typeof MutationObserver !== "undefined") {
+                this.containerObserver = new MutationObserver(() => {
+                    this.requestRibbonRedraw();
+                });
+                this.containerObserver.observe(container, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ["style", "hidden"]
+                });
+            }
+            if (typeof ResizeObserver !== "undefined") {
+                this.containerResizeObserver = new ResizeObserver(() => {
+                    this.requestRibbonRedraw();
+                });
+                this.containerResizeObserver.observe(container);
+            }
+        }
+
+        if (!this._stateEventsBound && typeof STATE !== "undefined" && typeof STATE.on === "function") {
+            this._stateEventsBound = true;
+            STATE.on("videosUpdated", () => {
+                this.colorExtractor?.initForProject();
+                this.requestRibbonRedraw();
+            });
+            STATE.on("photosUpdated", () => {
+                this.colorExtractor?.initForProject();
+                this.requestRibbonRedraw();
+            });
+            STATE.on("projectLoaded", (proj) => {
+                this.colorExtractor?.initForProject(proj?.id);
+                this.requestRibbonRedraw();
+            });
+            STATE.on("videoThumbnailUpdated", ({ videoId, video }) => {
+                if (this.colorExtractor) {
+                    this.colorExtractor.invalidateMedia("vid", videoId);
+                    if (video && video.palette_hex) {
+                        const best = this.colorExtractor.getBestPaletteColor(video.palette_hex);
+                        if (best) this.colorExtractor.cache.set(`vid_${videoId}`, best);
+                    }
+                }
+                this.requestRibbonRedraw();
+            });
+        }
 
         this.activeDoc.addEventListener("pointermove", this._onPointerMove);
         this.activeDoc.addEventListener("pointerleave", this._onPointerLeave);
@@ -7803,6 +8289,276 @@ export class LibraryScrollIndexTracker {
         this.activeWindow.addEventListener("pointerup", this._onPointerUp);
         this.activeWindow.addEventListener("wheel", this._onWheel, { passive: false });
         this.activeWindow.addEventListener("resize", this._onResize);
+
+        this.requestRibbonRedraw();
+        setTimeout(() => this.requestRibbonRedraw(), 100);
+        setTimeout(() => this.requestRibbonRedraw(), 450);
+        setTimeout(() => this.requestRibbonRedraw(), 1200);
+    }
+
+    ensureRibbonElement() {
+        const doc = this.activeDoc || document;
+        let canvas = doc.getElementById("library-scroll-color-ribbon");
+        const container = this.getScrollContainer();
+        const sidebarLeft = doc.getElementById("sidebar-left");
+        const parent = sidebarLeft || container?.parentElement || doc.body;
+
+        if (!canvas) {
+            canvas = doc.createElement("canvas");
+            canvas.id = "library-scroll-color-ribbon";
+            parent.appendChild(canvas);
+        } else if (canvas.parentElement !== parent) {
+            parent.appendChild(canvas);
+        }
+
+        this.ribbonCanvas = canvas;
+        this.ribbonCtx = canvas.getContext("2d");
+        return canvas;
+    }
+
+    ensureCursorElement() {
+        const doc = this.activeDoc || document;
+        let cursor = doc.getElementById("library-scroll-ribbon-cursor");
+        const sidebarLeft = doc.getElementById("sidebar-left");
+        const container = this.getScrollContainer();
+        const parent = sidebarLeft || container?.parentElement || doc.body;
+
+        if (!cursor) {
+            cursor = doc.createElement("div");
+            cursor.id = "library-scroll-ribbon-cursor";
+            cursor.className = `cursor-mode-${this.cursorMode || "negative"}`;
+            cursor.title = "Arrastar ou navegar pela Fita Cromática";
+            parent.appendChild(cursor);
+
+            let isDragging = false;
+            let startY = 0;
+            let startScrollTop = 0;
+
+            cursor.addEventListener("pointerdown", (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                isDragging = true;
+                this.isPointerDownOnGutter = true;
+                startY = e.clientY;
+                const c = this.getScrollContainer();
+                startScrollTop = c ? c.scrollTop : 0;
+                try { cursor.setPointerCapture(e.pointerId); } catch (_) {}
+                cursor.classList.add("active-dragging");
+            });
+
+            cursor.addEventListener("pointermove", (e) => {
+                if (!isDragging) return;
+                e.stopPropagation();
+                e.preventDefault();
+                const c = this.getScrollContainer();
+                if (!c) return;
+                const cRect = c.getBoundingClientRect();
+                const ribbonH = Math.max(20, cRect.height);
+                const thumbH = parseFloat(cursor.style.height) || 20;
+                const trackTravel = Math.max(1, ribbonH - thumbH);
+                const maxScroll = Math.max(1, c.scrollHeight - c.clientHeight);
+                const dy = e.clientY - startY;
+                c.scrollTop = Math.max(0, Math.min(maxScroll, startScrollTop + (dy / trackTravel) * maxScroll));
+                this.updateCursorPosition();
+            });
+
+            const stopDrag = (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                this.isPointerDownOnGutter = false;
+                cursor.classList.remove("active-dragging");
+                try { cursor.releasePointerCapture(e.pointerId); } catch (_) {}
+            };
+
+            cursor.addEventListener("pointerup", stopDrag);
+            cursor.addEventListener("pointercancel", stopDrag);
+        } else if (cursor.parentElement !== parent) {
+            parent.appendChild(cursor);
+        }
+
+        cursor.className = `cursor-mode-${this.cursorMode || "negative"}`;
+        this.cursorEl = cursor;
+        return cursor;
+    }
+
+    getColorAtRatio(ratio) {
+        const items = this._currentRibbonItemsWithColors;
+        if (!items || items.length === 0) return "#38bdf8";
+        const idx = Math.max(0, Math.min(items.length - 1, Math.round(ratio * (items.length - 1))));
+        return items[idx]?.color || "#38bdf8";
+    }
+
+    updateCursorPosition() {
+        const doc = this.activeDoc || document;
+        const container = this.getScrollContainer();
+        const sidebarLeft = doc.getElementById("sidebar-left");
+
+        if (!this.isRibbonEnabled || this.ribbonStyle === "off" || !container) {
+            if (this.cursorEl) this.cursorEl.style.display = "none";
+            return;
+        }
+
+        const activeTab = doc.querySelector("#sidebar-left .tab-content.active")?.id;
+        if (activeTab !== "tab-media" && activeTab !== "tab-videos" && activeTab !== "tab-photos") {
+            if (this.cursorEl) this.cursorEl.style.display = "none";
+            return;
+        }
+
+        if (container.scrollHeight <= container.clientHeight + 8) {
+            if (this.cursorEl) this.cursorEl.style.display = "none";
+            return;
+        }
+
+        this.ensureCursorElement();
+        if (!this.cursorEl) return;
+
+        const cRect = container.getBoundingClientRect();
+        const pRect = (sidebarLeft || container).getBoundingClientRect();
+        const topOffset = Math.max(0, cRect.top - pRect.top);
+        const ribbonHeight = Math.max(20, cRect.height);
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+
+        const thumbHeight = Math.max(20, Math.min(ribbonHeight, (clientHeight / scrollHeight) * ribbonHeight));
+        const maxScroll = Math.max(1, scrollHeight - clientHeight);
+        const scrollRatio = Math.max(0, Math.min(1, container.scrollTop / maxScroll));
+        const thumbTop = topOffset + scrollRatio * (ribbonHeight - thumbHeight);
+
+        this.cursorEl.style.display = "block";
+        this.cursorEl.style.top = `${Math.round(thumbTop)}px`;
+        this.cursorEl.style.height = `${Math.round(thumbHeight)}px`;
+
+        if (this.cursorMode === "aura" || this.cursorMode === "vacuum") {
+            const currentColor = this.getColorAtRatio(scrollRatio);
+            const compColor = getComplementaryColor(currentColor);
+            this.cursorEl.style.setProperty("--aura-color", currentColor);
+            this.cursorEl.style.setProperty("--aura-comp", compColor);
+        }
+    }
+
+    requestRibbonRedraw() {
+        if (this._ribbonRafId) return;
+        const win = this.activeWindow || window;
+        this._ribbonRafId = win.requestAnimationFrame(() => {
+            this._ribbonRafId = null;
+            this.renderColorRibbon();
+        });
+    }
+
+    renderColorRibbon() {
+        const doc = this.activeDoc || document;
+        const sidebarLeft = doc.getElementById("sidebar-left");
+
+        if (!this.isRibbonEnabled || this.ribbonStyle === "off") {
+            if (this.ribbonCanvas) this.ribbonCanvas.style.display = "none";
+            if (this.cursorEl) this.cursorEl.style.display = "none";
+            sidebarLeft?.classList.remove("has-color-ribbon");
+            return;
+        }
+
+        const container = this.getScrollContainer();
+        if (!container) return;
+
+        const activeTab = doc.querySelector("#sidebar-left .tab-content.active")?.id;
+        if (activeTab !== "tab-media" && activeTab !== "tab-videos" && activeTab !== "tab-photos") {
+            if (this.ribbonCanvas) this.ribbonCanvas.style.display = "none";
+            if (this.cursorEl) this.cursorEl.style.display = "none";
+            sidebarLeft?.classList.remove("has-color-ribbon");
+            return;
+        }
+
+        const activeTabEl = doc.getElementById(activeTab);
+        if (!activeTabEl) return;
+
+        // Se a lista não tiver overflow ou não tiver itens visíveis
+        if (container.scrollHeight <= container.clientHeight + 8) {
+            if (this.ribbonCanvas) this.ribbonCanvas.style.display = "none";
+            if (this.cursorEl) this.cursorEl.style.display = "none";
+            sidebarLeft?.classList.remove("has-color-ribbon");
+            return;
+        }
+
+        const items = Array.from(activeTabEl.querySelectorAll(".tree-folder-header, .tree-file-item, .media-card"))
+            .filter(el => el.offsetParent !== null);
+        if (items.length === 0) {
+            if (this.ribbonCanvas) this.ribbonCanvas.style.display = "none";
+            if (this.cursorEl) this.cursorEl.style.display = "none";
+            sidebarLeft?.classList.remove("has-color-ribbon");
+            return;
+        }
+
+        this.ensureRibbonElement();
+        if (!this.ribbonCanvas || !this.ribbonCtx) return;
+
+        sidebarLeft?.classList.add("has-color-ribbon");
+
+        const cRect = container.getBoundingClientRect();
+        const pRect = (sidebarLeft || container).getBoundingClientRect();
+        const topOffset = Math.max(0, cRect.top - pRect.top);
+        const height = Math.max(20, cRect.height);
+        const width = 4; // 4px largura constante
+
+        this.ribbonCanvas.style.display = "block";
+        this.ribbonCanvas.style.top = `${Math.round(topOffset)}px`;
+        this.ribbonCanvas.style.height = `${Math.round(height)}px`;
+
+        const dpr = (this.activeWindow || window).devicePixelRatio || 1;
+        const targetW = Math.round(width * dpr);
+        const targetH = Math.round(height * dpr);
+
+        if (this.ribbonCanvas.width !== targetW || this.ribbonCanvas.height !== targetH) {
+            this.ribbonCanvas.width = targetW;
+            this.ribbonCanvas.height = targetH;
+        }
+
+        const ctx = this.ribbonCtx;
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, width, height);
+
+        const allVideos = STATE.allVideos || [];
+        const allPhotos = STATE.allPhotos || [];
+        const itemsWithColors = items.map((item, idx) => ({
+            index: idx,
+            item,
+            color: this.colorExtractor.getColor(item, allVideos, allPhotos)
+        }));
+        this._currentRibbonItemsWithColors = itemsWithColors;
+
+        if (this.ribbonStyle === "gradient") {
+            // Modo Gradiente Contínuo
+            const grad = ctx.createLinearGradient(0, 0, 0, height);
+            const total = itemsWithColors.length;
+            const maxStops = Math.min(total, 32);
+            const step = Math.max(1, Math.floor(total / maxStops));
+            for (let i = 0; i < total; i += step) {
+                const ratio = i / (total - 1 || 1);
+                grad.addColorStop(Math.max(0, Math.min(1, ratio)), itemsWithColors[i].color);
+            }
+            grad.addColorStop(1, itemsWithColors[total - 1].color);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+        } else {
+            // Modo Blocos de Cena (Padrão)
+            const blocks = coalesceColorBlocks(itemsWithColors);
+            const totalCount = itemsWithColors.length;
+            let currentY = 0;
+
+            blocks.forEach((block, bIdx) => {
+                const blockH = Math.max(2, (block.count / totalCount) * height);
+                ctx.fillStyle = block.color;
+                ctx.fillRect(0, currentY, width, blockH);
+
+                if (bIdx > 0) {
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+                    ctx.fillRect(0, currentY, width, 1);
+                }
+                currentY += blockH;
+            });
+        }
+
+        ctx.restore();
+        this.updateCursorPosition();
     }
 
     getScrollContainer() {
@@ -7842,6 +8598,7 @@ export class LibraryScrollIndexTracker {
                         <div class="scroll-index-sub">
                             <span class="scroll-index-badge tag-interview">Fala</span>
                             <span class="scroll-index-duration" style="font-family: monospace; font-size: 8.5px; color: var(--text-muted);"></span>
+                            <span class="scroll-index-color-chip" style="display:none;"><span class="scroll-index-color-dot"></span><span class="scroll-index-color-text"></span></span>
                         </div>
                     </div>
                 </div>
@@ -7863,6 +8620,9 @@ export class LibraryScrollIndexTracker {
             titleEl: el.querySelector(".scroll-index-title"),
             badgeEl: el.querySelector(".scroll-index-badge"),
             durationEl: el.querySelector(".scroll-index-duration"),
+            colorChip: el.querySelector(".scroll-index-color-chip"),
+            colorDot: el.querySelector(".scroll-index-color-dot"),
+            colorText: el.querySelector(".scroll-index-color-text"),
             summaryEl: el.querySelector(".scroll-index-summary"),
             tagsRow: el.querySelector(".scroll-index-tags-row"),
             posEl: el.querySelector(".scroll-index-pos")
@@ -8037,6 +8797,12 @@ export class LibraryScrollIndexTracker {
             }
         }
 
+        if (isInsideGutter && this.ribbonCanvas) {
+            this.ribbonCanvas.classList.add("active-tracking");
+        } else if (!isInsideTooltip && this.ribbonCanvas) {
+            this.ribbonCanvas.classList.remove("active-tracking");
+        }
+
         if (!isInsideGutter && !isInsideTooltip) {
             this.hide();
             return;
@@ -8201,6 +8967,9 @@ export class LibraryScrollIndexTracker {
 
     handlePointerLeave() {
         this.isPointerDownOnGutter = false;
+        if (this.ribbonCanvas) {
+            this.ribbonCanvas.classList.remove("active-tracking");
+        }
         this.hide();
     }
 
@@ -8440,6 +9209,8 @@ export class LibraryScrollIndexTracker {
         const doc = this.activeDoc || document;
         const chkEnabled = doc.getElementById("chk-scroll-index-enabled") || document.getElementById("chk-scroll-index-enabled");
         const selDwell = doc.getElementById("sel-scroll-index-dwell") || document.getElementById("sel-scroll-index-dwell");
+        const chkRibbon = doc.getElementById("chk-scroll-color-ribbon-enabled") || document.getElementById("chk-scroll-color-ribbon-enabled");
+        const selRibbonStyle = doc.getElementById("sel-scroll-color-ribbon-style") || document.getElementById("sel-scroll-color-ribbon-style");
 
         if (chkEnabled) {
             chkEnabled.checked = this.isEnabled;
@@ -8455,6 +9226,57 @@ export class LibraryScrollIndexTracker {
             selDwell.addEventListener("change", (e) => {
                 this.dwellDelay = parseInt(e.target.value, 10);
                 localStorage.setItem("library_scroll_index_dwell", this.dwellDelay);
+            });
+        }
+
+        if (chkRibbon) {
+            chkRibbon.checked = this.isRibbonEnabled && this.ribbonStyle !== "off";
+            chkRibbon.addEventListener("change", (e) => {
+                this.isRibbonEnabled = e.target.checked;
+                localStorage.setItem("library_scroll_color_ribbon_enabled", this.isRibbonEnabled);
+                if (!this.isRibbonEnabled) {
+                    this.ribbonStyle = "off";
+                    if (selRibbonStyle) selRibbonStyle.value = "off";
+                    localStorage.setItem("library_scroll_color_ribbon_style", "off");
+                } else {
+                    if (this.ribbonStyle === "off") {
+                        this.ribbonStyle = "blocks";
+                        if (selRibbonStyle) selRibbonStyle.value = "blocks";
+                    }
+                    localStorage.setItem("library_scroll_color_ribbon_style", this.ribbonStyle);
+                }
+                this.requestRibbonRedraw();
+            });
+        }
+
+        if (selRibbonStyle) {
+            selRibbonStyle.value = this.ribbonStyle;
+            selRibbonStyle.addEventListener("change", (e) => {
+                this.ribbonStyle = e.target.value;
+                localStorage.setItem("library_scroll_color_ribbon_style", this.ribbonStyle);
+                if (this.ribbonStyle === "off") {
+                    this.isRibbonEnabled = false;
+                    if (chkRibbon) chkRibbon.checked = false;
+                    localStorage.setItem("library_scroll_color_ribbon_enabled", false);
+                } else {
+                    this.isRibbonEnabled = true;
+                    if (chkRibbon) chkRibbon.checked = true;
+                    localStorage.setItem("library_scroll_color_ribbon_enabled", true);
+                }
+                this.requestRibbonRedraw();
+            });
+        }
+
+        const selRibbonCursor = doc.getElementById("sel-scroll-color-ribbon-cursor") || document.getElementById("sel-scroll-color-ribbon-cursor");
+        if (selRibbonCursor) {
+            selRibbonCursor.value = this.cursorMode;
+            selRibbonCursor.addEventListener("change", (e) => {
+                this.cursorMode = e.target.value;
+                localStorage.setItem("library_scroll_ribbon_cursor_mode", this.cursorMode);
+                if (this.cursorEl) {
+                    this.cursorEl.className = `cursor-mode-${this.cursorMode}`;
+                }
+                this.updateCursorPosition();
             });
         }
     }
@@ -8552,6 +9374,35 @@ export class LibraryScrollIndexTracker {
         const isFolder = itemEl.classList.contains("tree-folder-header");
         const cardIndex = allItems.indexOf(itemEl);
         if (posEl) posEl.textContent = `Posição: ${cardIndex + 1} de ${allItems.length}`;
+
+        const itemColor = this.colorExtractor ? this.colorExtractor.getColor(itemEl, STATE.allVideos || [], STATE.allPhotos || []) : null;
+        if (itemColor && this.dom.colorChip) {
+            this.dom.colorChip.style.display = "inline-flex";
+            if (this.dom.colorDot) this.dom.colorDot.style.background = itemColor;
+            if (this.dom.colorText) {
+                const clean = (itemColor || "").replace("#", "");
+                const val = parseInt(clean.length === 3 ? clean.split("").map(c => c + c).join("") : clean, 16) || 0;
+                const r = (val >> 16) & 255;
+                const g = (val >> 8) & 255;
+                const b = val & 255;
+                const max = Math.max(r, g, b);
+                const min = Math.min(r, g, b);
+                const isWarm = (r > b + 25) && (r > g * 0.85);
+                const isCold = (b > r + 20) || (g > r + 30 && b > r);
+                const isNeutral = (max - min) < 30;
+
+                let tempLabel = "Cena";
+                if (isFolder) tempLabel = "Pasta";
+                else if (isNeutral) tempLabel = "Neutro";
+                else if (isWarm) tempLabel = "Luz Quente";
+                else if (isCold) tempLabel = "Luz Fria";
+                else tempLabel = "Cromática";
+
+                this.dom.colorText.textContent = tempLabel;
+            }
+        } else if (this.dom.colorChip) {
+            this.dom.colorChip.style.display = "none";
+        }
 
         if (isFolder) {
             const folderName = itemEl.querySelector(".folder-name")?.textContent || "Pasta";
@@ -8808,6 +9659,9 @@ export class LibraryScrollIndexTracker {
         }
         if (this.tooltipEl) {
             this.tooltipEl.classList.remove("visible", "expanded");
+        }
+        if (this.ribbonCanvas) {
+            this.ribbonCanvas.classList.remove("active-tracking");
         }
         clearTimeout(this.dwellTimer);
         if (this.splitterDismissTimer) {
