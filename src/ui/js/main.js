@@ -1946,6 +1946,33 @@ window.addEventListener("DOMContentLoaded", () => {
     if (reopenRight) reopenRight.addEventListener("click", () => expandSidebar("right"));
     if (reopenTimeline) reopenTimeline.addEventListener("click", () => expandSidebar("timeline"));
 
+    // Duplo clique no espaço vazio do cabeçalho das abas/sidebars (Biblioteca, Ajustes, Falas)
+    [
+        { panelId: "sidebar-left", toggleBtnId: "toggle-left", side: "left" },
+        { panelId: "inspector-panel", toggleBtnId: "toggle-inspector", side: "inspector" },
+        { panelId: "sidebar-right", toggleBtnId: "toggle-right", side: "right" }
+    ].forEach(({ panelId, toggleBtnId, side }) => {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+        const headers = panel.querySelectorAll(".sidebar-header");
+        headers.forEach(header => {
+            header.addEventListener("dblclick", (e) => {
+                if (e.target.closest("button, input, select, option, label, a, .tab-btn, .media-tabs, .btn-icon, .btn-toggle-sidebar, #s3-status-indicator")) return;
+                e.preventDefault();
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0) {
+                    sel.removeAllRanges();
+                }
+                const btn = header.querySelector(".btn-toggle-sidebar") || panel.querySelector(".btn-toggle-sidebar") || document.getElementById(toggleBtnId);
+                if (btn) {
+                    btn.click();
+                } else {
+                    collapseSidebar(side);
+                }
+            });
+        });
+    });
+
     // ── CONFIGURAÇÃO DE RETRAÇÃO DO NOVO TOOLBAR E CABEÇALHOS DA TIMELINE ──
     const timelineActionsSidebar = document.getElementById("timeline-actions-sidebar");
     const timelineHeadersSidebar = document.getElementById("timeline-headers-sidebar");

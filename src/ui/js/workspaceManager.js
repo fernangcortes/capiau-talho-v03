@@ -2963,6 +2963,20 @@ export class WorkspaceManager {
                         const slotBtnId = idx === 0 ? "btn-toggle-slot-1" : "btn-toggle-slot-2";
                         win.document.getElementById(slotBtnId)?.click();
                     });
+
+                    // Duplo clique no espaço vazio do cabeçalho da sidebar na janela destacada recolhe o slot correspondente
+                    const header = panelEl.querySelector(".sidebar-header");
+                    if (header) {
+                        header.addEventListener("dblclick", (e) => {
+                            if (e.target.closest("button, input, select, option, label, a, .tab-btn, .media-tabs, .btn-icon, .btn-toggle-sidebar, #s3-status-indicator")) return;
+                            e.preventDefault();
+                            try {
+                                const sel = win.getSelection ? win.getSelection() : window.getSelection();
+                                sel?.removeAllRanges();
+                            } catch (err) {}
+                            toggleBtn.click();
+                        });
+                    }
                 }
             });
         }

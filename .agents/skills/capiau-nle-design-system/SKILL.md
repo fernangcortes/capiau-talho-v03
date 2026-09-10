@@ -1,6 +1,6 @@
 ---
 name: capiau-nle-design-system
-description: Diretrizes do design system flat, layout sem espaços (seamless), sidebars adaptativas, selects premium, controles numéricos e motor global de tooltips para a interface clássica NLE do CapIAu.
+description: Diretrizes do design system flat, layout sem espaços (seamless), sidebars adaptativas, selects premium, controles numéricos, retração universal por duplo clique e motor global de tooltips para a interface clássica NLE do CapIAu.
 ---
 
 # Design System Flat & Seamless NLE - CapIAu
@@ -310,3 +310,93 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
   * Sombra pronunciada para destacar da timeline: `box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75);`.
   * Botões internos com ícones vetoriais SVG (line art 18x18px), glow ciano no estado `.active` e tooltips contextuais descritivos.
   * Indicador no botão pai: um pequeno triângulo sutil no canto inferior direito (`.flyout-indicator`) sinalizando ao usuário a existência de subopções.
+
+---
+
+## VIII. Gesto Universal de Duplo Clique para Retração Rápida (Double-Click Collapse Standard)
+
+### 14. Padrão Obrigatório de Duplo Clique para Criação de Barras, Cabeçalhos e Abas
+* **Princípio Fundamental:** Qualquer barra, cabeçalho de aplicação (`.header`), cabeçalho de painel/sidebar (`.sidebar-header`), cabeçalho de pistas (`.timeline-headers-sidebar`), barra de ferramentas (`.timeline-actions-sidebar`), barra superior da timeline (`#timeline-header-bar`), ou contêiner de abas (Biblioteca, Ajustes, Falas, etc.) **DEVE suportar o gesto universal de duplo clique no espaço vazio** para recolher (colapsar) a respectiva barra ou painel instantaneamente.
+* **Pareamento Obrigatório com Linhas Restauradoras de 4px (`.restore-line`):**
+  * Todo elemento que implementa retração por duplo clique DEVE possuir sua respectiva linha restauradora de 4px integrada ao fluxo flexbox (conforme Seção I, Item 2), garantindo que o usuário possa reabri-lo com um simples clique na borda luminosa.
+* **Filtro Estrito de Exclusão (Interactive Element Guard):**
+  * O ouvinte de evento `dblclick` **nunca deve disparar** caso o usuário tenha clicado sobre botões, inputs, selects, links, opções, abas ou controles de arraste.
+  * O callback deve conter a cláusula de guarda imediata via `closest(...)`:
+    ```javascript
+    if (e.target.closest("button, input, select, option, label, a, .tab-btn, .media-tabs, .btn-icon, .btn-toggle-sidebar, .slider-control-item, .resize-handle")) {
+        return;
+    }
+    ```
+* **Proteção Anti-Seleção de Texto e Supressão de Dicionários/Pesquisa do Chrome (Anti-Selection Standard):**
+  * **Problema Crítico:** Em navegadores Chromium/Chrome no Windows, múltiplos cliques rápidos sobre textos de cabeçalhos acionam a seleção automática de palavras inteiras e podem disparar popups intrusivos de tradução, pesquisa de texto no Google ou atalhos do sistema operacional, degradando a experiência do usuário NLE.
+  * **Tríplice Camada Obrigatória de Proteção:**
+    1. **CSS Obligatório (`user-select: none !important`):**
+       Todos os cabeçalhos, barras, réguas e chrome devem ter seleção estritamente proibida:
+       ```css
+       .header, .header *:not(input):not(textarea),
+       .sidebar-header, .sidebar-header *:not(input):not(textarea),
+       .timeline-header-ruler, .timeline-header-ruler *,
+       #timeline-header-bar, #timeline-header-bar *:not(input):not(textarea),
+       #timeline-actions-sidebar, #timeline-actions-sidebar *,
+       #timeline-headers-sidebar, #timeline-headers-sidebar *:not(input):not(textarea),
+       #dual-popout-toolbar, #dual-popout-toolbar * {
+           -webkit-user-select: none !important;
+           -moz-user-select: none !important;
+           -ms-user-select: none !important;
+           user-select: none !important;
+       }
+       ```
+    2. **Limpeza Imediata de Seleção no Handler de Duplo Clique:**
+       No callback do `dblclick`, executar `e.preventDefault()` e expurgar qualquer range que o navegador tenha computado:
+       ```javascript
+       e.preventDefault();
+       const sel = window.getSelection();
+       if (sel && sel.rangeCount > 0) {
+           sel.removeAllRanges();
+       }
+       ```
+    3. **Interceptação Global na Fase de Captura de `mousedown` (`e.detail > 1`):**
+       O navegador inicia a marcação de seleção já no segundo `mousedown` (antes mesmo do evento `dblclick` ser disparado). Para suprimir essa seleção na raiz, todo documento ou janela filha DEVE possuir o listener capture-phase:
+       ```javascript
+       document.addEventListener("mousedown", (e) => {
+           if (e.detail > 1) {
+               if (!e.target.closest("input:not([readonly]), textarea, [contenteditable='true'], .bubble-text, .transcript-line")) {
+                   e.preventDefault();
+                   window.getSelection()?.removeAllRanges();
+               }
+           }
+       }, { capture: true });
+       ```
+* **Template JavaScript Universal para Novas Barras ou Abas:**
+  Ao criar qualquer novo cabeçalho ou barra recolhível no projeto, adote o seguinte padrão:
+  ```javascript
+  /**
+   * Configuração de retração por duplo clique para novo contêiner/cabeçalho
+   * @param {HTMLElement} headerEl - Elemento do cabeçalho ou barra que recebe o duplo clique
+   * @param {HTMLElement} toggleBtn - Botão de toggle correspondente
+   * @param {Function} collapseFn - Função de callback opcional de retração
+   */
+  function setupHeaderDoubleClickCollapse(headerEl, toggleBtn, collapseFn) {
+      if (!headerEl) return;
+      headerEl.addEventListener("dblclick", (e) => {
+          // 1. Ignora elementos interativos
+          if (e.target.closest("button, input, select, option, label, a, .tab-btn, .media-tabs, .btn-icon, .btn-toggle-sidebar")) {
+              return;
+          }
+          // 2. Previne seleção de texto residual
+          e.preventDefault();
+          window.getSelection()?.removeAllRanges();
+
+          // 3. Executa a retração pelo botão ou callback direto
+          if (toggleBtn) {
+              toggleBtn.click();
+          } else if (typeof collapseFn === "function") {
+              collapseFn();
+          }
+      });
+  }
+  ```
+* **Comportamento em Janelas Destacadas e Popouts (Multi-Window):**
+  * Quando um painel é adotado em uma janela popout (`panel.html` ou popouts individuais), o evento de duplo clique no seu cabeçalho deve ser compatibilizado com o documento da janela hospedeira (`win.document`).
+  * No contexto da nova janela, a limpeza de seleção deve referenciar o `getSelection` da janela correspondente (`(win.getSelection || window.getSelection)()?.removeAllRanges()`), garantindo isolamento de contexto e prevenindo erros entre janelas filhas.
+
