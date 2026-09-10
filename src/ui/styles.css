@@ -6548,8 +6548,20 @@ select option, .nle-select option {
 }
 .btn-track-lock:hover {
     transform: scale(1.15);
-    color: var(--color-rose) !important;
-    text-shadow: 0 0 8px var(--color-rose);
+}
+.btn-track-lock.locked {
+    color: #ef4444 !important;
+}
+.btn-track-lock.locked:hover {
+    color: #f87171 !important;
+    text-shadow: 0 0 8px #ef4444;
+}
+.btn-track-lock.unlocked {
+    color: var(--color-emerald, #10b981) !important;
+}
+.btn-track-lock.unlocked:hover {
+    color: #34d399 !important;
+    text-shadow: 0 0 8px var(--color-emerald, #10b981);
 }
 
 .btn-track-mute {

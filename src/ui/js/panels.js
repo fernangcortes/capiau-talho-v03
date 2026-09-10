@@ -3058,11 +3058,8 @@ export class PanelsManager {
                     row.style.height = `${h}px`;
                 }
                 const isCompact = h < 40;
-                const wasCompact = row.dataset.compact === "true";
-                if (isCompact !== wasCompact) {
-                    row.dataset.compact = isCompact ? "true" : "false";
-                    this.renderTrackRowContent(row, track, h);
-                }
+                row.dataset.compact = isCompact ? "true" : "false";
+                this.renderTrackRowContent(row, track, h);
             });
             inner.style.transform = `translateY(${-TIMELINE_STATE.scrollTop}px)`;
             return;
@@ -3234,12 +3231,15 @@ export class PanelsManager {
             const muteIcon = track.muted
                 ? `<i class="fa-solid fa-volume-xmark" style="color: var(--color-rose);"></i>`
                 : `<i class="fa-solid fa-volume-high"></i>`;
-            const lockIcon = track.locked
-                ? `<i class="fa-solid fa-lock" style="color: var(--color-rose);"></i>`
-                : `<i class="fa-solid fa-lock-open"></i>`;
+            const isLocked = !!track.locked;
+            const lockColor = isLocked ? "#ef4444" : "var(--color-emerald, #10b981)";
+            const lockIcon = isLocked
+                ? `<i class="fa-solid fa-lock" style="color: ${lockColor};"></i>`
+                : `<i class="fa-solid fa-lock-open" style="color: ${lockColor};"></i>`;
             const isSyncLocked = track.syncLocked !== undefined ? !!track.syncLocked : true;
             const syncColor = isSyncLocked ? "var(--color-cyan)" : "var(--text-muted)";
             const syncBtn = `<button class="btn-track-sync-lock btn-track-action" title="${isSyncLocked ? 'Sync Lock ativado: esta pista acompanha operações de Ripple e Inserção' : 'Sync Lock desativado: esta pista permanece fixa no tempo'}" style="color: ${syncColor}; font-size: 9px;"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>`;
+            const lockBtn = `<button class="btn-track-lock btn-track-action ${isLocked ? 'locked' : 'unlocked'}" title="${isLocked ? 'Pista travada (clique para destravar)' : 'Pista destravada (clique para travar)'}" style="color: ${lockColor}; font-size: 9px;">${lockIcon}</button>`;
 
             const visibilityIcon = `<i class="fa-solid fa-eye"></i>`;
             const thumbIcon = track.thumbnailsEnabled
@@ -3269,7 +3269,7 @@ export class PanelsManager {
                         <div style="display: flex; gap: 6px; flex-shrink: 0; align-items: center;">
                             ${thumbBtn}
                             ${syncBtn}
-                            <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
+                            ${lockBtn}
                             ${muteBtn}
                         </div>
                         ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="flex: 1; display: flex; align-items: center; min-width: 40px; gap: 4px; margin-left: 2px;">${volumeSlider}<span class="track-volume-val" style="font-size: 9px; font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
@@ -3283,7 +3283,7 @@ export class PanelsManager {
                             ${thumbBtn}
                             <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
                             ${syncBtn}
-                            <button class="btn-track-lock btn-track-action" title="Travar/Destravar pista" style="color: var(--text-secondary); font-size: 9px;">${lockIcon}</button>
+                            ${lockBtn}
                             ${muteBtn}
                             <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
                         </div>
