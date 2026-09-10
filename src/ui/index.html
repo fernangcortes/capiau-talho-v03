@@ -328,6 +328,26 @@
                             </select>
                         </div>
                         <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;"></div>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
+                            <input type="checkbox" id="chk-scroll-color-ribbon-enabled" checked style="cursor:pointer;"> Fita Cromática (Cores)
+                        </label>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; font-size: 9px; color: var(--text-muted);">
+                            <span>Modo Cromático:</span>
+                            <select id="sel-scroll-color-ribbon-style" class="nle-select" style="height: 20px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer; outline: none;">
+                                <option value="blocks" selected>Blocos de Cena</option>
+                                <option value="gradient">Gradiente Contínuo</option>
+                                <option value="off">Desligado</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; font-size: 9px; color: var(--text-muted); margin-top: 2px;">
+                            <span>Cursor da Fita:</span>
+                            <select id="sel-scroll-color-ribbon-cursor" class="nle-select" style="height: 20px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer; outline: none;">
+                                <option value="negative" selected>Negativo Brilhante</option>
+                                <option value="aura">Aura Reativa</option>
+                                <option value="vacuum">Vácuo Luminoso</option>
+                            </select>
+                        </div>
+                        <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;"></div>
                         <button id="btn-regenerate-executive-titles" style="width: 100%; height: 22px; font-size: 9px; padding: 0 4px; display: flex; align-items: center; justify-content: center; gap: 4px; background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.35); color: var(--color-cyan); border-radius: 3px; cursor: pointer;" title="Gera títulos executivos (3 a 6 palavras) para os vídeos existentes">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Títulos IA
                         </button>

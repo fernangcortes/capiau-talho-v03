@@ -8717,6 +8717,143 @@ input[type="number"] {
     background: rgba(255, 255, 255, 0.28) !important;
 }
 
+/* Fita Cromática da Biblioteca (Scene Color Minimap) */
+#library-scroll-color-ribbon {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    pointer-events: none;
+    z-index: 15;
+    opacity: 0.52;
+    transition: opacity 0.2s ease, width 0.2s ease;
+    border-radius: 2px 0 0 2px;
+}
+.sidebar-left:hover #library-scroll-color-ribbon,
+#library-scroll-color-ribbon.active-tracking {
+    opacity: 0.95;
+    width: 5px;
+}
+.sidebar-left.has-color-ribbon .sidebar-content.scrollable::-webkit-scrollbar-thumb {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* ==========================================================================
+   Cursor Seletor da Fita Cromática (3 Modos Premium)
+   ========================================================================== */
+#library-scroll-ribbon-cursor {
+    position: absolute;
+    right: 0;
+    width: 6px;
+    min-height: 20px;
+    z-index: 25;
+    pointer-events: auto;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    border-radius: 3px;
+    transition: width 0.15s ease, box-shadow 0.15s ease;
+    display: none;
+    box-sizing: border-box;
+}
+#library-scroll-ribbon-cursor:active,
+#library-scroll-ribbon-cursor.active-dragging {
+    cursor: grabbing;
+    width: 8px;
+}
+
+/* Modo 1: Efeito Negativo Brilhante (Lente Inversora) */
+#library-scroll-ribbon-cursor.cursor-mode-negative {
+    mix-blend-mode: difference;
+    background: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow:
+        0 0 6px rgba(255, 255, 255, 0.9),
+        0 0 16px rgba(255, 255, 255, 0.5);
+}
+#library-scroll-ribbon-cursor.cursor-mode-negative:hover,
+#library-scroll-ribbon-cursor.cursor-mode-negative:active,
+#library-scroll-ribbon-cursor.cursor-mode-negative.active-dragging {
+    box-shadow:
+        0 0 10px rgba(255, 255, 255, 1),
+        0 0 22px rgba(255, 255, 255, 0.85);
+}
+
+/* Modo 2: Aura Reativa (Orbe Translúcida com Cor Complementar Dinâmica) */
+#library-scroll-ribbon-cursor.cursor-mode-aura {
+    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.95) 0%, var(--aura-comp, rgba(56, 189, 248, 0.6)) 60%, transparent 100%);
+    border: 1.5px solid var(--aura-comp, #38bdf8);
+    box-shadow:
+        0 0 8px var(--aura-comp, #38bdf8),
+        0 0 16px var(--aura-color, #f59e0b),
+        inset 0 0 4px rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(2px);
+}
+#library-scroll-ribbon-cursor.cursor-mode-aura:hover,
+#library-scroll-ribbon-cursor.cursor-mode-aura:active,
+#library-scroll-ribbon-cursor.cursor-mode-aura.active-dragging {
+    box-shadow:
+        0 0 12px var(--aura-comp, #38bdf8),
+        0 0 24px var(--aura-color, #f59e0b),
+        inset 0 0 6px rgba(255, 255, 255, 1);
+}
+
+/* Modo 3: Efeito de Vácuo Luminoso (Anel Gravitacional de Alta Intensidade) */
+#library-scroll-ribbon-cursor.cursor-mode-vacuum {
+    background: rgba(10, 12, 18, 0.88);
+    border: 1.5px solid #ffffff;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.9),
+        0 0 10px rgba(255, 255, 255, 0.95),
+        0 0 18px var(--aura-color, rgba(6, 182, 212, 0.65)),
+        inset 0 0 8px #000000;
+}
+#library-scroll-ribbon-cursor.cursor-mode-vacuum::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 38%;
+    min-height: 8px;
+    background: #ffffff;
+    box-shadow: 0 0 6px #ffffff, 0 0 10px var(--aura-color, #38bdf8);
+    border-radius: 1px;
+}
+#library-scroll-ribbon-cursor.cursor-mode-vacuum:hover,
+#library-scroll-ribbon-cursor.cursor-mode-vacuum:active,
+#library-scroll-ribbon-cursor.cursor-mode-vacuum.active-dragging {
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.95),
+        0 0 14px rgba(255, 255, 255, 1),
+        0 0 26px var(--aura-color, rgba(6, 182, 212, 0.85)),
+        inset 0 0 10px #000000;
+}
+
+.scroll-index-color-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 8px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.scroll-index-color-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    display: inline-block;
+    flex-shrink: 0;
+}
+
 /* Outros painéis internos mantêm scrollbar invisível */
 .sidebar-left,
 .sidebar-left #adjustments-panel-content,
