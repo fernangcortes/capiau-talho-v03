@@ -4640,6 +4640,9 @@ export class SplitterHelper {
         let isDragging = false;
 
         splitter.addEventListener("mousedown", (e) => {
+            if (typeof window !== "undefined" && window.libraryScrollIndex && typeof window.libraryScrollIndex.hide === "function") {
+                window.libraryScrollIndex.hide();
+            }
             e.preventDefault();
             isDragging = true;
             splitter.classList.add("active");

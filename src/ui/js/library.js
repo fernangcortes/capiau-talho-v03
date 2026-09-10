@@ -7713,6 +7713,8 @@ export class LibraryScrollIndexTracker {
         this.tooltipEl = null;
         this.dom = null;
         this.dwellTimer = null;
+        this.splitterDismissTimer = null;
+        this.splitterDismissDelay = 600; // Tolerância para retorno ao índice ao passar pelo divisor (splitter)
         this.lastHoverEvent = null;
         this.currentTargetItem = null;
         this.isPointerDownOnGutter = false;
@@ -7885,6 +7887,17 @@ export class LibraryScrollIndexTracker {
         const container = this.getScrollContainer();
         if (!container) return false;
 
+        let hitEl = null;
+        try {
+            hitEl = doc.elementFromPoint(e.clientX, e.clientY);
+        } catch (err) {}
+
+        const isOnSplitter = Boolean(
+            (e.target?.closest && e.target.closest(".panel-splitter, .panel-splitter-v, [class*='splitter-']")) ||
+            (hitEl?.closest && hitEl.closest(".panel-splitter, .panel-splitter-v, [class*='splitter-']"))
+        );
+        if (isOnSplitter) return false;
+
         const activeTab = doc.querySelector("#sidebar-left .tab-content.active")?.id;
         if (activeTab !== "tab-media" && activeTab !== "tab-videos" && activeTab !== "tab-photos") {
             return false;
@@ -7902,7 +7915,7 @@ export class LibraryScrollIndexTracker {
             }
             const tRect = this.tooltipEl.getBoundingClientRect();
             if (
-                e.clientX >= tRect.left - 6 && e.clientX <= tRect.right + 6 &&
+                e.clientX >= tRect.left - 2 && e.clientX <= tRect.right + 6 &&
                 e.clientY >= tRect.top - 6 && e.clientY <= tRect.bottom + 6
             ) {
                 return true;
@@ -7912,7 +7925,7 @@ export class LibraryScrollIndexTracker {
         // 2. Hover sobre a calha de rolagem (gutter do índice)
         const rect = container.getBoundingClientRect();
         const isInsideGutter = (
-            e.clientX >= rect.right - 20 && e.clientX <= rect.right + 8 &&
+            e.clientX >= rect.right - 20 && e.clientX <= rect.right + 2 &&
             e.clientY >= rect.top && e.clientY <= rect.bottom
         );
         if (isInsideGutter) {
@@ -7929,8 +7942,8 @@ export class LibraryScrollIndexTracker {
             return;
         }
 
-        // Não exibe nem rastreia se qualquer modal ou overlay estiver aberto
-        if (this.isAnyModalOpen()) {
+        // Não exibe nem rastreia se qualquer modal ou overlay estiver aberto ou se o workspace estiver sendo redimensionado
+        if (this.isAnyModalOpen() || doc.body.classList.contains("layout-resizing") || doc.querySelector(".splitter-drag-overlay")) {
             this.hide();
             return;
         }
@@ -7954,9 +7967,43 @@ export class LibraryScrollIndexTracker {
             return;
         }
 
+        let hitEl = null;
+        try {
+            hitEl = doc.elementFromPoint(e.clientX, e.clientY);
+        } catch (err) {}
+
+        const isOnSplitter = Boolean(
+            (e.target?.closest && e.target.closest(".panel-splitter, .panel-splitter-v, [class*='splitter-']")) ||
+            (hitEl?.closest && hitEl.closest(".panel-splitter, .panel-splitter-v, [class*='splitter-']"))
+        );
+
+        // Se o cursor estiver sobre o splitter (divisor de janelas)
+        if (isOnSplitter) {
+            // Se o card já estava visível pelo hover no índice, inicia tolerância de ~600ms
+            // para permitir que o editor volte ao índice caso não deseje o splitter.
+            if (this.tooltipEl && this.tooltipEl.classList.contains("visible")) {
+                if (!this.splitterDismissTimer) {
+                    this.splitterDismissTimer = setTimeout(() => {
+                        this.hide();
+                        this.splitterDismissTimer = null;
+                    }, this.splitterDismissDelay);
+                }
+            }
+            return;
+        }
+
+        // Se retornou ao índice ou outra área, cancela timer de fechamento do splitter
+        if (this.splitterDismissTimer) {
+            clearTimeout(this.splitterDismissTimer);
+            this.splitterDismissTimer = null;
+        }
+
         const rect = container.getBoundingClientRect();
-        // Área da calha da barra (últimos 20px da borda direita da lista)
-        const isInsideGutter = (e.clientX >= rect.right - 20 && e.clientX <= rect.right + 8 && e.clientY >= rect.top && e.clientY <= rect.bottom);
+        // Área da calha da barra (últimos 20px da borda direita da lista, sem invadir o divisor)
+        const isInsideGutter = (
+            e.clientX >= rect.right - 20 && e.clientX <= rect.right + 2 &&
+            e.clientY >= rect.top && e.clientY <= rect.bottom
+        );
 
         let isInsideTooltip = false;
         if (this.tooltipEl && this.tooltipEl.classList.contains("visible")) {
@@ -7965,7 +8012,7 @@ export class LibraryScrollIndexTracker {
             } else {
                 const tRect = this.tooltipEl.getBoundingClientRect();
                 isInsideTooltip = (
-                    e.clientX >= tRect.left - 6 && e.clientX <= tRect.right + 6 &&
+                    e.clientX >= tRect.left - 2 && e.clientX <= tRect.right + 6 &&
                     e.clientY >= tRect.top - 6 && e.clientY <= tRect.bottom + 6
                 );
             }
@@ -7982,7 +8029,6 @@ export class LibraryScrollIndexTracker {
         }
 
         // Verificação de hit-test no DOM quando na calha
-        const hitEl = doc.elementFromPoint(e.clientX, e.clientY);
         if (!hitEl || (!container.contains(hitEl) && hitEl !== container && !hitEl.closest("#sidebar-left"))) {
             this.hide();
             return;
@@ -8127,6 +8173,20 @@ export class LibraryScrollIndexTracker {
         const container = this.getScrollContainer();
         if (!container) return;
 
+        let hitEl = null;
+        try {
+            hitEl = doc.elementFromPoint(e.clientX, e.clientY);
+        } catch (err) {}
+
+        const isOnSplitter = Boolean(
+            (e.target?.closest && e.target.closest(".panel-splitter, .panel-splitter-v, [class*='splitter-']")) ||
+            (hitEl?.closest && hitEl.closest(".panel-splitter, .panel-splitter-v, [class*='splitter-']"))
+        );
+        if (isOnSplitter) {
+            this.hide();
+            return;
+        }
+
         const activeTab = doc.querySelector("#sidebar-left .tab-content.active")?.id;
         if (activeTab !== "tab-media" && activeTab !== "tab-videos" && activeTab !== "tab-photos") return;
         
@@ -8139,9 +8199,8 @@ export class LibraryScrollIndexTracker {
         }
 
         const rect = container.getBoundingClientRect();
-        const isInsideGutter = (e.clientX >= rect.right - 20 && e.clientX <= rect.right + 8 && e.clientY >= rect.top && e.clientY <= rect.bottom);
+        const isInsideGutter = (e.clientX >= rect.right - 20 && e.clientX <= rect.right + 2 && e.clientY >= rect.top && e.clientY <= rect.bottom);
         if (isInsideGutter) {
-            const hitEl = doc.elementFromPoint(e.clientX, e.clientY);
             if (!hitEl || (!container.contains(hitEl) && hitEl !== container && !hitEl.closest("#sidebar-left"))) {
                 return;
             }
@@ -8524,6 +8583,10 @@ export class LibraryScrollIndexTracker {
             this.tooltipEl.classList.remove("visible", "expanded");
         }
         clearTimeout(this.dwellTimer);
+        if (this.splitterDismissTimer) {
+            clearTimeout(this.splitterDismissTimer);
+            this.splitterDismissTimer = null;
+        }
         this.currentTargetItem = null;
     }
 }
