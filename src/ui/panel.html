@@ -937,6 +937,14 @@
         const fallbackTip = document.getElementById("global-tooltip");
         if (fallbackTip) {
             document.body.addEventListener("mouseover", (e) => {
+                const titledEl = e.target.closest("[title]");
+                if (titledEl && titledEl.hasAttribute && titledEl.hasAttribute("title")) {
+                    const title = titledEl.getAttribute("title");
+                    if (title && !titledEl.hasAttribute("data-tooltip")) {
+                        titledEl.setAttribute("data-tooltip", title);
+                    }
+                    titledEl.removeAttribute("title");
+                }
                 const target = e.target.closest("[data-tooltip]");
                 if (!target) return;
                 const text = target.getAttribute("data-tooltip");

@@ -166,7 +166,7 @@
             <aside class="sidebar-left glassmorphism dock-left" id="sidebar-left">
                 <div id="library-main-view" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;">
                     <div class="sidebar-header">
-                    <button class="btn-toggle-sidebar" id="toggle-left" title="Recolher Painel" data-tooltip="Recolher Painel (Esquerda)" style="margin-right: 4px; padding: 4px; font-size: 12px;">
+                    <button class="btn-toggle-sidebar" id="toggle-left" data-tooltip="Recolher Painel (Esquerda)" style="margin-right: 4px; padding: 4px; font-size: 12px;">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
                     <h2 style="flex: 1; display: flex; align-items: center; gap: 8px; margin-left: 2px;">
@@ -663,7 +663,7 @@
             <!-- ── INSPECTOR / ADJUSTMENTS PANEL (COLLAPSIBLE & DETACHABLE) ── -->
             <aside class="sidebar-inspector glassmorphism dock-left" id="inspector-panel">
                 <div class="sidebar-header">
-                    <button class="btn-toggle-sidebar" id="toggle-inspector" title="Recolher Painel" data-tooltip="Recolher Painel (Esquerda)">
+                    <button class="btn-toggle-sidebar" id="toggle-inspector" data-tooltip="Recolher Painel (Esquerda)">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
                     <h2><i class="fa-solid fa-sliders"></i> <span class="header-title-text">Ajustes & Efeitos</span></h2>
@@ -729,11 +729,11 @@
                                 <div class="current-media-title" id="source-player-title" style="font-size: 11px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width: 200px;"></div>
                             </div>
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <button id="btn-toggle-monitors-layout-source" class="btn-control btn-toggle-monitors-layout" data-tooltip="Alternar Disposição dos Monitores (Lado a Lado / Empilhados)" title="Alternar Monitores: Lado a Lado / Empilhados" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-table-columns" style="transform: rotate(90deg); display: inline-block;"></i></button>
+                                <button id="btn-toggle-monitors-layout-source" class="btn-control btn-toggle-monitors-layout" data-tooltip="Alternar Disposição dos Monitores (Lado a Lado / Empilhados)" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-table-columns" style="transform: rotate(90deg); display: inline-block;"></i></button>
                                 <button id="btn-swap-to-program" class="btn-control btn-swap-player" title="Alternar para Program (Q)" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px; display: none;"><i class="fa-solid fa-right-left"></i></button>
                                 <button id="btn-popout-source" class="btn-control" title="Destacar Player" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-up-right-from-square"></i></button>
                                 <button id="btn-expand-source" class="btn-control" title="Maximizar" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-expand"></i></button>
-                                <span id="source-tally-dot" class="player-tally-dot source" title="Monitor de Origem (Source)" data-tooltip="Monitor de Origem (Source)"></span>
+                                <span id="source-tally-dot" class="player-tally-dot source" data-tooltip="Monitor de Origem (Source)"></span>
                             </div>
                         </div>
                         
@@ -779,7 +779,7 @@
                     <section class="player-panel glassmorphism" id="program-player-panel" style="flex: 1; display: flex; flex-direction: column; position: relative;">
                         <div class="player-header" style="display: flex; justify-content: flex-end; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-glass);">
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <button id="btn-toggle-monitors-layout-program" class="btn-control btn-toggle-monitors-layout" data-tooltip="Alternar Disposição dos Monitores (Lado a Lado / Empilhados)" title="Alternar Monitores: Lado a Lado / Empilhados" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-table-columns" style="transform: rotate(90deg); display: inline-block;"></i></button>
+                                <button id="btn-toggle-monitors-layout-program" class="btn-control btn-toggle-monitors-layout" data-tooltip="Alternar Disposição dos Monitores (Lado a Lado / Empilhados)" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-table-columns" style="transform: rotate(90deg); display: inline-block;"></i></button>
                                 <button id="btn-swap-to-source" class="btn-control btn-swap-player" title="Alternar para Source (Q)" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px; display: none;"><i class="fa-solid fa-right-left"></i></button>
                                 <select id="program-preview-zoom" title="Zoom do Preview" style="font-size: 10px; height: 20px; padding: 0 4px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; border-radius: 4px; outline: none; cursor: pointer;">
                                     <option value="fit">Ajustar</option>
@@ -791,10 +791,10 @@
                                     <option value="1.5">150%</option>
                                     <option value="2">200%</option>
                                 </select>
-                                <button id="btn-seq-settings-program" class="btn-control" data-tooltip="Configurações da Sequência (Resolução/FPS)" title="Configurações da Sequência" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-gear"></i></button>
+                                <button id="btn-seq-settings-program" class="btn-control" data-tooltip="Configurações da Sequência (Resolução/FPS)" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-gear"></i></button>
                                 <button id="btn-popout-program" class="btn-control" title="Destacar Player" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-up-right-from-square"></i></button>
                                 <button id="btn-expand-program" class="btn-control" title="Maximizar" style="border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 12px;"><i class="fa-solid fa-expand"></i></button>
-                                <span id="program-tally-dot" class="player-tally-dot program" title="Monitor de Programa (Timeline Ativa)" data-tooltip="Monitor de Programa (Timeline Ativa)"></span>
+                                <span id="program-tally-dot" class="player-tally-dot program" data-tooltip="Monitor de Programa (Timeline Ativa)"></span>
                             </div>
                         </div>
                         
@@ -1121,7 +1121,7 @@
             <!-- ── RIGHT SIDEBAR (COLLAPSIBLE - TRANSCRIPTION / DIALOGUES) ──── -->
             <aside class="sidebar-right glassmorphism dock-right" id="sidebar-right">
                 <div class="sidebar-header">
-                    <button class="btn-toggle-sidebar" id="toggle-right" title="Recolher Painel" data-tooltip="Recolher Painel (Direita)">
+                    <button class="btn-toggle-sidebar" id="toggle-right" data-tooltip="Recolher Painel (Direita)">
                         <i class="fa-solid fa-chevron-right"></i>
                     </button>
                     <h2><i class="fa-solid fa-comment-dots"></i> <span class="header-title-text"><span class="text-full">Transcrição & Falas</span><span class="text-short" style="display:none;">Transcrição</span></span></h2>

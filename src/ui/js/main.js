@@ -1570,36 +1570,48 @@ window.addEventListener("DOMContentLoaded", () => {
 
         // Auto-converter de title para data-tooltip para tooltips premium unificadas
         const convertTitleToTooltip = (root = doc) => {
-            root.querySelectorAll("[title]").forEach(el => {
-                const title = el.getAttribute("title");
-                if (title && !el.hasAttribute("data-tooltip")) {
-                    el.setAttribute("data-tooltip", title);
-                    el.removeAttribute("title");
+            if (!root) return;
+            if (root.nodeType === Node.ELEMENT_NODE && root.hasAttribute("title")) {
+                const title = root.getAttribute("title");
+                if (title && !root.hasAttribute("data-tooltip")) {
+                    root.setAttribute("data-tooltip", title);
                 }
-            });
+                root.removeAttribute("title");
+            }
+            if (root.querySelectorAll) {
+                root.querySelectorAll("[title]").forEach(el => {
+                    const title = el.getAttribute("title");
+                    if (title && !el.hasAttribute("data-tooltip")) {
+                        el.setAttribute("data-tooltip", title);
+                    }
+                    el.removeAttribute("title");
+                });
+            }
         };
         convertTitleToTooltip(doc);
         
-        // Configura um MutationObserver para lidar com elementos criados dinamicamente
+        // Configura um MutationObserver para lidar com elementos criados dinamicamente e atributos title injetados
         const observer = new MutationObserver((mutations) => {
             mutations.forEach(mutation => {
+                if (mutation.type === "attributes" && mutation.attributeName === "title") {
+                    const el = mutation.target;
+                    if (el && el.hasAttribute && el.hasAttribute("title")) {
+                        const title = el.getAttribute("title");
+                        if (title && !el.hasAttribute("data-tooltip")) {
+                            el.setAttribute("data-tooltip", title);
+                        }
+                        el.removeAttribute("title");
+                    }
+                    return;
+                }
                 mutation.addedNodes.forEach(node => {
                     if (node.nodeType === Node.ELEMENT_NODE) {
-                        if (node.hasAttribute("title")) {
-                            const title = node.getAttribute("title");
-                            node.setAttribute("data-tooltip", title);
-                            node.removeAttribute("title");
-                        }
-                        node.querySelectorAll("[title]").forEach(el => {
-                            const title = el.getAttribute("title");
-                            el.setAttribute("data-tooltip", title);
-                            el.removeAttribute("title");
-                        });
+                        convertTitleToTooltip(node);
                     }
                 });
             });
         });
-        observer.observe(doc.body, { childList: true, subtree: true });
+        observer.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["title"] });
 
         // Criar elemento global de tooltip
         let globalTooltip = doc.getElementById("global-tooltip");
@@ -1612,6 +1624,16 @@ window.addEventListener("DOMContentLoaded", () => {
 
         // Eventos mouseover/mouseout delegados para exibir e posicionar a tooltip global
         doc.body.addEventListener("mouseover", (e) => {
+            // Suprime preventivamente qualquer atributo title no elemento sob o cursor ou seus ancestrais
+            const titledEl = e.target.closest("[title]");
+            if (titledEl && titledEl.hasAttribute && titledEl.hasAttribute("title")) {
+                const title = titledEl.getAttribute("title");
+                if (title && !titledEl.hasAttribute("data-tooltip")) {
+                    titledEl.setAttribute("data-tooltip", title);
+                }
+                titledEl.removeAttribute("title");
+            }
+
             const target = e.target.closest("[data-tooltip]");
             if (!target) return;
             globalTooltip.style.display = "";

@@ -718,24 +718,27 @@ export class WorkspaceManager {
         if (btnTimelineExpandLeft) {
             btnTimelineExpandLeft.classList.toggle("active", isLeftExpanded);
             btnTimelineExpandLeft.innerHTML = isLeftExpanded ? `<i class="fa-solid fa-arrow-right"></i>` : `<i class="fa-solid fa-arrow-left"></i>`;
-            btnTimelineExpandLeft.title = isLeftExpanded ? "Recolher Timeline da Esquerda" : "Expandir Timeline para a Esquerda";
-            btnTimelineExpandLeft.setAttribute("data-tooltip", btnTimelineExpandLeft.title);
+            const tip = isLeftExpanded ? "Recolher Timeline da Esquerda" : "Expandir Timeline para a Esquerda";
+            btnTimelineExpandLeft.removeAttribute("title");
+            btnTimelineExpandLeft.setAttribute("data-tooltip", tip);
         }
 
         const btnTimelineExpandRight = document.getElementById("btn-timeline-expand-right");
         if (btnTimelineExpandRight) {
             btnTimelineExpandRight.classList.toggle("active", isRightExpanded);
             btnTimelineExpandRight.innerHTML = isRightExpanded ? `<i class="fa-solid fa-arrow-left"></i>` : `<i class="fa-solid fa-arrow-right"></i>`;
-            btnTimelineExpandRight.title = isRightExpanded ? "Recolher Timeline da Direita" : "Expandir Timeline para a Direita";
-            btnTimelineExpandRight.setAttribute("data-tooltip", btnTimelineExpandRight.title);
+            const tip = isRightExpanded ? "Recolher Timeline da Direita" : "Expandir Timeline para a Direita";
+            btnTimelineExpandRight.removeAttribute("title");
+            btnTimelineExpandRight.setAttribute("data-tooltip", tip);
         }
 
         const btnToggleTimelinePos = document.getElementById("btn-toggle-timeline-position");
         if (btnToggleTimelinePos) {
             const isCenter = this.timelinePosition === "center";
             btnToggleTimelinePos.innerHTML = isCenter ? `<i class="fa-solid fa-window-maximize"></i>` : `<i class="fa-solid fa-arrows-left-right-to-line"></i>`;
-            btnToggleTimelinePos.title = isCenter ? "Mover Timeline para a Faixa de Baixo (Largura Total)" : "Mover Timeline para entre os Menus";
-            btnToggleTimelinePos.setAttribute("data-tooltip", btnToggleTimelinePos.title);
+            const tip = isCenter ? "Mover Timeline para a Faixa de Baixo (Largura Total)" : "Mover Timeline para entre os Menus";
+            btnToggleTimelinePos.removeAttribute("title");
+            btnToggleTimelinePos.setAttribute("data-tooltip", tip);
         }
 
         const btnToggleMonitorsSrc = document.getElementById("btn-toggle-monitors-layout-source");
@@ -756,12 +759,12 @@ export class WorkspaceManager {
 
         if (btnToggleMonitorsSrc) {
             btnToggleMonitorsSrc.innerHTML = monitorsIconHtml;
-            btnToggleMonitorsSrc.title = monitorsTooltip;
+            btnToggleMonitorsSrc.removeAttribute("title");
             btnToggleMonitorsSrc.setAttribute("data-tooltip", monitorsTooltip);
         }
         if (btnToggleMonitorsPrg) {
             btnToggleMonitorsPrg.innerHTML = monitorsIconHtml;
-            btnToggleMonitorsPrg.title = monitorsTooltip;
+            btnToggleMonitorsPrg.removeAttribute("title");
             btnToggleMonitorsPrg.setAttribute("data-tooltip", monitorsTooltip);
         }
 
@@ -770,7 +773,9 @@ export class WorkspaceManager {
             btnMaxLib.innerHTML = (isBottomFull && isStacked)
                 ? `<i class="fa-solid fa-compress"></i>`
                 : `<i class="fa-solid fa-expand"></i>`;
-            btnMaxLib.title = (isBottomFull && isStacked) ? "Sair do Layout Estúdio" : "Layout Estúdio (biblioteca + players + timeline)";
+            const tip = (isBottomFull && isStacked) ? "Sair do Layout Estúdio" : "Layout Estúdio (biblioteca + players + timeline)";
+            btnMaxLib.removeAttribute("title");
+            btnMaxLib.setAttribute("data-tooltip", tip);
         }
     }
 
@@ -1095,7 +1100,7 @@ export class WorkspaceManager {
                 ? `<i class="fa-solid fa-chevron-left"></i>` 
                 : `<i class="fa-solid fa-chevron-right"></i>`;
             const title = isLeft ? "Recolher Painel (Esquerda)" : "Recolher Painel (Direita)";
-            toggleBtn.title = title;
+            toggleBtn.removeAttribute("title");
             toggleBtn.setAttribute("data-tooltip", title);
         }
     }
@@ -3209,7 +3214,7 @@ export class WorkspaceManager {
                 if (popBtn) {
                     popBtn.setAttribute("data-orig-tooltip", popBtn.getAttribute("data-tooltip") || popBtn.title || DEFAULT_POPOUT_TITLES[currentId] || "Destacar");
                     popBtn.setAttribute("data-orig-html", popBtn.innerHTML);
-                    popBtn.title = "Reanexar ao Editor Principal";
+                    popBtn.removeAttribute("title");
                     popBtn.setAttribute("data-tooltip", "Reanexar ao Editor Principal");
                     popBtn.innerHTML = '<i class="fa-solid fa-down-left-and-up-right-to-center"></i>';
                     popBtn.onclick = (e) => {
@@ -3231,7 +3236,7 @@ export class WorkspaceManager {
                         const isStacked = layout === "stacked";
                         toggleBtn.innerHTML = isStacked ? '<i class="fa-solid fa-chevron-up"></i>' : '<i class="fa-solid fa-chevron-left"></i>';
                         const tip = isStacked ? "Recolher Painel (Cima)" : "Recolher Painel (Esquerda)";
-                        toggleBtn.title = tip;
+                        toggleBtn.removeAttribute("title");
                         toggleBtn.setAttribute("data-tooltip", tip);
                     } else {
                         panelEl.classList.remove("dock-left");
@@ -3239,7 +3244,7 @@ export class WorkspaceManager {
                         const isStacked = layout === "stacked";
                         toggleBtn.innerHTML = isStacked ? '<i class="fa-solid fa-chevron-down"></i>' : '<i class="fa-solid fa-chevron-right"></i>';
                         const tip = isStacked ? "Recolher Painel (Baixo)" : "Recolher Painel (Direita)";
-                        toggleBtn.title = tip;
+                        toggleBtn.removeAttribute("title");
                         toggleBtn.setAttribute("data-tooltip", tip);
                     }
 
@@ -3442,7 +3447,7 @@ export class WorkspaceManager {
 
                 popBtn.setAttribute("data-orig-tooltip", currentTooltip);
                 popBtn.setAttribute("data-orig-html", currentHtml);
-                popBtn.title = "Reanexar ao Editor Principal";
+                popBtn.removeAttribute("title");
                 popBtn.setAttribute("data-tooltip", "Reanexar ao Editor Principal");
                 popBtn.innerHTML = '<i class="fa-solid fa-down-left-and-up-right-to-center"></i>';
                 popBtn.style.display = "";
@@ -3613,7 +3618,7 @@ export class WorkspaceManager {
             const origTooltip = popBtn.getAttribute("data-orig-tooltip") || DEFAULT_POPOUT_TITLES[panelId] || "Destacar Painel";
             const origHtml = popBtn.getAttribute("data-orig-html") || DEFAULT_POPOUT_HTML;
 
-            popBtn.title = origTooltip;
+            popBtn.removeAttribute("title");
             popBtn.setAttribute("data-tooltip", origTooltip);
             popBtn.innerHTML = origHtml;
             popBtn.removeAttribute("data-orig-tooltip");
@@ -3713,7 +3718,8 @@ export class WorkspaceManager {
                 btnMaxInspector.innerHTML = isMax 
                     ? `<i class="fa-solid fa-compress"></i>` 
                     : `<i class="fa-solid fa-expand"></i>`;
-                btnMaxInspector.title = isMax ? "Restaurar Painel" : "Maximizar Painel";
+                btnMaxInspector.removeAttribute("title");
+                btnMaxInspector.setAttribute("data-tooltip", isMax ? "Restaurar Painel" : "Maximizar Painel");
                 
                 window.dispatchEvent(new Event("resize"));
             });
@@ -3728,7 +3734,8 @@ export class WorkspaceManager {
                 btnMaxRight.innerHTML = isMax 
                     ? `<i class="fa-solid fa-compress"></i>` 
                     : `<i class="fa-solid fa-expand"></i>`;
-                btnMaxRight.title = isMax ? "Restaurar Painel" : "Maximizar Painel";
+                btnMaxRight.removeAttribute("title");
+                btnMaxRight.setAttribute("data-tooltip", isMax ? "Restaurar Painel" : "Maximizar Painel");
                 
                 window.dispatchEvent(new Event("resize"));
             });
