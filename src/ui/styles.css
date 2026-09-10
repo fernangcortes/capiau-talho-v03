@@ -505,6 +505,7 @@ button {
 
 /* ── RETRACTABLE SIDEBARS ────────────────────────────────────────────── */
 .sidebar-left, .sidebar-right, .sidebar-inspector {
+    position: relative !important;
     display: flex;
     flex-direction: column;
     width: 350px;

@@ -8744,6 +8744,11 @@ export class LibraryScrollIndexTracker {
         const activeTabEl = doc.getElementById(activeTab);
         if (!activeTabEl) return;
 
+        // Garante que blocos pendentes entraram no DOM antes de indexar e desenhar a fita
+        if (typeof flushAllPendingChunks === "function") {
+            flushAllPendingChunks(activeTabEl);
+        }
+
         // Se a lista não tiver overflow ou não tiver itens visíveis
         if (container.scrollHeight <= container.clientHeight + 8) {
             if (this.ribbonCanvas) this.ribbonCanvas.style.display = "none";
@@ -8813,21 +8818,21 @@ export class LibraryScrollIndexTracker {
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, width, height);
         } else {
-            // Modo Blocos de Cena (Padrão)
+            // Modo Blocos de Cena (Padrão com indexação vetorial estrita e proporcional)
             const blocks = coalesceColorBlocks(itemsWithColors);
             const totalCount = itemsWithColors.length;
-            let currentY = 0;
 
             blocks.forEach((block, bIdx) => {
-                const blockH = Math.max(2, (block.count / totalCount) * height);
+                const yStart = (block.startIndex / totalCount) * height;
+                const yEnd = ((block.endIndex + 1) / totalCount) * height;
+                const blockH = Math.max(1, yEnd - yStart);
                 ctx.fillStyle = block.color;
-                ctx.fillRect(0, currentY, width, blockH);
+                ctx.fillRect(0, yStart, width, blockH);
 
-                if (bIdx > 0) {
+                if (bIdx > 0 && (yEnd - yStart) > 3) {
                     ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
-                    ctx.fillRect(0, currentY, width, 1);
+                    ctx.fillRect(0, yStart, width, 1);
                 }
-                currentY += blockH;
             });
         }
 
