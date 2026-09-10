@@ -202,6 +202,10 @@ export class CapiauTimelineInteraction {
                 this.renderer.rollingGuide = null;
                 this.renderer.requestRedraw();
             }
+            if (this.renderer && this.renderer.hoveredGap) {
+                this.renderer.hoveredGap = null;
+                this.renderer.requestRedraw();
+            }
             this.hideRollingTooltip();
             this.hideHoverPreview();
         };
@@ -1988,6 +1992,10 @@ export class CapiauTimelineInteraction {
                     }
                 }
 
+                if (this.renderer && this.renderer.hoveredGap) {
+                    this.renderer.hoveredGap = null;
+                    this.renderer.requestRedraw();
+                }
                 const trimHit = this.getTrimHit(x, track);
                 if (trimHit) {
                     this.canvas.style.cursor = this.getTrimCursor(trimHit.activeSide, trimHit.isUnited);
@@ -1998,6 +2006,15 @@ export class CapiauTimelineInteraction {
                 if (TIMELINE_STATE.hoveredFadeHandle !== null) {
                     TIMELINE_STATE.hoveredFadeHandle = null;
                     if (this.renderer) this.renderer.requestRedraw();
+                }
+                const gap = track ? TIMELINE_STATE.getGapAt(frame, track) : null;
+                if (this.renderer) {
+                    const prevGap = this.renderer.hoveredGap;
+                    const isDifferent = (!prevGap && gap) || (prevGap && !gap) || (prevGap && gap && (prevGap.trackId !== gap.trackId || prevGap.startFrame !== gap.startFrame));
+                    if (isDifferent) {
+                        this.renderer.hoveredGap = gap;
+                        this.renderer.requestRedraw();
+                    }
                 }
                 const trimHit = this.getTrimHit(x, track);
                 if (trimHit) {
@@ -2859,15 +2876,45 @@ export class CapiauTimelineInteraction {
             e.preventDefault();
             e.stopPropagation();
             this.showClipContextMenu(e.clientX, e.clientY, hit.data, frame);
-        } else if (hit && hit.type === "gap") {
-            e.preventDefault();
-            e.stopPropagation();
-            this.showGapContextMenu(e.clientX, e.clientY, hit.data, frame);
-        } else {
-            e.preventDefault();
-            e.stopPropagation();
-            this.showRulerContextMenu(e.clientX, e.clientY, frame);
+            return;
         }
+
+        // Verifica se clicou sobre um espaço vazio (Gap)
+        let gap = track ? TIMELINE_STATE.getGapAt(frame, track) : null;
+        if (!gap && TIMELINE_STATE.selectedGap) {
+            const sGap = TIMELINE_STATE.selectedGap;
+            if (frame >= sGap.startFrame && frame <= sGap.endFrame) {
+                gap = sGap;
+            }
+        }
+        if (!gap) {
+            // Se a pista clicada não tem cortes mas há um espaço vazio global na timeline
+            const allCuts = STATE.activeTimelineCuts || [];
+            const hasAnyClipAtFrame = allCuts.some(c => frame >= (c.timelineStartFrame || 0) && frame < (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame));
+            if (!hasAnyClipAtFrame && allCuts.length > 0) {
+                const tracksWithClips = TIMELINE_STATE.tracks.filter(t => allCuts.some(c => c.track === t.id));
+                for (const t of tracksWithClips) {
+                    const g = TIMELINE_STATE.getGapAt(frame, t.id);
+                    if (g) {
+                        gap = g;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (gap) {
+            e.preventDefault();
+            e.stopPropagation();
+            TIMELINE_STATE.selectGap(gap);
+            if (this.renderer) this.renderer.requestRedraw();
+            this.showGapContextMenu(e.clientX, e.clientY, gap, frame);
+            return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+        this.showRulerContextMenu(e.clientX, e.clientY, frame);
     }
 
     /**
@@ -2991,15 +3038,23 @@ export class CapiauTimelineInteraction {
 
         addDivider();
 
-        // 4. Edição Destrutiva no Intervalo
+        // 4. Edição Destrutiva no Intervalo / Espaço
+        if (TIMELINE_STATE.selectedGap) {
+            const sGap = TIMELINE_STATE.selectedGap;
+            addItem("fa-solid fa-arrow-right-to-bracket", "Ripple Delete no Espaço Selecionado", "Shift+Del", () => {
+                TIMELINE_STATE.rippleDeleteGap(sGap.trackId, sGap.startFrame, sGap.durationFrames);
+                if (typeof window.showToast === "function") window.showToast("Ripple Delete: espaço fechado", "info");
+            }, true, "var(--color-cyan)");
+        }
+
         addItem("fa-solid fa-scissors", "Lift no Intervalo IN–OUT", ";", () => {
             TIMELINE_STATE.liftRange();
             if (typeof window.showToast === "function") window.showToast("Lift executado no intervalo IN-OUT", "info");
         }, hasAny);
 
-        addItem("fa-solid fa-film", "Extract no Intervalo IN–OUT", "'", () => {
+        addItem("fa-solid fa-film", "Extract (Ripple Delete) no Intervalo IN–OUT", "'", () => {
             TIMELINE_STATE.extractRange();
-            if (typeof window.showToast === "function") window.showToast("Extract executado no intervalo IN-OUT", "info");
+            if (typeof window.showToast === "function") window.showToast("Extract (Ripple Delete) executado no intervalo IN-OUT", "info");
         }, hasAny);
 
         document.body.appendChild(menu);
@@ -3337,7 +3392,7 @@ export class CapiauTimelineInteraction {
         menu.style.position = "fixed";
         menu.style.left = `${clientX}px`;
         menu.style.top = `${clientY}px`;
-        menu.style.width = "200px";
+        menu.style.width = "230px";
         menu.style.zIndex = "100000";
         menu.style.padding = "6px 0";
 
@@ -3351,42 +3406,112 @@ export class CapiauTimelineInteraction {
         title.style.display = "flex";
         title.style.alignItems = "center";
         title.style.gap = "6px";
-        title.innerHTML = `<i class="fa-solid fa-arrows-left-right-to-line"></i> ESPAÇO VAZIO (GAP)`;
+        const trackName = gap.trackId || "V1";
+        title.innerHTML = `<i class="fa-solid fa-arrows-left-right-to-line"></i> ESPAÇO VAZIO [${trackName}]`;
         menu.appendChild(title);
 
-        const itemRippleDel = document.createElement("div");
-        itemRippleDel.className = "menu-item";
-        itemRippleDel.style.display = "flex";
-        itemRippleDel.style.alignItems = "center";
-        itemRippleDel.style.justifyContent = "space-between";
-        itemRippleDel.style.padding = "7px 12px";
-        itemRippleDel.style.cursor = "pointer";
-        itemRippleDel.innerHTML = `
-            <span style="display:flex; align-items:center; gap:8px;">
-                <i class="fa-solid fa-arrow-right-to-bracket" style="color:var(--color-cyan);"></i>
-                <span>Fechar Espaço (Ripple)</span>
-            </span>
-            <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Del</kbd>
-        `;
-        itemRippleDel.onclick = () => {
-            TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
-            if (typeof window.showToast === "function") {
-                window.showToast("Espaço fechado com Ripple", "info");
-            }
-            if (this.renderer) this.renderer.requestRedraw();
+        const cleanup = () => {
             menu.remove();
+            document.removeEventListener("mousedown", closeHandler);
+            document.removeEventListener("keydown", keyHandler);
         };
-        menu.appendChild(itemRippleDel);
-
-        document.body.appendChild(menu);
 
         const closeHandler = (ev) => {
             if (!menu.contains(ev.target)) {
-                menu.remove();
-                document.removeEventListener("mousedown", closeHandler);
+                cleanup();
             }
         };
-        setTimeout(() => document.addEventListener("mousedown", closeHandler), 10);
+
+        const keyHandler = (ev) => {
+            if (ev.key === "Escape") {
+                cleanup();
+            }
+        };
+
+        const addItem = (icon, label, kbd, action, isEnabled = true, iconColor = "var(--color-cyan)") => {
+            const item = document.createElement("div");
+            item.className = "menu-item";
+            item.style.display = "flex";
+            item.style.alignItems = "center";
+            item.style.justifyContent = "space-between";
+            item.style.padding = "7px 12px";
+            item.style.cursor = isEnabled ? "pointer" : "default";
+            item.style.opacity = isEnabled ? "1" : "0.5";
+            item.innerHTML = `
+                <span style="display:flex; align-items:center; gap:8px;">
+                    <i class="${icon}" style="color:${iconColor}; width:14px; text-align:center;"></i>
+                    <span>${label}</span>
+                </span>
+                ${kbd ? `<kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">${kbd}</kbd>` : ""}
+            `;
+            if (isEnabled) {
+                item.onclick = () => {
+                    action();
+                    cleanup();
+                };
+            }
+            menu.appendChild(item);
+        };
+
+        const addDivider = () => {
+            const div = document.createElement("div");
+            div.style.height = "1px";
+            div.style.background = "var(--border-glass)";
+            div.style.margin = "4px 0";
+            menu.appendChild(div);
+        };
+
+        // 1. Ripple Delete (Fechar Espaço)
+        addItem("fa-solid fa-arrow-right-to-bracket", "Ripple Delete (Fechar Espaço)", "Shift+Del", () => {
+            TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
+            if (typeof window.showToast === "function") {
+                window.showToast("Ripple Delete: espaço fechado", "info");
+            }
+            if (this.renderer) this.renderer.requestRedraw();
+        }, true, "var(--color-cyan)");
+
+        addDivider();
+
+        // 2. Marcar Ponto IN e OUT no Intervalo do Espaço
+        addItem("fa-solid fa-crop-simple", "Marcar Intervalo IN e OUT", "X", () => {
+            TIMELINE_STATE.setInPoint(gap.startFrame);
+            TIMELINE_STATE.setOutPoint(gap.startFrame + gap.durationFrames);
+            if (this.renderer) this.renderer.requestRedraw();
+            if (typeof window.showToast === "function") {
+                window.showToast("Intervalo IN–OUT marcado no espaço", "info");
+            }
+        });
+
+        // 3. Navegação para Início e Fim do Espaço
+        addItem("fa-solid fa-backward-step", "Ir para Início do Espaço", "", () => {
+            this.updatePlayhead(gap.startFrame);
+            if (this.renderer) this.renderer.requestRedraw();
+        });
+
+        addItem("fa-solid fa-forward-step", "Ir para Fim do Espaço", "", () => {
+            this.updatePlayhead(gap.startFrame + gap.durationFrames);
+            if (this.renderer) this.renderer.requestRedraw();
+        });
+
+        addDivider();
+
+        // 4. Desmarcar
+        addItem("fa-solid fa-xmark", "Desmarcar Espaço", "Esc", () => {
+            TIMELINE_STATE.clearSelectedGap();
+            if (this.renderer) this.renderer.requestRedraw();
+        }, true, "var(--text-muted)");
+
+        document.body.appendChild(menu);
+
+        // Previne transbordar das bordas da janela
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+        if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+
+        setTimeout(() => {
+            document.addEventListener("mousedown", closeHandler);
+            document.addEventListener("keydown", keyHandler);
+        }, 10);
     }
 
     /**
