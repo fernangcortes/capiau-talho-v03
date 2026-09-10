@@ -5,6 +5,16 @@
 
 const assert = require("assert");
 
+if (typeof globalThis.localStorage === "undefined") {
+    globalThis.localStorage = {
+        _data: {},
+        getItem(k) { return this._data[k] || null; },
+        setItem(k, v) { this._data[k] = String(v); },
+        removeItem(k) { delete this._data[k]; },
+        clear() { this._data = {}; }
+    };
+}
+
 console.log("=== Iniciando Testes de Expansão Direcional da Timeline ===");
 
 class MockElement {
@@ -217,6 +227,26 @@ class WorkspaceManagerSimulator {
 
         const timelinePanel = findElement("timeline-panel");
         const reopenTimeline = findElement("reopen-timeline");
+
+        let currentTimelineH = null;
+        if (timelinePanel && !timelinePanel.classList.contains("collapsed")) {
+            const inlineH = parseFloat(timelinePanel.style.height);
+            if (!isNaN(inlineH) && inlineH > 50) {
+                currentTimelineH = Math.round(inlineH);
+            }
+        }
+        if (!currentTimelineH && typeof globalThis.localStorage !== "undefined") {
+            const savedH = parseFloat(globalThis.localStorage.getItem("layout-dim-splitter-timeline"))
+                        || parseFloat(globalThis.localStorage.getItem("layout-dim-splitter-studio-timeline"));
+            if (!isNaN(savedH) && savedH > 50) {
+                currentTimelineH = Math.round(savedH);
+            }
+        }
+        if (currentTimelineH && typeof globalThis.localStorage !== "undefined") {
+            globalThis.localStorage.setItem("layout-dim-splitter-timeline", currentTimelineH);
+            globalThis.localStorage.setItem("layout-dim-splitter-studio-timeline", currentTimelineH);
+        }
+
         const centerIndex = this.columnOrder.indexOf("center-stage");
 
         if (position === "bottom-full") {
@@ -316,6 +346,11 @@ class WorkspaceManagerSimulator {
                 "layout-timeline-bottom-right",
                 "layout-timeline-expanded"
             );
+        }
+
+        if (timelinePanel && currentTimelineH && !timelinePanel.classList.contains("collapsed")) {
+            timelinePanel.style.height = `${currentTimelineH}px`;
+            timelinePanel.style.flex = `0 0 ${currentTimelineH}px`;
         }
     }
 
@@ -595,5 +630,66 @@ assert.ok(
 
 console.log("✓ Teste 10: Integridade de bottom-full, classes do body e folhas de estilo CSS validadas");
 
-console.log("\nTODOS OS 10 TESTES DE EXPANSÃO DIRECIONAL DA TIMELINE PASSARAM COM SUCESSO!");
+// =========================================================================
+// TESTE 11: Preservação Estrita da Altura da Timeline ao Mudar de Posição
+// =========================================================================
+// Define uma altura customizada no painel da timeline (ex: 450px) em modo 'center'
+sim.timelinePanel.style.height = "450px";
+sim.timelinePanel.style.flex = "0 0 450px";
+
+// Ciclo completo de posições: center -> bottom-left -> bottom-right -> bottom-full -> center
+const positions = ["bottom-left", "bottom-right", "bottom-full", "center", "bottom-full", "bottom-left", "center"];
+for (const pos of positions) {
+    sim.setTimelinePosition(pos);
+    assert.strictEqual(
+        sim.timelinePanel.style.height,
+        "450px",
+        `A altura da timeline DEVE continuar 450px após transição para '${pos}'`
+    );
+    assert.strictEqual(
+        sim.timelinePanel.style.flex,
+        "0 0 450px",
+        `O flex da timeline DEVE continuar '0 0 450px' após transição para '${pos}'`
+    );
+    assert.strictEqual(
+        globalThis.localStorage.getItem("layout-dim-splitter-timeline"),
+        "450",
+        `layout-dim-splitter-timeline no localStorage deve ser sincronizado com 450`
+    );
+    assert.strictEqual(
+        globalThis.localStorage.getItem("layout-dim-splitter-studio-timeline"),
+        "450",
+        `layout-dim-splitter-studio-timeline no localStorage deve ser sincronizado com 450`
+    );
+}
+
+console.log("✓ Teste 11: Preservação estrita da altura da timeline (450px) validada em todas as transições de posição");
+
+// =========================================================================
+// TESTE 12: Verificação Estática de Sincronia e Proteção no SplitterHelper
+// =========================================================================
+assert.ok(
+    wmSource.includes("const isTimelineSplitter = direction === \"vertical\" && (className.includes(\"splitter-timeline\") || className.includes(\"splitter-studio-timeline\"));"),
+    "SplitterHelper DEVE identificar se o divisor é vertical da timeline"
+);
+assert.ok(
+    wmSource.includes("localStorage.setItem(\"layout-dim-splitter-timeline\", currentTimelineH);") &&
+    wmSource.includes("localStorage.setItem(\"layout-dim-splitter-studio-timeline\", currentTimelineH);"),
+    "setTimelinePosition DEVE sincronizar ambas as chaves de splitter no localStorage"
+);
+assert.ok(
+    wmSource.includes("localStorage.setItem(\"layout-dim-splitter-timeline\", storedValue);") &&
+    wmSource.includes("localStorage.setItem(\"layout-dim-splitter-studio-timeline\", storedValue);"),
+    "SplitterHelper.handleMouseUp DEVE sincronizar ambas as chaves ao arrastar o divisor da timeline"
+);
+assert.ok(
+    wmSource.includes("localStorage.setItem(\"layout-dim-splitter-timeline\", targetH);") &&
+    wmSource.includes("localStorage.setItem(\"layout-dim-splitter-studio-timeline\", targetH);"),
+    "fitTimelineHeightToTracks DEVE sincronizar ambas as chaves ao ajustar altura automaticamente"
+);
+
+console.log("✓ Teste 12: Verificação estática de sincronia bidirecional e preservação no SplitterHelper validada com sucesso");
+
+console.log("\nTODOS OS 12 TESTES DE EXPANSÃO DIRECIONAL E PRESERVAÇÃO DE ALTURA DA TIMELINE PASSARAM COM SUCESSO!");
+
 

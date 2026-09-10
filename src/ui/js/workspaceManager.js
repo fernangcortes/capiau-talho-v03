@@ -1840,6 +1840,33 @@ export class WorkspaceManager {
         const timelinePanel = findElement("timeline-panel");
         const reopenTimeline = findElement("reopen-timeline");
 
+        // Preserva rigorosamente a altura atual da timeline antes de reposicionar
+        let currentTimelineH = null;
+        if (timelinePanel && !timelinePanel.classList.contains("collapsed")) {
+            const inlineH = parseFloat(timelinePanel.style.height);
+            if (!isNaN(inlineH) && inlineH > 50) {
+                currentTimelineH = Math.round(inlineH);
+            } else {
+                const rectH = (typeof timelinePanel.getBoundingClientRect === "function" ? timelinePanel.getBoundingClientRect().height : 0) || timelinePanel.offsetHeight;
+                if (rectH && rectH > 50) {
+                    currentTimelineH = Math.round(rectH);
+                }
+            }
+        }
+        if (!currentTimelineH) {
+            const savedH = parseFloat(localStorage.getItem("layout-dim-splitter-timeline"))
+                        || parseFloat(localStorage.getItem("layout-dim-splitter-studio-timeline"));
+            if (!isNaN(savedH) && savedH > 50) {
+                currentTimelineH = Math.round(savedH);
+            }
+        }
+        if (currentTimelineH) {
+            try {
+                localStorage.setItem("layout-dim-splitter-timeline", currentTimelineH);
+                localStorage.setItem("layout-dim-splitter-studio-timeline", currentTimelineH);
+            } catch (e) {}
+        }
+
         const centerIndex = this.columnOrder.indexOf("center-stage");
 
         if (position === "bottom-full") {
@@ -2001,8 +2028,18 @@ export class WorkspaceManager {
 
         this.updateLayoutUI();
 
+        if (timelinePanel && currentTimelineH && !timelinePanel.classList.contains("collapsed")) {
+            timelinePanel.style.height = `${currentTimelineH}px`;
+            timelinePanel.style.flex = `0 0 ${currentTimelineH}px`;
+        }
+
         if (!skipSplitterReinit) {
             this.reinitSplitters();
+        }
+
+        if (timelinePanel && currentTimelineH && !timelinePanel.classList.contains("collapsed")) {
+            timelinePanel.style.height = `${currentTimelineH}px`;
+            timelinePanel.style.flex = `0 0 ${currentTimelineH}px`;
         }
         if (window.timelineRenderer) {
             window.timelineRenderer.resize();
@@ -2423,8 +2460,8 @@ export class WorkspaceManager {
                         resizeTarget: "right",
                         unit: "px",
                         minVal: 150,
-                        maxVal: 600,
-                        defaultVal: 290,
+                        maxVal: 700,
+                        defaultVal: 300,
                         className: "splitter-timeline",
                         tooltip: "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)",
                         onDoubleClick: () => this.fitTimelineHeightToTracks(true)
@@ -2511,8 +2548,8 @@ export class WorkspaceManager {
         const fitTargetH = Math.max(minAllowedH, Math.min(maxAllowedH, neededH));
 
         // 7. Altura atual e verificação de toggle
-        const currentH = Math.round(timelinePanel.getBoundingClientRect().height || timelinePanel.offsetHeight || 290);
-        const defaultVal = this.timelinePosition === "center" ? 290 : 300;
+        const currentH = Math.round(timelinePanel.getBoundingClientRect().height || timelinePanel.offsetHeight || 300);
+        const defaultVal = 300;
 
         let targetH = fitTargetH;
         // Se a timeline já estiver ajustada na altura de encaixe (diferença <= 3px), alterna para a altura anterior/padrão
@@ -2543,7 +2580,10 @@ export class WorkspaceManager {
         if (!smooth) {
             timelinePanel.style.height = `${targetH}px`;
             timelinePanel.style.flex = `0 0 ${targetH}px`;
-            if (storageKey) localStorage.setItem(storageKey, targetH);
+            try {
+                localStorage.setItem("layout-dim-splitter-timeline", targetH);
+                localStorage.setItem("layout-dim-splitter-studio-timeline", targetH);
+            } catch (e) {}
             if (tlState) {
                 if (targetH === fitTargetH) tlState.scrollTop = 0;
                 tlState.clampScrollTop();
@@ -2598,8 +2638,10 @@ export class WorkspaceManager {
                 this._timelineResizeAnimRaf = null;
                 // Finalização com os valores exatos
                 timelinePanel.style.height = `${targetH}px`;
-                timelinePanel.style.flex = `0 0 ${targetH}px`;
-                if (storageKey) localStorage.setItem(storageKey, targetH);
+                try {
+                    localStorage.setItem("layout-dim-splitter-timeline", targetH);
+                    localStorage.setItem("layout-dim-splitter-studio-timeline", targetH);
+                } catch (e) {}
                 if (tlState) {
                     if (shouldZeroScroll) tlState.scrollTop = 0;
                     tlState.clampScrollTop();
@@ -3042,11 +3084,18 @@ export class WorkspaceManager {
                 sidebarRight.style.width = valStr;
                 sidebarRight.style.flex = `0 0 ${valStr}`;
             }
-            if (timelinePanel && customConfig.splitters["layout-dim-splitter-timeline"]) {
-                const val = customConfig.splitters["layout-dim-splitter-timeline"];
-                const valStr = typeof val === "number" ? `${val}px` : String(val);
+            const customTimelineH = customConfig.splitters && (customConfig.splitters["layout-dim-splitter-timeline"] || customConfig.splitters["layout-dim-splitter-studio-timeline"]);
+            if (timelinePanel && customTimelineH) {
+                const valStr = typeof customTimelineH === "number" ? `${customTimelineH}px` : String(customTimelineH);
                 timelinePanel.style.height = valStr;
                 timelinePanel.style.flex = `0 0 ${valStr}`;
+                const parsedVal = parseInt(customTimelineH);
+                if (!isNaN(parsedVal)) {
+                    try {
+                        localStorage.setItem("layout-dim-splitter-timeline", parsedVal);
+                        localStorage.setItem("layout-dim-splitter-studio-timeline", parsedVal);
+                    } catch (e) {}
+                }
             }
             if (sourcePanel && customConfig.splitters["layout-dim-splitter-players"]) {
                 const val = customConfig.splitters["layout-dim-splitter-players"];
@@ -4766,11 +4815,18 @@ export class SplitterHelper {
         const maxVal = options.maxVal || (unit === "%" ? (options.maxPct || 80) : 800);
         let defaultVal = options.defaultVal || (unit === "%" ? (options.defaultPct || 50) : 350);
         const className = options.className || "";
+        const isTimelineSplitter = direction === "vertical" && (className.includes("splitter-timeline") || className.includes("splitter-studio-timeline"));
 
         // Tenta recuperar do localStorage se aplicável
         const storageKey = className ? `layout-dim-${className.split(" ")[0]}` : null;
         if (storageKey) {
-            const savedVal = localStorage.getItem(storageKey);
+            let savedVal = localStorage.getItem(storageKey);
+            if (savedVal === null && isTimelineSplitter) {
+                const fallbackKey = storageKey === "layout-dim-splitter-timeline"
+                    ? "layout-dim-splitter-studio-timeline"
+                    : "layout-dim-splitter-timeline";
+                savedVal = localStorage.getItem(fallbackKey);
+            }
             if (savedVal !== null) {
                 const parsed = parseFloat(savedVal);
                 if (!isNaN(parsed)) {
@@ -4808,6 +4864,18 @@ export class SplitterHelper {
         if (unit === "px") {
             const targetEl = resizeTarget === "left" ? leftEl : rightEl;
             if (targetEl && !targetEl.classList.contains("center-stage") && !targetEl.classList.contains("compound-stage")) {
+                if (isTimelineSplitter) {
+                    const existingH = parseFloat(targetEl.style.height);
+                    if (!isNaN(existingH) && existingH > 50 && !targetEl.classList.contains("collapsed")) {
+                        defaultVal = Math.round(existingH);
+                    }
+                    if (!targetEl.classList.contains("collapsed")) {
+                        try {
+                            localStorage.setItem("layout-dim-splitter-timeline", defaultVal);
+                            localStorage.setItem("layout-dim-splitter-studio-timeline", defaultVal);
+                        } catch (e) {}
+                    }
+                }
                 targetEl.style.flex = `0 0 ${defaultVal}px`;
                 if (direction === "horizontal") {
                     targetEl.style.width = `${defaultVal}px`;
@@ -5040,6 +5108,12 @@ export class SplitterHelper {
                         }
                     }
                     localStorage.setItem(key, storedValue);
+                    if (key === "layout-dim-splitter-timeline" || key === "layout-dim-splitter-studio-timeline") {
+                        try {
+                            localStorage.setItem("layout-dim-splitter-timeline", storedValue);
+                            localStorage.setItem("layout-dim-splitter-studio-timeline", storedValue);
+                        } catch (e) {}
+                    }
                 }
 
                 if (wasDragging) {
