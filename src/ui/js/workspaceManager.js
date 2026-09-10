@@ -139,6 +139,9 @@ export class WorkspaceManager {
             }
         };
 
+        this._timelineResizeAnimRaf = null;
+        this._lastTimelineCustomHeight = null;
+
         this.init();
     }
 
@@ -2163,7 +2166,9 @@ export class WorkspaceManager {
                     minVal: 150,
                     maxVal: 700,
                     defaultVal: 300,
-                    className: "splitter-studio-timeline splitter-compound-timeline"
+                    className: "splitter-studio-timeline splitter-compound-timeline",
+                    tooltip: "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)",
+                    onDoubleClick: () => this.fitTimelineHeightToTracks(true)
                 });
             }
 
@@ -2254,7 +2259,9 @@ export class WorkspaceManager {
                     minVal: 150,
                     maxVal: 700,
                     defaultVal: 300,
-                    className: "splitter-studio-timeline splitter-compound-timeline"
+                    className: "splitter-studio-timeline splitter-compound-timeline",
+                    tooltip: "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)",
+                    onDoubleClick: () => this.fitTimelineHeightToTracks(true)
                 });
             }
 
@@ -2403,7 +2410,9 @@ export class WorkspaceManager {
                         minVal: 150,
                         maxVal: 700,
                         defaultVal: 300,
-                        className: "splitter-studio-timeline"
+                        className: "splitter-studio-timeline",
+                        tooltip: "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)",
+                        onDoubleClick: () => this.fitTimelineHeightToTracks(true)
                     });
                 }
             } else {
@@ -2416,7 +2425,9 @@ export class WorkspaceManager {
                         minVal: 150,
                         maxVal: 600,
                         defaultVal: 290,
-                        className: "splitter-timeline"
+                        className: "splitter-timeline",
+                        tooltip: "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)",
+                        onDoubleClick: () => this.fitTimelineHeightToTracks(true)
                     });
                 }
             }
@@ -2440,6 +2451,173 @@ export class WorkspaceManager {
         if (this.monitorsLayout === "auto") {
             this.evaluateAutoMonitorsLayout(true);
         }
+    }
+
+    /**
+     * Ajusta automaticamente a altura vertical da timeline para caber exatamente todas as pistas abertas,
+     * garantindo que a última pista não fique escondida no rodapé do monitor.
+     * Suporta animação suave com duração proporcional ao delta de altura e alternância (toggle).
+     * @param {boolean} [smooth=true] Se true, redimensiona com animação suave e redesenho síncrono.
+     */
+    fitTimelineHeightToTracks(smooth = true) {
+        const timelinePanel = document.getElementById("timeline-panel") || getActiveElement("timeline-panel");
+        if (!timelinePanel) return;
+
+        const doc = timelinePanel.ownerDocument || document;
+        const win = doc.defaultView || window;
+
+        // Se o painel da timeline estiver colapsado, expande primeiro
+        if (timelinePanel.classList.contains("collapsed")) {
+            const reopenTimeline = doc.getElementById("reopen-timeline");
+            if (reopenTimeline) reopenTimeline.click();
+            else timelinePanel.classList.remove("collapsed");
+        }
+
+        // 1. Altura do cabeçalho da timeline
+        const headerBar = timelinePanel.querySelector("#timeline-header-bar");
+        const reopenHeader = timelinePanel.querySelector("#reopen-timeline-header");
+        let headerH = 0;
+        if (headerBar && !headerBar.classList.contains("collapsed")) {
+            headerH = headerBar.getBoundingClientRect().height || headerBar.offsetHeight || 32;
+        } else if (reopenHeader && reopenHeader.style.display !== "none") {
+            headerH = reopenHeader.getBoundingClientRect().height || reopenHeader.offsetHeight || 4;
+        }
+
+        // 2. Altura da régua (ruler)
+        const rulerH = (win.timelineRenderer && win.timelineRenderer.rulerHeight) || 30;
+
+        // 3. Altura de todas as pistas
+        const tlState = win.TIMELINE_STATE || (typeof STATE !== "undefined" && window.TIMELINE_STATE) || null;
+        let tracksH = 240;
+        if (tlState && typeof tlState.totalTracksHeight === "function") {
+            tracksH = tlState.totalTracksHeight();
+        }
+
+        // 4. Paddings e bordas do timelinePanel
+        const cs = win.getComputedStyle ? win.getComputedStyle(timelinePanel) : {};
+        const padBorderV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+                         + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+
+        // 5. Total necessário (+ 2px de segurança contra subpixel rounding para a última pista)
+        const neededH = Math.ceil(headerH + rulerH + tracksH + padBorderV + 2);
+
+        // 6. Limites do contêiner pai
+        const container = timelinePanel.parentElement;
+        const containerH = container ? (container.clientHeight || container.getBoundingClientRect().height) : (win.innerHeight - 60);
+        // Preserva pelo menos 180px para os monitores / studio-top + 4px de divisor
+        const maxAllowedH = Math.max(180, Math.floor(containerH - 184));
+        const minAllowedH = 150;
+
+        const fitTargetH = Math.max(minAllowedH, Math.min(maxAllowedH, neededH));
+
+        // 7. Altura atual e verificação de toggle
+        const currentH = Math.round(timelinePanel.getBoundingClientRect().height || timelinePanel.offsetHeight || 290);
+        const defaultVal = this.timelinePosition === "center" ? 290 : 300;
+
+        let targetH = fitTargetH;
+        // Se a timeline já estiver ajustada na altura de encaixe (diferença <= 3px), alterna para a altura anterior/padrão
+        if (Math.abs(currentH - fitTargetH) <= 3) {
+            targetH = this._lastTimelineCustomHeight ? this._lastTimelineCustomHeight : defaultVal;
+            targetH = Math.max(minAllowedH, Math.min(maxAllowedH, targetH));
+            if (Math.abs(targetH - fitTargetH) <= 3) {
+                targetH = defaultVal;
+            }
+        } else {
+            // Guarda a altura atual para que o usuário possa reverter com outro clique-duplo
+            this._lastTimelineCustomHeight = currentH;
+        }
+
+        const deltaH = targetH - currentH;
+        if (Math.abs(deltaH) === 0) return;
+
+        // Chave de armazenamento no localStorage
+        const isBottomFull = this.timelinePosition === "bottom-full";
+        const storageKey = isBottomFull ? "layout-dim-splitter-studio-timeline" : "layout-dim-splitter-timeline";
+
+        // Cancela qualquer animação de redimensionamento anterior
+        if (this._timelineResizeAnimRaf) {
+            cancelAnimationFrame(this._timelineResizeAnimRaf);
+            this._timelineResizeAnimRaf = null;
+        }
+
+        if (!smooth) {
+            timelinePanel.style.height = `${targetH}px`;
+            timelinePanel.style.flex = `0 0 ${targetH}px`;
+            if (storageKey) localStorage.setItem(storageKey, targetH);
+            if (tlState) {
+                if (targetH === fitTargetH) tlState.scrollTop = 0;
+                tlState.clampScrollTop();
+                if (typeof STATE !== "undefined") STATE.emit("timelineVScrollChanged", tlState.scrollTop);
+            }
+            if (win.timelineRenderer) {
+                win.timelineRenderer.resize();
+                win.timelineRenderer.draw();
+            }
+            container?.dispatchEvent(new Event("resize"));
+            win.dispatchEvent(new Event("resize"));
+            if (this.monitorsLayout === "auto") {
+                this.evaluateAutoMonitorsLayout(true);
+            }
+            return;
+        }
+
+        // Animação suave com duração proporcional ao delta de altura:
+        // Pequenos ajustes (~30px) -> ~160ms; Grandes ajustes (~300px) -> ~360ms.
+        const duration = Math.min(420, Math.max(160, Math.round(Math.abs(deltaH) * 0.8 + 120)));
+        const startTime = performance.now();
+        const startH = currentH;
+        const startScroll = (tlState && typeof tlState.scrollTop === "number") ? tlState.scrollTop : 0;
+        const shouldZeroScroll = (targetH === fitTargetH);
+
+        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+        const step = (now) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(1, elapsed / duration);
+            const eased = easeOutCubic(progress);
+
+            const newH = Math.round(startH + deltaH * eased);
+            timelinePanel.style.height = `${newH}px`;
+            timelinePanel.style.flex = `0 0 ${newH}px`;
+
+            if (tlState && shouldZeroScroll && startScroll > 0) {
+                tlState.scrollTop = Math.round(startScroll * (1 - eased));
+                tlState.clampScrollTop();
+                if (typeof STATE !== "undefined") STATE.emit("timelineVScrollChanged", tlState.scrollTop);
+            }
+
+            // Redesenho síncrono imediato para evitar stretch e frames pretos
+            if (win.timelineRenderer) {
+                win.timelineRenderer.resize();
+                win.timelineRenderer.draw();
+            }
+
+            if (progress < 1) {
+                this._timelineResizeAnimRaf = requestAnimationFrame(step);
+            } else {
+                this._timelineResizeAnimRaf = null;
+                // Finalização com os valores exatos
+                timelinePanel.style.height = `${targetH}px`;
+                timelinePanel.style.flex = `0 0 ${targetH}px`;
+                if (storageKey) localStorage.setItem(storageKey, targetH);
+                if (tlState) {
+                    if (shouldZeroScroll) tlState.scrollTop = 0;
+                    tlState.clampScrollTop();
+                    if (typeof STATE !== "undefined") STATE.emit("timelineVScrollChanged", tlState.scrollTop);
+                }
+                if (win.timelineRenderer) {
+                    win.timelineRenderer.resize();
+                    win.timelineRenderer.draw();
+                }
+                container?.dispatchEvent(new Event("resize"));
+                win.dispatchEvent(new Event("resize"));
+                if (this.monitorsLayout === "auto") {
+                    this.evaluateAutoMonitorsLayout(true);
+                }
+            }
+        };
+
+        this._timelineResizeAnimRaf = requestAnimationFrame(step);
     }
 
     /** Legado para compatibilidade */
@@ -4617,6 +4795,12 @@ export class SplitterHelper {
             splitter.classList.add(...className.split(" "));
         }
 
+        if (options.tooltip) {
+            splitter.setAttribute("data-tooltip", options.tooltip);
+        } else if (className && (className.includes("splitter-timeline") || className.includes("splitter-studio-timeline"))) {
+            splitter.setAttribute("data-tooltip", "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)");
+        }
+
         // Insere o divisor entre as duas colunas/linhas
         leftEl.after(splitter);
 
@@ -4637,41 +4821,115 @@ export class SplitterHelper {
             rightEl.style.flex = `1 1 0%`;
         }
 
+        const onDoubleClick = options.onDoubleClick || (
+            (className && (className.includes("splitter-timeline") || className.includes("splitter-studio-timeline")))
+                ? () => {
+                    const win = container.ownerDocument.defaultView || window;
+                    if (win.workspaceManager && typeof win.workspaceManager.fitTimelineHeightToTracks === "function") {
+                        win.workspaceManager.fitTimelineHeightToTracks(true);
+                    }
+                }
+                : null
+        );
+
+        let lastHandledDblClick = -99999;
+        const triggerDoubleClick = (e) => {
+            const now = performance.now();
+            if (now - lastHandledDblClick < 300) return;
+            lastHandledDblClick = now;
+
+            if (e) {
+                e.preventDefault();
+                const win = container.ownerDocument.defaultView || window;
+                win.getSelection?.()?.removeAllRanges();
+            }
+            if (typeof onDoubleClick === "function") {
+                onDoubleClick(e);
+            }
+        };
+
+        splitter.addEventListener("dblclick", (e) => {
+            triggerDoubleClick(e);
+        });
+
+        let isMouseDown = false;
         let isDragging = false;
+        let overlay = null;
+        let startX = 0;
+        let startY = 0;
+        let lastMouseDownTime = -99999;
+        let lastMouseDownX = 0;
+        let lastMouseDownY = 0;
 
         splitter.addEventListener("mousedown", (e) => {
+            if (e.button !== 0) return;
             if (typeof window !== "undefined" && window.libraryScrollIndex && typeof window.libraryScrollIndex.hide === "function") {
                 window.libraryScrollIndex.hide();
             }
+
+            // Cancela qualquer animação ativa de resize de timeline se o usuário interagir manualmente
+            const win = container.ownerDocument.defaultView || window;
+            if (win.workspaceManager?._timelineResizeAnimRaf) {
+                cancelAnimationFrame(win.workspaceManager._timelineResizeAnimRaf);
+                win.workspaceManager._timelineResizeAnimRaf = null;
+            }
+
+            const now = performance.now();
+            const isQuickSecondClick = (e.detail === 2) || (lastMouseDownTime > 0 && (now - lastMouseDownTime < 350) && Math.hypot(e.clientX - lastMouseDownX, e.clientY - lastMouseDownY) < 6);
+            lastMouseDownTime = now;
+            lastMouseDownX = e.clientX;
+            lastMouseDownY = e.clientY;
+
+            if (isQuickSecondClick && typeof onDoubleClick === "function") {
+                e.preventDefault();
+                win.getSelection?.()?.removeAllRanges();
+                triggerDoubleClick(e);
+                return;
+            }
+
             e.preventDefault();
-            isDragging = true;
-            splitter.classList.add("active");
+            isMouseDown = true;
+            isDragging = false;
+            startX = e.clientX;
+            startY = e.clientY;
 
             // Grava coordenadas exatas dos painéis no momento do clique
             const startLeftRect = leftEl.getBoundingClientRect();
             const startRightRect = rightEl.getBoundingClientRect();
             const startContainerRect = container.getBoundingClientRect();
 
-            // Adiciona classe de resizing ao body para desativar transições e seleções de texto temporariamente
-            container.ownerDocument.body.classList.add("layout-resizing");
-
-            // Adiciona overlay na tela para evitar interrupções de arraste
-            const overlay = container.ownerDocument.createElement("div");
-            overlay.className = "splitter-drag-overlay";
-            overlay.style.position = "fixed";
-            overlay.style.top = "0";
-            overlay.style.left = "0";
-            overlay.style.width = "100vw";
-            overlay.style.height = "100vh";
-            overlay.style.zIndex = "9999";
-            overlay.style.cursor = direction === "horizontal" ? "col-resize" : "row-resize";
-            container.ownerDocument.body.appendChild(overlay);
-
             let moveRaf = null;
             let pendingMoveEvent = null;
 
+            const ensureOverlay = () => {
+                if (!overlay) {
+                    overlay = container.ownerDocument.createElement("div");
+                    overlay.className = "splitter-drag-overlay";
+                    overlay.style.position = "fixed";
+                    overlay.style.top = "0";
+                    overlay.style.left = "0";
+                    overlay.style.width = "100vw";
+                    overlay.style.height = "100vh";
+                    overlay.style.zIndex = "9999";
+                    overlay.style.cursor = direction === "horizontal" ? "col-resize" : "row-resize";
+                    container.ownerDocument.body.appendChild(overlay);
+                    container.ownerDocument.body.classList.add("layout-resizing");
+                    splitter.classList.add("active");
+                }
+            };
+
             const applyMove = (moveEvent) => {
-                if (!isDragging) return;
+                if (!isMouseDown) return;
+
+                // Threshold: só entra no modo arraste se mover mais de 3px
+                if (!isDragging) {
+                    if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) >= 3) {
+                        isDragging = true;
+                        ensureOverlay();
+                    } else {
+                        return;
+                    }
+                }
 
                 if (unit === "px") {
                     let val;
@@ -4728,12 +4986,12 @@ export class SplitterHelper {
             };
 
             const handleMouseMove = (moveEvent) => {
-                if (!isDragging) return;
+                if (!isMouseDown) return;
                 pendingMoveEvent = moveEvent;
                 if (!moveRaf) {
                     moveRaf = requestAnimationFrame(() => {
                         moveRaf = null;
-                        if (isDragging && pendingMoveEvent) {
+                        if (isMouseDown && pendingMoveEvent) {
                             applyMove(pendingMoveEvent);
                         }
                     });
@@ -4745,19 +5003,25 @@ export class SplitterHelper {
                     cancelAnimationFrame(moveRaf);
                     moveRaf = null;
                 }
-                if (pendingMoveEvent) {
+                if (isDragging && pendingMoveEvent) {
                     applyMove(pendingMoveEvent);
                     pendingMoveEvent = null;
                 }
+                isMouseDown = false;
+                const wasDragging = isDragging;
                 isDragging = false;
+                
+                if (overlay) {
+                    overlay.remove();
+                    overlay = null;
+                }
                 splitter.classList.remove("active");
                 container.ownerDocument.body.classList.remove("layout-resizing");
-                overlay.remove();
                 container.ownerDocument.removeEventListener("mousemove", handleMouseMove);
                 container.ownerDocument.removeEventListener("mouseup", handleMouseUp);
                 
-                // Salva o novo valor no localStorage
-                if (storageKey) {
+                // Salva o novo valor no localStorage apenas se houve arraste
+                if (wasDragging && storageKey) {
                     const targetEl = resizeTarget === "left" ? leftEl : rightEl;
                     let storedValue;
                     if (unit === "px") {
@@ -4778,8 +5042,10 @@ export class SplitterHelper {
                     localStorage.setItem(key, storedValue);
                 }
 
-                // Dispara resize final para garantir sincronia
-                window.dispatchEvent(new Event("resize"));
+                if (wasDragging) {
+                    // Dispara resize final para garantir sincronia
+                    window.dispatchEvent(new Event("resize"));
+                }
             };
 
             container.ownerDocument.addEventListener("mousemove", handleMouseMove);
