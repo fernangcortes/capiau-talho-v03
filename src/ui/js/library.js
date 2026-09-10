@@ -4147,6 +4147,11 @@ export class LibraryManager {
         }
         this.attachScrollListener(win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
         this.attachWheelZoomListener(win.document);
+
+        // Reposiciona o dropdown de opções de exibição para a janela popout
+        if (typeof this.onPopoutDisplaySettings === "function") {
+            this.onPopoutDisplaySettings(win);
+        }
     }
 
     onPopoutRestored() {
@@ -4170,6 +4175,11 @@ export class LibraryManager {
         }
         this.attachScrollListener();
         this.attachWheelZoomListener(document);
+
+        // Restaura o dropdown de opções de exibição para a janela principal
+        if (typeof this.onRestoreDisplaySettings === "function") {
+            this.onRestoreDisplaySettings();
+        }
     }
 
     init() {
@@ -4461,17 +4471,280 @@ export class LibraryManager {
         const settingsDropdown = document.getElementById("library-display-settings-dropdown");
         
         if (btnDisplaySettings && settingsDropdown) {
-            btnDisplaySettings.addEventListener("click", (e) => {
-                e.stopPropagation();
-                const isHidden = settingsDropdown.style.display === "none";
-                settingsDropdown.style.display = isHidden ? "flex" : "none";
-            });
-            
-            document.addEventListener("click", (e) => {
-                if (settingsDropdown.style.display === "flex" && !settingsDropdown.contains(e.target) && e.target !== btnDisplaySettings) {
-                    settingsDropdown.style.display = "none";
+            this.settingsDropdownEl = settingsDropdown;
+
+            // Função para configurar os submenus customizados (.nle-custom-select)
+            const setupCustomSelects = (dropdownEl) => {
+                if (!dropdownEl) return;
+
+                dropdownEl.querySelectorAll(".nle-custom-select").forEach(container => {
+                    const selectId = container.getAttribute("data-select-id");
+                    const trigger = container.querySelector(".nle-custom-select-trigger");
+                    const valSpan = container.querySelector(".nle-custom-select-val");
+                    const hiddenSelect = container.querySelector(`select#${selectId}`) || dropdownEl.querySelector(`select#${selectId}`);
+                    const options = container.querySelectorAll(".nle-custom-select-option");
+
+                    const syncFromSelect = () => {
+                        if (!hiddenSelect) return;
+                        const currentVal = String(hiddenSelect.value);
+                        let matched = false;
+                        options.forEach(opt => {
+                            const optVal = opt.getAttribute("data-val");
+                            if (optVal === currentVal) {
+                                opt.classList.add("active");
+                                if (valSpan) valSpan.textContent = opt.textContent;
+                                matched = true;
+                            } else {
+                                opt.classList.remove("active");
+                            }
+                        });
+                        if (!matched && options[0] && valSpan && !valSpan.textContent) {
+                            options[0].classList.add("active");
+                            valSpan.textContent = options[0].textContent;
+                        }
+                    };
+
+                    if (hiddenSelect && !hiddenSelect.__customSelectSyncBound) {
+                        hiddenSelect.__customSelectSyncBound = true;
+                        hiddenSelect.addEventListener("change", syncFromSelect);
+                    }
+                    syncFromSelect();
+
+                    if (trigger && !trigger.__customSelectTriggerBound) {
+                        trigger.__customSelectTriggerBound = true;
+                        trigger.addEventListener("click", (e) => {
+                            e.stopPropagation();
+                            dropdownEl.querySelectorAll(".nle-custom-select.open").forEach(other => {
+                                if (other !== container) other.classList.remove("open", "open-up");
+                            });
+
+                            const triggerRect = trigger.getBoundingClientRect();
+                            const dropdownRect = dropdownEl.getBoundingClientRect();
+
+                            if (dropdownRect.bottom - triggerRect.bottom < 110) {
+                                container.classList.add("open-up");
+                            } else {
+                                container.classList.remove("open-up");
+                            }
+                            container.classList.toggle("open");
+                        });
+                    }
+
+                    options.forEach(opt => {
+                        if (!opt.__customSelectOptBound) {
+                            opt.__customSelectOptBound = true;
+                            opt.addEventListener("click", (e) => {
+                                e.stopPropagation();
+                                const val = opt.getAttribute("data-val");
+                                if (hiddenSelect) {
+                                    hiddenSelect.value = val;
+                                    hiddenSelect.dispatchEvent(new Event("change"));
+                                }
+                                options.forEach(o => o.classList.remove("active"));
+                                opt.classList.add("active");
+                                if (valSpan) valSpan.textContent = opt.textContent;
+                                container.classList.remove("open", "open-up");
+                            });
+                        }
+                    });
+                });
+
+                if (!dropdownEl.__customSelectPointerBound) {
+                    dropdownEl.__customSelectPointerBound = true;
+                    dropdownEl.addEventListener("pointerdown", (e) => {
+                        if (!e.target.closest(".nle-custom-select")) {
+                            dropdownEl.querySelectorAll(".nle-custom-select.open").forEach(c => c.classList.remove("open", "open-up"));
+                        }
+                    });
                 }
+            };
+
+            this.setupDisplayCustomSelects = () => setupCustomSelects(settingsDropdown);
+            this.setupDisplayCustomSelects();
+
+            let hideTimeout = null;
+
+            const cancelHide = () => {
+                if (hideTimeout) {
+                    clearTimeout(hideTimeout);
+                    hideTimeout = null;
+                }
+            };
+
+            const getTargetButton = () => {
+                const doc = this.activeDoc || btnDisplaySettings.ownerDocument || document;
+                return doc.getElementById("btn-library-display-settings") || btnDisplaySettings;
+            };
+
+            const getTargetDoc = () => {
+                const btn = getTargetButton();
+                return btn.ownerDocument || this.activeDoc || document;
+            };
+
+            const getTargetWin = () => {
+                const doc = getTargetDoc();
+                return doc.defaultView || this.activeWindow || window;
+            };
+
+            const ensureDropdownInActiveWindow = () => {
+                const targetDoc = getTargetDoc();
+                if (settingsDropdown.ownerDocument !== targetDoc || settingsDropdown.parentNode !== targetDoc.body) {
+                    targetDoc.adoptNode(settingsDropdown);
+                    targetDoc.body.appendChild(settingsDropdown);
+                    setupCustomSelects(settingsDropdown);
+                }
+                attachWindowListeners(targetDoc, targetDoc.defaultView || window);
+            };
+
+            const positionDisplaySettings = () => {
+                ensureDropdownInActiveWindow();
+
+                const btn = getTargetButton();
+                const curWin = getTargetWin();
+                if (!btn || !settingsDropdown) return;
+
+                const rect = btn.getBoundingClientRect();
+                const dropdownWidth = 235;
+                
+                // Top: logo abaixo do botão na janela do botão
+                const top = Math.round(rect.bottom + 4);
+                
+                // Alinha a borda direita do dropdown com a do botão
+                let left = Math.round(rect.right - dropdownWidth);
+                
+                // Respeita os limites da viewport da janela do botão
+                const winWidth = curWin.innerWidth;
+                const winHeight = curWin.innerHeight;
+
+                if (left < 10) {
+                    left = 10;
+                } else if (left + dropdownWidth > winWidth - 10) {
+                    left = winWidth - dropdownWidth - 10;
+                }
+                
+                // Ajusta a altura máxima para não vazar a tela
+                const maxH = winHeight - top - 16;
+                settingsDropdown.style.maxHeight = `${Math.max(200, maxH)}px`;
+                settingsDropdown.style.left = `${left}px`;
+                settingsDropdown.style.top = `${top}px`;
+            };
+
+            const showDropdown = () => {
+                cancelHide();
+                ensureDropdownInActiveWindow();
+                settingsDropdown.querySelectorAll(".nle-custom-select.open").forEach(c => c.classList.remove("open", "open-up"));
+                setupCustomSelects(settingsDropdown);
+                positionDisplaySettings();
+                settingsDropdown.classList.add("show");
+                getTargetButton().classList.add("active");
+            };
+
+            const hideDropdown = () => {
+                cancelHide();
+                settingsDropdown.querySelectorAll(".nle-custom-select.open").forEach(c => c.classList.remove("open", "open-up"));
+                settingsDropdown.classList.remove("show");
+                getTargetButton().classList.remove("active");
+            };
+
+            const scheduleHide = (delay = 350) => {
+                cancelHide();
+                hideTimeout = setTimeout(() => {
+                    // Não fecha se algum submenu customizado estiver aberto
+                    if (settingsDropdown.querySelector(".nle-custom-select.open")) {
+                        return;
+                    }
+                    const targetDoc = getTargetDoc();
+                    if (settingsDropdown.contains(targetDoc.activeElement)) {
+                        return;
+                    }
+                    hideDropdown();
+                }, delay);
+            };
+
+            const bindButtonEvents = (btn) => {
+                if (!btn || btn.__displaySettingsBound) return;
+                btn.__displaySettingsBound = true;
+
+                btn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    if (settingsDropdown.classList.contains("show")) {
+                        hideDropdown();
+                    } else {
+                        showDropdown();
+                    }
+                });
+
+                btn.addEventListener("mouseenter", () => {
+                    cancelHide();
+                });
+
+                btn.addEventListener("mouseleave", () => {
+                    if (settingsDropdown.classList.contains("show")) {
+                        scheduleHide(350);
+                    }
+                });
+            };
+
+            bindButtonEvents(btnDisplaySettings);
+
+            settingsDropdown.addEventListener("mouseenter", () => {
+                cancelHide();
             });
+
+            settingsDropdown.addEventListener("mouseleave", () => {
+                scheduleHide(350);
+            });
+
+            const attachWindowListeners = (doc, win) => {
+                if (!doc || doc.__libDisplaySettingsBound) return;
+                doc.__libDisplaySettingsBound = true;
+
+                const btn = doc.getElementById("btn-library-display-settings");
+                if (btn) bindButtonEvents(btn);
+
+                // Clique fora infalível em fase de captura
+                doc.addEventListener("pointerdown", (e) => {
+                    if (settingsDropdown.classList.contains("show")) {
+                        const curBtn = getTargetButton();
+                        if (!settingsDropdown.contains(e.target) && !curBtn.contains(e.target) && !e.target.closest("#btn-library-display-settings")) {
+                            hideDropdown();
+                        }
+                    }
+                }, true);
+
+                // Tecla Escape fecha imediatamente
+                doc.addEventListener("keydown", (e) => {
+                    if (e.key === "Escape" && settingsDropdown.classList.contains("show")) {
+                        hideDropdown();
+                        e.stopPropagation();
+                    }
+                });
+
+                if (win) {
+                    win.addEventListener("resize", () => {
+                        if (settingsDropdown.classList.contains("show")) {
+                            positionDisplaySettings();
+                        }
+                    });
+                }
+            };
+
+            this.onPopoutDisplaySettings = (win) => {
+                if (!win || !win.document) return;
+                ensureDropdownInActiveWindow();
+                attachWindowListeners(win.document, win);
+                const popBtn = win.document.getElementById("btn-library-display-settings");
+                if (popBtn) bindButtonEvents(popBtn);
+            };
+
+            this.onRestoreDisplaySettings = () => {
+                ensureDropdownInActiveWindow();
+                attachWindowListeners(document, window);
+            };
+
+            // Inicializa no documento principal
+            ensureDropdownInActiveWindow();
+            attachWindowListeners(document, window);
 
             const btnRegenTitles = document.getElementById("btn-regenerate-executive-titles");
             if (btnRegenTitles) {
@@ -4493,6 +4766,7 @@ export class LibraryManager {
 
                         btnRegenTitles.disabled = false;
                         btnRegenTitles.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Títulos IA`;
+                        hideDropdown();
                     } catch(err) {
                         alert("Erro ao disparar regeneração de títulos: " + err.message);
                         btnRegenTitles.disabled = false;
@@ -9223,6 +9497,7 @@ export class LibraryScrollIndexTracker {
 
         if (selDwell) {
             selDwell.value = String(this.dwellDelay);
+            selDwell.dispatchEvent(new Event("change"));
             selDwell.addEventListener("change", (e) => {
                 this.dwellDelay = parseInt(e.target.value, 10);
                 localStorage.setItem("library_scroll_index_dwell", this.dwellDelay);
@@ -9236,12 +9511,18 @@ export class LibraryScrollIndexTracker {
                 localStorage.setItem("library_scroll_color_ribbon_enabled", this.isRibbonEnabled);
                 if (!this.isRibbonEnabled) {
                     this.ribbonStyle = "off";
-                    if (selRibbonStyle) selRibbonStyle.value = "off";
+                    if (selRibbonStyle) {
+                        selRibbonStyle.value = "off";
+                        selRibbonStyle.dispatchEvent(new Event("change"));
+                    }
                     localStorage.setItem("library_scroll_color_ribbon_style", "off");
                 } else {
                     if (this.ribbonStyle === "off") {
                         this.ribbonStyle = "blocks";
-                        if (selRibbonStyle) selRibbonStyle.value = "blocks";
+                        if (selRibbonStyle) {
+                            selRibbonStyle.value = "blocks";
+                            selRibbonStyle.dispatchEvent(new Event("change"));
+                        }
                     }
                     localStorage.setItem("library_scroll_color_ribbon_style", this.ribbonStyle);
                 }
@@ -9251,6 +9532,7 @@ export class LibraryScrollIndexTracker {
 
         if (selRibbonStyle) {
             selRibbonStyle.value = this.ribbonStyle;
+            selRibbonStyle.dispatchEvent(new Event("change"));
             selRibbonStyle.addEventListener("change", (e) => {
                 this.ribbonStyle = e.target.value;
                 localStorage.setItem("library_scroll_color_ribbon_style", this.ribbonStyle);
@@ -9270,6 +9552,7 @@ export class LibraryScrollIndexTracker {
         const selRibbonCursor = doc.getElementById("sel-scroll-color-ribbon-cursor") || document.getElementById("sel-scroll-color-ribbon-cursor");
         if (selRibbonCursor) {
             selRibbonCursor.value = this.cursorMode;
+            selRibbonCursor.dispatchEvent(new Event("change"));
             selRibbonCursor.addEventListener("change", (e) => {
                 this.cursorMode = e.target.value;
                 localStorage.setItem("library_scroll_ribbon_cursor_mode", this.cursorMode);

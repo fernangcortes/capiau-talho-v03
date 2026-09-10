@@ -6205,6 +6205,324 @@ select option, .nle-select option {
     box-shadow: 0 0 8px rgba(6, 182, 212, 0.35);
 }
 
+/* ── Dropdown de Opções de Exibição da Biblioteca (Flat NLE & Glassmorphic) ── */
+.library-display-settings-dropdown {
+    position: fixed;
+    z-index: 999999;
+    width: 235px;
+    box-sizing: border-box;
+    display: none;
+    flex-direction: column;
+    gap: 7px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(6, 182, 212, 0.35);
+    background: rgba(18, 18, 25, 0.96);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(6, 182, 212, 0.15);
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: var(--text-primary);
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(6, 182, 212, 0.3) transparent;
+}
+
+.library-display-settings-dropdown::-webkit-scrollbar {
+    width: 4px;
+}
+.library-display-settings-dropdown::-webkit-scrollbar-thumb {
+    background: rgba(6, 182, 212, 0.3);
+    border-radius: 2px;
+}
+
+@keyframes libDisplayDropdownIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.library-display-settings-dropdown.show {
+    display: flex !important;
+    animation: libDisplayDropdownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#btn-library-display-settings.active {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+
+/* Títulos de Seção */
+.library-display-settings-dropdown .display-opt-header {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--color-cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 2px 2px;
+    user-select: none;
+}
+
+/* Divisores sutis */
+.library-display-settings-dropdown .display-opt-sep {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 2px 0;
+    flex-shrink: 0;
+}
+
+/* Rótulos & Checkboxes Customizados (elimina caixas cinzas/brancas padrão do Windows) */
+.library-display-settings-dropdown .display-opt-check-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--text-secondary);
+    margin: 0;
+    user-select: none;
+    padding: 3px 6px;
+    border-radius: 4px;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.library-display-settings-dropdown .display-opt-check-label:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.library-display-settings-dropdown .display-opt-check-label input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    position: relative;
+    outline: none;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    margin: 0;
+}
+
+.library-display-settings-dropdown .display-opt-check-label input[type="checkbox"]:hover {
+    border-color: var(--color-cyan);
+    background: rgba(6, 182, 212, 0.1);
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.3);
+}
+
+.library-display-settings-dropdown .display-opt-check-label input[type="checkbox"]:checked {
+    background: var(--color-cyan);
+    border-color: var(--color-cyan);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.45);
+}
+
+.library-display-settings-dropdown .display-opt-check-label input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 4px;
+    height: 7.5px;
+    border: solid #090d16;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+/* Linha com Select */
+.library-display-settings-dropdown .display-opt-select-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 2px 6px;
+}
+
+.library-display-settings-dropdown .display-opt-select-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Custom Select Flat & Glassmorphism (Elimina submenus nativos do Windows) */
+.library-display-settings-dropdown .nle-custom-select {
+    position: relative;
+    width: 124px;
+    flex-shrink: 0;
+}
+
+.library-display-settings-dropdown .nle-custom-select-trigger {
+    width: 100%;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 1px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-glass);
+    border-radius: 4px;
+    color: #e2e8f0;
+    font-size: 10px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+    text-align: left;
+    box-sizing: border-box;
+}
+
+.library-display-settings-dropdown .nle-custom-select-trigger:hover {
+    border-color: rgba(6, 182, 212, 0.6);
+    background: rgba(255, 255, 255, 0.09);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.25);
+    color: #ffffff;
+}
+
+.library-display-settings-dropdown .nle-custom-select.open .nle-custom-select-trigger {
+    border-color: var(--color-cyan);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.35);
+    background: rgba(6, 182, 212, 0.1);
+}
+
+.library-display-settings-dropdown .nle-custom-select-val {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.library-display-settings-dropdown .nle-select-chevron {
+    font-size: 8px;
+    color: #c084fc;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.library-display-settings-dropdown .nle-custom-select.open .nle-select-chevron {
+    transform: rotate(180deg);
+}
+
+.library-display-settings-dropdown .nle-custom-select-menu {
+    position: absolute;
+    top: calc(100% + 3px);
+    left: 0;
+    right: 0;
+    z-index: 1000000;
+    background: rgba(16, 16, 24, 0.98);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    border-radius: 5px;
+    padding: 3px;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 10px rgba(6, 182, 212, 0.25);
+    min-width: 100%;
+}
+
+.library-display-settings-dropdown .nle-custom-select.open-up .nle-custom-select-menu {
+    top: auto;
+    bottom: calc(100% + 3px);
+}
+
+.library-display-settings-dropdown .nle-custom-select.open .nle-custom-select-menu {
+    display: flex;
+    animation: libDisplayDropdownIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.library-display-settings-dropdown .nle-custom-select-option {
+    padding: 4px 8px;
+    font-size: 10px;
+    font-family: 'Outfit', sans-serif;
+    color: var(--text-secondary);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+}
+
+.library-display-settings-dropdown .nle-custom-select-option:hover {
+    background: rgba(6, 182, 212, 0.15);
+    color: #ffffff;
+    text-shadow: 0 0 6px var(--color-cyan);
+}
+
+.library-display-settings-dropdown .nle-custom-select-option.active {
+    background: rgba(6, 182, 212, 0.22);
+    color: var(--color-cyan);
+    font-weight: 600;
+}
+
+.library-display-settings-dropdown select.display-opt-select {
+    max-width: 124px;
+    flex: 1;
+    min-width: 0;
+    height: 22px !important;
+    font-size: 10px !important;
+    font-weight: 500 !important;
+    padding: 1px 20px 1px 6px !important;
+    border-radius: 4px !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid var(--border-glass) !important;
+    color: #e2e8f0 !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.library-display-settings-dropdown select.display-opt-select:hover {
+    border-color: rgba(6, 182, 212, 0.6) !important;
+    background-color: rgba(255, 255, 255, 0.09) !important;
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.25) !important;
+}
+
+/* Botão de Títulos Executivos */
+.library-display-settings-dropdown .display-opt-btn-action {
+    width: 100%;
+    height: 25px;
+    font-size: 10.5px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(6, 182, 212, 0.12);
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    color: var(--color-cyan);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-top: 3px;
+    box-sizing: border-box;
+}
+
+.library-display-settings-dropdown .display-opt-btn-action:hover {
+    background: rgba(6, 182, 212, 0.25);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.45);
+    transform: translateY(-1px);
+}
+
 /* NLE 2-Up Split Preview Overlay (Sobrescrita & Trim Dinâmico) */
 #nle-2up-overlay {
     position: absolute;

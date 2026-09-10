@@ -292,63 +292,106 @@
                     </div>
 
                     <!-- Dropdown de Configurações de Exibição da Biblioteca (Retrátil) -->
-                    <div id="library-display-settings-dropdown" class="glassmorphism" style="display: none; flex-direction: column; gap: 8px; padding: 10px; border-radius: 6px; border: 1px solid rgba(6,182,212,0.3); background: rgba(20, 18, 25, 0.98); box-shadow: 0 4px 20px rgba(0,0,0,0.5); position: absolute; top: 100%; right: 12px; z-index: 1000; width: 175px;">
-                        <div style="font-size: 9px; font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Visualização</div>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
-                            <input type="checkbox" id="chk-show-tags" checked style="cursor:pointer;"> Tags de Categoria
+                    <div id="library-display-settings-dropdown" class="glassmorphism library-display-settings-dropdown">
+                        <div class="display-opt-header">Visualização</div>
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-show-tags" checked> <span>Tags de Categoria</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
-                            <input type="checkbox" id="chk-show-status" checked style="cursor:pointer;"> Status de IA
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-show-status" checked> <span>Status de IA</span>
                         </label>
-                        <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;"></div>
-                        <div style="font-size: 9px; font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;">Tooltip de Decupagem</div>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
-                            <input type="checkbox" id="chk-tooltip-category" style="cursor:pointer;"> Categoria
+
+                        <div class="display-opt-sep"></div>
+
+                        <div class="display-opt-header">Tooltip de Decupagem</div>
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-tooltip-category"> <span>Categoria</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
-                            <input type="checkbox" id="chk-tooltip-speaker" style="cursor:pointer;"> Falante / Entrevista
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-tooltip-speaker"> <span>Falante / Entrevista</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
-                            <input type="checkbox" id="chk-tooltip-duration" style="cursor:pointer;"> Duração
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-tooltip-duration"> <span>Duração</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
-                            <input type="checkbox" id="chk-tooltip-tags" style="cursor:pointer;"> Tags Semânticas
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-tooltip-tags"> <span>Tags Semânticas</span>
                         </label>
-                        <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;"></div>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
-                            <input type="checkbox" id="chk-scroll-index-enabled" checked style="cursor:pointer;"> Índice na Barra
+
+                        <div class="display-opt-sep"></div>
+
+                        <div class="display-opt-header">Índice & Fita de Rolagem</div>
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-scroll-index-enabled" checked> <span>Índice na Barra</span>
                         </label>
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; font-size: 9px; color: var(--text-muted);">
-                            <span>Expansão IA:</span>
-                            <select id="sel-scroll-index-dwell" class="nle-select" style="height: 20px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer; outline: none;">
-                                <option value="500">0.5s</option>
-                                <option value="1000" selected>1.0s</option>
-                                <option value="1500">1.5s</option>
-                                <option value="0">Desativada</option>
-                            </select>
+                        <div class="display-opt-select-row">
+                            <span class="display-opt-select-label">Expansão IA:</span>
+                            <div class="nle-custom-select" data-select-id="sel-scroll-index-dwell">
+                                <button type="button" class="nle-custom-select-trigger">
+                                    <span class="nle-custom-select-val">1.0s</span>
+                                    <i class="fa-solid fa-chevron-down nle-select-chevron"></i>
+                                </button>
+                                <div class="nle-custom-select-menu glassmorphism">
+                                    <div class="nle-custom-select-option" data-val="500">0.5s</div>
+                                    <div class="nle-custom-select-option active" data-val="1000">1.0s</div>
+                                    <div class="nle-custom-select-option" data-val="1500">1.5s</div>
+                                    <div class="nle-custom-select-option" data-val="0">Desativada</div>
+                                </div>
+                                <select id="sel-scroll-index-dwell" style="display: none;">
+                                    <option value="500">0.5s</option>
+                                    <option value="1000" selected>1.0s</option>
+                                    <option value="1500">1.5s</option>
+                                    <option value="0">Desativada</option>
+                                </select>
+                            </div>
                         </div>
-                        <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;"></div>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; cursor: pointer; color: var(--text-secondary); margin: 0; user-select: none;">
-                            <input type="checkbox" id="chk-scroll-color-ribbon-enabled" checked style="cursor:pointer;"> Fita Cromática (Cores)
+
+                        <div class="display-opt-sep"></div>
+
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-scroll-color-ribbon-enabled" checked> <span>Fita Cromática (Cores)</span>
                         </label>
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; font-size: 9px; color: var(--text-muted);">
-                            <span>Modo Cromático:</span>
-                            <select id="sel-scroll-color-ribbon-style" class="nle-select" style="height: 20px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer; outline: none;">
-                                <option value="blocks" selected>Blocos de Cena</option>
-                                <option value="gradient">Gradiente Contínuo</option>
-                                <option value="off">Desligado</option>
-                            </select>
+                        <div class="display-opt-select-row">
+                            <span class="display-opt-select-label">Modo Cromático:</span>
+                            <div class="nle-custom-select" data-select-id="sel-scroll-color-ribbon-style">
+                                <button type="button" class="nle-custom-select-trigger">
+                                    <span class="nle-custom-select-val">Blocos de Cena</span>
+                                    <i class="fa-solid fa-chevron-down nle-select-chevron"></i>
+                                </button>
+                                <div class="nle-custom-select-menu glassmorphism">
+                                    <div class="nle-custom-select-option active" data-val="blocks">Blocos de Cena</div>
+                                    <div class="nle-custom-select-option" data-val="gradient">Gradiente Contínuo</div>
+                                    <div class="nle-custom-select-option" data-val="off">Desligado</div>
+                                </div>
+                                <select id="sel-scroll-color-ribbon-style" style="display: none;">
+                                    <option value="blocks" selected>Blocos de Cena</option>
+                                    <option value="gradient">Gradiente Contínuo</option>
+                                    <option value="off">Desligado</option>
+                                </select>
+                            </div>
                         </div>
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; font-size: 9px; color: var(--text-muted); margin-top: 2px;">
-                            <span>Cursor da Fita:</span>
-                            <select id="sel-scroll-color-ribbon-cursor" class="nle-select" style="height: 20px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer; outline: none;">
-                                <option value="negative" selected>Negativo Brilhante</option>
-                                <option value="aura">Aura Reativa</option>
-                                <option value="vacuum">Vácuo Luminoso</option>
-                            </select>
+                        <div class="display-opt-select-row">
+                            <span class="display-opt-select-label">Cursor da Fita:</span>
+                            <div class="nle-custom-select" data-select-id="sel-scroll-color-ribbon-cursor">
+                                <button type="button" class="nle-custom-select-trigger">
+                                    <span class="nle-custom-select-val">Negativo Brilhante</span>
+                                    <i class="fa-solid fa-chevron-down nle-select-chevron"></i>
+                                </button>
+                                <div class="nle-custom-select-menu glassmorphism">
+                                    <div class="nle-custom-select-option active" data-val="negative">Negativo Brilhante</div>
+                                    <div class="nle-custom-select-option" data-val="aura">Aura Reativa</div>
+                                    <div class="nle-custom-select-option" data-val="vacuum">Vácuo Luminoso</div>
+                                </div>
+                                <select id="sel-scroll-color-ribbon-cursor" style="display: none;">
+                                    <option value="negative" selected>Negativo Brilhante</option>
+                                    <option value="aura">Aura Reativa</option>
+                                    <option value="vacuum">Vácuo Luminoso</option>
+                                </select>
+                            </div>
                         </div>
-                        <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;"></div>
-                        <button id="btn-regenerate-executive-titles" style="width: 100%; height: 22px; font-size: 9px; padding: 0 4px; display: flex; align-items: center; justify-content: center; gap: 4px; background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.35); color: var(--color-cyan); border-radius: 3px; cursor: pointer;" title="Gera títulos executivos (3 a 6 palavras) para os vídeos existentes">
+
+                        <div class="display-opt-sep"></div>
+
+                        <button id="btn-regenerate-executive-titles" class="display-opt-btn-action" title="Gera títulos executivos (3 a 6 palavras) para os vídeos existentes">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Títulos IA
                         </button>
                     </div>
