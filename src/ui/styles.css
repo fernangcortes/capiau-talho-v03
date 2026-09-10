@@ -5245,7 +5245,16 @@ mark.search-highlight {
 #timeline-panel.collapsed ~ .splitter-studio-timeline { display: none !important; }
 .monitors-container:has(.player-panel.maximized) .splitter-players,
 .monitors-container:has(.player-panel.maximized) .splitter-studio-players,
-.monitors-container:has(.player-panel.maximized) .splitter-players-v { display: none !important; }
+.monitors-container:has(.player-panel.maximized) .splitter-players-v,
+.monitors-container:has(.player-panel.popped-out-hidden) .splitter-players,
+.monitors-container:has(.player-panel.popped-out-hidden) .splitter-studio-players,
+.monitors-container:has(.player-panel.popped-out-hidden) .splitter-players-v,
+.monitors-container:has(.player-panel.collapsed) .splitter-players,
+.monitors-container:has(.player-panel.collapsed) .splitter-studio-players,
+.monitors-container:has(.player-panel.collapsed) .splitter-players-v,
+.monitors-container:has(.player-panel[style*="display: none"]) .splitter-players,
+.monitors-container:has(.player-panel[style*="display: none"]) .splitter-studio-players,
+.monitors-container:has(.player-panel[style*="display: none"]) .splitter-players-v { display: none !important; }
 .timeline-canvas-wrapper:has(#timeline-headers-sidebar.collapsed) .splitter-timeline-headers { display: none !important; }
 .timeline-headers-sidebar.collapsed + .splitter-timeline-headers { display: none !important; }
 

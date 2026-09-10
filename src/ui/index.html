@@ -81,7 +81,8 @@
                 <!-- Seletor de Disposição dos Monitores -->
                 <div style="display: flex; align-items: center; gap: 4px;" data-tooltip="Disposição dos Monitores (Preview & Program)">
                     <i id="icon-monitors-layout" class="fa-solid fa-table-columns" style="color: var(--color-cyan); font-size: 11px;"></i>
-                    <select id="select-monitors-layout" style="color: var(--color-cyan); max-width: 140px; background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; cursor: pointer;">
+                    <select id="select-monitors-layout" style="color: var(--color-cyan); max-width: 160px; background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; cursor: pointer;">
+                        <option value="auto">Monitores: Automático</option>
                         <option value="side-by-side">Monitores: Lado a Lado</option>
                         <option value="stacked">Monitores: Empilhados</option>
                     </select>
@@ -2997,6 +2998,9 @@
                         <i class="fa-solid fa-table-columns" style="color: var(--color-cyan);"></i> Disposição dos Monitores
                     </label>
                     <div style="display: flex; gap: 6px;">
+                        <button type="button" class="ws-layout-option-btn" id="btn-opt-monitors-auto" data-monitors-layout="auto">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Automático
+                        </button>
                         <button type="button" class="ws-layout-option-btn active" id="btn-opt-monitors-side" data-monitors-layout="side-by-side">
                             <i class="fa-solid fa-table-columns"></i> Lado a Lado
                         </button>

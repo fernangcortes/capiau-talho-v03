@@ -77,7 +77,10 @@ export class WorkspaceManager {
         this.poppedElements = {};
         this.originalParents = {};
         this.originalNextSiblings = {};
-        this.monitorsLayout = localStorage.getItem("capiau_monitors_layout") || "side-by-side";
+        this.monitorsLayout = localStorage.getItem("capiau_monitors_layout") || "auto";
+        this.resolvedMonitorsLayout = "side-by-side";
+        this.autoMonitorsObserver = null;
+        this._autoMonitorsRaf = null;
         const savedTimelinePos = localStorage.getItem("capiau_timeline_position");
         this.timelinePosition = ["center", "bottom-left", "bottom-right", "bottom-full"].includes(savedTimelinePos)
             ? savedTimelinePos
@@ -211,6 +214,10 @@ export class WorkspaceManager {
                     ? `<i class="fa-solid fa-compress"></i>` 
                     : `<i class="fa-solid fa-expand"></i>`;
                 updateSwapButtonsVisibility();
+                if (!panel.classList.contains("maximized") && this.monitorsLayout === "auto") {
+                    this.evaluateAutoMonitorsLayout();
+                }
+                this.reinitMonitorsSplitter();
             });
         }
 
@@ -224,6 +231,10 @@ export class WorkspaceManager {
                     ? `<i class="fa-solid fa-compress"></i>` 
                     : `<i class="fa-solid fa-expand"></i>`;
                 updateSwapButtonsVisibility();
+                if (!panel.classList.contains("maximized") && this.monitorsLayout === "auto") {
+                    this.evaluateAutoMonitorsLayout();
+                }
+                this.reinitMonitorsSplitter();
             });
         }
 
@@ -504,6 +515,16 @@ export class WorkspaceManager {
         this.setTimelinePosition(this.timelinePosition, true);
         this.setMonitorsLayout(this.monitorsLayout, true);
 
+        // Inicializa observação inteligente dos monitores por espaço disponível
+        this.setupAutoMonitorsObserver();
+        if (typeof STATE !== "undefined" && STATE.on) {
+            STATE.on("activeVideoChanged", () => {
+                if (this.monitorsLayout === "auto") {
+                    this.evaluateAutoMonitorsLayout();
+                }
+            });
+        }
+
         // Inicializa os divisores de tela ajustáveis (Splitters)
         this.reinitSplitters();
 
@@ -633,8 +654,13 @@ export class WorkspaceManager {
     /**
      * Atualiza os seletores e botões de interface de acordo com o estado ativo.
      */
+    /**
+     * Atualiza os seletores e botões de interface de acordo com o estado ativo.
+     */
     updateLayoutUI() {
-        const isStacked = this.monitorsLayout === "stacked";
+        const isAuto = this.monitorsLayout === "auto";
+        const effectiveLayout = isAuto ? (this.resolvedMonitorsLayout || "side-by-side") : this.monitorsLayout;
+        const isStacked = effectiveLayout === "stacked";
         const isBottomFull = this.timelinePosition === "bottom-full";
         const isBottomLeft = this.timelinePosition === "bottom-left";
         const isBottomRight = this.timelinePosition === "bottom-right";
@@ -647,9 +673,15 @@ export class WorkspaceManager {
         }
         const iconMonitorsLayout = document.getElementById("icon-monitors-layout");
         if (iconMonitorsLayout) {
-            iconMonitorsLayout.className = isStacked ? "fa-solid fa-table-columns fa-rotate-90" : "fa-solid fa-table-columns";
-            iconMonitorsLayout.style.transform = isStacked ? "rotate(90deg)" : "none";
-            iconMonitorsLayout.style.display = "inline-block";
+            if (isAuto) {
+                iconMonitorsLayout.className = "fa-solid fa-wand-magic-sparkles";
+                iconMonitorsLayout.style.transform = "none";
+                iconMonitorsLayout.style.display = "inline-block";
+            } else {
+                iconMonitorsLayout.className = isStacked ? "fa-solid fa-table-columns fa-rotate-90" : "fa-solid fa-table-columns";
+                iconMonitorsLayout.style.transform = isStacked ? "rotate(90deg)" : "none";
+                iconMonitorsLayout.style.display = "inline-block";
+            }
         }
 
         const selectTimelinePosition = document.getElementById("select-timeline-position");
@@ -708,12 +740,19 @@ export class WorkspaceManager {
 
         const btnToggleMonitorsSrc = document.getElementById("btn-toggle-monitors-layout-source");
         const btnToggleMonitorsPrg = document.getElementById("btn-toggle-monitors-layout-program");
-        const monitorsIconHtml = isStacked 
-            ? `<i class="fa-solid fa-table-columns"></i>` 
-            : `<i class="fa-solid fa-table-columns fa-rotate-90" style="transform: rotate(90deg); display: inline-block;"></i>`;
-        const monitorsTooltip = isStacked 
-            ? "Disposição dos Monitores: Lado a Lado" 
-            : "Disposição dos Monitores: Empilhados (1 acima / 1 abaixo)";
+        let monitorsIconHtml;
+        let monitorsTooltip;
+
+        if (isAuto) {
+            monitorsIconHtml = `<i class="fa-solid fa-wand-magic-sparkles" style="color: var(--color-cyan);"></i>`;
+            monitorsTooltip = `Disposição dos Monitores: Automático (Ativo: ${isStacked ? 'Empilhados' : 'Lado a Lado'}) - Clique para alternar`;
+        } else if (isStacked) {
+            monitorsIconHtml = `<i class="fa-solid fa-table-columns"></i>`;
+            monitorsTooltip = "Disposição dos Monitores: Empilhados (Manual) - Clique para alternar";
+        } else {
+            monitorsIconHtml = `<i class="fa-solid fa-table-columns fa-rotate-90" style="transform: rotate(90deg); display: inline-block;"></i>`;
+            monitorsTooltip = "Disposição dos Monitores: Lado a Lado (Manual) - Clique para alternar";
+        }
 
         if (btnToggleMonitorsSrc) {
             btnToggleMonitorsSrc.innerHTML = monitorsIconHtml;
@@ -736,20 +775,240 @@ export class WorkspaceManager {
     }
 
     /**
-     * Altera a disposição dos monitores (Source e Program).
-     * @param {"side-by-side" | "stacked"} layout 
-     * @param {boolean} [skipSplitterReinit=false]
+     * Verifica se ambos os monitores (Source e Program) estão abertos, presentes no container,
+     * não maximizados, não colapsados/ocultos e não destacados em pop-out.
+     * @returns {boolean}
      */
-    setMonitorsLayout(layout, skipSplitterReinit = false) {
-        if (layout !== "side-by-side" && layout !== "stacked") return;
-        this.monitorsLayout = layout;
-        localStorage.setItem("capiau_monitors_layout", layout);
-
+    areBothMonitorsOpen() {
         const monitorsContainer = document.querySelector(".monitors-container");
         const sourcePanel = document.getElementById("source-player-panel");
         const programPanel = document.getElementById("program-player-panel");
 
-        if (layout === "stacked") {
+        if (!monitorsContainer || !sourcePanel || !programPanel) return false;
+        if (!monitorsContainer.contains(sourcePanel) || !monitorsContainer.contains(programPanel)) return false;
+
+        // Se algum estiver em pop-out
+        if (this.poppedElements?.["source-player-panel"] || this.poppedElements?.["program-player-panel"]) return false;
+        if (sourcePanel.classList.contains("popped-out-hidden") || programPanel.classList.contains("popped-out-hidden")) return false;
+
+        // Se algum estiver oculto ou colapsado
+        if (sourcePanel.style.display === "none" || programPanel.style.display === "none") return false;
+        if (sourcePanel.classList.contains("collapsed") || programPanel.classList.contains("collapsed")) return false;
+
+        // Se algum estiver maximizado preenchendo o espaço todo
+        if (sourcePanel.classList.contains("maximized") || programPanel.classList.contains("maximized")) return false;
+
+        return true;
+    }
+
+    /**
+     * Calcula qual a melhor disposição dos monitores (side-by-side vs stacked)
+     * para maximizar a área útil de visualização de vídeo e preservar a ergonomia dos controles.
+     * @param {number} containerW - Largura total do .monitors-container
+     * @param {number} containerH - Altura total do .monitors-container
+     * @param {number} [videoAspect=1.7778] - Aspect ratio do vídeo (largura / altura)
+     * @returns {"side-by-side" | "stacked"}
+     */
+    calculateBestMonitorsLayout(containerW, containerH, videoAspect = 16 / 9) {
+        if (!containerW || !containerH || containerW <= 0 || containerH <= 0) {
+            return this.resolvedMonitorsLayout || "side-by-side";
+        }
+
+        const aspect = (typeof videoAspect === "number" && videoAspect > 0) ? videoAspect : (16 / 9);
+        const splitterSize = 4;
+
+        // 1. Candidato Lado a Lado (Horizontal)
+        // Cada monitor recebe metade da largura disponível
+        const sideWidthPerMonitor = Math.max(0, (containerW - splitterSize) / 2);
+
+        // No modo lado a lado, cabeçalho e controles ocupam espaço vertical fixo no fluxo
+        let sideChromeH = 110;
+        const sourcePanel = document.getElementById("source-player-panel");
+        const programPanel = document.getElementById("program-player-panel");
+        const headerEl = (sourcePanel && sourcePanel.querySelector(".player-header"))
+            || (programPanel && programPanel.querySelector(".player-header"));
+        const controlsEl = (sourcePanel && sourcePanel.querySelector(".player-controls"))
+            || (programPanel && programPanel.querySelector(".player-controls"));
+        if (headerEl && controlsEl) {
+            const hH = headerEl.offsetHeight;
+            const cH = controlsEl.offsetHeight;
+            if (hH > 0 && cH > 0) {
+                sideChromeH = hH + cH;
+            }
+        }
+        const sideHeightForVideo = Math.max(0, containerH - sideChromeH);
+
+        // Ajuste proporcional de vídeo com object-fit: contain
+        const sideVidW = Math.min(sideWidthPerMonitor, sideHeightForVideo * aspect);
+        const sideVidH = aspect > 0 ? sideVidW / aspect : 0;
+        let sideScore = sideVidW * sideVidH;
+
+        // 2. Candidato Empilhados (Vertical)
+        // Cada monitor recebe largura total e metade da altura disponível
+        const stackedWidthPerMonitor = Math.max(0, containerW);
+        const stackedHeightPerMonitor = Math.max(0, (containerH - splitterSize) / 2);
+
+        // No modo empilhado (layout flat/estúdio), cabeçalho e controles são overlays absolutos em hover (0px no fluxo normal)
+        const stackedVidW = Math.min(stackedWidthPerMonitor, stackedHeightPerMonitor * aspect);
+        const stackedVidH = aspect > 0 ? stackedVidW / aspect : 0;
+        let stackedScore = stackedVidW * stackedVidH;
+
+        // 3. Fatores ergonômicos:
+        // - Penalidade se a largura em side-by-side for menor que 280px (botões e timecode espremidos)
+        if (sideWidthPerMonitor < 280) {
+            sideScore *= 0.65;
+        } else if (sideWidthPerMonitor < 320) {
+            sideScore *= 0.85;
+        }
+
+        // - Penalidade se a altura em stacked for menor que 120px (faixa excessivamente estreita)
+        if (stackedHeightPerMonitor < 120) {
+            stackedScore *= 0.5;
+        } else if (stackedHeightPerMonitor < 150) {
+            stackedScore *= 0.8;
+        }
+
+        // 4. Histerese Anti-Flicker:
+        // Para alternar o layout ativo atual, o concorrente precisa superar a pontuação atual em pelo menos 8%
+        const currentActive = this.resolvedMonitorsLayout || "side-by-side";
+        const HYSTERESIS = 1.08;
+
+        if (currentActive === "side-by-side") {
+            return (stackedScore > sideScore * HYSTERESIS) ? "stacked" : "side-by-side";
+        } else {
+            return (sideScore > stackedScore * HYSTERESIS) ? "side-by-side" : "stacked";
+        }
+    }
+
+    /**
+     * Avalia e aplica a melhor disposição caso o modo automático esteja ativo.
+     * @param {boolean} [skipSplitterReinit=false]
+     */
+    evaluateAutoMonitorsLayout(skipSplitterReinit = false) {
+        if (this.monitorsLayout !== "auto") return;
+
+        // Proteção: não altera durante arraste ativo do divisor interno entre monitores
+        if (document.querySelector(".splitter-players.active, .splitter-studio-players.active")) {
+            return;
+        }
+
+        if (!this.areBothMonitorsOpen()) return;
+
+        const monitorsContainer = document.querySelector(".monitors-container");
+        if (!monitorsContainer) return;
+
+        const rect = monitorsContainer.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+
+        // Detecta o aspect ratio do vídeo ativo
+        let videoAspect = 16 / 9;
+        const prgVideo = document.getElementById("program-video");
+        const srcVideo = document.getElementById("source-video");
+        if (prgVideo && prgVideo.videoWidth > 0 && prgVideo.videoHeight > 0) {
+            videoAspect = prgVideo.videoWidth / prgVideo.videoHeight;
+        } else if (srcVideo && srcVideo.videoWidth > 0 && srcVideo.videoHeight > 0) {
+            videoAspect = srcVideo.videoWidth / srcVideo.videoHeight;
+        }
+
+        const bestLayout = this.calculateBestMonitorsLayout(rect.width, rect.height, videoAspect);
+        if (bestLayout !== this.resolvedMonitorsLayout) {
+            this.resolvedMonitorsLayout = bestLayout;
+            this.applyMonitorsDOM(bestLayout, skipSplitterReinit);
+        }
+    }
+
+    /**
+     * Configura o ResizeObserver no .monitors-container para detecção contínua
+     * de mudanças de dimensão provocadas por redimensionamento de abas, timeline, etc.
+     */
+    setupAutoMonitorsObserver() {
+        if (this.autoMonitorsObserver) {
+            this.autoMonitorsObserver.disconnect();
+            this.autoMonitorsObserver = null;
+        }
+
+        const monitorsContainer = document.querySelector(".monitors-container");
+        if (!monitorsContainer || typeof ResizeObserver === "undefined") return;
+
+        this.autoMonitorsObserver = new ResizeObserver(() => {
+            if (this._autoMonitorsRaf) cancelAnimationFrame(this._autoMonitorsRaf);
+            this._autoMonitorsRaf = requestAnimationFrame(() => {
+                if (this.monitorsLayout === "auto") {
+                    this.evaluateAutoMonitorsLayout();
+                }
+            });
+        });
+
+        this.autoMonitorsObserver.observe(monitorsContainer);
+
+        window.addEventListener("resize", () => {
+            if (this.monitorsLayout === "auto") {
+                if (this._autoMonitorsRaf) cancelAnimationFrame(this._autoMonitorsRaf);
+                this._autoMonitorsRaf = requestAnimationFrame(() => {
+                    this.evaluateAutoMonitorsLayout();
+                });
+            }
+        });
+    }
+
+    /**
+     * Reinicializa exclusivamente o divisor (splitter) entre os monitores Source e Program,
+     * sem remover ou interferir nos divisores das sidebars e timeline.
+     */
+    reinitMonitorsSplitter() {
+        const monitorsContainer = document.querySelector(".monitors-container");
+        if (!monitorsContainer) return;
+
+        // Remove divisores anteriores de monitores
+        const oldSplitterH = monitorsContainer.querySelector(".splitter-players");
+        if (oldSplitterH) oldSplitterH.remove();
+        const oldSplitterV = monitorsContainer.querySelector(".splitter-studio-players");
+        if (oldSplitterV) oldSplitterV.remove();
+
+        const sourcePanel = document.getElementById("source-player-panel");
+        const programPanel = document.getElementById("program-player-panel");
+        if (!sourcePanel || !programPanel) return;
+
+        if (!this.areBothMonitorsOpen()) return;
+
+        const effectiveLayout = this.monitorsLayout === "auto"
+            ? (this.resolvedMonitorsLayout || "side-by-side")
+            : this.monitorsLayout;
+
+        if (effectiveLayout === "stacked") {
+            SplitterHelper.initSplitter(monitorsContainer, "#source-player-panel", "#program-player-panel", {
+                direction: "vertical",
+                resizeTarget: "left",
+                unit: "%",
+                minVal: 20,
+                maxVal: 80,
+                defaultVal: 50,
+                className: "splitter-studio-players"
+            });
+        } else {
+            SplitterHelper.initSplitter(monitorsContainer, "#source-player-panel", "#program-player-panel", {
+                direction: "horizontal",
+                resizeTarget: "left",
+                unit: "%",
+                minVal: 20,
+                maxVal: 80,
+                defaultVal: 50,
+                className: "splitter-players"
+            });
+        }
+    }
+
+    /**
+     * Aplica no DOM as classes, dimensões e splitters para a disposição efetiva fornecida.
+     * @param {"side-by-side" | "stacked"} effectiveLayout 
+     * @param {boolean} [skipSplitterReinit=false] 
+     */
+    applyMonitorsDOM(effectiveLayout, skipSplitterReinit = false) {
+        const monitorsContainer = document.querySelector(".monitors-container");
+        const sourcePanel = document.getElementById("source-player-panel");
+        const programPanel = document.getElementById("program-player-panel");
+
+        if (effectiveLayout === "stacked") {
             document.body.classList.add("layout-monitors-stacked");
             document.body.classList.remove("layout-monitors-side-by-side");
             if (monitorsContainer) {
@@ -759,8 +1018,14 @@ export class WorkspaceManager {
             if (this.timelinePosition === "bottom-full") {
                 document.body.classList.add("studio");
             }
-            if (sourcePanel) sourcePanel.style.width = "100%";
-            if (programPanel) programPanel.style.width = "100%";
+            if (sourcePanel) {
+                sourcePanel.style.width = "100%";
+                sourcePanel.style.height = "";
+            }
+            if (programPanel) {
+                programPanel.style.width = "100%";
+                programPanel.style.height = "";
+            }
         } else {
             document.body.classList.remove("layout-monitors-stacked");
             document.body.classList.add("layout-monitors-side-by-side");
@@ -769,16 +1034,41 @@ export class WorkspaceManager {
                 monitorsContainer.classList.add("side-by-side");
             }
             document.body.classList.remove("studio");
-            if (sourcePanel) sourcePanel.style.height = "100%";
-            if (programPanel) programPanel.style.height = "100%";
+            if (sourcePanel) {
+                sourcePanel.style.height = "100%";
+                sourcePanel.style.width = "";
+            }
+            if (programPanel) {
+                programPanel.style.height = "100%";
+                programPanel.style.width = "";
+            }
         }
 
         this.updateLayoutUI();
 
         if (!skipSplitterReinit) {
-            this.reinitSplitters();
+            this.reinitMonitorsSplitter();
         }
         setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
+    }
+
+    /**
+     * Altera a disposição dos monitores (Source e Program).
+     * @param {"auto" | "side-by-side" | "stacked"} layout 
+     * @param {boolean} [skipSplitterReinit=false]
+     */
+    setMonitorsLayout(layout, skipSplitterReinit = false) {
+        if (layout !== "auto" && layout !== "side-by-side" && layout !== "stacked") return;
+        this.monitorsLayout = layout;
+        localStorage.setItem("capiau_monitors_layout", layout);
+
+        if (layout === "auto") {
+            this.evaluateAutoMonitorsLayout(skipSplitterReinit);
+            this.updateLayoutUI();
+        } else {
+            this.resolvedMonitorsLayout = layout;
+            this.applyMonitorsDOM(layout, skipSplitterReinit);
+        }
     }
 
     /**
@@ -1408,8 +1698,10 @@ export class WorkspaceManager {
             }
 
             document.body.classList.remove("layout-timeline-bottom-left", "layout-timeline-bottom-right", "layout-timeline-expanded");
-            document.body.classList.add("layout-timeline-bottom");
-            if (this.monitorsLayout === "stacked") {
+            const effectiveMonitors = this.monitorsLayout === "auto"
+                ? (this.resolvedMonitorsLayout || "side-by-side")
+                : this.monitorsLayout;
+            if (effectiveMonitors === "stacked") {
                 document.body.classList.add("studio");
             } else {
                 document.body.classList.remove("studio");
@@ -1546,15 +1838,30 @@ export class WorkspaceManager {
         if (window.panelsManager) {
             window.panelsManager.renderTrackHeaders(true);
         }
+        if (this.monitorsLayout === "auto") {
+            this.evaluateAutoMonitorsLayout();
+        }
         setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
     }
 
-    /** Alterna rapidamente a disposição dos monitores */
+    /** Alterna ciclicamente a disposição dos monitores: Auto -> Lado a Lado -> Empilhados -> Auto */
     toggleMonitorsLayout() {
-        const next = this.monitorsLayout === "stacked" ? "side-by-side" : "stacked";
+        let next;
+        let toastMsg;
+        if (this.monitorsLayout === "auto") {
+            next = "side-by-side";
+            toastMsg = "Monitores: Lado a Lado (Manual)";
+        } else if (this.monitorsLayout === "side-by-side") {
+            next = "stacked";
+            toastMsg = "Monitores: Empilhados (Manual)";
+        } else {
+            next = "auto";
+            const activeDesc = this.resolvedMonitorsLayout === "stacked" ? "Empilhados" : "Lado a Lado";
+            toastMsg = `Monitores: Automático (Ajuste inteligente ativo: ${activeDesc})`;
+        }
         this.setMonitorsLayout(next);
         if (window.showToast) {
-            window.showToast(next === "stacked" ? "Monitores: Empilhados (1 acima / 1 abaixo)" : "Monitores: Lado a Lado", "info");
+            window.showToast(toastMsg, "info");
         }
     }
 
@@ -1622,7 +1929,7 @@ export class WorkspaceManager {
         const isBottomFull = this.timelinePosition === "bottom-full";
         const isBottomLeft = this.timelinePosition === "bottom-left";
         const isBottomRight = this.timelinePosition === "bottom-right";
-        const isStacked = this.monitorsLayout === "stacked";
+        const isStacked = (this.monitorsLayout === "auto" ? (this.resolvedMonitorsLayout || "side-by-side") : this.monitorsLayout) === "stacked";
         const workspace = document.querySelector(".workspace");
         const centerStage = document.querySelector(".center-stage");
         const monitorsContainer = document.querySelector(".monitors-container");
@@ -1932,31 +2239,7 @@ export class WorkspaceManager {
             }
         }
 
-        if (monitorsContainer) {
-            if (isStacked) {
-                // Source (topo) <-> Program (base)
-                SplitterHelper.initSplitter(monitorsContainer, "#source-player-panel", "#program-player-panel", {
-                    direction: "vertical",
-                    resizeTarget: "left",
-                    unit: "%",
-                    minVal: 20,
-                    maxVal: 80,
-                    defaultVal: 50,
-                    className: "splitter-studio-players"
-                });
-            } else {
-                // Source (esquerda) <-> Program (direita)
-                SplitterHelper.initSplitter(monitorsContainer, "#source-player-panel", "#program-player-panel", {
-                    direction: "horizontal",
-                    resizeTarget: "left",
-                    unit: "%",
-                    minVal: 20,
-                    maxVal: 80,
-                    defaultVal: 50,
-                    className: "splitter-players"
-                });
-            }
-        }
+        this.reinitMonitorsSplitter();
 
         if (timelineWrapper) {
             // Cabeçalho de Trilhas <-> Canvas da Timeline
@@ -1969,6 +2252,10 @@ export class WorkspaceManager {
                 defaultVal: 180,
                 className: "splitter-timeline-headers"
             });
+        }
+
+        if (this.monitorsLayout === "auto") {
+            this.evaluateAutoMonitorsLayout(true);
         }
     }
 
@@ -3411,7 +3698,8 @@ export class WorkspaceManager {
             btnMaxLib.addEventListener("click", (e) => {
                 e.stopPropagation();
                 // Alterna o layout Estúdio (biblioteca + players empilhados + timeline full-width)
-                const isStudio = this.timelinePosition === "bottom-full" && this.monitorsLayout === "stacked";
+                const effectiveMonitors = this.monitorsLayout === "auto" ? (this.resolvedMonitorsLayout || "side-by-side") : this.monitorsLayout;
+                const isStudio = this.timelinePosition === "bottom-full" && effectiveMonitors === "stacked";
                 this.applyStudio(!isStudio);
             });
         }
@@ -3526,7 +3814,8 @@ export class WorkspaceManager {
         if (btn) {
             btn.click();
         } else {
-            const isStudio = this.timelinePosition === "bottom-full" && this.monitorsLayout === "stacked";
+            const effectiveMonitors = this.monitorsLayout === "auto" ? (this.resolvedMonitorsLayout || "side-by-side") : this.monitorsLayout;
+            const isStudio = this.timelinePosition === "bottom-full" && effectiveMonitors === "stacked";
             this.applyStudio(!isStudio);
         }
     }
