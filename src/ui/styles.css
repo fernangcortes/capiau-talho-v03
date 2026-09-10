@@ -84,6 +84,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
     height: 46px;
     padding: 0 16px;
     margin: 0;
@@ -91,12 +92,47 @@ body {
     border-bottom: 1px solid var(--border-glass);
     z-index: 100;
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), margin 0.3s ease, height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* ── PROTEÇÃO GLOBAL ANTI-SELEÇÃO DE TEXTO NO CHROME DA APLICAÇÃO ── */
+.header,
+.header *:not(input):not(textarea),
+#timeline-header-bar,
+#timeline-header-bar *:not(input):not(textarea),
+#timeline-actions-sidebar,
+#timeline-actions-sidebar *,
+#timeline-headers-sidebar,
+#timeline-headers-sidebar *:not(input):not(textarea),
+.timeline-header-ruler,
+.timeline-header-ruler *,
+.sidebar-header,
+.sidebar-header *:not(input):not(textarea),
+#dual-popout-toolbar,
+#dual-popout-toolbar * {
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+}
+
+.search-area input,
+#timeline-name-input,
+.track-name-input,
+input[type="text"],
+input[type="search"],
+textarea {
+    -webkit-user-select: text !important;
+    user-select: text !important;
 }
 
 .logo-area {
     display: flex;
     align-items: center;
     gap: 8px;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .logo-icon {
@@ -113,6 +149,8 @@ body {
     background: linear-gradient(135deg, #fff 30%, var(--color-violet));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .logo-text span {
@@ -122,7 +160,10 @@ body {
 .search-area {
     display: flex;
     align-items: center;
-    width: 35%;
+    width: auto;
+    min-width: 240px;
+    max-width: 440px;
+    flex: 1 1 320px;
     height: 30px;
     padding: 0 8px;
     border-radius: 6px;

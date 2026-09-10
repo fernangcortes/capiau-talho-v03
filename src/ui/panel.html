@@ -790,8 +790,18 @@
             // Atalho: duplo clique no espaço vazio do toolbar também recolhe o cabeçalho
             dualToolbar?.addEventListener("dblclick", (e) => {
                 if (e.target.closest("button") || e.target.closest(".dual-splitter") || e.target.closest(".dual-btn-group")) return;
+                e.preventDefault();
+                window.getSelection()?.removeAllRanges();
                 setDualHeaderCollapsed(true);
             });
+
+            // Previne seleção acidental de texto na janela multi em múltiplos cliques
+            document.addEventListener("mousedown", (e) => {
+                if (e.detail > 1 && !e.target.closest("input, textarea")) {
+                    e.preventDefault();
+                    window.getSelection()?.removeAllRanges();
+                }
+            }, { capture: true });
 
             // Atalho de teclado: Ctrl + Shift + H (Ocultar / Mostrar Cabeçalho)
             window.addEventListener("keydown", (e) => {

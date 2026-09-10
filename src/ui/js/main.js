@@ -1975,6 +1975,8 @@ window.addEventListener("DOMContentLoaded", () => {
     if (timelineActionsSidebar && btnToggleToolbar) {
         timelineActionsSidebar.addEventListener("dblclick", (e) => {
             if (e.target.closest("button, input, select, .toolbar-submenu-flyout, .btn-toolbar-action")) return;
+            e.preventDefault();
+            window.getSelection()?.removeAllRanges();
             btnToggleToolbar.click();
         });
     }
@@ -2040,6 +2042,8 @@ window.addEventListener("DOMContentLoaded", () => {
     if (timelineHeadersSidebar && btnToggleHeaders) {
         timelineHeadersSidebar.addEventListener("dblclick", (e) => {
             if (e.target.closest("button, input, select, .track-name-label, .track-resize-handle, .resize-handle, .track-controls, .track-vol-slider, .track-meter")) return;
+            e.preventDefault();
+            window.getSelection()?.removeAllRanges();
             btnToggleHeaders.click();
         });
     }
@@ -2072,6 +2076,8 @@ window.addEventListener("DOMContentLoaded", () => {
     if (timelineHeaderBar && btnToggleTimelineHeader) {
         timelineHeaderBar.addEventListener("dblclick", (e) => {
             if (e.target.closest("button, input, select, option, label, a, .slider-control-item, .track-height-slider-compact, .timeline-zoom-slider-compact, #timeline-title-group")) return;
+            e.preventDefault();
+            window.getSelection()?.removeAllRanges();
             if (e.altKey || e.shiftKey) {
                 const toggleTimeline = document.getElementById("toggle-timeline");
                 if (toggleTimeline) {
@@ -2293,9 +2299,24 @@ window.addEventListener("DOMContentLoaded", () => {
         if (mainHeader) {
             mainHeader.addEventListener("dblclick", (e) => {
                 if (e.target.closest("button, input, select, option, label, a, #health-status-badge")) return;
+                e.preventDefault();
+                window.getSelection()?.removeAllRanges();
                 btnCollapseHeader.click();
             });
         }
+
+        // Previne seleção acidental de texto no chrome da aplicação em múltiplos cliques
+        document.addEventListener("mousedown", (e) => {
+            if (e.detail > 1) {
+                if (!e.target.closest("input:not([readonly]), textarea, [contenteditable='true'], .bubble-text, .transcript-line")) {
+                    e.preventDefault();
+                    const sel = window.getSelection();
+                    if (sel && sel.rangeCount > 0) {
+                        sel.removeAllRanges();
+                    }
+                }
+            }
+        }, { capture: true });
     }
 
     // ── TABS NATIVAS DA ESQUERDA (BIBLIOTECA) ──
