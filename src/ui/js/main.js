@@ -1971,6 +1971,14 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Duplo clique no espaço vazio da barra de ferramentas recolhe a barra
+    if (timelineActionsSidebar && btnToggleToolbar) {
+        timelineActionsSidebar.addEventListener("dblclick", (e) => {
+            if (e.target.closest("button, input, select, .toolbar-submenu-flyout, .btn-toolbar-action")) return;
+            btnToggleToolbar.click();
+        });
+    }
+
     if (timelineActionsSidebar) {
         let targetScrollTop = timelineActionsSidebar.scrollTop;
         let isSmoothScrolling = false;
@@ -2028,6 +2036,14 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Duplo clique no espaço vazio do cabeçalho de pistas recolhe as pistas
+    if (timelineHeadersSidebar && btnToggleHeaders) {
+        timelineHeadersSidebar.addEventListener("dblclick", (e) => {
+            if (e.target.closest("button, input, select, .track-name-label, .track-resize-handle, .resize-handle, .track-controls, .track-vol-slider, .track-meter")) return;
+            btnToggleHeaders.click();
+        });
+    }
+
     // ── CONFIGURAÇÃO DE RETRAÇÃO DO CABEÇALHO SUPERIOR DA TIMELINE ──
     const timelineHeaderBar = document.getElementById("timeline-header-bar");
     const btnToggleTimelineHeader = document.getElementById("btn-toggle-timeline-header");
@@ -2049,6 +2065,21 @@ window.addEventListener("DOMContentLoaded", () => {
             reopenTimelineHeader.style.display = "none";
             localStorage.setItem("capiau_timeline_header_collapsed", "false");
             window.dispatchEvent(new Event("resize"));
+        });
+    }
+
+    // Duplo clique no espaço vazio da barra superior da timeline recolhe o cabeçalho (ou timeline inteira com Alt/Shift)
+    if (timelineHeaderBar && btnToggleTimelineHeader) {
+        timelineHeaderBar.addEventListener("dblclick", (e) => {
+            if (e.target.closest("button, input, select, option, label, a, .slider-control-item, .track-height-slider-compact, .timeline-zoom-slider-compact, #timeline-title-group")) return;
+            if (e.altKey || e.shiftKey) {
+                const toggleTimeline = document.getElementById("toggle-timeline");
+                if (toggleTimeline) {
+                    toggleTimeline.click();
+                    return;
+                }
+            }
+            btnToggleTimelineHeader.click();
         });
     }
 
@@ -2256,6 +2287,15 @@ window.addEventListener("DOMContentLoaded", () => {
             headerRestoreTrigger.style.display = "none";
             window.dispatchEvent(new Event("resize"));
         });
+
+        // Duplo clique no espaço vazio do cabeçalho principal recolhe o cabeçalho
+        const mainHeader = document.querySelector("header.header") || document.querySelector(".header");
+        if (mainHeader) {
+            mainHeader.addEventListener("dblclick", (e) => {
+                if (e.target.closest("button, input, select, option, label, a, #health-status-badge")) return;
+                btnCollapseHeader.click();
+            });
+        }
     }
 
     // ── TABS NATIVAS DA ESQUERDA (BIBLIOTECA) ──
