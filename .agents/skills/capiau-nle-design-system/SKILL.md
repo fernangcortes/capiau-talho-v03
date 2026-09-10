@@ -89,8 +89,9 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
   5. **Desacoplamento do `ResizeObserver`:**
      * O `ResizeObserver` deve monitorar unicamente o elemento pai direto (`.timeline-canvas-container`).
      * **NUNCA observar a própria tag `<canvas>`**, pois alterar seus atributos físicos dispara novos eventos de resize em cascata.
-  6. **Proteção contra Inversão de DOM (`layout-resizing`):**
-     * Enquanto qualquer divisor estiver sendo arrastado (classe `body.layout-resizing`), motores de ajuste automático de layout (como alternar monitores entre lado a lado e empilhados) devem ser estritamente bloqueados até o `mouseup`.
+  6. **Adaptação Dinâmica Contínua de Monitores:**
+     * Ao redimensionar a timeline, sidebars ou a janela, o modo automático (`monitorsLayout: "auto"`) deve continuar avaliando a proporção útil e alternando entre Lado a Lado e Empilhados em tempo real durante o arrasto.
+     * Apenas o divisor interno entre os próprios monitores (`.splitter-players` / `.splitter-studio-players`) deve suspender a alternância enquanto estiver ativo sob o cursor.
 
 ---
 
