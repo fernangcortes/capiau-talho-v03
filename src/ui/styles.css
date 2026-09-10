@@ -404,15 +404,28 @@ textarea {
     text-shadow: 0 0 8px var(--color-cyan);
 }
 
-/* VIOLETA - IA / Ações de Projeto */
+/* VIOLETA - IA / Ações de Projeto / Timeline */
 #btn-cluster:hover,
-#btn-new-project:hover {
-    color: var(--color-violet) !important;
+#btn-new-project:hover,
+#btn-timeline-position:hover,
+#btn-timeline-position.active {
+    color: #c084fc !important;
 }
 #btn-cluster:hover i,
-#btn-new-project:hover i {
-    color: var(--color-violet) !important;
-    text-shadow: 0 0 8px var(--color-violet);
+#btn-new-project:hover i,
+#btn-timeline-position:hover i,
+#btn-timeline-position.active i {
+    color: #c084fc !important;
+    text-shadow: 0 0 8px rgba(192, 132, 252, 0.7);
+}
+
+.header-empty-spacer {
+    flex: 1 1 auto;
+    height: 100%;
+    min-width: 24px;
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 /* ROSA - Ações Destrutivas / Erro */
@@ -5370,6 +5383,14 @@ body.studio .workspace {
     flex-direction: column !important;
 }
 
+body.layout-timeline-bottom .workspace > #timeline-panel,
+body.studio .workspace > #timeline-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex-shrink: 0;
+}
+
 body.layout-timeline-bottom-left .workspace,
 body.layout-timeline-bottom-right .workspace {
     flex-direction: row !important;
@@ -5388,10 +5409,11 @@ body.layout-timeline-bottom-right .workspace {
 body.layout-timeline-bottom .studio-top,
 body.studio .studio-top,
 .compound-stage > .studio-top {
-    display: flex;
-    flex: 1 1 0%;
-    min-height: 0;
-    width: 100%;
+    display: flex !important;
+    flex-direction: row !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    width: 100% !important;
     position: relative;
 }
 
@@ -6973,6 +6995,99 @@ select option, .nle-select option {
 }
 .custom-context-menu .menu-item-has-submenu:hover > .menu-submenu {
     display: block;
+}
+
+/* ── SUBMENU CUSTOMIZADO DE POSIÇÃO DA TIMELINE (DARK GLASSMORPHISM) ── */
+.custom-context-menu.timeline-position-menu {
+    border-color: rgba(192, 132, 252, 0.35);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.75), 0 0 16px rgba(192, 132, 252, 0.2);
+    min-width: 255px;
+}
+.timeline-position-menu .menu-header {
+    padding: 6px 12px;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #c084fc;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border-glass);
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    user-select: none;
+}
+.timeline-position-menu .menu-header i {
+    font-size: 10px;
+    color: #c084fc;
+}
+.timeline-position-menu .menu-item {
+    padding: 7px 12px;
+    gap: 10px;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.timeline-position-menu .menu-item i.item-icon {
+    width: 16px;
+    text-align: center;
+    font-size: 11px;
+    color: #c084fc;
+    flex-shrink: 0;
+    transition: color 0.15s ease, transform 0.15s ease;
+}
+.timeline-position-menu .menu-item .item-details {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+    overflow: hidden;
+}
+.timeline-position-menu .menu-item .item-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.timeline-position-menu .menu-item .item-desc {
+    font-size: 9.5px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+.timeline-position-menu .menu-item .item-check {
+    font-size: 11px;
+    color: var(--color-cyan);
+    margin-left: auto;
+    flex-shrink: 0;
+    text-shadow: 0 0 6px rgba(6, 182, 212, 0.6);
+}
+.timeline-position-menu .menu-item:hover {
+    background: rgba(139, 92, 246, 0.22);
+}
+.timeline-position-menu .menu-item:hover .item-title {
+    color: #ffffff;
+}
+.timeline-position-menu .menu-item:hover .item-desc {
+    color: rgba(255, 255, 255, 0.7);
+}
+.timeline-position-menu .menu-item:hover i.item-icon {
+    color: #ffffff;
+    transform: scale(1.1);
+    text-shadow: 0 0 8px rgba(192, 132, 252, 0.8);
+}
+.timeline-position-menu .menu-item.active {
+    background: rgba(139, 92, 246, 0.15);
+}
+.timeline-position-menu .menu-item.active .item-title {
+    color: #ffffff;
+    font-weight: 600;
+}
+.timeline-position-menu .menu-item.active i.item-icon {
+    color: var(--color-cyan);
+    text-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
 }
 
 /* Previne que tooltips ou índice de rolagem apareçam quando o menu de contexto está aberto */

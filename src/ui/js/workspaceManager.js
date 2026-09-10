@@ -534,6 +534,7 @@ export class WorkspaceManager {
         this.initMaximizeButtons();
         this.initSidebarObservers();
         this.initNumpadAndWorkspaceShortcuts();
+        this.initTimelinePositionDropdown();
 
         // Vincula controles do Modal de Configuração de Workspace (Drag & Drop e Presets)
         const btnConfigWorkspace = document.getElementById("btn-config-workspace");
@@ -688,6 +689,14 @@ export class WorkspaceManager {
         if (selectTimelinePosition) {
             selectTimelinePosition.value = this.timelinePosition;
         }
+        let timelineLabel = "Entre menus";
+        if (isBottomFull) {
+            timelineLabel = "Faixa de baixo (Total)";
+        } else if (isBottomLeft) {
+            timelineLabel = "Abaixo da esquerda";
+        } else if (isBottomRight) {
+            timelineLabel = "Abaixo da direita";
+        }
         const iconTimelinePosition = document.getElementById("icon-timeline-position");
         if (iconTimelinePosition) {
             if (isBottomFull) {
@@ -699,6 +708,10 @@ export class WorkspaceManager {
             } else {
                 iconTimelinePosition.className = "fa-solid fa-arrows-left-right-to-line";
             }
+        }
+        const btnTimelinePosition = document.getElementById("btn-timeline-position");
+        if (btnTimelinePosition) {
+            btnTimelinePosition.setAttribute("data-tooltip", `Posição da Linha do Tempo: ${timelineLabel}`);
         }
 
         const chkTimelineBottomFull = document.getElementById("chk-timeline-bottom-full");
@@ -1337,6 +1350,156 @@ export class WorkspaceManager {
     }
 
     /**
+     * Inicializa o seletor de posicionamento da timeline flat line-icon com menu flutuante customizado (Dark Glassmorphism).
+     */
+    initTimelinePositionDropdown() {
+        const btnTimelinePosition = document.getElementById("btn-timeline-position");
+        if (!btnTimelinePosition) return;
+
+        const options = [
+            {
+                value: "center",
+                label: "Timeline: Entre menus",
+                desc: "Centralizada entre as colunas laterais",
+                icon: "fa-solid fa-arrows-left-right-to-line"
+            },
+            {
+                value: "bottom-left",
+                label: "Timeline: Abaixo da esquerda",
+                desc: "Estendida sob a biblioteca e o painel esquerdo",
+                icon: "fa-solid fa-arrow-left"
+            },
+            {
+                value: "bottom-right",
+                label: "Timeline: Abaixo da direita",
+                desc: "Estendida sob o inspetor e o painel direito",
+                icon: "fa-solid fa-arrow-right"
+            },
+            {
+                value: "bottom-full",
+                label: "Timeline: Faixa de baixo (Total)",
+                desc: "Largura total ocupando toda a base da tela",
+                icon: "fa-solid fa-window-maximize"
+            }
+        ];
+
+        const closeMenu = () => {
+            const existing = document.getElementById("custom-timeline-position-menu");
+            if (existing) {
+                existing.remove();
+            }
+            btnTimelinePosition.classList.remove("active");
+            document.removeEventListener("pointerdown", handleOutsideClick, true);
+            document.removeEventListener("keydown", handleKeydown);
+        };
+
+        const handleOutsideClick = (e) => {
+            const menu = document.getElementById("custom-timeline-position-menu");
+            if (menu && !menu.contains(e.target) && !btnTimelinePosition.contains(e.target)) {
+                closeMenu();
+            }
+        };
+
+        const handleKeydown = (e) => {
+            if (e.key === "Escape") {
+                closeMenu();
+            }
+        };
+
+        btnTimelinePosition.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const existing = document.getElementById("custom-timeline-position-menu");
+            if (existing) {
+                closeMenu();
+                return;
+            }
+
+            // Fecha outros menus de contexto abertos no documento
+            document.querySelectorAll(".custom-context-menu").forEach(m => m.remove());
+
+            // Esconde tooltip global para não sobrepor o menu
+            const globalTooltip = document.getElementById("global-tooltip");
+            if (globalTooltip) {
+                globalTooltip.classList.remove("visible");
+                globalTooltip.style.display = "none";
+            }
+
+            const menu = document.createElement("div");
+            menu.id = "custom-timeline-position-menu";
+            menu.className = "custom-context-menu timeline-position-menu";
+
+            // Header do menu
+            const header = document.createElement("div");
+            header.className = "menu-header";
+            header.innerHTML = `<i class="fa-solid fa-arrows-left-right-to-line"></i><span>Posição da Timeline</span>`;
+            menu.appendChild(header);
+
+            // Itens
+            options.forEach(opt => {
+                const isActive = this.timelinePosition === opt.value;
+                const item = document.createElement("div");
+                item.className = `menu-item ${isActive ? "active" : ""}`;
+                item.setAttribute("data-value", opt.value);
+
+                item.innerHTML = `
+                    <i class="${opt.icon} item-icon"></i>
+                    <div class="item-details">
+                        <span class="item-title">${opt.label}</span>
+                        <span class="item-desc">${opt.desc}</span>
+                    </div>
+                    ${isActive ? '<i class="fa-solid fa-check item-check"></i>' : ''}
+                `;
+
+                item.addEventListener("click", (ev) => {
+                    ev.stopPropagation();
+                    closeMenu();
+                    if (this.timelinePosition !== opt.value) {
+                        this.setTimelinePosition(opt.value);
+                        if (window.showToast) {
+                            window.showToast(`Posição da Timeline: ${opt.label.replace("Timeline: ", "")}`, "info");
+                        }
+                    }
+                });
+
+                menu.appendChild(item);
+            });
+
+            document.body.appendChild(menu);
+            btnTimelinePosition.classList.add("active");
+
+            // Posiciona logo abaixo do botão
+            const btnRect = btnTimelinePosition.getBoundingClientRect();
+            let top = btnRect.bottom + 6;
+            let left = btnRect.left;
+
+            // Evita que extrapole as bordas da viewport
+            const menuRect = menu.getBoundingClientRect();
+            if (left + menuRect.width > window.innerWidth - 10) {
+                left = window.innerWidth - menuRect.width - 10;
+            }
+            if (top + menuRect.height > window.innerHeight - 10) {
+                top = btnRect.top - menuRect.height - 6;
+            }
+
+            menu.style.top = `${Math.max(8, top)}px`;
+            menu.style.left = `${Math.max(8, left)}px`;
+
+            setTimeout(() => {
+                document.addEventListener("pointerdown", handleOutsideClick, true);
+                document.addEventListener("keydown", handleKeydown);
+            }, 10);
+        });
+
+        window.addEventListener("resize", () => {
+            if (document.getElementById("custom-timeline-position-menu")) {
+                closeMenu();
+            }
+        });
+    }
+
+    /**
      * Retorna a chave do preset ativo se o estado pendente coincidir com algum preset pré-definido.
      */
     getActivePresetKey() {
@@ -1677,11 +1840,6 @@ export class WorkspaceManager {
         const centerIndex = this.columnOrder.indexOf("center-stage");
 
         if (position === "bottom-full") {
-            // Limpeza de compoundStage se existia
-            if (this.compoundStage && this.compoundStage.parentNode) {
-                this.compoundStage.remove();
-            }
-
             if (!this.studioTop) {
                 this.studioTop = document.createElement("div");
                 this.studioTop.className = "studio-top";
@@ -1702,7 +1860,14 @@ export class WorkspaceManager {
                 workspace.appendChild(reopenTimeline);
             }
 
+            // 4. Limpeza de compoundStage somente após transferir os elementos com segurança
+            if (this.compoundStage && this.compoundStage.parentNode) {
+                this.compoundStage.remove();
+            }
+
+            // 5. Classes do body para layout-timeline-bottom (full-width)
             document.body.classList.remove("layout-timeline-bottom-left", "layout-timeline-bottom-right", "layout-timeline-expanded");
+            document.body.classList.add("layout-timeline-bottom");
             const effectiveMonitors = this.monitorsLayout === "auto"
                 ? (this.resolvedMonitorsLayout || "side-by-side")
                 : this.monitorsLayout;
@@ -1947,6 +2112,19 @@ export class WorkspaceManager {
         if (this.compoundStage) {
             this.compoundStage.style.removeProperty("width");
             this.compoundStage.style.flex = "1 1 0%";
+        }
+        if (this.studioTop) {
+            this.studioTop.style.removeProperty("width");
+            this.studioTop.style.removeProperty("height");
+            this.studioTop.style.flex = "1 1 0%";
+        }
+        const timelinePanelEl = document.getElementById("timeline-panel");
+        if (timelinePanelEl && isBottomFull) {
+            timelinePanelEl.style.removeProperty("width");
+        }
+        if (monitorsContainer) {
+            monitorsContainer.style.removeProperty("width");
+            monitorsContainer.style.removeProperty("height");
         }
 
         const getColSplitterConfig = (targetCol) => {

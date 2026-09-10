@@ -551,4 +551,49 @@ assert.ok(wsChildren.indexOf("compound-stage") < wsChildren.indexOf("sidebar-rig
 
 console.log("✓ Teste 9: Ordem exata de reparenting no workspace validada sem inversão de colunas em transições reversíveis");
 
-console.log("\nTODOS OS 9 TESTES DE EXPANSÃO DIRECIONAL DA TIMELINE PASSARAM COM SUCESSO!");
+// =========================================================================
+// TESTE 10: Integridade da Faixa de Baixo (bottom-full) e Transições Bidirecionais
+// =========================================================================
+// 1. Transição de bottom-left para bottom-full
+sim.setTimelinePosition("bottom-left");
+assert.strictEqual(sim.timelinePosition, "bottom-left");
+assert.ok(sim.body.classList.contains("layout-timeline-bottom-left"));
+
+sim.setTimelinePosition("bottom-full");
+assert.strictEqual(sim.timelinePosition, "bottom-full");
+assert.ok(sim.body.classList.contains("layout-timeline-bottom"), "body deve ter layout-timeline-bottom em bottom-full");
+assert.ok(!sim.body.classList.contains("layout-timeline-bottom-left"), "body NÃO deve ter layout-timeline-bottom-left");
+assert.ok(!sim.body.classList.contains("layout-timeline-bottom-right"), "body NÃO deve ter layout-timeline-bottom-right");
+assert.ok(!sim.body.classList.contains("layout-timeline-expanded"), "body NÃO deve ter layout-timeline-expanded em bottom-full");
+
+// Em bottom-full, compound-stage não pode existir no DOM
+assert.strictEqual(sim.compoundStage.parentNode, null, "compoundStage deve ter sido desanexado do DOM em bottom-full");
+assert.strictEqual(sim.workspace.querySelector(".compound-stage"), null, "workspace não deve conter compound-stage em bottom-full");
+assert.strictEqual(sim.studioTop.parentNode, sim.workspace, "studioTop deve ser filho direto do workspace");
+assert.strictEqual(sim.timelinePanel.parentNode, sim.workspace, "timelinePanel deve ser filho direto do workspace");
+assert.strictEqual(sim.reopenTimeline.parentNode, sim.workspace, "reopenTimeline deve ser filho direto do workspace");
+
+// Valida que o código-fonte de workspaceManager.js realmente adiciona layout-timeline-bottom
+const fs = require("fs");
+const path = require("path");
+const wmSource = fs.readFileSync(path.join(__dirname, "../src/ui/js/workspaceManager.js"), "utf-8");
+assert.ok(
+    wmSource.includes('document.body.classList.add("layout-timeline-bottom");'),
+    "workspaceManager.js DEVE adicionar layout-timeline-bottom ao document.body em bottom-full"
+);
+
+// Valida que styles.css possui regras para body.layout-timeline-bottom no workspace e timeline-panel
+const cssSource = fs.readFileSync(path.join(__dirname, "../src/ui/styles.css"), "utf-8");
+assert.ok(
+    cssSource.includes("body.layout-timeline-bottom .workspace"),
+    "styles.css DEVE conter regra de coluna para body.layout-timeline-bottom .workspace"
+);
+assert.ok(
+    cssSource.includes("body.layout-timeline-bottom .workspace > #timeline-panel"),
+    "styles.css DEVE conter regra de largura total para body.layout-timeline-bottom .workspace > #timeline-panel"
+);
+
+console.log("✓ Teste 10: Integridade de bottom-full, classes do body e folhas de estilo CSS validadas");
+
+console.log("\nTODOS OS 10 TESTES DE EXPANSÃO DIRECIONAL DA TIMELINE PASSARAM COM SUCESSO!");
+

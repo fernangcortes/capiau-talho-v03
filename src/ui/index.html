@@ -90,16 +90,16 @@
 
                 <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.15);"></div>
 
-                <!-- Seletor de Posição da Timeline -->
-                <div style="display: flex; align-items: center; gap: 4px;" data-tooltip="Posição da Linha do Tempo">
-                    <i id="icon-timeline-position" class="fa-solid fa-arrows-left-right-to-line" style="color: #c084fc; font-size: 11px;"></i>
-                    <select id="select-timeline-position" style="color: #c084fc; max-width: 175px; background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; cursor: pointer;">
-                        <option value="center">Timeline: Entre menus</option>
-                        <option value="bottom-left">Timeline: Abaixo da esquerda</option>
-                        <option value="bottom-right">Timeline: Abaixo da direita</option>
-                        <option value="bottom-full">Timeline: Faixa de baixo (Total)</option>
-                    </select>
-                </div>
+                <!-- Seletor de Posição da Timeline (Line-Icon com Tooltip e Menu Design System) -->
+                <button id="btn-timeline-position" class="btn-icon" data-tooltip="Posição da Linha do Tempo: Entre menus" style="color: #c084fc; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; cursor: pointer; border-radius: 4px;">
+                    <i id="icon-timeline-position" class="fa-solid fa-arrows-left-right-to-line" style="font-size: 11px;"></i>
+                </button>
+                <select id="select-timeline-position" style="display: none;" aria-hidden="true">
+                    <option value="center">Timeline: Entre menus</option>
+                    <option value="bottom-left">Timeline: Abaixo da esquerda</option>
+                    <option value="bottom-right">Timeline: Abaixo da direita</option>
+                    <option value="bottom-full">Timeline: Faixa de baixo (Total)</option>
+                </select>
 
                 <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.15);"></div>
 
@@ -108,6 +108,9 @@
                     <i class="fa-solid fa-table-columns"></i>
                 </button>
             </div>
+            
+            <!-- Espaço Vazio Clicável para Retração do Cabeçalho (Sem tooltip) -->
+            <div class="header-empty-spacer"></div>
             
             <div class="search-area glassmorphism">
                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
