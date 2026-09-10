@@ -3033,7 +3033,11 @@ export function flushAllPendingChunks(root) {
     const scope = root || document.getElementById("media-tree-list");
     if (!scope) return;
     if (typeof scope._flushAllChunks === "function") scope._flushAllChunks();
-    scope.querySelectorAll(".tree-folder-children").forEach(el => {
+    const treeList = scope.id === "media-tree-list" ? null : scope.querySelector?.("#media-tree-list");
+    if (treeList && typeof treeList._flushAllChunks === "function") {
+        treeList._flushAllChunks();
+    }
+    scope.querySelectorAll?.(".tree-folder-children").forEach(el => {
         if (typeof el._flushAllChunks === "function") el._flushAllChunks();
     });
 }
@@ -7720,6 +7724,21 @@ export class LibraryScrollIndexTracker {
         this.isPointerDownOnGutter = false;
         this.resizeObserver = null;
         
+        // Rastreamento de velocidade adaptativa e animação fluida (rAF)
+        this.lastPointerX = null;
+        this.lastPointerY = null;
+        this.lastPointerTime = null;
+        this.currentVelocity = 0; // Velocidade escalar suavizada em px/ms
+        this.velocityX = 0; // deltaX / deltaTime em px/ms
+        this.velocityY = 0; // deltaY / deltaTime em px/ms
+        this.targetRatio = 0; // Razão alvo [0, 1] para interpolação
+        this.currentRatio = 0; // Razão atual amortecida [0, 1] em exibição
+        this.lastRawRatio = null; // Última razão física direta calculada
+        this.videoScrubTime = null; // Posição em segundos de frame no vídeo sob o cursor
+        this.rafId = null; // Identificador do laço requestAnimationFrame
+        this._isTracking = false;
+        this.activeTabId = null;
+
         this.isEnabled = localStorage.getItem("library_scroll_index_enabled") !== "false";
         this.dwellDelay = parseInt(localStorage.getItem("library_scroll_index_dwell") || "1000", 10);
         this.thumbWidth = parseInt(localStorage.getItem("library_scroll_preview_thumb_width") || "128", 10);
@@ -8023,9 +8042,9 @@ export class LibraryScrollIndexTracker {
             return;
         }
 
-        // Se o mouse estiver sobre o tooltip, mantém o tooltip travado no item atual
-        if (isInsideTooltip) {
-            return;
+        // Garante que todos os blocos da árvore de mídia estão materializados no DOM
+        if (typeof flushAllPendingChunks === "function") {
+            flushAllPendingChunks(container.querySelector("#media-tree-list") || doc.getElementById("media-tree-list") || doc.getElementById(activeTab));
         }
 
         // Verificação de hit-test no DOM quando na calha
@@ -8038,17 +8057,145 @@ export class LibraryScrollIndexTracker {
             return;
         }
 
-        this.lastHoverEvent = e;
-        const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-        this.updateAtRatio(ratio, e, activeTab);
+        // 1. Rastreamento e cálculo de velocidade (deltaX / deltaTime, deltaY / deltaTime)
+        const now = performance.now();
+        const dt = this.lastPointerTime ? Math.max(1, now - this.lastPointerTime) : 16;
+        const dx = this.lastPointerX !== null ? (e.clientX - this.lastPointerX) : 0;
+        const dy = this.lastPointerY !== null ? (e.clientY - this.lastPointerY) : 0;
 
+        const instSpeed = Math.hypot(dx, dy) / dt; // px/ms
+        this.velocityX = dx / dt;
+        this.velocityY = dy / dt;
+        // Suavização exponencial da velocidade (60% histórico, 40% novo)
+        this.currentVelocity = this.currentVelocity * 0.6 + instSpeed * 0.4;
+
+        this.lastPointerX = e.clientX;
+        this.lastPointerY = e.clientY;
+        this.lastPointerTime = now;
+        this.lastHoverEvent = e;
+        this.activeTabId = activeTab;
+
+        // Se o mouse estiver sobre o tooltip, mantém travado no item e permite scrubbing fino de vídeo com deltaX
+        if (isInsideTooltip) {
+            if (this.currentTargetItem && this.currentTargetItem.hasAttribute("data-video-id")) {
+                const vidId = parseInt(this.currentTargetItem.getAttribute("data-video-id"), 10);
+                const video = (STATE.allVideos || []).find(v => v.id === vidId);
+                if (video && video.duration > 0) {
+                    const absVx = Math.abs(this.velocityX);
+                    let scrubScale = 1.0;
+                    if (absVx < 0.25) {
+                        scrubScale = Math.max(0.15, absVx / 0.35); // Busca lenta/fina: redução proporcional
+                    } else if (absVx > 0.8) {
+                        scrubScale = Math.min(3.0, 1.0 + (absVx - 0.8) * 1.5); // Busca rápida: saltos maiores
+                    }
+                    const timeDelta = (dx / 120) * video.duration * scrubScale;
+                    if (this.videoScrubTime === null) {
+                        this.videoScrubTime = 0;
+                    }
+                    this.videoScrubTime = Math.max(0, Math.min(video.duration, this.videoScrubTime + timeDelta));
+                    this.scheduleRafUpdate(activeTab);
+                }
+            }
+            return;
+        }
+
+        // Ao navegar pela calha, limpa qualquer estado de scrub interno do tooltip
+        if (this.videoScrubTime !== null) {
+            this.videoScrubTime = null;
+        }
+
+        // Navegação na calha do índice
+        const rawPhysicalRatio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+
+        // Arraste com o ponteiro pressionado na calha: sem amortecimento, 100% imediato
         if (this.isPointerDownOnGutter) {
+            this.targetRatio = rawPhysicalRatio;
+            this.currentRatio = rawPhysicalRatio;
+            this.lastRawRatio = rawPhysicalRatio;
+            this.updateAtRatio(rawPhysicalRatio, e, activeTab);
             if (this.currentTargetItem) {
                 this.navigateToItem(this.currentTargetItem, false);
             } else {
-                const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
+                const targetScrollTop = rawPhysicalRatio * (container.scrollHeight - container.clientHeight);
                 container.scrollTop = targetScrollTop;
             }
+            return;
+        }
+
+        // Primeiro toque na calha: ancoragem direta sem salto
+        if (!this._isTracking) {
+            this._isTracking = true;
+            this.targetRatio = rawPhysicalRatio;
+            this.currentRatio = rawPhysicalRatio;
+            this.lastRawRatio = rawPhysicalRatio;
+            this.updateAtRatio(rawPhysicalRatio, e, activeTab);
+            return;
+        }
+
+        const rawDeltaRatio = rawPhysicalRatio - (this.lastRawRatio !== null ? this.lastRawRatio : rawPhysicalRatio);
+        this.lastRawRatio = rawPhysicalRatio;
+
+        // Velocidade Adaptativa:
+        // A coordenada física direta sob o cursor é a meta exata (targetRatio).
+        // O amortecimento (lerp adaptativo no rAF) desacelera o avanço em velocidade baixa para busca fina,
+        // e salta instantaneamente em velocidade alta para varredura rápida.
+        this.targetRatio = rawPhysicalRatio;
+
+        this.scheduleRafUpdate(activeTab);
+    }
+
+    scheduleRafUpdate(activeTab) {
+        this.activeTabId = activeTab;
+        if (!this.rafId) {
+            this.rafId = requestAnimationFrame(() => this.onRafStep());
+        }
+    }
+
+    onRafStep() {
+        this.rafId = null;
+        if (!this._isTracking && !this.tooltipEl?.classList.contains("visible")) {
+            return;
+        }
+
+        const now = performance.now();
+        // Se o mouse parou de se mover, desacelera suavemente a velocidade
+        if (this.lastPointerTime && (now - this.lastPointerTime > 45)) {
+            this.currentVelocity *= 0.82;
+        }
+
+        const diff = this.targetRatio - this.currentRatio;
+
+        // Fator de amortecimento (lerp alpha adaptativo):
+        // Velocidade baixa: amortecimento forte (alpha 0.08 a 0.16) para navegação minuciosa frame a frame
+        // Velocidade média: alpha 0.18 a 0.50
+        // Velocidade alta: alpha 0.65 a 0.90 para saltos e varredura rápida
+        let alpha;
+        if (this.currentVelocity < 0.25) {
+            const t = Math.max(0, Math.min(1, this.currentVelocity / 0.25));
+            alpha = 0.08 + t * 0.08;
+        } else if (this.currentVelocity >= 0.8) {
+            const t = Math.min(1, (this.currentVelocity - 0.8) / 1.5);
+            alpha = 0.65 + t * 0.25;
+        } else {
+            const t = (this.currentVelocity - 0.25) / 0.55;
+            alpha = 0.18 + t * 0.42;
+        }
+
+        const absDiff = Math.abs(diff);
+        if (absDiff > 0.0002) {
+            this.currentRatio += diff * alpha;
+        } else {
+            this.currentRatio = this.targetRatio;
+        }
+
+        // Renderiza no DOM via updateAtRatio com ratio suavizado
+        if (this.lastHoverEvent && this.activeTabId) {
+            this.updateAtRatio(this.currentRatio, this.lastHoverEvent, this.activeTabId);
+        }
+
+        // Mantém o laço ativo se o lerp ainda estiver convergindo
+        if (Math.abs(this.targetRatio - this.currentRatio) > 0.0002) {
+            this.rafId = requestAnimationFrame(() => this.onRafStep());
         }
     }
 
@@ -8117,7 +8264,9 @@ export class LibraryScrollIndexTracker {
         const startY = container.scrollTop;
         const diff = targetY - startY;
 
-        if (container._scrollAnimId) {
+        if (typeof container._cancelScrollAnim === "function") {
+            container._cancelScrollAnim();
+        } else if (container._scrollAnimId) {
             cancelAnimationFrame(container._scrollAnimId);
             container._scrollAnimId = null;
         }
@@ -8133,16 +8282,20 @@ export class LibraryScrollIndexTracker {
         const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
 
         const cancelOnUserInteraction = () => {
-            if (container._scrollAnimId) {
-                cancelAnimationFrame(container._scrollAnimId);
-                container._scrollAnimId = null;
-                cleanup();
+            if (typeof container._cancelScrollAnim === "function") {
+                container._cancelScrollAnim();
             }
         };
         const cleanup = () => {
             container.removeEventListener("wheel", cancelOnUserInteraction);
             container.removeEventListener("pointerdown", cancelOnUserInteraction);
+            container._cancelScrollAnim = null;
+            if (container._scrollAnimId) {
+                cancelAnimationFrame(container._scrollAnimId);
+                container._scrollAnimId = null;
+            }
         };
+        container._cancelScrollAnim = cleanup;
         container.addEventListener("wheel", cancelOnUserInteraction, { passive: true, once: true });
         container.addEventListener("pointerdown", cancelOnUserInteraction, { passive: true, once: true });
 
@@ -8157,7 +8310,6 @@ export class LibraryScrollIndexTracker {
                 container._scrollAnimId = requestAnimationFrame(step);
             } else {
                 container.scrollTop = targetY;
-                container._scrollAnimId = null;
                 cleanup();
                 if (onComplete) onComplete();
             }
@@ -8209,13 +8361,28 @@ export class LibraryScrollIndexTracker {
             }
 
             this.isPointerDownOnGutter = true;
-            const ratio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-            this.updateAtRatio(ratio, e, activeTab);
+
+            // Cancela animações prévias para ancoragem física imediata sem desvios
+            if (typeof container._cancelScrollAnim === "function") {
+                container._cancelScrollAnim();
+            }
+            if (this.rafId) {
+                cancelAnimationFrame(this.rafId);
+                this.rafId = null;
+            }
+
+            // Posição física exata do clique (sem atraso de lerp)
+            const exactRatio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+            this.targetRatio = exactRatio;
+            this.currentRatio = exactRatio;
+            this.lastRawRatio = exactRatio;
+
+            this.updateAtRatio(exactRatio, e, activeTab);
 
             if (this.currentTargetItem) {
                 this.navigateToItem(this.currentTargetItem, true);
             } else {
-                const targetScrollTop = ratio * (container.scrollHeight - container.clientHeight);
+                const targetScrollTop = exactRatio * (container.scrollHeight - container.clientHeight);
                 container.scrollTo({ top: targetScrollTop, behavior: "smooth" });
             }
         }
@@ -8321,10 +8488,31 @@ export class LibraryScrollIndexTracker {
 
         // Mapeamento proporcional direto por índice: 0% = primeiro item, 100% = último item da lista.
         // Totalmente imune ao zoom das mídias ou à altura do viewport.
-        const targetIndex = Math.max(0, Math.min(items.length - 1, Math.round(ratio * (items.length - 1))));
+        const continuousIndex = ratio * (items.length - 1);
+        const targetIndex = Math.max(0, Math.min(items.length - 1, Math.round(continuousIndex)));
         const bestItem = items[targetIndex] || items[0];
 
-        this.renderItemData(bestItem, items, activeTabId);
+        // Se o item mudou, limpa o scrub de frame manual salvo do item anterior
+        if (this.currentTargetItem !== bestItem) {
+            this.videoScrubTime = null;
+        }
+
+        // Cálculo de frame de vídeo proporcional
+        let currentFrameTime = null;
+        if (bestItem.hasAttribute("data-video-id")) {
+            const vidId = parseInt(bestItem.getAttribute("data-video-id"), 10);
+            const video = (STATE.allVideos || []).find(v => v.id === vidId);
+            if (video && video.duration > 0) {
+                if (this.videoScrubTime !== null) {
+                    currentFrameTime = this.videoScrubTime;
+                } else {
+                    const slotProgress = Math.max(0, Math.min(1, continuousIndex - targetIndex + 0.5));
+                    currentFrameTime = slotProgress * video.duration;
+                }
+            }
+        }
+
+        this.renderItemData(bestItem, items, activeTabId, currentFrameTime);
         this.positionTooltip(mouseEvent, containerRect);
 
         // Gerenciamento de Dwell Time (Expansão progressiva ao parar)
@@ -8356,7 +8544,7 @@ export class LibraryScrollIndexTracker {
         }
     }
 
-    renderItemData(itemEl, allItems, activeTabId) {
+    renderItemData(itemEl, allItems, activeTabId, currentFrameTime = null) {
         if (!this.tooltipEl || !this.dom) return;
 
         const { thumbImg, thumbIcon, folderSpan, titleEl, badgeEl, durationEl, summaryEl, tagsRow, posEl } = this.dom;
@@ -8374,7 +8562,10 @@ export class LibraryScrollIndexTracker {
                 badgeEl.textContent = "Pasta";
             }
             if (durationEl) durationEl.textContent = "";
-            if (thumbImg) thumbImg.style.display = "none";
+            if (thumbImg) {
+                thumbImg.dataset.activeSrc = "";
+                thumbImg.style.display = "none";
+            }
             if (thumbIcon) {
                 thumbIcon.style.display = "block";
                 thumbIcon.className = "fa-solid fa-folder scroll-index-icon";
@@ -8408,9 +8599,17 @@ export class LibraryScrollIndexTracker {
 
                     if (durationEl) {
                         if (video.duration) {
-                            const m = Math.floor(video.duration / 60);
-                            const s = Math.floor(video.duration % 60);
-                            durationEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+                            if (currentFrameTime !== null && currentFrameTime >= 0) {
+                                const curM = Math.floor(currentFrameTime / 60);
+                                const curS = Math.floor(currentFrameTime % 60);
+                                const totM = Math.floor(video.duration / 60);
+                                const totS = Math.floor(video.duration % 60);
+                                durationEl.textContent = `${curM}:${curS.toString().padStart(2, '0')} / ${totM}:${totS.toString().padStart(2, '0')}`;
+                            } else {
+                                const m = Math.floor(video.duration / 60);
+                                const s = Math.floor(video.duration % 60);
+                                durationEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+                            }
                         } else {
                             durationEl.textContent = "";
                         }
@@ -8418,13 +8617,35 @@ export class LibraryScrollIndexTracker {
 
                     const vVersion = video._thumbVersion || video.thumb_version || video.updated_at || "";
                     const qs = vVersion ? `?v=${vVersion}` : "";
+                    const defaultThumbSrc = `/api/video/${video.id}/thumbnail${qs}`;
+
                     if (thumbImg) {
-                        thumbImg.src = `/api/video/${video.id}/thumbnail${qs}`;
+                        let targetSrc = defaultThumbSrc;
+                        // Apenas tenta buscar frame específico via thumbnail-at se estiver fazendo scrub interativo DENTRO do tooltip
+                        if (this.videoScrubTime !== null && currentFrameTime !== null && currentFrameTime >= 0) {
+                            const roundedSec = Math.round(currentFrameTime * 2) / 2;
+                            targetSrc = `/api/video/${video.id}/thumbnail-at?time=${roundedSec.toFixed(1)}`;
+                        }
+
+                        if (thumbImg.dataset.activeSrc !== targetSrc) {
+                            thumbImg.dataset.activeSrc = targetSrc;
+                            thumbImg.onerror = () => {
+                                // Se a miniatura de frame (thumbnail-at) falhar (404), usa a miniatura principal de capa do vídeo
+                                if (targetSrc !== defaultThumbSrc) {
+                                    thumbImg.dataset.activeSrc = defaultThumbSrc;
+                                    thumbImg.onerror = () => {
+                                        if (thumbImg) thumbImg.style.display = "none";
+                                        if (thumbIcon) thumbIcon.style.display = "block";
+                                    };
+                                    thumbImg.src = defaultThumbSrc;
+                                } else {
+                                    if (thumbImg) thumbImg.style.display = "none";
+                                    if (thumbIcon) thumbIcon.style.display = "block";
+                                }
+                            };
+                            thumbImg.src = targetSrc;
+                        }
                         thumbImg.style.display = "block";
-                        thumbImg.onerror = () => {
-                            if (thumbImg) thumbImg.style.display = "none";
-                            if (thumbIcon) thumbIcon.style.display = "block";
-                        };
                     }
                     if (thumbIcon) {
                         thumbIcon.style.display = "none";
@@ -8487,6 +8708,7 @@ export class LibraryScrollIndexTracker {
 
                     const src = photo.proxy_path || (photo.filepath && (photo.filepath.startsWith('http') || photo.filepath.startsWith('/')) ? photo.filepath : `/originals/${photo.filename}`);
                     if (thumbImg) {
+                        thumbImg.dataset.activeSrc = src;
                         thumbImg.src = src;
                         thumbImg.style.display = "block";
                         thumbImg.onerror = () => {
@@ -8579,6 +8801,11 @@ export class LibraryScrollIndexTracker {
     }
 
     hide() {
+        this._isTracking = false;
+        if (this.rafId) {
+            cancelAnimationFrame(this.rafId);
+            this.rafId = null;
+        }
         if (this.tooltipEl) {
             this.tooltipEl.classList.remove("visible", "expanded");
         }
@@ -8588,6 +8815,14 @@ export class LibraryScrollIndexTracker {
             this.splitterDismissTimer = null;
         }
         this.currentTargetItem = null;
+        this.lastPointerX = null;
+        this.lastPointerY = null;
+        this.lastPointerTime = null;
+        this.lastRawRatio = null;
+        this.currentVelocity = 0;
+        this.velocityX = 0;
+        this.velocityY = 0;
+        this.videoScrubTime = null;
     }
 }
 
