@@ -260,6 +260,7 @@ const codeInteraction = readFileSync(path.join(raiz, "src", "ui", "js", "timelin
 const cleanedInteractionCode = codeInteraction
     .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, "")
     .replace(/export class CapiauTimelineInteraction/g, "class CapiauTimelineInteraction")
+    .replace(/export const /g, "const ")
     .replace(/export default /g, "var defaultInteraction = ");
 
 context.mockRenderer = mockRenderer;
