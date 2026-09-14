@@ -396,6 +396,32 @@ A timeline e os monitores de vídeo contam com o conjunto completo de corte prof
   - A cabeça da agulha recebe um contorno sutil automático quando posicionada próxima a marcadores para máxima clareza visual.
   - Cursores gráficos temáticos em SVG indicam a ferramenta ativa sob o mouse: **Vermelho** para Playhead, **Ciano** para Ponto IN, **Rosa** para Ponto OUT e cursor bidirecional para transladar todo o intervalo In/Out segurando **`Alt`** ou **`Shift`** mantendo a duração constante.
 
+### M. Zoom Microscópico até Nível de Frames (80 px/f), Régua Adaptativa e Zoom to Fit
+A timeline do CapIAu-Talho suporta uma amplitude extraordinária de zoom horizontal (de **0.01 px/frame** até **80.0 px/frame**):
+- **Zoom em Nível de Frames e Sub-frames:** Ao aproximar ao máximo, a régua de tempo transiciona dinamicamente para exibir células visuais de quadros individuais numerados, ticks de sub-frames e formatação limpa protegida contra sobreposição de timecodes — inclusive em taxas de quadros fracionárias como 23.976 fps e 59.94 fps.
+- **Ajustar Sequência na Tela (Zoom to Fit Toggle):**
+  - Pressione **`\`** (no CapIAu e Premiere) ou **`Shift + Z`** (no DaVinci Resolve e Final Cut Pro) ou clique no botão rápido **`#btn-timeline-zoom-fit`** na régua da timeline.
+  - O sistema calcula a duração total de todos os clipes e ajusta a escala com margem de respiro para preencher 100% da largura da timeline.
+  - Um segundo acionamento restaura instantaneamente o nível de zoom e a rolagem de trabalho anterior (*mecanismo NLE de Toggle com memória de estado*).
+- **Restauração Rápida de Zoom Padrão (1:1 / 0.5 px/f):** Pressione a tecla **`.` (Ponto)** (no CapIAu/Kdenlive), **`Ctrl + 1`** (no Premiere) ou **`Shift + 1`** (no Resolve/Final Cut) para redefinir o zoom de trabalho padrão.
+- **Navegação Contínua com Ferramenta Mão (`H`) e Roda na Régua:**
+  - Pressione **`H`**, mantenha pressionada a barra de **`Espaço`** na timeline ou use o **botão do meio do mouse** para ativar a Ferramenta Mão e navegar por arrasto (*pan*).
+  - Rolar a **roda do mouse diretamente sobre a régua da timeline** aplica zoom horizontal centralizado no cursor do mouse, sem exigir teclas modificadoras.
+
+### N. Modos de Visualização de Miniaturas nas Faixas e Popover Reativo
+Para equilibrar ergonomia visual e performance em sequências densas, a timeline oferece 3 modos clássicos de miniaturas de vídeo:
+- **Proporção Real de Aspecto Preservada:** A largura de cada miniatura é calculada dinamicamente com base na altura real da pista (`clipHeight * aspectRatio`). Vídeos panorâmicos (16:9), verticais (9:16 reels/shorts/tiktok) e fotos quadradas (1:1) mantêm sua geometria nativa sem corte ou fatiamento vertical em faixas altas.
+- **Os 3 Modos Clássicos:**
+  1. **Rolo de Filme / Contínuo (Filmstrip):** As miniaturas repetem-se ao longo de todo o clipe com intervalo proporcional à escala de zoom.
+  2. **Apenas Início (Head Only):** Uma única miniatura de abertura é desenhada na borda esquerda do corte, deixando a pista limpa para visualização rápida.
+  3. **Desativar Miniaturas (None):** Remove todas as miniaturas das pistas de vídeo, liberando 100% do poder de processamento da CPU para formas de onda de áudio e edição ultrarrápida.
+- **Popover de Opções com Auto-Flip Inteligente:** Ao clicar no botão de opções de visualização (`#btn-timeline-view-options`), o menu popover é desacoplado do contêiner da timeline com posicionamento `fixed`. Se a timeline estiver localizada na base da tela, o popover inverte sua abertura automaticamente para cima (*auto-flip vertical*), evitando qualquer corte de tela.
+
+### O. Redimensionamento Vertical de Pistas: Individual (Shift+Roda) vs. Global
+O controle vertical das pistas de vídeo e áudio conta com granularidade dupla:
+- **Redimensionamento de Pista Específica (`Shift + Roda do Mouse` sobre o cabeçalho da pista):** Posicione o cursor do mouse sobre o cabeçalho de uma pista específica (ex.: `V1` ou `A1`) e gire a roda mantendo **`Shift`** pressionado. Apenas aquela pista terá sua altura ajustada de forma cirúrgica (entre 22px e 240px em incrementos de 8px), permitindo inspecionar uma forma de onda ou miniatura detalhada sem inflar as demais pistas da timeline.
+- **Redimensionamento Global da Timeline (`Shift + Roda` sobre o Canvas ou `Numpad +` / `Numpad -`):** Girar a roda com **`Shift`** sobre a área livre dos clipes ou régua ajusta a escala vertical uniforme (`trackHeightScale` de 0.5x a 1.7x) de todas as faixas simultaneamente.
+
 ---
 
 ## 🎚️ 6. Tratamento de Áudio: Diagnóstico, Presets e Comparação A/B
@@ -1006,6 +1032,16 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | | **`Delete` / `Backspace`** | Lift Delete (clipe) ou Ripple Delete (espaço/gap) |
 | | **`Shift + Delete`** | Ripple Delete de clipe selecionado |
 | | **`S`** *(ou `F10`/`N`)* | Alternar Snapping magnético global |
+| | **`H`** *(ou segurar `Espaço` / botão do meio)* | Ferramenta Mão / Pan (arrasto contínuo da timeline) |
+| | **`Z`** *(ou ícone na barra de ferramentas)* | Ferramenta Zoom / Lupa (Clique aproxima 1.4x, Alt+Clique afasta 0.7x) |
+| | **`+` / `=`** *(ou `Ctrl+=` no Resolve/FCP/Kdenlive)* | Aumentar Zoom na Timeline (ancorado na agulha / playhead) |
+| | **`-`** *(ou `Ctrl+-` no Resolve/FCP/Kdenlive)* | Diminuir Zoom na Timeline (ancorado na agulha / playhead) |
+| | **`\`** *(ou `Shift+Z` / `Ctrl+Shift+Espaço`)* | Ajustar Sequência na Tela (*Zoom to Fit Toggle*) |
+| | **`.` (Ponto)** *(ou `Ctrl+1` / `Shift+1`)* | Restaurar Zoom Padrão da Régua (1:1 / 0.5 px/frame) |
+| | **`Roda do Mouse (sobre a Régua)`** | Zoom horizontal dinâmico contínuo na régua |
+| | **`Ctrl + Roda (sobre o Canvas)`** | Zoom horizontal centralizado no cursor do mouse |
+| | **`Shift + Roda (sobre Cabeçalho de Pista)`** | Redimensionar altura daquela pista específica (22px a 240px) |
+| | **`Shift + Roda (sobre Canvas/Régua)`** | Ajustar escala de altura global de todas as pistas (0.5x a 1.7x) |
 | | **`Alt + ←` / `Alt + →`** | Ajustar ponto de entrada (Trim In em 1 frame) |
 | | **`Shift + ←` / `Shift + →`** | Ajustar ponto de saída (Trim Out em 1 frame) |
 | | **`Ctrl + Z` / `Ctrl + Y`** | Desfazer (*Undo*) / Refazer (*Redo*) |

@@ -10,11 +10,11 @@ Você pode alternar o perfil ativo a qualquer momento através do menu **Perfil*
 
 | Perfil NLE | Foco & Ergonomia | Destaques de Mapeamento |
 | :--- | :--- | :--- |
-| 🎬 **CapIAu Padrão** | Híbrido moderno ultrarrápido para montagem documental e corte inteligente. | `Z` Split, `V` Seleção, `T` Faixa, `Q`/`W` Ripple Trims, `S` Snapping, `M` Marcador, `A` Alternativas IA. |
-| 🐧 **Kdenlive** | Padrão clássico do ecossistema Open Source e Linux NLE. | `Shift+R` / `X` Razor Split, `S` Seleção, `M` / `Shift+M` Espaçador, `V` Inserção, `F10` Snapping, `J`/`K`/`L` Shuttle. |
-| 🟣 **Adobe Premiere Pro** | Ergonomia familiar para editores acostumados ao ecossistema Adobe. | `Ctrl+K` / `C` Razor Split, `A` / `Shift+A` Seleção de Trilha, `V` Seleção, `S` Snapping, `Q`/`W` Ripple Trims. |
-| 🟡 **DaVinci Resolve** | Padrão Blackmagic Design para ilhas de edição e pós-produção. | `Ctrl+\` / `B` Blade Split, `A` Seleção, `N` Snapping, `Shift+Backspace` Ripple Delete, `Alt+[` / `Alt+]` Trims. |
-| 🍏 **Apple Final Cut Pro** | Ergonomia magnética e atalhos otimizados para fluxo contínuo. | `Cmd+B` / `B` Blade Split, `A` Seleção, `N` Snapping, `E` Append, `Shift+Delete` Ripple Delete. |
+| 🎬 **CapIAu Padrão** | Híbrido moderno ultrarrápido para montagem documental e corte inteligente. | `Z` Split, `V` Seleção, `T` Faixa, `Q`/`W` Ripple Trims, `S` Snapping, `\` / `Shift+Z` Zoom to Fit, `+`/`-` Zoom na Agulha, `.` Zoom Reset, `H` Mão, `M` Marcador, `A` Alternativas IA. |
+| 🐧 **Kdenlive** | Padrão clássico do ecossistema Open Source e Linux NLE. | `Shift+R` / `X` Razor Split, `S` Seleção, `M` / `Shift+M` Espaçador, `V` Inserção, `F10` Snapping, `Ctrl+Shift+Espaço` Zoom to Fit, `Ctrl+=`/`Ctrl+-` Zoom, `.` Zoom Reset, `Z` Zoom Tool, `H` Mão, `J`/`K`/`L` Shuttle. |
+| 🟣 **Adobe Premiere Pro** | Ergonomia familiar para editores acostumados ao ecossistema Adobe. | `Ctrl+K` / `C` Razor Split, `A` / `Shift+A` Seleção de Trilha, `V` Seleção, `S` Snapping, `Q`/`W` Ripple Trims, `\` Zoom to Fit, `+`/`-` Zoom na Agulha, `Ctrl+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
+| 🟡 **DaVinci Resolve** | Padrão Blackmagic Design para ilhas de edição e pós-produção. | `Ctrl+\` / `B` Blade Split, `A` Seleção, `N` Snapping, `Shift+Backspace` Ripple Delete, `Alt+[` / `Alt+]` Trims, `Shift+Z` Zoom to Fit, `Ctrl+=`/`Ctrl+-` Zoom, `Shift+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
+| 🍏 **Apple Final Cut Pro** | Ergonomia magnética e atalhos otimizados para fluxo contínuo. | `Cmd+B` / `B` Blade Split, `A` Seleção, `N` Snapping, `E` Append, `Shift+Delete` Ripple Delete, `Shift+Z` Zoom to Fit, `Cmd+=`/`Cmd+-` Zoom, `Shift+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
 | ⚙️ **Personalizado (Custom)** | Mapeamento livre configurado pelo usuário. | Totalmente editável pela aba **Personalizar Atalhos & Tabela**, com persistência local e exportação JSON. |
 
 ---
@@ -110,6 +110,16 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 | **`T`** *(ou `A` no Premiere)* | **Selecionar Faixa para Frente** | Seleciona todos os clipes à direita em todas as faixas ativas (*Shift = 1 faixa*). |
 | **`Shift + T`** *(ou `Shift+A`)* | **Selecionar Faixa para Trás** | Seleciona todos os clipes à esquerda em todas as faixas ativas (*Shift = 1 faixa*). |
 | **`S`** *(ou `F10` / `N`)* | **Alternar Snapping Magnético** | Liga ou desliga o magnetismo da timeline com guias visuais no Canvas. |
+| **`H`** *(ou segurar `Espaço` / botão do meio)* | **Ferramenta Mão / Pan** | Permite arrastar e navegar livremente pela timeline em qualquer direção. |
+| **`Z`** *(ou ícone na barra de ferramentas)* | **Ferramenta Zoom / Lupa** | Clique com botão esquerdo para aproximar (1.4x), `Alt + Clique` para afastar (0.7x), centrado no clique. *(Nos perfis Premiere/Resolve/FCP/Kdenlive, atalho nativo `Z`)*. |
+| **`+` / `=`** *(ou `Ctrl+=` no Resolve/FCP/Kdenlive)* | **Aumentar Zoom na Timeline (Zoom In)** | Aproxima o zoom horizontal da régua e clipes ancorado na posição da agulha de reprodução (*Playhead*). |
+| **`-`** *(ou `Ctrl+-` no Resolve/FCP/Kdenlive)* | **Diminuir Zoom na Timeline (Zoom Out)** | Afasta o zoom horizontal da régua e clipes ancorado na posição da agulha de reprodução (*Playhead*). |
+| **`\`** *(ou `Shift+Z` / `Ctrl+Shift+Espaço`)* | **Ajustar Sequência na Tela (Zoom to Fit)** | Alternância (*Toggle*) inteligente: enquadra perfeitamente todos os clipes na timeline com margem de respiro ou restaura o zoom anterior. |
+| **`.` (Ponto)** *(ou `Ctrl+1` no Premiere / `Shift+1` no Resolve/FCP)* | **Restaurar Zoom Padrão (1:1 / 0.5 px/f)** | Redefine a escala horizontal para 0.5 pixels por frame. |
+| **`Roda do Mouse` (sobre a Régua)** | **Zoom Horizontal Dinâmico na Régua** | Rolar a roda do mouse diretamente sobre a régua aplica zoom horizontal contínuo centralizado no ponteiro. |
+| **`Ctrl + Roda` (sobre o Canvas)** | **Zoom Horizontal Centralizado no Cursor** | Aproxima ou afasta a timeline centrado na coordenada do ponteiro do mouse. |
+| **`Shift + Roda` (sobre Cabeçalho de Pista)** | **Altura Individual daquela Pista Específica** | Aumenta ou diminui a altura vertical daquela pista específica em passos de 8px (22px a 240px). |
+| **`Shift + Roda` (sobre o Canvas / Régua)** | **Altura Global de Todas as Pistas** | Ajusta progressivamente a escala vertical uniforme de todas as faixas (0.5x a 1.7x). |
 | **`←` / `→`** | **Deslocar Clipe (Nudge 1 Frame)** | Desloca o clipe selecionado 1 frame para a esquerda ou direita. |
 | **`Alt + ←` / `Alt + →`** | **Ajustar Ponto IN (Trim In)** | Recua ou avança a borda esquerda do clipe selecionado em 1 frame. |
 | **`Shift + ←` / `Shift + →`** | **Ajustar Ponto OUT (Trim Out)** | Recua ou avança a borda direita do clipe selecionado em 1 frame. |

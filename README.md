@@ -187,7 +187,15 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   - **Deslizar Conteúdo Interno / Slip Tool (`Y`):** Desliza o trecho interno da mídia bruta preservando a posição e a duração física na timeline rigorosamente inalteradas, com suporte a cortes J/L com **`Alt`**.
   - **Deslocamento com Compensação / Slide Tool (`U`):** Move a posição do clipe na timeline compensando simetricamente nos vizinhos adjacentes, com monitor 2-Up ao vivo e clamping de mídia.
   - **Corte Contínuo Adjacente / Rolling Edit Tool (`N`):** Ajusta o ponto de emenda entre clipes colados mantendo a duração total da sequência estática ($\text{Dur}_A + \text{Dur}_B = \text{constante}$), com projeção 2-Up das saídas/entradas, cortes assimétricos J/L com **`Alt`** e suporte ergonômico a seek e *scrubbing* fora de emenda.
+  - **Ferramenta Mão / Pan (`H`):** Navegação e arraste contínuo pela timeline em qualquer direção (também acionado segurando a barra de `Espaço` na timeline ou pelo botão do meio do mouse).
+  - **Ferramenta Zoom / Lupa (`Z`):** Aproximação (1.4x) e afastamento com **`Alt + Clique`** (0.7x) centralizado no cursor do mouse.
   - **Prevenção Física de Sobreposição & Modos de Movimentação:** Bloqueio magnético anti-invasão (*Clamp*), modo *Overwrite* com **`Shift`** e modo *Ripple Insert* atômico com **`Ctrl`**.
+
+- **Zoom Microscópico da Régua até Nível de Frames (até 80.0 px/frame) & Zoom to Fit.** Régua adaptativa contínua exibindo células visuais de quadros individuais numerados e ticks de sub-frames em zoom máximo, com suporte nativo a taxas fracionárias (23.976 e 59.94 fps). Inclui comando **Ajustar Sequência na Tela (*Zoom to Fit Toggle*)** com botão rápido (`#btn-timeline-zoom-fit`) e alternância inteligente, atalhos universais de zoom horizontal (**`+` / `=`** e **`-`**) ancorados no playhead, zoom dinâmico por rolagem da roda do mouse sobre a régua e viewport culling com teto de amostras da waveform para 60 FPS fluidos.
+
+- **Miniaturas Proporcionais (16:9, 9:16, 1:1) e 3 Modos de Visualização.** Cálculo de largura geométrica real (`clipHeight * aspectRatio`) eliminando o fatiamento vertical em faixas expandidas. Conta com 3 modos clássicos selecionáveis pelo popover de opções com auto-flip vertical: **Rolo de Filme / Contínuo (*Filmstrip*)**, **Apenas Início (*Head Only*)** e **Desativar Miniaturas (*None*)**.
+
+- **Redimensionamento Vertical Granular de Pistas.** Controle duplo de altura de faixas: ajuste cirúrgico individual de uma pista específica via **`Shift + Roda do Mouse`** sobre o cabeçalho correspondente (22px a 240px em passos de 8px) ou escala global da timeline via **`Shift + Roda`** sobre o canvas (`Numpad +` / `Numpad -`).
 
 - **Agente editor com ferramentas (IA copiloto).** Um agente conversacional analisa o roteiro e a
   timeline ativa e propõe cortes por *function-calling*. Edições simples são aplicadas direto (com
@@ -219,7 +227,7 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   mouse pela régua e pelos clipes, miniaturas progressivas e **duplo clique para resetar sliders**
   (posição, escala, rotação, crop e volume).
 
-- **Sistema de Keymap, Perfis NLE e Teclado Visual 1:1.** Motor centralizado com **6 perfis integrados** (*CapIAu*, *Kdenlive*, *Premiere Pro*, *DaVinci Resolve*, *Final Cut Pro* e *Custom*). Inclui simulador de teclado mecânico ANSI TKL em tamanho real com **destaque bidirecional** (hover tecla ↔ manual esquemático), camadas de modificadores (`Shift`, `Ctrl`, `Alt`), **Live Testing HUD** para testar atalhos sem sair do modal, gravação de teclas com detecção de conflitos e exportação/importação JSON.
+- **Sistema de Keymap, Perfis NLE e Teclado Visual 1:1.** Motor centralizado com **6 perfis integrados** (*CapIAu*, *Kdenlive*, *Premiere Pro*, *DaVinci Resolve*, *Final Cut Pro* e *Custom*), cobrindo atalhos de corte, shuttle JKL, navegação e comandos de zoom específicos de cada plataforma (como Zoom to Fit via `\` no CapIAu/Premiere, `Shift+Z` no Resolve/FCP ou `Ctrl+Shift+Espaço` no Kdenlive). Inclui simulador de teclado mecânico ANSI 100% com Numpad em tamanho real com **destaque bidirecional** (hover tecla ↔ manual esquemático), camadas de modificadores (`Shift`, `Ctrl`, `Alt`), **Live Testing HUD** para testar atalhos sem sair do modal, gravação de teclas com detecção de conflitos e exportação/importação JSON.
 
 - **Marcadores teclado-first.** Marcadores de régua e marcadores ancorados ao clipe de vídeo
   (V1 / V2 B-Roll), com caixa flutuante compacta (310 px) que opera sem pausar a reprodução.

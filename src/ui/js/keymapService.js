@@ -214,6 +214,18 @@ export const COMMANDS_CATALOG = [
         description: "Liga ou desliga o alinhamento magnético inteligente de bordas e agulha"
     },
     {
+        id: "tools.hand",
+        category: "tools",
+        label: "Ferramenta Mão / Pan",
+        description: "Ativa a ferramenta de navegação e arrasto contínuo da timeline (Pan)"
+    },
+    {
+        id: "tools.zoom",
+        category: "tools",
+        label: "Ferramenta Zoom / Lupa",
+        description: "Ativa a ferramenta de aproximação e afastamento por clique"
+    },
+    {
         id: "tools.escape",
         category: "tools",
         label: "Desmarcar Seleção / Fechar Caixas",
@@ -638,6 +650,7 @@ export const KEYMAP_PRESETS = {
         "tools.track_forward": ["KeyT"],
         "tools.track_backward": ["Shift+KeyT"],
         "tools.snapping": ["KeyS"],
+        "tools.hand": ["KeyH"],
         "tools.escape": ["Escape"],
 
         "edit.split": ["KeyZ"],
@@ -726,7 +739,7 @@ export const KEYMAP_PRESETS = {
         "workspace.save_slot_9": ["Ctrl+Alt+Shift+Digit9", "Ctrl+Alt+Shift+Numpad9"]
     },
 
-    // 2. Kdenlive (Padrão Clássico Open-Source)
+    // 2. Kdenlive (Linux / Open Source NLE)
     kdenlive: {
         "playback.play_pause": ["Space"],
         "playback.shuttle_reverse": ["KeyJ"],
@@ -738,7 +751,7 @@ export const KEYMAP_PRESETS = {
         "playback.mark_out": ["KeyO"],
         "playback.clear_in": ["Ctrl+Shift+KeyI", "Alt+KeyI"],
         "playback.clear_out": ["Ctrl+Shift+KeyO", "Alt+KeyO"],
-        "playback.clear_in_out": ["Ctrl+Shift+KeyX", "Alt+KeyX"],
+        "playback.clear_in_out": ["Alt+KeyX", "Ctrl+Shift+KeyA"],
         "playback.mark_clip": ["KeyX"],
         "playback.goto_in": ["Shift+KeyI"],
         "playback.goto_out": ["Shift+KeyO"],
@@ -760,6 +773,8 @@ export const KEYMAP_PRESETS = {
         "tools.track_forward": ["KeyM"],
         "tools.track_backward": ["Shift+KeyM"],
         "tools.snapping": ["F10", "KeyS"],
+        "tools.hand": ["KeyH"],
+        "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
 
         "edit.split": ["Shift+KeyR", "KeyX"],
@@ -830,6 +845,8 @@ export const KEYMAP_PRESETS = {
         "tools.track_forward": ["KeyA"],
         "tools.track_backward": ["Shift+KeyA"],
         "tools.snapping": ["KeyS"],
+        "tools.hand": ["KeyH"],
+        "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
 
         "edit.split": ["Ctrl+KeyK"],
@@ -900,6 +917,8 @@ export const KEYMAP_PRESETS = {
         "tools.track_forward": ["KeyY"],
         "tools.track_backward": ["Ctrl+KeyY"],
         "tools.snapping": ["Shift+KeyN", "KeyS"],
+        "tools.hand": ["KeyH"],
+        "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
 
         "edit.split": ["Ctrl+Backslash"],
@@ -970,6 +989,8 @@ export const KEYMAP_PRESETS = {
         "tools.track_forward": ["KeyP"],
         "tools.track_backward": ["Shift+KeyP"],
         "tools.snapping": ["Shift+KeyN", "KeyS"],
+        "tools.hand": ["KeyH"],
+        "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
 
         "edit.split": ["Cmd+KeyB"],

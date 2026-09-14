@@ -10137,6 +10137,30 @@ export class CapiauTimelineInteraction {
             return;
         }
 
+        // Ferramenta Mão / Pan (H)
+        if (KEYMAP_SERVICE.matches(e, "tools.hand")) {
+            TIMELINE_STATE.setTool("hand");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta Mão / Pan (H)", "info");
+            }
+            if (this.canvas) this.canvas.style.cursor = "grab";
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // Ferramenta Zoom / Lupa (Z em perfis NLE onde Z não é Split)
+        if (KEYMAP_SERVICE.matches(e, "tools.zoom")) {
+            TIMELINE_STATE.setTool("zoom");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta Zoom / Lupa (Z)", "info");
+            }
+            if (this.canvas) this.canvas.style.cursor = "zoom-in";
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
         // Undo / Redo
         if (KEYMAP_SERVICE.matches(e, "history.redo")) {
             e.preventDefault();

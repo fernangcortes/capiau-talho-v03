@@ -2977,6 +2977,10 @@ function appendChildrenChunked(node, keys, container, childDepth) {
         return;
     }
 
+    cancelPendingChunkJobs(container);
+
+    const win = container?.ownerDocument?.defaultView || window;
+
     let cursor = RENDER_CHUNK_SIZE;
     renderRange(0, cursor); // primeiro bloco sincrono: a lista nunca aparece vazia
 
@@ -2984,8 +2988,8 @@ function appendChildrenChunked(node, keys, container, childDepth) {
     let stallId = null;
 
     const parar = () => {
-        if (rafId !== null) cancelAnimationFrame(rafId);
-        if (stallId !== null) clearTimeout(stallId);
+        if (rafId !== null) win.cancelAnimationFrame(rafId);
+        if (stallId !== null) win.clearTimeout(stallId);
         rafId = null;
         stallId = null;
     };
@@ -3011,8 +3015,8 @@ function appendChildrenChunked(node, keys, container, childDepth) {
     // por quadro sem travar nada. Com a janela oculta o rAF nao dispara — por
     // isso a rede de seguranca abaixo conclui de uma vez.
     const armarRedeDeSeguranca = () => {
-        if (stallId !== null) clearTimeout(stallId);
-        stallId = setTimeout(concluir, CHUNK_STALL_TIMEOUT_MS);
+        if (stallId !== null) win.clearTimeout(stallId);
+        stallId = win.setTimeout(concluir, CHUNK_STALL_TIMEOUT_MS);
     };
 
     const step = () => {
@@ -3021,7 +3025,7 @@ function appendChildrenChunked(node, keys, container, childDepth) {
         renderRange(cursor, end);
         cursor = end;
         if (cursor < keys.length) {
-            rafId = requestAnimationFrame(step);
+            rafId = win.requestAnimationFrame(step);
             armarRedeDeSeguranca();
         } else {
             concluir();
@@ -3030,13 +3034,14 @@ function appendChildrenChunked(node, keys, container, childDepth) {
 
     container._flushAllChunks = concluir;
     pendingChunkJobs.add(job);
-    rafId = requestAnimationFrame(step);
+    rafId = win.requestAnimationFrame(step);
     armarRedeDeSeguranca();
 }
 
 /** Garante que todos os blocos pendentes entraram no DOM (revelar item, exportar, etc). */
 export function flushAllPendingChunks(root) {
-    const scope = root || document.getElementById("media-tree-list");
+    const activeDoc = window.libraryScrollIndex?.activeDoc || window.libraryInstance?.activeDoc || (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed ? window.popoutWindows["sidebar-left"].document : document);
+    const scope = root || activeDoc?.getElementById("media-tree-list") || document.getElementById("media-tree-list");
     if (!scope) return;
     if (typeof scope._flushAllChunks === "function") scope._flushAllChunks();
     const treeList = scope.id === "media-tree-list" ? null : scope.querySelector?.("#media-tree-list");
@@ -4044,10 +4049,11 @@ export class LibraryManager {
             ? this.tabScrollPositions[tabId]
             : (window._libraryTabScrollPositions?.[tabId] || 0);
 
+        const win = cont?.ownerDocument?.defaultView || window;
         cont.scrollTop = target;
-        requestAnimationFrame(() => {
+        win.requestAnimationFrame(() => {
             cont.scrollTop = target;
-            requestAnimationFrame(() => {
+            win.requestAnimationFrame(() => {
                 cont.scrollTop = target;
             });
         });
@@ -5748,11 +5754,12 @@ export class LibraryManager {
 
         if (shouldPreserveScroll && container) {
             const isTabActive = this.docsListEl.closest(".tab-content")?.classList.contains("active");
+            const win = container?.ownerDocument?.defaultView || window;
             if (isTabActive && savedScroll > 0) {
                 container.scrollTop = savedScroll;
-                requestAnimationFrame(() => {
+                win.requestAnimationFrame(() => {
                     container.scrollTop = savedScroll;
-                    requestAnimationFrame(() => {
+                    win.requestAnimationFrame(() => {
                         container.scrollTop = savedScroll;
                     });
                 });
@@ -5882,6 +5889,7 @@ export class LibraryManager {
         const targetDoc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed)
             ? window.popoutWindows["sidebar-left"].document
             : (this.activeDoc || document);
+        const targetWin = targetDoc?.defaultView || window;
         const tabBtn = targetDoc.querySelector('.sidebar-left .tab-btn[data-tab="tab-media"]');
         if (tabBtn) tabBtn.click();
 
@@ -5902,10 +5910,7 @@ export class LibraryManager {
 
         flushAllPendingChunks(); // o card alvo pode estar num bloco ainda nao montado
 
-        requestAnimationFrame(() => {
-            const targetDoc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed)
-                ? window.popoutWindows["sidebar-left"].document
-                : (this.activeDoc || document);
+        targetWin.requestAnimationFrame(() => {
             const card = targetDoc.querySelector(`.media-card.tree-file-item[data-video-id="${videoId}"]`);
             if (card) {
                 card.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -5926,6 +5931,7 @@ export class LibraryManager {
         const targetDoc = (window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed)
             ? window.popoutWindows["sidebar-left"].document
             : (this.activeDoc || document);
+        const targetWin = targetDoc?.defaultView || window;
         const tabBtn = targetDoc.querySelector('.sidebar-left .tab-btn[data-tab="tab-media"]');
         if (tabBtn) tabBtn.click();
 
@@ -5944,7 +5950,7 @@ export class LibraryManager {
 
         flushAllPendingChunks();
 
-        requestAnimationFrame(() => {
+        targetWin.requestAnimationFrame(() => {
             const card = targetDoc.querySelector(`[data-photo-id="${photoId}"]`);
             if (card) {
                 card.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -6038,9 +6044,10 @@ export class LibraryManager {
 
         if (shouldPreserveScroll && container) {
             const isTabActive = targetEl.closest(".tab-content")?.classList.contains("active");
+            const win = container?.ownerDocument?.defaultView || window;
             if (isTabActive && savedScroll > 0) {
                 container.scrollTop = savedScroll;
-                requestAnimationFrame(() => {
+                win.requestAnimationFrame(() => {
                     container.scrollTop = savedScroll;
                 });
             }
@@ -7046,7 +7053,8 @@ export class LibraryManager {
 
         // Faz scroll até o card do vídeo ativo na biblioteca
         if (STATE.activeVideo) {
-            requestAnimationFrame(() => {
+            const targetWin = targetDoc?.defaultView || window;
+            targetWin.requestAnimationFrame(() => {
                 const activeCard = targetDoc.querySelector(`.media-card.tree-file-item[data-video-id="${STATE.activeVideo.id}"]`);
                 if (activeCard) {
                     activeCard.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -8447,6 +8455,10 @@ export class LibraryScrollIndexTracker {
         this.init();
     }
 
+    get win() {
+        return this.activeWindow || window;
+    }
+
     init() {
         this.attachToWindow(window);
         this.bindSettings();
@@ -9096,7 +9108,7 @@ export class LibraryScrollIndexTracker {
         }
 
         // 1. Rastreamento e cálculo de velocidade (deltaX / deltaTime, deltaY / deltaTime)
-        const now = performance.now();
+        const now = (this.win?.performance || performance).now();
         const dt = this.lastPointerTime ? Math.max(1, now - this.lastPointerTime) : 16;
         const dx = this.lastPointerX !== null ? (e.clientX - this.lastPointerX) : 0;
         const dy = this.lastPointerY !== null ? (e.clientY - this.lastPointerY) : 0;
@@ -9185,7 +9197,7 @@ export class LibraryScrollIndexTracker {
     scheduleRafUpdate(activeTab) {
         this.activeTabId = activeTab;
         if (!this.rafId) {
-            this.rafId = requestAnimationFrame(() => this.onRafStep());
+            this.rafId = this.win.requestAnimationFrame(() => this.onRafStep());
         }
     }
 
@@ -9195,7 +9207,7 @@ export class LibraryScrollIndexTracker {
             return;
         }
 
-        const now = performance.now();
+        const now = (this.win?.performance || performance).now();
         // Se o mouse parou de se mover, desacelera suavemente a velocidade
         if (this.lastPointerTime && (now - this.lastPointerTime > 45)) {
             this.currentVelocity *= 0.82;
@@ -9233,7 +9245,7 @@ export class LibraryScrollIndexTracker {
 
         // Mantém o laço ativo se o lerp ainda estiver convergindo
         if (Math.abs(this.targetRatio - this.currentRatio) > 0.0002) {
-            this.rafId = requestAnimationFrame(() => this.onRafStep());
+            this.rafId = this.win.requestAnimationFrame(() => this.onRafStep());
         }
     }
 
@@ -9251,7 +9263,7 @@ export class LibraryScrollIndexTracker {
         if (!container) return;
 
         if (typeof flushAllPendingChunks === "function") {
-            flushAllPendingChunks();
+            flushAllPendingChunks(container.querySelector("#media-tree-list") || container);
         }
 
         const triggerHighlight = () => {
@@ -9265,20 +9277,6 @@ export class LibraryScrollIndexTracker {
             }, 1600);
         };
 
-        if (!smooth) {
-            try {
-                item.scrollIntoView({ block: "center", behavior: "auto" });
-            } catch (err) {
-                const rect = container.getBoundingClientRect();
-                const itemRect = item.getBoundingClientRect();
-                const targetScroll = (itemRect.top - rect.top) + container.scrollTop - (rect.height / 2);
-                container.scrollTop = Math.max(0, targetScroll);
-            }
-            triggerHighlight();
-            return;
-        }
-
-        // Rolagem suave personalizada com desaceleração elegante (Ease-Out Quartic, 1s)
         const containerRect = container.getBoundingClientRect();
         const itemRect = item.getBoundingClientRect();
         const itemCenter = (itemRect.top - containerRect.top) + container.scrollTop + (itemRect.height / 2);
@@ -9286,7 +9284,14 @@ export class LibraryScrollIndexTracker {
         const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
         const targetScroll = Math.max(0, Math.min(maxScroll, desiredScrollTop));
 
-        this.smoothScrollTo(container, targetScroll, 1000, () => {
+        if (!smooth) {
+            container.scrollTop = targetScroll;
+            triggerHighlight();
+            return;
+        }
+
+        // Rolagem suave personalizada com desaceleração elegante (Ease-Out Quartic, 320ms)
+        this.smoothScrollTo(container, targetScroll, 320, () => {
             if (item && item.isConnected) {
                 const cRect = container.getBoundingClientRect();
                 const iRect = item.getBoundingClientRect();
@@ -9301,14 +9306,15 @@ export class LibraryScrollIndexTracker {
         });
     }
 
-    smoothScrollTo(container, targetY, duration = 1000, onComplete = null) {
+    smoothScrollTo(container, targetY, duration = 320, onComplete = null) {
         const startY = container.scrollTop;
         const diff = targetY - startY;
+        const win = this.win || container?.ownerDocument?.defaultView || window;
 
         if (typeof container._cancelScrollAnim === "function") {
             container._cancelScrollAnim();
         } else if (container._scrollAnimId) {
-            cancelAnimationFrame(container._scrollAnimId);
+            win.cancelAnimationFrame(container._scrollAnimId);
             container._scrollAnimId = null;
         }
 
@@ -9318,8 +9324,8 @@ export class LibraryScrollIndexTracker {
             return;
         }
 
-        const startTime = performance.now();
-        // Curva de desaceleração suave: Ease-Out Quartic
+        let animStartTime = null;
+        // Curva de desaceleração suave: Ease-Out Quartic (320ms ágil para NLE)
         const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
 
         const cancelOnUserInteraction = () => {
@@ -9332,7 +9338,7 @@ export class LibraryScrollIndexTracker {
             container.removeEventListener("pointerdown", cancelOnUserInteraction);
             container._cancelScrollAnim = null;
             if (container._scrollAnimId) {
-                cancelAnimationFrame(container._scrollAnimId);
+                win.cancelAnimationFrame(container._scrollAnimId);
                 container._scrollAnimId = null;
             }
         };
@@ -9341,14 +9347,17 @@ export class LibraryScrollIndexTracker {
         container.addEventListener("pointerdown", cancelOnUserInteraction, { passive: true, once: true });
 
         const step = (currentTime) => {
-            const elapsed = currentTime - startTime;
+            if (animStartTime === null) {
+                animStartTime = currentTime;
+            }
+            const elapsed = Math.max(0, currentTime - animStartTime);
             const progress = Math.min(1, elapsed / duration);
             const eased = easeOutQuart(progress);
 
             container.scrollTop = startY + (diff * eased);
 
             if (progress < 1) {
-                container._scrollAnimId = requestAnimationFrame(step);
+                container._scrollAnimId = win.requestAnimationFrame(step);
             } else {
                 container.scrollTop = targetY;
                 cleanup();
@@ -9356,7 +9365,7 @@ export class LibraryScrollIndexTracker {
             }
         };
 
-        container._scrollAnimId = requestAnimationFrame(step);
+        container._scrollAnimId = win.requestAnimationFrame(step);
     }
 
     handlePointerDown(e) {
@@ -9408,7 +9417,7 @@ export class LibraryScrollIndexTracker {
                 container._cancelScrollAnim();
             }
             if (this.rafId) {
-                cancelAnimationFrame(this.rafId);
+                this.win.cancelAnimationFrame(this.rafId);
                 this.rafId = null;
             }
 
@@ -9611,10 +9620,11 @@ export class LibraryScrollIndexTracker {
             clearTimeout(this.dwellTimer);
 
             if (this.dwellDelay > 0) {
-                this.dwellTimer = setTimeout(() => {
+                const win = this.win;
+                this.dwellTimer = win.setTimeout(() => {
                     this.tooltipEl.classList.add("expanded");
-                    if (typeof requestAnimationFrame !== "undefined") {
-                        requestAnimationFrame(() => {
+                    if (win && typeof win.requestAnimationFrame !== "undefined") {
+                        win.requestAnimationFrame(() => {
                             if (this.lastHoverEvent && this.tooltipEl && this.tooltipEl.classList.contains("visible")) {
                                 const currentContainer = this.getScrollContainer();
                                 if (currentContainer) {
@@ -9921,7 +9931,7 @@ export class LibraryScrollIndexTracker {
     hide() {
         this._isTracking = false;
         if (this.rafId) {
-            cancelAnimationFrame(this.rafId);
+            this.win.cancelAnimationFrame(this.rafId);
             this.rafId = null;
         }
         if (this.tooltipEl) {
@@ -9930,9 +9940,9 @@ export class LibraryScrollIndexTracker {
         if (this.ribbonCanvas) {
             this.ribbonCanvas.classList.remove("active-tracking");
         }
-        clearTimeout(this.dwellTimer);
+        this.win.clearTimeout(this.dwellTimer);
         if (this.splitterDismissTimer) {
-            clearTimeout(this.splitterDismissTimer);
+            this.win.clearTimeout(this.splitterDismissTimer);
             this.splitterDismissTimer = null;
         }
         this.currentTargetItem = null;

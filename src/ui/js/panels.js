@@ -3932,6 +3932,7 @@ export class PanelsManager {
             else if (cmd.category === "workspace_numpad") badgeColor = "#34d399";
             else if (cmd.category === "markers") badgeColor = "var(--color-sky)";
             else if (cmd.category === "ai") badgeColor = "#ec4899";
+            else if (cmd.category === "canvas_history") badgeColor = "#06b6d4";
 
             item.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
