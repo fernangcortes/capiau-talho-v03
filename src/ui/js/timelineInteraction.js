@@ -5434,30 +5434,18 @@ export class CapiauTimelineInteraction {
         if (btnSplitPlayhead && !btnSplitPlayhead.__capiauToolBound) {
             btnSplitPlayhead.__capiauToolBound = true;
             btnSplitPlayhead.onclick = () => {
-                const selectedId = TIMELINE_STATE.selectedClipId;
-                const playhead = TIMELINE_STATE.playheadFrame;
-                if (selectedId) {
-                    TIMELINE_STATE.splitClip(selectedId, playhead);
+                const res = TIMELINE_STATE.splitAtPlayhead(true);
+                if (res) {
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Clipe dividido no playhead (E / Z)", "info");
+                    }
+                    if (this.renderer) this.renderer.requestRedraw();
+                    this.refreshClipInspector();
                 } else {
-                    const cuts = STATE.activeTimelineCuts || [];
-                    const target = cuts.find(c => {
-                        const s = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * (TIMELINE_STATE.fps || 24));
-                        const e = s + (c.outFrame - c.inFrame);
-                        return (c.track === TIMELINE_STATE.selectedTrack || c.track === "V1") && s < playhead && playhead < e;
-                    }) || cuts.find(c => {
-                        const s = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * (TIMELINE_STATE.fps || 24));
-                        const e = s + (c.outFrame - c.inFrame);
-                        return s < playhead && playhead < e;
-                    });
-                    if (target) {
-                        TIMELINE_STATE.splitClip(target.id, playhead);
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Nenhum clipe sob a agulha para dividir", "warning");
                     }
                 }
-                if (typeof window.showToast === "function") {
-                    window.showToast("Clipe dividido no playhead (Z)", "info");
-                }
-                if (this.renderer) this.renderer.requestRedraw();
-                this.refreshClipInspector();
                 refocusTimeline(btnSplitPlayhead);
             };
         }
@@ -10149,11 +10137,11 @@ export class CapiauTimelineInteraction {
             return;
         }
 
-        // Ferramenta Zoom / Lupa (Z em perfis NLE onde Z não é Split)
+        // Ferramenta Zoom / Lupa (em perfis NLE onde Z não é Split)
         if (KEYMAP_SERVICE.matches(e, "tools.zoom")) {
             TIMELINE_STATE.setTool("zoom");
             if (typeof window.showToast === "function") {
-                window.showToast("Ferramenta Zoom / Lupa (Z)", "info");
+                window.showToast("Ferramenta Zoom / Lupa", "info");
             }
             if (this.canvas) this.canvas.style.cursor = "zoom-in";
             if (this.renderer) this.renderer.requestRedraw();
@@ -10173,25 +10161,28 @@ export class CapiauTimelineInteraction {
             return;
         }
 
-        // Split / Dividir clipe no Playhead (Z no CapIAu, Ctrl+K no Premiere)
+        // Split / Dividir clipe no Playhead (E ou Z no CapIAu, Ctrl+K no Premiere)
         // Se Alt estiver pressionado, faz split individual desunindo a parte direita para J/L-Cut
+        // Funciona instantaneamente mesmo sem clipe selecionado (corta clipe sob a agulha)
         if (KEYMAP_SERVICE.matches(e, "edit.split")) {
-            if (selectedId) {
-                const splitLinked = !e.altKey;
-                const res = TIMELINE_STATE.splitClipAtFrame(selectedId, TIMELINE_STATE.playheadFrame, splitLinked);
-                if (res) {
-                    if (typeof window.showToast === "function") {
-                        const msg = !splitLinked 
-                            ? "Dividir no Playhead (Alt+Corte): pista individual (J/L-Cut)"
-                            : "Dividir no Playhead (Z)";
-                        window.showToast(msg, "info");
-                    }
-                    if (this.renderer) this.renderer.requestRedraw();
-                    this.refreshClipInspector();
+            const splitLinked = !e.altKey;
+            const res = TIMELINE_STATE.splitAtPlayhead(splitLinked);
+            if (res) {
+                if (typeof window.showToast === "function") {
+                    const msg = !splitLinked 
+                        ? "Dividir no Playhead (Alt+Corte): pista individual (J/L-Cut)"
+                        : "Dividir no Playhead (E / Z)";
+                    window.showToast(msg, "info");
                 }
-                e.preventDefault();
-                return;
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+            } else {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Nenhum clipe sob a agulha para dividir", "warning");
+                }
             }
+            e.preventDefault();
+            return;
         }
 
         // Desvincular Par A/V

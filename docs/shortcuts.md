@@ -83,9 +83,8 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 | **`Alt + X`** | **Limpar In / Out** | Remove as marcações de entrada e saída ativas no monitor ou timeline. |
 | **`;` (Ponto e Vírgula)** | **Lift (Extração com Gap)** | Remove o trecho entre [In–Out] mantendo o espaço vazio correspondente. |
 | **`'` (Aspas Simples)** | **Extract (Extração com Ripple)** | Remove o trecho entre [In–Out] e fecha o espaço puxando os clipes à direita. |
-| **`E`** | **Adicionar à Timeline (Append)** | Insere o trecho marcado [In-Out] na trilha de destino correspondente. |
-| **`Shift + E`** | **Corte de Fala Rápido** | Insere o texto/diálogo selecionado na transcrição diretamente na trilha V1/A1. |
-| **`Z`** *(ou `Shift+R`/`Ctrl+K`/`B`)* | **Dividir Clipe (Split)** | Corta o clipe na agulha (playhead). Se vinculado (A/V), divide áudio e vídeo juntos. |
+| **`E`** ou **`Z`** *(ou `Ctrl+K`/`Cmd+B`)* | **Dividir Clipe no Playhead (Split)** | Corta o clipe sob a agulha instantaneamente, sem precisar selecionar previamente o clipe na timeline. Completa a tríade ergonômica da mão esquerda **`Q`** (Trim Início), **`W`** (Trim Fim) e **`E`** (Split). Divide par A/V sincronizado (`Alt+E` ou `Alt+Z` para corte individual J/L-Cut). |
+| **`Shift + E`** | **Adicionar à Timeline (Append)** | Insere o trecho marcado [In–Out] do monitor de origem na trilha correspondente. |
 | **`Q`** | **Ripple Delete até a Agulha (Head)** | Corta do início do clipe até a agulha e puxa os clipes posteriores nas pistas com Sync Lock. |
 | **`W`** | **Ripple Delete da Agulha até o Fim (Tail)** | Corta da agulha até o fim do clipe e puxa os clipes posteriores nas pistas com Sync Lock. |
 | **`Delete` / `Backspace`** | **Lift Delete / Deletar Gap / Ghost** | **Em clipe:** Apaga o clipe mantendo o Gap vazio.<br>**Em Gap:** Fecha o espaço vazio puxando os clipes.<br>**Em Ghost:** Rejeita sugestão de IA. |

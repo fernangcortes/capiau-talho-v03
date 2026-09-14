@@ -237,7 +237,7 @@ export const COMMANDS_CATALOG = [
         id: "edit.split",
         category: "edit",
         label: "Dividir Clipe no Playhead (Split)",
-        description: "Fatia o clipe selecionado na posição exata da agulha de reprodução"
+        description: "Fatia o clipe sob a agulha de reprodução (ou o clipe selecionado)"
     },
     {
         id: "edit.ripple_trim_head",
@@ -634,7 +634,7 @@ export const KEYMAP_PRESETS = {
         "playback.goto_out": ["Shift+KeyO"],
         "playback.play_in_to_out": ["Shift+Space", "Alt+Slash"],
         "playback.toggle_loop": ["Ctrl+KeyL", "Ctrl+Shift+Space"],
-        "playback.append_timeline": ["KeyE"],
+        "playback.append_timeline": ["Shift+KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
         "playback.prev_edit_point": ["ArrowUp"],
@@ -653,7 +653,7 @@ export const KEYMAP_PRESETS = {
         "tools.hand": ["KeyH"],
         "tools.escape": ["Escape"],
 
-        "edit.split": ["KeyZ"],
+        "edit.split": ["KeyE", "KeyZ", "Alt+KeyE", "Alt+KeyZ"],
         "edit.ripple_trim_head": ["KeyQ"],
         "edit.ripple_trim_tail": ["KeyW"],
         "edit.lift_delete": ["Delete", "Backspace"],
@@ -1197,9 +1197,9 @@ class KeymapService {
 
         const { isHoldingKey = null } = options;
 
-        const eventCtrl = e.ctrlKey || e.metaKey;
-        const eventShift = e.shiftKey;
-        const eventAlt = e.altKey;
+        const eventCtrl = !!(e.ctrlKey || e.metaKey);
+        const eventShift = !!e.shiftKey;
+        const eventAlt = !!e.altKey;
         const eventCode = e.code;
         const eventKey = e.key;
 

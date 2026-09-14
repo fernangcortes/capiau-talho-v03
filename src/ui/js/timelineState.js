@@ -3931,10 +3931,113 @@ export class CapiauTimelineState {
     }
 
     /**
-     * Divide um clipe em dois no frame especificado (mantido para compatibilidade com btn-split-playhead).
+     * Divide um clipe em dois no frame especificado (mantido para compatibilidade).
      */
     splitClip(clipId, splitFrame) {
+        if (!clipId) {
+            return this.splitAtPlayhead(true);
+        }
         return this.splitClipAtFrame(clipId, splitFrame, true);
+    }
+
+    /**
+     * Divide o(s) clipe(s) que interceptam a agulha (Playhead).
+     * Se houver clipe selecionado que cruza a agulha, divide o selecionado.
+     * Se nenhum clipe estiver selecionado (ou o selecionado não cruzar a agulha),
+     * busca automaticamente o clipe sob a agulha:
+     *   1º na pista ativa (this.selectedTrack);
+     *   2º na pista V1;
+     *   3º em qualquer pista de vídeo destravada sob a agulha;
+     *   4º em qualquer outra pista destravada sob a agulha.
+     * 
+     * @param {boolean} [splitLinked=true] Se true (padrão), divide também o par vinculado (ex: áudio/vídeo).
+     * @returns {object|null} Retorna o objeto resultado com { leftClip, rightClip, partnerRightClip } ou null se nenhum clipe interceptar.
+     */
+    splitAtPlayhead(splitLinked = true) {
+        const playhead = this.playheadFrame || 0;
+        const cuts = STATE.activeTimelineCuts || [];
+        if (cuts.length === 0) return null;
+        const fps = this.fps || 24;
+
+        const coversPlayhead = (c) => {
+            const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+            const dur = (c.outFrame || 0) - (c.inFrame || 0);
+            const end = start + dur;
+            return playhead > start && playhead < end;
+        };
+
+        // 1. Clipes selecionados que cruzam a agulha
+        let targets = [];
+        if (this.selectedClipIds && this.selectedClipIds.size > 0) {
+            targets = cuts.filter(c => this.selectedClipIds.has(c.id) && coversPlayhead(c));
+        } else if (this.selectedClipId) {
+            const c = cuts.find(item => item.id === this.selectedClipId);
+            if (c && coversPlayhead(c)) {
+                targets.push(c);
+            }
+        }
+
+        // 2. Se nenhum clipe selecionado cruzar a agulha, busca automaticamente sob o playhead
+        if (targets.length === 0) {
+            const unlockedTracks = new Set(
+                (this.tracks || []).filter(t => !t.locked && t.kind !== "ai").map(t => t.id)
+            );
+
+            // a) Pista selecionada no momento (se for válida e destravada)
+            if (this.selectedTrack && unlockedTracks.has(this.selectedTrack)) {
+                const trackClip = cuts.find(c => c.track === this.selectedTrack && coversPlayhead(c));
+                if (trackClip) targets.push(trackClip);
+            }
+
+            // b) Pista principal de vídeo "V1" (se destravada)
+            if (targets.length === 0 && unlockedTracks.has("V1")) {
+                const v1Clip = cuts.find(c => c.track === "V1" && coversPlayhead(c));
+                if (v1Clip) targets.push(v1Clip);
+            }
+
+            // c) Qualquer clipe de vídeo sob a agulha em pistas destravadas
+            if (targets.length === 0) {
+                const videoClip = cuts.find(c => unlockedTracks.has(c.track) && c.track && c.track.startsWith("V") && coversPlayhead(c));
+                if (videoClip) targets.push(videoClip);
+            }
+
+            // d) Qualquer outro clipe (áudio, texto, etc.) sob a agulha em pistas destravadas
+            if (targets.length === 0) {
+                const anyClip = cuts.find(c => (unlockedTracks.size === 0 || unlockedTracks.has(c.track)) && coversPlayhead(c));
+                if (anyClip) targets.push(anyClip);
+            }
+        }
+
+        if (targets.length === 0) return null;
+
+        const processedIds = new Set();
+        let finalResult = null;
+
+        for (const target of targets) {
+            if (processedIds.has(target.id)) continue;
+            const res = this.splitClipAtFrame(target.id, playhead, splitLinked);
+            if (res) {
+                finalResult = res;
+                processedIds.add(target.id);
+                if (res.leftClip) processedIds.add(res.leftClip.id);
+                if (res.rightClip) {
+                    processedIds.add(res.rightClip.id);
+                    this.selectedClipId = res.rightClip.id;
+                    if (this.selectedClipIds) {
+                        this.selectedClipIds.clear();
+                        this.selectedClipIds.add(res.rightClip.id);
+                    }
+                }
+                if (res.partnerRightClip) {
+                    processedIds.add(res.partnerRightClip.id);
+                    if (this.selectedClipIds) {
+                        this.selectedClipIds.add(res.partnerRightClip.id);
+                    }
+                }
+            }
+        }
+
+        return finalResult;
     }
 
     /**

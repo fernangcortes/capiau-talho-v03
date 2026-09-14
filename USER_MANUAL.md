@@ -1029,11 +1029,12 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | | **`N`** *(ou `T` no Resolve/Final Cut)* | Corte Contínuo Adjacente (*Rolling Edit Tool* - ajusta emenda com tempo constante) |
 | | **`T` / `Shift + T`** | Selecionar Faixa para Frente / Trás (*Shift = 1 faixa*) |
 | | **`Q` / `W`** | Ripple Delete até a agulha (Início→Agulha / Agulha→Fim) |
+| | **`E` / `Z`** | Dividir Clipe no Playhead (*Split* instantâneo sob a agulha sem precisar selecionar o clipe) |
 | | **`Delete` / `Backspace`** | Lift Delete (clipe) ou Ripple Delete (espaço/gap) |
 | | **`Shift + Delete`** | Ripple Delete de clipe selecionado |
 | | **`S`** *(ou `F10`/`N`)* | Alternar Snapping magnético global |
 | | **`H`** *(ou segurar `Espaço` / botão do meio)* | Ferramenta Mão / Pan (arrasto contínuo da timeline) |
-| | **`Z`** *(ou ícone na barra de ferramentas)* | Ferramenta Zoom / Lupa (Clique aproxima 1.4x, Alt+Clique afasta 0.7x) |
+| | **Ícone na toolbar** *(ou `Z` no Premiere/Resolve/FCP)* | Ferramenta Zoom / Lupa (Clique aproxima 1.4x, Alt+Clique afasta 0.7x) |
 | | **`+` / `=`** *(ou `Ctrl+=` no Resolve/FCP/Kdenlive)* | Aumentar Zoom na Timeline (ancorado na agulha / playhead) |
 | | **`-`** *(ou `Ctrl+-` no Resolve/FCP/Kdenlive)* | Diminuir Zoom na Timeline (ancorado na agulha / playhead) |
 | | **`\`** *(ou `Shift+Z` / `Ctrl+Shift+Espaço`)* | Ajustar Sequência na Tela (*Zoom to Fit Toggle*) |
