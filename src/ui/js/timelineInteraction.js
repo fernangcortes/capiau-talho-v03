@@ -1082,12 +1082,29 @@ export class CapiauTimelineInteraction {
             }
         }
 
-        // 2. Clique com botão do meio (Scroll/Pan) ou Barra de Espaço pressionada
-        if (e.button === 1 || (e.button === 0 && e.spaceKey)) {
+        // 2. Clique com botão do meio (Scroll/Pan), Barra de Espaço ou Ferramenta Mão (Hand Tool)
+        if (e.button === 1 || (e.button === 0 && (e.spaceKey || TIMELINE_STATE.activeTool === "hand"))) {
             this.dragState = "pan";
             this.dragStartMouseX = e.clientX;
             this.dragStartClipFrame = TIMELINE_STATE.scrollLeftFrame;
             this.canvas.style.cursor = "grabbing";
+            return;
+        }
+
+        // Ferramenta: Zoom / Lupa (Z)
+        if (TIMELINE_STATE.activeTool === "zoom" && e.button === 0) {
+            const zoomFactor = e.altKey ? 0.7 : 1.4; // Alt+clique afasta (zoom out), clique simples aproxima (zoom in)
+            const minZ = TIMELINE_STATE.minZoom || 0.01;
+            const maxZ = TIMELINE_STATE.maxZoom || 80.0;
+            const oldZoom = TIMELINE_STATE.zoom;
+            const newZoom = Math.max(minZ, Math.min(maxZ, oldZoom * zoomFactor));
+
+            const mouseFrame = TIMELINE_STATE.scrollLeftFrame + (x / oldZoom);
+            const newScrollLeft = mouseFrame - (x / newZoom);
+
+            TIMELINE_STATE.setZoom(newZoom);
+            TIMELINE_STATE.setScrollLeftFrame(newScrollLeft);
+            if (this.renderer) this.renderer.requestRedraw();
             return;
         }
 
@@ -9473,6 +9490,12 @@ export class CapiauTimelineInteraction {
     onWheel(e) {
         e.preventDefault();
 
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const rulerH = this.renderer ? (this.renderer.rulerHeight || 30) : 30;
+        const isOverRuler = mouseY < rulerH;
+
         if (e.altKey) {
             // Alt + roda do mouse: mesmo funcionamento que setas para cima e para baixo (pulos entre cortes/pontos de edição)
             window.activeFocusedPlayer = "program";
@@ -9510,21 +9533,21 @@ export class CapiauTimelineInteraction {
                     this.ensureFrameVisible(targetFrame);
                 }
             }
-        } else if (e.ctrlKey) {
-            // Zoom horizontal centralizado no mouse
-            const rect = this.canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-
+        } else if (e.ctrlKey || isOverRuler) {
+            // Zoom horizontal centralizado no mouse (acionado por Ctrl + Roda ou Roda diretamente sobre a Régua da Timeline)
             const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
 
+            const minZ = TIMELINE_STATE.minZoom || 0.01;
+            const maxZ = TIMELINE_STATE.maxZoom || 80.0;
             const oldZoom = TIMELINE_STATE.zoom;
-            const newZoom = Math.max(0.01, Math.min(5.0, oldZoom * zoomFactor));
+            const newZoom = Math.max(minZ, Math.min(maxZ, oldZoom * zoomFactor));
 
             const mouseFrame = TIMELINE_STATE.scrollLeftFrame + (mouseX / oldZoom);
             const newScrollLeft = mouseFrame - (mouseX / newZoom);
 
             TIMELINE_STATE.setZoom(newZoom);
             TIMELINE_STATE.setScrollLeftFrame(newScrollLeft);
+            if (this.renderer) this.renderer.requestRedraw();
         } else if (e.shiftKey) {
             // Shift + roda = Zoom vertical das pistas (altura das pistas)
             const currentScale = TIMELINE_STATE.trackHeightScale || 1.0;
@@ -10126,6 +10149,30 @@ export class CapiauTimelineInteraction {
                 e.preventDefault();
                 return;
             }
+        }
+
+        // Atalhos de Zoom da Timeline (+ / = para aproximar; - para afastar)
+        const isZoomInKey = (e.key === "+" || e.key === "=" || e.code === "NumpadAdd" || e.code === "Equal") && !e.ctrlKey && !e.altKey && !e.metaKey;
+        const isZoomOutKey = (e.key === "-" || e.key === "_" || e.code === "NumpadSubtract" || e.code === "Minus") && !e.ctrlKey && !e.altKey && !e.metaKey;
+
+        if (isZoomInKey || isZoomOutKey) {
+            const zoomFactor = isZoomInKey ? 1.3 : (1 / 1.3);
+            const minZ = TIMELINE_STATE.minZoom || 0.01;
+            const maxZ = TIMELINE_STATE.maxZoom || 80.0;
+            const oldZoom = TIMELINE_STATE.zoom;
+            const newZoom = Math.max(minZ, Math.min(maxZ, oldZoom * zoomFactor));
+
+            const canvasW = this.canvas ? this.canvas.width : (this.renderer ? this.renderer.width : 1000);
+            const playheadF = TIMELINE_STATE.playheadFrame || 0;
+            const playheadScreenX = (playheadF - TIMELINE_STATE.scrollLeftFrame) * oldZoom;
+            const targetScreenX = (playheadScreenX >= 0 && playheadScreenX <= canvasW) ? playheadScreenX : (canvasW / 2);
+
+            const newScrollLeft = playheadF - (targetScreenX / newZoom);
+            TIMELINE_STATE.setZoom(newZoom);
+            TIMELINE_STATE.setScrollLeftFrame(newScrollLeft);
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
         }
 
         // Deletes (Apagar clipe selecionado, marcadores, gap ou ripple delete)

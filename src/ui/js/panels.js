@@ -326,12 +326,23 @@ export class PanelsManager {
             });
         }
 
-        // ── Zoom da régua da timeline: slider horizontal (0.05px/f – 3.0px/f) ──
+        // ── Zoom da régua da timeline: slider horizontal exponencial (0.02px/f – 80.0px/f) ──
         const timelineZoomSlider = document.getElementById("timeline-zoom-slider");
         if (timelineZoomSlider) {
-            timelineZoomSlider.value = TIMELINE_STATE.zoom ? String(TIMELINE_STATE.zoom) : "0.5";
+            const SLIDER_MIN_Z = 0.02;
+            const SLIDER_MAX_Z = 80.0;
+            const sliderToZoom = (val) => {
+                const ratio = Math.max(0, Math.min(100, Number(val) || 0)) / 100;
+                return Math.round(SLIDER_MIN_Z * Math.pow(SLIDER_MAX_Z / SLIDER_MIN_Z, ratio) * 100) / 100;
+            };
+            const zoomToSlider = (z) => {
+                const clamped = Math.max(SLIDER_MIN_Z, Math.min(SLIDER_MAX_Z, Number(z) || 0.5));
+                return Math.round((Math.log(clamped / SLIDER_MIN_Z) / Math.log(SLIDER_MAX_Z / SLIDER_MIN_Z)) * 1000) / 10;
+            };
+
+            timelineZoomSlider.value = String(zoomToSlider(TIMELINE_STATE.zoom || 0.5));
             timelineZoomSlider.addEventListener("input", (e) => {
-                const z = parseFloat(e.target.value);
+                const z = sliderToZoom(parseFloat(e.target.value));
                 if (!isNaN(z) && z > 0) {
                     TIMELINE_STATE.setZoom(z);
                     if (this.timelineRenderer) this.timelineRenderer.requestRedraw();
@@ -339,13 +350,16 @@ export class PanelsManager {
             });
             timelineZoomSlider.addEventListener("dblclick", () => {
                 TIMELINE_STATE.setZoom(0.5);
-                timelineZoomSlider.value = "0.5";
+                timelineZoomSlider.value = String(zoomToSlider(0.5));
                 if (this.timelineRenderer) this.timelineRenderer.requestRedraw();
             });
             STATE.on("timelineZoomChanged", (newZoom) => {
                 const zEl = getActiveElement("timeline-zoom-slider");
-                if (zEl && Math.abs(parseFloat(zEl.value) - newZoom) > 0.01) {
-                    zEl.value = String(newZoom);
+                if (zEl) {
+                    const targetSliderVal = zoomToSlider(newZoom);
+                    if (Math.abs(parseFloat(zEl.value) - targetSliderVal) > 0.5) {
+                        zEl.value = String(targetSliderVal);
+                    }
                 }
             });
         }

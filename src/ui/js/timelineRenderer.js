@@ -721,12 +721,19 @@ export class CapiauTimelineRenderer {
 
     /**
      * Desenha a régua de tempo adaptativa com marcas de subdivisão e timecode dinâmico.
+     * Suporta zoom de alta precisão até o nível de frames individuais (:00, :01, :02...).
+     */
+    /**
+     * Desenha a régua de tempo adaptativa com marcas de subdivisão e timecode dinâmico.
+     * Suporta zoom de alta precisão até o nível de frames individuais sem sobreposição ou poluição visual.
      */
     drawRuler() {
         const ctx = this.ctx;
         const zoom = TIMELINE_STATE.zoom;
         const scrollLeft = TIMELINE_STATE.scrollLeftFrame;
         const fps = TIMELINE_STATE.fps || 24;
+        const fpsVal = Number(fps) > 0 ? Number(fps) : 24;
+        const fpsBase = Math.max(1, Math.round(fpsVal));
 
         // Fundo da régua
         ctx.fillStyle = this.colors.rulerBg;
@@ -740,89 +747,183 @@ export class CapiauTimelineRenderer {
         ctx.lineTo(this.width, this.rulerHeight);
         ctx.stroke();
 
-        // 1. Candidatos a intervalo de rótulo (em frames)
+        const startFrame = Math.max(0, scrollLeft);
+        const endFrame = startFrame + Math.ceil(this.width / zoom);
+        const forceHours = endFrame >= 3600 * fpsVal;
+
+        // 1. Células visuais e destaque de frames sob zoom microscópico (zoom >= 18px/frame)
+        if (zoom >= 18) {
+            const playheadF = TIMELINE_STATE.playheadFrame;
+            for (let f = Math.floor(startFrame); f <= endFrame; f++) {
+                const fx = (f - startFrame) * zoom;
+                if (fx + zoom < 0 || fx > this.width) continue;
+
+                // Fundo alternado muito sutil para delimitar cada frame individual como um bloco visual
+                if (f === playheadF) {
+                    ctx.fillStyle = "rgba(239, 68, 68, 0.16)"; // Leve brilho da agulha de reprodução no frame ativo
+                    ctx.fillRect(fx, 0, zoom, this.rulerHeight);
+                } else if (f % 2 === 1) {
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.02)";
+                    ctx.fillRect(fx, 0, zoom, this.rulerHeight);
+                }
+
+                // Divisória sutil na base da régua marcando a fronteira de cada frame
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                const lineX = Math.round(fx) + 0.5;
+                ctx.moveTo(lineX, this.rulerHeight - 4);
+                ctx.lineTo(lineX, this.rulerHeight);
+                ctx.stroke();
+            }
+        }
+
+        // 2. Candidatos a intervalo de rótulo (estritamente inteiros)
         const rawCandidates = [
             1,
             2,
             5,
-            Math.max(1, Math.round(fps / 4)),
-            Math.max(1, Math.round(fps / 2)),
-            fps * 1,
-            fps * 2,
-            fps * 5,
-            fps * 10,
-            fps * 15,
-            fps * 30,
-            fps * 60,
-            fps * 120,
-            fps * 300,
-            fps * 600,
-            fps * 900,
-            fps * 1800,
-            fps * 3600,
-            fps * 7200,
-            fps * 18000
+            10,
+            Math.max(1, Math.round(fpsBase / 4)),
+            Math.max(1, Math.round(fpsBase / 2)),
+            fpsBase * 1,
+            fpsBase * 2,
+            fpsBase * 5,
+            fpsBase * 10,
+            fpsBase * 15,
+            fpsBase * 30,
+            fpsBase * 60,
+            fpsBase * 120,
+            fpsBase * 300,
+            fpsBase * 600,
+            fpsBase * 900,
+            fpsBase * 1800,
+            fpsBase * 3600,
+            fpsBase * 7200,
+            fpsBase * 18000
         ];
-        const candidates = [...new Set(rawCandidates.map(Math.round))].sort((a, b) => a - b);
+        const candidates = [...new Set(rawCandidates.map(Math.round))].filter(c => c >= 1).sort((a, b) => a - b);
 
-        // 2. Determinar textInterval para garantir espaçamento mínimo de ~90px entre textos (evita sobreposição)
-        const minTextPx = 90;
+        // 3. Determinar textInterval com margem de segurança generosa para garantir legibilidade absoluta
+        function getRequiredPx(c) {
+            if (c === 1) return 45; // Cada frame individual rotulado requer pelo menos 45px de largura para não amontoar
+            if (c === 2) return 55; // Rótulos a cada 2 frames requerem pelo menos 55px
+            if (c <= 5) return 65;
+            if (c < fpsBase) return 75;
+            return forceHours ? 95 : 85; // Timecode completo "MM:SS" ou "HH:MM:SS"
+        }
+
         let textInterval = candidates[candidates.length - 1];
         for (const c of candidates) {
-            if (c * zoom >= minTextPx) {
+            if (c * zoom >= getRequiredPx(c)) {
                 textInterval = c;
                 break;
             }
         }
 
-        // 3. Determinar subTickInterval (divisores exatos de textInterval com pelo menos 8px entre ticks)
+        // 4. Determinar subTickInterval (divisores com ticks nítidos; com zoom >= 4.5 desenha tick para cada frame)
         let subTickInterval = textInterval;
         if (textInterval > 1) {
-            const divisors = [];
-            for (let d = textInterval; d >= 1; d--) {
-                if (textInterval % d === 0) {
-                    divisors.push(d);
+            if (zoom >= 4.5) {
+                subTickInterval = 1;
+            } else {
+                const minTickPx = 6;
+                const divisors = [];
+                for (let d = 1; d <= textInterval; d++) {
+                    if (textInterval % d === 0) divisors.push(d);
                 }
-            }
-            for (const d of divisors) {
-                if (d * zoom >= 8) {
-                    subTickInterval = d;
+                for (const d of divisors) {
+                    if (d * zoom >= minTickPx) {
+                        subTickInterval = d;
+                        break;
+                    }
                 }
             }
         }
 
-        // 4. Parâmetros de exibição do Timecode
-        const startFrame = Math.max(0, scrollLeft);
-        const endFrame = startFrame + Math.ceil(this.width / zoom);
-        const showFrames = textInterval < fps;
-        const forceHours = endFrame >= 3600 * fps;
+        const showFrames = textInterval < fpsBase;
 
         ctx.font = "9px 'Outfit', 'Inter', monospace";
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
 
         const firstTickFrame = Math.floor(startFrame / subTickInterval) * subTickInterval;
+        let lastDrawnTextRight = -9999; // Guarda física de colisão contra sobreposição de números
 
         for (let f = firstTickFrame; f <= endFrame; f += subTickInterval) {
             const x = (f - startFrame) * zoom;
-            if (x < -15 || x > this.width + 15) continue;
+            if (x < -30 || x > this.width + 30) continue;
 
-            const isTextTick = (f % textInterval === 0);
-            const tickSize = isTextTick ? 10 : 5;
+            const frameInt = Math.round(f);
+            const isSecond = (frameInt % fpsBase === 0);
+            const isTextTick = (frameInt % textInterval === 0);
+            const isFiveFrames = (frameInt % 5 === 0);
+            const isHalfSecond = (frameInt % Math.max(1, Math.round(fpsBase / 2)) === 0);
+
+            let tickSize = 4;
+            let strokeColor = "rgba(255, 255, 255, 0.16)";
+            let lineWidth = 1;
+
+            if (isSecond) {
+                tickSize = 13;
+                strokeColor = "rgba(255, 255, 255, 0.75)";
+                lineWidth = 1.5;
+            } else if (isTextTick) {
+                tickSize = 9;
+                strokeColor = "rgba(255, 255, 255, 0.45)";
+                lineWidth = 1.2;
+            } else if (isHalfSecond || isFiveFrames) {
+                tickSize = 7;
+                strokeColor = "rgba(255, 255, 255, 0.30)";
+                lineWidth = 1;
+            } else {
+                tickSize = 4;
+                strokeColor = "rgba(255, 255, 255, 0.16)";
+                lineWidth = 1;
+            }
 
             // Desenha tick
-            ctx.strokeStyle = isTextTick ? "rgba(255, 255, 255, 0.4)" : "rgba(255, 255, 255, 0.15)";
-            ctx.lineWidth = isTextTick ? 1.5 : 1;
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = lineWidth;
             ctx.beginPath();
-            ctx.moveTo(x, this.rulerHeight - tickSize);
-            ctx.lineTo(x, this.rulerHeight);
+            const tickX = Math.round(x) + 0.5;
+            ctx.moveTo(tickX, this.rulerHeight - tickSize);
+            ctx.lineTo(tickX, this.rulerHeight);
             ctx.stroke();
 
-            // Desenha texto do timecode
+            // Desenha texto do timecode/frame
             if (isTextTick) {
-                const label = formatRulerTimecode(f, fps, showFrames, forceHours);
-                ctx.fillStyle = this.colors.rulerText;
-                ctx.fillText(label, x + 4, this.rulerHeight - 16);
+                let label;
+                if (isSecond) {
+                    // No segundo exato, exibe o timecode completo daquele ponto (ex: 00:01:00 ou 01:23:45)
+                    label = formatRulerTimecode(frameInt, fpsVal, showFrames, forceHours);
+                } else if (showFrames) {
+                    // Tick de frame fracionário (ex: frame 1, 2, 5, 10, 15...):
+                    // Se houver espaço amplo (>= 75px por tick), exibe timecode completo MM:SS:FF
+                    if (textInterval * zoom >= 75) {
+                        label = formatRulerTimecode(frameInt, fpsVal, true, forceHours);
+                    } else {
+                        // Formato frame compacto limpo: :FF (garantido 2 dígitos inteiros: :01, :05, :12...)
+                        const frameInSec = ((frameInt % fpsBase) + fpsBase) % fpsBase;
+                        label = `:${String(frameInSec).padStart(2, '0')}`;
+                    }
+                } else {
+                    label = formatRulerTimecode(frameInt, fpsVal, false, forceHours);
+                }
+
+                ctx.font = isSecond
+                    ? "600 9px 'Outfit', 'Inter', monospace"
+                    : "9px 'Outfit', 'Inter', monospace";
+
+                const textWidth = ctx.measureText(label).width;
+                const textLeft = Math.round(x) + 4;
+
+                // Proteção contra amontoamento: garante pelo menos 14px de respiro entre rótulos consecutivos
+                if (textLeft >= lastDrawnTextRight + 14) {
+                    ctx.fillStyle = isSecond ? "#f8fafc" : this.colors.rulerText;
+                    ctx.fillText(label, textLeft, this.rulerHeight - 16);
+                    lastDrawnTextRight = textLeft + textWidth;
+                }
             }
         }
     }
@@ -1199,8 +1300,10 @@ export class CapiauTimelineRenderer {
                 const thumbWidth = 80;
                 const durationSecs = duration / (TIMELINE_STATE?.fps || 24);
                 const numThumbs = Math.max(1, Math.ceil(width / thumbWidth));
+                const startIdx = Math.max(0, Math.floor((-startX) / thumbWidth));
+                const endIdx = Math.min(numThumbs - 1, Math.ceil((this.width - startX) / thumbWidth));
 
-                for (let i = 0; i < numThumbs; i++) {
+                for (let i = startIdx; i <= endIdx; i++) {
                     const xOffset = i * thumbWidth;
                     const ratio = (xOffset + thumbWidth / 2) / width;
                     const timeInClip = ratio * durationSecs;
@@ -1516,8 +1619,8 @@ export class CapiauTimelineRenderer {
         const fadeInDur = fadeInEff ? Math.min(clipDurS, Math.max(0, fadeInEff.duration_s || 0)) : 0;
         const fadeOutDur = fadeOutEff ? Math.min(clipDurS - fadeInDur, Math.max(0, fadeOutEff.duration_s || 0)) : 0;
 
-        // 1 ponto a cada 2 pixels para desenho suave e detalhado
-        const numPoints = Math.max(10, Math.floor(width / 2));
+        // 1 ponto a cada 2 pixels para desenho suave e detalhado (limitado ao viewport a 2500 pontos)
+        const numPoints = Math.min(2500, Math.max(10, Math.floor(width / 2)));
 
         // Busca picos reais no WaveformManager
         const sampled = WaveformManager.getSampledEnvelope(cut.video_id, inSec, outSec, numPoints);

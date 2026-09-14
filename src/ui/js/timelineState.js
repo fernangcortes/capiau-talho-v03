@@ -203,6 +203,8 @@ export class CapiauTimelineState {
     constructor() {
         this.fps = 24; // FPS padrão da timeline (conforme padrão do player)
         this.zoom = 0.5; // Pixels por frame (0.5px/frame = 12px/s em 24fps)
+        this.minZoom = 0.01; // Zoom mínimo: ~100 frames por pixel (visão panorâmica de longas sequências)
+        this.maxZoom = 80.0; // Zoom máximo: 80 pixels por frame (visão microscópica detalhada de frames)
         this.scrollLeftFrame = 0; // Posição do scroll horizontal em frames
         this.scrollTop = 0; // Scroll vertical das pistas em pixels
         this.playheadFrame = 0; // Posição atual do cursor de reprodução em frames
@@ -2563,11 +2565,13 @@ export class CapiauTimelineState {
     }
 
     /**
-     * Define o nível de zoom.
+     * Define o nível de zoom (em pixels por frame).
+     * Permite zoom contínuo de visão macro (0.01px/f) até o nível de frames individuais (80px/f).
      */
     setZoom(val) {
-        // Limita o zoom entre 0.01 (100 frames por pixel) e 5.0 (5 pixels por frame)
-        this.zoom = Math.max(0.01, Math.min(5.0, val));
+        const minZ = this.minZoom || 0.01;
+        const maxZ = this.maxZoom || 80.0;
+        this.zoom = Math.max(minZ, Math.min(maxZ, Number(val) || 0.5));
         STATE.emit("timelineZoomChanged", this.zoom);
     }
 
