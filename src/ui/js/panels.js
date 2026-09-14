@@ -3195,12 +3195,7 @@ export class PanelsManager {
                     e.preventDefault();
                     e.stopPropagation();
                 }
-                const liveTrack = TIMELINE_STATE.getTrack(trackId);
-                if (liveTrack) {
-                    delete liveTrack.heightPx;
-                }
-                TIMELINE_STATE.clampScrollTop();
-                STATE.emit("timelineTracksChanged", TIMELINE_STATE.tracks);
+                TIMELINE_STATE.resetTrackHeight(trackId);
             };
 
             resizeHandle.addEventListener("mousedown", (e) => {

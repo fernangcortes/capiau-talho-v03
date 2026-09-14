@@ -405,10 +405,12 @@ export class CapiauTimelineInteraction {
         window.addEventListener("mouseup", this.boundMouseUp);
         document.addEventListener("mouseup", this.boundMouseUp);
         win.addEventListener("mousemove", this.boundWindowMouseMove);
-        this.canvas.addEventListener("wheel", this.boundWheel);
-        const headersSidebar = this.canvas.ownerDocument.getElementById("timeline-headers-sidebar");
+        this.canvas.addEventListener("wheel", this.boundWheel, { passive: false });
+        const doc = this.canvas ? (this.canvas.ownerDocument || document) : document;
+        const headersSidebar = doc.getElementById("timeline-headers-sidebar");
         if (headersSidebar) {
-            headersSidebar.addEventListener("wheel", this.boundWheel);
+            headersSidebar.removeEventListener("wheel", this.boundWheel);
+            headersSidebar.addEventListener("wheel", this.boundWheel, { passive: false });
         }
         this.canvas.addEventListener("mouseleave", this.boundMouseLeave);
 
@@ -9549,18 +9551,72 @@ export class CapiauTimelineInteraction {
             TIMELINE_STATE.setScrollLeftFrame(newScrollLeft);
             if (this.renderer) this.renderer.requestRedraw();
         } else if (e.shiftKey) {
-            // Shift + roda = Zoom vertical das pistas (altura das pistas)
-            const currentScale = TIMELINE_STATE.trackHeightScale || 1.0;
-            const delta = e.deltaY < 0 ? 0.05 : -0.05;
-            const newScale = Math.min(1.7, Math.max(0.5, Math.round((currentScale + delta) * 100) / 100));
-            TIMELINE_STATE.setTrackHeightScale(newScale);
+            // Verifica se o cursor está em hover sobre o cabeçalho de uma pista específica
+            let targetEl = e.target && e.target.nodeType === 1 ? e.target : e.target?.parentElement;
+            let trackHeader = targetEl?.closest?.(".timeline-header-track");
+            if (!trackHeader && e.clientX !== undefined && e.clientY !== undefined) {
+                const doc = this.canvas?.ownerDocument || document;
+                if (typeof doc.elementFromPoint === "function") {
+                    const elUnderPoint = doc.elementFromPoint(e.clientX, e.clientY);
+                    trackHeader = elUnderPoint?.closest?.(".timeline-header-track");
+                }
+            }
+
+            const trackId = trackHeader?.dataset?.trackId;
+            const hoveredTrack = trackId ? TIMELINE_STATE.getTrack(trackId) : null;
+
+            if (hoveredTrack && !hoveredTrack.hidden) {
+                // Redimensionamento individual da altura daquela pista específica
+                let normDelta = e.deltaY;
+                if (e.deltaMode === 1) normDelta *= 30;
+                else if (e.deltaMode === 2) normDelta *= 300;
+
+                let deltaH = 0;
+                if (Math.abs(normDelta) >= 30) {
+                    const steps = Math.max(1, Math.min(5, Math.round(Math.abs(normDelta) / 100)));
+                    deltaH = (normDelta < 0 ? 1 : -1) * (steps * 8);
+                    this._trackWheelAccum = 0;
+                } else {
+                    this._trackWheelAccum = (this._trackWheelAccum || 0) + normDelta;
+                    clearTimeout(this._trackWheelTimer);
+                    this._trackWheelTimer = setTimeout(() => { this._trackWheelAccum = 0; }, 150);
+                    if (Math.abs(this._trackWheelAccum) >= 25) {
+                        deltaH = this._trackWheelAccum < 0 ? 8 : -8;
+                        this._trackWheelAccum = 0;
+                    }
+                }
+
+                if (deltaH !== 0) {
+                    const currentH = TIMELINE_STATE.trackHeight(hoveredTrack);
+                    const newH = Math.min(240, Math.max(22, currentH + deltaH));
+                    if (newH !== currentH) {
+                        TIMELINE_STATE.setTrackHeight(trackId, newH);
+                    }
+                }
+            } else {
+                // Shift + roda fora de um cabeçalho de pista (ex: sobre o canvas da timeline ou régua) = Zoom vertical global de todas as pistas
+                const currentScale = TIMELINE_STATE.trackHeightScale || 1.0;
+                const delta = e.deltaY < 0 ? 0.05 : -0.05;
+                const newScale = Math.min(1.7, Math.max(0.5, Math.round((currentScale + delta) * 100) / 100));
+                TIMELINE_STATE.setTrackHeightScale(newScale);
+            }
         } else {
-            // Roda simples: scroll vertical das pistas quando excedem a área visível ou quando scrollTop > 0
+            // Roda simples:
+            const targetEl = e.target && e.target.nodeType === 1 ? e.target : e.target?.parentElement;
+            const isOverHeaders = !!(targetEl?.closest?.("#timeline-headers-sidebar"));
             const viewportH = (this.renderer.height || 200) - (this.renderer.rulerHeight || 30);
             const overflow = TIMELINE_STATE.totalTracksHeight() > viewportH;
-            if ((overflow || TIMELINE_STATE.scrollTop > 0) && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+
+            if (isOverHeaders) {
+                // No cabeçalho de pistas, roda simples faz unicamente scroll vertical das faixas (nunca scroll horizontal de frames)
+                if (overflow || TIMELINE_STATE.scrollTop > 0) {
+                    TIMELINE_STATE.setScrollTop(TIMELINE_STATE.scrollTop + e.deltaY * 0.5, viewportH);
+                }
+            } else if ((overflow || TIMELINE_STATE.scrollTop > 0) && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                // No canvas: scroll vertical se houver overflow vertical prioritário
                 TIMELINE_STATE.setScrollTop(TIMELINE_STATE.scrollTop + e.deltaY * 0.5, viewportH);
             } else {
+                // Scroll horizontal de frames da timeline
                 const deltaFrames = (e.deltaX || e.deltaY) / TIMELINE_STATE.zoom;
                 TIMELINE_STATE.setScrollLeftFrame(TIMELINE_STATE.scrollLeftFrame + deltaFrames);
             }

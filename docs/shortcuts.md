@@ -51,6 +51,8 @@ No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado V
 | **`Shift + I`** | **Ir para Ponto IN** | Posiciona a agulha de reprodução exatamente no ponto de entrada marcado. |
 | **`Shift + O`** | **Ir para Ponto OUT** | Posiciona a agulha de reprodução exatamente no ponto de saída marcado. |
 | **`Duplo Clique` (Player)** | **Maximizar / Minimizar Player** | Expande o monitor ativo para tela cheia ou restaura o layout. |
+| **`Shift + Roda` (Cabeçalho de Pista)** | **Altura Individual da Pista** | Aumenta ou diminui a altura vertical daquela pista específica em passos de 8px (22px a 240px). |
+| **`Shift + Roda` (Timeline / Canvas)** | **Altura Global das Pistas** | Ajusta progressivamente a escala vertical de todas as pistas da timeline. |
 | **`Shift + Roda` (Biblioteca)** | **Zoom Dinâmico de Cards** | Ajusta progressivamente o tamanho dos cards e miniaturas da biblioteca. |
 
 ---

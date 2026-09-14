@@ -1010,12 +1010,22 @@ export class CapiauTimelineState {
         STATE.emit("timelineTracksChanged", this.tracks);
     }
 
-    /** Define a altura base (px em escala 1.0) de UMA pista específica (arraste individual). */
+    /** Define a altura base (px em escala 1.0) de UMA pista específica (arraste individual ou Shift + Roda). */
     setTrackHeight(trackId, px) {
         const track = this.tracks.find(t => t.id === trackId);
         if (!track) return;
         const scale = this.trackHeightScale || 1.0;
-        track.heightPx = Math.min(240, Math.max(22, Math.round(px / scale)));
+        const targetRendered = Math.min(240, Math.max(22, Math.round(px)));
+        track.heightPx = Math.round(targetRendered / scale);
+        this.clampScrollTop();
+        STATE.emit("timelineTracksChanged", this.tracks);
+    }
+
+    /** Restaura a altura padrão de uma pista específica removendo o override heightPx. */
+    resetTrackHeight(trackId) {
+        const track = this.tracks.find(t => t.id === trackId);
+        if (!track) return;
+        delete track.heightPx;
         this.clampScrollTop();
         STATE.emit("timelineTracksChanged", this.tracks);
     }

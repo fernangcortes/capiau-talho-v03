@@ -68,9 +68,9 @@ async function runTests() {
     console.log("✓ Teste 2: Prevenção de stale closures validada com lookup dinâmico por trackId");
 
     // 5. Teste de reset de altura individual
-    delete liveTrack.heightPx;
+    state.resetTrackHeight("V1");
     const defaultH = state.trackHeight(state.getTrack("V1"));
-    assert.strictEqual(defaultH, 72, "Ao deletar heightPx, trackHeight deve retornar a altura padrão do kind video (72px)");
+    assert.strictEqual(defaultH, 72, "resetTrackHeight deve restaurar a altura padrão do kind video (72px)");
     console.log("✓ Teste 3: Reset de altura individual restaura altura padrão de vídeo (72px)");
 
     // 6. Teste de geometria de lanes (espelho do timelineRenderer.getTrackLanes)
@@ -102,7 +102,109 @@ async function runTests() {
     assert.strictEqual(a1Lane.top, v1Lane.top + v1Lane.height, "Topo de A1 deve começar exatamente onde V1 termina");
     console.log("✓ Teste 4: Geometria de lanes no canvas acompanha perfeitamente os cabeçalhos redimensionados");
 
-    console.log("\nTODOS OS 4 TESTES DE REDIMENSIONAMENTO E INTEGRIDADE DE PISTAS PASSARAM COM SUCESSO!");
+    // 7. Simulação e validação do fluxo de Shift + Wheel no cabeçalho de uma pista específica
+    // Função auxiliar que reproduz com precisão o algoritmo de detecção e redimensionamento de onWheel
+    function simulateTrackHeaderWheel(timelineState, targetElement, event) {
+        if (!event.shiftKey) return;
+        const targetEl = targetElement && targetElement.nodeType === 1 ? targetElement : targetElement?.parentElement;
+        const trackHeader = targetEl?.closest?.(".timeline-header-track");
+        const trackId = trackHeader?.dataset?.trackId;
+        const hoveredTrack = trackId ? timelineState.getTrack(trackId) : null;
+
+        if (hoveredTrack && !hoveredTrack.hidden) {
+            let normDelta = event.deltaY;
+            if (event.deltaMode === 1) normDelta *= 30;
+            else if (event.deltaMode === 2) normDelta *= 300;
+
+            let deltaH = 0;
+            if (Math.abs(normDelta) >= 30) {
+                const steps = Math.max(1, Math.min(5, Math.round(Math.abs(normDelta) / 100)));
+                deltaH = (normDelta < 0 ? 1 : -1) * (steps * 8);
+            }
+            if (deltaH !== 0) {
+                const currentH = timelineState.trackHeight(hoveredTrack);
+                const newH = Math.min(240, Math.max(22, currentH + deltaH));
+                if (newH !== currentH) {
+                    timelineState.setTrackHeight(trackId, newH);
+                }
+            }
+        } else {
+            const currentScale = timelineState.trackHeightScale || 1.0;
+            const delta = event.deltaY < 0 ? 0.05 : -0.05;
+            const newScale = Math.min(1.7, Math.max(0.5, Math.round((currentScale + delta) * 100) / 100));
+            timelineState.setTrackHeightScale(newScale);
+        }
+    }
+
+    // Mock simples de elementos do DOM
+    function createMockHeader(trackId, isHidden = false) {
+        return {
+            nodeType: 1,
+            className: isHidden ? "timeline-header-track restore-line" : "timeline-header-track",
+            dataset: { trackId: String(trackId) },
+            closest(sel) {
+                if (sel === ".timeline-header-track") return this;
+                return null;
+            }
+        };
+    }
+
+    // Reseta pistas para valores conhecidos
+    state.resetTrackHeight("V1");
+    state.resetTrackHeight("A1");
+    assert.strictEqual(state.trackHeight(state.getTrack("V1")), 72, "V1 deve iniciar em 72px");
+    assert.strictEqual(state.trackHeight(state.getTrack("A1")), 48, "A1 deve iniciar em 48px");
+
+    const headerV1 = createMockHeader("V1");
+    const headerA1 = createMockHeader("A1");
+    const headerA2Hidden = createMockHeader("A2", true);
+
+    // Teste 5: Shift + Wheel Up no cabeçalho de V1 incrementa V1 em +8px e mantém A1 intacto
+    simulateTrackHeaderWheel(state, headerV1, { shiftKey: true, deltaY: -100, deltaMode: 0 });
+    assert.strictEqual(state.trackHeight(state.getTrack("V1")), 80, "V1 deve ter aumentado de 72px para 80px (+8px)");
+    assert.strictEqual(state.trackHeight(state.getTrack("A1")), 48, "A1 deve permanecer inalterado em 48px");
+    console.log("✓ Teste 5: Shift + Wheel Up no cabeçalho aumenta altura apenas da pista específica");
+
+    // Teste 6: Shift + Wheel Down no cabeçalho de V1 decrementa V1 em -8px
+    simulateTrackHeaderWheel(state, headerV1, { shiftKey: true, deltaY: 100, deltaMode: 0 });
+    assert.strictEqual(state.trackHeight(state.getTrack("V1")), 72, "V1 deve retornar para 72px (-8px)");
+    simulateTrackHeaderWheel(state, headerV1, { shiftKey: true, deltaY: 100, deltaMode: 0 });
+    assert.strictEqual(state.trackHeight(state.getTrack("V1")), 64, "V1 deve diminuir para 64px (-8px)");
+    console.log("✓ Teste 6: Shift + Wheel Down no cabeçalho diminui altura apenas da pista específica");
+
+    // Teste 7: Shift + Wheel no cabeçalho de A1 afeta apenas A1
+    simulateTrackHeaderWheel(state, headerA1, { shiftKey: true, deltaY: -100, deltaMode: 0 });
+    assert.strictEqual(state.trackHeight(state.getTrack("A1")), 56, "A1 deve ter aumentado para 56px (+8px)");
+    assert.strictEqual(state.trackHeight(state.getTrack("V1")), 64, "V1 deve permanecer em 64px");
+    console.log("✓ Teste 7: Isolamento entre pistas validado ao aplicar Shift+Wheel em outra pista");
+
+    // Teste 8: Pista oculta (restore-line) ignora Shift+Wheel
+    simulateTrackHeaderWheel(state, headerA2Hidden, { shiftKey: true, deltaY: -100, deltaMode: 0 });
+    assert.strictEqual(state.trackHeight(state.getTrack("A2")), 4, "Pista oculta A2 deve permanecer com 4px fixos");
+    console.log("✓ Teste 8: Pistas ocultas (restore-lines) ignoram redimensionamento por roda");
+
+    // Teste 9: Clamping de limites (mínimo 22px, máximo 240px)
+    state.setTrackHeight("V1", 236);
+    simulateTrackHeaderWheel(state, headerV1, { shiftKey: true, deltaY: -100, deltaMode: 0 });
+    assert.strictEqual(state.trackHeight(state.getTrack("V1")), 240, "V1 deve atingir o teto de 240px");
+    simulateTrackHeaderWheel(state, headerV1, { shiftKey: true, deltaY: -100, deltaMode: 0 });
+    assert.strictEqual(state.trackHeight(state.getTrack("V1")), 240, "V1 não deve ultrapassar o teto de 240px");
+
+    state.setTrackHeight("V1", 26);
+    simulateTrackHeaderWheel(state, headerV1, { shiftKey: true, deltaY: 100, deltaMode: 0 });
+    assert.strictEqual(state.trackHeight(state.getTrack("V1")), 22, "V1 deve atingir o piso de 22px");
+    simulateTrackHeaderWheel(state, headerV1, { shiftKey: true, deltaY: 100, deltaMode: 0 });
+    assert.strictEqual(state.trackHeight(state.getTrack("V1")), 22, "V1 não deve ficar abaixo do piso de 22px");
+    console.log("✓ Teste 9: Clamping nos limites [22px, 240px] validado com precisão");
+
+    // Teste 10: Shift + Wheel fora de um cabeçalho (ex: canvas) aciona o zoom vertical global (trackHeightScale)
+    const initialScale = state.trackHeightScale || 1.0;
+    const canvasElement = { nodeType: 1, className: "timeline-canvas", closest: () => null };
+    simulateTrackHeaderWheel(state, canvasElement, { shiftKey: true, deltaY: -100, deltaMode: 0 });
+    assert.strictEqual(state.trackHeightScale, initialScale + 0.05, "Fora do cabeçalho, Shift+Wheel deve alterar a escala global");
+    console.log("✓ Teste 10: Shift + Wheel fora dos cabeçalhos preserva o zoom vertical global de todas as pistas");
+
+    console.log("\nTODOS OS 10 TESTES DE REDIMENSIONAMENTO E CABEÇALHOS DE PISTAS PASSARAM COM SUCESSO!");
 }
 
 runTests().catch(err => {
