@@ -10151,9 +10151,28 @@ export class CapiauTimelineInteraction {
             }
         }
 
+        // Ajustar Sequência na Tela (Zoom to Fit: \ no Premiere/CapIAu, Shift+Z no Resolve/FinalCut, Ctrl+Shift+Espaço no Kdenlive)
+        if (KEYMAP_SERVICE.matches(e, "timeline.zoom_fit")) {
+            const viewportW = (this.renderer && this.renderer.width > 0) ? this.renderer.width : (this.canvas ? this.canvas.clientWidth : 1000);
+            TIMELINE_STATE.zoomToFit(viewportW);
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // Restaurar Zoom Padrão (1:1 / 0.5 px/f: . no Kdenlive/CapIAu, Ctrl+1 no Premiere, Shift+1 no Resolve/FinalCut)
+        if (KEYMAP_SERVICE.matches(e, "timeline.zoom_reset")) {
+            TIMELINE_STATE.setZoom(0.5);
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
         // Atalhos de Zoom da Timeline (+ / = para aproximar; - para afastar)
-        const isZoomInKey = (e.key === "+" || e.key === "=" || e.code === "NumpadAdd" || e.code === "Equal") && !e.ctrlKey && !e.altKey && !e.metaKey;
-        const isZoomOutKey = (e.key === "-" || e.key === "_" || e.code === "NumpadSubtract" || e.code === "Minus") && !e.ctrlKey && !e.altKey && !e.metaKey;
+        const isZoomInKey = KEYMAP_SERVICE.matches(e, "timeline.zoom_in") ||
+            ((e.key === "+" || e.key === "=" || e.code === "NumpadAdd" || e.code === "Equal") && !e.ctrlKey && !e.altKey && !e.metaKey);
+        const isZoomOutKey = KEYMAP_SERVICE.matches(e, "timeline.zoom_out") ||
+            ((e.key === "-" || e.key === "_" || e.code === "NumpadSubtract" || e.code === "Minus") && !e.ctrlKey && !e.altKey && !e.metaKey);
 
         if (isZoomInKey || isZoomOutKey) {
             const zoomFactor = isZoomInKey ? 1.3 : (1 / 1.3);
@@ -10162,7 +10181,7 @@ export class CapiauTimelineInteraction {
             const oldZoom = TIMELINE_STATE.zoom;
             const newZoom = Math.max(minZ, Math.min(maxZ, oldZoom * zoomFactor));
 
-            const canvasW = this.canvas ? this.canvas.width : (this.renderer ? this.renderer.width : 1000);
+            const canvasW = (this.renderer && this.renderer.width > 0) ? this.renderer.width : (this.canvas ? this.canvas.clientWidth : 1000);
             const playheadF = TIMELINE_STATE.playheadFrame || 0;
             const playheadScreenX = (playheadF - TIMELINE_STATE.scrollLeftFrame) * oldZoom;
             const targetScreenX = (playheadScreenX >= 0 && playheadScreenX <= canvasW) ? playheadScreenX : (canvasW / 2);

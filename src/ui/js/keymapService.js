@@ -354,6 +354,30 @@ export const COMMANDS_CATALOG = [
 
     // ── CANVAS, ZOOM & HISTÓRICO ────────────────────────────────────────────
     {
+        id: "timeline.zoom_fit",
+        category: "canvas_history",
+        label: "Ajustar Sequência na Tela (Zoom to Fit)",
+        description: "Enquadra perfeitamente todos os clipes na timeline ou restaura o zoom anterior (Toggle)"
+    },
+    {
+        id: "timeline.zoom_in",
+        category: "canvas_history",
+        label: "Aumentar Zoom na Linha do Tempo",
+        description: "Aproxima o zoom horizontal da régua e clipes da timeline"
+    },
+    {
+        id: "timeline.zoom_out",
+        category: "canvas_history",
+        label: "Diminuir Zoom na Linha do Tempo",
+        description: "Afasta o zoom horizontal da régua e clipes da timeline"
+    },
+    {
+        id: "timeline.zoom_reset",
+        category: "canvas_history",
+        label: "Restaurar Zoom Padrão (1:1 / 0.5 px/f)",
+        description: "Restaura a escala da régua e dos clipes para o zoom padrão de 0.5 pixels por frame"
+    },
+    {
         id: "history.undo",
         category: "canvas_history",
         label: "Desfazer Ação (Undo)",
@@ -644,6 +668,11 @@ export const KEYMAP_PRESETS = {
         "history.redo": ["Ctrl+Shift+KeyZ", "Ctrl+KeyY"],
         "workspace.save": ["Ctrl+Shift+KeyS"],
 
+        "timeline.zoom_fit": ["Backslash", "Shift+KeyZ"],
+        "timeline.zoom_in": ["Equal", "NumpadAdd"],
+        "timeline.zoom_out": ["Minus", "NumpadSubtract"],
+        "timeline.zoom_reset": ["Period"],
+
         // Layout & Workspace (Numpad & Slots)
         "workspace.numpad_1": ["Numpad1"],
         "workspace.alt_numpad_1": ["Alt+Numpad1"],
@@ -759,7 +788,12 @@ export const KEYMAP_PRESETS = {
 
         "history.undo": ["Ctrl+KeyZ"],
         "history.redo": ["Ctrl+Shift+KeyZ", "Ctrl+KeyY"],
-        "workspace.save": ["Ctrl+Shift+KeyS"]
+        "workspace.save": ["Ctrl+Shift+KeyS"],
+
+        "timeline.zoom_fit": ["Ctrl+Shift+Space"],
+        "timeline.zoom_reset": ["Period"],
+        "timeline.zoom_in": ["Ctrl+Equal", "Ctrl+NumpadAdd"],
+        "timeline.zoom_out": ["Ctrl+Minus", "Ctrl+NumpadSubtract"]
     },
 
     // 3. Adobe Premiere Pro
@@ -824,7 +858,12 @@ export const KEYMAP_PRESETS = {
 
         "history.undo": ["Ctrl+KeyZ"],
         "history.redo": ["Ctrl+Shift+KeyZ", "Ctrl+KeyY"],
-        "workspace.save": ["Ctrl+Shift+KeyS"]
+        "workspace.save": ["Ctrl+Shift+KeyS"],
+
+        "timeline.zoom_fit": ["Backslash"],
+        "timeline.zoom_in": ["Equal", "NumpadAdd"],
+        "timeline.zoom_out": ["Minus", "NumpadSubtract"],
+        "timeline.zoom_reset": ["Ctrl+Digit1"]
     },
 
     // 4. DaVinci Resolve
@@ -889,7 +928,12 @@ export const KEYMAP_PRESETS = {
 
         "history.undo": ["Ctrl+KeyZ"],
         "history.redo": ["Ctrl+Shift+KeyZ", "Ctrl+KeyY"],
-        "workspace.save": ["Ctrl+Shift+KeyS"]
+        "workspace.save": ["Ctrl+Shift+KeyS"],
+
+        "timeline.zoom_fit": ["Shift+KeyZ"],
+        "timeline.zoom_in": ["Ctrl+Equal", "Ctrl+NumpadAdd", "Cmd+Equal"],
+        "timeline.zoom_out": ["Ctrl+Minus", "Ctrl+NumpadSubtract", "Cmd+Minus"],
+        "timeline.zoom_reset": ["Shift+Digit1"]
     },
 
     // 5. Apple Final Cut Pro
@@ -954,7 +998,12 @@ export const KEYMAP_PRESETS = {
 
         "history.undo": ["Ctrl+KeyZ"],
         "history.redo": ["Ctrl+Shift+KeyZ", "Ctrl+KeyY"],
-        "workspace.save": ["Ctrl+Shift+KeyS"]
+        "workspace.save": ["Ctrl+Shift+KeyS"],
+
+        "timeline.zoom_fit": ["Shift+KeyZ"],
+        "timeline.zoom_in": ["Cmd+Equal", "Ctrl+Equal"],
+        "timeline.zoom_out": ["Cmd+Minus", "Ctrl+Minus"],
+        "timeline.zoom_reset": ["Shift+Digit1"]
     }
 };
 
@@ -1187,7 +1236,9 @@ class KeymapService {
             if (targetKey === "F12" && (eventCode === "F12" || eventKey === "F12")) return true;
             if (targetKey === "F9" && (eventCode === "F9" || eventKey === "F9")) return true;
             if (targetKey === "NumpadMultiply" && (eventCode === "NumpadMultiply" || eventKey === "*")) return true;
-            if (targetKey === "Backslash" && (eventCode === "Backslash" || eventKey === "\\")) return true;
+            if (targetKey === "Backslash" && (eventCode === "Backslash" || eventKey === "\\" || eventKey === "|")) return true;
+            if ((targetKey === "Equal" || targetKey === "Plus") && (eventCode === "Equal" || eventCode === "NumpadAdd" || eventKey === "=" || eventKey === "+")) return true;
+            if ((targetKey === "Minus" || targetKey === "Underscore") && (eventCode === "Minus" || eventCode === "NumpadSubtract" || eventKey === "-" || eventKey === "_")) return true;
 
             // Normalização de Numpad e Digit
             if (targetKey.startsWith("Numpad") && eventCode === targetKey) return true;
@@ -1228,6 +1279,8 @@ class KeymapService {
         if (key === "Comma") return ",";
         if (key === "Period") return ".";
         if (key === "Backslash") return "\\";
+        if (key === "Equal" || key === "Plus") return "+ / =";
+        if (key === "Minus" || key === "Underscore") return "-";
         return key;
     }
 

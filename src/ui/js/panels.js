@@ -361,8 +361,24 @@ export class PanelsManager {
                         zEl.value = String(targetSliderVal);
                     }
                 }
+                const fitBtn = getActiveElement("btn-timeline-zoom-fit");
+                if (fitBtn) fitBtn.classList.toggle("active", Boolean(TIMELINE_STATE._isFitted));
             });
         }
+
+        // ── Botão Ajustar Sequência na Tela (Zoom to Fit) ──
+        const btnZoomFit = document.getElementById("btn-timeline-zoom-fit");
+        if (btnZoomFit) {
+            btnZoomFit.addEventListener("click", () => {
+                const vw = this.timelineRenderer?.width || 1000;
+                TIMELINE_STATE.zoomToFit(vw);
+                if (this.timelineRenderer) this.timelineRenderer.requestRedraw();
+            });
+        }
+        STATE.on("timelineZoomFitted", ({ isFitted }) => {
+            const fitBtn = getActiveElement("btn-timeline-zoom-fit");
+            if (fitBtn) fitBtn.classList.toggle("active", Boolean(isFitted));
+        });
 
         // ── Undo / Redo da timeline ──
         const btnUndo = document.getElementById("btn-undo-timeline");

@@ -245,6 +245,10 @@ export class CapiauTimelineState {
         // Manipulador de Fade ativo no hover ({ clipId, side: "in"|"out", type: "duration"|"curve" })
         this.hoveredFadeHandle = null;
 
+        // Estado de Enquadramento da Sequência na Tela (Zoom to Fit / Toggle NLE)
+        this._isFitted = false;
+        this._preFitState = null;
+
         // Modo de Colisão e Movimentação na Mesma Pista (Task 3.5):
         // "clamp" (Bloqueio Físico rígido - Padrão), "overwrite" (Sobrescrita / Shift), "ripple" (Inserção Magnética / Ctrl)
         this._dragCollisionMode = this.loadDragCollisionMode();
@@ -2571,8 +2575,68 @@ export class CapiauTimelineState {
     setZoom(val) {
         const minZ = this.minZoom || 0.01;
         const maxZ = this.maxZoom || 80.0;
-        this.zoom = Math.max(minZ, Math.min(maxZ, Number(val) || 0.5));
+        const targetZoom = Math.max(minZ, Math.min(maxZ, Number(val) || 0.5));
+        if (this._isFitted && Math.abs(this.zoom - targetZoom) > 0.005) {
+            this._isFitted = false;
+        }
+        this.zoom = targetZoom;
         STATE.emit("timelineZoomChanged", this.zoom);
+    }
+
+    /**
+     * Alterna o zoom da timeline para enquadrar perfeitamente toda a sequência na tela (Zoom to Fit).
+     * Se já estiver enquadrado, restaura o nível de zoom e scroll anteriores (Toggle NLE clássico).
+     * @param {number} [viewportWidth] Largura útil visível da timeline em pixels (CSS pixels).
+     * @returns {boolean} Retorna true se a ação foi executada.
+     */
+    zoomToFit(viewportWidth) {
+        let vw = (typeof viewportWidth === "number" && viewportWidth > 0) ? viewportWidth : 0;
+        if (!vw && typeof window !== "undefined") {
+            vw = window.timelineRenderer?.width || window.timelineInteraction?.canvas?.clientWidth || 0;
+        }
+        if (!vw) vw = 1000;
+
+        const totalDuration = this.getDurationFrames();
+
+        // Se a timeline estiver vazia (sem clipes), restaura para o zoom padrão 0.5 e scroll 0
+        if (totalDuration <= 0) {
+            this.setZoom(0.5);
+            this.setScrollLeftFrame(0);
+            this._isFitted = false;
+            this._preFitState = null;
+            return true;
+        }
+
+        const minZ = this.minZoom || 0.01;
+        const maxZ = this.maxZoom || 80.0;
+
+        // Margem confortável à direita (5% da viewport ou até 60px) para não colar o último corte na borda direita
+        const marginPx = Math.min(60, Math.max(20, vw * 0.05));
+        const usableWidth = Math.max(20, vw - marginPx);
+        const fitZoom = Math.max(minZ, Math.min(maxZ, usableWidth / totalDuration));
+
+        // Mecanismo de Toggle NLE (Premiere Pro "\" / DaVinci Resolve Shift+Z):
+        // Se a timeline já estiver ajustada e o scroll no início, restaura o zoom de trabalho anterior
+        const isCurrentlyFitted = this._isFitted && Math.abs(this.zoom - fitZoom) < 0.005 && this.scrollLeftFrame === 0;
+
+        if (isCurrentlyFitted && this._preFitState) {
+            const prevZoom = this._preFitState.zoom;
+            const prevScroll = this._preFitState.scrollLeftFrame;
+            this._isFitted = false;
+            this.setZoom(prevZoom);
+            this.setScrollLeftFrame(prevScroll);
+        } else {
+            this._preFitState = {
+                zoom: this.zoom,
+                scrollLeftFrame: this.scrollLeftFrame
+            };
+            this.setZoom(fitZoom);
+            this.setScrollLeftFrame(0);
+            this._isFitted = true;
+        }
+
+        STATE.emit("timelineZoomFitted", { isFitted: this._isFitted, zoom: this.zoom });
+        return true;
     }
 
     /**
