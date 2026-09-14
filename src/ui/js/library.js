@@ -8418,11 +8418,10 @@ export class LibraryScrollIndexTracker {
         this.dwellDelay = parseInt(localStorage.getItem("library_scroll_index_dwell") || "1000", 10);
         this.thumbWidth = parseInt(localStorage.getItem("library_scroll_preview_thumb_width") || "128", 10);
 
-        // Fita Cromática (Scene Color Minimap) e Cursor Seletor Premium
+        // Fita Cromática (Scene Color Minimap) e Cursor Seletor Definitivo
         this.colorExtractor = new MediaColorExtractor();
         this.isRibbonEnabled = localStorage.getItem("library_scroll_color_ribbon_enabled") !== "false";
         this.ribbonStyle = localStorage.getItem("library_scroll_color_ribbon_style") || "blocks";
-        this.cursorMode = localStorage.getItem("library_scroll_ribbon_cursor_mode") || "negative";
         this.ribbonCanvas = null;
         this.ribbonCtx = null;
         this.cursorEl = null;
@@ -8600,7 +8599,6 @@ export class LibraryScrollIndexTracker {
         if (!cursor) {
             cursor = doc.createElement("div");
             cursor.id = "library-scroll-ribbon-cursor";
-            cursor.className = `cursor-mode-${this.cursorMode || "negative"}`;
             cursor.title = "Arrastar ou navegar pela Fita Cromática";
             parent.appendChild(cursor);
 
@@ -8650,7 +8648,6 @@ export class LibraryScrollIndexTracker {
             parent.appendChild(cursor);
         }
 
-        cursor.className = `cursor-mode-${this.cursorMode || "negative"}`;
         this.cursorEl = cursor;
         return cursor;
     }
@@ -8702,12 +8699,8 @@ export class LibraryScrollIndexTracker {
         this.cursorEl.style.top = `${Math.round(thumbTop)}px`;
         this.cursorEl.style.height = `${Math.round(thumbHeight)}px`;
 
-        if (this.cursorMode === "aura" || this.cursorMode === "vacuum") {
-            const currentColor = this.getColorAtRatio(scrollRatio);
-            const compColor = getComplementaryColor(currentColor);
-            this.cursorEl.style.setProperty("--aura-color", currentColor);
-            this.cursorEl.style.setProperty("--aura-comp", compColor);
-        }
+        const currentColor = this.getColorAtRatio(scrollRatio);
+        this.cursorEl.style.setProperty("--cursor-color", currentColor);
     }
 
     requestRibbonRedraw() {
@@ -8775,7 +8768,7 @@ export class LibraryScrollIndexTracker {
         const pRect = (sidebarLeft || container).getBoundingClientRect();
         const topOffset = Math.max(0, cRect.top - pRect.top);
         const height = Math.max(20, cRect.height);
-        const width = 4; // 4px largura constante
+        const width = 6; // 6px largura base (1.5x de 4px)
 
         this.ribbonCanvas.style.display = "block";
         this.ribbonCanvas.style.top = `${Math.round(topOffset)}px`;
@@ -9551,20 +9544,6 @@ export class LibraryScrollIndexTracker {
                     localStorage.setItem("library_scroll_color_ribbon_enabled", true);
                 }
                 this.requestRibbonRedraw();
-            });
-        }
-
-        const selRibbonCursor = doc.getElementById("sel-scroll-color-ribbon-cursor") || document.getElementById("sel-scroll-color-ribbon-cursor");
-        if (selRibbonCursor) {
-            selRibbonCursor.value = this.cursorMode;
-            selRibbonCursor.dispatchEvent(new Event("change"));
-            selRibbonCursor.addEventListener("change", (e) => {
-                this.cursorMode = e.target.value;
-                localStorage.setItem("library_scroll_ribbon_cursor_mode", this.cursorMode);
-                if (this.cursorEl) {
-                    this.cursorEl.className = `cursor-mode-${this.cursorMode}`;
-                }
-                this.updateCursorPosition();
             });
         }
     }
