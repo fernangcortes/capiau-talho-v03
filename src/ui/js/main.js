@@ -2245,9 +2245,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const selectDensity = document.getElementById("select-timeline-thumbs-density");
         if (selectDensity) {
-            selectDensity.value = String(TIMELINE_STATE.globalThumbnailsInterval);
+            selectDensity.value = TIMELINE_STATE.thumbnailMode || (TIMELINE_STATE.globalThumbnailsInterval === 0 ? "none" : "continuous");
             selectDensity.addEventListener("change", (e) => {
-                TIMELINE_STATE.setGlobalThumbnailsInterval(parseFloat(e.target.value));
+                TIMELINE_STATE.setGlobalThumbnailMode(e.target.value);
             });
         }
 

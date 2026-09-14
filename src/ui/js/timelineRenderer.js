@@ -1291,35 +1291,55 @@ export class CapiauTimelineRenderer {
             }
 
             // Miniaturas para pista de vídeo (se habilitadas na pista e globalmente)
-            if (laneKind === "video" && !isPhoto && !isText && lane.track.thumbnailsEnabled && TIMELINE_STATE.globalThumbnailsInterval > 0 && video) {
+            const thumbsGloballyEnabled = (TIMELINE_STATE.thumbnailMode !== "none") && (TIMELINE_STATE.globalThumbnailsInterval > 0);
+            const trackThumbsEnabled = lane.track && lane.track.thumbnailsEnabled !== false;
+
+            if (laneKind === "video" && !isPhoto && !isText && trackThumbsEnabled && thumbsGloballyEnabled && video) {
                 ctx.save();
                 ctx.beginPath();
                 ctx.rect(startX, clipY, width, clipHeight);
                 ctx.clip(); // Corta para caber no bloco do clipe
 
-                const thumbWidth = 80;
-                const durationSecs = duration / (TIMELINE_STATE?.fps || 24);
-                const numThumbs = Math.max(1, Math.ceil(width / thumbWidth));
-                const startIdx = Math.max(0, Math.floor((-startX) / thumbWidth));
-                const endIdx = Math.min(numThumbs - 1, Math.ceil((this.width - startX) / thumbWidth));
+                // Calcula a proporção real do vídeo para manter fidelidade geométrica sem fatiamentos artificiais
+                const aspect = this.getVideoAspectRatio(video);
+                const thumbWidth = Math.max(16, Math.round(clipHeight * aspect));
+                const isHeadOnly = TIMELINE_STATE.thumbnailMode === "head";
 
-                for (let i = startIdx; i <= endIdx; i++) {
-                    const xOffset = i * thumbWidth;
-                    const ratio = (xOffset + thumbWidth / 2) / width;
-                    const timeInClip = ratio * durationSecs;
-                    const targetTime = cut.in + timeInClip;
-
-                    const interval = TIMELINE_STATE.globalThumbnailsInterval || 1.0;
-                    const roundedTime = Math.round(targetTime / interval) * interval;
-
-                    let img = this.getVideoThumb(video.id, roundedTime);
+                if (isHeadOnly || clipHeight < 26) {
+                    // Modo 2: Apenas Início (Head Only / Primeiro Quadro) ou pista muito comprimida (< 26px)
+                    const targetTime = cut.in || 0;
+                    let img = this.getVideoThumb(video.id, targetTime);
                     if (!img) {
-                        // Exibição progressiva de fallback (vizinho mais próximo)
-                        img = this.getClosestLoadedVideoThumb(video.id, roundedTime);
+                        img = this.getClosestLoadedVideoThumb(video.id, targetTime);
                     }
-
                     if (img) {
-                        this.drawImageCover(img, startX + xOffset, clipY, thumbWidth, clipHeight);
+                        this.drawImageCover(img, startX, clipY, thumbWidth, clipHeight);
+                    }
+                } else {
+                    // Modo 1: Contínuo (Filmstrip / Rolo de Filme na proporção exata)
+                    const durationSecs = duration / (TIMELINE_STATE?.fps || 24);
+                    const numThumbs = Math.max(1, Math.ceil(width / thumbWidth));
+                    const startIdx = Math.max(0, Math.floor((-startX) / thumbWidth));
+                    const endIdx = Math.min(numThumbs - 1, Math.ceil((this.width - startX) / thumbWidth));
+
+                    for (let i = startIdx; i <= endIdx; i++) {
+                        const xOffset = i * thumbWidth;
+                        const ratio = (xOffset + thumbWidth / 2) / width;
+                        const timeInClip = ratio * durationSecs;
+                        const targetTime = cut.in + timeInClip;
+
+                        const interval = TIMELINE_STATE.globalThumbnailsInterval || 1.0;
+                        const roundedTime = Math.round(targetTime / interval) * interval;
+
+                        let img = this.getVideoThumb(video.id, roundedTime);
+                        if (!img) {
+                            // Exibição progressiva de fallback (vizinho mais próximo)
+                            img = this.getClosestLoadedVideoThumb(video.id, roundedTime);
+                        }
+
+                        if (img) {
+                            this.drawImageCover(img, startX + xOffset, clipY, thumbWidth, clipHeight);
+                        }
                     }
                 }
 
@@ -1330,14 +1350,20 @@ export class CapiauTimelineRenderer {
             }
 
             // Miniatura da foto como fundo (cover) + véu escuro para legibilidade do rótulo
-            if (isPhoto && photo) {
+            if (isPhoto && photo && trackThumbsEnabled && thumbsGloballyEnabled) {
                 const thumb = this.getPhotoThumb(photo);
                 if (thumb) {
                     ctx.save();
                     ctx.beginPath();
                     ctx.rect(startX, clipY, width, clipHeight);
                     ctx.clip();
-                    this.drawImageCover(thumb, startX, clipY, width, clipHeight);
+                    if (TIMELINE_STATE.thumbnailMode === "head") {
+                        const pAspect = (thumb.naturalWidth && thumb.naturalHeight) ? (thumb.naturalWidth / thumb.naturalHeight) : 1.0;
+                        const pThumbWidth = Math.max(16, Math.round(clipHeight * pAspect));
+                        this.drawImageCover(thumb, startX, clipY, pThumbWidth, clipHeight);
+                    } else {
+                        this.drawImageCover(thumb, startX, clipY, width, clipHeight);
+                    }
                     ctx.fillStyle = "rgba(0,0,0,0.35)";
                     ctx.fillRect(startX, clipY, width, clipHeight);
                     ctx.restore();
@@ -1510,7 +1536,43 @@ export class CapiauTimelineRenderer {
         return bestImg;
     }
 
-    /** Desenha uma imagem cobrindo (cover) o retângulo dado, preservando proporção. */
+    /**
+     * Retorna a proporção de aspecto (aspect ratio = width / height) do vídeo.
+     * Prioridades:
+     * 1. Miniatura já carregada em cache (img.naturalWidth / img.naturalHeight)
+     * 2. Metadado de resolução do vídeo (ex: "1920x1080" ou "1080x1920")
+     * 3. Dimensões ativas da timeline
+     * 4. Padrão 16/9
+     */
+    getVideoAspectRatio(video) {
+        if (!video) return 16 / 9;
+
+        if (this.videoThumbCache) {
+            for (const key in this.videoThumbCache) {
+                if (key.startsWith(`${video.id}_`)) {
+                    const entry = this.videoThumbCache[key];
+                    if (entry && entry.loaded && entry.img && entry.img.naturalWidth && entry.img.naturalHeight) {
+                        return entry.img.naturalWidth / entry.img.naturalHeight;
+                    }
+                }
+            }
+        }
+
+        if (video.resolution && typeof video.resolution === "string" && video.resolution.includes("x")) {
+            const parts = video.resolution.split("x").map(Number);
+            if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
+                return parts[0] / parts[1];
+            }
+        }
+
+        if (TIMELINE_STATE?.width && TIMELINE_STATE?.height && TIMELINE_STATE.height > 0) {
+            return TIMELINE_STATE.width / TIMELINE_STATE.height;
+        }
+
+        return 16 / 9;
+    }
+
+    /** Desenha uma imagem cobrindo (cover) o retângulo dado, preservando proporção e delimitando com precisão. */
     drawImageCover(img, x, y, w, h) {
         const iw = img.naturalWidth || img.width;
         const ih = img.naturalHeight || img.height;
@@ -1518,7 +1580,12 @@ export class CapiauTimelineRenderer {
         const scale = Math.max(w / iw, h / ih);
         const dw = iw * scale, dh = ih * scale;
         const dx = x + (w - dw) / 2, dy = y + (h - dh) / 2;
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.rect(x, y, w, h);
+        this.ctx.clip();
         this.ctx.drawImage(img, dx, dy, dw, dh);
+        this.ctx.restore();
     }
 
     /**

@@ -2861,6 +2861,7 @@ export class WorkspaceManager {
                 previewPanX: ts.previewPanX,
                 previewPanY: ts.previewPanY,
                 hoverPreviewEnabled: ts.hoverPreviewEnabled,
+                thumbnailMode: ts.thumbnailMode || (ts.globalThumbnailsInterval === 0 ? "none" : "continuous"),
                 globalThumbnailsInterval: ts.globalThumbnailsInterval,
                 muteHiddenTracksPlayback: ts.muteHiddenTracksPlayback,
                 toolbarIsTop: localStorage.getItem("capiau_timeline_toolbar_top") === "true",
@@ -3255,10 +3256,14 @@ export class WorkspaceManager {
                     const chkHover = document.getElementById("chk-timeline-hover-preview");
                     if (chkHover) chkHover.checked = !!td.hoverPreviewEnabled;
                 }
-                if (td.globalThumbnailsInterval !== undefined) {
+                if (td.thumbnailMode !== undefined) {
+                    ts.setGlobalThumbnailMode(td.thumbnailMode);
+                    const selDensity = document.getElementById("select-timeline-thumbs-density");
+                    if (selDensity) selDensity.value = ts.thumbnailMode;
+                } else if (td.globalThumbnailsInterval !== undefined) {
                     ts.setGlobalThumbnailsInterval(td.globalThumbnailsInterval);
                     const selDensity = document.getElementById("select-timeline-thumbs-density");
-                    if (selDensity) selDensity.value = String(td.globalThumbnailsInterval);
+                    if (selDensity) selDensity.value = ts.thumbnailMode;
                 }
                 if (td.muteHiddenTracksPlayback !== undefined) {
                     ts.setMuteHiddenTracksPlayback(td.muteHiddenTracksPlayback);

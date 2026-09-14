@@ -226,6 +226,7 @@ export class CapiauTimelineState {
         this.trackHeightScale = 1.0; // Fator de escala vertical das pistas (compacto ↔ alto)
 
         this.hoverPreviewEnabled = true;
+        this.thumbnailMode = "continuous"; // "continuous" | "head" | "none"
         this.globalThumbnailsInterval = 1.0; // 1.0 para alta densidade, 2.0 para média densidade
         this.muteHiddenTracksPlayback = true;
 
@@ -1221,9 +1222,27 @@ export class CapiauTimelineState {
         this.hoverPreviewEnabled = enabled !== undefined ? !!enabled : !this.hoverPreviewEnabled;
     }
 
-    setGlobalThumbnailsInterval(val) {
-        this.globalThumbnailsInterval = Number(val) || 1.0;
+    setGlobalThumbnailMode(mode) {
+        if (mode === "none" || mode === "0.0" || mode === "0" || mode === 0) {
+            this.thumbnailMode = "none";
+            this.globalThumbnailsInterval = 0.0;
+        } else if (mode === "head") {
+            this.thumbnailMode = "head";
+            this.globalThumbnailsInterval = 1.0;
+        } else {
+            this.thumbnailMode = "continuous";
+            const num = parseFloat(mode);
+            this.globalThumbnailsInterval = (!isNaN(num) && num > 0) ? num : 1.0;
+        }
+        const sel = document.getElementById("select-timeline-thumbs-density");
+        if (sel && sel.value !== this.thumbnailMode) {
+            sel.value = this.thumbnailMode;
+        }
         STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+    }
+
+    setGlobalThumbnailsInterval(val) {
+        this.setGlobalThumbnailMode(val);
     }
 
     setMuteHiddenTracksPlayback(enabled) {
