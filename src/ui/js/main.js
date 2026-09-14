@@ -2213,18 +2213,122 @@ window.addEventListener("DOMContentLoaded", () => {
     const btnViewOptions = document.getElementById("btn-timeline-view-options");
     const viewOptionsDropdown = document.getElementById("timeline-view-options-dropdown");
     if (btnViewOptions && viewOptionsDropdown) {
+        // Garante que o dropdown resida no body para evitar qualquer corte por overflow: hidden
+        const targetDoc = btnViewOptions.ownerDocument || document;
+        if (viewOptionsDropdown.parentElement !== targetDoc.body) {
+            targetDoc.body.appendChild(viewOptionsDropdown);
+        }
+
+        const positionViewOptionsDropdown = () => {
+            const isVisible = viewOptionsDropdown.classList.contains("visible") || viewOptionsDropdown.style.display === "flex";
+            if (!isVisible) return;
+
+            const doc = btnViewOptions.ownerDocument || document;
+            const win = doc.defaultView || window;
+            const btnRect = btnViewOptions.getBoundingClientRect();
+            const menuRect = viewOptionsDropdown.getBoundingClientRect();
+            const menuWidth = menuRect.width || 236;
+            const menuHeight = menuRect.height || 260;
+
+            // Alinhamento horizontal: ancorado no início do botão e contido na viewport
+            let left = btnRect.left;
+            if (left + menuWidth > win.innerWidth - 8) {
+                left = win.innerWidth - menuWidth - 8;
+            }
+            if (left < 8) {
+                left = 8;
+            }
+
+            // Alinhamento vertical inteligente:
+            // Tenta abrir para baixo do botão
+            let top = btnRect.bottom + 6;
+            const fitsBelow = (top + menuHeight <= win.innerHeight - 8);
+            const fitsAbove = (btnRect.top - menuHeight - 6 >= 8);
+
+            if (!fitsBelow && fitsAbove) {
+                // Inverte para cima se não couber embaixo (previne corte no rodapé)
+                top = btnRect.top - menuHeight - 6;
+            } else if (!fitsBelow && !fitsAbove) {
+                // Em viewports muito comprimidas, clampa dentro da tela visível
+                top = Math.max(8, win.innerHeight - menuHeight - 8);
+            }
+
+            viewOptionsDropdown.style.top = `${Math.round(top)}px`;
+            viewOptionsDropdown.style.left = `${Math.round(left)}px`;
+        };
+
+        const openViewOptions = () => {
+            // Fecha outros menus de contexto abertos
+            document.querySelectorAll(".custom-context-menu").forEach(m => m.remove());
+
+            // Esconde tooltip global para não sobrepor o botão
+            const globalTooltip = document.getElementById("global-tooltip");
+            if (globalTooltip) {
+                globalTooltip.classList.remove("visible");
+                globalTooltip.style.display = "none";
+            }
+
+            viewOptionsDropdown.classList.add("visible");
+            viewOptionsDropdown.style.display = "flex";
+            btnViewOptions.classList.add("active");
+            positionViewOptionsDropdown();
+        };
+
+        const closeViewOptions = () => {
+            viewOptionsDropdown.classList.remove("visible");
+            viewOptionsDropdown.style.display = "none";
+            btnViewOptions.classList.remove("active");
+        };
+
         btnViewOptions.addEventListener("click", (e) => {
             e.stopPropagation();
-            const visible = viewOptionsDropdown.style.display === "flex";
-            viewOptionsDropdown.style.display = visible ? "none" : "flex";
-        });
-
-        // Esconde ao clicar fora
-        document.addEventListener("click", (e) => {
-            if (!viewOptionsDropdown.contains(e.target) && e.target !== btnViewOptions && !btnViewOptions.contains(e.target)) {
-                viewOptionsDropdown.style.display = "none";
+            const isVisible = viewOptionsDropdown.classList.contains("visible") || viewOptionsDropdown.style.display === "flex";
+            if (isVisible) {
+                closeViewOptions();
+            } else {
+                openViewOptions();
             }
         });
+
+        // Esconde ao clicar fora usando pointerdown
+        document.addEventListener("pointerdown", (e) => {
+            const isVisible = viewOptionsDropdown.classList.contains("visible") || viewOptionsDropdown.style.display === "flex";
+            if (isVisible) {
+                if (!viewOptionsDropdown.contains(e.target) && !btnViewOptions.contains(e.target)) {
+                    closeViewOptions();
+                }
+            }
+        });
+
+        // Fecha com tecla Escape
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                const isVisible = viewOptionsDropdown.classList.contains("visible") || viewOptionsDropdown.style.display === "flex";
+                if (isVisible) {
+                    closeViewOptions();
+                }
+            }
+        });
+
+        // Reposiciona se a janela for redimensionada enquanto aberto
+        window.addEventListener("resize", () => {
+            const isVisible = viewOptionsDropdown.classList.contains("visible") || viewOptionsDropdown.style.display === "flex";
+            if (isVisible) {
+                positionViewOptionsDropdown();
+            }
+        });
+
+        // Reposiciona se o layout da timeline for alterado
+        const syncDropdownReposition = () => {
+            const isVisible = viewOptionsDropdown.classList.contains("visible") || viewOptionsDropdown.style.display === "flex";
+            if (isVisible) {
+                requestAnimationFrame(positionViewOptionsDropdown);
+            }
+        };
+
+        window.addEventListener("timelineLayoutChanged", syncDropdownReposition);
+        window.positionTimelineViewOptions = positionViewOptionsDropdown;
+        window.closeTimelineViewOptions = closeViewOptions;
 
         // Configura estados iniciais no DOM a partir de TIMELINE_STATE
         const chkHover = document.getElementById("chk-timeline-hover-preview");
@@ -2250,6 +2354,19 @@ window.addEventListener("DOMContentLoaded", () => {
                 TIMELINE_STATE.setGlobalThumbnailMode(e.target.value);
             });
         }
+
+        // Reposiciona se checkboxes de layout forem clicados
+        [
+            "chk-timeline-toolbar-top",
+            "chk-timeline-expand-left",
+            "chk-timeline-expand-right",
+            "chk-timeline-bottom-full"
+        ].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener("change", syncDropdownReposition);
+            }
+        });
 
         // Função para mudar a posição da barra de ferramentas da timeline
         function setTimelineToolbarPosition(isTop) {

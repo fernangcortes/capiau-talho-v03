@@ -5173,19 +5173,26 @@ export class SplitterHelper {
 
 export function showToast(msg, type = "info") {
     let toast = document.getElementById("global-nle-toast");
-    if (!toast) {
+    if (!toast && typeof document.createElement === "function") {
         toast = document.createElement("div");
-        toast.id = "global-nle-toast";
-        toast.className = "nle-toast";
-        document.body.appendChild(toast);
+        if (toast) {
+            toast.id = "global-nle-toast";
+            toast.className = "nle-toast";
+            if (document.body) document.body.appendChild(toast);
+        }
     }
+    if (!toast) return;
     toast.textContent = msg;
-    toast.style.display = "block";
-    toast.style.borderColor = type === "success" ? "rgba(16, 185, 129, 0.6)" : "rgba(6, 182, 212, 0.6)";
-    toast.classList.add("visible");
+    if (toast.style) {
+        toast.style.display = "block";
+        toast.style.borderColor = type === "success" ? "rgba(16, 185, 129, 0.6)" : "rgba(6, 182, 212, 0.6)";
+    }
+    if (toast.classList) {
+        toast.classList.add("visible");
+    }
     setTimeout(() => {
-        toast.classList.remove("visible");
-        setTimeout(() => { toast.style.display = "none"; }, 300);
+        if (toast.classList) toast.classList.remove("visible");
+        setTimeout(() => { if (toast.style) toast.style.display = "none"; }, 300);
     }, 2500);
 }
 if (!window.showToast) {
