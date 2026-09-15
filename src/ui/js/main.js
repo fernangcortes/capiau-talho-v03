@@ -2522,6 +2522,12 @@ window.addEventListener("DOMContentLoaded", () => {
             localStorage.setItem("active-left-tab", btn.dataset.tab);
             STATE.emit("leftTabChanged", btn.dataset.tab);
 
+            // Mostra/esconde a barra de filtros conforme a aba ativa
+            const filterBar = doc.getElementById("library-filter-bar");
+            if (filterBar) {
+                filterBar.style.display = (btn.dataset.tab === "tab-media") ? "" : "none";
+            }
+
             // 2. Restaura a posição de rolagem da nova aba ativa
             if (scrollContainer) {
                 if (window.libraryInstance) {
