@@ -3743,7 +3743,9 @@ export class WorkspaceManager {
                 }
             });
             win.addEventListener("keyup", (e) => {
-                if (e.code === "KeyK" && window.player) {
+                if (window.player && typeof window.player.handleGlobalKeyUp === "function") {
+                    window.player.handleGlobalKeyUp(e);
+                } else if (e.code === "KeyK" && window.player) {
                     window.player.isKeyKDown = false;
                 }
             });
@@ -3964,7 +3966,9 @@ export class WorkspaceManager {
                 }
             });
             win.addEventListener("keyup", (e) => {
-                if (e.code === "KeyK" && window.player) {
+                if (window.player && typeof window.player.handleGlobalKeyUp === "function") {
+                    window.player.handleGlobalKeyUp(e);
+                } else if (e.code === "KeyK" && window.player) {
                     window.player.isKeyKDown = false;
                 }
             });

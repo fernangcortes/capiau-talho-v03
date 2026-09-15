@@ -40,8 +40,8 @@ export const COMMANDS_CATALOG = [
     {
         id: "playback.shuttle_stop",
         category: "playback",
-        label: "Shuttle Parar (K)",
-        description: "Interrompe e pausa a reprodução/shuttle imediatamente"
+        label: "Shuttle Play / Pause (K)",
+        description: "Alterna entre reproduzir e pausar a reprodução (segure K com J ou L para avançar/recuar quadro a quadro)"
     },
     {
         id: "playback.shuttle_forward",

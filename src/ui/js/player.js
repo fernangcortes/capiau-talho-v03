@@ -380,6 +380,11 @@ export class SourcePlayer {
         this.onPlayStateChange(true);
     }
 
+    get isPlaying() {
+        const vid = this.el("source-video");
+        return !!(this.isReversing || (vid && !vid.paused));
+    }
+
     pause() {
         this.stopReverse();
         const vid = this.el("source-video");
@@ -539,6 +544,13 @@ export class SourcePlayer {
             }
         }
         this.showShuttleOsd(this.jklState === 'J' ? `${this.speedsReverse[this.jklIndex]}x` : `${this.speedsForward[this.jklIndex]}x`);
+    }
+
+    shuttlePlay() {
+        this.jklState = 'L';
+        this.jklIndex = 0;
+        this.play(this.speedsForward[0]);
+        this.showShuttleOsd(`${this.speedsForward[0]}x`);
     }
 
     shuttleStop() {
@@ -1887,6 +1899,13 @@ export class ProgramPlayer {
             }
         }
         this.showShuttleOsd(this.jklState === 'J' ? `${this.speedsReverse[this.jklIndex]}x` : `${this.speedsForward[this.jklIndex]}x`);
+    }
+
+    shuttlePlay() {
+        this.jklState = 'L';
+        this.jklIndex = 0;
+        this.play(this.speedsForward[0]);
+        this.showShuttleOsd(`${this.speedsForward[0]}x`);
     }
 
     shuttleStop() {
@@ -3979,16 +3998,17 @@ export class VideoPlayer {
         this.sourcePlayer = new SourcePlayer();
         this.programPlayer = new ProgramPlayer();
         this.isKeyKDown = false;
+        this._kActionTaken = null;
+        this._kJogUsed = false;
+        this._kDownTime = 0;
 
         // Escuta atalhos globais de teclado redirecionando para o player focado
         document.addEventListener("keydown", (e) => this.handleGlobalKeyboard(e));
-        document.addEventListener("keyup", (e) => {
-            if (e.code === "KeyK") {
-                this.isKeyKDown = false;
-            }
-        });
+        document.addEventListener("keyup", (e) => this.handleGlobalKeyUp(e));
         window.addEventListener("blur", () => {
             this.isKeyKDown = false;
+            this._kActionTaken = null;
+            this._kJogUsed = false;
         });
     }
 
@@ -4031,13 +4051,28 @@ export class VideoPlayer {
             return;
         }
 
+        // Se K estiver pressionado e outra tecla for acionada, anula o play ao soltar K
+        if (this.isKeyKDown && e.code !== "KeyK") {
+            this._kJogUsed = true;
+        }
+
         const activePlayer = window.activeFocusedPlayer === "source" ? this.sourcePlayer : this.programPlayer;
 
-        // Shuttle Parar (K)
+        // Shuttle Parar / Play-Pause (K)
         if (KEYMAP_SERVICE.matches(e, "playback.shuttle_stop")) {
             e.preventDefault();
+            if (e.repeat) return;
+
             this.isKeyKDown = true;
-            activePlayer.shuttleStop();
+            this._kJogUsed = false;
+            this._kDownTime = performance.now();
+
+            if (activePlayer && activePlayer.isPlaying) {
+                this._kActionTaken = "paused";
+                activePlayer.shuttleStop();
+            } else {
+                this._kActionTaken = "pending_play";
+            }
             return;
         } 
         
@@ -4058,11 +4093,13 @@ export class VideoPlayer {
         // Jog Avançar 1 frame (K + L) ou Shuttle Avanço (L)
         if (this.isKeyKDown && KEYMAP_SERVICE.matches(e, "playback.jog_next_frame", { isHoldingKey: "KeyK" })) {
             e.preventDefault();
+            this._kJogUsed = true;
             this.stepFrame(1);
             return;
         } else if (KEYMAP_SERVICE.matches(e, "playback.shuttle_forward")) {
             e.preventDefault();
             if (this.isKeyKDown) {
+                this._kJogUsed = true;
                 this.stepFrame(1);
             } else {
                 activePlayer.shuttleForward();
@@ -4073,11 +4110,13 @@ export class VideoPlayer {
         // Jog Recuar 1 frame (K + J) ou Shuttle Reverso (J)
         if (this.isKeyKDown && KEYMAP_SERVICE.matches(e, "playback.jog_prev_frame", { isHoldingKey: "KeyK" })) {
             e.preventDefault();
+            this._kJogUsed = true;
             this.stepFrame(-1);
             return;
         } else if (KEYMAP_SERVICE.matches(e, "playback.shuttle_reverse")) {
             e.preventDefault();
             if (this.isKeyKDown) {
+                this._kJogUsed = true;
                 this.stepFrame(-1);
             } else {
                 activePlayer.shuttleReverse();
@@ -4295,6 +4334,29 @@ export class VideoPlayer {
                 }
             }
             return;
+        }
+    }
+
+    handleGlobalKeyUp(e) {
+        if (e.code === "KeyK") {
+            const wasPendingPlay = (this._kActionTaken === "pending_play") && !this._kJogUsed;
+            const elapsed = performance.now() - (this._kDownTime || 0);
+            const isTap = elapsed < 500;
+
+            this.isKeyKDown = false;
+            this._kActionTaken = null;
+            this._kJogUsed = false;
+
+            if (wasPendingPlay && isTap) {
+                const activePlayer = window.activeFocusedPlayer === "source" ? this.sourcePlayer : this.programPlayer;
+                if (activePlayer && !activePlayer.isPlaying) {
+                    if (typeof activePlayer.shuttlePlay === "function") {
+                        activePlayer.shuttlePlay();
+                    } else if (typeof activePlayer.togglePlay === "function") {
+                        activePlayer.togglePlay();
+                    }
+                }
+            }
         }
     }
 
