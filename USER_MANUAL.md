@@ -342,30 +342,46 @@ O CapIAu-Talho adota a **arquitetura clássica track-based de NLEs profissionais
 ### D. Controle de Sync Lock por Pista
 - **Sincronismo Granular:** Cada cabeçalho de pista possui o botão de **Sync Lock** (`btn-track-sync-lock`). Pistas com Sync Lock ativo (cor ciano) acompanham todas as operações de ripple (fechamento de gaps, ripple delete e ripple insert). Pistas desativadas (cor cinza) permanecem travadas no tempo, garantindo que trilhas musicais ou efeitos sonoros não percam sincronia indesejada.
 
-### E. Snapping Magnético (`S`) e Guias Visuais
-- **Atalho `S`:** Pressione a tecla **`S`** para ativar ou desativar o encaixe magnético global.
+### E. Snapping Magnético (`N` ou `Shift+S`) e Guias Visuais
+- **Atalho `N` / `Shift+S`:** Pressione a tecla **`N`** (ou **`Shift + S`**) para ativar ou desativar o encaixe magnético global (padrão DaVinci Resolve / Final Cut Pro). Essa reorganização libera a tecla `S` para a navegação ergonômica de pontos de corte.
 - **Linhas Guias:** Durante o arrasto de clipes, marcadores ou playhead, uma linha guia vertical tracejada ciano é projetada através de todas as pistas no instante em que as bordas se alinham perfeitamente.
 
-### F. Lift Delete vs. Ripple Delete de Clipes
-- **Lift Delete (`Delete` ou `Backspace`):** Remove o clipe selecionado deixando um espaço vazio (Gap) no seu lugar, sem alterar a posição dos demais clipes.
-- **Ripple Delete (`Shift + Delete`):** Remove o clipe selecionado e puxa todos os clipes à direita nas pistas sincronizadas, fechando o intervalo deixado pelo corte.
+### F. Lift Delete (`Delete` / `Alt+R`) vs. Ripple Delete (`Backspace` / `R` / `Shift+Delete`)
+- **Ripple Delete (`Backspace` ou `R`):** Remove o clipe selecionado, o Gap selecionado ou o elemento sob a agulha de reprodução, puxando imediatamente todos os cortes posteriores nas pistas com Sync Lock ativo para fechar o espaço.
+- **Lift Delete (`Delete` ou `Alt+R`):** Remove o clipe selecionado ou o clipe sob a agulha deixando um espaço vazio (Gap) no seu lugar, sem alterar a posição temporal dos demais clipes.
 
-### G. Vínculo de Clipes (Link A/V) e Edição de J/L-Cuts (Tecla U)
+### G. Suíte de Edição Rápida com Uma Mão (Q-W-E-R & A-S-D-F)
+Para maximizar a produtividade e permitir montagem ultraveloz na mão esquerda sem dependência contínua do mouse:
+- **`Q` (Ripple Trim Head):** Corta do início do clipe até a agulha de reprodução e fecha o vão puxando os clipes seguintes.
+- **`W` (Ripple Trim Tail):** Corta da agulha de reprodução até o final do clipe e fecha o vão com ripple.
+- **`E` (Split no Playhead):** Fatia o clipe sob a agulha instantaneamente, sem exigir seleção prévia (se houver clipe selecionado, fatia o selecionado).
+- **`R` (Ripple Delete Inteligente):** Apaga o clipe ou Gap selecionado (ou o elemento sob a agulha) e fecha a lacuna com ripple.
+- **`Alt + R` (Lift Delete Rápido):** Apaga o clipe selecionado ou sob a agulha mantendo o vão vazio intacto.
+- **`A` / `S` (Previous / Next Edit Point):** Salta a agulha imediatamente para o ponto de corte anterior (`A`) ou seguinte (`S`).
+- **`D` (Select Clip at Playhead):** Seleciona o clipe posicionado sob a agulha na trilha ativa com um único toque.
+- **`Shift + D` (Multi-Select at Playhead):** Seleciona todos os clipes sob a agulha em todas as pistas destravadas e adiciona cumulativamente à seleção atual.
+- **`F` (Toggle Disable / Mute Clip):** Alterna o estado ativo/desativado do clipe. Clipes desativados ganham hachura diagonal, etiqueta `⊘ [DESATIVADO]`, ganho de áudio zerado no player e bypass na exportação.
+
+### H. Modo "Seleção Acompanha a Agulha" (Selection Follows Playhead)
+- **Atalho `Ctrl + Alt + P` & Botão na Barra:** Ative ou desative o modo pelo atalho **`Ctrl + Alt + P`** ou pelo botão com indicador LED ciano na barra de ferramentas (`#btn-selection-follows-playhead`).
+- **Comportamento Dinâmico:** Ao navegar pela timeline (via J-K-L, setas, A/S ou arrasto na régua), o clipe que cruza a agulha de reprodução na trilha ativa é selecionado automaticamente. Isso permite aplicar trims, splits, desativações ou ajustes no Inspetor de forma contínua sem tocar no mouse.
+
+### I. Vínculo de Clipes (Link A/V) e Edição de J/L-Cuts (Tecla U)
 - **Vínculo Automático:** Por padrão, os clipes de vídeo e seus respectivos áudios são importados de forma acoplada (`link_id`). Ao arrastar o vídeo na timeline, o áudio correspondente o acompanha de forma sincronizada.
 - **Edição de J-Cuts e L-Cuts:** Para desvincular o par de áudio e vídeo e fazer edições independentes (por exemplo, estender o áudio de uma fala sobre a cena do B-roll seguinte), selecione o clipe e pressione a tecla **`U`** (Desvincular). Após desvincular, você pode mover ou ajustar as bordas (*trim*) de cada faixa de forma independente na timeline.
 - **Ripple Trim (`Ctrl` + Trim):** Arrastar a borda de corte segurando **`Ctrl`** ajusta a duração do clipe enquanto puxa ou empurra os clipes seguintes nas pistas com Sync Lock.
 
-### H. Dividir Clipe (Split - Tecla Z)
-- Selecione qualquer clipe na timeline e pressione a tecla **`Z`** para cortá-lo ao meio exatamente na posição da agulha (playhead). Se o clipe de vídeo possuir um clipe de áudio vinculado (`link_id`), o corte é aplicado a ambos os clipes de forma sincronizada.
+### J. Dividir Clipe no Playhead (Split - Teclas E e Z)
+- Pressione **`E`** ou **`Z`** para cortar instantaneamente o clipe posicionado sob a agulha de reprodução (playhead), sem precisar de seleção prévia. Se um clipe estiver previamente selecionado, o corte é aplicado a ele. Se o clipe de vídeo possuir um áudio vinculado (`link_id`), o corte é aplicado a ambos de forma sincronizada (`Alt + E` ou `Alt + Z` fatia apenas a pista selecionada).
 
-### I. Controles Nativos de Pistas (Mute, Solo, Sync Lock e Visibilidade)
+### K. Controles Nativos de Pistas (Mute, Solo, Sync Lock e Visibilidade)
 Cada cabeçalho de pista na timeline (V1/V2 para vídeos e A1/A2 para áudios) possui botões individuais de controle:
 - **Mute (M):** Silencia o áudio da pista correspondente.
 - **Solo (S):** Isola a pista ativa, silenciando/ocultando temporariamente todas as demais.
 - **Sync Lock:** Alterna se a pista deve acompanhar operações de ripple.
 - **Visibilidade (Ícone de Olho):** Oculta a renderização de vídeo da pista selecionada no Program Player.
 
-### J. Marcadores de Timeline & Clipe de Vídeo (Teclado-First, Popover Compacto & Seleção em Lote)
+### L. Marcadores de Timeline & Clipe de Vídeo (Teclado-First, Popover Compacto & Seleção em Lote)
 O sistema suporta dois tipos de marcadores visuais altamente integrados com a timeline:
 - **Marcadores de Régua:** Ancorados à régua de tempo para notações globais de estrutura.
 - **Marcadores Vinculados ao Clipe de Vídeo:** Se a agulha estiver sobre um clipe de vídeo na timeline (seja na pista V1 ou na pista B-Roll V2), o marcador é automaticamente fixado no retângulo do clipe de vídeo (`clipId`). Se o clipe for arrastado ou se a timeline for alterada, o marcador acompanha o vídeo perfeitamente. O marcador de clipe é desenhado exclusivamente dentro da pista do vídeo (sem stems verticais cruzando a tela).
@@ -982,7 +998,7 @@ O **CapIAu-Talho** conta com um motor completo de atalhos e perfis NLE, permitin
 
 ### 🎛️ Perfis NLE Suportados
 No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selecione o perfil ativo:
-1. **🎬 CapIAu Padrão (Default):** Híbrido moderno (`Z` Split, `V` Seleção, `T` Faixa, `Q`/`W` Ripple Trims, `S` Snapping, `M` Marcadores, `A` Alternativas IA).
+1. **🎬 CapIAu Padrão (Default):** Híbrido moderno ultrarrápido com suíte QWER/ASDF na mão esquerda (`Q`/`W` Ripple Trims, `E` Split, `R` Ripple Delete, `Alt+R` Lift Delete, `A`/`S` Ponto Anterior/Seguinte, `D` Selecionar na Agulha, `Shift+D` Multi-seleção, `F` Desativar Clipe, `N`/`Shift+S` Snapping, `Shift+N` Rolling Edit, `Backspace` Ripple Delete, `Delete` Lift Delete, `Ctrl+Alt+P` Seleção Acompanha Agulha, `Alt+A` Alternativas IA).
 2. **🐧 Kdenlive:** Padrão clássico Open Source (`Shift+R` / `X` Split Razor, `S` Seleção, `M` Espaçador, `V` Inserção, `F10` Snapping, `J`/`K`/`L` Shuttle).
 3. **🟣 Adobe Premiere Pro:** Padrão Adobe (`Ctrl+K` / `C` Razor, `A` Seleção de Trilha, `V` Seleção, `S` Snapping, `Q`/`W` Ripple Trims).
 4. **🟡 DaVinci Resolve:** Padrão Blackmagic Design (`Ctrl+\` / `B` Blade, `A` Seleção, `N` Snapping, `Shift+Backspace` Ripple Delete).
@@ -1005,13 +1021,13 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | | **`J` / `K` / `L`** | Shuttle Reverso (-1x..-8x), Parar, Avanço (+1.5x..+8x) |
 | | **`K + J` / `K + L`** | Jog frame a frame (Recuar / Avançar 1 frame) |
 | | **`←` / `→`** | Navegar quadro a quadro (1 frame) |
-| | **`↑` / `↓`** | Saltar pontos de corte anteriores ou seguintes |
+| | **`A` / `S`** *(ou `↑` / `↓`)* | Saltar pontos de corte anteriores (`A`) ou seguintes (`S`) |
 | | **`Shift + I` / `Shift + O`** | Saltar agulha diretamente para ponto IN ou ponto OUT |
 | **Pontos de Corte & Inserção** | **`I` / `O`** | Marcar ponto de Entrada (In) e Saída (Out) |
 | | **`Alt + X`** | Limpar pontos de In e Out ativos |
 | | **`;` (Ponto e Vírgula)** | Lift: extrai intervalo [In–Out] mantendo Gap vazio |
 | | **`'` (Aspas Simples)** | Extract: extrai intervalo [In–Out] e fecha Gap com Ripple |
-| | **`E`** | Adicionar segmento marcado à timeline (Append) |
+| | **`E`** | Dividir Clipe no Playhead (*Split* na agulha) ou Append do Source |
 | | **`Shift + E`** | Inserir fala selecionada na transcrição na timeline |
 | **Ingestão na Timeline (Biblioteca)** | **`Duplo Clique`** | Inserir na timeline na posição da agulha (*Playhead*) |
 | | **`Shift + Duplo Clique`** | Inserir no final do último clipe (*Append*) |
@@ -1021,18 +1037,25 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | | **`Alt + Duplo Clique`** | Inserir empurrando cortes subsequentes (*Ripple Insert*) |
 | | **`Ctrl + Alt + Duplo Clique`** | Sobrepor em pista superior (*Overlay B-Roll*) |
 | | **`Botão Direito ➔ Substituir`** | Substituir clipe selecionado na timeline |
-| **Edição & Ferramentas NLE** | **`Z`** *(ou `Shift+R`/`Ctrl+K`/`B`)* | Dividir clipe na agulha (*Split*) |
-| | **`V`** | Ferramenta de Seleção Padrão |
+| **Suíte de Edição Rápida (Mão Esquerda)** | **`Q`** | Ripple Trim Head (corta do início do clipe até a agulha e fecha o vão) |
+| | **`W`** | Ripple Trim Tail (corta da agulha até o fim do clipe e fecha o vão) |
+| | **`E`** *(ou `Z`)* | Dividir Clipe no Playhead (*Split* instantâneo sob a agulha sem seleção prévia) |
+| | **`R`** *(ou `Backspace`)* | Ripple Delete (apaga clipe ou gap sob a agulha e fecha a lacuna) |
+| | **`Alt + R`** | Lift Delete com a mão esquerda (apaga clipe mantendo o gap vazio) |
+| | **`A` / `S`** | Saltar para o ponto de corte anterior (`A`) ou próximo (`S`) |
+| | **`D`** | Selecionar clipe sob a agulha na trilha ativa com 1 toque (*Select at Playhead*) |
+| | **`Shift + D`** | Multi-seleção na agulha (adiciona todos os clipes sob a agulha à seleção) |
+| | **`F`** | Ativar / Desativar clipe selecionado ou na agulha (*Mute / Bypass / Disable*) |
+| | **`Backspace`** | Ripple Delete de clipe selecionado, gap selecionado ou sob o playhead |
+| | **`Delete`** | Lift Delete (apaga clipe mantendo o gap vazio) |
+| | **`Ctrl + Alt + P`** | Alternar modo "Seleção Acompanha a Agulha" (*Selection Follows Playhead*) |
+| **Ferramentas NLE & Canvas** | **`V`** | Ferramenta de Seleção Padrão |
 | | **`C`** *(ou `B` no Resolve/Final Cut)* | Ferramenta Lâmina / Gilete (*Blade Tool* - corte simples ou `Shift+C` global) |
 | | **`Y`** *(ou `Shift+Y` no Resolve)* | Deslizar Conteúdo Interno (*Slip Tool* - mantém tamanho na timeline) |
 | | **`U`** | Deslocamento com Compensação (*Slide Tool* - ajusta vizinhos adjacentes) |
-| | **`N`** *(ou `T` no Resolve/Final Cut)* | Corte Contínuo Adjacente (*Rolling Edit Tool* - ajusta emenda com tempo constante) |
+| | **`Shift + N`** *(ou `T` no Resolve/Final Cut)* | Corte Contínuo Adjacente (*Rolling Edit Tool* - ajusta emenda com tempo constante) |
+| | **`N`** *(ou `Shift+S` / `F10`)* | Alternar Snapping magnético global |
 | | **`T` / `Shift + T`** | Selecionar Faixa para Frente / Trás (*Shift = 1 faixa*) |
-| | **`Q` / `W`** | Ripple Delete até a agulha (Início→Agulha / Agulha→Fim) |
-| | **`E` / `Z`** | Dividir Clipe no Playhead (*Split* instantâneo sob a agulha sem precisar selecionar o clipe) |
-| | **`Delete` / `Backspace`** | Lift Delete (clipe) ou Ripple Delete (espaço/gap) |
-| | **`Shift + Delete`** | Ripple Delete de clipe selecionado |
-| | **`S`** *(ou `F10`/`N`)* | Alternar Snapping magnético global |
 | | **`H`** *(ou segurar `Espaço` / botão do meio)* | Ferramenta Mão / Pan (arrasto contínuo da timeline) |
 | | **Ícone na toolbar** *(ou `Z` no Premiere/Resolve/FCP)* | Ferramenta Zoom / Lupa (Clique aproxima 1.4x, Alt+Clique afasta 0.7x) |
 | | **`+` / `=`** *(ou `Ctrl+=` no Resolve/FCP/Kdenlive)* | Aumentar Zoom na Timeline (ancorado na agulha / playhead) |
@@ -1051,7 +1074,7 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | **Marcadores** | **`M`** | Criar ou editar marcador na agulha (popover rápido) |
 | | **`Shift + M` / `Alt + M`** | Pular para o próximo / anterior marcador |
 | | **`Shift + Clique`** | Selecionar múltiplos marcadores para exclusão em lote |
-| **IA & Inspetor** | **`A` (na Timeline)** | Carrossel de alternativas da IA para o clipe ativo |
+| **IA & Inspetor** | **`Alt + A`** | Carrossel de alternativas da IA para o clipe ativo |
 | | **`Enter` / `Y`** | Aceitar sugestão da IA (*Ghost Clip*) |
 | | **`Del` (sobre Ghost)** | Rejeitar sugestão da IA |
 | | **`Esc`** | Fechar modais, desmarcar ou sair de campos de texto |

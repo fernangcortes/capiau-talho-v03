@@ -10,7 +10,7 @@ Você pode alternar o perfil ativo a qualquer momento através do menu **Perfil*
 
 | Perfil NLE | Foco & Ergonomia | Destaques de Mapeamento |
 | :--- | :--- | :--- |
-| 🎬 **CapIAu Padrão** | Híbrido moderno ultrarrápido para montagem documental e corte inteligente. | `Z` Split, `V` Seleção, `T` Faixa, `Q`/`W` Ripple Trims, `S` Snapping, `\` / `Shift+Z` Zoom to Fit, `+`/`-` Zoom na Agulha, `.` Zoom Reset, `H` Mão, `M` Marcador, `A` Alternativas IA. |
+| 🎬 **CapIAu Padrão** | Híbrido moderno com suíte QWER/ASDF na mão esquerda para corte documental ultrarrápido. | `Q`/`W` Ripple Trims, `E`/`Z` Split, `R` / `Backspace` Ripple Delete, `Alt+R` / `Delete` Lift Delete, `A`/`S` Ponto Anterior/Seguinte, `D` Selecionar na Agulha, `Shift+D` Multi-seleção, `F` Desativar Clipe, `N`/`Shift+S` Snapping, `Shift+N` Rolling Edit, `Ctrl+Alt+P` Seleção Acompanha Agulha, `Alt+A` Alternativas IA. |
 | 🐧 **Kdenlive** | Padrão clássico do ecossistema Open Source e Linux NLE. | `Shift+R` / `X` Razor Split, `S` Seleção, `M` / `Shift+M` Espaçador, `V` Inserção, `F10` Snapping, `Ctrl+Shift+Espaço` Zoom to Fit, `Ctrl+=`/`Ctrl+-` Zoom, `.` Zoom Reset, `Z` Zoom Tool, `H` Mão, `J`/`K`/`L` Shuttle. |
 | 🟣 **Adobe Premiere Pro** | Ergonomia familiar para editores acostumados ao ecossistema Adobe. | `Ctrl+K` / `C` Razor Split, `A` / `Shift+A` Seleção de Trilha, `V` Seleção, `S` Snapping, `Q`/`W` Ripple Trims, `\` Zoom to Fit, `+`/`-` Zoom na Agulha, `Ctrl+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
 | 🟡 **DaVinci Resolve** | Padrão Blackmagic Design para ilhas de edição e pós-produção. | `Ctrl+\` / `B` Blade Split, `A` Seleção, `N` Snapping, `Shift+Backspace` Ripple Delete, `Alt+[` / `Alt+]` Trims, `Shift+Z` Zoom to Fit, `Ctrl+=`/`Ctrl+-` Zoom, `Shift+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
@@ -47,7 +47,7 @@ No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado V
 | **`K + J`** | **Jog Recuar 1 Frame** | Pressione K mantendo pressionado J para recuar exatamente 1 frame. |
 | **`K + L`** | **Jog Avançar 1 Frame** | Pressione K mantendo pressionado L para avançar exatamente 1 frame. |
 | **`←` / `→`** | **Navegar Frames** | Retrocede ou avança exatamente 1 frame do vídeo para cortes cirúrgicos. |
-| **`↑` / `↓`** | **Navegar Pontos de Corte (Edit Points)** | **Na Timeline:** Move a agulha para o corte anterior (↑) ou próximo (↓).<br>**No Source:** Pula para o ponto In/Início (↑) ou ponto Out/Fim (↓). |
+| **`A` / `S`** *(ou `↑` / `↓`)* | **Navegar Pontos de Corte (Edit Points)** | **Na Timeline:** Move a agulha para o corte anterior (`A`/↑) ou próximo (`S`/↓).<br>**No Source:** Pula para o ponto In/Início (↑) ou ponto Out/Fim (↓). |
 | **`Shift + I`** | **Ir para Ponto IN** | Posiciona a agulha de reprodução exatamente no ponto de entrada marcado. |
 | **`Shift + O`** | **Ir para Ponto OUT** | Posiciona a agulha de reprodução exatamente no ponto de saída marcado. |
 | **`Duplo Clique` (Player)** | **Maximizar / Minimizar Player** | Expande o monitor ativo para tela cheia ou restaura o layout. |
@@ -85,9 +85,17 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 | **`'` (Aspas Simples)** | **Extract (Extração com Ripple)** | Remove o trecho entre [In–Out] e fecha o espaço puxando os clipes à direita. |
 | **`E`** ou **`Z`** *(ou `Ctrl+K`/`Cmd+B`)* | **Dividir Clipe no Playhead (Split)** | Corta o clipe sob a agulha instantaneamente, sem precisar selecionar previamente o clipe na timeline. Completa a tríade ergonômica da mão esquerda **`Q`** (Trim Início), **`W`** (Trim Fim) e **`E`** (Split). Divide par A/V sincronizado (`Alt+E` ou `Alt+Z` para corte individual J/L-Cut). |
 | **`Shift + E`** | **Adicionar à Timeline (Append)** | Insere o trecho marcado [In–Out] do monitor de origem na trilha correspondente. |
-| **`Q`** | **Ripple Delete até a Agulha (Head)** | Corta do início do clipe até a agulha e puxa os clipes posteriores nas pistas com Sync Lock. |
-| **`W`** | **Ripple Delete da Agulha até o Fim (Tail)** | Corta da agulha até o fim do clipe e puxa os clipes posteriores nas pistas com Sync Lock. |
-| **`Delete` / `Backspace`** | **Lift Delete / Deletar Gap / Ghost** | **Em clipe:** Apaga o clipe mantendo o Gap vazio.<br>**Em Gap:** Fecha o espaço vazio puxando os clipes.<br>**Em Ghost:** Rejeita sugestão de IA. |
+| **`Q`** | **Ripple Trim Head** | Corta do início do clipe até a agulha e puxa os clipes posteriores nas pistas com Sync Lock. |
+| **`W`** | **Ripple Trim Tail** | Corta da agulha até o fim do clipe e puxa os clipes posteriores nas pistas com Sync Lock. |
+| **`R`** *(ou `Backspace`)* | **Ripple Delete Inteligente** | Apaga o clipe selecionado, gap selecionado ou sob a agulha e puxa os clipes posteriores fechando o vão. |
+| **`Alt + R`** | **Lift Delete Rápido (Mão Esquerda)** | Apaga o clipe selecionado ou sob a agulha mantendo o vão vazio (gap) intacto. |
+| **`Backspace`** | **Ripple Delete / Fechar Gap** | **Em clipe ou sob a agulha:** Apaga e fecha a lacuna com ripple.<br>**Em Gap:** Fecha o vão vazio puxando os clipes.<br>**Em Ghost:** Rejeita sugestão de IA. |
+| **`Delete`** | **Lift Delete** | Apaga o clipe selecionado ou sob a agulha mantendo o vão vazio (Gap) intacto. |
+| **`A` / `S`** | **Navegar Pontos de Corte (Edit Points)** | Salta a agulha instantaneamente para o ponto de corte anterior (`A`) ou seguinte (`S`). |
+| **`D`** | **Selecionar Clipe na Agulha** | Seleciona com 1 toque o clipe sob a agulha na trilha ativa (*Select at Playhead*). |
+| **`Shift + D`** | **Multi-Seleção na Agulha** | Seleciona todos os clipes sob a agulha em todas as faixas e adiciona cumulativamente à seleção atual. |
+| **`F`** | **Ativar / Desativar Clipe (Mute/Bypass)** | Desativa o clipe (hachura visual, mute no áudio e bypass no export). Pressione novamente para reativar. |
+| **`Ctrl + Alt + P`** | **Alternar Seleção Acompanha a Agulha** | Liga ou desliga o modo dinâmico onde o clipe que cruza a agulha é selecionado automaticamente. |
 | **`Shift + Delete`** | **Ripple Delete de Clipe** | Apaga o clipe selecionado e fecha o espaço vazio imediatamente. |
 | **`Alt + Delete`** | **Apagar Faixa Única** | Apaga apenas o vídeo ou o áudio do clipe selecionado, desvinculando o par temporariamente. |
 | **`Alt + Clique`** | **Seleção A/V Independente** | Seleciona apenas a pista clicada de um par vinculado para cortes L-Cut e J-Cut. |
@@ -104,11 +112,11 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 | **`C`** *(ou `B` no Resolve/Final Cut)* | **Ferramenta Lâmina / Gilete (Blade)** | Divide o clipe clicado no frame exato (`Shift+C` fatia todas as pistas destravadas na agulha). |
 | **`Y`** *(ou `Shift+Y` no Resolve)* | **Deslizar Conteúdo Interno (Slip Tool)** | Desliza os pontos IN e OUT da mídia bruta mantendo a posição e duração na timeline intactas. |
 | **`U`** | **Deslocamento com Compensação (Slide Tool)** | Move a posição do clipe compensando simetricamente nos vizinhos adjacentes. |
-| **`N`** *(ou `T` no Resolve/Final Cut)* | **Corte Contínuo Adjacente (Rolling Edit)** | Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência. |
+| **`Shift + N`** *(ou `T` no Resolve/Final Cut)* | **Corte Contínuo Adjacente (Rolling Edit)** | Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência. |
 | **`Arraste Livre`** | **Seleção por Retângulo (Marquee)** | Abre caixa pontilhada para selecionar múltiplos clipes e marcadores em bloco. |
 | **`T`** *(ou `A` no Premiere)* | **Selecionar Faixa para Frente** | Seleciona todos os clipes à direita em todas as faixas ativas (*Shift = 1 faixa*). |
 | **`Shift + T`** *(ou `Shift+A`)* | **Selecionar Faixa para Trás** | Seleciona todos os clipes à esquerda em todas as faixas ativas (*Shift = 1 faixa*). |
-| **`S`** *(ou `F10` / `N`)* | **Alternar Snapping Magnético** | Liga ou desliga o magnetismo da timeline com guias visuais no Canvas. |
+| **`N`** *(ou `Shift+S` / `F10`)* | **Alternar Snapping Magnético** | Liga ou desliga o magnetismo da timeline com guias visuais no Canvas. |
 | **`H`** *(ou segurar `Espaço` / botão do meio)* | **Ferramenta Mão / Pan** | Permite arrastar e navegar livremente pela timeline em qualquer direção. |
 | **`Z`** *(ou ícone na barra de ferramentas)* | **Ferramenta Zoom / Lupa** | Clique com botão esquerdo para aproximar (1.4x), `Alt + Clique` para afastar (0.7x), centrado no clique. *(Nos perfis Premiere/Resolve/FCP/Kdenlive, atalho nativo `Z`)*. |
 | **`+` / `=`** *(ou `Ctrl+=` no Resolve/FCP/Kdenlive)* | **Aumentar Zoom na Timeline (Zoom In)** | Aproxima o zoom horizontal da régua e clipes ancorado na posição da agulha de reprodução (*Playhead*). |
@@ -143,7 +151,7 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 
 | Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
-| **`A`** | **Alternativas IA / Inspetor** | **Na Timeline:** Abre o carrossel de planos alternativos sugeridos pela IA.<br>**Na Biblioteca:** Abre o Inspetor de Metadados e Decupagem. |
+| **`Alt + A`** *(ou `A` na Biblioteca)* | **Alternativas IA / Inspetor** | **Na Timeline:** Abre o carrossel de planos alternativos sugeridos pela IA.<br>**Na Biblioteca:** Abre o Inspetor de Metadados e Decupagem. |
 | **`Enter` / `Y`** | **Aceitar Sugestão de IA** | Aceita e consolida o clipe fantasma (*ghost clip*) sugerido na timeline. |
 | **`Del` (sobre Ghost)** | **Rejeitar Sugestão de IA** | Remove o clipe fantasma sugerido pela IA. |
 | **`Ctrl + S`** | **Salvar Timeline / Projeto** | Salva a timeline ativa e persiste no banco SQLite/JSON. |

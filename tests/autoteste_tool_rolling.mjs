@@ -109,15 +109,23 @@ for (const p of presetsEsperados) {
     
     const rollingBinding = presetConfig["tools.rolling"];
     assert.ok(rollingBinding && rollingBinding.length > 0, `Preset '${p}' deve mapear 'tools.rolling'`);
-    assert.ok(rollingBinding.includes("KeyN"), `Preset '${p}' deve suportar tecla 'KeyN' para a ferramenta Rolling Edit`);
+    if (p === "capiau") {
+        assert.ok(rollingBinding.includes("Shift+KeyN"), `Preset 'capiau' deve suportar tecla 'Shift+KeyN' para a ferramenta Rolling Edit`);
+    } else {
+        assert.ok(rollingBinding.includes("KeyN"), `Preset '${p}' deve suportar tecla 'KeyN' para a ferramenta Rolling Edit`);
+    }
 
     // Valida não-colisão com tools.snapping
     const snappingBinding = presetConfig["tools.snapping"];
     if (snappingBinding) {
-        assert.ok(!snappingBinding.includes("KeyN"), `Preset '${p}' não pode colidir 'KeyN' pura com tools.snapping`);
+        if (p === "capiau") {
+            assert.ok(!rollingBinding.includes("KeyN"), `Preset 'capiau' não deve colidir 'KeyN' pura no rolling (alocada para snapping)`);
+        } else {
+            assert.ok(!snappingBinding.includes("KeyN"), `Preset '${p}' não pode colidir 'KeyN' pura com tools.snapping`);
+        }
     }
 }
-console.log("  ✔ Mapeamento unificado da tecla 'N' nos 5 perfis NLE validado sem colisão.");
+console.log("  ✔ Mapeamento unificado da tecla 'N' / 'Shift+N' nos 5 perfis NLE validado sem colisão.");
 
 // 2.3 Simulação da Cheat Sheet
 for (const p of presetsEsperados) {
