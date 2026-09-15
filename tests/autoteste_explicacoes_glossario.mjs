@@ -76,7 +76,7 @@ class FakeDoc {
 
 // ─────────── carrega timelineInteraction.js como módulo avaliável ───────────
 let codigo = readFileSync(path.join(raiz, "src/ui/js/timelineInteraction.js"), "utf8");
-codigo = codigo.replace(/^import\s.*$/gm, "").replace(/^export\s+(?=(function|class|const|let|var))/gm, "");
+codigo = codigo.replace(/import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"];?/g, "").replace(/^import\s.*$/gm, "").replace(/^export\s+(?=(function|class|const|let|var))/gm, "");
 codigo = `
 const STATE = __d.state;
 const TIMELINE_STATE = __d.timelineState;
@@ -87,6 +87,21 @@ const framesToSeconds = (f) => f;
 const framesToTimecode = (f) => String(f);
 const evaluateFadeCurve = () => 0;
 const FADE_CURVE_PRESETS = {};
+const getActiveElement = (id) => document.getElementById(id);
+const getActiveQuerySelector = (sel) => document.querySelector ? document.querySelector(sel) : null;
+const KEYMAP_SERVICE = { matches: () => false, getBindingDescription: () => "" };
+const FONT_MODAL = {};
+const CURATED_FONTS = [];
+const ensureFontLoaded = () => Promise.resolve();
+const hasKeyframes = () => false;
+const getKeyframeAt = () => null;
+const getPrevKeyframeTime = () => null;
+const getNextKeyframeTime = () => null;
+const addOrUpdateKeyframe = () => {};
+const removeKeyframe = () => {};
+const toggleKeyframing = () => {};
+const evaluateClipProperty = () => null;
+const EASING_OPTIONS = [];
 ` + codigo;
 codigo += "\nglobalThis.__exports = { CapiauTimelineInteraction };\n";
 

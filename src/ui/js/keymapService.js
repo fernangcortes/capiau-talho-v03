@@ -234,6 +234,24 @@ export const COMMANDS_CATALOG = [
 
     // ── EDIÇÃO, CORTES & TRIMS ──────────────────────────────────────────────
     {
+        id: "edit.insert",
+        category: "edit",
+        label: "Inserir na Agulha (Ripple Insert)",
+        description: "Insere o trecho marcado no monitor Source na coordenada da agulha empurrando os clipes subsequentes"
+    },
+    {
+        id: "edit.overwrite",
+        category: "edit",
+        label: "Sobrescrever na Agulha (Overwrite Edit)",
+        description: "Insere o trecho marcado no monitor Source na coordenada da agulha substituindo o material sob o intervalo"
+    },
+    {
+        id: "edit.toggle_source_audio",
+        category: "edit",
+        label: "Alternar Canais na Inserção (AV / V / A)",
+        description: "Alterna os canais transferidos do monitor Source para a Timeline: Áudio+Vídeo (AV), Somente Vídeo (V) ou Somente Áudio (A)"
+    },
+    {
         id: "edit.split",
         category: "edit",
         label: "Dividir Clipe no Playhead (Split)",
@@ -677,6 +695,9 @@ export const KEYMAP_PRESETS = {
         "tools.hand": ["KeyH"],
         "tools.escape": ["Escape"],
 
+        "edit.insert": ["Comma"],
+        "edit.overwrite": ["Period"],
+        "edit.toggle_source_audio": ["Ctrl+Alt+KeyA"],
         "edit.split": ["KeyE", "KeyZ", "Alt+KeyE", "Alt+KeyZ"],
         "edit.ripple_trim_head": ["KeyQ"],
         "edit.ripple_trim_tail": ["KeyW"],
@@ -711,7 +732,7 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_fit": ["Backslash", "Shift+KeyZ"],
         "timeline.zoom_in": ["Equal", "NumpadAdd"],
         "timeline.zoom_out": ["Minus", "NumpadSubtract"],
-        "timeline.zoom_reset": ["Period"],
+        "timeline.zoom_reset": ["Ctrl+Digit1"],
         "timeline.toggle_selection_follows_playhead": ["Ctrl+Alt+KeyP"],
 
         // Layout & Workspace (Numpad & Slots)
@@ -785,7 +806,7 @@ export const KEYMAP_PRESETS = {
         "playback.goto_out": ["Shift+KeyO"],
         "playback.play_in_to_out": ["Shift+Space"],
         "playback.toggle_loop": ["Ctrl+Shift+Space", "Ctrl+KeyL"],
-        "playback.append_timeline": ["KeyV", "KeyE"],
+        "playback.append_timeline": ["KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
         "playback.prev_edit_point": ["Alt+ArrowLeft", "ArrowUp"],
@@ -805,6 +826,9 @@ export const KEYMAP_PRESETS = {
         "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
 
+        "edit.insert": ["KeyV", "Comma"],
+        "edit.overwrite": ["KeyB", "Period"],
+        "edit.toggle_source_audio": ["Ctrl+Alt+KeyA"],
         "edit.split": ["Shift+KeyR", "KeyX"],
         "edit.ripple_trim_head": ["BracketLeft", "KeyQ"],
         "edit.ripple_trim_tail": ["BracketRight", "KeyW"],
@@ -857,7 +881,7 @@ export const KEYMAP_PRESETS = {
         "playback.goto_out": ["Shift+KeyO"],
         "playback.play_in_to_out": ["Ctrl+Shift+Space", "Shift+Space", "Alt+KeyK"],
         "playback.toggle_loop": ["Ctrl+KeyL"],
-        "playback.append_timeline": ["Period", "KeyE"],
+        "playback.append_timeline": ["KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
         "playback.prev_edit_point": ["ArrowUp"],
@@ -877,6 +901,9 @@ export const KEYMAP_PRESETS = {
         "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
 
+        "edit.insert": ["Comma"],
+        "edit.overwrite": ["Period"],
+        "edit.toggle_source_audio": ["Ctrl+Alt+KeyA"],
         "edit.split": ["Ctrl+KeyK"],
         "edit.ripple_trim_head": ["KeyQ"],
         "edit.ripple_trim_tail": ["KeyW"],
@@ -929,7 +956,7 @@ export const KEYMAP_PRESETS = {
         "playback.goto_out": ["Shift+KeyO"],
         "playback.play_in_to_out": ["Alt+Slash", "Shift+Space"],
         "playback.toggle_loop": ["Ctrl+Slash", "Ctrl+KeyL"],
-        "playback.append_timeline": ["Shift+F12", "F9", "KeyE"],
+        "playback.append_timeline": ["Shift+F12", "KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
         "playback.prev_edit_point": ["ArrowUp"],
@@ -949,6 +976,9 @@ export const KEYMAP_PRESETS = {
         "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
 
+        "edit.insert": ["F9", "Comma"],
+        "edit.overwrite": ["F10", "Period"],
+        "edit.toggle_source_audio": ["Ctrl+Alt+KeyA"],
         "edit.split": ["Ctrl+Backslash"],
         "edit.ripple_trim_head": ["Shift+BracketLeft", "KeyQ"],
         "edit.ripple_trim_tail": ["Shift+BracketRight", "KeyW"],
@@ -958,8 +988,8 @@ export const KEYMAP_PRESETS = {
         "edit.extract_in_out": ["Shift+Backspace", "Quote"],
         "edit.delete_single_stream": ["Alt+Delete", "Alt+Backspace"],
         "edit.unlink_av": ["Ctrl+Alt+KeyL"],
-        "edit.nudge_left": ["Comma"],
-        "edit.nudge_right": ["Period"],
+        "edit.nudge_left": ["Alt+ArrowLeft"],
+        "edit.nudge_right": ["Alt+ArrowRight"],
         "edit.trim_in_nudge_left": ["Shift+Comma"],
         "edit.trim_in_nudge_right": ["Shift+Period"],
         "edit.trim_out_nudge_left": ["Ctrl+Comma"],
@@ -1021,17 +1051,20 @@ export const KEYMAP_PRESETS = {
         "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
 
+        "edit.insert": ["KeyW", "Comma"],
+        "edit.overwrite": ["KeyD", "Period"],
+        "edit.toggle_source_audio": ["Ctrl+Alt+KeyA"],
         "edit.split": ["Cmd+KeyB"],
         "edit.ripple_trim_head": ["Alt+BracketLeft", "KeyQ"],
-        "edit.ripple_trim_tail": ["Alt+BracketRight", "KeyW"],
+        "edit.ripple_trim_tail": ["Alt+BracketRight"],
         "edit.lift_delete": ["Delete"],
         "edit.ripple_delete": ["Shift+Delete", "Backspace"],
         "edit.lift_in_out": ["Delete", "Semicolon"],
         "edit.extract_in_out": ["Shift+Delete", "Quote"],
         "edit.delete_single_stream": ["Alt+Delete"],
         "edit.unlink_av": ["Cmd+Shift+KeyS", "Ctrl+Shift+KeyS"],
-        "edit.nudge_left": ["Comma"],
-        "edit.nudge_right": ["Period"],
+        "edit.nudge_left": ["Alt+ArrowLeft"],
+        "edit.nudge_right": ["Alt+ArrowRight"],
         "edit.trim_in_nudge_left": ["Shift+Comma"],
         "edit.trim_in_nudge_right": ["Shift+Period"],
         "edit.trim_out_nudge_left": ["Alt+Comma"],

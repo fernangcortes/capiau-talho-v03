@@ -182,15 +182,42 @@ export class SourcePlayer {
             scrubber.addEventListener("mousedown", (e) => this.startScrubberDrag(e));
         }
 
-        // Marcadores
+        // Marcadores & Ações de Montagem 3 Pontos
         const btnIn = this.el("btn-mark-in");
         if (btnIn) btnIn.addEventListener("click", () => this.markIn());
 
         const btnOut = this.el("btn-mark-out");
         if (btnOut) btnOut.addEventListener("click", () => this.markOut());
 
+        const btnToggleAudio = this.el("btn-source-toggle-audio");
+        if (btnToggleAudio) {
+            btnToggleAudio.addEventListener("click", () => {
+                const newMode = STATE.cycleSourceStreamMode();
+                if (typeof window.showToast === "function") {
+                    const labels = {
+                        av: "Canais na inserção: ÁUDIO + VÍDEO (AV)",
+                        v: "Canais na inserção: SOMENTE VÍDEO (V)",
+                        a: "Canais na inserção: SOMENTE ÁUDIO (A)"
+                    };
+                    window.showToast(labels[newMode] || `Modo: ${newMode.toUpperCase()}`, "info");
+                }
+            });
+        }
+
+        const btnInsert = this.el("btn-source-insert");
+        if (btnInsert) btnInsert.addEventListener("click", () => this.insertAtPlayhead());
+
+        const btnOverwrite = this.el("btn-source-overwrite");
+        if (btnOverwrite) btnOverwrite.addEventListener("click", () => this.overwriteAtPlayhead());
+
         const btnAppend = this.el("btn-append-timeline");
         if (btnAppend) btnAppend.addEventListener("click", () => this.appendToTimeline());
+
+        STATE.on("sourceInsertRequested", () => this.insertAtPlayhead());
+        STATE.on("sourceOverwriteRequested", () => this.overwriteAtPlayhead());
+        STATE.on("sourceStreamModeChanged", (mode) => this.updateStreamModeUI(mode));
+        STATE.on("sourceAudioEnabledChanged", () => this.updateStreamModeUI(STATE.sourceStreamMode));
+        this.updateStreamModeUI(STATE.sourceStreamMode);
 
         // Vincula foco visual
         const panel = document.getElementById("source-player-panel");
@@ -638,6 +665,136 @@ export class SourcePlayer {
 
         STATE.markerIn = null;
         STATE.markerOut = null;
+    }
+
+    /**
+     * Extrai os dados do trecho ativo do Source Player (mídia e marcadores [IN-OUT]).
+     */
+    getSourceClipData() {
+        if (STATE.activeVideo) {
+            const vid = this.el("source-video");
+            const inSec = (STATE.markerIn !== null && STATE.markerIn !== undefined) ? Number(STATE.markerIn) : 0.0;
+            const outSec = (STATE.markerOut !== null && STATE.markerOut !== undefined) ? Number(STATE.markerOut) : (vid && vid.duration && !isNaN(vid.duration) ? vid.duration : (STATE.activeVideo.duration || 5.0));
+            if (inSec >= outSec) {
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("Ponto IN deve ser menor que o ponto OUT.", "warning");
+                }
+                return null;
+            }
+            const streamMode = STATE.sourceStreamMode || "av";
+            return {
+                type: "video",
+                id: STATE.activeVideo.id,
+                inSec,
+                outSec,
+                video: STATE.activeVideo,
+                streamMode,
+                includeAudio: streamMode === "av" || streamMode === "a",
+                includeVideo: streamMode === "av" || streamMode === "v"
+            };
+        }
+        if (STATE.activePhoto) {
+            const streamMode = STATE.sourceStreamMode || "av";
+            if (streamMode === "a") {
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("Fotos não possuem faixa de áudio.", "warning");
+                }
+                return null;
+            }
+            return {
+                type: "photo",
+                id: STATE.activePhoto.id,
+                inSec: 0,
+                outSec: 5.0,
+                photo: STATE.activePhoto,
+                streamMode: "v",
+                includeAudio: false,
+                includeVideo: true
+            };
+        }
+        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+            window.showToast("Nenhuma mídia carregada no Source Player.", "warning");
+        }
+        return null;
+    }
+
+    /**
+     * Atualiza o estado visual do botão de canais na inserção (AV / V / A).
+     */
+    updateStreamModeUI(mode) {
+        const btn = this.el("btn-source-toggle-audio");
+        if (!btn) return;
+        const currentMode = mode || STATE.sourceStreamMode || "av";
+
+        if (btn.classList) {
+            btn.classList.remove("mode-av", "mode-v", "mode-a", "active");
+            btn.classList.add(`mode-${currentMode}`);
+            if (currentMode === "av") btn.classList.add("active");
+        }
+
+        const iconAV = typeof btn.querySelector === "function" ? btn.querySelector(".stream-icon-av") : null;
+        const iconV = typeof btn.querySelector === "function" ? btn.querySelector(".stream-icon-v") : null;
+        const iconA = typeof btn.querySelector === "function" ? btn.querySelector(".stream-icon-a") : null;
+        const badge = typeof btn.querySelector === "function" ? btn.querySelector(".stream-mode-badge") : null;
+
+        if (iconAV) iconAV.style.display = currentMode === "av" ? "" : "none";
+        if (iconV) iconV.style.display = currentMode === "v" ? "" : "none";
+        if (iconA) iconA.style.display = currentMode === "a" ? "" : "none";
+
+        const descriptions = {
+            av: "Canais de Inserção: Áudio + Vídeo (AV) — Clique para alternar [Ctrl+Alt+A]",
+            v: "Canais de Inserção: Somente Vídeo (V) — Clique para alternar [Ctrl+Alt+A]",
+            a: "Canais de Inserção: Somente Áudio (A) — Clique para alternar [Ctrl+Alt+A]"
+        };
+        const tooltip = descriptions[currentMode] || `Canais: ${currentMode.toUpperCase()}`;
+        if (typeof btn.setAttribute === "function") {
+            btn.setAttribute("data-tooltip", tooltip);
+            btn.setAttribute("title", tooltip);
+        }
+        if (badge) {
+            badge.textContent = currentMode.toUpperCase();
+        }
+    }
+
+    /**
+     * Retrocompatibilidade com updateAudioToggleUI
+     */
+    updateAudioToggleUI(enabled) {
+        this.updateStreamModeUI(enabled ? "av" : "v");
+    }
+
+    /**
+     * Inserção Ripple na Agulha (tecla ','):
+     * Insere o trecho do Source Player no playhead empurrando clipes subsequentes.
+     */
+    insertAtPlayhead() {
+        const data = this.getSourceClipData();
+        if (!data) return null;
+        if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.insertSourceClipAtPlayhead === "function") {
+            const cut = TIMELINE_STATE.insertSourceClipAtPlayhead(data, true);
+            if (typeof window !== "undefined" && window.TIMELINE_INTERACTION && window.TIMELINE_INTERACTION.renderer) {
+                window.TIMELINE_INTERACTION.renderer.requestRedraw();
+            }
+            return cut;
+        }
+        return null;
+    }
+
+    /**
+     * Sobrescrita na Agulha (tecla '.'):
+     * Insere o trecho do Source Player no playhead substituindo o material sob o intervalo.
+     */
+    overwriteAtPlayhead() {
+        const data = this.getSourceClipData();
+        if (!data) return null;
+        if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.overwriteSourceClipAtPlayhead === "function") {
+            const cut = TIMELINE_STATE.overwriteSourceClipAtPlayhead(data);
+            if (typeof window !== "undefined" && window.TIMELINE_INTERACTION && window.TIMELINE_INTERACTION.renderer) {
+                window.TIMELINE_INTERACTION.renderer.requestRedraw();
+            }
+            return cut;
+        }
+        return null;
     }
 
     createOverlayContainer() {
@@ -4250,6 +4407,35 @@ export class VideoPlayer {
             if (ok && typeof window.showToast === "function") {
                 window.showToast("Extract executado no intervalo IN-OUT", "info");
             }
+            return;
+        }
+
+        // Alternar Canais da Fonte na Inserção (AV, V, A) (Ctrl+Alt+A)
+        if (KEYMAP_SERVICE.matches(e, "edit.toggle_source_audio")) {
+            e.preventDefault();
+            const newMode = STATE.cycleSourceStreamMode();
+            if (typeof window.showToast === "function") {
+                const labels = {
+                    av: "Canais na inserção: ÁUDIO + VÍDEO (AV)",
+                    v: "Canais na inserção: SOMENTE VÍDEO (V)",
+                    a: "Canais na inserção: SOMENTE ÁUDIO (A)"
+                };
+                window.showToast(labels[newMode] || `Modo: ${newMode.toUpperCase()}`, "info");
+            }
+            return;
+        }
+
+        // Inserção Ripple na Agulha (,)
+        if (KEYMAP_SERVICE.matches(e, "edit.insert")) {
+            e.preventDefault();
+            this.sourcePlayer.insertAtPlayhead();
+            return;
+        }
+
+        // Sobrescrita na Agulha (.)
+        if (KEYMAP_SERVICE.matches(e, "edit.overwrite")) {
+            e.preventDefault();
+            this.sourcePlayer.overwriteAtPlayhead();
             return;
         }
 

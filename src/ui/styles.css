@@ -2150,6 +2150,102 @@ button {
     color: var(--color-cyan) !important;
 }
 
+.player-controls .btn-edit-insert,
+.player-controls .btn-edit-overwrite {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--text-secondary);
+    font-weight: 600 !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    height: 26px !important;
+    padding: 4px 7px !important;
+    border-radius: 4px;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.player-controls .btn-edit-insert:hover {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
+    transform: scale(1.08);
+}
+.player-controls .btn-edit-overwrite:hover {
+    color: var(--color-violet) !important;
+    text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);
+    transform: scale(1.08);
+}
+
+.player-controls .btn-source-stream-mode,
+.player-controls .btn-source-audio-toggle {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--text-muted, #71717a) !important;
+    font-weight: 600 !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    height: 26px !important;
+    padding: 4px 6px !important;
+    border-radius: 4px;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    opacity: 0.85;
+}
+
+.player-controls .btn-source-stream-mode.mode-av,
+.player-controls .btn-source-audio-toggle.active {
+    color: var(--color-cyan, #06b6d4) !important;
+    opacity: 1 !important;
+    text-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+}
+
+.player-controls .btn-source-stream-mode.mode-v {
+    color: #38bdf8 !important;
+    opacity: 1 !important;
+    text-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+}
+
+.player-controls .btn-source-stream-mode.mode-a {
+    color: #10b981 !important;
+    opacity: 1 !important;
+    text-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.player-controls .btn-source-stream-mode:hover,
+.player-controls .btn-source-audio-toggle:hover {
+    filter: brightness(1.2);
+    transform: scale(1.05);
+}
+
+.player-controls .btn-source-stream-mode .stream-mode-badge {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    font-family: var(--font-mono, monospace);
+    padding: 1px 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    line-height: 1;
+}
+
+.player-controls .btn-source-stream-mode.mode-av .stream-mode-badge {
+    background: rgba(6, 182, 212, 0.16);
+    color: var(--color-cyan, #06b6d4);
+}
+
+.player-controls .btn-source-stream-mode.mode-v .stream-mode-badge {
+    background: rgba(56, 189, 248, 0.16);
+    color: #38bdf8;
+}
+
+.player-controls .btn-source-stream-mode.mode-a .stream-mode-badge {
+    background: rgba(16, 185, 129, 0.16);
+    color: #10b981;
+}
+
 /* Custom Flat Resolution Selector */
 .player-controls .dropdown-wrapper {
     background: transparent !important;

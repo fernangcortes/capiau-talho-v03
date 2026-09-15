@@ -3414,6 +3414,292 @@ export class CapiauTimelineState {
     }
 
     /**
+     * Inserção de Três Pontos: Insere o trecho ativo do Source Player na agulha da timeline.
+     * Suporta Inserção Ripple (isRipple = true, tecla ',') empurrando clipes subsequentes,
+     * ou Sobrescrita (isRipple = false, tecla '.') substituindo o material sob o intervalo.
+     * Avança a agulha automaticamente para o final do trecho inserido (Continuous Storytelling Edit).
+     * 
+     * @param {Object|null} [sourceData=null] Dados opcionais do clipe (caso venha de teste ou evento)
+     * @param {boolean} [isRipple=true] true para Ripple Insert, false para Overwrite Edit
+     * @returns {Object|null} Objeto contendo o clipe criado e status da operação
+     */
+    insertSourceClipAtPlayhead(sourceData = null, isRipple = true) {
+        let mediaType = sourceData?.type || (STATE.activeVideo ? "video" : (STATE.activePhoto ? "photo" : null));
+        let mediaId = sourceData?.id || (mediaType === "video" ? STATE.activeVideo?.id : STATE.activePhoto?.id);
+
+        if (!mediaType || !mediaId) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Nenhuma mídia selecionada no Source Player.", "warning");
+            }
+            return null;
+        }
+
+        const isVideo = mediaType === "video";
+        const videoObj = isVideo ? ((STATE.allVideos || []).find(v => v.id === mediaId) || STATE.activeVideo) : null;
+        const photoObj = !isVideo ? ((STATE.allPhotos || []).find(p => p.id === mediaId) || STATE.activePhoto) : null;
+
+        // Auto-configuração no primeiro clipe da timeline se vazia
+        if ((STATE.activeTimelineCuts || []).length === 0 && videoObj) {
+            let w = 1920, h = 1080;
+            if (videoObj.resolution && videoObj.resolution.includes("x")) {
+                const parts = videoObj.resolution.split("x").map(Number);
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    w = parts[0];
+                    h = parts[1];
+                }
+            }
+            const fps = parseFloat(videoObj.fps) || 24;
+            this.width = w;
+            this.height = h;
+            this.fps = fps;
+            STATE.emit("timelineFpsChanged", this.fps);
+            STATE.emit("timelinePropertiesChanged", { width: w, height: h, fps });
+        }
+
+        const fps = this.fps || 24;
+
+        // 1. Determinação de In / Out (Frames e Segundos)
+        let inFrame = 0;
+        let outFrame = 0;
+
+        if (sourceData && sourceData.inFrame !== undefined && sourceData.outFrame !== undefined) {
+            inFrame = Math.max(0, Math.round(sourceData.inFrame));
+            outFrame = Math.max(inFrame + 1, Math.round(sourceData.outFrame));
+        } else {
+            let inSec = 0.0;
+            let outSec = 5.0;
+
+            if (sourceData && (sourceData.inSec !== undefined || sourceData.outSec !== undefined)) {
+                inSec = sourceData.inSec !== undefined && sourceData.inSec !== null ? Number(sourceData.inSec) : 0.0;
+                outSec = sourceData.outSec !== undefined && sourceData.outSec !== null ? Number(sourceData.outSec) : (isVideo ? (videoObj?.duration || 5.0) : PHOTO_DEFAULT_DURATION);
+            } else {
+                inSec = (STATE.markerIn !== null && STATE.markerIn !== undefined) ? Number(STATE.markerIn) : 0.0;
+                if (STATE.markerOut !== null && STATE.markerOut !== undefined) {
+                    outSec = Number(STATE.markerOut);
+                } else if (isVideo) {
+                    const srcVidEl = (typeof document !== "undefined") ? document.getElementById("source-video") : null;
+                    outSec = (srcVidEl && srcVidEl.duration && !isNaN(srcVidEl.duration)) ? srcVidEl.duration : (videoObj?.duration || 5.0);
+                } else {
+                    outSec = PHOTO_DEFAULT_DURATION;
+                }
+            }
+
+            if (outSec <= inSec) {
+                outSec = inSec + (isVideo ? (videoObj?.duration || 5.0) : PHOTO_DEFAULT_DURATION);
+            }
+
+            inFrame = Math.max(0, Math.round(inSec * fps));
+            outFrame = Math.max(inFrame + 1, Math.round(outSec * fps));
+        }
+
+        const durFrames = outFrame - inFrame;
+        const actualInSec = inFrame / fps;
+        const actualOutSec = outFrame / fps;
+
+        // 2. Determinação do Modo de Inserção (AV, V ou A) e Pistas Alvo
+        let streamMode = sourceData?.streamMode;
+        if (!streamMode) {
+            if (sourceData?.includeAudio !== undefined && sourceData?.includeVideo !== undefined) {
+                if (sourceData.includeVideo && sourceData.includeAudio) streamMode = "av";
+                else if (sourceData.includeVideo) streamMode = "v";
+                else if (sourceData.includeAudio) streamMode = "a";
+                else streamMode = "av";
+            } else if (sourceData?.includeAudio !== undefined) {
+                streamMode = sourceData.includeAudio ? "av" : "v";
+            } else if (sourceData?.includeVideo !== undefined) {
+                streamMode = sourceData.includeVideo ? "av" : "a";
+            } else if (typeof STATE !== "undefined" && STATE.sourceStreamMode) {
+                streamMode = STATE.sourceStreamMode;
+            } else {
+                streamMode = "av";
+            }
+        }
+
+        // Fotos não têm áudio
+        if (!isVideo && streamMode === "a") {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Fotos não possuem faixa de áudio.", "warning");
+            }
+            return null;
+        }
+
+        let shouldInsertVideo = isVideo ? (streamMode === "av" || streamMode === "v") : true;
+        let shouldInsertAudio = isVideo && (streamMode === "av" || streamMode === "a");
+
+        if (sourceData && sourceData.targetAudioTrack === null) {
+            shouldInsertAudio = false;
+        }
+        if (sourceData && sourceData.targetTrack === null) {
+            shouldInsertVideo = false;
+        }
+
+        let targetVideoTrack = shouldInsertVideo ? (sourceData?.targetTrack || null) : null;
+        let targetAudioTrack = shouldInsertAudio ? (sourceData?.targetAudioTrack || undefined) : null;
+
+        if (shouldInsertVideo && !targetVideoTrack) {
+            if (this.selectedTrack && this.trackKindOf(this.selectedTrack) === "video") {
+                targetVideoTrack = this.selectedTrack;
+            } else {
+                const vidTracks = this.getVideoTracks().filter(t => !t.locked);
+                targetVideoTrack = (vidTracks.find(t => t.id === "V1") || vidTracks[0] || { id: "V1" }).id;
+            }
+        }
+
+        if (shouldInsertAudio && targetAudioTrack === undefined) {
+            if (this.selectedTrack && this.trackKindOf(this.selectedTrack) === "audio") {
+                targetAudioTrack = this.selectedTrack;
+            } else {
+                const baseVid = targetVideoTrack || (this.selectedTrack && this.trackKindOf(this.selectedTrack) === "video" ? this.selectedTrack : "V1");
+                targetAudioTrack = this.pairedAudioTrackId(baseVid) || "A1";
+            }
+        }
+
+        // 3. Verificação de Pistas Travadas (Track Locks)
+        const isVidLocked = (shouldInsertVideo && targetVideoTrack) ? (this.tracks ? this.tracks.some(t => t.id === targetVideoTrack && t.locked) : false) : false;
+        const isAudLocked = (shouldInsertAudio && targetAudioTrack) ? (this.tracks ? this.tracks.some(t => t.id === targetAudioTrack && t.locked) : false) : false;
+
+        // Se todas as pistas alvos pretendidas estiverem travadas:
+        if ((shouldInsertVideo && shouldInsertAudio && isVidLocked && isAudLocked) ||
+            (shouldInsertVideo && !shouldInsertAudio && isVidLocked) ||
+            (shouldInsertAudio && !shouldInsertVideo && isAudLocked)) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("A(s) pista(s) de destino estão bloqueadas.", "warning");
+            }
+            return null;
+        }
+
+        // 4. Posição da Agulha (Playhead Frame)
+        const startFrame = (this.playheadFrame !== null && this.playheadFrame !== undefined) ? Math.max(0, Math.round(this.playheadFrame)) : 0;
+
+        // 5. Execução Atômica no Histórico (Undo / Redo)
+        const stamp = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        const linkId = (shouldInsertVideo && !isVidLocked && shouldInsertAudio && !isAudLocked) ? `link_${stamp}` : null;
+        let createdCut = null;
+
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+            let workingCuts = [...currentCuts];
+            const splitLinkMap = new Map();
+
+            if (isRipple) {
+                // Modo Inserção Ripple (,): empurra clipes subsequentes e fatia clipes sob a agulha
+                if (shouldInsertVideo && !isVidLocked && targetVideoTrack) {
+                    workingCuts = this.rippleInsertTimeRange(targetVideoTrack, startFrame, durFrames, [], workingCuts, splitLinkMap);
+                }
+                if (shouldInsertAudio && !isAudLocked && targetAudioTrack) {
+                    workingCuts = this.rippleInsertTimeRange(targetAudioTrack, startFrame, durFrames, [], workingCuts, splitLinkMap);
+                }
+            } else {
+                // Modo Sobrescrita (.): substitui / fatia o material existente no intervalo [startFrame, startFrame + durFrames)
+                if (shouldInsertVideo && !isVidLocked && targetVideoTrack) {
+                    workingCuts = this.overwriteTimeRange(targetVideoTrack, startFrame, durFrames, [], workingCuts, splitLinkMap);
+                }
+                if (shouldInsertAudio && !isAudLocked && targetAudioTrack) {
+                    workingCuts = this.overwriteTimeRange(targetAudioTrack, startFrame, durFrames, [], workingCuts, splitLinkMap);
+                }
+            }
+
+            // Inserção dos novos cortes
+            if (isVideo) {
+                if (shouldInsertVideo && !isVidLocked && targetVideoTrack) {
+                    createdCut = {
+                        id: `cut_${stamp}`,
+                        type: "video",
+                        video_id: mediaId,
+                        inFrame: inFrame,
+                        outFrame: outFrame,
+                        in: actualInSec,
+                        out: actualOutSec,
+                        track: targetVideoTrack,
+                        timelineStartFrame: startFrame,
+                        timeline_start: startFrame / fps,
+                        link_id: linkId
+                    };
+                    workingCuts.push(createdCut);
+                }
+
+                if (shouldInsertAudio && !isAudLocked && targetAudioTrack) {
+                    const audioCut = {
+                        id: `cut_${stamp}_a`,
+                        type: "video",
+                        video_id: mediaId,
+                        inFrame: inFrame,
+                        outFrame: outFrame,
+                        in: actualInSec,
+                        out: actualOutSec,
+                        track: targetAudioTrack,
+                        timelineStartFrame: startFrame,
+                        timeline_start: startFrame / fps,
+                        link_id: linkId
+                    };
+                    if (!createdCut) createdCut = audioCut;
+                    workingCuts.push(audioCut);
+                }
+            } else {
+                // Foto (Still)
+                if (!isVidLocked) {
+                    createdCut = {
+                        id: `cut_${stamp}`,
+                        type: "photo",
+                        photo_id: mediaId,
+                        video_id: null,
+                        inFrame: 0,
+                        outFrame: durFrames,
+                        in: 0,
+                        out: durFrames / fps,
+                        track: targetVideoTrack,
+                        timelineStartFrame: startFrame,
+                        timeline_start: startFrame / fps,
+                        link_id: null,
+                        effects: [{ type: "fit", mode: "fill" }]
+                    };
+                    workingCuts.push(createdCut);
+                }
+            }
+
+            STATE.activeTimelineCuts = workingCuts;
+
+            // 6. Avanço Automático da Agulha (Continuous Storytelling Edit)
+            const newPlayheadFrame = startFrame + durFrames;
+            this.setPlayheadFrame(newPlayheadFrame);
+
+            // Seleciona o novo clipe inserido
+            if (createdCut) {
+                this.selectedClipId = createdCut.id;
+                this.selectedClipIds = new Set([createdCut.id]);
+                this.selectedTrack = createdCut.track;
+                STATE.emit("timelineClipSelected", createdCut.id);
+            }
+        });
+
+        // Garante visibilidade da agulha na viewport
+        if (typeof window !== "undefined" && window.TIMELINE_INTERACTION && typeof window.TIMELINE_INTERACTION.ensureFrameVisible === "function") {
+            window.TIMELINE_INTERACTION.ensureFrameVisible(startFrame + durFrames);
+        }
+
+        // Foco e Notificação
+        if (typeof window !== "undefined") {
+            window.activeFocusedPlayer = "program";
+        }
+        const mediaTitle = isVideo ? (videoObj?.title || videoObj?.filename || "Vídeo") : (photoObj?.title || photoObj?.filename || "Foto");
+        const modeLabel = isRipple ? "inserido com Ripple (,)" : "sobrescrito (.)";
+        STATE.emit("statusChanged", { text: `"${mediaTitle}" ${modeLabel} na agulha.`, active: true });
+        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+            window.showToast(`${isVideo ? 'Vídeo' : 'Foto'} ${modeLabel}!`, "success");
+        }
+
+        return createdCut;
+    }
+
+    /**
+     * Sobrescrita de Três Pontos (Overwrite Edit — tecla '.'):
+     * Insere o trecho do Source na agulha substituindo o material sob o intervalo sem empurrar a cauda.
+     */
+    overwriteSourceClipAtPlayhead(sourceData = null) {
+        return this.insertSourceClipAtPlayhead(sourceData, false);
+    }
+
+    /**
      * Adiciona um novo corte à timeline de forma compatível e reativa.
      */
     addCut(videoId, inSec, outSec, track = null, timelineStartFrame = null) {
@@ -4834,7 +5120,8 @@ class TimelineHistory {
             inFrame: TIMELINE_STATE.inFrame,
             outFrame: TIMELINE_STATE.outFrame,
             markers: TIMELINE_STATE.markers || [],
-            selectedMarkerIds: Array.from(TIMELINE_STATE.selectedMarkerIds || [])
+            selectedMarkerIds: Array.from(TIMELINE_STATE.selectedMarkerIds || []),
+            playheadFrame: (TIMELINE_STATE.playheadFrame !== undefined && TIMELINE_STATE.playheadFrame !== null) ? TIMELINE_STATE.playheadFrame : 0
         }));
     }
 
@@ -4886,6 +5173,13 @@ class TimelineHistory {
             TIMELINE_STATE.markers = JSON.parse(JSON.stringify(snap.markers));
             TIMELINE_STATE.selectedMarkerIds = new Set(snap.selectedMarkerIds || []);
             STATE.emit("timelineMarkersChanged", TIMELINE_STATE.markers);
+        }
+        if (snap.playheadFrame !== undefined && snap.playheadFrame !== null) {
+            if (typeof TIMELINE_STATE.setPlayheadFrame === "function") {
+                TIMELINE_STATE.setPlayheadFrame(snap.playheadFrame);
+            } else {
+                TIMELINE_STATE.playheadFrame = snap.playheadFrame;
+            }
         }
         STATE.emit("timelineInOutChanged", { inFrame: TIMELINE_STATE.inFrame, outFrame: TIMELINE_STATE.outFrame });
         STATE.emit("timelineGhostUpdated", TIMELINE_STATE.ghostTrack);

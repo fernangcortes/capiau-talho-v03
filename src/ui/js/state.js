@@ -54,6 +54,15 @@ class AppState extends EventEmitter {
         this._openFolders = new Set();
         this._currentPhotoList = [];
         this._currentPhotoIndex = -1;
+
+        // Inserção do Source Player: canais da fonte (av = vídeo e áudio, v = apenas vídeo, a = apenas áudio)
+        const savedStreamMode = (typeof localStorage !== "undefined" && localStorage.getItem)
+            ? localStorage.getItem("capiau_source_stream_mode")
+            : null;
+        this._sourceStreamMode = (savedStreamMode === "av" || savedStreamMode === "v" || savedStreamMode === "a")
+            ? savedStreamMode
+            : "av";
+        this._sourceAudioEnabled = this._sourceStreamMode !== "v";
     }
 
     // -- Getters e Setters com Emissão de Eventos de mudança
@@ -276,6 +285,36 @@ class AppState extends EventEmitter {
     set currentPhotoList(val) { this._currentPhotoList = val; }
     get currentPhotoIndex() { return this._currentPhotoIndex; }
     set currentPhotoIndex(val) { this._currentPhotoIndex = val; }
+
+    get sourceStreamMode() { return this._sourceStreamMode || "av"; }
+    set sourceStreamMode(val) {
+        const mode = (val === "av" || val === "v" || val === "a") ? val : "av";
+        this._sourceStreamMode = mode;
+        this._sourceAudioEnabled = mode !== "v";
+        try {
+            if (typeof localStorage !== "undefined" && localStorage.setItem) {
+                localStorage.setItem("capiau_source_stream_mode", mode);
+                localStorage.setItem("capiau_source_audio_enabled", this._sourceAudioEnabled ? "true" : "false");
+            }
+        } catch (_) {}
+        this.emit("sourceStreamModeChanged", mode);
+        this.emit("sourceAudioEnabledChanged", this._sourceAudioEnabled);
+    }
+    cycleSourceStreamMode() {
+        const modes = ["av", "v", "a"];
+        const nextIdx = (modes.indexOf(this.sourceStreamMode) + 1) % modes.length;
+        this.sourceStreamMode = modes[nextIdx];
+        return this.sourceStreamMode;
+    }
+
+    get sourceAudioEnabled() { return this.sourceStreamMode !== "v"; }
+    set sourceAudioEnabled(val) {
+        this.sourceStreamMode = val ? "av" : "v";
+    }
+    toggleSourceAudio() {
+        this.sourceAudioEnabled = !this.sourceAudioEnabled;
+        return this.sourceAudioEnabled;
+    }
 }
 
 export const STATE = new AppState();
