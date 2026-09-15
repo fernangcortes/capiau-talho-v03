@@ -3735,6 +3735,9 @@ export class WorkspaceManager {
                 const activeTag = win.document.activeElement?.tagName?.toLowerCase();
                 if (activeTag === "input" || activeTag === "textarea") return;
                 
+                if (window.isAnyModalOpen && window.isAnyModalOpen(win.document)) return;
+                if (window.FaceManager && window.FaceManager.inspectorCard) return;
+
                 if (window.player && typeof window.player.handleGlobalKeyboard === "function") {
                     window.player.handleGlobalKeyboard(e);
                 }
@@ -3953,6 +3956,9 @@ export class WorkspaceManager {
                 const activeTag = win.document.activeElement?.tagName?.toLowerCase();
                 if (activeTag === "input" || activeTag === "textarea") return;
                 
+                if (window.isAnyModalOpen && window.isAnyModalOpen(win.document)) return;
+                if (window.FaceManager && window.FaceManager.inspectorCard) return;
+
                 if (window.player && typeof window.player.handleGlobalKeyboard === "function") {
                     window.player.handleGlobalKeyboard(e);
                 }

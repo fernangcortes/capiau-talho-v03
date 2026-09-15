@@ -63,9 +63,239 @@ export class FaceManager {
         }
     }
 
+    static getActiveDoc() {
+        const leftSidebar = getActiveElement("sidebar-left");
+        if (leftSidebar && leftSidebar.ownerDocument) {
+            return leftSidebar.ownerDocument;
+        }
+        return document;
+    }
+
+    static getActiveWin() {
+        const doc = this.getActiveDoc();
+        return doc.defaultView || window;
+    }
+
+    static adoptModals(targetDoc) {
+        if (!targetDoc || targetDoc === document) return;
+        const modalIds = [
+            "face-group-manager-modal",
+            "fullscreen-faces-disambiguation",
+            "face-disambiguation-modal",
+            "names-manager-modal",
+            "entities-manager-modal",
+            "face-inspector-overlay"
+        ];
+        modalIds.forEach(id => {
+            const el = document.getElementById(id) || targetDoc.getElementById(id);
+            if (el && el.ownerDocument !== targetDoc) {
+                try {
+                    targetDoc.adoptNode(el);
+                    targetDoc.body.appendChild(el);
+                } catch (err) {
+                    console.warn("[FaceManager] Erro ao adotar modal no popout:", id, err);
+                }
+            }
+        });
+    }
+
+    static restoreModals(mainDoc = document) {
+        const modalIds = [
+            "face-group-manager-modal",
+            "fullscreen-faces-disambiguation",
+            "face-disambiguation-modal",
+            "names-manager-modal",
+            "entities-manager-modal",
+            "face-inspector-overlay"
+        ];
+        for (const name in window.popoutWindows) {
+            const win = window.popoutWindows[name];
+            if (win && win.document) {
+                modalIds.forEach(id => {
+                    const el = win.document.getElementById(id);
+                    if (el && el.ownerDocument !== mainDoc) {
+                        try {
+                            mainDoc.adoptNode(el);
+                            mainDoc.body.appendChild(el);
+                        } catch (err) {
+                            console.warn("[FaceManager] Erro ao restaurar modal para o doc principal:", id, err);
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    static bindKeyboardEvents(win) {
+        if (!win || win._hasFaceKeyboardListener) return;
+        win._hasFaceKeyboardListener = true;
+        win.addEventListener("keydown", (e) => {
+            this.handleKeyboard(e, win);
+        }, { capture: true });
+        win.addEventListener("keyup", (e) => {
+            if (e.code === "Space" || e.key === " ") {
+                if (this.fiSpace) {
+                    this.fiSpace = false;
+                    this.fiPanning = false;
+                    this._inspectorEl?.querySelector(".fi-media")?.classList.remove("space-mode", "is-panning");
+                }
+            }
+        }, { capture: true });
+    }
+
+    static handleKeyboard(e, targetWin = window) {
+        const doc = targetWin?.document || document;
+
+        // Com o Inspetor aberto, ele captura a navegação — mesmo com foco num
+        // input e independente do estado dos modais atrás dele.
+        if (this.inspectorCard) {
+            if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); this.closeInspector(); return true; }
+            if (e.key === "a" || e.key === "A") { e.preventDefault(); e.stopPropagation(); this.advanceInspector(); return true; }
+            if (e.key === "s" || e.key === "S") { e.preventDefault(); e.stopPropagation(); this.regressInspector(); return true; }
+            
+            // Na Fase 3 (Dinâmica Temporal)
+            if (this.inspectorState === 3 && this._temporalData) {
+                if (this._temporalData.type === "photo") {
+                    if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+                        e.preventDefault(); e.stopPropagation();
+                        this.stepInspector(e.key === "ArrowLeft" ? -1 : 1);
+                        return true;
+                    }
+                    if (e.key === "ArrowLeft") { e.preventDefault(); e.stopPropagation(); this.stepFilmstrip(-1); return true; }
+                    if (e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); this.stepFilmstrip(1); return true; }
+                } else if (this._temporalData.type === "video") {
+                    if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+                        e.preventDefault(); e.stopPropagation();
+                        this.stepInspector(e.key === "ArrowLeft" ? -1 : 1);
+                        return true;
+                    }
+                    if (e.key === "ArrowLeft") { e.preventDefault(); e.stopPropagation(); this.scrubVideoDelta(-0.1); return true; }
+                    if (e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); this.scrubVideoDelta(0.1); return true; }
+                    if (e.code === "Space" || e.key === " ") {
+                        e.preventDefault(); e.stopPropagation();
+                        this.toggleVideoLoop();
+                        return true;
+                    }
+                }
+            }
+
+            if (e.key === "ArrowLeft")  { e.preventDefault(); e.stopPropagation(); this.stepInspector(-1); return true; }
+            if (e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); this.stepInspector(1);  return true; }
+            if (e.code === "Space" || e.key === " ") {
+                // Segurar espaço = modo mover (arraste). keyup limpa o modo.
+                e.preventDefault(); e.stopPropagation();
+                if (!this.fiSpace) {
+                    this.fiSpace = true;
+                    this._inspectorEl?.querySelector(".fi-media")?.classList.add("space-mode");
+                }
+                return true;
+            }
+            return true; // enquanto inspeciona, o Inspetor consome as demais teclas
+        }
+
+        const fsModal = getActiveElement("fullscreen-faces-disambiguation");
+        const diagModal = getActiveElement("face-disambiguation-modal");
+        const groupModal = getActiveElement("face-group-manager-modal");
+        const namesModal = getActiveElement("names-manager-modal");
+        const entitiesModal = getActiveElement("entities-manager-modal");
+        const isFsOpen = fsModal && fsModal.style.display !== "none";
+        const isDiagOpen = diagModal && diagModal.style.display !== "none";
+        const isGroupOpen = groupModal && groupModal.style.display !== "none";
+        const isNamesOpen = namesModal && namesModal.style.display !== "none";
+        const isEntitiesOpen = entitiesModal && entitiesModal.style.display !== "none";
+
+        // Se o usuário pressionar Escape em algum dos modais de rostos / entidades:
+        if (e.key === "Escape") {
+            if (isGroupOpen) { e.preventDefault(); e.stopPropagation(); this.closeGroupManagerModal(); return true; }
+            if (isNamesOpen) { e.preventDefault(); e.stopPropagation(); this.closeNamesManagerModal(); return true; }
+            if (isEntitiesOpen) { e.preventDefault(); e.stopPropagation(); if (window.EntityManager) window.EntityManager.closeEntitiesModal(); return true; }
+            if (isFsOpen) { e.preventDefault(); e.stopPropagation(); this.closeFullscreenDisambiguation(); return true; }
+            if (isDiagOpen) { e.preventDefault(); e.stopPropagation(); this.closeDisambiguationModal(); return true; }
+        }
+
+        const isFacesTabActive = !!(
+            doc.querySelector("#sidebar-left #tab-faces.active") ||
+            getActiveElement("sidebar-left")?.querySelector("#tab-faces.active")
+        );
+
+        if (!isFsOpen && !isDiagOpen && !isGroupOpen && !isNamesOpen && !isEntitiesOpen && !isFacesTabActive) {
+            return false;
+        }
+
+        // Ignore if typing in an input/textarea/select
+        const activeEl = doc.activeElement || document.activeElement;
+        const activeTag = activeEl?.tagName;
+        if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT" || activeEl?.isContentEditable) {
+            return false;
+        }
+
+        // Ctrl+A / Cmd+A no gerenciador de grupo de rostos: seleciona / desseleciona todos
+        if (isGroupOpen && (e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+            e.preventDefault(); e.stopPropagation();
+            const grid = groupModal?.querySelector("#group-manager-faces-grid");
+            const cards = Array.from(grid?.querySelectorAll(".group-manager-face-card") || []);
+            if (cards.length > 0) {
+                const allSelected = cards.every(c => c.classList.contains("selected"));
+                const targetState = !allSelected;
+                cards.forEach(c => {
+                    c.classList.toggle("selected", targetState);
+                    const badge = c.querySelector(".group-manager-face-select-badge i");
+                    if (badge) badge.style.display = targetState ? "block" : "none";
+                });
+                this.updateGroupManagerBulkBar();
+            }
+            return true;
+        }
+
+        // Card alvo: o que está sob o mouse (hoveredCard) ou selecionado
+        let targetCard = this.hoveredCard;
+        if (!targetCard) {
+            const docList = [doc];
+            if (!docList.includes(document)) docList.push(document);
+            for (const name in window.popoutWindows) {
+                const pWin = window.popoutWindows[name];
+                if (pWin && !pWin.closed && pWin.document && !docList.includes(pWin.document)) {
+                    docList.push(pWin.document);
+                }
+            }
+            const selector = ".fullscreen-face-card:hover, .disambiguation-item:hover, .group-manager-face-card:hover, .face-cluster-card:hover, .fullscreen-face-card.selected, .disambiguation-item.selected, .group-manager-face-card.selected, .face-cluster-card.selected";
+            for (const d of docList) {
+                try {
+                    const found = d.querySelector(selector);
+                    if (found) { targetCard = found; break; }
+                } catch (_) {}
+            }
+        }
+
+        // Atalho 'a' / 'A': abre o Inspetor de Rosto no card alvo (apenas sem modificadores)
+        if ((e.key === "a" || e.key === "A") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (targetCard) {
+                e.preventDefault(); e.stopPropagation();
+                this.openInspector(targetCard);
+                return true;
+            }
+        }
+
+        const selected = doc.querySelectorAll(".fullscreen-face-card.selected");
+        if (selected.length > 0 && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && e.key !== "a" && e.key !== "A") {
+            const bulkInput = getActiveElement("bulk-face-input");
+            if (bulkInput) {
+                bulkInput.focus();
+                bulkInput.value = e.key;
+                e.preventDefault(); e.stopPropagation();
+                bulkInput.dispatchEvent(new Event('input', { bubbles: true }));
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     static onPopoutReady(win) {
         if (!win || !win.document) return;
+        this.adoptModals(win.document);
         this.bindToolbarEvents(win.document);
+        this.bindKeyboardEvents(win);
         this.updateSpeakersDatalist(this.allSpeakers || []);
         const activeTab = win.document.querySelector("#sidebar-left .tab-content.active")?.id;
         if (activeTab === "tab-faces" || !this.allClusters) {
@@ -76,6 +306,7 @@ export class FaceManager {
     }
 
     static onPopoutRestored() {
+        this.restoreModals(document);
         this.bindToolbarEvents(document);
         this.updateSpeakersDatalist(this.allSpeakers || []);
         const activeTab = document.querySelector("#sidebar-left .tab-content.active")?.id;
@@ -88,178 +319,61 @@ export class FaceManager {
 
     static init() {
         this.bindToolbarEvents(document);
+        this.bindKeyboardEvents(window);
 
-        // Atalhos de teclado: busca rápida + Inspetor de Rosto (atalho 'a')
-        document.addEventListener("keydown", (e) => {
-            // Com o Inspetor aberto, ele captura a navegação — mesmo com foco num
-            // input e independente do estado dos modais atrás dele.
-            if (this.inspectorCard) {
-                if (e.key === "Escape") { e.preventDefault(); this.closeInspector(); return; }
-                if (e.key === "a" || e.key === "A") { e.preventDefault(); this.advanceInspector(); return; }
-                if (e.key === "s" || e.key === "S") { e.preventDefault(); this.regressInspector(); return; }
-                
-                // Na Fase 3 (Dinâmica Temporal)
-                if (this.inspectorState === 3 && this._temporalData) {
-                    if (this._temporalData.type === "photo") {
-                        if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-                            e.preventDefault();
-                            this.stepInspector(e.key === "ArrowLeft" ? -1 : 1);
-                            return;
-                        }
-                        if (e.key === "ArrowLeft") { e.preventDefault(); this.stepFilmstrip(-1); return; }
-                        if (e.key === "ArrowRight") { e.preventDefault(); this.stepFilmstrip(1); return; }
-                    } else if (this._temporalData.type === "video") {
-                        if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-                            e.preventDefault();
-                            this.stepInspector(e.key === "ArrowLeft" ? -1 : 1);
-                            return;
-                        }
-                        if (e.key === "ArrowLeft") { e.preventDefault(); this.scrubVideoDelta(-0.1); return; }
-                        if (e.key === "ArrowRight") { e.preventDefault(); this.scrubVideoDelta(0.1); return; }
-                        if (e.code === "Space" || e.key === " ") {
-                            e.preventDefault();
-                            this.toggleVideoLoop();
-                            return;
-                        }
-                    }
-                }
-
-                if (e.key === "ArrowLeft")  { e.preventDefault(); this.stepInspector(-1); return; }
-                if (e.key === "ArrowRight") { e.preventDefault(); this.stepInspector(1);  return; }
-                if (e.code === "Space" || e.key === " ") {
-                    // Segurar espaço = modo mover (arraste). keyup limpa o modo.
-                    e.preventDefault();
-                    if (!this.fiSpace) {
-                        this.fiSpace = true;
-                        this._inspectorEl.querySelector(".fi-media").classList.add("space-mode");
-                    }
-                    return;
-                }
-                return; // enquanto inspeciona, o Inspetor consome as demais teclas
-            }
-
-            const fsModal = document.getElementById("fullscreen-faces-disambiguation");
-            const diagModal = document.getElementById("face-disambiguation-modal");
-            const groupModal = document.getElementById("face-group-manager-modal");
-            const namesModal = document.getElementById("names-manager-modal");
-            const entitiesModal = document.getElementById("entities-manager-modal");
-            const isFsOpen = fsModal && fsModal.style.display !== "none";
-            const isDiagOpen = diagModal && diagModal.style.display !== "none";
-            const isGroupOpen = groupModal && groupModal.style.display !== "none";
-            const isNamesOpen = namesModal && namesModal.style.display !== "none";
-            const isEntitiesOpen = entitiesModal && entitiesModal.style.display !== "none";
-
-            // Se o usuário pressionar Escape em algum dos modais de rostos / entidades:
-            if (e.key === "Escape") {
-                if (isGroupOpen) { e.preventDefault(); this.closeGroupManagerModal(); return; }
-                if (isNamesOpen) { e.preventDefault(); this.closeNamesManagerModal(); return; }
-                if (isEntitiesOpen) { e.preventDefault(); if (window.EntityManager) window.EntityManager.closeEntitiesModal(); return; }
-                if (isFsOpen) { e.preventDefault(); this.closeFullscreenDisambiguation(); return; }
-                if (isDiagOpen) { e.preventDefault(); this.closeDisambiguationModal(); return; }
-            }
-
-            if (!isFsOpen && !isDiagOpen && !isGroupOpen && !isNamesOpen && !isEntitiesOpen) return;
-
-            // Ignore if typing in an input/textarea/select
-            const activeTag = document.activeElement?.tagName;
-            if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT" || document.activeElement?.isContentEditable) return;
-
-            // Ctrl+A / Cmd+A no gerenciador de grupo de rostos: seleciona / desseleciona todos
-            if (isGroupOpen && (e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
-                e.preventDefault();
-                const cards = Array.from(document.querySelectorAll("#group-manager-faces-grid .group-manager-face-card"));
-                if (cards.length > 0) {
-                    const allSelected = cards.every(c => c.classList.contains("selected"));
-                    const targetState = !allSelected;
-                    cards.forEach(c => {
-                        c.classList.toggle("selected", targetState);
-                        const badge = c.querySelector(".group-manager-face-select-badge i");
-                        if (badge) badge.style.display = targetState ? "block" : "none";
-                    });
-                    this.updateGroupManagerBulkBar();
-                }
-                return;
-            }
-
-            // Card alvo: o que está sob o mouse ou selecionado
-            const targetCard = this.hoveredCard || document.querySelector(".fullscreen-face-card:hover, .disambiguation-item:hover, .group-manager-face-card:hover, .fullscreen-face-card.selected, .disambiguation-item.selected, .group-manager-face-card.selected");
-
-            // Atalho 'a' / 'A': abre o Inspetor de Rosto no card alvo (apenas sem modificadores)
-            if ((e.key === "a" || e.key === "A") && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                if (targetCard) {
-                    e.preventDefault();
-                    this.openInspector(targetCard);
-                    return;
-                }
-            }
-
-            const selected = document.querySelectorAll(".fullscreen-face-card.selected");
-            if (selected.length > 0 && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && e.key !== "a" && e.key !== "A") {
-                const bulkInput = document.getElementById("bulk-face-input");
-                if (bulkInput) {
-                    bulkInput.focus();
-                    bulkInput.value = e.key;
-                    e.preventDefault(); // prevent double insertion of key
-                    bulkInput.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-            }
-        });
-
-
-
-        const btnCloseFullscreen = document.getElementById("btn-close-fullscreen-faces");
+        const btnCloseFullscreen = getActiveElement("btn-close-fullscreen-faces");
         if (btnCloseFullscreen) {
             btnCloseFullscreen.addEventListener("click", () => this.closeFullscreenDisambiguation());
         }
 
         // Close disambiguation modal event
-        const btnCloseDisambiguation = document.getElementById("btn-close-disambiguation");
+        const btnCloseDisambiguation = getActiveElement("btn-close-disambiguation");
         if (btnCloseDisambiguation) {
             btnCloseDisambiguation.addEventListener("click", () => this.closeDisambiguationModal());
         }
 
         // --- Group Manager Modal Bindings ---
-        const btnCloseGroupManager = document.getElementById("btn-close-group-manager");
+        const btnCloseGroupManager = getActiveElement("btn-close-group-manager");
         if (btnCloseGroupManager) {
             btnCloseGroupManager.addEventListener("click", () => this.closeGroupManagerModal());
         }
 
-        const btnGroupDissolveAll = document.getElementById("btn-group-dissolve-all");
+        const btnGroupDissolveAll = getActiveElement("btn-group-dissolve-all");
         if (btnGroupDissolveAll) {
             btnGroupDissolveAll.addEventListener("click", () => this.dissolveGroup(this.activeGroupCluster));
         }
 
-        const btnGroupConfirmAll = document.getElementById("btn-group-confirm-all");
+        const btnGroupConfirmAll = getActiveElement("btn-group-confirm-all");
         if (btnGroupConfirmAll) {
             btnGroupConfirmAll.addEventListener("click", () => this.confirmGroup(this.activeGroupCluster));
         }
 
-        const btnGroupBulkDissociate = document.getElementById("btn-group-bulk-dissociate");
+        const btnGroupBulkDissociate = getActiveElement("btn-group-bulk-dissociate");
         if (btnGroupBulkDissociate) {
             btnGroupBulkDissociate.addEventListener("click", () => this.dissociateSelectedFaces(this.activeGroupCluster));
         }
 
-        const btnGroupBulkReassign = document.getElementById("btn-group-bulk-reassign");
+        const btnGroupBulkReassign = getActiveElement("btn-group-bulk-reassign");
         if (btnGroupBulkReassign) {
             btnGroupBulkReassign.addEventListener("click", () => this.reassignSelectedFaces(this.activeGroupCluster));
         }
 
-        const btnGroupBulkReject = document.getElementById("btn-group-bulk-reject");
+        const btnGroupBulkReject = getActiveElement("btn-group-bulk-reject");
         if (btnGroupBulkReject) {
             btnGroupBulkReject.addEventListener("click", () => this.rejectSelectedFaces(this.activeGroupCluster));
         }
 
         // --- Reassign Modal Bindings ---
-        const btnCloseReassign = document.getElementById("btn-close-reassign");
+        const btnCloseReassign = getActiveElement("btn-close-reassign");
         if (btnCloseReassign) {
             btnCloseReassign.addEventListener("click", () => this.closeReassignModal());
         }
-        const btnReassignCancel = document.getElementById("btn-reassign-cancel");
+        const btnReassignCancel = getActiveElement("btn-reassign-cancel");
         if (btnReassignCancel) {
             btnReassignCancel.addEventListener("click", () => this.closeReassignModal());
         }
-        const selectReassign = document.getElementById("reassign-name-select");
-        const inputReassign = document.getElementById("reassign-name-input");
+        const selectReassign = getActiveElement("reassign-name-select");
+        const inputReassign = getActiveElement("reassign-name-input");
         if (selectReassign && inputReassign) {
             selectReassign.addEventListener("change", () => {
                 if (selectReassign.value) {
@@ -267,37 +381,38 @@ export class FaceManager {
                 }
             });
         }
-        const btnReassignConfirm = document.getElementById("btn-reassign-confirm");
+        const btnReassignConfirm = getActiveElement("btn-reassign-confirm");
         if (btnReassignConfirm) {
             btnReassignConfirm.addEventListener("click", () => this.confirmReassignFaces());
         }
 
         // --- Names Manager Bindings ---
-        const btnCloseNamesManager = document.getElementById("btn-close-names-manager");
+        const btnCloseNamesManager = getActiveElement("btn-close-names-manager");
         if (btnCloseNamesManager) {
             btnCloseNamesManager.addEventListener("click", () => this.closeNamesManagerModal());
         }
 
-        const searchNamesManager = document.getElementById("names-manager-search");
+        const searchNamesManager = getActiveElement("names-manager-search");
         if (searchNamesManager) {
             searchNamesManager.addEventListener("input", () => this.loadNamesManagerList());
         }
 
-        const chkSelectAll = document.getElementById("chk-names-select-all");
+        const chkSelectAll = getActiveElement("chk-names-select-all");
         if (chkSelectAll) {
             chkSelectAll.addEventListener("change", () => {
-                const checkboxes = document.querySelectorAll(".name-select-checkbox");
+                const modal = getActiveElement("names-manager-modal");
+                const checkboxes = modal ? modal.querySelectorAll(".name-select-checkbox") : [];
                 checkboxes.forEach(cb => cb.checked = chkSelectAll.checked);
                 this.updateNamesBulkActionsBar();
             });
         }
 
-        const btnBulkDelete = document.getElementById("btn-names-bulk-delete");
+        const btnBulkDelete = getActiveElement("btn-names-bulk-delete");
         if (btnBulkDelete) {
             btnBulkDelete.addEventListener("click", () => this.handleNamesBulkDelete());
         }
 
-        const btnBulkMerge = document.getElementById("btn-names-bulk-merge");
+        const btnBulkMerge = getActiveElement("btn-names-bulk-merge");
         if (btnBulkMerge) {
             btnBulkMerge.addEventListener("click", () => this.handleNamesBulkMerge());
         }
@@ -463,6 +578,10 @@ export class FaceManager {
             const card = doc.createElement("div");
             card.className = "face-cluster-card";
             card.dataset.clusterId = cluster.cluster_id;
+            card.dataset.faceId = cluster.rep_face_id;
+
+            card.addEventListener("mouseenter", () => { FaceManager.hoveredCard = card; });
+            card.addEventListener("mouseleave", () => { if (FaceManager.hoveredCard === card) FaceManager.hoveredCard = null; });
 
             const thumbUrl = `/api/faces/face/${cluster.rep_face_id}/thumbnail`;
             const occurrencesText = cluster.occurrences === 1 ? "1 aparição" : `${cluster.occurrences} aparições`;
@@ -576,13 +695,15 @@ export class FaceManager {
 
     // Modal de Desambiguação
     static async openDisambiguationModal({ faceId, currentClusterId, existingClusterId, targetName }) {
-        const modal = document.getElementById("face-disambiguation-modal");
-        const grid = document.getElementById("disambiguation-faces-grid");
-        const infoText = document.getElementById("disambiguation-info-text");
+        const doc = this.getActiveDoc();
+        this.adoptModals(doc);
+        const modal = doc.getElementById("face-disambiguation-modal") || getActiveElement("face-disambiguation-modal");
+        const grid = doc.getElementById("disambiguation-faces-grid") || getActiveElement("disambiguation-faces-grid");
+        const infoText = doc.getElementById("disambiguation-info-text") || getActiveElement("disambiguation-info-text");
         
         if (!modal || !grid || !infoText) return;
 
-        try { window.focus(); } catch (e) {}
+        try { (doc.defaultView || window).focus(); } catch (e) {}
 
         infoText.textContent = `O nome "${targetName}" já está associado a outro grupo de rostos (Grupo ${existingClusterId + 1}). Escolha os rostos do Grupo ${currentClusterId + 1} abaixo que pertencem a "${targetName}" para fazer a reassociação, ou clique em "Fusão Total" para unir os grupos por completo.`;
         grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Carregando rostos...</div>';
@@ -598,8 +719,9 @@ export class FaceManager {
                 return;
             }
 
+            const itemDoc = grid.ownerDocument || doc;
             faces.forEach(face => {
-                const item = document.createElement("div");
+                const item = itemDoc.createElement("div");
                 item.className = "disambiguation-item selected"; // selected by default
                 item.dataset.faceId = face.id;
 
@@ -631,47 +753,49 @@ export class FaceManager {
 
 
             // Bind action buttons
-            const btnFuseAll = document.getElementById("btn-disambiguation-fuse-all");
-            const btnApproveSelected = document.getElementById("btn-disambiguation-approve");
+            const btnFuseAll = modal.querySelector("#btn-disambiguation-fuse-all") || getActiveElement("btn-disambiguation-fuse-all");
+            const btnApproveSelected = modal.querySelector("#btn-disambiguation-approve") || getActiveElement("btn-disambiguation-approve");
 
-            // Remove existing listeners by replacing buttons
-            const newBtnFuseAll = btnFuseAll.cloneNode(true);
-            const newBtnApproveSelected = btnApproveSelected.cloneNode(true);
+            if (btnFuseAll && btnApproveSelected) {
+                // Remove existing listeners by replacing buttons
+                const newBtnFuseAll = btnFuseAll.cloneNode(true);
+                const newBtnApproveSelected = btnApproveSelected.cloneNode(true);
 
-            btnFuseAll.parentNode.replaceChild(newBtnFuseAll, btnFuseAll);
-            btnApproveSelected.parentNode.replaceChild(newBtnApproveSelected, btnApproveSelected);
+                btnFuseAll.parentNode.replaceChild(newBtnFuseAll, btnFuseAll);
+                btnApproveSelected.parentNode.replaceChild(newBtnApproveSelected, btnApproveSelected);
 
-            newBtnFuseAll.addEventListener("click", async () => {
-                if (confirm(`Deseja realmente fundir TODOS os rostos do Grupo ${currentClusterId + 1} com o Grupo ${existingClusterId + 1} sob o nome "${targetName}"?`)) {
+                newBtnFuseAll.addEventListener("click", async () => {
+                    if (confirm(`Deseja realmente fundir TODOS os rostos do Grupo ${currentClusterId + 1} com o Grupo ${existingClusterId + 1} sob o nome "${targetName}"?`)) {
+                        try {
+                            await CapIAuAPI.mergeClusters(STATE.currentProjectId, currentClusterId, existingClusterId, targetName);
+                            this.closeDisambiguationModal();
+                            await this.loadFaceClusters();
+                        } catch (e) {
+                            console.error("[FaceManager] Error merging clusters:", e);
+                            alert("Erro ao realizar fusão dos clusters.");
+                        }
+                    }
+                });
+
+                newBtnApproveSelected.addEventListener("click", async () => {
+                    const selectedItems = grid.querySelectorAll(".disambiguation-item.selected");
+                    const faceIds = Array.from(selectedItems).map(item => parseInt(item.dataset.faceId));
+
+                    if (faceIds.length === 0) {
+                        alert("Selecione pelo menos um rosto para reassociar, ou feche a tela.");
+                        return;
+                    }
+
                     try {
-                        await CapIAuAPI.mergeClusters(STATE.currentProjectId, currentClusterId, existingClusterId, targetName);
+                        await CapIAuAPI.reassignFaces(STATE.currentProjectId, faceIds, existingClusterId, targetName);
                         this.closeDisambiguationModal();
                         await this.loadFaceClusters();
                     } catch (e) {
-                        console.error("[FaceManager] Error merging clusters:", e);
-                        alert("Erro ao realizar fusão dos clusters.");
+                        console.error("[FaceManager] Error reassigning faces:", e);
+                        alert("Erro ao reatribuir rostos selecionados.");
                     }
-                }
-            });
-
-            newBtnApproveSelected.addEventListener("click", async () => {
-                const selectedItems = grid.querySelectorAll(".disambiguation-item.selected");
-                const faceIds = Array.from(selectedItems).map(item => parseInt(item.dataset.faceId));
-
-                if (faceIds.length === 0) {
-                    alert("Selecione pelo menos um rosto para reassociar, ou feche a tela.");
-                    return;
-                }
-
-                try {
-                    await CapIAuAPI.reassignFaces(STATE.currentProjectId, faceIds, existingClusterId, targetName);
-                    this.closeDisambiguationModal();
-                    await this.loadFaceClusters();
-                } catch (e) {
-                    console.error("[FaceManager] Error reassigning faces:", e);
-                    alert("Erro ao reatribuir rostos selecionados.");
-                }
-            });
+                });
+            }
 
         } catch (e) {
             console.error("[FaceManager] Error loading cluster faces for disambiguation:", e);
@@ -680,7 +804,7 @@ export class FaceManager {
     }
 
     static closeDisambiguationModal() {
-        const modal = document.getElementById("face-disambiguation-modal");
+        const modal = getActiveElement("face-disambiguation-modal") || document.getElementById("face-disambiguation-modal");
         if (modal) modal.style.display = "none";
     }
 
@@ -695,7 +819,7 @@ export class FaceManager {
             });
             // We register a temporary event or callback when modal is closed/resolved
             const checkClose = setInterval(() => {
-                const modal = document.getElementById("face-disambiguation-modal");
+                const modal = getActiveElement("face-disambiguation-modal") || document.getElementById("face-disambiguation-modal");
                 if (modal && modal.style.display === "none") {
                     clearInterval(checkClose);
                     if (successCallback) successCallback();
@@ -707,38 +831,40 @@ export class FaceManager {
     }
 
     static async openFullscreenDisambiguation() {
-        const modal = document.getElementById("fullscreen-faces-disambiguation");
-        const grid = document.getElementById("fullscreen-faces-grid");
+        const doc = this.getActiveDoc();
+        this.adoptModals(doc);
+        const modal = doc.getElementById("fullscreen-faces-disambiguation") || getActiveElement("fullscreen-faces-disambiguation");
+        const grid = doc.getElementById("fullscreen-faces-grid") || getActiveElement("fullscreen-faces-grid");
         if (!modal || !grid) return;
         
-        try { window.focus(); } catch (e) {}
+        try { (doc.defaultView || window).focus(); } catch (e) {}
 
         modal.style.display = "flex";
         grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">Carregando rostos do projeto...</p></div>';
         
         // Oculta a barra de ações em massa inicialmente
-        const bulkBar = document.getElementById("fullscreen-bulk-actions-bar");
+        const bulkBar = modal.querySelector("#fullscreen-bulk-actions-bar") || getActiveElement("fullscreen-bulk-actions-bar");
         if (bulkBar) bulkBar.style.display = "none";
         
-        if (!this.bulkEventsBound) {
-            this.bulkEventsBound = true;
-            const btnBulkApply = document.getElementById("btn-bulk-apply");
-            if (btnBulkApply) {
-                btnBulkApply.addEventListener("click", () => this.applyBulkLabel());
-            }
-            const btnBulkReject = document.getElementById("btn-bulk-reject");
-            if (btnBulkReject) {
-                btnBulkReject.addEventListener("click", () => this.applyBulkReject());
-            }
-            // Suporte para Enter no campo bulk
-            const bulkInput = document.getElementById("bulk-face-input");
-            if (bulkInput) {
-                bulkInput.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") {
-                        this.applyBulkLabel();
-                    }
-                });
-            }
+        const btnBulkApply = modal.querySelector("#btn-bulk-apply") || getActiveElement("btn-bulk-apply");
+        if (btnBulkApply && !btnBulkApply._hasBulkApplyListener) {
+            btnBulkApply._hasBulkApplyListener = true;
+            btnBulkApply.addEventListener("click", () => this.applyBulkLabel());
+        }
+        const btnBulkReject = modal.querySelector("#btn-bulk-reject") || getActiveElement("btn-bulk-reject");
+        if (btnBulkReject && !btnBulkReject._hasBulkRejectListener) {
+            btnBulkReject._hasBulkRejectListener = true;
+            btnBulkReject.addEventListener("click", () => this.applyBulkReject());
+        }
+        // Suporte para Enter no campo bulk
+        const bulkInput = modal.querySelector("#bulk-face-input") || getActiveElement("bulk-face-input");
+        if (bulkInput && !bulkInput._hasBulkInputListener) {
+            bulkInput._hasBulkInputListener = true;
+            bulkInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    this.applyBulkLabel();
+                }
+            });
         }
         
         try {
@@ -752,11 +878,11 @@ export class FaceManager {
     }
 
     static renderFullscreenFaces(faces) {
-        const grid = document.getElementById("fullscreen-faces-grid");
+        const grid = getActiveElement("fullscreen-faces-grid") || document.getElementById("fullscreen-faces-grid");
         if (!grid) return;
 
         // Remove old load-more container if present
-        const oldLoadMore = document.getElementById("fullscreen-load-more-container");
+        const oldLoadMore = grid.parentElement?.querySelector("#fullscreen-load-more-container") || getActiveElement("fullscreen-load-more-container");
         if (oldLoadMore) oldLoadMore.remove();
 
         this.unlabeledFaces = faces || [];
@@ -769,11 +895,11 @@ export class FaceManager {
     }
 
     static renderNextPage() {
-        const grid = document.getElementById("fullscreen-faces-grid");
+        const grid = getActiveElement("fullscreen-faces-grid") || document.getElementById("fullscreen-faces-grid");
         if (!grid) return;
 
         // Remove old load-more button if it exists
-        const oldLoadMore = document.getElementById("fullscreen-load-more-container");
+        const oldLoadMore = grid.parentElement?.querySelector("#fullscreen-load-more-container") || getActiveElement("fullscreen-load-more-container");
         if (oldLoadMore) oldLoadMore.remove();
 
         const startIdx = this.currentPage * this.pageSize;
@@ -791,8 +917,9 @@ export class FaceManager {
             return;
         }
 
+        const doc = grid.ownerDocument || document;
         pageFaces.forEach(face => {
-            const card = document.createElement("div");
+            const card = doc.createElement("div");
             card.className = "fullscreen-face-card";
             card.dataset.faceId = face.id;
             card.dataset.clusterId = face.cluster_id;
@@ -826,8 +953,25 @@ export class FaceManager {
                 </div>
             `;
 
-            card.addEventListener("mouseenter", () => { FaceManager.hoveredCard = card; });
-            card.addEventListener("mouseleave", () => { if (FaceManager.hoveredCard === card) FaceManager.hoveredCard = null; });
+            card.addEventListener("mouseenter", () => {
+                FaceManager.hoveredCard = card;
+                const selectEl = doc.getElementById("select-hover-delay") || getActiveElement("select-hover-delay");
+                const hoverDelay = selectEl ? parseInt(selectEl.value) : 2000;
+                
+                if (hoverDelay >= 999999) return; // Desativado
+                // Não mostrar popover de hover enquanto o Inspetor ('a') estiver aberto
+                if (FaceManager.inspectorCard) return;
+
+                hoverTimeout = setTimeout(() => {
+                    if (FaceManager.inspectorCard) return;
+                    FaceManager.showContextPreview(face, card);
+                }, hoverDelay);
+            });
+            card.addEventListener("mouseleave", () => {
+                if (FaceManager.hoveredCard === card) FaceManager.hoveredCard = null;
+                clearTimeout(hoverTimeout);
+                FaceManager.hideContextPreview();
+            });
 
             const inputEl = card.querySelector(".fullscreen-face-input");
 
@@ -892,7 +1036,7 @@ export class FaceManager {
                         
                         // Listen for modal resolution to potentially remove card
                         const checkClose = setInterval(() => {
-                            const modal = document.getElementById("face-disambiguation-modal");
+                            const modal = getActiveElement("face-disambiguation-modal") || document.getElementById("face-disambiguation-modal");
                             if (modal && modal.style.display === "none") {
                                 clearInterval(checkClose);
                                 if (face.cluster_id !== null && face.cluster_id !== undefined && face.cluster_id >= 0) {
@@ -1001,23 +1145,6 @@ export class FaceManager {
 
             // Hover para exibir contexto (imagem cheia ou clip de vídeo)
             let hoverTimeout;
-            card.addEventListener("mouseenter", () => {
-                const selectEl = document.getElementById("select-hover-delay");
-                const hoverDelay = selectEl ? parseInt(selectEl.value) : 2000;
-                
-                if (hoverDelay >= 999999) return; // Desativado
-                // Não mostrar popover de hover enquanto o Inspetor ('a') estiver aberto
-                if (FaceManager.inspectorCard) return;
-
-                hoverTimeout = setTimeout(() => {
-                    if (FaceManager.inspectorCard) return;
-                    FaceManager.showContextPreview(face, card);
-                }, hoverDelay);
-            });
-            card.addEventListener("mouseleave", () => {
-                clearTimeout(hoverTimeout);
-                FaceManager.hideContextPreview();
-            });
 
             grid.appendChild(card);
         });
@@ -1026,11 +1153,12 @@ export class FaceManager {
 
         // Add the "Load More" button if there are more faces
         if (endIdx < this.unlabeledFaces.length) {
-            const container = document.createElement("div");
+            const doc = grid.ownerDocument || document;
+            const container = doc.createElement("div");
             container.id = "fullscreen-load-more-container";
             container.style.cssText = "grid-column: 1/-1; display: flex; justify-content: center; padding: 20px 0; margin-top: 10px;";
             
-            const btn = document.createElement("button");
+            const btn = doc.createElement("button");
             btn.className = "btn-secondary";
             btn.style.cssText = "padding: 10px 24px; font-size: 13px; font-weight: 600; cursor: pointer; border-color: rgba(6, 182, 212, 0.3); color: var(--color-cyan);";
             btn.innerHTML = `<i class="fa-solid fa-angles-down"></i> Carregar Mais Rostos (${this.unlabeledFaces.length - endIdx} restantes)`;
@@ -1044,7 +1172,7 @@ export class FaceManager {
 
     static removeCardsByClusterId(clusterId) {
         if (clusterId === null || clusterId === undefined || clusterId === "" || clusterId < 0) return;
-        const grid = document.getElementById("fullscreen-faces-grid");
+        const grid = getActiveElement("fullscreen-faces-grid") || document.getElementById("fullscreen-faces-grid");
         if (!grid) return;
         const cards = Array.from(grid.querySelectorAll(".fullscreen-face-card"));
         const cardsToRemove = cards.filter(c => c.dataset.clusterId == clusterId);
@@ -1065,10 +1193,11 @@ export class FaceManager {
     }
 
     static updateBulkActionsBar() {
-        const selectedCards = document.querySelectorAll(".fullscreen-face-card.selected");
+        const modal = getActiveElement("fullscreen-faces-disambiguation") || document.getElementById("fullscreen-faces-disambiguation");
+        const selectedCards = modal ? modal.querySelectorAll(".fullscreen-face-card.selected") : document.querySelectorAll(".fullscreen-face-card.selected");
         const count = selectedCards.length;
-        const bar = document.getElementById("fullscreen-bulk-actions-bar");
-        const countEl = document.getElementById("bulk-select-count");
+        const bar = modal?.querySelector("#fullscreen-bulk-actions-bar") || getActiveElement("fullscreen-bulk-actions-bar");
+        const countEl = modal?.querySelector("#bulk-select-count") || getActiveElement("bulk-select-count");
         
         if (!bar || !countEl) return;
 
@@ -1081,18 +1210,22 @@ export class FaceManager {
     }
 
     static async applyBulkLabel() {
-        const newName = document.getElementById("bulk-face-input").value.trim();
+        const modal = getActiveElement("fullscreen-faces-disambiguation") || document.getElementById("fullscreen-faces-disambiguation");
+        const inputEl = modal?.querySelector("#bulk-face-input") || getActiveElement("bulk-face-input");
+        const newName = inputEl ? inputEl.value.trim() : "";
         if (!newName) {
             alert("Por favor, digite o nome da pessoa/objeto.");
             return;
         }
 
-        const selectedCards = Array.from(document.querySelectorAll(".fullscreen-face-card.selected"));
+        const selectedCards = Array.from(modal ? modal.querySelectorAll(".fullscreen-face-card.selected") : document.querySelectorAll(".fullscreen-face-card.selected"));
         if (selectedCards.length === 0) return;
 
-        const btnApply = document.getElementById("btn-bulk-apply");
-        btnApply.disabled = true;
-        btnApply.textContent = "Aplicando...";
+        const btnApply = modal?.querySelector("#btn-bulk-apply") || getActiveElement("btn-bulk-apply");
+        if (btnApply) {
+            btnApply.disabled = true;
+            btnApply.textContent = "Aplicando...";
+        }
 
         const projectId = STATE.currentProjectId;
         let successCount = 0;
@@ -1133,16 +1266,19 @@ export class FaceManager {
             FaceManager.removeCardsByClusterId(cid);
         }
 
-        btnApply.disabled = false;
-        btnApply.textContent = "Aplicar";
-        document.getElementById("bulk-face-input").value = "";
+        if (btnApply) {
+            btnApply.disabled = false;
+            btnApply.textContent = "Aplicar";
+        }
+        if (inputEl) inputEl.value = "";
 
         // Oculta a barra de ações em massa
-        document.getElementById("fullscreen-bulk-actions-bar").style.display = "none";
+        const bulkBar = modal?.querySelector("#fullscreen-bulk-actions-bar") || getActiveElement("fullscreen-bulk-actions-bar");
+        if (bulkBar) bulkBar.style.display = "none";
 
         // Se sobrar nenhum card, exibe o empty state
         setTimeout(() => {
-            const grid = document.getElementById("fullscreen-faces-grid");
+            const grid = modal?.querySelector("#fullscreen-faces-grid") || getActiveElement("fullscreen-faces-grid");
             if (grid && grid.children.length === 0) {
                 this.renderFullscreenFaces([]);
             }
@@ -1158,15 +1294,18 @@ export class FaceManager {
     }
 
     static async applyBulkReject() {
-        const selectedCards = Array.from(document.querySelectorAll(".fullscreen-face-card.selected"));
+        const modal = getActiveElement("fullscreen-faces-disambiguation") || document.getElementById("fullscreen-faces-disambiguation");
+        const selectedCards = Array.from(modal ? modal.querySelectorAll(".fullscreen-face-card.selected") : document.querySelectorAll(".fullscreen-face-card.selected"));
         if (selectedCards.length === 0) return;
 
         const objectName = prompt(`As ${selectedCards.length} detecções selecionadas não são rostos. Se forem o mesmo objeto relevante (ex: Abajur, Cadeira, Microfone), digite o nome do objeto. Caso contrário, deixe em branco para marcar todas como Não Relevante:\n(Clique em Cancelar para desistir)`);
         if (objectName === null) return;
 
-        const btnReject = document.getElementById("btn-bulk-reject");
-        btnReject.disabled = true;
-        btnReject.textContent = "Descartando...";
+        const btnReject = modal?.querySelector("#btn-bulk-reject") || getActiveElement("btn-bulk-reject");
+        if (btnReject) {
+            btnReject.disabled = true;
+            btnReject.textContent = "Descartando...";
+        }
 
         let successCount = 0;
         let errorCount = 0;
@@ -1186,15 +1325,18 @@ export class FaceManager {
             }
         }
 
-        btnReject.disabled = false;
-        btnReject.textContent = "Descartar";
+        if (btnReject) {
+            btnReject.disabled = false;
+            btnReject.textContent = "Descartar";
+        }
 
         // Oculta a barra de ações em massa
-        document.getElementById("fullscreen-bulk-actions-bar").style.display = "none";
+        const bulkBar = modal?.querySelector("#fullscreen-bulk-actions-bar") || getActiveElement("fullscreen-bulk-actions-bar");
+        if (bulkBar) bulkBar.style.display = "none";
 
         // Se sobrar nenhum card, exibe o empty state
         setTimeout(() => {
-            const grid = document.getElementById("fullscreen-faces-grid");
+            const grid = modal?.querySelector("#fullscreen-faces-grid") || getActiveElement("fullscreen-faces-grid");
             if (grid && grid.children.length === 0) {
                 this.renderFullscreenFaces([]);
             }
@@ -1208,9 +1350,11 @@ export class FaceManager {
     }
 
     static showContextPreview(face, card) {
-        let popover = document.getElementById("fullscreen-face-context-popover");
+        const doc = card?.ownerDocument || this.getActiveDoc() || document;
+        const win = doc.defaultView || window;
+        let popover = doc.getElementById("fullscreen-face-context-popover") || getActiveElement("fullscreen-face-context-popover");
         if (!popover) {
-            popover = document.createElement("div");
+            popover = doc.createElement("div");
             popover.id = "fullscreen-face-context-popover";
             popover.style.position = "fixed";
             popover.style.zIndex = "25000";
@@ -1224,17 +1368,22 @@ export class FaceManager {
             popover.style.flexDirection = "column";
             popover.style.gap = "8px";
             popover.style.pointerEvents = "none"; // Evita interferir no mouseleave
-            document.body.appendChild(popover);
+            doc.body.appendChild(popover);
+        } else if (popover.ownerDocument !== doc) {
+            try {
+                doc.adoptNode(popover);
+                doc.body.appendChild(popover);
+            } catch (e) {}
         }
 
         const cardRect = card.getBoundingClientRect();
         let left = cardRect.right + 15;
-        if (left + 340 > window.innerWidth) {
+        if (left + 340 > win.innerWidth) {
             left = cardRect.left - 340; 
         }
         let top = cardRect.top + (cardRect.height - 240) / 2;
         if (top < 10) top = 10;
-        if (top + 240 > window.innerHeight) top = window.innerHeight - 250;
+        if (top + 240 > win.innerHeight) top = win.innerHeight - 250;
 
         popover.style.left = `${left}px`;
         popover.style.top = `${top}px`;
@@ -1273,7 +1422,7 @@ export class FaceManager {
                 }
             }
             
-            const videoEl = document.createElement("video");
+            const videoEl = doc.createElement("video");
             videoEl.src = src;
             videoEl.style.width = "100%";
             videoEl.style.height = "100%";
@@ -1301,7 +1450,7 @@ export class FaceManager {
     }
 
     static hideContextPreview() {
-        const popover = document.getElementById("fullscreen-face-context-popover");
+        const popover = getActiveElement("fullscreen-face-context-popover") || document.getElementById("fullscreen-face-context-popover");
         if (popover) {
             popover.style.display = "none";
             popover.innerHTML = "";
@@ -1309,22 +1458,24 @@ export class FaceManager {
     }
 
     static closeFullscreenDisambiguation() {
-        const modal = document.getElementById("fullscreen-faces-disambiguation");
+        const modal = getActiveElement("fullscreen-faces-disambiguation") || document.getElementById("fullscreen-faces-disambiguation");
         if (modal) modal.style.display = "none";
         this.loadFaceClusters();
     }
 
     // --- GERENCIADOR DE GRUPO DE ROSTOS ---
     static async openGroupManagerModal(cluster) {
-        const modal = document.getElementById("face-group-manager-modal");
-        const grid = document.getElementById("group-manager-faces-grid");
-        const title = document.getElementById("group-manager-title");
-        const countVal = document.getElementById("group-manager-count-val");
-        const bulkBar = document.getElementById("group-manager-bulk-bar");
+        const doc = this.getActiveDoc();
+        this.adoptModals(doc);
+        const modal = doc.getElementById("face-group-manager-modal") || getActiveElement("face-group-manager-modal");
+        const grid = doc.getElementById("group-manager-faces-grid") || getActiveElement("group-manager-faces-grid");
+        const title = modal?.querySelector("#group-manager-title") || getActiveElement("group-manager-title");
+        const countVal = modal?.querySelector("#group-manager-count-val") || getActiveElement("group-manager-count-val");
+        const bulkBar = modal?.querySelector("#group-manager-bulk-bar") || getActiveElement("group-manager-bulk-bar");
         
         if (!modal || !grid) return;
         
-        try { window.focus(); } catch (e) {}
+        try { (doc.defaultView || window).focus(); } catch (e) {}
 
         modal.style.display = "flex";
         if (bulkBar) bulkBar.style.display = "none";
@@ -1349,14 +1500,14 @@ export class FaceManager {
     }
 
     static closeGroupManagerModal() {
-        const modal = document.getElementById("face-group-manager-modal");
+        const modal = getActiveElement("face-group-manager-modal") || document.getElementById("face-group-manager-modal");
         if (modal) modal.style.display = "none";
         this.activeGroupCluster = null;
         this.closeReassignModal();
     }
 
     static renderGroupManagerFaces(faces, cluster) {
-        const grid = document.getElementById("group-manager-faces-grid");
+        const grid = getActiveElement("group-manager-faces-grid") || document.getElementById("group-manager-faces-grid");
         if (!grid) return;
         
         grid.innerHTML = "";
@@ -1366,8 +1517,9 @@ export class FaceManager {
             return;
         }
         
+        const doc = grid.ownerDocument || document;
         faces.forEach(face => {
-            const card = document.createElement("div");
+            const card = doc.createElement("div");
             card.className = "group-manager-face-card";
             card.dataset.faceId = face.id;
             
@@ -1431,11 +1583,15 @@ export class FaceManager {
             
             let hoverTimeout;
             card.addEventListener("mouseenter", () => {
+                FaceManager.hoveredCard = card;
+                if (FaceManager.inspectorCard) return;
                 hoverTimeout = setTimeout(() => {
+                    if (FaceManager.inspectorCard) return;
                     FaceManager.showContextPreview(face, card);
                 }, 400);
             });
             card.addEventListener("mouseleave", () => {
+                if (FaceManager.hoveredCard === card) FaceManager.hoveredCard = null;
                 clearTimeout(hoverTimeout);
                 FaceManager.hideContextPreview();
             });
@@ -1445,10 +1601,11 @@ export class FaceManager {
     }
 
     static updateGroupManagerBulkBar() {
-        const selected = document.querySelectorAll(".group-manager-face-card.selected");
+        const modal = getActiveElement("face-group-manager-modal") || document.getElementById("face-group-manager-modal");
+        const selected = modal ? modal.querySelectorAll(".group-manager-face-card.selected") : document.querySelectorAll(".group-manager-face-card.selected");
         const count = selected.length;
-        const bar = document.getElementById("group-manager-bulk-bar");
-        const countText = document.getElementById("group-manager-bulk-count");
+        const bar = modal?.querySelector("#group-manager-bulk-bar") || getActiveElement("group-manager-bulk-bar");
+        const countText = modal?.querySelector("#group-manager-bulk-count") || getActiveElement("group-manager-bulk-count");
         
         if (!bar) return;
         
@@ -1459,7 +1616,7 @@ export class FaceManager {
             }
         } else {
             bar.style.display = "none";
-            const panel = document.getElementById("group-manager-reassign-panel");
+            const panel = modal?.querySelector("#group-manager-reassign-panel") || getActiveElement("group-manager-reassign-panel");
             if (panel) panel.style.display = "none";
         }
     }
@@ -1523,7 +1680,8 @@ export class FaceManager {
 
     static async dissociateSelectedFaces(cluster) {
         if (!cluster) return;
-        const selected = document.querySelectorAll(".group-manager-face-card.selected");
+        const modal = getActiveElement("face-group-manager-modal") || document.getElementById("face-group-manager-modal");
+        const selected = modal ? modal.querySelectorAll(".group-manager-face-card.selected") : document.querySelectorAll(".group-manager-face-card.selected");
         const faceIds = Array.from(selected).map(card => parseInt(card.dataset.faceId));
         if (faceIds.length === 0) return;
         
@@ -1541,7 +1699,7 @@ export class FaceManager {
             await this.loadFaceClusters();
             
             // Atualizar contagem no modal
-            const countVal = document.getElementById("group-manager-count-val");
+            const countVal = modal?.querySelector("#group-manager-count-val") || getActiveElement("group-manager-count-val");
             if (countVal) countVal.textContent = faces.length;
             
             if (faces.length === 0) {
@@ -1560,16 +1718,17 @@ export class FaceManager {
 
     static async reassignSelectedFaces(cluster) {
         if (!cluster) return;
-        const selected = document.querySelectorAll(".group-manager-face-card.selected");
+        const modal = getActiveElement("face-group-manager-modal") || document.getElementById("face-group-manager-modal");
+        const selected = modal ? modal.querySelectorAll(".group-manager-face-card.selected") : document.querySelectorAll(".group-manager-face-card.selected");
         const faceIds = Array.from(selected).map(card => parseInt(card.dataset.faceId));
         if (faceIds.length === 0) return;
 
         this.reassignCluster = cluster;
         this.reassignFaceIds = faceIds;
 
-        const panel = document.getElementById("group-manager-reassign-panel");
-        const selectEl = document.getElementById("reassign-name-select");
-        const inputEl = document.getElementById("reassign-name-input");
+        const panel = modal?.querySelector("#group-manager-reassign-panel") || getActiveElement("group-manager-reassign-panel");
+        const selectEl = modal?.querySelector("#reassign-name-select") || getActiveElement("reassign-name-select");
+        const inputEl = modal?.querySelector("#reassign-name-input") || getActiveElement("reassign-name-input");
 
         if (!panel) return;
 
@@ -1580,9 +1739,10 @@ export class FaceManager {
                 .filter(s => s && !s.startsWith("Pessoa Desconhecida") && !s.startsWith("SPEAKER_"))
                 .sort();
 
+            const doc = panel.ownerDocument || document;
             selectEl.innerHTML = '<option value="" style="background: #111; color: var(--text-secondary);">Selecione existente...</option>';
             cleanSpeakers.forEach(sp => {
-                const opt = document.createElement("option");
+                const opt = doc.createElement("option");
                 opt.value = sp;
                 opt.textContent = sp;
                 opt.style.background = "#111";
@@ -1598,10 +1758,11 @@ export class FaceManager {
     }
 
     static closeReassignModal() {
-        const panel = document.getElementById("group-manager-reassign-panel");
+        const modal = getActiveElement("face-group-manager-modal") || document.getElementById("face-group-manager-modal");
+        const panel = modal?.querySelector("#group-manager-reassign-panel") || getActiveElement("group-manager-reassign-panel");
         if (panel) panel.style.display = "none";
-        const selectEl = document.getElementById("reassign-name-select");
-        const inputEl = document.getElementById("reassign-name-input");
+        const selectEl = modal?.querySelector("#reassign-name-select") || getActiveElement("reassign-name-select");
+        const inputEl = modal?.querySelector("#reassign-name-input") || getActiveElement("reassign-name-input");
         if (selectEl) selectEl.value = "";
         if (inputEl) inputEl.value = "";
         this.reassignCluster = null;
@@ -1613,7 +1774,8 @@ export class FaceManager {
         const faceIds = this.reassignFaceIds;
         if (!cluster || !faceIds || faceIds.length === 0) return;
 
-        const inputEl = document.getElementById("reassign-name-input");
+        const modal = getActiveElement("face-group-manager-modal") || document.getElementById("face-group-manager-modal");
+        const inputEl = modal?.querySelector("#reassign-name-input") || getActiveElement("reassign-name-input");
         if (!inputEl) return;
         const newName = inputEl.value.trim();
         if (!newName) {
@@ -1634,7 +1796,7 @@ export class FaceManager {
             // Recarregar a barra lateral de grupos
             await this.loadFaceClusters();
 
-            const countVal = document.getElementById("group-manager-count-val");
+            const countVal = modal?.querySelector("#group-manager-count-val") || getActiveElement("group-manager-count-val");
             if (countVal) countVal.textContent = faces.length;
 
             if (faces.length === 0) {
@@ -1653,7 +1815,8 @@ export class FaceManager {
 
     static async rejectSelectedFaces(cluster) {
         if (!cluster) return;
-        const selected = document.querySelectorAll(".group-manager-face-card.selected");
+        const modal = getActiveElement("face-group-manager-modal") || document.getElementById("face-group-manager-modal");
+        const selected = modal ? modal.querySelectorAll(".group-manager-face-card.selected") : document.querySelectorAll(".group-manager-face-card.selected");
         const faceIds = Array.from(selected).map(card => parseInt(card.dataset.faceId));
         if (faceIds.length === 0) return;
         
@@ -1673,7 +1836,7 @@ export class FaceManager {
             // Recarregar a barra lateral de grupos
             await this.loadFaceClusters();
             
-            const countVal = document.getElementById("group-manager-count-val");
+            const countVal = modal?.querySelector("#group-manager-count-val") || getActiveElement("group-manager-count-val");
             if (countVal) countVal.textContent = faces.length;
             
             if (faces.length === 0) {
@@ -1691,29 +1854,32 @@ export class FaceManager {
     }
 
     static async openNamesManagerModal() {
-        const modal = document.getElementById("names-manager-modal");
+        const doc = this.getActiveDoc();
+        this.adoptModals(doc);
+        const modal = doc.getElementById("names-manager-modal") || getActiveElement("names-manager-modal");
         if (modal) {
-            try { window.focus(); } catch (e) {}
+            try { (doc.defaultView || window).focus(); } catch (e) {}
             modal.style.display = "flex";
-            const searchInput = document.getElementById("names-manager-search");
+            const searchInput = modal.querySelector("#names-manager-search") || getActiveElement("names-manager-search");
             if (searchInput) searchInput.value = "";
             await this.loadNamesManagerList();
         }
     }
 
     static closeNamesManagerModal() {
-        const modal = document.getElementById("names-manager-modal");
+        const modal = getActiveElement("names-manager-modal") || document.getElementById("names-manager-modal");
         if (modal) {
             modal.style.display = "none";
         }
     }
 
     static async loadNamesManagerList() {
-        const tbody = document.getElementById("names-manager-tbody");
+        const modal = getActiveElement("names-manager-modal") || document.getElementById("names-manager-modal");
+        const tbody = modal?.querySelector("#names-manager-tbody") || getActiveElement("names-manager-tbody");
         if (!tbody) return;
 
         // Reset check all and bulk actions bar
-        const chkSelectAll = document.getElementById("chk-names-select-all");
+        const chkSelectAll = modal?.querySelector("#chk-names-select-all") || getActiveElement("chk-names-select-all");
         if (chkSelectAll) chkSelectAll.checked = false;
         this.updateNamesBulkActionsBar();
 
@@ -1730,7 +1896,7 @@ export class FaceManager {
                 .filter(s => s && !s.startsWith("Pessoa Desconhecida") && !s.startsWith("SPEAKER_"))
                 .sort();
 
-            const searchInput = document.getElementById("names-manager-search");
+            const searchInput = modal?.querySelector("#names-manager-search") || getActiveElement("names-manager-search");
             const filterText = searchInput ? searchInput.value.toLowerCase().trim() : "";
             
             const filteredSpeakers = cleanSpeakers.filter(sp => sp.toLowerCase().includes(filterText));
@@ -1740,9 +1906,10 @@ export class FaceManager {
                 return;
             }
 
+            const doc = tbody.ownerDocument || document;
             tbody.innerHTML = "";
             filteredSpeakers.forEach(sp => {
-                const tr = document.createElement("tr");
+                const tr = doc.createElement("tr");
                 tr.style.borderBottom = "1px solid rgba(255,255,255,0.04)";
                 
                 tr.innerHTML = `
@@ -1833,14 +2000,15 @@ export class FaceManager {
     }
 
     static updateNamesBulkActionsBar() {
-        const bar = document.getElementById("names-bulk-actions-bar");
-        const countSpan = document.getElementById("names-bulk-select-count");
-        const chkSelectAll = document.getElementById("chk-names-select-all");
+        const modal = getActiveElement("names-manager-modal") || document.getElementById("names-manager-modal");
+        const bar = modal?.querySelector("#names-bulk-actions-bar") || getActiveElement("names-bulk-actions-bar");
+        const countSpan = modal?.querySelector("#names-bulk-select-count") || getActiveElement("names-bulk-select-count");
+        const chkSelectAll = modal?.querySelector("#chk-names-select-all") || getActiveElement("chk-names-select-all");
         
         if (!bar || !countSpan) return;
 
-        const checked = document.querySelectorAll(".name-select-checkbox:checked");
-        const allCheckbox = document.querySelectorAll(".name-select-checkbox");
+        const checked = modal ? modal.querySelectorAll(".name-select-checkbox:checked") : document.querySelectorAll(".name-select-checkbox:checked");
+        const allCheckbox = modal ? modal.querySelectorAll(".name-select-checkbox") : document.querySelectorAll(".name-select-checkbox");
 
         countSpan.textContent = checked.length;
         bar.style.display = checked.length > 0 ? "flex" : "none";
@@ -1851,7 +2019,8 @@ export class FaceManager {
     }
 
     static async handleNamesBulkDelete() {
-        const checked = document.querySelectorAll(".name-select-checkbox:checked");
+        const modal = getActiveElement("names-manager-modal") || document.getElementById("names-manager-modal");
+        const checked = modal ? modal.querySelectorAll(".name-select-checkbox:checked") : document.querySelectorAll(".name-select-checkbox:checked");
         if (checked.length === 0) return;
 
         const names = Array.from(checked).map(cb => cb.dataset.name);
@@ -1881,11 +2050,12 @@ export class FaceManager {
     }
 
     static async handleNamesBulkMerge() {
-        const checked = document.querySelectorAll(".name-select-checkbox:checked");
+        const modal = getActiveElement("names-manager-modal") || document.getElementById("names-manager-modal");
+        const checked = modal ? modal.querySelectorAll(".name-select-checkbox:checked") : document.querySelectorAll(".name-select-checkbox:checked");
         if (checked.length === 0) return;
 
         const names = Array.from(checked).map(cb => cb.dataset.name);
-        const targetInput = document.getElementById("names-bulk-merge-target");
+        const targetInput = modal?.querySelector("#names-bulk-merge-target") || getActiveElement("names-bulk-merge-target");
         const targetName = targetInput ? targetInput.value.trim() : "";
 
         if (!targetName) {
@@ -1986,11 +2156,23 @@ export class FaceManager {
     //    ← → = rosto anterior/próximo · a = avançar · Esc/clique-fora = fechar
     // ======================================================================
 
-    static ensureInspector() {
-        let overlay = document.getElementById("face-inspector-overlay");
-        if (overlay) { this._inspectorEl = overlay; return overlay; }
+    static ensureInspector(targetDoc = null) {
+        const doc = targetDoc || this.getActiveDoc() || document;
+        let overlay = getActiveElement("face-inspector-overlay") || doc.getElementById("face-inspector-overlay") || document.getElementById("face-inspector-overlay");
+        if (overlay) {
+            if (overlay.ownerDocument !== doc) {
+                try {
+                    doc.adoptNode(overlay);
+                    doc.body.appendChild(overlay);
+                } catch (e) {
+                    console.warn("[FaceManager] Erro ao adotar inspector overlay:", e);
+                }
+            }
+            this._inspectorEl = overlay;
+            return overlay;
+        }
 
-        overlay = document.createElement("div");
+        overlay = doc.createElement("div");
         overlay.id = "face-inspector-overlay";
         overlay.innerHTML = `
             <div class="fi-stage">
@@ -2075,7 +2257,7 @@ export class FaceManager {
                     </div>
                 </div>
             </div>`;
-        document.body.appendChild(overlay);
+        doc.body.appendChild(overlay);
         this._inspectorEl = overlay;
         const media = overlay.querySelector(".fi-media");
 
@@ -2171,17 +2353,24 @@ export class FaceManager {
             };
 
             let isScrubbing = false;
+            const onScrubMove = (e) => {
+                if (isScrubbing) handleTrackScrub(e);
+            };
+            const onScrubUp = (e) => {
+                isScrubbing = false;
+                const currentWin = e.view || overlay.ownerDocument?.defaultView || window;
+                currentWin.removeEventListener("mousemove", onScrubMove);
+                currentWin.removeEventListener("mouseup", onScrubUp);
+            };
+
             scrubTrackContainer.addEventListener("mousedown", (e) => {
                 e.stopPropagation();
                 e.preventDefault();
                 isScrubbing = true;
                 handleTrackScrub(e);
-            });
-            window.addEventListener("mousemove", (e) => {
-                if (isScrubbing) handleTrackScrub(e);
-            });
-            window.addEventListener("mouseup", () => {
-                isScrubbing = false;
+                const currentWin = e.view || overlay.ownerDocument?.defaultView || window;
+                currentWin.addEventListener("mousemove", onScrubMove);
+                currentWin.addEventListener("mouseup", onScrubUp);
             });
         }
 
@@ -2201,6 +2390,21 @@ export class FaceManager {
         }, { passive: false });
 
         // Pan com arraste (espaço pressionado, botão do meio, ou já ampliado)
+        const onMouseMove = (e) => {
+            if (!this.fiPanning) return;
+            this.fiPanX = this._panIX + (e.clientX - this._panSX);
+            this.fiPanY = this._panIY + (e.clientY - this._panSY);
+            this._fiUpdateTransform(false);
+        };
+        const onMouseUp = (e) => {
+            if (this.fiPanning) {
+                this.fiPanning = false;
+                media.classList.remove("is-panning");
+            }
+            const currentWin = e.view || overlay.ownerDocument?.defaultView || window;
+            currentWin.removeEventListener("mousemove", onMouseMove);
+            currentWin.removeEventListener("mouseup", onMouseUp);
+        };
         media.addEventListener("mousedown", (e) => {
             if (!this.inspectorCard || e.target.closest(".fi-minimap") || this.inspectorState === 3) return;
             const left = e.button === 0, mid = e.button === 1;
@@ -2210,22 +2414,9 @@ export class FaceManager {
                 this._panIX = this.fiPanX || 0; this._panIY = this.fiPanY || 0;
                 media.classList.add("is-panning");
                 e.preventDefault();
-            }
-        });
-        window.addEventListener("mousemove", (e) => {
-            if (!this.fiPanning) return;
-            this.fiPanX = this._panIX + (e.clientX - this._panSX);
-            this.fiPanY = this._panIY + (e.clientY - this._panSY);
-            this._fiUpdateTransform(false);
-        });
-        window.addEventListener("mouseup", () => {
-            if (this.fiPanning) { this.fiPanning = false; media.classList.remove("is-panning"); }
-        });
-        // Soltar espaço encerra o modo de arraste
-        window.addEventListener("keyup", (e) => {
-            if (e.code === "Space" || e.key === " ") {
-                this.fiSpace = false; this.fiPanning = false;
-                media.classList.remove("space-mode", "is-panning");
+                const currentWin = e.view || overlay.ownerDocument?.defaultView || window;
+                currentWin.addEventListener("mousemove", onMouseMove);
+                currentWin.addEventListener("mouseup", onMouseUp);
             }
         });
 
@@ -2242,9 +2433,22 @@ export class FaceManager {
             this._fiUpdateTransform(false);
         };
         let mmDrag = false;
-        mm.addEventListener("mousedown", (e) => { e.stopPropagation(); e.preventDefault(); mmDrag = true; navMinimap(e); });
-        window.addEventListener("mousemove", (e) => { if (mmDrag) navMinimap(e); });
-        window.addEventListener("mouseup", () => { mmDrag = false; });
+        const onMmMove = (e) => { if (mmDrag) navMinimap(e); };
+        const onMmUp = (e) => {
+            mmDrag = false;
+            const currentWin = e.view || overlay.ownerDocument?.defaultView || window;
+            currentWin.removeEventListener("mousemove", onMmMove);
+            currentWin.removeEventListener("mouseup", onMmUp);
+        };
+        mm.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            mmDrag = true;
+            navMinimap(e);
+            const currentWin = e.view || overlay.ownerDocument?.defaultView || window;
+            currentWin.addEventListener("mousemove", onMmMove);
+            currentWin.addEventListener("mouseup", onMmUp);
+        });
 
         return overlay;
     }
@@ -2255,7 +2459,8 @@ export class FaceManager {
         if (!faceId) return;
 
         this.hideContextPreview();
-        this.ensureInspector();
+        const targetDoc = card.ownerDocument || this.getActiveDoc() || document;
+        this.ensureInspector(targetDoc);
 
         this.inspectorCard = card;
         this.inspectorFaceId = faceId;
@@ -2948,7 +3153,7 @@ export class FaceManager {
         if (!card) return;
         const container = card.parentElement;
         if (!container) return;
-        const cards = Array.from(container.querySelectorAll(".fullscreen-face-card, .disambiguation-item"));
+        const cards = Array.from(container.querySelectorAll(".fullscreen-face-card, .disambiguation-item, .group-manager-face-card, .face-cluster-card"));
         const idx = cards.indexOf(card);
         if (idx === -1) return;
         let n = idx + dir;

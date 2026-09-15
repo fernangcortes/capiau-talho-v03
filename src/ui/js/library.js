@@ -140,26 +140,40 @@ export function handleLibraryUndo() {
 }
 window.handleLibraryUndo = handleLibraryUndo;
 
-export function isAnyModalOpen(doc = document) {
-    if (!doc) return false;
-    const candidateModals = doc.querySelectorAll(`
-        .modal-overlay,
-        #modal-timeline-help,
-        #modal-edit-marker,
-        #timeline-alternatives-popup,
-        #timeline-alternatives-backdrop,
-        .face-inspector-overlay,
-        #face-inspector-overlay,
-        dialog[open]
-    `);
-    for (let i = 0; i < candidateModals.length; i++) {
-        const el = candidateModals[i];
-        if (el.classList.contains("active")) return true;
-        const inlineDisplay = el.style.display;
-        if (inlineDisplay && inlineDisplay !== "none") return true;
-        const style = window.getComputedStyle(el);
-        if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
-            return true;
+export function isAnyModalOpen(targetDoc = null) {
+    const docs = targetDoc ? [targetDoc] : [document];
+    if (!targetDoc && window.popoutWindows) {
+        for (const name in window.popoutWindows) {
+            const win = window.popoutWindows[name];
+            if (win && !win.closed && win.document && !docs.includes(win.document)) {
+                docs.push(win.document);
+            }
+        }
+    }
+    for (const doc of docs) {
+        if (!doc) continue;
+        const candidateModals = doc.querySelectorAll(`
+            .modal-overlay,
+            #modal-timeline-help,
+            #modal-edit-marker,
+            #timeline-alternatives-popup,
+            #timeline-alternatives-backdrop,
+            .face-inspector-overlay,
+            #face-inspector-overlay,
+            dialog[open]
+        `);
+        for (let i = 0; i < candidateModals.length; i++) {
+            const el = candidateModals[i];
+            if (el.classList.contains("active")) return true;
+            const inlineDisplay = el.style.display;
+            if (inlineDisplay && inlineDisplay !== "none") return true;
+            try {
+                const win = doc.defaultView || window;
+                const style = win.getComputedStyle(el);
+                if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
+                    return true;
+                }
+            } catch (_) {}
         }
     }
     if (window.FaceManager && window.FaceManager.inspectorCard) {
