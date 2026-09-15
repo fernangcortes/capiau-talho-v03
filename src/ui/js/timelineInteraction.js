@@ -4976,7 +4976,8 @@ export class CapiauTimelineInteraction {
 
         let noResultsEl = doc.getElementById("adjustments-no-results");
         if (cleanQuery === "") {
-            if (noResultsEl) noResultsEl.remove();
+            if (noResultsEl && typeof noResultsEl.remove === "function") noResultsEl.remove();
+            else if (noResultsEl && noResultsEl.parentNode) noResultsEl.parentNode.removeChild(noResultsEl);
             container.querySelectorAll(".adjustments-section").forEach(section => {
                 const sectionId = section.dataset.sectionId;
                 const matchesCategory = (activeCat === "all") || (categorySections[activeCat] && categorySections[activeCat].includes(sectionId));
@@ -5338,6 +5339,32 @@ export class CapiauTimelineInteraction {
 
         bindToolClick(toolButtons["select"], "select", "default");
         bindToolClick(toolButtons["marquee"], "marquee", "crosshair");
+
+        const btnFollow = doc.getElementById("btn-selection-follows-playhead");
+        const updateFollowButton = () => {
+            if (btnFollow) {
+                const active = !!TIMELINE_STATE.selectionFollowsPlayhead;
+                btnFollow.classList.toggle("active", active);
+                btnFollow.setAttribute("data-tooltip", active 
+                    ? "Seleção Acompanha a Agulha: ATIVADA (Ctrl+Alt+P)" 
+                    : "Seleção Acompanha a Agulha: DESATIVADA (Ctrl+Alt+P)");
+            }
+        };
+        this.updateFollowButton = updateFollowButton;
+        updateFollowButton();
+        if (btnFollow && !btnFollow.__capiauBound) {
+            btnFollow.__capiauBound = true;
+            btnFollow.onclick = () => {
+                const enabled = TIMELINE_STATE.toggleSelectionFollowsPlayhead();
+                updateFollowButton();
+                if (typeof window.showToast === "function") {
+                    window.showToast(enabled ? "Seleção Acompanha a Agulha: Ativada" : "Seleção Acompanha a Agulha: Desativada", "info");
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+                refocusTimeline(btnFollow);
+            };
+        }
         if (toolButtons["blade"] && !toolButtons["blade"].__capiauToolBound) {
             toolButtons["blade"].__capiauToolBound = true;
             toolButtons["blade"].onclick = () => {
@@ -10185,6 +10212,88 @@ export class CapiauTimelineInteraction {
             return;
         }
 
+        // Selecionar Clipe sob a Agulha (D no CapIAu / Premiere)
+        if (KEYMAP_SERVICE.matches(e, "edit.select_clip_at_playhead")) {
+            const hit = TIMELINE_STATE.getClipAtPlayhead();
+            if (hit) {
+                TIMELINE_STATE.selectClip(hit.id);
+                if (typeof window.showToast === "function") {
+                    window.showToast("Clipe selecionado sob a agulha", "info");
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+            } else {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Nenhum clipe sob a agulha para selecionar", "warning");
+                }
+            }
+            e.preventDefault();
+            return;
+        }
+
+        // Multi-Seleção sob a Agulha (Shift+D: seleciona todos sob o playhead e adiciona à seleção)
+        if (KEYMAP_SERVICE.matches(e, "edit.select_clips_multi")) {
+            const hits = TIMELINE_STATE.getAllClipsAtPlayhead();
+            if (hits.length > 0) {
+                const idsToAdd = new Set();
+                const cuts = STATE.activeTimelineCuts || [];
+                hits.forEach(h => {
+                    idsToAdd.add(h.id);
+                    if (h.link_id) {
+                        const partner = cuts.find(c => c.link_id === h.link_id && c.id !== h.id);
+                        if (partner) idsToAdd.add(partner.id);
+                    }
+                });
+                TIMELINE_STATE.addClipsToSelection(Array.from(idsToAdd));
+                if (typeof window.showToast === "function") {
+                    const count = TIMELINE_STATE.selectedClipIds ? TIMELINE_STATE.selectedClipIds.size : idsToAdd.size;
+                    window.showToast(`${count} clipe(s) selecionado(s) na agulha`, "info");
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+            } else {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Nenhum clipe sob a agulha para selecionar", "warning");
+                }
+            }
+            e.preventDefault();
+            return;
+        }
+
+        // Ativar / Desativar Clipe (F no CapIAu / DaVinci D)
+        if (KEYMAP_SERVICE.matches(e, "edit.toggle_clip_disable")) {
+            const res = TIMELINE_STATE.toggleClipDisabled();
+            if (res) {
+                if (typeof window.showToast === "function") {
+                    const statusMsg = res.newState ? "Clipe desativado (Muted / Bypass)" : "Clipe ativado";
+                    window.showToast(statusMsg, "info");
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+            } else {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Nenhum clipe selecionado ou sob a agulha", "warning");
+                }
+            }
+            e.preventDefault();
+            return;
+        }
+
+        // Alternar 'Selection Follows Playhead'
+        if (KEYMAP_SERVICE.matches(e, "timeline.toggle_selection_follows_playhead")) {
+            const active = TIMELINE_STATE.toggleSelectionFollowsPlayhead();
+            if (typeof this.updateFollowButton === "function") {
+                this.updateFollowButton();
+            }
+            if (typeof window.showToast === "function") {
+                window.showToast(active ? "Seleção Acompanha a Agulha: Ativada" : "Seleção Acompanha a Agulha: Desativada", "info");
+            }
+            if (this.renderer) this.renderer.requestRedraw();
+            this.refreshClipInspector();
+            e.preventDefault();
+            return;
+        }
+
         // Desvincular Par A/V
         if (KEYMAP_SERVICE.matches(e, "edit.unlink_av")) {
             if (selectedId) {
@@ -10268,7 +10377,7 @@ export class CapiauTimelineInteraction {
         // Deletes (Apagar clipe selecionado, marcadores, gap ou ripple delete)
         const hasMarkers = TIMELINE_STATE.selectedMarkerIds && TIMELINE_STATE.selectedMarkerIds.size > 0;
         const hasClips = (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) || !!selectedId;
-        const isDeleteKey = e.key === "Delete" || e.key === "Backspace" || KEYMAP_SERVICE.matches(e, "edit.lift_delete") || KEYMAP_SERVICE.matches(e, "edit.ripple_delete");
+        const isDeleteKey = e.key === "Delete" || e.key === "Backspace";
 
         if (hasMarkers && isDeleteKey) {
             TIMELINE_STATE.removeSelectedMarkers();
@@ -10303,7 +10412,13 @@ export class CapiauTimelineInteraction {
         }
 
         if (KEYMAP_SERVICE.matches(e, "edit.ripple_delete")) {
-            if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) {
+            if (TIMELINE_STATE.selectedGap) {
+                const gap = TIMELINE_STATE.selectedGap;
+                TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
+                if (this.renderer) this.renderer.requestRedraw();
+                e.preventDefault();
+                return;
+            } else if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) {
                 TIMELINE_STATE.rippleDeleteSelectedClips();
                 this.refreshClipInspector();
                 if (this.renderer) this.renderer.requestRedraw();
@@ -10315,6 +10430,29 @@ export class CapiauTimelineInteraction {
                 if (this.renderer) this.renderer.requestRedraw();
                 e.preventDefault();
                 return;
+            } else {
+                // Auto-target sob a agulha: gap ou clipe
+                const gapAtPlayhead = TIMELINE_STATE.getGapAtPlayhead();
+                if (gapAtPlayhead) {
+                    TIMELINE_STATE.rippleDeleteGap(gapAtPlayhead.trackId, gapAtPlayhead.startFrame, gapAtPlayhead.durationFrames);
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Ripple Delete no espaço vazio (Gap)", "info");
+                    }
+                    if (this.renderer) this.renderer.requestRedraw();
+                    e.preventDefault();
+                    return;
+                }
+                const clipAtPlayhead = TIMELINE_STATE.getClipAtPlayhead();
+                if (clipAtPlayhead) {
+                    TIMELINE_STATE.rippleDeleteClip(clipAtPlayhead.id);
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Ripple Delete no clipe sob a agulha", "info");
+                    }
+                    this.refreshClipInspector();
+                    if (this.renderer) this.renderer.requestRedraw();
+                    e.preventDefault();
+                    return;
+                }
             }
         }
 
@@ -10331,6 +10469,19 @@ export class CapiauTimelineInteraction {
                 if (this.renderer) this.renderer.requestRedraw();
                 e.preventDefault();
                 return;
+            } else {
+                // Auto-target sob a agulha
+                const clipAtPlayhead = TIMELINE_STATE.getClipAtPlayhead();
+                if (clipAtPlayhead) {
+                    TIMELINE_STATE.liftDeleteClip(clipAtPlayhead.id);
+                    if (typeof window.showToast === "function") {
+                        window.showToast("Lift Delete no clipe sob a agulha (mantido gap)", "info");
+                    }
+                    this.refreshClipInspector();
+                    if (this.renderer) this.renderer.requestRedraw();
+                    e.preventDefault();
+                    return;
+                }
             }
         }
 

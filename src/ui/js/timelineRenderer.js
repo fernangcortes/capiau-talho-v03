@@ -1378,6 +1378,23 @@ export class CapiauTimelineRenderer {
             ctx.strokeRect(startX, clipY, width, clipHeight);
             if (isPartner) ctx.setLineDash([]);
 
+            // Clipe Desativado / Muted: véu escuro e textura de listras diagonais sutis
+            if (cut.disabled === true) {
+                ctx.save();
+                ctx.fillStyle = "rgba(10, 10, 15, 0.68)";
+                ctx.fillRect(startX, clipY, width, clipHeight);
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+                ctx.lineWidth = 1;
+                const step = 14;
+                ctx.beginPath();
+                for (let lx = startX - clipHeight; lx < startX + width; lx += step) {
+                    ctx.moveTo(lx, clipY + clipHeight);
+                    ctx.lineTo(lx + clipHeight, clipY);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
             // Waveform apenas nos clipes das pistas de áudio (fotos/textos não têm áudio)
             if (laneKind === "audio") {
                 this.drawWaveform(cut, startX, clipY, width, clipHeight, style.wave, lane.track);
@@ -1413,12 +1430,16 @@ export class CapiauTimelineRenderer {
                 label = `${prefix} ${name} [${inTc} → ${outTc}]`;
             }
 
+            if (cut.disabled === true) {
+                label = `⊘ [DESATIVADO] ${label}`;
+            }
+
             ctx.save();
             ctx.beginPath();
             ctx.rect(startX + 4, clipY, width - 8, clipHeight);
             ctx.clip(); // Limita o desenho do texto ao espaço do clipe
 
-            ctx.fillStyle = this.colors.textPrimary;
+            ctx.fillStyle = cut.disabled === true ? "rgba(180, 180, 195, 0.65)" : this.colors.textPrimary;
             ctx.font = "bold 10px Inter, sans-serif";
             ctx.fillText(label, startX + 8, clipY + 14);
             ctx.restore();
@@ -1597,6 +1618,11 @@ export class CapiauTimelineRenderer {
      * 4. Tratamento de áudio ({ type: "audio_render", status: "ready", analysis_before, analysis_after, disabled }) quando em modo tratado
      */
     getClipEffectiveAudioGain(cut, track) {
+        // 0. Clipe desativado por completo (mute / bypass)
+        if (cut && cut.disabled === true) {
+            return 0;
+        }
+
         if (!track && typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.getTrack === "function") {
             track = TIMELINE_STATE.getTrack(cut.track);
         }

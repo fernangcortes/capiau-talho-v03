@@ -1945,6 +1945,7 @@ export class ProgramPlayer {
         const videoTracks = TIMELINE_STATE.getVideoTracks().filter(t => !TIMELINE_STATE.muteHiddenTracksPlayback || !t.hidden); // ordem visual: topo → base
         const clipAtPlayhead = (trackId) => cuts.find(c =>
             c.track === trackId &&
+            !c.disabled &&
             currentFrame >= c.timelineStartFrame &&
             currentFrame < (c.timelineStartFrame + (c.outFrame - c.inFrame))
         );
@@ -2738,7 +2739,7 @@ export class ProgramPlayer {
             const vol = (track.volume !== undefined && typeof track.volume === "number" && Number.isFinite(track.volume)) ? track.volume : 1.0;
             const rawFinalVol = vol * clipVol * fadeVol;
             const finalVol = (typeof rawFinalVol === "number" && Number.isFinite(rawFinalVol)) ? Math.max(0, Math.min(1.0, rawFinalVol)) : 1.0;
-            el.volume = (track.muted || isHighSpeedOrReverse) ? 0 : finalVol;
+            el.volume = (track.muted || cut.disabled || isHighSpeedOrReverse) ? 0 : finalVol;
 
             if (this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse && el.paused) {
                 this._retomarContextoAudioAoVivo();

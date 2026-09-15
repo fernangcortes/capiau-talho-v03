@@ -176,10 +176,18 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
     (ou **`Cmd`**) ao arrastar ou soltar para executar *Ripple Insert* (com linha guia roxa e setas).
   - **Sync Lock granular por pista:** Botões dedicados nos cabeçalhos de V1, V2, A1 e A2 para
     habilitar ou desabilitar se a pista deve acompanhar operações de ripple (gaps, deletes e trims).
-  - **Snapping Magnético global (`S`):** Atalho rápido para ligar/desligar o encaixe magnético, com
-    linhas guias verticais ciano projetadas em tempo real através de todas as pistas.
-  - **Lift Delete (`Delete`) vs. Ripple Delete (`Shift + Delete`):** Escolha se a exclusão de um clipe
-    deve preservar o buraco intacto ou fechar a timeline puxando os cortes seguintes.
+  - **Snapping Magnético global (`N` ou `Shift+S`):** Atalho rápido para ligar/desligar o encaixe magnético (padrão DaVinci Resolve / Final Cut Pro), com linhas guias verticais ciano projetadas em tempo real através de todas as pistas.
+  - **Suíte de Edição Rápida com Uma Mão (Q-W-E-R & A-S-D-F):**
+    - `Q` / `W`: *Ripple Trim Head* e *Tail* até a agulha de reprodução.
+    - `E`: *Split* / Dividir clipe sob o playhead (sem necessidade de seleção manual).
+    - `R`: *Ripple Delete* instantâneo (apaga clipe ou gap sob a agulha e fecha a lacuna).
+    - `Alt + R`: *Lift Delete* rápido com a mão esquerda (apaga mantendo o gap vazio).
+    - `A` / `S`: Salto imediato para o ponto de corte anterior / seguinte (*Previous / Next Edit Point*).
+    - `D`: *Select Clip at Playhead* (seleciona o clipe sob a agulha na trilha ativa com 1 toque).
+    - `Shift + D`: *Multi-Select at Playhead* (seleciona todos os clipes sob a agulha em todas as pistas e acumula à seleção existente).
+    - `F`: *Toggle Disable / Mute Clip* (desativa / silencia o clipe com visual acinzentado e bypass em playback e export).
+  - **Exclusão Dedicada (`Backspace` vs. `Delete`):** Pressione **`Backspace`** (ou **`R`**) para Ripple Delete (apaga e junta tudo); use **`Delete`** (ou **`Alt + R`**) para Lift Delete (apaga deixando o vão vazio intacto).
+  - **Modo 'Seleção Acompanha a Agulha' (*Selection Follows Playhead*):** Modo comutável por botão com luz de status ciano na barra de ferramentas (`#btn-selection-follows-playhead`) ou pelo atalho **`Ctrl + Alt + P`**, selecionando automaticamente o clipe que cruza a agulha ao navegar para agilizar cortes e inspeções sem tocar no mouse.
 
 - **Suíte Clássica de Ferramentas NLE de Precisão (Tool Strip Vertical).** Barra lateral ergonômica com layout *seamless*, cursores temáticos em SVG e paridade com os principais NLEs de mercado:
   - **Lâmina / Gilete (`C`):** Divide o clipe no cursor com precisão cirúrgica ou fatia todas as pistas destravadas na agulha com **`Shift + C`**.
@@ -202,7 +210,7 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   undo/redo); edições complexas ou em lote viram rascunhos visuais (*ghost clips*) para aprovação.
 
 - **Modal de alternativas da IA.** Todo clipe inserido pela IA carrega candidatos semânticos.
-  Selecione um clipe e pressione **`A`**: um modal exibe cada alternativa tocando em loop silencioso,
+  Selecione um clipe e pressione **`Alt + A`**: um modal exibe cada alternativa tocando em loop silencioso,
   com a justificativa da IA. Troque com um clique usando **Slot Fixo** (mantém a duração) ou
   **Ripple** (desloca a timeline para encaixar a duração ideal).
 

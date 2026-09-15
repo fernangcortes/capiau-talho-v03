@@ -215,6 +215,7 @@ export class CapiauTimelineState {
         this.selectedTrack = "V1"; // Track focada ativa
         this.selectedGap = null; // Gap selecionado: { trackId, startFrame, endFrame, durationFrames }
         this.snappingEnabled = true; // Encaixe magnético global ativo por padrão
+        this.selectionFollowsPlayhead = false; // Modo 'Seleção Acompanha a Agulha' (Toggle)
 
         this.width = 1920; // Largura padrão da sequência (Fase 1)
         this.height = 1080; // Altura padrão da sequência (Fase 1)
@@ -2083,6 +2084,22 @@ export class CapiauTimelineState {
     }
 
     /**
+     * Adiciona múltiplos clipes à seleção atual sem descartar os já selecionados (Shift+D).
+     */
+    addClipsToSelection(clipIds) {
+        if (!this.selectedClipIds) this.selectedClipIds = new Set();
+        if (Array.isArray(clipIds)) {
+            clipIds.forEach(id => this.selectedClipIds.add(id));
+            if (!this.selectedClipId && clipIds.length > 0) {
+                this.selectedClipId = clipIds[0];
+            }
+        }
+        this.clearSelectedGap();
+        this.selectedGhostClipId = null;
+        STATE.emit("timelineSelectionChanged", this.selectedClipId);
+    }
+
+    /**
      * Limpa a seleção de clipes ativa.
      */
     clearClipSelection() {
@@ -2710,6 +2727,156 @@ export class CapiauTimelineState {
         if (this.playheadFrame === newFrame) return;
         this.playheadFrame = newFrame;
         STATE.emit("timelinePlayheadChanged", this.playheadFrame);
+        if (this.selectionFollowsPlayhead) {
+            this.syncSelectionToPlayhead();
+        }
+    }
+
+    /**
+     * Localiza o clipe sob o playhead (respeitando pista ativa, V1 ou pistas destravadas).
+     */
+    getClipAtPlayhead(playhead = this.playheadFrame, preferredTrack = this.selectedTrack) {
+        const cuts = STATE.activeTimelineCuts || [];
+        const fps = this.fps || 24;
+        const coversPlayhead = (c) => {
+            const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+            const dur = (c.outFrame !== undefined ? c.outFrame : 0) - (c.inFrame !== undefined ? c.inFrame : 0);
+            const end = start + dur;
+            return playhead >= start && playhead < end;
+        };
+
+        const unlockedTracks = new Set(
+            (this.tracks || []).filter(t => !t.locked && t.kind !== "ai").map(t => t.id)
+        );
+
+        // a) Pista preferida / focada
+        if (preferredTrack && unlockedTracks.has(preferredTrack)) {
+            const hit = cuts.find(c => c.track === preferredTrack && coversPlayhead(c));
+            if (hit) return hit;
+        }
+
+        // b) V1
+        if (unlockedTracks.has("V1")) {
+            const v1Hit = cuts.find(c => c.track === "V1" && coversPlayhead(c));
+            if (v1Hit) return v1Hit;
+        }
+
+        // c) Qualquer pista de vídeo destravada
+        const videoHit = cuts.find(c => unlockedTracks.has(c.track) && c.track && c.track.startsWith("V") && coversPlayhead(c));
+        if (videoHit) return videoHit;
+
+        // d) Qualquer outra pista destravada
+        const anyHit = cuts.find(c => (unlockedTracks.size === 0 || unlockedTracks.has(c.track)) && coversPlayhead(c));
+        return anyHit || null;
+    }
+
+    /**
+     * Localiza todos os clipes sob o playhead em pistas destravadas.
+     */
+    getAllClipsAtPlayhead(playhead = this.playheadFrame) {
+        const cuts = STATE.activeTimelineCuts || [];
+        const fps = this.fps || 24;
+        const coversPlayhead = (c) => {
+            const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+            const dur = (c.outFrame !== undefined ? c.outFrame : 0) - (c.inFrame !== undefined ? c.inFrame : 0);
+            const end = start + dur;
+            return playhead >= start && playhead < end;
+        };
+
+        const unlockedTracks = new Set(
+            (this.tracks || []).filter(t => !t.locked && t.kind !== "ai").map(t => t.id)
+        );
+
+        return cuts.filter(c => unlockedTracks.has(c.track) && coversPlayhead(c));
+    }
+
+    /**
+     * Localiza um gap (espaço vazio) sob o playhead na trilha alvo ou em V1.
+     */
+    getGapAtPlayhead(playhead = this.playheadFrame, preferredTrack = this.selectedTrack) {
+        const cuts = STATE.activeTimelineCuts || [];
+        const trackId = (preferredTrack && this.tracks.some(t => t.id === preferredTrack && !t.locked)) ? preferredTrack : "V1";
+        const trackCuts = cuts
+            .filter(c => c.track === trackId)
+            .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+
+        let cursor = 0;
+        for (const c of trackCuts) {
+            const start = c.timelineStartFrame || 0;
+            const dur = (c.outFrame || 0) - (c.inFrame || 0);
+            if (playhead >= cursor && playhead < start) {
+                return { trackId, startFrame: cursor, endFrame: start, durationFrames: start - cursor };
+            }
+            cursor = Math.max(cursor, start + dur);
+        }
+        return null;
+    }
+
+    /**
+     * Sincroniza a seleção da timeline com o clipe sob a agulha quando selectionFollowsPlayhead está ativo.
+     */
+    syncSelectionToPlayhead() {
+        const clip = this.getClipAtPlayhead();
+        if (clip) {
+            if (this.selectedClipId !== clip.id) {
+                this.selectClip(clip.id);
+            }
+        } else {
+            if (this.selectedClipId) {
+                this.clearClipSelection();
+            }
+        }
+    }
+
+    /**
+     * Alterna o modo 'Selection Follows Playhead'.
+     */
+    toggleSelectionFollowsPlayhead() {
+        this.selectionFollowsPlayhead = !this.selectionFollowsPlayhead;
+        if (this.selectionFollowsPlayhead) {
+            this.syncSelectionToPlayhead();
+        }
+        return this.selectionFollowsPlayhead;
+    }
+
+    /**
+     * Alterna o estado ativo/desativado (disabled / mute / bypass) do clipe selecionado ou sob a agulha.
+     */
+    toggleClipDisabled(clipId) {
+        const cuts = STATE.activeTimelineCuts || [];
+        let targetId = clipId || this.selectedClipId;
+        if (!targetId && this.selectedClipIds && this.selectedClipIds.size > 0) {
+            targetId = Array.from(this.selectedClipIds)[0];
+        }
+        if (!targetId) {
+            const hit = this.getClipAtPlayhead();
+            if (hit) targetId = hit.id;
+        }
+        if (!targetId) return null;
+
+        const clip = cuts.find(c => c.id === targetId);
+        if (!clip) return null;
+
+        const newState = !clip.disabled;
+        const targets = [clip];
+        if (clip.link_id) {
+            const partner = cuts.find(c => c.link_id === clip.link_id && c.id !== clip.id);
+            if (partner) targets.push(partner);
+        }
+
+        const hist = (typeof TIMELINE_HISTORY !== "undefined" ? TIMELINE_HISTORY : (typeof window !== "undefined" ? window.TIMELINE_HISTORY : null));
+        if (hist && typeof hist.record === "function") {
+            hist.record(() => {
+                targets.forEach(t => { t.disabled = newState; });
+                STATE.activeTimelineCuts = cuts;
+            });
+        } else {
+            targets.forEach(t => { t.disabled = newState; });
+            STATE.activeTimelineCuts = cuts;
+        }
+
+        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        return { clip, newState };
     }
 
     /**

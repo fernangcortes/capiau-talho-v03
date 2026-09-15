@@ -1391,6 +1391,7 @@ function _assinaturaDaTela() {
     const fps = Number((TIMELINE_STATE && TIMELINE_STATE.fps) || 24) || 24;
     let clipes = 0, efeitos = 0, duracao = 0;
     cortes.forEach(c => {
+        if (c.disabled) return;                          // Clipes desativados não renderizam
         if (idsIA.has(String(c.track))) return;         // P1: pista de IA nunca renderiza
         clipes += 1;
         efeitos += Array.isArray(c.effects) ? c.effects.length : 0;
@@ -1461,7 +1462,7 @@ async function salvarTimelineDaTela() {
         // mapeamento do botao "Salvar timeline" em panels.js:1995 -- passar os
         // cortes crus devolve 422 com "Field required: in_time" para cada clipe.
         const fps = Number(TIMELINE_STATE.fps) || 24;
-        const cortes = (STATE.activeTimelineCuts || []).map(c => ({
+        const cortes = (STATE.activeTimelineCuts || []).filter(c => !c.disabled).map(c => ({
             id: String(c.id),
             type: c.type || "video",
             video_id: c.video_id ?? null,

@@ -323,6 +323,24 @@ export const COMMANDS_CATALOG = [
         label: "Trim Ponto OUT: Avançar 1 Frame",
         description: "Avança a ponta final do clipe selecionado em 1 frame"
     },
+    {
+        id: "edit.select_clip_at_playhead",
+        category: "edit",
+        label: "Selecionar Clipe sob a Agulha",
+        description: "Seleciona o clipe na trilha ativa posicionado sob a agulha de reprodução (D)"
+    },
+    {
+        id: "edit.select_clips_multi",
+        category: "edit",
+        label: "Multi-Seleção na Agulha (Adicionar à Seleção)",
+        description: "Seleciona todos os clipes sob a agulha em todas as pistas e adiciona à seleção existente (Shift+D)"
+    },
+    {
+        id: "edit.toggle_clip_disable",
+        category: "edit",
+        label: "Ativar / Desativar Clipe (Mute / Bypass)",
+        description: "Alterna se o clipe selecionado (ou sob a agulha) está ativo ou desativado"
+    },
 
     // ── MARCADORES ──────────────────────────────────────────────────────────
     {
@@ -388,6 +406,12 @@ export const COMMANDS_CATALOG = [
         category: "canvas_history",
         label: "Restaurar Zoom Padrão (1:1 / 0.5 px/f)",
         description: "Restaura a escala da régua e dos clipes para o zoom padrão de 0.5 pixels por frame"
+    },
+    {
+        id: "timeline.toggle_selection_follows_playhead",
+        category: "canvas_history",
+        label: "Alternar 'Seleção Acompanha a Agulha'",
+        description: "Ativa ou desativa a seleção automática do clipe sob a agulha ao se mover"
     },
     {
         id: "history.undo",
@@ -637,8 +661,8 @@ export const KEYMAP_PRESETS = {
         "playback.append_timeline": ["Shift+KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
-        "playback.prev_edit_point": ["ArrowUp"],
-        "playback.next_edit_point": ["ArrowDown"],
+        "playback.prev_edit_point": ["ArrowUp", "KeyA"],
+        "playback.next_edit_point": ["ArrowDown", "KeyS"],
 
         "tools.select": ["KeyV"],
         "tools.marquee": ["Shift+KeyV"],
@@ -646,18 +670,21 @@ export const KEYMAP_PRESETS = {
         "tools.blade_global": ["Shift+KeyC"],
         "tools.slip": ["KeyY"],
         "tools.slide": ["KeyU"],
-        "tools.rolling": ["KeyN"],
+        "tools.rolling": ["Shift+KeyN"],
         "tools.track_forward": ["KeyT"],
         "tools.track_backward": ["Shift+KeyT"],
-        "tools.snapping": ["KeyS"],
+        "tools.snapping": ["KeyN", "Shift+KeyS"],
         "tools.hand": ["KeyH"],
         "tools.escape": ["Escape"],
 
         "edit.split": ["KeyE", "KeyZ", "Alt+KeyE", "Alt+KeyZ"],
         "edit.ripple_trim_head": ["KeyQ"],
         "edit.ripple_trim_tail": ["KeyW"],
-        "edit.lift_delete": ["Delete", "Backspace"],
-        "edit.ripple_delete": ["Shift+Delete"],
+        "edit.lift_delete": ["Delete", "Alt+KeyR"],
+        "edit.ripple_delete": ["KeyR", "Backspace", "Shift+Delete"],
+        "edit.select_clip_at_playhead": ["KeyD"],
+        "edit.select_clips_multi": ["Shift+KeyD"],
+        "edit.toggle_clip_disable": ["KeyF"],
         "edit.lift_in_out": ["Semicolon", "Alt+Delete"],
         "edit.extract_in_out": ["Quote", "Alt+Shift+Delete"],
         "edit.delete_single_stream": ["Alt+Delete"],
@@ -673,7 +700,7 @@ export const KEYMAP_PRESETS = {
         "markers.next": ["Shift+KeyM"],
         "markers.prev": ["Alt+KeyM"],
 
-        "ai.toggle_alternatives": ["KeyA"],
+        "ai.toggle_alternatives": ["Alt+KeyA"],
         "ai.accept_ghost": ["Enter", "KeyY"],
         "ai.reject_ghost": ["Delete", "KeyN"],
 
@@ -685,6 +712,7 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_in": ["Equal", "NumpadAdd"],
         "timeline.zoom_out": ["Minus", "NumpadSubtract"],
         "timeline.zoom_reset": ["Period"],
+        "timeline.toggle_selection_follows_playhead": ["Ctrl+Alt+KeyP"],
 
         // Layout & Workspace (Numpad & Slots)
         "workspace.numpad_1": ["Numpad1"],
