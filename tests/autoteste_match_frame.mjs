@@ -217,6 +217,63 @@ assert.ok(badgesMatch.includes("Alt + F"), "Badges de edit.match_frame no CapIAu
 assert.ok(badgesRevMatch.includes("Shift + F"), "Badges de edit.reverse_match_frame no CapIAu devem conter 'Shift + F'");
 console.log("  ✔ Renderização de badges HTML validada com sucesso.");
 
+// ── 4.1 INTERAÇÃO BIDIRECIONAL DO TECLADO VIRTUAL COM ÍNDICE ESQUEMÁTICO ────
+console.log("\n4.1 Validando highlightSchematicItem com prioridade de combinação exata...");
+const createMockSchematicItem = (code, combo) => {
+    const classes = new Set();
+    let scrollCount = 0;
+    return {
+        dataset: { code, combo },
+        classList: {
+            add: (c) => classes.add(c),
+            remove: (c) => classes.delete(c),
+            contains: (c) => classes.has(c)
+        },
+        scrollIntoView: () => { scrollCount++; },
+        get scrollCount() { return scrollCount; },
+        resetScroll: () => { scrollCount = 0; }
+    };
+};
+
+const itemAltF = createMockSchematicItem("KeyF", "Alt+KeyF"); // Match Frame
+const itemShiftF = createMockSchematicItem("KeyF", "Shift+KeyF"); // Reverse Match Frame
+const itemKeyF = createMockSchematicItem("KeyF", "KeyF"); // Ativar/Desativar Clipe
+const mockItems = [itemAltF, itemShiftF, itemKeyF];
+
+const originalQSA = globalThis.document.querySelectorAll;
+globalThis.document.querySelectorAll = (selector) => {
+    if (selector === ".vk-schematic-item") return mockItems;
+    return typeof originalQSA === "function" ? originalQSA(selector) : [];
+};
+
+const { PanelsManager } = await import("../src/ui/js/panels.js");
+const pmInstance = Object.create(PanelsManager.prototype);
+
+// Teste A: Inspecionar tecla F na camada Alt (combo "Alt+KeyF")
+pmInstance.highlightSchematicItem("KeyF", "Alt+KeyF");
+assert.ok(itemAltF.classList.contains("active"), "Item Alt+KeyF (Match Frame) deve ficar ativo");
+assert.ok(!itemShiftF.classList.contains("active"), "Item Shift+KeyF NÃO deve ficar ativo");
+assert.ok(!itemKeyF.classList.contains("active"), "Item KeyF (Desativar clipe) NÃO deve ficar ativo");
+assert.strictEqual(itemAltF.scrollCount, 1, "scrollIntoView deve ser chamado em Alt+KeyF");
+assert.strictEqual(itemKeyF.scrollCount, 0, "scrollIntoView NUNCA deve ser chamado em KeyF ao inspecionar Alt+KeyF");
+
+// Teste B: Inspecionar tecla F na camada Shift (combo "Shift+KeyF")
+itemAltF.resetScroll();
+itemKeyF.resetScroll();
+pmInstance.highlightSchematicItem("KeyF", "Shift+KeyF");
+assert.ok(!itemAltF.classList.contains("active"), "Item Alt+KeyF NÃO deve ficar ativo");
+assert.ok(itemShiftF.classList.contains("active"), "Item Shift+KeyF (Reverse Match Frame) deve ficar ativo");
+assert.ok(!itemKeyF.classList.contains("active"), "Item KeyF NÃO deve ficar ativo");
+
+// Teste C: Inspecionar tecla F na camada Padrão (combo "KeyF")
+pmInstance.highlightSchematicItem("KeyF", "KeyF");
+assert.ok(!itemAltF.classList.contains("active"), "Item Alt+KeyF NÃO deve ficar ativo");
+assert.ok(!itemShiftF.classList.contains("active"), "Item Shift+KeyF NÃO deve ficar ativo");
+assert.ok(itemKeyF.classList.contains("active"), "Item KeyF (Desativar clipe) deve ficar ativo");
+
+globalThis.document.querySelectorAll = originalQSA;
+console.log("  ✔ highlightSchematicItem isola perfeitamente cada combinação sem conflito de foco.");
+
 // ── 5. MATEMÁTICA DO MATCH FRAME (TIMELINE ➔ SOURCE) ────────────────────────
 console.log("\n5. Validando Matemática do Match Frame (Timeline ➔ Source)...");
 TIMELINE_STATE.fps = 24;

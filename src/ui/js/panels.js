@@ -3698,6 +3698,7 @@ export class PanelsManager {
         this._activeEditorCategory = "all";
         this._keymapSearchQuery = "";
         this._vkActiveLayer = "none";
+        this._vkManualLayer = "none";
 
         const refreshAll = () => {
             if (selectPreset) selectPreset.value = KEYMAP_SERVICE.getActivePreset();
@@ -3893,6 +3894,10 @@ export class PanelsManager {
                 else if (cmd.category === "workspace_numpad") dot.style.backgroundColor = "#10b981";
                 else dot.style.backgroundColor = "#94a3b8";
                 keyEl.appendChild(dot);
+                const cmdName = cmd.label || cmd.name || cmd.id;
+                keyEl.title = `${cmdName} [${KEYMAP_SERVICE.formatCombo(combo)}]`;
+            } else {
+                keyEl.title = `Tecla [${KEYMAP_SERVICE.formatCombo(combo)}] (sem comando nesta camada)`;
             }
         });
 
@@ -3971,14 +3976,42 @@ export class PanelsManager {
     }
 
     highlightSchematicItem(code, combo) {
-        document.querySelectorAll(".vk-schematic-item").forEach(item => {
-            if (item.dataset.combo === combo || item.dataset.code === code) {
-                item.classList.add("active");
-                item.scrollIntoView({ behavior: "smooth", block: "nearest" });
-            } else {
+        let exactMatchFound = false;
+
+        // 1. Prioridade absoluta: correspondência exata pelo combo ativo (ex: "Alt+KeyF", "Shift+KeyF" ou "KeyF")
+        if (combo) {
+            document.querySelectorAll(".vk-schematic-item").forEach(item => {
+                if (item.dataset.combo === combo) {
+                    item.classList.add("active");
+                    item.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                    exactMatchFound = true;
+                } else {
+                    item.classList.remove("active");
+                }
+            });
+        }
+
+        // 2. Se nenhuma combinação exata foi encontrada e a camada for a padrão (sem modificador no combo)
+        if (!exactMatchFound && code && combo && !combo.includes("+")) {
+            let firstScrolled = false;
+            document.querySelectorAll(".vk-schematic-item").forEach(item => {
+                if (item.dataset.combo === code) {
+                    item.classList.add("active");
+                    if (!firstScrolled) {
+                        item.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                        firstScrolled = true;
+                    }
+                    exactMatchFound = true;
+                }
+            });
+        }
+
+        // 3. Se não houver nada mapeado para esta combinação específica, desmarca os itens esquemáticos
+        if (!exactMatchFound) {
+            document.querySelectorAll(".vk-schematic-item").forEach(item => {
                 item.classList.remove("active");
-            }
-        });
+            });
+        }
     }
 
     clearKeymapHighlight() {
@@ -4019,7 +4052,9 @@ export class PanelsManager {
         // Botões de camada de modificadores
         document.querySelectorAll(".vk-mod-btn").forEach(btn => {
             btn.addEventListener("click", () => {
-                this.setVirtualKeyboardLayer(btn.dataset.layer || "none");
+                const layer = btn.dataset.layer || "none";
+                this._vkManualLayer = layer;
+                this.setVirtualKeyboardLayer(layer);
             });
         });
 
@@ -4085,6 +4120,11 @@ export class PanelsManager {
             // Ignora se estiver digitando no campo de busca do editor
             if (e.target && e.target.tagName === "INPUT") return;
 
+            // Evita que o Alt acione atalhos de janela/menus nativos do navegador no Windows
+            if (e.key === "Alt" || e.altKey) {
+                e.preventDefault();
+            }
+
             // Atualiza camada de modificadores
             if (e.ctrlKey && e.altKey) {
                 if (this._vkActiveLayer !== "ctrl-alt") this.setVirtualKeyboardLayer("ctrl-alt");
@@ -4094,6 +4134,19 @@ export class PanelsManager {
                 this.setVirtualKeyboardLayer("ctrl");
             } else if (e.altKey && this._vkActiveLayer !== "alt") {
                 this.setVirtualKeyboardLayer("alt");
+            }
+
+            // Se pressionou apenas uma tecla modificadora isolada (ex: Shift, Ctrl, Alt)
+            const isModifierOnly = ["Alt", "Control", "Shift", "Meta"].includes(e.key) ||
+                ["AltLeft", "AltRight", "ControlLeft", "ControlRight", "ShiftLeft", "ShiftRight", "MetaLeft", "MetaRight"].includes(e.code);
+
+            if (isModifierOnly) {
+                const modKeyEl = document.querySelector(`.vk-keycap[data-code="${e.code}"]`);
+                if (modKeyEl) {
+                    modKeyEl.classList.add("is-pressed");
+                    setTimeout(() => modKeyEl.classList.remove("is-pressed"), 200);
+                }
+                return;
             }
 
             const parts = [];
@@ -4116,8 +4169,12 @@ export class PanelsManager {
 
         window.addEventListener("keyup", (e) => {
             if (!modal || modal.style.display === "none") return;
-            if (!e.shiftKey && !e.ctrlKey && !e.altKey && this._vkActiveLayer !== "none") {
-                this.setVirtualKeyboardLayer("none");
+            if (!e.shiftKey && !e.ctrlKey && !e.altKey) {
+                // Quando todas as teclas modificadoras físicas são soltas, restaura a camada manual ativa
+                const targetLayer = this._vkManualLayer || "none";
+                if (this._vkActiveLayer !== targetLayer) {
+                    this.setVirtualKeyboardLayer(targetLayer);
+                }
             }
         });
     }

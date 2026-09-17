@@ -20,6 +20,8 @@ profissional.
 3. [🤖 3. Assistente Conversacional de Edição (Chat-Agente) & Ghost Clips](#3-assistente-conversacional-de-edição-chat-agente--ghost-clips)
 4. [👥 4. Mapeamento de Rostos, Objetos e Desambiguação Rápida](#4-mapeamento-de-rostos-objetos-e-desambiguação-rápida)
 5. [🎛️ 5. Arquitetura Track-Based NLE, Gaps, Sync Lock e J/L-Cuts Nativos](#5-arquitetura-track-based-nle-gaps-sync-lock-e-jl-cuts-nativos)
+   - [Montagem Clássica de 3 e 4 Pontos & Roteamento de Canais](#p-montagem-clássica-de-3-e-4-pontos--roteamento-de-canais-insert--overwrite)
+   - [Localizar Quadro na Fonte (Match Frame & Reverse)](#q-localizar-quadro-original-na-fonte-match-frame--reverse-match-frame)
 6. [🎚️ 6. Tratamento de Áudio: Diagnóstico, Presets e Comparação A/B](#6-tratamento-de-áudio-diagnóstico-presets-e-comparação-ab)
 7. [🔄 7. Carrossel de Alternativas da IA (Atalho A)](#7-carrossel-de-alternativas-da-ia-atalho-a)
 8. [💾 8. Salvando, Auto-Salvamento & Logs com IA](#8-salvando-auto-salvamento--logs-com-ia)
@@ -437,6 +439,37 @@ Para equilibrar ergonomia visual e performance em sequências densas, a timeline
 O controle vertical das pistas de vídeo e áudio conta com granularidade dupla:
 - **Redimensionamento de Pista Específica (`Shift + Roda do Mouse` sobre o cabeçalho da pista):** Posicione o cursor do mouse sobre o cabeçalho de uma pista específica (ex.: `V1` ou `A1`) e gire a roda mantendo **`Shift`** pressionado. Apenas aquela pista terá sua altura ajustada de forma cirúrgica (entre 22px e 240px em incrementos de 8px), permitindo inspecionar uma forma de onda ou miniatura detalhada sem inflar as demais pistas da timeline.
 - **Redimensionamento Global da Timeline (`Shift + Roda` sobre o Canvas ou `Numpad +` / `Numpad -`):** Girar a roda com **`Shift`** sobre a área livre dos clipes ou régua ajusta a escala vertical uniforme (`trackHeightScale` de 0.5x a 1.7x) de todas as faixas simultaneamente.
+
+### P. Montagem Clássica de 3 e 4 Pontos & Roteamento de Canais (Insert & Overwrite)
+A montagem de 3 e 4 pontos permite transferir trechos do monitor de origem (Source Player) diretamente para a agulha da timeline com máxima rapidez:
+- **Inserção Ripple / Insert (Tecla `,` - Vírgula):**
+  - Divide os clipes sob a agulha na timeline ativa e insere o trecho demarcado entre os pontos [In–Out] do Source Player.
+  - Empurra automaticamente todos os clipes subsequentes para a direita, preservando a sincronia das pistas com Sync Lock ativo.
+  - A agulha de reprodução avança exatamente até o término do trecho inserido, preparando a próxima inserção contínua.
+- **Sobrescrita / Overwrite (Tecla `.` - Ponto ou `F10`):**
+  - Substitui o trecho da timeline a partir da agulha pela duração do trecho [In–Out] do Source Player, sem empurrar a timeline nem alterar a duração total da sequência.
+- **Seletor Cíclico de Canais de Destino (`AV` ➔ `V` ➔ `A`):**
+  - Alterne o modo de canais pressionando **`Ctrl + Alt + A`** ou clicando no botão dinâmico `#btn-source-toggle-audio` no Source Player.
+  - **`AV` (Áudio + Vídeo):** Insere vídeo na pista V ativa e áudio na pista A pareada, com vinculação de corte ativada.
+  - **`V` (Apenas Vídeo):** Grava exclusivamente o vídeo na pista de vídeo ativa, ideal para B-Rolls e inserts sem poluir as trilhas de som.
+  - **`A` (Apenas Áudio):** Grava exclusivamente a faixa sonora na pista de áudio pareada, ideal para narrações e depoimentos em off (inclui proteção contra inserção de fotos no modo áudio).
+- **Desfazer / Refazer com Memória de Agulha:** As operações de 3 pontos são 100% atômicas no histórico (`Ctrl+Z` / `Ctrl+Y`), restaurando tanto os clipes quanto a coordenada exata da agulha.
+
+### Q. Localizar Quadro Original na Fonte (Match Frame & Reverse Match Frame)
+A navegação bidirecional de frames conecta de forma transparente a timeline montada e os arquivos originais da biblioteca:
+- **Match Frame (`Alt + F` no CapIAu / `F` no Premiere e Resolve / `Shift + F` no Final Cut):**
+  - Posicione a agulha sobre qualquer clipe na timeline. Ao acionar o comando (ou clicar no botão com mira `#btn-match-frame` no Program Player), o sistema localiza a mídia bruta na biblioteca e abre instantaneamente o Source Player no mesmo instante temporal exato:
+    $$\text{sourceTime} = \frac{\text{inFrame} + (\text{playheadFrame} - \text{timelineStartFrame})}{\text{fps}}$$
+  - Os limites [IN–OUT] do corte da timeline são projetados no mini-slider do Source Player para conferência visual de sobras e handles de filmagem.
+  - O sistema respeita a pista selecionada pelo usuário ou desempata priorizando a pista superior de vídeo visível (**V2 > V1 > A2 > A1**).
+  - O foco é transferido para o Source Player para controle imediato via teclado.
+- **Reverse Match Frame (`Shift + F` no CapIAu, Premiere, Resolve e Kdenlive / `Alt + F` no Final Cut):**
+  - A partir de qualquer posição no Source Player, acione o atalho (ou clique no botão `#btn-source-reverse-match` no Source Player).
+  - O sistema varre a timeline ativa e localiza onde aquele quadro específico está sendo utilizado:
+    $$\text{targetPlayheadFrame} = \text{timelineStartFrame} + (\text{sourceFrame} - \text{inFrame})$$
+  - Caso a mesma mídia bruta tenha sido fatiada em múltiplos cortes pela timeline, o algoritmo seleciona inteligentemente a ocorrência mais próxima da posição atual da agulha.
+  - A agulha salta para a coordenada calculada, o clipe é selecionado e o foco vai para o Program Player.
+  - Caso o quadro inspecionado não esteja presente na timeline, um aviso não-intrusivo via toast notifica o editor.
 
 ---
 

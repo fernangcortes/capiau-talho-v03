@@ -199,6 +199,21 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   - **Ferramenta Zoom / Lupa (`Z`):** Aproximação (1.4x) e afastamento com **`Alt + Clique`** (0.7x) centralizado no cursor do mouse.
   - **Prevenção Física de Sobreposição & Modos de Movimentação:** Bloqueio magnético anti-invasão (*Clamp*), modo *Overwrite* com **`Shift`** e modo *Ripple Insert* atômico com **`Ctrl`**.
 
+- **Montagem Clássica de 3 e 4 Pontos & Roteamento de Canais (Insert & Overwrite).** Inserção de alta precisão diretamente a partir do monitor de origem (Source Player):
+  - **Inserção Ripple / Insert (`,`)**: Divide o clipe na agulha da timeline e insere o trecho demarcado entre os pontos [In–Out] do Source Player, empurrando cortes subsequentes com sincronismo atômico.
+  - **Sobrescrita / Overwrite (`.` / `F10`)**: Substitui o trecho da timeline a partir do playhead pela duração exata [In–Out] da fonte, sem deslocar a timeline.
+  - **Seletor de Canais de 3 Estados (`AV` ➔ `V` ➔ `A`):** Alternável pelo atalho **`Ctrl+Alt+A`** ou clique no botão dinâmico do Source Player, permitindo gravar canais de áudio e vídeo vinculados (`AV`), apenas vídeo (`V`) para B-rolls ou apenas áudio (`A`) para narrações e ambiências (com bloqueio protetivo para fotos).
+  - **Histórico Atômico com Restauração de Playhead:** Suporte completo a Undo/Redo (`Ctrl+Z` / `Ctrl+Y`) restaurando o estado da timeline e a posição da agulha.
+
+- **Localização Bidirecional de Quadro na Fonte (Match Frame & Reverse Match Frame).** Navegação ágil entre a timeline montada e o arquivo bruto original:
+  - **Match Frame (`Alt+F` no CapIAu / `F` no Premiere e Resolve / `Shift+F` no Final Cut):** Com a agulha sobre qualquer clipe na timeline, localiza a mídia bruta na biblioteca e abre no Source Player no mesmo instante exato:
+    $$\text{sourceTime} = \frac{\text{inFrame} + (\text{playheadFrame} - \text{timelineStartFrame})}{\text{fps}}$$
+    projetando automaticamente os marcadores `[IN-OUT]` do clipe nos sliders da fonte e respeitando a hierarquia de pistas (pista ativa ou prioridade visual V2 > V1 > A2 > A1).
+  - **Reverse Match Frame (`Shift+F` no CapIAu, Premiere, Resolve e Kdenlive / `Alt+F` no Final Cut):** A partir de qualquer instante no Source Player, localiza onde o quadro corrente foi utilizado na timeline ativa, salta a agulha, seleciona o clipe e transfere o foco para o Program Player:
+    $$\text{targetPlayheadFrame} = \text{timelineStartFrame} + (\text{sourceFrame} - \text{inFrame})$$
+    com desempate inteligente por proximidade quando a mesma mídia bruta é fatiada em múltiplos cortes.
+  - **Interface Flat Dedicada:** Botões de apoio minimalistas `#btn-source-reverse-match` (Source) e `#btn-match-frame` (Program) perfeitamente integrados ao design system.
+
 - **Zoom Microscópico da Régua até Nível de Frames (até 80.0 px/frame) & Zoom to Fit.** Régua adaptativa contínua exibindo células visuais de quadros individuais numerados e ticks de sub-frames em zoom máximo, com suporte nativo a taxas fracionárias (23.976 e 59.94 fps). Inclui comando **Ajustar Sequência na Tela (*Zoom to Fit Toggle*)** com botão rápido (`#btn-timeline-zoom-fit`) e alternância inteligente, atalhos universais de zoom horizontal (**`+` / `=`** e **`-`**) ancorados no playhead, zoom dinâmico por rolagem da roda do mouse sobre a régua e viewport culling com teto de amostras da waveform para 60 FPS fluidos.
 
 - **Miniaturas Proporcionais (16:9, 9:16, 1:1) e 3 Modos de Visualização.** Cálculo de largura geométrica real (`clipHeight * aspectRatio`) eliminando o fatiamento vertical em faixas expandidas. Conta com 3 modos clássicos selecionáveis pelo popover de opções com auto-flip vertical: **Rolo de Filme / Contínuo (*Filmstrip*)**, **Apenas Início (*Head Only*)** e **Desativar Miniaturas (*None*)**.
@@ -737,26 +752,29 @@ como `VISION_MODEL_FALLBACK`. Essa é a configuração padrão justamente por is
 
 ## 🧪 Testes <a id="testes"></a>
 
+O projeto possui uma estratégia dupla de testes automatizados com cobertura de ponta a ponta:
+
+### 1. Testes de Backend (Python / pytest)
 A suíte cobre exportação OTIO, agente de chat, segmentação, paletas, entidades, triagem e o
-tratamento de respostas nulas da IA.
-
-O `pytest` é uma dependência só de desenvolvimento e **não vem no `requirements.txt`**. Instale-o
-antes da primeira execução:
+tratamento de respostas nulas da IA:
 
 ```bash
+# Instalação do pytest
 pip install pytest
-```
 
-Rode a suíte completa:
-
-```bash
+# Execução da suíte de backend
 python -m pytest tests/ -v
 ```
 
-Ou um arquivo específico:
+### 2. Autotestes da Interface e Timeline NLE (Node.js ESM)
+Bateria com **31 suítes automatizadas** cobrindo manipulação de Canvas 2D, colisões de clipes, ferramentas da Tool Strip (Blade, Slip, Slide, Rolling), montagem de 3/4 pontos, Match Frame bidirecional e keymaps NLE:
 
 ```bash
-python -m pytest tests/test_f3_segmentation.py -v
+# Executar teste específico (ex.: Match Frame & Reverse Match Frame)
+node tests/autoteste_match_frame.mjs
+
+# Executar todas as 31 baterias sequencialmente
+node -e "import fs from 'node:fs'; import { execSync } from 'node:child_process'; const files = fs.readdirSync('tests').filter(f => f.startsWith('autoteste_') && f.endsWith('.mjs')); for (const f of files) { execSync('node tests/' + f, { stdio: 'inherit' }); }"
 ```
 
 ---
@@ -764,14 +782,16 @@ python -m pytest tests/test_f3_segmentation.py -v
 ## 🗺️ Roadmap <a id="roadmap"></a>
 
 O plano completo, com decisões registradas e critérios de aceite, está em
-[`docs/PLANO_IMPLEMENTACAO.md`](docs/PLANO_IMPLEMENTACAO.md).
+[`docs/PLANO_IMPLEMENTACAO.md`](docs/PLANO_IMPLEMENTACAO.md) e o plano de NLE Clássico em [`docs/PLANO_SUITE_NLE_CLASSICO.md`](docs/PLANO_SUITE_NLE_CLASSICO.md).
 
 | Etapa | Escopo | Situação |
 |---|---|---|
 | **1 — Sanear a base** | Limpeza do pipeline de análise | ✅ Concluída |
-| **2 — Segmentação e CLIP local** | Shots, beats, embeddings de imagem e análise condicional | ✅ Concluída (faltam chips de faceta na UI e o título no índice) |
-| **3 — Sala de Projeto** | Cartão de contexto, chat produtor, extração de roteiro, *capability manager* | 🔄 Em andamento |
-| **4 — Busca multi-vetor e agentes** | Busca em 3 passos, chat com ferramentas, servidor MCP, farm de GPUs | 📋 Planejada |
+| **2 — Segmentação e CLIP local** | Shots, beats, embeddings de imagem e análise condicional | ✅ Concluída |
+| **Suíte NLE Clássico (Sessões 0 a 2)** | Layout 2 Zonas, Tool Strip (Gilete, Slip, Slide, Rolling), 3-Pontos, Match Frame | ✅ Concluída (Tasks 0 a 8) |
+| **3 — Sala de Projeto & NLE Avançado** | Cartão de contexto, Replace Edit, Subclipes, Timecode Interativo, Freezes | 🔄 Em andamento |
+| **4 — Áudio, Cor & Efeitos NLE** | Crossfades, Transições, VU Meters, Keyframes de Volume, Auto-Ducking | 📋 Planejada |
+| **5 — Busca multi-vetor e agentes** | Busca em 3 passos, chat com ferramentas, servidor MCP, farm de GPUs | 📋 Planejada |
 
 ---
 
@@ -782,7 +802,7 @@ capiau-talho/
 ├── data/              Bancos locais (capiau.db, Qdrant, proxies, caches) — não versionado
 ├── docs/              Documentação complementar
 │   └── images/        Capturas de tela do README
-├── scripts/           Utilitários (lançador desgrudado, retriagem)
+├── scripts/           Utilitários (lançador desgrudado, retriagem, deploy da wiki)
 ├── src/
 │   ├── api/           Rotas FastAPI e controladores
 │   │   └── routes/    entities · faces · media · narrative · projects · scenes · settings
@@ -797,7 +817,8 @@ capiau-talho/
 │   ├── transcription/ Motor de ASR e diarização
 │   ├── ui/            Interface web (HTML, CSS e JS em /ui/js)
 │   └── vision/        Biometria facial local e análise multimodal
-├── tests/             Suíte de testes automatizados
+├── tests/             Suíte de testes automatizados (pytest e autotestes Node.js)
+├── wiki/              Documentação oficial da Wiki do GitHub (17 capítulos)
 └── watch/             Pasta observada para ingestão automática
 ```
 
@@ -807,7 +828,9 @@ capiau-talho/
 
 | Documento | Conteúdo |
 |---|---|
+| 🌐 [**Wiki Oficial no GitHub**](https://github.com/fernangcortes/capiau-talho-v03/wiki) | Manual completo de 17 capítulos cobrindo toda a plataforma |
 | 📖 [**Manual do Usuário**](USER_MANUAL.md) | Operação completa das funcionalidades visuais da tela |
+| 🎞️ [**Suíte NLE Clássico**](docs/PLANO_SUITE_NLE_CLASSICO.md) | Especificação técnica completa de montagem, ferramentas e keymaps |
 | 🎬 [**Fluxo com o Kdenlive**](docs/kdenlive_workflow.md) | Sincronização e exportação para edição offline |
 | 🎹 [**Atalhos de teclado**](docs/shortcuts.md) | Lista de atalhos e mapa do teclado NLE |
 | 💰 [**Custos e segurança de APIs**](docs/costs_and_security.md) | Como economizar na precificação do OpenRouter e AssemblyAI |
