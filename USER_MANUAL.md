@@ -467,8 +467,12 @@ A navegação bidirecional de frames conecta de forma transparente a timeline mo
   - A partir de qualquer posição no Source Player, acione o atalho (ou clique no botão `#btn-source-reverse-match` no Source Player).
   - O sistema varre a timeline ativa e localiza onde aquele quadro específico está sendo utilizado:
     $$\text{targetPlayheadFrame} = \text{timelineStartFrame} + (\text{sourceFrame} - \text{inFrame})$$
-  - Caso a mesma mídia bruta tenha sido fatiada em múltiplos cortes pela timeline, o algoritmo seleciona inteligentemente a ocorrência mais próxima da posição atual da agulha.
-  - A agulha salta para a coordenada calculada, o clipe é selecionado e o foco vai para o Program Player.
+  - Caso a mesma mídia bruta tenha sido fatiada em múltiplos cortes pela timeline, o algoritmo seleciona inicialmente a ocorrência mais próxima da agulha.
+  - **Navegação Cíclica entre Múltiplas Ocorrências (`Shift+F` contínuo):** Ao manter a tecla `Shift` pressionada e tocar `F` repetidas vezes, o sistema cicla sequencialmente por todos os cortes da montagem onde a mídia foi usada ($1 \to 2 \to 3 \to \dots \to 1$).
+  - **Deduplicação Inteligente de Trilhas A/V:** Cortes que possuem vídeo e áudio vinculados (`link_id`) são contados como uma única ocorrência física, eliminando saltos duplicados e exibindo a contagem real de tomadas.
+  - **Mini-HUD Flutuante no Source:** Durante a navegação de ocorrências, um HUD minimalista translúcido surge no Source Player (`#source-reverse-match-hud`) mostrando o contador de tomada e pista (ex.: `2 / 3 · V1`), botões de salto anterior/próximo e atalho para a listagem completa. O HUD se oculta automaticamente ao soltar a tecla `Shift`.
+  - **Menu Popover de Ocorrências com Retenção em Hover:** O botão `#btn-source-reverse-match` exibe um badge ciano com o total de cortes e um menu suspenso (`#popover-reverse-match-list`) com todos os pontos da timeline. O menu permanece aberto enquanto o cursor do mouse estiver sobre ele (com tolerância suave de 250ms), permitindo clicar em ocorrências para navegar na timeline sem fechar a lista acidentalmente.
+  - A agulha salta para a coordenada calculada, o clipe é selecionado e realçado com pulso ciano temporário na timeline.
   - Caso o quadro inspecionado não esteja presente na timeline, um aviso não-intrusivo via toast notifica o editor.
 
 ---
