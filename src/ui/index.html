@@ -201,19 +201,28 @@
                 </div>
                 
                 <div class="library-toolbar" id="library-filter-bar" style="padding: 8px 12px; border-bottom: 1px solid var(--border-glass); display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.15); position: relative;">
-                    <!-- Linha 1: Campo de Busca e Botões de Similaridade + Ajustes -->
-                    <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+                    <!-- Linha 1: Campo de Busca e Botões de Similaridade + Ajustes + Filtro de Mídia -->
+                    <div style="display: flex; gap: 4px; width: 100%; align-items: center;">
                         <div class="search-area glassmorphism library-search-area" style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 28px; width: 100%;">
                             <i class="fa-solid fa-magnifying-glass search-icon" style="color: var(--text-muted); font-size: 10px;"></i>
                             <input type="text" id="library-search-input" placeholder="Buscar mídias..." style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; font-size: 10px; color: #fff;">
                         </div>
-                        <button id="btn-search-similar-selected" title="Buscar mídias parecidas com os itens selecionados" class="lib-action-btn" style="display: none; color: #c084fc; position: relative;">
+                        <button id="btn-search-similar-selected" data-tooltip="Buscar mídias parecidas com os itens selecionados" class="lib-action-btn" style="display: none; color: #c084fc; position: relative;">
                             <i class="fa-solid fa-images"></i>
                             <span id="similar-selected-count" class="similar-count-badge">0</span>
                         </button>
-                        <button id="btn-clear-similar-selected" title="Limpar seleção de similares" class="lib-action-btn" style="display: none;"><i class="fa-solid fa-xmark"></i></button>
-                        <button id="btn-toggle-advanced-search" title="Busca Avançada & Filtros" class="lib-action-btn"><i class="fa-solid fa-sliders"></i></button>
-                        <button id="btn-library-display-settings" title="Opções de Exibição" class="lib-action-btn"><i class="fa-solid fa-gear"></i></button>
+                        <button id="btn-clear-similar-selected" data-tooltip="Limpar seleção de similares" class="lib-action-btn" style="display: none;"><i class="fa-solid fa-xmark"></i></button>
+                        <button id="btn-toggle-advanced-search" data-tooltip="Busca Avançada & Filtros" class="lib-action-btn"><i class="fa-solid fa-sliders"></i></button>
+                        <button id="btn-library-display-settings" data-tooltip="Opções de Exibição" class="lib-action-btn"><i class="fa-solid fa-gear"></i></button>
+
+                        <!-- Filtros Rápidos por Tipo de Mídia (Line Icons Flat ao lado direito das Opções de Exibição) -->
+                        <div class="media-type-filter-chips" id="media-type-filter-chips">
+                            <button class="chip-filter active" data-type-filter="all" data-tooltip="Todos (0)"><i class="fa-solid fa-layer-group"></i><span class="chip-count" id="count-all" style="display: none;">0</span></button>
+                            <button class="chip-filter" data-type-filter="video" data-tooltip="Vídeos (0)"><i class="fa-solid fa-film"></i><span class="chip-count" id="count-video" style="display: none;">0</span></button>
+                            <button class="chip-filter" data-type-filter="photo" data-tooltip="Fotos (0)"><i class="fa-solid fa-camera"></i><span class="chip-count" id="count-photo" style="display: none;">0</span></button>
+                            <button class="chip-filter" data-type-filter="audio" data-tooltip="Áudios (0)"><i class="fa-solid fa-music"></i><span class="chip-count" id="count-audio" style="display: none;">0</span></button>
+                        </div>
+
                         <button id="btn-reanalyze-failed" data-tooltip="Ver falhas na biblioteca" class="lib-action-btn btn-flat-rose" style="display: none; align-items: center; gap: 4px; background: transparent !important; border: none !important; color: var(--color-rose); cursor: pointer; padding: 0 4px; font-size: 11px; flex-shrink: 0; position: relative;">
                             <i class="fa-solid fa-arrows-rotate"></i>
                             <span id="failed-count-badge" class="badge-failed-square">0</span>
@@ -228,14 +237,6 @@
                             <i class="fa-solid fa-circle-stop"></i>
                             <span>Cancelar Análises</span>
                         </button>
-                    </div>
-
-                    <!-- Linha 2: Chips de Filtro Rápido por Tipo de Mídia -->
-                    <div class="media-type-filter-chips" id="media-type-filter-chips" style="display: flex; gap: 4px; align-items: center; width: 100%; margin-top: 1px;">
-                        <button class="chip-filter active" data-type-filter="all"><i class="fa-solid fa-layer-group"></i> <span>Todos</span> <span class="chip-count" id="count-all">0</span></button>
-                        <button class="chip-filter" data-type-filter="video"><i class="fa-solid fa-film"></i> <span>Vídeos</span> <span class="chip-count" id="count-video">0</span></button>
-                        <button class="chip-filter" data-type-filter="photo"><i class="fa-solid fa-camera"></i> <span>Fotos</span> <span class="chip-count" id="count-photo">0</span></button>
-                        <button class="chip-filter" data-type-filter="audio"><i class="fa-solid fa-music"></i> <span>Áudios</span> <span class="chip-count" id="count-audio">0</span></button>
                     </div>
 
                     <!-- Popover de Busca por Similaridade em Lote -->
@@ -869,7 +870,7 @@
                                     <button id="btn-source-play" class="btn-control play-btn" style="padding: 4px 12px; font-size: 11px;" title="Play/Pause"><i class="fa-solid fa-play"></i></button>
                                     <button id="btn-source-next-frame" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Próximo Frame"><i class="fa-solid fa-chevron-right"></i></button>
                                     <button id="btn-source-set-thumbnail" class="btn-control" style="padding: 4px 8px; font-size: 11px; color: var(--color-cyan);" title="Definir Frame como Miniatura"><i class="fa-solid fa-camera"></i></button>
-                                    <button id="btn-source-toggle-crucial" class="btn-control" style="padding: 4px 8px; font-size: 11px; color: #fbbf24;" data-tooltip="Marcar/Desmarcar Momento Crucial no Frame Atual (Ctrl+Shift+Click)" title="Momento Crucial"><i class="fa-solid fa-star"></i></button>
+                                    <button id="btn-source-toggle-crucial" class="btn-control" style="padding: 4px 8px; font-size: 11px; color: #fbbf24;" data-tooltip="Marcar/Desmarcar Momento Crucial no Frame Atual (Ctrl+Shift+Click)"><i class="fa-solid fa-star"></i></button>
                                 </div>
                                 <div style="display: flex; gap: 6px; align-items: center;">
                                     <button id="btn-mark-in" class="btn-control btn-marker" style="padding: 4px 8px; font-size: 10px; font-weight: bold;" title="Ponto In (I)">IN</button>
@@ -903,6 +904,13 @@
                                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                             <rect x="2" y="7.5" width="12" height="5.5" rx="0.75"/>
                                             <path d="M8 1.5v6.5m0 0l-2.2-2.2m2.2 2.2l2.2-2.2"/>
+                                        </svg>
+                                    </button>
+                                    <button id="btn-source-reverse-match" class="btn-control" style="padding: 4px 7px; font-size: 11px; height: 26px; display: inline-flex; align-items: center; justify-content: center;" data-tooltip="Localizar Quadro na Timeline / Reverse Match Frame [Shift+F]">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="2" y="3" width="12" height="10" rx="1.5"/>
+                                            <path d="M8 5v6m0 0l-2-2m2 2l2-2"/>
+                                            <path d="M4 14h8"/>
                                         </svg>
                                     </button>
                                     <button id="btn-append-timeline" class="btn-control btn-append" style="padding: 4px 8px; font-size: 11px; height: 26px; display: flex; align-items: center; gap: 4px;" title="Inserir no Fim da Timeline (Shift+E)">
@@ -1009,6 +1017,14 @@
                                     <button id="btn-program-play-in-out" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Tocar de IN até OUT (Shift+Espaço)"><i class="fa-solid fa-play"></i><i class="fa-solid fa-arrows-left-right" style="font-size: 8px; margin-left: 2px;"></i></button>
                                     <button id="btn-program-loop" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Alternar Loop Contínuo (Ctrl+L)"><i class="fa-solid fa-repeat"></i></button>
                                     <button id="btn-program-clear-in-out" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Limpar Pontos IN e OUT (Alt+X)"><i class="fa-solid fa-xmark"></i></button>
+                                    <div style="width: 1px; height: 16px; background: var(--border-glass); margin: 0 2px;"></div>
+                                    <button id="btn-match-frame" class="btn-control" style="padding: 4px 8px; font-size: 11px; height: 26px; display: inline-flex; align-items: center; justify-content: center;" data-tooltip="Localizar Quadro na Fonte / Match Frame [Alt+F]">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="2" y="3" width="12" height="10" rx="1.5"/>
+                                            <circle cx="8" cy="8" r="2.5"/>
+                                            <path d="M8 1v2M8 13v2M1 8h2M13 8h2"/>
+                                        </svg>
+                                    </button>
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: center;">
                                     <!-- Volume / Resolution selector -->

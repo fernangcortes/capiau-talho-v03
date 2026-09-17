@@ -5045,15 +5045,28 @@ export class LibraryManager {
         });
 
         // Chips de filtro rápido de tipo de mídia (Todos, Vídeos, Fotos, Áudios)
-        const chipButtons = document.querySelectorAll(".media-type-filter-chips .chip-filter");
-        chipButtons.forEach(btn => {
-            btn.addEventListener("click", () => {
-                chipButtons.forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
-                this.activeTypeFilter = btn.getAttribute("data-type-filter") || "all";
-                this.scheduleRenderMedia();
+        const bindFilterChips = (targetDoc = document) => {
+            const chipButtons = targetDoc.querySelectorAll(".media-type-filter-chips .chip-filter");
+            chipButtons.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const filter = btn.getAttribute("data-type-filter") || "all";
+                    this.activeTypeFilter = filter;
+                    getAllLibraryDocuments().forEach(d => {
+                        try {
+                            d.querySelectorAll(".media-type-filter-chips .chip-filter").forEach(b => {
+                                if (b.getAttribute("data-type-filter") === filter) {
+                                    b.classList.add("active");
+                                } else {
+                                    b.classList.remove("active");
+                                }
+                            });
+                        } catch (e) {}
+                    });
+                    this.scheduleRenderMedia();
+                });
             });
-        });
+        };
+        bindFilterChips(document);
 
         if (this.btnScan) this.btnScan.addEventListener("click", () => this.runWatchScan());
         if (this.btnImportExternal) this.btnImportExternal.addEventListener("click", () => this.runImportExternal());
@@ -6884,18 +6897,33 @@ export class LibraryManager {
         const allVids = STATE.allVideos || [];
         const allPhotos = STATE.allPhotos || [];
 
-        // Atualiza contadores dos chips de tipo
+        // Atualiza contadores dos chips de tipo e tooltips com nome e contagem de mídias
         getAllLibraryDocuments().forEach(doc => {
             try {
+                const countAll = allVids.length + allPhotos.length;
+                const countVideo = allVids.length;
+                const countPhoto = allPhotos.length;
+                const countAudio = 0;
+
                 const countAllEl = doc.getElementById("count-all");
                 const countVideoEl = doc.getElementById("count-video");
                 const countPhotoEl = doc.getElementById("count-photo");
                 const countAudioEl = doc.getElementById("count-audio");
 
-                if (countAllEl) countAllEl.textContent = `${allVids.length + allPhotos.length}`;
-                if (countVideoEl) countVideoEl.textContent = `${allVids.length}`;
-                if (countPhotoEl) countPhotoEl.textContent = `${allPhotos.length}`;
-                if (countAudioEl) countAudioEl.textContent = "0";
+                if (countAllEl) countAllEl.textContent = `${countAll}`;
+                if (countVideoEl) countVideoEl.textContent = `${countVideo}`;
+                if (countPhotoEl) countPhotoEl.textContent = `${countPhoto}`;
+                if (countAudioEl) countAudioEl.textContent = `${countAudio}`;
+
+                const chipAll = doc.querySelector('.media-type-filter-chips .chip-filter[data-type-filter="all"]');
+                const chipVideo = doc.querySelector('.media-type-filter-chips .chip-filter[data-type-filter="video"]');
+                const chipPhoto = doc.querySelector('.media-type-filter-chips .chip-filter[data-type-filter="photo"]');
+                const chipAudio = doc.querySelector('.media-type-filter-chips .chip-filter[data-type-filter="audio"]');
+
+                if (chipAll) chipAll.setAttribute("data-tooltip", `Todos (${countAll})`);
+                if (chipVideo) chipVideo.setAttribute("data-tooltip", `Vídeos (${countVideo})`);
+                if (chipPhoto) chipPhoto.setAttribute("data-tooltip", `Fotos (${countPhoto})`);
+                if (chipAudio) chipAudio.setAttribute("data-tooltip", `Áudios (${countAudio})`);
             } catch (e) {}
         });
 

@@ -226,6 +226,9 @@ export class SourcePlayer {
         const btnOverwrite = this.el("btn-source-overwrite");
         if (btnOverwrite) btnOverwrite.addEventListener("click", () => this.overwriteAtPlayhead());
 
+        const btnReverseMatch = this.el("btn-source-reverse-match");
+        if (btnReverseMatch) btnReverseMatch.addEventListener("click", () => this.reverseMatchFrame());
+
         const btnAppend = this.el("btn-append-timeline");
         if (btnAppend) btnAppend.addEventListener("click", () => this.appendToTimeline());
 
@@ -898,6 +901,26 @@ export class SourcePlayer {
         return null;
     }
 
+    /**
+     * Localiza o quadro original na fonte a partir da timeline (Match Frame).
+     */
+    matchFrame() {
+        if (typeof window !== "undefined" && window.player && typeof window.player.matchFrameFromTimeline === "function") {
+            return window.player.matchFrameFromTimeline();
+        }
+        return null;
+    }
+
+    /**
+     * Localiza o quadro da fonte na timeline ativa (Reverse Match Frame).
+     */
+    reverseMatchFrame() {
+        if (typeof window !== "undefined" && window.player && typeof window.player.reverseMatchFrameFromSource === "function") {
+            return window.player.reverseMatchFrameFromSource();
+        }
+        return null;
+    }
+
     createOverlayContainer() {
         if (this.overlayContainer) return;
         const wrapper = this.el("source-video-wrapper");
@@ -1524,6 +1547,15 @@ export class ProgramPlayer {
 
         const btnClearInOut = this.el("btn-program-clear-in-out");
         if (btnClearInOut) btnClearInOut.addEventListener("click", () => TIMELINE_STATE.clearInOut());
+
+        const btnMatchFrame = this.el("btn-match-frame");
+        if (btnMatchFrame) {
+            btnMatchFrame.addEventListener("click", () => {
+                if (typeof window !== "undefined" && window.player && typeof window.player.matchFrameFromTimeline === "function") {
+                    window.player.matchFrameFromTimeline();
+                }
+            });
+        }
 
         const btnLoop = this.el("btn-program-loop");
         if (btnLoop) btnLoop.addEventListener("click", () => TIMELINE_STATE.toggleLoop());
@@ -4269,6 +4301,12 @@ export class VideoPlayer {
             this._kActionTaken = null;
             this._kJogUsed = false;
         });
+
+        window.player = this;
+        if (typeof window !== "undefined") {
+            window.matchFrameFromTimeline = () => this.matchFrameFromTimeline();
+            window.reverseMatchFrameFromSource = () => this.reverseMatchFrameFromSource();
+        }
     }
 
     stepFrame(delta) {
@@ -4548,6 +4586,20 @@ export class VideoPlayer {
             return;
         }
 
+        // Localizar Quadro Original na Fonte / Match Frame (Alt+F / F / Shift+F)
+        if (KEYMAP_SERVICE.matches(e, "edit.match_frame")) {
+            e.preventDefault();
+            this.matchFrameFromTimeline();
+            return;
+        }
+
+        // Localizar Quadro na Timeline / Reverse Match Frame (Shift+F / Alt+F)
+        if (KEYMAP_SERVICE.matches(e, "edit.reverse_match_frame")) {
+            e.preventDefault();
+            this.reverseMatchFrameFromSource();
+            return;
+        }
+
         // Inserir na Timeline (Append)
         if (KEYMAP_SERVICE.matches(e, "playback.append_timeline")) {
             if (window.activeFocusedPlayer === "source") {
@@ -4674,6 +4726,291 @@ export class VideoPlayer {
         if (this.programPlayer) {
             this.programPlayer.hide2UpPreview();
         }
+    }
+
+    /**
+     * Match Frame: Localiza o clipe sob a agulha na timeline ativa
+     * e carrega o quadro correspondente no monitor Source com os marcadores [IN-OUT] projetados.
+     */
+    matchFrameFromTimeline() {
+        if (typeof TIMELINE_STATE === "undefined") return null;
+
+        const fps = TIMELINE_STATE.fps || 24;
+        const playhead = TIMELINE_STATE.playheadFrame !== undefined ? TIMELINE_STATE.playheadFrame : 0;
+        const cuts = STATE.activeTimelineCuts || [];
+
+        const coversPlayhead = (c) => {
+            const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+            const inF = c.inFrame !== undefined ? c.inFrame : Math.round((c.in || 0) * fps);
+            const outF = c.outFrame !== undefined ? c.outFrame : Math.round((c.out || 0) * fps);
+            const dur = Math.max(1, outF - inF);
+            const end = start + dur;
+            return playhead >= start && playhead < end;
+        };
+
+        let targetClip = null;
+
+        // 1. Respeita a pista selecionada / focada se contiver clipe sob o playhead
+        if (TIMELINE_STATE.selectedTrack) {
+            targetClip = cuts.find(c => c.track === TIMELINE_STATE.selectedTrack && coversPlayhead(c));
+        }
+
+        // 2. Se não houver clipe na pista selecionada, busca na pista de vídeo superior com mídia sob o playhead
+        if (!targetClip) {
+            const videoTracks = typeof TIMELINE_STATE.getVideoTracks === "function" 
+                ? TIMELINE_STATE.getVideoTracks() 
+                : (TIMELINE_STATE.tracks || []).filter(t => t.kind === "video");
+            for (const track of videoTracks) {
+                const c = cuts.find(cut => cut.track === track.id && coversPlayhead(cut));
+                if (c) {
+                    targetClip = c;
+                    break;
+                }
+            }
+        }
+
+        // 3. Fallback: qualquer pista (incluindo áudio A1/A2) com clipe sob o playhead
+        if (!targetClip) {
+            targetClip = cuts.find(c => coversPlayhead(c));
+        }
+
+        // 4. Nenhum clipe sob a agulha (gap vazio)
+        if (!targetClip) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Nenhum clipe sob a agulha na timeline.", "info");
+            }
+            return null;
+        }
+
+        // 5. Localiza a mídia bruta correspondente em STATE.allVideos ou STATE.allPhotos
+        const isVideo = targetClip.type === "video" || !!targetClip.video_id;
+        const mediaId = targetClip.video_id || targetClip.photo_id;
+
+        let mediaObj = null;
+        const mediaType = isVideo ? "video" : "photo";
+
+        if (isVideo) {
+            mediaObj = (STATE.allVideos || []).find(v => String(v.id) === String(mediaId)) ||
+                       (STATE.activeVideo && String(STATE.activeVideo.id) === String(mediaId) ? STATE.activeVideo : null);
+        } else {
+            mediaObj = (STATE.allPhotos || []).find(p => String(p.id) === String(mediaId)) ||
+                       (STATE.activePhoto && String(STATE.activePhoto.id) === String(mediaId) ? STATE.activePhoto : null);
+        }
+
+        if (!mediaObj) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Arquivo de mídia não encontrado na biblioteca.", "warning");
+            }
+            return null;
+        }
+
+        // 6. Carrega a mídia no Source Player
+        if (mediaType === "video") {
+            STATE.activeVideo = mediaObj;
+            STATE.activePhoto = null;
+            if (this.sourcePlayer && typeof this.sourcePlayer.loadVideo === "function") {
+                this.sourcePlayer.loadVideo(mediaObj);
+            }
+        } else {
+            STATE.activePhoto = mediaObj;
+            STATE.activeVideo = null;
+            if (this.sourcePlayer && typeof this.sourcePlayer.loadPhoto === "function") {
+                this.sourcePlayer.loadPhoto(mediaObj);
+            }
+        }
+
+        // 7. Cálculo matemático do quadro correspondente na fonte:
+        // sourceTime = (inFrame + (playheadFrame - timelineStartFrame)) / fps
+        const clipStartFrame = targetClip.timelineStartFrame !== undefined 
+            ? targetClip.timelineStartFrame 
+            : Math.round((targetClip.timeline_start || 0) * fps);
+        const clipInFrame = targetClip.inFrame !== undefined 
+            ? targetClip.inFrame 
+            : Math.round((targetClip.in || 0) * fps);
+        const clipOutFrame = targetClip.outFrame !== undefined 
+            ? targetClip.outFrame 
+            : Math.round((targetClip.out || 0) * fps);
+
+        const offsetFrames = Math.max(0, playhead - clipStartFrame);
+        const sourceFrame = clipInFrame + offsetFrames;
+        const sourceTime = sourceFrame / fps;
+
+        // 8. Projeção dos marcadores originais [IN-OUT] do corte no Source Player
+        STATE.markerIn = clipInFrame / fps;
+        STATE.markerOut = clipOutFrame / fps;
+
+        if (this.sourcePlayer) {
+            const vid = this.sourcePlayer.el("source-video");
+            if (vid) {
+                if (!vid.duration || isNaN(vid.duration) || vid.readyState < 1) {
+                    const onMeta = () => {
+                        try { vid.removeEventListener("loadedmetadata", onMeta); } catch (_) {}
+                        this.sourcePlayer.seek(sourceTime);
+                        this.sourcePlayer.updateMarkersUI();
+                    };
+                    vid.addEventListener("loadedmetadata", onMeta);
+                }
+                this.sourcePlayer.seek(sourceTime);
+            }
+            this.sourcePlayer.updateMarkersUI();
+        }
+
+        // 9. Foco visual e operacional no Source Player
+        window.activeFocusedPlayer = "source";
+        const sourceWrapper = (typeof document !== "undefined") ? document.getElementById("source-video-wrapper") : null;
+        if (sourceWrapper && typeof sourceWrapper.focus === "function") {
+            sourceWrapper.focus();
+        }
+
+        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+            window.showToast("Match Frame: Quadro localizado na fonte", "info");
+        }
+
+        // Emite evento global para sincronização multi-monitor / janelas popout (Diretriz 6)
+        if (typeof STATE !== "undefined" && typeof STATE.emit === "function") {
+            STATE.emit("matchFramePerformed", {
+                clip: targetClip,
+                media: mediaObj,
+                mediaType,
+                sourceTime,
+                sourceFrame,
+                inFrame: clipInFrame,
+                outFrame: clipOutFrame
+            });
+        }
+
+        return {
+            clip: targetClip,
+            media: mediaObj,
+            mediaType,
+            sourceTime,
+            sourceFrame,
+            inFrame: clipInFrame,
+            outFrame: clipOutFrame
+        };
+    }
+
+    /**
+     * Reverse Match Frame: A partir da mídia e quadro sob o cursor do Source Player,
+     * localiza o corte na timeline ativa e salta a agulha para o instante correspondente.
+     */
+    reverseMatchFrameFromSource() {
+        if (typeof TIMELINE_STATE === "undefined") return null;
+
+        const isVideo = !!STATE.activeVideo;
+        const isPhoto = !isVideo && !!STATE.activePhoto;
+        const media = STATE.activeVideo || STATE.activePhoto;
+
+        if (!media) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Nenhuma mídia carregada no Source Player.", "warning");
+            }
+            return null;
+        }
+
+        const fps = TIMELINE_STATE.fps || 24;
+        let sourceTime = 0;
+
+        if (isVideo) {
+            const vid = this.sourcePlayer ? this.sourcePlayer.el("source-video") : null;
+            sourceTime = vid ? (vid.currentTime || 0) : 0;
+        } else {
+            sourceTime = 0;
+        }
+
+        const sourceFrame = Math.round(sourceTime * fps);
+        const cuts = STATE.activeTimelineCuts || [];
+        const mediaId = String(media.id);
+
+        // Clipes que utilizam a mesma mídia
+        const candidateCuts = cuts.filter(c => {
+            if (isVideo) {
+                return String(c.video_id) === mediaId;
+            } else {
+                return String(c.photo_id) === mediaId;
+            }
+        });
+
+        // Filtra clipes cujo intervalo [inFrame, outFrame) engloba o sourceFrame
+        const matchingCuts = candidateCuts.filter(c => {
+            const inF = c.inFrame !== undefined ? c.inFrame : Math.round((c.in || 0) * fps);
+            const outF = c.outFrame !== undefined ? c.outFrame : Math.round((c.out || 0) * fps);
+            return sourceFrame >= inF && sourceFrame < outF;
+        });
+
+        // Se não encontrar corte com o quadro sob a agulha na timeline
+        if (matchingCuts.length === 0) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Quadro não localizado na timeline ativa", "info");
+            }
+            return null;
+        }
+
+        // Se houver múltiplos cortes, salta para a ocorrência mais próxima do playhead atual
+        const currentPlayhead = TIMELINE_STATE.playheadFrame || 0;
+        matchingCuts.sort((a, b) => {
+            const aIn = a.inFrame !== undefined ? a.inFrame : Math.round((a.in || 0) * fps);
+            const aStart = a.timelineStartFrame !== undefined ? a.timelineStartFrame : Math.round((a.timeline_start || 0) * fps);
+            const aTarget = aStart + (sourceFrame - aIn);
+
+            const bIn = b.inFrame !== undefined ? b.inFrame : Math.round((b.in || 0) * fps);
+            const bStart = b.timelineStartFrame !== undefined ? b.timelineStartFrame : Math.round((b.timeline_start || 0) * fps);
+            const bTarget = bStart + (sourceFrame - bIn);
+
+            const distA = Math.abs(aTarget - currentPlayhead);
+            const distB = Math.abs(bTarget - currentPlayhead);
+            if (distA !== distB) return distA - distB;
+            return aStart - bStart;
+        });
+
+        const bestCut = matchingCuts[0];
+        const bestIn = bestCut.inFrame !== undefined ? bestCut.inFrame : Math.round((bestCut.in || 0) * fps);
+        const bestStart = bestCut.timelineStartFrame !== undefined ? bestCut.timelineStartFrame : Math.round((bestCut.timeline_start || 0) * fps);
+
+        // playheadFrame = timelineStartFrame + (sourceFrame - inFrame)
+        const targetPlayheadFrame = bestStart + (sourceFrame - bestIn);
+
+        // Atualiza a timeline
+        TIMELINE_STATE.setPlayheadFrame(targetPlayheadFrame);
+        if (typeof TIMELINE_STATE.selectClip === "function") {
+            TIMELINE_STATE.selectClip(bestCut.id);
+        }
+
+        // Redesenha timeline e garante visibilidade do quadro
+        if (typeof window !== "undefined") {
+            if (window.timelineInteraction && typeof window.timelineInteraction.ensureFrameVisible === "function") {
+                window.timelineInteraction.ensureFrameVisible(targetPlayheadFrame);
+            }
+            if (window.TIMELINE_INTERACTION && window.TIMELINE_INTERACTION.renderer) {
+                window.TIMELINE_INTERACTION.renderer.requestRedraw();
+            }
+        }
+
+        // Foco visual e operacional no Program Player / Timeline
+        window.activeFocusedPlayer = "program";
+        const progWrapper = (typeof document !== "undefined") ? document.getElementById("program-video-wrapper") : null;
+        if (progWrapper && typeof progWrapper.focus === "function") {
+            progWrapper.focus();
+        }
+
+        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+            window.showToast("Reverse Match Frame: Quadro localizado na timeline", "info");
+        }
+
+        // Emite evento global para sincronização multi-monitor / janelas popout (Diretriz 6)
+        if (typeof STATE !== "undefined" && typeof STATE.emit === "function") {
+            STATE.emit("reverseMatchFramePerformed", {
+                clip: bestCut,
+                targetPlayheadFrame,
+                sourceFrame
+            });
+        }
+
+        return {
+            clip: bestCut,
+            targetPlayheadFrame,
+            sourceFrame
+        };
     }
 }
 
