@@ -53,6 +53,29 @@ class MediaRepository:
         """Atualiza o status de processamento e possíveis erros de conversão do vídeo."""
         conn.execute("UPDATE video SET status = ?, error_message = ? WHERE id = ?", (status, error_message, video_id))
 
+    @staticmethod
+    def set_crucial_moments(conn: sqlite3.Connection, video_id: int, moments: List[float]) -> None:
+        """Define os instantes cruciais de um vídeo (lista de timestamps)."""
+        moments_json = json.dumps(sorted(list(set(round(m, 2) for m in moments))))
+        conn.execute("UPDATE video SET crucial_moments = ? WHERE id = ?", (moments_json, video_id))
+
+    @staticmethod
+    def set_hover_duration(conn: sqlite3.Connection, video_id: int, duration: Optional[float]) -> None:
+        """Define a duração customizada do hover play para um vídeo específico (NULL = global)."""
+        conn.execute("UPDATE video SET hover_loop_duration = ? WHERE id = ?", (duration, video_id))
+
+    @staticmethod
+    def set_thumbnail_time(conn: sqlite3.Connection, video_id: int, thumbnail_time: Optional[float]) -> None:
+        """Define o timestamp da miniatura principal escolhida."""
+        conn.execute("UPDATE video SET thumbnail_time = ? WHERE id = ?", (thumbnail_time, video_id))
+
+    @staticmethod
+    def set_media_rotation(conn: sqlite3.Connection, media_type: str, media_id: int, rotation: int) -> None:
+        """Atualiza a orientação da mídia (0, 90, 180, 270 graus)."""
+        table = "video" if media_type == "video" else "photo"
+        valid_rotation = int(rotation) % 360
+        conn.execute(f"UPDATE {table} SET rotation = ? WHERE id = ?", (valid_rotation, media_id))
+
     # Colunas de cor graváveis (Fase 0 de docs/PLANO_COR_OCIO.md). Lista fechada
     # porque o nome da coluna entra no SQL por f-string: sem whitelist isso seria
     # injeção. Chave fora da lista é ignorada em silêncio de propósito -- o dict

@@ -343,6 +343,15 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
 
 ### 🖥️ Interface e produtividade <a id="interface-e-produtividade"></a>
 
+- **Modo Galeria Clean (Google Fotos) & Inspeção Dinâmica de Mídias.** Novo modo de visualização da biblioteca (`#btn-view-mode-gallery`) focado em máxima densidade visual e triagem ultrarrápida:
+  - **Aproveitamento Total da Largura (Sem Espaço Cinza Ocioso):** Grade justificada contínua que preenche 100% da linha útil encostando na margem direita, com cálculo dinâmico de altura (`aspect-ratio: var(--aspect)`) e preservação proporcional nativa (16:9, 4:3, 9:16 vertical e panorâmico). No zoom máximo (`.zoom-xl`), cada clipe se expande como um preview imersivo sem corte (`object-fit: contain`).
+  - **Hover Play Singleton & Scrubbing Instantâneo com `Ctrl`:** Ao passar o mouse com `Ctrl`, navegue frame a frame ao longo do vídeo com uma barra de progresso ciano (`.gallery-scrub-track`) e timecode em tempo real sem sobrecarregar a memória, reproduzindo previews de vídeo via player singleton. Duração de hover customizável (2s, 3s, 5s, 10s ou até o fim).
+  - **Miniaturas de Alta Nitidez (HQ) com Upgrade Progressivo:** Pipeline de dois estágios que exibe miniaturas LQ instantâneas (160px) durante o movimento e, após 180ms de repouso em um frame, faz o upgrade suave para miniatura de alta definição HQ (640px) pré-carregada em memória, sem oscilação ou tela preta.
+  - **Momentos Cruciais (Key Moments) & Slideshow com `Alt`:** Marque pontos-chave do clipe com `Ctrl+Shift+Clique` ou pelo botão estrela no monitor Source. Os momentos cruciais recebem pré-geração em lote de miniaturas HQ em segundo plano, marcadores na régua do Source (`.source-crucial-tick`), badges na galeria e modo slideshow automático com a tecla `Alt` (com intervalos ajustáveis de 300ms a 1.2s).
+  - **HUD Flutuante Desacoplado com `Shift + Hover`:** Segure `Shift` sobre qualquer card para abrir um HUD translúcido flutuante com título executivo, nome do arquivo, resumo da decupagem IA, falantes, tags e dados técnicos (fps, resolução, codec), com botões diretos de inserção e inspeção.
+  - **Rotação Dinâmica Não-Destrutiva de Mídia:** Gire vídeos ou fotos de set em passos de 90° (0°, 90°, 180°, 270°) com persistência no SQLite e recálculo instantâneo de proporção na interface.
+  - **Definição de Miniatura de Capa Customizável:** Defina qualquer frame inspecionado no Source Player como o pôster oficial do clipe com persistência atômica da coluna `thumbnail_time`.
+
 - **Janelas destacáveis multi-monitor com persistência total.** Destaque a Biblioteca ou outros painéis
   em janelas popout nomeadas (`CapIAu_Library_Window`) com handshake bidirecional via `BroadcastChannel`,
   gravação de coordenadas de tela (`screenX`/`screenY`/`outerWidth`/`outerHeight` no `localStorage`) e reposicionamento

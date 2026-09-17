@@ -11153,10 +11153,10 @@ export class CapiauTimelineInteraction {
                 const offsetFrames = frame - clip.timelineStartFrame;
                 const hoverTime = clip.in + (offsetFrames / fps);
 
-                // Mostra a miniatura estática instantaneamente
+                // Mostra a miniatura estática instantaneamente (baixa resolução inicial)
                 const interval = TIMELINE_STATE.globalThumbnailsInterval || 1.0;
                 const roundedTime = Math.round(hoverTime / interval) * interval;
-                const thumbSrc = `/api/video/${video.id}/thumbnail-at?time=${roundedTime.toFixed(1)}`;
+                const thumbSrc = `/api/video/${video.id}/thumbnail-at?time=${roundedTime.toFixed(1)}&quality=low`;
 
                 if (imgEl) {
                     imgEl.onerror = () => {
@@ -11174,7 +11174,21 @@ export class CapiauTimelineInteraction {
                             imgEl.src = `/api/video/${video.id}/thumbnail?v=${vVersion}`;
                         }
                     };
-                    if (imgEl.src.indexOf(thumbSrc) === -1) imgEl.src = thumbSrc;
+                    if (imgEl.src.indexOf(thumbSrc) === -1) {
+                        imgEl.src = thumbSrc;
+                        // Upgrade progressivo para HQ após 180ms de repouso no mesmo frame
+                        if (window._timelinePreviewHqTimer) clearTimeout(window._timelinePreviewHqTimer);
+                        window._timelinePreviewHqTimer = setTimeout(() => {
+                            const hqUrl = `/api/video/${video.id}/thumbnail-at?time=${roundedTime.toFixed(1)}&quality=hq`;
+                            const pre = new Image();
+                            pre.onload = () => {
+                                if (imgEl && imgEl.style.display !== "none") {
+                                    imgEl.src = hqUrl;
+                                }
+                            };
+                            pre.src = hqUrl;
+                        }, 180);
+                    }
                     imgEl.style.display = "block";
                 }
 

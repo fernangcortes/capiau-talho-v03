@@ -1585,7 +1585,7 @@ button {
     grid-column: 1 / -1;
 }
 
-#btn-view-mode-list, #btn-view-mode-grid {
+#btn-view-mode-gallery, #btn-view-mode-list, #btn-view-mode-grid {
     background: transparent !important;
     border: none !important;
     border-radius: 0 !important;
@@ -1601,15 +1601,399 @@ button {
     font-size: 11px !important;
 }
 
-#btn-view-mode-list:hover, #btn-view-mode-grid:hover {
+#btn-view-mode-gallery:hover, #btn-view-mode-list:hover, #btn-view-mode-grid:hover {
     background: transparent !important;
     color: var(--text-primary) !important;
 }
 
-#btn-view-mode-list.active, #btn-view-mode-grid.active {
+#btn-view-mode-gallery.active, #btn-view-mode-list.active, #btn-view-mode-grid.active {
     background: transparent !important;
     border-color: transparent !important;
     color: var(--color-cyan) !important;
+}
+
+/* ── MODO GALERIA CLEAN (ESTILO GOOGLE FOTOS) ───────────────────────── */
+:root {
+    --gallery-gap: 2px;
+    --gallery-item-height: 110px;
+}
+
+/* Lista no Modo Galeria */
+.view-mode-gallery {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding: 4px 6px 40px 6px !important;
+}
+.sidebar-left.has-color-ribbon .view-mode-gallery {
+    padding-right: 10px !important;
+}
+
+/* Blocos da Galeria */
+.gallery-block {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin-bottom: 6px;
+}
+
+/* Cabeçalho Sticky do Bloco */
+.gallery-sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    background: rgba(16, 14, 23, 0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 4px;
+    user-select: none;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.gallery-sticky-header .gallery-header-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #e2e8f0;
+    font-family: var(--font-heading);
+}
+
+.gallery-sticky-header .gallery-header-meta {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+
+/* Container de miniaturas dentro do bloco */
+.gallery-block-mosaic {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gallery-gap, 2px);
+    width: 100%;
+    align-items: stretch;
+}
+
+/* Cada Item da Galeria */
+.gallery-item {
+    position: relative;
+    flex-grow: calc(var(--aspect, 1.777) * 100);
+    flex-shrink: 1;
+    flex-basis: calc(var(--gallery-item-height, 110px) * var(--aspect, 1.777));
+    min-width: 60px;
+    max-width: 100%;
+    aspect-ratio: var(--aspect, 1.777);
+    height: auto;
+    overflow: hidden;
+    cursor: pointer;
+    background: #0d0c13;
+    border-radius: 2px;
+    box-sizing: border-box;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gallery-item:hover {
+    z-index: 10;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+.gallery-item.active {
+    outline: 2px solid var(--color-cyan);
+    outline-offset: -2px;
+    z-index: 12;
+}
+
+.gallery-item.selected-for-similar {
+    outline: 2px solid #facc15;
+    outline-offset: -2px;
+}
+
+/* Imagem da thumb */
+.gallery-item img.gallery-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+    transition: transform 0.25s ease;
+}
+
+/* Rotações CSS matematicamente exatas (sem scale arbitrário e sem crop) */
+.gallery-item.rot-90 img.gallery-thumb-img,
+.gallery-item.rot-90 .gallery-hover-video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: calc(100% / var(--aspect, 1));
+    height: calc(100% * var(--aspect, 1));
+    transform: translate(-50%, -50%) rotate(90deg);
+}
+.gallery-item.rot-180 img.gallery-thumb-img,
+.gallery-item.rot-180 .gallery-hover-video {
+    transform: rotate(180deg);
+}
+.gallery-item.rot-270 img.gallery-thumb-img,
+.gallery-item.rot-270 .gallery-hover-video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: calc(100% / var(--aspect, 1));
+    height: calc(100% * var(--aspect, 1));
+    transform: translate(-50%, -50%) rotate(270deg);
+}
+
+/* ── ZOOM MÁXIMO NA GALERIA (EXPANSÃO TOTAL ATÉ A BORDA DIREITA) ── */
+/* No zoom máximo, o item atua como prévia expandida preenchendo 100% da largura disponível */
+.zoom-xl .gallery-item {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    aspect-ratio: var(--aspect, 1.777) !important;
+    height: auto !important;
+    max-height: 82vh !important;
+    margin-bottom: 4px;
+}
+
+.zoom-xl .gallery-item img.gallery-thumb-img,
+.zoom-xl .gallery-item .gallery-hover-video {
+    object-fit: contain !important;
+    background: #000;
+}
+
+.zoom-xl .gallery-video-pill {
+    font-size: 10px;
+    padding: 2px 6px;
+}
+.zoom-xl .gallery-video-pill i {
+    font-size: 8px;
+}
+.zoom-xl .gallery-crucial-badge {
+    font-size: 9.5px;
+    padding: 2px 6px;
+}
+.zoom-xl .gallery-crucial-badge i {
+    font-size: 8.5px;
+}
+
+/* Badge minimalista de vídeo com play e duração (Google Fotos) */
+.gallery-video-pill {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    color: #ffffff;
+    font-size: 8.5px;
+    font-family: monospace;
+    font-weight: 500;
+    pointer-events: none;
+    z-index: 5;
+    letter-spacing: 0.2px;
+}
+.gallery-video-pill i {
+    font-size: 7px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Indicador de momentos cruciais */
+.gallery-crucial-badge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: rgba(139, 92, 246, 0.85);
+    backdrop-filter: blur(4px);
+    color: #fff;
+    font-size: 7.5px;
+    font-weight: 600;
+    z-index: 6;
+    pointer-events: none;
+}
+.gallery-crucial-badge i {
+    font-size: 7px;
+}
+
+/* Linha de scrubbing rápido com Ctrl */
+.gallery-scrub-track {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2.5px;
+    background: rgba(255, 255, 255, 0.2);
+    display: none;
+    z-index: 15;
+    pointer-events: none;
+}
+.gallery-scrub-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--color-cyan);
+    box-shadow: 0 0 6px var(--color-cyan);
+}
+.gallery-scrub-timecode {
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    color: #fff;
+    font-size: 8.5px;
+    font-family: monospace;
+    padding: 1px 4px;
+    border-radius: 2px;
+    display: none;
+    z-index: 16;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.gallery-item.scrubbing .gallery-scrub-track,
+.gallery-item.scrubbing .gallery-scrub-timecode {
+    display: block;
+}
+
+/* Vídeo singleton de hover */
+.gallery-hover-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 8;
+    pointer-events: none;
+    background: transparent;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+/* HUD Flutuante Desacoplado (Shift + Hover) */
+.gallery-shift-hud {
+    position: fixed;
+    z-index: 999999;
+    max-width: 320px;
+    background: rgba(16, 14, 23, 0.96);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+    border-radius: 6px;
+    padding: 8px 10px;
+    pointer-events: auto;
+    font-family: var(--font-body);
+    animation: nleToastIn 0.15s ease-out;
+}
+.gallery-hud-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #f8fafc;
+    margin-bottom: 2px;
+    line-height: 1.3;
+    font-family: var(--font-heading);
+    word-break: break-word;
+}
+.gallery-hud-filename {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-family: monospace;
+    margin-bottom: 4px;
+    word-break: break-all;
+}
+.gallery-hud-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9px;
+    color: var(--color-cyan);
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+}
+.gallery-hud-summary {
+    font-size: 10px;
+    line-height: 1.35;
+    color: rgba(226, 232, 240, 0.85);
+    margin-bottom: 6px;
+    max-height: 54px;
+    overflow-y: auto;
+}
+.gallery-hud-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: 6px;
+}
+.gallery-hud-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 4px;
+    margin-top: 4px;
+}
+.gallery-hud-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    color: var(--text-secondary);
+    font-size: 9px;
+    padding: 2px 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s;
+}
+.gallery-hud-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    border-color: var(--color-cyan);
+}
+
+/* ── MARCADORES CRUCIAIS NO MONITOR SOURCE ── */
+.source-crucial-tick {
+    position: absolute;
+    top: -2px;
+    width: 6px;
+    height: 10px;
+    background: #fbbf24;
+    border: 1px solid rgba(0, 0, 0, 0.6);
+    border-radius: 2px;
+    transform: translateX(-50%);
+    cursor: pointer;
+    pointer-events: auto;
+    z-index: 4;
+    box-shadow: 0 0 4px rgba(251, 191, 36, 0.6);
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+.source-crucial-tick:hover {
+    transform: translateX(-50%) scale(1.3);
+    background: #fef08a;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.9);
+}
+#btn-source-toggle-crucial.active {
+    background: rgba(251, 191, 36, 0.2) !important;
+    border-color: rgba(251, 191, 36, 0.5) !important;
+    color: #fef08a !important;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
 }
 
 #btn-expand-all:hover, #btn-library-photos-in-player:hover {
@@ -9218,22 +9602,28 @@ input[type="number"] {
 }
 
 /* Fita Cromática da Biblioteca (Scene Color Minimap) */
-#library-scroll-color-ribbon {
+#library-scroll-color-ribbon,
+.library-scroll-color-ribbon {
     position: absolute;
     top: 0;
     right: 0;
     width: 6px;
     height: 100%;
     pointer-events: none;
-    z-index: 15;
+    z-index: 30;
     opacity: 0.58;
     transition: opacity 0.2s ease, width 0.2s ease;
     border-radius: 3px 0 0 3px;
 }
 .sidebar-left:hover #library-scroll-color-ribbon,
-#library-scroll-color-ribbon.active-tracking {
+.sidebar-left:hover .library-scroll-color-ribbon,
+#library-scroll-color-ribbon.active-tracking,
+.library-scroll-color-ribbon.active-tracking {
     opacity: 0.95;
     width: 8px;
+}
+.sidebar-left.has-color-ribbon .sidebar-content.scrollable {
+    scrollbar-color: transparent transparent !important;
 }
 .sidebar-left.has-color-ribbon .sidebar-content.scrollable::-webkit-scrollbar-thumb {
     background: transparent !important;
@@ -9247,12 +9637,13 @@ input[type="number"] {
    - Pílula esguia com micro-apontador em cunha voltado para a fita
    - Cor sincronizada dinamicamente com o item/bloco ativo
    ========================================================================== */
-#library-scroll-ribbon-cursor {
+#library-scroll-ribbon-cursor,
+.library-scroll-ribbon-cursor {
     position: absolute;
     right: 8px;
     width: 4px;
     min-height: 20px;
-    z-index: 25;
+    z-index: 35;
     pointer-events: auto;
     cursor: grab;
     user-select: none;
@@ -9270,7 +9661,8 @@ input[type="number"] {
 }
 
 /* Micro-apontador em cunha apontando diretamente para a fita cromática */
-#library-scroll-ribbon-cursor::after {
+#library-scroll-ribbon-cursor::after,
+.library-scroll-ribbon-cursor::after {
     content: '';
     position: absolute;
     top: 50%;
@@ -9287,14 +9679,19 @@ input[type="number"] {
 }
 
 .sidebar-left:hover #library-scroll-ribbon-cursor,
+.sidebar-left:hover .library-scroll-ribbon-cursor,
 #library-scroll-color-ribbon.active-tracking ~ #library-scroll-ribbon-cursor,
-#library-scroll-ribbon-cursor:hover {
+.library-scroll-color-ribbon.active-tracking ~ .library-scroll-ribbon-cursor,
+#library-scroll-ribbon-cursor:hover,
+.library-scroll-ribbon-cursor:hover {
     right: 10px;
     opacity: 0.95;
 }
 
 #library-scroll-ribbon-cursor:active,
-#library-scroll-ribbon-cursor.active-dragging {
+.library-scroll-ribbon-cursor:active,
+#library-scroll-ribbon-cursor.active-dragging,
+.library-scroll-ribbon-cursor.active-dragging {
     cursor: grabbing;
     right: 10px;
     opacity: 1;

@@ -379,6 +379,12 @@ export const COMMANDS_CATALOG = [
         label: "Pular para o Marcador Anterior",
         description: "Recua a agulha de reprodução até o marcador anterior na timeline"
     },
+    {
+        id: "markers.toggle_crucial",
+        category: "markers",
+        label: "Alternar Momento Crucial (Player / Galeria)",
+        description: "Marca ou desmarca o quadro atual como Momento Crucial para reprodução rápida em hover"
+    },
 
     // ── ASSISTÊNCIA DE IA & TOMADAS ─────────────────────────────────────────
     {
@@ -720,6 +726,7 @@ export const KEYMAP_PRESETS = {
         "markers.add_edit": ["KeyM"],
         "markers.next": ["Shift+KeyM"],
         "markers.prev": ["Alt+KeyM"],
+        "markers.toggle_crucial": ["Ctrl+Shift+KeyK", "Ctrl+Shift+KeyM"],
 
         "ai.toggle_alternatives": ["Alt+KeyA"],
         "ai.accept_ghost": ["Enter", "KeyY"],
@@ -848,6 +855,7 @@ export const KEYMAP_PRESETS = {
         "markers.add_edit": ["NumpadMultiply", "KeyG", "KeyM"],
         "markers.next": ["Alt+KeyG", "Shift+KeyM"],
         "markers.prev": ["Alt+Shift+KeyG", "Alt+KeyM"],
+        "markers.toggle_crucial": ["Ctrl+Shift+KeyK"],
 
         "ai.toggle_alternatives": ["KeyA"],
         "ai.accept_ghost": ["Enter", "KeyY"],
@@ -923,6 +931,7 @@ export const KEYMAP_PRESETS = {
         "markers.add_edit": ["KeyM"],
         "markers.next": ["Shift+KeyM"],
         "markers.prev": ["Ctrl+Shift+KeyM", "Alt+KeyM"],
+        "markers.toggle_crucial": ["Ctrl+Shift+KeyK"],
 
         "ai.toggle_alternatives": ["Shift+KeyT", "KeyA"],
         "ai.accept_ghost": ["Enter", "KeyY"],
@@ -998,6 +1007,7 @@ export const KEYMAP_PRESETS = {
         "markers.add_edit": ["KeyM"],
         "markers.next": ["Shift+KeyM"],
         "markers.prev": ["Alt+KeyM"],
+        "markers.toggle_crucial": ["Ctrl+Shift+KeyK"],
 
         "ai.toggle_alternatives": ["KeyT", "KeyA"],
         "ai.accept_ghost": ["Enter", "KeyY"],
@@ -1073,6 +1083,7 @@ export const KEYMAP_PRESETS = {
         "markers.add_edit": ["KeyM"],
         "markers.next": ["Ctrl+Quote", "Shift+KeyM"],
         "markers.prev": ["Ctrl+Semicolon", "Alt+KeyM"],
+        "markers.toggle_crucial": ["Ctrl+Shift+KeyK"],
 
         "ai.toggle_alternatives": ["KeyY", "KeyA"],
         "ai.accept_ghost": ["Enter", "KeyY"],

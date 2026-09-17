@@ -55,6 +55,12 @@ CREATE TABLE IF NOT EXISTS video (
     status TEXT CHECK(status IN ('pending', 'ingested', 'transcribing', 'transcribed', 'analyzing', 'analyzed', 'error')) DEFAULT 'pending',
     error_message TEXT,
     
+    -- Modo Galeria Clean & Momentos Cruciais
+    crucial_moments TEXT,          -- JSON array de timestamps float [12.5, 45.0]
+    hover_loop_duration REAL,      -- Duracao customizada de hover play unitario em segundos (NULL = usa global)
+    rotation INTEGER DEFAULT 0,    -- Rotacao em graus (0, 90, 180, 270)
+    thumbnail_time REAL DEFAULT NULL, -- Timestamp da miniatura principal escolhida
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -74,6 +80,7 @@ CREATE TABLE IF NOT EXISTS photo (
     tags TEXT, -- JSON array de tags visuais
     burst_group_id INTEGER, -- id da foto lider da rajada (a unica analisada por API); NULL = foto isolada
     status TEXT CHECK(status IN ('pending', 'ingested', 'analyzed', 'error')) DEFAULT 'pending',
+    rotation INTEGER DEFAULT 0,    -- Rotacao em graus (0, 90, 180, 270)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -527,6 +534,27 @@ def init_db(db_path: Path = None):
                 print(f"[MIGRATION] Coluna '{_col}' adicionada a tabela video.")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_video_color_profile ON video(project_id, color_profile)")
 
+        # Modo Galeria Clean & Momentos Cruciais
+        if "crucial_moments" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN crucial_moments TEXT")
+            print("[MIGRATION] Coluna 'crucial_moments' adicionada a tabela video.")
+        if "hover_loop_duration" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN hover_loop_duration REAL")
+            print("[MIGRATION] Coluna 'hover_loop_duration' adicionada a tabela video.")
+        if "rotation" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN rotation INTEGER DEFAULT 0")
+            print("[MIGRATION] Coluna 'rotation' adicionada a tabela video.")
+        if "thumbnail_time" not in video_cols:
+            cursor.execute("ALTER TABLE video ADD COLUMN thumbnail_time REAL DEFAULT NULL")
+            print("[MIGRATION] Coluna 'thumbnail_time' adicionada a tabela video.")
+
+        # Backfill seguro: sincroniza thumbnail_time com a miniatura inicial padrão do ingest (10% ou 1s) para registros nulos
+        cursor.execute("""
+            UPDATE video
+            SET thumbnail_time = ROUND(MAX(1.0, duration * 0.1), 2)
+            WHERE thumbnail_time IS NULL AND duration IS NOT NULL AND duration > 0
+        """)
+
         # Migracoes para tabela photo (descricao original preservada antes do enriquecimento)
         cursor.execute("PRAGMA table_info(photo)")
         photo_cols = [row[1] for row in cursor.fetchall()]
@@ -575,6 +603,10 @@ def init_db(db_path: Path = None):
             if _col not in photo_cols:
                 cursor.execute(f"ALTER TABLE photo ADD COLUMN {_col} {_tipo}")
                 print(f"[MIGRATION] Coluna '{_col}' adicionada a tabela photo.")
+
+        if "rotation" not in photo_cols:
+            cursor.execute("ALTER TABLE photo ADD COLUMN rotation INTEGER DEFAULT 0")
+            print("[MIGRATION] Coluna 'rotation' adicionada a tabela photo.")
 
         # Migracoes para tabela theme (centroide de embedding e temas fixados pelo usuario)
         cursor.execute("PRAGMA table_info(theme)")

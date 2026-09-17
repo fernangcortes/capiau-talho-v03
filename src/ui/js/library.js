@@ -1160,6 +1160,43 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     });
     menu.appendChild(relinkItem);
 
+    // Item: Girar Mídia (+90°)
+    const rotateItem = document.createElement("div");
+    rotateItem.className = "menu-item";
+    rotateItem.innerHTML = `<i class="fa-solid fa-rotate-right" style="color:var(--color-cyan);"></i><span class="menu-item-text">Girar Mídia (+90°)</span>`;
+    rotateItem.addEventListener("click", async () => {
+        menu.remove();
+        try {
+            const res = await CapIAuAPI.rotateMedia(kind, item.id, 90);
+            item.rotation = res.rotation;
+            if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+            if (typeof window.showToast === "function") window.showToast(`Mídia rotacionada para ${res.rotation}°!`, "success");
+        } catch (err) {
+            alert("Erro ao girar mídia: " + err.message);
+        }
+    });
+    menu.appendChild(rotateItem);
+
+    if (isVideo) {
+        // Item: Limpar Momentos Cruciais
+        const clearCrucialItem = document.createElement("div");
+        clearCrucialItem.className = "menu-item";
+        const countCrucial = (item.crucial_moments && Array.isArray(item.crucial_moments)) ? item.crucial_moments.length : 0;
+        clearCrucialItem.innerHTML = `<i class="fa-solid fa-sparkles" style="color:var(--color-violet);"></i><span class="menu-item-text">Limpar Momentos Cruciais (${countCrucial})</span>`;
+        clearCrucialItem.addEventListener("click", async () => {
+            menu.remove();
+            try {
+                const res = await CapIAuAPI.updateCrucialMoments(item.id, "set", null, []);
+                item.crucial_moments = [];
+                if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+                if (typeof window.showToast === "function") window.showToast("Momentos cruciais resetados para padrão automático!", "info");
+            } catch (err) {
+                alert("Erro ao limpar momentos: " + err.message);
+            }
+        });
+        menu.appendChild(clearCrucialItem);
+    }
+
     // Separador
     const sep4 = document.createElement("div");
     sep4.className = "menu-separator";
@@ -3998,6 +4035,741 @@ window.expandCollapseAllSubfolders = function(folderPath, expand) {
     if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia();
 };
 
+export function formatShortDuration(sec) {
+    if (!sec || isNaN(sec) || sec <= 0) return "0:00";
+    const s = Math.floor(sec);
+    const hrs = Math.floor(s / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    const secs = s % 60;
+    if (hrs > 0) {
+        return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// ── GERENCIADOR DE INTERAÇÃO DA GALERIA CLEAN (SINGLETON HOVER, SCRUB & HUD) ────
+export class GalleryInteractionController {
+    constructor() {
+        this.hoverVideo = null;
+        this.activeItem = null;
+        this.hoverTimer = null;
+        this.ctrlHeldTimer = null;
+        this.ctrlScanInterval = null;
+        this.altSlideshowInterval = null;
+        this.altIdleTimer = null;
+        this.isCtrlScrubbing = false;
+        this.isAltInspecting = false;
+        this.shiftHud = null;
+        this.currentScrubTime = 0;
+        this.hqUpgradeTimer = null;
+        this.prefetchedCrucials = new Set();
+
+        this.initSingletonElements();
+        this.bindGlobalEvents();
+    }
+
+    initSingletonElements() {
+        if (typeof document === "undefined") return;
+        
+        // HUD Flutuante Desacoplado para Shift + Hover
+        let hud = document.getElementById("gallery-shift-hud");
+        if (!hud) {
+            hud = document.createElement("div");
+            hud.id = "gallery-shift-hud";
+            hud.className = "gallery-shift-hud";
+            hud.style.display = "none";
+            document.body.appendChild(hud);
+        }
+        this.shiftHud = hud;
+
+        // Singleton Hover Video Player
+        if (!this.hoverVideo) {
+            const vid = document.createElement("video");
+            vid.className = "gallery-hover-video";
+            vid.muted = true;
+            vid.playsInline = true;
+            vid.autoplay = false;
+            vid.loop = false;
+            vid.preload = "auto";
+            
+            const handleLoopReset = () => {
+                if (!this.activeItem || !this.activeItem._mediaData || vid.seeking) return;
+                const v = this.activeItem._mediaData;
+                const start = this.activeItem._effectiveHoverStart ?? (this.activeItem._crucialStart || 0);
+                const dur = this.activeItem._hoverLoopDur || 3.5;
+                const maxTime = (v.duration && v.duration > 0) ? v.duration : 5;
+
+                if (dur === "end") {
+                    if (vid.currentTime >= maxTime - 0.05) {
+                        vid.currentTime = start;
+                        if (vid.paused) vid.play().catch(() => {});
+                    }
+                } else {
+                    const loopEnd = Math.min(start + dur, maxTime);
+                    if (vid.currentTime >= loopEnd - 0.05) {
+                        vid.currentTime = start;
+                        if (vid.paused) vid.play().catch(() => {});
+                    }
+                }
+            };
+
+            vid.addEventListener("timeupdate", handleLoopReset);
+            vid.addEventListener("ended", () => {
+                if (!this.activeItem || !this.activeItem._mediaData) return;
+                const start = this.activeItem._effectiveHoverStart ?? (this.activeItem._crucialStart || 0);
+                vid.currentTime = start;
+                if (vid.paused) vid.play().catch(() => {});
+            });
+
+            this.hoverVideo = vid;
+        }
+    }
+
+    bindGlobalEvents() {
+        if (typeof window === "undefined") return;
+
+        window.addEventListener("keyup", (e) => {
+            if (e.key === "Control" && this.isCtrlScrubbing) {
+                this.stopCtrlScrubbing();
+            }
+            if (e.key === "Alt" && this.isAltInspecting) {
+                this.stopAltInspecting();
+            }
+            if (e.key === "Shift" && this.shiftHud) {
+                this.shiftHud.style.display = "none";
+            }
+        });
+
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "Control" && this.activeItem && !this.isCtrlScrubbing) {
+                this.startCtrlScrubbing(this.activeItem);
+            }
+            if (e.key === "Alt" && this.activeItem && !this.isAltInspecting) {
+                this.startAltInspecting(this.activeItem);
+            }
+            if (e.key === "Shift" && this.activeItem) {
+                this.showShiftHud(this.activeItem);
+            }
+        });
+    }
+
+    stopAllHover() {
+        if (this.hoverTimer) {
+            clearTimeout(this.hoverTimer);
+            this.hoverTimer = null;
+        }
+        if (this.hqUpgradeTimer) {
+            clearTimeout(this.hqUpgradeTimer);
+            this.hqUpgradeTimer = null;
+        }
+        if (this.ctrlHeldTimer) {
+            clearTimeout(this.ctrlHeldTimer);
+            this.ctrlHeldTimer = null;
+        }
+        if (this.ctrlScanInterval) {
+            clearInterval(this.ctrlScanInterval);
+            this.ctrlScanInterval = null;
+        }
+        if (this.altSlideshowInterval) {
+            clearInterval(this.altSlideshowInterval);
+            this.altSlideshowInterval = null;
+        }
+        if (this.altIdleTimer) {
+            clearTimeout(this.altIdleTimer);
+            this.altIdleTimer = null;
+        }
+        if (this.hoverVideo) {
+            this.hoverVideo.pause();
+            this.hoverVideo.onplaying = null;
+            this.hoverVideo.onseeked = null;
+            this.hoverVideo.style.opacity = "0";
+            this.hoverVideo.removeAttribute("src");
+            this.hoverVideo.load();
+            if (this.hoverVideo.parentNode) {
+                this.hoverVideo.parentNode.removeChild(this.hoverVideo);
+            }
+        }
+        if (this.shiftHud) {
+            this.shiftHud.style.display = "none";
+        }
+        if (this.activeItem) {
+            this.activeItem.classList.remove("scrubbing");
+            const thumbImg = this.activeItem.querySelector(".gallery-thumb-img");
+            if (thumbImg) {
+                delete thumbImg.dataset.scrubSec;
+                delete thumbImg.dataset.quality;
+                if (this.activeItem._defaultSrc) {
+                    thumbImg.src = this.activeItem._defaultSrc;
+                }
+            }
+            this.activeItem = null;
+        }
+        this.isCtrlScrubbing = false;
+        this.isAltInspecting = false;
+    }
+
+    getTargetStart(mediaData) {
+        if (!mediaData) return 0;
+        if (mediaData.thumbnail_time !== null && mediaData.thumbnail_time !== undefined && !isNaN(mediaData.thumbnail_time)) {
+            return parseFloat(mediaData.thumbnail_time);
+        }
+        const crucials = Array.isArray(mediaData.crucial_moments) ? mediaData.crucial_moments : [];
+        if (crucials.length > 0) {
+            const c0 = crucials[0];
+            return typeof c0 === "number" ? c0 : (c0?.timestamp ?? 0);
+        }
+        // Fallback natural perfeitamente alinhado com a miniatura padrão do ingest (10% do clipe, min 1s)
+        const dur = mediaData.duration || 0;
+        return dur > 0 ? Math.min(dur, Math.max(1.0, dur * 0.1)) : 0;
+    }
+
+    getEffectiveStart(mediaData, loopDuration) {
+        const targetStart = this.getTargetStart(mediaData);
+        const duration = mediaData?.duration || 0;
+        if (loopDuration !== "end" && (duration - targetStart) < loopDuration) {
+            return Math.max(0, duration - loopDuration);
+        }
+        return targetStart;
+    }
+
+    attachItemListeners(itemEl, mediaData) {
+        itemEl._mediaData = mediaData;
+        itemEl._mediaKind = mediaData._mediaKind || (mediaData.duration !== undefined ? "video" : "photo");
+
+        const crucials = Array.isArray(mediaData.crucial_moments) ? mediaData.crucial_moments : [];
+        const targetStart = this.getTargetStart(mediaData);
+        itemEl._crucialMoments = crucials;
+        itemEl._crucialStart = targetStart;
+
+        const globalLoop = localStorage.getItem("gallery-pref-hover-duration") || "3.5";
+        itemEl._hoverLoopDur = mediaData.hover_loop_duration || (globalLoop === "end" ? "end" : parseFloat(globalLoop));
+
+        itemEl.addEventListener("mouseenter", (e) => this.onMouseEnter(itemEl, e));
+        itemEl.addEventListener("mousemove", (e) => this.onMouseMove(itemEl, e));
+        itemEl.addEventListener("mouseleave", () => this.onMouseLeave(itemEl));
+        
+        // Atalho rápido: Ctrl + Shift + Clique grava/remove instante crucial
+        itemEl.addEventListener("click", (e) => {
+            if (e.ctrlKey && e.shiftKey) {
+                this.handleCtrlShiftClick(itemEl, e);
+            }
+        });
+    }
+
+    onMouseEnter(itemEl, e) {
+        this.activeItem = itemEl;
+        this.currentScrubTime = itemEl._crucialStart || 0;
+
+        if (e.shiftKey) {
+            this.showShiftHud(itemEl, e);
+        }
+
+        if (itemEl._mediaKind !== "video") return;
+
+        if (e.ctrlKey) {
+            this.startCtrlScrubbing(itemEl);
+            this.onCtrlMouseMove(itemEl, e);
+            return;
+        }
+
+        if (e.altKey) {
+            this.startAltInspecting(itemEl);
+            this.onAltMouseMove(itemEl, e);
+            return;
+        }
+
+        // Hover play normal com debounce de 180ms
+        if (this.hoverTimer) clearTimeout(this.hoverTimer);
+        this.hoverTimer = setTimeout(() => {
+            if (this.activeItem === itemEl && !this.isCtrlScrubbing && !this.isAltInspecting) {
+                this.startHoverVideo(itemEl);
+            }
+        }, 180);
+    }
+
+    onMouseMove(itemEl, e) {
+        if (e.shiftKey) {
+            this.showShiftHud(itemEl, e);
+        } else if (this.shiftHud) {
+            this.shiftHud.style.display = "none";
+        }
+
+        if (itemEl._mediaKind !== "video") return;
+
+        if (e.ctrlKey) {
+            if (!this.isCtrlScrubbing) this.startCtrlScrubbing(itemEl);
+            this.onCtrlMouseMove(itemEl, e);
+        } else if (e.altKey) {
+            if (!this.isAltInspecting) this.startAltInspecting(itemEl);
+            this.onAltMouseMove(itemEl, e);
+        } else {
+            if (this.isCtrlScrubbing) this.stopCtrlScrubbing();
+            if (this.isAltInspecting) this.stopAltInspecting();
+        }
+    }
+
+    onMouseLeave(itemEl) {
+        if (this.activeItem === itemEl) {
+            this.stopAllHover();
+        }
+    }
+
+    startHoverVideo(itemEl) {
+        if (!itemEl || !itemEl._mediaData) return;
+        const v = itemEl._mediaData;
+        if (!this.hoverVideo) this.initSingletonElements();
+
+        if (this.hoverVideo.parentNode) {
+            this.hoverVideo.parentNode.removeChild(this.hoverVideo);
+        }
+
+        const globalLoop = localStorage.getItem("gallery-pref-hover-duration") || "3.5";
+        const loopDur = itemEl._hoverLoopDur || v.hover_loop_duration || (globalLoop === "end" ? "end" : parseFloat(globalLoop));
+        const loopDuration = loopDur === "end" ? "end" : parseFloat(loopDur);
+        itemEl._hoverLoopDur = loopDuration;
+
+        const effectiveStart = this.getEffectiveStart(v, loopDuration);
+        itemEl._effectiveHoverStart = effectiveStart;
+
+        // Previne flash/blink preto: inicia transparente e revela apenas quando os frames começarem a tocar
+        this.hoverVideo.style.opacity = "0";
+        itemEl.appendChild(this.hoverVideo);
+
+        const onFrameReady = () => {
+            if (this.activeItem === itemEl) {
+                this.hoverVideo.style.opacity = "1";
+            }
+        };
+        this.hoverVideo.onplaying = onFrameReady;
+        this.hoverVideo.onseeked = () => {
+            if (this.activeItem === itemEl && !this.hoverVideo.paused) {
+                this.hoverVideo.style.opacity = "1";
+            }
+        };
+
+        const streamUrl = `/api/video/${v.id}/stream`;
+        const currentSrc = this.hoverVideo.getAttribute("src") || this.hoverVideo.src;
+        const isSameSource = currentSrc && (currentSrc.endsWith(streamUrl) || currentSrc === streamUrl);
+
+        const seekAndPlay = () => {
+            try {
+                this.hoverVideo.currentTime = effectiveStart;
+            } catch (err) {}
+            this.hoverVideo.play().catch(() => {});
+        };
+
+        if (!isSameSource) {
+            this.hoverVideo.src = streamUrl;
+            if (this.hoverVideo.readyState >= 1) {
+                seekAndPlay();
+            } else {
+                this.hoverVideo.addEventListener("loadedmetadata", seekAndPlay, { once: true });
+            }
+        } else {
+            seekAndPlay();
+        }
+    }
+
+    startCtrlScrubbing(itemEl) {
+        this.isCtrlScrubbing = true;
+        if (this.hoverVideo && this.hoverVideo.parentNode) {
+            this.hoverVideo.pause();
+            this.hoverVideo.parentNode.removeChild(this.hoverVideo);
+        }
+        if (this.hoverTimer) {
+            clearTimeout(this.hoverTimer);
+            this.hoverTimer = null;
+        }
+        itemEl.classList.add("scrubbing");
+    }
+
+    stopCtrlScrubbing() {
+        this.isCtrlScrubbing = false;
+        if (this.hqUpgradeTimer) {
+            clearTimeout(this.hqUpgradeTimer);
+            this.hqUpgradeTimer = null;
+        }
+        if (this.ctrlHeldTimer) clearTimeout(this.ctrlHeldTimer);
+        if (this.ctrlScanInterval) clearInterval(this.ctrlScanInterval);
+        if (this.activeItem) {
+            this.activeItem.classList.remove("scrubbing");
+            const thumbImg = this.activeItem.querySelector(".gallery-thumb-img");
+            if (thumbImg) {
+                delete thumbImg.dataset.scrubSec;
+                delete thumbImg.dataset.quality;
+                if (this.activeItem._defaultSrc) {
+                    thumbImg.src = this.activeItem._defaultSrc;
+                }
+            }
+        }
+    }
+
+    onCtrlMouseMove(itemEl, e) {
+        const v = itemEl._mediaData;
+        const dur = v.duration || 5.0;
+        const rect = itemEl.getBoundingClientRect();
+        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const time = pct * dur;
+        this.currentScrubTime = time;
+
+        // Cancela fast scan automático se o usuário moveu o mouse
+        if (this.ctrlScanInterval) {
+            clearInterval(this.ctrlScanInterval);
+            this.ctrlScanInterval = null;
+        }
+
+        this.applyScrubFrame(itemEl, time, pct, dur);
+
+        // Se o usuário ficar parado por 2 segundos segurando Ctrl, inicia passagem rápida automática
+        if (this.ctrlHeldTimer) clearTimeout(this.ctrlHeldTimer);
+        this.ctrlHeldTimer = setTimeout(() => {
+            if (this.isCtrlScrubbing && this.activeItem === itemEl) {
+                this.startCtrlAutoScan(itemEl);
+            }
+        }, 2000);
+    }
+
+    startCtrlAutoScan(itemEl) {
+        const v = itemEl._mediaData;
+        const dur = v.duration || 5.0;
+        let curTime = this.currentScrubTime || 0;
+        const step = Math.max(0.8, dur / 25);
+
+        if (this.ctrlScanInterval) clearInterval(this.ctrlScanInterval);
+        this.ctrlScanInterval = setInterval(() => {
+            if (!this.isCtrlScrubbing || this.activeItem !== itemEl) {
+                clearInterval(this.ctrlScanInterval);
+                return;
+            }
+            curTime += step;
+            if (curTime > dur) curTime = 0;
+            this.currentScrubTime = curTime;
+            const pct = curTime / dur;
+            this.applyScrubFrame(itemEl, curTime, pct, dur);
+        }, 110);
+    }
+
+    startAltInspecting(itemEl) {
+        this.isAltInspecting = true;
+        if (this.hoverVideo && this.hoverVideo.parentNode) {
+            this.hoverVideo.pause();
+            this.hoverVideo.parentNode.removeChild(this.hoverVideo);
+        }
+        if (this.hoverTimer) clearTimeout(this.hoverTimer);
+        itemEl.classList.add("scrubbing");
+
+        // Pré-carrega antecipadamente as miniaturas HQ de todos os momentos cruciais do vídeo
+        this.preloadCrucialHqThumbnails(itemEl);
+
+        // Slideshow automático de momentos cruciais caso parado
+        this.startAltSlideshow(itemEl);
+    }
+
+    stopAltInspecting() {
+        this.isAltInspecting = false;
+        if (this.hqUpgradeTimer) {
+            clearTimeout(this.hqUpgradeTimer);
+            this.hqUpgradeTimer = null;
+        }
+        if (this.altSlideshowInterval) clearInterval(this.altSlideshowInterval);
+        if (this.altIdleTimer) clearTimeout(this.altIdleTimer);
+        if (this.activeItem) {
+            this.activeItem.classList.remove("scrubbing");
+            const thumbImg = this.activeItem.querySelector(".gallery-thumb-img");
+            if (thumbImg) {
+                delete thumbImg.dataset.scrubSec;
+                delete thumbImg.dataset.quality;
+                if (this.activeItem._defaultSrc) {
+                    thumbImg.src = this.activeItem._defaultSrc;
+                }
+            }
+        }
+    }
+
+    onAltMouseMove(itemEl, e) {
+        const moments = itemEl._crucialMoments || [];
+        if (moments.length === 0) return;
+
+        if (this.altSlideshowInterval) {
+            clearInterval(this.altSlideshowInterval);
+            this.altSlideshowInterval = null;
+        }
+
+        const rect = itemEl.getBoundingClientRect();
+        const pct = Math.max(0, Math.min(0.999, (e.clientX - rect.left) / rect.width));
+        const idx = Math.floor(pct * moments.length);
+        const time = moments[idx];
+        this.currentScrubTime = time;
+
+        const dur = itemEl._mediaData.duration || 5.0;
+        this.applyScrubFrame(itemEl, time, time / dur, dur);
+
+        // Se ficar parado após mover, reinicia slideshow dos momentos cruciais
+        if (this.altIdleTimer) clearTimeout(this.altIdleTimer);
+        this.altIdleTimer = setTimeout(() => {
+            if (this.isAltInspecting && this.activeItem === itemEl) {
+                this.startAltSlideshow(itemEl);
+            }
+        }, 400);
+    }
+
+    startAltSlideshow(itemEl) {
+        const moments = itemEl._crucialMoments || [];
+        if (moments.length === 0) return;
+
+        const ms = parseInt(localStorage.getItem("gallery-pref-alt-interval")) || 500;
+        let idx = 0;
+        if (this.altSlideshowInterval) clearInterval(this.altSlideshowInterval);
+
+        this.altSlideshowInterval = setInterval(() => {
+            if (!this.isAltInspecting || this.activeItem !== itemEl) {
+                clearInterval(this.altSlideshowInterval);
+                return;
+            }
+            const time = moments[idx % moments.length];
+            idx++;
+            this.currentScrubTime = time;
+            const dur = itemEl._mediaData.duration || 5.0;
+            // No slideshow de momentos cruciais, requisita HQ imediatamente
+            this.applyScrubFrame(itemEl, time, time / dur, dur, { immediateHq: true });
+        }, ms);
+    }
+
+    applyScrubFrame(itemEl, time, pct, dur, options = {}) {
+        itemEl.classList.add("scrubbing");
+        const bar = itemEl.querySelector(".gallery-scrub-bar");
+        if (bar) bar.style.width = `${(pct * 100).toFixed(1)}%`;
+
+        const tc = itemEl.querySelector(".gallery-scrub-timecode");
+        if (tc) tc.textContent = `${formatShortDuration(time)} / ${formatShortDuration(dur)}`;
+
+        const img = itemEl.querySelector(".gallery-thumb-img");
+        const targetSec = Math.round(time);
+        const videoId = itemEl._mediaData?.id;
+        if (!img || !videoId) return;
+
+        // Se o segundo mudou, atualiza para miniatura em baixa qualidade (rápida/instantânea)
+        if (img.dataset.scrubSec != targetSec) {
+            img.dataset.scrubSec = targetSec;
+            img.dataset.quality = "low";
+
+            // Cancela upgrade HQ anterior pendente
+            if (this.hqUpgradeTimer) {
+                clearTimeout(this.hqUpgradeTimer);
+                this.hqUpgradeTimer = null;
+            }
+
+            img.src = `/api/video/${videoId}/thumbnail-at?time=${targetSec}&quality=low`;
+        }
+
+        // Agenda ou executa a substituição progressiva para Alta Resolução (HQ)
+        // Se o usuário permanecer no mesmo frame ou em hover por mais de 160ms, substitui pela melhor!
+        const delay = options.immediateHq ? 0 : 160;
+        if (img.dataset.quality !== "hq") {
+            if (this.hqUpgradeTimer) clearTimeout(this.hqUpgradeTimer);
+            this.hqUpgradeTimer = setTimeout(() => {
+                this.upgradeToHqThumbnail(itemEl, targetSec);
+            }, delay);
+        }
+    }
+
+    upgradeToHqThumbnail(itemEl, targetSec) {
+        if (!itemEl || !itemEl._mediaData) return;
+        const img = itemEl.querySelector(".gallery-thumb-img");
+        if (!img || img.dataset.scrubSec != targetSec) return;
+        if (img.dataset.quality === "hq") return;
+
+        const videoId = itemEl._mediaData.id;
+        const hqSrc = `/api/video/${videoId}/thumbnail-at?time=${targetSec}&quality=hq`;
+
+        // Pré-carrega a imagem HQ em memória para transição suave e sem piscar a tela
+        const preloader = new Image();
+        preloader.onload = () => {
+            if (img && img.dataset.scrubSec == targetSec) {
+                img.src = hqSrc;
+                img.dataset.quality = "hq";
+            }
+        };
+        preloader.src = hqSrc;
+    }
+
+    preloadCrucialHqThumbnails(itemEl) {
+        const moments = itemEl._crucialMoments || [];
+        const videoId = itemEl._mediaData?.id;
+        if (!videoId || moments.length === 0) return;
+
+        moments.forEach((m) => {
+            const sec = Math.round(typeof m === "number" ? m : m.timestamp);
+            const key = `${videoId}-${sec}`;
+            if (!this.prefetchedCrucials.has(key)) {
+                this.prefetchedCrucials.add(key);
+                const preloadImg = new Image();
+                preloadImg.src = `/api/video/${videoId}/thumbnail-at?time=${sec}&quality=hq`;
+            }
+        });
+    }
+
+    async handleCtrlShiftClick(itemEl, e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const v = itemEl._mediaData;
+        if (!v || itemEl._mediaKind !== "video") return;
+
+        const targetTs = this.currentScrubTime !== null && this.currentScrubTime !== undefined
+            ? this.currentScrubTime
+            : (v.duration ? v.duration * 0.25 : 0);
+
+        try {
+            const res = await CapIAuAPI.updateCrucialMoments(v.id, "toggle", targetTs);
+            if (res && res.crucial_moments) {
+                v.crucial_moments = res.crucial_moments;
+                itemEl._crucialMoments = res.crucial_moments;
+                itemEl._crucialStart = this.getTargetStart(v);
+
+                let badge = itemEl.querySelector(".gallery-crucial-badge");
+                if (res.crucial_moments.length > 0) {
+                    if (!badge) {
+                        badge = document.createElement("div");
+                        badge.className = "gallery-crucial-badge";
+                        itemEl.appendChild(badge);
+                    }
+                    badge.innerHTML = `<i class="fa-solid fa-sparkles"></i> ${res.crucial_moments.length}`;
+                    badge.setAttribute("data-tooltip", `${res.crucial_moments.length} momento(s) crucial(is)`);
+                } else if (badge) {
+                    badge.remove();
+                }
+
+                if (window.showToast) {
+                    window.showToast(`Momento crucial ${formatShortDuration(targetTs)} atualizado!`, "success");
+                }
+            }
+        } catch (err) {
+            console.error("Erro ao salvar momento crucial:", err);
+            if (window.showToast) window.showToast("Erro ao salvar momento crucial: " + err.message, "error");
+        }
+    }
+
+    showShiftHud(itemEl, e = null) {
+        if (!this.shiftHud || !itemEl || !itemEl._mediaData) return;
+        const item = itemEl._mediaData;
+        const isVideo = itemEl._mediaKind === "video";
+
+        // Preferências do usuário sobre o que mostrar
+        const showTitle = localStorage.getItem("gallery-hud-title") !== "false";
+        const showFilename = localStorage.getItem("gallery-hud-filename") !== "false";
+        const showSummary = localStorage.getItem("gallery-hud-summary") !== "false";
+        const showSpeaker = localStorage.getItem("gallery-hud-speaker") !== "false";
+        const showTags = localStorage.getItem("gallery-hud-tags") !== "false";
+        const showTech = localStorage.getItem("gallery-hud-tech") !== "false";
+
+        let titleHtml = showTitle ? `<div class="gallery-hud-title">${escapeHtml(item.title || item.filename)}</div>` : "";
+        let filenameHtml = (showFilename && item.filename && item.filename !== item.title) ? `<div class="gallery-hud-filename">${escapeHtml(item.filename)}</div>` : "";
+        
+        let metaHtml = "";
+        if (showTech) {
+            const parts = [];
+            if (item.duration) parts.push(`⏱ ${formatShortDuration(item.duration)}`);
+            if (item.resolution) parts.push(`📐 ${item.resolution}`);
+            if (item.fps) parts.push(`${Math.round(item.fps)} fps`);
+            if (item.codec) parts.push(item.codec.toUpperCase());
+            if (item.rotation) parts.push(`🔄 ${item.rotation}°`);
+            if (parts.length > 0) {
+                metaHtml = `<div class="gallery-hud-meta">${parts.map(p => `<span>${p}</span>`).join(" • ")}</div>`;
+            }
+        }
+
+        let summaryHtml = "";
+        if (showSummary && (item.summary || item.description)) {
+            summaryHtml = `<div class="gallery-hud-summary">${escapeHtml(item.summary || item.description)}</div>`;
+        }
+
+        let tagsHtml = "";
+        if (showTags && item.tags) {
+            try {
+                const parsed = typeof item.tags === "string" ? JSON.parse(item.tags) : item.tags;
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    tagsHtml = `<div class="gallery-hud-tags">` + parsed.slice(0, 5).map(t => {
+                        return `<span class="media-tag-chip">${escapeHtml(t)}</span>`;
+                    }).join("") + `</div>`;
+                }
+            } catch (err) {}
+        }
+
+        let actionsHtml = `
+            <div class="gallery-hud-actions">
+                <button class="gallery-hud-btn btn-hud-rotate" title="Girar 90°"><i class="fa-solid fa-rotate-right"></i> Girar</button>
+                ${isVideo ? `<button class="gallery-hud-btn btn-hud-crucial" title="Adicionar Momento Crucial"><i class="fa-solid fa-sparkles"></i> Crucial</button>` : ''}
+                <button class="gallery-hud-btn btn-hud-open" title="Abrir"><i class="fa-solid fa-expand"></i> Abrir</button>
+            </div>
+        `;
+
+        this.shiftHud.innerHTML = `
+            ${titleHtml}
+            ${filenameHtml}
+            ${metaHtml}
+            ${summaryHtml}
+            ${tagsHtml}
+            ${actionsHtml}
+        `;
+
+        // Posiciona desacoplado próximo ao item sem sair da janela
+        const rect = itemEl.getBoundingClientRect();
+        let top = rect.bottom + 6;
+        let left = rect.left;
+
+        if (top + 160 > window.innerHeight) {
+            top = Math.max(10, rect.top - 170);
+        }
+        if (left + 300 > window.innerWidth) {
+            left = Math.max(10, window.innerWidth - 310);
+        }
+
+        this.shiftHud.style.top = `${top}px`;
+        this.shiftHud.style.left = `${left}px`;
+        this.shiftHud.style.display = "block";
+
+        // Listeners dos botões do HUD
+        const btnRotate = this.shiftHud.querySelector(".btn-hud-rotate");
+        if (btnRotate) {
+            btnRotate.onclick = async (ev) => {
+                ev.stopPropagation();
+                try {
+                    const res = await CapIAuAPI.rotateMedia(isVideo ? "video" : "photo", item.id, 90);
+                    item.rotation = res.rotation;
+                    if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+                    this.shiftHud.style.display = "none";
+                    if (window.showToast) window.showToast(`Mídia rotacionada para ${res.rotation}°!`, "success");
+                } catch (err) {
+                    alert("Erro ao girar: " + err.message);
+                }
+            };
+        }
+
+        const btnCrucial = this.shiftHud.querySelector(".btn-hud-crucial");
+        if (btnCrucial) {
+            btnCrucial.onclick = async (ev) => {
+                ev.stopPropagation();
+                await this.handleCtrlShiftClick(itemEl, ev);
+                this.shiftHud.style.display = "none";
+            };
+        }
+
+        const btnOpen = this.shiftHud.querySelector(".btn-hud-open");
+        if (btnOpen) {
+            btnOpen.onclick = (ev) => {
+                ev.stopPropagation();
+                this.shiftHud.style.display = "none";
+                if (isVideo) {
+                    STATE.activeVideo = item;
+                    window.activeFocusedPlayer = "source";
+                } else {
+                    STATE.activePhoto = item;
+                }
+            };
+        }
+    }
+}
+
 export class LibraryManager {
     constructor() {
         window.libraryInstance = this;
@@ -4952,38 +5724,112 @@ export class LibraryManager {
         
         applyDisplayClasses();
 
-        // Modo de Visualização (Lista vs Grade)
-        const btnViewModeList = document.getElementById("btn-view-mode-list");
+        // Modo de Visualização (Galeria Clean vs Grade de Cards vs Lista)
+        const btnViewModeGallery = document.getElementById("btn-view-mode-gallery");
         const btnViewModeGrid = document.getElementById("btn-view-mode-grid");
+        const btnViewModeList = document.getElementById("btn-view-mode-list");
         
         function setViewMode(mode) {
+            const validMode = (mode === "grid" || mode === "list") ? mode : "gallery";
             const lists = getAllMediaLists();
             lists.forEach(list => {
-                if (mode === "grid") list.classList.add("view-mode-grid");
-                else list.classList.remove("view-mode-grid");
+                list.classList.remove("view-mode-grid", "view-mode-gallery");
+                if (validMode === "grid") list.classList.add("view-mode-grid");
+                else if (validMode === "gallery") list.classList.add("view-mode-gallery");
             });
+
             getAllLibraryDocuments().forEach(doc => {
                 try {
-                    const btnGrid = doc.getElementById("btn-view-mode-grid");
-                    const btnList = doc.getElementById("btn-view-mode-list");
-                    if (mode === "grid") {
-                        if (btnGrid) btnGrid.classList.add("active");
-                        if (btnList) btnList.classList.remove("active");
-                    } else {
-                        if (btnList) btnList.classList.add("active");
-                        if (btnGrid) btnGrid.classList.remove("active");
-                    }
+                    const btnGal = doc.getElementById("btn-view-mode-gallery");
+                    const btnGrd = doc.getElementById("btn-view-mode-grid");
+                    const btnLst = doc.getElementById("btn-view-mode-list");
+                    [btnGal, btnGrd, btnLst].forEach(b => b?.classList.remove("active"));
+                    if (validMode === "gallery") btnGal?.classList.add("active");
+                    else if (validMode === "grid") btnGrd?.classList.add("active");
+                    else if (validMode === "list") btnLst?.classList.add("active");
                 } catch (e) {}
             });
-            localStorage.setItem("lib-pref-view-mode", mode);
+
+            localStorage.setItem("lib-pref-view-mode", validMode);
+            if (window.libraryInstance) {
+                window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+            }
+            if (window.libraryScrollIndex && typeof window.libraryScrollIndex.requestRibbonRedraw === "function") {
+                window.libraryScrollIndex.requestRibbonRedraw();
+            }
         }
         
-        if (btnViewModeList) {
-            btnViewModeList.addEventListener("click", () => setViewMode("list"));
+        if (btnViewModeGallery) {
+            btnViewModeGallery.addEventListener("click", () => setViewMode("gallery"));
         }
         if (btnViewModeGrid) {
             btnViewModeGrid.addEventListener("click", () => setViewMode("grid"));
         }
+        if (btnViewModeList) {
+            btnViewModeList.addEventListener("click", () => setViewMode("list"));
+        }
+
+        // Configurações do Modo Galeria Clean
+        const selGrouping = document.getElementById("sel-gallery-grouping");
+        if (selGrouping) {
+            selGrouping.value = localStorage.getItem("gallery-pref-grouping") || "date";
+            selGrouping.addEventListener("change", (e) => {
+                localStorage.setItem("gallery-pref-grouping", e.target.value);
+                if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+            });
+        }
+
+        const gapSlider = document.getElementById("gallery-gap-slider");
+        const gapVal = document.getElementById("gallery-gap-val");
+        if (gapSlider) {
+            const savedGap = localStorage.getItem("gallery-pref-gap") || "2";
+            gapSlider.value = savedGap;
+            if (gapVal) gapVal.textContent = `${savedGap}px`;
+            
+            const updateGap = (val) => {
+                const px = `${val}px`;
+                if (gapVal) gapVal.textContent = px;
+                localStorage.setItem("gallery-pref-gap", val);
+                const lists = getAllMediaLists();
+                lists.forEach(l => l.style.setProperty("--gallery-gap", px));
+            };
+
+            gapSlider.addEventListener("input", (e) => updateGap(e.target.value));
+        }
+
+        const selHoverDur = document.getElementById("sel-gallery-hover-duration");
+        if (selHoverDur) {
+            selHoverDur.value = localStorage.getItem("gallery-pref-hover-duration") || "3.5";
+            selHoverDur.addEventListener("change", (e) => {
+                localStorage.setItem("gallery-pref-hover-duration", e.target.value);
+            });
+        }
+
+        const selAltInterval = document.getElementById("sel-gallery-alt-interval");
+        if (selAltInterval) {
+            selAltInterval.value = localStorage.getItem("gallery-pref-alt-interval") || "500";
+            selAltInterval.addEventListener("change", (e) => {
+                localStorage.setItem("gallery-pref-alt-interval", e.target.value);
+            });
+        }
+
+        // Checkboxes do HUD Shift + Hover
+        [
+            { id: "chk-hud-title", key: "gallery-hud-title" },
+            { id: "chk-hud-filename", key: "gallery-hud-filename" },
+            { id: "chk-hud-summary", key: "gallery-hud-summary" },
+            { id: "chk-hud-speaker", key: "gallery-hud-speaker" },
+            { id: "chk-hud-tags", key: "gallery-hud-tags" },
+            { id: "chk-hud-tech", key: "gallery-hud-tech" }
+        ].forEach(item => {
+            const el = document.getElementById(item.id);
+            if (el) {
+                el.checked = localStorage.getItem(item.key) !== "false";
+                el.addEventListener("change", () => {
+                    localStorage.setItem(item.key, el.checked ? "true" : "false");
+                });
+            }
+        });
         
         // Zoom Slider
         const zoomSlider = document.getElementById("library-zoom-slider");
@@ -4997,6 +5843,7 @@ export class LibraryManager {
             lists.forEach(list => {
                 list.style.setProperty("--thumb-width", `${numericVal}px`);
                 list.style.setProperty("--thumb-height", `${Math.round(numericVal * 9 / 16)}px`);
+                list.style.setProperty("--gallery-item-height", `${Math.max(60, Math.min(300, numericVal))}px`);
                 updateZoomTier(list, numericVal);
             });
 
@@ -5020,7 +5867,7 @@ export class LibraryManager {
                 setZoomValue(parseInt(e.target.value));
             });
             zoomSlider.addEventListener("dblclick", () => {
-                setZoomValue(80);
+                setZoomValue(110);
             });
         }
 
@@ -5031,11 +5878,11 @@ export class LibraryManager {
         window.setLibraryZoomValue = setZoomValue;
         window.getAllMediaLists = getAllMediaLists;
         
-        // Carrega preferências salvas
-        const savedViewMode = localStorage.getItem("lib-pref-view-mode") || "list";
+        // Carrega preferências salvas (Galeria Clean como NOVO PADRÃO)
+        const savedViewMode = localStorage.getItem("lib-pref-view-mode") || "gallery";
         setViewMode(savedViewMode);
         
-        const savedZoom = localStorage.getItem("lib-pref-zoom") || "80";
+        const savedZoom = localStorage.getItem("lib-pref-zoom") || "110";
         setZoomValue(parseInt(savedZoom));
 
         // Busca de mídias (Filtro em tempo real)
@@ -5991,13 +6838,17 @@ export class LibraryManager {
         refreshRenderContext();
 
         // Aplica modo de visualização e zoom persistidos diretamente no container
-        const savedMode = localStorage.getItem("lib-pref-view-mode") || "list";
+        const savedMode = localStorage.getItem("lib-pref-view-mode") || "gallery";
+        targetEl.classList.remove("view-mode-grid", "view-mode-gallery");
         if (savedMode === "grid") targetEl.classList.add("view-mode-grid");
-        else targetEl.classList.remove("view-mode-grid");
+        else if (savedMode === "gallery") targetEl.classList.add("view-mode-gallery");
 
-        const savedZoom = parseInt(localStorage.getItem("lib-pref-zoom")) || 80;
+        const savedZoom = parseInt(localStorage.getItem("lib-pref-zoom")) || 110;
         targetEl.style.setProperty("--thumb-width", `${savedZoom}px`);
         targetEl.style.setProperty("--thumb-height", `${Math.round(savedZoom * 9 / 16)}px`);
+        targetEl.style.setProperty("--gallery-item-height", `${Math.max(60, Math.min(300, savedZoom))}px`);
+        const savedGap = localStorage.getItem("gallery-pref-gap") || "2";
+        targetEl.style.setProperty("--gallery-gap", `${savedGap}px`);
         updateZoomTier(targetEl, savedZoom);
 
         const allVids = STATE.allVideos || [];
@@ -6046,14 +6897,18 @@ export class LibraryManager {
             return;
         }
 
-        const tree = buildTree(items);
-        lastRenderedTree = tree;
-        if (tree.isRoot && tree.name === "Biblioteca") {
-            appendChildrenChunked(tree, getSortedChildrenKeys(tree), targetEl, 0);
+        if (savedMode === "gallery") {
+            this.renderGalleryMode(items, targetEl);
         } else {
-            const fragment = document.createDocumentFragment();
-            renderTreeNode(tree, fragment, 0);
-            targetEl.appendChild(fragment);
+            const tree = buildTree(items);
+            lastRenderedTree = tree;
+            if (tree.isRoot && tree.name === "Biblioteca") {
+                appendChildrenChunked(tree, getSortedChildrenKeys(tree), targetEl, 0);
+            } else {
+                const fragment = document.createDocumentFragment();
+                renderTreeNode(tree, fragment, 0);
+                targetEl.appendChild(fragment);
+            }
         }
 
         if (shouldPreserveScroll && container) {
@@ -6067,6 +6922,321 @@ export class LibraryManager {
             }
             this.tabScrollPositions = this.tabScrollPositions || {};
             this.tabScrollPositions["tab-media"] = savedScroll;
+        }
+    }
+
+    /**
+     * Renderiza a biblioteca no Modo Galeria Clean (estilo Google Fotos).
+     * Mosaico flex justified edge-to-edge, sem caixas de cards ou textos fixos,
+     * agrupamento flexível (diárias, pastas ou contínuo), play em hover singleton,
+     * scrubbing com Ctrl e Alt, e suporte a rotação.
+     */
+    renderGalleryMode(items, targetEl) {
+        if (!items || items.length === 0) {
+            targetEl.innerHTML = `<div class="empty-state-text">Nenhuma mídia encontrada com os filtros atuais.</div>`;
+            return;
+        }
+
+        // Garante que o controller de interação global da galeria esteja ativo
+        if (!window._galleryController) {
+            window._galleryController = new GalleryInteractionController();
+        }
+        window._galleryController.stopAllHover();
+
+        const groupingMode = localStorage.getItem("gallery-pref-grouping") || "date";
+        
+        // Agrupa os itens
+        let groups = [];
+        if (groupingMode === "date") {
+            const dateMap = new Map();
+            for (const item of items) {
+                const rawDate = item.recorded_at || item.created_at;
+                let dateKey = "sem_data";
+                let dateLabel = "📅 Sem Data de Gravação";
+                let dateOrder = 0;
+                if (rawDate) {
+                    try {
+                        const d = new Date(rawDate);
+                        if (!isNaN(d.getTime())) {
+                            const y = d.getFullYear();
+                            const m = String(d.getMonth() + 1).padStart(2, '0');
+                            const day = String(d.getDate()).padStart(2, '0');
+                            dateKey = `${y}-${m}-${day}`;
+                            dateOrder = d.getTime();
+                            
+                            const weekday = d.toLocaleDateString("pt-BR", { weekday: "long" });
+                            const dayMonth = d.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+                            dateLabel = `📅 ${weekday.charAt(0).toUpperCase() + weekday.slice(1)}, ${dayMonth}`;
+                        }
+                    } catch (e) {}
+                }
+                if (!dateMap.has(dateKey)) {
+                    dateMap.set(dateKey, { key: dateKey, label: dateLabel, order: dateOrder, items: [] });
+                }
+                dateMap.get(dateKey).items.push(item);
+            }
+            // Ordena os grupos pela data mais recente primeiro (itens mais recentes no topo)
+            groups = Array.from(dateMap.values()).sort((a, b) => b.order - a.order);
+        } else if (groupingMode === "folder") {
+            const folderMap = new Map();
+            for (const item of items) {
+                const fPath = getItemVirtualFolder(item) || "root";
+                const cleanName = fPath === "root" ? "Raiz da Biblioteca" : fPath.replace(/^root\/?/, "");
+                if (!folderMap.has(fPath)) {
+                    folderMap.set(fPath, { key: fPath, label: `📁 ${cleanName}`, items: [] });
+                }
+                folderMap.get(fPath).items.push(item);
+            }
+            groups = Array.from(folderMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+        } else {
+            // Sem agrupamento (Contínuo)
+            groups = [{ key: "all", label: null, items: items }];
+        }
+
+        const fragment = document.createDocumentFragment();
+
+        groups.forEach(group => {
+            const blockDiv = document.createElement("div");
+            blockDiv.className = "gallery-block";
+            blockDiv.dataset.groupKey = group.key;
+
+            if (group.label) {
+                const header = document.createElement("div");
+                header.className = "gallery-sticky-header";
+                header.innerHTML = `
+                    <div class="gallery-header-title">
+                        <span>${escapeHtml(group.label)}</span>
+                    </div>
+                    <div class="gallery-header-meta">
+                        ${group.items.length} ${group.items.length === 1 ? 'mídia' : 'mídias'}
+                    </div>
+                `;
+                
+                // Duplo clique colapsa/expande o bloco (Seção VIII Design System)
+                header.addEventListener("dblclick", (e) => {
+                    e.preventDefault();
+                    window.getSelection()?.removeAllRanges();
+                    const mosaic = blockDiv.querySelector(".gallery-block-mosaic");
+                    if (mosaic) {
+                        const isHidden = mosaic.style.display === "none";
+                        mosaic.style.display = isHidden ? "flex" : "none";
+                        header.style.opacity = isHidden ? "1" : "0.6";
+                    }
+                });
+                
+                header.addEventListener("click", () => {
+                    const mosaic = blockDiv.querySelector(".gallery-block-mosaic");
+                    if (mosaic) {
+                        const isHidden = mosaic.style.display === "none";
+                        mosaic.style.display = isHidden ? "flex" : "none";
+                        header.style.opacity = isHidden ? "1" : "0.6";
+                    }
+                });
+
+                blockDiv.appendChild(header);
+            }
+
+            const mosaicDiv = document.createElement("div");
+            mosaicDiv.className = "gallery-block-mosaic";
+
+            group.items.forEach(item => {
+                const isVideo = item._mediaKind === "video" || (item.duration !== undefined);
+                const rot = (item.rotation || 0) % 360;
+
+                // Cálculo do Aspect Ratio nativo fiel
+                let aspect = item._naturalAspect || (isVideo ? (16 / 9) : (4 / 3));
+                if (!item._naturalAspect) {
+                    if (item.width && item.height && Number(item.width) > 0 && Number(item.height) > 0) {
+                        aspect = Number(item.width) / Number(item.height);
+                    } else if (item.resolution && typeof item.resolution === "string" && item.resolution.includes("x")) {
+                        const parts = item.resolution.split("x").map(Number);
+                        if (parts[0] > 0 && parts[1] > 0) {
+                            aspect = parts[0] / parts[1];
+                        }
+                    }
+                }
+                if (rot === 90 || rot === 270) {
+                    aspect = 1 / aspect;
+                }
+                aspect = Math.max(0.45, Math.min(2.8, aspect));
+
+                const itemEl = document.createElement("div");
+                itemEl.className = "gallery-item" + (rot ? ` rot-${rot}` : "");
+                itemEl.style.setProperty("--aspect", aspect.toFixed(3));
+                if (isVideo) {
+                    itemEl.dataset.videoId = item.id;
+                } else {
+                    itemEl.dataset.photoId = item.id;
+                }
+
+                if (STATE.activeVideo && isVideo && STATE.activeVideo.id === item.id) itemEl.classList.add("active");
+                if (STATE.activePhoto && !isVideo && STATE.activePhoto.id === item.id) itemEl.classList.add("active");
+
+                const vVersion = item._thumbVersion || item.thumb_version || item.updated_at || "";
+                const qs = vVersion ? `?v=${vVersion}` : "";
+                const defaultThumbSrc = isVideo
+                    ? `/api/video/${item.id}/thumbnail${qs}`
+                    : `/api/photo/${item.id}/thumbnail`;
+                itemEl._defaultSrc = defaultThumbSrc;
+
+                let badgeHtml = "";
+                let crucialBadgeHtml = "";
+                let scrubHtml = "";
+
+                if (isVideo) {
+                    const durStr = formatShortDuration(item.duration);
+                    badgeHtml = `<div class="gallery-video-pill"><i class="fa-solid fa-play"></i> <span>${durStr}</span></div>`;
+                    
+                    const crucialCount = (item.crucial_moments && Array.isArray(item.crucial_moments)) ? item.crucial_moments.length : 0;
+                    if (crucialCount > 0) {
+                        crucialBadgeHtml = `<div class="gallery-crucial-badge" data-tooltip="${crucialCount} momento(s) crucial(is)"><i class="fa-solid fa-sparkles"></i> ${crucialCount}</div>`;
+                    }
+
+                    scrubHtml = `
+                        <div class="gallery-scrub-track"><div class="gallery-scrub-bar"></div></div>
+                        <div class="gallery-scrub-timecode">00:00</div>
+                    `;
+                }
+
+                itemEl.innerHTML = `
+                    <img class="gallery-thumb-img" src="${defaultThumbSrc}" loading="lazy" decoding="async" alt="Thumb" onerror="this.onerror=null; this.style.opacity='0.4';">
+                    ${badgeHtml}
+                    ${crucialBadgeHtml}
+                    ${scrubHtml}
+                `;
+
+                // Adaptação dinâmica imediata ao carregar a imagem real da mídia
+                const thumbImg = itemEl.querySelector(".gallery-thumb-img");
+                if (thumbImg && !item._naturalAspect) {
+                    thumbImg.addEventListener("load", () => {
+                        if (thumbImg.naturalWidth > 0 && thumbImg.naturalHeight > 0) {
+                            let natAspect = thumbImg.naturalWidth / thumbImg.naturalHeight;
+                            if (rot === 90 || rot === 270) {
+                                natAspect = 1 / natAspect;
+                            }
+                            natAspect = Math.max(0.45, Math.min(2.8, natAspect));
+                            item._naturalAspect = natAspect;
+                            itemEl.style.setProperty("--aspect", natAspect.toFixed(3));
+                        }
+                    }, { once: true });
+                }
+
+                // Conecta o controller de eventos avançados (hover play, Ctrl scrub, Alt momentos, Shift HUD)
+                window._galleryController.attachItemListeners(itemEl, item);
+
+                // Arraste para a timeline (Drag and drop)
+                itemEl.draggable = true;
+                itemEl.addEventListener("dragstart", (e) => {
+                    window._galleryController.stopAllHover();
+                    const friendlyTitle = getFriendlyTitle(item);
+                    let inTime = 0.0;
+                    let outTime = isVideo ? (item.duration || 5.0) : 5.0;
+                    if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id) {
+                        if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
+                        if (STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) outTime = STATE.markerOut;
+                    }
+                    const effDur = Math.max(0.1, outTime - inTime);
+
+                    STATE.activeDragMedia = {
+                        type: isVideo ? "video" : "photo",
+                        id: item.id,
+                        title: friendlyTitle,
+                        filename: item.filename,
+                        duration: isVideo ? (item.duration || 5.0) : 5.0,
+                        inTime: inTime,
+                        outTime: outTime,
+                        effectiveDuration: effDur,
+                        video_type: item.video_type || null
+                    };
+
+                    e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({
+                        type: isVideo ? "video" : "photo",
+                        id: item.id,
+                        inTime: inTime,
+                        outTime: outTime,
+                        duration: effDur
+                    }));
+                    e.dataTransfer.effectAllowed = "copy";
+                });
+
+                itemEl.addEventListener("dragend", () => {
+                    STATE.activeDragMedia = null;
+                    if (window.TIMELINE_INTERACTION?.renderer) {
+                        window.TIMELINE_INTERACTION.renderer.dropIndicator = null;
+                        window.TIMELINE_INTERACTION.renderer.activeSnapFrame = null;
+                        window.TIMELINE_INTERACTION.renderer.requestRedraw();
+                    }
+                });
+
+                // Clique simples seleciona a mídia
+                itemEl.addEventListener("click", (e) => {
+                    if (e.ctrlKey && e.shiftKey) return;
+                    targetEl.querySelectorAll(".gallery-item.active").forEach(el => el.classList.remove("active"));
+                    itemEl.classList.add("active");
+                    if (isVideo) {
+                        STATE.activeVideo = item;
+                        window.activeFocusedPlayer = "source";
+                    } else {
+                        STATE.activePhoto = item;
+                    }
+                });
+
+                // Duplo clique insere na timeline (com suporte a atalhos Shift, Ctrl, Alt)
+                itemEl.addEventListener("dblclick", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._galleryController.stopAllHover();
+
+                    let mode = "playhead";
+                    if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                        mode = "end";
+                    } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+                        mode = "first_gap";
+                    } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
+                        mode = "next_gap";
+                    } else if (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                        mode = "start";
+                    } else if (e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                        mode = "ripple";
+                    } else if ((e.ctrlKey || e.metaKey) && e.altKey) {
+                        mode = "overlay";
+                    }
+
+                    let inTime = 0.0;
+                    let outTime = isVideo ? (item.duration || 5.0) : 5.0;
+                    if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id) {
+                        if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
+                        if (STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) outTime = STATE.markerOut;
+                    }
+
+                    if (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.insertMedia === "function") {
+                        window.TIMELINE_STATE.insertMedia({
+                            type: isVideo ? "video" : "photo",
+                            id: item.id,
+                            inSec: inTime,
+                            outSec: outTime,
+                            mode: mode
+                        });
+                    }
+                });
+
+                // Clique com botão direito aciona menu de contexto
+                itemEl.addEventListener("contextmenu", (e) => {
+                    window._galleryController.stopAllHover();
+                    showMediaContextMenu(e, item, isVideo ? "video" : "photo", itemEl);
+                });
+
+                mosaicDiv.appendChild(itemEl);
+            });
+
+            blockDiv.appendChild(mosaicDiv);
+            fragment.appendChild(blockDiv);
+        });
+
+        targetEl.appendChild(fragment);
+
+        if (window.libraryScrollIndex && typeof window.libraryScrollIndex.requestRibbonRedraw === "function") {
+            window.libraryScrollIndex.requestRibbonRedraw();
         }
     }
 
@@ -7924,10 +9094,12 @@ window.setVideoThumbnail = async function(videoId, timestamp, triggerBtn = null)
             const ver = Date.now();
             if (STATE.activeVideo && STATE.activeVideo.id === videoId) {
                 STATE.activeVideo._thumbVersion = ver;
+                STATE.activeVideo.thumbnail_time = timestamp;
             }
             const target = (STATE.allVideos || []).find(v => v.id === videoId);
             if (target) {
                 target._thumbVersion = ver;
+                target.thumbnail_time = timestamp;
                 if (respData.palette_hex) {
                     target.palette_hex = respData.palette_hex;
                     target.palette_temp = respData.palette_temp;
@@ -7946,6 +9118,22 @@ window.setVideoThumbnail = async function(videoId, timestamp, triggerBtn = null)
             // Atualiza diretamente os cards da biblioteca sem recriar o DOM nem resetar o scroll em todas as janelas (principal e destacadas)
             const allDocs = getAllLibraryDocuments();
             allDocs.forEach(doc => {
+                const cards = doc.querySelectorAll(`.gallery-item[data-video-id="${videoId}"], .tree-file-item[data-video-id="${videoId}"], .media-card[data-video-id="${videoId}"]`);
+                cards.forEach(cardEl => {
+                    if (cardEl._mediaData) {
+                        cardEl._mediaData.thumbnail_time = timestamp;
+                        cardEl._mediaData._thumbVersion = ver;
+                    }
+                    if (window._galleryController) {
+                        cardEl._crucialStart = window._galleryController.getTargetStart(cardEl._mediaData);
+                    }
+                    const gImg = cardEl.querySelector(".gallery-thumb-img");
+                    if (gImg) {
+                        cardEl._defaultSrc = `/api/video/${videoId}/thumbnail?v=${ver}`;
+                        gImg.src = cardEl._defaultSrc;
+                    }
+                });
+
                 const cardThumbnails = doc.querySelectorAll(`.tree-file-item[data-video-id="${videoId}"] .media-thumbnail, .media-card[data-video-id="${videoId}"] .media-thumbnail`);
                 cardThumbnails.forEach(thumbEl => {
                     let img = thumbEl.querySelector("img");
@@ -8164,16 +9352,39 @@ class MediaColorExtractor {
             return "#8b5cf6"; // Violeta padrão do CapIAu para pastas
         }
 
+        // Caso 1.5: Cabeçalho da Galeria Clean (.gallery-sticky-header)
+        if (itemEl.classList.contains("gallery-sticky-header")) {
+            const blockEl = itemEl.closest(".gallery-block");
+            const groupKey = blockEl?.dataset?.groupKey || "";
+            if (groupKey && typeof virtualFolderColors !== "undefined" && virtualFolderColors[groupKey]) {
+                return virtualFolderColors[groupKey];
+            }
+            const headerTitle = itemEl.querySelector(".gallery-header-title span")?.textContent?.replace(/^📁\s*/, "").trim() || "";
+            if (headerTitle && typeof virtualFolderColors !== "undefined" && virtualFolderColors[headerTitle]) {
+                return virtualFolderColors[headerTitle];
+            }
+            if (blockEl) {
+                const firstMedia = blockEl.querySelector(".gallery-item");
+                if (firstMedia) {
+                    const c = this.getColor(firstMedia, allVideos, allPhotos);
+                    if (c && c !== "#64748b" && c !== "#475569") return c;
+                }
+            }
+            return "#8b5cf6"; // Violeta padrão do CapIAu para cabeçalhos de bloco
+        }
+
         // Caso 2: Vídeo
-        if (itemEl.hasAttribute("data-video-id")) {
-            const vidId = parseInt(itemEl.getAttribute("data-video-id"), 10);
+        if (itemEl.hasAttribute("data-video-id") || Boolean(itemEl.dataset?.videoId)) {
+            const rawVidId = itemEl.getAttribute("data-video-id") || itemEl.dataset?.videoId;
+            const vidId = parseInt(rawVidId, 10);
             const video = (allVideos || []).find(v => v.id === vidId);
             return this.getVideoColor(video, itemEl);
         }
 
         // Caso 3: Foto
-        if (itemEl.hasAttribute("data-photo-id")) {
-            const photoId = parseInt(itemEl.getAttribute("data-photo-id"), 10);
+        if (itemEl.hasAttribute("data-photo-id") || Boolean(itemEl.dataset?.photoId)) {
+            const rawPhotoId = itemEl.getAttribute("data-photo-id") || itemEl.dataset?.photoId;
+            const photoId = parseInt(rawPhotoId, 10);
             const photo = (allPhotos || []).find(p => p.id === photoId);
             return this.getPhotoColor(photo, itemEl);
         }
@@ -8605,9 +9816,15 @@ export class LibraryScrollIndexTracker {
         if (!canvas) {
             canvas = doc.createElement("canvas");
             canvas.id = "library-scroll-color-ribbon";
+            canvas.className = "library-scroll-color-ribbon";
             parent.appendChild(canvas);
-        } else if (canvas.parentElement !== parent) {
-            parent.appendChild(canvas);
+        } else {
+            if (!canvas.classList.contains("library-scroll-color-ribbon")) {
+                canvas.classList.add("library-scroll-color-ribbon");
+            }
+            if (canvas.parentElement !== parent) {
+                parent.appendChild(canvas);
+            }
         }
 
         this.ribbonCanvas = canvas;
@@ -8625,6 +9842,7 @@ export class LibraryScrollIndexTracker {
         if (!cursor) {
             cursor = doc.createElement("div");
             cursor.id = "library-scroll-ribbon-cursor";
+            cursor.className = "library-scroll-ribbon-cursor";
             cursor.title = "Arrastar ou navegar pela Fita Cromática";
             parent.appendChild(cursor);
 
@@ -8670,8 +9888,13 @@ export class LibraryScrollIndexTracker {
 
             cursor.addEventListener("pointerup", stopDrag);
             cursor.addEventListener("pointercancel", stopDrag);
-        } else if (cursor.parentElement !== parent) {
-            parent.appendChild(cursor);
+        } else {
+            if (!cursor.classList.contains("library-scroll-ribbon-cursor")) {
+                cursor.classList.add("library-scroll-ribbon-cursor");
+            }
+            if (cursor.parentElement !== parent) {
+                parent.appendChild(cursor);
+            }
         }
 
         this.cursorEl = cursor;
@@ -8776,7 +9999,7 @@ export class LibraryScrollIndexTracker {
             return;
         }
 
-        const items = Array.from(activeTabEl.querySelectorAll(".tree-folder-header, .tree-file-item, .media-card"))
+        const items = Array.from(activeTabEl.querySelectorAll(".tree-folder-header, .tree-file-item, .media-card, .gallery-item, .gallery-sticky-header"))
             .filter(el => el.offsetParent !== null);
         if (items.length === 0) {
             if (this.ribbonCanvas) this.ribbonCanvas.style.display = "none";
@@ -9592,7 +10815,7 @@ export class LibraryScrollIndexTracker {
         }
 
         // Apenas itens visíveis (ignora pastas recolhidas cujo offsetParent é null)
-        const items = Array.from(activeTabEl.querySelectorAll(".tree-folder-header, .tree-file-item, .media-card")).filter(el => el.offsetParent !== null);
+        const items = Array.from(activeTabEl.querySelectorAll(".tree-folder-header, .tree-file-item, .media-card, .gallery-item, .gallery-sticky-header")).filter(el => el.offsetParent !== null);
         if (items.length === 0) {
             this.hide();
             return;
@@ -9611,8 +10834,9 @@ export class LibraryScrollIndexTracker {
 
         // Cálculo de frame de vídeo proporcional
         let currentFrameTime = null;
-        if (bestItem.hasAttribute("data-video-id")) {
-            const vidId = parseInt(bestItem.getAttribute("data-video-id"), 10);
+        if (bestItem.hasAttribute("data-video-id") || Boolean(bestItem.dataset?.videoId)) {
+            const rawVidId = bestItem.getAttribute("data-video-id") || bestItem.dataset?.videoId;
+            const vidId = parseInt(rawVidId, 10);
             const video = (STATE.allVideos || []).find(v => v.id === vidId);
             if (video && video.duration > 0) {
                 if (this.videoScrubTime !== null) {
@@ -9662,7 +10886,7 @@ export class LibraryScrollIndexTracker {
 
         const { thumbImg, thumbIcon, folderSpan, titleEl, badgeEl, durationEl, summaryEl, tagsRow, posEl } = this.dom;
 
-        const isFolder = itemEl.classList.contains("tree-folder-header");
+        const isFolder = itemEl.classList.contains("tree-folder-header") || itemEl.classList.contains("gallery-sticky-header");
         const cardIndex = allItems.indexOf(itemEl);
         if (posEl) posEl.textContent = `Posição: ${cardIndex + 1} de ${allItems.length}`;
 
@@ -9683,7 +10907,7 @@ export class LibraryScrollIndexTracker {
                 const isNeutral = (max - min) < 30;
 
                 let tempLabel = "Cena";
-                if (isFolder) tempLabel = "Pasta";
+                if (isFolder) tempLabel = itemEl.classList.contains("gallery-sticky-header") ? "Grupo" : "Pasta";
                 else if (isNeutral) tempLabel = "Neutro";
                 else if (isWarm) tempLabel = "Luz Quente";
                 else if (isCold) tempLabel = "Luz Fria";
@@ -9696,36 +10920,40 @@ export class LibraryScrollIndexTracker {
         }
 
         if (isFolder) {
-            const folderName = itemEl.querySelector(".folder-name")?.textContent || "Pasta";
-            if (folderSpan) folderSpan.textContent = "Diretório";
+            const isStickyHeader = itemEl.classList.contains("gallery-sticky-header");
+            const folderName = itemEl.querySelector(".folder-name, .gallery-header-title span")?.textContent?.trim() || (isStickyHeader ? "Grupo" : "Pasta");
+            if (folderSpan) folderSpan.textContent = isStickyHeader ? "Grupo Galeria" : "Diretório";
             if (titleEl) titleEl.textContent = folderName;
             if (badgeEl) {
                 badgeEl.className = "scroll-index-badge";
-                badgeEl.textContent = "Pasta";
+                badgeEl.textContent = isStickyHeader ? "Grupo" : "Pasta";
             }
-            if (durationEl) durationEl.textContent = "";
+            const metaCount = isStickyHeader ? itemEl.querySelector(".gallery-header-meta")?.textContent?.trim() : "";
+            if (durationEl) durationEl.textContent = metaCount || "";
             if (thumbImg) {
                 thumbImg.dataset.activeSrc = "";
                 thumbImg.style.display = "none";
             }
             if (thumbIcon) {
                 thumbIcon.style.display = "block";
-                thumbIcon.className = "fa-solid fa-folder scroll-index-icon";
+                thumbIcon.className = (isStickyHeader ? "fa-solid fa-layer-group" : "fa-solid fa-folder") + " scroll-index-icon";
                 thumbIcon.style.color = "var(--color-violet)";
             }
 
-            if (summaryEl) summaryEl.textContent = `Pasta contendo mídias organizadas.`;
+            if (summaryEl) summaryEl.textContent = isStickyHeader ? (metaCount ? `Grupo contendo ${metaCount}.` : `Grupo de mídias da galeria.`) : `Pasta contendo mídias organizadas.`;
             if (tagsRow) tagsRow.innerHTML = "";
         } else {
             // Na aba unificada video e foto convivem: o atributo do card decide.
-            const isVideo = itemEl.hasAttribute("data-video-id") || activeTabId === "tab-videos";
-            const isPhoto = itemEl.hasAttribute("data-photo-id") || activeTabId === "tab-photos";
+            const isVideo = itemEl.hasAttribute("data-video-id") || Boolean(itemEl.dataset?.videoId) || activeTabId === "tab-videos";
+            const isPhoto = itemEl.hasAttribute("data-photo-id") || Boolean(itemEl.dataset?.photoId) || activeTabId === "tab-photos";
             
-            const parentFolderName = itemEl.closest(".tree-folder-container")?.querySelector(".tree-folder-header .folder-name")?.textContent || "Biblioteca";
+            const parentFolderName = itemEl.closest(".tree-folder-container")?.querySelector(".tree-folder-header .folder-name")?.textContent
+                || itemEl.closest(".gallery-block")?.querySelector(".gallery-sticky-header .gallery-header-title span")?.textContent
+                || "Biblioteca";
             if (folderSpan) folderSpan.textContent = parentFolderName;
 
             if (isVideo) {
-                const vidId = parseInt(itemEl.getAttribute("data-video-id"), 10);
+                const vidId = parseInt(itemEl.getAttribute("data-video-id") || itemEl.dataset?.videoId, 10);
                 const video = (STATE.allVideos || []).find(v => v.id === vidId);
 
                 if (video) {
@@ -9766,7 +10994,20 @@ export class LibraryScrollIndexTracker {
                         // Apenas tenta buscar frame específico via thumbnail-at se estiver fazendo scrub interativo DENTRO do tooltip
                         if (this.videoScrubTime !== null && currentFrameTime !== null && currentFrameTime >= 0) {
                             const roundedSec = Math.round(currentFrameTime * 2) / 2;
-                            targetSrc = `/api/video/${video.id}/thumbnail-at?time=${roundedSec.toFixed(1)}`;
+                            targetSrc = `/api/video/${video.id}/thumbnail-at?time=${roundedSec.toFixed(1)}&quality=low`;
+                            
+                            // Upgrade progressivo para HQ após 180ms de repouso no mesmo frame
+                            if (this._scrollTooltipHqTimer) clearTimeout(this._scrollTooltipHqTimer);
+                            this._scrollTooltipHqTimer = setTimeout(() => {
+                                const hqSrc = `/api/video/${video.id}/thumbnail-at?time=${roundedSec.toFixed(1)}&quality=hq`;
+                                const pre = new Image();
+                                pre.onload = () => {
+                                    if (thumbImg && thumbImg.dataset.activeSrc === targetSrc) {
+                                        thumbImg.src = hqSrc;
+                                    }
+                                };
+                                pre.src = hqSrc;
+                            }, 180);
                         }
 
                         if (thumbImg.dataset.activeSrc !== targetSrc) {
@@ -9836,7 +11077,7 @@ export class LibraryScrollIndexTracker {
                     }
                 }
             } else if (isPhoto) {
-                const photoId = parseInt(itemEl.getAttribute("data-photo-id"), 10);
+                const photoId = parseInt(itemEl.getAttribute("data-photo-id") || itemEl.dataset?.photoId, 10);
                 const photo = (STATE.allPhotos || []).find(p => p.id === photoId);
 
                 if (photo) {

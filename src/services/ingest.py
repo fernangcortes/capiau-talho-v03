@@ -308,14 +308,16 @@ class IngestService:
                     MediaRepository.update_video_status(conn, video_id, 'ingested')
                     TASK_MANAGER.update_progress(str(video_id), 100.0, "finished")
                     
-                    # Gera a miniatura principal da capa (thumb_{video_id}.jpg)
+                    # Gera a miniatura principal da capa (thumb_{video_id}.jpg) e grava thumbnail_time inicial
                     try:
                         thumb_main = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
+                        target_time = max(1.0, duration * 0.1)
                         if not thumb_main.exists() or thumb_main.stat().st_size == 0:
-                            target_time = max(1.0, duration * 0.1)
                             success_thumb = extract_frame(proxy_path, target_time, thumb_main)
                             if not success_thumb or not thumb_main.exists():
                                 extract_frame(proxy_path, 0.0, thumb_main)
+                                target_time = 0.0
+                        MediaRepository.set_thumbnail_time(conn, video_id, round(target_time, 2))
                     except Exception as th_err:
                         print(f"[IngestService] Erro ao extrair thumbnail principal: {th_err}")
 
@@ -497,5 +499,33 @@ class IngestService:
             print(f"[IngestService] Waveform de áudio gerada com sucesso para o vídeo ID {video_id}.")
         except Exception as ex:
             print(f"[IngestService] Erro ao extrair waveform para o vídeo ID {video_id}: {ex}")
+
+    @staticmethod
+    def pregenerate_crucial_thumbnails(video_id: int, video_path: Path, crucial_moments: List[float]) -> None:
+        """Pré-gera em segundo plano miniaturas em alta definição (HQ, 640px) e baixa definição (LQ) para os momentos cruciais."""
+        from src.media.ffmpeg import extract_thumbnail_frame
+        try:
+            if not video_path.exists() or not crucial_moments:
+                return
+            proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+            proxy_fallback = proxy_path if proxy_path.exists() else None
+            CONFIG.THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
+            
+            for m in crucial_moments:
+                ts = float(m)
+                file_idx = int(round(ts)) + 1
+                hq_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_{file_idx:04d}_hq.jpg"
+                lq_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_{file_idx:04d}.jpg"
+                
+                # Gera versão HQ (640px, q:v 2)
+                if not hq_path.exists() or hq_path.stat().st_size == 0:
+                    extract_thumbnail_frame(video_path, ts, hq_path, width=640, quality=2, proxy_fallback_path=proxy_fallback)
+                    
+                # Gera versão LQ (160px, q:v 5)
+                if not lq_path.exists() or lq_path.stat().st_size == 0:
+                    extract_thumbnail_frame(video_path, ts, lq_path, width=160, quality=5, proxy_fallback_path=proxy_fallback)
+        except Exception as e:
+            print(f"[IngestService] Erro ao pré-gerar miniaturas de momentos cruciais para vídeo {video_id}: {e}")
+
 
 

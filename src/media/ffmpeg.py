@@ -388,28 +388,43 @@ def generate_video_proxy(
         return False
 
 
-def extract_thumbnail_frame(video_path: Path, timestamp: float, output_path: Path, width: int = 120) -> bool:
-    """Extrai um único frame JPEG em baixa resolução de forma rápida, com tratamento para MTS e busca lenta como fallback."""
+def extract_thumbnail_frame(
+    video_path: Path,
+    timestamp: float,
+    output_path: Path,
+    width: int = 120,
+    quality: int = 5,
+    proxy_fallback_path: Optional[Path] = None
+) -> bool:
+    """Extrai um único frame JPEG otimizado (LQ ou HQ) de forma rápida, com fallback para busca lenta e proxy."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     is_mts = video_path.suffix.lower() == '.mts'
+    
+    vf_args = []
+    if width > 0:
+        # Mantém proporção e garante dimensões pares (-2) evitando avisos/erros do encoder
+        scale_expr = f"scale='if(gte(iw,ih),{width},-2)':'if(gte(iw,ih),-2,{width})'"
+        vf_args = ['-vf', scale_expr]
+        
+    q_str = str(max(1, min(31, int(quality))))
     
     cmd_fast = [
         'ffmpeg', '-y',
         '-ss', f"{timestamp:.3f}",
-        '-i', str(video_path),
-        '-vf', f'scale={width}:-1',
+        '-i', str(video_path)
+    ] + vf_args + [
         '-vframes', '1',
-        '-q:v', '5',
+        '-q:v', q_str,
         str(output_path)
     ]
     
     cmd_slow = [
         'ffmpeg', '-y',
         '-i', str(video_path),
-        '-ss', f"{timestamp:.3f}",
-        '-vf', f'scale={width}:-1',
+        '-ss', f"{timestamp:.3f}"
+    ] + vf_args + [
         '-vframes', '1',
-        '-q:v', '5',
+        '-q:v', q_str,
         str(output_path)
     ]
     
@@ -420,29 +435,42 @@ def extract_thumbnail_frame(video_path: Path, timestamp: float, output_path: Pat
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         creationflags |= subprocess.BELOW_NORMAL_PRIORITY_CLASS
         
-    try:
-        # Se for MTS, não tenta a busca rápida (costuma gerar frames verdes)
-        if is_mts:
-            raise ValueError("MTS requer busca lenta para evitar frames verdes")
-            
-        if os.name == 'nt':
-            subprocess.run(cmd_fast, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, creationflags=creationflags, check=True)
-        else:
-            cmd_unix = ['nice', '-n', '15'] + cmd_fast
-            subprocess.run(cmd_unix, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-            
-        if output_path.exists() and output_path.stat().st_size > 0:
-            return True
-    except Exception:
-        # Fallback de busca lenta
+    def _try_run(cmd):
         try:
             if os.name == 'nt':
-                subprocess.run(cmd_slow, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, creationflags=creationflags, check=True)
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo, creationflags=creationflags, check=True)
             else:
-                cmd_unix = ['nice', '-n', '15'] + cmd_slow
+                cmd_unix = ['nice', '-n', '15'] + cmd
                 subprocess.run(cmd_unix, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-            return output_path.exists() and output_path.stat().st_size > 0
-        except Exception as e:
-            print(f"[FFmpeg] Falha ao extrair miniatura lenta a {timestamp}s de {video_path.name}: {e}")
+            return output_path.exists() and output_path.stat().st_size > 100
+        except Exception:
             return False
+
+    # 1. Busca rápida no arquivo alvo (a menos que seja MTS)
+    if not is_mts and _try_run(cmd_fast):
+        return True
+        
+    # 2. Busca lenta no arquivo alvo (fallback)
+    if _try_run(cmd_slow):
+        return True
+
+    # 3. Fallback para proxy se disponível e diferente do vídeo original
+    if proxy_fallback_path and proxy_fallback_path.exists() and proxy_fallback_path != video_path:
+        cmd_proxy = [
+            'ffmpeg', '-y',
+            '-ss', f"{timestamp:.3f}",
+            '-i', str(proxy_fallback_path)
+        ] + vf_args + [
+            '-vframes', '1',
+            '-q:v', q_str,
+            str(output_path)
+        ]
+        if _try_run(cmd_proxy):
+            return True
+
+    if output_path.exists():
+        try:
+            output_path.unlink()
+        except Exception:
+            pass
     return False

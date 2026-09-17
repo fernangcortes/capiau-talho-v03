@@ -372,6 +372,63 @@
 
                         <div class="display-opt-sep"></div>
 
+                        <div class="display-opt-header" style="color: var(--color-cyan);"><i class="fa-solid fa-grip"></i> Galeria Clean (Google Fotos)</div>
+                        <div class="display-opt-select-row">
+                            <span class="display-opt-select-label">Agrupamento:</span>
+                            <select id="sel-gallery-grouping" class="nle-select" style="flex: 1; height: 20px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer;">
+                                <option value="date" selected>Diárias / Datas</option>
+                                <option value="folder">Pastas / Bins</option>
+                                <option value="none">Sem Agrupamento (Contínuo)</option>
+                            </select>
+                        </div>
+                        <div class="display-opt-select-row" style="margin-top: 4px;">
+                            <span class="display-opt-select-label">Borda / Espaçamento:</span>
+                            <div style="display: flex; align-items: center; gap: 6px; flex: 1;">
+                                <input type="range" id="gallery-gap-slider" min="0" max="8" value="2" style="flex: 1; height: 3px; accent-color: var(--color-cyan); cursor: pointer;">
+                                <span id="gallery-gap-val" style="font-size: 8px; color: var(--text-muted); width: 18px; text-align: right;">2px</span>
+                            </div>
+                        </div>
+                        <div class="display-opt-select-row" style="margin-top: 4px;">
+                            <span class="display-opt-select-label">Loop no Hover:</span>
+                            <select id="sel-gallery-hover-duration" class="nle-select" style="flex: 1; height: 20px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer;">
+                                <option value="3.5" selected>3.5 segundos</option>
+                                <option value="5.0">5.0 segundos</option>
+                                <option value="10.0">10.0 segundos</option>
+                                <option value="end">Até o Fim do Clipe</option>
+                            </select>
+                        </div>
+                        <div class="display-opt-select-row" style="margin-top: 4px;">
+                            <span class="display-opt-select-label">Slideshow Alt:</span>
+                            <select id="sel-gallery-alt-interval" class="nle-select" style="flex: 1; height: 20px; font-size: 9px; padding: 0 4px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); color: #fff; border-radius: 3px; cursor: pointer;">
+                                <option value="300">300ms por frame</option>
+                                <option value="500" selected>500ms por frame</option>
+                                <option value="800">800ms por frame</option>
+                                <option value="1200">1.2s por frame</option>
+                            </select>
+                        </div>
+
+                        <div style="font-size: 9px; font-weight: 600; color: var(--text-secondary); margin-top: 6px; margin-bottom: 2px;">Metadados com Shift + Hover:</div>
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-hud-title" checked> <span>Título do Clipe</span>
+                        </label>
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-hud-filename" checked> <span>Nome do Arquivo Real</span>
+                        </label>
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-hud-summary" checked> <span>Sinopse / Decupagem IA</span>
+                        </label>
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-hud-speaker" checked> <span>Falantes / Entrevistados</span>
+                        </label>
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-hud-tags" checked> <span>Tags Semânticas</span>
+                        </label>
+                        <label class="display-opt-check-label">
+                            <input type="checkbox" id="chk-hud-tech" checked> <span>Dados Técnicos (Resolução/FPS)</span>
+                        </label>
+
+                        <div class="display-opt-sep"></div>
+
                         <button id="btn-regenerate-executive-titles" class="display-opt-btn-action" title="Gera títulos executivos (3 a 6 palavras) para os vídeos existentes">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Títulos IA
                         </button>
@@ -381,8 +438,9 @@
                     <div style="display: flex; width: 100%; align-items: center; justify-content: space-between; height: 24px; margin-top: 2px;">
                         <!-- Esquerda: Modo de Exibição e Zoom (Expande para preencher o espaço disponível) -->
                         <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; margin-right: 8px;">
-                            <button id="btn-view-mode-list" class="lib-action-btn active" title="Visualização em Árvore/Lista"><i class="fa-solid fa-list"></i></button>
-                            <button id="btn-view-mode-grid" class="lib-action-btn" title="Visualização em Grade/Cards"><i class="fa-solid fa-table-cells-large"></i></button>
+                            <button id="btn-view-mode-gallery" class="lib-action-btn active" title="Galeria Clean (Google Fotos)"><i class="fa-solid fa-grip"></i></button>
+                            <button id="btn-view-mode-grid" class="lib-action-btn" title="Grade de Cards"><i class="fa-solid fa-table-cells-large"></i></button>
+                            <button id="btn-view-mode-list" class="lib-action-btn" title="Árvore / Lista Detalhada"><i class="fa-solid fa-list"></i></button>
                             
                             <div style="width: 1px; height: 10px; background: rgba(255,255,255,0.12); margin: 0 2px; flex-shrink: 0;"></div>
                             
@@ -799,6 +857,7 @@
                                     <div class="scrubber-handle" id="source-scrubber-progress-handle" style="width: 10px; height: 10px; border-radius: 50%; background: #fff; position: absolute; top: -2px; left: 0%; transform: translateX(-50%); pointer-events: none;"></div>
                                     <div class="marker-in" id="source-marker-in-pos" style="display:none; position: absolute; width: 4px; height: 100%; background: #22c55e; top: 0;"></div>
                                     <div class="marker-out" id="source-marker-out-pos" style="display:none; position: absolute; width: 4px; height: 100%; background: #ef4444; top: 0;"></div>
+                                    <div class="source-crucial-markers" id="source-crucial-markers-container" style="position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none;"></div>
                                 </div>
                                 <span class="time-code" id="source-duration-time" style="font-size: 10px; font-family: monospace; color: var(--text-secondary);">00:00:00:00</span>
                             </div>
@@ -810,6 +869,7 @@
                                     <button id="btn-source-play" class="btn-control play-btn" style="padding: 4px 12px; font-size: 11px;" title="Play/Pause"><i class="fa-solid fa-play"></i></button>
                                     <button id="btn-source-next-frame" class="btn-control" style="padding: 4px 8px; font-size: 11px;" title="Próximo Frame"><i class="fa-solid fa-chevron-right"></i></button>
                                     <button id="btn-source-set-thumbnail" class="btn-control" style="padding: 4px 8px; font-size: 11px; color: var(--color-cyan);" title="Definir Frame como Miniatura"><i class="fa-solid fa-camera"></i></button>
+                                    <button id="btn-source-toggle-crucial" class="btn-control" style="padding: 4px 8px; font-size: 11px; color: #fbbf24;" data-tooltip="Marcar/Desmarcar Momento Crucial no Frame Atual (Ctrl+Shift+Click)" title="Momento Crucial"><i class="fa-solid fa-star"></i></button>
                                 </div>
                                 <div style="display: flex; gap: 6px; align-items: center;">
                                     <button id="btn-mark-in" class="btn-control btn-marker" style="padding: 4px 8px; font-size: 10px; font-weight: bold;" title="Ponto In (I)">IN</button>

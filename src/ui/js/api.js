@@ -801,5 +801,31 @@ export class CapIAuAPI {
             body: JSON.stringify({ status })
         });
     }
+
+    // -- Galeria Clean: Momentos Cruciais, Hover & Rotação
+    static updateCrucialMoments(videoId, action = "toggle", timestamp = null, moments = null) {
+        return this.request(`/api/video/${videoId}/crucial-moments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action, timestamp, moments })
+        });
+    }
+
+    static updateHoverDuration(videoId, duration) {
+        return this.request(`/api/video/${videoId}/hover-duration`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ duration })
+        });
+    }
+
+    static rotateMedia(mediaType, mediaId, step = 90, rotation = null) {
+        return this.request(`/api/media/${mediaType}/${mediaId}/rotate?step=${step}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rotation })
+        });
+    }
 }
+
 

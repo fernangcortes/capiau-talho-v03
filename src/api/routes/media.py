@@ -8,13 +8,15 @@ import shutil
 import sqlite3
 import subprocess
 import threading
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import sys
 import time
 import cv2
 import numpy as np
 from pathlib import Path
 from typing import Any, Dict, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, File, UploadFile, Form, Body
 from fastapi.responses import JSONResponse, FileResponse
 
 from src.config import CONFIG
@@ -54,6 +56,10 @@ ANALISE_AUDIO_CACHE_TETO_BYTES = 262144
 
 # Lado maior da miniatura de foto servida para os cards da biblioteca.
 PHOTO_THUMB_MAX_PX = 320
+
+# Executor dedicado para extração sob demanda de miniaturas (HQ e LQ) sem bloquear o threadpool síncrono do FastAPI
+THUMB_ONDEMAND_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="thumb-ondemand")
+_THUMB_ONDEMAND_IN_FLIGHT: set = set()
 
 
 def _scan_dir_names(directory) -> set:
@@ -97,6 +103,19 @@ def list_videos(project_id: int = Query(1), conn: sqlite3.Connection = Depends(g
                     v['proxy_path'] = None
             else:
                 v['proxy_path'] = None
+
+        # Dados do Modo Galeria Clean
+        raw_crucial = v.get('crucial_moments')
+        if raw_crucial:
+            try:
+                v['crucial_moments'] = json.loads(raw_crucial) if isinstance(raw_crucial, str) else raw_crucial
+            except Exception:
+                v['crucial_moments'] = []
+        else:
+            v['crucial_moments'] = []
+        v['rotation'] = v.get('rotation') or 0
+        v['hover_loop_duration'] = v.get('hover_loop_duration')
+        v['thumbnail_time'] = v.get('thumbnail_time')
     return videos
 
 @router.get("/api/photos")
@@ -113,6 +132,7 @@ def list_photos(project_id: int = Query(1), conn: sqlite3.Connection = Depends(g
             p['proxy_path'] = f"/proxies/photos/{proxy_name}"
         else:
             p['proxy_path'] = None
+        p['rotation'] = p.get('rotation') or 0
             
         # Desserializa tags JSON
         try:
@@ -1396,14 +1416,14 @@ def get_video_thumbnail(video_id: int, conn: sqlite3.Connection = Depends(get_db
     if thumb_path.exists() and thumb_path.stat().st_size > 0:
         return FileResponse(thumb_path, headers=cache_headers)
         
-    # Se já temos frames da timeline gerados, usa o primeiro frame como capa imediatamente!
-    seq_0001 = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_0001.jpg"
-    if seq_0001.exists() and seq_0001.stat().st_size > 0:
+    # Se já temos frames em alta resolução gerados, usa o primeiro frame HQ como capa imediatamente!
+    seq_0001_hq = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_0001_hq.jpg"
+    if seq_0001_hq.exists() and seq_0001_hq.stat().st_size > 0:
         try:
-            shutil.copy2(seq_0001, thumb_path)
+            shutil.copy2(seq_0001_hq, thumb_path)
             return FileResponse(thumb_path, headers=cache_headers)
         except Exception:
-            return FileResponse(seq_0001, headers=cache_headers)
+            return FileResponse(seq_0001_hq, headers=cache_headers)
 
     # Se não existe, busca metadados do vídeo para gerar a partir do proxy ou original
     video = MediaRepository.get_video(conn, video_id)
@@ -1430,6 +1450,11 @@ def get_video_thumbnail(video_id: int, conn: sqlite3.Connection = Depends(get_db
         success = extract_frame(video_path, 0.0, thumb_path, proxy_fallback_path=proxy_path)
     if success and thumb_path.exists():
         return FileResponse(thumb_path, headers=cache_headers)
+
+    # Último recurso antes de falhar: tenta miniatura da timeline se existir
+    seq_0001 = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_0001.jpg"
+    if seq_0001.exists() and seq_0001.stat().st_size > 0:
+        return FileResponse(seq_0001, headers=cache_headers)
         
     raise HTTPException(status_code=404, detail="Não foi possível gerar a miniatura do vídeo.")
 
@@ -1456,47 +1481,55 @@ def set_video_thumbnail(video_id: int, timestamp: float = Query(...), conn: sqli
     if success and thumb_path.exists():
         try:
             cursor = conn.cursor()
-            cursor.execute("UPDATE video SET created_at = CURRENT_TIMESTAMP WHERE id = ?", (video_id,))
-            from src.vision.palette import classify_palette_file
-            import json as _json
-            pal = classify_palette_file(thumb_path)
-            if pal:
-                cursor.execute(
-                    "UPDATE video SET palette_temp = ?, palette_hex = ? WHERE id = ?",
-                    (pal["palette_temp"], _json.dumps(pal["palette_hex"]), video_id)
-                )
-                conn.commit()
-                return {
-                    "status": "success",
-                    "message": "Miniatura atualizada com sucesso.",
-                    "palette_temp": pal["palette_temp"],
-                    "palette_hex": pal["palette_hex"]
-                }
-        except Exception:
-            pass
-        return {"status": "success", "message": "Miniatura atualizada com sucesso."}
+            cursor.execute("UPDATE video SET thumbnail_time = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?", (timestamp, video_id))
+            pal_result = {}
+            try:
+                from src.vision.palette import classify_palette_file
+                import json as _json
+                pal = classify_palette_file(thumb_path)
+                if pal:
+                    cursor.execute(
+                        "UPDATE video SET palette_temp = ?, palette_hex = ? WHERE id = ?",
+                        (pal["palette_temp"], _json.dumps(pal["palette_hex"]), video_id)
+                    )
+                    pal_result = {
+                        "palette_temp": pal["palette_temp"],
+                        "palette_hex": pal["palette_hex"]
+                    }
+            except Exception:
+                pass
+            conn.commit()
+            return {
+                "status": "success",
+                "message": "Miniatura atualizada com sucesso.",
+                "thumbnail_time": timestamp,
+                **pal_result
+            }
+        except Exception as err:
+            print(f"[set_video_thumbnail] Erro ao gravar no banco: {err}")
+        return {"status": "success", "message": "Miniatura atualizada com sucesso.", "thumbnail_time": timestamp}
         
     raise HTTPException(status_code=500, detail="Falha ao extrair frame no timestamp fornecido.")
 
 
 @router.get("/api/video/{video_id}/thumbnail-at")
-def get_video_thumbnail_at(video_id: int, time: float = Query(...), conn: sqlite3.Connection = Depends(get_db_conn)):
-    """Retorna o thumbnail do vídeo no timestamp fornecido (com cache progressivo).
+async def get_video_thumbnail_at(
+    video_id: int,
+    time: float = Query(...),
+    quality: str = Query("low", description="Qualidade da miniatura: 'low' (rápida para scrub) ou 'hq' (alta nitidez/resolução)"),
+    hq: Optional[bool] = Query(None, description="Alias booleano para quality='hq'"),
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Retorna o thumbnail do vídeo no timestamp fornecido com suporte a carregamento progressivo e extração sob demanda.
 
-    NUNCA extrai frame dentro da requisição. Rota síncrona roda no threadpool que o
-    FastAPI compartilha entre TODAS as rotas síncronas; chamar ffmpeg aqui fazia cada
-    miniatura faltante segurar uma thread por centenas de ms. Soltar um vídeo na
-    timeline dispara dezenas dessas de uma vez, o pool enchia e rotas sem relação
-    ficavam esperando — medido em 18/08: a exportação leva 13 ms, mas demorava
-    "muito" porque estava na fila atrás das miniaturas, não porque fosse lenta.
-
-    Cache miss agora devolve a miniatura genérica na hora e deixa a extração para a
-    fila de fundo (`_generate_timeline_thumbnails_task`), que já existia e preenche o
-    cache progressivamente. O front-end reconsulta e as miniaturas vão aparecendo.
+    - quality='low' (padrão): Retorna miniatura leve (160px, JPEG q:v=5) para scrubbing fluido e timeline.
+    - quality='hq' (ou hq=True): Retorna miniatura em alta resolução (640px, JPEG q:v=2) para hover e momentos cruciais.
+    
+    A extração sob demanda é executada de forma assíncrona em pool dedicado (THUMB_ONDEMAND_EXECUTOR),
+    evitando starvation no pool síncrono compartilhado do FastAPI.
     """
-    from fastapi.responses import FileResponse
+    is_hq = (hq is True) or (isinstance(quality, str) and quality.strip().lower() in ("hq", "high"))
 
-    # Cache miss: identifica a mídia só para poder enfileirar a geração em segundo plano
     video = MediaRepository.get_video(conn, video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
@@ -1505,24 +1538,106 @@ def get_video_thumbnail_at(video_id: int, time: float = Query(...), conn: sqlite
     if duration > 0:
         time = min(max(0.0, time), duration)
 
-    # O nome do arquivo segue o padrão de índice baseado no tempo arredondado (1 frame por segundo)
     file_idx = int(round(time)) + 1
-    thumb_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_{file_idx:04d}.jpg"
+    CONFIG.THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
     
-    if thumb_path.exists() and thumb_path.stat().st_size > 0:
-        return FileResponse(thumb_path)
+    thumb_lq_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_{file_idx:04d}.jpg"
+    thumb_hq_path = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}_seq_{file_idx:04d}_hq.jpg"
+    main_thumb = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
 
-    # Prioriza o proxy 720p local para extração rápida via FFmpeg
+    # 1. Se pediu HQ e o arquivo HQ já existe em cache físico, serve imediatamente
+    if is_hq and thumb_hq_path.exists() and thumb_hq_path.stat().st_size > 0:
+        return FileResponse(thumb_hq_path, headers={"X-Thumbnail-Quality": "hq"})
+
+    # 2. Se pediu LOW e o arquivo LQ já existe em cache físico, serve imediatamente
+    if not is_hq and thumb_lq_path.exists() and thumb_lq_path.stat().st_size > 0:
+        return FileResponse(thumb_lq_path, headers={"X-Thumbnail-Quality": "low"})
+
+    # Localiza o vídeo (prioriza proxy 720p se existir)
     proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
     if proxy_path.exists():
         video_path = proxy_path
     else:
-        video_path = Path(video['filepath'])
+        video_path = Path(video.get('filepath', ''))
         if not video_path.exists():
-            raise HTTPException(status_code=404, detail=f"Arquivo original/proxy não encontrado para o vídeo {video_id}")
+            local_orig = CONFIG.ORIGINALS_DIR / video.get('filename', '')
+            video_path = local_orig if local_orig.exists() else None
 
-    # Dispara a geração progressiva de miniaturas em segundo plano se a tarefa não estiver rodando no momento
-    duration = video.get('duration') or 0.0
+    # Se não temos arquivo de vídeo físico disponível, tenta servir o que tiver de cache
+    if not video_path or not video_path.exists():
+        if thumb_hq_path.exists() and thumb_hq_path.stat().st_size > 0:
+            return FileResponse(thumb_hq_path, headers={"X-Thumbnail-Quality": "hq"})
+        if thumb_lq_path.exists() and thumb_lq_path.stat().st_size > 0:
+            return FileResponse(thumb_lq_path, headers={"X-Thumbnail-Quality": "low"})
+        if main_thumb.exists() and main_thumb.stat().st_size > 0:
+            return FileResponse(main_thumb, headers={"X-Thumbnail-Quality": "cover"})
+        raise HTTPException(status_code=404, detail="Arquivo original/proxy não encontrado para o vídeo.")
+
+    from src.media.ffmpeg import extract_thumbnail_frame
+    loop = asyncio.get_running_loop()
+
+    # 3. Geração sob demanda para HQ
+    if is_hq:
+        key_hq = f"hq-{video_id}-{file_idx}"
+        if key_hq not in _THUMB_ONDEMAND_IN_FLIGHT:
+            _THUMB_ONDEMAND_IN_FLIGHT.add(key_hq)
+            try:
+                await loop.run_in_executor(
+                    THUMB_ONDEMAND_EXECUTOR,
+                    extract_thumbnail_frame,
+                    video_path,
+                    time,
+                    thumb_hq_path,
+                    640, # width (640px no maior eixo com aspecto preservado)
+                    2,   # quality (alta nitidez JPEG q:v=2)
+                    proxy_path if proxy_path.exists() else None
+                )
+            finally:
+                _THUMB_ONDEMAND_IN_FLIGHT.discard(key_hq)
+        else:
+            # Outra requisição já está extraindo esse mesmo quadro HQ: aguarda brevemente
+            for _ in range(12):
+                await asyncio.sleep(0.05)
+                if thumb_hq_path.exists() and thumb_hq_path.stat().st_size > 0:
+                    break
+
+        if thumb_hq_path.exists() and thumb_hq_path.stat().st_size > 0:
+            return FileResponse(thumb_hq_path, headers={"X-Thumbnail-Quality": "hq"})
+
+        # Se a extração HQ falhar, faz fallback suave para LQ ou capa
+        if thumb_lq_path.exists() and thumb_lq_path.stat().st_size > 0:
+            return FileResponse(thumb_lq_path, headers={"X-Thumbnail-Quality": "lq-fallback"})
+        if main_thumb.exists() and main_thumb.stat().st_size > 0:
+            return FileResponse(main_thumb, headers={"X-Thumbnail-Quality": "cover-fallback"})
+        raise HTTPException(status_code=404, detail="Miniatura HQ ainda em geração.")
+
+    # 4. Geração sob demanda para LOW (modo scrubbing rápido ou timeline)
+    key_lq = f"lq-{video_id}-{file_idx}"
+    if key_lq not in _THUMB_ONDEMAND_IN_FLIGHT:
+        _THUMB_ONDEMAND_IN_FLIGHT.add(key_lq)
+        try:
+            await loop.run_in_executor(
+                THUMB_ONDEMAND_EXECUTOR,
+                extract_thumbnail_frame,
+                video_path,
+                time,
+                thumb_lq_path,
+                160, # width leve para timeline e scrub
+                5,   # quality intermediária
+                proxy_path if proxy_path.exists() else None
+            )
+        finally:
+            _THUMB_ONDEMAND_IN_FLIGHT.discard(key_lq)
+    else:
+        for _ in range(8):
+            await asyncio.sleep(0.04)
+            if thumb_lq_path.exists() and thumb_lq_path.stat().st_size > 0:
+                break
+
+    if thumb_lq_path.exists() and thumb_lq_path.stat().st_size > 0:
+        return FileResponse(thumb_lq_path, headers={"X-Thumbnail-Quality": "low"})
+
+    # Dispara a geração em lote em segundo plano se ainda não estiver rodando
     task_key = f"thumbs-{video_id}"
     task_info = TASK_MANAGER.get_progress().get(task_key)
     is_running = task_info and task_info.get("status") == "running"
@@ -1532,20 +1647,10 @@ def get_video_thumbnail_at(video_id: int, time: float = Query(...), conn: sqlite
             video_id, video_path, duration
         )
 
-    # Com a fila de fundo a caminho, responde 404 em vez da miniatura genérica: o
-    # timelineRenderer guarda a imagem em cache PARA SEMPRE por (vídeo, segundo), então
-    # entregar a genérica aqui congelaria o mesmo quadro ao longo do clipe inteiro até
-    # o F5. O 404 faz o front reagendar o pedido, e ele exibe a vizinha mais próxima
-    # enquanto espera (getClosestLoadedVideoThumb).
-    if duration > 0:
-        raise HTTPException(status_code=404, detail="Miniatura ainda em geração.")
+    if main_thumb.exists() and main_thumb.stat().st_size > 0:
+        return FileResponse(main_thumb, headers={"X-Thumbnail-Quality": "cover-fallback"})
 
-    # Sem duração não há geração progressiva possível: a genérica é o melhor que existe
-    main_thumb = CONFIG.THUMBNAILS_DIR / f"thumb_{video_id}.jpg"
-    if main_thumb.exists():
-        return FileResponse(main_thumb)
-        
-    raise HTTPException(status_code=404, detail="Não foi possível gerar a miniatura do vídeo no tempo especificado.")
+    raise HTTPException(status_code=404, detail="Miniatura ainda em geração.")
 
 
 
@@ -3222,3 +3327,127 @@ def relink_project_media(
         "relinked_videos": relinked_videos,
         "relinked_photos": relinked_photos
     }
+
+
+# ── ROTAS DO MODO GALERIA CLEAN (MOMENTOS CRUCIAIS, HOVER & ROTAÇÃO) ───────────────
+
+@router.post("/api/video/{video_id}/crucial-moments")
+def update_crucial_moments(
+    video_id: int,
+    payload: Dict[str, Any] = Body(...),
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Adiciona, remove ou substitui momentos cruciais de um vídeo."""
+    video = MediaRepository.get_video(conn, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
+
+    raw = video.get("crucial_moments")
+    existing = []
+    if raw:
+        try:
+            existing = json.loads(raw) if isinstance(raw, str) else raw
+        except Exception:
+            existing = []
+
+    action = payload.get("action", "toggle")
+    timestamp = payload.get("timestamp")
+
+    if action == "set":
+        moments = payload.get("moments", [])
+        updated = [round(float(m), 2) for m in moments if m is not None]
+    elif timestamp is not None:
+        ts = round(float(timestamp), 2)
+        # Se action for toggle: remove se existir um momento a menos de 0.6s, senao adiciona
+        close_idx = None
+        for i, m in enumerate(existing):
+            if abs(m - ts) < 0.6:
+                close_idx = i
+                break
+        
+        if action == "toggle":
+            if close_idx is not None:
+                existing.pop(close_idx)
+            else:
+                existing.append(ts)
+        elif action == "add":
+            if close_idx is None:
+                existing.append(ts)
+        elif action == "remove":
+            if close_idx is not None:
+                existing.pop(close_idx)
+        updated = existing
+    else:
+        updated = payload.get("moments", existing)
+
+    updated = sorted(list(set(round(m, 2) for m in updated)))
+    MediaRepository.set_crucial_moments(conn, video_id, updated)
+    conn.commit()
+
+    # Dispara pré-geração em background das miniaturas HQ para os momentos cruciais
+    if updated:
+        try:
+            proxy_p = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+            v_p = proxy_p if proxy_p.exists() else Path(video.get('filepath', ''))
+            if not v_p.exists():
+                local_orig = CONFIG.ORIGINALS_DIR / video.get('filename', '')
+                v_p = local_orig if local_orig.exists() else v_p
+            if v_p.exists():
+                TASK_MANAGER.executor.submit(
+                    IngestService.pregenerate_crucial_thumbnails,
+                    video_id, v_p, updated
+                )
+        except Exception as pre_err:
+            print(f"[update_crucial_moments] Erro ao disparar pré-geração HQ: {pre_err}")
+
+    return {"status": "success", "video_id": video_id, "crucial_moments": updated}
+
+
+@router.post("/api/video/{video_id}/hover-duration")
+def update_hover_duration(
+    video_id: int,
+    payload: Dict[str, Any] = Body(...),
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Define ou limpa a duração customizada de hover play para um vídeo específico."""
+    video = MediaRepository.get_video(conn, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
+
+    duration = payload.get("duration") if "duration" in payload else payload.get("hover_loop_duration")
+    dur_val = float(duration) if duration is not None and float(duration) > 0 else None
+    MediaRepository.set_hover_duration(conn, video_id, dur_val)
+    conn.commit()
+    return {"status": "success", "video_id": video_id, "hover_loop_duration": dur_val}
+
+
+@router.post("/api/media/{media_type}/{media_id}/rotate")
+def rotate_media(
+    media_type: str,
+    media_id: int,
+    payload: Dict[str, Any] = Body(default={}),
+    step: int = Query(90),
+    conn: sqlite3.Connection = Depends(get_db_conn)
+):
+    """Gira a foto ou vídeo em passos de 90 graus (0, 90, 180, 270)."""
+    if media_type not in ("video", "photo"):
+        raise HTTPException(status_code=400, detail="media_type deve ser 'video' ou 'photo'.")
+
+    table = "video" if media_type == "video" else "photo"
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT rotation FROM {table} WHERE id = ?", (media_id,))
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"{media_type.capitalize()} não encontrado.")
+
+    cur_rot = row["rotation"] if isinstance(row, sqlite3.Row) else (row[0] or 0)
+    cur_rot = cur_rot or 0
+
+    if "rotation" in payload and payload["rotation"] is not None:
+        new_rot = int(payload["rotation"]) % 360
+    else:
+        new_rot = (cur_rot + step) % 360
+
+    MediaRepository.set_media_rotation(conn, media_type, media_id, new_rot)
+    conn.commit()
+    return {"status": "success", "media_type": media_type, "media_id": media_id, "rotation": new_rot}

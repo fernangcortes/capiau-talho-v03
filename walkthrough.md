@@ -1413,3 +1413,52 @@ que faltava nele.
     📌 **Falta teste manual:** os ajustes ao vivo nunca foram ouvidos, a
     conformação nunca foi aberta num NLE, nenhuma produção real foi enviada à
     nuvem e a ida e volta com a DAW nunca teve uma DAW de verdade.
+
+---
+
+## 🖼️ Modo Galeria Clean (Google Fotos) & Inspeção Dinâmica de Mídias
+
+Implementamos e validamos a suíte completa do **Modo Galeria Clean (Google Fotos)** para a biblioteca de mídias, trazendo uma experiência visual imersiva, moderna e de altíssima performance para triagem e decupagem sem depender da abertura contínua do player principal:
+
+### 1. Aproveitamento Total da Largura & Preservação Proporcional de Aspect Ratio (`src/ui/styles.css`, `src/ui/js/library.js`):
+- **Layout Contínuo de Margem a Margem:** Eliminação do espaço ocioso e das colunas cinzas à direita da biblioteca através de layout flexível justificado (`flex-grow: calc(var(--aspect, 1.777) * 100);` e `flex-basis: calc(var(--gallery-item-height, 110px) * var(--aspect, 1.777));`). Os itens expandem até encostar perfeitamente na borda direita.
+- **Proporção Geométrica Nativa sem Deformação:** Cálculo dinâmico de dimensões com `aspect-ratio: var(--aspect, 1.777) !important;` e `height: auto !important;`. O enquadramento nativo (16:9, 4:3, 9:16 vertical e panorâmico) é rigorosamente mantido.
+- **Modo Zoom Máximo / Preview Expandido (`.zoom-xl`):** No nível máximo do slider de zoom (até 300px), cada miniatura ocupa 100% da largura útil da coluna (`width: 100% !important; min-width: 100% !important; flex: 1 1 100% !important;`), atuando como um monitor de preview com `max-height: 82vh` e `object-fit: contain` para fotos e vídeos verticais.
+- **Transformações de Rotação CSS:** Ajuste automático de escala para rotações de 90° e 270° através de fórmulas dimensionais recíprocas (`calc(100% / var(--aspect))` e `calc(100% * var(--aspect))`).
+
+### 2. Player Singleton de Hover & Scrubbing Rápido com `Ctrl` (`src/ui/js/library.js`, `src/ui/styles.css`):
+- **Player de Vídeo Singleton Otimizado:** Elemento de vídeo reutilizável (`.gallery-hover-video`) que se acopla dinamicamente ao card em foco, eliminando alocação redundante de dezenas de instâncias de decodificadores de vídeo no DOM.
+- **Duração Customizável de Hover Play:** Configuração individual por clipe ou global através de seletor NLE (2.0s, 3.0s, 5.0s, 10.0s ou até o fim do clipe), persistida no banco SQLite (`hover_loop_duration`).
+- **Scrubbing Frame a Frame com `Ctrl + Hover`:** Ao segurar a tecla `Ctrl` e mover o cursor sobre o card, o sistema exibe instantaneamente os frames do vídeo acompanhados por uma barra de progresso ciano (`.gallery-scrub-track`) e um timecode flutuante formatado (`.gallery-scrub-timecode`).
+
+### 3. Pipeline de Miniaturas de Alta Nitidez (HQ) & Upgrade Progressivo (`src/media/ffmpeg.py`, `src/api/routes/media.py`, `src/services/ingest.py`):
+- **Arquitetura de Dois Estágios:**
+  1. *Baixa Resolução (LQ - 160px, `-q:v 5`):* Gerada e servida instantaneamente com header `X-Thumbnail-Quality: low` para resposta imediata durante scrubbing rápido ou renderização em lote da timeline.
+  2. *Alta Resolução (HQ - 640px, `-q:v 2`):* Ao repousar o cursor sobre o frame por mais de 180ms, o sistema dispara requisição em background (`quality=hq`), pré-carrega a imagem em memória via `new Image()` e faz a troca suave apenas quando os pixels estão prontos, sem efeito de tela preta ou cintilação.
+- **Cache Segregado em Disco:** Armazenamento em arquivos padronizados `thumb_{video_id}_seq_{file_idx:04d}_hq.jpg` (HQ) e `thumb_{video_id}_seq_{file_idx:04d}.jpg` (LQ).
+- **Executor Dedicado e Proteção In-Flight:** Uso de `ThreadPoolExecutor(max_workers=3)` e conjunto `_THUMB_ONDEMAND_IN_FLIGHT` para coalescer requisições idênticas simultâneas e evitar sobrecarga de CPU por spawns duplicados de FFmpeg.
+
+### 4. Momentos Cruciais (Key Moments / Stars) & Slideshow com `Alt` (`src/db/schema.py`, `src/db/repositories/media.py`, `src/ui/js/player.js`):
+- **Marcação Ergonômica:** O editor pode marcar ou desmarcar instantes-chave no vídeo através do atalho `Ctrl+Shift+Clique` ou pelo botão estrela (`#btn-source-toggle-crucial`) na barra de transporte do Source Player.
+- **Persistência Relacional:** Gravados no SQLite como lista JSON ordenada de timestamps (`crucial_moments TEXT`) com índice determinístico.
+- **Pré-geração em Background:** O agendamento de momentos cruciais dispara automaticamente `IngestService.pregenerate_crucial_thumbnails`, gerando as versões HQ (640px) e LQ (160px) de forma assíncrona.
+- **Marcadores na Régua do Source Player:** Ticks visuais âmbar (`.source-crucial-tick`) renderizados sobre a barra de scrubbing do Source com tooltips de timecode e salto com um clique.
+- **Badges na Galeria:** Selos estilizados com ícone de estrela (`.gallery-crucial-badge`) exibindo a contagem de momentos marcados.
+- **Slideshow Cíclico com `Alt + Hover`:** Segurar a tecla `Alt` sobre o card cicla dinamicamente entre os momentos cruciais ou pelos frames de amostra do vídeo, com cadência configurável (300ms, 500ms, 800ms ou 1.2s).
+
+### 5. HUD Flutuante Desacoplado com `Shift + Hover` (`src/ui/js/library.js`, `src/ui/styles.css`):
+- **Exibição Contextual Não-Intrusiva:** Ao segurar `Shift` e posicionar o cursor sobre qualquer mídia da galeria, um HUD translúcido em glassmorphism escuro (`.gallery-shift-hud`) aparece desacoplado no nível da viewport.
+- **Metadados Ricos Configuráveis:** Apresenta Título executivo, Nome do arquivo real, Sinopse/Decupagem narrativa por IA, Falantes/Entrevistados, Tags semânticas e Dados técnicos de vídeo (resolução, FPS, codec, canais).
+- **Menu de Opções de Exibição:** Novo dropdown com checkboxes individuais para personalizar quais metadados devem figurar no HUD, além de seletores para duração do hover e cadência do slideshow.
+
+### 6. Rotação Não-Destrutiva de Mídia & Pôster de Capa Customizado (`src/api/routes/media.py`):
+- **Orientação em Passos de 90°:** Endpoint `POST /api/media/{media_type}/{media_id}/rotate` permite rotacionar vídeos e fotos em 0°, 90°, 180° e 270°, atualizando a coluna `rotation` no banco SQLite com recálculo instantâneo de aspect ratio na interface sem regerar o arquivo proxy.
+- **Timestamp de Capa Customizável (`thumbnail_time`):** Persistência do segundo exato escolhido pelo editor para servir como miniatura oficial do vídeo, com backfill seguro inicial migrando automaticamente para 10% da duração ou 1.0s.
+
+### 7. Validação & Homologação de Testes:
+- **`tests/test_gallery_mode_api.py`:** 4 testes de integração cobrindo ciclo de vida completo de momentos cruciais, duração de hover, rotações 90°/180°/270°/360° em fotos e vídeos, e contrato CSS/JS de zoom e aspect ratio (100% OK).
+- **`tests/test_video_thumbnail_quality.py`:** 4 testes validando extração de frames LQ e HQ no FFmpeg, cabeçalhos HTTP do endpoint `thumbnail-at`, pré-geração em background pelo IngestService e agendamento de tarefas assíncronas (100% OK).
+- **`tests/test_video_thumbnail_time.py`:** 4 testes verificando persistência de `thumbnail_time` no schema SQLite, MediaRepository e endpoints da API (100% OK).
+- **`tests/autoteste_gallery_crucial_hq.mjs`:** Autoteste Node.js ESM validando `GalleryInteractionController`, throttling de scrubbing rápido, agendamento e cancelamento de timers HQ e pré-carregamento de momentos cruciais (100% OK).
+
+

@@ -161,6 +161,22 @@ export class SourcePlayer {
             });
         }
 
+        const btnToggleCrucial = this.el("btn-source-toggle-crucial");
+        if (btnToggleCrucial) {
+            btnToggleCrucial.addEventListener("click", () => this.toggleCrucialMomentAtCurrentTime());
+        }
+
+        const sourceVideoWrapper = this.el("source-video-wrapper");
+        if (sourceVideoWrapper) {
+            sourceVideoWrapper.addEventListener("click", (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    this.toggleCrucialMomentAtCurrentTime();
+                }
+            }, true);
+        }
+
         const btnInterviewSetThumb = this.el("btn-interview-modal-set-thumb");
         if (btnInterviewSetThumb) {
             btnInterviewSetThumb.addEventListener("click", async (e) => {
@@ -248,6 +264,10 @@ export class SourcePlayer {
                 STATE.markerOut = null;
                 this.videoFaces = [];
                 this.clearFacesOverlay();
+                const crucialCont = this.el("source-crucial-markers-container");
+                if (crucialCont) crucialCont.innerHTML = "";
+                const btnCrucial = this.el("btn-source-toggle-crucial");
+                if (btnCrucial) btnCrucial.classList.remove("active");
             }
             return;
         }
@@ -281,6 +301,8 @@ export class SourcePlayer {
 
         this.videoFaces = [];
         this.clearFacesOverlay();
+        this.updateCrucialMarkersUI();
+        this.updateCrucialButtonState();
 
         CapIAuAPI.fetchVideoFaces(video.id)
             .then(faces => {
@@ -341,6 +363,10 @@ export class SourcePlayer {
         
         this.videoFaces = [];
         this.clearFacesOverlay();
+        const crucialCont = this.el("source-crucial-markers-container");
+        if (crucialCont) crucialCont.innerHTML = "";
+        const btnCrucial = this.el("btn-source-toggle-crucial");
+        if (btnCrucial) btnCrucial.classList.remove("active");
     }
 
     hidePhoto() {
@@ -376,6 +402,7 @@ export class SourcePlayer {
         if (vid.paused) {
             this.updateFacesOverlay();
         }
+        this.updateCrucialButtonState();
     }
 
     onLoadedMetadata() {
@@ -383,6 +410,8 @@ export class SourcePlayer {
         if (!vid) return;
         const durTime = this.el("source-duration-time");
         if (durTime) durTime.textContent = formatTimecode(vid.duration);
+        this.updateCrucialMarkersUI();
+        this.updateCrucialButtonState();
         this.onTimeUpdate();
     }
 
@@ -640,6 +669,78 @@ export class SourcePlayer {
             } else if (markerOutBar) {
                 markerOutBar.style.display = "none";
             }
+        }
+    }
+
+    async toggleCrucialMomentAtCurrentTime() {
+        if (!STATE.activeVideo) {
+            if (window.showToast) window.showToast("Nenhum vídeo ativo para marcar momento crucial.", "warning");
+            return;
+        }
+        const vid = this.el("source-video");
+        if (!vid) return;
+
+        const curTime = Number(vid.currentTime.toFixed(2));
+        try {
+            const res = await CapIAuAPI.updateCrucialMoments(STATE.activeVideo.id, "toggle", curTime);
+            STATE.activeVideo.crucial_moments = res.crucial_moments || [];
+            this.updateCrucialMarkersUI();
+            this.updateCrucialButtonState();
+            if (window.libraryInstance) {
+                window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+            }
+            const moments = res.crucial_moments || [];
+            const isPresent = moments.some(m => Math.abs(m - curTime) < 0.35);
+            const msg = isPresent 
+                ? `Momento crucial adicionado aos ${formatTimecode(curTime)}!` 
+                : `Momento crucial removido aos ${formatTimecode(curTime)}!`;
+            if (window.showToast) window.showToast(msg, "success");
+        } catch (err) {
+            console.error("Erro ao atualizar momento crucial:", err);
+            if (window.showToast) window.showToast("Erro ao marcar momento: " + err.message, "error");
+        }
+    }
+
+    updateCrucialMarkersUI() {
+        const container = this.el("source-crucial-markers-container");
+        if (!container) return;
+        container.innerHTML = "";
+
+        const vid = this.el("source-video");
+        const dur = (vid && vid.duration > 0) ? vid.duration : (STATE.activeVideo?.duration || 0);
+        if (dur <= 0 || !STATE.activeVideo?.crucial_moments) return;
+
+        const moments = Array.isArray(STATE.activeVideo.crucial_moments) ? STATE.activeVideo.crucial_moments : [];
+        moments.forEach(m => {
+            const pct = Math.max(0, Math.min(100, (m / dur) * 100));
+            const tick = document.createElement("div");
+            tick.className = "source-crucial-tick";
+            tick.style.left = `${pct}%`;
+            tick.title = `Momento Crucial: ${formatTimecode(m)} (Clique para saltar)`;
+            tick.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.seek(m);
+            });
+            container.appendChild(tick);
+        });
+    }
+
+    updateCrucialButtonState() {
+        const btn = this.el("btn-source-toggle-crucial");
+        if (!btn) return;
+        const vid = this.el("source-video");
+        if (!vid || !STATE.activeVideo?.crucial_moments) {
+            btn.classList.remove("active");
+            return;
+        }
+        const cur = vid.currentTime;
+        const moments = Array.isArray(STATE.activeVideo.crucial_moments) ? STATE.activeVideo.crucial_moments : [];
+        const isNear = moments.some(m => Math.abs(m - cur) < 0.35);
+        btn.classList.toggle("active", isNear);
+        if (isNear) {
+            btn.title = "Desmarcar Momento Crucial neste Ponto (Ctrl+Shift+Click)";
+        } else {
+            btn.title = "Marcar Momento Crucial no Frame Atual (Ctrl+Shift+Click)";
         }
     }
 
@@ -4154,6 +4255,7 @@ export class VideoPlayer {
     constructor() {
         this.sourcePlayer = new SourcePlayer();
         this.programPlayer = new ProgramPlayer();
+        window.sourcePlayer = this.sourcePlayer;
         this.isKeyKDown = false;
         this._kActionTaken = null;
         this._kJogUsed = false;
@@ -4337,6 +4439,13 @@ export class VideoPlayer {
             } else {
                 TIMELINE_STATE.clearInOut();
             }
+            return;
+        }
+
+        // Alternar Momento Crucial
+        if (KEYMAP_SERVICE.matches(e, "markers.toggle_crucial")) {
+            e.preventDefault();
+            this.sourcePlayer.toggleCrucialMomentAtCurrentTime();
             return;
         }
 
