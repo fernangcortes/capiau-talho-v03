@@ -1727,7 +1727,8 @@ button {
 
 /* Rotações CSS matematicamente exatas (sem scale arbitrário e sem crop) */
 .gallery-item.rot-90 img.gallery-thumb-img,
-.gallery-item.rot-90 .gallery-hover-video {
+.gallery-item.rot-90 .gallery-hover-video,
+.gallery-hover-video.rot-90 {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1736,11 +1737,18 @@ button {
     transform: translate(-50%, -50%) rotate(90deg);
 }
 .gallery-item.rot-180 img.gallery-thumb-img,
-.gallery-item.rot-180 .gallery-hover-video {
+.gallery-item.rot-180 .gallery-hover-video,
+.gallery-hover-video.rot-180 {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     transform: rotate(180deg);
 }
 .gallery-item.rot-270 img.gallery-thumb-img,
-.gallery-item.rot-270 .gallery-hover-video {
+.gallery-item.rot-270 .gallery-hover-video,
+.gallery-hover-video.rot-270 {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1883,6 +1891,7 @@ button {
     pointer-events: none;
     background: transparent;
     opacity: 0;
+    transform: none;
     transition: opacity 0.15s ease;
 }
 

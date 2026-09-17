@@ -4185,6 +4185,9 @@ export class GalleryInteractionController {
             this.hoverVideo.style.opacity = "0";
             this.hoverVideo.removeAttribute("src");
             this.hoverVideo.load();
+            this.hoverVideo.className = "gallery-hover-video";
+            this.hoverVideo.style.removeProperty("--aspect");
+            delete this.hoverVideo.dataset.rotation;
             if (this.hoverVideo.parentNode) {
                 this.hoverVideo.parentNode.removeChild(this.hoverVideo);
             }
@@ -4331,6 +4334,27 @@ export class GalleryInteractionController {
         const effectiveStart = this.getEffectiveStart(v, loopDuration);
         itemEl._effectiveHoverStart = effectiveStart;
 
+        // Sincroniza classes de rotação (90°, 180°, 270°) tanto no card quanto no elemento singleton
+        const rot = (v.rotation || (itemEl._mediaData && itemEl._mediaData.rotation) || 0) % 360;
+        ["rot-90", "rot-180", "rot-270"].forEach(c => {
+            itemEl.classList.remove(c);
+            this.hoverVideo.classList.remove(c);
+        });
+        if (rot) {
+            itemEl.classList.add(`rot-${rot}`);
+            this.hoverVideo.classList.add(`rot-${rot}`);
+            this.hoverVideo.dataset.rotation = rot;
+        } else {
+            delete this.hoverVideo.dataset.rotation;
+        }
+
+        const curAspect = itemEl.style.getPropertyValue("--aspect");
+        if (curAspect) {
+            this.hoverVideo.style.setProperty("--aspect", curAspect);
+        } else {
+            this.hoverVideo.style.removeProperty("--aspect");
+        }
+
         // Previne flash/blink preto: inicia transparente e revela apenas quando os frames começarem a tocar
         this.hoverVideo.style.opacity = "0";
         itemEl.appendChild(this.hoverVideo);
@@ -4374,6 +4398,9 @@ export class GalleryInteractionController {
         this.isCtrlScrubbing = true;
         if (this.hoverVideo && this.hoverVideo.parentNode) {
             this.hoverVideo.pause();
+            this.hoverVideo.className = "gallery-hover-video";
+            this.hoverVideo.style.removeProperty("--aspect");
+            delete this.hoverVideo.dataset.rotation;
             this.hoverVideo.parentNode.removeChild(this.hoverVideo);
         }
         if (this.hoverTimer) {
@@ -4453,6 +4480,9 @@ export class GalleryInteractionController {
         this.isAltInspecting = true;
         if (this.hoverVideo && this.hoverVideo.parentNode) {
             this.hoverVideo.pause();
+            this.hoverVideo.className = "gallery-hover-video";
+            this.hoverVideo.style.removeProperty("--aspect");
+            delete this.hoverVideo.dataset.rotation;
             this.hoverVideo.parentNode.removeChild(this.hoverVideo);
         }
         if (this.hoverTimer) clearTimeout(this.hoverTimer);
@@ -7110,13 +7140,14 @@ export class LibraryManager {
                 if (thumbImg && !item._naturalAspect) {
                     thumbImg.addEventListener("load", () => {
                         if (thumbImg.naturalWidth > 0 && thumbImg.naturalHeight > 0) {
-                            let natAspect = thumbImg.naturalWidth / thumbImg.naturalHeight;
+                            const rawAspect = thumbImg.naturalWidth / thumbImg.naturalHeight;
+                            item._naturalAspect = rawAspect;
+                            let displayAspect = rawAspect;
                             if (rot === 90 || rot === 270) {
-                                natAspect = 1 / natAspect;
+                                displayAspect = 1 / displayAspect;
                             }
-                            natAspect = Math.max(0.45, Math.min(2.8, natAspect));
-                            item._naturalAspect = natAspect;
-                            itemEl.style.setProperty("--aspect", natAspect.toFixed(3));
+                            displayAspect = Math.max(0.45, Math.min(2.8, displayAspect));
+                            itemEl.style.setProperty("--aspect", displayAspect.toFixed(3));
                         }
                     }, { once: true });
                 }
