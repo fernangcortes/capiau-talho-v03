@@ -64,10 +64,13 @@ globalThis.document = {
     getElementById: (id) => {
         if (id === "source-video") return mockVideoElement;
         if (!domElements.has(id)) {
-            domElements.set(id, {
+            const el = {
                 id,
                 style: {},
                 dataset: {},
+                children: [],
+                innerHTML: "",
+                textContent: "",
                 currentTime: 0,
                 duration: 60,
                 readyState: 4,
@@ -83,15 +86,17 @@ globalThis.document = {
                     contains(c) { return this._classes.has(c); },
                     toggle(c) { if (this._classes.has(c)) this._classes.delete(c); else this._classes.add(c); }
                 },
-                setAttribute: () => {},
-                getAttribute: () => null,
-                removeAttribute: () => {},
+                setAttribute(k, v) { this[k] = v; },
+                getAttribute(k) { return this[k] || null; },
+                removeAttribute(k) { delete this[k]; },
+                appendChild(c) { this.children.push(c); return c; },
                 querySelector: () => null,
                 querySelectorAll: () => [],
                 addEventListener: () => {},
                 removeEventListener: () => {},
                 focus: () => {}
-            });
+            };
+            domElements.set(id, el);
         }
         return domElements.get(id);
     },
@@ -104,6 +109,9 @@ globalThis.document = {
         tagName: tag.toUpperCase(),
         style: {},
         dataset: {},
+        children: [],
+        innerHTML: "",
+        textContent: "",
         currentTime: 0,
         duration: 60,
         readyState: 4,
@@ -112,13 +120,18 @@ globalThis.document = {
         load: () => {},
         pause: () => {},
         play: () => Promise.resolve(),
-        classList: { add() {}, remove() {}, contains() { return false; } },
-        setAttribute: () => {},
-        getAttribute: () => null,
-        removeAttribute: () => {},
+        classList: {
+            _classes: new Set(),
+            add(c) { this._classes.add(c); },
+            remove(c) { this._classes.delete(c); },
+            contains(c) { return this._classes.has(c); }
+        },
+        setAttribute(k, v) { this[k] = v; },
+        getAttribute(k) { return this[k] || null; },
+        removeAttribute(k) { delete this[k]; },
         addEventListener: () => {},
         removeEventListener: () => {},
-        appendChild: () => {}
+        appendChild(c) { this.children.push(c); return c; }
     })
 };
 
@@ -487,6 +500,194 @@ assert.ok(eventMatchFired, "Evento 'matchFramePerformed' deve ser emitido via ST
 mockVideoElement.currentTime = 12.0;
 player.reverseMatchFrameFromSource();
 assert.ok(eventRevMatchFired, "Evento 'reverseMatchFramePerformed' deve ser emitido via STATE");
+STATE.listeners = {};
 console.log("  ✔ Barramento de eventos multi-monitor validado com sucesso.");
 
-console.log("\n🎉 TODOS OS 11 BLOCOS DE TESTE DA TASK 8 PASSARAM COM 100% DE SUCESSO!");
+// ── 12. MÚLTIPLAS OCORRÊNCIAS & CICLO CONTÍNUO (REVERSE MATCH FRAME) ────────
+console.log("\n12. Validando Múltiplas Ocorrências & Ciclo Contínuo de Reverse Match Frame...");
+
+assert.ok(indexContent.includes('id="source-reverse-match-hud"'), "index.html deve conter #source-reverse-match-hud");
+assert.ok(indexContent.includes('id="hud-reverse-match-prev"'), "index.html deve conter #hud-reverse-match-prev");
+assert.ok(indexContent.includes('id="hud-reverse-match-info"'), "index.html deve conter #hud-reverse-match-info");
+assert.ok(indexContent.includes('id="hud-reverse-match-next"'), "index.html deve conter #hud-reverse-match-next");
+assert.ok(indexContent.includes('id="hud-reverse-match-list"'), "index.html deve conter #hud-reverse-match-list");
+assert.ok(indexContent.includes('id="badge-source-reverse-match"'), "index.html deve conter #badge-source-reverse-match");
+assert.ok(indexContent.includes('id="popover-reverse-match-list"'), "index.html deve conter #popover-reverse-match-list");
+
+// Configura 3 ocorrências da mesma mídia na timeline:
+// Cut 1: Track V1 (track: 0), timelineStart: 0, in: 0, out: 100
+// Cut 2: Track V2 (track: 1), timelineStart: 300, in: 50, out: 150
+// Cut 3: Track V1 (track: 0), timelineStart: 600, in: 80, out: 180
+const multiCut1 = {
+    id: "cut_inst_1",
+    video_id: "vid_test_01",
+    name: "Take 1 - A",
+    timelineStartFrame: 0,
+    timelineEndFrame: 100,
+    inFrame: 0,
+    outFrame: 100,
+    track: 0,
+    trackName: "V1"
+};
+const multiCut2 = {
+    id: "cut_inst_2",
+    video_id: "vid_test_01",
+    name: "Take 1 - B (Inserto V2)",
+    timelineStartFrame: 300,
+    timelineEndFrame: 400,
+    inFrame: 50,
+    outFrame: 150,
+    track: 1,
+    trackName: "V2"
+};
+const multiCut3 = {
+    id: "cut_inst_3",
+    video_id: "vid_test_01",
+    name: "Take 1 - C",
+    timelineStartFrame: 600,
+    timelineEndFrame: 700,
+    inFrame: 80,
+    outFrame: 180,
+    track: 0,
+    trackName: "V1"
+};
+
+STATE.activeVideo = mockVideo1;
+STATE.activeTimelineCuts = [multiCut1, multiCut2, multiCut3];
+
+// Source frame = 90 (sourceTime = 90 / 24 = 3.75s)
+// Está dentro de:
+// Cut 1: [0, 100) -> Target Playhead: 0 + (90 - 0) = 90
+// Cut 2: [50, 150) -> Target Playhead: 300 + (90 - 50) = 340
+// Cut 3: [80, 180) -> Target Playhead: 600 + (90 - 80) = 610
+mockVideoElement.currentTime = 3.75;
+TIMELINE_STATE.setPlayheadFrame(0); // Mais perto de 90 (Cut 1)
+player._reverseMatchSession = null;
+
+// 1º disparo: deve selecionar o Cut 1 (mais próximo de 0) e criar a sessão com currentIndex = 0
+const match1 = player.reverseMatchFrameFromSource(1);
+assert.ok(match1, "1º disparo deve retornar ocorrência válida");
+assert.strictEqual(match1.clip.id, "cut_inst_1", "1º disparo deve saltar para Cut 1");
+assert.strictEqual(match1.currentIndex, 0, "currentIndex deve ser 0");
+assert.strictEqual(match1.totalOccurrences, 3, "totalOccurrences deve ser 3");
+assert.strictEqual(TIMELINE_STATE.playheadFrame, 90, "Playhead deve ser 90");
+
+// Verifica atualização do badge e HUD
+const badgeEl = document.getElementById("badge-source-reverse-match");
+assert.strictEqual(badgeEl.textContent, "3", "Badge deve indicar 3 ocorrências");
+assert.strictEqual(badgeEl.style.display, "inline-flex", "Badge deve estar visível");
+
+const hudEl = document.getElementById("source-reverse-match-hud");
+assert.strictEqual(hudEl.style.display, "flex", "HUD deve estar visível");
+assert.strictEqual(hudEl.classList.contains("is-hidden"), false, "HUD não deve ter classe is-hidden");
+
+const infoEl = document.getElementById("hud-reverse-match-info");
+assert.ok(infoEl.textContent.includes("1/3"), "HUD deve informar 1/3");
+assert.ok(infoEl.textContent.includes("V1"), "HUD deve informar faixa V1");
+
+// 2º disparo: ciclo contínuo avançando para a 2ª ocorrência (Cut 2 em V2)
+const match2 = player.reverseMatchFrameFromSource(1);
+assert.strictEqual(match2.clip.id, "cut_inst_2", "2º disparo deve saltar para Cut 2");
+assert.strictEqual(match2.currentIndex, 1, "currentIndex deve ser 1");
+assert.strictEqual(TIMELINE_STATE.playheadFrame, 340, "Playhead deve ser 340");
+assert.ok(infoEl.textContent.includes("2/3"), "HUD deve informar 2/3");
+assert.ok(infoEl.textContent.includes("V2"), "HUD deve informar faixa V2");
+
+// 3º disparo: avança para a 3ª ocorrência (Cut 3 em V1)
+const match3 = player.reverseMatchFrameFromSource(1);
+assert.strictEqual(match3.clip.id, "cut_inst_3", "3º disparo deve saltar para Cut 3");
+assert.strictEqual(match3.currentIndex, 2, "currentIndex deve ser 2");
+assert.strictEqual(TIMELINE_STATE.playheadFrame, 610, "Playhead deve ser 610");
+assert.ok(infoEl.textContent.includes("3/3"), "HUD deve informar 3/3");
+
+// 4º disparo: fechamento de ciclo (volta para a 1ª ocorrência Cut 1)
+const match4 = player.reverseMatchFrameFromSource(1);
+assert.strictEqual(match4.clip.id, "cut_inst_1", "4º disparo deve fechar o ciclo e voltar ao Cut 1");
+assert.strictEqual(match4.currentIndex, 0, "currentIndex deve reiniciar em 0");
+assert.strictEqual(TIMELINE_STATE.playheadFrame, 90, "Playhead deve retornar a 90");
+
+// 5º disparo com direção reversa (direction = -1): deve saltar para a 3ª ocorrência
+const matchRev = player.reverseMatchFrameFromSource(-1);
+assert.strictEqual(matchRev.clip.id, "cut_inst_3", "Salto reverso deve ir para Cut 3");
+assert.strictEqual(matchRev.currentIndex, 2, "currentIndex deve ser 2");
+assert.strictEqual(TIMELINE_STATE.playheadFrame, 610, "Playhead deve ser 610");
+
+// 6º Validação do Popover Dropdown
+player.toggleReverseMatchPopover();
+const popoverEl = document.getElementById("popover-reverse-match-list");
+assert.strictEqual(popoverEl.style.display, "flex", "Popover deve abrir em display: flex");
+assert.strictEqual(popoverEl.children.length, 4, "Popover deve ter 1 header + 3 itens de corte");
+
+// Salto direto pelo índice no popover
+player._jumpToReverseMatchIndex(1);
+assert.strictEqual(TIMELINE_STATE.playheadFrame, 340, "Salto direto pelo índice 1 deve posicionar em 340 (Cut 2)");
+
+player.closeReverseMatchPopover();
+assert.strictEqual(popoverEl.style.display, "none", "Fechar popover deve definir display: none");
+
+// 7º Validação do fechamento instantâneo do HUD ao soltar Shift (keyup)
+player._isShiftKeyDown = true;
+player.handleGlobalKeyUp({ key: "Shift", shiftKey: false });
+assert.strictEqual(player._isShiftKeyDown, false, "_isShiftKeyDown deve ser false");
+assert.ok(hudEl.classList.contains("is-hidden"), "HUD deve receber classe is-hidden ao soltar Shift");
+
+// 8º Validação de Deduplicação de Pares A/V Vinculados (link_id):
+// Adiciona pares de áudio correspondentes para cada corte de vídeo na timeline (A1 e A2)
+const audioCut1 = {
+    id: "cut_inst_1_audio",
+    video_id: "vid_test_01",
+    name: "Take 1 - A (Áudio)",
+    timelineStartFrame: 0,
+    timelineEndFrame: 100,
+    inFrame: 0,
+    outFrame: 100,
+    track: "A1",
+    trackName: "A1",
+    link_id: "link_cut_1",
+    isAudio: true
+};
+multiCut1.link_id = "link_cut_1";
+
+const audioCut2 = {
+    id: "cut_inst_2_audio",
+    video_id: "vid_test_01",
+    name: "Take 1 - B (Áudio)",
+    timelineStartFrame: 300,
+    timelineEndFrame: 400,
+    inFrame: 50,
+    outFrame: 150,
+    track: "A2",
+    trackName: "A2",
+    link_id: "link_cut_2",
+    isAudio: true
+};
+multiCut2.link_id = "link_cut_2";
+
+const audioCut3 = {
+    id: "cut_inst_3_audio",
+    video_id: "vid_test_01",
+    name: "Take 1 - C (Áudio)",
+    timelineStartFrame: 600,
+    timelineEndFrame: 700,
+    inFrame: 80,
+    outFrame: 180,
+    track: "A1",
+    trackName: "A1",
+    link_id: "link_cut_3",
+    isAudio: true
+};
+multiCut3.link_id = "link_cut_3";
+
+STATE.activeTimelineCuts = [multiCut1, audioCut1, multiCut2, audioCut2, multiCut3, audioCut3];
+player._reverseMatchSession = null;
+mockVideoElement.currentTime = 3.75;
+TIMELINE_STATE.setPlayheadFrame(0);
+
+const matchDedup = player.reverseMatchFrameFromSource(1);
+assert.strictEqual(matchDedup.totalOccurrences, 3, "Deve contabilizar exatamente 3 ocorrências (ignorando as faixas de áudio duplicadas dos pares vinculados)");
+assert.strictEqual(badgeEl.textContent, "3", "Badge deve continuar indicando 3 ocorrências e não 6");
+assert.strictEqual(matchDedup.clip.id, "cut_inst_1", "Deve selecionar o corte de vídeo e não o de áudio");
+
+console.log("  ✔ Ciclo contínuo, Mini-HUD flutuante, badge contador, popover e deduplicação A/V validados com sucesso.");
+
+console.log("\n🎉 TODOS OS 12 BLOCOS DE TESTE DA TASK 8 PASSARAM COM 100% DE SUCESSO!");

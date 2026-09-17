@@ -12603,3 +12603,164 @@ input[type="number"] {
     transform: scale(1.1);
 }
 
+/* ── REVERSE MATCH FRAME: MINI-HUD FLUTUANTE & MULTI-OCORRÊNCIAS ───────── */
+.source-floating-hud {
+    position: absolute;
+    bottom: 82px;
+    right: 16px;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: rgba(10, 15, 26, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(6, 182, 212, 0.45);
+    border-radius: 20px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.65), 0 0 12px rgba(6, 182, 212, 0.25);
+    pointer-events: auto;
+    user-select: none;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.source-floating-hud.is-hidden {
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
+}
+
+.player-panel .player-controls.has-popover-open,
+.player-panel .player-controls:has(.popover-reverse-match-menu[style*="flex"]),
+.player-panel .player-controls:has(.popover-reverse-match-menu[style*="block"]) {
+    z-index: 200 !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+.btn-reverse-match-container {
+    position: relative;
+    display: inline-flex;
+    z-index: 205;
+}
+
+.hud-mini-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 10px;
+    transition: all 0.15s ease;
+    padding: 0;
+}
+
+.hud-mini-btn:hover {
+    background: rgba(6, 182, 212, 0.2);
+    border-color: var(--color-cyan);
+    color: var(--color-cyan);
+    transform: scale(1.08);
+}
+
+.hud-mini-btn:active {
+    transform: scale(0.95);
+}
+
+.hud-mini-info {
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-cyan);
+    padding: 0 6px;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+}
+
+.btn-badge-counter {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    z-index: 10;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    padding: 0 3px;
+    background: var(--color-cyan, #06b6d4);
+    color: #031019;
+    font-family: monospace;
+    font-weight: 900;
+    font-size: 8.5px;
+    line-height: 14px;
+    text-align: center;
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.7);
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.popover-reverse-match-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    z-index: 300;
+    min-width: 220px;
+    background: rgba(11, 17, 32, 0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(6, 182, 212, 0.45);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75), 0 0 14px rgba(6, 182, 212, 0.3);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-sizing: border-box;
+}
+
+.popover-rm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 6px 5px 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.popover-rm-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.popover-rm-item:hover {
+    background: rgba(6, 182, 212, 0.15);
+    border-color: var(--color-cyan);
+    color: #fff;
+    transform: translateX(2px);
+}
+
+.popover-rm-item.is-active {
+    background: rgba(6, 182, 212, 0.25);
+    border-color: var(--color-cyan);
+    color: #fff;
+    font-weight: 700;
+}
+
+

@@ -111,6 +111,8 @@ export class CapiauTimelineRenderer {
         this.photoThumbCache = {}; // Cache de miniaturas (Image) de fotos por id
         this.videoThumbCache = {}; // Cache de miniaturas de vídeo: key "video_id_time" -> { img: Image, loaded: boolean, timestamp: float }
         this.marqueeBox = null; // Caixa translúcida de seleção por retângulo: { x, y, width, height }
+        this.highlightedMatchClipIds = new Set(); // IDs de clipes em destaque temporário de Match Frame
+        this._matchFlashTimer = null;
         this.init();
     }
 
@@ -1372,11 +1374,21 @@ export class CapiauTimelineRenderer {
 
             const isSelected = (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.has(cut.id)) || TIMELINE_STATE.selectedClipId === cut.id;
             const isPartner = !isSelected && selectedLink && cut.link_id === selectedLink;
-            ctx.strokeStyle = (isSelected || isPartner) ? this.colors.selection : style.border;
-            ctx.lineWidth = isSelected ? 2 : 1.5;
-            if (isPartner) ctx.setLineDash([4, 3]); // par A/V do selecionado: tracejado
-            ctx.strokeRect(startX, clipY, width, clipHeight);
-            if (isPartner) ctx.setLineDash([]);
+            const isMatchHighlight = this.highlightedMatchClipIds && this.highlightedMatchClipIds.has(String(cut.id));
+
+            ctx.strokeStyle = isMatchHighlight ? "rgba(6, 182, 212, 0.95)" : ((isSelected || isPartner) ? this.colors.selection : style.border);
+            ctx.lineWidth = isMatchHighlight ? 2.5 : (isSelected ? 2 : 1.5);
+            if (isPartner && !isMatchHighlight) ctx.setLineDash([4, 3]); // par A/V do selecionado: tracejado
+            if (isMatchHighlight) {
+                ctx.save();
+                ctx.shadowColor = "rgba(6, 182, 212, 0.85)";
+                ctx.shadowBlur = 8;
+                ctx.strokeRect(startX, clipY, width, clipHeight);
+                ctx.restore();
+            } else {
+                ctx.strokeRect(startX, clipY, width, clipHeight);
+            }
+            if (isPartner && !isMatchHighlight) ctx.setLineDash([]);
 
             // Clipe Desativado / Muted: véu escuro e textura de listras diagonais sutis
             if (cut.disabled === true) {
@@ -1482,6 +1494,7 @@ export class CapiauTimelineRenderer {
      */
     getPhotoThumb(photo) {
         if (!photo || !photo.proxy_path) return null;
+        if (!this.photoThumbCache) this.photoThumbCache = {};
         const key = photo.id;
         const cached = this.photoThumbCache[key];
         if (cached) return cached.loaded ? cached.img : null;
@@ -1496,6 +1509,7 @@ export class CapiauTimelineRenderer {
 
     getVideoThumb(videoId, timestamp) {
         if (!videoId) return null;
+        if (!this.videoThumbCache) this.videoThumbCache = {};
         const key = `${videoId}_${timestamp.toFixed(1)}`;
         const cached = this.videoThumbCache[key];
         if (cached) return cached.loaded ? cached.img : null;
@@ -2291,5 +2305,21 @@ export class CapiauTimelineRenderer {
 
             ctx.restore();
         }
+    }
+
+    /**
+     * Aplica destaque luminoso temporário nos clipes da timeline que contêm
+     * ocorrências do quadro localizado no Match Frame / Reverse Match Frame.
+     */
+    flashMatchOccurrences(clipIds, durationMs = 1800) {
+        if (!clipIds || !Array.isArray(clipIds) || clipIds.length === 0) return;
+        this.highlightedMatchClipIds = new Set(clipIds.map(String));
+        this.requestRedraw();
+
+        if (this._matchFlashTimer) clearTimeout(this._matchFlashTimer);
+        this._matchFlashTimer = setTimeout(() => {
+            this.highlightedMatchClipIds.clear();
+            this.requestRedraw();
+        }, durationMs);
     }
 }

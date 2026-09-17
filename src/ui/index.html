@@ -846,6 +846,20 @@
                         <div class="video-container" id="source-video-wrapper" style="flex: 1; background: #000; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;">
                             <video id="source-video" src="" preload="auto" style="position: absolute; width: 100%; height: 100%; object-fit: contain; display: block;"></video>
                             <img id="source-player-photo" style="display:none; width: 100%; height: 100%; object-fit: contain; position: absolute;" src="">
+                            
+                            <!-- Mini-HUD Flutuante de Múltiplas Ocorrências (Reverse Match Frame) -->
+                            <div id="source-reverse-match-hud" class="source-floating-hud" style="display: none;">
+                                <button id="hud-reverse-match-prev" class="hud-mini-btn" data-tooltip="Ocorrência Anterior [Shift+◀]">
+                                    <i class="fa-solid fa-chevron-left"></i>
+                                </button>
+                                <span id="hud-reverse-match-info" class="hud-mini-info">1/3 · V1 · 00:01:20:00</span>
+                                <button id="hud-reverse-match-next" class="hud-mini-btn" data-tooltip="Próxima Ocorrência [F]">
+                                    <i class="fa-solid fa-chevron-right"></i>
+                                </button>
+                                <button id="hud-reverse-match-list" class="hud-mini-btn" data-tooltip="Listar Todas as Ocorrências">
+                                    <i class="fa-solid fa-list-ul"></i>
+                                </button>
+                            </div>
                         </div>
                         
                         <!-- Controles Source -->
@@ -906,13 +920,18 @@
                                             <path d="M8 1.5v6.5m0 0l-2.2-2.2m2.2 2.2l2.2-2.2"/>
                                         </svg>
                                     </button>
-                                    <button id="btn-source-reverse-match" class="btn-control" style="padding: 4px 7px; font-size: 11px; height: 26px; display: inline-flex; align-items: center; justify-content: center;" data-tooltip="Localizar Quadro na Timeline / Reverse Match Frame [Shift+F]">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-                                            <rect x="2" y="3" width="12" height="10" rx="1.5"/>
-                                            <path d="M8 5v6m0 0l-2-2m2 2l2-2"/>
-                                            <path d="M4 14h8"/>
-                                        </svg>
-                                    </button>
+                                    <div class="btn-reverse-match-container" style="position: relative; display: inline-flex;">
+                                        <button id="btn-source-reverse-match" class="btn-control" style="padding: 4px 7px; font-size: 11px; height: 26px; display: inline-flex; align-items: center; justify-content: center; position: relative;" data-tooltip="Localizar Quadro na Timeline / Reverse Match Frame [Shift+F]">
+                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                                                <rect x="2" y="3" width="12" height="10" rx="1.5"/>
+                                                <path d="M8 5v6m0 0l-2-2m2 2l2-2"/>
+                                                <path d="M4 14h8"/>
+                                            </svg>
+                                            <span id="badge-source-reverse-match" class="btn-badge-counter" style="display: none;">1</span>
+                                        </button>
+                                        <!-- Popover Dropdown de Ocorrências -->
+                                        <div id="popover-reverse-match-list" class="popover-reverse-match-menu" style="display: none;"></div>
+                                    </div>
                                     <button id="btn-append-timeline" class="btn-control btn-append" style="padding: 4px 8px; font-size: 11px; height: 26px; display: flex; align-items: center; gap: 4px;" title="Inserir no Fim da Timeline (Shift+E)">
                                         <i class="fa-solid fa-plus"></i> Fim
                                     </button>

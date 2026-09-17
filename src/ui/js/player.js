@@ -2,7 +2,7 @@
 import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { FaceManager } from "./faces.js";
-import { TIMELINE_STATE, TIMELINE_HISTORY, evaluateFadeCurve } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY, evaluateFadeCurve, formatRulerTimecode } from "./timelineState.js";
 import { getActiveElement } from "./workspaceManager.js";
 import { PlayerTextOverlayManager } from "./playerTextOverlay.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
@@ -227,7 +227,59 @@ export class SourcePlayer {
         if (btnOverwrite) btnOverwrite.addEventListener("click", () => this.overwriteAtPlayhead());
 
         const btnReverseMatch = this.el("btn-source-reverse-match");
-        if (btnReverseMatch) btnReverseMatch.addEventListener("click", () => this.reverseMatchFrame());
+        if (btnReverseMatch) {
+            btnReverseMatch.addEventListener("click", () => this.reverseMatchFrame(1));
+            btnReverseMatch.addEventListener("contextmenu", (e) => {
+                e.preventDefault();
+                if (window.player && typeof window.player.toggleReverseMatchPopover === "function") {
+                    window.player.toggleReverseMatchPopover();
+                }
+            });
+        }
+
+        const hudPrev = document.getElementById("hud-reverse-match-prev");
+        if (hudPrev) {
+            hudPrev.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (window.player && typeof window.player.reverseMatchFrameFromSource === "function") {
+                    window.player.reverseMatchFrameFromSource(-1);
+                }
+            });
+        }
+
+        const hudNext = document.getElementById("hud-reverse-match-next");
+        if (hudNext) {
+            hudNext.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (window.player && typeof window.player.reverseMatchFrameFromSource === "function") {
+                    window.player.reverseMatchFrameFromSource(1);
+                }
+            });
+        }
+
+        const hudList = document.getElementById("hud-reverse-match-list");
+        if (hudList) {
+            hudList.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (window.player && typeof window.player.toggleReverseMatchPopover === "function") {
+                    window.player.toggleReverseMatchPopover();
+                }
+            });
+        }
+
+        if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+            document.addEventListener("click", (e) => {
+                if (e && e.target && typeof e.target.closest === "function") {
+                    if (!e.target.closest("#popover-reverse-match-list") && 
+                        !e.target.closest("#hud-reverse-match-list") && 
+                        !e.target.closest(".btn-reverse-match-container")) {
+                        if (window.player && typeof window.player.closeReverseMatchPopover === "function") {
+                            window.player.closeReverseMatchPopover();
+                        }
+                    }
+                }
+            });
+        }
 
         const btnAppend = this.el("btn-append-timeline");
         if (btnAppend) btnAppend.addEventListener("click", () => this.appendToTimeline());
@@ -914,9 +966,9 @@ export class SourcePlayer {
     /**
      * Localiza o quadro da fonte na timeline ativa (Reverse Match Frame).
      */
-    reverseMatchFrame() {
+    reverseMatchFrame(direction = 1) {
         if (typeof window !== "undefined" && window.player && typeof window.player.reverseMatchFrameFromSource === "function") {
-            return window.player.reverseMatchFrameFromSource();
+            return window.player.reverseMatchFrameFromSource(direction);
         }
         return null;
     }
@@ -4293,6 +4345,11 @@ export class VideoPlayer {
         this._kJogUsed = false;
         this._kDownTime = 0;
 
+        // Sessão de navegação cíclica de ocorrências do Reverse Match Frame
+        this._reverseMatchSession = null;
+        this._isShiftKeyDown = false;
+        this._reverseMatchHudTimer = null;
+
         // Escuta atalhos globais de teclado redirecionando para o player focado
         document.addEventListener("keydown", (e) => this.handleGlobalKeyboard(e));
         document.addEventListener("keyup", (e) => this.handleGlobalKeyUp(e));
@@ -4300,12 +4357,14 @@ export class VideoPlayer {
             this.isKeyKDown = false;
             this._kActionTaken = null;
             this._kJogUsed = false;
+            this._isShiftKeyDown = false;
+            this.hideReverseMatchHUD();
         });
 
         window.player = this;
         if (typeof window !== "undefined") {
             window.matchFrameFromTimeline = () => this.matchFrameFromTimeline();
-            window.reverseMatchFrameFromSource = () => this.reverseMatchFrameFromSource();
+            window.reverseMatchFrameFromSource = (dir = 1) => this.reverseMatchFrameFromSource(dir);
         }
     }
 
@@ -4593,10 +4652,14 @@ export class VideoPlayer {
             return;
         }
 
+        if (e.key === "Shift") {
+            this._isShiftKeyDown = true;
+        }
+
         // Localizar Quadro na Timeline / Reverse Match Frame (Shift+F / Alt+F)
         if (KEYMAP_SERVICE.matches(e, "edit.reverse_match_frame")) {
             e.preventDefault();
-            this.reverseMatchFrameFromSource();
+            this.reverseMatchFrameFromSource(1);
             return;
         }
 
@@ -4685,6 +4748,11 @@ export class VideoPlayer {
     }
 
     handleGlobalKeyUp(e) {
+        if (e.key === "Shift" || !e.shiftKey) {
+            this._isShiftKeyDown = false;
+            this.hideReverseMatchHUD();
+        }
+
         if (e.code === "KeyK") {
             const wasPendingPlay = (this._kActionTaken === "pending_play") && !this._kJogUsed;
             const elapsed = performance.now() - (this._kDownTime || 0);
@@ -4893,8 +4961,9 @@ export class VideoPlayer {
     /**
      * Reverse Match Frame: A partir da mídia e quadro sob o cursor do Source Player,
      * localiza o corte na timeline ativa e salta a agulha para o instante correspondente.
+     * Suporta ciclo contínuo (Shift+F repetido ou botões do HUD) entre múltiplas ocorrências.
      */
-    reverseMatchFrameFromSource() {
+    reverseMatchFrameFromSource(direction = 1) {
         if (typeof TIMELINE_STATE === "undefined") return null;
 
         const isVideo = !!STATE.activeVideo;
@@ -4902,6 +4971,8 @@ export class VideoPlayer {
         const media = STATE.activeVideo || STATE.activePhoto;
 
         if (!media) {
+            this.updateReverseMatchBadge(0);
+            this.hideReverseMatchHUD();
             if (typeof window !== "undefined" && typeof window.showToast === "function") {
                 window.showToast("Nenhuma mídia carregada no Source Player.", "warning");
             }
@@ -4932,58 +5003,158 @@ export class VideoPlayer {
         });
 
         // Filtra clipes cujo intervalo [inFrame, outFrame) engloba o sourceFrame
-        const matchingCuts = candidateCuts.filter(c => {
+        let matchingCuts = candidateCuts.filter(c => {
             const inF = c.inFrame !== undefined ? c.inFrame : Math.round((c.in || 0) * fps);
             const outF = c.outFrame !== undefined ? c.outFrame : Math.round((c.out || 0) * fps);
             return sourceFrame >= inF && sourceFrame < outF;
         });
 
+        // Deduplica pares A/V vinculados (link_id) ou cortes de áudio duplicados da mesma mídia:
+        // Quando a mídia é vídeo, cada clipe montado na timeline deve ser contabilizado apenas UMA vez
+        // (priorizando o corte na pista de vídeo e descartando o corte correspondente de áudio).
+        if (matchingCuts.length > 1) {
+            const isAudioCut = (c) => {
+                if (c.isAudio === true || c.type === "audio") return true;
+                if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.trackKindOf === "function") {
+                    return TIMELINE_STATE.trackKindOf(c.track) === "audio";
+                }
+                const trackStr = String(c.trackName || c.track || "").toUpperCase();
+                return trackStr.startsWith("A");
+            };
+
+            const seenLinks = new Set();
+            const deduped = [];
+
+            // 1. Prioriza e adiciona os cortes de vídeo, registrando seus link_ids
+            matchingCuts.forEach(c => {
+                if (!isAudioCut(c)) {
+                    if (c.link_id) seenLinks.add(String(c.link_id));
+                    deduped.push(c);
+                }
+            });
+
+            // 2. Se houver corte de áudio sem par de vídeo, ou se a mídia só existir na timeline como áudio
+            matchingCuts.forEach(c => {
+                if (isAudioCut(c)) {
+                    if (c.link_id && seenLinks.has(String(c.link_id))) {
+                        // Descarta o áudio parceiro da tomada de vídeo já catalogada
+                        return;
+                    }
+                    if (deduped.length > 0) {
+                        // Já possuímos cortes de vídeo para esta mídia na timeline; não duplica com faixas de áudio
+                        return;
+                    }
+                    if (c.link_id) seenLinks.add(String(c.link_id));
+                    deduped.push(c);
+                }
+            });
+
+            if (deduped.length > 0) {
+                matchingCuts = deduped;
+            }
+        }
+
         // Se não encontrar corte com o quadro sob a agulha na timeline
         if (matchingCuts.length === 0) {
+            this._reverseMatchSession = null;
+            this.updateReverseMatchBadge(0);
+            this.hideReverseMatchHUD();
             if (typeof window !== "undefined" && typeof window.showToast === "function") {
                 window.showToast("Quadro não localizado na timeline ativa", "info");
             }
             return null;
         }
 
-        // Se houver múltiplos cortes, salta para a ocorrência mais próxima do playhead atual
-        const currentPlayhead = TIMELINE_STATE.playheadFrame || 0;
+        // Ordena as ocorrências cronologicamente na timeline (esquerda -> direita)
         matchingCuts.sort((a, b) => {
-            const aIn = a.inFrame !== undefined ? a.inFrame : Math.round((a.in || 0) * fps);
             const aStart = a.timelineStartFrame !== undefined ? a.timelineStartFrame : Math.round((a.timeline_start || 0) * fps);
-            const aTarget = aStart + (sourceFrame - aIn);
-
-            const bIn = b.inFrame !== undefined ? b.inFrame : Math.round((b.in || 0) * fps);
             const bStart = b.timelineStartFrame !== undefined ? b.timelineStartFrame : Math.round((b.timeline_start || 0) * fps);
-            const bTarget = bStart + (sourceFrame - bIn);
-
-            const distA = Math.abs(aTarget - currentPlayhead);
-            const distB = Math.abs(bTarget - currentPlayhead);
-            if (distA !== distB) return distA - distB;
-            return aStart - bStart;
+            if (aStart !== bStart) return aStart - bStart;
+            return (a.track || 0) - (b.track || 0);
         });
 
-        const bestCut = matchingCuts[0];
-        const bestIn = bestCut.inFrame !== undefined ? bestCut.inFrame : Math.round((bestCut.in || 0) * fps);
-        const bestStart = bestCut.timelineStartFrame !== undefined ? bestCut.timelineStartFrame : Math.round((bestCut.timeline_start || 0) * fps);
+        const totalOccurrences = matchingCuts.length;
+        let currentIndex = 0;
 
-        // playheadFrame = timelineStartFrame + (sourceFrame - inFrame)
-        const targetPlayheadFrame = bestStart + (sourceFrame - bestIn);
+        // Verifica se é continuação da mesma sessão ativa de Reverse Match Frame
+        const isSameSession = this._reverseMatchSession &&
+            this._reverseMatchSession.mediaId === mediaId &&
+            this._reverseMatchSession.sourceFrame === sourceFrame &&
+            this._reverseMatchSession.occurrences.length === totalOccurrences;
+
+        if (isSameSession) {
+            // Cicla para o próximo/anterior respeitando módulo N
+            currentIndex = (this._reverseMatchSession.currentIndex + direction + totalOccurrences) % totalOccurrences;
+        } else {
+            // Nova busca: escolhe a ocorrência cujo instante resultante seja mais próximo do playhead atual
+            const currentPlayhead = TIMELINE_STATE.playheadFrame || 0;
+            let closestIdx = 0;
+            let minDistance = Infinity;
+
+            for (let i = 0; i < totalOccurrences; i++) {
+                const c = matchingCuts[i];
+                const inF = c.inFrame !== undefined ? c.inFrame : Math.round((c.in || 0) * fps);
+                const startF = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+                const targetF = startF + (sourceFrame - inF);
+                const dist = Math.abs(targetF - currentPlayhead);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closestIdx = i;
+                }
+            }
+            currentIndex = closestIdx;
+        }
+
+        // Salva a sessão ativa
+        this._reverseMatchSession = {
+            mediaId,
+            sourceFrame,
+            occurrences: matchingCuts,
+            currentIndex,
+            lastTriggerTime: Date.now()
+        };
+
+        const targetCut = matchingCuts[currentIndex];
+        const targetIn = targetCut.inFrame !== undefined ? targetCut.inFrame : Math.round((targetCut.in || 0) * fps);
+        const targetStart = targetCut.timelineStartFrame !== undefined ? targetCut.timelineStartFrame : Math.round((targetCut.timeline_start || 0) * fps);
+        const targetPlayheadFrame = targetStart + (sourceFrame - targetIn);
 
         // Atualiza a timeline
         TIMELINE_STATE.setPlayheadFrame(targetPlayheadFrame);
         if (typeof TIMELINE_STATE.selectClip === "function") {
-            TIMELINE_STATE.selectClip(bestCut.id);
+            TIMELINE_STATE.selectClip(targetCut.id);
         }
 
-        // Redesenha timeline e garante visibilidade do quadro
+        // Redesenha timeline, garante visibilidade do quadro e aplica realce ciano luminoso (glow)
         if (typeof window !== "undefined") {
             if (window.timelineInteraction && typeof window.timelineInteraction.ensureFrameVisible === "function") {
                 window.timelineInteraction.ensureFrameVisible(targetPlayheadFrame);
             }
             if (window.TIMELINE_INTERACTION && window.TIMELINE_INTERACTION.renderer) {
-                window.TIMELINE_INTERACTION.renderer.requestRedraw();
+                if (typeof window.TIMELINE_INTERACTION.renderer.flashMatchOccurrences === "function") {
+                    const flashIds = [];
+                    matchingCuts.forEach(c => {
+                        flashIds.push(c.id);
+                        if (c.link_id && Array.isArray(STATE.activeTimelineCuts)) {
+                            const partner = STATE.activeTimelineCuts.find(p => p.link_id === c.link_id && p.id !== c.id);
+                            if (partner) flashIds.push(partner.id);
+                        }
+                    });
+                    window.TIMELINE_INTERACTION.renderer.flashMatchOccurrences(flashIds);
+                } else if (typeof window.TIMELINE_INTERACTION.renderer.requestRedraw === "function") {
+                    window.TIMELINE_INTERACTION.renderer.requestRedraw();
+                }
             }
+        }
+
+        // Atualiza contador de ocorrências no botão
+        this.updateReverseMatchBadge(totalOccurrences);
+
+        // Se houver múltiplas ocorrências, exibe o Mini-HUD flutuante no Source Player
+        if (totalOccurrences > 1) {
+            this.showReverseMatchHUD(targetCut, currentIndex, totalOccurrences, targetPlayheadFrame, fps);
+        } else {
+            this.hideReverseMatchHUD();
         }
 
         // Foco visual e operacional no Program Player / Timeline
@@ -4994,23 +5165,281 @@ export class VideoPlayer {
         }
 
         if (typeof window !== "undefined" && typeof window.showToast === "function") {
-            window.showToast("Reverse Match Frame: Quadro localizado na timeline", "info");
+            if (totalOccurrences > 1) {
+                window.showToast(`Reverse Match: Ocorrência ${currentIndex + 1} de ${totalOccurrences}`, "info");
+            } else {
+                window.showToast("Reverse Match Frame: Quadro localizado na timeline", "info");
+            }
         }
 
         // Emite evento global para sincronização multi-monitor / janelas popout (Diretriz 6)
         if (typeof STATE !== "undefined" && typeof STATE.emit === "function") {
             STATE.emit("reverseMatchFramePerformed", {
-                clip: bestCut,
+                clip: targetCut,
                 targetPlayheadFrame,
-                sourceFrame
+                sourceFrame,
+                currentIndex,
+                totalOccurrences
             });
         }
 
         return {
-            clip: bestCut,
+            clip: targetCut,
             targetPlayheadFrame,
-            sourceFrame
+            sourceFrame,
+            currentIndex,
+            totalOccurrences
         };
+    }
+
+    /**
+     * Salta diretamente para uma ocorrência específica do Reverse Match Frame a partir do índice.
+     */
+    _jumpToReverseMatchIndex(index) {
+        if (!this._reverseMatchSession) return null;
+        const { occurrences, sourceFrame } = this._reverseMatchSession;
+        if (!occurrences || index < 0 || index >= occurrences.length) return null;
+
+        const fps = (typeof TIMELINE_STATE !== "undefined" && TIMELINE_STATE.fps) || 24;
+        this._reverseMatchSession.currentIndex = index;
+
+        const targetCut = occurrences[index];
+        const targetIn = targetCut.inFrame !== undefined ? targetCut.inFrame : Math.round((targetCut.in || 0) * fps);
+        const targetStart = targetCut.timelineStartFrame !== undefined ? targetCut.timelineStartFrame : Math.round((targetCut.timeline_start || 0) * fps);
+        const targetPlayheadFrame = targetStart + (sourceFrame - targetIn);
+
+        if (typeof TIMELINE_STATE !== "undefined") {
+            TIMELINE_STATE.setPlayheadFrame(targetPlayheadFrame);
+            if (typeof TIMELINE_STATE.selectClip === "function") {
+                TIMELINE_STATE.selectClip(targetCut.id);
+            }
+        }
+
+        if (typeof window !== "undefined") {
+            if (window.timelineInteraction && typeof window.timelineInteraction.ensureFrameVisible === "function") {
+                window.timelineInteraction.ensureFrameVisible(targetPlayheadFrame);
+            }
+            if (window.TIMELINE_INTERACTION && window.TIMELINE_INTERACTION.renderer) {
+                if (typeof window.TIMELINE_INTERACTION.renderer.flashMatchOccurrences === "function") {
+                    const flashIds = [];
+                    occurrences.forEach(c => {
+                        flashIds.push(c.id);
+                        if (c.link_id && Array.isArray(STATE.activeTimelineCuts)) {
+                            const partner = STATE.activeTimelineCuts.find(p => p.link_id === c.link_id && p.id !== c.id);
+                            if (partner) flashIds.push(partner.id);
+                        }
+                    });
+                    window.TIMELINE_INTERACTION.renderer.flashMatchOccurrences(flashIds);
+                } else if (typeof window.TIMELINE_INTERACTION.renderer.requestRedraw === "function") {
+                    window.TIMELINE_INTERACTION.renderer.requestRedraw();
+                }
+            }
+        }
+
+        this.showReverseMatchHUD(targetCut, index, occurrences.length, targetPlayheadFrame, fps);
+
+        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+            window.showToast(`Reverse Match: Ocorrência ${index + 1} de ${occurrences.length}`, "info");
+        }
+
+        if (typeof STATE !== "undefined" && typeof STATE.emit === "function") {
+            STATE.emit("reverseMatchFramePerformed", {
+                clip: targetCut,
+                targetPlayheadFrame,
+                sourceFrame,
+                currentIndex: index,
+                totalOccurrences: occurrences.length
+            });
+        }
+
+        return {
+            clip: targetCut,
+            targetPlayheadFrame,
+            sourceFrame,
+            currentIndex: index,
+            totalOccurrences: occurrences.length
+        };
+    }
+
+    /**
+     * Exibe o Mini-HUD flutuante no Source Player com informações da ocorrência ativa.
+     */
+    showReverseMatchHUD(cut, currentIndex, total, targetPlayheadFrame, fps) {
+        if (typeof document === "undefined") return;
+        const hud = document.getElementById("source-reverse-match-hud");
+        if (!hud) return;
+
+        const infoEl = document.getElementById("hud-reverse-match-info");
+        if (infoEl) {
+            const trackLabel = cut.trackName || (cut.isAudio ? `A${(cut.track || 0) + 1}` : `V${(cut.track || 0) + 1}`);
+            const tc = typeof formatRulerTimecode === "function" 
+                ? formatRulerTimecode(targetPlayheadFrame, fps) 
+                : `${targetPlayheadFrame}f`;
+            infoEl.textContent = `${currentIndex + 1}/${total} · ${trackLabel} · ${tc}`;
+        }
+
+        hud.classList.remove("is-hidden");
+        hud.style.display = "flex";
+
+        // Se a tecla Shift não estiver mantida pressionada, auto-oculta após 3s
+        if (this._reverseMatchHudTimer) {
+            clearTimeout(this._reverseMatchHudTimer);
+            this._reverseMatchHudTimer = null;
+        }
+
+        if (!this._isShiftKeyDown) {
+            this._reverseMatchHudTimer = setTimeout(() => {
+                this.hideReverseMatchHUD();
+            }, 3000);
+        }
+    }
+
+    /**
+     * Oculta o Mini-HUD flutuante no Source Player.
+     */
+    hideReverseMatchHUD() {
+        if (typeof document === "undefined") return;
+        const hud = document.getElementById("source-reverse-match-hud");
+        if (hud) {
+            hud.classList.add("is-hidden");
+            setTimeout(() => {
+                if (hud.classList.contains("is-hidden")) {
+                    hud.style.display = "none";
+                }
+            }, 200);
+        }
+        if (this._reverseMatchHudTimer) {
+            clearTimeout(this._reverseMatchHudTimer);
+            this._reverseMatchHudTimer = null;
+        }
+    }
+
+    /**
+     * Atualiza o badge contador no botão #btn-source-reverse-match.
+     */
+    updateReverseMatchBadge(totalOccurrences) {
+        if (typeof document === "undefined") return;
+        const badge = document.getElementById("badge-source-reverse-match");
+        const btn = document.getElementById("btn-source-reverse-match");
+
+        if (badge) {
+            if (totalOccurrences > 1) {
+                badge.textContent = String(totalOccurrences);
+                badge.style.display = "inline-flex";
+            } else {
+                badge.style.display = "none";
+            }
+        }
+
+        if (btn) {
+            if (totalOccurrences > 1) {
+                btn.setAttribute("data-tooltip", `Localizar Quadro na Timeline / Reverse Match Frame [Shift+F] (${totalOccurrences} ocorrências)`);
+            } else {
+                btn.setAttribute("data-tooltip", "Localizar Quadro na Timeline / Reverse Match Frame [Shift+F]");
+            }
+        }
+    }
+
+    /**
+     * Abre ou fecha o Popover com a lista completa de ocorrências.
+     */
+    toggleReverseMatchPopover() {
+        if (typeof document === "undefined") return;
+        const popover = document.getElementById("popover-reverse-match-list");
+        if (!popover) return;
+
+        if (popover.style.display === "flex" || popover.style.display === "block") {
+            this.closeReverseMatchPopover();
+            return;
+        }
+
+        if (!this._reverseMatchSession || !this._reverseMatchSession.occurrences || this._reverseMatchSession.occurrences.length <= 1) {
+            const res = this.reverseMatchFrameFromSource(0);
+            if (!res || res.totalOccurrences <= 1) return;
+        }
+
+        const { occurrences, currentIndex, sourceFrame } = this._reverseMatchSession;
+        const fps = (typeof TIMELINE_STATE !== "undefined" && TIMELINE_STATE.fps) || 24;
+
+        popover.innerHTML = "";
+
+        const header = document.createElement("div");
+        header.className = "popover-rm-header";
+        header.innerHTML = `<span>Ocorrências na Timeline (${occurrences.length})</span>`;
+        popover.appendChild(header);
+
+        occurrences.forEach((c, idx) => {
+            const inF = c.inFrame !== undefined ? c.inFrame : Math.round((c.in || 0) * fps);
+            const startF = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+            const targetF = startF + (sourceFrame - inF);
+            const tc = typeof formatRulerTimecode === "function" ? formatRulerTimecode(targetF, fps) : `${targetF}f`;
+            const track = c.trackName || (c.isAudio ? `A${(c.track || 0) + 1}` : `V${(c.track || 0) + 1}`);
+            const clipName = c.name || c.clipName || "Corte";
+
+            const item = document.createElement("div");
+            item.className = `popover-rm-item ${idx === currentIndex ? "is-active" : ""}`;
+            item.dataset.index = String(idx);
+            item.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="color: var(--color-cyan, #06b6d4); font-weight: bold; font-family: monospace;">${idx + 1}.</span>
+                    <span style="background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: 10px;">${track}</span>
+                    <span style="font-family: monospace; font-size: 11px;">${tc}</span>
+                    <span style="color: var(--text-secondary, #94a3b8); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${clipName}</span>
+                </div>
+                <span class="rm-item-check-slot">${idx === currentIndex ? '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: 11px;"></i>' : ''}</span>
+            `;
+            item.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this._jumpToReverseMatchIndex(idx);
+                // Mantém o painel aberto quando em hover e atualiza visualmente o item ativo
+                const allItems = popover.querySelectorAll(".popover-rm-item");
+                allItems.forEach((el, elIdx) => {
+                    const checkSlot = el.querySelector(".rm-item-check-slot");
+                    if (elIdx === idx) {
+                        el.classList.add("is-active");
+                        if (checkSlot) checkSlot.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: 11px;"></i>';
+                    } else {
+                        el.classList.remove("is-active");
+                        if (checkSlot) checkSlot.innerHTML = '';
+                    }
+                });
+            });
+            popover.appendChild(item);
+        });
+
+        // Mantém aberto enquanto em hover e fecha após pequeno delay ao retirar o mouse
+        let leaveTimer = null;
+        popover.onmouseleave = () => {
+            leaveTimer = setTimeout(() => {
+                this.closeReverseMatchPopover();
+            }, 250);
+        };
+        popover.onmouseenter = () => {
+            if (leaveTimer) {
+                clearTimeout(leaveTimer);
+                leaveTimer = null;
+            }
+        };
+
+        const controls = (typeof popover.closest === "function") ? popover.closest(".player-controls") : null;
+        if (controls) controls.classList.add("has-popover-open");
+
+        popover.style.display = "flex";
+    }
+
+    /**
+     * Fecha o popover de ocorrências do Reverse Match Frame.
+     */
+    closeReverseMatchPopover() {
+        if (typeof document === "undefined") return;
+        const popover = document.getElementById("popover-reverse-match-list");
+        if (popover) {
+            popover.style.display = "none";
+            popover.onmouseleave = null;
+            popover.onmouseenter = null;
+            const controls = (typeof popover.closest === "function") ? popover.closest(".player-controls") : null;
+            if (controls) controls.classList.remove("has-popover-open");
+        }
     }
 }
 
