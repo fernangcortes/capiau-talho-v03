@@ -1807,6 +1807,25 @@ window.addEventListener("DOMContentLoaded", () => {
             globalTooltip.style.width = "";
             globalTooltip.style.maxWidth = "";
         });
+
+        // Desaparece com a tooltip global imediatamente ao clicar
+        doc.body.addEventListener("pointerdown", () => {
+            if (globalTooltip && globalTooltip.classList.contains("visible")) {
+                globalTooltip.classList.remove("visible");
+                globalTooltip.classList.remove("media-desc-tooltip");
+                globalTooltip.style.width = "";
+                globalTooltip.style.maxWidth = "";
+            }
+        }, true);
+
+        window.hideGlobalTooltip = () => {
+            if (globalTooltip) {
+                globalTooltip.classList.remove("visible");
+                globalTooltip.classList.remove("media-desc-tooltip");
+                globalTooltip.style.width = "";
+                globalTooltip.style.maxWidth = "";
+            }
+        };
     }
     window.initGlobalTooltips = initGlobalTooltips;
 

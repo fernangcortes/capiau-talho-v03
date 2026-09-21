@@ -6225,8 +6225,8 @@ export class LibraryManager {
                 const btnSort = doc.getElementById("btn-library-sort");
                 if (btnSort) {
                     btnSort.innerHTML = `<i class="${stateInfo.btnIcon}"></i>`;
-                    btnSort.setAttribute("title", stateInfo.tooltip);
                     btnSort.setAttribute("data-tooltip", stateInfo.tooltip);
+                    btnSort.removeAttribute("title");
                 }
 
                 // 2. Atualiza o select oculto se existir
@@ -6280,6 +6280,46 @@ export class LibraryManager {
         const sortDropdown = document.getElementById("library-sort-dropdown");
 
         if (btnSortMain && sortDropdown) {
+            let hideTimeout = null;
+
+            const cancelHide = () => {
+                if (hideTimeout) {
+                    clearTimeout(hideTimeout);
+                    hideTimeout = null;
+                }
+            };
+
+            const scheduleHide = (delay = 280) => {
+                cancelHide();
+                hideTimeout = setTimeout(() => {
+                    const targetDoc = getTargetDoc();
+                    if (sortDropdown.contains(targetDoc.activeElement)) {
+                        return;
+                    }
+                    hideDropdown();
+                }, delay);
+            };
+
+            const hideAllTooltips = () => {
+                getAllLibraryDocuments().forEach(d => {
+                    const tip = d.getElementById("global-tooltip");
+                    if (tip) {
+                        tip.classList.remove("visible");
+                        tip.classList.remove("media-desc-tooltip");
+                        tip.style.width = "";
+                        tip.style.maxWidth = "";
+                    }
+                    const scrollTip = d.getElementById("library-scroll-index-tooltip");
+                    if (scrollTip) {
+                        scrollTip.style.display = "none";
+                        scrollTip.classList.remove("visible");
+                    }
+                });
+                if (typeof window.hideGlobalTooltip === "function") {
+                    window.hideGlobalTooltip();
+                }
+            };
+
             const getTargetButton = () => {
                 const targetDoc = (this.activeDoc && !this.activeDoc.defaultView?.closed)
                     ? this.activeDoc
@@ -6337,6 +6377,8 @@ export class LibraryManager {
             };
 
             const showDropdown = () => {
+                cancelHide();
+                hideAllTooltips();
                 ensureDropdownInActiveWindow();
                 positionSortDropdown();
                 sortDropdown.style.display = "flex";
@@ -6346,6 +6388,7 @@ export class LibraryManager {
             };
 
             const hideDropdown = () => {
+                cancelHide();
                 sortDropdown.style.display = "none";
                 sortDropdown.classList.remove("show");
                 const btn = getTargetButton();
@@ -6368,12 +6411,24 @@ export class LibraryManager {
 
                 btn.addEventListener("click", (e) => {
                     e.stopPropagation();
+                    hideAllTooltips();
                     toggleSortDropdown();
+                });
+
+                btn.addEventListener("mouseenter", () => {
+                    cancelHide();
+                });
+
+                btn.addEventListener("mouseleave", () => {
+                    if (sortDropdown.classList.contains("show")) {
+                        scheduleHide(280);
+                    }
                 });
 
                 // Clique com botão direito ou Alt+Clique inverte a direção atual diretamente
                 btn.addEventListener("contextmenu", (e) => {
                     e.preventDefault();
+                    hideAllTooltips();
                     const currentVal = localStorage.getItem("library_sort_by") || "keyword_asc";
                     const key = getSortKeyFromVal(currentVal);
                     const cfg = SORT_CONFIG[key];
@@ -6384,10 +6439,21 @@ export class LibraryManager {
                 });
             };
 
+            // Eventos de hover no próprio box de ordenação
+            sortDropdown.addEventListener("mouseenter", () => {
+                cancelHide();
+            });
+
+            sortDropdown.addEventListener("mouseleave", () => {
+                scheduleHide(280);
+            });
+
             // Clique nas opções do dropdown (vinculado uma única vez ao elemento do dropdown)
             sortDropdown.querySelectorAll(".sort-option").forEach(opt => {
                 opt.addEventListener("click", (e) => {
                     e.stopPropagation();
+                    cancelHide(); // Mantém o hover ativo e impede fechamento acidental
+                    hideAllTooltips();
                     const sortKey = opt.getAttribute("data-sort-key");
                     const cfg = SORT_CONFIG[sortKey];
                     if (!cfg) return;
@@ -6405,7 +6471,7 @@ export class LibraryManager {
                     }
 
                     applySort(newVal);
-                    hideDropdown();
+                    // O box se mantém aberto quando clicamos em uma opção dele mas mantemos o hover!
                 });
             });
 

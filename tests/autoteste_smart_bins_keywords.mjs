@@ -13,6 +13,9 @@ const indexHtmlContent = readFileSync(indexHtmlPath, 'utf8');
 const stylesCssPath = resolve(process.cwd(), 'src/ui/styles.css');
 const stylesCssContent = readFileSync(stylesCssPath, 'utf8');
 
+const mainJsPath = resolve(process.cwd(), 'src/ui/js/main.js');
+const mainJsContent = readFileSync(mainJsPath, 'utf8');
+
 // ── TESTE 1: TAXONOMIA DOS SMART BINS ─────────────────────────────────
 console.log("1. Verificando estrutura e taxonomia de SMART_BINS_TAXONOMY...");
 assert(libraryJsContent.includes("export const SMART_BINS_TAXONOMY = ["), "Taxonomia deve ser exportada no library.js");
@@ -296,6 +299,18 @@ assert(libraryJsContent.includes("this.onRestoreLibrarySort"), "library.js deve 
 assert(libraryJsContent.includes("targetDoc.adoptNode(sortDropdown)"), "library.js deve adotar o nó com adoptNode na janela ativa");
 console.log("✔ Teste 7 passou: Arquitetura multi-janela e popout do dropdown validada.");
 
+// ── TESTE 8: PERSISTÊNCIA EM HOVER E SUPRESSÃO DE TOOLTIP NO CLIQUE ───
+console.log("8. Verificando persistência no hover e supressão de tooltip no clique...");
+assert(stylesCssContent.includes("body:has(#library-sort-dropdown.show) #global-tooltip"), "CSS deve suprimir global-tooltip quando dropdown de ordenação estiver aberto");
+assert(stylesCssContent.includes("body:has(#btn-library-sort.active) #global-tooltip"), "CSS deve suprimir global-tooltip quando botão de ordenação estiver ativo");
+assert(mainJsContent.includes('doc.body.addEventListener("pointerdown"'), "main.js deve suprimir tooltip global imediatamente ao clicar em qualquer botão");
+assert(libraryJsContent.includes("scheduleHide"), "library.js deve gerenciar fechamento por hover via scheduleHide");
+assert(libraryJsContent.includes("cancelHide"), "library.js deve cancelar fechamento no mouseenter da caixa");
+assert(libraryJsContent.includes('sortDropdown.addEventListener("mouseenter"'), "sortDropdown deve manter-se aberto ao receber hover");
+assert(libraryJsContent.includes('sortDropdown.addEventListener("mouseleave"'), "sortDropdown deve fechar ao perder hover");
+assert(libraryJsContent.includes("btnSort.removeAttribute(\"title\")"), "library.js deve remover o title nativo para evitar tooltips OS persistentes");
+console.log("✔ Teste 8 passou: Hover persistente e supressão imediata de tooltips no clique validados.");
+
 console.log("\n=======================================================");
-console.log("✨ TODOS OS 7 TESTES DE VALIDAÇÃO PASSARAM COM SUCESSO!");
+console.log("✨ TODOS OS 8 TESTES DE VALIDAÇÃO PASSARAM COM SUCESSO!");
 console.log("=======================================================");

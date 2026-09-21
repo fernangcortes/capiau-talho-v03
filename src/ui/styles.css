@@ -8051,11 +8051,15 @@ select option, .nle-select option {
     font-weight: 500;
 }
 
-/* Previne que tooltips ou índice de rolagem apareçam quando o menu de contexto ou opções de visualização estão abertos */
+/* Previne que tooltips ou índice de rolagem apareçam quando o menu de contexto, opções ou ordenação estão abertos */
 body:has(.custom-context-menu) #library-scroll-index-tooltip,
 body:has(.custom-context-menu) #global-tooltip,
 body:has(#timeline-view-options-dropdown.visible) #global-tooltip,
-body:has(#timeline-view-options-dropdown.visible) #library-scroll-index-tooltip {
+body:has(#timeline-view-options-dropdown.visible) #library-scroll-index-tooltip,
+body:has(#library-sort-dropdown.show) #global-tooltip,
+body:has(#library-sort-dropdown.show) #library-scroll-index-tooltip,
+body:has(#btn-library-sort.active) #global-tooltip,
+body:has(#btn-library-sort.active) #library-scroll-index-tooltip {
     display: none !important;
     opacity: 0 !important;
     pointer-events: none !important;
