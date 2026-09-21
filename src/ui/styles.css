@@ -12894,4 +12894,85 @@ input[type="number"] {
     font-weight: 700;
 }
 
+/* ── TASK 10: SUBCLIPES VIRTUAIS NA BIBLIOTECA (MAKE SUBCLIP) ────────── */
+.btn-source-create-subclip {
+    color: #c084fc !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-source-create-subclip:hover {
+    color: #e9d5ff !important;
+    background: rgba(192, 132, 252, 0.18) !important;
+    border-color: rgba(192, 132, 252, 0.4) !important;
+    box-shadow: 0 0 10px rgba(192, 132, 252, 0.4) !important;
+    transform: scale(1.05);
+}
+
+.badge-subclip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(139, 92, 246, 0.22);
+    color: #c084fc;
+    border: 1px solid rgba(139, 92, 246, 0.45);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.subclip-item {
+    border-left: 2px solid #c084fc !important;
+}
+
+.subclip-gallery-item .gallery-video-pill {
+    background: rgba(139, 92, 246, 0.6) !important;
+    border-color: rgba(192, 132, 252, 0.6) !important;
+}
+
+.subclip-title-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(192, 132, 252, 0.3);
+    color: #e2e8f0;
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.subclip-title-chip:hover {
+    background: rgba(192, 132, 252, 0.2);
+    border-color: #c084fc;
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(192, 132, 252, 0.25);
+}
+
+.subclip-title-chip.selected {
+    background: rgba(192, 132, 252, 0.35);
+    border-color: #c084fc;
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 0 8px rgba(192, 132, 252, 0.4);
+}
+
+.subclip-title-chip .chip-source-tag {
+    font-size: 9px;
+    opacity: 0.7;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+
 

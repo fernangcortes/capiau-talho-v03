@@ -257,6 +257,9 @@ export class SourcePlayer {
         const btnOverwrite = this.el("btn-source-overwrite");
         if (btnOverwrite) btnOverwrite.addEventListener("click", () => this.overwriteAtPlayhead());
 
+        const btnCreateSubclip = this.el("btn-source-create-subclip");
+        if (btnCreateSubclip) btnCreateSubclip.addEventListener("click", () => this.openCreateSubclipModal());
+
         const btnReverseMatch = this.el("btn-source-reverse-match");
         if (btnReverseMatch) {
             btnReverseMatch.addEventListener("click", () => this.reverseMatchFrame(1));
@@ -423,10 +426,18 @@ export class SourcePlayer {
         this.applyRotation(video.rotation || 0);
 
         let videoSrc = "";
+        let streamVidId = video.parent_video_id || video.id;
+        if (String(streamVidId).startsWith("subclip_")) {
+            const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
+            const foundSub = subclips.find(s => String(s.id) === String(streamVidId));
+            if (foundSub && foundSub.parent_video_id) {
+                streamVidId = foundSub.parent_video_id;
+            }
+        }
         if (video.proxy_path && (video.proxy_path.startsWith("/") || video.proxy_path.startsWith("http"))) {
             videoSrc = video.proxy_path;
         } else {
-            videoSrc = `/api/video/${video.id}/stream`;
+            videoSrc = `/api/video/${streamVidId}/stream`;
         }
         
         vid.style.zIndex = "1";
@@ -438,14 +449,26 @@ export class SourcePlayer {
         
         const title = this.el("source-player-title");
         if (title) {
-            title.textContent = video.title || video.filename;
+            title.textContent = (video.title || video.filename) + (video.is_subclip ? " [Subclipe]" : "");
             title.title = video.filename;
         }
 
-        // Restaura marcadores salvos da mídia (ou null se não marcados)
-        const savedMarkers = (STATE && typeof STATE.getMediaMarkers === "function") ? STATE.getMediaMarkers(video.id) : null;
-        STATE.markerIn = (savedMarkers && savedMarkers.in !== undefined) ? savedMarkers.in : (video.inTime ?? null);
-        STATE.markerOut = (savedMarkers && savedMarkers.out !== undefined) ? savedMarkers.out : (video.outTime ?? null);
+        // Restaura marcadores salvos da mídia (ou in/out fixos do subclipe)
+        if (video.is_subclip) {
+            STATE.markerIn = (video.in !== undefined && video.in !== null) ? Number(video.in) : 0.0;
+            STATE.markerOut = (video.out !== undefined && video.out !== null) ? Number(video.out) : (video.duration || 5.0);
+            if (vid.readyState >= 1) {
+                this.seek(STATE.markerIn);
+            } else {
+                vid.addEventListener("loadedmetadata", () => {
+                    this.seek(STATE.markerIn);
+                }, { once: true });
+            }
+        } else {
+            const savedMarkers = (STATE && typeof STATE.getMediaMarkers === "function") ? STATE.getMediaMarkers(video.id) : null;
+            STATE.markerIn = (savedMarkers && savedMarkers.in !== undefined) ? savedMarkers.in : (video.inTime ?? null);
+            STATE.markerOut = (savedMarkers && savedMarkers.out !== undefined) ? savedMarkers.out : (video.outTime ?? null);
+        }
         this.updateMarkersUI();
         this.setSpeed(1.0);
         this.jklState = 'K';
@@ -455,7 +478,7 @@ export class SourcePlayer {
         this.updateCrucialMarkersUI();
         this.updateCrucialButtonState();
 
-        CapIAuAPI.fetchVideoFaces(video.id)
+        CapIAuAPI.fetchVideoFaces(streamVidId)
             .then(faces => {
                 this.videoFaces = faces || [];
                 const innerVid = this.el("source-video");
@@ -983,7 +1006,15 @@ export class SourcePlayer {
 
         // Usa o TIMELINE_STATE para rotear o clipe à pista correta
         // (entrevistas → pista magnética de falas; b-rolls → pista livre)
-        TIMELINE_STATE.addCut(STATE.activeVideo.id, inTime, outTime, null);
+        const isSubclip = !!STATE.activeVideo.is_subclip;
+        const mediaId = isSubclip ? (STATE.activeVideo.parent_video_id || STATE.activeVideo.id) : STATE.activeVideo.id;
+        TIMELINE_STATE.addCut(mediaId, inTime, outTime, null, null, isSubclip ? {
+            is_subclip: true,
+            subclip_id: STATE.activeVideo.id,
+            parent_video_id: STATE.activeVideo.parent_video_id,
+            name: STATE.activeVideo.title || STATE.activeVideo.filename,
+            hard_boundaries: !!STATE.activeVideo.hard_boundaries
+        } : {});
 
         STATE.markerIn = null;
         STATE.markerOut = null;
@@ -1004,12 +1035,19 @@ export class SourcePlayer {
                 return null;
             }
             const streamMode = STATE.sourceStreamMode || "av";
+            const isSubclip = !!STATE.activeVideo.is_subclip;
+            const mediaId = isSubclip ? (STATE.activeVideo.parent_video_id || STATE.activeVideo.id) : STATE.activeVideo.id;
             return {
                 type: "video",
-                id: STATE.activeVideo.id,
+                id: mediaId,
                 inSec,
                 outSec,
                 video: STATE.activeVideo,
+                name: isSubclip ? (STATE.activeVideo.title || STATE.activeVideo.filename) : null,
+                is_subclip: isSubclip,
+                subclip_id: isSubclip ? STATE.activeVideo.id : null,
+                parent_video_id: isSubclip ? STATE.activeVideo.parent_video_id : null,
+                hard_boundaries: isSubclip ? !!STATE.activeVideo.hard_boundaries : false,
                 streamMode,
                 includeAudio: streamMode === "av" || streamMode === "a",
                 includeVideo: streamMode === "av" || streamMode === "v"
@@ -1038,6 +1076,162 @@ export class SourcePlayer {
             window.showToast("Nenhuma mídia carregada no Source Player.", "warning");
         }
         return null;
+    }
+
+    /**
+     * Abre o modal de criação de subclipe virtual a partir das marcas IN / OUT.
+     * Oferece chips com todas as sugestões geradas pela IA e atalho Enter / Confirmar.
+     */
+    openCreateSubclipModal() {
+        const video = STATE.activeVideo;
+        if (!video) {
+            if (typeof window.showToast === "function") {
+                window.showToast("Nenhum vídeo ativo no Monitor Source para criar subclipe.", "warning");
+            } else {
+                alert("Nenhum vídeo ativo no Monitor Source para criar subclipe.");
+            }
+            return;
+        }
+
+        const modal = document.getElementById("create-subclip-modal");
+        if (!modal) return;
+
+        const vidEl = this.el("source-video");
+        const totalDur = (vidEl && vidEl.duration && !isNaN(vidEl.duration)) ? vidEl.duration : (video.duration || 5.0);
+
+        let inSec = (STATE.markerIn !== null && STATE.markerIn !== undefined) ? Number(STATE.markerIn) : 0.0;
+        let outSec = (STATE.markerOut !== null && STATE.markerOut !== undefined) ? Number(STATE.markerOut) : totalDur;
+
+        if (outSec <= inSec) {
+            outSec = totalDur;
+            if (outSec <= inSec) outSec = inSec + 1.0;
+        }
+
+        const durSec = Math.max(0.04, outSec - inSec);
+
+        // Preenche displays de timecode
+        const inDisplay = document.getElementById("subclip-in-display");
+        const outDisplay = document.getElementById("subclip-out-display");
+        const durDisplay = document.getElementById("subclip-dur-display");
+        if (inDisplay) inDisplay.textContent = formatTimecode(inSec);
+        if (outDisplay) outDisplay.textContent = formatTimecode(outSec);
+        if (durDisplay) durDisplay.textContent = formatTimecode(durSec);
+
+        // Busca sugestões de títulos geradas pela IA (todas as variações do CapIAu)
+        const candidates = (window.getCandidateTitlesForSubclip && typeof window.getCandidateTitlesForSubclip === "function")
+            ? window.getCandidateTitlesForSubclip(video, inSec, outSec)
+            : [{ label: "Padrão", title: `${video.title || video.filename || "Clipe"}_sub01`, type: "seq" }];
+
+        const nameInput = document.getElementById("subclip-name-input");
+        const suggestionsList = document.getElementById("subclip-title-suggestions-list");
+
+        if (nameInput) {
+            nameInput.value = candidates[0]?.title || `${video.title || video.filename || "Clipe"}_sub01`;
+        }
+
+        if (suggestionsList) {
+            suggestionsList.innerHTML = "";
+            candidates.forEach((cand, idx) => {
+                const chip = document.createElement("button");
+                chip.type = "button";
+                chip.className = "subclip-title-chip" + (idx === 0 ? " active" : "");
+                chip.innerHTML = `<span class="chip-type-badge">${cand.label}</span> <span class="chip-text">${cand.title}</span>`;
+                chip.addEventListener("click", () => {
+                    if (nameInput) {
+                        nameInput.value = cand.title;
+                        suggestionsList.querySelectorAll(".subclip-title-chip").forEach(c => c.classList.remove("active"));
+                        chip.classList.add("active");
+                        nameInput.focus();
+                        nameInput.select();
+                    }
+                });
+                suggestionsList.appendChild(chip);
+            });
+        }
+
+        // Exibe o modal
+        modal.style.display = "flex";
+        modal.classList.add("open");
+
+        if (nameInput) {
+            setTimeout(() => {
+                nameInput.focus();
+                nameInput.select();
+            }, 50);
+        }
+
+        const closeModal = () => {
+            modal.style.display = "none";
+            modal.classList.remove("open");
+            document.removeEventListener("keydown", handleModalKeydown);
+        };
+
+        const confirmCreation = () => {
+            const chosenTitle = nameInput ? nameInput.value.trim() : "";
+            const finalTitle = chosenTitle || candidates[0]?.title || `${video.title || video.filename}_sub01`;
+            const chkHard = document.getElementById("chk-subclip-hard-boundaries");
+            const hardBoundaries = chkHard ? chkHard.checked : false;
+
+            if (window.createSubclip && typeof window.createSubclip === "function") {
+                const newSub = window.createSubclip({
+                    video,
+                    inSec,
+                    outSec,
+                    title: finalTitle,
+                    hardBoundaries
+                });
+                closeModal();
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Subclipe "${finalTitle}" criado na Biblioteca!`, "success");
+                }
+            } else {
+                closeModal();
+            }
+        };
+
+        const handleModalKeydown = (e) => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                closeModal();
+            } else if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                confirmCreation();
+            }
+        };
+
+        document.addEventListener("keydown", handleModalKeydown);
+
+        const btnConfirm = document.getElementById("btn-confirm-subclip");
+        if (btnConfirm) {
+            btnConfirm.onclick = (e) => {
+                e.preventDefault();
+                confirmCreation();
+            };
+        }
+
+        const btnCancel = document.getElementById("btn-cancel-subclip");
+        if (btnCancel) {
+            btnCancel.onclick = (e) => {
+                e.preventDefault();
+                closeModal();
+            };
+        }
+
+        const btnClose = document.getElementById("btn-close-subclip-modal");
+        if (btnClose) {
+            btnClose.onclick = (e) => {
+                e.preventDefault();
+                closeModal();
+            };
+        }
+
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        };
     }
 
     /**
@@ -2519,6 +2713,22 @@ export class ProgramPlayer {
         }
 
         const cuts = STATE.activeTimelineCuts;
+        if (cuts && cuts.length > 0) {
+            cuts.forEach(c => {
+                if (c && c.video_id && String(c.video_id).startsWith("subclip_")) {
+                    const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
+                    const foundSub = subclips.find(s => String(s.id) === String(c.video_id));
+                    if (foundSub && foundSub.parent_video_id) {
+                        c.is_subclip = true;
+                        c.subclip_id = c.video_id;
+                        c.parent_video_id = foundSub.parent_video_id;
+                        c.video_id = foundSub.parent_video_id;
+                        if (!c.name) c.name = foundSub.name || foundSub.title;
+                        if (c.hard_boundaries === undefined) c.hard_boundaries = !!foundSub.hard_boundaries;
+                    }
+                }
+            });
+        }
 
         // ────────── COMPOSIÇÃO MULTIPISTA ──────────
         // Camada base = clipe da pista de vídeo MAIS BAIXA no playhead (geralmente falas).
@@ -2732,12 +2942,22 @@ export class ProgramPlayer {
     /** Caminho do arquivo de vídeo de um clipe (null para fotos ou mídia ausente). */
     _videoSrcForCut(cut) {
         if (!cut || cut.type === "photo") return null;
-        const videoData = STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
+        let videoId = cut.parent_video_id || cut.video_id;
+        let videoData = STATE.allVideos.find(v => String(v.id) === String(videoId));
+        if (!videoData && String(videoId).startsWith("subclip_")) {
+            const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
+            const foundSub = subclips.find(s => String(s.id) === String(videoId));
+            if (foundSub && foundSub.parent_video_id) {
+                videoId = foundSub.parent_video_id;
+                videoData = STATE.allVideos.find(v => String(v.id) === String(videoId));
+            }
+        }
         if (!videoData) return null;
+        const realId = videoData.parent_video_id || videoData.id;
         if (videoData.proxy_path && (videoData.proxy_path.startsWith("/") || videoData.proxy_path.startsWith("http"))) {
             return videoData.proxy_path;
         }
-        return `/api/video/${videoData.id}/stream`;
+        return `/api/video/${realId}/stream`;
     }
 
     /** Instante do arquivo (em segundos) correspondente a um frame da timeline. */
@@ -2955,7 +3175,15 @@ export class ProgramPlayer {
             const nextCut = upcoming[0];
             if (!nextCut) return;
 
-            const videoData = STATE.allVideos.find(v => String(v.id) === String(nextCut.video_id));
+            const nextVidId = nextCut.parent_video_id || nextCut.video_id;
+            let videoData = STATE.allVideos.find(v => String(v.id) === String(nextVidId));
+            if (!videoData && String(nextVidId).startsWith("subclip_")) {
+                const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
+                const foundSub = subclips.find(s => String(s.id) === String(nextVidId));
+                if (foundSub && foundSub.parent_video_id) {
+                    videoData = STATE.allVideos.find(v => String(v.id) === String(foundSub.parent_video_id));
+                }
+            }
             if (!videoData) return;
 
             const alvo = this._fonteAudioEfetiva(nextCut, videoData);
@@ -3053,7 +3281,8 @@ export class ProgramPlayer {
 
         const media = cut.type === "photo"
             ? STATE.allPhotos?.find(p => String(p.id) === String(cut.photo_id))
-            : STATE.allVideos?.find(v => String(v.id) === String(cut.video_id));
+            : (STATE.allVideos?.find(v => String(v.id) === String(cut.video_id)) ||
+               STATE.allVideos?.find(v => String(v.id) === String(cut.parent_video_id)));
         const mediaRot = (media && media.rotation) ? media.rotation : 0;
         const cutRot = cut.rotation !== undefined ? cut.rotation : mediaRot;
         let rotation = tf.rotation !== undefined ? tf.rotation : cutRot;
@@ -3260,7 +3489,15 @@ export class ProgramPlayer {
                 return;
             }
 
-            const videoData = STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
+            const cutVidId = cut.parent_video_id || cut.video_id;
+            let videoData = STATE.allVideos.find(v => String(v.id) === String(cutVidId));
+            if (!videoData && String(cutVidId).startsWith("subclip_")) {
+                const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
+                const foundSub = subclips.find(s => String(s.id) === String(cutVidId));
+                if (foundSub && foundSub.parent_video_id) {
+                    videoData = STATE.allVideos.find(v => String(v.id) === String(foundSub.parent_video_id));
+                }
+            }
             if (!videoData) {
                 if (!el.paused) el.pause();
                 return;
@@ -3803,7 +4040,12 @@ export class ProgramPlayer {
      * falha) devolve o caminho original — exatamente como antes deste bloco existir.
      */
     _fonteAudioEfetiva(cut, videoData) {
-        const rawSrc = videoData.proxy_path || videoData.filepath || `/originals/${videoData.filename}`;
+        let effectiveVideoData = videoData;
+        if (videoData && videoData.is_subclip && videoData.parent_video_id) {
+            const parentVid = STATE.allVideos.find(v => String(v.id) === String(videoData.parent_video_id));
+            if (parentVid) effectiveVideoData = parentVid;
+        }
+        const rawSrc = effectiveVideoData.proxy_path || effectiveVideoData.filepath || `/originals/${effectiveVideoData.filename}`;
         const originalSrc = String(rawSrc).replace(/\\/g, "/");
         if (!cut) return { src: originalSrc, tratado: false };
         const bruto = this._fontesAudioTratadas
@@ -3811,7 +4053,7 @@ export class ProgramPlayer {
         if (bruto === undefined || bruto === null || bruto === "") {
             return { src: originalSrc, tratado: false };
         }
-        const url = this._resolverUrlTratado(bruto, videoData.id, cut);
+        const url = this._resolverUrlTratado(bruto, effectiveVideoData.id, cut);
         if (!url || (this._falhasFonteTratada && this._falhasFonteTratada.has(url))) {
             return { src: originalSrc, tratado: false }; // falhou antes: original, visivelmente
         }
@@ -4709,6 +4951,8 @@ export class VideoPlayer {
         this.sourcePlayer = new SourcePlayer();
         this.programPlayer = new ProgramPlayer();
         window.sourcePlayer = this.sourcePlayer;
+        window.PLAYER_CONTROLLER = this;
+        window.openCreateSubclipModal = () => this.createSubclip();
         this.isKeyKDown = false;
         this._kActionTaken = null;
         this._kJogUsed = false;
@@ -5081,6 +5325,13 @@ export class VideoPlayer {
         if (KEYMAP_SERVICE.matches(e, "edit.overwrite")) {
             e.preventDefault();
             this.sourcePlayer.overwriteAtPlayhead();
+            return;
+        }
+
+        // Criar Subclipe Virtual a partir de [IN-OUT] (Ctrl+U)
+        if (KEYMAP_SERVICE.matches(e, "edit.create_subclip")) {
+            e.preventDefault();
+            this.sourcePlayer.openCreateSubclipModal();
             return;
         }
 
@@ -5985,6 +6236,15 @@ export class VideoPlayer {
             popover.onmouseenter = null;
             const controls = (typeof popover.closest === "function") ? popover.closest(".player-controls") : null;
             if (controls) controls.classList.remove("has-popover-open");
+        }
+    }
+
+    /**
+     * Aciona a criação de subclipe a partir do Source Player.
+     */
+    createSubclip() {
+        if (this.sourcePlayer) {
+            this.sourcePlayer.openCreateSubclipModal();
         }
     }
 }

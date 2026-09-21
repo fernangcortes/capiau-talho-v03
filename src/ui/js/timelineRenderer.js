@@ -1470,14 +1470,24 @@ export class CapiauTimelineRenderer {
                 const durS = framesToSeconds(cut.outFrame - cut.inFrame, TIMELINE_STATE.fps);
                 label = `▣ ${name} [${durS.toFixed(1)}s]`;
             } else {
-                const name = video ? (video.title || video.filename) : `Vídeo ${cut.video_id}`;
+                const subPrefix = cut.is_subclip ? "✂ " : "";
+                const effSubPrefix = subPrefix || (String(cut.video_id).startsWith("subclip_") || cut.subclip_id ? "✂ " : "");
+                let fallbackSubName = null;
+                if (!cut.name && (cut.is_subclip || String(cut.video_id).startsWith("subclip_") || cut.subclip_id)) {
+                    const subId = cut.subclip_id || (String(cut.video_id).startsWith("subclip_") ? cut.video_id : null);
+                    if (subId && typeof window.getProjectSubclips === "function") {
+                        const sub = window.getProjectSubclips().find(s => String(s.id) === String(subId));
+                        if (sub) fallbackSubName = sub.name || sub.title;
+                    }
+                }
+                const name = cut.name || fallbackSubName || (video ? (video.title || video.filename) : `Vídeo ${cut.video_id}`);
                 const prefix = laneKind === "audio" ? (cut.link_id ? "♪⇅" : "♪") : "#";
                 const fps = TIMELINE_STATE.fps || 24;
                 const maxFrame = Math.max(cut.inFrame || 0, cut.outFrame || 0);
                 const forceHours = maxFrame >= 3600 * fps;
                 const inTc = formatRulerTimecode(cut.inFrame || 0, fps, true, forceHours);
                 const outTc = formatRulerTimecode(cut.outFrame || 0, fps, true, forceHours);
-                label = `${prefix} ${name} [${inTc} → ${outTc}]`;
+                label = `${prefix} ${effSubPrefix}${name} [${inTc} → ${outTc}]`;
             }
 
             if (cut.disabled === true) {

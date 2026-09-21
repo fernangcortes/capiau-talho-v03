@@ -92,6 +92,296 @@ export function saveVirtualFoldersState(projectId = null) {
     }
 }
 
+// ── SUBCLIPES VIRTUAIS (TASK 10) ────────────────────────────────────
+export let virtualSubclipsMap = {}; // projectId -> array de subclipes
+
+export function loadVirtualSubclipsState(projectId = null) {
+    if (!projectId) projectId = getActiveProjectId();
+    try {
+        const raw = localStorage.getItem(`capiau_virtual_subclips_v1_${projectId}`) || localStorage.getItem(`capiau_virtual_subclips_${projectId}`) || "[]";
+        let parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) parsed = [];
+        let needsResave = false;
+        parsed.forEach(sub => {
+            if (!sub.parent_video_id) {
+                if (sub.video && sub.video.id) {
+                    sub.parent_video_id = sub.video.id;
+                    needsResave = true;
+                } else if (sub.videoId || sub.video_id) {
+                    sub.parent_video_id = sub.videoId || sub.video_id;
+                    needsResave = true;
+                } else if (window.STATE && Array.isArray(window.STATE.allVideos) && sub.filename) {
+                    const match = window.STATE.allVideos.find(v => v.filename === sub.filename);
+                    if (match) {
+                        sub.parent_video_id = match.id;
+                        needsResave = true;
+                    }
+                }
+            }
+            if (sub.video) {
+                delete sub.video;
+                needsResave = true;
+            }
+            if (!sub.name && sub.title) {
+                sub.name = sub.title;
+            }
+        });
+        virtualSubclipsMap[projectId] = parsed;
+        if (needsResave) {
+            saveVirtualSubclipsState(projectId);
+        }
+    } catch (e) {
+        console.error("Erro ao carregar subclipes virtuais:", e);
+        virtualSubclipsMap[projectId] = [];
+    }
+    return virtualSubclipsMap[projectId];
+}
+
+export function saveVirtualSubclipsState(projectId = null) {
+    if (!projectId) projectId = getActiveProjectId();
+    try {
+        const list = virtualSubclipsMap[projectId] || [];
+        const cleanList = list.map(sub => {
+            const copy = { ...sub };
+            delete copy.video;
+            return copy;
+        });
+        localStorage.setItem(`capiau_virtual_subclips_v1_${projectId}`, JSON.stringify(cleanList));
+    } catch (e) {
+        console.error("Erro ao salvar subclipes virtuais:", e);
+    }
+}
+
+export function getProjectSubclips(projectId = null) {
+    if (!projectId) projectId = getActiveProjectId();
+    if (!virtualSubclipsMap[projectId]) {
+        loadVirtualSubclipsState(projectId);
+    }
+    const list = virtualSubclipsMap[projectId] || [];
+    if (window.STATE && Array.isArray(window.STATE.allVideos) && window.STATE.allVideos.length > 0) {
+        let changed = false;
+        list.forEach(sub => {
+            if (!sub.parent_video_id) {
+                if (sub.videoId || sub.video_id) {
+                    sub.parent_video_id = sub.videoId || sub.video_id;
+                    changed = true;
+                } else if (sub.filename) {
+                    const match = window.STATE.allVideos.find(v => v.filename === sub.filename);
+                    if (match) {
+                        sub.parent_video_id = match.id;
+                        changed = true;
+                    }
+                }
+            }
+            if (sub.video) {
+                delete sub.video;
+                changed = true;
+            }
+        });
+        if (changed) saveVirtualSubclipsState(projectId);
+    }
+    return list;
+}
+
+export function getCandidateTitlesForSubclip(video, inSec = null, outSec = null) {
+    if (!video) return [];
+    const candidates = [];
+    const seen = new Set();
+    const add = (title, source, isDefault = false) => {
+        if (!title) return;
+        const clean = String(title).trim();
+        if (!clean || seen.has(clean.toLowerCase())) return;
+        seen.add(clean.toLowerCase());
+        candidates.push({ title: clean, label: source, source, isDefault });
+    };
+
+    // 1. Título conciso da IA (3 a 6 palavras)
+    if (video.title && video.title.trim()) {
+        add(video.title.trim(), "IA Título Curto", true);
+    }
+
+    // 2. Título executivo contextual do CapIAu
+    const friendly = typeof getFriendlyTitle === "function" ? getFriendlyTitle(video) : "";
+    if (friendly && friendly !== video.filename && friendly !== video.title) {
+        add(friendly, "IA Contextual", candidates.length === 0);
+    }
+
+    // 3. Trecho da fala transcrita no intervalo [inSec, outSec]
+    if (typeof inSec === "number" && typeof outSec === "number" && outSec > inSec) {
+        const transcript = window.STATE?.activeTranscript || [];
+        if (Array.isArray(transcript) && transcript.length > 0) {
+            const words = [];
+            transcript.forEach(seg => {
+                const segStart = seg.start ?? seg.start_time ?? 0;
+                const segEnd = seg.end ?? seg.end_time ?? 0;
+                if (segStart < outSec && segEnd > inSec) {
+                    if (seg.words && Array.isArray(seg.words)) {
+                        seg.words.forEach(w => {
+                            const wStart = w.start ?? w.start_time ?? 0;
+                            const wEnd = w.end ?? w.end_time ?? 0;
+                            if (wStart >= inSec && wEnd <= outSec) {
+                                words.push(w.word || w.text || "");
+                            }
+                        });
+                    } else if (seg.text) {
+                        words.push(seg.text);
+                    }
+                }
+            });
+            const spokenText = words.join(" ").trim();
+            if (spokenText) {
+                const snippet = spokenText.length > 65 ? spokenText.substring(0, 62).trim() + "..." : spokenText;
+                add(`"${snippet}"`, "Fala no Trecho");
+            }
+        }
+    }
+
+    // 4. Resumo da IA
+    if (video.summary && video.summary.trim()) {
+        const cleanSumm = typeof cleanTitle === "function" ? cleanTitle(video.summary.replace(/Resumo:|Entrevista:/i, "").trim()) : video.summary.trim();
+        if (cleanSumm) add(cleanSumm, "IA Resumo");
+    }
+
+    // 5. Descrição da IA
+    if (video.description && video.description.trim()) {
+        const cleanDesc = typeof cleanTitle === "function" ? cleanTitle(video.description.trim()) : video.description.trim();
+        if (cleanDesc) add(cleanDesc, "IA Descrição");
+    }
+
+    // 6. Padrão sequencial NLE
+    const baseName = (video.filename || "clip").replace(/\.[^/.]+$/, "");
+    const subclips = getProjectSubclips();
+    let seq = 1;
+    subclips.forEach(s => {
+        if (String(s.parent_video_id) === String(video.id)) seq++;
+    });
+    const seqStr = String(seq).padStart(2, '0');
+    add(`${baseName}_sub${seqStr}`, "Padrão NLE", candidates.length === 0);
+
+    return candidates;
+}
+
+export function createSubclip(subclipData, projectId = null) {
+    if (!projectId) projectId = getActiveProjectId();
+    const existing = getProjectSubclips(projectId);
+
+    const subclipId = subclipData.id || `subclip_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    let name = (subclipData.name || subclipData.title) ? String(subclipData.name || subclipData.title).trim() : "";
+    if (!name) {
+        const candidates = getCandidateTitlesForSubclip(subclipData.video || subclipData, subclipData.in ?? subclipData.inSec, subclipData.out ?? subclipData.outSec);
+        name = candidates[0] ? candidates[0].title : `Subclipe_${Date.now()}`;
+    }
+
+    const videoObj = subclipData.video || {};
+    const fps = subclipData.fps || videoObj.fps || 24;
+    const inSec = Math.max(0, Number(subclipData.in ?? subclipData.inSec ?? 0));
+    const outSec = Math.max(inSec + 0.1, Number(subclipData.out ?? subclipData.outSec ?? (inSec + 1)));
+    const durSec = outSec - inSec;
+
+    let parentVidId = subclipData.parent_video_id || subclipData.videoId || subclipData.video_id || videoObj.id || null;
+    if (videoObj.is_subclip && videoObj.parent_video_id) {
+        parentVidId = videoObj.parent_video_id;
+    }
+
+    const subclip = {
+        ...subclipData,
+        id: subclipId,
+        parent_video_id: parentVidId,
+        name: name,
+        title: name,
+        filename: subclipData.filename || videoObj.filename || subclipData.parentFilename || `${name}.mp4`,
+        filepath: subclipData.filepath || videoObj.filepath || "",
+        video_type: subclipData.video_type || videoObj.video_type || "broll",
+        is_subclip: true,
+        is_virtual: true,
+        in: inSec,
+        out: outSec,
+        duration: durSec,
+        inFrame: Math.round(inSec * fps),
+        outFrame: Math.round(outSec * fps),
+        fps: fps,
+        rotation: subclipData.rotation || videoObj.rotation || 0,
+        resolution: subclipData.resolution || videoObj.resolution || "1920x1080",
+        hard_boundaries: !!(subclipData.hard_boundaries ?? subclipData.hardBoundaries),
+        created_at: new Date().toISOString(),
+        summary: subclipData.summary || videoObj.summary || null,
+        description: subclipData.description || videoObj.description || null,
+        tags: subclipData.tags || videoObj.tags || null,
+        virtual_folder: subclipData.virtual_folder || videoObj.virtual_folder || null
+    };
+
+    delete subclip.video;
+
+    existing.push(subclip);
+    saveVirtualSubclipsState(projectId);
+
+    if (window.STATE && Array.isArray(window.STATE.allVideos)) {
+        if (!window.STATE.allVideos.some(v => String(v.id) === String(subclip.id))) {
+            window.STATE.allVideos.push(subclip);
+        }
+    }
+
+    if (window.STATE && typeof window.STATE.emit === "function") {
+        window.STATE.emit("subclipCreated", subclip);
+        window.STATE.emit("videosUpdated", window.STATE.allVideos);
+    }
+    if (window.libraryInstance && typeof window.libraryInstance.scheduleRenderMedia === "function") {
+        window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+    }
+    return subclip;
+}
+
+export function deleteSubclip(subclipId, projectId = null) {
+    if (!projectId) projectId = getActiveProjectId();
+    const existing = getProjectSubclips(projectId);
+    const idx = existing.findIndex(s => String(s.id) === String(subclipId));
+    if (idx >= 0) {
+        existing.splice(idx, 1);
+        saveVirtualSubclipsState(projectId);
+        if (window.STATE && Array.isArray(window.STATE.allVideos)) {
+            const vIdx = window.STATE.allVideos.findIndex(v => String(v.id) === String(subclipId));
+            if (vIdx >= 0) window.STATE.allVideos.splice(vIdx, 1);
+        }
+        if (window.STATE && typeof window.STATE.emit === "function") {
+            window.STATE.emit("subclipDeleted", subclipId);
+            window.STATE.emit("videosUpdated", window.STATE.allVideos);
+        }
+        if (window.libraryInstance && typeof window.libraryInstance.scheduleRenderMedia === "function") {
+            window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+        }
+        return true;
+    }
+    return false;
+}
+
+export function renameSubclip(subclipId, newName, projectId = null) {
+    if (!projectId) projectId = getActiveProjectId();
+    const existing = getProjectSubclips(projectId);
+    const subclip = existing.find(s => String(s.id) === String(subclipId));
+    if (subclip && newName && newName.trim()) {
+        subclip.name = newName.trim();
+        subclip.title = subclip.name;
+        saveVirtualSubclipsState(projectId);
+        if (window.STATE && Array.isArray(window.STATE.allVideos)) {
+            const v = window.STATE.allVideos.find(v => String(v.id) === String(subclipId));
+            if (v) {
+                v.name = newName.trim();
+                v.title = v.name;
+            }
+        }
+        if (window.STATE && typeof window.STATE.emit === "function") {
+            window.STATE.emit("subclipRenamed", { id: subclipId, name: subclip.name });
+            window.STATE.emit("videosUpdated", window.STATE.allVideos);
+        }
+        if (window.libraryInstance && typeof window.libraryInstance.scheduleRenderMedia === "function") {
+            window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+        }
+        return true;
+    }
+    return false;
+}
+
 // ── SMART BINS TAXONOMY & ATRIBUIÇÃO MANUAL ───────────────────────────
 export const SMART_BINS_TAXONOMY = [
     { id: 'interviews', label: '🎙️ Entrevistas & Depoimentos', keywords: ['entrevista', 'depoimento', 'relato', 'declarou', 'vitoria', 'vitória', 'luciana', 'dina brandao', 'dina brandão', 'joao antonio', 'joão antonio', 'thiago moyses'], weight: 3.0 },
@@ -885,28 +1175,67 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     });
     menu.appendChild(openItem);
 
+    // Se for subclipe: ação de localizar mestre original
+    if (item.is_subclip && item.parent_video_id) {
+        const findMasterItem = document.createElement("div");
+        findMasterItem.className = "menu-item";
+        findMasterItem.innerHTML = `<i class="fa-solid fa-crosshairs" style="color: var(--color-violet);"></i><span class="menu-item-text">Localizar Mestre na Biblioteca</span>`;
+        findMasterItem.addEventListener("click", () => {
+            menu.remove();
+            if (window.libraryInstance && typeof window.libraryInstance.revealAndPulseMedia === "function") {
+                window.libraryInstance.revealAndPulseMedia(item.parent_video_id);
+            }
+        });
+        menu.appendChild(findMasterItem);
+    } else if (!item.is_subclip && isVideo) {
+        const makeSubclipItem = document.createElement("div");
+        makeSubclipItem.className = "menu-item";
+        makeSubclipItem.innerHTML = `<i class="fa-solid fa-scissors" style="color: #c084fc;"></i><span class="menu-item-text">Criar Subclipe a partir de [IN-OUT]</span><span class="menu-item-shortcut">Ctrl+U</span>`;
+        makeSubclipItem.addEventListener("click", () => {
+            menu.remove();
+            if (STATE.activeVideo?.id !== item.id) {
+                STATE.activeVideo = item;
+                window.activeFocusedPlayer = "source";
+            }
+            if (window.PLAYER_CONTROLLER?.sourcePlayer) {
+                window.PLAYER_CONTROLLER.sourcePlayer.openCreateSubclipModal();
+            }
+        });
+        menu.appendChild(makeSubclipItem);
+    }
+
     // Helper para extrair In/Out e executar a inserção
     const runMediaInsert = (mode) => {
         let inTime = 0.0;
         let outTime = isVideo ? (item.duration || 5.0) : 5.0;
-        const savedMarkers = (STATE && typeof STATE.getMediaMarkers === "function") ? STATE.getMediaMarkers(item.id) : null;
-        if (savedMarkers && savedMarkers.in !== null && savedMarkers.in !== undefined) {
-            inTime = savedMarkers.in;
-        } else if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id && STATE.markerIn !== null && STATE.markerIn !== undefined) {
-            inTime = STATE.markerIn;
-        }
-        if (savedMarkers && savedMarkers.out !== null && savedMarkers.out !== undefined && savedMarkers.out > inTime) {
-            outTime = savedMarkers.out;
-        } else if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id && STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) {
-            outTime = STATE.markerOut;
+        if (item.is_subclip) {
+            inTime = (item.in !== undefined && item.in !== null) ? Number(item.in) : 0.0;
+            outTime = (item.out !== undefined && item.out !== null) ? Number(item.out) : (item.duration || 5.0);
+        } else {
+            const savedMarkers = (STATE && typeof STATE.getMediaMarkers === "function") ? STATE.getMediaMarkers(item.id) : null;
+            if (savedMarkers && savedMarkers.in !== null && savedMarkers.in !== undefined) {
+                inTime = savedMarkers.in;
+            } else if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id && STATE.markerIn !== null && STATE.markerIn !== undefined) {
+                inTime = STATE.markerIn;
+            }
+            if (savedMarkers && savedMarkers.out !== null && savedMarkers.out !== undefined && savedMarkers.out > inTime) {
+                outTime = savedMarkers.out;
+            } else if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id && STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) {
+                outTime = STATE.markerOut;
+            }
         }
         if (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.insertMedia === "function") {
             window.TIMELINE_STATE.insertMedia({
                 type: isVideo ? "video" : "photo",
-                id: item.id,
+                id: item.parent_video_id || item.id,
                 inSec: inTime,
                 outSec: outTime,
-                mode: mode
+                mode: mode,
+                is_subclip: !!item.is_subclip,
+                subclip_id: item.is_subclip ? item.id : null,
+                parent_video_id: item.parent_video_id || null,
+                name: item.title || item.name,
+                hard_boundaries: !!item.hard_boundaries
             });
         }
     };
@@ -1013,10 +1342,21 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     // Item: Renomear Título
     const renameItem = document.createElement("div");
     renameItem.className = "menu-item";
-    renameItem.innerHTML = `<i class="fa-solid fa-pen-to-square"></i><span class="menu-item-text">Renomear Título</span>`;
+    renameItem.innerHTML = `<i class="fa-solid fa-pen-to-square"></i><span class="menu-item-text">${item.is_subclip ? "Renomear Subclipe" : "Renomear Título"}</span>`;
     renameItem.addEventListener("click", () => {
         menu.remove();
-        startInlineTitleEditing(cardEl, item, kind);
+        if (item.is_subclip) {
+            const currentTitle = item.title || item.name || "";
+            const novo = prompt("Novo nome para o subclipe:", currentTitle);
+            if (novo && novo.trim() && novo.trim() !== currentTitle) {
+                renameSubclip(item.id, novo.trim());
+                if (typeof window.showToast === "function") {
+                    window.showToast("Subclipe renomeado com sucesso!", "success");
+                }
+            }
+        } else {
+            startInlineTitleEditing(cardEl, item, kind);
+        }
     });
     menu.appendChild(renameItem);
 
@@ -1097,6 +1437,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     menu.appendChild(sep2);
 
     // Submenu de Camadas de IA & Decupagem Completa
+    const targetMediaId = (item.is_subclip && item.parent_video_id) ? item.parent_video_id : item.id;
     const aiLayersMenuItem = document.createElement("div");
     aiLayersMenuItem.className = "menu-item menu-item-has-submenu";
     aiLayersMenuItem.innerHTML = `
@@ -1121,9 +1462,9 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         menu.remove();
         try {
             if (isVideo) {
-                await CapIAuAPI.analyzeVideoAll(item.id);
+                await CapIAuAPI.analyzeVideoAll(targetMediaId);
             } else {
-                await CapIAuAPI.analyzePhotoAll(item.id);
+                await CapIAuAPI.analyzePhotoAll(targetMediaId);
             }
             if (typeof window.showToast === "function") {
                 window.showToast(`Análise completa de IA iniciada para "${item.filename || 'mídia'}"!`, "success");
@@ -1152,7 +1493,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         asrItem.addEventListener("click", async () => {
             menu.remove();
             try {
-                await CapIAuAPI.transcribeVideo(item.id);
+                await CapIAuAPI.transcribeVideo(targetMediaId);
                 if (typeof window.showToast === "function") window.showToast("Transcrição ASR iniciada!", "success");
                 if (typeof window.openTasksDrawerAndSwitchTab === "function") window.openTasksDrawerAndSwitchTab();
             } catch (err) {
@@ -1175,10 +1516,10 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         menu.remove();
         try {
             if (isVideo) {
-                await CapIAuAPI.analyzeVideoVision(item.id);
+                await CapIAuAPI.analyzeVideoVision(targetMediaId);
                 if (typeof window.showToast === "function") window.showToast("Análise visual do vídeo iniciada!", "success");
             } else {
-                await CapIAuAPI.analyzePhotoVision(item.id);
+                await CapIAuAPI.analyzePhotoVision(targetMediaId);
                 if (typeof window.showToast === "function") window.showToast("Análise visual da foto concluída!", "success");
                 if (window.libraryInstance) await window.libraryInstance.reloadData();
             }
@@ -1203,9 +1544,9 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         try {
             const projectId = getActiveProjectId();
             if (isVideo) {
-                await CapIAuAPI.analyzeVideoAll(item.id);
+                await CapIAuAPI.analyzeVideoAll(targetMediaId);
             } else {
-                await CapIAuAPI.request(`/api/faces/photo/${item.id}/detect?project_id=${projectId}&image_path=${encodeURIComponent(item.filepath || '')}`, { method: "POST" });
+                await CapIAuAPI.request(`/api/faces/photo/${targetMediaId}/detect?project_id=${projectId}&image_path=${encodeURIComponent(item.filepath || '')}`, { method: "POST" });
             }
             if (typeof window.showToast === "function") window.showToast("Detecção facial concluída!", "success");
             if (window.libraryInstance) await window.libraryInstance.reloadData();
@@ -1228,9 +1569,9 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         menu.remove();
         try {
             if (isVideo) {
-                await CapIAuAPI.analyzeVideoVision(item.id);
+                await CapIAuAPI.analyzeVideoVision(targetMediaId);
             } else {
-                await CapIAuAPI.analyzePhotoVision(item.id);
+                await CapIAuAPI.analyzePhotoVision(targetMediaId);
             }
             if (typeof window.showToast === "function") window.showToast("Indexação vetorial sincronizada no Qdrant!", "success");
         } catch (err) {
@@ -1483,63 +1824,80 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     sep4.className = "menu-separator";
     menu.appendChild(sep4);
 
-    // Item: Limpar Proxy Físico (Destrutivo com Confirmação)
-    const cleanProxyItem = document.createElement("div");
-    cleanProxyItem.className = "menu-item menu-item-destructive";
-    cleanProxyItem.innerHTML = `<i class="fa-solid fa-broom"></i><span class="menu-item-text">Deletar / Limpar Proxy</span>`;
-    cleanProxyItem.addEventListener("click", async () => {
-        menu.remove();
-        const msg = `Deseja realmente excluir o arquivo proxy físico de "${item.filename}"?\n\nO clipe permanecerá no projeto, mas precisará ser recodificado para exibição local suave.`;
-        if (!confirm(msg)) return;
-        try {
-            if (isVideo) {
-                await CapIAuAPI.deleteVideoProxy(item.id);
-            } else {
-                await CapIAuAPI.deletePhotoProxy(item.id);
-            }
+    if (item.is_subclip) {
+        // Item: Excluir Subclipe da Biblioteca (Não-destrutivo para a mídia física)
+        const deleteSubclipItem = document.createElement("div");
+        deleteSubclipItem.className = "menu-item menu-item-destructive";
+        deleteSubclipItem.innerHTML = `<i class="fa-solid fa-trash-can"></i><span class="menu-item-text">Excluir Subclipe da Biblioteca</span>`;
+        deleteSubclipItem.addEventListener("click", () => {
+            menu.remove();
+            const clipName = item.title || item.name || "Subclipe";
+            if (!confirm(`Deseja realmente excluir o subclipe "${clipName}" da biblioteca?\n\nO arquivo original não será afetado.`)) return;
+            deleteSubclip(item.id);
             if (typeof window.showToast === "function") {
-                window.showToast("Proxy físico removido com sucesso!", "success");
+                window.showToast(`Subclipe "${clipName}" removido da biblioteca.`, "info");
             }
-            if (window.libraryInstance) await window.libraryInstance.reloadData();
-            else STATE.emit("projectChanged");
-        } catch (err) {
-            if (typeof window.showToast === "function") {
-                window.showToast("Erro ao excluir proxy: " + err.message, "error");
-            } else {
-                alert("Erro ao excluir proxy: " + err.message);
+        });
+        menu.appendChild(deleteSubclipItem);
+    } else {
+        // Item: Limpar Proxy Físico (Destrutivo com Confirmação)
+        const cleanProxyItem = document.createElement("div");
+        cleanProxyItem.className = "menu-item menu-item-destructive";
+        cleanProxyItem.innerHTML = `<i class="fa-solid fa-broom"></i><span class="menu-item-text">Deletar / Limpar Proxy</span>`;
+        cleanProxyItem.addEventListener("click", async () => {
+            menu.remove();
+            const msg = `Deseja realmente excluir o arquivo proxy físico de "${item.filename}"?\n\nO clipe permanecerá no projeto, mas precisará ser recodificado para exibição local suave.`;
+            if (!confirm(msg)) return;
+            try {
+                if (isVideo) {
+                    await CapIAuAPI.deleteVideoProxy(item.id);
+                } else {
+                    await CapIAuAPI.deletePhotoProxy(item.id);
+                }
+                if (typeof window.showToast === "function") {
+                    window.showToast("Proxy físico removido com sucesso!", "success");
+                }
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
+                else STATE.emit("projectChanged");
+            } catch (err) {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Erro ao excluir proxy: " + err.message, "error");
+                } else {
+                    alert("Erro ao excluir proxy: " + err.message);
+                }
             }
-        }
-    });
-    menu.appendChild(cleanProxyItem);
+        });
+        menu.appendChild(cleanProxyItem);
 
-    // Item: Remover Mídia do Projeto (Destrutivo com Confirmação)
-    const removeMediaItem = document.createElement("div");
-    removeMediaItem.className = "menu-item menu-item-destructive";
-    removeMediaItem.innerHTML = `<i class="fa-solid fa-trash-can"></i><span class="menu-item-text">Remover Mídia do Projeto</span>`;
-    removeMediaItem.addEventListener("click", async () => {
-        menu.remove();
-        const msg = `⚠️ ATENÇÃO: Deseja remover permanentemente "${item.filename}" do projeto?\n\nTodos os dados de decupagem, transcrição e indexação visual serão excluídos do banco de dados.`;
-        if (!confirm(msg)) return;
-        try {
-            if (isVideo) {
-                await CapIAuAPI.deleteVideo(item.id);
-            } else {
-                await CapIAuAPI.deletePhoto(item.id);
+        // Item: Remover Mídia do Projeto (Destrutivo com Confirmação)
+        const removeMediaItem = document.createElement("div");
+        removeMediaItem.className = "menu-item menu-item-destructive";
+        removeMediaItem.innerHTML = `<i class="fa-solid fa-trash-can"></i><span class="menu-item-text">Remover Mídia do Projeto</span>`;
+        removeMediaItem.addEventListener("click", async () => {
+            menu.remove();
+            const msg = `⚠️ ATENÇÃO: Deseja remover permanentemente "${item.filename}" do projeto?\n\nTodos os dados de decupagem, transcrição e indexação visual serão excluídos do banco de dados.`;
+            if (!confirm(msg)) return;
+            try {
+                if (isVideo) {
+                    await CapIAuAPI.deleteVideo(item.id);
+                } else {
+                    await CapIAuAPI.deletePhoto(item.id);
+                }
+                if (typeof window.showToast === "function") {
+                    window.showToast("Mídia removida do projeto!", "info");
+                }
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
+                else STATE.emit("projectChanged");
+            } catch (err) {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Erro ao remover mídia: " + err.message, "error");
+                } else {
+                    alert("Erro ao remover mídia: " + err.message);
+                }
             }
-            if (typeof window.showToast === "function") {
-                window.showToast("Mídia removida do projeto!", "info");
-            }
-            if (window.libraryInstance) await window.libraryInstance.reloadData();
-            else STATE.emit("projectChanged");
-        } catch (err) {
-            if (typeof window.showToast === "function") {
-                window.showToast("Erro ao remover mídia: " + err.message, "error");
-            } else {
-                alert("Erro ao remover mídia: " + err.message);
-            }
-        }
-    });
-    menu.appendChild(removeMediaItem);
+        });
+        menu.appendChild(removeMediaItem);
+    }
 
     targetDoc.body.appendChild(menu);
 
@@ -1595,6 +1953,11 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     }, 10);
 }
 window.showMediaContextMenu = showMediaContextMenu;
+window.createSubclip = createSubclip;
+window.deleteSubclipItem = deleteSubclip;
+window.renameSubclip = renameSubclip;
+window.getProjectSubclips = getProjectSubclips;
+window.getCandidateTitlesForSubclip = getCandidateTitlesForSubclip;
 
 // ── MENU DE CONTEXTO E GESTÃO DE BINS VIRTUAIS ───────────────────────
 
@@ -3741,7 +4104,7 @@ function renderTreeNode(node, container, depth = 0) {
 
         const rotV = (v.rotation || 0) % 360;
         const card = document.createElement("div");
-        card.className = "media-card tree-file-item" + (hasVisionError ? " has-vision-error" : "") + (rotV ? ` rot-${rotV}` : "");
+        card.className = "media-card tree-file-item" + (v.is_subclip ? " subclip-item" : "") + (hasVisionError ? " has-vision-error" : "") + (rotV ? ` rot-${rotV}` : "");
         card.setAttribute("data-video-id", v.id);
         card.style.paddingLeft = "6px";
         card._mediaData = v;
@@ -3796,12 +4159,18 @@ function renderTreeNode(node, container, depth = 0) {
         
         // Thumbnail (Real ou Ícone)
         const showRealThumb = !document.body.classList.contains("hide-thumbnails") && document.getElementById("chk-show-thumbnails")?.checked !== false;
-        let thumbContent = `<i class="fa-solid ${v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film'}"></i>`;
+        let thumbContent = `<i class="fa-solid ${v.is_subclip ? 'fa-scissors' : (v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film')}"></i>`;
         if (showRealThumb && v.status !== "pending" && v.status !== "error") {
+            const thumbVidId = v.parent_video_id || v.id;
             const vVersion = v._thumbVersion || v.thumb_version || v.updated_at || "";
             const qs = vVersion ? `?v=${vVersion}` : "";
-            const fallbackIcon = v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film';
-            thumbContent = `<img src="/api/video/${v.id}/thumbnail${qs}" alt="Thumb" loading="lazy" decoding="async" onerror="this.onerror=null; this.style.display='none'; if(this.parentNode) this.parentNode.insertAdjacentHTML('beforeend', '<i class=\\'fa-solid ${fallbackIcon}\\'></i>');">`;
+            const fallbackIcon = v.is_subclip ? 'fa-scissors' : (v.video_type === 'interview' ? 'fa-microphone-lines' : 'fa-film');
+            let thumbSrc = `/api/video/${thumbVidId}/thumbnail${qs}`;
+            if (v.is_subclip && v.in !== undefined && v.in !== null) {
+                const startSec = Math.max(0, Number(v.in)).toFixed(1);
+                thumbSrc = `/api/video/${thumbVidId}/thumbnail-at?time=${startSec}&quality=hq`;
+            }
+            thumbContent = `<img src="${thumbSrc}" alt="Thumb" loading="lazy" decoding="async" onerror="this.onerror=null; if(this.src.includes('thumbnail-at')){ this.src='/api/video/${thumbVidId}/thumbnail${qs}'; } else { this.style.display='none'; if(this.parentNode) this.parentNode.insertAdjacentHTML('beforeend', '<i class=\\'fa-solid ${fallbackIcon}\\'></i>'); }">`;
         }
         
         // Toggle title display icon
@@ -3818,6 +4187,10 @@ function renderTreeNode(node, container, depth = 0) {
         const overrideBtnHtml = hasVisionError
             ? `<button class="btn-card-action btn-hover-only btn-quick-override-ok" style="background:transparent; border:none; color:var(--color-emerald); cursor:pointer; padding: 2px;" data-tooltip="Marcar como Analisado (Ignorar Falha)"><i class="fa-solid fa-circle-check" style="font-size: 10px;"></i></button>`
             : `<button class="btn-card-action btn-hover-only btn-quick-override-fail" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" data-tooltip="Sinalizar Falha Visual (Mandar para Reanálise)"><i class="fa-solid fa-triangle-exclamation" style="font-size: 10px;"></i></button>`;
+
+        const subclipBadgeHtml = v.is_subclip
+            ? `<span class="badge badge-subclip" style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-scissors"></i> SUBCLIPE</span>`
+            : `<span class="badge-tag ${badgeClass}">${badgeLabel}</span>`;
 
         card.innerHTML = `
             <div class="media-thumbnail" style="position: relative;">
@@ -3836,7 +4209,7 @@ function renderTreeNode(node, container, depth = 0) {
                     <span class="media-duration">${v.duration ? formatTimecode(v.duration).substring(3, 11) : "00:00:00"}</span>
                     ${statusGlow}
                     ${statusBadge}
-                    <span class="badge-tag ${badgeClass}">${badgeLabel}</span>
+                    ${subclipBadgeHtml}
                     ${speakerHtml}
                     ${overrideBtnHtml}
                     ${actionBtn}
@@ -3976,23 +4349,32 @@ function renderTreeNode(node, container, depth = 0) {
             }
             let inTime = 0.0;
             let outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
-            const savedMarkers = (STATE && typeof STATE.getMediaMarkers === "function") ? STATE.getMediaMarkers(v.id) : null;
-            if (savedMarkers && savedMarkers.in !== null && savedMarkers.in !== undefined) {
-                inTime = savedMarkers.in;
-            } else if (STATE.activeVideo && STATE.activeVideo.id === v.id && STATE.markerIn !== null && STATE.markerIn !== undefined) {
-                inTime = STATE.markerIn;
+            if (v.is_subclip) {
+                inTime = (v.in !== undefined && v.in !== null) ? Number(v.in) : 0.0;
+                outTime = (v.out !== undefined && v.out !== null) ? Number(v.out) : (v.duration || 5.0);
+            } else {
+                const savedMarkers = (STATE && typeof STATE.getMediaMarkers === "function") ? STATE.getMediaMarkers(v.id) : null;
+                if (savedMarkers && savedMarkers.in !== null && savedMarkers.in !== undefined) {
+                    inTime = savedMarkers.in;
+                } else if (STATE.activeVideo && STATE.activeVideo.id === v.id && STATE.markerIn !== null && STATE.markerIn !== undefined) {
+                    inTime = STATE.markerIn;
+                }
+                if (savedMarkers && savedMarkers.out !== null && savedMarkers.out !== undefined && savedMarkers.out > inTime) {
+                    outTime = savedMarkers.out;
+                } else if (STATE.activeVideo && STATE.activeVideo.id === v.id && STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) {
+                    outTime = STATE.markerOut;
+                }
+                if (outTime <= inTime) outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
             }
-            if (savedMarkers && savedMarkers.out !== null && savedMarkers.out !== undefined && savedMarkers.out > inTime) {
-                outTime = savedMarkers.out;
-            } else if (STATE.activeVideo && STATE.activeVideo.id === v.id && STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) {
-                outTime = STATE.markerOut;
-            }
-            if (outTime <= inTime) outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
             const effDur = Math.max(0.1, outTime - inTime);
 
             STATE.activeDragMedia = {
                 type: "video",
-                id: v.id,
+                id: v.parent_video_id || v.id,
+                subclip_id: v.is_subclip ? v.id : null,
+                is_subclip: !!v.is_subclip,
+                parent_video_id: v.parent_video_id || null,
+                hard_boundaries: !!v.hard_boundaries,
                 title: currentTitle,
                 filename: v.filename,
                 duration: v.duration || 5.0,
@@ -4005,7 +4387,12 @@ function renderTreeNode(node, container, depth = 0) {
 
             e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({
                 type: "video",
-                id: v.id,
+                id: v.parent_video_id || v.id,
+                subclip_id: v.is_subclip ? v.id : null,
+                is_subclip: !!v.is_subclip,
+                parent_video_id: v.parent_video_id || null,
+                hard_boundaries: !!v.hard_boundaries,
+                name: currentTitle,
                 inTime: inTime,
                 outTime: outTime,
                 duration: effDur,
@@ -4067,7 +4454,10 @@ function renderTreeNode(node, container, depth = 0) {
 
             let inTime = 0.0;
             let outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
-            if (STATE.activeVideo && STATE.activeVideo.id === v.id) {
+            if (v.is_subclip) {
+                inTime = (v.in !== undefined && v.in !== null) ? Number(v.in) : 0.0;
+                outTime = (v.out !== undefined && v.out !== null) ? Number(v.out) : (v.duration || 5.0);
+            } else if (STATE.activeVideo && STATE.activeVideo.id === v.id) {
                 if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
                 if (STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) outTime = STATE.markerOut;
             }
@@ -4075,7 +4465,12 @@ function renderTreeNode(node, container, depth = 0) {
             if (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.insertMedia === "function") {
                 window.TIMELINE_STATE.insertMedia({
                     type: "video",
-                    id: v.id,
+                    id: v.parent_video_id || v.id,
+                    is_subclip: !!v.is_subclip,
+                    subclip_id: v.is_subclip ? v.id : null,
+                    parent_video_id: v.parent_video_id || null,
+                    name: currentTitle,
+                    hard_boundaries: !!v.hard_boundaries,
                     inSec: inTime,
                     outSec: outTime,
                     mode: mode
@@ -5220,13 +5615,16 @@ export class GalleryInteractionController {
         if (tc) tc.textContent = `${formatShortDuration(time)} / ${formatShortDuration(dur)}`;
 
         const img = itemEl.querySelector(".gallery-thumb-img");
-        const targetSec = Math.round(time);
-        const videoId = itemEl._mediaData?.id;
+        const media = itemEl._mediaData;
+        const videoId = media?.parent_video_id || media?.id;
         if (!img || !videoId) return;
 
+        const subIn = (media?.is_subclip && media?.in !== undefined) ? Number(media.in) : 0;
+        const realSec = Math.round(subIn + time);
+
         // Se o segundo mudou, atualiza para miniatura em baixa qualidade (rápida/instantânea)
-        if (img.dataset.scrubSec != targetSec) {
-            img.dataset.scrubSec = targetSec;
+        if (img.dataset.scrubSec != realSec) {
+            img.dataset.scrubSec = realSec;
             img.dataset.quality = "low";
 
             // Cancela upgrade HQ anterior pendente
@@ -5235,7 +5633,7 @@ export class GalleryInteractionController {
                 this.hqUpgradeTimer = null;
             }
 
-            img.src = `/api/video/${videoId}/thumbnail-at?time=${targetSec}&quality=low`;
+            img.src = `/api/video/${videoId}/thumbnail-at?time=${realSec}&quality=low`;
         }
 
         // Agenda ou executa a substituição progressiva para Alta Resolução (HQ)
@@ -5244,7 +5642,7 @@ export class GalleryInteractionController {
         if (img.dataset.quality !== "hq") {
             if (this.hqUpgradeTimer) clearTimeout(this.hqUpgradeTimer);
             this.hqUpgradeTimer = setTimeout(() => {
-                this.upgradeToHqThumbnail(itemEl, targetSec);
+                this.upgradeToHqThumbnail(itemEl, realSec);
             }, delay);
         }
     }
@@ -5255,7 +5653,8 @@ export class GalleryInteractionController {
         if (!img || img.dataset.scrubSec != targetSec) return;
         if (img.dataset.quality === "hq") return;
 
-        const videoId = itemEl._mediaData.id;
+        const media = itemEl._mediaData;
+        const videoId = media.parent_video_id || media.id;
         const hqSrc = `/api/video/${videoId}/thumbnail-at?time=${targetSec}&quality=hq`;
 
         // Pré-carrega a imagem HQ em memória para transição suave e sem piscar a tela
@@ -5271,7 +5670,8 @@ export class GalleryInteractionController {
 
     preloadCrucialHqThumbnails(itemEl) {
         const moments = itemEl._crucialMoments || [];
-        const videoId = itemEl._mediaData?.id;
+        const media = itemEl._mediaData;
+        const videoId = media?.parent_video_id || media?.id;
         if (!videoId || moments.length === 0) return;
 
         moments.forEach((m) => {
@@ -7474,7 +7874,8 @@ export class LibraryManager {
             }
 
             const videos = await CapIAuAPI.fetchVideos(projectId);
-            STATE.allVideos = videos;
+            const subclips = getProjectSubclips(projectId);
+            STATE.allVideos = videos.concat(subclips);
             const photos = await CapIAuAPI.fetchPhotos(projectId);
             STATE.allPhotos = photos;
             this.scheduleRenderMedia();
@@ -7978,7 +8379,9 @@ export class LibraryManager {
         targetEl.style.setProperty("--gallery-gap", `${savedGap}px`);
         updateZoomTier(targetEl, savedZoom);
 
-        const allVids = STATE.allVideos || [];
+        const rawVids = (STATE.allVideos || []).filter(v => !v.is_subclip);
+        const subclips = getProjectSubclips();
+        const allVids = rawVids.concat(subclips);
         const allPhotos = STATE.allPhotos || [];
 
         // Atualiza contadores dos chips de tipo e tooltips com nome e contagem de mídias
@@ -8297,7 +8700,7 @@ export class LibraryManager {
                 aspect = Math.max(0.45, Math.min(2.8, aspect));
 
                 const itemEl = document.createElement("div");
-                itemEl.className = "gallery-item" + (rot ? ` rot-${rot}` : "");
+                itemEl.className = "gallery-item" + (item.is_subclip ? " subclip-gallery-item" : "") + (rot ? ` rot-${rot}` : "");
                 itemEl.style.setProperty("--aspect", aspect.toFixed(3));
                 if (isVideo) {
                     itemEl.dataset.videoId = item.id;
@@ -8310,9 +8713,18 @@ export class LibraryManager {
 
                 const vVersion = item._thumbVersion || item.thumb_version || item.updated_at || "";
                 const qs = vVersion ? `?v=${vVersion}` : "";
-                const defaultThumbSrc = isVideo
-                    ? `/api/video/${item.id}/thumbnail${qs}`
-                    : `/api/photo/${item.id}/thumbnail`;
+                const thumbVidId = item.parent_video_id || item.id;
+                let defaultThumbSrc;
+                if (isVideo) {
+                    if (item.is_subclip && item.in !== undefined && item.in !== null) {
+                        const startSec = Math.max(0, Number(item.in)).toFixed(1);
+                        defaultThumbSrc = `/api/video/${thumbVidId}/thumbnail-at?time=${startSec}&quality=hq`;
+                    } else {
+                        defaultThumbSrc = `/api/video/${thumbVidId}/thumbnail${qs}`;
+                    }
+                } else {
+                    defaultThumbSrc = `/api/photo/${item.id}/thumbnail`;
+                }
                 itemEl._defaultSrc = defaultThumbSrc;
 
                 let badgeHtml = "";
@@ -8325,6 +8737,11 @@ export class LibraryManager {
                     if (itemKw) {
                         keywordPillHtml = `<div class="gallery-keyword-pill" title="Assunto: ${escapeHtml(itemKw)}"><i class="fa-solid fa-tag"></i> <span>${escapeHtml(itemKw)}</span></div>`;
                     }
+                }
+
+                let subclipBadgeHtml = "";
+                if (item.is_subclip) {
+                    subclipBadgeHtml = `<div class="gallery-subclip-badge badge-subclip" style="position: absolute; top: 4px; left: 4px; background: rgba(168, 85, 247, 0.85); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; z-index: 4; display: flex; align-items: center; gap: 4px; backdrop-filter: blur(4px);"><i class="fa-solid fa-scissors"></i> SUB</div>`;
                 }
 
                 if (isVideo) {
@@ -8343,7 +8760,8 @@ export class LibraryManager {
                 }
 
                 itemEl.innerHTML = `
-                    <img class="gallery-thumb-img" src="${defaultThumbSrc}" loading="lazy" decoding="async" alt="Thumb" onerror="this.onerror=null; this.style.opacity='0.4';">
+                    <img class="gallery-thumb-img" src="${defaultThumbSrc}" loading="lazy" decoding="async" alt="Thumb" onerror="this.onerror=null; if(this.src.includes('thumbnail-at')){ this.src='/api/video/${thumbVidId}/thumbnail${qs}'; } else { this.style.opacity='0.4'; }">
+                    ${subclipBadgeHtml}
                     ${keywordPillHtml}
                     ${badgeHtml}
                     ${crucialBadgeHtml}
@@ -8377,7 +8795,10 @@ export class LibraryManager {
                     const friendlyTitle = getFriendlyTitle(item);
                     let inTime = 0.0;
                     let outTime = isVideo ? (item.duration || 5.0) : 5.0;
-                    if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id) {
+                    if (item.is_subclip) {
+                        inTime = (item.in !== undefined && item.in !== null) ? Number(item.in) : 0.0;
+                        outTime = (item.out !== undefined && item.out !== null) ? Number(item.out) : (item.duration || 5.0);
+                    } else if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id) {
                         if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
                         if (STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) outTime = STATE.markerOut;
                     }
@@ -8385,7 +8806,11 @@ export class LibraryManager {
 
                     STATE.activeDragMedia = {
                         type: isVideo ? "video" : "photo",
-                        id: item.id,
+                        id: item.parent_video_id || item.id,
+                        subclip_id: item.is_subclip ? item.id : null,
+                        is_subclip: !!item.is_subclip,
+                        parent_video_id: item.parent_video_id || null,
+                        hard_boundaries: !!item.hard_boundaries,
                         title: friendlyTitle,
                         filename: item.filename,
                         duration: isVideo ? (item.duration || 5.0) : 5.0,
@@ -8398,7 +8823,12 @@ export class LibraryManager {
 
                     e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({
                         type: isVideo ? "video" : "photo",
-                        id: item.id,
+                        id: item.parent_video_id || item.id,
+                        subclip_id: item.is_subclip ? item.id : null,
+                        is_subclip: !!item.is_subclip,
+                        parent_video_id: item.parent_video_id || null,
+                        hard_boundaries: !!item.hard_boundaries,
+                        name: friendlyTitle,
                         inTime: inTime,
                         outTime: outTime,
                         duration: effDur,
@@ -8452,7 +8882,10 @@ export class LibraryManager {
 
                     let inTime = 0.0;
                     let outTime = isVideo ? (item.duration || 5.0) : 5.0;
-                    if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id) {
+                    if (item.is_subclip) {
+                        inTime = (item.in !== undefined && item.in !== null) ? Number(item.in) : 0.0;
+                        outTime = (item.out !== undefined && item.out !== null) ? Number(item.out) : (item.duration || 5.0);
+                    } else if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id) {
                         if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
                         if (STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) outTime = STATE.markerOut;
                     }
@@ -8460,7 +8893,12 @@ export class LibraryManager {
                     if (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.insertMedia === "function") {
                         window.TIMELINE_STATE.insertMedia({
                             type: isVideo ? "video" : "photo",
-                            id: item.id,
+                            id: item.parent_video_id || item.id,
+                            is_subclip: !!item.is_subclip,
+                            subclip_id: item.is_subclip ? item.id : null,
+                            parent_video_id: item.parent_video_id || null,
+                            name: getFriendlyTitle(item),
+                            hard_boundaries: !!item.hard_boundaries,
                             inSec: inTime,
                             outSec: outTime,
                             mode: mode

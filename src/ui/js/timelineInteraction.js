@@ -3969,23 +3969,54 @@ export class CapiauTimelineInteraction {
                     effects: [{ type: "fit", mode: "fit" }, ...effectsList]
                 }, snappedFrame, targetTrack);
             } else {
+                const isSub = !!(payload.is_subclip || dragMedia?.is_subclip);
+                const realVideoId = isSub ? (payload.parent_video_id || dragMedia?.parent_video_id || payload.id) : payload.id;
+                const subName = payload.name || dragMedia?.title || null;
+                const subId = payload.subclip_id || (isSub ? payload.id : null);
+                const hardBounds = !!(payload.hard_boundaries || dragMedia?.hard_boundaries);
+
                 TIMELINE_STATE.insertClipWithRipple({
                     type: "video",
-                    video_id: payload.id,
+                    video_id: realVideoId,
                     photo_id: null,
                     inFrame: inFrame,
                     outFrame: outFrame,
                     in: inTime,
                     out: outTime,
                     rotation: itemRot,
-                    effects: effectsList
+                    effects: effectsList,
+                    ...(isSub ? {
+                        is_subclip: true,
+                        subclip_id: subId,
+                        name: subName,
+                        hard_boundaries: hardBounds,
+                        subclip_in_frame: inFrame,
+                        subclip_out_frame: outFrame,
+                        subclip_in: inTime,
+                        subclip_out: outTime
+                    } : {})
                 }, snappedFrame, targetTrack);
             }
         } else {
             if (payload.type === "photo") {
                 TIMELINE_STATE.addPhotoCut(payload.id, { track: targetTrack, timelineStartFrame: snappedFrame });
             } else {
-                TIMELINE_STATE.addCut(payload.id, inTime, outTime, targetTrack, snappedFrame);
+                const isSub = !!(payload.is_subclip || dragMedia?.is_subclip);
+                const realVideoId = isSub ? (payload.parent_video_id || dragMedia?.parent_video_id || payload.id) : payload.id;
+                const subName = payload.name || dragMedia?.title || null;
+                const subId = payload.subclip_id || (isSub ? payload.id : null);
+                const hardBounds = !!(payload.hard_boundaries || dragMedia?.hard_boundaries);
+
+                TIMELINE_STATE.addCut(realVideoId, inTime, outTime, targetTrack, snappedFrame, isSub ? {
+                    is_subclip: true,
+                    subclip_id: subId,
+                    name: subName,
+                    hard_boundaries: hardBounds,
+                    inFrame,
+                    outFrame,
+                    inSec: inTime,
+                    outSec: outTime
+                } : {});
             }
         }
 
@@ -10941,10 +10972,14 @@ export class CapiauTimelineInteraction {
 
         const minDeltaFromNeighbor = minAllowedStart - baseStart;
 
-        // Clamping à mídia interna (inFrame não pode ser menor que 0)
-        let minDeltaFromMedia = -baseIn;
+        // Clamping à mídia interna (inFrame não pode ser menor que 0, ou subclip_in_frame com hard boundaries)
+        const clipMinIn = (clip.hard_boundaries && clip.is_subclip && clip.subclip_in_frame !== undefined)
+            ? clip.subclip_in_frame : 0;
+        let minDeltaFromMedia = clipMinIn - baseIn;
         if (partner && partnerBaseIn !== null) {
-            minDeltaFromMedia = Math.max(minDeltaFromMedia, -partnerBaseIn);
+            const partnerMinIn = (partner.hard_boundaries && partner.is_subclip && partner.subclip_in_frame !== undefined)
+                ? partner.subclip_in_frame : 0;
+            minDeltaFromMedia = Math.max(minDeltaFromMedia, partnerMinIn - partnerBaseIn);
         }
 
         const minDelta = Math.max(minDeltaFromMedia, minDeltaFromNeighbor);

@@ -110,8 +110,8 @@ assert.ok(indexContent.includes('stream-icon-v'), "Botão de canais deve conter 
 assert.ok(indexContent.includes('stream-icon-a'), "Botão de canais deve conter SVG para modo A");
 
 // Cache-busters
-assert.ok(indexContent.includes('styles.css?v=45'), "Cache-buster de styles.css deve ser v=45");
-assert.ok(indexContent.includes('main.js?v=45'), "Cache-buster de main.js deve ser v=45");
+assert.ok(/styles\.css\?v=(?:4[5-9]|[5-9]\d+)/.test(indexContent), "Cache-buster de styles.css deve ser v>=45");
+assert.ok(/main\.js\?v=(?:4[5-9]|[5-9]\d+)/.test(indexContent), "Cache-buster de main.js deve ser v>=45");
 
 // Estilos CSS
 assert.ok(stylesContent.includes('.btn-edit-insert'), "styles.css deve estilizar .btn-edit-insert");

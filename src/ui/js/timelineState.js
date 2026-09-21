@@ -2583,6 +2583,18 @@ export class CapiauTimelineState {
             const linkId = audioTrackId ? `link_${stamp}` : null;
 
             const isPhoto = clipData.type === "photo";
+            if (!isPhoto && clipData.video_id && String(clipData.video_id).startsWith("subclip_")) {
+                const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
+                const foundSub = subclips.find(s => String(s.id) === String(clipData.video_id));
+                if (foundSub && foundSub.parent_video_id) {
+                    clipData.is_subclip = true;
+                    clipData.subclip_id = clipData.video_id;
+                    clipData.parent_video_id = foundSub.parent_video_id;
+                    clipData.video_id = foundSub.parent_video_id;
+                    if (!clipData.name) clipData.name = foundSub.name || foundSub.title;
+                    if (clipData.hard_boundaries === undefined) clipData.hard_boundaries = !!foundSub.hard_boundaries;
+                }
+            }
             let clipRot = clipData.rotation;
             if (clipRot === undefined) {
                 const media = isPhoto
@@ -3037,6 +3049,14 @@ export class CapiauTimelineState {
             return Infinity;
         }
         const fps = this.fps || 24;
+        if (clip.hard_boundaries && clip.is_subclip) {
+            if (clip.subclip_out_frame !== undefined && clip.subclip_out_frame !== null && Number.isFinite(clip.subclip_out_frame)) {
+                return clip.subclip_out_frame;
+            }
+            if (clip.subclip_out !== undefined && clip.subclip_out !== null && Number.isFinite(clip.subclip_out)) {
+                return Math.round(clip.subclip_out * fps);
+            }
+        }
         if (clip.mediaDurationFrames !== undefined && clip.mediaDurationFrames !== null && Number.isFinite(clip.mediaDurationFrames)) {
             return clip.mediaDurationFrames;
         }
@@ -3117,14 +3137,39 @@ export class CapiauTimelineState {
      * @param {number} [params.timelineStartFrame=null] Frame inicial explícito
      * @returns {Object|null} Novo clipe adicionado ou substituído
      */
-    insertMedia({ type = "video", id, inSec = null, outSec = null, mode = "playhead", targetTrack = null, timelineStartFrame = null } = {}) {
+    insertMedia({ type = "video", id, inSec = null, outSec = null, mode = "playhead", targetTrack = null, timelineStartFrame = null, is_subclip = false, subclip_id = null, parent_video_id = null, name = null, hard_boundaries = false } = {}) {
         if (!id) return null;
+        let realId = id;
+        let isSub = is_subclip;
+        let parentVidId = parent_video_id;
+        let subId = subclip_id;
+        let clipName = name;
+        let hardBounds = hard_boundaries;
+
+        if (!parentVidId && (String(id).startsWith("subclip_") || isSub)) {
+            const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
+            const foundSub = subclips.find(s => String(s.id) === String(id) || String(s.subclip_id) === String(id));
+            if (foundSub) {
+                isSub = true;
+                subId = foundSub.id;
+                parentVidId = foundSub.parent_video_id;
+                realId = parentVidId;
+                if (!clipName) clipName = foundSub.name || foundSub.title;
+                if (inSec === null || inSec === undefined) inSec = foundSub.in;
+                if (outSec === null || outSec === undefined) outSec = foundSub.out;
+                hardBounds = !!foundSub.hard_boundaries;
+            }
+        }
+        if (isSub && parentVidId) {
+            realId = parentVidId;
+        }
+
         const isVideo = type === "video";
-        const video = isVideo ? (STATE.allVideos || []).find(v => String(v.id) === String(id)) : null;
-        const photo = !isVideo ? (STATE.allPhotos || []).find(p => String(p.id) === String(id)) : null;
+        const video = isVideo ? (STATE.allVideos || []).find(v => String(v.id) === String(realId)) : null;
+        const photo = !isVideo ? (STATE.allPhotos || []).find(p => String(p.id) === String(realId)) : null;
         const mediaRot = isVideo
-            ? ((video && video.rotation) || (STATE.activeVideo && String(STATE.activeVideo.id) === String(id) ? STATE.activeVideo.rotation : 0) || 0)
-            : ((photo && photo.rotation) || (STATE.activePhoto && String(STATE.activePhoto.id) === String(id) ? STATE.activePhoto.rotation : 0) || 0);
+            ? ((video && video.rotation) || (STATE.activeVideo && String(STATE.activeVideo.id) === String(realId) ? STATE.activeVideo.rotation : 0) || 0)
+            : ((photo && photo.rotation) || (STATE.activePhoto && String(STATE.activePhoto.id) === String(realId) ? STATE.activePhoto.rotation : 0) || 0);
         const rotNorm = ((Math.round(Number(mediaRot) || 0) % 360) + 360) % 360;
 
         // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
@@ -3358,7 +3403,7 @@ export class CapiauTimelineState {
                 createdCut = {
                     id: `cut_${stamp}`,
                     type: "video",
-                    video_id: id,
+                    video_id: realId,
                     inFrame: inFrame,
                     outFrame: outFrame,
                     in: actualInSec,
@@ -3370,13 +3415,24 @@ export class CapiauTimelineState {
                     rotation: rotNorm,
                     effects: rotNorm ? [{ type: "transform", rotation: rotNorm, scale: 1, x: 0, y: 0 }] : []
                 };
+                if (isSub) {
+                    createdCut.is_subclip = true;
+                    createdCut.subclip_id = subId || id;
+                    createdCut.parent_video_id = realId;
+                    createdCut.name = clipName;
+                    createdCut.hard_boundaries = !!hardBounds;
+                    createdCut.subclip_in_frame = inFrame;
+                    createdCut.subclip_out_frame = outFrame;
+                    createdCut.subclip_in = actualInSec;
+                    createdCut.subclip_out = actualOutSec;
+                }
                 workingCuts.push(createdCut);
 
                 if (audioTrackId) {
-                    workingCuts.push({
+                    const audioCut = {
                         id: `cut_${stamp}_a`,
                         type: "video",
-                        video_id: id,
+                        video_id: realId,
                         inFrame: inFrame,
                         outFrame: outFrame,
                         in: actualInSec,
@@ -3385,7 +3441,19 @@ export class CapiauTimelineState {
                         timelineStartFrame: startFrame,
                         timeline_start: startFrame / fps,
                         link_id: linkId
-                    });
+                    };
+                    if (isSub) {
+                        audioCut.is_subclip = true;
+                        audioCut.subclip_id = subId || id;
+                        audioCut.parent_video_id = realId;
+                        audioCut.name = clipName;
+                        audioCut.hard_boundaries = !!hardBounds;
+                        audioCut.subclip_in_frame = inFrame;
+                        audioCut.subclip_out_frame = outFrame;
+                        audioCut.subclip_in = actualInSec;
+                        audioCut.subclip_out = actualOutSec;
+                    }
+                    workingCuts.push(audioCut);
                 }
             } else {
                 createdCut = {
@@ -3650,6 +3718,7 @@ export class CapiauTimelineState {
 
             // Inserção dos novos cortes
             if (isVideo) {
+                const subclipName = sourceData?.name || (sourceData?.is_subclip ? (sourceData.title || sourceData.video?.title) : null);
                 if (shouldInsertVideo && !isVidLocked && targetVideoTrack) {
                     createdCut = {
                         id: `cut_${stamp}`,
@@ -3666,6 +3735,16 @@ export class CapiauTimelineState {
                         rotation: rotVal,
                         effects: rotVal ? [{ type: "transform", rotation: rotVal, scale: 1, x: 0, y: 0 }] : []
                     };
+                    if (sourceData?.is_subclip) {
+                        createdCut.is_subclip = true;
+                        createdCut.subclip_id = sourceData.subclip_id || sourceData.id;
+                        createdCut.name = subclipName;
+                        createdCut.hard_boundaries = !!sourceData.hard_boundaries;
+                        createdCut.subclip_in_frame = inFrame;
+                        createdCut.subclip_out_frame = outFrame;
+                        createdCut.subclip_in = actualInSec;
+                        createdCut.subclip_out = actualOutSec;
+                    }
                     workingCuts.push(createdCut);
                 }
 
@@ -3683,6 +3762,16 @@ export class CapiauTimelineState {
                         timeline_start: startFrame / fps,
                         link_id: linkId
                     };
+                    if (sourceData?.is_subclip) {
+                        audioCut.is_subclip = true;
+                        audioCut.subclip_id = sourceData.subclip_id || sourceData.id;
+                        audioCut.name = subclipName;
+                        audioCut.hard_boundaries = !!sourceData.hard_boundaries;
+                        audioCut.subclip_in_frame = inFrame;
+                        audioCut.subclip_out_frame = outFrame;
+                        audioCut.subclip_in = actualInSec;
+                        audioCut.subclip_out = actualOutSec;
+                    }
                     if (!createdCut) createdCut = audioCut;
                     workingCuts.push(audioCut);
                 }
@@ -3759,8 +3848,25 @@ export class CapiauTimelineState {
     /**
      * Adiciona um novo corte à timeline de forma compatível e reativa.
      */
-    addCut(videoId, inSec, outSec, track = null, timelineStartFrame = null) {
-        const video = (STATE.allVideos || []).find(v => String(v.id) === String(videoId));
+    addCut(videoId, inSec, outSec, track = null, timelineStartFrame = null, options = {}) {
+        let realVideoId = videoId;
+        let isSub = options && !!options.is_subclip;
+        let subId = options && options.subclip_id;
+        let subName = options && options.name;
+        let hardBounds = options && !!options.hard_boundaries;
+
+        if (String(videoId).startsWith("subclip_") || isSub) {
+            const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
+            const foundSub = subclips.find(s => String(s.id) === String(videoId) || String(s.subclip_id) === String(videoId));
+            if (foundSub && foundSub.parent_video_id) {
+                realVideoId = foundSub.parent_video_id;
+                isSub = true;
+                subId = foundSub.id;
+                if (!subName) subName = foundSub.name || foundSub.title;
+                if (options.hard_boundaries === undefined) hardBounds = !!foundSub.hard_boundaries;
+            }
+        }
+        const video = (STATE.allVideos || []).find(v => String(v.id) === String(realVideoId));
         // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
         const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
 
@@ -3855,7 +3961,7 @@ export class CapiauTimelineState {
         const newCut = {
             id: `cut_${stamp}`,
             type: "video",
-            video_id: videoId,
+            video_id: realVideoId,
             inFrame: inFrame,
             outFrame: outFrame,
             in: inSec,
@@ -3867,15 +3973,26 @@ export class CapiauTimelineState {
             rotation: rot,
             effects: rot ? [{ type: "transform", rotation: rot, scale: 1, x: 0, y: 0 }] : []
         };
+        if (isSub) {
+            newCut.is_subclip = true;
+            newCut.subclip_id = subId;
+            newCut.parent_video_id = realVideoId;
+            newCut.name = subName;
+            newCut.hard_boundaries = !!hardBounds;
+            newCut.subclip_in_frame = inFrame;
+            newCut.subclip_out_frame = outFrame;
+            newCut.subclip_in = inSec;
+            newCut.subclip_out = outSec;
+        }
 
         TIMELINE_HISTORY.record(() => {
             const currentCuts = this.conformCuts(STATE.activeTimelineCuts);
             currentCuts.push(newCut);
             if (audioTrackId) {
-                currentCuts.push({
+                const audioCut = {
                     id: `cut_${stamp}_a`,
                     type: "video",
-                    video_id: videoId,
+                    video_id: realVideoId,
                     inFrame: inFrame,
                     outFrame: outFrame,
                     in: inSec,
@@ -3884,7 +4001,19 @@ export class CapiauTimelineState {
                     timelineStartFrame: Math.max(0, Math.round(startFrame)),
                     timeline_start: Math.max(0, Math.round(startFrame)) / this.fps,
                     link_id: linkId
-                });
+                };
+                if (isSub) {
+                    audioCut.is_subclip = true;
+                    audioCut.subclip_id = subId;
+                    audioCut.parent_video_id = realVideoId;
+                    audioCut.name = subName;
+                    audioCut.hard_boundaries = !!hardBounds;
+                    audioCut.subclip_in_frame = inFrame;
+                    audioCut.subclip_out_frame = outFrame;
+                    audioCut.subclip_in = inSec;
+                    audioCut.subclip_out = outSec;
+                }
+                currentCuts.push(audioCut);
             }
 
             // Atualiza o estado global reativo

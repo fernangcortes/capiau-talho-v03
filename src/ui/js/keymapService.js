@@ -300,6 +300,12 @@ export const COMMANDS_CATALOG = [
         description: "Substitui a mídia do clipe alvo (selecionado, sob a agulha ou sob o cursor com Alt no arraste) preservando duração exata, efeitos (Ken Burns), cor e velocidade"
     },
     {
+        id: "edit.create_subclip",
+        category: "edit",
+        label: "Criar Subclipe na Biblioteca (Make Subclip)",
+        description: "Gera um novo item virtual na biblioteca a partir do intervalo [IN–OUT] delimitado no monitor Source"
+    },
+    {
         id: "edit.split",
         category: "edit",
         label: "Dividir Clipe no Playhead (Split)",
@@ -760,6 +766,7 @@ export const KEYMAP_PRESETS = {
         "edit.match_frame": ["Alt+KeyF"],
         "edit.reverse_match_frame": ["Shift+KeyF"],
         "edit.replace_clip": ["Ctrl+Shift+KeyR"],
+        "edit.create_subclip": ["Ctrl+KeyU"],
         "edit.split": ["KeyE", "KeyZ", "Alt+KeyE", "Alt+KeyZ"],
         "edit.ripple_trim_head": ["KeyQ"],
         "edit.ripple_trim_tail": ["KeyW"],
@@ -900,6 +907,7 @@ export const KEYMAP_PRESETS = {
         "edit.match_frame": ["Alt+KeyF"],
         "edit.reverse_match_frame": ["Shift+KeyF"],
         "edit.replace_clip": ["Ctrl+Shift+KeyR"],
+        "edit.create_subclip": ["Ctrl+KeyU"],
         "edit.split": ["Shift+KeyR", "KeyX"],
         "edit.ripple_trim_head": ["BracketLeft", "KeyQ"],
         "edit.ripple_trim_tail": ["BracketRight", "KeyW"],
@@ -984,6 +992,7 @@ export const KEYMAP_PRESETS = {
         "edit.match_frame": ["KeyF"],
         "edit.reverse_match_frame": ["Shift+KeyF"],
         "edit.replace_clip": ["Ctrl+Shift+KeyR"],
+        "edit.create_subclip": ["Ctrl+KeyU"],
         "edit.toggle_clip_disable": ["Shift+KeyE"],
         "edit.split": ["Ctrl+KeyK"],
         "edit.ripple_trim_head": ["KeyQ"],
@@ -1069,6 +1078,7 @@ export const KEYMAP_PRESETS = {
         "edit.match_frame": ["KeyF"],
         "edit.reverse_match_frame": ["Shift+KeyF"],
         "edit.replace_clip": ["Ctrl+Shift+KeyR"],
+        "edit.create_subclip": ["Ctrl+KeyU"],
         "edit.toggle_clip_disable": ["KeyD"],
         "edit.split": ["Ctrl+Backslash"],
         "edit.ripple_trim_head": ["Shift+BracketLeft", "KeyQ"],
@@ -1154,6 +1164,7 @@ export const KEYMAP_PRESETS = {
         "edit.match_frame": ["Shift+KeyF"],
         "edit.reverse_match_frame": ["Alt+KeyF"],
         "edit.replace_clip": ["Ctrl+Shift+KeyR"],
+        "edit.create_subclip": ["Ctrl+KeyU"],
         "edit.toggle_clip_disable": ["KeyV"],
         "edit.split": ["Cmd+KeyB"],
         "edit.ripple_trim_head": ["Alt+BracketLeft", "KeyQ"],
