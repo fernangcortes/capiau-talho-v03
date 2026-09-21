@@ -1764,6 +1764,20 @@ button {
     transform: translate(-50%, -50%) rotate(270deg);
 }
 
+/* Rotação em miniaturas da árvore e lista */
+.media-card.rot-90 .media-thumbnail img,
+.media-thumbnail.rot-90 img {
+    transform: rotate(90deg);
+}
+.media-card.rot-180 .media-thumbnail img,
+.media-thumbnail.rot-180 img {
+    transform: rotate(180deg);
+}
+.media-card.rot-270 .media-thumbnail img,
+.media-thumbnail.rot-270 img {
+    transform: rotate(270deg);
+}
+
 /* ── ZOOM MÁXIMO NA GALERIA (EXPANSÃO TOTAL ATÉ A BORDA DIREITA) ── */
 /* No zoom máximo, o item atua como prévia expandida preenchendo 100% da largura disponível */
 .zoom-xl .gallery-item {

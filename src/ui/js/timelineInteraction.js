@@ -3850,7 +3850,8 @@ export class CapiauTimelineInteraction {
                 id: dragMedia.id,
                 inTime: dragMedia.inTime,
                 outTime: dragMedia.outTime,
-                duration: dragMedia.effectiveDuration
+                duration: dragMedia.effectiveDuration,
+                rotation: dragMedia.rotation || 0
             };
         }
 
@@ -3876,15 +3877,15 @@ export class CapiauTimelineInteraction {
             inTime = 0.0;
             outTime = dur;
         } else {
-            const video = STATE.allVideos?.find(v => v.id === payload.id);
+            const video = (STATE.allVideos || []).find(v => String(v.id) === String(payload.id));
             const totalDur = (video && video.duration && video.duration > 0) ? video.duration : 5.0;
             if (payload.inTime !== undefined && payload.outTime !== undefined && payload.outTime > payload.inTime) {
                 inTime = payload.inTime;
                 outTime = payload.outTime;
-            } else if (dragMedia && dragMedia.id === payload.id && dragMedia.outTime > dragMedia.inTime) {
+            } else if (dragMedia && String(dragMedia.id) === String(payload.id) && dragMedia.outTime > dragMedia.inTime) {
                 inTime = dragMedia.inTime;
                 outTime = dragMedia.outTime;
-            } else if (STATE.activeVideo && STATE.activeVideo.id === payload.id) {
+            } else if (STATE.activeVideo && String(STATE.activeVideo.id) === String(payload.id)) {
                 if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
                 if (STATE.markerOut !== null && STATE.markerOut !== undefined) outTime = STATE.markerOut;
                 if (outTime <= inTime) outTime = totalDur;
@@ -3896,6 +3897,21 @@ export class CapiauTimelineInteraction {
 
         const effDur = Math.max(0.1, outTime - inTime);
         const effDurFrames = Math.max(1, secondsToFrames(effDur, fps));
+
+        // Determina a rotação da mídia vinda do drop
+        let itemRot = 0;
+        if (typeof payload.rotation === "number") {
+            itemRot = payload.rotation;
+        } else if (dragMedia && typeof dragMedia.rotation === "number") {
+            itemRot = dragMedia.rotation;
+        } else if (payload.type === "photo") {
+            const p = (STATE.allPhotos || []).find(it => String(it.id) === String(payload.id));
+            itemRot = p ? (p.rotation || 0) : ((STATE.activePhoto && String(STATE.activePhoto.id) === String(payload.id)) ? (STATE.activePhoto.rotation || 0) : 0);
+        } else {
+            const v = (STATE.allVideos || []).find(it => String(it.id) === String(payload.id));
+            itemRot = v ? (v.rotation || 0) : ((STATE.activeVideo && String(STATE.activeVideo.id) === String(payload.id)) ? (STATE.activeVideo.rotation || 0) : 0);
+        }
+        itemRot = ((Math.round(Number(itemRot) || 0) % 360) + 360) % 360;
 
         const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
         let snappedFrame = dropFrame;
@@ -3919,6 +3935,7 @@ export class CapiauTimelineInteraction {
         if (isInsert) {
             const inFrame = secondsToFrames(inTime, fps);
             const outFrame = secondsToFrames(outTime, fps);
+            const effectsList = itemRot ? [{ type: "transform", rotation: itemRot, scale: 1, x: 0, y: 0 }] : [];
             if (payload.type === "photo") {
                 TIMELINE_STATE.insertClipWithRipple({
                     type: "photo",
@@ -3928,7 +3945,8 @@ export class CapiauTimelineInteraction {
                     outFrame: secondsToFrames(effDur, fps),
                     in: 0,
                     out: effDur,
-                    effects: [{ type: "fit", mode: "fill" }]
+                    rotation: itemRot,
+                    effects: [{ type: "fit", mode: "fit" }, ...effectsList]
                 }, snappedFrame, targetTrack);
             } else {
                 TIMELINE_STATE.insertClipWithRipple({
@@ -3938,7 +3956,9 @@ export class CapiauTimelineInteraction {
                     inFrame: inFrame,
                     outFrame: outFrame,
                     in: inTime,
-                    out: outTime
+                    out: outTime,
+                    rotation: itemRot,
+                    effects: effectsList
                 }, snappedFrame, targetTrack);
             }
         } else {

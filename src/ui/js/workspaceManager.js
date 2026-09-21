@@ -3731,12 +3731,25 @@ export class WorkspaceManager {
         // Escuta atalhos de teclado no popout e redireciona para o player principal
         if (!win._hasWorkspaceKeyHandler) {
             win._hasWorkspaceKeyHandler = true;
+            if (window._galleryController && typeof window._galleryController.attachToWindow === "function") {
+                window._galleryController.attachToWindow(win);
+            }
             win.addEventListener("keydown", (e) => {
                 const activeTag = win.document.activeElement?.tagName?.toLowerCase();
                 if (activeTag === "input" || activeTag === "textarea") return;
                 
                 if (window.isAnyModalOpen && window.isAnyModalOpen(win.document)) return;
                 if (window.FaceManager && window.FaceManager.inspectorCard) return;
+
+                // Intercepta atalho de rotação de mídia sob o cursor (R / Shift+R) no popout
+                if (window._galleryController && window._galleryController.activeItem &&
+                    (e.code === "KeyR" || e.key === "r" || e.key === "R" || (window.KEYMAP_SERVICE?.matches(e, "tools.rotate_media")))) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const step = e.shiftKey ? -90 : 90;
+                    window._galleryController.rotateActiveItem(step);
+                    return;
+                }
 
                 if (window.player && typeof window.player.handleGlobalKeyboard === "function") {
                     window.player.handleGlobalKeyboard(e);
@@ -3894,6 +3907,11 @@ export class WorkspaceManager {
             window.initGlobalTooltips(win.document, win);
         }
 
+        // Anexa controlador de atalhos da galeria à janela destacada
+        if (window._galleryController && typeof window._galleryController.attachToWindow === "function") {
+            window._galleryController.attachToWindow(win);
+        }
+
         // Se for a biblioteca de mídias, anexa o tracker do índice de rolagem (Scroll Index) à janela destacada
         if (panelId === "sidebar-left") {
             if (window.libraryScrollIndex) {
@@ -3954,12 +3972,25 @@ export class WorkspaceManager {
         // Escuta atalhos de teclado no popout e redireciona para o player principal
         if (!win._hasWorkspaceKeyHandler) {
             win._hasWorkspaceKeyHandler = true;
+            if (window._galleryController && typeof window._galleryController.attachToWindow === "function") {
+                window._galleryController.attachToWindow(win);
+            }
             win.addEventListener("keydown", (e) => {
                 const activeTag = win.document.activeElement?.tagName?.toLowerCase();
                 if (activeTag === "input" || activeTag === "textarea") return;
                 
                 if (window.isAnyModalOpen && window.isAnyModalOpen(win.document)) return;
                 if (window.FaceManager && window.FaceManager.inspectorCard) return;
+
+                // Intercepta atalho de rotação de mídia sob o cursor (R / Shift+R) no popout
+                if (window._galleryController && window._galleryController.activeItem &&
+                    (e.code === "KeyR" || e.key === "r" || e.key === "R" || (window.KEYMAP_SERVICE?.matches(e, "tools.rotate_media")))) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const step = e.shiftKey ? -90 : 90;
+                    window._galleryController.rotateActiveItem(step);
+                    return;
+                }
 
                 if (window.player && typeof window.player.handleGlobalKeyboard === "function") {
                     window.player.handleGlobalKeyboard(e);

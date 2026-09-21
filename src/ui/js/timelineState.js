@@ -2579,13 +2579,32 @@ export class CapiauTimelineState {
             const audioTrackId = this.pairedAudioTrackId(targetTrackId);
             const linkId = audioTrackId ? `link_${stamp}` : null;
 
+            const isPhoto = clipData.type === "photo";
+            let clipRot = clipData.rotation;
+            if (clipRot === undefined) {
+                const media = isPhoto
+                    ? (STATE.allPhotos || []).find(p => String(p.id) === String(clipData.photo_id))
+                    : (STATE.allVideos || []).find(v => String(v.id) === String(clipData.video_id));
+                const activeMedia = isPhoto ? STATE.activePhoto : STATE.activeVideo;
+                const mediaId = isPhoto ? clipData.photo_id : clipData.video_id;
+                const activeRot = (activeMedia && String(activeMedia.id) === String(mediaId)) ? activeMedia.rotation : 0;
+                clipRot = (media && media.rotation) ? media.rotation : (activeRot || 0);
+            }
+            const rotVal = ((Math.round(Number(clipRot) || 0) % 360) + 360) % 360;
+            let clipEffects = clipData.effects ? [...clipData.effects] : (isPhoto ? [{ type: "fit", mode: "fit" }] : []);
+            if (rotVal !== 0 && !clipEffects.some(e => e.type === "transform")) {
+                clipEffects.push({ type: "transform", rotation: rotVal, scale: 1, x: 0, y: 0 });
+            }
+
             const newClip = {
                 ...clipData,
                 id: clipData.id || `cut_${stamp}`,
                 track: targetTrackId,
                 timelineStartFrame: targetFrame,
                 timeline_start: targetFrame / this.fps,
-                link_id: linkId
+                link_id: linkId,
+                rotation: rotVal,
+                effects: clipEffects
             };
             cuts.push(newClip);
 
@@ -3095,8 +3114,15 @@ export class CapiauTimelineState {
     insertMedia({ type = "video", id, inSec = null, outSec = null, mode = "playhead", targetTrack = null, timelineStartFrame = null } = {}) {
         if (!id) return null;
         const isVideo = type === "video";
-        const video = isVideo ? (STATE.allVideos || []).find(v => v.id === id) : null;
-        const photo = !isVideo ? (STATE.allPhotos || []).find(p => p.id === id) : null;
+        const video = isVideo ? (STATE.allVideos || []).find(v => String(v.id) === String(id)) : null;
+        const photo = !isVideo ? (STATE.allPhotos || []).find(p => String(p.id) === String(id)) : null;
+        const mediaRot = isVideo
+            ? ((video && video.rotation) || (STATE.activeVideo && String(STATE.activeVideo.id) === String(id) ? STATE.activeVideo.rotation : 0) || 0)
+            : ((photo && photo.rotation) || (STATE.activePhoto && String(STATE.activePhoto.id) === String(id) ? STATE.activePhoto.rotation : 0) || 0);
+        const rotNorm = ((Math.round(Number(mediaRot) || 0) % 360) + 360) % 360;
+
+        // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
+        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
 
         // Auto-configuração no primeiro clipe de vídeo da timeline (Fase 2.3)
         if ((STATE.activeTimelineCuts || []).length === 0 && video) {
@@ -3334,7 +3360,9 @@ export class CapiauTimelineState {
                     track: track,
                     timelineStartFrame: startFrame,
                     timeline_start: startFrame / fps,
-                    link_id: linkId
+                    link_id: linkId,
+                    rotation: rotNorm,
+                    effects: rotNorm ? [{ type: "transform", rotation: rotNorm, scale: 1, x: 0, y: 0 }] : []
                 };
                 workingCuts.push(createdCut);
 
@@ -3367,7 +3395,10 @@ export class CapiauTimelineState {
                     timelineStartFrame: startFrame,
                     timeline_start: startFrame / fps,
                     link_id: null,
-                    effects: [{ type: "fit", mode: "fill" }]
+                    rotation: rotNorm,
+                    effects: rotNorm
+                        ? [{ type: "fit", mode: "fit" }, { type: "transform", rotation: rotNorm, scale: 1, x: 0, y: 0 }]
+                        : [{ type: "fit", mode: "fit" }]
                 };
                 workingCuts.push(createdCut);
             }
@@ -3435,8 +3466,17 @@ export class CapiauTimelineState {
         }
 
         const isVideo = mediaType === "video";
-        const videoObj = isVideo ? ((STATE.allVideos || []).find(v => v.id === mediaId) || STATE.activeVideo) : null;
-        const photoObj = !isVideo ? ((STATE.allPhotos || []).find(p => p.id === mediaId) || STATE.activePhoto) : null;
+        const videoObj = isVideo ? ((STATE.allVideos || []).find(v => String(v.id) === String(mediaId)) || STATE.activeVideo) : null;
+        const photoObj = !isVideo ? ((STATE.allPhotos || []).find(p => String(p.id) === String(mediaId)) || STATE.activePhoto) : null;
+        let rotVal = 0;
+        if (isVideo) {
+            rotVal = (typeof videoObj?.rotation === "number") ? ((videoObj.rotation % 360) + 360) % 360 : 0;
+        } else {
+            rotVal = (typeof photoObj?.rotation === "number") ? ((photoObj.rotation % 360) + 360) % 360 : 0;
+        }
+
+        // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
+        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
 
         // Auto-configuração no primeiro clipe da timeline se vazia
         if ((STATE.activeTimelineCuts || []).length === 0 && videoObj) {
@@ -3613,7 +3653,9 @@ export class CapiauTimelineState {
                         track: targetVideoTrack,
                         timelineStartFrame: startFrame,
                         timeline_start: startFrame / fps,
-                        link_id: linkId
+                        link_id: linkId,
+                        rotation: rotVal,
+                        effects: rotVal ? [{ type: "transform", rotation: rotVal, scale: 1, x: 0, y: 0 }] : []
                     };
                     workingCuts.push(createdCut);
                 }
@@ -3651,7 +3693,10 @@ export class CapiauTimelineState {
                         timelineStartFrame: startFrame,
                         timeline_start: startFrame / fps,
                         link_id: null,
-                        effects: [{ type: "fit", mode: "fill" }]
+                        rotation: rotVal,
+                        effects: rotVal
+                            ? [{ type: "fit", mode: "fit" }, { type: "transform", rotation: rotVal, scale: 1, x: 0, y: 0 }]
+                            : [{ type: "fit", mode: "fit" }]
                     };
                     workingCuts.push(createdCut);
                 }
@@ -3703,7 +3748,9 @@ export class CapiauTimelineState {
      * Adiciona um novo corte à timeline de forma compatível e reativa.
      */
     addCut(videoId, inSec, outSec, track = null, timelineStartFrame = null) {
-        const video = STATE.allVideos.find(v => v.id === videoId);
+        const video = (STATE.allVideos || []).find(v => String(v.id) === String(videoId));
+        // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
+        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
 
         // Pista inexistente/travada vira roteamento automático
         if (track) {
@@ -3787,6 +3834,12 @@ export class CapiauTimelineState {
             }
         }
 
+        let rot = 0;
+        if (video && typeof video.rotation === 'number') {
+            rot = ((video.rotation % 360) + 360) % 360;
+        } else if (STATE.activeVideo && String(STATE.activeVideo.id) === String(videoId) && typeof STATE.activeVideo.rotation === 'number') {
+            rot = ((STATE.activeVideo.rotation % 360) + 360) % 360;
+        }
         const newCut = {
             id: `cut_${stamp}`,
             type: "video",
@@ -3798,7 +3851,9 @@ export class CapiauTimelineState {
             track: track,
             timelineStartFrame: Math.max(0, Math.round(startFrame)),
             timeline_start: Math.max(0, Math.round(startFrame)) / this.fps,
-            link_id: linkId
+            link_id: linkId,
+            rotation: rot,
+            effects: rot ? [{ type: "transform", rotation: rot, scale: 1, x: 0, y: 0 }] : []
         };
 
         TIMELINE_HISTORY.record(() => {
@@ -3863,6 +3918,13 @@ export class CapiauTimelineState {
             startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
         }
 
+        const photo = (STATE.allPhotos || []).find(p => String(p.id) === String(photoId));
+        let rot = 0;
+        if (photo && typeof photo.rotation === 'number') {
+            rot = ((photo.rotation % 360) + 360) % 360;
+        } else if (STATE.activePhoto && String(STATE.activePhoto.id) === String(photoId) && typeof STATE.activePhoto.rotation === 'number') {
+            rot = ((STATE.activePhoto.rotation % 360) + 360) % 360;
+        }
         const newCut = {
             id: `cut_${stamp}`,
             type: "photo",
@@ -3876,7 +3938,10 @@ export class CapiauTimelineState {
             timelineStartFrame: Math.max(0, Math.round(startFrame)),
             timeline_start: Math.max(0, Math.round(startFrame)) / this.fps,
             link_id: null,
-            effects: [{ type: "fit", mode: "fill" }]
+            rotation: rot,
+            effects: rot
+                ? [{ type: "fit", mode: "fit" }, { type: "transform", rotation: rot, scale: 1, x: 0, y: 0 }]
+                : [{ type: "fit", mode: "fit" }]
         };
 
         TIMELINE_HISTORY.record(() => {
@@ -5097,6 +5162,49 @@ export class CapiauTimelineState {
 
 export const TIMELINE_STATE = new CapiauTimelineState();
 window.TIMELINE_STATE = TIMELINE_STATE;
+
+// Sincroniza rotação de mídia com clipes existentes na timeline e estado global
+STATE.on("mediaRotated", ({ mediaType, mediaId, rotation }) => {
+    const rotNorm = ((Math.round(Number(rotation) || 0) % 360) + 360) % 360;
+    if (mediaType === "video") {
+        const v = (STATE.allVideos || []).find(it => String(it.id) === String(mediaId));
+        if (v) v.rotation = rotNorm;
+        if (STATE.activeVideo && String(STATE.activeVideo.id) === String(mediaId)) {
+            STATE.activeVideo.rotation = rotNorm;
+        }
+    } else if (mediaType === "photo") {
+        const p = (STATE.allPhotos || []).find(it => String(it.id) === String(mediaId));
+        if (p) p.rotation = rotNorm;
+        if (STATE.activePhoto && String(STATE.activePhoto.id) === String(mediaId)) {
+            STATE.activePhoto.rotation = rotNorm;
+        }
+    }
+
+    let changed = false;
+    (STATE.activeTimelineCuts || []).forEach(cut => {
+        const matches = (mediaType === "video" && String(cut.video_id) === String(mediaId)) ||
+                        (mediaType === "photo" && String(cut.photo_id) === String(mediaId));
+        if (matches) {
+            cut.rotation = rotation;
+            if (!cut.effects) cut.effects = [];
+            let tf = cut.effects.find(e => e.type === "transform");
+            if (tf) {
+                tf.rotation = rotation;
+            } else if (rotation !== 0) {
+                cut.effects.push({ type: "transform", rotation: rotation, scale: 1, x: 0, y: 0 });
+            }
+            changed = true;
+        }
+    });
+    if (changed) {
+        STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+        if (typeof window.player?.updateProgramView === "function") {
+            window.player.updateProgramView();
+        } else if (typeof window.player?.syncVideoToPlayhead === "function") {
+            window.player.syncVideoToPlayhead();
+        }
+    }
+});
 
 // --- HISTÓRICO DE UNDO/REDO (snapshots de clipes, pistas e sugestões) ---
 

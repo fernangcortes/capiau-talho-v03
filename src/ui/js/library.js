@@ -3,6 +3,7 @@ import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 import { FaceManager } from "./faces.js";
 import { parseQuery, evaluateAST, getAvailableSuggestions } from "./searchParser.js";
+import { KEYMAP_SERVICE } from "./keymapService.js";
 
 // Armazena o estado das pastas expandidas/recolhidas (persistido por projeto)
 const openFoldersSet = new Set();
@@ -1422,13 +1423,27 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     // Item: Girar Mídia (+90°)
     const rotateItem = document.createElement("div");
     rotateItem.className = "menu-item";
-    rotateItem.innerHTML = `<i class="fa-solid fa-rotate-right" style="color:var(--color-cyan);"></i><span class="menu-item-text">Girar Mídia (+90°)</span>`;
+    rotateItem.innerHTML = `<i class="fa-solid fa-rotate-right" style="color:var(--color-cyan);"></i><span class="menu-item-text">Girar Mídia (+90°)</span><span style="margin-left:auto; font-size:10px; color:var(--text-muted); padding-left:12px;">R</span>`;
     rotateItem.addEventListener("click", async () => {
         menu.remove();
         try {
             const res = await CapIAuAPI.rotateMedia(kind, item.id, 90);
             item.rotation = res.rotation;
+            if (kind === "video") {
+                const globalV = (STATE.allVideos || []).find(v => String(v.id) === String(item.id));
+                if (globalV) globalV.rotation = res.rotation;
+                if (STATE.activeVideo && String(STATE.activeVideo.id) === String(item.id)) {
+                    STATE.activeVideo.rotation = res.rotation;
+                }
+            } else {
+                const globalP = (STATE.allPhotos || []).find(p => String(p.id) === String(item.id));
+                if (globalP) globalP.rotation = res.rotation;
+                if (STATE.activePhoto && String(STATE.activePhoto.id) === String(item.id)) {
+                    STATE.activePhoto.rotation = res.rotation;
+                }
+            }
             if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+            STATE.emit("mediaRotated", { mediaType: kind, mediaId: item.id, rotation: res.rotation, item });
             if (typeof window.showToast === "function") window.showToast(`Mídia rotacionada para ${res.rotation}°!`, "success");
         } catch (err) {
             alert("Erro ao girar mídia: " + err.message);
@@ -3717,10 +3732,21 @@ function renderTreeNode(node, container, depth = 0) {
             if (!hasVisionError) return;
         }
 
+        const rotV = (v.rotation || 0) % 360;
         const card = document.createElement("div");
-        card.className = "media-card tree-file-item" + (hasVisionError ? " has-vision-error" : "");
+        card.className = "media-card tree-file-item" + (hasVisionError ? " has-vision-error" : "") + (rotV ? ` rot-${rotV}` : "");
         card.setAttribute("data-video-id", v.id);
         card.style.paddingLeft = "6px";
+        card._mediaData = v;
+        card._mediaKind = "video";
+        card.addEventListener("mouseenter", () => {
+            if (window._galleryController) window._galleryController.activeItem = card;
+        });
+        card.addEventListener("mouseleave", () => {
+            if (window._galleryController && window._galleryController.activeItem === card) {
+                window._galleryController.activeItem = null;
+            }
+        });
         if (STATE.activeVideo && STATE.activeVideo.id === v.id) card.classList.add("active");
         
         const badgeClass = v.video_type === "interview" ? "tag-interview" : "tag-broll";
@@ -3959,7 +3985,8 @@ function renderTreeNode(node, container, depth = 0) {
                 inTime: inTime,
                 outTime: outTime,
                 effectiveDuration: effDur,
-                video_type: v.video_type || null
+                video_type: v.video_type || null,
+                rotation: (v.rotation || 0) % 360
             };
 
             e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({
@@ -3967,7 +3994,8 @@ function renderTreeNode(node, container, depth = 0) {
                 id: v.id,
                 inTime: inTime,
                 outTime: outTime,
-                duration: effDur
+                duration: effDur,
+                rotation: (v.rotation || 0) % 360
             }));
             e.dataTransfer.effectAllowed = "copy";
         });
@@ -4048,10 +4076,21 @@ function renderTreeNode(node, container, depth = 0) {
             return;
         }
         
+        const rotP = (p.rotation || 0) % 360;
         const card = document.createElement("div");
-        card.className = "media-card tree-file-item photo-item";
+        card.className = "media-card tree-file-item photo-item" + (rotP ? ` rot-${rotP}` : "");
         card.setAttribute("data-photo-id", p.id);
         card.style.paddingLeft = "6px";
+        card._mediaData = p;
+        card._mediaKind = "photo";
+        card.addEventListener("mouseenter", () => {
+            if (window._galleryController) window._galleryController.activeItem = card;
+        });
+        card.addEventListener("mouseleave", () => {
+            if (window._galleryController && window._galleryController.activeItem === card) {
+                window._galleryController.activeItem = null;
+            }
+        });
         if (STATE.activePhoto && STATE.activePhoto.id === p.id) card.classList.add("active");
         
         // Card da biblioteca usa a miniatura (~320px), nao o proxy de 1024px.
@@ -4197,7 +4236,8 @@ function renderTreeNode(node, container, depth = 0) {
                     duration: effDur,
                     inTime: 0,
                     outTime: effDur,
-                    effectiveDuration: effDur
+                    effectiveDuration: effDur,
+                    rotation: (p.rotation || 0) % 360
                 };
 
                 e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({
@@ -4205,7 +4245,8 @@ function renderTreeNode(node, container, depth = 0) {
                     id: p.id,
                     inTime: 0,
                     outTime: effDur,
-                    duration: effDur
+                    duration: effDur,
+                    rotation: (p.rotation || 0) % 360
                 }));
                 e.dataTransfer.effectAllowed = "copy";
             });
@@ -4587,6 +4628,14 @@ export class GalleryInteractionController {
         });
 
         window.addEventListener("keydown", (e) => {
+            const activeEl = document.activeElement;
+            const activeTag = activeEl?.tagName;
+            const isTextInput = (activeTag === "INPUT" && activeEl.type !== "range") ||
+                                activeTag === "TEXTAREA" ||
+                                activeTag === "SELECT" ||
+                                activeEl?.isContentEditable;
+            if (isTextInput) return;
+
             if (e.key === "Control" && this.activeItem && !this.isCtrlScrubbing) {
                 this.startCtrlScrubbing(this.activeItem);
             }
@@ -4596,7 +4645,144 @@ export class GalleryInteractionController {
             if (e.key === "Shift" && this.activeItem) {
                 this.showShiftHud(this.activeItem);
             }
+
+            // Atalho para girar mídia sob hover (R ou Shift+R)
+            if (this.activeItem && (e.code === "KeyR" || e.key === "r" || e.key === "R" || (typeof KEYMAP_SERVICE !== "undefined" && KEYMAP_SERVICE?.matches(e, "tools.rotate_media")))) {
+                e.preventDefault();
+                e.stopPropagation();
+                const step = e.shiftKey ? -90 : 90;
+                this.rotateActiveItem(step);
+            }
         });
+    }
+
+    /** Permite interceptar atalhos (como 'R' no hover) em janelas destacadas (popout). */
+    attachToWindow(win) {
+        if (!win || win._hasGalleryInteraction) return;
+        win._hasGalleryInteraction = true;
+
+        win.addEventListener("keyup", (e) => {
+            if (e.key === "Control" && this.isCtrlScrubbing) {
+                this.stopCtrlScrubbing();
+            }
+            if (e.key === "Alt" && this.isAltInspecting) {
+                this.stopAltInspecting();
+            }
+            if (e.key === "Shift" && this.shiftHud) {
+                this.shiftHud.style.display = "none";
+            }
+        });
+
+        win.addEventListener("keydown", (e) => {
+            const activeEl = win.document?.activeElement;
+            const activeTag = activeEl?.tagName;
+            const isTextInput = (activeTag === "INPUT" && activeEl.type !== "range") ||
+                                activeTag === "TEXTAREA" ||
+                                activeTag === "SELECT" ||
+                                activeEl?.isContentEditable;
+            if (isTextInput) return;
+
+            if (e.key === "Control" && this.activeItem && !this.isCtrlScrubbing) {
+                this.startCtrlScrubbing(this.activeItem);
+            }
+            if (e.key === "Alt" && this.activeItem && !this.isAltInspecting) {
+                this.startAltInspecting(this.activeItem);
+            }
+            if (e.key === "Shift" && this.activeItem) {
+                this.showShiftHud(this.activeItem);
+            }
+
+            if (this.activeItem && (e.code === "KeyR" || e.key === "r" || e.key === "R" || (typeof KEYMAP_SERVICE !== "undefined" && KEYMAP_SERVICE?.matches(e, "tools.rotate_media")))) {
+                e.preventDefault();
+                e.stopPropagation();
+                const step = e.shiftKey ? -90 : 90;
+                this.rotateActiveItem(step);
+            }
+        });
+    }
+
+    async rotateActiveItem(step = 90) {
+        if (!this.activeItem) return;
+        const itemEl = this.activeItem;
+        const item = itemEl._mediaData;
+        if (!item) return;
+        const isVideo = itemEl._mediaKind === "video" || item.duration !== undefined;
+        const kind = isVideo ? "video" : "photo";
+
+        try {
+            const res = await CapIAuAPI.rotateMedia(kind, item.id, step);
+            const newRot = res.rotation;
+            item.rotation = newRot;
+
+            // Sincroniza em STATE.allVideos / STATE.allPhotos e activeVideo / activePhoto
+            if (kind === "video") {
+                const globalV = (STATE.allVideos || []).find(v => String(v.id) === String(item.id));
+                if (globalV) globalV.rotation = newRot;
+                if (STATE.activeVideo && String(STATE.activeVideo.id) === String(item.id)) {
+                    STATE.activeVideo.rotation = newRot;
+                }
+            } else {
+                const globalP = (STATE.allPhotos || []).find(p => String(p.id) === String(item.id));
+                if (globalP) globalP.rotation = newRot;
+                if (STATE.activePhoto && String(STATE.activePhoto.id) === String(item.id)) {
+                    STATE.activePhoto.rotation = newRot;
+                }
+            }
+
+            // Atualiza classes CSS de rotação no item
+            ["rot-90", "rot-180", "rot-270"].forEach(c => itemEl.classList.remove(c));
+            if (newRot > 0) itemEl.classList.add(`rot-${newRot}`);
+
+            // Atualiza miniaturas caso o card tenha .media-thumbnail (árvore/lista)
+            const cardThumb = itemEl.querySelector(".media-thumbnail, .tree-item-thumbnail");
+            if (cardThumb) {
+                ["rot-90", "rot-180", "rot-270"].forEach(c => cardThumb.classList.remove(c));
+                if (newRot > 0) cardThumb.classList.add(`rot-${newRot}`);
+            }
+
+            // Atualiza proporção de aspecto (aspect ratio) no elemento da galeria
+            let rawAspect = item._naturalAspect || (isVideo ? (16 / 9) : (4 / 3));
+            let displayAspect = rawAspect;
+            if (newRot === 90 || newRot === 270) {
+                displayAspect = 1 / displayAspect;
+            }
+            displayAspect = Math.max(0.45, Math.min(2.8, displayAspect));
+            itemEl.style.setProperty("--aspect", displayAspect.toFixed(3));
+
+            // Se o hover video singleton estiver anexado e ativo no card, atualiza suas classes
+            if (this.hoverVideo) {
+                ["rot-90", "rot-180", "rot-270"].forEach(c => this.hoverVideo.classList.remove(c));
+                if (newRot > 0) {
+                    this.hoverVideo.classList.add(`rot-${newRot}`);
+                    this.hoverVideo.dataset.rotation = newRot;
+                } else {
+                    delete this.hoverVideo.dataset.rotation;
+                }
+                this.hoverVideo.style.setProperty("--aspect", displayAspect.toFixed(3));
+            }
+
+            // Se o Shift-HUD estiver aberto para este card, reexibe com os dados atualizados
+            if (this.shiftHud && this.shiftHud.style.display !== "none") {
+                this.showShiftHud(itemEl);
+            }
+
+            // Emite evento reativo no STATE para sincronizar Source Player e Timeline
+            STATE.emit("mediaRotated", {
+                mediaType: kind,
+                mediaId: item.id,
+                rotation: newRot,
+                item
+            });
+
+            if (typeof window.showToast === "function") {
+                window.showToast(`Mídia rotacionada para ${newRot}°!`, "success");
+            }
+        } catch (err) {
+            console.error("Erro ao girar mídia no hover:", err);
+            if (typeof window.showToast === "function") {
+                window.showToast("Erro ao girar mídia: " + err.message, "error");
+            }
+        }
     }
 
     stopAllHover() {
@@ -5181,7 +5367,7 @@ export class GalleryInteractionController {
 
         let actionsHtml = `
             <div class="gallery-hud-actions">
-                <button class="gallery-hud-btn btn-hud-rotate" title="Girar 90°"><i class="fa-solid fa-rotate-right"></i> Girar</button>
+                <button class="gallery-hud-btn btn-hud-rotate" title="Girar +90° [R] / -90° [Shift+R]"><i class="fa-solid fa-rotate-right"></i> Girar (R)</button>
                 ${isVideo ? `<button class="gallery-hud-btn btn-hud-crucial" title="Adicionar Momento Crucial"><i class="fa-solid fa-sparkles"></i> Crucial</button>` : ''}
                 <button class="gallery-hud-btn btn-hud-open" title="Abrir"><i class="fa-solid fa-expand"></i> Abrir</button>
             </div>
@@ -5218,15 +5404,8 @@ export class GalleryInteractionController {
         if (btnRotate) {
             btnRotate.onclick = async (ev) => {
                 ev.stopPropagation();
-                try {
-                    const res = await CapIAuAPI.rotateMedia(isVideo ? "video" : "photo", item.id, 90);
-                    item.rotation = res.rotation;
-                    if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
-                    this.shiftHud.style.display = "none";
-                    if (window.showToast) window.showToast(`Mídia rotacionada para ${res.rotation}°!`, "success");
-                } catch (err) {
-                    alert("Erro ao girar: " + err.message);
-                }
+                await this.rotateActiveItem(ev.shiftKey ? -90 : 90);
+                this.shiftHud.style.display = "none";
             };
         }
 
@@ -8199,7 +8378,8 @@ export class LibraryManager {
                         inTime: inTime,
                         outTime: outTime,
                         effectiveDuration: effDur,
-                        video_type: item.video_type || null
+                        video_type: item.video_type || null,
+                        rotation: (item.rotation || 0) % 360
                     };
 
                     e.dataTransfer.setData("application/x-capiau-media", JSON.stringify({
@@ -8207,7 +8387,8 @@ export class LibraryManager {
                         id: item.id,
                         inTime: inTime,
                         outTime: outTime,
-                        duration: effDur
+                        duration: effDur,
+                        rotation: (item.rotation || 0) % 360
                     }));
                     e.dataTransfer.effectAllowed = "copy";
                 });

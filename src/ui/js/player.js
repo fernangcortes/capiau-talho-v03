@@ -62,6 +62,15 @@ export class SourcePlayer {
             window.activeFocusedPlayer = "source";
             this.loadPhoto(photo);
         });
+        STATE.on("mediaRotated", ({ mediaType, mediaId, rotation }) => {
+            if (mediaType === "video" && STATE.activeVideo && String(STATE.activeVideo.id) === String(mediaId)) {
+                STATE.activeVideo.rotation = rotation;
+                this.applyRotation(rotation);
+            } else if (mediaType === "photo" && STATE.activePhoto && String(STATE.activePhoto.id) === String(mediaId)) {
+                STATE.activePhoto.rotation = rotation;
+                this.applyRotation(rotation);
+            }
+        });
         STATE.on("markerInChanged", () => this.updateMarkersUI());
         STATE.on("markerOutChanged", () => this.updateMarkersUI());
 
@@ -122,8 +131,15 @@ export class SourcePlayer {
             this.resizeObserver = new ResizeObserver(() => {
                 const vid = this.el("source-video");
                 if (vid && vid.paused && !this.isReversing) this.updateOverlaySize();
+                if (this.currentRotation) {
+                    this.applyRotation(this.currentRotation);
+                }
             });
             this.resizeObserver.observe(video);
+            const sourceVideoWrapperEl = this.el("source-video-wrapper");
+            if (sourceVideoWrapperEl) {
+                this.resizeObserver.observe(sourceVideoWrapperEl);
+            }
         }
 
         // Botoes de Controle
@@ -168,6 +184,21 @@ export class SourcePlayer {
 
         const sourceVideoWrapper = this.el("source-video-wrapper");
         if (sourceVideoWrapper) {
+            sourceVideoWrapper.addEventListener("mouseenter", () => {
+                if (window._galleryController) {
+                    const activeMedia = STATE.activeVideo || STATE.activePhoto;
+                    if (activeMedia) {
+                        sourceVideoWrapper._mediaData = activeMedia;
+                        sourceVideoWrapper._mediaKind = STATE.activeVideo ? "video" : "photo";
+                        window._galleryController.activeItem = sourceVideoWrapper;
+                    }
+                }
+            });
+            sourceVideoWrapper.addEventListener("mouseleave", () => {
+                if (window._galleryController && window._galleryController.activeItem === sourceVideoWrapper) {
+                    window._galleryController.activeItem = null;
+                }
+            });
             sourceVideoWrapper.addEventListener("click", (e) => {
                 if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
                     e.stopPropagation();
@@ -304,12 +335,73 @@ export class SourcePlayer {
         }
     }
 
+    applyRotation(rotation = 0) {
+        const rot = ((Math.round(Number(rotation) || 0) % 360) + 360) % 360;
+        this.currentRotation = rot;
+        const targetEl = STATE.activePhoto ? this.el("source-player-photo") : this.el("source-video");
+        if (!targetEl) return;
+        const wrapper = this.el("source-video-wrapper");
+
+        targetEl.style.position = "absolute";
+        targetEl.style.left = "50%";
+        targetEl.style.top = "50%";
+        targetEl.style.transformOrigin = "center center";
+
+        if (rot === 90 || rot === 270) {
+            const wH = wrapper ? wrapper.clientHeight : 0;
+            const wW = wrapper ? wrapper.clientWidth : 0;
+            if (wH > 0 && wW > 0) {
+                this._rotationRetryAttempts = 0;
+                targetEl.style.width = `${wH}px`;
+                targetEl.style.height = `${wW}px`;
+                targetEl.style.maxWidth = "none";
+                targetEl.style.maxHeight = "none";
+                targetEl.style.transform = `translate(-50%, -50%) rotate(${rot}deg)`;
+            } else {
+                // Blindagem (popout recém-aberto, aba oculta, splitter em transição): o
+                // contêiner ainda está com dimensões zeradas. Mantém a rotação coerente
+                // e reagenda a geometria assim que o layout ganhar dimensões (o
+                // ResizeObserver de #source-video-wrapper também cobre esse caminho).
+                targetEl.style.transform = `translate(-50%, -50%) rotate(${rot}deg)`;
+                if ((this._rotationRetryAttempts || 0) < 30 && !this._rotationRetryScheduled) {
+                    this._rotationRetryScheduled = true;
+                    const reagendar = () => {
+                        this._rotationRetryScheduled = false;
+                        this._rotationRetryAttempts = (this._rotationRetryAttempts || 0) + 1;
+                        this.applyRotation(this.currentRotation);
+                    };
+                    if (typeof requestAnimationFrame === "function") {
+                        requestAnimationFrame(reagendar);
+                    } else {
+                        setTimeout(reagendar, 50);
+                    }
+                }
+            }
+        } else if (rot === 180) {
+            targetEl.style.width = "100%";
+            targetEl.style.height = "100%";
+            targetEl.style.maxWidth = "";
+            targetEl.style.maxHeight = "";
+            targetEl.style.transform = "translate(-50%, -50%) rotate(180deg)";
+        } else {
+            targetEl.style.width = "100%";
+            targetEl.style.height = "100%";
+            targetEl.style.maxWidth = "";
+            targetEl.style.maxHeight = "";
+            targetEl.style.transform = "translate(-50%, -50%)";
+        }
+    }
+
     loadVideo(video) {
         const vid = this.el("source-video");
         if (!vid) return;
 
         if (!video) {
+            // Blindagem: o setter de activePhoto emite activeVideoChanged(null) DEPOIS de
+            // carregar a foto; um applyRotation(0) incondicional aqui desfaria a rotação da
+            // foto ativa (applyRotation elege o alvo por STATE.activePhoto).
             if (!STATE.activePhoto) {
+                this.applyRotation(0);
                 this.hidePhoto();
                 vid.src = "";
                 vid.removeAttribute("data-loaded-src");
@@ -328,6 +420,7 @@ export class SourcePlayer {
         }
 
         this.hidePhoto();
+        this.applyRotation(video.rotation || 0);
 
         let videoSrc = "";
         if (video.proxy_path && (video.proxy_path.startsWith("/") || video.proxy_path.startsWith("http"))) {
@@ -433,6 +526,7 @@ export class SourcePlayer {
         const vid = this.el("source-video");
         if (vid) {
             vid.style.display = "block";
+            this.applyRotation(STATE.activeVideo ? (STATE.activeVideo.rotation || 0) : 0);
         }
     }
 
@@ -2829,14 +2923,19 @@ export class ProgramPlayer {
         let scale = 1.0;
         let tx = 0;
         let ty = 0;
-        let rotation = 0;
         let baseOpacity = 1.0;
+
+        const media = cut.type === "photo"
+            ? STATE.allPhotos?.find(p => String(p.id) === String(cut.photo_id))
+            : STATE.allVideos?.find(v => String(v.id) === String(cut.video_id));
+        const mediaRot = (media && media.rotation) ? media.rotation : 0;
+        const cutRot = cut.rotation !== undefined ? cut.rotation : mediaRot;
+        let rotation = tf.rotation !== undefined ? tf.rotation : cutRot;
 
         if (!tf.disabled) {
             scale = tf.scale !== undefined ? tf.scale : 1.0;
             tx = tf.x !== undefined ? tf.x : 0;
             ty = tf.y !== undefined ? tf.y : 0;
-            rotation = tf.rotation !== undefined ? tf.rotation : 0;
             baseOpacity = tf.opacity !== undefined ? tf.opacity : 1.0;
         }
 

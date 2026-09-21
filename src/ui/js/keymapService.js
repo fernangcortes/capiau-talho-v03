@@ -231,6 +231,12 @@ export const COMMANDS_CATALOG = [
         label: "Desmarcar Seleção / Fechar Caixas",
         description: "Limpa a seleção de clipes ou fecha pop-ups contextuais e modais"
     },
+    {
+        id: "tools.rotate_media",
+        category: "tools",
+        label: "Girar Mídia sob Cursor (+90°)",
+        description: "Rotaciona a mídia sob o cursor (hover) na biblioteca ou no monitor de origem"
+    },
 
     // ── EDIÇÃO, CORTES & TRIMS ──────────────────────────────────────────────
     {
@@ -712,6 +718,7 @@ export const KEYMAP_PRESETS = {
         "tools.snapping": ["KeyN", "Shift+KeyS"],
         "tools.hand": ["KeyH"],
         "tools.escape": ["Escape"],
+        "tools.rotate_media": ["KeyR"],
 
         "edit.insert": ["Comma"],
         "edit.overwrite": ["Period"],
@@ -846,6 +853,7 @@ export const KEYMAP_PRESETS = {
         "tools.hand": ["KeyH"],
         "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
+        "tools.rotate_media": ["KeyR"],
 
         "edit.insert": ["KeyV", "Comma"],
         "edit.overwrite": ["KeyB", "Period"],
@@ -924,6 +932,7 @@ export const KEYMAP_PRESETS = {
         "tools.hand": ["KeyH"],
         "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
+        "tools.rotate_media": ["KeyR"],
 
         "edit.insert": ["Comma"],
         "edit.overwrite": ["Period"],
@@ -1003,6 +1012,7 @@ export const KEYMAP_PRESETS = {
         "tools.hand": ["KeyH"],
         "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
+        "tools.rotate_media": ["KeyR"],
 
         "edit.insert": ["F9", "Comma"],
         "edit.overwrite": ["F10", "Period"],
@@ -1082,6 +1092,7 @@ export const KEYMAP_PRESETS = {
         "tools.hand": ["KeyH"],
         "tools.zoom": ["KeyZ"],
         "tools.escape": ["Escape"],
+        "tools.rotate_media": ["KeyR"],
 
         "edit.insert": ["KeyW", "Comma"],
         "edit.overwrite": ["KeyD", "Period"],

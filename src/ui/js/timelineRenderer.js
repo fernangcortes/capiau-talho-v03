@@ -1302,8 +1302,10 @@ export class CapiauTimelineRenderer {
                 ctx.rect(startX, clipY, width, clipHeight);
                 ctx.clip(); // Corta para caber no bloco do clipe
 
+                const videoRot = cut.rotation !== undefined ? cut.rotation : (video.rotation || 0);
+
                 // Calcula a proporção real do vídeo para manter fidelidade geométrica sem fatiamentos artificiais
-                const aspect = this.getVideoAspectRatio(video);
+                const aspect = this.getVideoAspectRatio(video, videoRot);
                 const thumbWidth = Math.max(16, Math.round(clipHeight * aspect));
                 const isHeadOnly = TIMELINE_STATE.thumbnailMode === "head";
 
@@ -1315,7 +1317,7 @@ export class CapiauTimelineRenderer {
                         img = this.getClosestLoadedVideoThumb(video.id, targetTime);
                     }
                     if (img) {
-                        this.drawImageCover(img, startX, clipY, thumbWidth, clipHeight);
+                        this.drawImageCover(img, startX, clipY, thumbWidth, clipHeight, videoRot);
                     }
                 } else {
                     // Modo 1: Contínuo (Filmstrip / Rolo de Filme na proporção exata)
@@ -1340,7 +1342,7 @@ export class CapiauTimelineRenderer {
                         }
 
                         if (img) {
-                            this.drawImageCover(img, startX + xOffset, clipY, thumbWidth, clipHeight);
+                            this.drawImageCover(img, startX + xOffset, clipY, thumbWidth, clipHeight, videoRot);
                         }
                     }
                 }
@@ -1355,16 +1357,20 @@ export class CapiauTimelineRenderer {
             if (isPhoto && photo && trackThumbsEnabled && thumbsGloballyEnabled) {
                 const thumb = this.getPhotoThumb(photo);
                 if (thumb) {
+                    const photoRot = cut.rotation !== undefined ? cut.rotation : (photo.rotation || 0);
+                    const rotNorm = ((Math.round(photoRot) % 360) + 360) % 360;
+                    const isSwapped = (rotNorm === 90 || rotNorm === 270);
                     ctx.save();
                     ctx.beginPath();
                     ctx.rect(startX, clipY, width, clipHeight);
                     ctx.clip();
                     if (TIMELINE_STATE.thumbnailMode === "head") {
-                        const pAspect = (thumb.naturalWidth && thumb.naturalHeight) ? (thumb.naturalWidth / thumb.naturalHeight) : 1.0;
+                        let pAspect = (thumb.naturalWidth && thumb.naturalHeight) ? (thumb.naturalWidth / thumb.naturalHeight) : 1.0;
+                        if (isSwapped && pAspect > 0) pAspect = 1 / pAspect;
                         const pThumbWidth = Math.max(16, Math.round(clipHeight * pAspect));
-                        this.drawImageCover(thumb, startX, clipY, pThumbWidth, clipHeight);
+                        this.drawImageCover(thumb, startX, clipY, pThumbWidth, clipHeight, photoRot);
                     } else {
-                        this.drawImageCover(thumb, startX, clipY, width, clipHeight);
+                        this.drawImageCover(thumb, startX, clipY, width, clipHeight, photoRot);
                     }
                     ctx.fillStyle = "rgba(0,0,0,0.35)";
                     ctx.fillRect(startX, clipY, width, clipHeight);
@@ -1579,47 +1585,62 @@ export class CapiauTimelineRenderer {
      * 3. Dimensões ativas da timeline
      * 4. Padrão 16/9
      */
-    getVideoAspectRatio(video) {
+    getVideoAspectRatio(video, rotation = 0) {
         if (!video) return 16 / 9;
 
+        let aspect = 16 / 9;
         if (this.videoThumbCache) {
             for (const key in this.videoThumbCache) {
                 if (key.startsWith(`${video.id}_`)) {
                     const entry = this.videoThumbCache[key];
                     if (entry && entry.loaded && entry.img && entry.img.naturalWidth && entry.img.naturalHeight) {
-                        return entry.img.naturalWidth / entry.img.naturalHeight;
+                        aspect = entry.img.naturalWidth / entry.img.naturalHeight;
+                        break;
                     }
                 }
             }
-        }
-
-        if (video.resolution && typeof video.resolution === "string" && video.resolution.includes("x")) {
+        } else if (video.resolution && typeof video.resolution === "string" && video.resolution.includes("x")) {
             const parts = video.resolution.split("x").map(Number);
             if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
-                return parts[0] / parts[1];
+                aspect = parts[0] / parts[1];
             }
+        } else if (TIMELINE_STATE?.width && TIMELINE_STATE?.height && TIMELINE_STATE.height > 0) {
+            aspect = TIMELINE_STATE.width / TIMELINE_STATE.height;
         }
 
-        if (TIMELINE_STATE?.width && TIMELINE_STATE?.height && TIMELINE_STATE.height > 0) {
-            return TIMELINE_STATE.width / TIMELINE_STATE.height;
+        const effRot = (rotation !== undefined && rotation !== 0) ? rotation : (video.rotation || 0);
+        const rotNorm = ((Math.round(effRot) % 360) + 360) % 360;
+        if (rotNorm === 90 || rotNorm === 270) {
+            return aspect > 0 ? (1 / aspect) : aspect;
         }
 
-        return 16 / 9;
+        return aspect;
     }
 
-    /** Desenha uma imagem cobrindo (cover) o retângulo dado, preservando proporção e delimitando com precisão. */
-    drawImageCover(img, x, y, w, h) {
+    /** Desenha uma imagem cobrindo (cover) o retângulo dado, preservando proporção, rotação e delimitando com precisão. */
+    drawImageCover(img, x, y, w, h, rotation = 0) {
         const iw = img.naturalWidth || img.width;
         const ih = img.naturalHeight || img.height;
         if (!iw || !ih) return;
-        const scale = Math.max(w / iw, h / ih);
+
+        const rotNorm = ((Math.round(rotation) % 360) + 360) % 360;
+        const isSwapped = (rotNorm === 90 || rotNorm === 270);
+        const scale = isSwapped ? Math.max(w / ih, h / iw) : Math.max(w / iw, h / ih);
         const dw = iw * scale, dh = ih * scale;
-        const dx = x + (w - dw) / 2, dy = y + (h - dh) / 2;
+
         this.ctx.save();
         this.ctx.beginPath();
         this.ctx.rect(x, y, w, h);
         this.ctx.clip();
-        this.ctx.drawImage(img, dx, dy, dw, dh);
+
+        if (rotNorm !== 0) {
+            this.ctx.translate(x + w / 2, y + h / 2);
+            this.ctx.rotate(rotNorm * Math.PI / 180);
+            this.ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+        } else {
+            const dx = x + (w - dw) / 2, dy = y + (h - dh) / 2;
+            this.ctx.drawImage(img, dx, dy, dw, dh);
+        }
         this.ctx.restore();
     }
 

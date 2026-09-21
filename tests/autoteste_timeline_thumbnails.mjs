@@ -132,8 +132,8 @@ assert.ok(indexHtml.includes('value="head"'), "index.html deve conter opção 'h
 assert.ok(indexHtml.includes('value="none"'), "index.html deve conter opção 'none'");
 
 const rendererJs = fs.readFileSync(path.join(ROOT, "src/ui/js/timelineRenderer.js"), "utf-8");
-assert.ok(rendererJs.includes("getVideoAspectRatio(video)"), "timelineRenderer.js deve conter método getVideoAspectRatio");
-assert.ok(rendererJs.includes("this.getVideoAspectRatio(video)"), "timelineRenderer.js deve chamar getVideoAspectRatio");
+assert.ok(rendererJs.includes("getVideoAspectRatio(video, rotation = 0)"), "timelineRenderer.js deve conter método getVideoAspectRatio (com suporte a rotação)");
+assert.ok(rendererJs.includes("this.getVideoAspectRatio(video, videoRot)"), "timelineRenderer.js deve chamar getVideoAspectRatio repassando a rotação");
 assert.ok(rendererJs.includes("TIMELINE_STATE.thumbnailMode === \"head\""), "timelineRenderer.js deve suportar modo head");
 assert.ok(rendererJs.includes("thumbsGloballyEnabled"), "timelineRenderer.js deve checar thumbsGloballyEnabled");
 

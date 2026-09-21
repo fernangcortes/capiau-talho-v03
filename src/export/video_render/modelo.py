@@ -264,6 +264,19 @@ def _clipe(c, indice: int) -> Optional[Clipe]:
     efeitos = c.get("effects")
     if not isinstance(efeitos, list):
         efeitos = []
+    else:
+        efeitos = [e for e in efeitos if isinstance(e, dict)]
+
+    rot = c.get("rotation")
+    if rot is not None:
+        try:
+            rot_val = float(rot) % 360
+            if rot_val != 0:
+                tem_tf = any(e.get("type") == "transform" and not e.get("disabled") for e in efeitos)
+                if not tem_tf:
+                    efeitos.append({"type": "transform", "rotation": rot_val, "scale": 1.0, "x": 0.0, "y": 0.0})
+        except (ValueError, TypeError):
+            pass
 
     return Clipe(
         id=str(c.get("id") or f"cut_{indice}"),
@@ -277,7 +290,7 @@ def _clipe(c, indice: int) -> Optional[Clipe]:
         link_id=(str(c["link_id"]) if c.get("link_id") else None),
         nome=(str(c["name"]) if c.get("name") else None),
         origem=str(c.get("origin") or "user"),
-        effects=[e for e in efeitos if isinstance(e, dict)],
+        effects=efeitos,
         indice=indice,
     )
 
