@@ -46,31 +46,36 @@ assert.ok(
 console.log("   ✔ Fallback fit + resolução de aspecto intrínseco presentes.");
 
 // ─────────────────────────────────────────────────────────────────────
-// 2. PLAYER.JS — CAIXA CONFORMADA + TRANSLAÇÃO EM % DO QUADRO
+// 2. PLAYER.JS — CAIXA CONFORMADA EM % (SEGUE O ZOOM) + TRANSLAÇÃO EQUIVALENTE
 // ─────────────────────────────────────────────────────────────────────
-console.log("2. Verificando caixa conformada e translação proporcional ao quadro...");
+console.log("2. Verificando caixa conformada em % (acompanha o zoom) e translação equivalente...");
 
 assert.ok(
     playerJs.includes("const effAspect = (rotNorm === 90 || rotNorm === 270) ? (1 / mediaAspect) : mediaAspect;"),
     "Aspecto efetivo deve inverter em rotações de 90/270"
 );
 assert.ok(
-    playerJs.includes("if (effAspect < frameAspect) {"),
-    "Cálculo da caixa conformada (contain) dentro do quadro deve existir"
+    playerJs.includes("fracW = effAspect / frameAspect;") && playerJs.includes("fracH = frameAspect / effAspect;"),
+    "Cálculo da caixa conformada (contain) em frações do quadro deve existir"
 );
 assert.ok(
-    count(playerJs, 'el.style.setProperty("left", "50%", "important");') >= 1,
-    "Elemento da mídia deve ser ancorado no centro (left 50%)"
+    playerJs.includes("const elWPct = ((sideways ? fracH * pH : fracW * pW) / pW) * 100;") &&
+    playerJs.includes("const elHPct = ((sideways ? fracW * pW : fracH * pH) / pH) * 100;"),
+    "Caixa da mídia deve ser expressa em % do contêiner (derivada do aspecto) — acompanha o zoom livre sem recomputo"
 );
 assert.ok(
-    count(playerJs, "translate(${txPx}px, ${tyPx}px)") >= 2,
-    "Translação em px proporcionais deve ser aplicada na mídia E espelhada no overlay"
+    count(playerJs, 'el.style.setProperty("width", `${elWPct}%`, "important");') >= 1,
+    "Largura em % com !important deve prevalecer sobre o inset:0 do HTML"
+);
+assert.ok(
+    count(playerJs, "translate(${txElPct}%, ${tyElPct}%)") >= 2,
+    "Translação em % do próprio elemento deve ser aplicada na mídia E espelhada no overlay"
 );
 assert.ok(
     !playerJs.includes("translate(${tx}%, ${ty}%) scale(${scale}) rotate(${rotation}deg)"),
-    "A translação antiga em % do próprio elemento (imprecisa para caixas conformadas) não deve permanecer"
+    "A translação antiga (antes do ajuste com fator de quadro) não deve permanecer"
 );
-console.log("   ✔ Caixa conformada + translação x/y em % do quadro (px convertidos) OK.");
+console.log("   ✔ Caixa em % (zoom-safe) + translação com equivalência de px OK.");
 
 // ─────────────────────────────────────────────────────────────────────
 // 3. PLAYER.JS — OVERLAY DE TRANSFORM ESPELHA A MESMA CAIXA
@@ -87,10 +92,17 @@ assert.ok(
     "Overlay deve localizar o elemento ativo (foto ou buffer de vídeo em exibição) pelo activeClipId"
 );
 assert.ok(
-    playerJs.includes("boxW = pH * effAspect;") && playerJs.includes("boxH = pW / effAspect;"),
-    "Overlay deve compartilhar as dimensões conformadas (boxW/boxH) com a mídia"
+    playerJs.includes("const boxWPct = ((sideways ? fracH * pH : fracW * pW) / pW) * 100;") &&
+    playerJs.includes("const boxHPct = ((sideways ? fracW * pW : fracH * pH) / pH) * 100;"),
+    "Overlay deve compartilhar a MESMA caixa em % da mídia (alças e zoom sempre em sincronia)"
 );
-console.log("   ✔ Overlay conformado (alças contornam o retângulo visível).");
+assert.ok(
+    playerJs.includes("cursorQuadrant") &&
+    playerJs.includes('tl: "nesw-resize", tc: "ew-resize", tr: "nwse-resize"') &&
+    playerJs.includes('handle.style.removeProperty("cursor")'),
+    "Cursores rotação-aware: mapa por quadrante aplicado só quando a caixa está girada (e limpo fora dele)"
+);
+console.log("   ✔ Overlay conformado em % (alças fiéis à mídia e ao zoom) + cursores rotação-aware.");
 
 // ─────────────────────────────────────────────────────────────────────
 // 4. PLAYER.JS — BLINDAGEM DA ROTAÇÃO NO SOURCE PLAYER
@@ -193,61 +205,67 @@ assert.ok(
 console.log("   ✔ Renderizador Python em paridade com o player.");
 
 // ─────────────────────────────────────────────────────────────────────
-// 9. MATEMÁTICA DA CAIXA CONFORMADA (CASOS NUMÉRICOS)
+// 9. MATEMÁTICA DA CAIXA CONFORMADA EM % (CASOS NUMÉRICOS)
 // ─────────────────────────────────────────────────────────────────────
-console.log("9. Validando a matemática da conformação (espelho da fórmula do applyMediaEffects)...");
+console.log("9. Validando a matemática da conformação em % (espelho da fórmula do applyMediaEffects)...");
 
 function conformarCaixa(mediaAspect, rotNorm, pW, pH, fitMode = "fit") {
     const effAspect = (rotNorm === 90 || rotNorm === 270) ? (1 / mediaAspect) : mediaAspect;
-    let renderedW = pW;
-    let renderedH = pH;
+    let fracW = 1;
+    let fracH = 1;
     if (fitMode !== "fill" && pW > 0 && pH > 0 && effAspect > 0) {
         const frameAspect = pW / pH;
         if (effAspect < frameAspect) {
-            renderedH = pH;
-            renderedW = pH * effAspect;
+            fracW = effAspect / frameAspect;
         } else {
-            renderedW = pW;
-            renderedH = pW / effAspect;
+            fracH = frameAspect / effAspect;
         }
     }
-    const swap = (rotNorm === 90 || rotNorm === 270);
+    const sideways = (rotNorm === 90 || rotNorm === 270);
     return {
-        width: swap ? renderedH : renderedW,
-        height: swap ? renderedW : renderedH,
-        visualW: renderedW,
-        visualH: renderedH
+        elWPct: ((sideways ? fracH * pH : fracW * pW) / pW) * 100,
+        elHPct: ((sideways ? fracW * pW : fracH * pH) / pH) * 100,
+        visualW: fracW * pW,
+        visualH: fracH * pH
     };
 }
+const txPctPara = (elWPct, tx) => (elWPct > 0) ? (tx * 100 / elWPct) : 0;
 
-// 9.1 Foto vertical (1080x1920) em quadro 16:9, sem rotação: pillarbox lateral, sem corte de teto/chão
+// 9.1 Foto vertical (1080x1920) em quadro 16:9, sem rotação: pillarbox 31,64% x 100% (sem corte de teto/chão)
 const vertical = conformarCaixa(1080 / 1920, 0, 1920, 1080);
-assert.equal(Math.round(vertical.height), 1080, "Foto vertical deve ocupar a altura total do quadro");
-assert.equal(Math.round(vertical.width), 608, "Foto vertical deve ter largura proporcional (pillarbox)");
-assert.ok(vertical.width < 1920, "Nada de crop destrutivo: largura menor que o quadro");
+assert.ok(Math.abs(vertical.elWPct - 31.640625) < 0.001, "Foto vertical deve ter largura de 31,64% do contêiner (pillarbox)");
+assert.equal(Math.round(vertical.elHPct), 100, "Foto vertical deve ocupar a altura total");
+assert.ok(vertical.elWPct < 100, "Nada de crop destrutivo: largura menor que o quadro");
 
-// 9.2 Mídia horizontal perfeita (16:9): cobre o quadro inteiro
+// 9.2 Mídia horizontal perfeita (16:9): cobre o quadro inteiro (100% x 100%)
 const exato = conformarCaixa(1920 / 1080, 0, 1920, 1080);
-assert.equal(Math.round(exato.width), 1920);
-assert.equal(Math.round(exato.height), 1080);
+assert.equal(Math.round(exato.elWPct), 100);
+assert.equal(Math.round(exato.elHPct), 100);
 
-// 9.3 Foto vertical rotacionada 90° (vira horizontal): aspect invertido cobre o quadro 16:9
+// 9.3 Foto vertical rotacionada 90° (vira horizontal): visual cobre o quadro; caixa pré-rotação transposta
 const verticalRot = conformarCaixa(1080 / 1920, 90, 1920, 1080);
-assert.equal(Math.round(verticalRot.width), 1080, "Caixa pré-rotação deve ter largura = altura do quadro");
-assert.equal(Math.round(verticalRot.height), 1920, "Caixa pré-rotação deve ter altura = largura do quadro");
+assert.ok(Math.abs(verticalRot.elWPct - 56.25) < 0.001, "Caixa pré-rotação: largura = 56,25% (altura do quadro)");
+assert.ok(Math.abs(verticalRot.elHPct - 177.7778) < 0.01, "Caixa pré-rotação: altura ≈ 177,78% (largura do quadro)");
 assert.equal(Math.round(verticalRot.visualW), 1920, "Rect visual pós-rotação deve cobrir a largura do quadro");
 assert.equal(Math.round(verticalRot.visualH), 1080, "Rect visual pós-rotação deve cobrir a altura do quadro");
 
-// 9.4 Vídeo horizontal rotacionado 90° (vira vertical): pillarbox estreito
+// 9.4 Vídeo horizontal rotacionado 90° (vira vertical): pillarbox estreito 56,25% x 56,25%
 const horizRot = conformarCaixa(1920 / 1080, 90, 1920, 1080);
+assert.ok(Math.abs(horizRot.elWPct - 56.25) < 0.001 && Math.abs(horizRot.elHPct - 56.25) < 0.001,
+    "Caixa transposta do horizontal rotacionado deve ter 56,25% x 56,25%");
 assert.ok(Math.round(horizRot.visualW) === 608 && Math.round(horizRot.visualH) === 1080,
     "Horizontal rotacionado deve virar faixa vertical de 608x1080");
 
 // 9.5 Modo fill: caixa permanece o quadro inteiro (cover recorta para preencher)
 const fill = conformarCaixa(1080 / 1920, 0, 1920, 1080, "fill");
-assert.equal(Math.round(fill.width), 1920);
-assert.equal(Math.round(fill.height), 1080);
-console.log("   ✔ Matemática da conformação validada em 5 casos.");
+assert.equal(Math.round(fill.elWPct), 100);
+assert.equal(Math.round(fill.elHPct), 100);
+
+// 9.6 Translação em % do próprio elemento mantém a equivalência de px do quadro
+assert.ok(Math.abs(txPctPara(vertical.elWPct, 10) - 31.6037) < 0.01,
+    "tx=10% do quadro deve virar ~31,60% da caixa vertical (mesmos px na tela)");
+assert.equal(txPctPara(fill.elWPct, 10), 10, "No modo fill (100%), tx em % do quadro = tx em % do elemento");
+console.log("   ✔ Matemática da conformação em % validada em 6 casos.");
 
 // ─────────────────────────────────────────────────────────────────────
 // 10. REGRESSÃO ZERO — ESTRUTURAS CRÍTICAS PRESERVADAS

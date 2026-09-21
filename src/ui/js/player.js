@@ -2967,42 +2967,44 @@ export class ProgramPlayer {
         // intrínseca da mídia (invertida em rotações de 90/270), cabendo por inteiro
         // dentro do quadro — sem crop destrutivo de topo/base (pillarbox/letterbox).
         // Em "fill" a caixa permanece o quadro inteiro (cover recorta para preencher).
+        // A caixa é expressa em % derivadas do ASPECTO (não em px): assim acompanha
+        // automaticamente o zoom livre do Program (Shift+wheel) e qualquer
+        // redimensionamento — em px a mídia ficaria presa/cortada ao dar zoom.
         const mediaAspect = this.getMediaAspect(el, media);
         const effAspect = (rotNorm === 90 || rotNorm === 270) ? (1 / mediaAspect) : mediaAspect;
-        let renderedW = pW;
-        let renderedH = pH;
+        let fracW = 1;
+        let fracH = 1;
         if (fitMode !== "fill" && pW > 0 && pH > 0 && effAspect > 0) {
             const frameAspect = pW / pH;
             if (effAspect < frameAspect) {
-                renderedH = pH;
-                renderedW = pH * effAspect;
+                fracW = effAspect / frameAspect;
             } else {
-                renderedW = pW;
-                renderedH = pW / effAspect;
+                fracH = frameAspect / effAspect;
             }
         }
+        // Frações do quadro → % do contêiner (largura% é relativa à largura; altura% à altura).
+        // Em 90°/270° a caixa do elemento é a transposta da caixa visual.
+        const sideways = (rotNorm === 90 || rotNorm === 270);
+        const elWPct = ((sideways ? fracH * pH : fracW * pW) / pW) * 100;
+        const elHPct = ((sideways ? fracW * pW : fracH * pH) / pH) * 100;
 
         el.style.position = "absolute";
         el.style.setProperty("left", "50%", "important");
         el.style.setProperty("top", "50%", "important");
         el.style.setProperty("right", "auto", "important");
         el.style.setProperty("bottom", "auto", "important");
-        if (rotNorm === 90 || rotNorm === 270) {
-            el.style.setProperty("width", `${renderedH}px`, "important");
-            el.style.setProperty("height", `${renderedW}px`, "important");
-        } else {
-            el.style.setProperty("width", `${renderedW}px`, "important");
-            el.style.setProperty("height", `${renderedH}px`, "important");
-        }
+        el.style.setProperty("width", `${elWPct}%`, "important");
+        el.style.setProperty("height", `${elHPct}%`, "important");
         el.style.setProperty("max-width", "none", "important");
         el.style.setProperty("max-height", "none", "important");
         el.style.removeProperty("margin");
 
-        // Translação em pixels proporcionais ao quadro: x/y permanecem em % do quadro
-        // (mesma unidade dos sliders, do snapping e do arraste no overlay de Transform).
-        const txPx = (pW > 0 ? (tx / 100) * pW : 0);
-        const tyPx = (pH > 0 ? (ty / 100) * pH : 0);
-        el.style.transform = `translate(-50%, -50%) translate(${txPx}px, ${tyPx}px) scale(${scale}) rotate(${rotation}deg)`;
+        // Translação em % do PRÓPRIO elemento (equivale a x/y em % do quadro; mesma unidade
+        // dos sliders, do snapping e do arraste no overlay). Em % do elemento a caixa continua
+        // seguindo o zoom sem recomputo.
+        const txElPct = (elWPct > 0) ? (tx * 100 / elWPct) : 0;
+        const tyElPct = (elHPct > 0) ? (ty * 100 / elHPct) : 0;
+        el.style.transform = `translate(-50%, -50%) translate(${txElPct}%, ${tyElPct}%) scale(${scale}) rotate(${rotation}deg)`;
 
         // 3. Filtros de Cor
         const col = effects.find(e => e.type === "color") || {};
@@ -3953,36 +3955,34 @@ export class ProgramPlayer {
         const mediaAspect = this.getMediaAspect(mediaEl, media);
         const effAspect = (rotNorm === 90 || rotNorm === 270) ? (1 / mediaAspect) : mediaAspect;
 
-        let boxW = pW;
-        let boxH = pH;
+        // Mesma caixa em % do applyMediaEffects: as alças contornam exatamente o
+        // retângulo visível e acompanham o zoom livre sem recomputo.
+        let fracW = 1;
+        let fracH = 1;
         if (fitMode !== "fill" && pW > 0 && pH > 0 && effAspect > 0) {
             const frameAspect = pW / pH;
             if (effAspect < frameAspect) {
-                boxH = pH;
-                boxW = pH * effAspect;
+                fracW = effAspect / frameAspect;
             } else {
-                boxW = pW;
-                boxH = pW / effAspect;
+                fracH = frameAspect / effAspect;
             }
         }
+        const sideways = (rotNorm === 90 || rotNorm === 270);
+        const boxWPct = ((sideways ? fracH * pH : fracW * pW) / pW) * 100;
+        const boxHPct = ((sideways ? fracW * pW : fracH * pH) / pH) * 100;
 
         overlay.style.left = "50%";
         overlay.style.top = "50%";
         overlay.style.right = "auto";
         overlay.style.bottom = "auto";
-        if (rotNorm === 90 || rotNorm === 270) {
-            overlay.style.width = `${boxH}px`;
-            overlay.style.height = `${boxW}px`;
-        } else {
-            overlay.style.width = `${boxW}px`;
-            overlay.style.height = `${boxH}px`;
-        }
+        overlay.style.width = `${boxWPct}%`;
+        overlay.style.height = `${boxHPct}%`;
         overlay.style.margin = "0";
 
-        // Mesma transformação da mídia (translação em px proporcionais ao quadro)
-        const txPx = (pW > 0 ? (tx / 100) * pW : 0);
-        const tyPx = (pH > 0 ? (ty / 100) * pH : 0);
-        overlay.style.transform = `translate(-50%, -50%) translate(${txPx}px, ${tyPx}px) scale(${scale}) rotate(${rotation}deg)`;
+        // Mesma transformação da mídia (translação em % do próprio elemento)
+        const txElPct = (boxWPct > 0) ? (tx * 100 / boxWPct) : 0;
+        const tyElPct = (boxHPct > 0) ? (ty * 100 / boxHPct) : 0;
+        overlay.style.transform = `translate(-50%, -50%) translate(${txElPct}%, ${tyElPct}%) scale(${scale}) rotate(${rotation}deg)`;
         overlay.style.transformOrigin = "center center";
         overlay.style.display = "block";
 
@@ -4036,6 +4036,22 @@ export class ProgramPlayer {
         if (anchor) {
             anchor.style.transform = `scale(${invScale}) rotate(${invRot}deg)`;
         }
+
+        // Cursores rotação-aware das alças: com a caixa em 90°/270° ela gira, mas os cursores
+        // do CSS (pensados para 0°/180°) não giram junto — ficariam "tudo ao contrário" no
+        // hover. Mapa por quadrante (cobre também rotações livres próximas de 90°/270°).
+        const cursorQuadrant = (rotNorm >= 45 && rotNorm < 135) || (rotNorm >= 225 && rotNorm < 315);
+        const rotatedCursors = cursorQuadrant ? {
+            tl: "nesw-resize", tc: "ew-resize", tr: "nwse-resize",
+            ml: "ns-resize", mr: "ns-resize",
+            bl: "nwse-resize", bc: "ew-resize", br: "nesw-resize"
+        } : null;
+        overlay.querySelectorAll(".transform-handle").forEach(handle => {
+            const key = handle.dataset.handle;
+            const cursor = rotatedCursors ? rotatedCursors[key] : null;
+            if (cursor) handle.style.cursor = cursor;
+            else handle.style.removeProperty("cursor");
+        });
     }
 
     /**
