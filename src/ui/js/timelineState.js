@@ -45,6 +45,7 @@ export function framesToTimecode(totalFrames, fps = 24) {
     return `${pad(h)}:${pad(m)}:${pad(s)}:${pad(f)}`;
 }
 
+
 /**
  * Converte frames para timecode adaptativo de régua (omite horas zeradas e quadros quando distante).
  * @param {number} totalFrames - Total de frames.
@@ -4319,6 +4320,170 @@ export class CapiauTimelineState {
             // Atualiza os cortes
             STATE.activeTimelineCuts = currentCuts;
         });
+    }
+
+    /**
+     * Substituição de Clipe na Timeline (Replace Edit — Task 9):
+     * Troca a mídia de um clipe existente (vídeo ou foto) por outra mídia da
+     * biblioteca mantendo, por construção, TODAS as propriedades do clipe original:
+     * posição (timelineStartFrame), DURAÇÃO exata (outFrame - inFrame), efeitos e
+     * animações (Ken Burns, Transform, Crop, Cor), velocidade, cor, rotação e keyframes —
+     * o objeto do clipe NÃO é recriado, apenas video_id/photo_id/type e a janela in/out.
+     *
+     * A janela da nova mídia é ancorada pelo IN (alignMode "in", padrão) ou pelo OUT
+     * (alignMode "out") da fonte, e clampada à duração real da mídia bruta; se a mídia
+     * nova for mais curta que o clipe, a duração é reduzida à mídia inteira
+     * (durationAdjusted = true) em vez de gerar quadro congelado.
+     *
+     * Pares A/V vinculados: substituição por outro VÍDEO atualiza o áudio parceiro em
+     * sincronia (preserva syncOffset de J/L-cuts); substituição por FOTO remove o áudio
+     * vinculado (foto não possui faixa de áudio).
+     *
+     * A operação NUNCA move outros clipes: sem ripple, sem gaps, sem colisões.
+     *
+     * @param {string} targetClipId ID do clipe da timeline a substituir.
+     * @param {number|string} newMediaId ID da nova mídia (vídeo ou foto).
+     * @param {"in"|"out"|"range"} [alignMode="in"] Ancoragem da janela da nova mídia (pelo IN, pelo OUT, ou trecho explícito [IN–OUT] do modo "range" — Replace com Alt+Ctrl).
+     * @param {{mediaType?: "video"|"photo", sourceInSec?: number, sourceOutSec?: number, maxDurationFrames?: number}} [options] maxDurationFrames limita a duração ao espaço livre na pista (a substituição nunca invade o clipe seguinte).
+     * @returns {{success: boolean, reason?: string, clip?: Object, removedPartnerId?: string|null, durationAdjusted?: boolean}}
+     */
+    replaceClip(targetClipId, newMediaId, alignMode = "in", options = {}) {
+        const fail = (reason) => ({ success: false, reason, clip: null, removedPartnerId: null, durationAdjusted: false });
+
+        const cuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        const target = cuts.find(c => c.id === targetClipId);
+        if (!target) return fail("target_not_found");
+
+        // Somente clipes de vídeo/foto em pistas de vídeo podem ser substituídos
+        if (target.type === "text" || target.type === "adjustment" || this.trackKindOf(target.track) !== "video") {
+            return fail("invalid_target");
+        }
+
+        const trackObj = this.getTrack(target.track);
+        if (trackObj && trackObj.locked) return fail("track_locked");
+
+        // Resolve a nova mídia (vídeo x foto). Sem hint de tipo, prefere a tabela de vídeos.
+        const requestedType = options.mediaType || options.type || null;
+        let video = null;
+        let photo = null;
+        if (requestedType !== "photo") video = (STATE.allVideos || []).find(v => String(v.id) === String(newMediaId)) || null;
+        if (requestedType !== "video") photo = (STATE.allPhotos || []).find(p => String(p.id) === String(newMediaId)) || null;
+        let isNewVideo;
+        if (requestedType === "photo") isNewVideo = false;
+        else if (requestedType === "video") isNewVideo = true;
+        else isNewVideo = Boolean(video) || !photo;
+        const media = isNewVideo ? video : photo;
+        if (!media) return fail("media_not_found");
+
+        const fps = this.fps || 24;
+        const oldDur = Math.max(1, Math.round(target.outFrame - target.inFrame));
+
+        // Duração máxima da mídia bruta da nova fonte (fotos/geradores são estáticos = Infinity)
+        let maxMedia = Infinity;
+        if (isNewVideo) {
+            const durSec = (media.duration !== undefined && media.duration !== null && Number.isFinite(Number(media.duration)) && Number(media.duration) > 0)
+                ? Number(media.duration) : null;
+            if (durSec !== null) maxMedia = Math.max(1, Math.round(durSec * fps));
+        }
+
+        // Espaço livre na pista: a substituição NUNCA invade o clipe seguinte.
+        // Informado pelo chamador (opcional); default = sem limite.
+        const maxRoom = (options.maxDurationFrames !== undefined && options.maxDurationFrames !== null && Number.isFinite(Number(options.maxDurationFrames)))
+            ? Math.max(1, Math.round(Number(options.maxDurationFrames)))
+            : Infinity;
+
+        // Janela da nova mídia
+        const toFrame = (sec) => (sec === null || sec === undefined || !Number.isFinite(Number(sec))) ? null : Math.round(Number(sec) * fps);
+        let newIn;
+        let newOut;
+        let durationAdjusted = false;
+
+        if (alignMode === "range") {
+            // Trecho explícito [IN–OUT] escolhido pelo usuário (Replace Edit com Alt+Ctrl)
+            const reqIn = Math.max(0, toFrame(options.sourceInSec) ?? 0);
+            const reqOut = Math.max(reqIn + 1, toFrame(options.sourceOutSec) ?? (reqIn + oldDur));
+            const reqDur = reqOut - reqIn;
+            if (!isNewVideo) {
+                // Fotos: sem janela interna — o trecho define apenas a nova duração
+                newIn = 0;
+                newOut = Math.max(1, Math.min(reqDur, maxRoom));
+            } else {
+                newIn = reqIn;
+                if (Number.isFinite(maxMedia) && newIn > maxMedia - 1) newIn = Math.max(0, maxMedia - 1);
+                newOut = reqOut;
+                if (Number.isFinite(maxMedia) && newOut > maxMedia) newOut = maxMedia;
+                if ((newOut - newIn) > maxRoom) newOut = newIn + maxRoom;
+                newOut = Math.max(newIn + 1, newOut);
+            }
+            durationAdjusted = (newOut - newIn) !== reqDur;
+        } else if (!isNewVideo) {
+            // Fotos (still): a janela é apenas a duração (inFrame = 0, como em addPhotoCut)
+            const newDur = Math.min(oldDur, maxRoom);
+            newIn = 0;
+            newOut = newDur;
+            durationAdjusted = newDur < oldDur;
+        } else {
+            // Duração preservada com clamp rígido à mídia bruta (evita fim congelado)
+            let newDur = Number.isFinite(maxMedia) ? Math.min(oldDur, maxMedia) : oldDur;
+            newDur = Math.min(newDur, maxRoom);
+            const sourceOutF = toFrame(options.sourceOutSec);
+            let anchorIn = (alignMode === "out" && sourceOutF !== null) ? (sourceOutF - newDur) : toFrame(options.sourceInSec);
+            if (anchorIn === null || !Number.isFinite(anchorIn)) anchorIn = 0;
+            newIn = Math.max(0, Math.round(anchorIn));
+            if (Number.isFinite(maxMedia) && (newIn + newDur) > maxMedia) newIn = Math.max(0, maxMedia - newDur);
+            newOut = newIn + newDur;
+            durationAdjusted = newDur < oldDur;
+        }
+
+        let removedPartnerId = null;
+
+        TIMELINE_HISTORY.record(() => {
+            const working = cuts.find(c => c.id === targetClipId);
+            if (!working) return;
+
+            // Troca a identidade da mídia SEM recriar o clipe (efeitos/Ken Burns, cor,
+            // rotação, velocidade, keyframes e demais propriedades permanecem intactos)
+            working.type = isNewVideo ? "video" : "photo";
+            working.video_id = isNewVideo ? media.id : null;
+            working.photo_id = isNewVideo ? null : media.id;
+            working.inFrame = Math.round(newIn);
+            working.outFrame = Math.round(newOut);
+            working.in = Math.round(newIn) / fps;
+            working.out = Math.round(newOut) / fps;
+
+            // Par A/V vinculado
+            if (working.link_id) {
+                const partner = cuts.find(c => c.id !== working.id && c.link_id === working.link_id) || null;
+                if (partner) {
+                    if (isNewVideo) {
+                        // Mantém o par sincronizado (preserva syncOffset de J/L-cuts)
+                        partner.video_id = media.id;
+                        partner.inFrame = working.inFrame;
+                        partner.outFrame = working.outFrame;
+                        partner.in = working.in;
+                        partner.out = working.out;
+                    } else {
+                        // Foto não possui faixa de áudio: remove o segmento vinculado
+                        const idx = cuts.indexOf(partner);
+                        if (idx !== -1) cuts.splice(idx, 1);
+                        removedPartnerId = partner.id;
+                        working.link_id = null;
+                    }
+                } else if (!isNewVideo) {
+                    working.link_id = null;
+                }
+            }
+
+            cuts.sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+
+            STATE.activeTimelineCuts = cuts;
+            this.selectedClipId = working.id;
+            this.selectedClipIds = new Set([working.id]);
+            this.selectedTrack = working.track;
+        });
+
+        const updated = (STATE.activeTimelineCuts || []).find(c => c.id === targetClipId) || null;
+        return { success: true, reason: null, clip: updated, removedPartnerId, durationAdjusted };
     }
 
     /**

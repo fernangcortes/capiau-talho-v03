@@ -589,6 +589,38 @@ export class CapiauTimelineRenderer {
 
                     ctx.restore();
                 }
+            } else if (type === "replace") {
+                // Replace Edit (Task 9): realce do clipe alvo — a mídia arrastada com Alt
+                // substitui o conteúdo preservando duração, efeitos (Ken Burns) e cor.
+                const lane = this.getLane(trackId);
+                if (lane && durationFrames > 0) {
+                    const width = durationFrames * zoom;
+
+                    ctx.save();
+                    ctx.fillStyle = "rgba(244, 63, 94, 0.20)"; // Rosa (substituição)
+                    ctx.fillRect(startX, lane.top, width, lane.height);
+
+                    ctx.strokeStyle = "rgba(244, 63, 94, 0.95)";
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 3]);
+                    ctx.strokeRect(startX + 1, lane.top + 1, Math.max(0, width - 2), Math.max(0, lane.height - 2));
+                    ctx.setLineDash([]);
+
+                    if (width > 30 && lane.height > 20) {
+                        ctx.font = "bold 9px Outfit, sans-serif";
+                        ctx.textBaseline = "top";
+                        ctx.fillStyle = "rgba(244, 63, 94, 0.95)";
+                        ctx.fillText("[REPLACE]", startX + 6, lane.top + 5);
+
+                        if (width > 110 && lane.height > 34) {
+                            ctx.font = "500 9px Outfit, sans-serif";
+                            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+                            const replaceSubtitle = this.dropIndicator.subtitle || "Mantém duração + efeitos";
+                            ctx.fillText(replaceSubtitle, startX + 6, lane.top + 18);
+                        }
+                    }
+                    ctx.restore();
+                }
             }
         }
 

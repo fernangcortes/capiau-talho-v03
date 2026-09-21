@@ -4647,7 +4647,7 @@ export class GalleryInteractionController {
             }
 
             // Atalho para girar mídia sob hover (R ou Shift+R)
-            if (this.activeItem && (e.code === "KeyR" || e.key === "r" || e.key === "R" || (typeof KEYMAP_SERVICE !== "undefined" && KEYMAP_SERVICE?.matches(e, "tools.rotate_media")))) {
+            if (this.activeItem && !e.ctrlKey && !e.metaKey && (e.code === "KeyR" || e.key === "r" || e.key === "R" || (typeof KEYMAP_SERVICE !== "undefined" && KEYMAP_SERVICE?.matches(e, "tools.rotate_media")))) {
                 e.preventDefault();
                 e.stopPropagation();
                 const step = e.shiftKey ? -90 : 90;
@@ -4692,7 +4692,7 @@ export class GalleryInteractionController {
                 this.showShiftHud(this.activeItem);
             }
 
-            if (this.activeItem && (e.code === "KeyR" || e.key === "r" || e.key === "R" || (typeof KEYMAP_SERVICE !== "undefined" && KEYMAP_SERVICE?.matches(e, "tools.rotate_media")))) {
+            if (this.activeItem && !e.ctrlKey && !e.metaKey && (e.code === "KeyR" || e.key === "r" || e.key === "R" || (typeof KEYMAP_SERVICE !== "undefined" && KEYMAP_SERVICE?.matches(e, "tools.rotate_media")))) {
                 e.preventDefault();
                 e.stopPropagation();
                 const step = e.shiftKey ? -90 : 90;

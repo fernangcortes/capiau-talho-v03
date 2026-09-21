@@ -270,6 +270,12 @@ export const COMMANDS_CATALOG = [
         description: "Localiza onde o quadro atual sob a agulha do Source Player está sendo utilizado na timeline ativa e salta a agulha para a posição correspondente"
     },
     {
+        id: "edit.replace_clip",
+        category: "edit",
+        label: "Substituir Clipe na Timeline (Replace Edit)",
+        description: "Substitui a mídia do clipe alvo (selecionado, sob a agulha ou sob o cursor com Alt no arraste) preservando duração exata, efeitos (Ken Burns), cor e velocidade"
+    },
+    {
         id: "edit.split",
         category: "edit",
         label: "Dividir Clipe no Playhead (Split)",
@@ -725,6 +731,7 @@ export const KEYMAP_PRESETS = {
         "edit.toggle_source_audio": ["Ctrl+Alt+KeyA"],
         "edit.match_frame": ["Alt+KeyF"],
         "edit.reverse_match_frame": ["Shift+KeyF"],
+        "edit.replace_clip": ["Ctrl+Shift+KeyR"],
         "edit.split": ["KeyE", "KeyZ", "Alt+KeyE", "Alt+KeyZ"],
         "edit.ripple_trim_head": ["KeyQ"],
         "edit.ripple_trim_tail": ["KeyW"],
@@ -860,6 +867,7 @@ export const KEYMAP_PRESETS = {
         "edit.toggle_source_audio": ["Ctrl+Alt+KeyA"],
         "edit.match_frame": ["Alt+KeyF"],
         "edit.reverse_match_frame": ["Shift+KeyF"],
+        "edit.replace_clip": ["Ctrl+Shift+KeyR"],
         "edit.split": ["Shift+KeyR", "KeyX"],
         "edit.ripple_trim_head": ["BracketLeft", "KeyQ"],
         "edit.ripple_trim_tail": ["BracketRight", "KeyW"],
@@ -939,6 +947,7 @@ export const KEYMAP_PRESETS = {
         "edit.toggle_source_audio": ["Ctrl+Alt+KeyA"],
         "edit.match_frame": ["KeyF"],
         "edit.reverse_match_frame": ["Shift+KeyF"],
+        "edit.replace_clip": ["Ctrl+Shift+KeyR"],
         "edit.toggle_clip_disable": ["Shift+KeyE"],
         "edit.split": ["Ctrl+KeyK"],
         "edit.ripple_trim_head": ["KeyQ"],
@@ -1019,6 +1028,7 @@ export const KEYMAP_PRESETS = {
         "edit.toggle_source_audio": ["Ctrl+Alt+KeyA"],
         "edit.match_frame": ["KeyF"],
         "edit.reverse_match_frame": ["Shift+KeyF"],
+        "edit.replace_clip": ["Ctrl+Shift+KeyR"],
         "edit.toggle_clip_disable": ["KeyD"],
         "edit.split": ["Ctrl+Backslash"],
         "edit.ripple_trim_head": ["Shift+BracketLeft", "KeyQ"],
@@ -1099,6 +1109,7 @@ export const KEYMAP_PRESETS = {
         "edit.toggle_source_audio": ["Ctrl+Alt+KeyA"],
         "edit.match_frame": ["Shift+KeyF"],
         "edit.reverse_match_frame": ["Alt+KeyF"],
+        "edit.replace_clip": ["Ctrl+Shift+KeyR"],
         "edit.toggle_clip_disable": ["KeyV"],
         "edit.split": ["Cmd+KeyB"],
         "edit.ripple_trim_head": ["Alt+BracketLeft", "KeyQ"],

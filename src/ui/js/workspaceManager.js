@@ -3742,7 +3742,7 @@ export class WorkspaceManager {
                 if (window.FaceManager && window.FaceManager.inspectorCard) return;
 
                 // Intercepta atalho de rotação de mídia sob o cursor (R / Shift+R) no popout
-                if (window._galleryController && window._galleryController.activeItem &&
+                if (window._galleryController && window._galleryController.activeItem && !e.ctrlKey && !e.metaKey &&
                     (e.code === "KeyR" || e.key === "r" || e.key === "R" || (window.KEYMAP_SERVICE?.matches(e, "tools.rotate_media")))) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -3983,7 +3983,7 @@ export class WorkspaceManager {
                 if (window.FaceManager && window.FaceManager.inspectorCard) return;
 
                 // Intercepta atalho de rotação de mídia sob o cursor (R / Shift+R) no popout
-                if (window._galleryController && window._galleryController.activeItem &&
+                if (window._galleryController && window._galleryController.activeItem && !e.ctrlKey && !e.metaKey &&
                     (e.code === "KeyR" || e.key === "r" || e.key === "R" || (window.KEYMAP_SERVICE?.matches(e, "tools.rotate_media")))) {
                     e.preventDefault();
                     e.stopPropagation();

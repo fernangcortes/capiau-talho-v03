@@ -258,6 +258,17 @@ export class CapiauTimelineInteraction {
             const durationFrames = Math.max(1, secondsToFrames(durationSec, fps));
             const targetTrackId = this.resolveDropTrack(track, y, mediaType);
 
+            // Replace Edit com Alt (Task 9): realce do clipe alvo sob o cursor em vez
+            // do fantasma de inserção — a mídia arrastada substitui o conteúdo do clipe
+            // preservando duração exata, efeitos (Ken Burns) e cor.
+            if (e.altKey) {
+                const replaceHit = this.findClipAt(Math.max(0, frame), track, y);
+                if (replaceHit && replaceHit.type === "clip") {
+                    this.renderReplaceDragIndicator(replaceHit.data);
+                    return;
+                }
+            }
+
             const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
             let snapped = Math.max(0, frame);
             let snapGuideFrame = null;
@@ -3867,6 +3878,15 @@ export class CapiauTimelineInteraction {
             this.renderer.dropIndicator = null;
         }
 
+        // ── Replace Edit via Alt (Task 9): soltar mídia com Alt sobre um clipe existente
+        // substitui o conteúdo preservando duração exata, efeitos (Ken Burns) e cor.
+        // Sem clipe sob o cursor, o drop segue o fluxo normal (Alt também desliga o snapping).
+        if (e.altKey && this.tryAltReplaceDrop(payload, dropFrame, track, y)) {
+            STATE.activeDragMedia = null;
+            if (this.renderer) this.renderer.requestRedraw();
+            return;
+        }
+
         const fps = (TIMELINE_STATE && TIMELINE_STATE.fps) ? TIMELINE_STATE.fps : 24;
 
         let inTime = 0.0;
@@ -3971,6 +3991,80 @@ export class CapiauTimelineInteraction {
 
         STATE.activeDragMedia = null;
         if (this.renderer) this.renderer.requestRedraw();
+    }
+
+    /**
+     * Drop com Alt sobre um clipe existente: Replace Edit (Task 9).
+     * Substitui a mídia do clipe sob o cursor preservando duração exata, efeitos
+     * (Ken Burns), cor e velocidade — a timeline não se move (sem ripple e sem gaps).
+     * @param {Object} payload Payload da mídia arrastada ({ type, id, inTime, outTime }).
+     * @param {number} frame Frame da posição do drop.
+     * @param {string} track Pista sob o ponteiro (bruta, antes do resolveDropTrack).
+     * @param {number|null} y Coordenada vertical do ponteiro.
+     * @returns {boolean} true se o gesto foi consumido pelo Replace (não insere clipe novo).
+     */
+    tryAltReplaceDrop(payload, frame, track, y = null) {
+        if (!payload || payload.id === undefined || payload.id === null || !track) return false;
+
+        const hit = this.findClipAt(frame, track, y);
+        if (!hit || hit.type !== "clip") return false;
+
+        const sourceInSec = (payload.inTime !== undefined && payload.inTime !== null)
+            ? payload.inTime
+            : ((STATE.markerIn !== null && STATE.markerIn !== undefined) ? STATE.markerIn : 0);
+        const sourceOutSec = (payload.outTime !== undefined && payload.outTime !== null) ? payload.outTime : null;
+
+        const result = (typeof TIMELINE_STATE.replaceClip === "function")
+            ? TIMELINE_STATE.replaceClip(hit.data.id, payload.id, "in", {
+                mediaType: payload.type || null,
+                sourceInSec,
+                sourceOutSec
+            })
+            : null;
+
+        if (!result || !result.success) {
+            const messages = {
+                track_locked: "Pista travada: destrave o cadeado para substituir o clipe.",
+                invalid_target: "Substituição disponível apenas para clipes de vídeo ou foto.",
+                media_not_found: "Mídia de origem não encontrada na biblioteca.",
+                target_not_found: "Clipe alvo não encontrado na timeline."
+            };
+            const msg = messages[result && result.reason] || "Não foi possível substituir o clipe.";
+            if (typeof window.showToast === "function") window.showToast(msg, "warn");
+            return true; // Consome o gesto: Alt sobre clipe nunca insere mídia por cima
+        }
+
+        this.refreshClipInspector();
+        if (this.renderer) this.renderer.requestRedraw();
+
+        if (typeof window.showToast === "function") {
+            let msg = "Clipe substituído preservando duração, efeitos e cor. Pressione Y para deslizar o trecho.";
+            if (result.durationAdjusted) msg += " Mídia mais curta: duração ajustada.";
+            if (result.removedPartnerId) msg += " Áudio vinculado removido (foto sem faixa de áudio).";
+            window.showToast(msg, "success");
+        }
+        return true;
+    }
+
+    /**
+     * Task 9 — Desenha o indicador [REPLACE] com selo visual sobre o clipe alvo.
+     */
+    renderReplaceDragIndicator(clip) {
+        if (!this.renderer) return;
+        const media = STATE.activeDragMedia || null;
+        const durFrames = Math.max(1, clip.outFrame - clip.inFrame);
+
+        this.renderer.activeSnapFrame = null;
+        this.renderer.dropIndicator = {
+            type: "replace",
+            frame: clip.timelineStartFrame,
+            trackId: clip.track,
+            durationFrames: durFrames,
+            title: (media && (media.title || media.filename)) || "",
+            mediaType: (media && media.type) || "video",
+            subtitle: "Solte com Alt para substituir preservando duração e efeitos"
+        };
+        this.renderer.requestRedraw();
     }
 
     /**

@@ -4405,7 +4405,7 @@ export class ProgramPlayer {
      * @param {Object} incomingClip - Corte do clipe subjacente recebendo o corte (ou null se espaço vazio).
      * @param {number} incomingTime - Ponto de corte do clipe entrando (em segundos).
      */
-    show2UpPreview(outgoingClip, outgoingTime, incomingClip, incomingTime) {
+    show2UpPreview(outgoingClip, outgoingTime, incomingClip, incomingTime, labels = null) {
         let overlay = document.getElementById("nle-2up-overlay");
         const targetContainer = document.fullscreenElement 
             || this.el("program-player-viewport") 
@@ -4443,6 +4443,12 @@ export class ProgramPlayer {
 
         overlay.classList.add("active");
         overlay.style.display = "flex";
+
+        // Rótulos contextuais dos monitores (ex.: escolha de trecho do Replace Edit com Alt+Ctrl)
+        const outBadgeLabel = overlay.querySelector(".nle-2up-badge.outgoing > span");
+        const inBadgeLabel = overlay.querySelector(".nle-2up-badge.incoming > span");
+        if (outBadgeLabel) outBadgeLabel.textContent = (labels && labels.outgoing) ? labels.outgoing : "OUTGOING (TAIL)";
+        if (inBadgeLabel) inBadgeLabel.textContent = (labels && labels.incoming) ? labels.incoming : "INCOMING (HEAD)";
 
         const fps = TIMELINE_STATE?.fps || 24;
 
@@ -4904,6 +4910,13 @@ export class VideoPlayer {
             return;
         }
 
+        // Substituição de Clipe na Timeline / Replace Edit (Ctrl+Shift+R)
+        if (KEYMAP_SERVICE.matches(e, "edit.replace_clip")) {
+            e.preventDefault();
+            this.replaceClipFromSource();
+            return;
+        }
+
         // Inserir na Timeline (Append)
         if (KEYMAP_SERVICE.matches(e, "playback.append_timeline")) {
             if (window.activeFocusedPlayer === "source") {
@@ -5025,9 +5038,9 @@ export class VideoPlayer {
         this.sourcePlayer.loadPhoto(photo);
     }
 
-    show2UpPreview(outgoingClip, outgoingTime, incomingClip, incomingTime) {
+    show2UpPreview(outgoingClip, outgoingTime, incomingClip, incomingTime, labels = null) {
         if (this.programPlayer) {
-            this.programPlayer.show2UpPreview(outgoingClip, outgoingTime, incomingClip, incomingTime);
+            this.programPlayer.show2UpPreview(outgoingClip, outgoingTime, incomingClip, incomingTime, labels);
         }
     }
 
@@ -5035,6 +5048,73 @@ export class VideoPlayer {
         if (this.programPlayer) {
             this.programPlayer.hide2UpPreview();
         }
+    }
+
+    /**
+     * Substituição de Clipe na Timeline (Replace Edit — Ctrl+Shift+R / Task 9):
+     * Troca a mídia do clipe selecionado (ou sob a agulha na pista ativa) pela mídia
+     * ativa do Source Player, preservando duração exata, efeitos (Ken Burns), cor e velocidade.
+     * Atravessa o barramento global (STATE / TIMELINE_STATE) — funciona também em popouts.
+     */
+    replaceClipFromSource() {
+        if (typeof TIMELINE_STATE === "undefined" || typeof TIMELINE_STATE.replaceClip !== "function") return null;
+
+        const sourceData = this.sourcePlayer.getSourceClipData();
+        if (!sourceData) return null;
+
+        const cuts = STATE.activeTimelineCuts || [];
+        let target = null;
+
+        // 1. Clipe selecionado na timeline
+        if (TIMELINE_STATE.selectedClipId) {
+            target = cuts.find(c => c.id === TIMELINE_STATE.selectedClipId) || null;
+        }
+
+        // 2. Fallback: clipe sob a agulha (pista ativa → V1 → pistas destravadas)
+        if (!target && typeof TIMELINE_STATE.getClipAtPlayhead === "function") {
+            target = TIMELINE_STATE.getClipAtPlayhead();
+        }
+
+        if (!target) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Selecione um clipe na timeline (ou posicione a agulha sobre ele) para substituir.", "warning");
+            }
+            return null;
+        }
+
+        const result = TIMELINE_STATE.replaceClip(target.id, sourceData.id, "in", {
+            mediaType: sourceData.type,
+            sourceInSec: sourceData.inSec,
+            sourceOutSec: sourceData.outSec
+        });
+
+        if (!result || !result.success) {
+            const messages = {
+                track_locked: "Pista travada: destrave o cadeado para substituir o clipe.",
+                invalid_target: "Substituição disponível apenas para clipes de vídeo ou foto.",
+                media_not_found: "Mídia não encontrada na biblioteca.",
+                target_not_found: "Clipe alvo não encontrado na timeline."
+            };
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast(messages[result && result.reason] || "Não foi possível substituir o clipe.", "warning");
+            }
+            return result;
+        }
+
+        if (typeof window !== "undefined" && window.TIMELINE_INTERACTION) {
+            if (window.TIMELINE_INTERACTION.renderer) window.TIMELINE_INTERACTION.renderer.requestRedraw();
+            if (typeof window.TIMELINE_INTERACTION.refreshClipInspector === "function") {
+                window.TIMELINE_INTERACTION.refreshClipInspector();
+            }
+        }
+
+        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+            let msg = "Clipe substituído preservando duração, efeitos e cor.";
+            if (result.durationAdjusted) msg += " Mídia mais curta: duração ajustada.";
+            if (result.removedPartnerId) msg += " Áudio vinculado removido (foto sem faixa de áudio).";
+            window.showToast(msg, "success");
+        }
+        return result;
     }
 
     /**
