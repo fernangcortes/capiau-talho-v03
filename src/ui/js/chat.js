@@ -664,17 +664,21 @@ export class ChatManager {
             if (btnTabVideos) btnTabVideos.click();
             
             setTimeout(() => {
-                const card = getActiveQuerySelector(`.media-card.tree-file-item[data-video-id="${item.id}"]`);
+                const card = getActiveQuerySelector(`.gallery-item[data-video-id="${item.id}"], .media-card.tree-file-item[data-video-id="${item.id}"], [data-video-id="${item.id}"]`);
                 if (card) {
                     this.expandParentFolders(card);
                     
                     card.scrollIntoView({ behavior: "smooth", block: "center" });
-                    card.style.background = "rgba(6, 182, 212, 0.3)";
-                    card.style.borderColor = "var(--color-cyan)";
-                    setTimeout(() => {
-                        card.style.background = "";
-                        card.style.borderColor = "";
-                    }, 2000);
+                    if (typeof window.applyRevealPulse === "function") {
+                        window.applyRevealPulse(card);
+                    } else {
+                        card.style.background = "rgba(6, 182, 212, 0.3)";
+                        card.style.borderColor = "var(--color-cyan)";
+                        setTimeout(() => {
+                            card.style.background = "";
+                            card.style.borderColor = "";
+                        }, 2000);
+                    }
                 }
             }, 150);
         } else if (item.type === "photo") {
@@ -685,12 +689,16 @@ export class ChatManager {
                 const card = getActiveQuerySelector(`[data-photo-id="${item.id}"]`);
                 if (card) {
                     card.scrollIntoView({ behavior: "smooth", block: "center" });
-                    card.style.background = "rgba(6, 182, 212, 0.3)";
-                    card.style.borderColor = "var(--color-cyan)";
-                    setTimeout(() => {
-                        card.style.background = "";
-                        card.style.borderColor = "";
-                    }, 2000);
+                    if (typeof window.applyRevealPulse === "function") {
+                        window.applyRevealPulse(card);
+                    } else {
+                        card.style.background = "rgba(6, 182, 212, 0.3)";
+                        card.style.borderColor = "var(--color-cyan)";
+                        setTimeout(() => {
+                            card.style.background = "";
+                            card.style.borderColor = "";
+                        }, 2000);
+                    }
                 }
             }, 150);
         } else if (item.type === "doc") {

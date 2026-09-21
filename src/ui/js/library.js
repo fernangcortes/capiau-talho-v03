@@ -7649,10 +7649,7 @@ export class LibraryManager {
             const card = targetDoc.querySelector(`.gallery-item[data-video-id="${videoId}"], .media-card.tree-file-item[data-video-id="${videoId}"], [data-video-id="${videoId}"]`);
             if (card) {
                 card.scrollIntoView({ block: "center", behavior: "smooth" });
-                card.classList.remove("reveal-pulse");
-                void card.offsetWidth; // reinicia a animação se já estava aplicada
-                card.classList.add("reveal-pulse");
-                setTimeout(() => card.classList.remove("reveal-pulse"), 1600);
+                applyRevealPulse(card);
             }
         });
         return true;
@@ -7689,10 +7686,7 @@ export class LibraryManager {
             const card = targetDoc.querySelector(`[data-photo-id="${photoId}"]`);
             if (card) {
                 card.scrollIntoView({ block: "center", behavior: "smooth" });
-                card.classList.remove("reveal-pulse");
-                void card.offsetWidth;
-                card.classList.add("reveal-pulse");
-                setTimeout(() => card.classList.remove("reveal-pulse"), 1600);
+                applyRevealPulse(card);
             }
         });
         return true;
@@ -10528,16 +10522,140 @@ class MediaColorExtractor {
 }
 
 /**
+ * Converte cor hexadecimal (#rgb ou #rrggbb) para trio numérico RGB [r, g, b].
+ */
+export function hexToRgb(hex) {
+    if (!hex || typeof hex !== "string") return [6, 182, 212];
+    const clean = hex.replace("#", "").trim();
+    if (clean.length === 3) {
+        const rVal = parseInt(clean[0] + clean[0], 16);
+        const gVal = parseInt(clean[1] + clean[1], 16);
+        const bVal = parseInt(clean[2] + clean[2], 16);
+        return [
+            isNaN(rVal) ? 6 : rVal,
+            isNaN(gVal) ? 182 : gVal,
+            isNaN(bVal) ? 212 : bVal
+        ];
+    }
+    const val = parseInt(clean, 16);
+    if (isNaN(val) || clean.length < 6) return [6, 182, 212];
+    return [(val >> 16) & 255, (val >> 8) & 255, val & 255];
+}
+
+/**
+ * Garante piso mínimo de luminosidade para cores escuras contra fundo dark,
+ * preservando rigorosamente o matiz (hue/tonalidade) original da mídia.
+ * @param {string} hex - Cor hexadecimal
+ * @param {number} floorL - Piso de luminosidade mínima [0.0 - 1.0], padrão 0.60
+ */
+export function calculateBoostedColor(hex, floorL = 0.60) {
+    const [r, g, b] = hexToRgb(hex);
+    const rN = r / 255, gN = g / 255, bN = b / 255;
+    const max = Math.max(rN, gN, bN), min = Math.min(rN, gN, bN);
+    let h = 0, s = 0, l = (max + min) / 2;
+
+    if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case rN: h = (gN - bN) / d + (gN < bN ? 6 : 0); break;
+            case gN: h = (bN - rN) / d + 2; break;
+            case bN: h = (rN - gN) / d + 4; break;
+        }
+        h /= 6;
+    }
+
+    // Se a cor estiver abaixo do piso de luminosidade, eleva no espaço HSL
+    if (l < floorL) {
+        const boostedL = Math.max(floorL, l * 1.35);
+        const boostedS = Math.min(1, Math.max(0.45, s * 1.25));
+
+        function hue2rgb(p, q, t) {
+            let val = t;
+            if (val < 0) val += 1;
+            if (val > 1) val -= 1;
+            if (val < 1/6) return p + (q - p) * 6 * val;
+            if (val < 1/2) return q;
+            if (val < 2/3) return p + (q - p) * (2/3 - val) * 6;
+            return p;
+        }
+
+        const q = boostedL < 0.5 ? boostedL * (1 + boostedS) : boostedL + boostedS - boostedL * boostedS;
+        const p = 2 * boostedL - q;
+        const bR = Math.round(hue2rgb(p, q, h + 1/3) * 255);
+        const bG = Math.round(hue2rgb(p, q, h) * 255);
+        const bB = Math.round(hue2rgb(p, q, h - 1/3) * 255);
+        return [bR, bG, bB];
+    }
+
+    return [r, g, b];
+}
+
+/**
+ * Aplica a onda contínua suave de destaque ao revelar uma mídia na biblioteca (6px em 1.10s),
+ * utilizando a cor temática real com piso de luminosidade adaptativo para garantir nitidez.
+ * @param {HTMLElement} item - Card ou item alvo da biblioteca
+ * @param {string|null} customColor - Cor hexadecimal opcional
+ */
+export function applyRevealPulse(item, customColor = null) {
+    if (!item) return;
+
+    let mediaColor = customColor;
+    if (!mediaColor) {
+        const extractor = window.libraryScrollIndex?.colorExtractor || window.libraryInstance?.scrollIndexTracker?.colorExtractor;
+        const allVideos = STATE.allVideos || window.STATE?.allVideos || [];
+        const allPhotos = STATE.allPhotos || window.STATE?.allPhotos || [];
+        if (extractor) {
+            mediaColor = extractor.getColor(item, allVideos, allPhotos);
+        }
+    }
+    if (!mediaColor || mediaColor === "#64748b" || mediaColor === "#475569") {
+        if (item.hasAttribute("data-video-id") || Boolean(item.dataset?.videoId)) {
+            const vidId = parseInt(item.getAttribute("data-video-id") || item.dataset?.videoId, 10);
+            const video = (STATE.allVideos || window.STATE?.allVideos || []).find(v => v.id === vidId);
+            if (video?.palette_hex) {
+                const extractor = window.libraryScrollIndex?.colorExtractor;
+                const bestHex = extractor ? extractor.getBestPaletteColor(video.palette_hex) : null;
+                if (bestHex) mediaColor = bestHex;
+            }
+        }
+    }
+    if (!mediaColor) {
+        mediaColor = "#06b6d4";
+    }
+
+    // Garante contraste imediato usando o piso de luminosidade
+    const [r, g, b] = calculateBoostedColor(mediaColor, 0.60);
+    item.style.setProperty("--reveal-color-rgb", `${r}, ${g}, ${b}`);
+
+    item.classList.remove("reveal-pulse");
+    void item.offsetWidth;
+    item.classList.add("reveal-pulse");
+
+    if (item._revealPulseTimer) {
+        clearTimeout(item._revealPulseTimer);
+    }
+    // Duração de 1.10s (1100ms) + 100ms de margem de transição suave
+    item._revealPulseTimer = setTimeout(() => {
+        item._revealPulseTimer = null;
+        if (item && item.isConnected) {
+            item.classList.remove("reveal-pulse");
+            item.style.removeProperty("--reveal-color-rgb");
+        }
+    }, 1200);
+}
+
+if (typeof window !== "undefined") {
+    window.hexToRgb = hexToRgb;
+    window.calculateBoostedColor = calculateBoostedColor;
+    window.applyRevealPulse = applyRevealPulse;
+}
+
+/**
  * Coalesce itens adjacentes que compartilham cores similares em blocos contíguos de cena.
  */
 function coalesceColorBlocks(itemsWithColors) {
     if (!itemsWithColors || itemsWithColors.length === 0) return [];
-
-    const hexToRgb = (hex) => {
-        const clean = (hex || "#64748b").replace("#", "");
-        const val = parseInt(clean.length === 3 ? clean.split("").map(c => c + c).join("") : clean, 16) || 0;
-        return [(val >> 16) & 255, (val >> 8) & 255, val & 255];
-    };
 
     const colorDistance = (c1, c2) => {
         const [r1, g1, b1] = hexToRgb(c1);
@@ -11497,14 +11615,12 @@ export class LibraryScrollIndexTracker {
         }
 
         const triggerHighlight = () => {
-            item.classList.remove("reveal-pulse");
-            void item.offsetWidth;
-            item.classList.add("reveal-pulse");
-            setTimeout(() => {
-                if (item && item.isConnected) {
-                    item.classList.remove("reveal-pulse");
-                }
-            }, 1600);
+            const allVideos = STATE.allVideos || [];
+            const allPhotos = STATE.allPhotos || [];
+            const mediaColor = this.colorExtractor
+                ? this.colorExtractor.getColor(item, allVideos, allPhotos)
+                : null;
+            applyRevealPulse(item, mediaColor);
         };
 
         const containerRect = container.getBoundingClientRect();
