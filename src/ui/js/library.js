@@ -91,6 +91,201 @@ export function saveVirtualFoldersState(projectId = null) {
     }
 }
 
+// ── SMART BINS TAXONOMY & ATRIBUIÇÃO MANUAL ───────────────────────────
+export const SMART_BINS_TAXONOMY = [
+    { id: 'interviews', label: '🎙️ Entrevistas & Depoimentos', keywords: ['entrevista', 'depoimento', 'relato', 'declarou', 'vitoria', 'vitória', 'luciana', 'dina brandao', 'dina brandão', 'joao antonio', 'joão antonio', 'thiago moyses'], weight: 3.0 },
+    { id: 'cast_characters', label: '🎭 Elenco & Personagens', keywords: ['mabel', 'yasmin', 'cobb', 'juliane', 'daniel', 'suzane', 'suzana', 'rafael', 'atriz', 'ator', 'elenco', 'personagem', 'atuação', 'atuacao', 'ensaio de cena', 'interpretação', 'interpretacao', 'figurino', 'kazak', 'casaco', 'maquiagem', 'cabelo'], weight: 2.5 },
+    { id: 'action_stunts', label: '💥 Ação, Dublês & Efeitos', keywords: ['sangue', 'briga', 'luta', 'dublê', 'duble', 'queda', 'batida', 'efeitos especiais', 'correria', 'ferimento', 'ação', 'acao'], weight: 2.0 },
+    { id: 'camera_cinematography', label: '🎥 Câmera, Enquadramento & Planos', keywords: ['câmera', 'camera', 'steadicam', 'gimbal', 'lente', 'drone', 'enquadramento', 'close-up', 'close', 'foco', 'pan', 'tilt', 'plano', 'cinegrafista', 'operador'], weight: 1.8 },
+    { id: 'lighting_atmosphere', label: '💡 Iluminação, Luz & Atmosfera', keywords: ['iluminação', 'iluminacao', 'luz', 'luzes', 'noturna', 'noturno', 'neblina', 'fumaça', 'fumaca', 'sombra', 'flare', 'gelatina', 'refletor', 'atmosfera'], weight: 1.8 },
+    { id: 'directing_dialogue', label: '🎬 Direção, Marcação & Ensaios', keywords: ['diretor', 'direção', 'direcao', 'marcação', 'marcacao', 'instruções', 'instrucoes', 'orientação', 'orientacao', 'conversa', 'diálogo', 'dialogo', 'discussão', 'discussao', 'ensaio'], weight: 1.2 },
+    { id: 'sound_music', label: '🎵 Trilha Sonora & Áudio', keywords: ['trilha', 'música', 'musica', 'som', 'áudio', 'audio', 'microfone', 'lapela', 'boom', 'vinil', 'toca-discos', 'ruído', 'ruido'], weight: 2.5 },
+    { id: 'set_production', label: '📦 Set de Filmagem & Bastidores', keywords: ['set', 'bastidores', 'making of', 'equipe', 'produção', 'producao', 'preparação', 'preparacao', 'preparativos', 'intervalo', 'pausa', 'almoço', 'almoco', 'técnico', 'tecnico'], weight: 0.8 },
+    { id: 'other', label: '📁 Cenas & Bastidores Gerais', keywords: [], weight: 0.0 }
+];
+
+export let manualSmartBinsMap = {};
+
+export function loadManualSmartBinsState(projectId = null) {
+    if (!projectId) projectId = getActiveProjectId();
+    try {
+        const saved = localStorage.getItem(`capiau_manual_smart_bins_${projectId}`);
+        manualSmartBinsMap = saved ? JSON.parse(saved) : {};
+    } catch (e) {
+        manualSmartBinsMap = {};
+    }
+    return manualSmartBinsMap;
+}
+
+export function saveManualSmartBinsState(projectId = null) {
+    if (!projectId) projectId = getActiveProjectId();
+    try {
+        localStorage.setItem(`capiau_manual_smart_bins_${projectId}`, JSON.stringify(manualSmartBinsMap));
+    } catch (e) {
+        console.error("Erro ao salvar smart bins manuais:", e);
+    }
+}
+
+export function setMediaManualSmartBin(item, binId, projectId = null) {
+    if (!item) return;
+    if (!projectId) projectId = getActiveProjectId();
+    loadManualSmartBinsState(projectId);
+    const key = mediaFolderKey(item);
+    if (!binId || binId === "auto") {
+        delete manualSmartBinsMap[key];
+    } else {
+        manualSmartBinsMap[key] = binId;
+    }
+    saveManualSmartBinsState(projectId);
+    item.custom_smart_bin = (binId && binId !== "auto") ? binId : null;
+}
+
+export function classifyMediaSmartBin(item) {
+    if (!item) return "other";
+    const vtype = item.video_type || (isVideoItem(item) ? "video" : "photo");
+    const category = (item.category || "").toLowerCase();
+
+    // Supressão do prefixo de câmera/rolo MONSTRO_ para não distorcer dublê/efeitos
+    let cleanFn = (item.filename || item.filepath || "").toLowerCase();
+    cleanFn = cleanFn.replace(/^monstro_\d+_\d+_[a-z0-9_]+/i, "").replace(/^monstro_/i, "");
+
+    const tText = (item.title || item.label || "").toLowerCase();
+    const sText = (item.summary || item.description || "").toLowerCase();
+    const fnText = cleanFn;
+    let tagText = "";
+    if (item.tags) {
+        try {
+            const parsed = typeof item.tags === "string" ? JSON.parse(item.tags) : item.tags;
+            if (Array.isArray(parsed)) tagText = parsed.join(" ").toLowerCase();
+            else tagText = String(item.tags).toLowerCase();
+        } catch (e) {
+            tagText = String(item.tags).toLowerCase();
+        }
+    }
+
+    const scores = {};
+    for (const b of SMART_BINS_TAXONOMY) {
+        if (b.id === "other") continue;
+        let sc = 0.0;
+        for (const kw of b.keywords) {
+            const kwLow = kw.toLowerCase();
+            // Título tem maior relevância (3.0 * peso)
+            if (tText.includes(kwLow)) sc += 3.0 * b.weight;
+            // Tags semânticas têm alta relevância (2.5 * peso)
+            if (tagText.includes(kwLow)) sc += 2.5 * b.weight;
+            // Sinopse/Resumo (1.5 * peso)
+            if (sText.includes(kwLow)) sc += 1.5 * b.weight;
+            // Nome de arquivo limpo (1.0 * peso)
+            if (fnText.includes(kwLow)) sc += 1.0 * b.weight;
+        }
+        if (b.id === "interviews" && (vtype === "interview" || category.includes("interview") || category === "depoimento")) {
+            sc += 12.0;
+        }
+        scores[b.id] = sc;
+    }
+
+    let bestBin = "other";
+    let maxScore = 0.0;
+    for (const [bid, sc] of Object.entries(scores)) {
+        if (sc > maxScore) {
+            maxScore = sc;
+            bestBin = bid;
+        }
+    }
+    return bestBin;
+}
+
+export function getMediaSmartBin(item) {
+    if (!item) return "other";
+    const key = mediaFolderKey(item);
+    if (manualSmartBinsMap[key]) {
+        return manualSmartBinsMap[key];
+    }
+    if (item.custom_smart_bin) {
+        return item.custom_smart_bin;
+    }
+    return classifyMediaSmartBin(item);
+}
+
+const CINEMA_KNOWN_ENTITIES = [
+    'Mabel', 'Cobb', 'Yasmin', 'Juliane', 'Daniel', 'Suzane', 'Suzana',
+    'Rafael', 'Vitória', 'Vitoria', 'Luciana', 'Dina Brandão', 'Dina Brandao',
+    'João Antonio', 'Joao Antonio', 'Thiago Moyses', 'Jones', 'Bayard',
+    'Felipe', 'Gabriel', 'Tim Martins', 'Tim', 'Bee', 'Nina', 'Emily Montenegro',
+    'Julia', 'Bruno', 'Carlos', 'UnB', 'Remington', 'Ronin', 'Blackmagic',
+    'Vans', 'Monstro'
+];
+
+export function extractTitleKeyword(title) {
+    if (!title || typeof title !== "string") return "";
+    let t = title.trim();
+    if (!t) return "";
+
+    // 1. Checa entidades de alto valor cinematográfico conhecidas
+    for (const ent of CINEMA_KNOWN_ENTITIES) {
+        const re = new RegExp(`\\b${ent.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i');
+        if (re.test(t)) {
+            return ent;
+        }
+    }
+
+    // 2. Tratamento de dois pontos (ex: "Bastidores: Atrizes e Preparação", "TRILHA: Tudo e Nada")
+    if (t.includes(":")) {
+        const parts = t.split(":");
+        const p1 = parts.slice(1).join(":").trim();
+        if (p1.length > 2) {
+            t = p1;
+        }
+    }
+
+    // 3. Detecção de entidades após conectores/preposições (ex: "com Mabel", "para Cobb", "de Yasmin")
+    const mPrep = t.match(/\b(?:com|de|do|da|para|sobre|por|em|no|na)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)*|[A-Z]{2,}(?:\s+\d+[a-zA-Z]*)?)/);
+    if (mPrep && mPrep[1]) {
+        const cand = mPrep[1].trim();
+        const candLow = cand.toLowerCase();
+        if (cand.length > 2 && !['equipe', 'atriz', 'ator', 'cena', 'set', 'luz', 'camera', 'câmera'].includes(candLow)) {
+            return cand;
+        }
+    }
+
+    // 4. Entidade capitalizada no início da frase que não seja stopword
+    const mStart = t.match(/^([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)*|[A-Z]{2,})/);
+    if (mStart && mStart[1]) {
+        const cand = mStart[1].trim();
+        const candLow = cand.toLowerCase();
+        if (cand.length > 2 && !['equipe', 'atriz', 'ator', 'cena', 'cenas', 'set', 'luz', 'luzes', 'bastidores', 'preparação', 'preparativos', 'ajuste', 'ajustes', 'gravação', 'ensaio', 'ensaios', 'entrevista', 'depoimento', 'detalhe', 'detalhes', 'visão', 'registro', 'conversa', 'discussão', 'revisão', 'análise', 'aplicação', 'configuração', 'trabalho', 'edição', 'filmagem', 'operação', 'interação'].includes(candLow)) {
+            return cand;
+        }
+    }
+
+    // 5. Decapagem de prefixos operacionais repetitivos de cinema
+    let clean = t.replace(/^(?:equipe|preparação|preparativos|ajuste|ajustes|cena|cenas|gravação|gravacao|ensaio|ensaios|entrevista|entrevistas|depoimento|depoimentos|teste|testes|bastidores|making\s+of|diretor|diretora|direção|direcao|cinegrafista|operador|operadores|operação|operacao|detalhe|detalhes|visão|visao|vistas|registro|registros|conversa|discussão|discussao|revisão|revisao|análise|analise|aplicação|aplicacao|configuração|configuracao|trabalho|edição|edicao|filmagem|inspeção|inspecao|discutindo|interação|interações|dinâmica)\b[\s:]*/i, "").trim();
+    clean = clean.replace(/^(?:de|do|da|dos|das|com|em|no|na|nos|nas|para|por|sobre|ao|à|aos|às|e|um|uma|uns|umas)\s+/i, "").trim();
+
+    const words = clean.split(/\s+/).filter(Boolean);
+    if (words.length > 0) {
+        const firstTwo = words.slice(0, 2).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+        return firstTwo;
+    }
+
+    return t.slice(0, 24).trim();
+}
+
+export function getMediaKeyword(item) {
+    if (!item) return "";
+    if (item.primary_keyword && typeof item.primary_keyword === "string" && item.primary_keyword.trim()) {
+        return item.primary_keyword.trim();
+    }
+    const raw = item.title || item.label || item.filename || "";
+    return extractTitleKeyword(raw);
+}
+window.extractTitleKeyword = extractTitleKeyword;
+window.getMediaKeyword = getMediaKeyword;
+window.classifyMediaSmartBin = classifyMediaSmartBin;
+window.getMediaSmartBin = getMediaSmartBin;
+window.setMediaManualSmartBin = setMediaManualSmartBin;
+window.SMART_BINS_TAXONOMY = SMART_BINS_TAXONOMY;
+
 /**
  * Uma pasta removida leva junto tudo que esta abaixo dela. Antes so o caminho
  * exato era testado: ao excluir "root/D:", o bin filho "root/D:/makinof-monstro"
@@ -1139,6 +1334,70 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         promptMoveMediaToBin(item, kind);
     });
     menu.appendChild(moveToBinItem);
+
+    // Item: Atribuir Smart Bin (IA) com Submenu
+    const smartBinMenuItem = document.createElement("div");
+    smartBinMenuItem.className = "menu-item menu-item-has-submenu";
+    smartBinMenuItem.innerHTML = `
+        <i class="fa-solid fa-brain" style="color:var(--color-cyan);"></i>
+        <span class="menu-item-text">Atribuir Smart Bin (IA)</span>
+        <i class="fa-solid fa-chevron-right menu-item-chevron"></i>
+        <div class="menu-submenu" style="min-width: 250px;"></div>
+    `;
+    const sbSubmenu = smartBinMenuItem.querySelector(".menu-submenu");
+
+    const currentSmartBin = getMediaSmartBin(item);
+    const key = mediaFolderKey(item);
+    const hasManualOverride = Boolean(manualSmartBinsMap[key]);
+
+    // Opção: 🤖 Automático (Classificação IA)
+    const autoItem = document.createElement("div");
+    autoItem.className = "menu-item";
+    autoItem.innerHTML = `
+        <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--color-cyan);"></i>
+        <span class="menu-item-text">🤖 Automático (Classificação IA)</span>
+        ${!hasManualOverride ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:10px; margin-left:auto; width:auto;"></i>' : ''}
+    `;
+    autoItem.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        menu.remove();
+        setMediaManualSmartBin(item, "auto");
+        if (window.libraryInstance) {
+            window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+        }
+        if (typeof window.showToast === "function") {
+            window.showToast("Classificação automática da IA restaurada para esta mídia.", "info");
+        }
+    });
+    sbSubmenu.appendChild(autoItem);
+
+    const sbSep = document.createElement("div");
+    sbSep.className = "menu-separator";
+    sbSubmenu.appendChild(sbSep);
+
+    // As 9 opções da taxonomia
+    SMART_BINS_TAXONOMY.forEach(bin => {
+        const subItem = document.createElement("div");
+        subItem.className = "menu-item";
+        const isCurrent = currentSmartBin === bin.id;
+        subItem.innerHTML = `
+            <span class="menu-item-text">${bin.label}</span>
+            ${isCurrent ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:10px; margin-left:auto; width:auto;"></i>' : ''}
+        `;
+        subItem.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            menu.remove();
+            setMediaManualSmartBin(item, bin.id);
+            if (window.libraryInstance) {
+                window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+            }
+            if (typeof window.showToast === "function") {
+                window.showToast(`Mídia atribuída a "${bin.label}"!`, "success");
+            }
+        });
+        sbSubmenu.appendChild(subItem);
+    });
+    menu.appendChild(smartBinMenuItem);
 
     // Item: Editar Metadados & Data
     const editMetaItem = document.createElement("div");
@@ -2370,6 +2629,26 @@ export async function handleDropToFolder(e, targetFolderPath) {
     const dataCapiau = e.dataTransfer.getData("application/x-capiau-media");
     const projectId = getActiveProjectId();
 
+    // 0. Se for um Smart Bin de temas IA: "smart_bins_root/temas_ia/<binId>"
+    if (dataCapiau && targetFolderPath && targetFolderPath.startsWith("smart_bins_root/temas_ia/")) {
+        try {
+            const parsed = JSON.parse(dataCapiau);
+            if (parsed && parsed.id) {
+                const kind = parsed.type === "photo" ? "photo" : "video";
+                const binId = targetFolderPath.replace("smart_bins_root/temas_ia/", "");
+                const binObj = SMART_BINS_TAXONOMY.find(b => b.id === binId) || { label: binId };
+                const list = kind === "photo" ? (STATE.allPhotos || []) : (STATE.allVideos || []);
+                const item = list.find(m => m.id === parsed.id) || parsed;
+                setMediaManualSmartBin(item, binId, projectId);
+                if (window.libraryInstance) await window.libraryInstance.reloadData();
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Mídia movida para Smart Bin "${binObj.label}"!`, "success");
+                }
+                return;
+            }
+        } catch (err) {}
+    }
+
     // 1. Mover item existente internamente na biblioteca
     if (dataCapiau) {
         try {
@@ -2551,7 +2830,7 @@ function hasMatchingChildren(node, query, ast = null) {
  * document.getElementById("library-search-input"), parseQuery(...) e
  * localStorage.getItem("library_sort_by") — ~2000 vezes por render.
  */
-let renderCtx = { query: "", ast: null, sortBy: "name_asc" };
+let renderCtx = { query: "", ast: null, sortBy: "keyword_asc" };
 let lastRenderedTree = null;
 
 /**
@@ -2606,7 +2885,7 @@ function refreshRenderContext() {
     renderCtx = {
         query,
         ast: query ? getCachedQueryAST(query) : null,
-        sortBy: sortSelect?.value || localStorage.getItem("library_sort_by") || "name_asc"
+        sortBy: sortSelect?.value || localStorage.getItem("library_sort_by") || "keyword_asc"
     };
     return renderCtx;
 }
@@ -2808,9 +3087,24 @@ function buildTree(items) {
             isOpen: openFoldersSet.has(tiposPath)
         };
 
-        // Uma unica passada sobre os itens alimenta os tres agrupamentos
+        // Smart Bin: Temas & Departamentos IA
+        const temasPath = "smart_bins_root/temas_ia";
+        const temasNode = {
+            name: "Smart Bins / Temas (IA)",
+            type: "folder",
+            path: temasPath,
+            isSmartBin: true,
+            icon: "fa-brain",
+            color: "var(--color-cyan)",
+            children: {},
+            isOpen: openFoldersSet.has(temasPath)
+        };
+
+        // Uma única passada sobre os itens alimenta os agrupamentos
         const itemsByDate = {};
         const itemsByCat = {};
+        const itemsBySmartBin = {};
+        loadManualSmartBinsState(projectId);
         const vids = [];
         const photos = [];
         items.forEach(item => {
@@ -2821,9 +3115,21 @@ function buildTree(items) {
             const catKey = item.category ? (CATEGORY_LABELS[item.category] || item.category) : "Sem Categoria";
             (itemsByCat[catKey] || (itemsByCat[catKey] = [])).push(item);
 
+            const sbId = getMediaSmartBin(item);
+            (itemsBySmartBin[sbId] || (itemsBySmartBin[sbId] = [])).push(item);
+
             if (isVideoItem(item)) vids.push(item);
             else photos.push(item);
         });
+
+        // Alimenta Temas IA
+        SMART_BINS_TAXONOMY.forEach(bin => {
+            const binItems = itemsBySmartBin[bin.id] || [];
+            if (binItems.length > 0) {
+                temasNode.children[bin.id] = makeSmartGroup(temasPath, bin.id, bin.label, binItems);
+            }
+        });
+        smartRoot.children["temas_ia"] = temasNode;
 
         Object.keys(itemsByDate).sort().reverse().forEach(dt => {
             diariasNode.children[dt] = makeSmartGroup(diariasPath, dt, dt, itemsByDate[dt]);
@@ -2919,9 +3225,187 @@ function animateStreamToggle(btnEl, goingToExpand, onComplete) {
     }, 900);
 }
 
+function getItemTimestamp(item) {
+    if (!item) return 0;
+    const raw = item.recorded_at || item.created_at;
+    if (raw) {
+        const t = new Date(raw).getTime();
+        if (!isNaN(t)) return t;
+    }
+    return 0;
+}
+
+function getItemTypePriority(item, preferredType) {
+    if (!item) return 99;
+    const isVid = isVideoItem(item);
+    if (!isVid) return 3;
+    const vType = item.video_type;
+    if (preferredType === "interview") {
+        if (vType === "interview") return 0;
+        if (vType === "broll") return 1;
+        return 2;
+    } else {
+        if (vType === "broll") return 0;
+        if (vType === "interview") return 1;
+        return 2;
+    }
+}
+
+export function getMediaContentSortKey(item) {
+    if (!item) return "";
+    // 1. Entrevistas ou depoimentos com falante/entrevistado identificado
+    if (item.video_type === "interview") {
+        let person = "";
+        if (item.title) {
+            const m = item.title.match(/^(?:entrevista\s*(?:com|-|:)?\s*)?([^:\-\n\.\(]+)/i);
+            if (m && m[1]) person = m[1].trim();
+        }
+        if (!person && item.description) {
+            const m = item.description.match(/Entrevista com\s+([^,\-\n]+)/i);
+            if (m && m[1]) person = m[1].trim();
+        }
+        if (!person && item.summary) {
+            const m = item.summary.match(/Entrevistado:\s*([^,\-\n\.]+)/i);
+            if (m && m[1]) person = m[1].trim();
+        }
+        if (!person && item.tags) {
+            try {
+                const parsed = typeof item.tags === "string" ? JSON.parse(item.tags) : item.tags;
+                const sTag = parsed.find(t => t.startsWith("Speaker:") || t.startsWith("Person:"));
+                if (sTag) person = sTag.split(":")[1].trim();
+            } catch(e) {}
+        }
+        if (person) {
+            const sub = item.title || item.summary || item.filename || "";
+            return `${person} - ${sub}`;
+        }
+    }
+    // 2. Título executivo / gerado pela IA ou editado pelo usuário
+    if (item.title && item.title.trim()) return item.title.trim();
+    // 3. Título amigável calculado
+    const friendly = getFriendlyTitle(item);
+    if (friendly && friendly !== item.filename) return friendly;
+    // 4. Fallback para nome do arquivo físico
+    return item.filename || item.filepath || "";
+}
+window.getMediaContentSortKey = getMediaContentSortKey;
+
+export function compareMediaItems(itemA, itemB, sortBy = "keyword_asc") {
+    if (!itemA && !itemB) return 0;
+    if (!itemA) return 1;
+    if (!itemB) return -1;
+
+    switch (sortBy) {
+        case "keyword_asc": {
+            const kwA = getMediaKeyword(itemA);
+            const kwB = getMediaKeyword(itemB);
+            const comp = kwA.localeCompare(kwB, undefined, { numeric: true, sensitivity: "base" });
+            if (comp !== 0) return comp;
+            const nameA = itemA.title || itemA.filename || "";
+            const nameB = itemB.title || itemB.filename || "";
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+        }
+        case "keyword_desc": {
+            const kwA = getMediaKeyword(itemA);
+            const kwB = getMediaKeyword(itemB);
+            const comp = kwB.localeCompare(kwA, undefined, { numeric: true, sensitivity: "base" });
+            if (comp !== 0) return comp;
+            const nameA = itemA.title || itemA.filename || "";
+            const nameB = itemB.title || itemB.filename || "";
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+        }
+        case "title_asc": {
+            const titleA = getMediaContentSortKey(itemA);
+            const titleB = getMediaContentSortKey(itemB);
+            return titleA.localeCompare(titleB, undefined, { numeric: true, sensitivity: "base" });
+        }
+        case "title_desc": {
+            const titleA = getMediaContentSortKey(itemA);
+            const titleB = getMediaContentSortKey(itemB);
+            return titleB.localeCompare(titleA, undefined, { numeric: true, sensitivity: "base" });
+        }
+        case "filename_asc":
+        case "name_asc": {
+            const nameA = itemA.filename || itemA.title || "";
+            const nameB = itemB.filename || itemB.title || "";
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+        }
+        case "filename_desc":
+        case "name_desc": {
+            const nameA = itemA.filename || itemA.title || "";
+            const nameB = itemB.filename || itemB.title || "";
+            return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: "base" });
+        }
+        case "duration_asc": {
+            // Mais rápido / curto primeiro (0s -> ...)
+            const durA = (typeof itemA.duration === "number") ? itemA.duration : 0;
+            const durB = (typeof itemB.duration === "number") ? itemB.duration : 0;
+            if (durA !== durB) return durA - durB;
+            const nameA = itemA.filename || itemA.title || "";
+            const nameB = itemB.filename || itemB.title || "";
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+        }
+        case "duration_desc": {
+            // Mais demorado / longo primeiro (... -> 0s)
+            const durA = (typeof itemA.duration === "number") ? itemA.duration : 0;
+            const durB = (typeof itemB.duration === "number") ? itemB.duration : 0;
+            if (durB !== durA) return durB - durA;
+            const nameA = itemA.filename || itemA.title || "";
+            const nameB = itemB.filename || itemB.title || "";
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+        }
+        case "date_desc": {
+            // Recente no topo
+            const timeA = getItemTimestamp(itemA);
+            const timeB = getItemTimestamp(itemB);
+            if (timeB !== timeA) return timeB - timeA;
+            return (itemB.id || 0) - (itemA.id || 0);
+        }
+        case "date_asc": {
+            // Antiga no topo
+            const timeA = getItemTimestamp(itemA);
+            const timeB = getItemTimestamp(itemB);
+            if (timeA !== timeB) return timeA - timeB;
+            return (itemA.id || 0) - (itemB.id || 0);
+        }
+        case "type_interview": {
+            const prioA = getItemTypePriority(itemA, "interview");
+            const prioB = getItemTypePriority(itemB, "interview");
+            if (prioA !== prioB) return prioA - prioB;
+            if (itemA._mediaKind === "photo" && itemB._mediaKind === "photo") {
+                const catA = itemA.category || "";
+                const catB = itemB.category || "";
+                if (catA !== catB) return catA.localeCompare(catB);
+            }
+            const nameA = itemA.filename || itemA.title || "";
+            const nameB = itemB.filename || itemB.title || "";
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+        }
+        case "type_broll": {
+            const prioA = getItemTypePriority(itemA, "broll");
+            const prioB = getItemTypePriority(itemB, "broll");
+            if (prioA !== prioB) return prioA - prioB;
+            if (itemA._mediaKind === "photo" && itemB._mediaKind === "photo") {
+                const catA = itemA.category || "";
+                const catB = itemB.category || "";
+                if (catA !== catB) return catA.localeCompare(catB);
+            }
+            const nameA = itemA.filename || itemA.title || "";
+            const nameB = itemB.filename || itemB.title || "";
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+        }
+        default: {
+            const nameA = itemA.filename || itemA.title || "";
+            const nameB = itemB.filename || itemB.title || "";
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+        }
+    }
+}
+window.compareMediaItems = compareMediaItems;
+
 function getSortedChildrenKeys(node) {
     if (!node || !node.children) return [];
-    const sortBy = renderCtx.sortBy || "name_asc";
+    const sortBy = renderCtx.sortBy || localStorage.getItem("library_sort_by") || "keyword_asc";
 
     return Object.keys(node.children).sort((a, b) => {
         const nodeA = node.children[a];
@@ -2931,53 +3415,15 @@ function getSortedChildrenKeys(node) {
         }
         if (nodeA.type === "folder") {
             if (sortBy === "name_desc") {
-                return b.localeCompare(a);
+                return b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" });
             }
-            return a.localeCompare(b);
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
         }
         const itemA = nodeA.video || nodeA.photo;
         const itemB = nodeB.video || nodeB.photo;
         if (!itemA || !itemB) return a.localeCompare(b);
 
-        if (sortBy === "name_asc") {
-            const nameA = itemA.filename || itemA.title || "";
-            const nameB = itemB.filename || itemB.title || "";
-            return nameA.localeCompare(nameB);
-        } else if (sortBy === "name_desc") {
-            const nameA = itemA.filename || itemA.title || "";
-            const nameB = itemB.filename || itemB.title || "";
-            return nameB.localeCompare(nameA);
-        } else if (sortBy === "type_interview") {
-            if (nodeA.video) {
-                const typeA = itemA.video_type === "interview" ? 0 : (itemA.video_type === "broll" ? 1 : 2);
-                const typeB = itemB.video_type === "interview" ? 0 : (itemB.video_type === "broll" ? 1 : 2);
-                if (typeA !== typeB) return typeA - typeB;
-            } else if (nodeA.photo) {
-                const catA = itemA.category || "";
-                const catB = itemB.category || "";
-                if (catA !== catB) return catA.localeCompare(catB);
-            }
-            return (itemA.filename || "").localeCompare(itemB.filename || "");
-        } else if (sortBy === "type_broll") {
-            if (nodeA.video) {
-                const typeA = itemA.video_type === "broll" ? 0 : (itemA.video_type === "interview" ? 1 : 2);
-                const typeB = itemB.video_type === "broll" ? 0 : (itemB.video_type === "interview" ? 1 : 2);
-                if (typeA !== typeB) return typeA - typeB;
-            } else if (nodeA.photo) {
-                const catA = itemA.category || "";
-                const catB = itemB.category || "";
-                if (catA !== catB) return catA.localeCompare(catB);
-            }
-            return (itemA.filename || "").localeCompare(itemB.filename || "");
-        } else if (sortBy === "duration_desc") {
-            const durA = itemA.duration || 0;
-            const durB = itemB.duration || 0;
-            if (durB !== durA) return durB - durA;
-            return (itemB.id || 0) - (itemA.id || 0);
-        } else if (sortBy === "date_desc") {
-            return (itemB.id || 0) - (itemA.id || 0);
-        }
-        return a.localeCompare(b);
+        return compareMediaItems(itemA, itemB, sortBy);
     });
 }
 
@@ -4686,6 +5132,7 @@ export class GalleryInteractionController {
 
         // Preferências do usuário sobre o que mostrar
         const showTitle = localStorage.getItem("gallery-hud-title") !== "false";
+        const showKeyword = localStorage.getItem("gallery-hud-keyword") !== "false";
         const showFilename = localStorage.getItem("gallery-hud-filename") !== "false";
         const showSummary = localStorage.getItem("gallery-hud-summary") !== "false";
         const showSpeaker = localStorage.getItem("gallery-hud-speaker") !== "false";
@@ -4693,6 +5140,13 @@ export class GalleryInteractionController {
         const showTech = localStorage.getItem("gallery-hud-tech") !== "false";
 
         let titleHtml = showTitle ? `<div class="gallery-hud-title">${escapeHtml(item.title || item.filename)}</div>` : "";
+        let keywordHtml = "";
+        if (showKeyword) {
+            const kw = getMediaKeyword(item);
+            if (kw) {
+                keywordHtml = `<div class="gallery-hud-keyword" style="font-size: 10px; color: var(--color-cyan); margin-bottom: 4px; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-tag" style="font-size: 8px;"></i> <span>${escapeHtml(kw)}</span></div>`;
+            }
+        }
         let filenameHtml = (showFilename && item.filename && item.filename !== item.title) ? `<div class="gallery-hud-filename">${escapeHtml(item.filename)}</div>` : "";
         
         let metaHtml = "";
@@ -4735,6 +5189,7 @@ export class GalleryInteractionController {
 
         this.shiftHud.innerHTML = `
             ${titleHtml}
+            ${keywordHtml}
             ${filenameHtml}
             ${metaHtml}
             ${summaryHtml}
@@ -4970,13 +5425,19 @@ export class LibraryManager {
         this.attachScrollListener(win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
         this.attachWheelZoomListener(win.document);
 
-        // Reposiciona o dropdown de opções de exibição para a janela popout
+        // Reposiciona o dropdown de opções de exibição e ordenação para a janela popout
         if (typeof this.onPopoutDisplaySettings === "function") {
             this.onPopoutDisplaySettings(win);
+        }
+        if (typeof this.onPopoutLibrarySort === "function") {
+            this.onPopoutLibrarySort(win);
         }
     }
 
     onPopoutRestored() {
+        if (typeof this.onRestoreLibrarySort === "function") {
+            this.onRestoreLibrarySort();
+        }
         this.activeDoc = document;
         this.activeWindow = window;
         this.mediaTreeListEl = document.getElementById("media-tree-list") || document.getElementById("video-list") || this.mediaTreeListEl;
@@ -5611,46 +6072,402 @@ export class LibraryManager {
             }
         }
         
-        // Custom Sort Dropdown Popover Toggling and Logic
-        const btnSort = document.getElementById("btn-library-sort");
-        const sortDropdown = document.getElementById("library-sort-dropdown");
-        
-        if (btnSort && sortDropdown) {
-            btnSort.addEventListener("click", (e) => {
-                e.stopPropagation();
-                const isHidden = sortDropdown.style.display === "none";
-                sortDropdown.style.display = isHidden ? "flex" : "none";
-            });
-            
-            document.addEventListener("click", (e) => {
-                if (sortDropdown.style.display === "flex" && !sortDropdown.contains(e.target) && e.target !== btnSort && !btnSort.contains(e.target)) {
-                    sortDropdown.style.display = "none";
-                }
-            });
-            
-            // Sync initial state of sort options
-            const currentSortVal = localStorage.getItem("library_sort_by") || "name_asc";
-            sortDropdown.querySelectorAll(".sort-option").forEach(opt => {
-                if (opt.getAttribute("data-val") === currentSortVal) {
-                    opt.classList.add("active");
-                } else {
-                    opt.classList.remove("active");
-                }
-                
-                opt.addEventListener("click", () => {
-                    const val = opt.getAttribute("data-val");
-                    const hiddenSortSelect = document.getElementById("library-sort-by");
-                    if (hiddenSortSelect) {
-                        hiddenSortSelect.value = val;
-                        hiddenSortSelect.dispatchEvent(new Event("change"));
+        // Custom Sort Dropdown Popover Toggling and Logic (Sistema Centralizado de Ordenação - Proposta 2)
+        const SORT_CONFIG = {
+            keyword: {
+                defaultVal: "keyword_asc",
+                invertedVal: "keyword_desc",
+                states: {
+                    keyword_asc: {
+                        val: "keyword_asc",
+                        icon: "fa-solid fa-tag",
+                        dirLabel: "A-Z",
+                        btnIcon: "fa-solid fa-arrow-down-a-z",
+                        tooltip: "Ordenar Mídias: Palavra-Chave / Assunto (A-Z)"
+                    },
+                    keyword_desc: {
+                        val: "keyword_desc",
+                        icon: "fa-solid fa-tag",
+                        dirLabel: "Z-A",
+                        btnIcon: "fa-solid fa-arrow-up-a-z",
+                        tooltip: "Ordenar Mídias: Palavra-Chave / Assunto (Z-A)"
                     }
-                    
-                    sortDropdown.querySelectorAll(".sort-option").forEach(o => o.classList.remove("active"));
-                    opt.classList.add("active");
-                    sortDropdown.style.display = "none";
+                }
+            },
+            title: {
+                defaultVal: "title_asc",
+                invertedVal: "title_desc",
+                states: {
+                    title_asc: {
+                        val: "title_asc",
+                        icon: "fa-solid fa-font",
+                        dirLabel: "A-Z",
+                        btnIcon: "fa-solid fa-arrow-down-a-z",
+                        tooltip: "Ordenar Mídias: Título & Pessoas (A-Z)"
+                    },
+                    title_desc: {
+                        val: "title_desc",
+                        icon: "fa-solid fa-font",
+                        dirLabel: "Z-A",
+                        btnIcon: "fa-solid fa-arrow-up-a-z",
+                        tooltip: "Ordenar Mídias: Título & Pessoas (Z-A)"
+                    }
+                }
+            },
+            filename: {
+                defaultVal: "filename_asc",
+                invertedVal: "filename_desc",
+                states: {
+                    filename_asc: {
+                        val: "filename_asc",
+                        icon: "fa-solid fa-file-lines",
+                        dirLabel: "A-Z",
+                        btnIcon: "fa-solid fa-arrow-down-a-z",
+                        tooltip: "Ordenar Mídias: Nome do Arquivo (A-Z)"
+                    },
+                    filename_desc: {
+                        val: "filename_desc",
+                        icon: "fa-solid fa-file-lines",
+                        dirLabel: "Z-A",
+                        btnIcon: "fa-solid fa-arrow-up-a-z",
+                        tooltip: "Ordenar Mídias: Nome do Arquivo (Z-A)"
+                    }
+                }
+            },
+            duration: {
+                defaultVal: "duration_asc",
+                invertedVal: "duration_desc",
+                states: {
+                    duration_asc: {
+                        val: "duration_asc",
+                        icon: "fa-solid fa-clock",
+                        dirLabel: "Curto ➔ Longo",
+                        btnIcon: "fa-solid fa-arrow-down-short-wide",
+                        tooltip: "Ordenar Mídias: Duração (Mais rápido primeiro)"
+                    },
+                    duration_desc: {
+                        val: "duration_desc",
+                        icon: "fa-solid fa-clock",
+                        dirLabel: "Longo ➔ Curto",
+                        btnIcon: "fa-solid fa-arrow-down-wide-short",
+                        tooltip: "Ordenar Mídias: Duração (Mais longo primeiro)"
+                    }
+                }
+            },
+            date: {
+                defaultVal: "date_desc",
+                invertedVal: "date_asc",
+                states: {
+                    date_desc: {
+                        val: "date_desc",
+                        icon: "fa-solid fa-calendar-days",
+                        dirLabel: "Recente",
+                        btnIcon: "fa-solid fa-calendar-days",
+                        tooltip: "Ordenar Mídias: Data (Mais recente primeiro)"
+                    },
+                    date_asc: {
+                        val: "date_asc",
+                        icon: "fa-solid fa-calendar-days",
+                        dirLabel: "Antiga",
+                        btnIcon: "fa-solid fa-calendar-day",
+                        tooltip: "Ordenar Mídias: Data (Mais antiga primeiro)"
+                    }
+                }
+            },
+            type: {
+                defaultVal: "type_interview",
+                invertedVal: "type_broll",
+                states: {
+                    type_interview: {
+                        val: "type_interview",
+                        icon: "fa-solid fa-layer-group",
+                        dirLabel: "Entrevistas 1º",
+                        btnIcon: "fa-solid fa-microphone",
+                        tooltip: "Ordenar Mídias: Entrevistas primeiro"
+                    },
+                    type_broll: {
+                        val: "type_broll",
+                        icon: "fa-solid fa-layer-group",
+                        dirLabel: "B-Rolls 1º",
+                        btnIcon: "fa-solid fa-video",
+                        tooltip: "Ordenar Mídias: B-Rolls primeiro"
+                    }
+                }
+            }
+        };
+
+        const getSortKeyFromVal = (val) => {
+            if (!val) return "keyword";
+            if (val.startsWith("keyword_")) return "keyword";
+            if (val.startsWith("title_")) return "keyword";
+            if (val.startsWith("filename_") || val.startsWith("name_")) return "filename";
+            if (val.startsWith("duration_")) return "duration";
+            if (val.startsWith("date_")) return "date";
+            if (val.startsWith("type_")) return "type";
+            return "keyword";
+        };
+
+        const getSortStateInfo = (sortVal) => {
+            let actualVal = sortVal;
+            if (actualVal === "name_asc") actualVal = "filename_asc";
+            else if (actualVal === "name_desc") actualVal = "filename_desc";
+            const key = getSortKeyFromVal(actualVal);
+            const cfg = SORT_CONFIG[key] || SORT_CONFIG.keyword || SORT_CONFIG.title;
+            return cfg.states[actualVal] || cfg.states[cfg.defaultVal];
+        };
+
+        const syncSortUI = (currentSortVal) => {
+            const activeKey = getSortKeyFromVal(currentSortVal);
+            const stateInfo = getSortStateInfo(currentSortVal);
+
+            getAllLibraryDocuments().forEach(doc => {
+                // 1. Atualiza o botão principal na barra
+                const btnSort = doc.getElementById("btn-library-sort");
+                if (btnSort) {
+                    btnSort.innerHTML = `<i class="${stateInfo.btnIcon}"></i>`;
+                    btnSort.setAttribute("title", stateInfo.tooltip);
+                    btnSort.setAttribute("data-tooltip", stateInfo.tooltip);
+                }
+
+                // 2. Atualiza o select oculto se existir
+                const sortSelect = doc.getElementById("library-sort-by");
+                if (sortSelect && sortSelect.value !== currentSortVal) {
+                    sortSelect.value = currentSortVal;
+                }
+
+                // 3. Atualiza as opções do dropdown
+                const dropdown = doc.getElementById("library-sort-dropdown");
+                if (dropdown) {
+                    dropdown.querySelectorAll(".sort-option").forEach(opt => {
+                        const sortKey = opt.getAttribute("data-sort-key");
+                        const cfg = SORT_CONFIG[sortKey];
+                        if (!cfg) return;
+
+                        const isThisActive = sortKey === activeKey;
+                        opt.classList.toggle("active", isThisActive);
+
+                        const optVal = isThisActive ? currentSortVal : cfg.defaultVal;
+                        const optState = cfg.states[optVal] || cfg.states[cfg.defaultVal];
+
+                        const dirEl = opt.querySelector(".sort-opt-dir");
+                        if (dirEl) {
+                            dirEl.textContent = optState.dirLabel;
+                        }
+
+                        const iconEl = opt.querySelector(".sort-opt-left i");
+                        if (iconEl && optState.icon) {
+                            iconEl.className = optState.icon;
+                        }
+                    });
+                }
+            });
+        };
+
+        const applySort = (newSortVal) => {
+            localStorage.setItem("library_sort_by", newSortVal);
+            syncSortUI(newSortVal);
+            if (window.libraryInstance) {
+                window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+            }
+            if (window.libraryScrollIndex && typeof window.libraryScrollIndex.requestRibbonRedraw === "function") {
+                window.libraryScrollIndex.requestRibbonRedraw();
+            }
+        };
+        this.applySort = applySort;
+        this.syncSortUI = syncSortUI;
+
+        const btnSortMain = document.getElementById("btn-library-sort");
+        const sortDropdown = document.getElementById("library-sort-dropdown");
+
+        if (btnSortMain && sortDropdown) {
+            const getTargetButton = () => {
+                const targetDoc = (this.activeDoc && !this.activeDoc.defaultView?.closed)
+                    ? this.activeDoc
+                    : ((window.popoutWindows?.["sidebar-left"]?.document && !window.popoutWindows["sidebar-left"].closed)
+                        ? window.popoutWindows["sidebar-left"].document
+                        : (btnSortMain ? btnSortMain.ownerDocument : document));
+                return targetDoc.getElementById("btn-library-sort") || btnSortMain;
+            };
+
+            const getTargetDoc = () => {
+                const btn = getTargetButton();
+                return btn ? (btn.ownerDocument || this.activeDoc || document) : (this.activeDoc || document);
+            };
+
+            const getTargetWin = () => {
+                const doc = getTargetDoc();
+                return doc.defaultView || this.activeWindow || window;
+            };
+
+            const ensureDropdownInActiveWindow = () => {
+                const targetDoc = getTargetDoc();
+                if (!targetDoc || !targetDoc.body || !sortDropdown) return;
+                if (sortDropdown.ownerDocument !== targetDoc || sortDropdown.parentNode !== targetDoc.body) {
+                    try {
+                        targetDoc.adoptNode(sortDropdown);
+                        targetDoc.body.appendChild(sortDropdown);
+                    } catch (err) {
+                        console.warn("[LibrarySort] Erro ao adotar nó do dropdown:", err);
+                    }
+                }
+                attachWindowListeners(targetDoc, targetDoc.defaultView || window);
+            };
+
+            const positionSortDropdown = () => {
+                ensureDropdownInActiveWindow();
+                const btn = getTargetButton();
+                const curWin = getTargetWin();
+                if (!btn || !sortDropdown) return;
+
+                const rect = btn.getBoundingClientRect();
+                const dropdownWidth = 185;
+                const top = Math.round(rect.bottom + 4);
+                let left = Math.round(rect.right - dropdownWidth);
+                const winWidth = curWin.innerWidth;
+                const winHeight = curWin.innerHeight;
+
+                if (left < 10) left = 10;
+                else if (left + dropdownWidth > winWidth - 10) left = winWidth - dropdownWidth - 10;
+
+                const maxH = winHeight - top - 16;
+                sortDropdown.style.maxHeight = `${Math.max(150, maxH)}px`;
+                sortDropdown.style.top = `${top}px`;
+                sortDropdown.style.left = `${left}px`;
+                sortDropdown.style.right = "auto";
+            };
+
+            const showDropdown = () => {
+                ensureDropdownInActiveWindow();
+                positionSortDropdown();
+                sortDropdown.style.display = "flex";
+                sortDropdown.classList.add("show");
+                const btn = getTargetButton();
+                if (btn) btn.classList.add("active");
+            };
+
+            const hideDropdown = () => {
+                sortDropdown.style.display = "none";
+                sortDropdown.classList.remove("show");
+                const btn = getTargetButton();
+                if (btn) btn.classList.remove("active");
+            };
+
+            const toggleSortDropdown = (forceShow) => {
+                const isCurrentlyHidden = sortDropdown.style.display === "none" || !sortDropdown.classList.contains("show");
+                const shouldShow = forceShow !== undefined ? forceShow : isCurrentlyHidden;
+                if (shouldShow) {
+                    showDropdown();
+                } else {
+                    hideDropdown();
+                }
+            };
+
+            const bindButtonEvents = (btn) => {
+                if (!btn || btn.__librarySortBound) return;
+                btn.__librarySortBound = true;
+
+                btn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    toggleSortDropdown();
+                });
+
+                // Clique com botão direito ou Alt+Clique inverte a direção atual diretamente
+                btn.addEventListener("contextmenu", (e) => {
+                    e.preventDefault();
+                    const currentVal = localStorage.getItem("library_sort_by") || "keyword_asc";
+                    const key = getSortKeyFromVal(currentVal);
+                    const cfg = SORT_CONFIG[key];
+                    if (cfg) {
+                        const nextVal = (currentVal === cfg.defaultVal) ? cfg.invertedVal : cfg.defaultVal;
+                        applySort(nextVal);
+                    }
+                });
+            };
+
+            // Clique nas opções do dropdown (vinculado uma única vez ao elemento do dropdown)
+            sortDropdown.querySelectorAll(".sort-option").forEach(opt => {
+                opt.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const sortKey = opt.getAttribute("data-sort-key");
+                    const cfg = SORT_CONFIG[sortKey];
+                    if (!cfg) return;
+
+                    const currentVal = localStorage.getItem("library_sort_by") || "keyword_asc";
+                    const activeKey = getSortKeyFromVal(currentVal);
+
+                    let newVal;
+                    if (sortKey === activeKey) {
+                        // Inverte a direção do critério ativo (toggle)
+                        newVal = (currentVal === cfg.defaultVal) ? cfg.invertedVal : cfg.defaultVal;
+                    } else {
+                        // Ativa novo critério na direção padrão
+                        newVal = cfg.defaultVal;
+                    }
+
+                    applySort(newVal);
+                    hideDropdown();
                 });
             });
+
+            const attachWindowListeners = (doc, win) => {
+                if (!doc || doc.__librarySortWindowBound) return;
+                doc.__librarySortWindowBound = true;
+
+                const btn = doc.getElementById("btn-library-sort");
+                if (btn) bindButtonEvents(btn);
+
+                // Clique fora infalível em fase de captura
+                doc.addEventListener("pointerdown", (e) => {
+                    if (sortDropdown.classList.contains("show")) {
+                        const curBtn = getTargetButton();
+                        if (!sortDropdown.contains(e.target) && !curBtn?.contains(e.target) && !e.target.closest("#btn-library-sort")) {
+                            hideDropdown();
+                        }
+                    }
+                }, true);
+
+                // Tecla Escape fecha o dropdown
+                doc.addEventListener("keydown", (e) => {
+                    if (e.key === "Escape" && sortDropdown.classList.contains("show")) {
+                        hideDropdown();
+                        e.stopPropagation();
+                    }
+                });
+
+                if (win) {
+                    win.addEventListener("resize", () => {
+                        if (sortDropdown.classList.contains("show")) {
+                            positionSortDropdown();
+                        }
+                    });
+                }
+            };
+
+            this.onPopoutLibrarySort = (win) => {
+                if (!win || !win.document) return;
+                ensureDropdownInActiveWindow();
+                attachWindowListeners(win.document, win);
+                const popBtn = win.document.getElementById("btn-library-sort");
+                if (popBtn) bindButtonEvents(popBtn);
+                const currentVal = localStorage.getItem("library_sort_by") || "keyword_asc";
+                syncSortUI(currentVal);
+            };
+
+            this.onRestoreLibrarySort = () => {
+                ensureDropdownInActiveWindow();
+                attachWindowListeners(document, window);
+                const currentVal = localStorage.getItem("library_sort_by") || "keyword_asc";
+                syncSortUI(currentVal);
+            };
+
+            // Inicializa no documento principal
+            ensureDropdownInActiveWindow();
+            attachWindowListeners(document, window);
+            if (btnSortMain) bindButtonEvents(btnSortMain);
         }
+
+        const initialSort = localStorage.getItem("library_sort_by") || "keyword_asc";
+        syncSortUI(initialSort);
         
         // Status Cycle Button and Synchronization
         const btnStatusCycle = document.getElementById("btn-status-filter-cycle");
@@ -5822,6 +6639,15 @@ export class LibraryManager {
             });
         }
 
+        const chkShowKeyword = document.getElementById("chk-gallery-show-keyword");
+        if (chkShowKeyword) {
+            chkShowKeyword.checked = localStorage.getItem("gallery-pref-show-keyword") === "true";
+            chkShowKeyword.addEventListener("change", (e) => {
+                localStorage.setItem("gallery-pref-show-keyword", e.target.checked ? "true" : "false");
+                if (window.libraryInstance) window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+            });
+        }
+
         const gapSlider = document.getElementById("gallery-gap-slider");
         const gapVal = document.getElementById("gallery-gap-val");
         if (gapSlider) {
@@ -5859,6 +6685,7 @@ export class LibraryManager {
         // Checkboxes do HUD Shift + Hover
         [
             { id: "chk-hud-title", key: "gallery-hud-title" },
+            { id: "chk-hud-keyword", key: "gallery-hud-keyword" },
             { id: "chk-hud-filename", key: "gallery-hud-filename" },
             { id: "chk-hud-summary", key: "gallery-hud-summary" },
             { id: "chk-hud-speaker", key: "gallery-hud-speaker" },
@@ -6094,9 +6921,13 @@ export class LibraryManager {
         if (sortSelect) {
             sortSelect.addEventListener("change", () => {
                 const val = sortSelect.value;
-                localStorage.setItem("library_sort_by", val);
-                STATE.emit("videosUpdated", STATE.allVideos);
-                if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
+                if (typeof this.applySort === "function") {
+                    this.applySort(val);
+                } else {
+                    localStorage.setItem("library_sort_by", val);
+                    STATE.emit("videosUpdated", STATE.allVideos);
+                    if (STATE.allPhotos) STATE.emit("photosUpdated", STATE.allPhotos);
+                }
             });
         }
 
@@ -6815,7 +7646,7 @@ export class LibraryManager {
         flushAllPendingChunks(); // o card alvo pode estar num bloco ainda nao montado
 
         targetWin.requestAnimationFrame(() => {
-            const card = targetDoc.querySelector(`.media-card.tree-file-item[data-video-id="${videoId}"]`);
+            const card = targetDoc.querySelector(`.gallery-item[data-video-id="${videoId}"], .media-card.tree-file-item[data-video-id="${videoId}"], [data-video-id="${videoId}"]`);
             if (card) {
                 card.scrollIntoView({ block: "center", behavior: "smooth" });
                 card.classList.remove("reveal-pulse");
@@ -7002,12 +7833,63 @@ export class LibraryManager {
         window._galleryController.stopAllHover();
 
         const groupingMode = localStorage.getItem("gallery-pref-grouping") || "date";
+        const sortBy = renderCtx.sortBy || localStorage.getItem("library_sort_by") || "keyword_asc";
+        const sortedItems = items.slice().sort((a, b) => compareMediaItems(a, b, sortBy));
+        const showKeywordPill = localStorage.getItem("gallery-pref-show-keyword") === "true";
         
-        // Agrupa os itens
+        // Agrupa os itens respeitando a ordenação ativa
         let groups = [];
-        if (groupingMode === "date") {
+        if (groupingMode === "smart_bins") {
+            loadManualSmartBinsState(getActiveProjectId());
+            const binMap = new Map();
+            SMART_BINS_TAXONOMY.forEach(bin => {
+                binMap.set(bin.id, { key: bin.id, label: bin.label, items: [] });
+            });
+            for (const item of sortedItems) {
+                const bId = getMediaSmartBin(item);
+                if (!binMap.has(bId)) {
+                    binMap.set(bId, { key: bId, label: `📁 ${bId}`, items: [] });
+                }
+                binMap.get(bId).items.push(item);
+            }
+            // Exibe os 9 núcleos que contêm itens na ordem natural da taxonomia
+            groups = Array.from(binMap.values()).filter(g => g.items.length > 0);
+        } else if (groupingMode === "keyword") {
+            const kwMap = new Map();
+            for (const item of sortedItems) {
+                const kw = getMediaKeyword(item) || "Outros";
+                if (!kwMap.has(kw)) {
+                    kwMap.set(kw, { key: `kw_${kw}`, rawKeyword: kw, label: `🏷️ ${kw}`, items: [] });
+                }
+                kwMap.get(kw).items.push(item);
+            }
+
+            const dedicated = [];
+            const otherItems = [];
+            for (const g of kwMap.values()) {
+                if (g.items.length >= 3) {
+                    dedicated.push(g);
+                } else {
+                    otherItems.push(...g.items);
+                }
+            }
+
+            // Ordena os grupos dedicados conforme a direção de ordenação
+            if (sortBy === "keyword_desc" || sortBy === "name_desc") {
+                dedicated.sort((a, b) => b.rawKeyword.localeCompare(a.rawKeyword, undefined, { numeric: true, sensitivity: "base" }));
+            } else {
+                dedicated.sort((a, b) => a.rawKeyword.localeCompare(b.rawKeyword, undefined, { numeric: true, sensitivity: "base" }));
+            }
+
+            if (otherItems.length > 0) {
+                // Reordena os itens consolidados de "Outros Assuntos" pelo critério ativo
+                otherItems.sort((a, b) => compareMediaItems(a, b, sortBy));
+                dedicated.push({ key: "kw_other", label: "🏷️ Outros Assuntos", items: otherItems });
+            }
+            groups = dedicated;
+        } else if (groupingMode === "date") {
             const dateMap = new Map();
-            for (const item of items) {
+            for (const item of sortedItems) {
                 const rawDate = item.recorded_at || item.created_at;
                 let dateKey = "sem_data";
                 let dateLabel = "📅 Sem Data de Gravação";
@@ -7033,11 +7915,15 @@ export class LibraryManager {
                 }
                 dateMap.get(dateKey).items.push(item);
             }
-            // Ordena os grupos pela data mais recente primeiro (itens mais recentes no topo)
-            groups = Array.from(dateMap.values()).sort((a, b) => b.order - a.order);
+            // Ordena os grupos: se date_asc, mais antigos primeiro; caso contrário, mais recentes no topo
+            if (sortBy === "date_asc") {
+                groups = Array.from(dateMap.values()).sort((a, b) => a.order - b.order);
+            } else {
+                groups = Array.from(dateMap.values()).sort((a, b) => b.order - a.order);
+            }
         } else if (groupingMode === "folder") {
             const folderMap = new Map();
-            for (const item of items) {
+            for (const item of sortedItems) {
                 const fPath = getItemVirtualFolder(item) || "root";
                 const cleanName = fPath === "root" ? "Raiz da Biblioteca" : fPath.replace(/^root\/?/, "");
                 if (!folderMap.has(fPath)) {
@@ -7045,10 +7931,14 @@ export class LibraryManager {
                 }
                 folderMap.get(fPath).items.push(item);
             }
-            groups = Array.from(folderMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+            if (sortBy === "name_desc") {
+                groups = Array.from(folderMap.values()).sort((a, b) => b.label.localeCompare(a.label, undefined, { numeric: true, sensitivity: "base" }));
+            } else {
+                groups = Array.from(folderMap.values()).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" }));
+            }
         } else {
             // Sem agrupamento (Contínuo)
-            groups = [{ key: "all", label: null, items: items }];
+            groups = [{ key: "all", label: null, items: sortedItems }];
         }
 
         const fragment = document.createDocumentFragment();
@@ -7069,6 +7959,41 @@ export class LibraryManager {
                         ${group.items.length} ${group.items.length === 1 ? 'mídia' : 'mídias'}
                     </div>
                 `;
+
+                // Drag & Drop no cabeçalho do bloco quando em modo smart_bins
+                if (groupingMode === "smart_bins") {
+                    header.addEventListener("dragover", (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.dataTransfer.dropEffect = "copy";
+                        header.classList.add("smart-bin-drop-target");
+                    });
+                    header.addEventListener("dragleave", (e) => {
+                        header.classList.remove("smart-bin-drop-target");
+                    });
+                    header.addEventListener("drop", (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        header.classList.remove("smart-bin-drop-target");
+                        const dataCapiau = e.dataTransfer.getData("application/x-capiau-media");
+                        if (dataCapiau) {
+                            try {
+                                const parsed = JSON.parse(dataCapiau);
+                                if (parsed && parsed.id) {
+                                    const list = parsed.type === "photo" ? (STATE.allPhotos || []) : (STATE.allVideos || []);
+                                    const item = list.find(m => m.id === parsed.id) || parsed;
+                                    setMediaManualSmartBin(item, group.key);
+                                    if (window.libraryInstance) {
+                                        window.libraryInstance.scheduleRenderMedia({ preserveScroll: true });
+                                    }
+                                    if (typeof window.showToast === "function") {
+                                        window.showToast(`Mídia movida para "${group.label}"!`, "success");
+                                    }
+                                }
+                            } catch (err) {}
+                        }
+                    });
+                }
                 
                 // Duplo clique colapsa/expande o bloco (Seção VIII Design System)
                 header.addEventListener("dblclick", (e) => {
@@ -7140,6 +8065,14 @@ export class LibraryManager {
                 let badgeHtml = "";
                 let crucialBadgeHtml = "";
                 let scrubHtml = "";
+                let keywordPillHtml = "";
+
+                if (showKeywordPill) {
+                    const itemKw = getMediaKeyword(item);
+                    if (itemKw) {
+                        keywordPillHtml = `<div class="gallery-keyword-pill" title="Assunto: ${escapeHtml(itemKw)}"><i class="fa-solid fa-tag"></i> <span>${escapeHtml(itemKw)}</span></div>`;
+                    }
+                }
 
                 if (isVideo) {
                     const durStr = formatShortDuration(item.duration);
@@ -7158,6 +8091,7 @@ export class LibraryManager {
 
                 itemEl.innerHTML = `
                     <img class="gallery-thumb-img" src="${defaultThumbSrc}" loading="lazy" decoding="async" alt="Thumb" onerror="this.onerror=null; this.style.opacity='0.4';">
+                    ${keywordPillHtml}
                     ${badgeHtml}
                     ${crucialBadgeHtml}
                     ${scrubHtml}

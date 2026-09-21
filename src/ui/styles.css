@@ -1654,6 +1654,13 @@ button {
     user-select: none;
     cursor: pointer;
     border-radius: 4px;
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.gallery-sticky-header.smart-bin-drop-target {
+    background: rgba(6, 182, 212, 0.2) !important;
+    border: 1px dashed var(--color-cyan) !important;
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.4) !important;
 }
 
 .gallery-sticky-header .gallery-header-title {
@@ -1836,6 +1843,51 @@ button {
 }
 .gallery-crucial-badge i {
     font-size: 7px;
+}
+
+/* Badge minimalista de palavra-chave / assunto */
+.gallery-keyword-pill {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: var(--color-cyan);
+    font-size: 8.5px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-weight: 500;
+    max-width: calc(100% - 52px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 5;
+    letter-spacing: 0.2px;
+}
+.gallery-keyword-pill i {
+    font-size: 7px;
+    color: var(--color-cyan);
+    flex-shrink: 0;
+}
+.gallery-keyword-pill span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.zoom-xl .gallery-keyword-pill {
+    font-size: 9.5px;
+    padding: 2px 6px;
+}
+.zoom-xl .gallery-keyword-pill i {
+    font-size: 8px;
 }
 
 /* Linha de scrubbing rápido com Ctrl */
@@ -10412,17 +10464,48 @@ input[type="number"] {
     text-shadow: 0 0 8px var(--color-emerald) !important;
 }
 
+/* Popover de Ordenação Customizado da Biblioteca (Multi-tela e Popout NLE) */
+.library-sort-dropdown {
+    position: fixed;
+    z-index: 999999;
+    width: 185px;
+    box-sizing: border-box;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 6px;
+    border: 1px solid rgba(6, 182, 212, 0.35);
+    background: rgba(18, 18, 25, 0.98);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(6, 182, 212, 0.15);
+    user-select: none;
+}
+
+.library-sort-dropdown.show {
+    display: flex !important;
+    animation: libDisplayDropdownIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#btn-library-sort.active {
+    color: var(--color-cyan) !important;
+    text-shadow: 0 0 8px var(--color-cyan);
+}
+
 /* Opções de ordenação no popover */
 .sort-option {
     font-size: 10px;
-    padding: 6px 10px;
+    padding: 6px 8px;
     border-radius: 4px;
     cursor: pointer;
     color: var(--text-secondary);
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: space-between;
+    gap: 8px;
     transition: all 0.2s;
+    user-select: none;
 }
 .sort-option:hover {
     background: rgba(6, 182, 212, 0.08);
@@ -10432,6 +10515,33 @@ input[type="number"] {
     background: rgba(6, 182, 212, 0.15);
     color: var(--color-cyan);
     font-weight: 600;
+}
+.sort-opt-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.sort-opt-left i {
+    width: 14px;
+    text-align: center;
+    font-size: 10px;
+}
+.sort-opt-dir {
+    font-size: 8.5px;
+    font-family: monospace;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    padding: 1px 4px;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+.sort-option.active .sort-opt-dir {
+    color: var(--color-cyan);
+    background: rgba(6, 182, 212, 0.12);
+    border-color: rgba(6, 182, 212, 0.3);
 }
 
 /* Chips de filtros rápidos no painel avançado */
