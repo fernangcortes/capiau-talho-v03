@@ -21,8 +21,8 @@ grafo_video.py.
 
 Decisoes registradas:
 
-- fit SEM bloco = "fill" (cover), igual ao player (`fitMode = fit ? mode :
-  "fill"`). O pad do modo "fit" e TRANSPARENTE (color=black@0) porque a caixa
+- fit SEM bloco = "fit" (contain), igual ao player (`fitMode = fit ? mode :
+  "fit"`). O pad do modo "fit" e TRANSPARENTE (color=black@0) porque a caixa
   do elemento e transparente fora da imagem na tela. Item em aberto 4 do plano:
   `letterbox_transparente=True` deixa o comportamento reversivel com uma flag.
 
@@ -100,7 +100,8 @@ def filtro_fit(modo: Optional[str], largura: int, altura: int,
 
     "fit"   = object-fit: contain -> scale decrease + pad (barras).
     outro   = object-fit: cover   -> scale increase + crop central.
-    Sem bloco o player usa cover, entao quem chama passa "fill" nesse caso.
+    Sem bloco o player usa contain (padrao NLE), entao quem chama passa
+    "fit" nesse caso.
     """
     w = int(largura)
     h = int(altura)

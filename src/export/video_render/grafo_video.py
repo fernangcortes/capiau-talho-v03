@@ -273,8 +273,9 @@ def cadeia_clipe(clipe, seq, escopo, rotulo_entrada, rotulo_saida,
     bloco_kb = (_bloco_ativo(clipe, "ken_burns")
                 if (clipe.e_foto and escopo.efeito_ligado("ken_burns")) else None)
     # Paridade bruta com player.js:2166-2168: fit NAO testa disabled.
+    # Sem bloco o padrao NLE e "fit" (contain), igual ao player atualizado.
     bloco_fit = clipe.efeito("fit", incluir_bypass=True) if escopo.efeito_ligado("fit") else None
-    modo_fit = str((bloco_fit or {}).get("mode") or "fill")
+    modo_fit = str((bloco_fit or {}).get("mode") or "fit")
 
     linear: List[str] = []
     declaracoes: List[str] = []

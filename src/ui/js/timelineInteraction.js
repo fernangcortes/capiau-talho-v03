@@ -5982,7 +5982,7 @@ export class CapiauTimelineInteraction {
         }
 
         const fit = effects.find(e => e.type === "fit");
-        const fitMode = fit ? fit.mode : "fill";
+        const fitMode = fit ? fit.mode : "fit";
         const kb = effects.find(e => e.type === "ken_burns");
         const kbPreset = kb ? (kb.preset || "none") : "none";
 

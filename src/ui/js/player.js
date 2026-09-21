@@ -468,7 +468,10 @@ export class SourcePlayer {
 
     loadPhoto(photo) {
         if (!photo) {
+            // Espelho da blindagem do loadVideo: com vídeo ativo, o activePhotoChanged(null)
+            // emitido logo após carregar o vídeo não pode zerar a rotação dele.
             if (!STATE.activeVideo) {
+                this.applyRotation(0);
                 this.hidePhoto();
             }
             return;
@@ -487,6 +490,7 @@ export class SourcePlayer {
             : `/api/photo/${photo.id}/file`;
         imgEl.src = src;
         imgEl.style.display = "block";
+        this.applyRotation(photo.rotation || 0);
         
         const title = this.el("source-player-title");
         if (title) {
@@ -2910,9 +2914,9 @@ export class ProgramPlayer {
         const durFrames = Math.max(1, cut.outFrame - cut.inFrame);
         const p = Math.min(1, Math.max(0, (currentFrame - cut.timelineStartFrame) / durFrames));
 
-        // 1. Enquadramento (fit/fill)
+        // 1. Enquadramento (fit/fill) — padrão NLE: fit (contain), sem crop destrutivo
         const fit = effects.find(e => e.type === "fit");
-        const fitMode = fit ? fit.mode : "fill";
+        const fitMode = fit ? fit.mode : "fit";
         el.style.objectFit = (fitMode === "fit") ? "contain" : "cover";
         el.style.transformOrigin = "center center";
 
@@ -2952,7 +2956,53 @@ export class ProgramPlayer {
             ty = fy + (tyy - fy) * ease;
         }
 
-        el.style.transform = `translate(${tx}%, ${ty}%) scale(${scale}) rotate(${rotation}deg)`;
+        const rotNorm = ((Math.round(rotation) % 360) + 360) % 360;
+        const parent = el.parentElement;
+        let pW = parent ? parent.clientWidth : 0;
+        let pH = parent ? parent.clientHeight : 0;
+        if (!pW || pW <= 0) pW = TIMELINE_STATE?.width || 1920;
+        if (!pH || pH <= 0) pH = TIMELINE_STATE?.height || 1080;
+
+        // Conformação fiel da caixa (Padrão NLE "fit"): o elemento assume a proporção
+        // intrínseca da mídia (invertida em rotações de 90/270), cabendo por inteiro
+        // dentro do quadro — sem crop destrutivo de topo/base (pillarbox/letterbox).
+        // Em "fill" a caixa permanece o quadro inteiro (cover recorta para preencher).
+        const mediaAspect = this.getMediaAspect(el, media);
+        const effAspect = (rotNorm === 90 || rotNorm === 270) ? (1 / mediaAspect) : mediaAspect;
+        let renderedW = pW;
+        let renderedH = pH;
+        if (fitMode !== "fill" && pW > 0 && pH > 0 && effAspect > 0) {
+            const frameAspect = pW / pH;
+            if (effAspect < frameAspect) {
+                renderedH = pH;
+                renderedW = pH * effAspect;
+            } else {
+                renderedW = pW;
+                renderedH = pW / effAspect;
+            }
+        }
+
+        el.style.position = "absolute";
+        el.style.setProperty("left", "50%", "important");
+        el.style.setProperty("top", "50%", "important");
+        el.style.setProperty("right", "auto", "important");
+        el.style.setProperty("bottom", "auto", "important");
+        if (rotNorm === 90 || rotNorm === 270) {
+            el.style.setProperty("width", `${renderedH}px`, "important");
+            el.style.setProperty("height", `${renderedW}px`, "important");
+        } else {
+            el.style.setProperty("width", `${renderedW}px`, "important");
+            el.style.setProperty("height", `${renderedH}px`, "important");
+        }
+        el.style.setProperty("max-width", "none", "important");
+        el.style.setProperty("max-height", "none", "important");
+        el.style.removeProperty("margin");
+
+        // Translação em pixels proporcionais ao quadro: x/y permanecem em % do quadro
+        // (mesma unidade dos sliders, do snapping e do arraste no overlay de Transform).
+        const txPx = (pW > 0 ? (tx / 100) * pW : 0);
+        const tyPx = (pH > 0 ? (ty / 100) * pH : 0);
+        el.style.transform = `translate(-50%, -50%) translate(${txPx}px, ${tyPx}px) scale(${scale}) rotate(${rotation}deg)`;
 
         // 3. Filtros de Cor
         const col = effects.find(e => e.type === "color") || {};
@@ -3017,6 +3067,27 @@ export class ProgramPlayer {
         } else {
             el.style.clipPath = "";
         }
+    }
+
+    /**
+     * Proporção intrínseca da mídia para a conformação de caixa do Program:
+     * pixels reais do elemento (vídeo decodificado / imagem carregada) > campo
+     * `resolution` do registro da mídia > proporção do quadro da timeline (16:9).
+     */
+    getMediaAspect(el, media) {
+        const elW = el ? (el.videoWidth || el.naturalWidth || 0) : 0;
+        const elH = el ? (el.videoHeight || el.naturalHeight || 0) : 0;
+        if (elW > 0 && elH > 0) return elW / elH;
+
+        const res = (media && typeof media.resolution === "string") ? media.resolution : "";
+        if (res.includes("x")) {
+            const parts = res.split("x").map(Number);
+            if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) return parts[0] / parts[1];
+        }
+
+        const fw = TIMELINE_STATE?.width || 1920;
+        const fh = TIMELINE_STATE?.height || 1080;
+        return (fw > 0 && fh > 0) ? (fw / fh) : (16 / 9);
     }
 
     /** Elemento <audio> dedicado de uma pista (criado sob demanda, fora do DOM visível). */
@@ -3853,10 +3924,65 @@ export class ProgramPlayer {
         const scale = tf.scale !== undefined ? tf.scale : 1.0;
         const tx = tf.x !== undefined ? tf.x : 0;
         const ty = tf.y !== undefined ? tf.y : 0;
-        const rotation = tf.rotation !== undefined ? tf.rotation : 0;
 
-        // Aplica o mesmo transform CSS da imagem
-        overlay.style.transform = `translate(${tx}%, ${ty}%) scale(${scale}) rotate(${rotation}deg)`;
+        const media = activeClip.type === "photo"
+            ? STATE.allPhotos?.find(p => String(p.id) === String(activeClip.photo_id))
+            : STATE.allVideos?.find(v => String(v.id) === String(activeClip.video_id));
+        const mediaRot = (media && media.rotation) ? media.rotation : 0;
+        const cutRot = activeClip.rotation !== undefined ? activeClip.rotation : mediaRot;
+        const rotation = tf.rotation !== undefined ? tf.rotation : cutRot;
+
+        const rotNorm = ((Math.round(rotation) % 360) + 360) % 360;
+        const parent = overlay.parentElement;
+        let pW = parent ? parent.clientWidth : 0;
+        let pH = parent ? parent.clientHeight : 0;
+        if (!pW || pW <= 0) pW = TIMELINE_STATE?.width || 1920;
+        if (!pH || pH <= 0) pH = TIMELINE_STATE?.height || 1080;
+
+        // Caixa conformada idêntica à da mídia (mesmo cálculo do applyMediaEffects):
+        // as alças contornam exatamente o retângulo visível, não o quadro inteiro.
+        const fitEffect = effects.find(e => e.type === "fit");
+        const fitMode = fitEffect ? fitEffect.mode : "fit";
+        const mediaEl = activeClip.type === "photo"
+            ? (["program-player-photo", "program-player-photo-b"]
+                .map(nodeId => this.el(nodeId))
+                .find(node => node && node.dataset.activeClipId === String(activeClip.id)) || null)
+            : (["program-video-a", "program-video-b", "program-video-c", "program-video-d"]
+                .map(nodeId => this.el(nodeId))
+                .find(node => node && node.dataset.activeClipId === String(activeClip.id)) || null);
+        const mediaAspect = this.getMediaAspect(mediaEl, media);
+        const effAspect = (rotNorm === 90 || rotNorm === 270) ? (1 / mediaAspect) : mediaAspect;
+
+        let boxW = pW;
+        let boxH = pH;
+        if (fitMode !== "fill" && pW > 0 && pH > 0 && effAspect > 0) {
+            const frameAspect = pW / pH;
+            if (effAspect < frameAspect) {
+                boxH = pH;
+                boxW = pH * effAspect;
+            } else {
+                boxW = pW;
+                boxH = pW / effAspect;
+            }
+        }
+
+        overlay.style.left = "50%";
+        overlay.style.top = "50%";
+        overlay.style.right = "auto";
+        overlay.style.bottom = "auto";
+        if (rotNorm === 90 || rotNorm === 270) {
+            overlay.style.width = `${boxH}px`;
+            overlay.style.height = `${boxW}px`;
+        } else {
+            overlay.style.width = `${boxW}px`;
+            overlay.style.height = `${boxH}px`;
+        }
+        overlay.style.margin = "0";
+
+        // Mesma transformação da mídia (translação em px proporcionais ao quadro)
+        const txPx = (pW > 0 ? (tx / 100) * pW : 0);
+        const tyPx = (pH > 0 ? (ty / 100) * pH : 0);
+        overlay.style.transform = `translate(-50%, -50%) translate(${txPx}px, ${tyPx}px) scale(${scale}) rotate(${rotation}deg)`;
         overlay.style.transformOrigin = "center center";
         overlay.style.display = "block";
 

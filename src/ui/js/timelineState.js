@@ -2561,6 +2561,8 @@ export class CapiauTimelineState {
      * Inserção com Ripple: insere um clipe abrindo espaço nas pistas sincronizadas.
      */
     insertClipWithRipple(clipData, targetFrame, targetTrackId) {
+        // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
+        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
         TIMELINE_HISTORY.record(() => {
             const cuts = this.conformCuts(STATE.activeTimelineCuts);
             const durationFrames = clipData.outFrame - clipData.inFrame;
@@ -2621,6 +2623,9 @@ export class CapiauTimelineState {
 
             STATE.activeTimelineCuts = cuts;
         });
+
+        // Auto-Zoom Inteligente: o primeiro clipe de uma timeline vazia nasce legível
+        if (wasEmptyTimeline) this.zoomToFit();
     }
 
     // ── SETTERS REATIVOS BÁSICOS ────────────────────────────────────────
@@ -3441,6 +3446,9 @@ export class CapiauTimelineState {
             window.showToast(`${isVideo ? 'Vídeo' : 'Foto'} inserido ${label}!`, "success");
         }
 
+        // Auto-Zoom Inteligente: a primeira mídia de uma timeline vazia já nasce enquadrada
+        if (wasEmptyTimeline) this.zoomToFit();
+
         return createdCut;
     }
 
@@ -3733,6 +3741,9 @@ export class CapiauTimelineState {
             window.showToast(`${isVideo ? 'Vídeo' : 'Foto'} ${modeLabel}!`, "success");
         }
 
+        // Auto-Zoom Inteligente: a primeira mídia de uma timeline vazia já nasce enquadrada
+        if (wasEmptyTimeline) this.zoomToFit();
+
         return createdCut;
     }
 
@@ -3887,15 +3898,21 @@ export class CapiauTimelineState {
                 window.TIMELINE_INTERACTION.ensureFrameVisible(Math.max(0, Math.round(startFrame)));
             }
         });
+
+        // Auto-Zoom Inteligente: o primeiro clipe de uma timeline vazia nasce legível
+        if (wasEmptyTimeline) this.zoomToFit();
+
         return newCut;
     }
 
     /**
      * Adiciona uma FOTO (still) como clipe na timeline.
      * Fotos não têm faixa de áudio (link_id sempre null) e usam uma duração padrão
-     * (ajustável depois pelo trim). Enquadramento default = "fill" (editável por clipe).
+     * (ajustável depois pelo trim). Enquadramento default = "fit" (contido, editável por clipe).
      */
     addPhotoCut(photoId, { durationSec = PHOTO_DEFAULT_DURATION, track = null, timelineStartFrame = null } = {}) {
+        // Captura se a timeline estava vazia ANTES da inserção (Auto-Zoom Inteligente)
+        const wasEmptyTimeline = (STATE.activeTimelineCuts || []).length === 0;
         // Roteamento: fotos vão para uma pista de vídeo LIVRE (como B-roll V2); fallback = V1
         if (track) {
             const t = this.getTrack(track);
@@ -3949,6 +3966,10 @@ export class CapiauTimelineState {
             currentCuts.push(newCut);
             STATE.activeTimelineCuts = currentCuts;
         });
+
+        // Auto-Zoom Inteligente: a primeira mídia de uma timeline vazia já nasce enquadrada
+        if (wasEmptyTimeline) this.zoomToFit();
+
         return newCut;
     }
 
@@ -4122,7 +4143,7 @@ export class CapiauTimelineState {
                         track: suggestion.track,
                         link_id: null,
                         origin: suggestion.origin || "ai",
-                        effects: [{ type: "fit", mode: "fill" }],
+                        effects: [{ type: "fit", mode: "fit" }],
                         timelineStartFrame
                     }];
                 }
