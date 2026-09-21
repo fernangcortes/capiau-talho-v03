@@ -95,7 +95,8 @@ class TestF1ChatAgent(unittest.TestCase):
         self.assertEqual(v_clips[1]["timeline_start"], 10.0) # 0.0 + (15.0 - 5.0)
 
         # 5. Testar mover clipe de V1 para V2
-        # (V2 é livre. Mover um clipe de V1 deve fazer o ripple reajustar o outro)
+        # (Track-based clássico: mover entre pistas deixa GAP na origem — sem ripple.
+        #  Ripple só no modo 'insert' explícito; posições absolutas são preservadas.)
         target_clip_id = v_clips[0]["id"]
         res = shadow.move_clip(target_clip_id, "V2", 5.0)
         self.assertEqual(res, "success")
@@ -105,8 +106,8 @@ class TestF1ChatAgent(unittest.TestCase):
         v2_clips = [c for c in shadow.clips if c["track"] == "V2"]
         self.assertEqual(len(v1_clips), 1)
         self.assertEqual(len(v2_clips), 1)
-        # O clipe que ficou em V1 deve ter sofrido ripple e ido para 0.0
-        self.assertEqual(v1_clips[0]["timeline_start"], 0.0)
+        # O clipe que ficou em V1 mantém a posição absoluta: o gap na origem é preservado
+        self.assertEqual(v1_clips[0]["timeline_start"], 10.0)
         # O clipe movido para V2 deve estar em 5.0
         self.assertEqual(v2_clips[0]["timeline_start"], 5.0)
 
@@ -122,16 +123,16 @@ class TestF1ChatAgent(unittest.TestCase):
         self.assertEqual(a2_clip["timeline_start"], 5.0)
 
         # 7. Testar split_clip
-        # Dividir o clipe em V1 (que tem duração 10s e começa no tempo 0.0, dividindo no segundo 4.0)
+        # Dividir o clipe remanescente de V1 (10.0s → 20.0s; 4s dentro do clipe = 14.0s na timeline)
         v1_clip_before_split = v1_clips[0]
-        res = shadow.split_clip(v1_clip_before_split["id"], 4.0)
+        res = shadow.split_clip(v1_clip_before_split["id"], 14.0)
         self.assertEqual(res, "success")
         # Deve ter gerado mais clipes
         v1_clips_after = sorted([c for c in shadow.clips if c["track"] == "V1"], key=lambda c: c["timeline_start"])
         self.assertEqual(len(v1_clips_after), 2)
         self.assertEqual(v1_clips_after[0]["out"], 4.0)
         self.assertEqual(v1_clips_after[1]["in"], 4.0)
-        self.assertEqual(v1_clips_after[1]["timeline_start"], 4.0)
+        self.assertEqual(v1_clips_after[1]["timeline_start"], 14.0)
 
         # 8. Testar delete_clip
         # Apagar a segunda metade de V1

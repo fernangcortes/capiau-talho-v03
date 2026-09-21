@@ -175,11 +175,6 @@ class TimelineShadowCopy:
             self._overwrite_range(track, timeline_start, timeline_start + duration)
             if paired_audio:
                 self._overwrite_range(paired_audio, timeline_start, timeline_start + duration)
-        elif mode == "overwrite":
-            # Deletar/recortar clipes que sobrepõem na pista de vídeo
-            self._overwrite_range(track, timeline_start, timeline_start + duration)
-            if paired_audio:
-                self._overwrite_range(paired_audio, timeline_start, timeline_start + duration)
 
         self.clips.append(new_video_clip)
 
