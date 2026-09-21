@@ -11023,6 +11023,11 @@ export class LibraryScrollIndexTracker {
         this.dwellDelay = parseInt(localStorage.getItem("library_scroll_index_dwell") || "1000", 10);
         this.thumbWidth = parseInt(localStorage.getItem("library_scroll_preview_thumb_width") || "128", 10);
 
+        // Supressão do card após clique (permanece oculto até o próximo movimento intencional do mouse)
+        this._suppressedUntilMove = false;
+        this._suppressedOriginX = null;
+        this._suppressedOriginY = null;
+
         // Fita Cromática (Scene Color Minimap) e Cursor Seletor Definitivo
         this.colorExtractor = new MediaColorExtractor();
         this.isRibbonEnabled = localStorage.getItem("library_scroll_color_ribbon_enabled") !== "false";
@@ -11227,6 +11232,7 @@ export class LibraryScrollIndexTracker {
                 e.preventDefault();
                 isDragging = true;
                 this.isPointerDownOnGutter = true;
+                this.suppressUntilMove(e.clientX, e.clientY);
                 startY = e.clientY;
                 const c = this.getScrollContainer();
                 startScrollTop = c ? c.scrollTop : 0;
@@ -11550,7 +11556,7 @@ export class LibraryScrollIndexTracker {
     }
 
     isPointerOnIndex(e) {
-        if (!this.isEnabled) return false;
+        if (!this.isEnabled || this._suppressedUntilMove) return false;
         if (!e) return false;
 
         const doc = this.activeDoc || document;
@@ -11612,6 +11618,21 @@ export class LibraryScrollIndexTracker {
         if (!this.isEnabled || doc.querySelector(".custom-context-menu")) {
             this.hide();
             return;
+        }
+
+        // Se estiver temporariamente suprimido por clique no índice, só reativa quando houver movimento real
+        if (this._suppressedUntilMove) {
+            const originX = this._suppressedOriginX ?? e.clientX;
+            const originY = this._suppressedOriginY ?? e.clientY;
+            const dist = Math.hypot(e.clientX - originX, e.clientY - originY);
+            // Tolerância de 4px para ignorar micro-tremores de hardware ao soltar o botão
+            if (dist > 4) {
+                this._suppressedUntilMove = false;
+                this._suppressedOriginX = null;
+                this._suppressedOriginY = null;
+            } else {
+                return;
+            }
         }
 
         // Não exibe nem rastreia se qualquer modal ou overlay estiver aberto ou se o workspace estiver sendo redimensionado
@@ -11812,6 +11833,9 @@ export class LibraryScrollIndexTracker {
 
     onRafStep() {
         this.rafId = null;
+        if (this._suppressedUntilMove) {
+            return;
+        }
         if (!this._isTracking && !this.tooltipEl?.classList.contains("visible")) {
             return;
         }
@@ -11860,6 +11884,9 @@ export class LibraryScrollIndexTracker {
 
     handlePointerLeave() {
         this.isPointerDownOnGutter = false;
+        this._suppressedUntilMove = false;
+        this._suppressedOriginX = null;
+        this._suppressedOriginY = null;
         if (this.ribbonCanvas) {
             this.ribbonCanvas.classList.remove("active-tracking");
         }
@@ -12001,8 +12028,10 @@ export class LibraryScrollIndexTracker {
         
         // Se o clique ocorreu dentro do tooltip visível -> "Clique: Ir" para o item
         if (this.tooltipEl && this.tooltipEl.classList.contains("visible") && e.target && this.tooltipEl.contains(e.target)) {
-            if (this.currentTargetItem) {
-                this.navigateToItem(this.currentTargetItem, true);
+            const targetItem = this.currentTargetItem;
+            this.suppressUntilMove(e.clientX, e.clientY);
+            if (targetItem) {
+                this.navigateToItem(targetItem, true);
             }
             return;
         }
@@ -12042,6 +12071,9 @@ export class LibraryScrollIndexTracker {
                 const targetScrollTop = exactRatio * (container.scrollHeight - container.clientHeight);
                 container.scrollTo({ top: targetScrollTop, behavior: "smooth" });
             }
+
+            // Oculta imediatamente o card e suprime até que o mouse se movimente novamente
+            this.suppressUntilMove(e.clientX, e.clientY);
         }
     }
 
@@ -12166,7 +12198,7 @@ export class LibraryScrollIndexTracker {
 
     updateAtRatio(ratio, mouseEvent, activeTabId) {
         const doc = this.activeDoc || document;
-        if (!this.isEnabled || doc.querySelector(".custom-context-menu")) {
+        if (!this.isEnabled || this._suppressedUntilMove || doc.querySelector(".custom-context-menu")) {
             this.hide();
             return;
         }
@@ -12551,6 +12583,13 @@ export class LibraryScrollIndexTracker {
 
         this.tooltipEl.style.top = `${Math.round(top)}px`;
         this.tooltipEl.style.left = `${Math.round(left)}px`;
+    }
+
+    suppressUntilMove(clientX, clientY) {
+        this._suppressedUntilMove = true;
+        this._suppressedOriginX = typeof clientX === "number" ? clientX : null;
+        this._suppressedOriginY = typeof clientY === "number" ? clientY : null;
+        this.hide();
     }
 
     hide() {
