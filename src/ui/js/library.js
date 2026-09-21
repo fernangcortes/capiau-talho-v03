@@ -889,9 +889,16 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     const runMediaInsert = (mode) => {
         let inTime = 0.0;
         let outTime = isVideo ? (item.duration || 5.0) : 5.0;
-        if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id) {
-            if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
-            if (STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) outTime = STATE.markerOut;
+        const savedMarkers = (STATE && typeof STATE.getMediaMarkers === "function") ? STATE.getMediaMarkers(item.id) : null;
+        if (savedMarkers && savedMarkers.in !== null && savedMarkers.in !== undefined) {
+            inTime = savedMarkers.in;
+        } else if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id && STATE.markerIn !== null && STATE.markerIn !== undefined) {
+            inTime = STATE.markerIn;
+        }
+        if (savedMarkers && savedMarkers.out !== null && savedMarkers.out !== undefined && savedMarkers.out > inTime) {
+            outTime = savedMarkers.out;
+        } else if (isVideo && STATE.activeVideo && STATE.activeVideo.id === item.id && STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) {
+            outTime = STATE.markerOut;
         }
         if (window.TIMELINE_STATE && typeof window.TIMELINE_STATE.insertMedia === "function") {
             window.TIMELINE_STATE.insertMedia({
@@ -3969,11 +3976,18 @@ function renderTreeNode(node, container, depth = 0) {
             }
             let inTime = 0.0;
             let outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
-            if (STATE.activeVideo && STATE.activeVideo.id === v.id) {
-                if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
-                if (STATE.markerOut !== null && STATE.markerOut !== undefined) outTime = STATE.markerOut;
-                if (outTime <= inTime) outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
+            const savedMarkers = (STATE && typeof STATE.getMediaMarkers === "function") ? STATE.getMediaMarkers(v.id) : null;
+            if (savedMarkers && savedMarkers.in !== null && savedMarkers.in !== undefined) {
+                inTime = savedMarkers.in;
+            } else if (STATE.activeVideo && STATE.activeVideo.id === v.id && STATE.markerIn !== null && STATE.markerIn !== undefined) {
+                inTime = STATE.markerIn;
             }
+            if (savedMarkers && savedMarkers.out !== null && savedMarkers.out !== undefined && savedMarkers.out > inTime) {
+                outTime = savedMarkers.out;
+            } else if (STATE.activeVideo && STATE.activeVideo.id === v.id && STATE.markerOut !== null && STATE.markerOut !== undefined && STATE.markerOut > inTime) {
+                outTime = STATE.markerOut;
+            }
+            if (outTime <= inTime) outTime = (v.duration && v.duration > 0) ? v.duration : 5.0;
             const effDur = Math.max(0.1, outTime - inTime);
 
             STATE.activeDragMedia = {

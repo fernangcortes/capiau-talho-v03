@@ -42,6 +42,7 @@ class AppState extends EventEmitter {
         this._activeTimelineCuts = [];
         this._markerIn = null;
         this._markerOut = null;
+        this._mediaMarkers = new Map();
         this._projectFps = 24;
         
         this._allVideos = [];
@@ -238,15 +239,41 @@ class AppState extends EventEmitter {
         this.emit("timelineCutsUpdated", this._activeTimelineCuts);
     }
 
+    getMediaMarkers(mediaId) {
+        if (!mediaId) return null;
+        return this._mediaMarkers.get(String(mediaId)) || null;
+    }
+
+    setMediaMarkers(mediaId, markers = {}) {
+        if (!mediaId) return;
+        const key = String(mediaId);
+        const existing = this._mediaMarkers.get(key) || {};
+        const updated = {
+            in: markers.in !== undefined ? markers.in : existing.in ?? null,
+            out: markers.out !== undefined ? markers.out : existing.out ?? null
+        };
+        this._mediaMarkers.set(key, updated);
+    }
+
     get markerIn() { return this._markerIn; }
     set markerIn(val) {
         this._markerIn = val;
+        const currentMedia = this._activeVideo || this._activePhoto;
+        if (currentMedia && currentMedia.id) {
+            this.setMediaMarkers(currentMedia.id, { in: val });
+            currentMedia.inTime = val;
+        }
         this.emit("markerInChanged", val);
     }
 
     get markerOut() { return this._markerOut; }
     set markerOut(val) {
         this._markerOut = val;
+        const currentMedia = this._activeVideo || this._activePhoto;
+        if (currentMedia && currentMedia.id) {
+            this.setMediaMarkers(currentMedia.id, { out: val });
+            currentMedia.outTime = val;
+        }
         this.emit("markerOutChanged", val);
     }
 

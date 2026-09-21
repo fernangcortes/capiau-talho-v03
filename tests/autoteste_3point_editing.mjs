@@ -600,6 +600,51 @@ assert.strictEqual(photoResult, null, "Inserir foto em modo Somente Áudio deve 
 
 console.log("  ✔ Inserção por canais (AV, V exclusivo, A exclusivo e guarda de fotos) 100% validada.");
 
+// ============================================================
+// 11. PERSISTÊNCIA DE MARCADORES [IN–OUT] POR MÍDIA NO SOURCE
+// ============================================================
+console.log("\n11. Persistência de marcadores [IN–OUT] por mídia no Source Player...");
+const videoA = { id: 101, filename: "cena_01.mp4", duration: 30.0 };
+const videoB = { id: 102, filename: "cena_02.mp4", duration: 45.0 };
+
+// 1. Marca IN/OUT no Vídeo A
+STATE.activeVideo = videoA;
+sourcePlayer.loadVideo(videoA);
+STATE.markerIn = 2.5;
+STATE.markerOut = 7.0;
+assert.strictEqual(STATE.markerIn, 2.5);
+assert.strictEqual(STATE.markerOut, 7.0);
+
+// 2. Troca para Vídeo B e marca outro IN/OUT
+STATE.activeVideo = videoB;
+sourcePlayer.loadVideo(videoB);
+assert.strictEqual(STATE.markerIn, null, "Vídeo B novo não deve ter IN prévio");
+assert.strictEqual(STATE.markerOut, null, "Vídeo B novo não deve ter OUT prévio");
+STATE.markerIn = 12.0;
+STATE.markerOut = 18.5;
+
+// 3. Volta para o Vídeo A: marcadores anteriores de A devem ser restaurados com exatidão!
+STATE.activeVideo = videoA;
+sourcePlayer.loadVideo(videoA);
+assert.strictEqual(STATE.markerIn, 2.5, "IN do Vídeo A deve ser restaurado ao retornar a ele");
+assert.strictEqual(STATE.markerOut, 7.0, "OUT do Vídeo A deve ser restaurado ao retornar a ele");
+
+// 4. Volta para o Vídeo B: marcadores anteriores de B devem ser restaurados com exatidão!
+STATE.activeVideo = videoB;
+sourcePlayer.loadVideo(videoB);
+assert.strictEqual(STATE.markerIn, 12.0, "IN do Vídeo B deve ser restaurado ao retornar a ele");
+assert.strictEqual(STATE.markerOut, 18.5, "OUT do Vídeo B deve ser restaurado ao retornar a ele");
+
+// 5. Limpa marcadores de B: deve refletir apenas em B sem afetar A
+STATE.markerIn = null;
+STATE.markerOut = null;
+STATE.activeVideo = videoA;
+sourcePlayer.loadVideo(videoA);
+assert.strictEqual(STATE.markerIn, 2.5, "Marcadores de A devem permanecer salvos mesmo após limpar os de B");
+assert.strictEqual(STATE.markerOut, 7.0);
+
+console.log("  ✔ Persistência e restauração de marcadores [IN–OUT] por mídia 100% validada.");
+
 console.log("\n============================================================");
 console.log("🎉 AUTOTESTE DA TASK 7 (3-POINT EDITING) 100% APROVADO!");
 console.log("============================================================\n");

@@ -442,8 +442,11 @@ export class SourcePlayer {
             title.title = video.filename;
         }
 
-        STATE.markerIn = null;
-        STATE.markerOut = null;
+        // Restaura marcadores salvos da mídia (ou null se não marcados)
+        const savedMarkers = (STATE && typeof STATE.getMediaMarkers === "function") ? STATE.getMediaMarkers(video.id) : null;
+        STATE.markerIn = (savedMarkers && savedMarkers.in !== undefined) ? savedMarkers.in : (video.inTime ?? null);
+        STATE.markerOut = (savedMarkers && savedMarkers.out !== undefined) ? savedMarkers.out : (video.outTime ?? null);
+        this.updateMarkersUI();
         this.setSpeed(1.0);
         this.jklState = 'K';
 
@@ -498,8 +501,10 @@ export class SourcePlayer {
             title.title = photo.filename;
         }
         
-        STATE.markerIn = null;
-        STATE.markerOut = null;
+        const savedMarkers = (STATE && typeof STATE.getMediaMarkers === "function") ? STATE.getMediaMarkers(photo.id) : null;
+        STATE.markerIn = (savedMarkers && savedMarkers.in !== undefined) ? savedMarkers.in : null;
+        STATE.markerOut = (savedMarkers && savedMarkers.out !== undefined) ? savedMarkers.out : null;
+        this.updateMarkersUI();
         
         const curTime = this.el("source-current-time");
         if (curTime) curTime.textContent = "00:00:00:00";
@@ -565,6 +570,7 @@ export class SourcePlayer {
         if (durTime) durTime.textContent = formatTimecode(vid.duration);
         this.updateCrucialMarkersUI();
         this.updateCrucialButtonState();
+        this.updateMarkersUI();
         this.onTimeUpdate();
     }
 
