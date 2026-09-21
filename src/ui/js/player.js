@@ -31,8 +31,8 @@ export function formatTimecode(secs, fps = null) {
  */
 export class SourcePlayer {
     constructor() {
-        this.speedsForward = [1.0, 2.0, 4.0, 8.0];
-        this.speedsReverse = [-1.0, -2.0, -4.0, -8.0];
+        this.speedsForward = [1.0, 2.0, 4.0, 8.0, 16.0];
+        this.speedsReverse = [-1.0, -2.0, -4.0, -8.0, -16.0];
         this.jklState = 'K';
         this.jklIndex = 0;
         this.isReversing = false;
@@ -771,6 +771,68 @@ export class SourcePlayer {
     shuttleStop() {
         this.pause();
         this.showShuttleOsd("Pausado");
+    }
+
+    shuttleFastForward() {
+        const vid = this.el("source-video");
+        if (!vid || !vid.src) return;
+        if (this.jklState === 'K' || (!this.isReversing && vid.paused)) {
+            this.jklState = 'L';
+            this.jklIndex = 1; // Inicia direto em 2x (acelerado)
+            this.play(this.speedsForward[this.jklIndex]);
+        } else if (this.jklState === 'L') {
+            this.jklIndex = Math.min(this.jklIndex + 1, this.speedsForward.length - 1);
+            this.play(this.speedsForward[this.jklIndex]);
+        } else if (this.jklState === 'J') {
+            if (this.jklIndex > 0) {
+                this.jklIndex--;
+                this.startReverse(this.speedsReverse[this.jklIndex]);
+            } else {
+                this.jklState = 'L';
+                this.jklIndex = 0;
+                this.play(this.speedsForward[0]);
+            }
+        }
+        this.showShuttleOsd(this.jklState === 'L' ? `${this.speedsForward[this.jklIndex]}x` : `${this.speedsReverse[this.jklIndex]}x`);
+    }
+
+    shuttleFastReverse() {
+        const vid = this.el("source-video");
+        if (!vid || !vid.src) return;
+        if (this.jklState === 'K' || (!this.isReversing && vid.paused)) {
+            this.jklState = 'J';
+            this.jklIndex = 1; // Inicia direto em -2x (reverso acelerado)
+            this.startReverse(this.speedsReverse[this.jklIndex]);
+        } else if (this.jklState === 'J') {
+            this.jklIndex = Math.min(this.jklIndex + 1, this.speedsReverse.length - 1);
+            this.startReverse(this.speedsReverse[this.jklIndex]);
+        } else if (this.jklState === 'L') {
+            if (this.jklIndex > 0) {
+                this.jklIndex--;
+                this.play(this.speedsForward[this.jklIndex]);
+            } else {
+                this.jklState = 'J';
+                this.jklIndex = 0;
+                this.startReverse(this.speedsReverse[0]);
+            }
+        }
+        this.showShuttleOsd(this.jklState === 'J' ? `${this.speedsReverse[this.jklIndex]}x` : `${this.speedsForward[this.jklIndex]}x`);
+    }
+
+    shuttleSlowForward() {
+        const vid = this.el("source-video");
+        if (!vid || !vid.src) return;
+        this.jklState = 'L';
+        this.play(0.25);
+        this.showShuttleOsd("0.25x (Câmera Lenta)");
+    }
+
+    shuttleSlowReverse() {
+        const vid = this.el("source-video");
+        if (!vid || !vid.src) return;
+        this.jklState = 'J';
+        this.startReverse(0.25);
+        this.showShuttleOsd("-0.25x (Câmera Lenta)");
     }
 
     showShuttleOsd(text) {
@@ -1644,8 +1706,8 @@ export class ProgramPlayer {
     constructor() {
         this.isPlaying = false;
         this.playRequest = null;
-        this.speedsForward = [1.0, 2.0, 4.0, 8.0];
-        this.speedsReverse = [-1.0, -2.0, -4.0, -8.0];
+        this.speedsForward = [1.0, 2.0, 4.0, 8.0, 16.0];
+        this.speedsReverse = [-1.0, -2.0, -4.0, -8.0, -16.0];
         this.jklState = 'K';
         this.jklIndex = 0;
         this.playbackSpeed = 1.0;
@@ -2357,6 +2419,60 @@ export class ProgramPlayer {
     shuttleStop() {
         this.pause();
         this.showShuttleOsd("Pausado");
+    }
+
+    shuttleFastForward() {
+        if (!this.isPlaying || this.jklState === 'K') {
+            this.jklState = 'L';
+            this.jklIndex = 1; // Inicia direto em 2x (acelerado)
+            this.play(this.speedsForward[this.jklIndex]);
+        } else if (this.jklState === 'L') {
+            this.jklIndex = Math.min(this.jklIndex + 1, this.speedsForward.length - 1);
+            this.play(this.speedsForward[this.jklIndex]);
+        } else if (this.jklState === 'J') {
+            if (this.jklIndex > 0) {
+                this.jklIndex--;
+                this.play(this.speedsReverse[this.jklIndex]);
+            } else {
+                this.jklState = 'L';
+                this.jklIndex = 0;
+                this.play(this.speedsForward[0]);
+            }
+        }
+        this.showShuttleOsd(this.jklState === 'L' ? `${this.speedsForward[this.jklIndex]}x` : `${this.speedsReverse[this.jklIndex]}x`);
+    }
+
+    shuttleFastReverse() {
+        if (!this.isPlaying || this.jklState === 'K') {
+            this.jklState = 'J';
+            this.jklIndex = 1; // Inicia direto em -2x (reverso acelerado)
+            this.play(this.speedsReverse[this.jklIndex]);
+        } else if (this.jklState === 'J') {
+            this.jklIndex = Math.min(this.jklIndex + 1, this.speedsReverse.length - 1);
+            this.play(this.speedsReverse[this.jklIndex]);
+        } else if (this.jklState === 'L') {
+            if (this.jklIndex > 0) {
+                this.jklIndex--;
+                this.play(this.speedsForward[this.jklIndex]);
+            } else {
+                this.jklState = 'J';
+                this.jklIndex = 0;
+                this.play(this.speedsReverse[0]);
+            }
+        }
+        this.showShuttleOsd(this.jklState === 'J' ? `${this.speedsReverse[this.jklIndex]}x` : `${this.speedsForward[this.jklIndex]}x`);
+    }
+
+    shuttleSlowForward() {
+        this.jklState = 'L';
+        this.play(0.25);
+        this.showShuttleOsd("0.25x (Câmera Lenta)");
+    }
+
+    shuttleSlowReverse() {
+        this.jklState = 'J';
+        this.play(-0.25);
+        this.showShuttleOsd("-0.25x (Câmera Lenta)");
     }
 
     showShuttleOsd(text) {
@@ -4603,6 +4719,9 @@ export class VideoPlayer {
         this._isShiftKeyDown = false;
         this._reverseMatchHudTimer = null;
 
+        // Estado para atalhos de seta com Shift (Acelerado/JKL) e Ctrl (Câmera Lenta)
+        this._arrowHoldState = null;
+
         // Escuta atalhos globais de teclado redirecionando para o player focado
         document.addEventListener("keydown", (e) => this.handleGlobalKeyboard(e));
         document.addEventListener("keyup", (e) => this.handleGlobalKeyUp(e));
@@ -4612,6 +4731,15 @@ export class VideoPlayer {
             this._kJogUsed = false;
             this._isShiftKeyDown = false;
             this.hideReverseMatchHUD();
+            if (this._arrowHoldState) {
+                if (this._arrowHoldState.isHolding) {
+                    const activePlayer = window.activeFocusedPlayer === "source" ? this.sourcePlayer : this.programPlayer;
+                    if (activePlayer && typeof activePlayer.shuttleStop === "function") {
+                        activePlayer.shuttleStop();
+                    }
+                }
+                this._arrowHoldState = null;
+            }
         });
 
         window.player = this;
@@ -4666,6 +4794,64 @@ export class VideoPlayer {
         }
 
         const activePlayer = window.activeFocusedPlayer === "source" ? this.sourcePlayer : this.programPlayer;
+
+        // Intercepta Shift + Setas (Acelerado / JKL) e Ctrl + Setas (Câmera Lenta)
+        const isArrowLeft = (e.code === "ArrowLeft" || e.key === "ArrowLeft");
+        const isArrowRight = (e.code === "ArrowRight" || e.key === "ArrowRight");
+        if (isArrowLeft || isArrowRight) {
+            const hasShift = !!e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey;
+            const hasCtrl = !!(e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey;
+
+            if (hasShift) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (!e.repeat) {
+                    this._arrowHoldState = {
+                        code: e.code || e.key,
+                        modifier: "shift",
+                        direction: isArrowRight ? 1 : -1,
+                        downTime: performance.now(),
+                        isHolding: false
+                    };
+                    if (isArrowRight) {
+                        activePlayer.shuttleFastForward();
+                    } else {
+                        activePlayer.shuttleFastReverse();
+                    }
+                } else {
+                    if (this._arrowHoldState) {
+                        this._arrowHoldState.isHolding = true;
+                    }
+                }
+                return;
+            }
+
+            if (hasCtrl) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (!e.repeat) {
+                    this._arrowHoldState = {
+                        code: e.code || e.key,
+                        modifier: "ctrl",
+                        direction: isArrowRight ? 1 : -1,
+                        downTime: performance.now(),
+                        isHolding: false
+                    };
+                    if (isArrowRight) {
+                        activePlayer.shuttleSlowForward();
+                    } else {
+                        activePlayer.shuttleSlowReverse();
+                    }
+                } else {
+                    if (this._arrowHoldState) {
+                        this._arrowHoldState.isHolding = true;
+                    }
+                }
+                return;
+            }
+        }
 
         // Shuttle Parar / Play-Pause (K)
         if (KEYMAP_SERVICE.matches(e, "playback.shuttle_stop")) {
@@ -5011,6 +5197,39 @@ export class VideoPlayer {
         if (e.key === "Shift" || !e.shiftKey) {
             this._isShiftKeyDown = false;
             this.hideReverseMatchHUD();
+        }
+
+        const activePlayer = window.activeFocusedPlayer === "source" ? this.sourcePlayer : this.programPlayer;
+
+        // Liberação de tecla de seta com modificador (Shift/Ctrl)
+        const isArrow = (e.code === "ArrowLeft" || e.code === "ArrowRight" || e.key === "ArrowLeft" || e.key === "ArrowRight");
+        if (isArrow && this._arrowHoldState && (this._arrowHoldState.code === e.code || this._arrowHoldState.code === e.key)) {
+            const elapsed = performance.now() - (this._arrowHoldState.downTime || 0);
+            const modifier = this._arrowHoldState.modifier;
+            const wasHolding = this._arrowHoldState.isHolding || elapsed >= 250;
+            this._arrowHoldState = null;
+
+            if (modifier === "ctrl") {
+                // Ctrl + Seta câmera lenta: ao soltar a tecla, pausa imediatamente
+                activePlayer.shuttleStop();
+                e.preventDefault();
+                return;
+            } else if (modifier === "shift") {
+                // Shift + Seta acelerado: se segurou (>250ms), pausa; se foi toque rápido (<250ms), mantém tocando (igual JKL)
+                if (wasHolding) {
+                    activePlayer.shuttleStop();
+                    e.preventDefault();
+                    return;
+                }
+            }
+        }
+
+        // Se soltou Shift ou Ctrl enquanto segurava a seta, encerra o hold
+        if ((e.key === "Shift" || e.key === "Control" || e.key === "Meta") && this._arrowHoldState) {
+            if (this._arrowHoldState.isHolding) {
+                activePlayer.shuttleStop();
+            }
+            this._arrowHoldState = null;
         }
 
         if (e.code === "KeyK") {

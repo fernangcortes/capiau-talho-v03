@@ -50,6 +50,30 @@ export const COMMANDS_CATALOG = [
         description: "Reproduz para frente. Pressionar repetidamente acelera a velocidade (1x, 2x, 4x, 8x)"
     },
     {
+        id: "playback.shuttle_fast_forward",
+        category: "playback",
+        label: "Shuttle Acelerado / Avanço Rápido (Shift + →)",
+        description: "Reproduz acelerado para frente. Toques repetidos aumentam a velocidade (igual JKL); segurar reproduz acelerado enquanto pressionado"
+    },
+    {
+        id: "playback.shuttle_fast_reverse",
+        category: "playback",
+        label: "Shuttle Acelerado / Recuo Rápido (Shift + ←)",
+        description: "Reproduz acelerado para trás. Toques repetidos aumentam a velocidade reversa; segurar reproduz acelerado enquanto pressionado"
+    },
+    {
+        id: "playback.shuttle_slow_forward",
+        category: "playback",
+        label: "Câmera Lenta Avanço (Ctrl + →)",
+        description: "Reproduz em câmera lenta para frente (0.25x). Segurar reproduz enquanto pressionado"
+    },
+    {
+        id: "playback.shuttle_slow_reverse",
+        category: "playback",
+        label: "Câmera Lenta Recuo (Ctrl + ←)",
+        description: "Reproduz em câmera lenta reversa (-0.25x). Segurar reproduz enquanto pressionado"
+    },
+    {
         id: "playback.jog_prev_frame",
         category: "playback",
         label: "Jog Recuar 1 Frame (K + J)",
@@ -709,6 +733,10 @@ export const KEYMAP_PRESETS = {
         "playback.append_timeline": ["Shift+KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
+        "playback.shuttle_fast_forward": ["Shift+ArrowRight"],
+        "playback.shuttle_fast_reverse": ["Shift+ArrowLeft"],
+        "playback.shuttle_slow_forward": ["Ctrl+ArrowRight"],
+        "playback.shuttle_slow_reverse": ["Ctrl+ArrowLeft"],
         "playback.prev_edit_point": ["ArrowUp", "KeyA"],
         "playback.next_edit_point": ["ArrowDown", "KeyS"],
 
@@ -748,8 +776,8 @@ export const KEYMAP_PRESETS = {
         "edit.nudge_right": ["ArrowRight"],
         "edit.trim_in_nudge_left": ["Alt+ArrowLeft", "BracketLeft"],
         "edit.trim_in_nudge_right": ["Alt+ArrowRight"],
-        "edit.trim_out_nudge_left": ["Shift+ArrowLeft"],
-        "edit.trim_out_nudge_right": ["Shift+ArrowRight", "BracketRight"],
+        "edit.trim_out_nudge_left": ["Alt+Shift+ArrowLeft", "BracketLeft"],
+        "edit.trim_out_nudge_right": ["Alt+Shift+ArrowRight", "BracketRight"],
 
         "markers.add_edit": ["KeyM"],
         "markers.next": ["Shift+KeyM"],
@@ -844,6 +872,10 @@ export const KEYMAP_PRESETS = {
         "playback.append_timeline": ["KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
+        "playback.shuttle_fast_forward": ["Shift+ArrowRight"],
+        "playback.shuttle_fast_reverse": ["Shift+ArrowLeft"],
+        "playback.shuttle_slow_forward": ["Ctrl+ArrowRight"],
+        "playback.shuttle_slow_reverse": ["Ctrl+ArrowLeft"],
         "playback.prev_edit_point": ["Alt+ArrowLeft", "ArrowUp"],
         "playback.next_edit_point": ["Alt+ArrowRight", "ArrowDown"],
 
@@ -881,8 +913,8 @@ export const KEYMAP_PRESETS = {
         "edit.nudge_right": ["ArrowRight"],
         "edit.trim_in_nudge_left": ["Alt+ArrowLeft"],
         "edit.trim_in_nudge_right": ["Alt+ArrowRight"],
-        "edit.trim_out_nudge_left": ["Shift+ArrowLeft"],
-        "edit.trim_out_nudge_right": ["Shift+ArrowRight"],
+        "edit.trim_out_nudge_left": ["Alt+Shift+ArrowLeft"],
+        "edit.trim_out_nudge_right": ["Alt+Shift+ArrowRight"],
 
         "markers.add_edit": ["NumpadMultiply", "KeyG", "KeyM"],
         "markers.next": ["Alt+KeyG", "Shift+KeyM"],
@@ -924,6 +956,10 @@ export const KEYMAP_PRESETS = {
         "playback.append_timeline": ["KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
+        "playback.shuttle_fast_forward": ["Shift+ArrowRight"],
+        "playback.shuttle_fast_reverse": ["Shift+ArrowLeft"],
+        "playback.shuttle_slow_forward": ["Ctrl+ArrowRight"],
+        "playback.shuttle_slow_reverse": ["Ctrl+ArrowLeft"],
         "playback.prev_edit_point": ["ArrowUp"],
         "playback.next_edit_point": ["ArrowDown"],
 
@@ -1005,6 +1041,10 @@ export const KEYMAP_PRESETS = {
         "playback.append_timeline": ["Shift+F12", "KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
+        "playback.shuttle_fast_forward": ["Shift+ArrowRight"],
+        "playback.shuttle_fast_reverse": ["Shift+ArrowLeft"],
+        "playback.shuttle_slow_forward": ["Ctrl+ArrowRight"],
+        "playback.shuttle_slow_reverse": ["Ctrl+ArrowLeft"],
         "playback.prev_edit_point": ["ArrowUp"],
         "playback.next_edit_point": ["ArrowDown"],
 
@@ -1086,6 +1126,10 @@ export const KEYMAP_PRESETS = {
         "playback.append_timeline": ["KeyE"],
         "playback.step_prev": ["ArrowLeft"],
         "playback.step_next": ["ArrowRight"],
+        "playback.shuttle_fast_forward": ["Shift+ArrowRight"],
+        "playback.shuttle_fast_reverse": ["Shift+ArrowLeft"],
+        "playback.shuttle_slow_forward": ["Ctrl+ArrowRight"],
+        "playback.shuttle_slow_reverse": ["Ctrl+ArrowLeft"],
         "playback.prev_edit_point": ["ArrowUp", "BracketLeft"],
         "playback.next_edit_point": ["ArrowDown", "BracketRight"],
 
