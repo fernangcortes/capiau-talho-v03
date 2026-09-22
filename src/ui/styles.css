@@ -12974,5 +12974,67 @@ input[type="number"] {
     font-weight: 700;
 }
 
+/* ── TASK 11: DISPLAY DE TIMECODE INTERATIVO & NAVEGAÇÃO NUMÉRICA ── */
+.interactive-timecode,
+.time-code.interactive-timecode {
+    cursor: text !important;
+    padding: 1px 5px !important;
+    border-radius: 3px !important;
+    border: 1px solid transparent !important;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease !important;
+    user-select: none !important;
+    display: inline-block !important;
+}
+
+.interactive-timecode:hover,
+.time-code.interactive-timecode:hover {
+    color: var(--color-cyan, #06b6d4) !important;
+    background: rgba(6, 182, 212, 0.12) !important;
+    border-color: rgba(6, 182, 212, 0.45) !important;
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.25) !important;
+}
+
+.timecode-inline-input {
+    width: 86px !important;
+    height: 18px !important;
+    background: rgba(18, 18, 24, 0.96) !important;
+    border: 1px solid var(--color-cyan, #06b6d4) !important;
+    border-radius: 3px !important;
+    color: #ffffff !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    text-align: center !important;
+    outline: none !important;
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.5) !important;
+    padding: 0 2px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    line-height: 16px !important;
+    vertical-align: middle !important;
+}
+
+.timecode-inline-input.input-error {
+    animation: timecodeShake 0.3s ease-in-out;
+}
+
+@keyframes timecodeShake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
+}
+
+.timeline-timecode-box {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08)) !important;
+    border-radius: 4px !important;
+    padding: 2px 4px !important;
+    box-sizing: border-box !important;
+    height: 22px !important;
+}
+
 
 

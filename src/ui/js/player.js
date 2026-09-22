@@ -13,15 +13,348 @@ window.activeFocusedPlayer = "source";
 export function formatTimecode(secs, fps = null) {
     if (isNaN(secs) || secs === null || secs < 0) return "00:00:00:00";
     const currentFps = Number(fps || TIMELINE_STATE?.fps) > 0 ? Number(fps || TIMELINE_STATE?.fps) : 24;
+    const fpsBase = Math.max(1, Math.round(currentFps));
     const totalIntFrames = Math.max(0, Math.round(Number(secs) * currentFps));
-    const totalSeconds = Math.floor(totalIntFrames / currentFps);
+    const totalSeconds = Math.floor(totalIntFrames / fpsBase);
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
-    const f = Math.min(Math.floor(currentFps) - 1, Math.max(0, Math.floor(totalIntFrames % currentFps)));
+    const f = totalIntFrames % fpsBase;
 
     const pad = (n) => String(Math.floor(Math.abs(Number(n) || 0))).padStart(2, '0');
     return `${pad(h)}:${pad(m)}:${pad(s)}:${pad(f)}`;
+}
+
+/**
+ * Analisa uma string de entrada para navegação por timecode (absoluta ou relativa).
+ *
+ * Suporta:
+ *  - Relativo por frames: "+50", "-24", "+48", "+50f", "-10frames"
+ *  - Relativo por segundos: "+2s", "-1.5s", "+0.5s", "-10sec"
+ *  - Relativo com notação de pontos NLE: "+1." (+1s), "+10." (+10s), "+1.." (+1min), "-2." (-2s)
+ *  - Relativo com timecode SMPTE: "+00:00:02:00", "+01:00", "-00:00:05:00"
+ *  - Absoluto SMPTE: "00:01:23:12", "01:23:12", "01:23"
+ *  - Absoluto por segundos: "83s", "1.5s", "90sec"
+ *  - Absoluto por frames: "150f", "2400frames"
+ *  - Absoluto por notação de pontos NLE: "1." (1s), "10." (10s), "1.." (1min), "1..." (1h)
+ *  - Shorthand numérico puro NLE:
+ *      - <= 2 dígitos: "50" -> frame 50
+ *      - > 2 dígitos com FF < fps: "12312" -> 01:23:12, "1200" -> 12:00, "100" -> 01:00
+ *      - > 2 dígitos com FF >= fps: "150" (com fps=24, 50 >= 24) -> frame 150
+ *
+ * @param {string} inputStr - String digitada pelo usuário.
+ * @param {number} [currentFrame=0] - Posição atual da agulha em frames.
+ * @param {number} [fps=24] - Taxa de quadros por segundo.
+ * @param {number|null} [maxFrames=null] - Limite máximo opcional de frames.
+ * @returns {{ targetFrame: number, deltaFrames: number, isRelative: boolean, valid: boolean, error?: string, formattedTimecode: string }}
+ */
+export function parseTimecodeNavigation(inputStr, currentFrame = 0, fps = 24, maxFrames = null) {
+    const fpsVal = Number(fps) > 0 ? Number(fps) : 24;
+    const fpsBase = Math.max(1, Math.round(fpsVal));
+    const curF = Math.max(0, Math.round(Number(currentFrame) || 0));
+
+    if (typeof inputStr !== "string") {
+        return { targetFrame: curF, deltaFrames: 0, isRelative: false, valid: false, error: "Entrada inválida", formattedTimecode: formatTimecode(curF / fpsVal, fpsVal) };
+    }
+
+    const raw = inputStr.trim();
+    if (!raw) {
+        return { targetFrame: curF, deltaFrames: 0, isRelative: false, valid: false, error: "Entrada vazia", formattedTimecode: formatTimecode(curF / fpsVal, fpsVal) };
+    }
+
+    let isRelative = false;
+    let sign = 1;
+    let valStr = raw;
+
+    if (raw.startsWith("+") || raw.startsWith("-")) {
+        isRelative = true;
+        sign = raw.startsWith("-") ? -1 : 1;
+        valStr = raw.slice(1).trim();
+    }
+
+    if (!valStr) {
+        return { targetFrame: curF, deltaFrames: 0, isRelative, valid: false, error: "Valor ausente após sinal", formattedTimecode: formatTimecode(curF / fpsVal, fpsVal) };
+    }
+
+    let frameEquivalent = 0;
+    let parsed = false;
+    const valLower = valStr.toLowerCase();
+
+    // 1. Notação por pontos clássica NLE: "1.", "10.", "1..", "1...", "+1.", etc.
+    const dotMatch = valStr.match(/^(\d+(?:\.\d+)?)\.{1,3}$/);
+    if (dotMatch) {
+        const numVal = parseFloat(dotMatch[1]);
+        const dotCount = valStr.length - dotMatch[1].length;
+        if (!isNaN(numVal)) {
+            if (dotCount === 1) {
+                frameEquivalent = Math.round(numVal * fpsBase);
+            } else if (dotCount === 2) {
+                frameEquivalent = Math.round(numVal * 60 * fpsBase);
+            } else if (dotCount === 3) {
+                frameEquivalent = Math.round(numVal * 3600 * fpsBase);
+            }
+            parsed = true;
+        }
+    }
+
+    // 2. Sufixo de segundos: "83s", "1.5s", "10sec", "10seconds"
+    if (!parsed) {
+        const secMatch = valLower.match(/^(\d+(?:\.\d+)?)\s*(s|sec|seconds)$/);
+        if (secMatch) {
+            const secs = parseFloat(secMatch[1]);
+            if (!isNaN(secs)) {
+                frameEquivalent = Math.round(secs * fpsBase);
+                parsed = true;
+            }
+        }
+    }
+
+    // 3. Sufixo de frames: "50f", "150fr", "200frames"
+    if (!parsed) {
+        const frameMatch = valLower.match(/^(\d+)\s*(f|fr|frames)$/);
+        if (frameMatch) {
+            const fVal = parseInt(frameMatch[1], 10);
+            if (!isNaN(fVal)) {
+                frameEquivalent = fVal;
+                parsed = true;
+            }
+        }
+    }
+
+    // 4. Timecode SMPTE com dois-pontos ou ponto-e-vírgula: "00:01:23:12", "01:23:12", "01:23"
+    if (!parsed && (valStr.includes(":") || valStr.includes(";"))) {
+        const parts = valStr.split(/[:;]/).map(s => s.trim());
+        if (parts.length >= 2 && parts.every(p => /^\d+$/.test(p))) {
+            const nums = parts.map(Number);
+            if (nums.length === 4) {
+                // HH:MM:SS:FF
+                const [h, m, s, f] = nums;
+                frameEquivalent = (h * 3600 + m * 60 + s) * fpsBase + f;
+                parsed = true;
+            } else if (nums.length === 3) {
+                // MM:SS:FF
+                const [m, s, f] = nums;
+                frameEquivalent = (m * 60 + s) * fpsBase + f;
+                parsed = true;
+            } else if (nums.length === 2) {
+                // MM:SS
+                const [m, s] = nums;
+                frameEquivalent = (m * 60 + s) * fpsBase;
+                parsed = true;
+            }
+        }
+    }
+
+    // 5. Números inteiros puros
+    if (!parsed && /^\d+$/.test(valStr)) {
+        if (isRelative) {
+            // Em modo relativo (+50, -24), inteiros sem sufixo são EXATAMENTE frames!
+            frameEquivalent = parseInt(valStr, 10);
+            parsed = true;
+        } else {
+            // Em modo absoluto:
+            // Se <= 2 dígitos (ex: "50", "8"): frame 50
+            if (valStr.length <= 2) {
+                frameEquivalent = parseInt(valStr, 10);
+                parsed = true;
+            } else {
+                // Shorthand NLE: analisa da direita para a esquerda em pares de 2 dígitos
+                const len = valStr.length;
+                const ffStr = valStr.slice(Math.max(0, len - 2));
+                const ssStr = len > 2 ? valStr.slice(Math.max(0, len - 4), len - 2) : "0";
+                const mmStr = len > 4 ? valStr.slice(Math.max(0, len - 6), len - 4) : "0";
+                const hhStr = len > 6 ? valStr.slice(0, len - 6) : "0";
+
+                const ff = parseInt(ffStr, 10) || 0;
+                const ss = parseInt(ssStr, 10) || 0;
+                const mm = parseInt(mmStr, 10) || 0;
+                const hh = parseInt(hhStr, 10) || 0;
+
+                // Se os últimos dois dígitos forem maiores ou iguais a fpsBase (ex: "150" com fps=24 -> ff=50 >= 24),
+                // trata diretamente como número puro de frames (frame 150)
+                if (ff >= fpsBase && len <= 4) {
+                    frameEquivalent = parseInt(valStr, 10);
+                } else {
+                    frameEquivalent = (hh * 3600 + mm * 60 + ss) * fpsBase + ff;
+                }
+                parsed = true;
+            }
+        }
+    }
+
+    if (!parsed) {
+        return {
+            targetFrame: curF,
+            deltaFrames: 0,
+            isRelative,
+            valid: false,
+            error: "Formato de timecode não reconhecido",
+            formattedTimecode: formatTimecode(curF / fpsVal, fpsVal)
+        };
+    }
+
+    let targetFrame = Math.round(isRelative ? (curF + sign * frameEquivalent) : frameEquivalent);
+    let deltaFrames = targetFrame - curF;
+
+    // Clamping seguro
+    if (targetFrame < 0) {
+        targetFrame = 0;
+        deltaFrames = targetFrame - curF;
+    }
+    if (maxFrames !== null && maxFrames !== undefined && Number(maxFrames) > 0) {
+        const maxF = Math.round(Number(maxFrames));
+        if (targetFrame > maxF) {
+            targetFrame = maxF;
+            deltaFrames = targetFrame - curF;
+        }
+    }
+
+    return {
+        targetFrame,
+        deltaFrames,
+        isRelative,
+        valid: true,
+        formattedTimecode: formatTimecode(targetFrame / fpsVal, fpsVal)
+    };
+}
+
+/**
+ * Transforma um elemento de timecode em um controle numérico interativo por clique.
+ *
+ * @param {HTMLElement} el - Elemento DOM do timecode (span).
+ * @param {Function} getContextFn - Função que retorna { currentFrame, fps, maxFrames, isSource }.
+ * @param {Function} onCommitFn - Callback acionado com o resultado parseado ao confirmar (Enter).
+ * @returns {{ activate: Function } | null}
+ */
+export function setupInteractiveTimecode(el, getContextFn, onCommitFn) {
+    if (!el) return null;
+
+    el.classList.add("interactive-timecode");
+    el.style.cursor = "text";
+
+    const activate = () => {
+        if (el._timecodeInputActive) return;
+        el._timecodeInputActive = true;
+
+        const ctx = (typeof getContextFn === "function" ? getContextFn() : {}) || {};
+        const fps = Number(ctx.fps) > 0 ? Number(ctx.fps) : (TIMELINE_STATE?.fps || 24);
+        const currentFrame = Number(ctx.currentFrame) >= 0 ? Math.round(Number(ctx.currentFrame)) : 0;
+        const initialText = formatTimecode(currentFrame / fps, fps);
+
+        // Oculta o span original
+        el.style.display = "none";
+
+        // Cria o input inline
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "timecode-inline-input";
+        input.value = initialText;
+        input.setAttribute("aria-label", "Timecode");
+        input.setAttribute("autocomplete", "off");
+        input.setAttribute("spellcheck", "false");
+
+        el.parentNode.insertBefore(input, el.nextSibling);
+
+        requestAnimationFrame(() => {
+            if (input.parentNode) {
+                input.focus();
+                input.select();
+            }
+        });
+
+        let isClosing = false;
+
+        const cleanup = () => {
+            if (isClosing) return;
+            isClosing = true;
+            el._timecodeInputActive = false;
+            if (input.parentNode) {
+                input.parentNode.removeChild(input);
+            }
+            el.style.display = "";
+        };
+
+        const commit = (val) => {
+            const res = parseTimecodeNavigation(val, currentFrame, fps, ctx.maxFrames);
+            if (res.valid) {
+                cleanup();
+                if (typeof onCommitFn === "function") {
+                    onCommitFn(res);
+                }
+            } else {
+                input.classList.add("input-error");
+                input.style.borderColor = "var(--color-rose, #f43f5e)";
+                input.style.boxShadow = "0 0 8px rgba(244, 63, 94, 0.6)";
+                if (window.showToast) {
+                    window.showToast(res.error || "Formato de timecode inválido (ex: +50, -24, 83s, 00:01:23:12)", "warn");
+                }
+                setTimeout(() => {
+                    if (input.parentNode) {
+                        input.style.borderColor = "var(--color-cyan, #06b6d4)";
+                        input.style.boxShadow = "0 0 8px rgba(6, 182, 212, 0.5)";
+                    }
+                }, 800);
+            }
+        };
+
+        input.addEventListener("keydown", (e) => {
+            e.stopPropagation();
+
+            if (KEYMAP_SERVICE.matches(e, "navigation.goto_timecode")) {
+                e.preventDefault();
+                cleanup();
+                return;
+            }
+
+            if (e.key === "Enter" || e.code === "Enter" || e.code === "NumpadEnter") {
+                e.preventDefault();
+                commit(input.value);
+            } else if (e.key === "Escape" || e.code === "Escape") {
+                e.preventDefault();
+                cleanup();
+            } else if (e.key === "ArrowUp" || e.code === "ArrowUp") {
+                e.preventDefault();
+                const step = e.shiftKey ? 10 : 1;
+                const parsedCur = parseTimecodeNavigation(input.value, currentFrame, fps, ctx.maxFrames);
+                const baseF = parsedCur.valid ? parsedCur.targetFrame : currentFrame;
+                const nextF = Math.max(0, baseF + step);
+                input.value = formatTimecode(nextF / fps, fps);
+                input.select();
+            } else if (e.key === "ArrowDown" || e.code === "ArrowDown") {
+                e.preventDefault();
+                const step = e.shiftKey ? 10 : 1;
+                const parsedCur = parseTimecodeNavigation(input.value, currentFrame, fps, ctx.maxFrames);
+                const baseF = parsedCur.valid ? parsedCur.targetFrame : currentFrame;
+                const nextF = Math.max(0, baseF - step);
+                input.value = formatTimecode(nextF / fps, fps);
+                input.select();
+            }
+        });
+
+        input.addEventListener("blur", () => {
+            if (isClosing) return;
+            if (input.value.trim() !== initialText.trim()) {
+                const res = parseTimecodeNavigation(input.value, currentFrame, fps, ctx.maxFrames);
+                if (res.valid) {
+                    commit(input.value);
+                    return;
+                }
+            }
+            cleanup();
+        });
+    };
+
+    el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        activate();
+    });
+
+    el.addEventListener("dblclick", (e) => {
+        e.stopPropagation();
+        activate();
+    });
+
+    return { activate };
 }
 
 /**
@@ -227,6 +560,37 @@ export class SourcePlayer {
         if (scrubber) {
             scrubber.addEventListener("click", (e) => this.seekScrubber(e));
             scrubber.addEventListener("mousedown", (e) => this.startScrubberDrag(e));
+        }
+
+        // Timecode Interativo do Source Player (Task 11)
+        const curTimeEl = this.el("source-current-time");
+        if (curTimeEl) {
+            this._interactiveTimecode = setupInteractiveTimecode(
+                curTimeEl,
+                () => {
+                    const vid = this.el("source-video");
+                    const fps = Number(STATE.activeVideo?.fps || TIMELINE_STATE?.fps) || 24;
+                    const curSec = (vid && !isNaN(vid.currentTime)) ? vid.currentTime : 0;
+                    const durSec = (vid && !isNaN(vid.duration)) ? vid.duration : 0;
+                    return {
+                        currentFrame: Math.round(curSec * fps),
+                        fps,
+                        maxFrames: durSec > 0 ? Math.round(durSec * fps) : null,
+                        isSource: true
+                    };
+                },
+                (res) => {
+                    const vid = this.el("source-video");
+                    if (!vid) return;
+                    const fps = Number(STATE.activeVideo?.fps || TIMELINE_STATE?.fps) || 24;
+                    const targetSec = res.targetFrame / fps;
+                    this.seek(targetSec);
+                    if (window.showToast) {
+                        const signStr = res.deltaFrames >= 0 ? `+${res.deltaFrames}` : `${res.deltaFrames}`;
+                        window.showToast(`Source: ${res.formattedTimecode} (${signStr}f)`, "info");
+                    }
+                }
+            );
         }
 
         // Marcadores & Ações de Montagem 3 Pontos
@@ -530,7 +894,7 @@ export class SourcePlayer {
         this.updateMarkersUI();
         
         const curTime = this.el("source-current-time");
-        if (curTime) curTime.textContent = "00:00:00:00";
+        if (curTime && !curTime._timecodeInputActive) curTime.textContent = "00:00:00:00";
         
         const durTime = this.el("source-duration-time");
         if (durTime) durTime.textContent = "00:00:00:00";
@@ -570,7 +934,7 @@ export class SourcePlayer {
         const dur = vid.duration || 0;
 
         const curTime = this.el("source-current-time");
-        if (curTime) curTime.textContent = formatTimecode(cur);
+        if (curTime && !curTime._timecodeInputActive) curTime.textContent = formatTimecode(cur);
         
         if (dur > 0) {
             const pct = (cur / dur) * 100;
@@ -584,6 +948,12 @@ export class SourcePlayer {
             this.updateFacesOverlay();
         }
         this.updateCrucialButtonState();
+    }
+
+    activateTimecodeInput() {
+        if (this._interactiveTimecode?.activate) {
+            this._interactiveTimecode.activate();
+        }
     }
 
     onLoadedMetadata() {
@@ -1998,6 +2368,66 @@ export class ProgramPlayer {
             scrubber.addEventListener("mousedown", (e) => this.startScrubberDrag(e));
         }
 
+        // Timecode Interativo do Program Player & Timeline (Task 11)
+        const curTimeEl = this.el("program-current-time");
+        if (curTimeEl) {
+            this._interactiveProgramTimecode = setupInteractiveTimecode(
+                curTimeEl,
+                () => ({
+                    currentFrame: TIMELINE_STATE?.playheadFrame || 0,
+                    fps: TIMELINE_STATE?.fps || 24,
+                    maxFrames: this.getDurationFrames() || null,
+                    isSource: false
+                }),
+                (res) => this.jumpToFrame(res)
+            );
+        }
+
+        const bindTimelineHeaderTimecode = () => {
+            const timelineTcEl = getActiveElement("timeline-current-time");
+            if (timelineTcEl) {
+                const fpsVal = TIMELINE_STATE?.fps || 24;
+                if (!timelineTcEl._timecodeInputActive) {
+                    timelineTcEl.textContent = formatTimecode((TIMELINE_STATE?.playheadFrame || 0) / fpsVal, fpsVal);
+                }
+                if (!timelineTcEl._timecodeBound) {
+                    timelineTcEl._timecodeBound = true;
+                    this._interactiveTimelineTimecode = setupInteractiveTimecode(
+                        timelineTcEl,
+                        () => ({
+                            currentFrame: TIMELINE_STATE?.playheadFrame || 0,
+                            fps: TIMELINE_STATE?.fps || 24,
+                            maxFrames: this.getDurationFrames() || null,
+                            isSource: false
+                        }),
+                        (res) => this.jumpToFrame(res)
+                    );
+                }
+            }
+
+            const box = getActiveElement("timeline-timecode-box");
+            if (box && !box._timecodeBoxBound) {
+                box._timecodeBoxBound = true;
+                box.style.cursor = "text";
+                box.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    this.activateTimecodeInput("timeline");
+                });
+            }
+        };
+        this.bindTimelineHeaderTimecode = bindTimelineHeaderTimecode;
+        bindTimelineHeaderTimecode();
+        setTimeout(bindTimelineHeaderTimecode, 200);
+
+        STATE.on("timelinePlayheadChanged", (frame) => {
+            const curProgramEl = this.el("program-current-time");
+            const curTimelineEl = getActiveElement("timeline-current-time");
+            const fpsVal = TIMELINE_STATE?.fps || 24;
+            const formattedTc = formatTimecode(frame / fpsVal, fpsVal);
+            if (curProgramEl && !curProgramEl._timecodeInputActive) curProgramEl.textContent = formattedTc;
+            if (curTimelineEl && !curTimelineEl._timecodeInputActive) curTimelineEl.textContent = formattedTc;
+        });
+
         // Foco visual do teclado
         const panel = document.getElementById("program-player-panel");
         if (panel) {
@@ -2019,6 +2449,58 @@ export class ProgramPlayer {
 
         // Inicializa controle de zoom livre, pan/scroll e minimapa
         this.initProgramZoomAndPan();
+    }
+
+    jumpToFrame(res) {
+        if (!res || isNaN(res.targetFrame)) return;
+        const prevFrame = TIMELINE_STATE.playheadFrame;
+        const targetFrame = Math.max(0, Math.round(res.targetFrame));
+        if (prevFrame === targetFrame) return;
+
+        // Histórico de ações (Ctrl+Z / Ctrl+Y)
+        if (typeof TIMELINE_HISTORY !== "undefined" && TIMELINE_HISTORY && typeof TIMELINE_HISTORY.record === "function") {
+            TIMELINE_HISTORY.record(() => {
+                TIMELINE_STATE.setPlayheadFrame(targetFrame);
+            });
+        } else {
+            TIMELINE_STATE.setPlayheadFrame(targetFrame);
+        }
+
+        if (window.timelineInteraction?.ensureFrameVisible) {
+            window.timelineInteraction.ensureFrameVisible(targetFrame);
+        }
+        this.syncVideoToPlayhead();
+        if (window.showToast) {
+            const fpsVal = TIMELINE_STATE?.fps || 24;
+            const fpsBase = Math.max(1, Math.round(fpsVal));
+            const signStr = res.deltaFrames >= 0 ? `+${res.deltaFrames}` : `${res.deltaFrames}`;
+            const s = Math.floor(Math.abs(res.deltaFrames) / fpsBase);
+            const f = Math.abs(res.deltaFrames) % fpsBase;
+            const detailStr = res.isRelative ? ` (${signStr}f = ${s}s ${f}f)` : ` (${signStr}f)`;
+            window.showToast(`Playhead: ${res.formattedTimecode}${detailStr}`, "info");
+        }
+    }
+
+    activateTimecodeInput(target = "timeline") {
+        if (target === "timeline" || target === "auto") {
+            const timelineTcEl = getActiveElement("timeline-current-time");
+            if (timelineTcEl) {
+                if (!this._interactiveTimelineTimecode && typeof this.bindTimelineHeaderTimecode === "function") {
+                    this.bindTimelineHeaderTimecode();
+                }
+                if (this._interactiveTimelineTimecode?.activate) {
+                    this._interactiveTimelineTimecode.activate();
+                    return;
+                }
+            }
+        }
+        if (this._interactiveProgramTimecode?.activate) {
+            this._interactiveProgramTimecode.activate();
+            return;
+        }
+        if (this._interactiveTimelineTimecode?.activate) {
+            this._interactiveTimelineTimecode.activate();
+        }
     }
 
     initProgramZoomAndPan() {
@@ -2694,8 +3176,11 @@ export class ProgramPlayer {
 
         // Atualiza tempos de scrubber
         const curTimeEl = this.el("program-current-time");
+        const timelineTcEl = getActiveElement("timeline-current-time");
         const fpsVal = TIMELINE_STATE?.fps || 24;
-        if (curTimeEl) curTimeEl.textContent = formatTimecode(currentFrame / fpsVal, fpsVal);
+        const formattedTc = formatTimecode(currentFrame / fpsVal, fpsVal);
+        if (curTimeEl && !curTimeEl._timecodeInputActive) curTimeEl.textContent = formattedTc;
+        if (timelineTcEl && !timelineTcEl._timecodeInputActive) timelineTcEl.textContent = formattedTc;
 
         const durTimeEl = this.el("program-duration-time");
         if (durTimeEl) durTimeEl.textContent = formatTimecode(durationFrames / fpsVal, fpsVal);
@@ -5011,6 +5496,19 @@ export class VideoPlayer {
         }
     }
 
+    _isTimelineOrProgramHovered() {
+        const timelinePanel = document.getElementById("timeline-panel") || document.querySelector(".timeline-canvas-container");
+        const timelineHeader = document.getElementById("timeline-header-bar");
+        const programPanel = document.getElementById("program-player-panel");
+        const doc = document;
+        return Boolean(
+            (timelinePanel && timelinePanel.matches(":hover")) ||
+            (timelineHeader && timelineHeader.matches(":hover")) ||
+            (programPanel && programPanel.matches(":hover")) ||
+            (doc.activeElement && (doc.activeElement.id === "timeline-canvas" || timelinePanel?.contains(doc.activeElement) || programPanel?.contains(doc.activeElement)))
+        );
+    }
+
     // Atalhos de teclado compartilhados
     handleGlobalKeyboard(e) {
         const activeEl = document.activeElement;
@@ -5095,6 +5593,21 @@ export class VideoPlayer {
                 }
                 return;
             }
+        }
+
+        // Ir para Timecode / Navegação Numérica (Ctrl+G / Ctrl+P)
+        if (KEYMAP_SERVICE.matches(e, "navigation.goto_timecode")) {
+            e.preventDefault();
+            const sourcePanel = document.getElementById("source-player-panel");
+            const isSourceHover = sourcePanel && (sourcePanel.matches(":hover") || sourcePanel.contains(document.activeElement));
+            const isSourceActive = window.activeFocusedPlayer === "source" && !this._isTimelineOrProgramHovered();
+
+            if (isSourceHover || isSourceActive) {
+                this.sourcePlayer.activateTimecodeInput();
+            } else {
+                this.programPlayer.activateTimecodeInput("timeline");
+            }
+            return;
         }
 
         // Shuttle Parar / Play-Pause (K)

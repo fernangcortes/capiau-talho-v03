@@ -19,7 +19,7 @@
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Customizados -->
-    <link rel="stylesheet" href="styles.css?v=48">
+    <link rel="stylesheet" href="styles.css?v=50">
 </head>
 <body>
     <div class="app-container">
@@ -896,7 +896,7 @@
                         <div class="player-controls" style="padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-glass); background: rgba(0,0,0,0.2);">
                             <!-- Scrubber -->
                             <div class="scrubber-container" style="display: flex; align-items: center; gap: 10px; width: 100%;">
-                                <span class="time-code" id="source-current-time" style="font-size: 10px; font-family: monospace; color: var(--text-secondary);">00:00:00:00</span>
+                                <span class="time-code interactive-timecode" id="source-current-time" style="font-size: 10px; font-family: monospace; color: var(--text-secondary);" data-tooltip="Timecode Atual do Source (Clique ou Ctrl+G para editar)">00:00:00:00</span>
                                 <div class="scrubber-bar" id="source-scrubber-progress-bar" style="flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; position: relative; cursor: pointer;">
                                     <div class="scrubber-fill" id="source-scrubber-progress-fill" style="height: 100%; width: 0%; background: var(--color-cyan); border-radius: 3px;"></div>
                                     <div class="scrubber-handle" id="source-scrubber-progress-handle" style="width: 10px; height: 10px; border-radius: 50%; background: #fff; position: absolute; top: -2px; left: 0%; transform: translateX(-50%); pointer-events: none;"></div>
@@ -1051,7 +1051,7 @@
                         <div class="player-controls" style="padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-glass); background: rgba(0,0,0,0.2);">
                             <!-- Scrubber -->
                             <div class="scrubber-container" style="display: flex; align-items: center; gap: 10px; width: 100%;">
-                                <span class="time-code" id="program-current-time" style="font-size: 10px; font-family: monospace; color: var(--text-secondary);">00:00:00:00</span>
+                                <span class="time-code interactive-timecode" id="program-current-time" style="font-size: 10px; font-family: monospace; color: var(--text-secondary);" data-tooltip="Timecode Atual do Programa (Clique ou Ctrl+G para editar)">00:00:00:00</span>
                                 <div class="scrubber-bar" id="program-scrubber-progress-bar" style="flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; position: relative; cursor: pointer;">
                                     <div class="program-inout-span" id="program-inout-span" style="position: absolute; height: 100%; top: 0; left: 0%; width: 0%; background: rgba(6, 182, 212, 0.25); border-radius: 2px; pointer-events: none; display: none;"></div>
                                     <div class="scrubber-fill" id="program-scrubber-progress-fill" style="height: 100%; width: 0%; background: #a855f7; border-radius: 3px;"></div>
@@ -1112,6 +1112,10 @@
                                 </h3>
                                 <button id="btn-rename-timeline" class="btn-header-flat" data-tooltip="Renomear Timeline (Clique para editar)"><i class="fa-solid fa-pen-to-square"></i></button>
                                 <input type="text" id="timeline-name-input" value="Rascunho Making Of #1" style="display: none;">
+                            </div>
+                            <div class="header-v-divider"></div>
+                            <div class="timeline-timecode-box" id="timeline-timecode-box" data-tooltip="Timecode da Timeline (Clique ou Ctrl+G para editar)">
+                                <span class="time-code interactive-timecode" id="timeline-current-time" style="font-size: 10px; font-family: monospace;">00:00:00:00</span>
                             </div>
                             <div class="header-v-divider"></div>
                             <button id="btn-seq-settings-timeline" class="btn-header-flat" data-tooltip="Configurações da Sequência (Resolução/FPS)"><i class="fa-solid fa-gear"></i></button>
@@ -3467,7 +3471,7 @@
     </div>
 
     <!-- Lógica da Aplicação -->
-    <script type="module" src="js/main.js?v=48"></script>
+    <script type="module" src="js/main.js?v=50"></script>
 </body>
 </html>
 

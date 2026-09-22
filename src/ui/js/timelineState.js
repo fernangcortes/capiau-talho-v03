@@ -34,12 +34,13 @@ export function framesToTimecode(totalFrames, fps = 24) {
     if (isNaN(totalFrames) || totalFrames < 0) return "00:00:00:00";
 
     const fpsVal = Number(fps) > 0 ? Number(fps) : 24;
+    const fpsBase = Math.max(1, Math.round(fpsVal));
     const totalIntFrames = Math.max(0, Math.round(Number(totalFrames) || 0));
-    const totalSeconds = Math.floor(totalIntFrames / fpsVal);
+    const totalSeconds = Math.floor(totalIntFrames / fpsBase);
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
-    const f = Math.min(Math.floor(fpsVal) - 1, Math.max(0, Math.floor(totalIntFrames % fpsVal)));
+    const f = totalIntFrames % fpsBase;
 
     const pad = (n) => String(Math.floor(Math.abs(Number(n) || 0))).padStart(2, '0');
     return `${pad(h)}:${pad(m)}:${pad(s)}:${pad(f)}`;
@@ -58,12 +59,13 @@ export function formatRulerTimecode(totalFrames, fps = 24, showFrames = false, f
     if (isNaN(totalFrames) || totalFrames < 0) totalFrames = 0;
 
     const fpsVal = Number(fps) > 0 ? Number(fps) : 24;
+    const fpsBase = Math.max(1, Math.round(fpsVal));
     const totalIntFrames = Math.max(0, Math.round(Number(totalFrames) || 0));
-    const totalSeconds = Math.floor(totalIntFrames / fpsVal);
+    const totalSeconds = Math.floor(totalIntFrames / fpsBase);
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
-    const f = Math.min(Math.floor(fpsVal) - 1, Math.max(0, Math.floor(totalIntFrames % fpsVal)));
+    const f = totalIntFrames % fpsBase;
 
     const pad = (n) => String(Math.floor(Math.abs(Number(n) || 0))).padStart(2, '0');
 
@@ -92,18 +94,21 @@ export function timecodeToFrames(tc, fps = 24) {
     const parts = tc.split(':').map(Number);
     if (parts.some(isNaN)) return 0;
 
+    const fpsVal = Number(fps) > 0 ? Number(fps) : 24;
+    const fpsBase = Math.max(1, Math.round(fpsVal));
+
     if (parts.length === 4) {
         // HH:MM:SS:FF
         const [h, m, s, f] = parts;
-        return (h * 3600 + m * 60 + s) * fps + f;
+        return (h * 3600 + m * 60 + s) * fpsBase + f;
     } else if (parts.length === 3) {
         // MM:SS:FF ou HH:MM:SS
         const [m, s, f] = parts;
-        return (m * 60 + s) * fps + f;
+        return (m * 60 + s) * fpsBase + f;
     } else if (parts.length === 2) {
         // MM:SS
         const [m, s] = parts;
-        return (m * 60 + s) * fps;
+        return (m * 60 + s) * fpsBase;
     }
     return 0;
 }

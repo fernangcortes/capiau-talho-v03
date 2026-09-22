@@ -2143,7 +2143,7 @@ window.addEventListener("DOMContentLoaded", () => {
     // Duplo clique no espaço vazio da barra superior da timeline recolhe o cabeçalho (ou timeline inteira com Alt/Shift)
     if (timelineHeaderBar && btnToggleTimelineHeader) {
         timelineHeaderBar.addEventListener("dblclick", (e) => {
-            if (e.target.closest("button, input, select, option, label, a, .slider-control-item, .track-height-slider-compact, .timeline-zoom-slider-compact, #timeline-title-group")) return;
+            if (e.target.closest("button, input, select, option, label, a, .slider-control-item, .track-height-slider-compact, .timeline-zoom-slider-compact, #timeline-title-group, .timeline-timecode-box, .interactive-timecode, .timecode-inline-input")) return;
             e.preventDefault();
             window.getSelection()?.removeAllRanges();
             if (e.altKey || e.shiftKey) {

@@ -9832,6 +9832,16 @@ export class CapiauTimelineInteraction {
             return;
         }
 
+        // Ir para Timecode / Navegação Numérica (Ctrl+G / Ctrl+P)
+        if (KEYMAP_SERVICE.matches(e, "navigation.goto_timecode")) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.player && window.player.programPlayer) {
+                window.player.programPlayer.activateTimecodeInput("timeline");
+            }
+            return;
+        }
+
         // Fechar popup de alternativas ou desmarcar seleções com a tecla 'Escape'
         if (KEYMAP_SERVICE.matches(e, "tools.escape") || e.key === "Escape") {
             const popup = this.canvas ? this.canvas.ownerDocument.querySelector("#timeline-alternatives-popup") : document.querySelector("#timeline-alternatives-popup");

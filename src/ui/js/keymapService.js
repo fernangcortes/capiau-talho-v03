@@ -175,6 +175,12 @@ export const COMMANDS_CATALOG = [
         label: "Pular para Próximo Ponto / Fim",
         description: "Program: move a agulha para o corte seguinte; Source: vai para OUT ou Fim"
     },
+    {
+        id: "navigation.goto_timecode",
+        category: "playback",
+        label: "Ir para Timecode / Navegação Numérica",
+        description: "Ativa a entrada de timecode para salto absoluto ou navegação relativa (+/- frames)"
+    },
 
     // ── FERRAMENTAS & MODOS ─────────────────────────────────────────────────
     {
@@ -745,6 +751,7 @@ export const KEYMAP_PRESETS = {
         "playback.shuttle_slow_reverse": ["Ctrl+ArrowLeft"],
         "playback.prev_edit_point": ["ArrowUp", "KeyA"],
         "playback.next_edit_point": ["ArrowDown", "KeyS"],
+        "navigation.goto_timecode": ["Ctrl+KeyG"],
 
         "tools.select": ["KeyV"],
         "tools.marquee": ["Shift+KeyV"],
@@ -885,6 +892,7 @@ export const KEYMAP_PRESETS = {
         "playback.shuttle_slow_reverse": ["Ctrl+ArrowLeft"],
         "playback.prev_edit_point": ["Alt+ArrowLeft", "ArrowUp"],
         "playback.next_edit_point": ["Alt+ArrowRight", "ArrowDown"],
+        "navigation.goto_timecode": ["Ctrl+KeyG"],
 
         "tools.select": ["KeyS"],
         "tools.marquee": ["Shift+KeyS"],
@@ -970,6 +978,7 @@ export const KEYMAP_PRESETS = {
         "playback.shuttle_slow_reverse": ["Ctrl+ArrowLeft"],
         "playback.prev_edit_point": ["ArrowUp"],
         "playback.next_edit_point": ["ArrowDown"],
+        "navigation.goto_timecode": ["Ctrl+KeyG"],
 
         "tools.select": ["KeyV"],
         "tools.marquee": ["Shift+KeyV"],
@@ -1056,6 +1065,7 @@ export const KEYMAP_PRESETS = {
         "playback.shuttle_slow_reverse": ["Ctrl+ArrowLeft"],
         "playback.prev_edit_point": ["ArrowUp"],
         "playback.next_edit_point": ["ArrowDown"],
+        "navigation.goto_timecode": ["Ctrl+KeyG"],
 
         "tools.select": ["KeyA"],
         "tools.marquee": ["Shift+KeyA"],
@@ -1142,6 +1152,7 @@ export const KEYMAP_PRESETS = {
         "playback.shuttle_slow_reverse": ["Ctrl+ArrowLeft"],
         "playback.prev_edit_point": ["ArrowUp", "BracketLeft"],
         "playback.next_edit_point": ["ArrowDown", "BracketRight"],
+        "navigation.goto_timecode": ["Ctrl+KeyP", "Ctrl+KeyG"],
 
         "tools.select": ["KeyA"],
         "tools.marquee": ["Shift+KeyA"],
