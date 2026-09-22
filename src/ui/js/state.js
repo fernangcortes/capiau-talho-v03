@@ -245,7 +245,13 @@ class AppState extends EventEmitter {
                 }
             });
             if (start < prevEnd) {
+                const shortfall = prevEnd - start;
                 start = prevEnd;
+                // VÍDEO VINCULADO NÃO DEVE DESSINCRONIZAR:
+                // Se o áudio precisou travar em prevEnd, o vídeo par vinculado deve acompanhar
+                // a mesma barreira para que a sincronia A/V não se perca.
+                v.timelineStartFrame = Math.max(v.timelineStartFrame || 0, (v.timelineStartFrame || 0) + shortfall);
+                v.timeline_start = v.timelineStartFrame / timelineFps;
             }
             c.timelineStartFrame = start;
             c.timeline_start = start / timelineFps;

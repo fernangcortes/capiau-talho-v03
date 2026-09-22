@@ -3072,8 +3072,14 @@ export class CapiauTimelineInteraction {
         if (TIMELINE_STATE.selectedGap) {
             const sGap = TIMELINE_STATE.selectedGap;
             addItem("fa-solid fa-arrow-right-to-bracket", "Ripple Delete no Espaço Selecionado", "Shift+Del", () => {
-                TIMELINE_STATE.rippleDeleteGap(sGap.trackId, sGap.startFrame, sGap.durationFrames);
-                if (typeof window.showToast === "function") window.showToast("Ripple Delete: espaço fechado", "info");
+                const res = TIMELINE_STATE.rippleDeleteGap(sGap.trackId, sGap.startFrame, sGap.durationFrames);
+                if (res && res.blocked) {
+                    if (typeof window.showToast === "function") window.showToast("Ripple Delete bloqueado: áudio vinculado não possui espaço para avançar sem dessincronizar", "warning");
+                } else if (res && !res.fullyClosed) {
+                    if (typeof window.showToast === "function") window.showToast(`Ripple Delete: espaço fechado parcialmente (${res.actualDelta} frames) para manter sincronia`, "info");
+                } else {
+                    if (typeof window.showToast === "function") window.showToast("Ripple Delete: espaço fechado", "info");
+                }
             }, true, "var(--color-cyan)");
         }
 
@@ -3530,9 +3536,19 @@ export class CapiauTimelineInteraction {
 
         // 1. Ripple Delete (Fechar Espaço)
         addItem("fa-solid fa-arrow-right-to-bracket", "Ripple Delete (Fechar Espaço)", "Shift+Del", () => {
-            TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
-            if (typeof window.showToast === "function") {
-                window.showToast("Ripple Delete: espaço fechado", "info");
+            const res = TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
+            if (res && res.blocked) {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Ripple Delete bloqueado: áudio vinculado não possui espaço para avançar sem dessincronizar", "warning");
+                }
+            } else if (res && !res.fullyClosed) {
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Ripple Delete: espaço fechado parcialmente (${res.actualDelta} frames) para manter sincronia`, "info");
+                }
+            } else {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Ripple Delete: espaço fechado", "info");
+                }
             }
             if (this.renderer) this.renderer.requestRedraw();
         }, true, "var(--color-cyan)");
@@ -10647,7 +10663,12 @@ export class CapiauTimelineInteraction {
 
         if (TIMELINE_STATE.selectedGap && (e.key === "Delete" || e.key === "Backspace" || KEYMAP_SERVICE.matches(e, "edit.lift_delete") || KEYMAP_SERVICE.matches(e, "edit.ripple_delete"))) {
             const gap = TIMELINE_STATE.selectedGap;
-            TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
+            const res = TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
+            if (res && res.blocked) {
+                if (typeof window.showToast === "function") window.showToast("Ripple Delete bloqueado: áudio vinculado não possui espaço para avançar sem dessincronizar", "warning");
+            } else if (res && !res.fullyClosed) {
+                if (typeof window.showToast === "function") window.showToast(`Ripple Delete: espaço fechado parcialmente (${res.actualDelta} frames) para manter sincronia`, "info");
+            }
             if (this.renderer) this.renderer.requestRedraw();
             e.preventDefault();
             return;
@@ -10671,7 +10692,12 @@ export class CapiauTimelineInteraction {
         if (KEYMAP_SERVICE.matches(e, "edit.ripple_delete")) {
             if (TIMELINE_STATE.selectedGap) {
                 const gap = TIMELINE_STATE.selectedGap;
-                TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
+                const res = TIMELINE_STATE.rippleDeleteGap(gap.trackId, gap.startFrame, gap.durationFrames);
+                if (res && res.blocked) {
+                    if (typeof window.showToast === "function") window.showToast("Ripple Delete bloqueado: áudio vinculado não possui espaço para avançar sem dessincronizar", "warning");
+                } else if (res && !res.fullyClosed) {
+                    if (typeof window.showToast === "function") window.showToast(`Ripple Delete: espaço fechado parcialmente (${res.actualDelta} frames) para manter sincronia`, "info");
+                }
                 if (this.renderer) this.renderer.requestRedraw();
                 e.preventDefault();
                 return;
@@ -10691,9 +10717,15 @@ export class CapiauTimelineInteraction {
                 // Auto-target sob a agulha: gap ou clipe
                 const gapAtPlayhead = TIMELINE_STATE.getGapAtPlayhead();
                 if (gapAtPlayhead) {
-                    TIMELINE_STATE.rippleDeleteGap(gapAtPlayhead.trackId, gapAtPlayhead.startFrame, gapAtPlayhead.durationFrames);
-                    if (typeof window.showToast === "function") {
-                        window.showToast("Ripple Delete no espaço vazio (Gap)", "info");
+                    const res = TIMELINE_STATE.rippleDeleteGap(gapAtPlayhead.trackId, gapAtPlayhead.startFrame, gapAtPlayhead.durationFrames);
+                    if (res && res.blocked) {
+                        if (typeof window.showToast === "function") window.showToast("Ripple Delete bloqueado: áudio vinculado não possui espaço para avançar sem dessincronizar", "warning");
+                    } else if (res && !res.fullyClosed) {
+                        if (typeof window.showToast === "function") window.showToast(`Ripple Delete: espaço fechado parcialmente (${res.actualDelta} frames) para manter sincronia`, "info");
+                    } else {
+                        if (typeof window.showToast === "function") {
+                            window.showToast("Ripple Delete no espaço vazio (Gap)", "info");
+                        }
                     }
                     if (this.renderer) this.renderer.requestRedraw();
                     e.preventDefault();
@@ -11164,13 +11196,21 @@ export class CapiauTimelineInteraction {
 
         if (isRipple && actualDelta !== 0) {
             const syncTracks = TIMELINE_STATE.getSyncLockedTrackIds();
-            cuts.forEach(c => {
-                if (c.id !== clip.id && (!clip.link_id || c.link_id !== clip.link_id) &&
-                    syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= baseStart) {
-                    c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) - actualDelta);
-                    c.timeline_start = c.timelineStartFrame / fps;
-                }
-            });
+            const ignored = [clip.id];
+            if (clip.link_id) {
+                const p = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                if (p) ignored.push(p.id);
+            }
+            if (actualDelta > 0) {
+                TIMELINE_STATE.applyRippleShift(cuts, syncTracks, baseStart, actualDelta, ignored);
+            } else {
+                cuts.forEach(c => {
+                    if (!ignored.includes(c.id) && syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= baseStart) {
+                        c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) - actualDelta);
+                        c.timeline_start = c.timelineStartFrame / fps;
+                    }
+                });
+            }
         }
 
         STATE.activeTimelineCuts = cuts;
@@ -11260,13 +11300,21 @@ export class CapiauTimelineInteraction {
         if (isRipple && actualDelta !== 0) {
             const syncTracks = TIMELINE_STATE.getSyncLockedTrackIds();
             const boundary = baseStart + (baseOut - clip.inFrame);
-            cuts.forEach(c => {
-                if (c.id !== clip.id && (!clip.link_id || c.link_id !== clip.link_id) &&
-                    syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= boundary - 1) {
-                    c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) + actualDelta);
-                    c.timeline_start = c.timelineStartFrame / fps;
-                }
-            });
+            const ignored = [clip.id];
+            if (clip.link_id) {
+                const p = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                if (p) ignored.push(p.id);
+            }
+            if (actualDelta < 0) {
+                TIMELINE_STATE.applyRippleShift(cuts, syncTracks, boundary, -actualDelta, ignored);
+            } else {
+                cuts.forEach(c => {
+                    if (!ignored.includes(c.id) && syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= boundary - 1) {
+                        c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) + actualDelta);
+                        c.timeline_start = c.timelineStartFrame / fps;
+                    }
+                });
+            }
         }
 
         STATE.activeTimelineCuts = cuts;

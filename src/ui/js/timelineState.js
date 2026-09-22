@@ -740,18 +740,8 @@ export class CapiauTimelineState {
                 }
             }
 
-            const finalCuts = intermediateCuts.map(c => {
-                const cStart = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * this.fps);
-                if (syncTrackIds.includes(c.track) && cStart >= endF - 1) {
-                    const newStart = Math.max(0, cStart - durationFrames);
-                    return {
-                        ...c,
-                        timelineStartFrame: newStart,
-                        timeline_start: newStart / this.fps
-                    };
-                }
-                return c;
-            });
+            this.applyRippleShift(intermediateCuts, syncTrackIds, endF, durationFrames);
+            const finalCuts = intermediateCuts;
 
             if (this.outFrame !== null) {
                 this.outFrame = Math.max(this.inFrame !== null ? this.inFrame : 0, this.outFrame - durationFrames);
@@ -2331,12 +2321,7 @@ export class CapiauTimelineState {
             const syncTracks = this.getSyncLockedTrackIds();
             const remaining = cuts.filter(c => !toDeleteIds.has(c.id));
 
-            remaining.forEach(c => {
-                if (syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= maxEnd - 1) {
-                    c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) - durationFrames);
-                    c.timeline_start = c.timelineStartFrame / this.fps;
-                }
-            });
+            this.applyRippleShift(remaining, syncTracks, maxEnd, durationFrames, Array.from(toDeleteIds));
 
             this.clearClipSelection();
             STATE.activeTimelineCuts = remaining;
@@ -2409,25 +2394,146 @@ export class CapiauTimelineState {
     }
 
     /**
-     * Ripple Delete de um Gap: fecha o espaço vazio puxando os clipes posteriores nas pistas sincronizadas.
+     * Aplica deslocamento Ripple (recuo à esquerda) em clipes subsequentes,
+     * garantindo paridade atômica e estrita sincronia para pares A/V vinculados (link_id).
+     *
+     * @param {Array<Object>} cuts - Array mutável de cortes da timeline.
+     * @param {Array<string>} syncTracks - Pistas com Sync Lock ativo participantes.
+     * @param {number} boundaryFrame - Coordenada temporal a partir da qual os clipes são considerados a jusante.
+     * @param {number} desiredDelta - Quantidade desejada de frames a recuar (valor positivo).
+     * @param {Array<string>} [ignoredClipIds=[]] - IDs de clipes a serem desconsiderados (ex: clipes excluídos).
+     * @returns {{ actualDelta: number, blocked: boolean, fullyClosed: boolean }}
+     */
+    applyRippleShift(cuts, syncTracks, boundaryFrame, desiredDelta, ignoredClipIds = []) {
+        if (!desiredDelta || desiredDelta <= 0 || !Array.isArray(cuts) || cuts.length === 0) {
+            return { actualDelta: 0, blocked: false, fullyClosed: false };
+        }
+
+        const ignoredSet = new Set(ignoredClipIds);
+        const activeTracks = new Set(syncTracks);
+
+        // 1. Identificar todos os clipes a jusante (downstream)
+        // Um clipe é a jusante se está em syncTracks e inicia em ou após boundaryFrame - 1
+        const downstreamIds = new Set();
+        cuts.forEach(c => {
+            if (!ignoredSet.has(c.id) && activeTracks.has(c.track) && (c.timelineStartFrame || 0) >= boundaryFrame - 1) {
+                downstreamIds.add(c.id);
+            }
+        });
+
+        // 2. Expandir para incluir parceiros vinculados (link_id)
+        // Clipes com mesmo link_id são inseparáveis: se um move, o parceiro obrigatoriamente move junto!
+        let addedPartner = true;
+        while (addedPartner) {
+            addedPartner = false;
+            cuts.forEach(c => {
+                if (c.link_id && !ignoredSet.has(c.id) && !downstreamIds.has(c.id)) {
+                    const hasMovingPartner = cuts.some(p => p.link_id === c.link_id && downstreamIds.has(p.id));
+                    if (hasMovingPartner) {
+                        downstreamIds.add(c.id);
+                        addedPartner = true;
+                    }
+                }
+            });
+        }
+
+        if (downstreamIds.size === 0) {
+            return { actualDelta: 0, blocked: false, fullyClosed: false };
+        }
+
+        // 3. Mapear o final do último clipe fixo (não-movimentado) em cada pista
+        const fixedEndsByTrack = {};
+        cuts.forEach(c => {
+            if (!ignoredSet.has(c.id) && !downstreamIds.has(c.id)) {
+                const cStart = c.timelineStartFrame || 0;
+                const cDur = (c.outFrame || 0) - (c.inFrame || 0);
+                const cEnd = cStart + cDur;
+                fixedEndsByTrack[c.track] = Math.max(fixedEndsByTrack[c.track] || 0, cEnd);
+            }
+        });
+
+        // 4. Calcular o espaço livre para cada clipe a jusante
+        // O primeiro clipe móvel de cada pista limita o deslocamento daquela pista contra o clipe fixo anterior.
+        const movingCutsByTrack = {};
+        cuts.forEach(c => {
+            if (downstreamIds.has(c.id)) {
+                if (!movingCutsByTrack[c.track]) movingCutsByTrack[c.track] = [];
+                movingCutsByTrack[c.track].push(c);
+            }
+        });
+
+        const freeSpaceByTrack = {};
+        for (const [track, trackCuts] of Object.entries(movingCutsByTrack)) {
+            trackCuts.sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+            const firstCut = trackCuts[0];
+            const prevFixedEnd = fixedEndsByTrack[track] || 0;
+            const space = Math.max(0, (firstCut.timelineStartFrame || 0) - prevFixedEnd);
+            freeSpaceByTrack[track] = space;
+        }
+
+        // 5. Limitação estrita para pares A/V vinculados:
+        // Nenhum membro de um par vinculado pode mover mais do que o parceiro pode se deslocar!
+        let maxAllowedShift = desiredDelta;
+
+        for (const [track, space] of Object.entries(freeSpaceByTrack)) {
+            maxAllowedShift = Math.min(maxAllowedShift, space);
+        }
+
+        const movingCuts = cuts.filter(c => downstreamIds.has(c.id));
+        const linksProcessed = new Set();
+        movingCuts.forEach(c => {
+            if (c.link_id && !linksProcessed.has(c.link_id)) {
+                linksProcessed.add(c.link_id);
+                const partners = cuts.filter(p => p.link_id === c.link_id && !ignoredSet.has(p.id));
+                partners.forEach(p => {
+                    const prevEnd = fixedEndsByTrack[p.track] || 0;
+                    const pSpace = Math.max(0, (p.timelineStartFrame || 0) - prevEnd);
+                    maxAllowedShift = Math.min(maxAllowedShift, pSpace);
+                });
+            }
+        });
+
+        const actualDelta = Math.max(0, maxAllowedShift);
+
+        // 6. Aplicar o deslocamento atômico
+        if (actualDelta > 0) {
+            const fps = this.fps || 24;
+            cuts.forEach(c => {
+                if (downstreamIds.has(c.id)) {
+                    c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) - actualDelta);
+                    c.timeline_start = c.timelineStartFrame / fps;
+                }
+            });
+        }
+
+        return {
+            actualDelta,
+            blocked: actualDelta === 0 && desiredDelta > 0,
+            fullyClosed: actualDelta === desiredDelta
+        };
+    }
+
+    /**
+     * Ripple Delete de um Gap: fecha o espaço vazio puxando os clipes posteriores nas pistas sincronizadas,
+     * respeitando rigorosamente a sincronia de mídias A/V vinculadas (link_id).
      */
     rippleDeleteGap(trackId, startFrame, durationFrames) {
-        if (!durationFrames || durationFrames <= 0) return;
+        if (!durationFrames || durationFrames <= 0) return { actualDelta: 0, blocked: false, fullyClosed: false };
+        let result = { actualDelta: 0, blocked: false, fullyClosed: false };
         TIMELINE_HISTORY.record(() => {
             const cuts = [...STATE.activeTimelineCuts];
             const syncTracks = this.getSyncLockedTrackIds();
             const targetTracks = Array.from(new Set([...syncTracks, trackId]));
+            const boundaryFrame = startFrame + durationFrames;
 
-            cuts.forEach(c => {
-                if (targetTracks.includes(c.track) && (c.timelineStartFrame || 0) >= startFrame + durationFrames - 1) {
-                    c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) - durationFrames);
-                    c.timeline_start = c.timelineStartFrame / this.fps;
-                }
-            });
+            result = this.applyRippleShift(cuts, targetTracks, boundaryFrame, durationFrames);
 
-            this.clearSelectedGap();
+            if (result.actualDelta > 0 || !result.blocked) {
+                this.clearSelectedGap();
+            }
             STATE.activeTimelineCuts = cuts;
         });
+        return result;
     }
 
     /**
@@ -2455,7 +2561,8 @@ export class CapiauTimelineState {
     }
 
     /**
-     * Ripple Delete de um clipe: apaga o clipe e fecha o buraco em todas as pistas com Sync Lock.
+     * Ripple Delete de um clipe: apaga o clipe e fecha o buraco em todas as pistas com Sync Lock,
+     * preservando rigorosamente a sincronia de mídias A/V vinculadas subsequentes.
      */
     rippleDeleteClip(clipId) {
         const cuts = [...STATE.activeTimelineCuts];
@@ -2467,23 +2574,25 @@ export class CapiauTimelineState {
             const durationFrames = clip.outFrame - clip.inFrame;
             const linkId = clip.link_id;
             const syncTracks = this.getSyncLockedTrackIds();
+            const deletedIds = [];
 
             if (linkId) {
                 for (let i = cuts.length - 1; i >= 0; i--) {
-                    if (cuts[i].link_id === linkId) cuts.splice(i, 1);
+                    if (cuts[i].link_id === linkId) {
+                        deletedIds.push(cuts[i].id);
+                        cuts.splice(i, 1);
+                    }
                 }
             } else {
                 const idx = cuts.findIndex(c => c.id === clipId);
-                if (idx !== -1) cuts.splice(idx, 1);
+                if (idx !== -1) {
+                    deletedIds.push(cuts[idx].id);
+                    cuts.splice(idx, 1);
+                }
             }
 
-            // Puxa os clipes posteriores nas pistas sincronizadas
-            cuts.forEach(c => {
-                if (syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= startFrame + durationFrames - 1) {
-                    c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) - durationFrames);
-                    c.timeline_start = c.timelineStartFrame / this.fps;
-                }
-            });
+            // Puxa os clipes posteriores nas pistas sincronizadas com proteção A/V
+            this.applyRippleShift(cuts, syncTracks, startFrame + durationFrames, durationFrames, deletedIds);
 
             if (this.selectedClipId === clipId) this.selectedClipId = null;
             STATE.activeTimelineCuts = cuts;
@@ -2589,13 +2698,8 @@ export class CapiauTimelineState {
 
                 if (maxTrimDuration <= 0) return;
 
-                // Desloca todos os clipes subsequentes nas pistas com Sync Lock ativo
-                cuts.forEach(c => {
-                    if (!targetIds.has(c.id) && syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= minStart + maxTrimDuration - 1) {
-                        c.timelineStartFrame = Math.max(minStart, (c.timelineStartFrame || 0) - maxTrimDuration);
-                        c.timeline_start = c.timelineStartFrame / fps;
-                    }
-                });
+                // Desloca todos os clipes subsequentes nas pistas com Sync Lock ativo com proteção A/V
+                this.applyRippleShift(cuts, syncTracks, minStart + maxTrimDuration, maxTrimDuration, Array.from(targetIds));
 
                 STATE.activeTimelineCuts = cuts;
 
@@ -2629,13 +2733,8 @@ export class CapiauTimelineState {
 
                 if (maxTrimDuration <= 0) return;
 
-                // Desloca todos os clipes subsequentes nas pistas com Sync Lock ativo
-                cuts.forEach(c => {
-                    if (!targetIds.has(c.id) && syncTracks.includes(c.track) && (c.timelineStartFrame || 0) >= playhead - 1) {
-                        c.timelineStartFrame = Math.max(playhead, (c.timelineStartFrame || 0) - maxTrimDuration);
-                        c.timeline_start = c.timelineStartFrame / fps;
-                    }
-                });
+                // Desloca todos os clipes subsequentes nas pistas com Sync Lock ativo com proteção A/V
+                this.applyRippleShift(cuts, syncTracks, playhead, maxTrimDuration, Array.from(targetIds));
 
                 STATE.activeTimelineCuts = cuts;
 
