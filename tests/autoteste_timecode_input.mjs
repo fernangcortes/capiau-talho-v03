@@ -140,9 +140,9 @@ assert.ok(htmlContent.includes('id="program-current-time"') && htmlContent.inclu
 assert.ok(htmlContent.includes('id="timeline-current-time"'), "timeline-current-time deve existir no cabeçalho da timeline");
 assert.ok(htmlContent.includes('id="timeline-timecode-box"'), "timeline-timecode-box deve envolver timeline-current-time");
 
-// Cache-buster v=50
-assert.ok(htmlContent.includes('styles.css?v=50'), "styles.css deve estar versionado com ?v=50");
-assert.ok(htmlContent.includes('main.js?v=50'), "main.js deve estar versionado com ?v=50");
+// Cache-buster v>=50
+assert.ok(/styles\.css\?v=(5[0-9]|[6-9][0-9])/.test(htmlContent), "styles.css deve estar versionado com ?v>=50");
+assert.ok(/main\.js\?v=(5[0-9]|[6-9][0-9])/.test(htmlContent), "main.js deve estar versionado com ?v>=50");
 
 // CSS classes
 assert.ok(cssContent.includes('.interactive-timecode'), "styles.css deve conter .interactive-timecode");

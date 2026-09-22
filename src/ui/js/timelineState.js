@@ -3240,7 +3240,7 @@ export class CapiauTimelineState {
      */
     getMaxMediaFrames(clip) {
         if (!clip) return Infinity;
-        if (clip.type === "photo" || clip.photo_id || clip.type === "text" || clip.textCategory) {
+        if (clip.is_freeze || clip.type === "photo" || clip.photo_id || clip.type === "text" || clip.textCategory) {
             return Infinity;
         }
         const fps = this.fps || 24;
@@ -3285,11 +3285,13 @@ export class CapiauTimelineState {
             let inFrame = cut.inFrame !== undefined ? cut.inFrame : secondsToFrames(cut.in, fps);
             let outFrame = cut.outFrame !== undefined ? cut.outFrame : secondsToFrames(cut.out, fps);
 
-            const maxMedia = this.getMaxMediaFrames(cut);
-            if (Number.isFinite(maxMedia) && maxMedia > 0) {
-                if (outFrame > maxMedia) outFrame = maxMedia;
+            if (!cut.is_freeze) {
+                const maxMedia = this.getMaxMediaFrames(cut);
+                if (Number.isFinite(maxMedia) && maxMedia > 0) {
+                    if (outFrame > maxMedia) outFrame = maxMedia;
+                }
+                if (inFrame < 0) inFrame = 0;
             }
-            if (inFrame < 0) inFrame = 0;
 
             const isText = cut.type === "text";
             const defaultTrack = isText ? "T1" : "V1";
@@ -5111,6 +5113,243 @@ export class CapiauTimelineState {
         }
 
         return finalResult;
+    }
+
+    /**
+     * Captura o quadro sob a agulha (ou no frame especificado) e insere um clipe estático (still)
+     * na timeline com duração configurável (padrão 3s) em modo Ripple ou Overwrite.
+     * 
+     * @param {string|null} [clipId=null] ID do clipe a ser congelado. Se nulo, busca automaticamente sob o playhead.
+     * @param {number|null} [playheadFrame=null] Frame na timeline. Se nulo, usa o playheadFrame atual.
+     * @param {number} [durationSec=3.0] Duração do clipe estático em segundos (padrão 3.0s).
+     * @param {string} [mode="ripple"] Modo de inserção: "ripple" (empurra para frente) ou "overwrite" (sobrescreve).
+     * @returns {object|null} Retorna o novo clipe congelado inserido ou null se a operação não puder ser realizada.
+     */
+    createFreezeFrameCut(clipId = null, playheadFrame = null, durationSec = 3.0, mode = "ripple") {
+        const fps = this.fps || 24;
+        const targetFrame = (playheadFrame !== null && playheadFrame !== undefined)
+            ? Math.round(playheadFrame)
+            : (this.playheadFrame !== undefined ? this.playheadFrame : Math.round((STATE.currentTime || 0) * fps));
+
+        const cuts = STATE.activeTimelineCuts || [];
+        if (cuts.length === 0) return null;
+
+        const durSec = Math.max(0.1, Number(durationSec) || 3.0);
+        const durationFrames = Math.max(1, Math.round(durSec * fps));
+
+        const coversFrame = (c) => {
+            const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+            const dur = (c.outFrame || 0) - (c.inFrame || 0);
+            const end = start + dur;
+            return targetFrame >= start && targetFrame <= end;
+        };
+
+        let targetClip = null;
+
+        // Função auxiliar para checar se uma pista é de vídeo
+        const isVideoTrack = (trackId) => {
+            if (!trackId) return false;
+            const t = this.getTrack(trackId);
+            if (t) return t.kind === "video";
+            return String(trackId).startsWith("V");
+        };
+
+        // 1. Se clipId foi fornecido:
+        if (clipId) {
+            const found = cuts.find(c => c.id === clipId);
+            if (found) {
+                if (isVideoTrack(found.track)) {
+                    targetClip = found;
+                } else if (found.link_id) {
+                    // Se o usuário clicou ou selecionou o áudio vinculado,
+                    // localiza obrigatoriamente o corte de VÍDEO correspondente
+                    targetClip = cuts.find(c => c.link_id === found.link_id && isVideoTrack(c.track)) || null;
+                }
+            }
+        }
+
+        // 2. Se não achou por clipId, busca entre os selecionados que cruzam a agulha (prioridade estrita para VÍDEO)
+        if (!targetClip) {
+            const selectedCandidates = [];
+            if (this.selectedClipIds && this.selectedClipIds.size > 0) {
+                for (const id of this.selectedClipIds) {
+                    const c = cuts.find(item => item.id === id);
+                    if (c && coversFrame(c)) selectedCandidates.push(c);
+                }
+            } else if (this.selectedClipId) {
+                const c = cuts.find(item => item.id === this.selectedClipId);
+                if (c && coversFrame(c)) selectedCandidates.push(c);
+            }
+
+            // Prioriza diretamente clipe de vídeo entre os selecionados
+            targetClip = selectedCandidates.find(c => isVideoTrack(c.track));
+
+            // Se o selecionado for um corte de áudio vinculado a um vídeo, resolve o parceiro de vídeo
+            if (!targetClip) {
+                const audioCandidate = selectedCandidates.find(c => c.link_id);
+                if (audioCandidate) {
+                    targetClip = cuts.find(c => c.link_id === audioCandidate.link_id && isVideoTrack(c.track) && coversFrame(c));
+                }
+            }
+        }
+
+        // 3. Se nenhum selecionado cruza o playhead, busca automaticamente clipe de VÍDEO sob a agulha
+        if (!targetClip) {
+            const unlockedVideoTracks = (this.tracks || [])
+                .filter(t => !t.locked && t.kind === "video")
+                .map(t => t.id);
+
+            const coversStrict = (c) => {
+                const start = c.timelineStartFrame !== undefined ? c.timelineStartFrame : Math.round((c.timeline_start || 0) * fps);
+                const dur = (c.outFrame || 0) - (c.inFrame || 0);
+                const end = start + dur;
+                return targetFrame >= start && targetFrame < end;
+            };
+
+            const findVideoClip = (trId) => {
+                return cuts.find(c => c.track === trId && coversStrict(c)) ||
+                       cuts.find(c => c.track === trId && coversFrame(c));
+            };
+
+            // a) Pista selecionada no momento (se for de vídeo)
+            if (this.selectedTrack && unlockedVideoTracks.includes(this.selectedTrack)) {
+                targetClip = findVideoClip(this.selectedTrack);
+            }
+            // b) Pista principal de vídeo "V1"
+            if (!targetClip && unlockedVideoTracks.includes("V1")) {
+                targetClip = findVideoClip("V1");
+            }
+            // c) Qualquer pista de vídeo destravada sob a agulha (na ordem das pistas)
+            if (!targetClip) {
+                for (const trId of unlockedVideoTracks) {
+                    const hit = findVideoClip(trId);
+                    if (hit) {
+                        targetClip = hit;
+                        break;
+                    }
+                }
+            }
+            // d) Fallback para qualquer corte cuja pista comece com "V"
+            if (!targetClip) {
+                targetClip = cuts.find(c => c.track && c.track.startsWith("V") && coversStrict(c)) ||
+                             cuts.find(c => c.track && c.track.startsWith("V") && coversFrame(c));
+            }
+        }
+
+        // Se mesmo assim não houver clipe de vídeo sob a agulha, aborta com segurança
+        if (!targetClip || !isVideoTrack(targetClip.track)) {
+            return null;
+        }
+
+        const track = this.getTrack(targetClip.track);
+        if (track && track.locked) return null;
+
+        const cStart = targetClip.timelineStartFrame !== undefined ? targetClip.timelineStartFrame : Math.round((targetClip.timeline_start || 0) * fps);
+        const cDur = (targetClip.outFrame || 0) - (targetClip.inFrame || 0);
+        const cEnd = cStart + cDur;
+
+        // Se fora dos limites
+        if (targetFrame < cStart || targetFrame > cEnd) return null;
+
+        const isTail = (targetFrame >= cEnd - 1);
+        let actualInsertFrame = targetFrame;
+        let freezeTimeSec = 0;
+        let freezeFrameInSource = 0;
+
+        if (isTail) {
+            // No último frame visível (cEnd - 1) ou na borda final (cEnd):
+            // Congela o último frame válido da mídia (outFrame - 1)
+            // e anexa o bloco estático exatamente ao final do clipe (cEnd),
+            // preservando o clipe inteiro e evitando gerar um fragmento residual indesejado de 1 frame.
+            actualInsertFrame = cEnd;
+            if (targetClip.is_freeze) {
+                freezeTimeSec = (targetClip.freeze_time !== undefined) ? targetClip.freeze_time : (targetClip.in || 0);
+                freezeFrameInSource = (targetClip.freeze_frame !== undefined) ? targetClip.freeze_frame : (targetClip.inFrame || 0);
+            } else {
+                freezeFrameInSource = Math.max(targetClip.inFrame || 0, (targetClip.outFrame || 1) - 1);
+                freezeTimeSec = (targetClip.out !== undefined && fps > 0)
+                    ? Math.max(targetClip.in || 0, freezeFrameInSource / fps)
+                    : (freezeFrameInSource / fps);
+            }
+        } else {
+            actualInsertFrame = targetFrame;
+            const offsetFrames = Math.max(0, targetFrame - cStart);
+            if (targetClip.is_freeze) {
+                freezeTimeSec = (targetClip.freeze_time !== undefined) ? targetClip.freeze_time : (targetClip.in || 0);
+                freezeFrameInSource = (targetClip.freeze_frame !== undefined) ? targetClip.freeze_frame : (targetClip.inFrame || 0);
+            } else {
+                freezeTimeSec = (targetClip.in || 0) + (offsetFrames / fps);
+                freezeFrameInSource = (targetClip.inFrame || 0) + offsetFrames;
+            }
+        }
+
+        let createdFreezeClip = null;
+
+        TIMELINE_HISTORY.record(() => {
+            const splitLinkMap = new Map();
+            let currentCuts = this.conformCuts(STATE.activeTimelineCuts);
+
+            // Procura se tem clipe parceiro vinculado
+            const partner = (targetClip.link_id)
+                ? currentCuts.find(c => c.link_id === targetClip.link_id && c.id !== targetClip.id)
+                : null;
+            const partnerTrack = partner ? this.getTrack(partner.track) : null;
+            const canShiftPartner = partner && (!partnerTrack || !partnerTrack.locked);
+
+            const isOverwrite = mode === "overwrite";
+
+            if (isOverwrite) {
+                currentCuts = this.overwriteTimeRange(targetClip.track, actualInsertFrame, durationFrames, [], currentCuts, splitLinkMap);
+            } else {
+                // Modo ripple (padrão): abre espaço na pista de vídeo e na pista de áudio vinculada
+                currentCuts = this.rippleInsertTimeRange(targetClip.track, actualInsertFrame, durationFrames, [], currentCuts, splitLinkMap);
+                if (canShiftPartner) {
+                    currentCuts = this.rippleInsertTimeRange(partner.track, actualInsertFrame, durationFrames, [], currentCuts, splitLinkMap);
+                }
+            }
+
+            const stamp = `${Date.now()}_${Math.floor(Math.random() * 900 + 100)}`;
+            const rawName = targetClip.name || "";
+            const cleanName = rawName.replace(/^(❄|\[Freeze[^\]]*\]|Freeze:|\s)+/gi, "").trim();
+
+            createdFreezeClip = {
+                id: `cut_${stamp}_freeze`,
+                type: targetClip.type || "video",
+                video_id: targetClip.video_id,
+                parent_video_id: targetClip.parent_video_id || targetClip.video_id,
+                photo_id: targetClip.photo_id || null,
+                is_freeze: true,
+                freeze_time: freezeTimeSec,
+                freeze_frame: freezeFrameInSource,
+                inFrame: freezeFrameInSource,
+                outFrame: freezeFrameInSource + durationFrames,
+                in: freezeTimeSec,
+                out: freezeTimeSec + (durationFrames / fps),
+                timelineStartFrame: actualInsertFrame,
+                timeline_start: actualInsertFrame / fps,
+                track: targetClip.track,
+                link_id: null,
+                rotation: targetClip.rotation || 0,
+                effects: targetClip.effects ? JSON.parse(JSON.stringify(targetClip.effects)) : [{ type: "fit", mode: "fit" }],
+                name: cleanName || undefined
+            };
+
+            currentCuts.push(createdFreezeClip);
+            STATE.activeTimelineCuts = currentCuts;
+
+            this.selectedClipId = createdFreezeClip.id;
+            if (this.selectedClipIds) {
+                this.selectedClipIds.clear();
+                this.selectedClipIds.add(createdFreezeClip.id);
+            }
+        });
+
+        if (createdFreezeClip) {
+            STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
+            STATE.emit("timelineClipSelected", createdFreezeClip.id);
+        }
+
+        return createdFreezeClip;
     }
 
     /**

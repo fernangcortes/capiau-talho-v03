@@ -1302,7 +1302,7 @@ export class CapiauTimelineRenderer {
             const laneKind = lane.track.kind || "video";
             const isText = cut.type === "text" || laneKind === "text";
             const isPhoto = cut.type === "photo";
-            const video = (isPhoto || isText) ? null : STATE.allVideos.find(v => String(v.id) === String(cut.video_id));
+            const video = (isPhoto || isText) ? null : (STATE.allVideos.find(v => String(v.id) === String(cut.video_id)) || (cut.parent_video_id ? STATE.allVideos.find(v => String(v.id) === String(cut.parent_video_id)) : null));
             const photo = isPhoto ? STATE.allPhotos.find(p => p.id === cut.photo_id) : null;
 
             // Espaçamento interno vertical do clipe
@@ -1320,6 +1320,17 @@ export class CapiauTimelineRenderer {
                 ctx.fillRect(startX, clipY, width, clipHeight);
                 // Faixa colorida sutil no topo do clipe de texto
                 ctx.fillStyle = "rgba(245, 158, 11, 0.8)";
+                ctx.fillRect(startX, clipY, width, 3);
+                ctx.restore();
+            }
+
+            // Estilização interna de quadro congelado (Freeze Frame)
+            if (cut.is_freeze) {
+                ctx.save();
+                ctx.fillStyle = "rgba(56, 189, 248, 0.12)";
+                ctx.fillRect(startX, clipY, width, clipHeight);
+                // Faixa colorida azul glacial no topo do clipe congelado
+                ctx.fillStyle = "rgba(56, 189, 248, 0.85)";
                 ctx.fillRect(startX, clipY, width, 3);
                 ctx.restore();
             }
@@ -1343,7 +1354,9 @@ export class CapiauTimelineRenderer {
 
                 if (isHeadOnly || clipHeight < 26) {
                     // Modo 2: Apenas Início (Head Only / Primeiro Quadro) ou pista muito comprimida (< 26px)
-                    const targetTime = cut.in || 0;
+                    const targetTime = cut.is_freeze
+                        ? (cut.freeze_time !== undefined ? cut.freeze_time : (cut.in || 0))
+                        : (cut.in || 0);
                     let img = this.getVideoThumb(video.id, targetTime);
                     if (!img) {
                         img = this.getClosestLoadedVideoThumb(video.id, targetTime);
@@ -1362,7 +1375,9 @@ export class CapiauTimelineRenderer {
                         const xOffset = i * thumbWidth;
                         const ratio = (xOffset + thumbWidth / 2) / width;
                         const timeInClip = ratio * durationSecs;
-                        const targetTime = cut.in + timeInClip;
+                        const targetTime = cut.is_freeze
+                            ? (cut.freeze_time !== undefined ? cut.freeze_time : (cut.in || 0))
+                            : (cut.in + timeInClip);
 
                         const interval = TIMELINE_STATE.globalThumbnailsInterval || 1.0;
                         const roundedTime = Math.round(targetTime / interval) * interval;
@@ -1469,6 +1484,13 @@ export class CapiauTimelineRenderer {
                 const name = photo ? (photo.title || photo.filename) : `Foto ${cut.photo_id}`;
                 const durS = framesToSeconds(cut.outFrame - cut.inFrame, TIMELINE_STATE.fps);
                 label = `▣ ${name} [${durS.toFixed(1)}s]`;
+            } else if (cut.is_freeze) {
+                const fps = TIMELINE_STATE.fps || 24;
+                const durS = framesToSeconds(cut.outFrame - cut.inFrame, fps);
+                const rawName = cut.name || (video ? (video.title || video.filename) : "Vídeo");
+                const cleanName = rawName.replace(/^(❄|\[Freeze[^\]]*\]|Freeze:|\s)+/gi, "").trim();
+                const displayName = cleanName || (video ? (video.title || video.filename) : "Vídeo");
+                label = `❄ [Freeze ${durS.toFixed(1)}s] ${displayName}`;
             } else {
                 const subPrefix = cut.is_subclip ? "✂ " : "";
                 const effSubPrefix = subPrefix || (String(cut.video_id).startsWith("subclip_") || cut.subclip_id ? "✂ " : "");

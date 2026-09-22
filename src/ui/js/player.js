@@ -3457,6 +3457,9 @@ export class ProgramPlayer {
 
     /** Instante do arquivo (em segundos) correspondente a um frame da timeline. */
     _targetSecondsFor(cut, frame) {
+        if (cut && cut.is_freeze) {
+            return (typeof cut.freeze_time === "number" && !isNaN(cut.freeze_time)) ? cut.freeze_time : (cut.in || 0);
+        }
         const fps = TIMELINE_STATE?.fps || 24;
         const inSec = (cut && typeof cut.in === "number" && !isNaN(cut.in)) ? cut.in : 0;
         const startFrame = (cut && typeof cut.timelineStartFrame === "number" && !isNaN(cut.timelineStartFrame)) ? cut.timelineStartFrame : 0;
@@ -3524,7 +3527,14 @@ export class ProgramPlayer {
         const baseRate = (this.isPlaying && this.playbackSpeed > 0)
             ? Math.min(4.0, this.playbackSpeed) : 1.0;
 
-        if (srcChanged || (clipChanged && Math.abs(drift) > BUFFER_CONTINUITY_TOLERANCE)) {
+        if (cut && cut.is_freeze) {
+            // Em quadros congelados (freeze frame), o buffer fica rigorosamente parado no alvo
+            el._pendingSeekTarget = null;
+            if (srcChanged || clipChanged || (Math.abs(drift) > 0.04 && !el.seeking)) {
+                el.currentTime = Math.max(0, target);
+            }
+            if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
+        } else if (srcChanged || (clipChanged && Math.abs(drift) > BUFFER_CONTINUITY_TOLERANCE)) {
             // Buffer entrando num clipe novo: posiciona antes de ir ao ar (está escondido).
             el._pendingSeekTarget = null;
             el.currentTime = Math.max(0, target);
@@ -3568,7 +3578,9 @@ export class ProgramPlayer {
 
         // Pistas de vídeo são só imagem: o áudio vem das pistas de áudio dedicadas
         el.muted = true;
-        if (live && this.isPlaying && this.playbackSpeed > 0) {
+        if (cut && cut.is_freeze) {
+            if (!el.paused) el.pause();
+        } else if (live && this.isPlaying && this.playbackSpeed > 0) {
             if (el.paused) el.play().catch(() => {});
         } else if (!el.paused) {
             el.pause();
@@ -5883,6 +5895,13 @@ export class VideoPlayer {
             return;
         }
 
+        // Congelar Quadro / Freeze Frame (Ctrl+Shift+F)
+        if (KEYMAP_SERVICE.matches(e, "edit.freeze_frame")) {
+            e.preventDefault();
+            this.freezeFrameAtPlayhead();
+            return;
+        }
+
         // Inserir na Timeline (Append)
         if (KEYMAP_SERVICE.matches(e, "playback.append_timeline")) {
             if (window.activeFocusedPlayer === "source") {
@@ -6113,6 +6132,40 @@ export class VideoPlayer {
             if (result.removedPartnerId) msg += " Áudio vinculado removido (foto sem faixa de áudio).";
             window.showToast(msg, "success");
         }
+        return result;
+    }
+
+    /**
+     * Congelar Quadro (Freeze Frame — Ctrl+Shift+F):
+     * Captura o quadro exato da mídia sob a agulha na timeline ativa
+     * e insere um clipe estático (still) com duração configurável (padrão 3s).
+     */
+    freezeFrameAtPlayhead(durationSec = 3.0, mode = "ripple") {
+        if (typeof TIMELINE_STATE === "undefined" || typeof TIMELINE_STATE.createFreezeFrameCut !== "function") return null;
+
+        const playhead = TIMELINE_STATE.playheadFrame;
+        const result = TIMELINE_STATE.createFreezeFrameCut(null, playhead, durationSec, mode);
+
+        if (!result) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Posicione a agulha sobre um clipe na timeline para congelar o quadro.", "warning");
+            }
+            return null;
+        }
+
+        if (typeof window !== "undefined" && window.TIMELINE_INTERACTION) {
+            if (window.TIMELINE_INTERACTION.renderer) window.TIMELINE_INTERACTION.renderer.requestRedraw();
+            if (typeof window.TIMELINE_INTERACTION.refreshClipInspector === "function") {
+                window.TIMELINE_INTERACTION.refreshClipInspector();
+            }
+        }
+
+        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+            const durText = durationSec ? `${Number(durationSec).toFixed(1)}s` : "3.0s";
+            window.showToast(`❄ Quadro congelado inserido (${durText})`, "info");
+        }
+
+        this.syncVideoToPlayhead();
         return result;
     }
 

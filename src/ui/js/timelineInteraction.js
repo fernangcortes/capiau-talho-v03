@@ -3227,6 +3227,43 @@ export class CapiauTimelineInteraction {
         }
         menu.appendChild(itemSplit);
 
+        // 3.5 Congelar Quadro no Playhead (Ctrl+Shift+F)
+        const hasVideo = (clip.track && clip.track.startsWith("V")) || Boolean(clip.link_id);
+        const isPlayheadOverClip = (typeof playhead === "number" && playhead >= cStart && playhead <= cEnd);
+        const canFreezeClip = hasVideo && (isPlayheadOverClip || (typeof frame === "number" && frame >= cStart && frame <= cEnd));
+        const effectiveFreezeFrame = isPlayheadOverClip ? playhead : frame;
+
+        const itemFreeze = document.createElement("div");
+        itemFreeze.className = "menu-item";
+        itemFreeze.style.display = "flex";
+        itemFreeze.style.alignItems = "center";
+        itemFreeze.style.justifyContent = "space-between";
+        itemFreeze.style.padding = "7px 12px";
+        itemFreeze.style.cursor = canFreezeClip ? "pointer" : "default";
+        itemFreeze.style.opacity = canFreezeClip ? "1" : "0.5";
+        itemFreeze.innerHTML = `
+            <span style="display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-snowflake" style="color:#38bdf8;"></i>
+                <span>Congelar Quadro</span>
+            </span>
+            <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Ctrl+Shift+F</kbd>
+        `;
+        if (canFreezeClip) {
+            itemFreeze.onclick = () => {
+                const res = TIMELINE_STATE.createFreezeFrameCut(clip.id, effectiveFreezeFrame, 3.0, "ripple");
+                if (res && typeof window.showToast === "function") {
+                    window.showToast("❄ Quadro congelado inserido (3.0s)", "info");
+                }
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+                if (window.player && typeof window.player.syncVideoToPlayhead === "function") {
+                    window.player.syncVideoToPlayhead();
+                }
+                menu.remove();
+            };
+        }
+        menu.appendChild(itemFreeze);
+
         // Divisor
         const sep1 = document.createElement("div");
         sep1.className = "menu-separator";
@@ -5644,6 +5681,33 @@ export class CapiauTimelineInteraction {
                     }
                 }
                 refocusTimeline(btnSplitPlayhead);
+            };
+        }
+
+        const btnFreezeFrame = doc.getElementById("btn-freeze-frame");
+        if (btnFreezeFrame && !btnFreezeFrame.__capiauToolBound) {
+            btnFreezeFrame.__capiauToolBound = true;
+            btnFreezeFrame.onclick = () => {
+                if (window.player && typeof window.player.freezeFrameAtPlayhead === "function") {
+                    window.player.freezeFrameAtPlayhead(3.0, "ripple");
+                } else {
+                    const res = TIMELINE_STATE.createFreezeFrameCut(null, null, 3.0, "ripple");
+                    if (res) {
+                        if (typeof window.showToast === "function") {
+                            window.showToast("❄ Quadro congelado inserido (3.0s)", "info");
+                        }
+                        if (this.renderer) this.renderer.requestRedraw();
+                        this.refreshClipInspector();
+                        if (window.player && typeof window.player.syncVideoToPlayhead === "function") {
+                            window.player.syncVideoToPlayhead();
+                        }
+                    } else {
+                        if (typeof window.showToast === "function") {
+                            window.showToast("Posicione a agulha sobre um clipe para congelar", "warning");
+                        }
+                    }
+                }
+                refocusTimeline(btnFreezeFrame);
             };
         }
 
