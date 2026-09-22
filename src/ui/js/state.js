@@ -232,6 +232,21 @@ class AppState extends EventEmitter {
                 c.in = c.inFrame / timelineFps;
                 start = 0;
             }
+            // Barreira física sólida contra invasão do clipe anterior na mesma pista (Bloqueio Físico NLE)
+            let prevEnd = 0;
+            this._activeTimelineCuts.forEach(other => {
+                if (other.id !== c.id && other.track === c.track) {
+                    const otherStart = other.timelineStartFrame || 0;
+                    const otherDur = (other.outFrame || 0) - (other.inFrame || 0);
+                    const otherEnd = otherStart + otherDur;
+                    if (otherEnd <= (c.timelineStartFrame || 0) || otherStart < start) {
+                        prevEnd = Math.max(prevEnd, otherEnd);
+                    }
+                }
+            });
+            if (start < prevEnd) {
+                start = prevEnd;
+            }
             c.timelineStartFrame = start;
             c.timeline_start = start / timelineFps;
         });

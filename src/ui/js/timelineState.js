@@ -1051,7 +1051,7 @@ export class CapiauTimelineState {
     /** Tipo (kind) da pista pelo id, com fallback "video" para pistas desconhecidas. */
     trackKindOf(trackId) {
         const t = this.getTrack(trackId);
-        return t ? (t.kind || "video") : "video";
+        return t ? (t.kind || "video") : (String(trackId || "").toUpperCase().startsWith("A") ? "audio" : "video");
     }
 
     /**
@@ -1487,6 +1487,9 @@ export class CapiauTimelineState {
             const cEnd = cStart + cDur;
 
             if (cEnd <= frame) {
+                prevClip = c;
+                prevEnd = Math.max(prevEnd, cEnd);
+            } else if (cStart < frame && cEnd > frame) {
                 prevClip = c;
                 prevEnd = Math.max(prevEnd, cEnd);
             } else if (cStart >= frame) {
