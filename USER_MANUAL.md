@@ -878,8 +878,8 @@ O CapIAu-Talho dispõe de um sistema flexível e robusto de **Workspaces Modular
 Você pode adicionar mídias à timeline de diversas formas altamente ergonômicas:
 
 1. **Modos de Ingestão por Duplo Clique & Modificadores:**
-   - **`2x Clique`** ➔ **Na Posição da Agulha (Playhead):** Insere a mídia na posição atual do cursor de reprodução e move a agulha para o término do clipe inserido.
-   - **`Shift + 2x Clique`** ➔ **No Final da Timeline (Append):** Localiza o término do último corte da timeline e anexa a mídia no final.
+   - **`2x Clique`** ➔ **No Final da Timeline (Append):** Localiza o término da timeline e anexa a mídia no final. Protege contra pistas ocultas e sempre prefere a Pista 1 (V1) caso ambas as pistas estejam abertas e seus finais forem iguais (incluindo timeline vazia).
+   - **`Shift + 2x Clique`** ➔ **Na Posição da Agulha (Playhead):** Insere a mídia na posição atual do cursor de reprodução e move a agulha para o término do clipe inserido.
    - **`Ctrl + 2x Clique`** *(ou `Cmd`)* ➔ **No 1º Espaço Vazio (Primeiro Gap):** Localiza o primeiro gap a partir do frame 0 e insere no início dele, **posicionando a agulha no começo da mídia**.
    - **`Ctrl + Shift + 2x Clique`** ➔ **No Próximo Espaço Vazio (Após Agulha):** Encontra o primeiro gap à frente da agulha atual e insere no início dele, **posicionando a agulha no começo da mídia**.
    - **`Alt + Shift + 2x Clique`** ➔ **No Início da Timeline (Frame 0):** Insere no frame 0 da pista de destino.
@@ -889,7 +889,7 @@ Você pode adicionar mídias à timeline de diversas formas altamente ergonômic
 2. **Submenu de Contexto no Botão Direito (`Adicionar à Timeline`):**
    - Ao clicar com o botão direito sobre qualquer card de vídeo ou foto na biblioteca, passe o cursor sobre **"Adicionar à Timeline"** para abrir um submenu com todas as opções acima e seus atalhos correspondentes.
    - Se houver um clipe selecionado na timeline, o submenu inclui a opção **"Substituir Clipe Selecionado"** para trocar a mídia preservando o posicionamento na timeline.
-   - Clicar diretamente no item pai aciona a inserção padrão na posição da agulha.
+   - Clicar diretamente no item pai aciona a inserção padrão no final da timeline.
 
 3. **Arrastar-e-Soltar (Drag-and-Drop):**
    - Clique e arraste qualquer vídeo ou foto para a trilha desejada na timeline (segure **`Ctrl`** durante o drop para fazer *Ripple Insert*).

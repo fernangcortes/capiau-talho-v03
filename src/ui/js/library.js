@@ -866,7 +866,7 @@ export function buildMediaTooltip(item, kind = "video", forceRealFilename = fals
         }
     }
     
-    parts.push("⚡ 2x Clique: Na agulha | Shift: Final | Ctrl: 1º Gap | Alt: Empurrar");
+    parts.push("⚡ 2x Clique: Final | Shift: Na agulha | Ctrl: 1º Gap | Alt: Empurrar");
 
     if (parts.length === 0) return "Sem decupagem";
     return parts.join("\n\n");
@@ -1253,8 +1253,8 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
 
     // Ações do Submenu
     const insertionOptions = [
-        { mode: "playhead", icon: "fa-location-crosshairs", label: "Na Posição da Agulha (Playhead)", shortcut: "2x Clique" },
-        { mode: "end", icon: "fa-forward-step", label: "No Final da Timeline (Append)", shortcut: "Shift + 2x Clique" },
+        { mode: "end", icon: "fa-forward-step", label: "No Final da Timeline (Append)", shortcut: "2x Clique" },
+        { mode: "playhead", icon: "fa-location-crosshairs", label: "Na Posição da Agulha (Playhead)", shortcut: "Shift + 2x Clique" },
         { mode: "first_gap", icon: "fa-arrows-to-dot", label: "No 1º Espaço Vazio (Primeiro Gap)", shortcut: "Ctrl + 2x Clique" },
         { mode: "next_gap", icon: "fa-forward", label: "No Próximo Espaço Vazio (Após Agulha)", shortcut: "Ctrl+Shift + 2x Clique" },
         { mode: "start", icon: "fa-backward-step", label: "No Início da Timeline (Frame 0)", shortcut: "Alt+Shift + 2x Clique" },
@@ -1287,11 +1287,11 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         addTlSubmenu.appendChild(subItem);
     });
 
-    // Clique direto no item-pai executa o modo padrão (playhead)
+    // Clique direto no item-pai executa o modo padrão (end)
     addTlMenuItem.addEventListener("click", (e) => {
         if (e.target.closest(".menu-submenu")) return;
         menu.remove();
-        runMediaInsert("playhead");
+        runMediaInsert("end");
     });
 
     menu.appendChild(addTlMenuItem);
@@ -4437,9 +4437,9 @@ function renderTreeNode(node, container, depth = 0) {
                 _librarySingleClickTimer = null;
             }
 
-            let mode = "playhead";
+            let mode = "end";
             if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                mode = "end";
+                mode = "playhead";
             } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
                 mode = "first_gap";
             } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
@@ -4702,9 +4702,9 @@ function renderTreeNode(node, container, depth = 0) {
                 _librarySingleClickTimer = null;
             }
 
-            let mode = "playhead";
+            let mode = "end";
             if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                mode = "end";
+                mode = "playhead";
             } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
                 mode = "first_gap";
             } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
@@ -8865,9 +8865,9 @@ export class LibraryManager {
                     e.stopPropagation();
                     window._galleryController.stopAllHover();
 
-                    let mode = "playhead";
+                    let mode = "end";
                     if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                        mode = "end";
+                        mode = "playhead";
                     } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
                         mode = "first_gap";
                     } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {

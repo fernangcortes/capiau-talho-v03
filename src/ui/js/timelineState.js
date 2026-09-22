@@ -3137,12 +3137,12 @@ export class CapiauTimelineState {
      * @param {number|string} params.id ID do vídeo ou foto
      * @param {number} [params.inSec] Ponto IN em segundos
      * @param {number} [params.outSec] Ponto OUT em segundos
-     * @param {string} [params.mode="playhead"] Modo de inserção
+     * @param {string} [params.mode="end"] Modo de inserção
      * @param {string} [params.targetTrack=null] Pista de destino opcional
      * @param {number} [params.timelineStartFrame=null] Frame inicial explícito
      * @returns {Object|null} Novo clipe adicionado ou substituído
      */
-    insertMedia({ type = "video", id, inSec = null, outSec = null, mode = "playhead", targetTrack = null, timelineStartFrame = null, is_subclip = false, subclip_id = null, parent_video_id = null, name = null, hard_boundaries = false } = {}) {
+    insertMedia({ type = "video", id, inSec = null, outSec = null, mode = "end", targetTrack = null, timelineStartFrame = null, is_subclip = false, subclip_id = null, parent_video_id = null, name = null, hard_boundaries = false } = {}) {
         if (!id) return null;
         let realId = id;
         let isSub = is_subclip;
@@ -3219,83 +3219,129 @@ export class CapiauTimelineState {
         const durFrames = outFrame - inFrame;
         const effDurSec = durFrames / fps;
 
-        // 2. Determina Pista de Destino
-        let track = targetTrack;
-        const videoTracks = this.getVideoTracks().filter(t => !t.locked);
+        // 2. Determina Pista de Destino e Posição na Timeline
+        const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
 
-        if (mode === "overlay") {
-            const activeTrackId = this.selectedTrack || "V1";
-            const curIdx = videoTracks.findIndex(t => t.id === activeTrackId);
-            if (curIdx > 0) {
-                track = videoTracks[curIdx - 1].id;
-            } else if (videoTracks.some(t => t.id === "V2") && activeTrackId !== "V2") {
-                track = "V2";
-            } else {
-                const newT = this.addVideoTrack();
-                track = newT ? newT.id : (videoTracks[0] || { id: "V1" }).id;
-            }
-        } else if (!track) {
-            if (this.selectedTrack) {
-                const tObj = this.getTrack(this.selectedTrack);
-                if (tObj && tObj.kind === "video" && !tObj.locked) {
-                    track = this.selectedTrack;
-                }
-            }
-            if (!track) {
-                const v2 = videoTracks.find(t => t.id === "V2");
-                const v1 = videoTracks.find(t => t.id === "V1");
-                if (!isVideo || (video && video.video_type === "broll")) {
-                    track = (v2 || v1 || videoTracks[0] || { id: "V1" }).id;
-                } else {
-                    track = (v1 || videoTracks[0] || { id: "V1" }).id;
-                }
+        const getTrackEndFrame = (trackId) => {
+            const cutsOnTrack = currentCuts.filter(c => c.track === trackId);
+            return cutsOnTrack.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+        };
+
+        let track = targetTrack;
+        if (track) {
+            const tObj = this.getTrack(track);
+            // Se a pista solicitada explicitamente estiver oculta ou bloqueada, desconsidera
+            if (tObj && (tObj.hidden || tObj.locked)) {
+                track = null;
             }
         }
 
-        // 3. Determina Start Frame & Posição da Agulha
-        const currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        const openVideoTracks = this.getVideoTracks().filter(t => !t.locked && !t.hidden);
+        const unlockedVideoTracks = this.getVideoTracks().filter(t => !t.locked);
+        const usableVideoTracks = openVideoTracks.length > 0 ? openVideoTracks : (unlockedVideoTracks.length > 0 ? unlockedVideoTracks : this.getVideoTracks());
+
         let startFrame = 0;
         let setPlayheadAtStart = false;
 
-        if (timelineStartFrame !== null && timelineStartFrame !== undefined) {
-            startFrame = Math.max(0, Math.round(timelineStartFrame));
-        } else if (mode === "end") {
-            const lastFrame = currentCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
-            startFrame = lastFrame;
-        } else if (mode === "start") {
-            startFrame = 0;
-            setPlayheadAtStart = true;
-        } else if (mode === "first_gap") {
-            const gaps = this.getTrackGaps(track);
-            if (gaps.length > 0) {
-                startFrame = gaps[0].startFrame;
+        if (mode === "end") {
+            if (!track) {
+                // Mapeia o término da timeline em cada pista de vídeo aberta
+                const trackEnds = usableVideoTracks.map(t => ({
+                    track: t,
+                    endFrame: getTrackEndFrame(t.id)
+                }));
+                const maxEnd = Math.max(0, ...trackEnds.map(te => te.endFrame));
+                const candidates = trackEnds.filter(te => te.endFrame === maxEnd);
+
+                // Regra de ouro: se ambas (ou múltiplas abertas) empatarem no final da timeline, SEMPRE preferir a pista 1 (V1)
+                const v1Candidate = candidates.find(c => c.track.id === "V1");
+                if (v1Candidate) {
+                    track = "V1";
+                } else {
+                    track = (candidates[0] && candidates[0].track.id) || (usableVideoTracks[0] && usableVideoTracks[0].id) || "V1";
+                }
+                startFrame = maxEnd;
             } else {
-                const trackCuts = currentCuts.filter(c => c.track === track);
-                startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+                startFrame = getTrackEndFrame(track);
             }
-            setPlayheadAtStart = true;
-        } else if (mode === "next_gap") {
-            const curPlayhead = (this.playheadFrame !== null && this.playheadFrame !== undefined) ? this.playheadFrame : 0;
-            const gaps = this.getTrackGaps(track);
-            const nextGap = gaps.find(g => g.endFrame > curPlayhead);
-            if (nextGap) {
-                startFrame = Math.max(curPlayhead, nextGap.startFrame);
-            } else {
-                const trackCuts = currentCuts.filter(c => c.track === track);
-                startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+            if (timelineStartFrame !== null && timelineStartFrame !== undefined) {
+                startFrame = Math.max(0, Math.round(timelineStartFrame));
             }
-            setPlayheadAtStart = true;
-        } else if (mode === "replace") {
-            const selClip = currentCuts.find(c => c.id === this.selectedClipId);
-            if (selClip) {
-                startFrame = selClip.timelineStartFrame || 0;
-                track = selClip.track || track;
+        } else if (mode === "overlay") {
+            if (!track) {
+                const activeTrackId = (this.selectedTrack && !this.getTrack(this.selectedTrack)?.hidden && !this.getTrack(this.selectedTrack)?.locked)
+                    ? this.selectedTrack
+                    : (usableVideoTracks.find(t => t.id === "V1")?.id || usableVideoTracks[0]?.id || "V1");
+                const curIdx = usableVideoTracks.findIndex(t => t.id === activeTrackId);
+                if (curIdx > 0) {
+                    track = usableVideoTracks[curIdx - 1].id;
+                } else if (usableVideoTracks.some(t => t.id === "V2") && activeTrackId !== "V2") {
+                    track = "V2";
+                } else {
+                    const newT = this.addVideoTrack();
+                    track = newT ? newT.id : (usableVideoTracks[0] || { id: "V1" }).id;
+                }
+            }
+            startFrame = (timelineStartFrame !== null && timelineStartFrame !== undefined)
+                ? Math.max(0, Math.round(timelineStartFrame))
+                : ((this.playheadFrame !== null && this.playheadFrame !== undefined) ? this.playheadFrame : 0);
+        } else {
+            if (!track) {
+                if (this.selectedTrack) {
+                    const tObj = this.getTrack(this.selectedTrack);
+                    if (tObj && tObj.kind === "video" && !tObj.locked && !tObj.hidden) {
+                        track = this.selectedTrack;
+                    }
+                }
+                if (!track) {
+                    const v2 = usableVideoTracks.find(t => t.id === "V2");
+                    const v1 = usableVideoTracks.find(t => t.id === "V1");
+                    if (!isVideo || (video && video.video_type === "broll")) {
+                        track = (v2 || v1 || usableVideoTracks[0] || { id: "V1" }).id;
+                    } else {
+                        track = (v1 || usableVideoTracks[0] || { id: "V1" }).id;
+                    }
+                }
+            }
+
+            if (timelineStartFrame !== null && timelineStartFrame !== undefined) {
+                startFrame = Math.max(0, Math.round(timelineStartFrame));
+            } else if (mode === "start") {
+                startFrame = 0;
+                setPlayheadAtStart = true;
+            } else if (mode === "first_gap") {
+                const gaps = this.getTrackGaps(track);
+                if (gaps.length > 0) {
+                    startFrame = gaps[0].startFrame;
+                } else {
+                    startFrame = getTrackEndFrame(track);
+                }
+                setPlayheadAtStart = true;
+            } else if (mode === "next_gap") {
+                const curPlayhead = (this.playheadFrame !== null && this.playheadFrame !== undefined) ? this.playheadFrame : 0;
+                const gaps = this.getTrackGaps(track);
+                const nextGap = gaps.find(g => g.endFrame > curPlayhead);
+                if (nextGap) {
+                    startFrame = Math.max(curPlayhead, nextGap.startFrame);
+                } else {
+                    startFrame = getTrackEndFrame(track);
+                }
+                setPlayheadAtStart = true;
+            } else if (mode === "replace") {
+                const selClip = currentCuts.find(c => c.id === this.selectedClipId);
+                if (selClip) {
+                    startFrame = selClip.timelineStartFrame || 0;
+                    const selTrackObj = this.getTrack(selClip.track);
+                    if (selTrackObj && !selTrackObj.hidden && !selTrackObj.locked) {
+                        track = selClip.track;
+                    }
+                } else {
+                    startFrame = (this.playheadFrame !== null && this.playheadFrame !== undefined) ? this.playheadFrame : 0;
+                }
             } else {
+                // "playhead", "ripple"
                 startFrame = (this.playheadFrame !== null && this.playheadFrame !== undefined) ? this.playheadFrame : 0;
             }
-        } else {
-            // "playhead", "ripple", "overlay"
-            startFrame = (this.playheadFrame !== null && this.playheadFrame !== undefined) ? this.playheadFrame : 0;
         }
 
         startFrame = Math.max(0, Math.round(startFrame));
@@ -3319,7 +3365,7 @@ export class CapiauTimelineState {
             if (isCollision) {
                 // 1. Tenta achar uma pista de vídeo alternativa livre no ponto da agulha
                 let placedOnAlternative = false;
-                for (const altTrack of videoTracks) {
+                for (const altTrack of usableVideoTracks) {
                     const altAudio = this.pairedAudioTrackId(altTrack.id);
                     if (!hasCollision(altTrack.id, startFrame, durFrames) &&
                         (!altAudio || !hasCollision(altAudio, startFrame, durFrames))) {
@@ -3338,8 +3384,7 @@ export class CapiauTimelineState {
                         startFrame = gapAfterPlayhead.startFrame;
                     } else {
                         // Sem gaps suficientes: posiciona no final da timeline nessa pista
-                        const trackCuts = currentCuts.filter(c => c.track === track);
-                        startFrame = trackCuts.reduce((max, c) => Math.max(max, (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame)), 0);
+                        startFrame = getTrackEndFrame(track);
                     }
                 }
             }

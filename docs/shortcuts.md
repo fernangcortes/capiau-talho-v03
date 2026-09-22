@@ -65,8 +65,8 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 
 | Tecla / Combinação | Modo de Ingestão | Ação e Comportamento na Timeline | Posição da Agulha |
 | :--- | :--- | :--- | :--- |
-| **`Duplo Clique`** | **Na Posição da Agulha (Playhead)** | Insere no frame exato onde a agulha está na pista ativa/padrão. | Final do clipe inserido |
-| **`Shift + Duplo Clique`** | **No Final da Timeline (Append)** | Localiza o término do último corte existente e anexa no final da timeline. | Final do clipe inserido |
+| **`Duplo Clique`** | **No Final da Timeline (Append)** | Localiza o término da timeline e anexa no final (prefere Pista 1 em empate; ignora pistas ocultas). | Final do clipe inserido |
+| **`Shift + Duplo Clique`** | **Na Posição da Agulha (Playhead)** | Insere no frame exato onde a agulha está na pista ativa/padrão. | Final do clipe inserido |
 | **`Ctrl + Duplo Clique`** *(ou `Cmd`)* | **No 1º Espaço Vazio (Primeiro Gap)** | Encontra o primeiro espaço vazio (gap) a partir do frame 0 e insere no início dele. | **Início do clipe inserido** |
 | **`Ctrl + Shift + Duplo Clique`** | **No Próximo Espaço Vazio (Após Agulha)** | Encontra o primeiro gap à frente da agulha atual e insere no início dele. | **Início do clipe inserido** |
 | **`Alt + Shift + Duplo Clique`** | **No Início da Timeline (Frame 0)** | Insere no frame 0 da pista de destino. | Início (Frame 0) |
