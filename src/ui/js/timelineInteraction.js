@@ -1613,7 +1613,7 @@ export class CapiauTimelineInteraction {
 
                     if (trimEdge === "left" || trimEdge === "right") {
                         const cuts = STATE.activeTimelineCuts || [];
-                        const partner = (!e.altKey && targetClip.link_id)
+                        const partner = targetClip.link_id
                             ? cuts.find(c => c.id !== targetClip.id && c.link_id === targetClip.link_id)
                             : null;
 
@@ -2513,7 +2513,7 @@ export class CapiauTimelineInteraction {
 
             if (this.renderer) this.renderer.activeSnapFrame = snapGuideFrame;
             const isRipple = e.ctrlKey || e.metaKey;
-            const trimLinked = !e.altKey;
+            const trimLinked = this.dragTrimLinked;
             this.trimClipLeft(this.draggedClipId, deltaFrames, isRipple, trimLinked);
         }
         else if (this.dragState === "trim-right" && this.draggedClipId) {
@@ -2542,7 +2542,7 @@ export class CapiauTimelineInteraction {
 
             if (this.renderer) this.renderer.activeSnapFrame = snapGuideFrame;
             const isRipple = e.ctrlKey || e.metaKey;
-            const trimLinked = !e.altKey;
+            const trimLinked = this.dragTrimLinked;
             this.trimClipRight(this.draggedClipId, deltaFrames, isRipple, trimLinked);
         }
         else if ((this.dragState === "fade-in-drag" || this.dragState === "fade-out-drag") && this.draggedClipId) {
@@ -11029,6 +11029,11 @@ export class CapiauTimelineInteraction {
             ? cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id)
             : null;
 
+        // Preserva o offset relativo existente de J-cut / L-cut entre os parceiros
+        const partnerOffset = partner
+            ? ((partner.timelineStartFrame || 0) - (clip.timelineStartFrame || 0))
+            : 0;
+
         let finalStart = Math.max(0, targetStartFrame);
 
         if (effectiveMode === "clamp") {
@@ -11039,7 +11044,12 @@ export class CapiauTimelineInteraction {
 
             if (partner) {
                 const partnerDur = partner.outFrame - partner.inFrame;
-                finalStart = this.calculateClampedStart(partner.track, finalStart, partnerDur, ignored);
+                const targetPartnerStart = Math.max(0, finalStart + partnerOffset);
+                const clampedPartnerStart = this.calculateClampedStart(partner.track, targetPartnerStart, partnerDur, ignored);
+                if (clampedPartnerStart !== targetPartnerStart) {
+                    finalStart = Math.max(0, clampedPartnerStart - partnerOffset);
+                    finalStart = this.calculateClampedStart(clip.track, finalStart, duration, ignored);
+                }
             }
         }
 
@@ -11047,8 +11057,15 @@ export class CapiauTimelineInteraction {
         clip.timeline_start = finalStart / fps;
 
         if (partner) {
-            partner.timelineStartFrame = finalStart;
-            partner.timeline_start = finalStart / fps;
+            const finalPartnerStart = Math.max(0, finalStart + partnerOffset);
+            partner.timelineStartFrame = finalPartnerStart;
+            partner.timeline_start = finalPartnerStart / fps;
+
+            const videoCut = (TIMELINE_STATE.trackKindOf(clip.track) === "video") ? clip : partner;
+            const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : partner;
+            if (videoCut && audioCut) {
+                audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+            }
         }
 
         STATE.activeTimelineCuts = cuts;
@@ -11076,13 +11093,13 @@ export class CapiauTimelineInteraction {
 
         // Barreira física sólida contra vizinho anterior na pista (Bloqueio Físico NLE)
         const neighbors = TIMELINE_STATE.getTrackClipNeighbors(clip.track, baseStart, ignored);
-        let minAllowedStart = neighbors.prevEnd;
+        let minDeltaFromNeighbor = neighbors.prevEnd - baseStart;
+        let pNeighbors = null;
         if (partner && partnerBaseStart !== null) {
-            const pNeighbors = TIMELINE_STATE.getTrackClipNeighbors(partner.track, partnerBaseStart, ignored);
-            minAllowedStart = Math.max(minAllowedStart, pNeighbors.prevEnd);
+            pNeighbors = TIMELINE_STATE.getTrackClipNeighbors(partner.track, partnerBaseStart, ignored);
+            const pDeltaFromNeighbor = pNeighbors.prevEnd - partnerBaseStart;
+            minDeltaFromNeighbor = Math.max(minDeltaFromNeighbor, pDeltaFromNeighbor);
         }
-
-        const minDeltaFromNeighbor = minAllowedStart - baseStart;
 
         // Clamping à mídia interna (inFrame não pode ser menor que 0, ou subclip_in_frame com hard boundaries)
         const clipMinIn = (clip.hard_boundaries && clip.is_subclip && clip.subclip_in_frame !== undefined)
@@ -11106,7 +11123,7 @@ export class CapiauTimelineInteraction {
         const actualDelta = Math.min(maxDelta, Math.max(minDelta, deltaFrames));
 
         const targetIn = baseIn + actualDelta;
-        const targetStart = Math.max(minAllowedStart, baseStart + actualDelta);
+        const targetStart = Math.max(neighbors.prevEnd, baseStart + actualDelta);
 
         clip.inFrame = targetIn;
         clip.in = targetIn / fps;
@@ -11115,7 +11132,8 @@ export class CapiauTimelineInteraction {
 
         if (partner && partnerBaseIn !== null && partnerBaseStart !== null) {
             const partnerTargetIn = partnerBaseIn + actualDelta;
-            const partnerTargetStart = Math.max(0, partnerBaseStart + actualDelta);
+            const partnerMinStart = pNeighbors ? pNeighbors.prevEnd : 0;
+            const partnerTargetStart = Math.max(partnerMinStart, partnerBaseStart + actualDelta);
             partner.inFrame = partnerTargetIn;
             partner.in = partnerTargetIn / fps;
             partner.timelineStartFrame = partnerTargetStart;
@@ -11125,6 +11143,22 @@ export class CapiauTimelineInteraction {
             const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : partner;
             if (videoCut && audioCut) {
                 audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+            }
+        } else if (clip.link_id) {
+            // Trim independente com Alt (J/L Cut): parceiro permanece estático e syncOffset é recalculado
+            const other = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+            if (other) {
+                if (partnerBaseIn !== null && partnerBaseIn !== undefined && partnerBaseStart !== null && partnerBaseStart !== undefined) {
+                    other.inFrame = partnerBaseIn;
+                    other.in = other.inFrame / fps;
+                    other.timelineStartFrame = partnerBaseStart;
+                    other.timeline_start = partnerBaseStart / fps;
+                }
+                const videoCut = (TIMELINE_STATE.trackKindOf(clip.track) === "video") ? clip : other;
+                const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : other;
+                if (videoCut && audioCut) {
+                    audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+                }
             }
         }
 
@@ -11165,14 +11199,13 @@ export class CapiauTimelineInteraction {
 
         // Barreira física sólida contra vizinho posterior na pista (Bloqueio Físico NLE)
         const neighbors = TIMELINE_STATE.getTrackClipNeighbors(clip.track, initialEnd, ignored);
-        let maxAllowedEnd = neighbors.nextStart;
+        let maxDeltaFromNeighbor = neighbors.nextStart === Infinity ? Infinity : (neighbors.nextStart - initialEnd);
         if (partner && partnerBaseOut !== null && partnerBaseStart !== null) {
             const partnerInitialEnd = partnerBaseStart + (partnerBaseOut - partner.inFrame);
             const pNeighbors = TIMELINE_STATE.getTrackClipNeighbors(partner.track, partnerInitialEnd, ignored);
-            maxAllowedEnd = Math.min(maxAllowedEnd, pNeighbors.nextStart);
+            const pDeltaFromNeighbor = pNeighbors.nextStart === Infinity ? Infinity : (pNeighbors.nextStart - partnerInitialEnd);
+            maxDeltaFromNeighbor = Math.min(maxDeltaFromNeighbor, pDeltaFromNeighbor);
         }
-
-        const maxDeltaFromNeighbor = maxAllowedEnd === Infinity ? Infinity : (maxAllowedEnd - initialEnd);
 
         // Clamping à duração real da mídia física (impede estender além do arquivo repetindo frames ou áudio piscando)
         const clipMax = TIMELINE_STATE.getMaxMediaFrames(clip);
@@ -11207,6 +11240,20 @@ export class CapiauTimelineInteraction {
             const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : partner;
             if (videoCut && audioCut) {
                 audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+            }
+        } else if (clip.link_id) {
+            // Trim independente com Alt (J/L Cut): parceiro permanece estático e syncOffset é recalculado
+            const other = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+            if (other) {
+                if (partnerBaseOut !== null && partnerBaseOut !== undefined) {
+                    other.outFrame = partnerBaseOut;
+                    other.out = other.outFrame / fps;
+                }
+                const videoCut = (TIMELINE_STATE.trackKindOf(clip.track) === "video") ? clip : other;
+                const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : other;
+                if (videoCut && audioCut) {
+                    audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+                }
             }
         }
 
