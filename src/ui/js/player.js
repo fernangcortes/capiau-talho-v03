@@ -2927,6 +2927,11 @@ export class ProgramPlayer {
                 }
             }
 
+            // Acompanhamento da agulha de reprodução pela timeline (Playback Auto-Scroll)
+            if (typeof TIMELINE_STATE?.checkFollowPlayhead === "function") {
+                TIMELINE_STATE.checkFollowPlayhead(true);
+            }
+
             // Heartbeat de atividade do editor para o backend
             if (!this.lastHeartbeatTime || now - this.lastHeartbeatTime > 2000) {
                 this.lastHeartbeatTime = now;
@@ -2947,6 +2952,11 @@ export class ProgramPlayer {
         if (this.playRequest) {
             cancelAnimationFrame(this.playRequest);
             this.playRequest = null;
+        }
+
+        // Arredonda o scroll horizontal ao pausar para manter pixels nítidos
+        if (TIMELINE_STATE && typeof TIMELINE_STATE.setScrollLeftFrame === "function") {
+            TIMELINE_STATE.setScrollLeftFrame(Math.round(TIMELINE_STATE.scrollLeftFrame));
         }
 
         const btnPlay = this.el("btn-program-play");

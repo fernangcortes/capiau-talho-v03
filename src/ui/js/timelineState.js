@@ -260,6 +260,87 @@ export class CapiauTimelineState {
         // Modo de Colisão e Movimentação na Mesma Pista (Task 3.5):
         // "clamp" (Bloqueio Físico rígido - Padrão), "overwrite" (Sobrescrita / Shift), "ripple" (Inserção Magnética / Ctrl)
         this._dragCollisionMode = this.loadDragCollisionMode();
+
+        // Linha do Tempo Segue a Agulha (Playback Auto-Scroll):
+        // Ativo por padrão (padrão NLE profissional). Modos: "page" (padrão NLE) ou "smooth" (suave/centralizado com ease)
+        this.followPlayhead = this.loadFollowPlayhead();
+        this.followPlayheadMode = this.loadFollowPlayheadMode();
+        this.smoothScrollAnchor = this.loadSmoothScrollAnchor(); // Âncora de 30% a 70% (padrão 50%)
+    }
+
+    /** Carrega a preferência de 'Timeline Segue a Agulha' do localStorage (default: true). */
+    loadFollowPlayhead() {
+        try {
+            if (typeof localStorage !== "undefined") {
+                const saved = localStorage.getItem("capiau_timeline_follow_playhead");
+                if (saved !== null) return saved === "true";
+            }
+        } catch (_) {}
+        return true;
+    }
+
+    /** Carrega o modo de rolagem da timeline do localStorage (default: 'page'). */
+    loadFollowPlayheadMode() {
+        try {
+            if (typeof localStorage !== "undefined") {
+                const saved = localStorage.getItem("capiau_timeline_follow_playhead_mode");
+                if (saved && ["page", "smooth"].includes(saved)) return saved;
+            }
+        } catch (_) {}
+        return "page";
+    }
+
+    /** Carrega o percentual de âncora da agulha para o modo suave (default: 0.5 [50%]). */
+    loadSmoothScrollAnchor() {
+        try {
+            if (typeof localStorage !== "undefined") {
+                const saved = localStorage.getItem("capiau_timeline_smooth_anchor");
+                if (saved !== null) {
+                    const num = parseFloat(saved);
+                    if (Number.isFinite(num)) {
+                        return Math.max(0.3, Math.min(0.7, num));
+                    }
+                }
+            }
+        } catch (_) {}
+        return 0.5;
+    }
+
+    /** Alterna ou define a rolagem automática acompanhando a agulha. */
+    toggleFollowPlayhead(enabled) {
+        this.followPlayhead = (enabled !== undefined) ? !!enabled : !this.followPlayhead;
+        try {
+            if (typeof localStorage !== "undefined") {
+                localStorage.setItem("capiau_timeline_follow_playhead", String(this.followPlayhead));
+            }
+        } catch (_) {}
+        STATE.emit("timelineFollowPlayheadChanged", this.followPlayhead);
+        return this.followPlayhead;
+    }
+
+    /** Define o modo de rolagem da timeline ('page' ou 'smooth'). */
+    setFollowPlayheadMode(mode) {
+        if (!["page", "smooth"].includes(mode)) return;
+        this.followPlayheadMode = mode;
+        try {
+            if (typeof localStorage !== "undefined") {
+                localStorage.setItem("capiau_timeline_follow_playhead_mode", mode);
+            }
+        } catch (_) {}
+        STATE.emit("timelineFollowPlayheadModeChanged", mode);
+    }
+
+    /** Define a posição de ancoragem (0.3 a 0.7) da agulha no modo suave. */
+    setSmoothScrollAnchor(fraction) {
+        const num = typeof fraction === "number" ? fraction : parseFloat(fraction);
+        if (!Number.isFinite(num)) return;
+        this.smoothScrollAnchor = Math.max(0.3, Math.min(0.7, num));
+        try {
+            if (typeof localStorage !== "undefined") {
+                localStorage.setItem("capiau_timeline_smooth_anchor", String(this.smoothScrollAnchor));
+            }
+        } catch (_) {}
+        STATE.emit("timelineSmoothAnchorChanged", this.smoothScrollAnchor);
     }
 
     /** Carrega a preferência de modo de colisão do localStorage (default: 'clamp'). */
@@ -2728,11 +2809,120 @@ export class CapiauTimelineState {
     }
 
     /**
-     * Define o scroll horizontal em frames.
+     * Retorna a largura útil da viewport visível da timeline em pixels (CSS pixels).
+     */
+    getViewportWidth() {
+        let vw = 0;
+        if (typeof window !== "undefined") {
+            vw = window.timelineRenderer?.width || window.timelineInteraction?.canvas?.clientWidth || this.lastViewportWidth || 0;
+        }
+        return (typeof vw === "number" && vw > 0) ? vw : 1000;
+    }
+
+    /**
+     * Define o scroll horizontal em frames (suporta decimais para interpolação suave em 60fps).
      */
     setScrollLeftFrame(val) {
-        this.scrollLeftFrame = Math.max(0, Math.round(val));
+        const target = typeof val === "number" ? Math.max(0, val) : 0;
+        if (Math.abs(this.scrollLeftFrame - target) < 0.0001) return;
+        this.scrollLeftFrame = target;
         STATE.emit("timelineScrollChanged", this.scrollLeftFrame);
+    }
+
+    /**
+     * Verifica e rola a timeline para acompanhar a agulha de reprodução.
+     * Suporta 'page' (padrão NLE com margem de 5%) e 'smooth' (interpolação ease na âncora configurável).
+     * @param {boolean} [isPlayback=false] Se está sendo chamado dentro do loop ativo de reprodução
+     * @returns {boolean} True se a timeline foi rolada
+     */
+    checkFollowPlayhead(isPlayback = false) {
+        if (!this.followPlayhead) return false;
+
+        const vw = this.getViewportWidth();
+        const zoom = Math.max(0.0001, this.zoom || 0.5);
+        const visibleFrames = vw / zoom;
+        const scrollLeft = this.scrollLeftFrame;
+        const playhead = this.playheadFrame;
+        const totalDuration = this.getDurationFrames();
+
+        // Se a timeline inteira couber perfeitamente na viewport sem scroll, nada a fazer
+        if (totalDuration <= visibleFrames && scrollLeft === 0 && playhead <= visibleFrames) {
+            return false;
+        }
+
+        if (this.followPlayheadMode === "page") {
+            const rightEdge = scrollLeft + visibleFrames;
+            // Avanço para frente: playhead atingiu ou ultrapassou a margem direita visível
+            if (playhead >= rightEdge) {
+                // Posiciona a agulha com margem de segurança visual de 5% no início da nova página
+                const leadIn = Math.max(0, Math.round(visibleFrames * 0.05));
+                const newScroll = Math.max(0, Math.round(playhead - leadIn));
+                this.setScrollLeftFrame(newScroll);
+                return true;
+            }
+            // Retrocesso (ex: J-K-L reverso): playhead retrocedeu antes da margem esquerda visível
+            if (playhead < scrollLeft) {
+                // Posiciona a agulha próxima à margem direita da página anterior (95%)
+                const newScroll = Math.max(0, Math.round(playhead - visibleFrames * 0.95));
+                this.setScrollLeftFrame(newScroll);
+                return true;
+            }
+        } else if (this.followPlayheadMode === "smooth") {
+            const anchor = Math.max(0.3, Math.min(0.7, this.smoothScrollAnchor || 0.5));
+            const anchorFrames = visibleFrames * anchor;
+            const targetScroll = Math.max(0, playhead - anchorFrames);
+
+            // Se o playhead ainda estiver antes da âncora e o scroll estiver no início, não rola
+            if (playhead < anchorFrames && scrollLeft === 0) {
+                return false;
+            }
+
+            const diff = targetScroll - scrollLeft;
+            if (Math.abs(diff) > 0.01) {
+                // Interpolação suave com amortecimento exponencial (lerp / ease)
+                const easeFactor = isPlayback ? 0.20 : 0.40;
+                const nextScroll = scrollLeft + (diff * easeFactor);
+                this.setScrollLeftFrame(nextScroll);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Ajusta interativamente a âncora do modo suave e posiciona a agulha na tela
+     * para fornecer feedback visual instantâneo durante o arraste do slider.
+     * @param {number} fraction Posição fracionária (0.3 a 0.7)
+     */
+    previewSmoothScrollAnchor(fraction) {
+        const anchor = Math.max(0.3, Math.min(0.7, fraction));
+        this.setSmoothScrollAnchor(anchor);
+
+        const vw = this.getViewportWidth();
+        const zoom = Math.max(0.0001, this.zoom || 0.5);
+        const visibleFrames = vw / zoom;
+        const scrollLeft = this.scrollLeftFrame;
+
+        // Posiciona a agulha exatamente na linha da âncora na viewport atual
+        const targetFrame = Math.max(0, Math.round(scrollLeft + (visibleFrames * anchor)));
+        this.setPlayheadFrame(targetFrame);
+    }
+
+    /**
+     * Rola imediatamente a visualização da timeline para enquadrar a agulha.
+     * @param {"center"|"left"|"right"} [align="center"] Alinhamento desejado na tela
+     */
+    scrollToPlayhead(align = "center") {
+        const vw = this.getViewportWidth();
+        const zoom = Math.max(0.0001, this.zoom || 0.5);
+        const visibleFrames = vw / zoom;
+        let offsetFraction = 0.5;
+        if (align === "left") offsetFraction = 0.05;
+        else if (align === "right") offsetFraction = 0.95;
+
+        const newScroll = Math.max(0, Math.round(this.playheadFrame - (visibleFrames * offsetFraction)));
+        this.setScrollLeftFrame(newScroll);
     }
 
     /**

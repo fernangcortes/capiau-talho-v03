@@ -498,6 +498,12 @@ export const COMMANDS_CATALOG = [
         description: "Ativa ou desativa a seleção automática do clipe sob a agulha ao se mover"
     },
     {
+        id: "timeline.toggle_follow_playhead",
+        category: "canvas_history",
+        label: "Alternar 'Timeline Segue a Agulha' (Auto-Scroll)",
+        description: "Ativa ou desativa a rolagem automática da timeline para acompanhar o cursor de reprodução"
+    },
+    {
         id: "history.undo",
         category: "canvas_history",
         label: "Desfazer Ação (Undo)",
@@ -811,6 +817,7 @@ export const KEYMAP_PRESETS = {
         "timeline.zoom_out": ["Minus", "NumpadSubtract"],
         "timeline.zoom_reset": ["Ctrl+Digit1"],
         "timeline.toggle_selection_follows_playhead": ["Ctrl+Alt+KeyP"],
+        "timeline.toggle_follow_playhead": ["Ctrl+Alt+KeyF"],
 
         // Layout & Workspace (Numpad & Slots)
         "workspace.numpad_1": ["Numpad1"],

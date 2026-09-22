@@ -1235,6 +1235,14 @@
                                         <rect x="4" y="9" width="16" height="8" rx="1.5" stroke-dasharray="2 2"></rect>
                                     </svg>
                                 </button>
+                                <button id="btn-timeline-follow-playhead" class="btn-toolbar-action active" data-tooltip="Timeline Segue a Agulha: ATIVADA (Ctrl+Alt+F)">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+                                        <line x1="5" y1="2" x2="5" y2="22"></line>
+                                        <polygon points="2,2 8,2 5,6" fill="currentColor"></polygon>
+                                        <polyline points="10 18 16 12 10 6"></polyline>
+                                        <polyline points="15 18 21 12 15 6"></polyline>
+                                    </svg>
+                                </button>
 
                                 <div class="toolbar-divider"></div>
 
@@ -3441,6 +3449,23 @@
         <div class="view-options-title">
             <i class="fa-solid fa-eye"></i>
             <span>Opções de Visualização</span>
+        </div>
+        <label>
+            <input type="checkbox" id="chk-timeline-follow-playhead" checked> Seguir Agulha (Auto-Scroll)
+        </label>
+        <div class="view-options-select-group" id="group-timeline-scroll-mode">
+            <span>Modo de Rolagem:</span>
+            <select id="select-timeline-scroll-mode" class="nle-select">
+                <option value="page">Por Página (Page Scroll - Padrão)</option>
+                <option value="smooth">Suave / Contínuo (Smooth Scroll)</option>
+            </select>
+        </div>
+        <div class="view-options-slider-group" id="group-timeline-smooth-anchor" style="display: none; flex-direction: column; gap: 4px; padding: 4px 0 6px 0; border-bottom: 1px solid var(--border-glass);">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                <span style="color: var(--text-secondary);">Âncora da Agulha (Suave):</span>
+                <span id="label-smooth-anchor-pct" style="color: var(--color-cyan); font-weight: 600; font-family: monospace;">50%</span>
+            </div>
+            <input type="range" id="slider-timeline-smooth-anchor" min="30" max="70" step="1" value="50" style="width: 100%; accent-color: var(--color-cyan); cursor: pointer;">
         </div>
         <label>
             <input type="checkbox" id="chk-timeline-hover-preview" checked> Ativar Hover Preview

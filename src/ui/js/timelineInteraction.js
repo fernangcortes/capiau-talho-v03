@@ -5510,6 +5510,31 @@ export class CapiauTimelineInteraction {
                 refocusTimeline(btnFollow);
             };
         }
+
+        const btnFollowPlayhead = doc.getElementById("btn-timeline-follow-playhead");
+        const updateFollowPlayheadButton = () => {
+            if (btnFollowPlayhead) {
+                const active = !!TIMELINE_STATE.followPlayhead;
+                btnFollowPlayhead.classList.toggle("active", active);
+                btnFollowPlayhead.setAttribute("data-tooltip", active 
+                    ? "Timeline Segue a Agulha: ATIVADA (Ctrl+Alt+F)" 
+                    : "Timeline Segue a Agulha: DESATIVADA (Ctrl+Alt+F)");
+            }
+        };
+        this.updateFollowPlayheadButton = updateFollowPlayheadButton;
+        updateFollowPlayheadButton();
+        if (btnFollowPlayhead && !btnFollowPlayhead.__capiauBound) {
+            btnFollowPlayhead.__capiauBound = true;
+            btnFollowPlayhead.onclick = () => {
+                const enabled = TIMELINE_STATE.toggleFollowPlayhead();
+                updateFollowPlayheadButton();
+                if (typeof window.showToast === "function") {
+                    window.showToast(enabled ? "Timeline Segue a Agulha: Ativada" : "Timeline Segue a Agulha: Desativada", "info");
+                }
+                refocusTimeline(btnFollowPlayhead);
+            };
+        }
+        STATE.on("timelineFollowPlayheadChanged", () => updateFollowPlayheadButton());
         if (toolButtons["blade"] && !toolButtons["blade"].__capiauToolBound) {
             toolButtons["blade"].__capiauToolBound = true;
             toolButtons["blade"].onclick = () => {
@@ -10445,6 +10470,19 @@ export class CapiauTimelineInteraction {
             }
             if (this.renderer) this.renderer.requestRedraw();
             this.refreshClipInspector();
+            e.preventDefault();
+            return;
+        }
+
+        // Alternar 'Timeline Follows Playhead' (Auto-Scroll)
+        if (KEYMAP_SERVICE.matches(e, "timeline.toggle_follow_playhead")) {
+            const active = TIMELINE_STATE.toggleFollowPlayhead();
+            if (typeof this.updateFollowPlayheadButton === "function") {
+                this.updateFollowPlayheadButton();
+            }
+            if (typeof window.showToast === "function") {
+                window.showToast(active ? "Timeline Segue a Agulha: Ativada" : "Timeline Segue a Agulha: Desativada", "info");
+            }
             e.preventDefault();
             return;
         }

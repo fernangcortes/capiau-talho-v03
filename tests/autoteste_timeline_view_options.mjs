@@ -29,6 +29,9 @@ assert.ok(dropdownMatch, "#timeline-view-options-dropdown deve existir em index.
 const dropdownHTML = dropdownMatch[0];
 
 const expectedControls = [
+    "chk-timeline-follow-playhead",
+    "select-timeline-scroll-mode",
+    "slider-timeline-smooth-anchor",
     "chk-timeline-hover-preview",
     "chk-timeline-mute-hidden",
     "chk-timeline-toolbar-top",

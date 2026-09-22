@@ -2350,6 +2350,71 @@ window.addEventListener("DOMContentLoaded", () => {
         window.closeTimelineViewOptions = closeViewOptions;
 
         // Configura estados iniciais no DOM a partir de TIMELINE_STATE
+        const chkFollow = document.getElementById("chk-timeline-follow-playhead");
+        const selectScrollMode = document.getElementById("select-timeline-scroll-mode");
+        const groupSmoothAnchor = document.getElementById("group-timeline-smooth-anchor");
+        const sliderSmoothAnchor = document.getElementById("slider-timeline-smooth-anchor");
+        const labelSmoothAnchor = document.getElementById("label-smooth-anchor-pct");
+
+        const updateSmoothAnchorVisibility = () => {
+            const isFollow = chkFollow ? chkFollow.checked : !!TIMELINE_STATE.followPlayhead;
+            const isSmooth = (selectScrollMode ? selectScrollMode.value : TIMELINE_STATE.followPlayheadMode) === "smooth";
+            if (groupSmoothAnchor) {
+                groupSmoothAnchor.style.display = (isFollow && isSmooth) ? "flex" : "none";
+            }
+        };
+
+        if (chkFollow) {
+            chkFollow.checked = !!TIMELINE_STATE.followPlayhead;
+            chkFollow.addEventListener("change", (e) => {
+                TIMELINE_STATE.toggleFollowPlayhead(e.target.checked);
+                updateSmoothAnchorVisibility();
+                if (window.timelineInteraction && typeof window.timelineInteraction.updateFollowPlayheadButton === "function") {
+                    window.timelineInteraction.updateFollowPlayheadButton();
+                }
+                syncDropdownReposition();
+            });
+        }
+
+        if (selectScrollMode) {
+            selectScrollMode.value = TIMELINE_STATE.followPlayheadMode || "page";
+            selectScrollMode.addEventListener("change", (e) => {
+                TIMELINE_STATE.setFollowPlayheadMode(e.target.value);
+                updateSmoothAnchorVisibility();
+                syncDropdownReposition();
+            });
+        }
+
+        if (sliderSmoothAnchor) {
+            const initialAnchorPct = Math.round((TIMELINE_STATE.smoothScrollAnchor || 0.5) * 100);
+            sliderSmoothAnchor.value = initialAnchorPct;
+            if (labelSmoothAnchor) labelSmoothAnchor.textContent = `${initialAnchorPct}%`;
+
+            sliderSmoothAnchor.addEventListener("input", (e) => {
+                const val = parseInt(e.target.value, 10);
+                if (labelSmoothAnchor) labelSmoothAnchor.textContent = `${val}%`;
+                // Preview dinâmico imediato: reposiciona a agulha na posição exata da viewport
+                TIMELINE_STATE.previewSmoothScrollAnchor(val / 100);
+            });
+        }
+
+        updateSmoothAnchorVisibility();
+
+        // Ouvintes reativos para atualizações externas (atalhos de teclado ou botões de toolbar)
+        STATE.on("timelineFollowPlayheadChanged", (enabled) => {
+            if (chkFollow) chkFollow.checked = !!enabled;
+            updateSmoothAnchorVisibility();
+        });
+        STATE.on("timelineFollowPlayheadModeChanged", (mode) => {
+            if (selectScrollMode) selectScrollMode.value = mode;
+            updateSmoothAnchorVisibility();
+        });
+        STATE.on("timelineSmoothAnchorChanged", (anchor) => {
+            const pct = Math.round(anchor * 100);
+            if (sliderSmoothAnchor) sliderSmoothAnchor.value = pct;
+            if (labelSmoothAnchor) labelSmoothAnchor.textContent = `${pct}%`;
+        });
+
         const chkHover = document.getElementById("chk-timeline-hover-preview");
         if (chkHover) {
             chkHover.checked = !!TIMELINE_STATE.hoverPreviewEnabled;

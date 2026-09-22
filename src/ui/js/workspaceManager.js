@@ -2861,6 +2861,9 @@ export class WorkspaceManager {
                 previewPanX: ts.previewPanX,
                 previewPanY: ts.previewPanY,
                 hoverPreviewEnabled: ts.hoverPreviewEnabled,
+                followPlayhead: ts.followPlayhead,
+                followPlayheadMode: ts.followPlayheadMode,
+                smoothScrollAnchor: ts.smoothScrollAnchor,
                 thumbnailMode: ts.thumbnailMode || (ts.globalThumbnailsInterval === 0 ? "none" : "continuous"),
                 globalThumbnailsInterval: ts.globalThumbnailsInterval,
                 muteHiddenTracksPlayback: ts.muteHiddenTracksPlayback,
@@ -3255,6 +3258,26 @@ export class WorkspaceManager {
                     ts.toggleHoverPreview(td.hoverPreviewEnabled);
                     const chkHover = document.getElementById("chk-timeline-hover-preview");
                     if (chkHover) chkHover.checked = !!td.hoverPreviewEnabled;
+                }
+                if (td.followPlayhead !== undefined) {
+                    ts.toggleFollowPlayhead(td.followPlayhead);
+                    const chkFollow = document.getElementById("chk-timeline-follow-playhead");
+                    if (chkFollow) chkFollow.checked = !!td.followPlayhead;
+                    if (window.timelineInteraction && typeof window.timelineInteraction.updateFollowPlayheadButton === "function") {
+                        window.timelineInteraction.updateFollowPlayheadButton();
+                    }
+                }
+                if (td.followPlayheadMode !== undefined) {
+                    ts.setFollowPlayheadMode(td.followPlayheadMode);
+                    const selMode = document.getElementById("select-timeline-scroll-mode");
+                    if (selMode) selMode.value = td.followPlayheadMode;
+                }
+                if (td.smoothScrollAnchor !== undefined) {
+                    ts.setSmoothScrollAnchor(td.smoothScrollAnchor);
+                    const sAnchor = document.getElementById("slider-timeline-smooth-anchor");
+                    const lAnchor = document.getElementById("label-smooth-anchor-pct");
+                    if (sAnchor) sAnchor.value = Math.round(td.smoothScrollAnchor * 100);
+                    if (lAnchor) lAnchor.textContent = `${Math.round(td.smoothScrollAnchor * 100)}%`;
                 }
                 if (td.thumbnailMode !== undefined) {
                     ts.setGlobalThumbnailMode(td.thumbnailMode);
