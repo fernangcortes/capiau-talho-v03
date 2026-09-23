@@ -31,7 +31,11 @@ const domRegistry = {};
 function makeEl(id) {
     const el = {
         id: id || "",
-        style: {},
+        style: {
+            getPropertyValue(k) { return this[k] || null; },
+            setProperty(k, v) { this[k] = String(v); },
+            removeProperty(k) { delete this[k]; }
+        },
         innerHTML: "",
         textContent: "",
         value: "",
@@ -55,7 +59,11 @@ function makeEl(id) {
         querySelector: () => null,
         querySelectorAll: () => [],
         focus() {},
-        select() {}
+        select() {},
+        pause() {},
+        play() { return Promise.resolve(); },
+        load() {},
+        removeAttribute(k) { delete el[k]; }
     };
     return el;
 }
@@ -445,6 +453,46 @@ test("Ciclo de Vida Reativo Imediato: Playback e Pré-carregamento sem F5", asyn
     // Exclusão também sincroniza
     deleteSubclip(sub.id, 99);
     assert.ok(!mockState.allVideos.some(v => v.id === sub.id), "STATE.allVideos removeu o subclipe imediatamente em memória");
+});
+
+test("Hover preview e loop em subclipes da biblioteca resolvem parent_video_id e respeitam in/out boundaries", async () => {
+    const { GalleryInteractionController } = await import(`../src/ui/js/library.js?ts=${Date.now()}_hover`);
+    assert.ok(GalleryInteractionController, "GalleryInteractionController deve estar exportado");
+
+    const ctrl = new GalleryInteractionController();
+
+    const mockSubclip = {
+        id: "subclip_1790021166886_775",
+        parent_video_id: 42,
+        is_subclip: true,
+        is_virtual: true,
+        in: 25.5,
+        out: 32.0,
+        duration: 6.5
+    };
+
+    // 1. getTargetStart deve retornar in (25.5s) e não 0 nem 10%
+    const targetStart = ctrl.getTargetStart(mockSubclip);
+    assert.strictEqual(targetStart, 25.5, "getTargetStart deve retornar o ponto de início (in) do subclipe");
+
+    // 2. getEffectiveStart deve respeitar o início do subclipe
+    const effStart = ctrl.getEffectiveStart(mockSubclip, 3.5);
+    assert.strictEqual(effStart, 25.5, "getEffectiveStart deve retornar 25.5s para o início do subclipe");
+
+    // 3. startHoverVideo deve compor a URL usando parent_video_id (42) e não subclip_...
+    const itemEl = makeEl("mock-subclip-card");
+    itemEl._mediaData = mockSubclip;
+    itemEl._mediaKind = "video";
+    itemEl._hoverLoopDur = 3.5;
+
+    ctrl.activeItem = itemEl;
+    ctrl.startHoverVideo(itemEl);
+
+    assert.ok(ctrl.hoverVideo, "hoverVideo singleton deve ter sido inicializado");
+    assert.ok(ctrl.hoverVideo.src.includes("/api/video/42/stream"), `src do hoverVideo deve apontar para /api/video/42/stream e não para subclip_, src atual: ${ctrl.hoverVideo.src}`);
+    assert.ok(!ctrl.hoverVideo.src.includes("subclip_"), "src não pode conter subclip_ id para evitar erro 422");
+
+    ctrl.stopAllHover();
 });
 
 let passed = 0;

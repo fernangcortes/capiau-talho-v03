@@ -1257,14 +1257,19 @@ def delete_photo(photo_id: int, conn: sqlite3.Connection = Depends(get_db_conn))
 
 
 @router.get("/api/video/{video_id}/stream")
-def stream_video(video_id: int, conn: sqlite3.Connection = Depends(get_db_conn)):
+def stream_video(video_id: str, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Retorna o arquivo de vídeo original ou proxy para streaming no player/card."""
     from fastapi.responses import FileResponse
-    video = MediaRepository.get_video(conn, video_id)
+    try:
+        vid_int = int(video_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail=f"ID de vídeo inválido: {video_id}")
+
+    video = MediaRepository.get_video(conn, vid_int)
     if not video:
         raise HTTPException(status_code=404, detail="Vídeo não encontrado.")
     
-    proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{video_id}.mp4"
+    proxy_path = CONFIG.PROXIES_DIR / f"proxy_vid_{vid_int}.mp4"
     if proxy_path.exists():
         return FileResponse(proxy_path, media_type="video/mp4")
         

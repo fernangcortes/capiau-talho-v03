@@ -4993,6 +4993,21 @@ export class GalleryInteractionController {
                 const v = this.activeItem._mediaData;
                 const start = this.activeItem._effectiveHoverStart ?? (this.activeItem._crucialStart || 0);
                 const dur = this.activeItem._hoverLoopDur || 3.5;
+
+                if (v.is_subclip) {
+                    const subIn = Number(v.in || 0);
+                    const subOut = (v.out !== undefined && v.out !== null) ? Number(v.out) : (subIn + (v.duration || 5));
+                    const loopEnd = (dur === "end") ? subOut : Math.min(start + dur, subOut);
+                    if (vid.currentTime >= loopEnd - 0.05 || vid.currentTime < start - 0.25) {
+                        vid.currentTime = start;
+                        if (vid.paused) vid.play().catch(() => {});
+                    }
+                    if (this.activeItem && vid.style.opacity === "0" && !vid.paused) {
+                        vid.style.opacity = "1";
+                    }
+                    return;
+                }
+
                 const maxTime = (v.duration && v.duration > 0) ? v.duration : 5;
 
                 if (dur === "end") {
@@ -5007,12 +5022,16 @@ export class GalleryInteractionController {
                         if (vid.paused) vid.play().catch(() => {});
                     }
                 }
+                if (this.activeItem && vid.style.opacity === "0" && !vid.paused) {
+                    vid.style.opacity = "1";
+                }
             };
 
             vid.addEventListener("timeupdate", handleLoopReset);
             vid.addEventListener("ended", () => {
                 if (!this.activeItem || !this.activeItem._mediaData) return;
-                const start = this.activeItem._effectiveHoverStart ?? (this.activeItem._crucialStart || 0);
+                const v = this.activeItem._mediaData;
+                const start = this.activeItem._effectiveHoverStart ?? (this.activeItem._crucialStart ?? (v.is_subclip ? Number(v.in || 0) : 0));
                 vid.currentTime = start;
                 if (vid.paused) vid.play().catch(() => {});
             });
@@ -5254,6 +5273,13 @@ export class GalleryInteractionController {
 
     getTargetStart(mediaData) {
         if (!mediaData) return 0;
+        if (mediaData.is_subclip) {
+            const subIn = Number(mediaData.in || 0);
+            if (mediaData.thumbnail_time !== null && mediaData.thumbnail_time !== undefined && !isNaN(mediaData.thumbnail_time)) {
+                return parseFloat(mediaData.thumbnail_time);
+            }
+            return subIn;
+        }
         if (mediaData.thumbnail_time !== null && mediaData.thumbnail_time !== undefined && !isNaN(mediaData.thumbnail_time)) {
             return parseFloat(mediaData.thumbnail_time);
         }
@@ -5268,6 +5294,15 @@ export class GalleryInteractionController {
     }
 
     getEffectiveStart(mediaData, loopDuration) {
+        if (mediaData?.is_subclip) {
+            const subIn = Number(mediaData.in || 0);
+            const subOut = (mediaData.out !== undefined && mediaData.out !== null) ? Number(mediaData.out) : (subIn + (mediaData.duration || 5));
+            const targetStart = this.getTargetStart(mediaData);
+            if (loopDuration !== "end" && (subOut - targetStart) < loopDuration) {
+                return Math.max(subIn, subOut - loopDuration);
+            }
+            return targetStart;
+        }
         const targetStart = this.getTargetStart(mediaData);
         const duration = mediaData?.duration || 0;
         if (loopDuration !== "end" && (duration - targetStart) < loopDuration) {
@@ -5407,12 +5442,29 @@ export class GalleryInteractionController {
         };
         this.hoverVideo.onplaying = onFrameReady;
         this.hoverVideo.onseeked = () => {
-            if (this.activeItem === itemEl && !this.hoverVideo.paused) {
+            if (this.activeItem === itemEl) {
                 this.hoverVideo.style.opacity = "1";
             }
         };
 
-        const streamUrl = `/api/video/${v.id}/stream`;
+        let streamVidId = v.parent_video_id || v.id;
+        if (String(streamVidId).startsWith("subclip_")) {
+            const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
+            const foundSub = subclips.find(s => String(s.id) === String(streamVidId));
+            if (foundSub && foundSub.parent_video_id) {
+                streamVidId = foundSub.parent_video_id;
+            }
+        }
+
+        let proxyPath = (v.proxy_path && (v.proxy_path.startsWith("/") || v.proxy_path.startsWith("http"))) ? v.proxy_path : null;
+        if (!proxyPath && v.is_subclip && window.STATE?.allVideos) {
+            const parentVid = window.STATE.allVideos.find(x => String(x.id) === String(streamVidId));
+            if (parentVid?.proxy_path && (parentVid.proxy_path.startsWith("/") || parentVid.proxy_path.startsWith("http"))) {
+                proxyPath = parentVid.proxy_path;
+            }
+        }
+        const streamUrl = proxyPath || `/api/video/${streamVidId}/stream`;
+
         const currentSrc = this.hoverVideo.getAttribute("src") || this.hoverVideo.src;
         const isSameSource = currentSrc && (currentSrc.endsWith(streamUrl) || currentSrc === streamUrl);
 
