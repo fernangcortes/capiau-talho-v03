@@ -207,7 +207,7 @@ class AppState extends EventEmitter {
                 // Mantém a chave em segundos sincronizada (evita valor obsoleto após drags)
                 timeline_start: Math.max(0, Math.round(timelineStartFrame)) / timelineFps,
                 link_id: cut.link_id || null,
-                syncOffset: typeof cut.syncOffset === "number" ? cut.syncOffset : 0
+                syncOffset: typeof cut.syncOffset === "number" ? cut.syncOffset : null
             };
         });
 
@@ -224,7 +224,15 @@ class AppState extends EventEmitter {
             if (!c.link_id || kindOf(c.track) !== "audio") return;
             const v = videoByLink[c.link_id];
             if (!v) return;
-            const syncOffset = typeof c.syncOffset === "number" ? c.syncOffset : 0;
+            let syncOffset = typeof c.syncOffset === "number" ? c.syncOffset : null;
+            if (syncOffset === null) {
+                if (c.timelineStartFrame !== undefined && c.timelineStartFrame !== null) {
+                    syncOffset = (c.timelineStartFrame - c.inFrame) - (v.timelineStartFrame - v.inFrame);
+                } else {
+                    syncOffset = 0;
+                }
+            }
+            c.syncOffset = syncOffset;
             let start = v.timelineStartFrame - v.inFrame + c.inFrame + syncOffset;
             if (start < 0) {
                 // Não existe timeline antes do 0: encurta a extensão do áudio
@@ -244,14 +252,21 @@ class AppState extends EventEmitter {
                     }
                 }
             });
+
+            // Se o áudio já possui timelineStartFrame explícito e não invade o clipe anterior:
+            if (typeof c.timelineStartFrame === "number" && !isNaN(c.timelineStartFrame) && c.timelineStartFrame >= prevEnd) {
+                c.timeline_start = c.timelineStartFrame / timelineFps;
+                return;
+            }
+
             if (start < prevEnd) {
                 const shortfall = prevEnd - start;
                 start = prevEnd;
-                // VÍDEO VINCULADO NÃO DEVE DESSINCRONIZAR:
-                // Se o áudio precisou travar em prevEnd, o vídeo par vinculado deve acompanhar
-                // a mesma barreira para que a sincronia A/V não se perca.
-                v.timelineStartFrame = Math.max(v.timelineStartFrame || 0, (v.timelineStartFrame || 0) + shortfall);
-                v.timeline_start = v.timelineStartFrame / timelineFps;
+                // VÍDEO VINCULADO NÃO DEVE DESSINCRONIZAR se não houver syncOffset intencional:
+                if (!c.syncOffset) {
+                    v.timelineStartFrame = Math.max(v.timelineStartFrame || 0, (v.timelineStartFrame || 0) + shortfall);
+                    v.timeline_start = v.timelineStartFrame / timelineFps;
+                }
             }
             c.timelineStartFrame = start;
             c.timeline_start = start / timelineFps;

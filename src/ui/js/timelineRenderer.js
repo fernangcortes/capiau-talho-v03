@@ -1,7 +1,7 @@
 // Renderizador de Alta Performance via Canvas (CapIAu-Talho)
 // v2: Multipista dinâmica com pista de IA, scroll vertical e cores por pista.
 import { STATE } from "./state.js";
-import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode, evaluateFadeCurve } from "./timelineState.js";
+import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode, evaluateFadeCurve, getClipSyncStatus } from "./timelineState.js";
 import { WaveformManager } from "./waveformManager.js";
 import { getAllKeyframeTimelineFrames } from "./keyframeEngine.js";
 
@@ -113,6 +113,7 @@ export class CapiauTimelineRenderer {
         this.marqueeBox = null; // Caixa translúcida de seleção por retângulo: { x, y, width, height }
         this.highlightedMatchClipIds = new Set(); // IDs de clipes em destaque temporário de Match Frame
         this._matchFlashTimer = null;
+        this.syncBadgeRects = new Map(); // Mapa de retângulos dos badges de sincronia A/V (clipId -> rect)
         this.init();
     }
 
@@ -1281,6 +1282,9 @@ export class CapiauTimelineRenderer {
         lanes.forEach(l => { laneMap[l.track.id] = l; });
         const fallbackLane = lanes.find(l => l.track.kind === "video");
 
+        // Limpa retângulos de badges da renderização anterior
+        if (this.syncBadgeRects) this.syncBadgeRects.clear();
+
         // Par A/V do clipe selecionado (recebe destaque tracejado)
         const selectedCut = cuts.find(c => c.id === TIMELINE_STATE.selectedClipId);
         const selectedLink = selectedCut ? selectedCut.link_id : null;
@@ -1555,6 +1559,9 @@ export class CapiauTimelineRenderer {
 
             // Desenho dos Fades In / Out, curvas e manipuladores
             this.drawClipFades(cut, startX, clipY, width, clipHeight, laneKind);
+
+            // Indicador sutil de fora de sincronia (+1, -1 quadros) estilo NLE
+            this.drawClipSyncBadge(ctx, cut, startX, clipY, width, clipHeight, laneKind);
         });
     }
 
@@ -2250,6 +2257,129 @@ export class CapiauTimelineRenderer {
             w: Math.max(duration * zoom, 20),
             h: lane.height
         };
+    }
+
+    /**
+     * Desenha o indicador sutil de quadros fora de sincronia A/V (+1, -1, etc.)
+     * conforme padrão visual de NLEs profissionais (Premiere Pro, DaVinci Resolve).
+     */
+    drawClipSyncBadge(ctx, cut, startX, clipY, width, clipHeight, laneKind) {
+        if (cut && cut._syncBadgeRect !== undefined) delete cut._syncBadgeRect;
+        if (!cut || !cut.link_id || width < 18 || clipHeight < 18) {
+            if (this.syncBadgeRects && cut) this.syncBadgeRects.delete(cut.id);
+            return;
+        }
+
+        const sync = getClipSyncStatus(cut, STATE.activeTimelineCuts);
+        if (!sync) {
+            if (this.syncBadgeRects && cut) this.syncBadgeRects.delete(cut.id);
+            return;
+        }
+
+        ctx.save();
+
+        const badgeText = sync.text; // ex: "+1", "-1", "+12", "-12"
+        ctx.font = "bold 9px 'Outfit', 'Inter', monospace";
+        const textMetrics = ctx.measureText(badgeText);
+        const textW = textMetrics.width;
+
+        const showIcon = width >= 52 && clipHeight >= 26;
+        const iconStr = "⇄ ";
+        const iconW = showIcon ? ctx.measureText(iconStr).width : 0;
+        const fullContentW = iconW + textW;
+
+        const padX = 4;
+        const badgeH = 13;
+        const badgeW = Math.min(width - 4, fullContentW + padX * 2);
+
+        // Posicionamento inteligente (Anti-Scroll Clipping):
+        // Se o clipe estiver parcialmente fora da tela à esquerda (startX < 0),
+        // o badge fica ancorado na margem visível do viewport para nunca sumir
+        const visLeft = Math.max(0, startX);
+        let badgeX = visLeft + 5;
+        if (badgeX + badgeW > startX + width - 4) {
+            badgeX = Math.max(startX + 2, startX + width - badgeW - 4);
+        }
+
+        // Posição vertical:
+        // Se a pista tiver altura suficiente (>= 32px), fica no canto inferior esquerdo
+        // Se houver tira de diagnóstico de áudio, sobe para não sobrepor
+        let badgeY;
+        const hasAudioDiag = laneKind === "audio" && this.getAudioDiag && !!this.getAudioDiag(cut);
+        if (clipHeight >= 32) {
+            badgeY = clipY + clipHeight - badgeH - (hasAudioDiag ? 7 : 3);
+        } else {
+            // Em pistas compactas (< 32px), posiciona no canto superior direito para não colidir com o título
+            badgeY = clipY + 2;
+            badgeX = Math.max(startX + 2, startX + width - badgeW - 4);
+        }
+
+        // Guarda retângulo no mapa do renderer para hit-test de mouse/tooltip e menu de contexto
+        // (NUNCA armazena no modelo de dados 'cut' para evitar referências circulares no JSON.stringify)
+        if (this.syncBadgeRects) {
+            this.syncBadgeRects.set(cut.id, {
+                x: badgeX,
+                y: badgeY,
+                w: badgeW,
+                h: badgeH,
+                status: {
+                    offset: sync.offset,
+                    text: sync.text,
+                    partnerKind: sync.partnerKind,
+                    clipKind: sync.clipKind,
+                    diff: sync.diff
+                }
+            });
+        }
+
+        // 1. Fundo do badge: tom carmim/rose escuro translúcido com leve brilho sutil
+        ctx.fillStyle = "rgba(190, 18, 60, 0.88)"; // Rose/Crimson escuro
+        ctx.shadowColor = "rgba(244, 63, 94, 0.45)";
+        ctx.shadowBlur = 4;
+
+        if (typeof ctx.roundRect === "function") {
+            ctx.beginPath();
+            ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 3);
+            ctx.fill();
+        } else {
+            ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+        }
+
+        ctx.shadowBlur = 0;
+
+        // 2. Borda sutil de 1px em tom rose luminoso
+        ctx.strokeStyle = "rgba(251, 113, 133, 0.85)";
+        ctx.lineWidth = 1;
+        if (typeof ctx.roundRect === "function") {
+            ctx.stroke();
+        } else {
+            ctx.strokeRect(badgeX, badgeY, badgeW, badgeH);
+        }
+
+        // 3. Texto do badge: branco puro de alto contraste
+        ctx.fillStyle = "#ffffff";
+        ctx.textBaseline = "middle";
+        const contentStartX = badgeX + padX;
+        const textCenterY = badgeY + badgeH / 2;
+
+        if (showIcon && badgeW >= fullContentW + padX) {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+            ctx.fillText(iconStr, contentStartX, textCenterY);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(badgeText, contentStartX + iconW, textCenterY);
+        } else {
+            ctx.fillText(badgeText, contentStartX, textCenterY);
+        }
+
+        ctx.restore();
+    }
+
+    /**
+     * Retorna as coordenadas e status do badge de sincronia de um clipe, se houver.
+     */
+    getSyncBadgeRect(clipId) {
+        if (!this.syncBadgeRects || !clipId) return null;
+        return this.syncBadgeRects.get(clipId) || null;
     }
 
     /**

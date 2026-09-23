@@ -1,6 +1,6 @@
 // Controlador de Interatividade, Cliques e Atalhos da Timeline (CapIAu-Talho)
 import { STATE } from "./state.js";
-import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds, framesToTimecode, evaluateFadeCurve, FADE_CURVE_PRESETS } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds, framesToTimecode, evaluateFadeCurve, FADE_CURVE_PRESETS, getClipSyncStatus } from "./timelineState.js";
 import { setTabVisibility } from "./tabsCustomization.js";
 import { getActiveElement, getActiveQuerySelector } from "./workspaceManager.js";
 import {
@@ -208,6 +208,23 @@ export class CapiauTimelineInteraction {
             }
             this.hideRollingTooltip();
             this.hideHoverPreview();
+        };
+        this.boundWindowBlur = () => {
+            if (this.dragState) {
+                if (this.dragState === "slip" || this.dragState === "slide" || this.dragState === "rolling" || this.dragState === "drag-selection" || this.dragState === "drag-clip") {
+                    TIMELINE_HISTORY.commit();
+                    STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+                }
+                this.dragState = null;
+                this.draggedClipId = null;
+            }
+            this.hideMarkerTooltip();
+            this.hideFadeTooltip();
+            this.hideSlipTooltip();
+            this.hideSlideTooltip();
+            this.hideRollingTooltip();
+            this.hideHoverPreview();
+            if (this.renderer) this.renderer.requestRedraw();
         };
         this.boundWindowMouseMove = (e) => {
             if (this.dragState) {
@@ -436,6 +453,8 @@ export class CapiauTimelineInteraction {
         // Keyboard Listener global
         win.addEventListener("keydown", this.boundKeyDown);
         win.addEventListener("keyup", this.boundKeyUp);
+        win.addEventListener("blur", this.boundWindowBlur);
+        window.addEventListener("blur", this.boundWindowBlur);
 
         // Ouvir mudança de abas no painel esquerdo para atualizar ajustes
         STATE.on("leftTabChanged", (tabId) => {
@@ -493,6 +512,8 @@ export class CapiauTimelineInteraction {
         document.removeEventListener("dragend", this.boundWindowDragEnd);
         win.removeEventListener("keydown", this.boundKeyDown);
         win.removeEventListener("keyup", this.boundKeyUp);
+        win.removeEventListener("blur", this.boundWindowBlur);
+        window.removeEventListener("blur", this.boundWindowBlur);
     }
 
     setCanvas(canvas) {
@@ -1014,6 +1035,25 @@ export class CapiauTimelineInteraction {
         } else {
             this.mouseDownClip = null;
         }
+
+        if (e.button === 2) {
+            // Clique com o botão direito é tratado exclusivamente por onContextMenu.
+            // Apenas seleciona o clipe/pista sob o cursor (se ainda não selecionado) sem iniciar
+            // arrastes, histórico de drag ou conflitos com o menu do navegador.
+            if (track) {
+                const hit = this.findClipAt(frame, track, y);
+                if (hit && hit.type === "clip") {
+                    if (!TIMELINE_STATE.selectedClipIds || !TIMELINE_STATE.selectedClipIds.has(hit.data.id)) {
+                        TIMELINE_STATE.selectClip(hit.data.id, false);
+                        TIMELINE_STATE.selectedTrack = track;
+                        this.syncPlayerToClip(hit.data);
+                        this.refreshClipInspector();
+                        if (this.renderer) this.renderer.requestRedraw();
+                    }
+                }
+            }
+            return;
+        }
         
         // 1. Clique na régua de tempo (In/Out Drag, Scrubbing, Drag de Marcador, Mover Playhead)
         if (y < this.renderer.rulerHeight) {
@@ -1287,6 +1327,13 @@ export class CapiauTimelineInteraction {
                     this.showSlipTooltip(e.clientX, e.clientY, 0, TIMELINE_STATE.fps || 24);
                     this.refreshClipInspector();
                     this.renderer.requestRedraw();
+                } else {
+                    TIMELINE_STATE.clearClipSelection();
+                    TIMELINE_STATE.clearSelectedGap();
+                    TIMELINE_STATE.setTool("select");
+                    if (this.canvas) this.canvas.style.cursor = "default";
+                    this.refreshClipInspector();
+                    if (this.renderer) this.renderer.requestRedraw();
                 }
                 return;
             }
@@ -1397,6 +1444,13 @@ export class CapiauTimelineInteraction {
 
                     this.refreshClipInspector();
                     this.renderer.requestRedraw();
+                } else {
+                    TIMELINE_STATE.clearClipSelection();
+                    TIMELINE_STATE.clearSelectedGap();
+                    TIMELINE_STATE.setTool("select");
+                    if (this.canvas) this.canvas.style.cursor = "default";
+                    this.refreshClipInspector();
+                    if (this.renderer) this.renderer.requestRedraw();
                 }
                 return;
             }
@@ -1529,6 +1583,19 @@ export class CapiauTimelineInteraction {
                         return;
                     }
 
+                    // Clique direto no badge de descompasso de sincronia
+                    const syncBadge = this.renderer ? this.renderer.getSyncBadgeRect(clip.id) : (clip._syncBadgeRect || null);
+                    const isClickOnSyncBadge = syncBadge &&
+                        x >= syncBadge.x && x <= (syncBadge.x + syncBadge.w) &&
+                        y >= syncBadge.y && y <= (syncBadge.y + syncBadge.h);
+                    if (e.button === 0 && isClickOnSyncBadge && syncBadge.status) {
+                        TIMELINE_STATE.selectClip(clip.id, e.shiftKey);
+                        this.syncPlayerToClip(clip);
+                        this.showClipContextMenu(e.clientX, e.clientY, clip, frame);
+                        e.preventDefault();
+                        return;
+                    }
+
                     // Se clicou em um clipe que já faz parte de uma seleção múltipla, inicia arrasto em grupo (mesmo com Shift)
                     if (!trimHit && TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 1 && TIMELINE_STATE.selectedClipIds.has(clip.id)) {
                         TIMELINE_HISTORY.begin();
@@ -1646,6 +1713,7 @@ export class CapiauTimelineInteraction {
                     } else {
                         // Drag normal do clipe (com suporte a Shift para Sobrescrita e Ctrl para Ripple)
                         this.dragState = "drag-clip";
+                        this.dragClipLinked = !e.altKey;
                         if (this.canvas) this.canvas.style.cursor = "grabbing";
                         this.draggedClipId = clip.id;
                         this.dragStartMouseX = e.clientX;
@@ -1655,7 +1723,7 @@ export class CapiauTimelineInteraction {
                         this.dragHoppedPastClips = new Set();
                         this.dragStartClipFrame = clip.timelineStartFrame;
                         this.dragHasMoved = false;
-                        this.dragOriginalCuts = JSON.parse(JSON.stringify(STATE.activeTimelineCuts || []));
+                        this.dragOriginalCuts = JSON.parse(JSON.stringify(STATE.activeTimelineCuts || [], (k, v) => (typeof k === "string" && k.startsWith("_")) ? undefined : v));
                         this.simulatedOverwriteResult = null;
                         this.simulatedRippleResult = null;
                     }
@@ -2027,10 +2095,27 @@ export class CapiauTimelineInteraction {
                     this.renderer.requestRedraw();
                 }
                 const trimHit = this.getTrimHit(x, track);
-                if (trimHit) {
+                const syncBadge = this.renderer ? this.renderer.getSyncBadgeRect(hit.data.id) : (hit.data._syncBadgeRect || null);
+                const isOverSyncBadge = syncBadge &&
+                    x >= syncBadge.x && x <= (syncBadge.x + syncBadge.w) &&
+                    y >= syncBadge.y && y <= (syncBadge.y + syncBadge.h);
+
+                if (isOverSyncBadge && syncBadge.status) {
+                    this.canvas.style.cursor = "pointer";
+                    const status = syncBadge.status;
+                    const partnerName = status.partnerKind === "video" ? "vídeo" : "áudio";
+                    const lateOrEarly = status.offset > 0 ? "atrasado" : "adiantado";
+                    const absOffset = Math.abs(status.offset);
+                    const qWord = absOffset === 1 ? "quadro" : "quadros";
+                    this.canvas.setAttribute("data-tooltip", `Fora de sincronia: ${status.text} ${qWord} (${lateOrEarly} em relação ao ${partnerName}) • Clique ou use botão direito para ressincronizar`);
+                } else if (trimHit) {
                     this.canvas.style.cursor = this.getTrimCursor(trimHit.activeSide, trimHit.isUnited);
+                    const curTip = this.canvas.getAttribute("data-tooltip");
+                    if (curTip && curTip.startsWith("Fora de sincronia:")) this.canvas.removeAttribute("data-tooltip");
                 } else {
                     this.canvas.style.cursor = "grab";
+                    const curTip = this.canvas.getAttribute("data-tooltip");
+                    if (curTip && curTip.startsWith("Fora de sincronia:")) this.canvas.removeAttribute("data-tooltip");
                 }
             } else {
                 if (TIMELINE_STATE.hoveredFadeHandle !== null) {
@@ -2052,6 +2137,8 @@ export class CapiauTimelineInteraction {
                 } else {
                     this.canvas.style.cursor = "default";
                     this.canvas.removeAttribute("title");
+                    const curTip = this.canvas.getAttribute("data-tooltip");
+                    if (curTip && curTip.startsWith("Fora de sincronia:")) this.canvas.removeAttribute("data-tooltip");
                 }
             }
         } else if (!this.dragState) {
@@ -2403,7 +2490,7 @@ export class CapiauTimelineInteraction {
 
             if (!isSnapDisabled && clip) {
                 const ignoredIds = [clip.id];
-                if (clip.link_id) {
+                if (this.dragClipLinked !== false && clip.link_id) {
                     const partner = baseCuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
                     if (partner) ignoredIds.push(partner.id);
                 }
@@ -2485,7 +2572,7 @@ export class CapiauTimelineInteraction {
                     };
                 }
 
-                this.moveClip(this.draggedClipId, snappedStart, targetTrack, mode);
+                this.moveClip(this.draggedClipId, snappedStart, targetTrack, mode, (this.dragClipLinked !== false));
             }
         }
         else if (this.dragState === "trim-left" && this.draggedClipId) {
@@ -2957,6 +3044,10 @@ export class CapiauTimelineInteraction {
         const menu = document.createElement("div");
         menu.id = "custom-timeline-context-menu";
         menu.className = "custom-context-menu";
+        menu.addEventListener("contextmenu", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+        });
         menu.style.position = "fixed";
         menu.style.left = `${clientX}px`;
         menu.style.top = `${clientY}px`;
@@ -3119,6 +3210,10 @@ export class CapiauTimelineInteraction {
         const menu = document.createElement("div");
         menu.id = "custom-timeline-context-menu";
         menu.className = "custom-context-menu";
+        menu.addEventListener("contextmenu", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+        });
         menu.style.position = "fixed";
         menu.style.left = `${clientX}px`;
         menu.style.top = `${clientY}px`;
@@ -3330,8 +3425,64 @@ export class CapiauTimelineInteraction {
         };
         menu.appendChild(itemLiftDel);
 
-        // 6. Desvincular A/V (se tiver link_id)
+        const cutsOnTimeline = STATE.activeTimelineCuts || [];
+
+        // 6. Sincronia e Vínculo A/V
         if (clip.link_id) {
+            const syncStatus = getClipSyncStatus(clip, cutsOnTimeline);
+            if (syncStatus) {
+                const sepSync = document.createElement("div");
+                sepSync.className = "menu-separator";
+                sepSync.style.height = "1px";
+                sepSync.style.background = "rgba(244, 63, 94, 0.35)";
+                sepSync.style.margin = "4px 0";
+                menu.appendChild(sepSync);
+
+                const absOffset = Math.abs(syncStatus.offset);
+                const qStr = absOffset === 1 ? "1 quadro" : `${absOffset} quadros`;
+                const lateEarly = syncStatus.offset > 0 ? "atrasado" : "adiantado";
+
+                const itemResyncMove = document.createElement("div");
+                itemResyncMove.className = "menu-item";
+                itemResyncMove.style.display = "flex";
+                itemResyncMove.style.alignItems = "center";
+                itemResyncMove.style.justifyContent = "space-between";
+                itemResyncMove.style.padding = "7px 12px";
+                itemResyncMove.style.cursor = "pointer";
+                itemResyncMove.innerHTML = `
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-arrows-left-right-to-line" style="color:var(--color-rose);"></i>
+                        <span>Mover para Sincronia (${syncStatus.text})</span>
+                    </span>
+                    <span style="font-size:9px; color:var(--text-secondary);">${qStr} ${lateEarly}</span>
+                `;
+                itemResyncMove.onclick = () => {
+                    this.resyncClip(clip.id, "move");
+                    menu.remove();
+                };
+                menu.appendChild(itemResyncMove);
+
+                const itemResyncSlip = document.createElement("div");
+                itemResyncSlip.className = "menu-item";
+                itemResyncSlip.style.display = "flex";
+                itemResyncSlip.style.alignItems = "center";
+                itemResyncSlip.style.justifyContent = "space-between";
+                itemResyncSlip.style.padding = "7px 12px";
+                itemResyncSlip.style.cursor = "pointer";
+                itemResyncSlip.innerHTML = `
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-sliders" style="color:var(--color-cyan);"></i>
+                        <span>Deslizar para Sincronia (Slip)</span>
+                    </span>
+                    <span style="font-size:9px; color:var(--text-secondary);">manter posição</span>
+                `;
+                itemResyncSlip.onclick = () => {
+                    this.resyncClip(clip.id, "slip");
+                    menu.remove();
+                };
+                menu.appendChild(itemResyncSlip);
+            }
+
             const sep2 = document.createElement("div");
             sep2.className = "menu-separator";
             sep2.style.height = "1px";
@@ -3368,10 +3519,48 @@ export class CapiauTimelineInteraction {
                 menu.remove();
             };
             menu.appendChild(itemUnlink);
+        } else {
+            // Se não tiver link_id, permite vincular caso haja clipe oposto selecionado ou da mesma mídia
+            const selectedIds = Array.from(TIMELINE_STATE.selectedClipIds || []);
+            const clipKind = TIMELINE_STATE.trackKindOf(clip.track);
+            const oppositeKind = clipKind === "video" ? "audio" : "video";
+            const partnerToLink = cutsOnTimeline.find(c => {
+                if (!c || c.id === clip.id) return false;
+                const isSelected = selectedIds.includes(c.id);
+                const isOpposite = TIMELINE_STATE.trackKindOf(c.track) === oppositeKind;
+                return isOpposite && (isSelected || c.video_id === clip.video_id);
+            });
+            if (partnerToLink) {
+                const sepLink = document.createElement("div");
+                sepLink.className = "menu-separator";
+                sepLink.style.height = "1px";
+                sepLink.style.background = "var(--border-glass)";
+                sepLink.style.margin = "4px 0";
+                menu.appendChild(sepLink);
+
+                const itemLink = document.createElement("div");
+                itemLink.className = "menu-item";
+                itemLink.style.display = "flex";
+                itemLink.style.alignItems = "center";
+                itemLink.style.justifyContent = "space-between";
+                itemLink.style.padding = "7px 12px";
+                itemLink.style.cursor = "pointer";
+                itemLink.innerHTML = `
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-link" style="color:var(--color-cyan);"></i>
+                        <span>Vincular Par Áudio/Vídeo</span>
+                    </span>
+                    <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Ctrl+L</kbd>
+                `;
+                itemLink.onclick = () => {
+                    this.linkClips(clip.id, partnerToLink.id);
+                    menu.remove();
+                };
+                menu.appendChild(itemLink);
+            }
         }
 
         // 7. Ações em Lote para Cortes da Mesma Mídia
-        const cutsOnTimeline = STATE.activeTimelineCuts || [];
         const sameMediaVideoCuts = this._getSameMediaVideoCuts(clip, cutsOnTimeline);
         const sameMediaAudioCuts = this._getSameMediaAudioCuts(clip, cutsOnTimeline);
         const totalMediaCuts = clip.type === "photo" ? sameMediaVideoCuts.length : Math.max(sameMediaVideoCuts.length, sameMediaAudioCuts.length);
@@ -3462,6 +3651,10 @@ export class CapiauTimelineInteraction {
         const menu = document.createElement("div");
         menu.id = "custom-timeline-context-menu";
         menu.className = "custom-context-menu";
+        menu.addEventListener("contextmenu", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+        });
         menu.style.position = "fixed";
         menu.style.left = `${clientX}px`;
         menu.style.top = `${clientY}px`;
@@ -3607,6 +3800,10 @@ export class CapiauTimelineInteraction {
         const menu = document.createElement("div");
         menu.id = "custom-fade-context-menu";
         menu.className = "custom-context-menu";
+        menu.addEventListener("contextmenu", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+        });
         menu.style.position = "fixed";
         menu.style.left = `${clientX}px`;
         menu.style.top = `${clientY}px`;
@@ -10156,6 +10353,11 @@ export class CapiauTimelineInteraction {
                 return;
             }
             let hadSelection = false;
+            if (TIMELINE_STATE.activeTool && TIMELINE_STATE.activeTool !== "select") {
+                TIMELINE_STATE.setTool("select");
+                if (this.canvas) this.canvas.style.cursor = "default";
+                hadSelection = true;
+            }
             if (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) {
                 TIMELINE_STATE.clearClipSelection();
                 hadSelection = true;
@@ -10567,21 +10769,40 @@ export class CapiauTimelineInteraction {
             return;
         }
 
-        // Desvincular Par A/V
+        // Desvincular / Vincular Par A/V (Ctrl+L / U)
         if (KEYMAP_SERVICE.matches(e, "edit.unlink_av")) {
             if (selectedId) {
                 const clip = cuts.find(c => c.id === selectedId);
-                if (clip && clip.link_id) {
-                    TIMELINE_HISTORY.record(() => {
-                        const linkId = clip.link_id;
-                        cuts.forEach(c => { if (c.link_id === linkId) c.link_id = null; });
-                        STATE.activeTimelineCuts = cuts;
-                    });
-                    if (typeof window.showToast === "function") {
-                        window.showToast("Áudio/Vídeo Desvinculados", "info");
+                if (clip) {
+                    if (clip.link_id) {
+                        TIMELINE_HISTORY.record(() => {
+                            const linkId = clip.link_id;
+                            cuts.forEach(c => { if (c.link_id === linkId) c.link_id = null; });
+                            STATE.activeTimelineCuts = cuts;
+                        });
+                        if (typeof window.showToast === "function") {
+                            window.showToast("Áudio/Vídeo Desvinculados", "info");
+                        }
+                        if (this.renderer) this.renderer.requestRedraw();
+                        e.preventDefault();
+                        return;
+                    } else {
+                        // Tenta vincular com clipe parceiro selecionado ou da mesma mídia
+                        const selectedIds = Array.from(TIMELINE_STATE.selectedClipIds || []);
+                        const clipKind = TIMELINE_STATE.trackKindOf(clip.track);
+                        const oppositeKind = clipKind === "video" ? "audio" : "video";
+                        const partnerToLink = cuts.find(c => {
+                            if (!c || c.id === clip.id) return false;
+                            const isSelected = selectedIds.includes(c.id);
+                            const isOpposite = TIMELINE_STATE.trackKindOf(c.track) === oppositeKind;
+                            return isOpposite && (isSelected || c.video_id === clip.video_id);
+                        });
+                        if (partnerToLink) {
+                            this.linkClips(clip.id, partnerToLink.id);
+                            e.preventDefault();
+                            return;
+                        }
                     }
-                    e.preventDefault();
-                    return;
                 }
             }
         }
@@ -10811,7 +11032,7 @@ export class CapiauTimelineInteraction {
                 e.preventDefault();
                 return;
             } else if (selectedId) {
-                this.nudgeSelection(selectedId, -1);
+                this.nudgeSelection(selectedId, -1, !e.altKey);
                 e.preventDefault();
                 return;
             }
@@ -10824,7 +11045,7 @@ export class CapiauTimelineInteraction {
                 e.preventDefault();
                 return;
             } else if (selectedId) {
-                this.nudgeSelection(selectedId, 1);
+                this.nudgeSelection(selectedId, 1, !e.altKey);
                 e.preventDefault();
                 return;
             }
@@ -11015,7 +11236,7 @@ export class CapiauTimelineInteraction {
         return Math.max(bestGap.startFrame, Math.min(bestGap.endFrame - duration, effectiveStart));
     }
 
-    moveClip(clipId, targetStartFrame, targetTrack, modeOrInsert = null) {
+    moveClip(clipId, targetStartFrame, targetTrack, modeOrInsert = null, moveLinked = true) {
         const cuts = [...STATE.activeTimelineCuts];
         const clip = cuts.find(c => c.id === clipId);
         if (!clip) return;
@@ -11045,7 +11266,7 @@ export class CapiauTimelineInteraction {
 
         if (clipKind === "video" && finalTrackId !== clip.track) {
             clip.track = finalTrackId;
-            if (clip.link_id) {
+            if (moveLinked && clip.link_id) {
                 const partnerAudio = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id &&
                     TIMELINE_STATE.trackKindOf(c.track) === "audio");
                 if (partnerAudio) {
@@ -11057,7 +11278,7 @@ export class CapiauTimelineInteraction {
             clip.track = finalTrackId;
         }
 
-        const partner = clip.link_id
+        const partner = (moveLinked && clip.link_id)
             ? cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id)
             : null;
 
@@ -11097,6 +11318,16 @@ export class CapiauTimelineInteraction {
             const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : partner;
             if (videoCut && audioCut) {
                 audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+            }
+        } else if (clip.link_id) {
+            // Movimento independente (Alt): parceiro permaneceu estático e syncOffset é recalculado
+            const other = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+            if (other) {
+                const videoCut = (TIMELINE_STATE.trackKindOf(clip.track) === "video") ? clip : other;
+                const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : other;
+                if (videoCut && audioCut) {
+                    audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+                }
             }
         }
 
@@ -11180,12 +11411,6 @@ export class CapiauTimelineInteraction {
             // Trim independente com Alt (J/L Cut): parceiro permanece estático e syncOffset é recalculado
             const other = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
             if (other) {
-                if (partnerBaseIn !== null && partnerBaseIn !== undefined && partnerBaseStart !== null && partnerBaseStart !== undefined) {
-                    other.inFrame = partnerBaseIn;
-                    other.in = other.inFrame / fps;
-                    other.timelineStartFrame = partnerBaseStart;
-                    other.timeline_start = partnerBaseStart / fps;
-                }
                 const videoCut = (TIMELINE_STATE.trackKindOf(clip.track) === "video") ? clip : other;
                 const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : other;
                 if (videoCut && audioCut) {
@@ -11285,10 +11510,6 @@ export class CapiauTimelineInteraction {
             // Trim independente com Alt (J/L Cut): parceiro permanece estático e syncOffset é recalculado
             const other = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
             if (other) {
-                if (partnerBaseOut !== null && partnerBaseOut !== undefined) {
-                    other.outFrame = partnerBaseOut;
-                    other.out = other.outFrame / fps;
-                }
                 const videoCut = (TIMELINE_STATE.trackKindOf(clip.track) === "video") ? clip : other;
                 const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : other;
                 if (videoCut && audioCut) {
@@ -11320,7 +11541,7 @@ export class CapiauTimelineInteraction {
         STATE.activeTimelineCuts = cuts;
     }
 
-    nudgeSelection(clipId, deltaFrames) {
+    nudgeSelection(clipId, deltaFrames, nudgeLinked = true) {
         if (!clipId) return;
         const cuts = [...STATE.activeTimelineCuts];
         const clip = cuts.find(c => c.id === clipId);
@@ -11330,7 +11551,7 @@ export class CapiauTimelineInteraction {
         if (trackObj && trackObj.locked) return;
 
         TIMELINE_HISTORY.record(() => {
-            this.moveClip(clipId, Math.max(0, (clip.timelineStartFrame || 0) + deltaFrames), null, false);
+            this.moveClip(clipId, Math.max(0, (clip.timelineStartFrame || 0) + deltaFrames), null, false, nudgeLinked);
         });
     }
 
@@ -11346,6 +11567,92 @@ export class CapiauTimelineInteraction {
                 this.trimClipRight(clipId, deltaFrames, false);
             }
         });
+    }
+
+    /**
+     * Re-sincroniza um clipe desvinculado ou com offset em relação ao seu parceiro A/V vinculado.
+     * @param {string} clipId - ID do clipe a ser ressincronizado
+     * @param {"move"|"slip"} mode - "move" move o clipe na timeline para a posição síncrona; "slip" desliza o inFrame/outFrame mantendo a posição e duração na timeline.
+     */
+    resyncClip(clipId, mode = "move") {
+        const cuts = [...STATE.activeTimelineCuts];
+        const clip = cuts.find(c => c.id === clipId);
+        if (!clip || !clip.link_id) return;
+
+        const syncStatus = getClipSyncStatus(clip, cuts);
+        if (!syncStatus || !syncStatus.partner) return;
+
+        const partner = syncStatus.partner;
+        const clipKind = TIMELINE_STATE.trackKindOf(clip.track);
+        const fps = TIMELINE_STATE.fps || 24;
+
+        TIMELINE_HISTORY.record(() => {
+            if (mode === "move") {
+                const targetTimelineStart = (partner.timelineStartFrame - partner.inFrame) + clip.inFrame;
+                clip.timelineStartFrame = Math.max(0, targetTimelineStart);
+                clip.timeline_start = clip.timelineStartFrame / fps;
+                const audioCut = clipKind === "audio" ? clip : partner;
+                if (audioCut) audioCut.syncOffset = 0;
+            } else if (mode === "slip") {
+                const duration = clip.outFrame - clip.inFrame;
+                const targetIn = clip.timelineStartFrame - (partner.timelineStartFrame - partner.inFrame);
+                const targetOut = targetIn + duration;
+                const maxFrames = TIMELINE_STATE.getMaxMediaFrames(clip);
+
+                if (targetIn >= 0 && (!Number.isFinite(maxFrames) || targetOut <= maxFrames)) {
+                    clip.inFrame = targetIn;
+                    clip.outFrame = targetOut;
+                    clip.in = targetIn / fps;
+                    clip.out = targetOut / fps;
+                    const audioCut = clipKind === "audio" ? clip : partner;
+                    if (audioCut) audioCut.syncOffset = 0;
+                } else {
+                    const targetTimelineStart = (partner.timelineStartFrame - partner.inFrame) + clip.inFrame;
+                    clip.timelineStartFrame = Math.max(0, targetTimelineStart);
+                    clip.timeline_start = clip.timelineStartFrame / fps;
+                    const audioCut = clipKind === "audio" ? clip : partner;
+                    if (audioCut) audioCut.syncOffset = 0;
+                }
+            }
+            STATE.activeTimelineCuts = cuts;
+        });
+
+        if (typeof window.showToast === "function") {
+            window.showToast(`Clipe ${mode === "slip" ? "deslizado" : "movido"} para sincronia perfeita`, "success");
+        }
+        this.refreshClipInspector();
+        if (this.renderer) this.renderer.requestRedraw();
+    }
+
+    /**
+     * Vincula dois clipes (tipicamente vídeo e áudio) compartilhando um link_id comum.
+     * @param {string} clipId1
+     * @param {string} clipId2
+     */
+    linkClips(clipId1, clipId2) {
+        if (!clipId1 || !clipId2 || clipId1 === clipId2) return;
+        const cuts = [...STATE.activeTimelineCuts];
+        const c1 = cuts.find(c => c.id === clipId1);
+        const c2 = cuts.find(c => c.id === clipId2);
+        if (!c1 || !c2) return;
+
+        const newLinkId = `link_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        TIMELINE_HISTORY.record(() => {
+            c1.link_id = newLinkId;
+            c2.link_id = newLinkId;
+            const videoCut = (TIMELINE_STATE.trackKindOf(c1.track) === "video") ? c1 : ((TIMELINE_STATE.trackKindOf(c2.track) === "video") ? c2 : null);
+            const audioCut = (TIMELINE_STATE.trackKindOf(c1.track) === "audio") ? c1 : ((TIMELINE_STATE.trackKindOf(c2.track) === "audio") ? c2 : null);
+            if (videoCut && audioCut) {
+                audioCut.syncOffset = (audioCut.timelineStartFrame - audioCut.inFrame) - (videoCut.timelineStartFrame - videoCut.inFrame);
+            }
+            STATE.activeTimelineCuts = cuts;
+        });
+
+        if (typeof window.showToast === "function") {
+            window.showToast("Par Áudio/Vídeo Vinculado (Ctrl+L)", "success");
+        }
+        this.refreshClipInspector();
+        if (this.renderer) this.renderer.requestRedraw();
     }
 
     // --- POPUPS E INTERACTION IA CONTEXTUAL ---

@@ -176,6 +176,72 @@ export function evaluateFadeCurve(progress, curveType = "linear", tension = 0.0)
     }
 }
 
+/**
+ * Retorna o status de sincronia A/V de um clipe vinculado.
+ * Se o clipe possuir par vinculado e estiver fora de sincronia em relação à mídia original,
+ * retorna um objeto com { clip, partner, clipKind, partnerKind, offset, text, diff }.
+ * Se estiver em sincronia perfeita (0 quadros) ou não possuir par vinculado, retorna null.
+ * 
+ * @param {Object} clip - O clipe sendo analisado
+ * @param {Array} [cuts] - Lista de cortes da timeline (padrão STATE.activeTimelineCuts)
+ * @returns {Object|null} Status de sincronia ou null
+ */
+export function getClipSyncStatus(clip, cuts = null) {
+    if (!clip || !clip.link_id) return null;
+    const allCuts = cuts || (STATE && STATE.activeTimelineCuts) || [];
+    
+    // Determina se este clipe é vídeo ou áudio
+    const clipTrack = String(clip.track || "");
+    let clipKind = "video";
+    if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.trackKindOf === "function") {
+        clipKind = TIMELINE_STATE.trackKindOf(clipTrack);
+    } else {
+        clipKind = clipTrack.startsWith("A") ? "audio" : "video";
+    }
+    if (clipKind !== "video" && clipKind !== "audio") return null;
+
+    const partnerKind = clipKind === "video" ? "audio" : "video";
+    const partner = allCuts.find(c => {
+        if (!c || c.id === clip.id || c.link_id !== clip.link_id) return false;
+        let k = "video";
+        if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.trackKindOf === "function") {
+            k = TIMELINE_STATE.trackKindOf(c.track);
+        } else {
+            k = String(c.track || "").startsWith("A") ? "audio" : "video";
+        }
+        return k === partnerKind;
+    });
+
+    if (!partner) return null;
+
+    // Calcula as âncoras na mídia original:
+    // Posição temporal equivalente na mídia = timelineStartFrame - inFrame
+    const videoCut = clipKind === "video" ? clip : partner;
+    const audioCut = clipKind === "audio" ? clip : partner;
+
+    const videoAnchor = (videoCut.timelineStartFrame || 0) - (videoCut.inFrame || 0);
+    const audioAnchor = (audioCut.timelineStartFrame || 0) - (audioCut.inFrame || 0);
+
+    // diff = audioAnchor - videoAnchor
+    // Se diff > 0: o áudio está atrasado em relação ao vídeo (+diff no áudio, -diff no vídeo)
+    // Se diff < 0: o áudio está adiantado em relação ao vídeo (-diff no áudio, +diff no vídeo)
+    const diff = Math.round(audioAnchor - videoAnchor);
+    if (diff === 0) return null;
+
+    const offset = clipKind === "audio" ? diff : -diff;
+    const text = offset > 0 ? `+${offset}` : `${offset}`;
+
+    return {
+        clip,
+        partner,
+        clipKind,
+        partnerKind,
+        offset, // Número inteiro de quadros (+1, -1, +12, -12...)
+        text,   // "+1", "-1", "+12", etc.
+        diff    // audioAnchor - videoAnchor
+    };
+}
+
 // --- MODELO DE PISTAS ---
 
 // Alturas por tipo de pista (px no canvas)
@@ -2341,6 +2407,16 @@ export class CapiauTimelineState {
                     TIMELINE_HISTORY.record(() => {
                         cut.timelineStartFrame = newStart;
                         cut.timeline_start = newStart / this.fps;
+                        if (cut.link_id) {
+                            const partner = STATE.activeTimelineCuts.find(p => p.id !== cut.id && p.link_id === cut.link_id);
+                            if (partner) {
+                                const v = this.trackKindOf(cut.track) === "video" ? cut : partner;
+                                const a = this.trackKindOf(cut.track) === "audio" ? cut : partner;
+                                if (v && a) {
+                                    a.syncOffset = (a.timelineStartFrame - a.inFrame) - (v.timelineStartFrame - v.inFrame);
+                                }
+                            }
+                        }
                         STATE.activeTimelineCuts = [...STATE.activeTimelineCuts];
                     });
                     return true;
@@ -2362,9 +2438,30 @@ export class CapiauTimelineState {
                 c.timelineStartFrame = Math.max(0, (c.timelineStartFrame || 0) + effectiveDelta);
                 c.timeline_start = c.timelineStartFrame / this.fps;
             });
+            selectedCuts.forEach(c => {
+                if (c.link_id) {
+                    const partner = cuts.find(p => p.id !== c.id && p.link_id === c.link_id);
+                    if (partner) {
+                        const v = this.trackKindOf(c.track) === "video" ? c : partner;
+                        const a = this.trackKindOf(c.track) === "audio" ? c : partner;
+                        if (v && a) {
+                            a.syncOffset = (a.timelineStartFrame - a.inFrame) - (v.timelineStartFrame - v.inFrame);
+                        }
+                    }
+                }
+            });
             STATE.activeTimelineCuts = [...cuts];
         });
         return true;
+    }
+
+    /**
+     * Retorna o status de sincronia A/V de um clipe vinculado.
+     * @param {Object} clip - O clipe sendo analisado
+     * @returns {Object|null} Status de sincronia ou null
+     */
+    getClipSyncStatus(clip) {
+        return getClipSyncStatus(clip, STATE.activeTimelineCuts);
     }
 
     selectGap(gap) {
@@ -6104,6 +6201,11 @@ STATE.on("mediaRotated", ({ mediaType, mediaId, rotation }) => {
 
 // --- HISTÓRICO DE UNDO/REDO (snapshots de clipes, pistas e sugestões) ---
 
+const safeHistoryReplacer = (key, value) => {
+    if (key && typeof key === "string" && key.startsWith("_")) return undefined;
+    return value;
+};
+
 class TimelineHistory {
     constructor() {
         this.undoStack = [];
@@ -6126,7 +6228,7 @@ class TimelineHistory {
             markers: TIMELINE_STATE.markers || [],
             selectedMarkerIds: Array.from(TIMELINE_STATE.selectedMarkerIds || []),
             playheadFrame: (TIMELINE_STATE.playheadFrame !== undefined && TIMELINE_STATE.playheadFrame !== null) ? TIMELINE_STATE.playheadFrame : 0
-        }));
+        }, safeHistoryReplacer));
     }
 
     /** Abre uma transação (ex: mousedown de um drag/trim). Idempotente. */
@@ -6139,7 +6241,7 @@ class TimelineHistory {
         if (!this.pending) return;
         const before = this.pending;
         this.pending = null;
-        if (JSON.stringify(before) === JSON.stringify(this._capture())) return;
+        if (JSON.stringify(before, safeHistoryReplacer) === JSON.stringify(this._capture(), safeHistoryReplacer)) return;
         this.undoStack.push(before);
         if (this.undoStack.length > this.limit) this.undoStack.shift();
         this.redoStack = [];
