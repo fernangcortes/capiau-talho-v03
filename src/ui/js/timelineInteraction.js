@@ -421,7 +421,7 @@ export class CapiauTimelineInteraction {
 
     init() {
         if (!this.canvas) return;
-        const win = this.canvas.ownerDocument.defaultView || window;
+        const win = this.canvas.ownerDocument?.defaultView || window;
 
         // Mouse Listeners
         this.canvas.addEventListener("mousedown", this.boundMouseDown);
@@ -4112,7 +4112,12 @@ export class CapiauTimelineInteraction {
                 inTime: dragMedia.inTime,
                 outTime: dragMedia.outTime,
                 duration: dragMedia.effectiveDuration,
-                rotation: dragMedia.rotation || 0
+                rotation: dragMedia.rotation || 0,
+                is_subclip: dragMedia.is_subclip,
+                subclip_id: dragMedia.subclip_id,
+                parent_video_id: dragMedia.parent_video_id,
+                hard_boundaries: dragMedia.hard_boundaries,
+                name: dragMedia.title || dragMedia.name
             };
         }
 
@@ -4142,20 +4147,35 @@ export class CapiauTimelineInteraction {
         let inTime = 0.0;
         let outTime = 5.0;
 
+        const isSub = !!(payload.is_subclip || dragMedia?.is_subclip);
+        const realVideoId = isSub ? (payload.parent_video_id || dragMedia?.parent_video_id || payload.id) : payload.id;
+        const subName = payload.name || dragMedia?.title || null;
+        const subId = payload.subclip_id || (isSub ? payload.id : null);
+        const hardBounds = !!(payload.hard_boundaries || dragMedia?.hard_boundaries);
+
+        if (isSub && (payload.inTime === undefined || payload.outTime === undefined)) {
+            const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
+            const foundSub = subclips.find(s => String(s.id) === String(subId) || String(s.id) === String(payload.id));
+            if (foundSub) {
+                if (payload.inTime === undefined && foundSub.in !== undefined) payload.inTime = Number(foundSub.in);
+                if (payload.outTime === undefined && foundSub.out !== undefined) payload.outTime = Number(foundSub.out);
+            }
+        }
+
         if (payload.type === "photo") {
             const dur = (dragMedia && dragMedia.effectiveDuration) ? dragMedia.effectiveDuration : (payload.duration || 5.0);
             inTime = 0.0;
             outTime = dur;
         } else {
-            const video = (STATE.allVideos || []).find(v => String(v.id) === String(payload.id));
+            const video = (STATE.allVideos || []).find(v => String(v.id) === String(realVideoId) || String(v.id) === String(payload.id));
             const totalDur = (video && video.duration && video.duration > 0) ? video.duration : 5.0;
             if (payload.inTime !== undefined && payload.outTime !== undefined && payload.outTime > payload.inTime) {
                 inTime = payload.inTime;
                 outTime = payload.outTime;
-            } else if (dragMedia && String(dragMedia.id) === String(payload.id) && dragMedia.outTime > dragMedia.inTime) {
+            } else if (dragMedia && (String(dragMedia.id) === String(payload.id) || String(dragMedia.subclip_id) === String(payload.id)) && dragMedia.outTime > dragMedia.inTime) {
                 inTime = dragMedia.inTime;
                 outTime = dragMedia.outTime;
-            } else if (STATE.activeVideo && String(STATE.activeVideo.id) === String(payload.id)) {
+            } else if (!isSub && STATE.activeVideo && String(STATE.activeVideo.id) === String(payload.id)) {
                 if (STATE.markerIn !== null && STATE.markerIn !== undefined) inTime = STATE.markerIn;
                 if (STATE.markerOut !== null && STATE.markerOut !== undefined) outTime = STATE.markerOut;
                 if (outTime <= inTime) outTime = totalDur;
@@ -4167,6 +4187,8 @@ export class CapiauTimelineInteraction {
 
         const effDur = Math.max(0.1, outTime - inTime);
         const effDurFrames = Math.max(1, secondsToFrames(effDur, fps));
+        const inFrame = secondsToFrames(inTime, fps);
+        const outFrame = secondsToFrames(outTime, fps);
 
         // Determina a rotação da mídia vinda do drop
         let itemRot = 0;
@@ -4178,8 +4200,8 @@ export class CapiauTimelineInteraction {
             const p = (STATE.allPhotos || []).find(it => String(it.id) === String(payload.id));
             itemRot = p ? (p.rotation || 0) : ((STATE.activePhoto && String(STATE.activePhoto.id) === String(payload.id)) ? (STATE.activePhoto.rotation || 0) : 0);
         } else {
-            const v = (STATE.allVideos || []).find(it => String(it.id) === String(payload.id));
-            itemRot = v ? (v.rotation || 0) : ((STATE.activeVideo && String(STATE.activeVideo.id) === String(payload.id)) ? (STATE.activeVideo.rotation || 0) : 0);
+            const v = (STATE.allVideos || []).find(it => String(it.id) === String(realVideoId) || String(it.id) === String(payload.id));
+            itemRot = v ? (v.rotation || 0) : ((STATE.activeVideo && (String(STATE.activeVideo.id) === String(realVideoId) || String(STATE.activeVideo.id) === String(payload.id))) ? (STATE.activeVideo.rotation || 0) : 0);
         }
         itemRot = ((Math.round(Number(itemRot) || 0) % 360) + 360) % 360;
 
@@ -4203,8 +4225,6 @@ export class CapiauTimelineInteraction {
 
         const isInsert = mode === "ripple";
         if (isInsert) {
-            const inFrame = secondsToFrames(inTime, fps);
-            const outFrame = secondsToFrames(outTime, fps);
             const effectsList = itemRot ? [{ type: "transform", rotation: itemRot, scale: 1, x: 0, y: 0 }] : [];
             if (payload.type === "photo") {
                 TIMELINE_STATE.insertClipWithRipple({
@@ -4219,12 +4239,6 @@ export class CapiauTimelineInteraction {
                     effects: [{ type: "fit", mode: "fit" }, ...effectsList]
                 }, snappedFrame, targetTrack);
             } else {
-                const isSub = !!(payload.is_subclip || dragMedia?.is_subclip);
-                const realVideoId = isSub ? (payload.parent_video_id || dragMedia?.parent_video_id || payload.id) : payload.id;
-                const subName = payload.name || dragMedia?.title || null;
-                const subId = payload.subclip_id || (isSub ? payload.id : null);
-                const hardBounds = !!(payload.hard_boundaries || dragMedia?.hard_boundaries);
-
                 TIMELINE_STATE.insertClipWithRipple({
                     type: "video",
                     video_id: realVideoId,
@@ -4251,12 +4265,6 @@ export class CapiauTimelineInteraction {
             if (payload.type === "photo") {
                 TIMELINE_STATE.addPhotoCut(payload.id, { track: targetTrack, timelineStartFrame: snappedFrame });
             } else {
-                const isSub = !!(payload.is_subclip || dragMedia?.is_subclip);
-                const realVideoId = isSub ? (payload.parent_video_id || dragMedia?.parent_video_id || payload.id) : payload.id;
-                const subName = payload.name || dragMedia?.title || null;
-                const subId = payload.subclip_id || (isSub ? payload.id : null);
-                const hardBounds = !!(payload.hard_boundaries || dragMedia?.hard_boundaries);
-
                 TIMELINE_STATE.addCut(realVideoId, inTime, outTime, targetTrack, snappedFrame, isSub ? {
                     is_subclip: true,
                     subclip_id: subId,

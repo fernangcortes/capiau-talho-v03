@@ -298,7 +298,7 @@ test("SourcePlayer suporta reprodução e criação de subclipes", () => {
 // ---------------------------------------------------------------------------
 // Bateria 8: Arraste e Soltura (Drag & Drop) com Metadados de Subclipe
 // ---------------------------------------------------------------------------
-test("Drag and drop transporta payload de subclipe e cria corte correspondente", () => {
+test("Drag and drop transporta payload de subclipe e cria corte correspondente", async () => {
     // No library.js
     assert.ok(lbSrc.includes("subclip_id: v.is_subclip ? v.id : null"), "Drag payload deve conter subclip_id");
     assert.ok(lbSrc.includes("is_subclip: !!v.is_subclip"), "Drag payload deve conter is_subclip flag");
@@ -308,6 +308,69 @@ test("Drag and drop transporta payload de subclipe e cria corte correspondente",
     assert.ok(tiSrc.includes("const isSub = !!(payload.is_subclip || dragMedia?.is_subclip)"), "onDrop deve checar is_subclip");
     assert.ok(tiSrc.includes("const realVideoId = isSub ? (payload.parent_video_id || dragMedia?.parent_video_id || payload.id)"), "onDrop deve resolver realVideoId para o mestre");
     assert.ok(tiSrc.includes("is_subclip: true"), "onDrop deve repassar is_subclip: true ao TIMELINE_STATE");
+
+    // Teste dinâmico de onDrop garantindo ausência de ReferenceError: inFrame is not defined
+    const { TIMELINE_STATE } = await import("../src/ui/js/timelineState.js");
+    let addCutArgs = null;
+    const origAddCut = TIMELINE_STATE.addCut;
+    TIMELINE_STATE.addCut = (...args) => {
+        addCutArgs = args;
+    };
+
+    const { CapiauTimelineInteraction } = await import(`../src/ui/js/timelineInteraction.js?ts=${Date.now()}`);
+    const interaction = new CapiauTimelineInteraction({
+        canvas: {
+            getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 200 }),
+            addEventListener: () => {},
+            removeEventListener: () => {}
+        },
+        requestRedraw: () => {}
+    });
+    interaction.getCoordinates = () => ({ x: 100, y: 50, frame: 120, track: "V1" });
+    interaction.resolveDropTrack = () => "V1";
+    interaction.calculateClampedStart = (track, frame) => frame;
+
+    const subPayload = {
+        type: "video",
+        id: 42,
+        subclip_id: "subclip_123",
+        is_subclip: true,
+        parent_video_id: 42,
+        name: "Subclipe Teste",
+        inTime: 10.0,
+        outTime: 25.0
+    };
+
+    const mockDropEvent = {
+        preventDefault: () => {},
+        clientX: 100,
+        clientY: 50,
+        altKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+        metaKey: false,
+        dataTransfer: {
+            getData: (type) => type === "application/x-capiau-media" ? JSON.stringify(subPayload) : null
+        }
+    };
+
+    try {
+        interaction.onDrop(mockDropEvent);
+    } finally {
+        TIMELINE_STATE.addCut = origAddCut;
+    }
+
+    assert.ok(addCutArgs, "TIMELINE_STATE.addCut deve ter sido chamado");
+    assert.strictEqual(addCutArgs[0], 42, "addCut deve receber parent_video_id");
+    assert.strictEqual(addCutArgs[1], 10.0, "inSec deve ser 10.0");
+    assert.strictEqual(addCutArgs[2], 25.0, "outSec deve ser 25.0");
+    assert.strictEqual(addCutArgs[3], "V1", "track deve ser V1");
+    assert.strictEqual(addCutArgs[4], 120, "timelineStartFrame deve ser 120");
+    assert.strictEqual(addCutArgs[5].is_subclip, true, "options.is_subclip deve ser true");
+    assert.strictEqual(addCutArgs[5].subclip_id, "subclip_123", "options.subclip_id deve ser subclip_123");
+    assert.strictEqual(addCutArgs[5].name, "Subclipe Teste", "options.name deve ser Subclipe Teste");
+    assert.strictEqual(addCutArgs[5].inFrame, 240, "options.inFrame deve ser 240");
+    assert.strictEqual(addCutArgs[5].outFrame, 600, "options.outFrame deve ser 600");
 });
 
 // ---------------------------------------------------------------------------
