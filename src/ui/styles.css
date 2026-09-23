@@ -7803,11 +7803,14 @@ select option, .nle-select option {
     transition: background 0.15s, color 0.15s;
     position: relative;
 }
-.custom-context-menu .menu-item i {
+.custom-context-menu .menu-item i,
+.custom-context-menu .menu-item svg {
     width: 14px;
+    height: 14px;
     text-align: center;
     font-size: 11px;
     color: var(--color-cyan);
+    stroke: var(--color-cyan);
     flex-shrink: 0;
 }
 .custom-context-menu .menu-item .menu-item-text {
@@ -7842,8 +7845,10 @@ select option, .nle-select option {
     color: #fff;
     text-shadow: 0 0 5px rgba(139, 92, 246, 0.4);
 }
-.custom-context-menu .menu-item:hover i {
+.custom-context-menu .menu-item:hover i,
+.custom-context-menu .menu-item:hover svg {
     color: #fff;
+    stroke: #fff;
 }
 .custom-context-menu .menu-separator {
     height: 1px;
@@ -7853,16 +7858,20 @@ select option, .nle-select option {
 .custom-context-menu .menu-item.menu-item-destructive {
     color: var(--color-rose);
 }
-.custom-context-menu .menu-item.menu-item-destructive i {
+.custom-context-menu .menu-item.menu-item-destructive i,
+.custom-context-menu .menu-item.menu-item-destructive svg {
     color: var(--color-rose);
+    stroke: var(--color-rose);
 }
 .custom-context-menu .menu-item.menu-item-destructive:hover {
     background: rgba(244, 63, 94, 0.2);
     color: #fff;
     text-shadow: 0 0 6px rgba(244, 63, 94, 0.6);
 }
-.custom-context-menu .menu-item.menu-item-destructive:hover i {
+.custom-context-menu .menu-item.menu-item-destructive:hover i,
+.custom-context-menu .menu-item.menu-item-destructive:hover svg {
     color: #fff;
+    stroke: #fff;
 }
 .custom-context-menu .menu-item-has-submenu {
     position: relative;

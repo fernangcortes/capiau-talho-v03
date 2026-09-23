@@ -1588,7 +1588,7 @@ export class CapiauTimelineInteraction {
                     }
 
                     // Clique direto no badge de descompasso de sincronia
-                    const syncBadge = this.renderer ? this.renderer.getSyncBadgeRect(clip.id) : (clip._syncBadgeRect || null);
+                    const syncBadge = (this.renderer && typeof this.renderer.getSyncBadgeRect === "function") ? this.renderer.getSyncBadgeRect(clip.id) : (clip._syncBadgeRect || null);
                     const isClickOnSyncBadge = syncBadge &&
                         x >= syncBadge.x && x <= (syncBadge.x + syncBadge.w) &&
                         y >= syncBadge.y && y <= (syncBadge.y + syncBadge.h);
@@ -2099,7 +2099,7 @@ export class CapiauTimelineInteraction {
                     this.renderer.requestRedraw();
                 }
                 const trimHit = this.getTrimHit(x, track);
-                const syncBadge = this.renderer ? this.renderer.getSyncBadgeRect(hit.data.id) : (hit.data._syncBadgeRect || null);
+                const syncBadge = (this.renderer && typeof this.renderer.getSyncBadgeRect === "function") ? this.renderer.getSyncBadgeRect(hit.data.id) : (hit.data._syncBadgeRect || null);
                 const isOverSyncBadge = syncBadge &&
                     x >= syncBadge.x && x <= (syncBadge.x + syncBadge.w) &&
                     y >= syncBadge.y && y <= (syncBadge.y + syncBadge.h);
@@ -2114,12 +2114,12 @@ export class CapiauTimelineInteraction {
                     this.canvas.setAttribute("data-tooltip", `Fora de sincronia: ${status.text} ${qWord} (${lateOrEarly} em relação ao ${partnerName}) • Clique ou use botão direito para ressincronizar`);
                 } else if (trimHit) {
                     this.canvas.style.cursor = this.getTrimCursor(trimHit.activeSide, trimHit.isUnited);
-                    const curTip = this.canvas.getAttribute("data-tooltip");
-                    if (curTip && curTip.startsWith("Fora de sincronia:")) this.canvas.removeAttribute("data-tooltip");
+                    const curTip = typeof this.canvas.getAttribute === "function" ? this.canvas.getAttribute("data-tooltip") : null;
+                    if (curTip && curTip.startsWith("Fora de sincronia:") && typeof this.canvas.removeAttribute === "function") this.canvas.removeAttribute("data-tooltip");
                 } else {
                     this.canvas.style.cursor = "grab";
-                    const curTip = this.canvas.getAttribute("data-tooltip");
-                    if (curTip && curTip.startsWith("Fora de sincronia:")) this.canvas.removeAttribute("data-tooltip");
+                    const curTip = typeof this.canvas.getAttribute === "function" ? this.canvas.getAttribute("data-tooltip") : null;
+                    if (curTip && curTip.startsWith("Fora de sincronia:") && typeof this.canvas.removeAttribute === "function") this.canvas.removeAttribute("data-tooltip");
                 }
             } else {
                 if (TIMELINE_STATE.hoveredFadeHandle !== null) {
@@ -3256,7 +3256,7 @@ export class CapiauTimelineInteraction {
         itemRippleHead.style.opacity = isPlayheadInside ? "1" : "0.5";
         itemRippleHead.innerHTML = `
             <span style="display:flex; align-items:center; gap:8px;">
-                <i class="fa-solid fa-arrow-left-to-line" style="color:var(--color-cyan);"></i>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-cyan); flex-shrink:0;"><line x1="5" y1="4" x2="5" y2="20"></line><line x1="19" y1="12" x2="6" y2="12"></line><polyline points="12 6 6 12 12 18"></polyline></svg>
                 <span>Ripple Início ➔ Agulha</span>
             </span>
             <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Q</kbd>
@@ -3285,7 +3285,7 @@ export class CapiauTimelineInteraction {
         itemRippleTail.style.opacity = isPlayheadInside ? "1" : "0.5";
         itemRippleTail.innerHTML = `
             <span style="display:flex; align-items:center; gap:8px;">
-                <i class="fa-solid fa-arrow-right-from-line" style="color:var(--color-cyan);"></i>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-cyan); flex-shrink:0;"><line x1="19" y1="4" x2="19" y2="20"></line><line x1="5" y1="12" x2="18" y2="12"></line><polyline points="12 6 18 12 12 18"></polyline></svg>
                 <span>Ripple Agulha ➔ Fim</span>
             </span>
             <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">W</kbd>
@@ -3422,6 +3422,14 @@ export class CapiauTimelineInteraction {
         const gapRightCtx = (nextStartCtx !== null) ? Math.max(0, nextStartCtx - cEndCtx) : 0;
 
         if (gapLeftCtx > 0 || gapRightCtx > 0) {
+            // Divisor contextual para separar ações de preenchimento de lacunas
+            const sepGap = document.createElement("div");
+            sepGap.className = "menu-separator";
+            sepGap.style.height = "1px";
+            sepGap.style.background = "var(--border-glass)";
+            sepGap.style.margin = "4px 0";
+            menu.appendChild(sepGap);
+
             if (gapLeftCtx > 0 && gapRightCtx > 0) {
                 // Item 1: Ambos os Lados (Ação principal com atalho Ctrl+Alt+R)
                 const itemBoth = document.createElement("div");
@@ -3457,10 +3465,11 @@ export class CapiauTimelineInteraction {
                 itemRight.title = `Preencher espaço à frente (+${gapRightCtx}f)`;
                 itemRight.setAttribute("data-tooltip", itemRight.title);
                 itemRight.innerHTML = `
-                    <span style="display:flex; align-items:center; gap:8px; padding-left:14px; font-size:11px; color:var(--text-secondary);">
-                        <i class="fa-solid fa-arrow-right" style="color:var(--color-cyan); font-size:10px;"></i>
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-arrow-right" style="color:var(--color-cyan);"></i>
                         <span>Preencher Frente</span>
                     </span>
+                    <kbd style="font-size:9px; background:rgba(255,255,255,0.06); color:var(--text-secondary); padding:1px 4px; border-radius:3px;">+${gapRightCtx}f</kbd>
                 `;
                 itemRight.onclick = () => {
                     menu.remove();
@@ -3479,10 +3488,11 @@ export class CapiauTimelineInteraction {
                 itemLeft.title = `Preencher espaço atrás (+${gapLeftCtx}f)`;
                 itemLeft.setAttribute("data-tooltip", itemLeft.title);
                 itemLeft.innerHTML = `
-                    <span style="display:flex; align-items:center; gap:8px; padding-left:14px; font-size:11px; color:var(--text-secondary);">
-                        <i class="fa-solid fa-arrow-left" style="color:var(--color-cyan); font-size:10px;"></i>
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-arrow-left" style="color:var(--color-cyan);"></i>
                         <span>Preencher Trás</span>
                     </span>
+                    <kbd style="font-size:9px; background:rgba(255,255,255,0.06); color:var(--text-secondary); padding:1px 4px; border-radius:3px;">+${gapLeftCtx}f</kbd>
                 `;
                 itemLeft.onclick = () => {
                     menu.remove();
