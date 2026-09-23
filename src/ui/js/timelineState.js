@@ -5552,6 +5552,369 @@ export class CapiauTimelineState {
     }
 
     /**
+     * Altera a velocidade percentual, duração e sentido de reprodução de um clipe (Task 13).
+     * Suporta recálculo proporcional de duração, reversão, ripple edit e sincronia de pares A/V vinculados.
+     * @param {string} clipId - ID do clipe alvo (ou null para usar o clipe selecionado / sob a agulha)
+     * @param {Object} options - { speed: number, durationFrames: number, reverse: boolean, ripple: boolean, pitchCorrection: boolean }
+     * @returns {Object|null} Objeto com informações do clipe atualizado ou null em caso de falha.
+     */
+    changeClipSpeed(clipId, options = {}) {
+        let targetId = clipId || this.selectedClipId;
+        const cuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        let targetClip = cuts.find(c => c.id === targetId);
+
+        // Se nenhum clipe informado ou selecionado, busca o clipe sob a agulha
+        if (!targetClip && typeof this.playheadFrame === "number") {
+            const curFrame = this.playheadFrame;
+            // Prioriza pista de vídeo sobre áudio
+            const underPlayhead = cuts.filter(c => {
+                const s = c.timelineStartFrame || 0;
+                const d = (c.outFrame || 0) - (c.inFrame || 0);
+                return curFrame >= s && curFrame <= s + d;
+            });
+            targetClip = underPlayhead.find(c => this.trackKindOf(c.track) === "video") || underPlayhead[0] || null;
+            if (targetClip) targetId = targetClip.id;
+        }
+
+        if (!targetClip) return null;
+
+        const targetTrack = this.getTrack(targetClip.track);
+        if (targetTrack && targetTrack.locked) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("A pista está travada com cadeado", "warning");
+            }
+            return null;
+        }
+
+        const fps = this.fps || 24;
+        const oldDurFrames = Math.max(1, (targetClip.outFrame || 0) - (targetClip.inFrame || 0));
+
+        // Base de frames de mídia sem distorção de velocidade anterior
+        let baseMediaFrames = targetClip.source_duration_frames;
+        if (!baseMediaFrames || isNaN(baseMediaFrames)) {
+            const currentSpeed = (typeof targetClip.speed === "number" && targetClip.speed > 0) ? targetClip.speed : 1.0;
+            baseMediaFrames = Math.max(1, Math.round(oldDurFrames * currentSpeed));
+        }
+
+        // Calcula nova velocidade e nova duração em frames
+        let newSpeed = 1.0;
+        let newDurFrames = oldDurFrames;
+
+        if (options.durationFrames !== undefined && options.durationFrames !== null && Number(options.durationFrames) > 0) {
+            newDurFrames = Math.max(1, Math.round(Number(options.durationFrames)));
+            newSpeed = (options.speed !== undefined && options.speed !== null && Number(options.speed) > 0)
+                ? Number(options.speed)
+                : (baseMediaFrames / newDurFrames);
+        } else if (options.speed !== undefined && options.speed !== null && Number(options.speed) > 0) {
+            newSpeed = Math.max(0.01, Math.min(100.0, Number(options.speed)));
+            newDurFrames = Math.max(1, Math.round(baseMediaFrames / newSpeed));
+        } else if (typeof targetClip.speed === "number" && targetClip.speed > 0) {
+            newSpeed = targetClip.speed;
+            newDurFrames = Math.max(1, Math.round(baseMediaFrames / newSpeed));
+        }
+
+        const isReverse = options.reverse !== undefined ? !!options.reverse : !!targetClip.reverse;
+        const pitchCorr = options.pitchCorrection !== undefined ? !!options.pitchCorrection : (targetClip.pitch_correction !== false);
+        const timelineMode = options.mode || (options.ripple === false ? "none" : (options.cutSubsequent ? "cut" : "ripple"));
+        const isRipple = timelineMode === "ripple";
+
+        const deltaFrames = newDurFrames - oldDurFrames;
+        const oldTargetStart = targetClip.timelineStartFrame || 0;
+        const newTargetStart = (options.newTimelineStartFrame !== undefined && options.newTimelineStartFrame !== null)
+            ? Math.max(0, Math.round(Number(options.newTimelineStartFrame)))
+            : oldTargetStart;
+
+        if (timelineMode === "cut" || timelineMode === "ripple") {
+            this._lastClipSpeedMode = timelineMode;
+        }
+
+        // Procura parceiro vinculado A/V
+        const partner = (targetClip.link_id)
+            ? cuts.find(c => c.link_id === targetClip.link_id && c.id !== targetClip.id)
+            : null;
+        const partnerTrack = partner ? this.getTrack(partner.track) : null;
+        if (partner && partnerTrack && partnerTrack.locked) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("A pista vinculada está travada", "warning");
+            }
+            return null;
+        }
+
+        TIMELINE_HISTORY.record(() => {
+            let currentCuts = this.conformCuts(STATE.activeTimelineCuts || []);
+            const clipToUpdate = currentCuts.find(c => c.id === targetId);
+            if (!clipToUpdate) return;
+
+            const partnerToUpdate = (clipToUpdate.link_id)
+                ? currentCuts.find(c => c.link_id === clipToUpdate.link_id && c.id !== clipToUpdate.id)
+                : null;
+
+            const targetStart = oldTargetStart;
+            const targetOldEnd = targetStart + oldDurFrames;
+            const newTargetEnd = newTargetStart + newDurFrames;
+
+            // 1. Atualiza propriedades de velocidade, duração e início no clipe
+            clipToUpdate.speed = newSpeed;
+            clipToUpdate.reverse = isReverse;
+            clipToUpdate.pitch_correction = pitchCorr;
+            clipToUpdate.source_duration_frames = baseMediaFrames;
+            clipToUpdate.timelineStartFrame = newTargetStart;
+            clipToUpdate.timeline_start = newTargetStart / fps;
+            clipToUpdate.outFrame = clipToUpdate.inFrame + newDurFrames;
+            clipToUpdate.out = (clipToUpdate.in || 0) + (baseMediaFrames / fps);
+
+            if (partnerToUpdate) {
+                partnerToUpdate.speed = newSpeed;
+                partnerToUpdate.reverse = isReverse;
+                partnerToUpdate.pitch_correction = pitchCorr;
+                partnerToUpdate.source_duration_frames = baseMediaFrames;
+                partnerToUpdate.timelineStartFrame = newTargetStart;
+                partnerToUpdate.timeline_start = newTargetStart / fps;
+                partnerToUpdate.outFrame = partnerToUpdate.inFrame + newDurFrames;
+                partnerToUpdate.out = (partnerToUpdate.in || 0) + (baseMediaFrames / fps);
+            }
+
+            // 2. Comportamento na Timeline: Cut (Manter Duração) vs Ripple (Deslocar) vs None
+            if (timelineMode === "cut") {
+                if (deltaFrames > 0) {
+                    const affectedTrackIds = new Set([clipToUpdate.track]);
+                    if (partnerToUpdate) affectedTrackIds.add(partnerToUpdate.track);
+                    const syncTracks = this.getSyncLockedTrackIds ? this.getSyncLockedTrackIds() : [];
+                    syncTracks.forEach(tId => affectedTrackIds.add(tId));
+
+                    const toRemoveIds = new Set();
+                    currentCuts.forEach(c => {
+                        if (c.id === clipToUpdate.id || (partnerToUpdate && c.id === partnerToUpdate.id)) return;
+                        if (!affectedTrackIds.has(c.track)) return;
+
+                        const cStart = c.timelineStartFrame || 0;
+                        const cDur = Math.max(1, (c.outFrame || 0) - (c.inFrame || 0));
+                        const cEnd = cStart + cDur;
+
+                        // Se o corte cai ou inicia dentro do intervalo de expansão [targetOldEnd, newTargetEnd]
+                        if (cStart < newTargetEnd && cEnd > targetOldEnd) {
+                            if (cEnd <= newTargetEnd) {
+                                // O corte é totalmente sobrescrito pelo clipe que cresceu
+                                toRemoveIds.add(c.id);
+                            } else {
+                                // O corte é cortado no início: move cStart para newTargetEnd e consome a mídia
+                                const overlap = newTargetEnd - cStart;
+                                c.inFrame = (c.inFrame || 0) + overlap;
+                                c.in = (c.in || 0) + (overlap / fps);
+                                c.timelineStartFrame = newTargetEnd;
+                                c.timeline_start = newTargetEnd / fps;
+                            }
+                        }
+                    });
+
+                    if (toRemoveIds.size > 0) {
+                        currentCuts = currentCuts.filter(c => !toRemoveIds.has(c.id));
+                    }
+                }
+                // Se deltaFrames <= 0, os cortes subsequentes permanecem nas suas posições exatas
+            } else if (timelineMode === "ripple" && deltaFrames !== 0) {
+                const affectedTrackIds = new Set([clipToUpdate.track]);
+                if (partnerToUpdate) affectedTrackIds.add(partnerToUpdate.track);
+
+                // Inclui pistas marcadas com syncLocked
+                const syncTracks = this.getSyncLockedTrackIds ? this.getSyncLockedTrackIds() : [];
+                syncTracks.forEach(tId => affectedTrackIds.add(tId));
+
+                currentCuts.forEach(c => {
+                    if (c.id === clipToUpdate.id || (partnerToUpdate && c.id === partnerToUpdate.id)) return;
+                    if (affectedTrackIds.has(c.track)) {
+                        const cStart = c.timelineStartFrame || 0;
+                        if (cStart >= targetOldEnd) {
+                            c.timelineStartFrame = Math.max(0, cStart + deltaFrames);
+                            c.timeline_start = c.timelineStartFrame / fps;
+                        }
+                    }
+                });
+            }
+
+            // 3. Posicionamento Relativo da Agulha (Playhead):
+            // Permanece na mesma porcentagem interna do vídeo editado, e não na posição temporal estática
+            if (typeof this.playheadFrame === "number") {
+                let alpha = (this.playheadFrame - targetStart) / oldDurFrames;
+                if (alpha < 0 || alpha > 1) {
+                    alpha = Math.max(0, Math.min(1, alpha));
+                }
+                const newPlayhead = Math.max(0, Math.round(newTargetStart + (alpha * newDurFrames)));
+                if (typeof this.setPlayheadFrame === "function") {
+                    this.setPlayheadFrame(newPlayhead);
+                } else {
+                    this.playheadFrame = newPlayhead;
+                    this.playheadSeconds = newPlayhead / fps;
+                    STATE.emit("timelinePlayheadChanged", this.playheadFrame);
+                }
+            }
+
+            STATE.activeTimelineCuts = currentCuts;
+        });
+
+        STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
+        STATE.emit("timelineClipSelected", targetClip.id);
+
+        return {
+            clipId: targetClip.id,
+            speed: newSpeed,
+            reverse: isReverse,
+            durationFrames: newDurFrames,
+            pitchCorrection: pitchCorr,
+            deltaFrames: deltaFrames,
+            timelineStartFrame: newTargetStart,
+            mode: timelineMode
+        };
+    }
+
+    /**
+     * Preenche automaticamente o espaço vazio (lacuna) adjacente na pista estendendo a duração
+     * e ajustando a velocidade do clipe selecionado (Fit to Gap — Ctrl+Alt+R).
+     * @param {string|null} clipId - ID do clipe ou null para o selecionado / sob a agulha
+     * @param {"auto"|"both"|"left"|"right"} direction - Direção do preenchimento
+     * @returns {Object|null}
+     */
+    fillTrackGap(clipId = null, direction = "auto") {
+        let targetId = clipId || this.selectedClipId;
+        const cuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        let clip = cuts.find(c => c.id === targetId);
+
+        if (!clip && typeof this.playheadFrame === "number") {
+            const curFrame = this.playheadFrame;
+            const underPlayhead = cuts.filter(c => {
+                const s = c.timelineStartFrame || 0;
+                const d = (c.outFrame || 0) - (c.inFrame || 0);
+                return curFrame >= s && curFrame <= s + d;
+            });
+            clip = underPlayhead.find(c => this.trackKindOf(c.track) === "video") || underPlayhead[0] || null;
+            if (clip) targetId = clip.id;
+        }
+
+        if (!clip) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("Selecione um clipe ou posicione a agulha para preencher espaço (Ctrl+Alt+R)", "warning");
+            }
+            return null;
+        }
+
+        const track = this.getTrack(clip.track);
+        if (track && track.locked) {
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast("A pista está travada com cadeado", "warning");
+            }
+            return null;
+        }
+
+        const trackCuts = cuts
+            .filter(c => c.track === clip.track && c.id !== clip.id)
+            .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+
+        const oldDurFrames = Math.max(1, (clip.outFrame || 0) - (clip.inFrame || 0));
+        const clipStart = clip.timelineStartFrame || 0;
+        const clipEnd = clipStart + oldDurFrames;
+
+        // 1. Espaço à esquerda (para trás)
+        let prevEnd = 0;
+        for (let i = trackCuts.length - 1; i >= 0; i--) {
+            const c = trackCuts[i];
+            const cS = c.timelineStartFrame || 0;
+            const cD = Math.max(1, (c.outFrame || 0) - (c.inFrame || 0));
+            if (cS + cD <= clipStart) {
+                prevEnd = cS + cD;
+                break;
+            }
+        }
+        const gapLeft = Math.max(0, clipStart - prevEnd);
+
+        // 2. Espaço à direita (para frente)
+        let nextStart = null;
+        for (let i = 0; i < trackCuts.length; i++) {
+            const c = trackCuts[i];
+            const cS = c.timelineStartFrame || 0;
+            if (cS >= clipEnd) {
+                nextStart = cS;
+                break;
+            }
+        }
+        if (nextStart === null) {
+            let maxOverallEnd = 0;
+            cuts.forEach(c => {
+                const s = c.timelineStartFrame || 0;
+                const d = Math.max(1, (c.outFrame || 0) - (c.inFrame || 0));
+                if (s + d > maxOverallEnd) maxOverallEnd = s + d;
+            });
+            if (maxOverallEnd > clipEnd) {
+                nextStart = maxOverallEnd;
+            }
+        }
+        const gapRight = (nextStart !== null) ? Math.max(0, nextStart - clipEnd) : 0;
+
+        let chosenDir = direction;
+        if (chosenDir === "auto") {
+            if (gapLeft > 0 && gapRight > 0) chosenDir = "both";
+            else if (gapRight > 0) chosenDir = "right";
+            else if (gapLeft > 0) chosenDir = "left";
+            else {
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("Nenhum espaço vazio adjacente na pista para preencher", "info");
+                }
+                return null;
+            }
+        }
+
+        let newStart = clipStart;
+        let newDur = oldDurFrames;
+        let labelDir = "";
+
+        if (chosenDir === "both") {
+            if (gapLeft <= 0 && gapRight <= 0) return null;
+            newStart = prevEnd;
+            newDur = (nextStart !== null ? nextStart : clipEnd) - prevEnd;
+            labelDir = "Ambos os Lados";
+        } else if (chosenDir === "left") {
+            if (gapLeft <= 0) return null;
+            newStart = prevEnd;
+            newDur = clipEnd - prevEnd;
+            labelDir = "Para Trás";
+        } else if (chosenDir === "right") {
+            if (gapRight <= 0 || nextStart === null) return null;
+            newStart = clipStart;
+            newDur = nextStart - clipStart;
+            labelDir = "Para Frente";
+        }
+
+        const currentSpeed = (typeof clip.speed === "number" && clip.speed > 0) ? clip.speed : 1.0;
+        const baseMediaFrames = clip.source_duration_frames || Math.max(1, Math.round(oldDurFrames * currentSpeed));
+        const newSpeed = baseMediaFrames / newDur;
+
+        const res = this.changeClipSpeed(clip.id, {
+            speed: newSpeed,
+            durationFrames: newDur,
+            newTimelineStartFrame: newStart,
+            reverse: Boolean(clip.reverse),
+            pitchCorrection: clip.pitch_correction !== false,
+            mode: "none" // NUNCA empurra outros clipes da timeline: apenas preenche o espaço vazio existente!
+        });
+
+        if (res) {
+            const pct = Math.round(newSpeed * 100);
+            const addedFrames = newDur - oldDurFrames;
+            if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                window.showToast(`⚡ Espaço preenchido (${labelDir}): velocidade ${pct}% (+${addedFrames}f)`, "success");
+            }
+            if (typeof window !== "undefined") {
+                if (window.TIMELINE_INTERACTION && window.TIMELINE_INTERACTION.renderer) {
+                    window.TIMELINE_INTERACTION.renderer.requestRedraw();
+                }
+                if (window.player && typeof window.player.syncVideoToPlayhead === "function") {
+                    window.player.syncVideoToPlayhead();
+                }
+            }
+        }
+        return res;
+    }
+
+    /**
      * Define as propriedades da sequência (largura, altura e fps) e reescala clipes.
      */
     setTimelineProperties({ width, height, fps }) {

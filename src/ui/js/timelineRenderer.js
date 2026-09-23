@@ -1337,6 +1337,15 @@ export class CapiauTimelineRenderer {
                 ctx.fillStyle = "rgba(56, 189, 248, 0.85)";
                 ctx.fillRect(startX, clipY, width, 3);
                 ctx.restore();
+            } else if (cut.reverse) {
+                // Estilização interna de clipe em sentido reverso (Reverse Clip)
+                ctx.save();
+                ctx.fillStyle = "rgba(244, 63, 94, 0.12)";
+                ctx.fillRect(startX, clipY, width, clipHeight);
+                // Faixa colorida rosa no topo do clipe reverso
+                ctx.fillStyle = "rgba(244, 63, 94, 0.85)";
+                ctx.fillRect(startX, clipY, width, 3);
+                ctx.restore();
             }
 
             // Miniaturas para pista de vídeo (se habilitadas na pista e globalmente)
@@ -1356,11 +1365,19 @@ export class CapiauTimelineRenderer {
                 const thumbWidth = Math.max(16, Math.round(clipHeight * aspect));
                 const isHeadOnly = TIMELINE_STATE.thumbnailMode === "head";
 
+                const clipSpeed = (typeof cut.speed === "number" && cut.speed > 0) ? cut.speed : 1.0;
+                const isClipReverse = Boolean(cut.reverse);
+
                 if (isHeadOnly || clipHeight < 26) {
                     // Modo 2: Apenas Início (Head Only / Primeiro Quadro) ou pista muito comprimida (< 26px)
-                    const targetTime = cut.is_freeze
-                        ? (cut.freeze_time !== undefined ? cut.freeze_time : (cut.in || 0))
-                        : (cut.in || 0);
+                    let targetTime;
+                    if (cut.is_freeze) {
+                        targetTime = (cut.freeze_time !== undefined ? cut.freeze_time : (cut.in || 0));
+                    } else if (isClipReverse) {
+                        targetTime = (typeof cut.out === "number" && !isNaN(cut.out)) ? cut.out : (cut.in || 0);
+                    } else {
+                        targetTime = (cut.in || 0);
+                    }
                     let img = this.getVideoThumb(video.id, targetTime);
                     if (!img) {
                         img = this.getClosestLoadedVideoThumb(video.id, targetTime);
@@ -1374,14 +1391,22 @@ export class CapiauTimelineRenderer {
                     const numThumbs = Math.max(1, Math.ceil(width / thumbWidth));
                     const startIdx = Math.max(0, Math.floor((-startX) / thumbWidth));
                     const endIdx = Math.min(numThumbs - 1, Math.ceil((this.width - startX) / thumbWidth));
+                    const mediaDurSecs = (typeof cut.out === "number" && typeof cut.in === "number" && cut.out > cut.in)
+                        ? (cut.out - cut.in)
+                        : (durationSecs * clipSpeed);
 
                     for (let i = startIdx; i <= endIdx; i++) {
                         const xOffset = i * thumbWidth;
                         const ratio = (xOffset + thumbWidth / 2) / width;
-                        const timeInClip = ratio * durationSecs;
-                        const targetTime = cut.is_freeze
-                            ? (cut.freeze_time !== undefined ? cut.freeze_time : (cut.in || 0))
-                            : (cut.in + timeInClip);
+                        let targetTime;
+                        if (cut.is_freeze) {
+                            targetTime = (cut.freeze_time !== undefined ? cut.freeze_time : (cut.in || 0));
+                        } else if (isClipReverse) {
+                            const outSec = (typeof cut.out === "number" && !isNaN(cut.out)) ? cut.out : ((cut.in || 0) + mediaDurSecs);
+                            targetTime = Math.max(cut.in || 0, outSec - (ratio * durationSecs * clipSpeed));
+                        } else {
+                            targetTime = (cut.in || 0) + (ratio * durationSecs * clipSpeed);
+                        }
 
                         const interval = TIMELINE_STATE.globalThumbnailsInterval || 1.0;
                         const roundedTime = Math.round(targetTime / interval) * interval;
@@ -1516,6 +1541,22 @@ export class CapiauTimelineRenderer {
                 label = `${prefix} ${effSubPrefix}${name} [${inTc} → ${outTc}]`;
             }
 
+            // Badge de velocidade e sentido reverso (Task 13)
+            // Badge de velocidade e sentido reverso em vermelho (Task 13)
+            const hasCustomSpeed = cut.speed !== undefined && cut.speed !== null && Number(cut.speed) !== 1.0;
+            const isReversed = Boolean(cut.reverse);
+            let speedBadgeText = "";
+            if (hasCustomSpeed || isReversed) {
+                const pct = Math.round((Number(cut.speed) || 1.0) * 100);
+                if (hasCustomSpeed && isReversed) {
+                    speedBadgeText = `⚡[${pct}% REV]`;
+                } else if (hasCustomSpeed) {
+                    speedBadgeText = `⚡[${pct}%]`;
+                } else if (isReversed) {
+                    speedBadgeText = `◀◀[REV]`;
+                }
+            }
+
             if (cut.disabled === true) {
                 label = `⊘ [DESATIVADO] ${label}`;
             }
@@ -1525,9 +1566,18 @@ export class CapiauTimelineRenderer {
             ctx.rect(startX + 4, clipY, width - 8, clipHeight);
             ctx.clip(); // Limita o desenho do texto ao espaço do clipe
 
-            ctx.fillStyle = cut.disabled === true ? "rgba(180, 180, 195, 0.65)" : this.colors.textPrimary;
             ctx.font = "bold 10px Inter, sans-serif";
-            ctx.fillText(label, startX + 8, clipY + 14);
+            let currentTextX = startX + 8;
+
+            if (speedBadgeText) {
+                // Desenha a porcentagem / badge de velocidade em VERMELHO vibrante
+                ctx.fillStyle = "#ef4444";
+                ctx.fillText(speedBadgeText, currentTextX, clipY + 14);
+                currentTextX += ctx.measureText(speedBadgeText + " ").width;
+            }
+
+            ctx.fillStyle = cut.disabled === true ? "rgba(180, 180, 195, 0.65)" : this.colors.textPrimary;
+            ctx.fillText(label, currentTextX, clipY + 14);
             ctx.restore();
 
             // Desenho dos Marcadores de Keyframe (losangos ◆) se houver canais de animação

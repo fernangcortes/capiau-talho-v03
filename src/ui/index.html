@@ -19,7 +19,7 @@
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Customizados -->
-    <link rel="stylesheet" href="styles.css?v=55">
+    <link rel="stylesheet" href="styles.css?v=62">
 </head>
 <body>
     <div class="app-container">
@@ -2318,6 +2318,142 @@
         </div>
     </div>
 
+    <!-- Diálogo Flutuante: Velocidade / Duração do Clipe (Clip Speed / Duration - Ctrl+R) -->
+    <div id="clip-speed-modal" class="floating-speed-dialog glassmorphism" style="display: none; position: fixed; top: 90px; right: 30px; width: 420px; z-index: 9990; border: 1px solid rgba(6, 182, 212, 0.45); box-shadow: 0 16px 45px rgba(0,0,0,0.75); border-radius: 8px; overflow: hidden; pointer-events: auto; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px);">
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div class="modal-header" id="clip-speed-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border-glass); cursor: move; user-select: none;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-gauge-high" style="color: var(--color-cyan); font-size: 14px;"></i>
+                    <h2 style="font-size: 13px; margin: 0; font-weight: 600; color: #f1f5f9;">Velocidade / Duração do Clipe</h2>
+                </div>
+                <button class="btn-close-modal" id="btn-close-clip-speed-modal" title="Fechar" style="font-size: 18px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; line-height: 1; padding: 2px 6px;">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Informações do Clipe Alvo -->
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 6px; padding: 5px 10px; font-size: 11px;">
+                    <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
+                        <i class="fa-solid fa-film" style="color: var(--color-cyan); font-size: 11px;"></i>
+                        <span id="clip-speed-target-name" style="color: #fff; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Clipe</span>
+                    </div>
+                    <span id="clip-speed-target-track" class="badge-track" style="font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(6,182,212,0.15); color: var(--color-cyan); font-weight: bold;">V1</span>
+                </div>
+
+                <!-- Linha Velocidade (%) e Duração com Trava Proporcional -->
+                <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center;">
+                    <!-- Velocidade (%) -->
+                    <div>
+                        <label for="clip-speed-input" style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Velocidade</label>
+                        <div style="display: flex; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 5px; padding: 0 8px; height: 32px;">
+                            <input type="number" id="clip-speed-input" min="1" max="10000" step="1" value="100" style="width: 100%; border: none; background: transparent; color: #fff; font-size: 13px; font-family: monospace; font-weight: 600; text-align: right; outline: none;">
+                            <span style="color: var(--text-muted); font-size: 12px; margin-left: 4px;">%</span>
+                        </div>
+                    </div>
+
+                    <!-- Botão Vínculo Proporcional (Trava) -->
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-top: 14px;">
+                        <button id="btn-clip-speed-lock" class="btn-speed-lock active" data-tooltip="Vínculo Proporcional Ativo: alterar velocidade recalcula a duração e vice-versa" style="background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.4); color: var(--color-cyan); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;">
+                            <i class="fa-solid fa-link" style="font-size: 11px;"></i>
+                        </button>
+                    </div>
+
+                    <!-- Duração -->
+                    <div>
+                        <label for="clip-speed-duration-input" style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Duração</label>
+                        <div style="display: flex; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 5px; padding: 0 8px; height: 32px;">
+                            <input type="text" id="clip-speed-duration-input" value="00:00:00:00" style="width: 100%; border: none; background: transparent; color: #fbbf24; font-size: 13px; font-family: monospace; font-weight: 600; text-align: center; outline: none;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Presets Rápidos de Velocidade -->
+                <div>
+                    <span style="font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); display: block; margin-bottom: 5px;">Presets Rápidos</span>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <button type="button" class="speed-preset-btn" data-speed="25">25% (0.25x)</button>
+                        <button type="button" class="speed-preset-btn" data-speed="50">50% (Câmera Lenta)</button>
+                        <button type="button" class="speed-preset-btn" data-speed="100">100% (Normal)</button>
+                        <button type="button" class="speed-preset-btn" data-speed="200">200% (2x Rápido)</button>
+                        <button type="button" class="speed-preset-btn" data-speed="400">400% (4x Hiper)</button>
+                    </div>
+                </div>
+
+                <!-- Slider Contínuo (Duplo Clique para 100%) -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="range" id="clip-speed-slider" min="10" max="500" value="100" title="Ajuste contínuo (Duplo clique para 100%)" data-tooltip="Duplo clique para voltar a 100%" style="flex: 1; accent-color: var(--color-cyan); cursor: pointer;">
+                </div>
+
+                <!-- Preenchimento de Espaço na Trilha (Fit to Gap) -->
+                <div id="clip-speed-gap-container" style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border-glass); padding-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); display: flex; align-items: center; gap: 5px;">
+                            <i class="fa-solid fa-arrows-to-dot" style="color: var(--color-cyan); font-size: 10px;"></i>
+                            Preencher Espaço na Trilha
+                        </span>
+                        <span id="clip-speed-gap-info" style="font-size: 9.5px; color: var(--color-cyan); font-family: monospace;"></span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 6px;">
+                        <button type="button" class="btn-gap-fill" id="btn-clip-speed-fill-left" title="Preencher espaço à esquerda (para trás) até o clipe anterior ou início da pista">
+                            <i class="fa-solid fa-arrow-left"></i> Para Trás
+                        </button>
+                        <button type="button" class="btn-gap-fill" id="btn-clip-speed-fill-both" title="Preencher espaço em ambos os lados até os clipes adjacentes">
+                            <i class="fa-solid fa-arrows-left-right"></i> Ambos os Lados
+                        </button>
+                        <button type="button" class="btn-gap-fill" id="btn-clip-speed-fill-right" title="Preencher espaço à direita (para frente) até o próximo clipe">
+                            Para Frente <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Comportamento na Timeline: Deslocar (Ripple) vs Cortar (Manter Tamanho) -->
+                <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border-glass); padding-top: 10px;">
+                    <span style="font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); display: block;">Comportamento na Timeline</span>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #e2e8f0; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 6px 8px; cursor: pointer; user-select: none;">
+                            <input type="radio" name="clip-speed-mode" id="rad-clip-speed-ripple" value="ripple" checked style="accent-color: var(--color-cyan); cursor: pointer;">
+                            <span style="display: flex; align-items: center; gap: 5px;">
+                                <i class="fa-solid fa-arrows-left-right-to-line" style="color: var(--color-cyan); font-size: 10px;"></i>
+                                Deslocar (Ripple)
+                            </span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #e2e8f0; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; padding: 6px 8px; cursor: pointer; user-select: none;">
+                            <input type="radio" name="clip-speed-mode" id="rad-clip-speed-cut" value="cut" style="accent-color: var(--color-cyan); cursor: pointer;">
+                            <span style="display: flex; align-items: center; gap: 5px;">
+                                <i class="fa-solid fa-scissors" style="color: #f59e0b; font-size: 10px;"></i>
+                                Cortar (Manter Tam.)
+                            </span>
+                        </label>
+                    </div>
+                    <!-- Checkbox de compatibilidade retroativa -->
+                    <input type="checkbox" id="chk-clip-speed-ripple" checked style="display: none;">
+                </div>
+
+                <!-- Checkboxes de Opções Avançadas -->
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="chk-clip-speed-reverse" style="accent-color: var(--color-cyan); cursor: pointer;">
+                        <span style="display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-backward" style="color: #f43f5e; font-size: 10px;"></i>
+                            Inverter Reprodução (Reverse Clip)
+                        </span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="chk-clip-speed-pitch" checked style="accent-color: var(--color-cyan); cursor: pointer;">
+                        <span style="display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-music" style="color: #a855f7; font-size: 10px;"></i>
+                            Manter afinação original do áudio (Pitch Correction)
+                        </span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding-top: 10px; border-top: 1px solid var(--border-glass); gap: 10px; display: flex; justify-content: flex-end;">
+                <button id="btn-cancel-clip-speed" class="btn-secondary" style="height: 30px; font-size: 11px; padding: 0 14px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-glass); color: #cbd5e1; border-radius: 4px; cursor: pointer;">Fechar</button>
+                <button id="btn-confirm-clip-speed" class="btn-primary" style="height: 30px; font-size: 11px; padding: 0 16px; background: linear-gradient(135deg, rgba(6,182,212,0.85), rgba(139,92,246,0.85)); border: none; color: #fff; font-weight: 600; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 0 12px rgba(6,182,212,0.3);">
+                    <i class="fa-solid fa-check"></i> Aplicar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Gerenciador de Nomes & Falantes -->
     <div id="names-manager-modal" class="modal-overlay" style="display: none; background: rgba(10, 8, 14, 0.95); backdrop-filter: blur(20px);">
         <div class="modal-content glassmorphism" style="width: 80%; max-width: 700px; height: 80vh; display: flex; flex-direction: column; padding: 25px; box-sizing: border-box; gap: 15px; border: 1px solid rgba(6, 182, 212, 0.3);">
@@ -3497,7 +3633,7 @@
     </div>
 
     <!-- Lógica da Aplicação -->
-    <script type="module" src="js/main.js?v=57"></script>
+    <script type="module" src="js/main.js?v=62"></script>
 </body>
 </html>
 

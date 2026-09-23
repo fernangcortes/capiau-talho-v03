@@ -1,6 +1,6 @@
 // Controlador de Interatividade, Cliques e Atalhos da Timeline (CapIAu-Talho)
 import { STATE } from "./state.js";
-import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds, framesToTimecode, evaluateFadeCurve, FADE_CURVE_PRESETS, getClipSyncStatus } from "./timelineState.js";
+import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames, framesToSeconds, framesToTimecode, formatRulerTimecode, evaluateFadeCurve, FADE_CURVE_PRESETS, getClipSyncStatus } from "./timelineState.js";
 import { setTabVisibility } from "./tabsCustomization.js";
 import { getActiveElement, getActiveQuerySelector } from "./workspaceManager.js";
 import {
@@ -73,6 +73,10 @@ export class CapiauTimelineInteraction {
     constructor(renderer) {
         this.renderer = renderer;
         this.canvas = renderer.canvas;
+        if (typeof window !== "undefined") {
+            window.TIMELINE_INTERACTION = this;
+            window.openClipSpeedDialog = (clipId) => this.openClipSpeedDialog(clipId);
+        }
         
         // Estado local de interação
         this.dragState = null; // null, "scrub", "drag-clip", "drag-selection", "trim-left", "trim-right", "pan", "fade-in-drag", "fade-out-drag", "fade-in-curve", "fade-out-curve", "slip", "slide"
@@ -3365,6 +3369,173 @@ export class CapiauTimelineInteraction {
         }
         menu.appendChild(itemFreeze);
 
+        // 3.6 Velocidade / Duração do Clipe (Ctrl+R)
+        const itemSpeed = document.createElement("div");
+        itemSpeed.className = "menu-item";
+        itemSpeed.style.display = "flex";
+        itemSpeed.style.alignItems = "center";
+        itemSpeed.style.justifyContent = "space-between";
+        itemSpeed.style.padding = "7px 12px";
+        itemSpeed.style.cursor = "pointer";
+        itemSpeed.innerHTML = `
+            <span style="display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-gauge-high" style="color:var(--color-cyan);"></i>
+                <span>Velocidade / Duração...</span>
+            </span>
+            <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Ctrl+R</kbd>
+        `;
+        itemSpeed.onclick = () => {
+            menu.remove();
+            this.openClipSpeedDialog(clip.id);
+        };
+        menu.appendChild(itemSpeed);
+
+        // Opções contextuais de Preenchimento de Lacunas na Trilha
+        const allTrackCuts = (STATE.activeTimelineCuts || [])
+            .filter(c => c.track === clip.track && c.id !== clip.id)
+            .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+        const cStartCtx = clip.timelineStartFrame || 0;
+        const cDurCtx = Math.max(1, (clip.outFrame || 0) - (clip.inFrame || 0));
+        const cEndCtx = cStartCtx + cDurCtx;
+
+        let prevEndCtx = 0;
+        for (let i = allTrackCuts.length - 1; i >= 0; i--) {
+            const c = allTrackCuts[i];
+            const s = c.timelineStartFrame || 0;
+            const d = Math.max(1, (c.outFrame || 0) - (c.inFrame || 0));
+            if (s + d <= cStartCtx) {
+                prevEndCtx = s + d;
+                break;
+            }
+        }
+        const gapLeftCtx = Math.max(0, cStartCtx - prevEndCtx);
+
+        let nextStartCtx = null;
+        for (let i = 0; i < allTrackCuts.length; i++) {
+            const c = allTrackCuts[i];
+            const s = c.timelineStartFrame || 0;
+            if (s >= cEndCtx) {
+                nextStartCtx = s;
+                break;
+            }
+        }
+        const gapRightCtx = (nextStartCtx !== null) ? Math.max(0, nextStartCtx - cEndCtx) : 0;
+
+        if (gapLeftCtx > 0 || gapRightCtx > 0) {
+            if (gapLeftCtx > 0 && gapRightCtx > 0) {
+                // Item 1: Ambos os Lados (Ação principal com atalho Ctrl+Alt+R)
+                const itemBoth = document.createElement("div");
+                itemBoth.className = "menu-item";
+                itemBoth.style.display = "flex";
+                itemBoth.style.alignItems = "center";
+                itemBoth.style.justifyContent = "space-between";
+                itemBoth.style.padding = "7px 12px";
+                itemBoth.style.cursor = "pointer";
+                itemBoth.title = `Preencher ambos os lados (+${gapLeftCtx}f à esquerda e +${gapRightCtx}f à direita)`;
+                itemBoth.setAttribute("data-tooltip", itemBoth.title);
+                itemBoth.innerHTML = `
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-arrows-left-right" style="color:var(--color-cyan);"></i>
+                        <span>Preencher Ambos</span>
+                    </span>
+                    <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Ctrl+Alt+R</kbd>
+                `;
+                itemBoth.onclick = () => {
+                    menu.remove();
+                    TIMELINE_STATE.fillTrackGap(clip.id, "both");
+                };
+                menu.appendChild(itemBoth);
+
+                // Item 2: Apenas para Frente
+                const itemRight = document.createElement("div");
+                itemRight.className = "menu-item";
+                itemRight.style.display = "flex";
+                itemRight.style.alignItems = "center";
+                itemRight.style.justifyContent = "space-between";
+                itemRight.style.padding = "7px 12px";
+                itemRight.style.cursor = "pointer";
+                itemRight.title = `Preencher espaço à frente (+${gapRightCtx}f)`;
+                itemRight.setAttribute("data-tooltip", itemRight.title);
+                itemRight.innerHTML = `
+                    <span style="display:flex; align-items:center; gap:8px; padding-left:14px; font-size:11px; color:var(--text-secondary);">
+                        <i class="fa-solid fa-arrow-right" style="color:var(--color-cyan); font-size:10px;"></i>
+                        <span>Preencher Frente</span>
+                    </span>
+                `;
+                itemRight.onclick = () => {
+                    menu.remove();
+                    TIMELINE_STATE.fillTrackGap(clip.id, "right");
+                };
+                menu.appendChild(itemRight);
+
+                // Item 3: Apenas para Trás
+                const itemLeft = document.createElement("div");
+                itemLeft.className = "menu-item";
+                itemLeft.style.display = "flex";
+                itemLeft.style.alignItems = "center";
+                itemLeft.style.justifyContent = "space-between";
+                itemLeft.style.padding = "7px 12px";
+                itemLeft.style.cursor = "pointer";
+                itemLeft.title = `Preencher espaço atrás (+${gapLeftCtx}f)`;
+                itemLeft.setAttribute("data-tooltip", itemLeft.title);
+                itemLeft.innerHTML = `
+                    <span style="display:flex; align-items:center; gap:8px; padding-left:14px; font-size:11px; color:var(--text-secondary);">
+                        <i class="fa-solid fa-arrow-left" style="color:var(--color-cyan); font-size:10px;"></i>
+                        <span>Preencher Trás</span>
+                    </span>
+                `;
+                itemLeft.onclick = () => {
+                    menu.remove();
+                    TIMELINE_STATE.fillTrackGap(clip.id, "left");
+                };
+                menu.appendChild(itemLeft);
+            } else if (gapRightCtx > 0) {
+                const itemRight = document.createElement("div");
+                itemRight.className = "menu-item";
+                itemRight.style.display = "flex";
+                itemRight.style.alignItems = "center";
+                itemRight.style.justifyContent = "space-between";
+                itemRight.style.padding = "7px 12px";
+                itemRight.style.cursor = "pointer";
+                itemRight.title = `Preencher espaço à frente (+${gapRightCtx}f)`;
+                itemRight.setAttribute("data-tooltip", itemRight.title);
+                itemRight.innerHTML = `
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-arrow-right" style="color:var(--color-cyan);"></i>
+                        <span>Preencher Frente</span>
+                    </span>
+                    <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Ctrl+Alt+R</kbd>
+                `;
+                itemRight.onclick = () => {
+                    menu.remove();
+                    TIMELINE_STATE.fillTrackGap(clip.id, "right");
+                };
+                menu.appendChild(itemRight);
+            } else if (gapLeftCtx > 0) {
+                const itemLeft = document.createElement("div");
+                itemLeft.className = "menu-item";
+                itemLeft.style.display = "flex";
+                itemLeft.style.alignItems = "center";
+                itemLeft.style.justifyContent = "space-between";
+                itemLeft.style.padding = "7px 12px";
+                itemLeft.style.cursor = "pointer";
+                itemLeft.title = `Preencher espaço atrás (+${gapLeftCtx}f)`;
+                itemLeft.setAttribute("data-tooltip", itemLeft.title);
+                itemLeft.innerHTML = `
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-arrow-left" style="color:var(--color-cyan);"></i>
+                        <span>Preencher Trás</span>
+                    </span>
+                    <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Ctrl+Alt+R</kbd>
+                `;
+                itemLeft.onclick = () => {
+                    menu.remove();
+                    TIMELINE_STATE.fillTrackGap(clip.id, "left");
+                };
+                menu.appendChild(itemLeft);
+            }
+        }
+
         // Divisor
         const sep1 = document.createElement("div");
         sep1.className = "menu-separator";
@@ -4678,6 +4849,560 @@ export class CapiauTimelineInteraction {
         if (tooltip) {
             tooltip.style.display = "none";
             this.isMarkerTooltipActive = false;
+        }
+    }
+
+    /**
+     * Abre o diálogo modal de Velocidade e Duração do Clipe (Task 13 — Ctrl+R).
+     * @param {string} [clipId] - ID do clipe alvo (opcional).
+     */
+    openClipSpeedDialog(clipId = null) {
+        let targetId = clipId || TIMELINE_STATE.selectedClipId;
+        const cuts = STATE.activeTimelineCuts || [];
+        let clip = cuts.find(c => c.id === targetId);
+
+        if (!clip && typeof TIMELINE_STATE.playheadFrame === "number") {
+            const curFrame = TIMELINE_STATE.playheadFrame;
+            const underPlayhead = cuts.filter(c => {
+                const s = c.timelineStartFrame || 0;
+                const d = (c.outFrame || 0) - (c.inFrame || 0);
+                return curFrame >= s && curFrame <= s + d;
+            });
+            clip = underPlayhead.find(c => TIMELINE_STATE.trackKindOf(c.track) === "video") || underPlayhead[0] || null;
+            if (clip) targetId = clip.id;
+        }
+
+        if (!clip) {
+            if (typeof window.showToast === "function") {
+                window.showToast("Selecione um clipe ou posicione a agulha sobre ele para ajustar a velocidade (Ctrl+R)", "warning");
+            }
+            return;
+        }
+
+        window.activeFocusedPlayer = "program";
+
+        const doc = this.canvas ? this.canvas.ownerDocument : document;
+        const modal = doc.getElementById("clip-speed-modal");
+        if (!modal) return;
+
+        const targetNameEl = doc.getElementById("clip-speed-target-name");
+        const targetTrackEl = doc.getElementById("clip-speed-target-track");
+        const speedInput = doc.getElementById("clip-speed-input");
+        const speedSlider = doc.getElementById("clip-speed-slider");
+        const durInput = doc.getElementById("clip-speed-duration-input");
+        const btnLock = doc.getElementById("btn-clip-speed-lock");
+        const chkReverse = doc.getElementById("chk-clip-speed-reverse");
+        const chkRipple = doc.getElementById("chk-clip-speed-ripple");
+        const chkPitch = doc.getElementById("chk-clip-speed-pitch");
+        const radRipple = doc.getElementById("rad-clip-speed-ripple");
+        const radCut = doc.getElementById("rad-clip-speed-cut");
+        const btnClose = doc.getElementById("btn-close-clip-speed-modal");
+        const btnCancel = doc.getElementById("btn-cancel-clip-speed");
+        const btnConfirm = doc.getElementById("btn-confirm-clip-speed");
+
+        // Permite arrastar o diálogo flutuante pela barra de título
+        const headerEl = doc.getElementById("clip-speed-header") || modal.querySelector(".modal-header");
+        if (headerEl && !headerEl.__dragBound) {
+            headerEl.__dragBound = true;
+            headerEl.style.cursor = "move";
+            let isDragging = false;
+            let startX = 0, startY = 0;
+            let initialLeft = 0, initialTop = 0;
+
+            headerEl.addEventListener("mousedown", (e) => {
+                if (e.target.closest("button, input")) return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = modal.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+
+                const onMouseMove = (moveEvt) => {
+                    if (!isDragging) return;
+                    const deltaX = moveEvt.clientX - startX;
+                    const deltaY = moveEvt.clientY - startY;
+                    const winW = (typeof window !== "undefined" && window.innerWidth) ? window.innerWidth : 1200;
+                    const winH = (typeof window !== "undefined" && window.innerHeight) ? window.innerHeight : 800;
+                    const maxLeft = Math.max(10, winW - (modal.offsetWidth || 420) - 10);
+                    const maxTop = Math.max(10, winH - (modal.offsetHeight || 300) - 10);
+                    const newLeft = Math.max(10, Math.min(maxLeft, initialLeft + deltaX));
+                    const newTop = Math.max(10, Math.min(maxTop, initialTop + deltaY));
+                    modal.style.left = `${newLeft}px`;
+                    modal.style.top = `${newTop}px`;
+                    modal.style.right = "auto";
+                    modal.style.bottom = "auto";
+                };
+
+                const onMouseUp = () => {
+                    isDragging = false;
+                    doc.removeEventListener("mousemove", onMouseMove);
+                    doc.removeEventListener("mouseup", onMouseUp);
+                };
+
+                doc.addEventListener("mousemove", onMouseMove);
+                doc.addEventListener("mouseup", onMouseUp);
+            });
+        }
+
+        if (!modal.__focusBound) {
+            modal.__focusBound = true;
+            modal.addEventListener("mousedown", () => {
+                window.activeFocusedPlayer = "program";
+            });
+        }
+
+        // Intercepta Barra de Espaço diretamente no modal para que NUNCA ative inputs ou botões,
+        // disparando sempre o Play/Pause da timeline (Program Player)
+        if (!modal.__spaceCaptureBound) {
+            modal.__spaceCaptureBound = true;
+            modal.addEventListener("keydown", (e) => {
+                if (e.code === "Space" || e.key === " " || e.keyCode === 32) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (doc.activeElement && typeof doc.activeElement.blur === "function") {
+                        try { doc.activeElement.blur(); } catch (_) {}
+                    }
+                    window.activeFocusedPlayer = "program";
+                    const canvas = doc.getElementById("timeline-canvas") || this.canvas;
+                    if (canvas && typeof canvas.focus === "function") {
+                        try { canvas.focus(); } catch (_) {}
+                    }
+                    if (window.player && window.player.programPlayer && typeof window.player.programPlayer.togglePlay === "function") {
+                        window.player.programPlayer.togglePlay();
+                    }
+                }
+            }, true); // useCapture = true para interceptar antes de qualquer controle filho
+        }
+
+        this._currentSpeedClipId = clip.id;
+
+        if (!this._clipSpeedSelectionBound) {
+            this._clipSpeedSelectionBound = true;
+            STATE.on("timelineClipSelected", (selectedId) => {
+                const spModal = doc.getElementById("clip-speed-modal");
+                if (spModal && spModal.style.display !== "none" && selectedId) {
+                    if (this._currentSpeedClipId === selectedId) return;
+                    this.openClipSpeedDialog(selectedId);
+                }
+            });
+        }
+
+        const fps = TIMELINE_STATE.fps || 24;
+        const oldDurFrames = Math.max(1, (clip.outFrame || 0) - (clip.inFrame || 0));
+        const currentSpeed = (typeof clip.speed === "number" && clip.speed > 0) ? clip.speed : 1.0;
+        const baseMediaFrames = clip.source_duration_frames || Math.max(1, Math.round(oldDurFrames * currentSpeed));
+
+        let isLocked = true;
+        let speedPct = Math.round(currentSpeed * 100);
+        let durFrames = oldDurFrames;
+
+        let clipDisplayName = clip.name || "";
+        if (!clipDisplayName) {
+            if (clip.type === "photo") {
+                const p = (STATE.allPhotos || []).find(ph => String(ph.id) === String(clip.photo_id));
+                clipDisplayName = p ? (p.title || p.filename) : `Foto ${clip.photo_id}`;
+            } else {
+                const v = (STATE.allVideos || []).find(vd => String(vd.id) === String(clip.video_id));
+                clipDisplayName = v ? (v.title || v.filename) : `Vídeo ${clip.video_id}`;
+            }
+        }
+        if (targetNameEl) targetNameEl.textContent = clipDisplayName;
+        if (targetTrackEl) targetTrackEl.textContent = clip.track || "V1";
+
+        let pendingNewStartFrame = clip.timelineStartFrame || 0;
+
+        const updateUIFromSpeed = (val) => {
+            speedPct = Math.max(1, Math.min(10000, Math.round(Number(val) || 100)));
+            if (speedInput) speedInput.value = speedPct;
+            if (speedSlider) speedSlider.value = Math.min(500, Math.max(10, speedPct));
+            modal.querySelectorAll(".speed-preset-btn").forEach(b => {
+                b.classList.toggle("active", Number(b.dataset.speed) === speedPct);
+            });
+            if (isLocked) {
+                const sFactor = speedPct / 100;
+                durFrames = Math.max(1, Math.round(baseMediaFrames / sFactor));
+                if (durInput) durInput.value = framesToTimecode(durFrames, fps);
+            }
+        };
+
+        const updateUIFromDuration = (newDurFramesVal) => {
+            durFrames = Math.max(1, Math.round(newDurFramesVal));
+            if (durInput) durInput.value = framesToTimecode(durFrames, fps);
+            if (isLocked) {
+                const sFactor = baseMediaFrames / durFrames;
+                speedPct = Math.max(1, Math.min(10000, Math.round(sFactor * 100)));
+                if (speedInput) speedInput.value = speedPct;
+                if (speedSlider) speedSlider.value = Math.min(500, Math.max(10, speedPct));
+                modal.querySelectorAll(".speed-preset-btn").forEach(b => {
+                    b.classList.toggle("active", Number(b.dataset.speed) === speedPct);
+                });
+            }
+        };
+
+        let isGapFillActive = false;
+        const clearGapFillActive = () => {
+            isGapFillActive = false;
+            const btnFillLeft = doc.getElementById("btn-clip-speed-fill-left");
+            const btnFillBoth = doc.getElementById("btn-clip-speed-fill-both");
+            const btnFillRight = doc.getElementById("btn-clip-speed-fill-right");
+            const gapInfoEl = doc.getElementById("clip-speed-gap-info");
+            if (btnFillLeft) btnFillLeft.classList.remove("active");
+            if (btnFillBoth) btnFillBoth.classList.remove("active");
+            if (btnFillRight) btnFillRight.classList.remove("active");
+            if (gapInfoEl) gapInfoEl.textContent = "";
+        };
+
+        updateUIFromSpeed(speedPct);
+        if (durInput) durInput.value = framesToTimecode(durFrames, fps);
+        if (chkReverse) chkReverse.checked = Boolean(clip.reverse);
+        if (chkPitch) chkPitch.checked = clip.pitch_correction !== false;
+
+        // Comportamento na Timeline: Mantém a escolha do usuário (não força retorno a deslocar)
+        const savedMode = TIMELINE_STATE._lastClipSpeedMode || "ripple";
+        if (radCut && radRipple && chkRipple) {
+            if (savedMode === "cut") {
+                radCut.checked = true;
+                radRipple.checked = false;
+                chkRipple.checked = false;
+            } else {
+                radRipple.checked = true;
+                radCut.checked = false;
+                chkRipple.checked = true;
+            }
+            radRipple.onchange = () => {
+                if (radRipple.checked) {
+                    TIMELINE_STATE._lastClipSpeedMode = "ripple";
+                    chkRipple.checked = true;
+                }
+            };
+            radCut.onchange = () => {
+                if (radCut.checked) {
+                    TIMELINE_STATE._lastClipSpeedMode = "cut";
+                    chkRipple.checked = false;
+                }
+            };
+        }
+
+        // Preenchimento de Espaço na Trilha (Fit to Gap)
+        const btnFillLeft = doc.getElementById("btn-clip-speed-fill-left");
+        const btnFillBoth = doc.getElementById("btn-clip-speed-fill-both");
+        const btnFillRight = doc.getElementById("btn-clip-speed-fill-right");
+        const gapInfoEl = doc.getElementById("clip-speed-gap-info");
+
+        const allCuts = STATE.activeTimelineCuts || [];
+        const trackCuts = allCuts
+            .filter(c => c.track === clip.track && c.id !== clip.id)
+            .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+
+        const clipStart = clip.timelineStartFrame || 0;
+        const clipEnd = clipStart + oldDurFrames;
+
+        // 1. Espaço à esquerda / para trás (clipe anterior ou início 0)
+        let prevEnd = 0;
+        for (let i = trackCuts.length - 1; i >= 0; i--) {
+            const c = trackCuts[i];
+            const cS = c.timelineStartFrame || 0;
+            const cD = Math.max(1, (c.outFrame || 0) - (c.inFrame || 0));
+            if (cS + cD <= clipStart) {
+                prevEnd = cS + cD;
+                break;
+            }
+        }
+        const gapLeft = Math.max(0, clipStart - prevEnd);
+
+        // 2. Espaço à direita / para frente (próximo clipe ou teto da timeline)
+        let nextStart = null;
+        for (let i = 0; i < trackCuts.length; i++) {
+            const c = trackCuts[i];
+            const cS = c.timelineStartFrame || 0;
+            if (cS >= clipEnd) {
+                nextStart = cS;
+                break;
+            }
+        }
+        if (nextStart === null) {
+            let maxOverallEnd = 0;
+            allCuts.forEach(c => {
+                const s = c.timelineStartFrame || 0;
+                const d = Math.max(1, (c.outFrame || 0) - (c.inFrame || 0));
+                if (s + d > maxOverallEnd) maxOverallEnd = s + d;
+            });
+            if (maxOverallEnd > clipEnd) {
+                nextStart = maxOverallEnd;
+            }
+        }
+        const gapRight = (nextStart !== null) ? Math.max(0, nextStart - clipEnd) : 0;
+
+        if (btnFillLeft) {
+            btnFillLeft.disabled = (gapLeft <= 0);
+            if (gapLeft > 0) {
+                btnFillLeft.title = `Preencher ${gapLeft}f à esquerda (início move de ${clipStart} para ${prevEnd})`;
+            }
+            btnFillLeft.onclick = (e) => {
+                e.preventDefault();
+                if (gapLeft <= 0) return;
+                clearGapFillActive();
+                isGapFillActive = true;
+                btnFillLeft.classList.add("active");
+                pendingNewStartFrame = prevEnd;
+                const newDur = clipEnd - prevEnd;
+                updateUIFromDuration(newDur);
+                if (gapInfoEl) gapInfoEl.textContent = `← +${gapLeft}f (${framesToTimecode(gapLeft, fps)})`;
+            };
+        }
+
+        if (btnFillRight) {
+            btnFillRight.disabled = (gapRight <= 0);
+            if (gapRight > 0) {
+                btnFillRight.title = `Preencher ${gapRight}f à direita (fim move de ${clipEnd} para ${nextStart})`;
+            }
+            btnFillRight.onclick = (e) => {
+                e.preventDefault();
+                if (gapRight <= 0) return;
+                clearGapFillActive();
+                isGapFillActive = true;
+                btnFillRight.classList.add("active");
+                pendingNewStartFrame = clipStart;
+                const newDur = nextStart - clipStart;
+                updateUIFromDuration(newDur);
+                if (gapInfoEl) gapInfoEl.textContent = `→ +${gapRight}f (${framesToTimecode(gapRight, fps)})`;
+            };
+        }
+
+        if (btnFillBoth) {
+            btnFillBoth.disabled = !(gapLeft > 0 && gapRight > 0);
+            if (gapLeft > 0 && gapRight > 0) {
+                btnFillBoth.title = `Preencher ambos os lados (${gapLeft}f à esq + ${gapRight}f à dir = ${gapLeft + gapRight}f total)`;
+            }
+            btnFillBoth.onclick = (e) => {
+                e.preventDefault();
+                if (gapLeft <= 0 || gapRight <= 0) return;
+                clearGapFillActive();
+                isGapFillActive = true;
+                btnFillBoth.classList.add("active");
+                pendingNewStartFrame = prevEnd;
+                const newDur = nextStart - prevEnd;
+                updateUIFromDuration(newDur);
+                if (gapInfoEl) gapInfoEl.textContent = `↔ +${gapLeft + gapRight}f (${framesToTimecode(gapLeft + gapRight, fps)})`;
+            };
+        }
+
+        if (btnLock) {
+            btnLock.classList.add("active");
+            const lockIcon = btnLock.querySelector("i");
+            if (lockIcon) lockIcon.className = "fa-solid fa-link";
+            btnLock.onclick = (e) => {
+                e.preventDefault();
+                isLocked = !isLocked;
+                btnLock.classList.toggle("active", isLocked);
+                if (lockIcon) lockIcon.className = isLocked ? "fa-solid fa-link" : "fa-solid fa-link-slash";
+            };
+        }
+
+        if (speedInput) {
+            speedInput.oninput = () => {
+                pendingNewStartFrame = clip.timelineStartFrame || 0;
+                clearGapFillActive();
+                updateUIFromSpeed(speedInput.value);
+            };
+            speedInput.onchange = () => {
+                pendingNewStartFrame = clip.timelineStartFrame || 0;
+                clearGapFillActive();
+                updateUIFromSpeed(speedInput.value);
+            };
+            speedInput.onkeydown = (e) => {
+                if (e.key === "Enter") {
+                    speedInput.blur();
+                    applySpeedChange();
+                }
+            };
+        }
+
+        // Slider Contínuo: suporte a Duplo Clique para voltar a 100%
+        if (speedSlider) {
+            speedSlider.oninput = () => {
+                pendingNewStartFrame = clip.timelineStartFrame || 0;
+                clearGapFillActive();
+                updateUIFromSpeed(speedSlider.value);
+            };
+            speedSlider.onchange = () => {
+                try { speedSlider.blur(); } catch (_) {}
+                const canvas = doc.getElementById("timeline-canvas") || this.canvas;
+                if (canvas && typeof canvas.focus === "function") {
+                    try { canvas.focus(); } catch (_) {}
+                }
+            };
+            speedSlider.ondblclick = (e) => {
+                e.preventDefault();
+                pendingNewStartFrame = clip.timelineStartFrame || 0;
+                clearGapFillActive();
+                speedSlider.value = 100;
+                updateUIFromSpeed(100);
+                try { speedSlider.blur(); } catch (_) {}
+                const canvas = doc.getElementById("timeline-canvas") || this.canvas;
+                if (canvas && typeof canvas.focus === "function") {
+                    try { canvas.focus(); } catch (_) {}
+                }
+                if (typeof window !== "undefined" && typeof window.showToast === "function") {
+                    window.showToast("⚡ Velocidade resetada para 100%", "info");
+                }
+            };
+        }
+
+        if (durInput) {
+            durInput.onchange = () => {
+                pendingNewStartFrame = clip.timelineStartFrame || 0;
+                clearGapFillActive();
+                let framesVal = durFrames;
+                const parseFn = (typeof parseTimecodeNavigation === "function")
+                    ? parseTimecodeNavigation
+                    : (typeof window !== "undefined" && typeof window.parseTimecodeNavigation === "function")
+                        ? window.parseTimecodeNavigation
+                        : null;
+                if (parseFn) {
+                    const parsed = parseFn(durInput.value, 0, fps, 360000);
+                    if (parsed && parsed.valid && parsed.targetFrame > 0) {
+                        framesVal = parsed.targetFrame;
+                    }
+                } else {
+                    const parts = durInput.value.trim().split(/[:;]/);
+                    if (parts.length === 4 && parts.every(p => /^\d+$/.test(p.trim()))) {
+                        const [h, m, s, f] = parts.map(Number);
+                        framesVal = (h * 3600 + m * 60 + s) * fps + f;
+                    } else if (parts.length === 3 && parts.every(p => /^\d+$/.test(p.trim()))) {
+                        const [m, s, f] = parts.map(Number);
+                        framesVal = (m * 60 + s) * fps + f;
+                    } else {
+                        const num = parseInt(durInput.value, 10);
+                        if (!isNaN(num) && num > 0) framesVal = num;
+                    }
+                }
+                updateUIFromDuration(framesVal);
+            };
+            durInput.onkeydown = (e) => {
+                if (e.key === "Enter") {
+                    durInput.blur();
+                    applySpeedChange();
+                } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    pendingNewStartFrame = clip.timelineStartFrame || 0;
+                    clearGapFillActive();
+                    updateUIFromDuration(durFrames + (e.shiftKey ? 10 : 1));
+                } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    pendingNewStartFrame = clip.timelineStartFrame || 0;
+                    clearGapFillActive();
+                    updateUIFromDuration(Math.max(1, durFrames - (e.shiftKey ? 10 : 1)));
+                }
+            };
+        }
+
+        modal.querySelectorAll(".speed-preset-btn").forEach(b => {
+            b.onclick = (e) => {
+                e.preventDefault();
+                pendingNewStartFrame = clip.timelineStartFrame || 0;
+                clearGapFillActive();
+                const pSpeed = Number(b.dataset.speed);
+                if (pSpeed > 0) updateUIFromSpeed(pSpeed);
+                try { b.blur(); } catch (_) {}
+                const canvas = doc.getElementById("timeline-canvas") || this.canvas;
+                if (canvas && typeof canvas.focus === "function") {
+                    try { canvas.focus(); } catch (_) {}
+                }
+            };
+        });
+
+        const closeDialog = () => {
+            modal.style.display = "none";
+            this._currentSpeedClipId = null;
+            doc.removeEventListener("keydown", handleKeydown);
+            window.activeFocusedPlayer = "program";
+            const canvas = doc.getElementById("timeline-canvas") || this.canvas;
+            if (canvas && typeof canvas.focus === "function") {
+                try { canvas.focus(); } catch (_) {}
+            }
+        };
+
+        const handleKeydown = (e) => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                closeDialog();
+            } else if (e.key === "Enter" && !e.target.matches("input, textarea")) {
+                e.preventDefault();
+                applySpeedChange();
+            }
+        };
+        doc.addEventListener("keydown", handleKeydown);
+
+        if (btnClose) btnClose.onclick = closeDialog;
+        if (btnCancel) btnCancel.onclick = closeDialog;
+
+        const applySpeedChange = () => {
+            const finalSpeed = speedPct / 100;
+            const finalReverse = chkReverse ? chkReverse.checked : false;
+            const finalPitch = chkPitch ? chkPitch.checked : true;
+            const finalMode = isGapFillActive ? "none" : ((radCut && radCut.checked) ? "cut" : "ripple");
+            const finalRipple = (finalMode === "ripple");
+
+            const res = TIMELINE_STATE.changeClipSpeed(clip.id, {
+                speed: finalSpeed,
+                durationFrames: durFrames,
+                newTimelineStartFrame: pendingNewStartFrame,
+                reverse: finalReverse,
+                ripple: finalRipple,
+                mode: finalMode,
+                pitchCorrection: finalPitch
+            });
+
+            // Desfoca imediatamente qualquer input ou botão do modal para que a barra de espaço não ative nada nele
+            if (speedInput) try { speedInput.blur(); } catch (_) {}
+            if (durInput) try { durInput.blur(); } catch (_) {}
+            if (btnConfirm) try { btnConfirm.blur(); } catch (_) {}
+            if (doc.activeElement && doc.activeElement.closest("#clip-speed-modal")) {
+                try { doc.activeElement.blur(); } catch (_) {}
+            }
+            window.activeFocusedPlayer = "program";
+            const canvas = doc.getElementById("timeline-canvas") || this.canvas;
+            if (canvas && typeof canvas.focus === "function") {
+                try { canvas.focus(); } catch (_) {}
+            }
+
+            if (res) {
+                // Atualiza a referência do corte ativo
+                const updatedClip = STATE.activeTimelineCuts.find(c => c.id === clip.id);
+                if (updatedClip) {
+                    clip = updatedClip;
+                }
+                if (this.renderer && typeof this.renderer.requestRedraw === "function") {
+                    this.renderer.requestRedraw();
+                }
+                if (typeof this.refreshClipInspector === "function") {
+                    this.refreshClipInspector();
+                }
+                if (window.player && typeof window.player.syncVideoToPlayhead === "function") {
+                    window.player.syncVideoToPlayhead();
+                }
+                if (typeof window.showToast === "function") {
+                    const revText = finalReverse ? " (Reverso)" : "";
+                    const modeText = finalMode === "cut" ? " [Manter Tamanho]" : (finalMode === "none" ? " [Preencher Espaço]" : " [Ripple]");
+                    window.showToast(`⚡ Velocidade ajustada para ${speedPct}%${revText}${modeText}`, "success");
+                }
+            }
+        };
+
+        if (btnConfirm) btnConfirm.onclick = applySpeedChange;
+
+        const wasHidden = (modal.style.display === "none" || !modal.style.display);
+        modal.style.display = "block";
+        window.activeFocusedPlayer = "program";
+        if (wasHidden) {
+            setTimeout(() => {
+                if (speedInput && modal.style.display !== "none") {
+                    speedInput.focus();
+                    speedInput.select();
+                }
+            }, 50);
         }
     }
 

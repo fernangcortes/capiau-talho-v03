@@ -217,6 +217,9 @@ export function parseTimecodeNavigation(inputStr, currentFrame = 0, fps = 24, ma
         formattedTimecode: formatTimecode(targetFrame / fpsVal, fpsVal)
     };
 }
+if (typeof window !== "undefined") {
+    window.parseTimecodeNavigation = parseTimecodeNavigation;
+}
 
 /**
  * Transforma um elemento de timecode em um controle numérico interativo por clique.
@@ -3464,7 +3467,18 @@ export class ProgramPlayer {
         const inSec = (cut && typeof cut.in === "number" && !isNaN(cut.in)) ? cut.in : 0;
         const startFrame = (cut && typeof cut.timelineStartFrame === "number" && !isNaN(cut.timelineStartFrame)) ? cut.timelineStartFrame : 0;
         const curFrame = (typeof frame === "number" && !isNaN(frame)) ? frame : 0;
-        return inSec + ((curFrame - startFrame) / fps);
+
+        const clipSpeed = (cut && typeof cut.speed === "number" && cut.speed > 0) ? cut.speed : 1.0;
+        const offsetSec = ((curFrame - startFrame) / fps) * clipSpeed;
+
+        if (cut && cut.reverse) {
+            const outSec = (cut && typeof cut.out === "number" && !isNaN(cut.out))
+                ? cut.out
+                : (inSec + (((cut.outFrame || 0) - (cut.inFrame || 0)) / fps) * clipSpeed);
+            return Math.max(inSec, Math.min(outSec, outSec - offsetSec));
+        }
+
+        return inSec + offsetSec;
     }
 
     /** true quando o buffer já tem o quadro certo decodificado e pode ir ao ar sem piscar. */
@@ -3519,13 +3533,16 @@ export class ProgramPlayer {
         if (clipChanged) el.dataset.activeClipId = String(cut.id);
 
         const drift = el.currentTime - target;
+        const clipSpeed = (cut && typeof cut.speed === "number" && cut.speed > 0) ? cut.speed : 1.0;
+        const isClipReversed = !!(cut && cut.reverse);
 
-        // SINCRONIA COM VELOCIDADE (shuttle JKL) SEM SEEK-LOOP:
+        // SINCRONIA COM VELOCIDADE (shuttle JKL e velocidade individual do clipe) SEM SEEK-LOOP:
         // Em reprodução, a deriva é corrigida suavemente via playbackRate em torno da
-        // velocidade corrente (baseRate); seek duro só em descontinuidade real.
+        // velocidade efetiva (baseRate); seek duro só em descontinuidade real.
         // Em reverso, o buffer fica pausado e o currentTime acompanha a agulha.
-        const baseRate = (this.isPlaying && this.playbackSpeed > 0)
-            ? Math.min(4.0, this.playbackSpeed) : 1.0;
+        const effectiveRate = this.playbackSpeed * clipSpeed;
+        const baseRate = (this.isPlaying && effectiveRate > 0)
+            ? Math.min(8.0, Math.max(0.1, effectiveRate)) : 1.0;
 
         if (cut && cut.is_freeze) {
             // Em quadros congelados (freeze frame), o buffer fica rigorosamente parado no alvo
@@ -3534,6 +3551,12 @@ export class ProgramPlayer {
                 el.currentTime = Math.max(0, target);
             }
             if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
+        } else if (isClipReversed || this.playbackSpeed < 0) {
+            // Clipe reverso ou shuttle reverso: mantenha o vídeo pausado e atualize currentTime suavemente
+            el._pendingSeekTarget = null;
+            if (!el.seeking && Math.abs(drift) > 0.03) {
+                el.currentTime = Math.max(0, target);
+            }
         } else if (srcChanged || (clipChanged && Math.abs(drift) > BUFFER_CONTINUITY_TOLERANCE)) {
             // Buffer entrando num clipe novo: posiciona antes de ir ao ar (está escondido).
             el._pendingSeekTarget = null;
@@ -3550,11 +3573,6 @@ export class ProgramPlayer {
                 el.playbackRate = baseRate * 1.08; // vídeo atrasado: acelera levemente
             } else if (el.playbackRate !== baseRate) {
                 el.playbackRate = baseRate;
-            }
-        } else if (live && this.isPlaying && this.playbackSpeed < 0) {
-            // Reverse: mantenha o vídeo pausado e atualize currentTime suavemente
-            if (!el.seeking && Math.abs(drift) > 0.03) {
-                el.currentTime = Math.max(0, target);
             }
         } else if (live) {
             // Pausado (scrub manual com a agulha):
@@ -3580,7 +3598,7 @@ export class ProgramPlayer {
         el.muted = true;
         if (cut && cut.is_freeze) {
             if (!el.paused) el.pause();
-        } else if (live && this.isPlaying && this.playbackSpeed > 0) {
+        } else if (live && this.isPlaying && this.playbackSpeed > 0 && !isClipReversed) {
             if (el.paused) el.play().catch(() => {});
         } else if (!el.paused) {
             el.pause();
@@ -4014,18 +4032,34 @@ export class ProgramPlayer {
             const alvo = this._fonteAudioEfetiva(cut, videoData);
             const audioSrc = alvo.src;
 
+            const clipSpeed = (cut && typeof cut.speed === "number" && cut.speed > 0) ? cut.speed : 1.0;
+            const isClipReversed = !!(cut && cut.reverse);
+
             // Fallback robusto para o in da fonte em segundos
             const cutInSec = (cut.in !== undefined && cut.in !== null && Number.isFinite(cut.in))
                 ? cut.in
                 : ((cut.inFrame || 0) / fps);
             const offsetFrames = currentFrame - (cut.timelineStartFrame ?? 0);
             const baseFonte = (el.dataset.audioTratado === "1" && alvo.tratado) ? 0 : cutInSec;
-            const targetSeconds = baseFonte + (offsetFrames / fps);
+
+            let targetSeconds;
+            if (isClipReversed) {
+                const cutOutSec = (cut.out !== undefined && cut.out !== null && Number.isFinite(cut.out))
+                    ? cut.out
+                    : (cutInSec + (((cut.outFrame || 0) - (cut.inFrame || 0)) / fps) * clipSpeed);
+                const offsetSec = (offsetFrames / fps) * clipSpeed;
+                targetSeconds = Math.max(cutInSec, cutOutSec - offsetSec);
+            } else {
+                targetSeconds = baseFonte + ((offsetFrames / fps) * clipSpeed);
+            }
             if (!Number.isFinite(targetSeconds)) return;
 
-            const isHighSpeedOrReverse = this.playbackSpeed > 2.0 || this.playbackSpeed < 0;
+            const isHighSpeedOrReverse = this.playbackSpeed > 2.0 || this.playbackSpeed < 0 || isClipReversed || (this.playbackSpeed * clipSpeed > 2.0);
             const clipChanged = el.dataset.activeClipId !== String(cut.id);
             const srcChanged = el.dataset.loadedSrc !== audioSrc;
+
+            if ("preservesPitch" in el) el.preservesPitch = cut.pitch_correction !== false;
+            if ("webkitPreservesPitch" in el) el.webkitPreservesPitch = cut.pitch_correction !== false;
 
             // Troca suave que deixou de corresponder ao pedido atual: aborta
             const pendente = this._trocaAudioPendente(track.id);
@@ -4092,7 +4126,7 @@ export class ProgramPlayer {
                         el.playbackRate = 1.0;
                     } else {
                         // Deriva sutil: nudge de taxa sem clicks
-                        const targetRate = Math.min(2.0, this.playbackSpeed);
+                        const targetRate = Math.min(2.0, Math.max(0.1, this.playbackSpeed * clipSpeed));
                         if (drift > 0.06) el.playbackRate = targetRate * 0.97;
                         else if (drift < -0.06) el.playbackRate = targetRate * 1.03;
                         else if (el.playbackRate !== targetRate) el.playbackRate = targetRate;
@@ -5533,6 +5567,28 @@ export class VideoPlayer {
 
     // Atalhos de teclado compartilhados
     handleGlobalKeyboard(e) {
+        const speedModal = document.getElementById("clip-speed-modal");
+        const isSpeedDialogOpen = speedModal && speedModal.style.display !== "none";
+
+        // Se a janela flutuante de velocidade estiver aberta e a Barra de Espaço for acionada:
+        // Dá play/pause na agulha da timeline (Program Player) e remove o foco de inputs/botões do modal
+        if (isSpeedDialogOpen && (e.code === "Space" || e.key === " " || e.keyCode === 32)) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (document.activeElement && typeof document.activeElement.blur === "function") {
+                try { document.activeElement.blur(); } catch (_) {}
+            }
+            window.activeFocusedPlayer = "program";
+            const canvas = document.getElementById("timeline-canvas");
+            if (canvas && typeof canvas.focus === "function") {
+                try { canvas.focus(); } catch (_) {}
+            }
+            if (this.programPlayer && typeof this.programPlayer.togglePlay === "function") {
+                this.programPlayer.togglePlay();
+            }
+            return;
+        }
+
         const activeEl = document.activeElement;
         const activeTag = activeEl?.tagName?.toLowerCase();
         const isTextInput = (activeTag === "input" && activeEl.type !== "range") ||
@@ -5556,6 +5612,7 @@ export class VideoPlayer {
         if (this.isKeyKDown && e.code !== "KeyK") {
             this._kJogUsed = true;
         }
+
 
         const activePlayer = window.activeFocusedPlayer === "source" ? this.sourcePlayer : this.programPlayer;
 
@@ -5660,6 +5717,11 @@ export class VideoPlayer {
         // Play / Pause (Espaço)
         if (KEYMAP_SERVICE.matches(e, "playback.play_pause")) {
             e.preventDefault();
+            if (isSpeedDialogOpen) {
+                window.activeFocusedPlayer = "program";
+                this.programPlayer.togglePlay();
+                return;
+            }
             activePlayer.togglePlay();
             return;
         }
@@ -5899,6 +5961,22 @@ export class VideoPlayer {
         if (KEYMAP_SERVICE.matches(e, "edit.freeze_frame")) {
             e.preventDefault();
             this.freezeFrameAtPlayhead();
+            return;
+        }
+
+        // Velocidade / Duração do Clipe / Clip Speed / Duration (Ctrl+R)
+        if (KEYMAP_SERVICE.matches(e, "edit.clip_speed")) {
+            e.preventDefault();
+            this.openClipSpeedDialog();
+            return;
+        }
+
+        // Preencher Espaço na Trilha / Fit to Gap (Ctrl+Alt+R)
+        if (KEYMAP_SERVICE.matches(e, "edit.fit_to_gap")) {
+            e.preventDefault();
+            if (typeof TIMELINE_STATE.fillTrackGap === "function") {
+                TIMELINE_STATE.fillTrackGap(null, "auto");
+            }
             return;
         }
 
@@ -6167,6 +6245,16 @@ export class VideoPlayer {
 
         this.syncVideoToPlayhead();
         return result;
+    }
+
+    /**
+     * Abre a caixa de diálogo de Velocidade e Duração do Clipe selecionado ou sob a agulha.
+     */
+    openClipSpeedDialog(clipId = null) {
+        if (typeof window !== "undefined" && typeof window.openClipSpeedDialog === "function") {
+            return window.openClipSpeedDialog(clipId);
+        }
+        return null;
     }
 
     /**

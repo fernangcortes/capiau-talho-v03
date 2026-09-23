@@ -318,6 +318,18 @@ export const COMMANDS_CATALOG = [
         description: "Captura o quadro sob a agulha e insere um segmento estático na timeline (Ctrl+Shift+F)"
     },
     {
+        id: "edit.clip_speed",
+        category: "edit",
+        label: "Velocidade / Duração do Clipe (Speed / Duration)",
+        description: "Abre o diálogo de velocidade percentual, duração proporcional e reversão do clipe selecionado (Ctrl+R)"
+    },
+    {
+        id: "edit.fit_to_gap",
+        category: "edit",
+        label: "Preencher Espaço na Trilha (Fit to Gap)",
+        description: "Estende a duração do clipe ajustando a velocidade para preencher automaticamente o espaço vazio adjacente na pista (Ctrl+Alt+R)"
+    },
+    {
         id: "edit.split",
         category: "edit",
         label: "Dividir Clipe no Playhead (Split)",
@@ -787,6 +799,8 @@ export const KEYMAP_PRESETS = {
         "edit.replace_clip": ["Ctrl+Shift+KeyR"],
         "edit.create_subclip": ["Ctrl+KeyU"],
         "edit.freeze_frame": ["Ctrl+Shift+KeyF"],
+        "edit.clip_speed": ["Ctrl+KeyR"],
+        "edit.fit_to_gap": ["Ctrl+Alt+KeyR"],
         "edit.split": ["KeyE", "KeyZ", "Alt+KeyE", "Alt+KeyZ"],
         "edit.ripple_trim_head": ["KeyQ"],
         "edit.ripple_trim_tail": ["KeyW"],
@@ -931,6 +945,8 @@ export const KEYMAP_PRESETS = {
         "edit.replace_clip": ["Ctrl+Shift+KeyR"],
         "edit.create_subclip": ["Ctrl+KeyU"],
         "edit.freeze_frame": ["Ctrl+Shift+KeyF"],
+        "edit.clip_speed": ["Ctrl+KeyR"],
+        "edit.fit_to_gap": ["Ctrl+Alt+KeyR"],
         "edit.split": ["Shift+KeyR", "KeyX"],
         "edit.ripple_trim_head": ["BracketLeft", "KeyQ"],
         "edit.ripple_trim_tail": ["BracketRight", "KeyW"],
@@ -1018,6 +1034,8 @@ export const KEYMAP_PRESETS = {
         "edit.replace_clip": ["Ctrl+Shift+KeyR"],
         "edit.create_subclip": ["Ctrl+KeyU"],
         "edit.freeze_frame": ["Ctrl+Shift+KeyF"],
+        "edit.clip_speed": ["Ctrl+KeyR"],
+        "edit.fit_to_gap": ["Ctrl+Alt+KeyR"],
         "edit.toggle_clip_disable": ["Shift+KeyE"],
         "edit.split": ["Ctrl+KeyK"],
         "edit.ripple_trim_head": ["KeyQ"],
@@ -1106,6 +1124,8 @@ export const KEYMAP_PRESETS = {
         "edit.replace_clip": ["Ctrl+Shift+KeyR"],
         "edit.create_subclip": ["Ctrl+KeyU"],
         "edit.freeze_frame": ["Ctrl+Shift+KeyF"],
+        "edit.clip_speed": ["Ctrl+KeyR"],
+        "edit.fit_to_gap": ["Ctrl+Alt+KeyR", "Cmd+Alt+KeyR"],
         "edit.toggle_clip_disable": ["KeyD"],
         "edit.split": ["Ctrl+Backslash"],
         "edit.ripple_trim_head": ["Shift+BracketLeft", "KeyQ"],
@@ -1194,6 +1214,8 @@ export const KEYMAP_PRESETS = {
         "edit.replace_clip": ["Ctrl+Shift+KeyR"],
         "edit.create_subclip": ["Ctrl+KeyU"],
         "edit.freeze_frame": ["Ctrl+Shift+KeyF"],
+        "edit.clip_speed": ["Ctrl+KeyR", "Cmd+KeyR"],
+        "edit.fit_to_gap": ["Ctrl+Alt+KeyR", "Cmd+Alt+KeyR"],
         "edit.toggle_clip_disable": ["KeyV"],
         "edit.split": ["Cmd+KeyB"],
         "edit.ripple_trim_head": ["Alt+BracketLeft", "KeyQ"],
