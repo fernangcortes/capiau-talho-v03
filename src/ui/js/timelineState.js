@@ -304,7 +304,7 @@ export class CapiauTimelineState {
         this.selectedTrack = "V1"; // Track focada ativa
         this.selectedGap = null; // Gap selecionado: { trackId, startFrame, endFrame, durationFrames }
         this.snappingEnabled = true; // Encaixe magnético global ativo por padrão
-        this.selectionFollowsPlayhead = false; // Modo 'Seleção Acompanha a Agulha' (Toggle)
+        this.selectionFollowsPlayhead = this.loadSelectionFollowsPlayhead(); // Modo 'Seleção Acompanha a Agulha' (Toggle - ativo por padrão)
 
         this.width = 1920; // Largura padrão da sequência (Fase 1)
         this.height = 1080; // Altura padrão da sequência (Fase 1)
@@ -3282,14 +3282,33 @@ export class CapiauTimelineState {
         }
     }
 
+    /** Carrega a preferência de 'Seleção Acompanha a Agulha' do localStorage (default: true). */
+    loadSelectionFollowsPlayhead() {
+        try {
+            if (typeof localStorage !== "undefined") {
+                const saved = localStorage.getItem("capiau_timeline_selection_follows_playhead");
+                if (saved !== null) return saved === "true";
+            }
+        } catch (_) {}
+        return true;
+    }
+
     /**
      * Alterna o modo 'Selection Follows Playhead'.
+     * @param {boolean} [enabled] - Força estado específico se fornecido.
+     * @returns {boolean} Novo estado.
      */
-    toggleSelectionFollowsPlayhead() {
-        this.selectionFollowsPlayhead = !this.selectionFollowsPlayhead;
+    toggleSelectionFollowsPlayhead(enabled) {
+        this.selectionFollowsPlayhead = (enabled !== undefined) ? !!enabled : !this.selectionFollowsPlayhead;
+        try {
+            if (typeof localStorage !== "undefined") {
+                localStorage.setItem("capiau_timeline_selection_follows_playhead", String(this.selectionFollowsPlayhead));
+            }
+        } catch (_) {}
         if (this.selectionFollowsPlayhead) {
             this.syncSelectionToPlayhead();
         }
+        STATE.emit("timelineSelectionFollowsPlayheadChanged", this.selectionFollowsPlayhead);
         return this.selectionFollowsPlayhead;
     }
 

@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -97,30 +97,38 @@ console.log("  ✔ getAllClipsAtPlayhead e addClipsToSelection (Shift+D) validad
 
 // 3. Validando Selection Follows Playhead e Botão na UI
 console.log("\n3. Validando Modo Selection Follows Playhead e Botão...");
-assert.strictEqual(tState.selectionFollowsPlayhead, false);
-
-tState.toggleSelectionFollowsPlayhead();
-assert.strictEqual(tState.selectionFollowsPlayhead, true);
+assert.strictEqual(tState.selectionFollowsPlayhead, true, "Modo selectionFollowsPlayhead deve ser ativo por padrão");
 
 tState.setPlayheadFrame(10);
-assert.strictEqual(tState.selectedClipId, "c1");
+assert.strictEqual(tState.selectedClipId, "c1", "Deve selecionar clipe c1 sob o playhead no frame 10");
 
 tState.setPlayheadFrame(60);
-assert.strictEqual(tState.selectedClipId, null);
+assert.strictEqual(tState.selectedClipId, null, "Deve limpar seleção quando sob o gap no frame 60");
 
 tState.setPlayheadFrame(80);
-assert.strictEqual(tState.selectedClipId, "c2");
+assert.strictEqual(tState.selectedClipId, "c2", "Deve selecionar clipe c2 sob o playhead no frame 80");
 
+// Alternar para desativar
 tState.toggleSelectionFollowsPlayhead();
-assert.strictEqual(tState.selectionFollowsPlayhead, false);
+assert.strictEqual(tState.selectionFollowsPlayhead, false, "Deve alternar para desativado");
+
+// Quando desativado, o playhead não altera seleção automaticamente
+tState.setPlayheadFrame(10);
+assert.strictEqual(tState.selectedClipId, "c2", "Com o modo desativado, mover a agulha não altera a seleção");
+
+// Reativar modo
+tState.toggleSelectionFollowsPlayhead();
+assert.strictEqual(tState.selectionFollowsPlayhead, true, "Deve reativar o modo com sucesso");
+assert.strictEqual(tState.selectedClipId, "c1", "Ao reativar no frame 10, deve selecionar c1 imediatamente");
 
 // Validação do DOM do botão #btn-selection-follows-playhead
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const htmlContent = readFileSync(path.join(raiz, "src", "ui", "index.html"), "utf8");
 assert.ok(htmlContent.includes('id="btn-selection-follows-playhead"'), "Botão #btn-selection-follows-playhead deve existir no index.html");
-assert.ok(htmlContent.includes('data-tooltip="Seleção Acompanha a Agulha (Ctrl+Alt+P)"'), "Tooltip do botão deve indicar atalho Ctrl+Alt+P");
+assert.ok(htmlContent.includes('id="btn-selection-follows-playhead" class="btn-toolbar-action active"'), "Botão #btn-selection-follows-playhead deve vir com classe active por padrão");
+assert.ok(htmlContent.includes('data-tooltip="Seleção Acompanha a Agulha: ATIVADA (Ctrl+Alt+P)"'), "Tooltip do botão deve indicar estado ATIVADA e atalho Ctrl+Alt+P");
 
-console.log("  ✔ Selection Follows Playhead e botão na toolbar validados com sucesso.");
+console.log("  ✔ Selection Follows Playhead (ativo por padrão) e botão na toolbar validados com sucesso.");
 
 // 4. Validando Disable / Mute de Clipe (KeyF)
 console.log("\n4. Validando Toggle Disable/Mute de Clipe...");

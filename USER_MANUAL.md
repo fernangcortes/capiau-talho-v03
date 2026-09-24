@@ -373,7 +373,7 @@ Para maximizar a produtividade e permitir montagem ultraveloz na mão esquerda s
 - **`F` (Toggle Disable / Mute Clip):** Alterna o estado ativo/desativado do clipe. Clipes desativados ganham hachura diagonal, etiqueta `⊘ [DESATIVADO]`, ganho de áudio zerado no player e bypass na exportação.
 
 ### H. Modo "Seleção Acompanha a Agulha" (Selection Follows Playhead)
-- **Atalho `Ctrl + Alt + P` & Botão na Barra:** Ative ou desative o modo pelo atalho **`Ctrl + Alt + P`** ou pelo botão com indicador LED ciano na barra de ferramentas (`#btn-selection-follows-playhead`).
+- **Atalho `Ctrl + Alt + P` & Botão na Barra:** Ativo por padrão na timeline (padrão NLE profissional). Pode ser ativado ou desativado a qualquer momento pelo atalho **`Ctrl + Alt + P`** ou pelo botão com indicador LED ciano na barra de ferramentas (`#btn-selection-follows-playhead`).
 - **Comportamento Dinâmico:** Ao navegar pela timeline (via J-K-L, setas, A/S ou arrasto na régua), o clipe que cruza a agulha de reprodução na trilha ativa é selecionado automaticamente. Isso permite aplicar trims, splits, desativações ou ajustes no Inspetor de forma contínua sem tocar no mouse.
 
 ### I. Vínculo de Clipes (Link A/V) e Edição de J/L-Cuts (Tecla U)

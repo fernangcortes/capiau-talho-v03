@@ -7151,6 +7151,7 @@ export class CapiauTimelineInteraction {
                 refocusTimeline(btnFollow);
             };
         }
+        STATE.on("timelineSelectionFollowsPlayheadChanged", () => updateFollowButton());
 
         const btnFollowPlayhead = doc.getElementById("btn-timeline-follow-playhead");
         const updateFollowPlayheadButton = () => {
