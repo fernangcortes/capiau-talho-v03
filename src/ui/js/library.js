@@ -4109,12 +4109,31 @@ function renderTreeNode(node, container, depth = 0) {
         card.style.paddingLeft = "6px";
         card._mediaData = v;
         card._mediaKind = "video";
-        card.addEventListener("mouseenter", () => {
-            if (window._galleryController) window._galleryController.activeItem = card;
+        card.addEventListener("mouseenter", (e) => {
+            if (window._galleryController) {
+                window._galleryController.activeItem = card;
+                if (e.shiftKey) {
+                    window._galleryController.showShiftHud(card, e);
+                }
+            }
         });
-        card.addEventListener("mouseleave", () => {
+        card.addEventListener("mousemove", (e) => {
+            if (window._galleryController) {
+                if (e.shiftKey) {
+                    window._galleryController.showShiftHud(card, e);
+                } else if (window._galleryController.shiftHud) {
+                    window._galleryController.hideShiftHud();
+                }
+            }
+        });
+        card.addEventListener("mouseleave", (e) => {
             if (window._galleryController && window._galleryController.activeItem === card) {
+                const hud = window._galleryController.shiftHud;
+                if (e && e.relatedTarget && hud && (e.relatedTarget === hud || (typeof hud.contains === "function" && hud.contains(e.relatedTarget)))) {
+                    return;
+                }
                 window._galleryController.activeItem = null;
+                window._galleryController.hideShiftHud();
             }
         });
         if (STATE.activeVideo && STATE.activeVideo.id === v.id) card.classList.add("active");
@@ -4492,12 +4511,31 @@ function renderTreeNode(node, container, depth = 0) {
         card.style.paddingLeft = "6px";
         card._mediaData = p;
         card._mediaKind = "photo";
-        card.addEventListener("mouseenter", () => {
-            if (window._galleryController) window._galleryController.activeItem = card;
+        card.addEventListener("mouseenter", (e) => {
+            if (window._galleryController) {
+                window._galleryController.activeItem = card;
+                if (e.shiftKey) {
+                    window._galleryController.showShiftHud(card, e);
+                }
+            }
         });
-        card.addEventListener("mouseleave", () => {
+        card.addEventListener("mousemove", (e) => {
+            if (window._galleryController) {
+                if (e.shiftKey) {
+                    window._galleryController.showShiftHud(card, e);
+                } else if (window._galleryController.shiftHud) {
+                    window._galleryController.hideShiftHud();
+                }
+            }
+        });
+        card.addEventListener("mouseleave", (e) => {
             if (window._galleryController && window._galleryController.activeItem === card) {
+                const hud = window._galleryController.shiftHud;
+                if (e && e.relatedTarget && hud && (e.relatedTarget === hud || (typeof hud.contains === "function" && hud.contains(e.relatedTarget)))) {
+                    return;
+                }
                 window._galleryController.activeItem = null;
+                window._galleryController.hideShiftHud();
             }
         });
         if (STATE.activePhoto && STATE.activePhoto.id === p.id) card.classList.add("active");
@@ -4964,19 +5002,45 @@ export class GalleryInteractionController {
         this.bindGlobalEvents();
     }
 
-    initSingletonElements() {
-        if (typeof document === "undefined") return;
-        
-        // HUD Flutuante Desacoplado para Shift + Hover
-        let hud = document.getElementById("gallery-shift-hud");
+    getShiftHud(targetDoc = (typeof document !== "undefined" ? document : null)) {
+        if (!targetDoc) return null;
+        let hud = targetDoc.getElementById("gallery-shift-hud");
         if (!hud) {
-            hud = document.createElement("div");
+            hud = targetDoc.createElement("div");
             hud.id = "gallery-shift-hud";
             hud.className = "gallery-shift-hud";
             hud.style.display = "none";
-            document.body.appendChild(hud);
+            if (targetDoc.body && typeof targetDoc.body.appendChild === "function") {
+                targetDoc.body.appendChild(hud);
+            }
         }
-        this.shiftHud = hud;
+        return hud;
+    }
+
+    hideShiftHud() {
+        if (this.shiftHud) {
+            this.shiftHud.style.display = "none";
+        }
+        const mainHud = (typeof document !== "undefined") ? document.getElementById("gallery-shift-hud") : null;
+        if (mainHud) mainHud.style.display = "none";
+
+        if (typeof window !== "undefined" && window.popoutWindows) {
+            Object.values(window.popoutWindows).forEach(win => {
+                try {
+                    if (win && !win.closed && win.document) {
+                        const popHud = win.document.getElementById("gallery-shift-hud");
+                        if (popHud) popHud.style.display = "none";
+                    }
+                } catch (_) {}
+            });
+        }
+    }
+
+    initSingletonElements() {
+        if (typeof document === "undefined") return;
+        
+        // HUD Flutuante Desacoplado para Shift + Hover no documento principal
+        this.shiftHud = this.getShiftHud(document);
 
         // Singleton Hover Video Player
         if (!this.hoverVideo) {
@@ -5050,9 +5114,15 @@ export class GalleryInteractionController {
             if (e.key === "Alt" && this.isAltInspecting) {
                 this.stopAltInspecting();
             }
-            if (e.key === "Shift" && this.shiftHud) {
-                this.shiftHud.style.display = "none";
+            if (e.key === "Shift") {
+                this.hideShiftHud();
             }
+        });
+
+        window.addEventListener("blur", () => {
+            if (this.isCtrlScrubbing) this.stopCtrlScrubbing();
+            if (this.isAltInspecting) this.stopAltInspecting();
+            this.hideShiftHud();
         });
 
         window.addEventListener("keydown", (e) => {
@@ -5084,7 +5154,7 @@ export class GalleryInteractionController {
         });
     }
 
-    /** Permite interceptar atalhos (como 'R' no hover) em janelas destacadas (popout). */
+    /** Permite interceptar atalhos (como 'R' e 'Shift' no hover) em janelas destacadas (popout). */
     attachToWindow(win) {
         if (!win || win._hasGalleryInteraction) return;
         win._hasGalleryInteraction = true;
@@ -5096,9 +5166,15 @@ export class GalleryInteractionController {
             if (e.key === "Alt" && this.isAltInspecting) {
                 this.stopAltInspecting();
             }
-            if (e.key === "Shift" && this.shiftHud) {
-                this.shiftHud.style.display = "none";
+            if (e.key === "Shift") {
+                this.hideShiftHud();
             }
+        });
+
+        win.addEventListener("blur", () => {
+            if (this.isCtrlScrubbing) this.stopCtrlScrubbing();
+            if (this.isAltInspecting) this.stopAltInspecting();
+            this.hideShiftHud();
         });
 
         win.addEventListener("keydown", (e) => {
@@ -5252,9 +5328,7 @@ export class GalleryInteractionController {
                 this.hoverVideo.parentNode.removeChild(this.hoverVideo);
             }
         }
-        if (this.shiftHud) {
-            this.shiftHud.style.display = "none";
-        }
+        this.hideShiftHud();
         if (this.activeItem) {
             this.activeItem.classList.remove("scrubbing");
             const thumbImg = this.activeItem.querySelector(".gallery-thumb-img");
@@ -5325,7 +5399,7 @@ export class GalleryInteractionController {
 
         itemEl.addEventListener("mouseenter", (e) => this.onMouseEnter(itemEl, e));
         itemEl.addEventListener("mousemove", (e) => this.onMouseMove(itemEl, e));
-        itemEl.addEventListener("mouseleave", () => this.onMouseLeave(itemEl));
+        itemEl.addEventListener("mouseleave", (e) => this.onMouseLeave(itemEl, e));
         
         // Atalho rápido: Ctrl + Shift + Clique grava/remove instante crucial
         itemEl.addEventListener("click", (e) => {
@@ -5370,7 +5444,7 @@ export class GalleryInteractionController {
         if (e.shiftKey) {
             this.showShiftHud(itemEl, e);
         } else if (this.shiftHud) {
-            this.shiftHud.style.display = "none";
+            this.hideShiftHud();
         }
 
         if (itemEl._mediaKind !== "video") return;
@@ -5387,7 +5461,10 @@ export class GalleryInteractionController {
         }
     }
 
-    onMouseLeave(itemEl) {
+    onMouseLeave(itemEl, e = null) {
+        if (e && e.relatedTarget && this.shiftHud && (e.relatedTarget === this.shiftHud || (typeof this.shiftHud.contains === "function" && this.shiftHud.contains(e.relatedTarget)))) {
+            return;
+        }
         if (this.activeItem === itemEl) {
             this.stopAllHover();
         }
@@ -5433,6 +5510,11 @@ export class GalleryInteractionController {
 
         // Previne flash/blink preto: inicia transparente e revela apenas quando os frames começarem a tocar
         this.hoverVideo.style.opacity = "0";
+        if (itemEl.ownerDocument && this.hoverVideo.ownerDocument !== itemEl.ownerDocument && typeof itemEl.ownerDocument.adoptNode === "function") {
+            try {
+                itemEl.ownerDocument.adoptNode(this.hoverVideo);
+            } catch (_) {}
+        }
         itemEl.appendChild(this.hoverVideo);
 
         const onFrameReady = () => {
@@ -5778,7 +5860,31 @@ export class GalleryInteractionController {
     }
 
     showShiftHud(itemEl, e = null) {
-        if (!this.shiftHud || !itemEl || !itemEl._mediaData) return;
+        if (!itemEl || !itemEl._mediaData) return;
+        const targetDoc = itemEl.ownerDocument || (typeof document !== "undefined" ? document : null);
+        if (!targetDoc) return;
+        const targetWin = targetDoc.defaultView || (typeof window !== "undefined" ? window : globalThis);
+
+        // Oculta HUD de outros documentos para evitar que o card apareça no editor principal
+        if (typeof document !== "undefined" && targetDoc !== document) {
+            const mainHud = document.getElementById("gallery-shift-hud");
+            if (mainHud) mainHud.style.display = "none";
+        }
+        if (typeof window !== "undefined" && window.popoutWindows) {
+            Object.values(window.popoutWindows).forEach(win => {
+                try {
+                    if (win && !win.closed && win.document && win.document !== targetDoc) {
+                        const otherHud = win.document.getElementById("gallery-shift-hud");
+                        if (otherHud) otherHud.style.display = "none";
+                    }
+                } catch (_) {}
+            });
+        }
+
+        const hud = this.getShiftHud(targetDoc);
+        if (!hud) return;
+        this.shiftHud = hud;
+
         const item = itemEl._mediaData;
         const isVideo = itemEl._mediaKind === "video";
 
@@ -5849,21 +5955,41 @@ export class GalleryInteractionController {
             ${actionsHtml}
         `;
 
-        // Posiciona desacoplado próximo ao item sem sair da janela
-        const rect = itemEl.getBoundingClientRect();
+        // Posiciona desacoplado próximo ao item na janela correta (popout ou principal)
+        const rect = (typeof itemEl.getBoundingClientRect === "function")
+            ? itemEl.getBoundingClientRect()
+            : { top: 0, bottom: 0, left: 0, right: 0 };
         let top = rect.bottom + 6;
         let left = rect.left;
 
-        if (top + 160 > window.innerHeight) {
-            top = Math.max(10, rect.top - 170);
+        const maxH = targetWin.innerHeight || 800;
+        const maxW = targetWin.innerWidth || 1200;
+
+        this.shiftHud.style.visibility = "hidden";
+        this.shiftHud.style.display = "block";
+        const hudH = this.shiftHud.offsetHeight || 180;
+        const hudW = this.shiftHud.offsetWidth || 300;
+
+        if (top + hudH > maxH - 10) {
+            top = Math.max(10, rect.top - hudH - 6);
         }
-        if (left + 300 > window.innerWidth) {
-            left = Math.max(10, window.innerWidth - 310);
+        if (left + hudW > maxW - 10) {
+            left = Math.max(10, maxW - hudW - 10);
         }
+        left = Math.max(10, left);
+        top = Math.max(10, top);
 
         this.shiftHud.style.top = `${top}px`;
         this.shiftHud.style.left = `${left}px`;
-        this.shiftHud.style.display = "block";
+        this.shiftHud.style.visibility = "visible";
+
+        // Manter HUD aberto caso o cursor navegue para dentro dele
+        this.shiftHud.onmouseleave = (ev) => {
+            if (ev && ev.relatedTarget && (ev.relatedTarget === itemEl || (typeof itemEl.contains === "function" && itemEl.contains(ev.relatedTarget)))) {
+                return;
+            }
+            this.hideShiftHud();
+        };
 
         // Listeners dos botões do HUD
         const btnRotate = this.shiftHud.querySelector(".btn-hud-rotate");
@@ -5871,7 +5997,7 @@ export class GalleryInteractionController {
             btnRotate.onclick = async (ev) => {
                 ev.stopPropagation();
                 await this.rotateActiveItem(ev.shiftKey ? -90 : 90);
-                this.shiftHud.style.display = "none";
+                this.hideShiftHud();
             };
         }
 
@@ -5880,7 +6006,7 @@ export class GalleryInteractionController {
             btnCrucial.onclick = async (ev) => {
                 ev.stopPropagation();
                 await this.handleCtrlShiftClick(itemEl, ev);
-                this.shiftHud.style.display = "none";
+                this.hideShiftHud();
             };
         }
 
@@ -5888,7 +6014,7 @@ export class GalleryInteractionController {
         if (btnOpen) {
             btnOpen.onclick = (ev) => {
                 ev.stopPropagation();
-                this.shiftHud.style.display = "none";
+                this.hideShiftHud();
                 if (isVideo) {
                     STATE.activeVideo = item;
                     window.activeFocusedPlayer = "source";
@@ -5898,6 +6024,10 @@ export class GalleryInteractionController {
             };
         }
     }
+}
+
+if (typeof window !== "undefined") {
+    window.GalleryInteractionController = GalleryInteractionController;
 }
 
 export class LibraryManager {
@@ -6070,6 +6200,12 @@ export class LibraryManager {
         this.attachScrollListener(win.document.querySelector("#sidebar-left .sidebar-content.scrollable"));
         this.attachWheelZoomListener(win.document);
 
+        // Conecta o controller de eventos avançados (hover play, Ctrl scrub, Alt momentos, Shift HUD) à janela destacada
+        if (!window._galleryController) {
+            window._galleryController = new GalleryInteractionController();
+        }
+        window._galleryController.attachToWindow(win);
+
         // Reposiciona o dropdown de opções de exibição e ordenação para a janela popout
         if (typeof this.onPopoutDisplaySettings === "function") {
             this.onPopoutDisplaySettings(win);
@@ -6080,6 +6216,9 @@ export class LibraryManager {
     }
 
     onPopoutRestored() {
+        if (window._galleryController) {
+            window._galleryController.hideShiftHud();
+        }
         if (typeof this.onRestoreLibrarySort === "function") {
             this.onRestoreLibrarySort();
         }
@@ -6111,6 +6250,9 @@ export class LibraryManager {
     }
 
     init() {
+        if (!window._galleryController) {
+            window._galleryController = new GalleryInteractionController();
+        }
         this.attachScrollListener();
         this.attachWheelZoomListener();
         STATE.on("videosUpdated", (videos) => this.renderVideos(videos));

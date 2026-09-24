@@ -2863,6 +2863,7 @@ export class WorkspaceManager {
                 hoverPreviewEnabled: ts.hoverPreviewEnabled,
                 followPlayhead: ts.followPlayhead,
                 followPlayheadMode: ts.followPlayheadMode,
+                selectionFollowsPlayhead: ts.selectionFollowsPlayhead,
                 smoothScrollAnchor: ts.smoothScrollAnchor,
                 thumbnailMode: ts.thumbnailMode || (ts.globalThumbnailsInterval === 0 ? "none" : "continuous"),
                 globalThumbnailsInterval: ts.globalThumbnailsInterval,
@@ -3265,6 +3266,12 @@ export class WorkspaceManager {
                     if (chkFollow) chkFollow.checked = !!td.followPlayhead;
                     if (window.timelineInteraction && typeof window.timelineInteraction.updateFollowPlayheadButton === "function") {
                         window.timelineInteraction.updateFollowPlayheadButton();
+                    }
+                }
+                if (td.selectionFollowsPlayhead !== undefined) {
+                    ts.toggleSelectionFollowsPlayhead(td.selectionFollowsPlayhead);
+                    if (window.timelineInteraction && typeof window.timelineInteraction.updateFollowButton === "function") {
+                        window.timelineInteraction.updateFollowButton();
                     }
                 }
                 if (td.followPlayheadMode !== undefined) {
@@ -3754,6 +3761,9 @@ export class WorkspaceManager {
         // Escuta atalhos de teclado no popout e redireciona para o player principal
         if (!win._hasWorkspaceKeyHandler) {
             win._hasWorkspaceKeyHandler = true;
+            if (!window._galleryController && window.GalleryInteractionController) {
+                window._galleryController = new window.GalleryInteractionController();
+            }
             if (window._galleryController && typeof window._galleryController.attachToWindow === "function") {
                 window._galleryController.attachToWindow(win);
             }
@@ -3797,6 +3807,9 @@ export class WorkspaceManager {
 
     restoreDualPopout(panelId1, panelId2) {
         console.log(`[WorkspaceManager] Restaurando painéis duplos: ${panelId1} + ${panelId2}`);
+        if (window._galleryController && typeof window._galleryController.hideShiftHud === "function") {
+            window._galleryController.hideShiftHud();
+        }
         const win = window.popoutWindows["dual-sidebar"] || window.popoutWindows[panelId1] || window.popoutWindows[panelId2];
         if (win && !win.closed) {
             try { win.close(); } catch (e) {}
@@ -3931,6 +3944,9 @@ export class WorkspaceManager {
         }
 
         // Anexa controlador de atalhos da galeria à janela destacada
+        if (!window._galleryController && window.GalleryInteractionController) {
+            window._galleryController = new window.GalleryInteractionController();
+        }
         if (window._galleryController && typeof window._galleryController.attachToWindow === "function") {
             window._galleryController.attachToWindow(win);
         }
@@ -3995,6 +4011,9 @@ export class WorkspaceManager {
         // Escuta atalhos de teclado no popout e redireciona para o player principal
         if (!win._hasWorkspaceKeyHandler) {
             win._hasWorkspaceKeyHandler = true;
+            if (!window._galleryController && window.GalleryInteractionController) {
+                window._galleryController = new window.GalleryInteractionController();
+            }
             if (window._galleryController && typeof window._galleryController.attachToWindow === "function") {
                 window._galleryController.attachToWindow(win);
             }
@@ -4042,6 +4061,9 @@ export class WorkspaceManager {
 
     restorePanel(panelId) {
         console.log(`[WorkspaceManager] Restaurando painel localmente: ${panelId}`);
+        if (window._galleryController && typeof window._galleryController.hideShiftHud === "function") {
+            window._galleryController.hideShiftHud();
+        }
         if (window.popoutWindows[panelId]) {
             delete window.popoutWindows[panelId];
         }
