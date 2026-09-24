@@ -60,6 +60,11 @@ const CURSOR_SLIDE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org
 // Cursor SVG em alta definição para a Ferramenta Rolling Edit (Corte Contínuo Adjacente - N)
 export const CURSOR_ROLLING = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="11" y1="3" x2="11" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="13" y1="3" x2="13" y2="21" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="11" y1="12" x2="5" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="13" y1="12" x2="19" y2="12" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="11" y1="3" x2="11" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><line x1="13" y1="3" x2="13" y2="21" stroke="%2306b6d4" stroke-width="1.8" stroke-linecap="round"/><line x1="11" y1="12" x2="5" y2="12" stroke="%23fff" stroke-width="1.8" stroke-linecap="round"/><line x1="13" y1="12" x2="19" y2="12" stroke="%23fff" stroke-width="1.8" stroke-linecap="round"/><polygon points="8,8 4,12 8,16" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/><polygon points="16,8 20,12 16,16" fill="%2306b6d4" stroke="%23000" stroke-width="1.5" stroke-linejoin="round"/></svg>') 12 12, ew-resize`;
 
+// Cursores SVG em alta definição para a Ferramenta Esticar / Comprimir Taxa (Rate Stretch Tool — Shift+R / R)
+export const CURSOR_RATE_STRETCH_RIGHT = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="19" y1="3" x2="19" y2="21" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="19" y1="3" x2="19" y2="21" stroke="%2306b6d4" stroke-width="2" stroke-linecap="round"/><line x1="15" y1="3" x2="19" y2="3" stroke="%2306b6d4" stroke-width="2" stroke-linecap="round"/><line x1="15" y1="21" x2="19" y2="21" stroke="%2306b6d4" stroke-width="2" stroke-linecap="round"/><line x1="3" y1="12" x2="17" y2="12" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="3" y1="12" x2="17" y2="12" stroke="%23fff" stroke-width="1.5" stroke-linecap="round"/><polygon points="6,9 2,12 6,15" fill="%2306b6d4" stroke="%23000" stroke-width="1" stroke-linejoin="round"/><polygon points="14,9 18,12 14,15" fill="%2306b6d4" stroke="%23000" stroke-width="1" stroke-linejoin="round"/><circle cx="10" cy="12" r="4.5" fill="%23121218" stroke="%2306b6d4" stroke-width="1.2"/><polyline points="10,9.5 10,12 12,13" stroke="%23fff" stroke-width="1.2" stroke-linecap="round"/></svg>') 12 12, ew-resize`;
+
+export const CURSOR_RATE_STRETCH_LEFT = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="5" y1="3" x2="5" y2="21" stroke="%23000" stroke-width="3.5" stroke-linecap="round"/><line x1="5" y1="3" x2="5" y2="21" stroke="%2306b6d4" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="3" x2="9" y2="3" stroke="%2306b6d4" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="21" x2="9" y2="21" stroke="%2306b6d4" stroke-width="2" stroke-linecap="round"/><line x1="7" y1="12" x2="21" y2="12" stroke="%23000" stroke-width="3" stroke-linecap="round"/><line x1="7" y1="12" x2="21" y2="12" stroke="%23fff" stroke-width="1.5" stroke-linecap="round"/><polygon points="10,9 6,12 10,15" fill="%2306b6d4" stroke="%23000" stroke-width="1" stroke-linejoin="round"/><polygon points="18,9 22,12 18,15" fill="%2306b6d4" stroke="%23000" stroke-width="1" stroke-linejoin="round"/><circle cx="14" cy="12" r="4.5" fill="%23121218" stroke="%2306b6d4" stroke-width="1.2"/><polyline points="14,9.5 14,12 16,13" stroke="%23fff" stroke-width="1.2" stroke-linecap="round"/></svg>') 12 12, ew-resize`;
+
 // Cursores SVG em alta definição para Trim de Clipes (Seleção V):
 // Quando há dois clipes unidos, a ponta de seta esquerda ou direita é pintada em ciano elétrico
 // para sinalizar visualmente ao editor exatamente qual clipe será manipulado no corte.
@@ -421,6 +426,13 @@ export class CapiauTimelineInteraction {
      */
     getRollingCursor() {
         return CURSOR_ROLLING;
+    }
+
+    /**
+     * Retorna a string de cursor CSS para a Ferramenta Esticar / Comprimir Taxa (Rate Stretch).
+     */
+    getRateStretchCursor(edge = "right") {
+        return edge === "left" ? CURSOR_RATE_STRETCH_LEFT : CURSOR_RATE_STRETCH_RIGHT;
     }
 
     init() {
@@ -1019,7 +1031,7 @@ export class CapiauTimelineInteraction {
         }
 
         if (e.button === 0 || e.button === 1) {
-            e.preventDefault();
+            if (typeof e.preventDefault === "function") e.preventDefault();
         }
 
         // Restaura foco na timeline e desativa foco preso em inputs/sliders/botões
@@ -1446,6 +1458,104 @@ export class CapiauTimelineInteraction {
                         window.player.show2UpPreview(leftClip, outgoingTime, rightClip, incomingTime);
                     }
 
+                    this.refreshClipInspector();
+                    this.renderer.requestRedraw();
+                } else {
+                    TIMELINE_STATE.clearClipSelection();
+                    TIMELINE_STATE.clearSelectedGap();
+                    TIMELINE_STATE.setTool("select");
+                    if (this.canvas) this.canvas.style.cursor = "default";
+                    this.refreshClipInspector();
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                return;
+            }
+
+            // Ferramenta: Esticar / Comprimir Taxa de Velocidade / Rate Stretch Tool (Shift+R / R)
+            if (TIMELINE_STATE.activeTool === "rate-stretch") {
+                const hit = this.findClipAt(frame, track, y);
+                if (hit && hit.type === "clip") {
+                    const clip = hit.data;
+                    const clipTrack = TIMELINE_STATE.getTrack(clip.track);
+                    if (clipTrack && clipTrack.locked) {
+                        TIMELINE_STATE.selectClip(clip.id, false);
+                        TIMELINE_STATE.selectedTrack = track;
+                        if (typeof window.showToast === "function") {
+                            window.showToast("A pista está travada com cadeado", "warning");
+                        }
+                        this.syncPlayerToClip(clip);
+                        this.refreshClipInspector();
+                        this.renderer.requestRedraw();
+                        return;
+                    }
+
+                    TIMELINE_STATE.selectClip(clip.id, false);
+                    TIMELINE_STATE.selectedTrack = track;
+                    TIMELINE_STATE.clearSelectedGap();
+
+                    const clipStart = clip.timelineStartFrame || 0;
+                    const clipDur = Math.max(1, (clip.outFrame || 0) - (clip.inFrame || 0));
+                    const clipEnd = clipStart + clipDur;
+
+                    const midFrame = clipStart + clipDur / 2;
+                    const edge = frame >= midFrame ? "right" : "left";
+
+                    const cuts = STATE.activeTimelineCuts || [];
+                    const partner = clip.link_id
+                        ? cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id)
+                        : null;
+
+                    this.dragState = edge === "right" ? "rate-stretch-right" : "rate-stretch-left";
+                    this.draggedClipId = clip.id;
+                    this.dragStartMouseX = e.clientX;
+                    this.dragStartMouseY = e.clientY;
+                    this.dragStartClipFrame = clipStart;
+                    this.dragStartInFrame = clip.inFrame;
+                    this.dragStartOutFrame = clip.outFrame;
+                    this.dragStartSpeed = (typeof clip.speed === "number" && clip.speed > 0) ? clip.speed : 1.0;
+
+                    let baseMediaFrames = clip.source_duration_frames;
+                    if (!baseMediaFrames || isNaN(baseMediaFrames)) {
+                        baseMediaFrames = Math.max(1, Math.round(clipDur * this.dragStartSpeed));
+                    }
+                    this.dragStartSourceDuration = baseMediaFrames;
+                    this.dragRateStretchLinked = !e.altKey && !!partner;
+
+                    if (partner) {
+                        this.dragPartnerClipId = partner.id;
+                        this.dragPartnerStartClipFrame = partner.timelineStartFrame;
+                        this.dragPartnerStartInFrame = partner.inFrame;
+                        this.dragPartnerStartOutFrame = partner.outFrame;
+                    } else {
+                        this.dragPartnerClipId = null;
+                        this.dragPartnerStartClipFrame = null;
+                        this.dragPartnerStartInFrame = null;
+                        this.dragPartnerStartOutFrame = null;
+                    }
+
+                    const trackCuts = cuts
+                        .filter(c => c.track === clip.track && c.id !== clip.id)
+                        .sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+
+                    const prevClip = trackCuts.filter(c => ((c.timelineStartFrame || 0) + Math.max(1, (c.outFrame || 0) - (c.inFrame || 0))) <= clipStart).pop();
+                    const nextClip = trackCuts.find(c => (c.timelineStartFrame || 0) >= clipEnd);
+
+                    this.dragRateStretchMinStart = prevClip ? ((prevClip.timelineStartFrame || 0) + Math.max(1, (prevClip.outFrame || 0) - (prevClip.inFrame || 0))) : 0;
+                    this.dragRateStretchMaxEnd = nextClip ? (nextClip.timelineStartFrame || 0) : Infinity;
+
+                    this.currentDragRateStretch = {
+                        durationFrames: clipDur,
+                        speed: this.dragStartSpeed,
+                        newTimelineStartFrame: clipStart
+                    };
+
+                    TIMELINE_HISTORY.begin();
+                    this.syncPlayerToClip(clip);
+                    const fps = TIMELINE_STATE.fps || 24;
+                    this.showRateStretchTooltip(e.clientX, e.clientY, this.dragStartSpeed, clipDur, 0, fps);
+                    if (this.canvas) {
+                        this.canvas.style.cursor = this.getRateStretchCursor(edge);
+                    }
                     this.refreshClipInspector();
                     this.renderer.requestRedraw();
                 } else {
@@ -2022,6 +2132,31 @@ export class CapiauTimelineInteraction {
             // Se a ferramenta Slip estiver ativa, define o cursor apropriado
             if (TIMELINE_STATE.activeTool === "slip") {
                 this.canvas.style.cursor = this.getSlipCursor();
+                this.hideMarkerTooltip();
+                if (TIMELINE_STATE.hoveredMarkerId !== null) {
+                    TIMELINE_STATE.hoveredMarkerId = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                if (TIMELINE_STATE.hoveredFadeHandle !== null) {
+                    TIMELINE_STATE.hoveredFadeHandle = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+                return;
+            }
+
+            // Se a ferramenta Rate Stretch estiver ativa, atualiza cursor direcional baseado na borda do clipe sob o mouse
+            if (TIMELINE_STATE.activeTool === "rate-stretch") {
+                const hit = this.findClipAt(frame, track, y);
+                if (hit && hit.type === "clip") {
+                    const clip = hit.data;
+                    const clipStart = clip.timelineStartFrame || 0;
+                    const clipDur = Math.max(1, (clip.outFrame || 0) - (clip.inFrame || 0));
+                    const midFrame = clipStart + clipDur / 2;
+                    const edge = frame >= midFrame ? "right" : "left";
+                    this.canvas.style.cursor = this.getRateStretchCursor(edge);
+                } else {
+                    this.canvas.style.cursor = this.getRateStretchCursor("right");
+                }
                 this.hideMarkerTooltip();
                 if (TIMELINE_STATE.hoveredMarkerId !== null) {
                     TIMELINE_STATE.hoveredMarkerId = null;
@@ -2636,6 +2771,109 @@ export class CapiauTimelineInteraction {
             const trimLinked = this.dragTrimLinked;
             this.trimClipRight(this.draggedClipId, deltaFrames, isRipple, trimLinked);
         }
+        else if ((this.dragState === "rate-stretch-right" || this.dragState === "rate-stretch-left") && this.draggedClipId) {
+            const isRight = this.dragState === "rate-stretch-right";
+            if (this.canvas) this.canvas.style.cursor = this.getRateStretchCursor(isRight ? "right" : "left");
+            const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
+            if (!clip) return;
+
+            const dx = e.clientX - this.dragStartMouseX;
+            const rawDelta = Math.round(dx / TIMELINE_STATE.zoom);
+            let snapGuideFrame = null;
+
+            const fps = TIMELINE_STATE.fps || 24;
+            const oldDur = Math.max(1, this.dragStartOutFrame - this.dragStartInFrame);
+            const baseMediaFrames = this.dragStartSourceDuration || oldDur;
+
+            // Clamping de velocidade: 10% (0.1x) a 1000% (10.0x)
+            const minAllowedDur = Math.max(1, Math.round(baseMediaFrames / 10.0)); // 1000%
+            const maxAllowedDur = Math.max(1, Math.round(baseMediaFrames / 0.1));  // 10%
+
+            const isSnapDisabled = !TIMELINE_STATE.snappingEnabled || e.altKey;
+
+            let candidateDur = oldDur;
+            let candidateStart = this.dragStartClipFrame;
+
+            if (isRight) {
+                const initialEnd = this.dragStartClipFrame + oldDur;
+                let rawEnd = initialEnd + rawDelta;
+
+                if (!isSnapDisabled) {
+                    const ignoredIds = [clip.id];
+                    if (clip.link_id) {
+                        const partner = STATE.activeTimelineCuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                        if (partner) ignoredIds.push(partner.id);
+                    }
+                    const snappedEnd = this.snapFrame(rawEnd, 8, ignoredIds);
+                    if (snappedEnd !== rawEnd) {
+                        snapGuideFrame = snappedEnd;
+                        rawEnd = snappedEnd;
+                    }
+                }
+
+                // Clamping contra vizinho da frente na mesma pista
+                if (!e.shiftKey && Number.isFinite(this.dragRateStretchMaxEnd)) {
+                    rawEnd = Math.min(rawEnd, this.dragRateStretchMaxEnd);
+                }
+
+                candidateDur = Math.max(minAllowedDur, Math.min(maxAllowedDur, rawEnd - this.dragStartClipFrame));
+            } else {
+                // Arraste pela borda esquerda
+                const initialStart = this.dragStartClipFrame;
+                const fixedEnd = this.dragStartClipFrame + oldDur;
+                let rawStart = initialStart + rawDelta;
+
+                if (!isSnapDisabled) {
+                    const ignoredIds = [clip.id];
+                    if (clip.link_id) {
+                        const partner = STATE.activeTimelineCuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
+                        if (partner) ignoredIds.push(partner.id);
+                    }
+                    const snappedStart = this.snapFrame(rawStart, 8, ignoredIds);
+                    if (snappedStart !== rawStart) {
+                        snapGuideFrame = snappedStart;
+                        rawStart = snappedStart;
+                    }
+                }
+
+                // Clamping contra início da timeline (>= 0) e vizinho anterior
+                const minStart = (!e.shiftKey && typeof this.dragRateStretchMinStart === "number") ? this.dragRateStretchMinStart : 0;
+                rawStart = Math.max(minStart, rawStart);
+
+                candidateDur = Math.max(minAllowedDur, Math.min(maxAllowedDur, fixedEnd - rawStart));
+                candidateStart = fixedEnd - candidateDur;
+            }
+
+            if (this.renderer) this.renderer.activeSnapFrame = snapGuideFrame;
+
+            const computedSpeed = baseMediaFrames / candidateDur;
+            this.currentDragRateStretch = {
+                durationFrames: candidateDur,
+                speed: computedSpeed,
+                newTimelineStartFrame: candidateStart
+            };
+
+            // Atualização reativa dos dados de prévia do clipe
+            clip.speed = computedSpeed;
+            clip.timelineStartFrame = candidateStart;
+            clip.timeline_start = candidateStart / fps;
+            clip.outFrame = clip.inFrame + candidateDur;
+            clip.out = (clip.in || 0) + (baseMediaFrames / fps);
+
+            if (this.dragRateStretchLinked && this.dragPartnerClipId) {
+                const partner = STATE.activeTimelineCuts.find(c => c.id === this.dragPartnerClipId);
+                if (partner) {
+                    partner.speed = computedSpeed;
+                    partner.timelineStartFrame = candidateStart;
+                    partner.timeline_start = candidateStart / fps;
+                    partner.outFrame = partner.inFrame + candidateDur;
+                    partner.out = (partner.in || 0) + (baseMediaFrames / fps);
+                }
+            }
+
+            this.showRateStretchTooltip(e.clientX, e.clientY, computedSpeed, candidateDur, (candidateDur - oldDur), fps);
+            if (this.renderer) this.renderer.requestRedraw();
+        }
         else if ((this.dragState === "fade-in-drag" || this.dragState === "fade-out-drag") && this.draggedClipId) {
             const clip = STATE.activeTimelineCuts.find(c => c.id === this.draggedClipId);
             if (clip) {
@@ -2921,9 +3159,30 @@ export class CapiauTimelineInteraction {
         this.dragLastMouseX = null;
         this.dragHoppedPastClips = new Set();
         const wasTrim = this.dragState === "trim-left" || this.dragState === "trim-right";
+        const wasRateStretch = this.dragState === "rate-stretch-right" || this.dragState === "rate-stretch-left";
+        if (wasRateStretch && this.draggedClipId) {
+            const clipId = this.draggedClipId;
+            const stretchData = this.currentDragRateStretch;
+            this.hideRateStretchTooltip();
+            if (stretchData) {
+                TIMELINE_STATE.changeClipSpeed(clipId, {
+                    speed: stretchData.speed,
+                    durationFrames: stretchData.durationFrames,
+                    newTimelineStartFrame: stretchData.newTimelineStartFrame,
+                    ripple: false,
+                    pitchCorrection: true,
+                    updateLinked: this.dragRateStretchLinked !== false
+                });
+                const speedPct = (stretchData.speed * 100).toFixed(1);
+                if (typeof window.showToast === "function") {
+                    window.showToast(`Velocidade ajustada: ${speedPct}% (${stretchData.speed.toFixed(2)}x)`, "info");
+                }
+            }
+            this.currentDragRateStretch = null;
+        }
         // Fecha a transação do drag/trim (no-op se nada mudou)
         TIMELINE_HISTORY.commit();
-        if (wasTrim) {
+        if (wasTrim || wasRateStretch) {
             this.dragTrimIsUnited = false;
             STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
         }
@@ -2946,6 +3205,8 @@ export class CapiauTimelineInteraction {
                 this.canvas.style.cursor = this.getSlipCursor();
             } else if (TIMELINE_STATE.activeTool === "slide") {
                 this.canvas.style.cursor = this.getSlideCursor();
+            } else if (TIMELINE_STATE.activeTool === "rate-stretch") {
+                this.canvas.style.cursor = this.getRateStretchCursor("right");
             } else if (TIMELINE_STATE.activeTool === "rolling") {
                 const { x, track } = (e && typeof e.clientX === "number") ? this.getCoordinates(e.clientX, e.clientY) : { x: null, track: null };
                 const rollingHit = (x !== null && track) ? this.getRollingHit(x, track, 8) : null;
@@ -4232,6 +4493,43 @@ export class CapiauTimelineInteraction {
 
     hideRollingTooltip() {
         const tip = document.getElementById("timeline-rolling-tooltip");
+        if (tip) tip.style.display = "none";
+    }
+
+    /**
+     * Tooltip visual durante o arraste da Ferramenta Rate Stretch (Esticar / Comprimir Taxa de Velocidade).
+     */
+    showRateStretchTooltip(x, y, speed, durationFrames, deltaFrames, fps = 24) {
+        let tip = document.getElementById("timeline-rate-stretch-tooltip");
+        if (!tip) {
+            tip = document.createElement("div");
+            tip.id = "timeline-rate-stretch-tooltip";
+            tip.style.position = "fixed";
+            tip.style.zIndex = "99999";
+            tip.style.pointerEvents = "none";
+            tip.style.background = "rgba(18, 18, 24, 0.95)";
+            tip.style.color = "#ffffff";
+            tip.style.border = "1px solid rgba(6, 182, 212, 0.75)";
+            tip.style.borderRadius = "4px";
+            tip.style.padding = "4px 8px";
+            tip.style.fontSize = "11px";
+            tip.style.fontFamily = "Outfit, sans-serif";
+            tip.style.backdropFilter = "blur(8px)";
+            tip.style.boxShadow = "0 4px 14px rgba(0,0,0,0.6), 0 0 10px rgba(6, 182, 212, 0.3)";
+            document.body.appendChild(tip);
+        }
+        const speedPercent = (speed * 100).toFixed(1);
+        const speedMultiplier = speed.toFixed(2);
+        const sign = deltaFrames > 0 ? "+" : (deltaFrames < 0 ? "" : "±");
+        const durSec = (durationFrames / fps).toFixed(2);
+        tip.innerHTML = `<span style="color:#06b6d4; font-weight:600;"><i class="fa-solid fa-gauge-high" style="margin-right:4px;"></i>Taxa:</span> <span style="color:#ef4444; font-weight:700;">${speedPercent}%</span> <span style="color:#94a3b8; font-size:10px;">(${speedMultiplier}x)</span> · <span style="color:#a855f7; font-weight:600;">Dur:</span> <span style="font-family:monospace; font-weight:500;">${durSec}s (${sign}${deltaFrames}f)</span>`;
+        tip.style.display = "block";
+        tip.style.left = `${x + 14}px`;
+        tip.style.top = `${y - 28}px`;
+    }
+
+    hideRateStretchTooltip() {
+        const tip = document.getElementById("timeline-rate-stretch-tooltip");
         if (tip) tip.style.display = "none";
     }
 
@@ -6564,7 +6862,15 @@ export class CapiauTimelineInteraction {
                 refocusTimeline(toolButtons["rolling"]);
             };
         }
-        bindToolClick(toolButtons["rate-stretch"], "rate-stretch", "ew-resize");
+        if (toolButtons["rate-stretch"] && !toolButtons["rate-stretch"].__capiauToolBound) {
+            toolButtons["rate-stretch"].__capiauToolBound = true;
+            toolButtons["rate-stretch"].onclick = () => {
+                TIMELINE_STATE.setTool("rate-stretch");
+                if (this.canvas) this.canvas.style.cursor = this.getRateStretchCursor("right");
+                if (this.renderer) this.renderer.requestRedraw();
+                refocusTimeline(toolButtons["rate-stretch"]);
+            };
+        }
         bindToolClick(toolButtons["hand"], "hand", "grab");
         bindToolClick(toolButtons["zoom"], "zoom", "zoom-in");
 
@@ -11007,6 +11313,45 @@ export class CapiauTimelineInteraction {
                 e.preventDefault();
                 return;
             }
+            if (this.dragState === "rate-stretch-right" || this.dragState === "rate-stretch-left") {
+                this.hideRateStretchTooltip();
+                if (this.draggedClipId && this.dragStartClipFrame !== undefined) {
+                    const cuts = [...STATE.activeTimelineCuts];
+                    const clip = cuts.find(c => c.id === this.draggedClipId);
+                    if (clip) {
+                        const fps = TIMELINE_STATE.fps || 24;
+                        clip.speed = this.dragStartSpeed;
+                        clip.timelineStartFrame = this.dragStartClipFrame;
+                        clip.timeline_start = this.dragStartClipFrame / fps;
+                        clip.inFrame = this.dragStartInFrame;
+                        clip.outFrame = this.dragStartOutFrame;
+                        clip.out = clip.outFrame / fps;
+                        if (clip.link_id && this.dragPartnerClipId) {
+                            const partner = cuts.find(c => c.id === this.dragPartnerClipId);
+                            if (partner) {
+                                partner.speed = this.dragStartSpeed;
+                                partner.timelineStartFrame = this.dragPartnerStartClipFrame;
+                                partner.timeline_start = this.dragPartnerStartClipFrame / fps;
+                                partner.inFrame = this.dragPartnerStartInFrame;
+                                partner.outFrame = this.dragPartnerStartOutFrame;
+                                partner.out = partner.outFrame / fps;
+                            }
+                        }
+                        STATE.activeTimelineCuts = cuts;
+                    }
+                }
+                TIMELINE_HISTORY.pending = null;
+                this.dragState = null;
+                this.draggedClipId = null;
+                this.currentDragRateStretch = null;
+                if (this.renderer) {
+                    this.renderer.activeSnapFrame = null;
+                    this.renderer.requestRedraw();
+                }
+                this.refreshClipInspector();
+                e.preventDefault();
+                return;
+            }
             if (this.dragState === "rolling") {
                 this.hideRollingTooltip();
                 if (window.player) window.player.hide2UpPreview();
@@ -11313,6 +11658,18 @@ export class CapiauTimelineInteraction {
                 window.showToast("Ferramenta Corte Contínuo / Rolling Edit (N)", "info");
             }
             if (this.canvas) this.canvas.style.cursor = "default";
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
+
+        // Ferramenta Esticar / Comprimir Taxa de Velocidade / Rate Stretch Tool (Shift+R / R)
+        if (KEYMAP_SERVICE.matches(e, "tools.rate_stretch")) {
+            TIMELINE_STATE.setTool("rate-stretch");
+            if (typeof window.showToast === "function") {
+                window.showToast("Ferramenta Esticar / Comprimir Taxa (Rate Stretch)", "info");
+            }
+            if (this.canvas) this.canvas.style.cursor = this.getRateStretchCursor("right");
             if (this.renderer) this.renderer.requestRedraw();
             e.preventDefault();
             return;

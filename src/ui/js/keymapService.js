@@ -226,6 +226,12 @@ export const COMMANDS_CATALOG = [
         description: "Ajusta o ponto de corte entre dois clipes contíguos sem alterar a duração total da sequência"
     },
     {
+        id: "tools.rate_stretch",
+        category: "tools",
+        label: "Esticar / Comprimir Taxa de Velocidade (Rate Stretch)",
+        description: "Altera a velocidade do clipe arrastando suas bordas para esticar ou comprimir a taxa temporal"
+    },
+    {
         id: "tools.track_forward",
         category: "tools",
         label: "Selecionar Faixa para Frente",
@@ -784,6 +790,7 @@ export const KEYMAP_PRESETS = {
         "tools.slip": ["KeyY"],
         "tools.slide": ["KeyU"],
         "tools.rolling": ["Shift+KeyN"],
+        "tools.rate_stretch": ["Shift+KeyR", "KeyX"],
         "tools.track_forward": ["KeyT"],
         "tools.track_backward": ["Shift+KeyT"],
         "tools.snapping": ["KeyN", "Shift+KeyS"],
@@ -924,11 +931,12 @@ export const KEYMAP_PRESETS = {
 
         "tools.select": ["KeyS"],
         "tools.marquee": ["Shift+KeyS"],
-        "tools.blade": ["KeyC", "Shift+KeyR"],
+        "tools.blade": ["KeyC"],
         "tools.blade_global": ["Shift+KeyC"],
         "tools.slip": ["KeyY"],
         "tools.slide": ["KeyU"],
         "tools.rolling": ["KeyN"],
+        "tools.rate_stretch": ["Shift+KeyR"],
         "tools.track_forward": ["KeyM"],
         "tools.track_backward": ["Shift+KeyM"],
         "tools.snapping": ["F10", "KeyS"],
@@ -1018,6 +1026,7 @@ export const KEYMAP_PRESETS = {
         "tools.slip": ["KeyY"],
         "tools.slide": ["KeyU"],
         "tools.rolling": ["KeyN"],
+        "tools.rate_stretch": ["KeyR"],
         "tools.track_forward": ["KeyA"],
         "tools.track_backward": ["Shift+KeyA"],
         "tools.snapping": ["KeyS"],
@@ -1108,6 +1117,7 @@ export const KEYMAP_PRESETS = {
         "tools.slip": ["Shift+KeyY", "KeyY"],
         "tools.slide": ["KeyU"],
         "tools.rolling": ["KeyN", "KeyT"],
+        "tools.rate_stretch": ["KeyR", "Shift+KeyR"],
         "tools.track_forward": ["KeyY"],
         "tools.track_backward": ["Ctrl+KeyY"],
         "tools.snapping": ["Shift+KeyN", "KeyS"],
@@ -1198,6 +1208,7 @@ export const KEYMAP_PRESETS = {
         "tools.slip": ["KeyY"],
         "tools.slide": ["KeyU"],
         "tools.rolling": ["KeyN", "KeyT"],
+        "tools.rate_stretch": ["KeyR"],
         "tools.track_forward": ["KeyP"],
         "tools.track_backward": ["Shift+KeyP"],
         "tools.snapping": ["Shift+KeyN", "KeyS"],
@@ -1460,7 +1471,7 @@ class KeymapService {
             if (targetKey.startsWith("Key") && eventCode === targetKey) {
                 return true;
             }
-            if (targetKey.startsWith("Key") && eventKey.toLowerCase() === targetKey.substring(3).toLowerCase()) {
+            if (targetKey.startsWith("Key") && eventKey && eventKey.toLowerCase() === targetKey.substring(3).toLowerCase()) {
                 return true;
             }
 

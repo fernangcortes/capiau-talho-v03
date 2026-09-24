@@ -5628,8 +5628,9 @@ export class CapiauTimelineState {
             this._lastClipSpeedMode = timelineMode;
         }
 
-        // Procura parceiro vinculado A/V
-        const partner = (targetClip.link_id)
+        // Procura parceiro vinculado A/V (respeita flag updateLinked: false para modo Alt desvinculado)
+        const shouldUpdateLinked = options.updateLinked !== false;
+        const partner = (shouldUpdateLinked && targetClip.link_id)
             ? cuts.find(c => c.link_id === targetClip.link_id && c.id !== targetClip.id)
             : null;
         const partnerTrack = partner ? this.getTrack(partner.track) : null;
@@ -5645,7 +5646,7 @@ export class CapiauTimelineState {
             const clipToUpdate = currentCuts.find(c => c.id === targetId);
             if (!clipToUpdate) return;
 
-            const partnerToUpdate = (clipToUpdate.link_id)
+            const partnerToUpdate = (shouldUpdateLinked && clipToUpdate.link_id)
                 ? currentCuts.find(c => c.link_id === clipToUpdate.link_id && c.id !== clipToUpdate.id)
                 : null;
 
