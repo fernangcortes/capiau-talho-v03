@@ -336,6 +336,12 @@ export const COMMANDS_CATALOG = [
         description: "Estende a duração do clipe ajustando a velocidade para preencher automaticamente o espaço vazio adjacente na pista (Ctrl+Alt+R)"
     },
     {
+        id: "edit.apply_audio_crossfade",
+        category: "edit",
+        label: "Crossfade de Áudio (Potência Constante)",
+        description: "Aplica transição de crossfade de áudio de potência constante (Equal-Power) na emenda entre clipes contíguos ou no clipe selecionado (Ctrl+Shift+D)"
+    },
+    {
         id: "edit.split",
         category: "edit",
         label: "Dividir Clipe no Playhead (Split)",
@@ -808,6 +814,7 @@ export const KEYMAP_PRESETS = {
         "edit.freeze_frame": ["Ctrl+Shift+KeyF"],
         "edit.clip_speed": ["Ctrl+KeyR"],
         "edit.fit_to_gap": ["Ctrl+Alt+KeyR"],
+        "edit.apply_audio_crossfade": ["Ctrl+Shift+KeyD"],
         "edit.split": ["KeyE", "KeyZ", "Alt+KeyE", "Alt+KeyZ"],
         "edit.ripple_trim_head": ["KeyQ"],
         "edit.ripple_trim_tail": ["KeyW"],
@@ -955,6 +962,7 @@ export const KEYMAP_PRESETS = {
         "edit.freeze_frame": ["Ctrl+Shift+KeyF"],
         "edit.clip_speed": ["Ctrl+KeyR"],
         "edit.fit_to_gap": ["Ctrl+Alt+KeyR"],
+        "edit.apply_audio_crossfade": ["Ctrl+Shift+KeyD", "KeyU"],
         "edit.split": ["Shift+KeyR", "KeyX"],
         "edit.ripple_trim_head": ["BracketLeft", "KeyQ"],
         "edit.ripple_trim_tail": ["BracketRight", "KeyW"],
@@ -1045,6 +1053,7 @@ export const KEYMAP_PRESETS = {
         "edit.freeze_frame": ["Ctrl+Shift+KeyF"],
         "edit.clip_speed": ["Ctrl+KeyR"],
         "edit.fit_to_gap": ["Ctrl+Alt+KeyR"],
+        "edit.apply_audio_crossfade": ["Ctrl+Shift+KeyD"],
         "edit.toggle_clip_disable": ["Shift+KeyE"],
         "edit.split": ["Ctrl+KeyK"],
         "edit.ripple_trim_head": ["KeyQ"],
@@ -1136,6 +1145,7 @@ export const KEYMAP_PRESETS = {
         "edit.freeze_frame": ["Ctrl+Shift+KeyF"],
         "edit.clip_speed": ["Ctrl+KeyR"],
         "edit.fit_to_gap": ["Ctrl+Alt+KeyR", "Cmd+Alt+KeyR"],
+        "edit.apply_audio_crossfade": ["Alt+KeyT", "Ctrl+Shift+KeyD"],
         "edit.toggle_clip_disable": ["KeyD"],
         "edit.split": ["Ctrl+Backslash"],
         "edit.ripple_trim_head": ["Shift+BracketLeft", "KeyQ"],
@@ -1227,6 +1237,7 @@ export const KEYMAP_PRESETS = {
         "edit.freeze_frame": ["Ctrl+Shift+KeyF"],
         "edit.clip_speed": ["Ctrl+KeyR", "Cmd+KeyR"],
         "edit.fit_to_gap": ["Ctrl+Alt+KeyR", "Cmd+Alt+KeyR"],
+        "edit.apply_audio_crossfade": ["Alt+Cmd+KeyT", "Ctrl+Shift+KeyD"],
         "edit.toggle_clip_disable": ["KeyV"],
         "edit.split": ["Cmd+KeyB"],
         "edit.ripple_trim_head": ["Alt+BracketLeft", "KeyQ"],

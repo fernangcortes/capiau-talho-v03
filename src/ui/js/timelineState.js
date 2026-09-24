@@ -119,7 +119,8 @@ export const FADE_CURVE_PRESETS = {
     linear: { id: "linear", name: "Linear", label: "Linear" },
     exponential: { id: "exponential", name: "Exponencial (Ease-In)", label: "Exponencial" },
     logarithmic: { id: "logarithmic", name: "Logarítmica (Ease-Out)", label: "Logarítmica" },
-    s_curve: { id: "s_curve", name: "Curva em S (Suave)", label: "Curva em S" }
+    s_curve: { id: "s_curve", name: "Curva em S (Suave)", label: "Curva em S" },
+    equal_power: { id: "equal_power", name: "Potência Constante", label: "Potência Constante" }
 };
 
 /**
@@ -128,13 +129,29 @@ export const FADE_CURVE_PRESETS = {
  * Suporta presets e ajuste paramétrico contínuo de tensão k [-1.0 a +1.0].
  *
  * @param {number} progress - Progresso normalizado [0..1]
- * @param {string} [curveType="linear"] - Tipo de curva ("linear", "exponential", "logarithmic", "s_curve", "custom")
+ * @param {string} [curveType="linear"] - Tipo de curva ("linear", "exponential", "logarithmic", "s_curve", "equal_power", "custom")
  * @param {number} [tension=0.0] - Tensão da curva [-1..1] (0 = padrão da curva ou linear)
  * @returns {number} Fator atenuado [0..1]
  */
 export function evaluateFadeCurve(progress, curveType = "linear", tension = 0.0) {
     const p = Math.max(0, Math.min(1, Number(progress) || 0));
     const k = Math.max(-1, Math.min(1, Number(tension) || 0));
+
+    if (curveType === "equal_power") {
+        // Curva de Potência Constante (Equal-Power Crossfade):
+        // Preserva a potência acústica: Gain_out^2 + Gain_in^2 = cos^2(pi*p/2) + sin^2(pi*p/2) = 1.0
+        // Para fade-in: p vai de 0 a 1 -> sin(p * PI / 2) vai de 0 a 1
+        // Para fade-out: (1-p) vai de 1 a 0 -> sin((1-p) * PI / 2) = cos(p * PI / 2)
+        const base = Math.sin(p * Math.PI * 0.5);
+        if (Math.abs(k) < 0.01) return base;
+        if (k > 0) {
+            const exp = 1 / (1 + k * 1.5);
+            return Math.pow(base, exp);
+        } else {
+            const exp = 1 + Math.abs(k) * 1.5;
+            return Math.pow(base, exp);
+        }
+    }
 
     if (curveType === "s_curve") {
         // Base Hermite Smoothstep: 3p^2 - 2p^3
@@ -332,6 +349,12 @@ export class CapiauTimelineState {
         this.followPlayhead = this.loadFollowPlayhead();
         this.followPlayheadMode = this.loadFollowPlayheadMode();
         this.smoothScrollAnchor = this.loadSmoothScrollAnchor(); // Âncora de 30% a 70% (padrão 50%)
+
+        // Transições de corte na timeline (Task 15: Áudio / Task 16: Vídeo):
+        // [{ id, type, kind, track, cutFrame, clipAId, clipBId, durationFrames, duration_s, alignment, curve, tension }]
+        this.transitions = [];
+        this.selectedTransitionId = null;
+        this.hoveredTransition = null;
     }
 
     /** Carrega a preferência de 'Timeline Segue a Agulha' do localStorage (default: true). */
@@ -5916,6 +5939,676 @@ export class CapiauTimelineState {
     }
 
     /**
+     * Retorna a lista de transições ativas na timeline.
+     * @returns {Array}
+     */
+    getTransitions() {
+        return this.transitions || [];
+    }
+
+    /**
+     * Retorna as transições associadas a um clipe específico.
+     * @param {string} clipId - ID do clipe
+     * @returns {Array}
+     */
+    getTransitionsForClip(clipId) {
+        if (!clipId || !this.transitions) return [];
+        return this.transitions.filter(t => t.clipAId === clipId || t.clipBId === clipId);
+    }
+
+    /**
+     * Localiza uma transição em uma pista próxima a um determinado frame.
+     * @param {string} trackId - ID da pista (ex: "A1")
+     * @param {number} frame - Coordenada temporal em frames
+     * @param {number} [toleranceFrames=6] - Tolerância em frames
+     * @returns {Object|null}
+     */
+    getTransitionAt(trackId, frame, toleranceFrames = 6) {
+        if (!trackId || typeof frame !== "number" || !this.transitions) return null;
+        return this.transitions.find(t => {
+            if (t.track !== trackId) return false;
+            const halfA = t.halfAFrames !== undefined ? t.halfAFrames : Math.round((t.durationFrames || 24) / 2);
+            const halfB = t.halfBFrames !== undefined ? t.halfBFrames : Math.round((t.durationFrames || 24) / 2);
+            return frame >= (t.cutFrame - halfA - toleranceFrames) && frame <= (t.cutFrame + halfB + toleranceFrames);
+        }) || null;
+    }
+
+    /**
+     * Detecta se as coordenadas temporais coincidem com uma borda de transição (para resize) ou seu corpo.
+     * @param {string} trackId - ID da pista (ex: "A1")
+     * @param {number} frame - Coordenada temporal em frames
+     * @param {number} [toleranceFrames=4] - Tolerância para detectar a borda
+     * @returns {{ transition: Object, edge: "left"|"right"|"body" }|null}
+     */
+    getTransitionHit(trackId, frame, toleranceFrames = 4) {
+        if (!trackId || typeof frame !== "number" || !this.transitions) return null;
+        const zoom = this.zoom || 1;
+        const tol = (typeof toleranceFrames === "number") 
+            ? Math.min(toleranceFrames, Math.max(1, Math.round(6 / zoom))) 
+            : Math.max(1, Math.round(6 / zoom));
+
+        for (const t of this.transitions) {
+            if (t.track !== trackId) continue;
+            const halfA = t.halfAFrames !== undefined ? t.halfAFrames : Math.round((t.durationFrames || 24) / 2);
+            const halfB = t.halfBFrames !== undefined ? t.halfBFrames : Math.round((t.durationFrames || 24) / 2);
+            const startFrame = t.cutFrame - halfA;
+            const endFrame = t.cutFrame + halfB;
+
+            if (Math.abs(frame - startFrame) <= tol) {
+                return { transition: t, edge: "left" };
+            }
+            if (Math.abs(frame - endFrame) <= tol) {
+                return { transition: t, edge: "right" };
+            }
+            if (frame > (startFrame - tol) && frame < (endFrame + tol)) {
+                return { transition: t, edge: "body" };
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Aplica transição de Crossfade de Áudio de Junção com Potência Constante (Task 15 — Ctrl+Shift+D).
+     * Suporta junções contíguas entre dois clipes de áudio, clipes selecionados ou detecção automática sob a agulha.
+     * @param {Object} [options={}] - Parâmetros opcionais { clipAId, clipBId, trackId, cutFrame, duration_s, durationFrames, alignment, curve, tension }
+     * @returns {Object|null} Objeto com { transition, clipA, clipB } ou null em caso de falha/bloqueio.
+     */
+    addAudioCrossfade(options = {}) {
+        const cuts = this.conformCuts(STATE.activeTimelineCuts || []);
+        if (!cuts || cuts.length === 0) return null;
+        const fps = this.fps || 24;
+
+        let clipA = null;
+        let clipB = null;
+        let trackId = options.trackId || null;
+
+        // 1. Clipes explicitamente fornecidos
+        if (options.clipAId && options.clipBId) {
+            clipA = cuts.find(c => c.id === options.clipAId);
+            clipB = cuts.find(c => c.id === options.clipBId);
+            if (clipA && !trackId) trackId = clipA.track;
+        } else if (options.clipAId && !options.clipBId) {
+            const target = cuts.find(c => c.id === options.clipAId);
+            if (target && this.trackKindOf(target.track) === "audio") {
+                trackId = target.track;
+                const trackClips = cuts.filter(c => c.track === trackId).sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+                const targetStart = target.timelineStartFrame || 0;
+                const targetEnd = targetStart + ((target.outFrame || 0) - (target.inFrame || 0));
+                const playhead = (typeof this.playheadFrame === "number") ? this.playheadFrame : targetStart;
+                
+                const distToStart = Math.abs(playhead - targetStart);
+                const distToEnd = Math.abs(playhead - targetEnd);
+                
+                if (distToStart <= distToEnd) {
+                    const pred = trackClips.find(c => {
+                        const cEnd = (c.timelineStartFrame || 0) + ((c.outFrame || 0) - (c.inFrame || 0));
+                        return Math.abs(cEnd - targetStart) <= 1 && c.id !== target.id;
+                    });
+                    if (pred) {
+                        clipA = pred;
+                        clipB = target;
+                    }
+                }
+                if (!clipA || !clipB) {
+                    const succ = trackClips.find(c => {
+                        return Math.abs((c.timelineStartFrame || 0) - targetEnd) <= 1 && c.id !== target.id;
+                    });
+                    if (succ) {
+                        clipA = target;
+                        clipB = succ;
+                    }
+                }
+                if (!clipA || !clipB) {
+                    const pred = trackClips.find(c => {
+                        const cEnd = (c.timelineStartFrame || 0) + ((c.outFrame || 0) - (c.inFrame || 0));
+                        return Math.abs(cEnd - targetStart) <= 1 && c.id !== target.id;
+                    });
+                    if (pred) {
+                        clipA = pred;
+                        clipB = target;
+                    }
+                }
+            }
+        }
+
+        // 2. Clipes selecionados na timeline
+        if (!clipA || !clipB) {
+            const selectedIds = this.selectedClipIds && this.selectedClipIds.size > 0 
+                ? Array.from(this.selectedClipIds) 
+                : (this.selectedClipId ? [this.selectedClipId] : []);
+            
+            const selectedAudioClips = cuts.filter(c => selectedIds.includes(c.id) && this.trackKindOf(c.track) === "audio");
+            
+            if (selectedAudioClips.length >= 2) {
+                // Procura par contíguo na mesma pista
+                const byTrack = {};
+                selectedAudioClips.forEach(c => {
+                    if (!byTrack[c.track]) byTrack[c.track] = [];
+                    byTrack[c.track].push(c);
+                });
+                for (const tId in byTrack) {
+                    const list = byTrack[tId].sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+                    for (let i = 0; i < list.length - 1; i++) {
+                        const c1 = list[i];
+                        const c2 = list[i + 1];
+                        const end1 = (c1.timelineStartFrame || 0) + ((c1.outFrame || 0) - (c1.inFrame || 0));
+                        if (Math.abs((c2.timelineStartFrame || 0) - end1) <= 1) {
+                            clipA = c1;
+                            clipB = c2;
+                            trackId = tId;
+                            break;
+                        }
+                    }
+                    if (clipA && clipB) break;
+                }
+            } else if (selectedAudioClips.length === 1) {
+                // Um único clipe de áudio selecionado: busca vizinho contíguo mais próximo
+                const target = selectedAudioClips[0];
+                trackId = target.track;
+                const trackClips = cuts.filter(c => c.track === trackId).sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+                const targetStart = target.timelineStartFrame || 0;
+                const targetEnd = targetStart + ((target.outFrame || 0) - (target.inFrame || 0));
+                const playhead = (typeof this.playheadFrame === "number") ? this.playheadFrame : targetStart;
+                
+                const distToStart = Math.abs(playhead - targetStart);
+                const distToEnd = Math.abs(playhead - targetEnd);
+                
+                if (distToStart <= distToEnd) {
+                    const pred = trackClips.find(c => {
+                        const cEnd = (c.timelineStartFrame || 0) + ((c.outFrame || 0) - (c.inFrame || 0));
+                        return Math.abs(cEnd - targetStart) <= 1 && c.id !== target.id;
+                    });
+                    if (pred) {
+                        clipA = pred;
+                        clipB = target;
+                    }
+                } else {
+                    const succ = trackClips.find(c => {
+                        return Math.abs((c.timelineStartFrame || 0) - targetEnd) <= 1 && c.id !== target.id;
+                    });
+                    if (succ) {
+                        clipA = target;
+                        clipB = succ;
+                    }
+                }
+
+                // Se o clipe selecionado não possui vizinhos adjacentes (clipe isolado), aplica fade de potência constante nas bordas
+                if (!clipA && !clipB) {
+                    const trackObj = this.getTrack ? this.getTrack(trackId) : (this.tracks || []).find(t => t.id === trackId);
+                    if (trackObj && trackObj.locked) return null;
+
+                    const curDurS = Math.max(0.1, ((target.outFrame || 0) - (target.inFrame || 0)) / fps);
+                    const fadeDurS = Math.min(1.0, Math.max(0.1, curDurS * 0.4));
+                    let appliedSide = "in";
+
+                    TIMELINE_HISTORY.record(() => {
+                        const cTarget = (STATE.activeTimelineCuts || []).find(c => c.id === target.id);
+                        if (!cTarget) return;
+                        if (!cTarget.effects) cTarget.effects = [];
+
+                        if (distToStart <= distToEnd) {
+                            cTarget.effects = cTarget.effects.filter(e => !(e.type === "crossfade" && e.side === "in"));
+                            cTarget.effects.push({
+                                type: "crossfade",
+                                side: "in",
+                                duration_s: fadeDurS,
+                                curve: options.curve || "equal_power",
+                                tension: typeof options.tension === "number" ? options.tension : 0,
+                                disabled: false
+                            });
+                            appliedSide = "in";
+                        } else {
+                            cTarget.effects = cTarget.effects.filter(e => !(e.type === "crossfade" && e.side === "out"));
+                            cTarget.effects.push({
+                                type: "crossfade",
+                                side: "out",
+                                duration_s: fadeDurS,
+                                curve: options.curve || "equal_power",
+                                tension: typeof options.tension === "number" ? options.tension : 0,
+                                disabled: false
+                            });
+                            appliedSide = "out";
+                        }
+                    });
+
+                    STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
+                    return { clip: target, type: "edge_fade", side: appliedSide, duration_s: fadeDurS };
+                }
+            }
+        }
+
+        // 3. Detecção automática baseada na agulha de reprodução (Playhead)
+        if (!clipA || !clipB) {
+            const playhead = (typeof this.playheadFrame === "number") ? this.playheadFrame : 0;
+            const audioTracks = (this.tracks || []).filter(t => t.kind === "audio" && !t.locked).map(t => t.id);
+            
+            // Prioriza a pista selecionada se for de áudio e destravada
+            const tracksToSearch = (this.selectedTrack && audioTracks.includes(this.selectedTrack))
+                ? [this.selectedTrack, ...audioTracks.filter(t => t !== this.selectedTrack)]
+                : audioTracks;
+
+            let closestDist = Infinity;
+            for (const tId of tracksToSearch) {
+                const trackClips = cuts.filter(c => c.track === tId).sort((a, b) => (a.timelineStartFrame || 0) - (b.timelineStartFrame || 0));
+                for (let i = 0; i < trackClips.length - 1; i++) {
+                    const c1 = trackClips[i];
+                    const c2 = trackClips[i + 1];
+                    const end1 = (c1.timelineStartFrame || 0) + ((c1.outFrame || 0) - (c1.inFrame || 0));
+                    const start2 = c2.timelineStartFrame || 0;
+                    if (Math.abs(start2 - end1) <= 1) {
+                        const dist = Math.abs(playhead - end1);
+                        if (dist < closestDist && dist <= Math.max(48, fps * 2)) {
+                            closestDist = dist;
+                            clipA = c1;
+                            clipB = c2;
+                            trackId = tId;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!clipA || !clipB || !trackId) {
+            return null;
+        }
+
+        // Proteção: pista travada com cadeado não pode receber transição
+        const trackObj = this.getTrack ? this.getTrack(trackId) : (this.tracks || []).find(t => t.id === trackId);
+        if (trackObj && trackObj.locked) {
+            return null;
+        }
+
+        const cutFrame = options.cutFrame !== undefined 
+            ? options.cutFrame 
+            : (clipA.timelineStartFrame || 0) + ((clipA.outFrame || 0) - (clipA.inFrame || 0));
+
+        const durAClip = Math.max(1, (clipA.outFrame || 0) - (clipA.inFrame || 0));
+        const durBClip = Math.max(1, (clipB.outFrame || 0) - (clipB.inFrame || 0));
+        const clipAStart = Math.max(0, clipA.timelineStartFrame || 0);
+        const clipBStart = (clipB.timelineStartFrame !== undefined) ? clipB.timelineStartFrame : cutFrame;
+        const clipBEnd = clipBStart + durBClip;
+
+        const safetyMargin = Math.min(4, Math.max(1, Math.floor(Math.min(durAClip, durBClip) / 6)));
+        const maxMutualCap = Math.max(1, Math.min(durAClip - safetyMargin, durBClip - safetyMargin));
+
+        let maxLimA = Math.max(1, Math.min(maxMutualCap, cutFrame - clipAStart - safetyMargin));
+        let maxLimB = Math.max(1, Math.min(maxMutualCap, clipBEnd - cutFrame - safetyMargin));
+
+        // Prevenção de colisão com transições vizinhas na mesma pista
+        const otherTrs = (this.transitions || []).filter(t => t.track === trackId);
+        const prevTrs = otherTrs.filter(t => t.cutFrame < cutFrame);
+        if (prevTrs.length > 0) {
+            prevTrs.sort((a, b) => b.cutFrame - a.cutFrame);
+            const prevR = prevTrs[0].cutFrame + (prevTrs[0].halfBFrames !== undefined ? prevTrs[0].halfBFrames : 15);
+            maxLimA = Math.min(maxLimA, Math.max(1, cutFrame - prevR - safetyMargin));
+        }
+        const nextTrs = otherTrs.filter(t => t.cutFrame > cutFrame);
+        if (nextTrs.length > 0) {
+            nextTrs.sort((a, b) => a.cutFrame - b.cutFrame);
+            const nextL = nextTrs[0].cutFrame - (nextTrs[0].halfAFrames !== undefined ? nextTrs[0].halfAFrames : 15);
+            maxLimB = Math.min(maxLimB, Math.max(1, nextL - cutFrame - safetyMargin));
+        }
+        const maxSymLim = Math.max(1, Math.min(maxLimA, maxLimB));
+
+        const reqDurS = (typeof options.duration_s === "number" && options.duration_s > 0) ? options.duration_s : 1.0;
+        const reqDurFrames = (typeof options.durationFrames === "number" && options.durationFrames > 0) 
+            ? options.durationFrames 
+            : Math.round(reqDurS * fps);
+
+        const alignment = options.alignment || "center"; // "center", "start", "end"
+        let halfA, halfB;
+        if (alignment === "start") {
+            halfA = 1;
+            halfB = Math.max(1, Math.min(reqDurFrames, maxLimB));
+        } else if (alignment === "end") {
+            halfA = Math.max(1, Math.min(reqDurFrames, maxLimA));
+            halfB = 1;
+        } else {
+            // "center"
+            halfA = Math.max(1, Math.min(Math.floor(reqDurFrames / 2), maxSymLim));
+            halfB = Math.max(1, Math.min(Math.ceil(reqDurFrames / 2), maxSymLim));
+        }
+        const totalDurFrames = halfA + halfB;
+        const totalDurS = totalDurFrames / fps;
+
+        let createdTransition = null;
+
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = STATE.activeTimelineCuts || [];
+            const cA = currentCuts.find(c => c.id === clipA.id);
+            const cB = currentCuts.find(c => c.id === clipB.id);
+            if (!cA || !cB) return;
+
+            const transId = options.id || ("trans_cf_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6));
+            createdTransition = {
+                id: transId,
+                type: "audio_crossfade",
+                kind: "audio",
+                track: trackId,
+                cutFrame: cutFrame,
+                clipAId: cA.id,
+                clipBId: cB.id,
+                durationFrames: totalDurFrames,
+                duration_s: totalDurS,
+                halfAFrames: halfA,
+                halfBFrames: halfB,
+                alignment: alignment,
+                curve: options.curve || "equal_power",
+                tension: typeof options.tension === "number" ? options.tension : 0
+            };
+
+            // Atualiza efeitos no clipe A (Fade Out com Potência Constante)
+            cA.effects = (cA.effects || []).filter(e => !(e.type === "crossfade" && e.side === "out"));
+            cA.effects.push({
+                type: "crossfade",
+                side: "out",
+                duration_s: halfA / fps,
+                curve: createdTransition.curve,
+                tension: createdTransition.tension,
+                transitionId: createdTransition.id,
+                disabled: false
+            });
+
+            // Atualiza efeitos no clipe B (Fade In com Potência Constante)
+            cB.effects = (cB.effects || []).filter(e => !(e.type === "crossfade" && e.side === "in"));
+            cB.effects.push({
+                type: "crossfade",
+                side: "in",
+                duration_s: halfB / fps,
+                curve: createdTransition.curve,
+                tension: createdTransition.tension,
+                transitionId: createdTransition.id,
+                disabled: false
+            });
+
+            // Registra a transição na lista de transições da timeline
+            if (!this.transitions) this.transitions = [];
+            this.transitions = this.transitions.filter(t => !(t.track === trackId && Math.abs(t.cutFrame - cutFrame) <= 1));
+            this.transitions.push(createdTransition);
+            this.selectedTransitionId = createdTransition.id;
+
+            STATE.activeTimelineCuts = currentCuts;
+        });
+
+        if (createdTransition) {
+            STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
+            STATE.emit("timelineTransitionsChanged", this.transitions);
+        }
+
+        const finalCuts = STATE.activeTimelineCuts || [];
+        const finalClipA = finalCuts.find(c => c.id === clipA.id) || clipA;
+        const finalClipB = finalCuts.find(c => c.id === clipB.id) || clipB;
+
+        return createdTransition ? { transition: createdTransition, clipA: finalClipA, clipB: finalClipB } : null;
+    }
+
+    /**
+     * Remove uma transição de corte pelo ID e limpa os efeitos nos clipes correspondentes.
+     * @param {string} transitionId - ID da transição a remover
+     * @returns {boolean} True se removida com sucesso
+     */
+    removeTransition(transitionId) {
+        if (!transitionId || !this.transitions) return false;
+        const trans = this.transitions.find(t => t.id === transitionId);
+        if (!trans) return false;
+
+        TIMELINE_HISTORY.record(() => {
+            const currentCuts = STATE.activeTimelineCuts || [];
+            const cA = currentCuts.find(c => c.id === trans.clipAId);
+            const cB = currentCuts.find(c => c.id === trans.clipBId);
+
+            if (cA && cA.effects) {
+                cA.effects = cA.effects.filter(e => e.transitionId !== transitionId);
+            }
+            if (cB && cB.effects) {
+                cB.effects = cB.effects.filter(e => e.transitionId !== transitionId);
+            }
+
+            this.transitions = this.transitions.filter(t => t.id !== transitionId);
+            if (this.selectedTransitionId === transitionId) {
+                this.selectedTransitionId = null;
+            }
+            STATE.activeTimelineCuts = currentCuts;
+        });
+
+        STATE.emit("timelineCutsChanged", STATE.activeTimelineCuts);
+        STATE.emit("timelineTransitionsChanged", this.transitions);
+        return true;
+    }
+
+    /**
+     * Calcula os limites físicos estritos de expansão para uma transição de corte (Crossfade),
+     * garantindo que as metades da transição nunca ultrapassem os limites físicos dos clipes,
+     * o início da timeline (frame 0) nem transições adjacentes na mesma pista.
+     * @param {string} transitionId - ID da transição
+     * @returns {Object|null} Limites calculados ou null
+     */
+    getTransitionLimits(transitionId) {
+        if (!transitionId || !this.transitions) return null;
+        const tr = this.transitions.find(t => t.id === transitionId);
+        if (!tr) return null;
+
+        const cuts = STATE.activeTimelineCuts || [];
+        const clipA = cuts.find(c => c.id === tr.clipAId);
+        const clipB = cuts.find(c => c.id === tr.clipBId);
+        if (!clipA || !clipB) return null;
+
+        const durAClip = Math.max(1, (clipA.outFrame || 0) - (clipA.inFrame || 0));
+        const durBClip = Math.max(1, (clipB.outFrame || 0) - (clipB.inFrame || 0));
+        const clipAStart = Math.max(0, clipA.timelineStartFrame || 0);
+        const cutFrame = (typeof tr.cutFrame === "number") ? tr.cutFrame : (clipAStart + durAClip);
+        const clipBStart = (clipB.timelineStartFrame !== undefined) ? clipB.timelineStartFrame : cutFrame;
+        const clipBEnd = clipBStart + durBClip;
+
+        // Margem tátil de segurança para evitar que a alça de transição cole na extremidade
+        // do clipe, preservando sempre uma zona de clique/trim visível para o editor
+        const safetyMargin = Math.min(4, Math.max(1, Math.floor(Math.min(durAClip, durBClip) / 6)));
+
+        // Teto Mútuo Cruzado: um crossfade acústico entre A e B não pode ter uma metade maior
+        // do que a extensão total do clipe parceiro (o clipe oposto deve ter áudio suficiente para a fusão)
+        const maxMutualCap = Math.max(1, Math.min(durAClip - safetyMargin, durBClip - safetyMargin));
+
+        // Limite Físico Lado A: nunca antes do início do clipe A, respeitando teto mútuo e margem
+        let maxHalfA = Math.max(1, Math.min(maxMutualCap, cutFrame - clipAStart - safetyMargin));
+
+        // Limite Físico Lado B: nunca depois do fim do clipe B, respeitando teto mútuo e margem
+        let maxHalfB = Math.max(1, Math.min(maxMutualCap, clipBEnd - cutFrame - safetyMargin));
+
+        // Prevenção de Colisão: não sobrepor transições vizinhas na mesma pista
+        const otherTransitions = (this.transitions || []).filter(t => t.track === tr.track && t.id !== tr.id);
+        const prevTrList = otherTransitions.filter(t => t.cutFrame < cutFrame);
+        if (prevTrList.length > 0) {
+            prevTrList.sort((a, b) => b.cutFrame - a.cutFrame);
+            const prevTr = prevTrList[0];
+            const prevRight = prevTr.cutFrame + (prevTr.halfBFrames !== undefined ? prevTr.halfBFrames : 15);
+            maxHalfA = Math.min(maxHalfA, Math.max(1, cutFrame - prevRight - safetyMargin));
+        }
+
+        const nextTrList = otherTransitions.filter(t => t.cutFrame > cutFrame);
+        if (nextTrList.length > 0) {
+            nextTrList.sort((a, b) => a.cutFrame - b.cutFrame);
+            const nextTr = nextTrList[0];
+            const nextLeft = nextTr.cutFrame - (nextTr.halfAFrames !== undefined ? nextTr.halfAFrames : 15);
+            maxHalfB = Math.min(maxHalfB, Math.max(1, nextLeft - cutFrame - safetyMargin));
+        }
+
+        const maxSymmetricHalf = Math.max(1, Math.min(maxHalfA, maxHalfB));
+
+        return {
+            cutFrame,
+            durAClip,
+            durBClip,
+            clipAStart,
+            clipBEnd,
+            maxHalfA,
+            maxHalfB,
+            maxSymmetricHalf
+        };
+    }
+
+    /**
+     * Atualiza a duração e as metades (halfA / halfB) de uma transição de corte existente,
+     * respeitando rigorosamente os limites físicos da pista e sincronizando os efeitos.
+     * @param {string} transitionId - ID da transição
+     * @param {number} halfAFrames - Duração em quadros para o lado esquerdo (Clip A)
+     * @param {number} halfBFrames - Duração em quadros para o lado direito (Clip B)
+     * @param {boolean} isSymmetric - Se true, aplica a trava simétrica rígida
+     * @returns {Object|null} A transição atualizada ou null
+     */
+    updateTransitionDuration(transitionId, halfAFrames, halfBFrames, isSymmetric = false) {
+        if (!transitionId || !this.transitions) return null;
+        const tr = this.transitions.find(t => t.id === transitionId);
+        if (!tr) return null;
+
+        const cuts = STATE.activeTimelineCuts || [];
+        const clipA = cuts.find(c => c.id === tr.clipAId);
+        const clipB = cuts.find(c => c.id === tr.clipBId);
+        if (!clipA || !clipB) return null;
+
+        const limits = this.getTransitionLimits(transitionId);
+        const fps = this.fps || 24;
+        const durAClip = Math.max(1, (clipA.outFrame || 0) - (clipA.inFrame || 0));
+        const durBClip = Math.max(1, (clipB.outFrame || 0) - (clipB.inFrame || 0));
+
+        const maxA = limits ? limits.maxHalfA : durAClip - 1;
+        const maxB = limits ? limits.maxHalfB : durBClip - 1;
+        const maxSym = limits ? limits.maxSymmetricHalf : Math.min(maxA, maxB);
+
+        const reqA = Math.round(halfAFrames);
+        const reqB = Math.round(halfBFrames);
+        let clampedHalfA, clampedHalfB;
+
+        if (isSymmetric && reqA === reqB) {
+            const clamped = Math.max(1, Math.min(reqA, maxSym));
+            clampedHalfA = clamped;
+            clampedHalfB = clamped;
+        } else {
+            clampedHalfA = Math.max(1, Math.min(reqA, maxA));
+            clampedHalfB = Math.max(1, Math.min(reqB, maxB));
+        }
+
+        const hitLimitA = clampedHalfA >= maxA || (isSymmetric && clampedHalfA >= maxSym);
+        const hitLimitB = clampedHalfB >= maxB || (isSymmetric && clampedHalfB >= maxSym);
+        tr.hitLimit = hitLimitA || hitLimitB;
+        tr.hitLimitA = hitLimitA;
+        tr.hitLimitB = hitLimitB;
+        tr.maxHalfA = maxA;
+        tr.maxHalfB = maxB;
+        tr.maxSymmetricHalf = maxSym;
+
+        const totalDurFrames = clampedHalfA + clampedHalfB;
+        const totalDurS = totalDurFrames / fps;
+
+        tr.halfAFrames = clampedHalfA;
+        tr.halfBFrames = clampedHalfB;
+        tr.durationFrames = totalDurFrames;
+        tr.duration_s = totalDurS;
+
+        // Atualiza ou adiciona o efeito no Clip A
+        if (!clipA.effects) clipA.effects = [];
+        let effA = clipA.effects.find(e => e.transitionId === tr.id && e.side === "out");
+        if (effA) {
+            effA.duration_s = clampedHalfA / fps;
+        } else {
+            clipA.effects.push({
+                type: "crossfade",
+                side: "out",
+                duration_s: clampedHalfA / fps,
+                curve: tr.curve || "equal_power",
+                tension: tr.tension || 0,
+                transitionId: tr.id,
+                disabled: false
+            });
+        }
+
+        // Atualiza ou adiciona o efeito no Clip B
+        if (!clipB.effects) clipB.effects = [];
+        let effB = clipB.effects.find(e => e.transitionId === tr.id && e.side === "in");
+        if (effB) {
+            effB.duration_s = clampedHalfB / fps;
+        } else {
+            clipB.effects.push({
+                type: "crossfade",
+                side: "in",
+                duration_s: clampedHalfB / fps,
+                curve: tr.curve || "equal_power",
+                tension: tr.tension || 0,
+                transitionId: tr.id,
+                disabled: false
+            });
+        }
+
+        return tr;
+    }
+
+    /**
+     * Valida todas as transições da timeline e remove automaticamente
+     * transições órfãs cujos clipes não existem mais, foram movidos de pista
+     * ou não estão mais contíguos na timeline (quando separados).
+     * Sincroniza também cutFrame caso os clipes tenham sido movidos juntos.
+     * @returns {boolean} True se alguma transição foi modificada ou removida.
+     */
+    validateTransitions() {
+        if (!this.transitions || this.transitions.length === 0) return false;
+        const cuts = STATE.activeTimelineCuts || [];
+        const validTransitions = [];
+        let changed = false;
+
+        this.transitions.forEach(tr => {
+            const clipA = cuts.find(c => c.id === tr.clipAId);
+            const clipB = cuts.find(c => c.id === tr.clipBId);
+
+            // 1. Se algum dos clipes foi deletado da timeline: transição órfã
+            if (!clipA || !clipB) {
+                changed = true;
+                if (clipA && clipA.effects) clipA.effects = clipA.effects.filter(e => e.transitionId !== tr.id);
+                if (clipB && clipB.effects) clipB.effects = clipB.effects.filter(e => e.transitionId !== tr.id);
+                return;
+            }
+
+            // 2. Se os clipes foram movidos para pistas diferentes: transição órfã
+            if (clipA.track !== tr.track || clipB.track !== tr.track) {
+                changed = true;
+                if (clipA.effects) clipA.effects = clipA.effects.filter(e => e.transitionId !== tr.id);
+                if (clipB.effects) clipB.effects = clipB.effects.filter(e => e.transitionId !== tr.id);
+                return;
+            }
+
+            // 3. Verifica contiguidade na timeline (se foram separados por um gap ou rearranjo)
+            const endA = (clipA.timelineStartFrame || 0) + ((clipA.outFrame || 0) - (clipA.inFrame || 0));
+            const startB = (clipB.timelineStartFrame || 0);
+
+            // Tolerância máxima de 1 frame para colagem magnética
+            if (Math.abs(startB - endA) > 1) {
+                // OS CLIPES FORAM SEPARADOS: remove a transição e seus efeitos nos clipes
+                changed = true;
+                if (clipA.effects) clipA.effects = clipA.effects.filter(e => e.transitionId !== tr.id);
+                if (clipB.effects) clipB.effects = clipB.effects.filter(e => e.transitionId !== tr.id);
+                return;
+            }
+
+            // 4. Se continuam juntos mas foram movidos (deslocados na régua), atualiza cutFrame
+            if (tr.cutFrame !== endA) {
+                tr.cutFrame = endA;
+                changed = true;
+            }
+
+            validTransitions.push(tr);
+        });
+
+        if (changed) {
+            this.transitions = validTransitions;
+            if (this.selectedTransitionId && !validTransitions.some(t => t.id === this.selectedTransitionId)) {
+                this.selectedTransitionId = null;
+            }
+            STATE.emit("timelineTransitionsChanged", this.transitions);
+            STATE.emit("timelineCutsChanged", cuts);
+        }
+
+        return changed;
+    }
+
+    /**
      * Define as propriedades da sequência (largura, altura e fps) e reescala clipes.
      */
     setTimelineProperties({ width, height, fps }) {
@@ -6563,6 +7256,13 @@ STATE.on("mediaRotated", ({ mediaType, mediaId, rotation }) => {
     }
 });
 
+// Valida e limpa transições automaticamente quando os clipes mudam na timeline
+STATE.on("timelineCutsUpdated", () => {
+    if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.validateTransitions === "function") {
+        TIMELINE_STATE.validateTransitions();
+    }
+});
+
 // --- HISTÓRICO DE UNDO/REDO (snapshots de clipes, pistas e sugestões) ---
 
 const safeHistoryReplacer = (key, value) => {
@@ -6591,6 +7291,8 @@ class TimelineHistory {
             outFrame: TIMELINE_STATE.outFrame,
             markers: TIMELINE_STATE.markers || [],
             selectedMarkerIds: Array.from(TIMELINE_STATE.selectedMarkerIds || []),
+            transitions: (TIMELINE_STATE.transitions || []).map(t => ({ ...t })),
+            selectedTransitionId: TIMELINE_STATE.selectedTransitionId || null,
             playheadFrame: (TIMELINE_STATE.playheadFrame !== undefined && TIMELINE_STATE.playheadFrame !== null) ? TIMELINE_STATE.playheadFrame : 0
         }, safeHistoryReplacer));
     }
@@ -6603,6 +7305,9 @@ class TimelineHistory {
     /** Fecha a transação: empilha o estado anterior somente se algo mudou. */
     commit() {
         if (!this.pending) return;
+        if (typeof TIMELINE_STATE !== "undefined" && typeof TIMELINE_STATE.validateTransitions === "function") {
+            TIMELINE_STATE.validateTransitions();
+        }
         const before = this.pending;
         this.pending = null;
         if (JSON.stringify(before, safeHistoryReplacer) === JSON.stringify(this._capture(), safeHistoryReplacer)) return;
@@ -6643,6 +7348,11 @@ class TimelineHistory {
             TIMELINE_STATE.markers = JSON.parse(JSON.stringify(snap.markers));
             TIMELINE_STATE.selectedMarkerIds = new Set(snap.selectedMarkerIds || []);
             STATE.emit("timelineMarkersChanged", TIMELINE_STATE.markers);
+        }
+        if (snap.transitions !== undefined) {
+            TIMELINE_STATE.transitions = (snap.transitions || []).map(t => ({ ...t }));
+            TIMELINE_STATE.selectedTransitionId = snap.selectedTransitionId || null;
+            STATE.emit("timelineTransitionsChanged", TIMELINE_STATE.transitions);
         }
         if (snap.playheadFrame !== undefined && snap.playheadFrame !== null) {
             if (typeof TIMELINE_STATE.setPlayheadFrame === "function") {

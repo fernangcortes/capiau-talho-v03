@@ -248,6 +248,11 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
 
 - **Miniaturas Proporcionais (16:9, 9:16, 1:1) e 3 Modos de Visualização.** Cálculo de largura geométrica real (`clipHeight * aspectRatio`) eliminando o fatiamento vertical em faixas expandidas. Conta com 3 modos clássicos selecionáveis pelo popover de opções com auto-flip vertical: **Rolo de Filme / Contínuo (*Filmstrip*)**, **Apenas Início (*Head Only*)** e **Desativar Miniaturas (*None*)**.
 
+- **Crossfade de Áudio com Potência Constante (`Ctrl + Shift + D`).** Transições acústicas contíguas de alta fidelidade baseadas no princípio matemático de Equal-Power ($\cos^2(\theta) + \sin^2(\theta) = 1.0$), eliminando a clássica queda perceptiva de 3 dB de fades lineares:
+  - **Reprodução Dual Simultânea & Buffer Quente:** O motor HTML5 Audio pré-carrega o áudio do segundo clipe em repouso e dispara a reprodução simultânea no corte sem engasgos, promovendo o elemento de forma contínua para o pool principal.
+  - **Teto Mútuo Cruzado & Proteção Tátil:** Clamping rígido mútuo que impede expansão além da duração física do clipe parceiro, com margem de segurança tátil de 4 frames preservando a zona de corte/trim do clipe.
+  - **Alças Táteis em Bracket & Cursor SVG Dedicado:** Identificação visual inequívoca das alças com o cursor exclusivo `CURSOR_TRANSITION_RESIZE`, comutando para os cursores clássicos de corte do clipe caso a transição não esteja selecionada.
+
 - **Redimensionamento Vertical Granular de Pistas.** Controle duplo de altura de faixas: ajuste cirúrgico individual de uma pista específica via **`Shift + Roda do Mouse`** sobre o cabeçalho correspondente (22px a 240px em passos de 8px) ou escala global da timeline via **`Shift + Roda`** sobre o canvas (`Numpad +` / `Numpad -`).
 
 - **Agente editor com ferramentas (IA copiloto).** Um agente conversacional analisa o roteiro e a
@@ -818,9 +823,9 @@ O plano completo, com decisões registradas e critérios de aceite, está em
 |---|---|---|
 | **1 — Sanear a base** | Limpeza do pipeline de análise | ✅ Concluída |
 | **2 — Segmentação e CLIP local** | Shots, beats, embeddings de imagem e análise condicional | ✅ Concluída |
-| **Suíte NLE Clássico (Sessões 0 a 2)** | Layout 2 Zonas, Tool Strip (Gilete, Slip, Slide, Rolling), 3-Pontos, Match Frame | ✅ Concluída (Tasks 0 a 8) |
-| **3 — Sala de Projeto & NLE Avançado** | Cartão de contexto, Replace Edit, Subclipes, Timecode Interativo, Freezes | 🔄 Em andamento |
-| **4 — Áudio, Cor & Efeitos NLE** | Crossfades, Transições, VU Meters, Keyframes de Volume, Auto-Ducking | 📋 Planejada |
+| **Suíte NLE Clássico (Sessões 0 a 4)** | Layout 2 Zonas, Tool Strip (Gilete, Slip, Slide, Rolling), 3-Pontos, Match Frame, Replace Edit, Subclipes, Timecode, Freezes, Speed, Rate Stretch, Crossfade | ✅ Concluída (Tasks 0 a 15) |
+| **3 — Sala de Projeto & IA de Montagem** | Cartão de contexto, sugestões de transição e escaleta | 🔄 Em andamento |
+| **4 — Vídeo, Cor & Efeitos NLE** | Transições de Vídeo (Cross Dissolve), Adjustment Layer, VU Meters, Keyframes, Auto-Ducking | 📋 Planejada (Tasks 16 a 25) |
 | **5 — Busca multi-vetor e agentes** | Busca em 3 passos, chat com ferramentas, servidor MCP, farm de GPUs | 📋 Planejada |
 
 ---

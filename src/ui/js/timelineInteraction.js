@@ -74,6 +74,10 @@ export const CURSOR_TRIM_RIGHT = `url('data:image/svg+xml;utf8,<svg xmlns="http:
 
 export const CURSOR_TRIM_BIDIRECTIONAL = "w-resize";
 
+// Cursor SVG em alta definição para Redimensionamento de Transição de Junção (Task 15 / Crossfade):
+// Mostra o badge de transição cruzada com setas nas pontas para distinguir imediatamente do trim de clipes.
+export const CURSOR_TRANSITION_RESIZE = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" fill="%23121216" stroke="%2310b981" stroke-width="1.4"/><line x1="12" y1="5" x2="12" y2="19" stroke="%23ffffff" stroke-width="1" stroke-dasharray="2,2"/><polygon points="5,18 12,6 12,18" fill="rgba(6,182,212,0.45)"/><polygon points="12,18 19,6 12,6" fill="rgba(16,185,129,0.45)"/><polygon points="2,12 5,8 5,16" fill="%2306b6d4" stroke="%23000" stroke-width="1"/><polygon points="22,12 19,8 19,16" fill="%2310b981" stroke="%23000" stroke-width="1"/></svg>') 12 12, ew-resize`;
+
 export class CapiauTimelineInteraction {
     constructor(renderer) {
         this.renderer = renderer;
@@ -195,6 +199,11 @@ export class CapiauTimelineInteraction {
             this.hideMarkerTooltip();
             this.hideFadeTooltip();
             this.hideSlipTooltip();
+            this.hideTransitionTooltip();
+            if (TIMELINE_STATE.hoveredTransitionId) {
+                TIMELINE_STATE.hoveredTransitionId = null;
+                if (this.renderer) this.renderer.requestRedraw();
+            }
             if (TIMELINE_STATE.hoveredMarkerId !== null) {
                 TIMELINE_STATE.hoveredMarkerId = null;
                 if (this.renderer) this.renderer.requestRedraw();
@@ -220,18 +229,21 @@ export class CapiauTimelineInteraction {
         };
         this.boundWindowBlur = () => {
             if (this.dragState) {
-                if (this.dragState === "slip" || this.dragState === "slide" || this.dragState === "rolling" || this.dragState === "drag-selection" || this.dragState === "drag-clip") {
+                if (this.dragState === "slip" || this.dragState === "slide" || this.dragState === "rolling" || this.dragState === "drag-selection" || this.dragState === "drag-clip" || this.dragState === "transition-resize") {
                     TIMELINE_HISTORY.commit();
                     STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
                 }
                 this.dragState = null;
                 this.draggedClipId = null;
+                this.resizingTransition = null;
+                this.transitionResizeEdge = null;
             }
             this.hideMarkerTooltip();
             this.hideFadeTooltip();
             this.hideSlipTooltip();
             this.hideSlideTooltip();
             this.hideRollingTooltip();
+            this.hideTransitionTooltip();
             this.hideHoverPreview();
             if (this.renderer) this.renderer.requestRedraw();
         };
@@ -858,8 +870,8 @@ export class CapiauTimelineInteraction {
         if (x < startX - 4 || x > startX + width + 4) return null;
 
         const effects = clip.effects || [];
-        const fadeInEff = effects.find(e => e.type === "crossfade" && e.side === "in" && !e.disabled);
-        const fadeOutEff = effects.find(e => e.type === "crossfade" && e.side === "out" && !e.disabled);
+        const fadeInEff = effects.find(e => e.type === "crossfade" && e.side === "in" && !e.disabled && !e.transitionId);
+        const fadeOutEff = effects.find(e => e.type === "crossfade" && e.side === "out" && !e.disabled && !e.transitionId);
 
         const fadeInDur = fadeInEff ? Math.min(clipDurS, Math.max(0, fadeInEff.duration_s || 0)) : 0;
         const fadeOutDur = fadeOutEff ? Math.min(clipDurS - fadeInDur, Math.max(0, fadeOutEff.duration_s || 0)) : 0;
@@ -1069,6 +1081,48 @@ export class CapiauTimelineInteraction {
                 }
             }
             return;
+        }
+
+        // Clique com botão esquerdo em transição de corte
+        if (e.button === 0 && track && typeof TIMELINE_STATE.getTransitionHit === "function") {
+            const transHit = TIMELINE_STATE.getTransitionHit(track, frame, 4);
+            if (transHit) {
+                // Se o mouse estiver sobre trimHit de clipe (borda de corte ou extremidade) e a transição NÃO estiver selecionada:
+                // Prioriza o corte e arrasto do clipe (trim), sem sequestrar para a transição!
+                const trimHit = this.getTrimHit(x, track);
+                const isAlreadySelected = TIMELINE_STATE.selectedTransitionId === transHit.transition.id;
+
+                if (trimHit && !isAlreadySelected && transHit.edge !== "body") {
+                    // Deixa passar para o fluxo normal de trim do clipe abaixo
+                } else {
+                    TIMELINE_STATE.selectedTransitionId = transHit.transition.id;
+                    TIMELINE_STATE.clearClipSelection();
+                    TIMELINE_STATE.clearSelectedGap();
+
+                    if (transHit.edge === "left" || transHit.edge === "right") {
+                        this.dragState = "transition-resize";
+                        this.resizingTransition = transHit.transition;
+                        this.transitionResizeEdge = transHit.edge; // "left" ou "right"
+                        this.transitionResizeStartMouseX = e.clientX;
+                        this.transitionResizeStartHalfA = transHit.transition.halfAFrames !== undefined 
+                            ? transHit.transition.halfAFrames 
+                            : Math.round((transHit.transition.durationFrames || 24) / 2);
+                        this.transitionResizeStartHalfB = transHit.transition.halfBFrames !== undefined 
+                            ? transHit.transition.halfBFrames 
+                            : Math.round((transHit.transition.durationFrames || 24) / 2);
+                        TIMELINE_HISTORY.begin();
+                        if (this.canvas) this.canvas.style.cursor = CURSOR_TRANSITION_RESIZE;
+                        this.showTransitionTooltip(e.clientX, e.clientY, transHit.transition, e.altKey);
+                    }
+
+                    if (this.renderer) this.renderer.requestRedraw();
+                    return;
+                }
+            }
+        }
+        if (e.button === 0 && TIMELINE_STATE.selectedTransitionId) {
+            TIMELINE_STATE.selectedTransitionId = null;
+            if (this.renderer) this.renderer.requestRedraw();
         }
         
         // 1. Clique na régua de tempo (In/Out Drag, Scrubbing, Drag de Marcador, Mover Playhead)
@@ -2203,6 +2257,37 @@ export class CapiauTimelineInteraction {
                 TIMELINE_STATE.hoveredMarkerId = null;
                 if (this.renderer) this.renderer.requestRedraw();
             }
+
+            // Hover sobre transições de corte
+            if (track && typeof TIMELINE_STATE.getTransitionHit === "function") {
+                const trimHit = this.getTrimHit(x, track);
+                const transHit = TIMELINE_STATE.getTransitionHit(track, frame, 4);
+                const isSelected = transHit && TIMELINE_STATE.selectedTransitionId === transHit.transition.id;
+
+                if (transHit && (!trimHit || isSelected || transHit.edge === "body")) {
+                    if (transHit.edge === "left" || transHit.edge === "right") {
+                        this.canvas.style.cursor = CURSOR_TRANSITION_RESIZE;
+                        this.canvas.setAttribute("data-tooltip", "Transição: Arraste para ajustar duração (Segure Alt para ajuste assimétrico)");
+                    } else {
+                        this.canvas.style.cursor = "pointer";
+                        this.canvas.setAttribute("data-tooltip", "Transição: Clique para selecionar ou botão direito para opções");
+                    }
+                    if (TIMELINE_STATE.hoveredTransitionId !== transHit.transition.id) {
+                        TIMELINE_STATE.hoveredTransitionId = transHit.transition.id;
+                        if (this.renderer) this.renderer.requestRedraw();
+                    }
+                    if (TIMELINE_STATE.hoveredFadeHandle !== null) {
+                        TIMELINE_STATE.hoveredFadeHandle = null;
+                        if (this.renderer) this.renderer.requestRedraw();
+                    }
+                    this.hideHoverPreview();
+                    return;
+                } else if (TIMELINE_STATE.hoveredTransitionId !== null) {
+                    TIMELINE_STATE.hoveredTransitionId = null;
+                    if (this.renderer) this.renderer.requestRedraw();
+                }
+            }
+
             const hit = this.findClipAt(frame, track, y);
             if (hit && hit.type === "clip") {
                 const fadeZone = this.checkFadeZone(x, y, hit.data, false);
@@ -2945,6 +3030,70 @@ export class CapiauTimelineInteraction {
                 if (this.renderer) this.renderer.requestRedraw();
             }
         }
+        else if (this.dragState === "transition-resize" && this.resizingTransition) {
+            this.canvas.style.cursor = CURSOR_TRANSITION_RESIZE;
+            const tr = this.resizingTransition;
+            const dx = e.clientX - this.transitionResizeStartMouseX;
+            const deltaFrames = Math.round(dx / (TIMELINE_STATE.zoom || 1));
+
+            const limits = TIMELINE_STATE.getTransitionLimits(tr.id);
+            const isAlt = !!e.altKey;
+
+            let newHalfA = this.transitionResizeStartHalfA;
+            let newHalfB = this.transitionResizeStartHalfB;
+            let hitLimit = false;
+
+            if (isAlt) {
+                // Modo Assimétrico: move apenas a borda sob o mouse
+                if (this.transitionResizeEdge === "left") {
+                    const rawA = this.transitionResizeStartHalfA - deltaFrames;
+                    newHalfA = limits ? Math.max(1, Math.min(rawA, limits.maxHalfA)) : Math.max(1, rawA);
+                    if (limits && rawA >= limits.maxHalfA) hitLimit = true;
+                } else {
+                    const rawB = this.transitionResizeStartHalfB + deltaFrames;
+                    newHalfB = limits ? Math.max(1, Math.min(rawB, limits.maxHalfB)) : Math.max(1, rawB);
+                    if (limits && rawB >= limits.maxHalfB) hitLimit = true;
+                }
+            } else {
+                // Modo Simétrico (Padrão): puxar qualquer lado expande/contrai ambos igualmente
+                const delta = (this.transitionResizeEdge === "left") ? -deltaFrames : deltaFrames;
+                if (limits) {
+                    if (delta >= 0) {
+                        // Expansão simétrica: para assim que qualquer um dos dois clipes atingir o teto
+                        const maxGrowthA = Math.max(0, limits.maxHalfA - this.transitionResizeStartHalfA);
+                        const maxGrowthB = Math.max(0, limits.maxHalfB - this.transitionResizeStartHalfB);
+                        const maxAllowedDelta = Math.min(maxGrowthA, maxGrowthB);
+                        const effDelta = Math.min(delta, maxAllowedDelta);
+                        newHalfA = this.transitionResizeStartHalfA + effDelta;
+                        newHalfB = this.transitionResizeStartHalfB + effDelta;
+                        if (delta >= maxAllowedDelta && maxAllowedDelta < delta) {
+                            hitLimit = true;
+                        }
+                    } else {
+                        // Contração simétrica: até mínimo de 1 frame em ambos
+                        const maxShrinkA = Math.max(0, this.transitionResizeStartHalfA - 1);
+                        const maxShrinkB = Math.max(0, this.transitionResizeStartHalfB - 1);
+                        const maxAllowedShrink = Math.min(maxShrinkA, maxShrinkB);
+                        const effShrink = Math.min(-delta, maxAllowedShrink);
+                        newHalfA = this.transitionResizeStartHalfA - effShrink;
+                        newHalfB = this.transitionResizeStartHalfB - effShrink;
+                    }
+                    if (newHalfA >= limits.maxHalfA || newHalfB >= limits.maxHalfB) {
+                        hitLimit = true;
+                    }
+                } else {
+                    newHalfA = Math.max(1, this.transitionResizeStartHalfA + delta);
+                    newHalfB = Math.max(1, this.transitionResizeStartHalfB + delta);
+                }
+            }
+
+            const updated = TIMELINE_STATE.updateTransitionDuration(tr.id, newHalfA, newHalfB, !isAlt);
+            if (updated) {
+                if (hitLimit) updated.hitLimit = true;
+                this.showTransitionTooltip(e.clientX, e.clientY, updated, isAlt);
+                if (this.renderer) this.renderer.requestRedraw();
+            }
+        }
     }
 
     onMouseUp(e) {
@@ -2953,9 +3102,22 @@ export class CapiauTimelineInteraction {
         this.hideSlipTooltip();
         this.hideSlideTooltip();
         this.hideRollingTooltip();
+        this.hideTransitionTooltip();
         if (this.renderer) {
             this.renderer.activeSnapFrame = null;
             this.renderer.dropIndicator = null;
+        }
+        if (this.dragState === "transition-resize") {
+            TIMELINE_HISTORY.commit();
+            STATE.emit("timelineCutsUpdated", STATE.activeTimelineCuts);
+            STATE.emit("timelineTransitionsChanged", TIMELINE_STATE.transitions);
+            this.hideTransitionTooltip();
+            this.dragState = null;
+            this.resizingTransition = null;
+            this.transitionResizeEdge = null;
+            if (this.canvas) this.canvas.style.cursor = "default";
+            if (this.renderer) this.renderer.requestRedraw();
+            return;
         }
         if (this.dragState === "slip") {
             TIMELINE_HISTORY.commit();
@@ -3246,6 +3408,22 @@ export class CapiauTimelineInteraction {
             this.showRulerContextMenu(e.clientX, e.clientY, frame);
             return;
         }
+
+        // Verifica se clicou sobre uma transição de corte
+        if (track && typeof TIMELINE_STATE.getTransitionAt === "function") {
+            const transHit = TIMELINE_STATE.getTransitionAt(track, frame, 4);
+            if (transHit) {
+                e.preventDefault();
+                e.stopPropagation();
+                TIMELINE_STATE.selectedTransitionId = transHit.id;
+                TIMELINE_STATE.clearClipSelection();
+                TIMELINE_STATE.clearSelectedGap();
+                if (this.renderer) this.renderer.requestRedraw();
+                this.showTransitionContextMenu(e.clientX, e.clientY, transHit);
+                return;
+            }
+        }
+
         const hit = this.findClipAt(frame, track, y);
         if (hit && hit.type === "clip") {
             const fadeZone = this.checkFadeZone(x, y, hit.data, true);
@@ -3650,6 +3828,35 @@ export class CapiauTimelineInteraction {
             this.openClipSpeedDialog(clip.id);
         };
         menu.appendChild(itemSpeed);
+
+        // 3.7 Crossfade de Áudio (Potência Constante — Ctrl+Shift+D)
+        const isAudioTrack = (clip.track && clip.track.startsWith("A")) || Boolean(clip.link_id);
+        if (isAudioTrack) {
+            const itemCrossfade = document.createElement("div");
+            itemCrossfade.className = "menu-item";
+            itemCrossfade.style.display = "flex";
+            itemCrossfade.style.alignItems = "center";
+            itemCrossfade.style.justifyContent = "space-between";
+            itemCrossfade.style.padding = "7px 12px";
+            itemCrossfade.style.cursor = "pointer";
+            itemCrossfade.innerHTML = `
+                <span style="display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-bolt" style="color:var(--color-emerald, #10b981);"></i>
+                    <span>Crossfade de Áudio (Potência Constante)</span>
+                </span>
+                <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px;">Ctrl+Shift+D</kbd>
+            `;
+            itemCrossfade.onclick = () => {
+                menu.remove();
+                const res = TIMELINE_STATE.addAudioCrossfade({ clipAId: clip.id });
+                if (res && typeof window.showToast === "function") {
+                    window.showToast("Crossfade de Áudio (Potência Constante) aplicado", "success");
+                }
+                this.refreshClipInspector();
+                if (this.renderer) this.renderer.requestRedraw();
+            };
+            menu.appendChild(itemCrossfade);
+        }
 
         // Opções contextuais de Preenchimento de Lacunas na Trilha
         const allTrackCuts = (STATE.activeTimelineCuts || [])
@@ -4273,7 +4480,8 @@ export class CapiauTimelineInteraction {
             { id: "linear", name: "Linear", icon: "fa-arrow-trend-up" },
             { id: "exponential", name: "Exponencial (Ease-In)", icon: "fa-chart-line" },
             { id: "logarithmic", name: "Logarítmica (Ease-Out)", icon: "fa-wave-square" },
-            { id: "s_curve", name: "Curva em S (Suave)", icon: "fa-bezier-curve" }
+            { id: "s_curve", name: "Curva em S (Suave)", icon: "fa-bezier-curve" },
+            { id: "equal_power", name: "Potência Constante", icon: "fa-bolt" }
         ];
 
         presets.forEach(p => {
@@ -4353,6 +4561,93 @@ export class CapiauTimelineInteraction {
     }
 
     /**
+     * Exibe o menu de contexto customizado para uma transição de corte selecionada na timeline.
+     */
+    showTransitionContextMenu(clientX, clientY, transition) {
+        if (!transition) return;
+        const oldMenu = document.getElementById("custom-transition-context-menu");
+        if (oldMenu) oldMenu.remove();
+
+        const menu = document.createElement("div");
+        menu.id = "custom-transition-context-menu";
+        menu.className = "custom-context-menu";
+        menu.addEventListener("contextmenu", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+        });
+        menu.style.position = "fixed";
+        menu.style.left = `${clientX}px`;
+        menu.style.top = `${clientY}px`;
+        menu.style.width = "220px";
+        menu.style.zIndex = "100000";
+        menu.style.padding = "6px 0";
+
+        const isAudio = transition.type === "crossfade";
+        const title = document.createElement("div");
+        title.style.padding = "6px 12px";
+        title.style.fontSize = "10px";
+        title.style.fontWeight = "bold";
+        title.style.color = "var(--color-cyan, #06b6d4)";
+        title.style.borderBottom = "1px solid var(--border-glass, rgba(255,255,255,0.1))";
+        title.style.marginBottom = "4px";
+        title.style.display = "flex";
+        title.style.alignItems = "center";
+        title.style.gap = "6px";
+        title.innerHTML = `<i class="fa-solid ${isAudio ? 'fa-bolt' : 'fa-film'}"></i> ${isAudio ? 'CROSSFADE DE ÁUDIO' : 'TRANSIÇÃO'}`;
+        menu.appendChild(title);
+
+        const info = document.createElement("div");
+        info.style.padding = "4px 12px 6px 12px";
+        info.style.fontSize = "10px";
+        info.style.color = "var(--text-muted, #94a3b8)";
+        const durFrames = transition.durationFrames || 30;
+        const curveName = transition.curve === "equal_power" ? "Potência Constante" : (transition.curve || "Equal Power");
+        info.innerText = `Duração: ${durFrames}f • ${curveName}`;
+        menu.appendChild(info);
+
+        const sep = document.createElement("div");
+        sep.style.height = "1px";
+        sep.style.background = "var(--border-glass, rgba(255,255,255,0.1))";
+        sep.style.margin = "4px 0";
+        menu.appendChild(sep);
+
+        const removeItem = document.createElement("div");
+        removeItem.className = "menu-item";
+        removeItem.style.display = "flex";
+        removeItem.style.alignItems = "center";
+        removeItem.style.justifyContent = "space-between";
+        removeItem.style.padding = "7px 12px";
+        removeItem.style.cursor = "pointer";
+        removeItem.style.fontSize = "11px";
+        removeItem.style.color = "var(--color-rose, #f43f5e)";
+        removeItem.innerHTML = `
+            <span style="display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-trash" style="width:14px;"></i>
+                <span>Remover Transição</span>
+            </span>
+            <kbd style="font-size:9px; background:rgba(255,255,255,0.08); padding:1px 4px; border-radius:3px; color:var(--text-muted, #94a3b8);">Del</kbd>
+        `;
+
+        removeItem.onclick = () => {
+            TIMELINE_STATE.removeTransition(transition.id);
+            if (this.renderer) this.renderer.requestRedraw();
+            menu.remove();
+        };
+        menu.appendChild(removeItem);
+
+        document.body.appendChild(menu);
+
+        // Fechar ao clicar fora
+        const closeHandler = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener("mousedown", closeHandler);
+            }
+        };
+        setTimeout(() => document.addEventListener("mousedown", closeHandler), 10);
+    }
+
+    /**
      * Tooltip visual durante o arrasto de duração ou curva de Fade.
      */
     showFadeTooltip(x, y, title, value) {
@@ -4382,6 +4677,61 @@ export class CapiauTimelineInteraction {
 
     hideFadeTooltip() {
         const tip = document.getElementById("timeline-fade-tooltip");
+        if (tip) tip.style.display = "none";
+    }
+
+    /**
+     * Tooltip visual durante o arraste da borda de transição de corte.
+     */
+    showTransitionTooltip(x, y, tr, isAltKey = false) {
+        if (!tr) return;
+        const doc = this.canvas?.ownerDocument || document;
+        let tip = doc.getElementById("timeline-transition-tooltip");
+        if (!tip) {
+            tip = doc.createElement("div");
+            tip.id = "timeline-transition-tooltip";
+            tip.style.position = "fixed";
+            tip.style.zIndex = "99999";
+            tip.style.pointerEvents = "none";
+            tip.style.background = "rgba(18, 18, 24, 0.95)";
+            tip.style.color = "#ffffff";
+            tip.style.border = "1px solid rgba(6, 182, 212, 0.5)";
+            tip.style.borderRadius = "4px";
+            tip.style.padding = "6px 10px";
+            tip.style.fontSize = "11px";
+            tip.style.fontFamily = "Outfit, sans-serif";
+            tip.style.backdropFilter = "blur(8px)";
+            tip.style.boxShadow = "0 4px 12px rgba(0,0,0,0.5)";
+            tip.style.lineHeight = "1.4";
+            (doc.body || doc.documentElement).appendChild(tip);
+        }
+        const durS = (tr.duration_s || 0).toFixed(2);
+        const durF = tr.durationFrames || 0;
+        const halfA = tr.halfAFrames !== undefined ? tr.halfAFrames : Math.round(durF / 2);
+        const halfB = tr.halfBFrames !== undefined ? tr.halfBFrames : Math.round(durF / 2);
+        const modeLabel = isAltKey 
+            ? '<span style="color:#f59e0b; font-weight:600;">Modo Assimétrico (Alt)</span>' 
+            : '<span style="color:var(--color-cyan, #06b6d4); font-weight:600;">Modo Simétrico</span> (Segure Alt para lado único)';
+
+        const limitWarning = tr.hitLimit 
+            ? '<div style="font-size:10px; color:#ef4444; font-weight:700; margin-top:3px;">⚠️ (Limite do clipe)</div>' 
+            : '';
+
+        tip.innerHTML = `
+            <div style="font-weight:700; color:var(--color-cyan, #06b6d4); margin-bottom:2px;">Transição: Potência Constante</div>
+            <div>Duração: <span style="font-family:monospace; font-weight:600;">${durS}s (${durF}q)</span></div>
+            <div style="font-size:10px; color:#94a3b8;">Lado A (Fade Out): ${halfA}q &nbsp;|&nbsp; Lado B (Fade In): ${halfB}q</div>
+            <div style="font-size:10px; margin-top:2px;">${modeLabel}</div>
+            ${limitWarning}
+        `;
+        tip.style.display = "block";
+        tip.style.left = `${x + 14}px`;
+        tip.style.top = `${y - 40}px`;
+    }
+
+    hideTransitionTooltip() {
+        const doc = this.canvas?.ownerDocument || document;
+        const tip = doc.getElementById("timeline-transition-tooltip");
         if (tip) tip.style.display = "none";
     }
 
@@ -11750,6 +12100,27 @@ export class CapiauTimelineInteraction {
             return;
         }
 
+        // Crossfade de Áudio de Junção com Potência Constante (Ctrl+Shift+D)
+        if (KEYMAP_SERVICE.matches(e, "edit.apply_audio_crossfade") || (e.ctrlKey && e.shiftKey && (e.key === "D" || e.key === "d"))) {
+            e.preventDefault();
+            const res = TIMELINE_STATE.addAudioCrossfade();
+            if (res) {
+                if (typeof window.showToast === "function") {
+                    const msg = res.type === "edge_fade"
+                        ? `Fade de Áudio (Potência Constante) aplicado (${res.side === "in" ? "Início" : "Fim"})`
+                        : "Crossfade de Áudio (Potência Constante) aplicado na emenda";
+                    window.showToast(msg, "success");
+                }
+                if (this.renderer) this.renderer.requestRedraw();
+                this.refreshClipInspector();
+            } else {
+                if (typeof window.showToast === "function") {
+                    window.showToast("Nenhuma emenda ou clipe de áudio elegível para crossfade", "warning");
+                }
+            }
+            return;
+        }
+
         // Split / Dividir clipe no Playhead (E ou Z no CapIAu, Ctrl+K no Premiere)
         // Se Alt estiver pressionado, faz split individual desunindo a parte direita para J/L-Cut
         // Funciona instantaneamente mesmo sem clipe selecionado (corta clipe sob a agulha)
@@ -11972,6 +12343,15 @@ export class CapiauTimelineInteraction {
         const hasMarkers = TIMELINE_STATE.selectedMarkerIds && TIMELINE_STATE.selectedMarkerIds.size > 0;
         const hasClips = (TIMELINE_STATE.selectedClipIds && TIMELINE_STATE.selectedClipIds.size > 0) || !!selectedId;
         const isDeleteKey = e.key === "Delete" || e.key === "Backspace";
+
+        // Se uma transição de corte estiver selecionada, deleta apenas a transição
+        if (TIMELINE_STATE.selectedTransitionId && (isDeleteKey || KEYMAP_SERVICE.matches(e, "edit.lift_delete") || KEYMAP_SERVICE.matches(e, "edit.ripple_delete"))) {
+            TIMELINE_STATE.removeTransition(TIMELINE_STATE.selectedTransitionId);
+            TIMELINE_STATE.selectedTransitionId = null;
+            if (this.renderer) this.renderer.requestRedraw();
+            e.preventDefault();
+            return;
+        }
 
         if (hasMarkers && isDeleteKey) {
             TIMELINE_STATE.removeSelectedMarkers();

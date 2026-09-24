@@ -2971,6 +2971,17 @@ export class ProgramPlayer {
                 if (!el.paused) el.pause();
             });
         }
+        if (this.audioTransitionPool) {
+            Object.values(this.audioTransitionPool).forEach(el => {
+                if (el && !el.paused) el.pause();
+            });
+        }
+        if (this._paresAudio) {
+            Object.values(this._paresAudio).forEach(p => {
+                if (p?.a && !p.a.paused) p.a.pause();
+                if (p?.b && !p.b.paused) p.b.pause();
+            });
+        }
     }
 
     /**
@@ -3984,6 +3995,192 @@ export class ProgramPlayer {
         return this.audioPool[trackId];
     }
 
+    /** Elemento <audio> secundário para reprodução simultânea durante transições de corte (Crossfade). */
+    getTransitionAudioElement(trackId) {
+        if (!this.audioTransitionPool) this.audioTransitionPool = {};
+        if (!this.audioTransitionPool[trackId]) {
+            const el = document.createElement("audio");
+            el.preload = "auto";
+            el.dataset.trackId = trackId;
+            el.dataset.isTransition = "1";
+            document.body.appendChild(el);
+            el.addEventListener("error", () => this._aoErroElementoAudio(el));
+            this.audioTransitionPool[trackId] = el;
+        }
+        return this.audioTransitionPool[trackId];
+    }
+
+    /**
+     * Sincroniza e modula um único elemento de áudio (fonte, posição, taxa de reprodução, efeitos e volume).
+     */
+    _syncSingleAudioElement(el, cut, currentFrame, forcedGain = 1.0, track, fps) {
+        if (!el || !cut) return;
+
+        const cutVidId = cut.parent_video_id || cut.video_id;
+        let videoData = STATE.allVideos.find(v => String(v.id) === String(cutVidId));
+        if (!videoData && String(cutVidId).startsWith("subclip_")) {
+            const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
+            const foundSub = subclips.find(s => String(s.id) === String(cutVidId));
+            if (foundSub && foundSub.parent_video_id) {
+                videoData = STATE.allVideos.find(v => String(v.id) === String(foundSub.parent_video_id));
+            }
+        }
+        if (!videoData) {
+            if (!el.paused) el.pause();
+            return;
+        }
+
+        // F4 - A/B do contrato: WAV tratado quando registrado para o clipe, original caso contrario.
+        const alvo = this._fonteAudioEfetiva(cut, videoData);
+        const audioSrc = alvo.src;
+
+        const clipSpeed = (cut && typeof cut.speed === "number" && cut.speed > 0) ? cut.speed : 1.0;
+        const isClipReversed = !!(cut && cut.reverse);
+
+        // Fallback robusto para o in da fonte em segundos
+        const cutInSec = (cut.in !== undefined && cut.in !== null && Number.isFinite(cut.in))
+            ? cut.in
+            : ((cut.inFrame || 0) / fps);
+        const offsetFrames = currentFrame - (cut.timelineStartFrame ?? 0);
+        const baseFonte = (el.dataset.audioTratado === "1" && alvo.tratado) ? 0 : cutInSec;
+
+        let targetSeconds;
+        if (isClipReversed) {
+            const cutOutSec = (cut.out !== undefined && cut.out !== null && Number.isFinite(cut.out))
+                ? cut.out
+                : (cutInSec + (((cut.outFrame || 0) - (cut.inFrame || 0)) / fps) * clipSpeed);
+            const offsetSec = (offsetFrames / fps) * clipSpeed;
+            targetSeconds = Math.max(cutInSec, cutOutSec - offsetSec);
+        } else {
+            targetSeconds = baseFonte + ((offsetFrames / fps) * clipSpeed);
+        }
+        if (!Number.isFinite(targetSeconds)) return;
+
+        const isHighSpeedOrReverse = this.playbackSpeed > 2.0 || this.playbackSpeed < 0 || isClipReversed || (this.playbackSpeed * clipSpeed > 2.0);
+        const clipChanged = el.dataset.activeClipId !== String(cut.id);
+        const srcChanged = el.dataset.loadedSrc !== audioSrc;
+
+        if ("preservesPitch" in el) el.preservesPitch = cut.pitch_correction !== false;
+        if ("webkitPreservesPitch" in el) el.webkitPreservesPitch = cut.pitch_correction !== false;
+
+        if (srcChanged) {
+            const trackId = track ? track.id : el.dataset.trackId;
+            if (!clipChanged && typeof this._podeTrocarSuave === "function" && this._podeTrocarSuave(el)) {
+                // Contrato F4: A/B no mesmo clipe com som no ar -> transição suave atômica
+                this._iniciarTrocaSuave(trackId, el, alvo, cut);
+            } else {
+                if (typeof this._cancelarTrocaAudio === "function") this._cancelarTrocaAudio(trackId);
+                el.dataset.audioTratado = alvo.tratado ? "1" : "";
+                el.src = audioSrc;
+                el.dataset.loadedSrc = audioSrc;
+                el.dataset.activeClipId = String(cut.id);
+                el.load();
+                el.currentTime = Math.max(0, targetSeconds);
+                el.playbackRate = 1.0;
+                if (this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse && targetSeconds >= 0) {
+                    this._retomarContextoAudioAoVivo();
+                    el.play().catch(() => {});
+                }
+            }
+        }
+
+        if (clipChanged) {
+            el.dataset.activeClipId = String(cut.id);
+        }
+
+        // Proteção contra engasgos e pulos (drift jump) em transições sem head handle:
+        // Se targetSeconds < 0 (antes do corte e o arquivo de mídia começa em 0s):
+        // mantém o elemento já carregado com a URL do segundo clipe em buffer quente,
+        // porém pausado e com volume 0, sem tocar adiantado e pronto para play instantâneo no corte.
+        if (targetSeconds < 0) {
+            if (!el.paused) el.pause();
+            el.volume = 0;
+            if (el.currentTime !== 0 && !el.seeking) el.currentTime = 0;
+            return;
+        }
+
+        // Se ultrapassou o fim da mídia da fonte (sem tail handle além do corte)
+        if (videoData.duration && targetSeconds > videoData.duration) {
+            if (!el.paused) el.pause();
+            el.volume = 0;
+            return;
+        }
+
+        targetSeconds = Math.max(0, targetSeconds);
+
+        const drift = el.currentTime - targetSeconds;
+        const isContiguous = !srcChanged && Math.abs(drift) <= BUFFER_CONTINUITY_TOLERANCE;
+
+        if (clipChanged && !isContiguous) {
+            if (!el.seeking) {
+                el.currentTime = targetSeconds;
+                el.playbackRate = 1.0;
+            }
+        } else if (this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse) {
+            if (!el.seeking) {
+                if (Math.abs(drift) > 0.5) {
+                    el.currentTime = targetSeconds;
+                    el.playbackRate = 1.0;
+                } else {
+                    const targetRate = Math.min(2.0, Math.max(0.1, this.playbackSpeed * clipSpeed));
+                    if (drift > 0.06) el.playbackRate = targetRate * 0.97;
+                    else if (drift < -0.06) el.playbackRate = targetRate * 1.03;
+                    else if (el.playbackRate !== targetRate) el.playbackRate = targetRate;
+                }
+            }
+        } else {
+            if (!el.seeking && Math.abs(drift) > 0.25) {
+                el.currentTime = targetSeconds;
+            }
+            if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
+        }
+
+        // Volume do clipe individual
+        const effects = cut.effects || [];
+        const clipVolEff = effects.find(e => e && e.type === "volume");
+        let clipVol = 1.0;
+        if (clipVolEff && !clipVolEff.disabled) {
+            const rawVol = clipVolEff.level !== undefined ? clipVolEff.level : (clipVolEff.gain !== undefined ? clipVolEff.gain : 1.0);
+            clipVol = (typeof rawVol === "number" && Number.isFinite(rawVol)) ? rawVol : 1.0;
+        }
+
+        // Audio Fade-in / Fade-out duration (APENAS fades de borda isolados, sem transitionId)
+        let fadeVol = 1.0;
+        const durCut = Math.max(1, ((cut.outFrame || 0) - (cut.inFrame || 0)) || (Math.round(((cut.out || 0) - (cut.in || 0)) * fps)));
+        const tIn = (currentFrame - (cut.timelineStartFrame || 0)) / fps;
+        const tOut = ((cut.timelineStartFrame || 0) + durCut - currentFrame) / fps;
+        effects.filter(e => e && e.type === "crossfade" && !e.transitionId).forEach(cf => {
+            if (cf.disabled) return;
+            const d = Math.max(0.05, cf.duration_s || 0.5);
+            if (cf.side === "in" && tIn < d) {
+                const p = Math.max(0, Math.min(1, tIn / d));
+                const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+                if (typeof factor === "number" && Number.isFinite(factor)) fadeVol = Math.min(fadeVol, factor);
+            }
+            if (cf.side === "out" && tOut < d) {
+                const p = Math.max(0, Math.min(1, tOut / d));
+                const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
+                if (typeof factor === "number" && Number.isFinite(factor)) fadeVol = Math.min(fadeVol, factor);
+            }
+        });
+
+        const vol = (track && track.volume !== undefined && typeof track.volume === "number" && Number.isFinite(track.volume)) ? track.volume : 1.0;
+        const rawFinalVol = vol * clipVol * fadeVol * forcedGain;
+        const finalVol = (typeof rawFinalVol === "number" && Number.isFinite(rawFinalVol)) ? Math.max(0, Math.min(1.0, rawFinalVol)) : 1.0;
+        el.volume = ((track && track.muted) || cut.disabled || isHighSpeedOrReverse) ? 0 : finalVol;
+
+        if (this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse && el.paused) {
+            this._retomarContextoAudioAoVivo();
+            el.play().catch(() => {});
+        } else if ((!this.isPlaying || isHighSpeedOrReverse) && !el.paused) {
+            el.pause();
+        }
+
+        // Ajustes de áudio AO VIVO (Etapa 2)
+        if (this._efeitosAudioAoVivo(effects)) this.aplicarAudioAoVivo(el, effects);
+        else this.liberarAudioAoVivo(el);
+    }
+
     syncAudioTracks(cuts, currentFrame) {
         if (!cuts || !cuts.length) return;
         const audioTracks = (TIMELINE_STATE?.tracks || []).filter(t => t.kind === "audio");
@@ -3999,78 +4196,77 @@ export class ProgramPlayer {
             if (track.hidden && TIMELINE_STATE.muteHiddenTracksPlayback) {
                 if (!el.paused) el.pause();
                 el.dataset.activeClipId = "";
+                const elTr = this.audioTransitionPool?.[track.id];
+                if (elTr && !elTr.paused) elTr.pause();
                 return;
             }
 
+            // Verifica se há transição de corte ativa nesta pista no quadro atual
+            const activeTrans = (TIMELINE_STATE?.transitions || []).find(t =>
+                t.track === track.id &&
+                currentFrame >= (t.cutFrame - (t.halfAFrames !== undefined ? t.halfAFrames : 15)) &&
+                currentFrame < (t.cutFrame + (t.halfBFrames !== undefined ? t.halfBFrames : 15))
+            );
+
+            if (activeTrans) {
+                const cA = cuts.find(c => c.id === activeTrans.clipAId);
+                const cB = cuts.find(c => c.id === activeTrans.clipBId);
+
+                if (cA && cB) {
+                    const halfA = activeTrans.halfAFrames !== undefined ? activeTrans.halfAFrames : 15;
+                    const halfB = activeTrans.halfBFrames !== undefined ? activeTrans.halfBFrames : 15;
+                    const tStart = activeTrans.cutFrame - halfA;
+                    const tEnd = activeTrans.cutFrame + halfB;
+                    const span = Math.max(1, tEnd - tStart);
+                    const progress = Math.max(0, Math.min(1, (currentFrame - tStart) / span));
+
+                    const gainA = evaluateFadeCurve(1 - progress, activeTrans.curve || "equal_power", activeTrans.tension || 0);
+                    const gainB = evaluateFadeCurve(progress, activeTrans.curve || "equal_power", activeTrans.tension || 0);
+
+                    const elTrans = this.getTransitionAudioElement(track.id);
+
+                    // Sincroniza ambos os clipes simultaneamente durante a janela de transição (fusão contínua)
+                    this._syncSingleAudioElement(el, cA, currentFrame, gainA, track, fps);
+                    this._syncSingleAudioElement(elTrans, cB, currentFrame, gainB, track, fps);
+                    return;
+                }
+            }
+
+            // Se não há transição ativa no momento, verifica se o elemento secundário estava tocando ou associado ao clipe
+            const elTrans = this.audioTransitionPool?.[track.id];
+            if (elTrans && elTrans.dataset.activeClipId) {
+                const followingCut = cuts.find(c =>
+                    c.track === track.id &&
+                    currentFrame >= (c.timelineStartFrame ?? 0) &&
+                    currentFrame < ((c.timelineStartFrame ?? 0) + ((c.outFrame ?? 0) - (c.inFrame ?? 0)))
+                );
+                if (followingCut && elTrans.dataset.activeClipId === String(followingCut.id)) {
+                    // Promoção contínua sem recarregar nem buscar: elTrans vira o elemento principal da pista
+                    this.audioPool[track.id] = elTrans;
+                    this.audioTransitionPool[track.id] = el;
+                    el.pause();
+                    el.dataset.activeClipId = "";
+                    el = elTrans;
+                } else {
+                    if (!elTrans.paused) elTrans.pause();
+                    elTrans.dataset.activeClipId = "";
+                }
+            }
+
+            // Reprodução normal de clipe individual
             const cut = cuts.find(c =>
                 c.track === track.id &&
                 currentFrame >= (c.timelineStartFrame ?? 0) &&
                 currentFrame < ((c.timelineStartFrame ?? 0) + ((c.outFrame ?? 0) - (c.inFrame ?? 0)))
             );
 
-            if (!cut) {
-                if (!el.paused) el.pause();
-                el.dataset.activeClipId = "";
-                return;
-            }
-
-            const cutVidId = cut.parent_video_id || cut.video_id;
-            let videoData = STATE.allVideos.find(v => String(v.id) === String(cutVidId));
-            if (!videoData && String(cutVidId).startsWith("subclip_")) {
-                const subclips = (typeof window.getProjectSubclips === "function") ? window.getProjectSubclips() : [];
-                const foundSub = subclips.find(s => String(s.id) === String(cutVidId));
-                if (foundSub && foundSub.parent_video_id) {
-                    videoData = STATE.allVideos.find(v => String(v.id) === String(foundSub.parent_video_id));
-                }
-            }
-            if (!videoData) {
-                if (!el.paused) el.pause();
-                return;
-            }
-
-            // F4 - A/B do contrato: WAV tratado quando registrado para o clipe, original caso contrario.
-            const alvo = this._fonteAudioEfetiva(cut, videoData);
-            const audioSrc = alvo.src;
-
-            const clipSpeed = (cut && typeof cut.speed === "number" && cut.speed > 0) ? cut.speed : 1.0;
-            const isClipReversed = !!(cut && cut.reverse);
-
-            // Fallback robusto para o in da fonte em segundos
-            const cutInSec = (cut.in !== undefined && cut.in !== null && Number.isFinite(cut.in))
-                ? cut.in
-                : ((cut.inFrame || 0) / fps);
-            const offsetFrames = currentFrame - (cut.timelineStartFrame ?? 0);
-            const baseFonte = (el.dataset.audioTratado === "1" && alvo.tratado) ? 0 : cutInSec;
-
-            let targetSeconds;
-            if (isClipReversed) {
-                const cutOutSec = (cut.out !== undefined && cut.out !== null && Number.isFinite(cut.out))
-                    ? cut.out
-                    : (cutInSec + (((cut.outFrame || 0) - (cut.inFrame || 0)) / fps) * clipSpeed);
-                const offsetSec = (offsetFrames / fps) * clipSpeed;
-                targetSeconds = Math.max(cutInSec, cutOutSec - offsetSec);
-            } else {
-                targetSeconds = baseFonte + ((offsetFrames / fps) * clipSpeed);
-            }
-            if (!Number.isFinite(targetSeconds)) return;
-
-            const isHighSpeedOrReverse = this.playbackSpeed > 2.0 || this.playbackSpeed < 0 || isClipReversed || (this.playbackSpeed * clipSpeed > 2.0);
-            const clipChanged = el.dataset.activeClipId !== String(cut.id);
-            const srcChanged = el.dataset.loadedSrc !== audioSrc;
-
-            if ("preservesPitch" in el) el.preservesPitch = cut.pitch_correction !== false;
-            if ("webkitPreservesPitch" in el) el.webkitPreservesPitch = cut.pitch_correction !== false;
-
-            // Troca suave que deixou de corresponder ao pedido atual: aborta
-            const pendente = this._trocaAudioPendente(track.id);
-            if (pendente && (pendente.destino !== audioSrc || pendente.clipId !== String(cut.id))) {
-                this._cancelarTrocaAudio(track.id);
-            }
-
             // Se houver reserva pré-carregada e posicionada para este corte, promove de imediato
-            const reserva = this._parReservaAudio(track.id, el);
+            const clipChanged = el.dataset.activeClipId !== String(cut.id);
+            const alvoCut = this._fonteAudioEfetiva(cut, (STATE.allVideos || []).find(v => String(v.id) === String(cut.parent_video_id || cut.video_id)) || {});
+            const audioSrcCut = alvoCut?.src;
+            const reserva = typeof this._parReservaAudio === "function" ? this._parReservaAudio(track.id, el) : null;
             if (clipChanged && reserva && reserva.dataset.activeClipId === String(cut.id) &&
-                reserva.dataset.loadedSrc === audioSrc && reserva.readyState >= 2) {
+                reserva.dataset.loadedSrc === audioSrcCut && reserva.readyState >= 2) {
                 const estavaTocando = !el.paused || this.isPlaying;
                 const rate = el.playbackRate;
                 if (!el.paused) el.pause();
@@ -4078,112 +4274,13 @@ export class ProgramPlayer {
                 this.audioPool[track.id] = reserva;
                 el = reserva;
                 el.playbackRate = rate;
-                if (estavaTocando && this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse) {
+                if (estavaTocando && this.isPlaying && this.playbackSpeed > 0) {
                     this._retomarContextoAudioAoVivo();
                     el.play().catch(() => {});
                 }
-            } else if (srcChanged) {
-                if (!clipChanged && this._podeTrocarSuave(el)) {
-                    // Contrato F4: A/B no mesmo clipe com som no ar -> transição suave atômica
-                    this._iniciarTrocaSuave(track.id, el, alvo, cut);
-                } else {
-                    // Transição direta de fonte (novo clipe ou sem suporte a troca suave)
-                    this._cancelarTrocaAudio(track.id);
-                    el.dataset.audioTratado = alvo.tratado ? "1" : "";
-                    el.src = audioSrc;
-                    el.dataset.loadedSrc = audioSrc;
-                    el.dataset.activeClipId = String(cut.id);
-                    el.load();
-                    el.currentTime = Math.max(0, targetSeconds);
-                    el.playbackRate = 1.0;
-                    if (this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse) {
-                        this._retomarContextoAudioAoVivo();
-                        el.play().catch(() => {});
-                    }
-                }
             }
 
-            if (clipChanged) {
-                el.dataset.activeClipId = String(cut.id);
-            }
-
-            const drift = el.currentTime - targetSeconds;
-            // Corte contíguo: mesmo arquivo e deriva mínima (ex: razor cut ou Ripple swap de clipes colados)
-            const isContiguous = !srcChanged && Math.abs(drift) <= BUFFER_CONTINUITY_TOLERANCE;
-
-            // Ajuste de sincronia e posição:
-            if (clipChanged && !isContiguous) {
-                // Descontinuidade real de corte no mesmo arquivo: seek duro inicial (se não estiver buscando)
-                if (!el.seeking) {
-                    el.currentTime = Math.max(0, targetSeconds);
-                    el.playbackRate = 1.0;
-                }
-            } else if (this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse) {
-                if (!el.seeking) {
-                    if (Math.abs(drift) > 0.5) {
-                        // Deriva grande real (ex: salto manual com a agulha): seek duro
-                        el.currentTime = Math.max(0, targetSeconds);
-                        el.playbackRate = 1.0;
-                    } else {
-                        // Deriva sutil: nudge de taxa sem clicks
-                        const targetRate = Math.min(2.0, Math.max(0.1, this.playbackSpeed * clipSpeed));
-                        if (drift > 0.06) el.playbackRate = targetRate * 0.97;
-                        else if (drift < -0.06) el.playbackRate = targetRate * 1.03;
-                        else if (el.playbackRate !== targetRate) el.playbackRate = targetRate;
-                    }
-                }
-            } else {
-                // Pausado (scrub manual com agulha): áudio não toca no scrub, sincroniza apenas em descontinuidade real
-                if (!el.seeking && Math.abs(drift) > 0.25) {
-                    el.currentTime = Math.max(0, targetSeconds);
-                }
-                if (el.playbackRate !== 1.0) el.playbackRate = 1.0;
-            }
-
-            // Volume do clipe individual (suporta level ou gain, garantindo número finito)
-            const clipVolEff = (cut.effects || []).find(e => e && e.type === "volume");
-            let clipVol = 1.0;
-            if (clipVolEff && !clipVolEff.disabled) {
-                const rawVol = clipVolEff.level !== undefined ? clipVolEff.level : (clipVolEff.gain !== undefined ? clipVolEff.gain : 1.0);
-                clipVol = (typeof rawVol === "number" && Number.isFinite(rawVol)) ? rawVol : 1.0;
-            }
-
-            // Audio Fade-in / Fade-out duration
-            let fadeVol = 1.0;
-            const durCut = Math.max(1, ((cut.outFrame || 0) - (cut.inFrame || 0)) || (Math.round(((cut.out || 0) - (cut.in || 0)) * fps)));
-            const tIn = (currentFrame - (cut.timelineStartFrame || 0)) / fps;
-            const tOut = ((cut.timelineStartFrame || 0) + durCut - currentFrame) / fps;
-            const effects = cut.effects || [];
-            effects.filter(e => e && e.type === "crossfade").forEach(cf => {
-                if (cf.disabled) return;
-                const d = Math.max(0.05, cf.duration_s || 0.5);
-                if (cf.side === "in" && tIn < d) {
-                    const p = Math.max(0, Math.min(1, tIn / d));
-                    const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
-                    if (typeof factor === "number" && Number.isFinite(factor)) fadeVol = Math.min(fadeVol, factor);
-                }
-                if (cf.side === "out" && tOut < d) {
-                    const p = Math.max(0, Math.min(1, tOut / d));
-                    const factor = evaluateFadeCurve(p, cf.curve || "linear", cf.tension || 0);
-                    if (typeof factor === "number" && Number.isFinite(factor)) fadeVol = Math.min(fadeVol, factor);
-                }
-            });
-
-            const vol = (track.volume !== undefined && typeof track.volume === "number" && Number.isFinite(track.volume)) ? track.volume : 1.0;
-            const rawFinalVol = vol * clipVol * fadeVol;
-            const finalVol = (typeof rawFinalVol === "number" && Number.isFinite(rawFinalVol)) ? Math.max(0, Math.min(1.0, rawFinalVol)) : 1.0;
-            el.volume = (track.muted || cut.disabled || isHighSpeedOrReverse) ? 0 : finalVol;
-
-            if (this.isPlaying && this.playbackSpeed > 0 && !isHighSpeedOrReverse && el.paused) {
-                this._retomarContextoAudioAoVivo();
-                el.play().catch(() => {});
-            } else if ((!this.isPlaying || isHighSpeedOrReverse) && !el.paused) {
-                el.pause();
-            }
-
-            // Ajustes de áudio AO VIVO (Etapa 2)
-            if (this._efeitosAudioAoVivo(effects)) this.aplicarAudioAoVivo(el, effects);
-            else this.liberarAudioAoVivo(el);
+            this._syncSingleAudioElement(el, cut, currentFrame, 1.0, track, fps);
 
             // F4: conduz a troca tratado/original pendente (se houver)
             this._dirigirTrocaSuave(track.id, cut, currentFrame);
@@ -4198,6 +4295,14 @@ export class ProgramPlayer {
                     el.src = "";
                     el.remove();
                     delete this.audioPool[tid];
+                    if (this.audioTransitionPool && this.audioTransitionPool[tid]) {
+                        const trEl = this.audioTransitionPool[tid];
+                        trEl.pause();
+                        this.liberarAudioAoVivo(trEl);
+                        trEl.src = "";
+                        trEl.remove();
+                        delete this.audioTransitionPool[tid];
+                    }
                     // F4: descarta também o par de troca e qualquer troca pendente da pista.
                     const par = this._paresAudio ? this._paresAudio[tid] : null;
                     if (par) {

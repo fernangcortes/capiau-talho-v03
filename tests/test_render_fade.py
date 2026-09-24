@@ -13,6 +13,7 @@ A tolerancia e apertada de proposito. A divergencia real medida em 24/08/2026 e
 3,7e-10 na camada 1; um passo de 8 bits e 3,9e-3. Tolerancia frouxa aqui esconde
 exatamente o tipo de erro que este teste existe para achar.
 """
+import math
 import shutil
 import struct
 import subprocess
@@ -29,6 +30,8 @@ _VOCABULARIO = {
     "_clip": lambda v, a, b: max(a, min(b, v)),
     "_min": min,
     "_max": max,
+    "sin": math.sin,
+    "PI": math.pi,
 }
 
 
@@ -53,6 +56,7 @@ class TestCurvasContraGabarito(unittest.TestCase):
         ("s_curve", 0.0), ("s_curve", 0.5), ("s_curve", -0.5),
         ("exponential", 0.0), ("exponential", 0.3),
         ("logarithmic", 0.0), ("logarithmic", 0.3),
+        ("equal_power", 0.0), ("equal_power", 0.4), ("equal_power", -0.4),
         ("custom", 0.9),
         ("curva_que_nao_existe", 0.0),  # cai em linear, como no player
     ]

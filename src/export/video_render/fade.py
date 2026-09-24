@@ -37,7 +37,7 @@ LIMIAR_TENSAO_NULA = 0.01
 DURACAO_MINIMA_S = 0.05
 DURACAO_PADRAO_S = 0.5
 
-CURVAS_CONHECIDAS = ("linear", "exponential", "logarithmic", "s_curve", "custom")
+CURVAS_CONHECIDAS = ("linear", "exponential", "logarithmic", "s_curve", "equal_power", "custom")
 
 
 def _clamp(valor: float, minimo: float, maximo: float) -> float:
@@ -111,6 +111,15 @@ def avaliar(progress: float, curve: str = "linear", tension: float = 0.0) -> flo
     if tipo == "logarithmic":
         return 1.0 - (1.0 - p) ** (2.0 + abs(k) * 2.0)
 
+    if tipo == "equal_power":
+        import math
+        base = math.sin(p * math.pi * 0.5)
+        if abs(k) < LIMIAR_TENSAO_NULA:
+            return base
+        if k > 0:
+            return base ** (1.0 / (1 + k * 1.5))
+        return base ** (1 + abs(k) * 1.5)
+
     # linear / custom
     if abs(k) < LIMIAR_TENSAO_NULA:
         return p
@@ -181,6 +190,13 @@ def expressao(curve: str, tension, progresso_expr: str) -> str:
 
     if tipo == "logarithmic":
         return f"(1-pow((1-{p}),{_n(2.0 + abs(k) * 2.0)}))"
+
+    if tipo == "equal_power":
+        base_s = f"sin({p}*PI/2)"
+        if abs(k) < LIMIAR_TENSAO_NULA:
+            return base_s
+        expo = (1.0 / (1 + k * 1.5)) if k > 0 else (1 + abs(k) * 1.5)
+        return f"pow({base_s},{_n(expo)})"
 
     # linear / custom
     if abs(k) < LIMIAR_TENSAO_NULA:

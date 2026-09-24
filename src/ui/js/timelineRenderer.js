@@ -353,6 +353,9 @@ export class CapiauTimelineRenderer {
         // Desenha os clipes salvos
         this.drawClips();
 
+        // Desenha transições de junção (Task 15: Crossfade de Áudio / Task 16: Transições de Vídeo)
+        this.drawTransitions();
+
         // Desenha as sugestões fantasma da IA (Ghost Clips)
         this.drawGhostClips();
 
@@ -1863,8 +1866,8 @@ export class CapiauTimelineRenderer {
         const inSec = (cut.inFrame || 0) / fps;
         const outSec = (cut.outFrame || 0) / fps;
         const effects = cut.effects || [];
-        const fadeInEff = effects.find(e => e.type === "crossfade" && e.side === "in" && !e.disabled);
-        const fadeOutEff = effects.find(e => e.type === "crossfade" && e.side === "out" && !e.disabled);
+        const fadeInEff = effects.find(e => e.type === "crossfade" && e.side === "in" && !e.disabled && !e.transitionId);
+        const fadeOutEff = effects.find(e => e.type === "crossfade" && e.side === "out" && !e.disabled && !e.transitionId);
         const fadeInDur = fadeInEff ? Math.min(clipDurS, Math.max(0, fadeInEff.duration_s || 0)) : 0;
         const fadeOutDur = fadeOutEff ? Math.min(clipDurS - fadeInDur, Math.max(0, fadeOutEff.duration_s || 0)) : 0;
 
@@ -2004,8 +2007,8 @@ export class CapiauTimelineRenderer {
         if (clipDurS <= 0 || width <= 4) return;
 
         const effects = cut.effects || [];
-        const fadeInEff = effects.find(e => e.type === "crossfade" && e.side === "in" && !e.disabled);
-        const fadeOutEff = effects.find(e => e.type === "crossfade" && e.side === "out" && !e.disabled);
+        const fadeInEff = effects.find(e => e.type === "crossfade" && e.side === "in" && !e.disabled && !e.transitionId);
+        const fadeOutEff = effects.find(e => e.type === "crossfade" && e.side === "out" && !e.disabled && !e.transitionId);
 
         const fadeInDur = fadeInEff ? Math.min(clipDurS, Math.max(0, fadeInEff.duration_s || 0)) : 0;
         const fadeOutDur = fadeOutEff ? Math.min(clipDurS - fadeInDur, Math.max(0, fadeOutEff.duration_s || 0)) : 0;
@@ -2017,8 +2020,13 @@ export class CapiauTimelineRenderer {
         const isClipHovered = hoveredHandle && String(hoveredHandle.clipId) === String(cut.id);
 
         const isAudio = laneKind === "audio";
-        const accentColor = isAudio ? "rgba(16, 185, 129, 0.9)" : "rgba(6, 182, 212, 0.9)";
-        const lineColor = isAudio ? "rgba(110, 231, 183, 0.85)" : "rgba(255, 255, 255, 0.8)";
+        const isEqualPower = (fadeInEff && fadeInEff.curve === "equal_power") || (fadeOutEff && fadeOutEff.curve === "equal_power");
+        const accentColor = isEqualPower 
+            ? "rgba(6, 182, 212, 0.95)" 
+            : (isAudio ? "rgba(16, 185, 129, 0.9)" : "rgba(6, 182, 212, 0.9)");
+        const lineColor = isEqualPower
+            ? "rgba(110, 231, 183, 0.95)"
+            : (isAudio ? "rgba(110, 231, 183, 0.85)" : "rgba(255, 255, 255, 0.8)");
 
         // ── 1. FADE IN ──
         if (fadeInDur > 0 && wIn > 1) {
@@ -2200,6 +2208,172 @@ export class CapiauTimelineRenderer {
             ctx.fill();
             ctx.restore();
         }
+    }
+
+    /**
+     * Desenha as transições de corte (ex: Crossfade de Áudio — Task 15).
+     */
+    drawTransitions() {
+        if (TIMELINE_STATE && typeof TIMELINE_STATE.validateTransitions === "function") {
+            TIMELINE_STATE.validateTransitions();
+        }
+        const transitions = (TIMELINE_STATE && TIMELINE_STATE.transitions) || [];
+        if (transitions.length === 0) return;
+
+        const ctx = this.ctx;
+        const zoom = TIMELINE_STATE.zoom || 0.5;
+        const scrollLeft = TIMELINE_STATE.scrollLeftFrame || 0;
+        const lanes = this.getTrackLanes ? this.getTrackLanes() : [];
+        const laneMap = {};
+        lanes.forEach(l => { if (l && l.track) laneMap[l.track.id] = l; });
+
+        transitions.forEach(tr => {
+            const lane = laneMap[tr.track];
+            if (!lane || (lane.track && lane.track.hidden)) return;
+            if (lane.top + lane.height < this.rulerHeight || lane.top > this.height) return;
+
+            const halfA = tr.halfAFrames !== undefined ? tr.halfAFrames : (tr.durationFrames / 2);
+            const halfB = tr.halfBFrames !== undefined ? tr.halfBFrames : (tr.durationFrames / 2);
+            const cutX = (tr.cutFrame - scrollLeft) * zoom;
+            const startX = cutX - halfA * zoom;
+            const width = (halfA + halfB) * zoom;
+
+            if (startX + width < 0 || startX > this.width) return;
+
+            const isSelected = TIMELINE_STATE.selectedTransitionId === tr.id;
+            const isHovered = TIMELINE_STATE.hoveredTransitionId === tr.id || (TIMELINE_STATE.hoveredTransition && TIMELINE_STATE.hoveredTransition.id === tr.id);
+            const top = lane.top + 2;
+            const height = lane.height - 4;
+
+            ctx.save();
+
+            // Fundo da caixa de transição (estilo NLE clássico de transição)
+            ctx.fillStyle = isSelected 
+                ? "rgba(6, 182, 212, 0.38)" 
+                : (isHovered ? "rgba(16, 185, 129, 0.30)" : "rgba(16, 185, 129, 0.18)");
+            ctx.fillRect(startX, top, width, height);
+
+            // Borda da transição
+            ctx.strokeStyle = isSelected 
+                ? "rgba(6, 182, 212, 0.95)" 
+                : (isHovered ? "rgba(110, 231, 183, 0.9)" : "rgba(16, 185, 129, 0.65)");
+            ctx.lineWidth = isSelected ? 1.5 : 1.0;
+            ctx.strokeRect(startX, top, width, height);
+
+            // Alças táteis de borda para redimensionamento por arrasto (Bracket Handles NLE)
+            if (width >= 12 && height >= 12) {
+                ctx.save();
+                const gripColor = isSelected ? "#06b6d4" : (isHovered ? "#34d399" : "rgba(16, 185, 129, 0.85)");
+                ctx.fillStyle = gripColor;
+                const gripH = Math.min(18, height - 4);
+                const gripY = top + (height - gripH) / 2;
+                
+                // Alça Esquerda
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(startX, gripY, 3, gripH, [2, 0, 0, 2]);
+                else ctx.rect(startX, gripY, 3, gripH);
+                ctx.fill();
+
+                // Alça Direita
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(startX + width - 3, gripY, 3, gripH, [0, 2, 2, 0]);
+                else ctx.rect(startX + width - 3, gripY, 3, gripH);
+                ctx.fill();
+
+                // Linha de limite atingido (feedback tátil visual)
+                if (tr.hitLimitA) {
+                    ctx.fillStyle = "#f59e0b";
+                    ctx.fillRect(startX, top, 2, height);
+                }
+                if (tr.hitLimitB) {
+                    ctx.fillStyle = "#f59e0b";
+                    ctx.fillRect(startX + width - 2, top, 2, height);
+                }
+                ctx.restore();
+            }
+
+            // Linha central de emenda (cutFrame)
+            ctx.save();
+            ctx.setLineDash([2, 2]);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+            ctx.beginPath();
+            ctx.moveTo(cutX, top);
+            ctx.lineTo(cutX, top + height);
+            ctx.stroke();
+            ctx.restore();
+
+            // Desenha as curvas cruzadas no bloco da transição
+            if (width >= 8) {
+                const steps = Math.max(10, Math.min(60, Math.floor(width / 2)));
+                
+                // Curva Out (descendente: 1 -> 0)
+                ctx.save();
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(6, 182, 212, 0.9)";
+                ctx.lineWidth = 1.6;
+                for (let i = 0; i <= steps; i++) {
+                    const p = i / steps;
+                    const factor = evaluateFadeCurve(1 - p, tr.curve || "equal_power", tr.tension || 0);
+                    const px = startX + p * width;
+                    const py = top + (1 - factor) * (height - 2) + 1;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                ctx.restore();
+
+                // Curva In (ascendente: 0 -> 1)
+                ctx.save();
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(110, 231, 183, 0.9)";
+                ctx.lineWidth = 1.6;
+                for (let i = 0; i <= steps; i++) {
+                    const p = i / steps;
+                    const factor = evaluateFadeCurve(p, tr.curve || "equal_power", tr.tension || 0);
+                    const px = startX + p * width;
+                    const py = top + (1 - factor) * (height - 2) + 1;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Rótulo com pill translúcida para máxima legibilidade sobre waveforms
+            if (width >= 18 && height >= 14) {
+                const label = width >= 90 ? "Potência Constante" : (width >= 42 ? "Crossfade" : "CF");
+                ctx.font = "bold 8.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+                const textMetrics = ctx.measureText(label);
+                const pillW = Math.min(width - 6, textMetrics.width + 8);
+                const pillH = 12;
+                const pillX = cutX - pillW / 2;
+                const pillY = top + Math.max(2, (height - pillH) / 2);
+
+                if (pillW >= 12) {
+                    ctx.save();
+                    ctx.fillStyle = isSelected ? "rgba(10, 25, 47, 0.85)" : "rgba(15, 23, 42, 0.75)";
+                    ctx.strokeStyle = isSelected ? "rgba(6, 182, 212, 0.6)" : "rgba(255, 255, 255, 0.15)";
+                    ctx.lineWidth = 1;
+                    if (ctx.roundRect) {
+                        ctx.beginPath();
+                        ctx.roundRect(pillX, pillY, pillW, pillH, 3);
+                        ctx.fill();
+                        ctx.stroke();
+                    } else {
+                        ctx.fillRect(pillX, pillY, pillW, pillH);
+                        ctx.strokeRect(pillX, pillY, pillW, pillH);
+                    }
+
+                    ctx.fillStyle = isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.9)";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(label, cutX, pillY + pillH / 2);
+                    ctx.restore();
+                }
+            }
+
+            ctx.restore();
+        });
     }
 
     /**
