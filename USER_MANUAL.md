@@ -22,6 +22,14 @@ profissional.
 5. [🎛️ 5. Arquitetura Track-Based NLE, Gaps, Sync Lock e J/L-Cuts Nativos](#5-arquitetura-track-based-nle-gaps-sync-lock-e-jl-cuts-nativos)
    - [Montagem Clássica de 3 e 4 Pontos & Roteamento de Canais](#p-montagem-clássica-de-3-e-4-pontos--roteamento-de-canais-insert--overwrite)
    - [Localizar Quadro na Fonte (Match Frame & Reverse)](#q-localizar-quadro-original-na-fonte-match-frame--reverse-match-frame)
+   - [Navegação Numérica e Timecode Interativo](#r-navegação-e-entrada-numérica-de-timecode-task-11)
+   - [Rolagem Automática (Follow Playhead)](#s-rolagem-automática-que-segue-a-agulha-playhead-follow--auto-scroll)
+   - [Congelar Quadro (Freeze Frame Tool)](#t-ferramenta-de-congelamento-de-quadro-freeze-frame---task-12)
+   - [Velocidade, Reverso e Fit to Gap](#u-velocidade-do-clipe-reprodução-reversa-e-preenchimento-de-lacunas-task-13)
+   - [Ferramenta Rate Stretch](#v-ferramenta-de-estiramento-de-taxa-de-velocidade-rate-stretch-tool)
+   - [Subclipes Virtuais Não-Destrutivos](#w-subclipes-virtuais-não-destrutivos-virtual-subclips)
+   - [Substituição de Clipe (Replace Edit)](#x-substituição-de-clipe-replace-edit-via-altdrop-e-ctrlshiftr)
+   - [Indicadores de Sincronia A/V e Ressincronização](#y-indicadores-de-sincronia-av-xf---xf-e-opções-de-ressincronização)
 6. [🎚️ 6. Tratamento de Áudio: Diagnóstico, Presets e Comparação A/B](#6-tratamento-de-áudio-diagnóstico-presets-e-comparação-ab)
 7. [🔄 7. Carrossel de Alternativas da IA (Atalho A)](#7-carrossel-de-alternativas-da-ia-atalho-a)
 8. [💾 8. Salvando, Auto-Salvamento & Logs com IA](#8-salvando-auto-salvamento--logs-com-ia)
@@ -474,6 +482,121 @@ A navegação bidirecional de frames conecta de forma transparente a timeline mo
   - **Menu Popover de Ocorrências com Retenção em Hover:** O botão `#btn-source-reverse-match` exibe um badge ciano com o total de cortes e um menu suspenso (`#popover-reverse-match-list`) com todos os pontos da timeline. O menu permanece aberto enquanto o cursor do mouse estiver sobre ele (com tolerância suave de 250ms), permitindo clicar em ocorrências para navegar na timeline sem fechar a lista acidentalmente.
   - A agulha salta para a coordenada calculada, o clipe é selecionado e realçado com pulso ciano temporário na timeline.
   - Caso o quadro inspecionado não esteja presente na timeline, um aviso não-intrusivo via toast notifica o editor.
+
+### R. Navegação e Entrada Numérica de Timecode (Task 11)
+Para garantir velocidade cirúrgica na navegação temporal, os displays de timecode do Source Player, Program Player e do cabeçalho da timeline funcionam como **entradas numéricas interativas inline** (`.interactive-timecode`):
+- **Entrada Direta e Atalho Universal (`Ctrl + G` / `Ctrl + P`):**
+  - Clique diretamente em qualquer exibição de timecode na interface ou pressione **`Ctrl + G`** (no CapIAu, Premiere, Resolve e Kdenlive) ou **`Ctrl + P`** (no Final Cut Pro) para ativar a caixa de entrada numérica com seleção automática do texto. O comando intercepta e previne a abertura indevida do diálogo de busca do navegador.
+- **Sintaxes Flexíveis do Parser Numérico Universal:**
+  - **Deslocamentos Relativos em Quadros (`+50`, `-24`):** Digite `+50` para avançar 50 frames a partir da agulha atual ou `-24` para recuar 24 frames. Um toast informativo transparente exibe o cálculo exato (ex.: `+50f = 1s 20f`).
+  - **Deslocamentos Relativos em Segundos (`+2s`, `-1.5s`):** Converte frações temporais diretamente para frames conforme a taxa da sequência.
+  - **Notação de Ponto NLE (`1.`, `10.`, `1..`):** Padrão consagrado da indústria — digite `1.` para saltar 1 segundo à frente, `10.` para 10 segundos e `1..` para 1 minuto exato.
+  - **Notação Numérica Abreviada (`1200`, `100`, `50`):** `1200` navega para `00:00:12:00`, `100` para `00:00:01:00` e `50` para o frame 50.
+  - **Timecode SMPTE Tradicional (`HH:MM:SS:FF`):** Aceita timecodes absolutos com ou sem separadores de dois pontos.
+- **Precisão Matemática em Taxas Fracionárias (29.97 fps / NDF):**
+  - O cálculo utiliza a base inteira nominal ($\text{fpsBase} = \operatorname{round}(\text{fps})$), eliminando ticks duplicados na régua e garantindo alinhamento pixel-perfect da agulha de reprodução.
+- **Histórico Atômico de Saltos:** Todo salto numérico é registrado no histórico da timeline, permitindo desfazer com **`Ctrl + Z`** ou refazer com **`Ctrl + Y`**.
+
+### S. Rolagem Automática que Segue a Agulha (Playhead Follow / Auto-Scroll)
+A timeline inclui mecanismo nativo de auto-scroll para manter a agulha sempre visível durante a reprodução contínua:
+- **Ativação por Teclado e Botão Dedicado:**
+  - Pressione **`Ctrl + Alt + F`** ou clique no botão de acesso rápido com indicador LED ciano na barra de ferramentas (`#btn-timeline-follow-playhead`).
+- **Dois Modos de Rolagem NLE:**
+  1. **Modo Página (`page`):** Ao atingir a borda direita da viewport durante a reprodução (com margem de segurança de 5%), a timeline avança uma página completa posicionando a agulha no início da nova tela, com suporte idêntico para reprodução reversa (Shuttle J).
+  2. **Modo Suave (`smooth`):** A visualização acompanha a agulha de forma contínua e amortecida com interpolação suave (*lerp*), mantendo o playhead ancorado no ponto percentual configurado pelo editor.
+- **Âncora de Câmera Ajustável (30% a 70%):**
+  - No menu de Opções de Visualização da Timeline (`#btn-timeline-view-options`), deslize o controle de âncora para escolher se a agulha deve correr mais à esquerda (30%), no centro (50%) ou mais à direita (70%), com preview interativo em tempo real.
+- **Persistência Universal:** O estado de ativação, o modo e o percentual de âncora são gravados no `workspaceManager` e mantidos entre sessões no `localStorage`.
+
+### T. Ferramenta de Congelamento de Quadro (Freeze Frame - Task 12)
+Permite criar quadros congelados instantâneos na timeline a partir de qualquer instante da mídia de vídeo:
+- **Acionamento Rápido (`Ctrl + Shift + F`):**
+  - Posicione a agulha sobre o quadro desejado e pressione **`Ctrl + Shift + F`** (em todos os 5 perfis NLE), clique no botão `#btn-freeze-frame` na barra de ferramentas ou selecione **"Congelar Quadro"** no menu de contexto do clipe.
+- **Técnica Tail Hold e Imunidade a Limites de Mídia (Bounds Immunity):**
+  - Clipes congelados gerados pelo sistema utilizam a técnica *tail hold* com o frame estático congelado (`freeze_time`).
+  - Possuem **imunidade completa às fronteiras da mídia bruta original** (`is_freeze: true`), permitindo ao editor esticar a duração do quadro congelado na timeline indefinidamente sem esbarrar na duração física do arquivo original gravado pela câmera.
+- **Modos Ripple e Overwrite:**
+  - Suporta abertura de espaço empurrando a timeline (*Ripple Freeze Frame*) ou substituição do trecho (*Overwrite Freeze Frame*).
+- **Tratamento Sonoro e Identidade Visual Ice Cyan:**
+  - A pista pareada de áudio recebe uma lacuna silenciosa (Gap) correspondente à duração do congelamento.
+  - No canvas da timeline, o clipe ganha visual temático **Ice Cyan**, rótulo identificador claro e miniaturas de filmstrip estáticas repetindo o mesmo quadro congelado.
+
+### U. Velocidade do Clipe, Reprodução Reversa e Preenchimento de Lacunas (Task 13)
+O controle de velocidade e timing da timeline disponibiliza controle numérico e paramétrico completo:
+- **Diálogo Flutuante e Arrastável de Velocidade e Duração (`Ctrl + R`):**
+  - Com um clipe selecionado na timeline, pressione **`Ctrl + R`** (ou clique com botão direito ➔ **"Velocidade e Duração..."**).
+  - Um modal flutuante e arrastável abre no centro da tela. A barra de **Espaço** continua operando prioritariamente o Play/Pause do Program Player, permitindo testar o andamento da cena sem fechar o diálogo.
+- **Conversão Bidirecional Proporcional:**
+  - Digite a velocidade em porcentagem (ex.: `50%`, `200%`) ou digite a duração desejada em timecode (`00:00:04:12`) ou frames. O sistema recalcula o valor complementar instantaneamente.
+  - Duplo clique no campo de porcentagem restaura a velocidade padrão (100%).
+- **Modo Ripple (Deslocar Posteriores) vs. Modo Cortar (Manter Duração):**
+  - **Deslocar Clipes Posteriores (Ripple):** Ao acelerar ou desacelerar o clipe, os cortes subsequentes nas pistas com Sync Lock avançam ou recuam para fechar o espaço ou acomodar a nova extensão.
+  - **Manter Duração da Timeline (Cortar):** Altera a velocidade interna sem mudar a duração física ocupada na timeline, fatiando ou repetindo frames dentro da caixa existente.
+- **Reprodução Reversa (Reverse Play):**
+  - Marque a opção **Inverter Reprodução (Reverso)** ou digite valores negativos. O clipe reproduz de trás para frente, as miniaturas do filmstrip são invertidas espacialmente da direita para a esquerda e o canvas exibe o badge de velocidade em **vermelho neon** (ex.: `-100%`).
+- **Preenchimento Instantâneo de Lacunas (Fit to Gap - `Ctrl + Alt + R`):**
+  - Pressione **`Ctrl + Alt + R`** para ajustar a velocidade do clipe selecionado de forma que ele preencha perfeitamente a lacuna vazia vizinha sem empurrar a montagem.
+  - **Menu de Contexto de Gaps:** Ao clicar com botão direito sobre clipes adjacentes a espaços vazios, utilize as opções com cálculo automático:
+    - **Preencher Lacunas (Ambos):** Expande o clipe recalculando a velocidade para cobrir lacunas antes e depois.
+    - **Preencher Lacuna à Frente:** Ajusta a velocidade para colar na cabeça do próximo corte.
+    - **Preencher Lacuna Atrás:** Ajusta a velocidade para colar na cauda do corte anterior.
+
+### V. Ferramenta de Estiramento de Taxa de Velocidade (Rate Stretch Tool)
+A Ferramenta de Estiramento de Taxa permite alterar a velocidade de clipes de forma tátil e visual diretamente na timeline:
+- **Seleção da Ferramenta e Paridade de Atalhos NLE:**
+  - Pressione **`Shift + R`** (ou **`X`**) no perfil CapIAu Padrão, **`R`** nos perfis Adobe Premiere Pro, DaVinci Resolve e Apple Final Cut Pro, ou **`Shift + R`** no Kdenlive.
+  - Também pode ser ativada clicando no botão `#btn-tool-rate-stretch` na barra vertical de ferramentas da timeline.
+- **Cursores Direcionais SVG & HUD Flutuante em Tempo Real:**
+  - O cursor do mouse assume formato vetorial temático com colchetes direcionais (`CURSOR_RATE_STRETCH_RIGHT` e `LEFT`).
+  - Durante o arraste da borda do clipe, um HUD flutuante translúcido (`#timeline-rate-stretch-tooltip`) acompanha o ponteiro exibindo em tempo real:
+    - A nova porcentagem de velocidade calculada (faixa permitida de 10% a 1000%).
+    - O multiplicador de velocidade (ex.: `0.50x`, `2.00x`).
+    - A nova duração resultante em timecode e total de quadros.
+- **Estiramento (Slow Motion) e Compressão (Fast Motion):**
+  - **Arrastar a borda para fora (esticar):** Reduz a porcentagem de velocidade (câmera lenta), respeitando barreiras físicas de gaps ou o término de mídia.
+  - **Arrastar a borda para dentro (comprimir):** Aumenta a porcentagem de velocidade (aceleração).
+  - O arraste respeita o **snapping magnético**, alinhando com agulha, marcadores e bordas vizinhas.
+- **Pares Vinculados A/V com Pitch Correction & Tecla Alt:**
+  - Por padrão, esticar ou comprimir o clipe altera áudio e vídeo vinculados de forma rigorosamente sincronizada, ativando preservação e correção tonal de pitch no áudio.
+  - Mantenha pressionada a tecla **`Alt`** durante o arraste para esticar exclusivamente a pista clicada (por exemplo, esticar apenas o vídeo mantendo a duração do áudio intacta para criar um insert visual estendido).
+- **Cancelamento e Retorno Ágil:**
+  - Pressione **`Escape`** durante o arraste para cancelar imediatamente e restaurar o clipe ao estado original.
+  - Pressione **`V`** a qualquer momento para retornar à Ferramenta de Seleção Padrão.
+
+### W. Subclipes Virtuais Não-Destrutivos (Virtual Subclips)
+Subclipes virtuais permitem fatiar e catalogar trechos seletos de arquivos brutos extensos sem duplicar arquivos de mídia nem gerar novos proxies:
+- **Criação Rápida a partir do Source Player (`Ctrl + U`):**
+  - No monitor Source Player, marque os limites desejados com **`I`** (In) e **`O`** (Out).
+  - Pressione **`Ctrl + U`** (em todos os 5 perfis NLE) ou clique no botão dedicado de criar subclipe com ícone de tesoura `#btn-source-create-subclip`.
+- **Modal de Criação com Sugestões Inteligentes de IA:**
+  - Um modal flutuante exibe os timecodes de entrada, saída e duração total do trecho.
+  - Chips inteligentes oferecem sugestões automáticas de nomes baseadas na decupagem narrativa de IA ou transcrição fonética daquele trecho específico.
+- **Limites Rígidos (Hard Boundaries) de Proteção:**
+  - O subclipe gerado possui barreiras rígidas em suas pontas: na timeline, as alças de trim impedem o estiramento acidental para fora do intervalo demarcado pelo editor.
+- **Identificação Visual na Biblioteca e Timeline:**
+  - Na biblioteca (tanto no modo Grade quanto na Galeria Clean), o subclipe recebe badge identificador `SUB`, miniaturas nítidas do ponto de entrada e hover preview delimitado estritamente ao intervalo [In–Out].
+  - Ao ser inserido na timeline (via arrastar e soltar ou duplo clique), o clipe recebe o prefixo gráfico **`✂`** em seu título para clareza imediata na montagem.
+
+### X. Substituição de Clipe (Replace Edit via Alt+Drop e Ctrl+Shift+R)
+Permite trocar a mídia bruta de um clipe posicionado na timeline sem perder o trabalho de montagem já executado:
+- **Substituição via Drag & Drop com Alt (`Alt + Arraste`):**
+  - Arraste uma mídia da biblioteca ou do monitor Source diretamente sobre um clipe existente na timeline mantendo a tecla **`Alt`** pressionada.
+  - A timeline projeta um realce visual **`[REPLACE]`** sobre o clipe alvo. Ao soltar, a mídia é substituída imediatamente.
+- **Substituição via Atalho Universal (`Ctrl + Shift + R`):**
+  - Selecione o clipe alvo na timeline, navegue até o quadro desejado no Source Player (ou marque o ponto In) e tecle **`Ctrl + Shift + R`**.
+- **Preservação Rigorosa de Parâmetros:**
+  - A operação de Replace Edit mantém 100% inalterados: a posição temporal na timeline (`timelineStartFrame`), a duração física exata, a velocidade do clipe, o alinhamento de pares de áudio e vídeo, a cor e efeitos de enquadramento (inclusive parâmetros Ken Burns).
+
+### Y. Indicadores de Sincronia A/V (+Xf / -Xf) e Opções de Ressincronização
+Ao trabalhar com áudio e vídeo vinculados que foram deslocados no tempo (por exemplo, após trims assimétricos de J-Cut ou L-Cut), a timeline mantém o editor orientado com precisão milimétrica:
+- **Badges Visuais de Descompasso:**
+  - Sempre que a relação temporal entre o vídeo e o áudio divergir da filmagem original, badges sutis surgem sobre as bordas dos clipes na timeline indicando o descompasso exato em frames (ex.: `+2f`, `-5f`).
+- **Comandos de Ressincronização no Menu de Contexto:**
+  - Clique com o botão direito sobre o clipe ou badge para acessar as opções de restauração:
+    - **Mover para Sincronia:** Translada o clipe fisicamente na timeline para realinhar com seu par original.
+    - **Deslizar Conteúdo (Slip) para Sincronia:** Executa uma compensação interna de Slip nos pontos In/Out da mídia bruta, recuperando a sincronia perfeita sem mover o clipe nem abrir lacunas na timeline.
+- **Blindagem Automática no Ripple Delete:**
+  - O motor de ripple delete conta com proteção bidirecional para pares A/V vinculados: se a pista de vídeo sofrer uma extração, a pista de áudio associada avança em perfeita paridade atômica, impedindo a criação involuntária de descompassos labiais.
 
 ---
 
@@ -1057,23 +1180,31 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | | **`Ctrl + L` / `Cmd + L`** | Alternar Loop Contínuo no intervalo [In–Out] |
 | | **`J` / `K` / `L`** | Shuttle Reverso (-1x..-8x), Parar, Avanço (+1.5x..+8x) |
 | | **`K + J` / `K + L`** | Jog frame a frame (Recuar / Avançar 1 frame) |
+| | **`Shift + ←` / `Shift + →`** | Shuttle Acelerado contínuo (2x, 4x, 8x, 16x) |
+| | **`Ctrl + ←` / `Ctrl + →`** | Câmera Lenta suave (0.25x / -0.25x) |
 | | **`←` / `→`** | Navegar quadro a quadro (1 frame) |
 | | **`A` / `S`** *(ou `↑` / `↓`)* | Saltar pontos de corte anteriores (`A`) ou seguintes (`S`) |
 | | **`Shift + I` / `Shift + O`** | Saltar agulha diretamente para ponto IN ou ponto OUT |
+| | **`Ctrl + G`** *(ou `Ctrl+P` no FCP)* | Ir para Timecode / Entrada Numérica Direta (.interactive-timecode) |
 | **Pontos de Corte & Inserção** | **`I` / `O`** | Marcar ponto de Entrada (In) e Saída (Out) |
 | | **`Alt + X`** | Limpar pontos de In e Out ativos |
+| | **`,` (Vírgula)** | Inserção Ripple / Insert (3 Pontos a partir do Source) |
+| | **`.` (Ponto)** *(ou `F10`)* | Sobrescrita / Overwrite (3 Pontos a partir do Source) |
+| | **`Ctrl + Alt + A`** | Alternar Canais de Inserção (AV $\rightarrow$ V $\rightarrow$ A) |
 | | **`;` (Ponto e Vírgula)** | Lift: extrai intervalo [In–Out] mantendo Gap vazio |
 | | **`'` (Aspas Simples)** | Extract: extrai intervalo [In–Out] e fecha Gap com Ripple |
 | | **`E`** | Dividir Clipe no Playhead (*Split* na agulha) ou Append do Source |
 | | **`Shift + E`** | Inserir fala selecionada na transcrição na timeline |
-| **Ingestão na Timeline (Biblioteca)** | **`Duplo Clique`** | Inserir na timeline na posição da agulha (*Playhead*) |
-| | **`Shift + Duplo Clique`** | Inserir no final do último clipe (*Append*) |
+| | **`Ctrl + U`** | Criar Subclipe Virtual no Source Player com títulos sugeridos por IA |
+| **Ingestão na Timeline (Biblioteca)** | **`Duplo Clique`** | Inserir no final da timeline (*Append* - prefere V1; ignora pistas ocultas) |
+| | **`Shift + Duplo Clique`** | Inserir na posição da agulha (*Playhead*) |
 | | **`Ctrl + Duplo Clique`** | Inserir no 1º espaço vazio (*First Gap*) e mover agulha pro início |
 | | **`Ctrl + Shift + Duplo Clique`** | Inserir no próximo espaço vazio (*Next Gap*) e mover agulha pro início |
 | | **`Alt + Shift + Duplo Clique`** | Inserir no início da timeline (*Frame 0*) |
 | | **`Alt + Duplo Clique`** | Inserir empurrando cortes subsequentes (*Ripple Insert*) |
 | | **`Ctrl + Alt + Duplo Clique`** | Sobrepor em pista superior (*Overlay B-Roll*) |
-| | **`Botão Direito ➔ Substituir`** | Substituir clipe selecionado na timeline |
+| | **`Ctrl + Shift + R`** *(ou `Alt + Arraste`)* | Substituir clipe selecionado na timeline (*Replace Edit*) mantendo duração e efeitos |
+| | **`R` / `Shift + R`** *(na Biblioteca/Galeria)* | Girar mídia 90° horário ou anti-horário |
 | **Suíte de Edição Rápida (Mão Esquerda)** | **`Q`** | Ripple Trim Head (corta do início do clipe até a agulha e fecha o vão) |
 | | **`W`** | Ripple Trim Tail (corta da agulha até o fim do clipe e fecha o vão) |
 | | **`E`** *(ou `Z`)* | Dividir Clipe no Playhead (*Split* instantâneo sob a agulha sem seleção prévia) |
@@ -1086,7 +1217,12 @@ No cabeçalho do Guia de Atalhos (<kbd>⌨️</kbd> na barra da timeline), selec
 | | **`Backspace`** | Ripple Delete de clipe selecionado, gap selecionado ou sob o playhead |
 | | **`Delete`** | Lift Delete (apaga clipe mantendo o gap vazio) |
 | | **`Ctrl + Alt + P`** | Alternar modo "Seleção Acompanha a Agulha" (*Selection Follows Playhead*) |
+| **Velocidade, Tempo & Modos** | **`Ctrl + R`** | Velocidade e Duração do Clipe (diálogo com Ripple, Cortar e Reverse) |
+| | **`Ctrl + Alt + R`** | Preencher Lacuna com Velocidade (*Fit to Gap*) |
+| | **`Ctrl + Shift + F`** | Congelar Quadro (*Freeze Frame* com tail hold e bounds immunity) |
+| | **`Ctrl + Alt + F`** | Alternar Rolagem Automática da Agulha (*Follow Playhead* - Page / Smooth) |
 | **Ferramentas NLE & Canvas** | **`V`** | Ferramenta de Seleção Padrão |
+| | **`Shift + R`** *(ou `X` no CapIAu / `R` nos outros)* | Ferramenta Estiramento de Taxa de Velocidade (*Rate Stretch Tool* - 10% a 1000%) |
 | | **`C`** *(ou `B` no Resolve/Final Cut)* | Ferramenta Lâmina / Gilete (*Blade Tool* - corte simples ou `Shift+C` global) |
 | | **`Y`** *(ou `Shift+Y` no Resolve)* | Deslizar Conteúdo Interno (*Slip Tool* - mantém tamanho na timeline) |
 | | **`U`** | Deslocamento com Compensação (*Slide Tool* - ajusta vizinhos adjacentes) |

@@ -10,11 +10,11 @@ Você pode alternar o perfil ativo a qualquer momento através do menu **Perfil*
 
 | Perfil NLE | Foco & Ergonomia | Destaques de Mapeamento |
 | :--- | :--- | :--- |
-| 🎬 **CapIAu Padrão** | Híbrido moderno com suíte QWER/ASDF na mão esquerda para corte documental ultrarrápido. | `Q`/`W` Ripple Trims, `E`/`Z` Split, `R` / `Backspace` Ripple Delete, `Alt+R` / `Delete` Lift Delete, `A`/`S` Ponto Anterior/Seguinte, `D` Selecionar na Agulha, `Shift+D` Multi-seleção, `F` Desativar Clipe, `,` Insert, `.` Overwrite, `Ctrl+Alt+A` Canais AV/V/A, `Alt+F` Match Frame, `Shift+F` Reverse Match Frame, `N`/`Shift+S` Snapping, `Shift+N` Rolling Edit, `Ctrl+Alt+P` Seleção Acompanha Agulha, `Alt+A` Alternativas IA. |
-| 🐧 **Kdenlive** | Padrão clássico do ecossistema Open Source e Linux NLE. | `Shift+R` / `X` Razor Split, `S` Seleção, `M` / `Shift+M` Espaçador, `V` Inserção, `F10` Snapping, `Ctrl+Shift+Espaço` Zoom to Fit, `Ctrl+=`/`Ctrl+-` Zoom, `.` Zoom Reset, `Z` Zoom Tool, `H` Mão, `Alt+F` Match Frame, `Shift+F` Reverse Match Frame, `B` Desativar Clipe, `J`/`K`/`L` Shuttle. |
-| 🟣 **Adobe Premiere Pro** | Ergonomia familiar para editores acostumados ao ecossistema Adobe. | `Ctrl+K` / `C` Razor Split, `A` / `Shift+A` Seleção de Trilha, `V` Seleção, `S` Snapping, `Q`/`W` Ripple Trims, `,` Insert, `.` Overwrite, `F` Match Frame, `Shift+F` Reverse Match Frame, `Shift+E` Desativar Clipe, `\` Zoom to Fit, `+`/`-` Zoom na Agulha, `Ctrl+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
-| 🟡 **DaVinci Resolve** | Padrão Blackmagic Design para ilhas de edição e pós-produção. | `Ctrl+\` / `B` Blade Split, `A` Seleção, `N` Snapping, `Shift+Backspace` Ripple Delete, `Alt+[` / `Alt+]` Trims, `F9` Insert, `F10` Overwrite, `F` Match Frame, `Shift+F` Reverse Match Frame, `D` Desativar Clipe, `Shift+Z` Zoom to Fit, `Ctrl+=`/`Ctrl+-` Zoom, `Shift+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
-| 🍏 **Apple Final Cut Pro** | Ergonomia magnética e atalhos otimizados para fluxo contínuo. | `Cmd+B` / `B` Blade Split, `A` Seleção, `N` Snapping, `W` Insert, `E` Append, `Shift+Delete` Ripple Delete, `Shift+F` Match Frame, `Alt+F` Reverse Match Frame, `V` Desativar Clipe, `Shift+Z` Zoom to Fit, `Cmd+=`/`Cmd+-` Zoom, `Shift+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
+| 🎬 **CapIAu Padrão** | Híbrido moderno com suíte QWER/ASDF na mão esquerda para corte documental ultrarrápido. | `Q`/`W` Ripple Trims, `E`/`Z` Split, `R` / `Backspace` Ripple Delete, `Alt+R` / `Delete` Lift Delete, `A`/`S` Ponto Anterior/Seguinte, `D` Selecionar na Agulha, `Shift+D` Multi-seleção, `F` Desativar Clipe, `,` Insert, `.` Overwrite, `Ctrl+Alt+A` Canais AV/V/A, `Shift+R` / `X` Rate Stretch Tool, `Ctrl+R` Velocidade/Duração, `Ctrl+Alt+R` Fit to Gap, `Ctrl+Shift+F` Freeze Frame, `Ctrl+Alt+F` Follow Playhead, `Ctrl+G` Ir para Timecode, `Ctrl+U` Subclipe, `Ctrl+Shift+R` / `Alt+Drop` Replace Edit, `Alt+F` Match Frame, `Shift+F` Reverse Match Frame, `N`/`Shift+S` Snapping, `Shift+N` Rolling Edit, `Ctrl+Alt+P` Seleção Acompanha Agulha, `Alt+A` Alternativas IA. |
+| 🐧 **Kdenlive** | Padrão clássico do ecossistema Open Source e Linux NLE. | `Shift+R` / `X` Razor Split, `Shift+R` Rate Stretch Tool, `Ctrl+R` Velocidade, `Ctrl+Shift+F` Freeze Frame, `Ctrl+G` Ir para Timecode, `Ctrl+U` Subclipe, `S` Seleção, `M` / `Shift+M` Espaçador, `V` Inserção, `F10` Snapping, `Ctrl+Shift+Espaço` Zoom to Fit, `Ctrl+=`/`Ctrl+-` Zoom, `.` Zoom Reset, `Z` Zoom Tool, `H` Mão, `Alt+F` Match Frame, `Shift+F` Reverse Match Frame, `B` Desativar Clipe, `J`/`K`/`L` Shuttle. |
+| 🟣 **Adobe Premiere Pro** | Ergonomia familiar para editores acostumados ao ecossistema Adobe. | `Ctrl+K` / `C` Razor Split, `R` Rate Stretch Tool, `Ctrl+R` Velocidade/Duração, `Ctrl+Shift+F` Freeze Frame, `Ctrl+G` Ir para Timecode, `Ctrl+U` Subclipe, `Ctrl+Shift+R` Replace Edit, `A` / `Shift+A` Seleção de Trilha, `V` Seleção, `S` Snapping, `Q`/`W` Ripple Trims, `,` Insert, `.` Overwrite, `F` Match Frame, `Shift+F` Reverse Match Frame, `Shift+E` Desativar Clipe, `\` Zoom to Fit, `+`/`-` Zoom na Agulha, `Ctrl+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
+| 🟡 **DaVinci Resolve** | Padrão Blackmagic Design para ilhas de edição e pós-produção. | `Ctrl+\` / `B` Blade Split, `R` Rate Stretch Tool, `Ctrl+R` Velocidade/Duração, `Ctrl+Shift+F` Freeze Frame, `Ctrl+G` Ir para Timecode, `Ctrl+U` Subclipe, `A` Seleção, `N` Snapping, `Shift+Backspace` Ripple Delete, `Alt+[` / `Alt+]` Trims, `F9` Insert, `F10` Overwrite, `F` Match Frame, `Shift+F` Reverse Match Frame, `D` Desativar Clipe, `Shift+Z` Zoom to Fit, `Ctrl+=`/`Ctrl+-` Zoom, `Shift+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
+| 🍏 **Apple Final Cut Pro** | Ergonomia magnética e atalhos otimizados para fluxo contínuo. | `Cmd+B` / `B` Blade Split, `R` Rate Stretch Tool, `Ctrl+R` Velocidade/Duração, `Ctrl+Shift+F` Freeze Frame, `Ctrl+P` Ir para Timecode, `Ctrl+U` Subclipe, `A` Seleção, `N` Snapping, `W` Insert, `E` Append, `Shift+Delete` Ripple Delete, `Shift+F` Match Frame, `Alt+F` Reverse Match Frame, `V` Desativar Clipe, `Shift+Z` Zoom to Fit, `Cmd+=`/`Cmd+-` Zoom, `Shift+1` Zoom Reset, `Z` Zoom Tool, `H` Mão. |
 | ⚙️ **Personalizado (Custom)** | Mapeamento livre configurado pelo usuário. | Totalmente editável pela aba **Personalizar Atalhos & Tabela**, com persistência local e exportação JSON. |
 
 ---
@@ -46,7 +46,10 @@ No modal de atalhos (<kbd>⌨️</kbd> na timeline), a aba principal **Teclado V
 | **`L`** | **Shuttle Avanço** | Pressione consecutivamente para acelerar a velocidade de avanço (1.5x, 2x, 4x, 8x). |
 | **`K + J`** | **Jog Recuar 1 Frame** | Pressione K mantendo pressionado J para recuar exatamente 1 frame. |
 | **`K + L`** | **Jog Avançar 1 Frame** | Pressione K mantendo pressionado L para avançar exatamente 1 frame. |
+| **`Shift + ←` / `Shift + →`** | **Shuttle Acelerado Contínuo** | Segurar reproduz acelerado e soltar pausa; toques rápidos ciclam velocidade (2x, 4x, 8x, 16x). |
+| **`Ctrl + ←` / `Ctrl + →`** | **Câmera Lenta Suave** | Reproduz em câmera lenta suave (0.25x / -0.25x), pausando imediatamente ao soltar a tecla. |
 | **`←` / `→`** | **Navegar Frames** | Retrocede ou avança exatamente 1 frame do vídeo para cortes cirúrgicos. |
+| **`Ctrl + G`** *(ou `Ctrl+P` no FCP)* | **Ir para Timecode / Entrada Numérica** | Ativa entrada numérica inline (.interactive-timecode) para saltos relativos (`+50`, `-24`), notação de ponto (`1.`), segundos (`+2s`) ou timecode absoluto. |
 | **`A` / `S`** *(ou `↑` / `↓`)* | **Navegar Pontos de Corte (Edit Points)** | **Na Timeline:** Move a agulha para o corte anterior (`A`/↑) ou próximo (`S`/↓).<br>**No Source:** Pula para o ponto In/Início (↑) ou ponto Out/Fim (↓). |
 | **`Shift + I`** | **Ir para Ponto IN** | Posiciona a agulha de reprodução exatamente no ponto de entrada marcado. |
 | **`Shift + O`** | **Ir para Ponto OUT** | Posiciona a agulha de reprodução exatamente no ponto de saída marcado. |
@@ -70,9 +73,11 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 | **`Ctrl + Duplo Clique`** *(ou `Cmd`)* | **No 1º Espaço Vazio (Primeiro Gap)** | Encontra o primeiro espaço vazio (gap) a partir do frame 0 e insere no início dele. | **Início do clipe inserido** |
 | **`Ctrl + Shift + Duplo Clique`** | **No Próximo Espaço Vazio (Após Agulha)** | Encontra o primeiro gap à frente da agulha atual e insere no início dele. | **Início do clipe inserido** |
 | **`Alt + Shift + Duplo Clique`** | **No Início da Timeline (Frame 0)** | Insere no frame 0 da pista de destino. | Início (Frame 0) |
-| **`Alt + Duplo Clique`** | **Inserir Empurrando (Ripple Insert)** | Divide clipes sob a agulha e empurra todos os cortes subsequentes pela duração do novo clipe. | Final do clipe inserido |
-| **`Ctrl + Alt + Duplo Clique`** | **Sobrepor em Pista Superior (Overlay)** | Insere na pista superior livre (ex: V2/B-Roll) na posição da agulha. | Final do clipe inserido |
-| **`Botão Direito ➔ Substituir`** | **Substituir Clipe Selecionado** | Substitui a mídia do clipe atualmente selecionado na timeline mantendo seu início. | Mantém posição |
+| **`Alt + 2x Clique`** | **Inserir Empurrando (Ripple Insert)** | Divide clipes sob a agulha e empurra todos os cortes subsequentes pela duração do novo clipe. | Final do clipe inserido |
+| **`Ctrl + Alt + 2x Clique`** | **Sobrepor em Pista Superior (Overlay)** | Insere na pista superior livre (ex: V2/B-Roll) na posição da agulha. | Final do clipe inserido |
+| **`Ctrl + Shift + R`** *(ou `Alt + Arraste`)* | **Substituir Clipe (Replace Edit)** | Substitui a mídia do clipe atualmente selecionado na timeline mantendo rigorosamente sua duração, velocidade, cor e efeitos. | Mantém posição |
+| **`Ctrl + U`** *(no Source Player)* | **Criar Subclipe Virtual** | Gera subclipe virtual não-destrutivo com hard boundaries a partir dos pontos [In–Out] com sugestões de títulos por IA. | Inalterada |
+| **`R` / `Shift + R`** *(na Biblioteca/Galeria)* | **Girar Mídia 90°** | Gira a orientação da mídia em 90° no sentido horário (`R`) ou anti-horário (`Shift+R`). | Inalterada |
 
 ---
 
@@ -108,6 +113,10 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 | **`Alt + Clique`** | **Seleção A/V Independente** | Seleciona apenas a pista clicada de um par vinculado para cortes L-Cut e J-Cut. |
 | **`Ctrl + Arraste`** | **Ripple Insert** | Insere mídia abrindo espaço e empurrando os cortes à direita nas pistas sincronizadas. |
 | **`Ctrl + Trim`** | **Ripple Trim** | Ajusta as bordas de entrada/saída compensando o tempo nas pistas sincronizadas. |
+| **`Ctrl + R`** | **Velocidade e Duração do Clipe** | Abre diálogo modal flutuante com cálculo bidirecional de %, timecode, opções de Ripple/Cortar e Reverse Play. |
+| **`Ctrl + Alt + R`** | **Preencher Lacuna (Fit to Gap)** | Ajusta a velocidade do clipe selecionado para preencher a lacuna vizinha perfeitamente sem empurrar a montagem. |
+| **`Ctrl + Shift + F`** | **Congelar Quadro (Freeze Frame)** | Congela o frame sob o playhead com técnica tail hold e imunidade a limites da mídia fonte (*bounds immunity*). |
+| **`Ctrl + Alt + F`** | **Alternar Rolagem Automática (Follow Playhead)** | Ativa ou desativa a rolagem automática da timeline durante playback (modos Page e Smooth). |
 
 ---
 
@@ -116,6 +125,7 @@ O CapIAu-Talho suporta múltiplos modos de ingestão instantânea via **combina�
 | Tecla / Combinação | Ação | Descrição |
 | :--- | :--- | :--- |
 | **`V`** *(ou `S` no Kdenlive / `A` no Resolve)* | **Ferramenta de Seleção** | Retorna ao cursor padrão de seleção e arraste. |
+| **`Shift + R`** *(ou `X` no CapIAu / `R` no Premiere/Resolve/FCP / `Shift+R` no Kdenlive)* | **Ferramenta Estiramento de Taxa (Rate Stretch Tool)** | Altera a velocidade arrastando as bordas do clipe na timeline (10% a 1000%), com HUD flutuante em tempo real e cursores SVG direcionais. Mantenha `Alt` para estiramento de faixa individual. |
 | **`C`** *(ou `B` no Resolve/Final Cut)* | **Ferramenta Lâmina / Gilete (Blade)** | Divide o clipe clicado no frame exato (`Shift+C` fatia todas as pistas destravadas na agulha). |
 | **`Y`** *(ou `Shift+Y` no Resolve)* | **Deslizar Conteúdo Interno (Slip Tool)** | Desliza os pontos IN e OUT da mídia bruta mantendo a posição e duração na timeline intactas. |
 | **`U`** | **Deslocamento com Compensação (Slide Tool)** | Move a posição do clipe compensando simetricamente nos vizinhos adjacentes. |

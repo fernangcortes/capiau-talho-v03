@@ -190,6 +190,7 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   - **Modo 'Seleção Acompanha a Agulha' (*Selection Follows Playhead*):** Modo comutável por botão com luz de status ciano na barra de ferramentas (`#btn-selection-follows-playhead`) ou pelo atalho **`Ctrl + Alt + P`**, selecionando automaticamente o clipe que cruza a agulha ao navegar para agilizar cortes e inspeções sem tocar no mouse.
 
 - **Suíte Clássica de Ferramentas NLE de Precisão (Tool Strip Vertical).** Barra lateral ergonômica com layout *seamless*, cursores temáticos em SVG e paridade com os principais NLEs de mercado:
+  - **Ferramenta Estiramento de Taxa de Velocidade / Rate Stretch Tool (`Shift+R` / `X` no CapIAu, `R` nos demais):** Altera a velocidade arrastando as bordas do clipe na timeline (faixa de 10% a 1000%), com cursores direcionais SVG de alta definição, HUD flutuante em tempo real exibindo porcentagem, multiplicador e timecode, compensação de par A/V com pitch correction e suporte a faixa única com `Alt`.
   - **Lâmina / Gilete (`C`):** Divide o clipe no cursor com precisão cirúrgica ou fatia todas as pistas destravadas na agulha com **`Shift + C`**.
   - **Seleção por Caixa / Retângulo (Marquee):** Arraste pontilhado fluido para seleção e movimentação de múltiplos clipes e marcadores em bloco.
   - **Deslizar Conteúdo Interno / Slip Tool (`Y`):** Desliza o trecho interno da mídia bruta preservando a posição e a duração física na timeline rigorosamente inalteradas, com suporte a cortes J/L com **`Alt`**.
@@ -198,6 +199,33 @@ semiautônomos — exportáveis para **Kdenlive, Premiere, Resolve e Final Cut**
   - **Ferramenta Mão / Pan (`H`):** Navegação e arraste contínuo pela timeline em qualquer direção (também acionado segurando a barra de `Espaço` na timeline ou pelo botão do meio do mouse).
   - **Ferramenta Zoom / Lupa (`Z`):** Aproximação (1.4x) e afastamento com **`Alt + Clique`** (0.7x) centralizado no cursor do mouse.
   - **Prevenção Física de Sobreposição & Modos de Movimentação:** Bloqueio magnético anti-invasão (*Clamp*), modo *Overwrite* com **`Shift`** e modo *Ripple Insert* atômico com **`Ctrl`**.
+
+- **Velocidade do Clipe, Reprodução Reversa e Preenchimento de Lacunas (Task 13).** Controle temporal profissional com diálogo modal arrastável (**`Ctrl + R`**):
+  - **Conversão Bidirecional:** Cálculo simultâneo entre porcentagem (%) e timecode/frames, com reset para 100% via duplo clique.
+  - **Modos Ripple vs. Cortar:** Alterne entre deslocar os clipes posteriores nas pistas com Sync Lock ou manter a duração estática na timeline fatiando a mídia.
+  - **Reprodução Reversa (Reverse Play):** Reproduz o clipe de trás para frente, com filmstrip renderizado com amostragem invertida de frames e badge de velocidade em vermelho neon no canvas.
+  - **Preenchimento Automático de Lacunas / Fit to Gap (`Ctrl + Alt + R`):** Ajusta instantaneamente a velocidade do clipe para preencher o vão livre adjacente sem deslocar o restante da montagem, também acessível pelo menu de contexto (*Preencher Ambos*, *Preencher Frente*, *Preencher Trás*).
+
+- **Ferramenta de Congelamento de Quadro (Freeze Frame Tool - `Ctrl + Shift + F`).** Congela instantaneamente o quadro posicionado sob a agulha de reprodução:
+  - **Técnica Tail Hold com Imunidade a Limites de Mídia (*Bounds Immunity*):** Clipes congelados podem ser estendidos indefinidamente na timeline sem esbarrar no término do arquivo original gravado pela câmera.
+  - **Modos Ripple e Overwrite:** Suporte a inserção empurrando cortes posteriores ou sobrescrevendo o trecho, com silêncio gerado na faixa de áudio e visual temático Ice Cyan com filmstrip estático.
+
+- **Rolagem Automática que Segue a Agulha (Playhead Follow / Auto-Scroll).** Mantém a agulha sempre visível na reprodução:
+  - Comutável pelo atalho **`Ctrl + Alt + F`** ou pelo botão com indicador LED ciano na barra de ferramentas (`#btn-timeline-follow-playhead`).
+  - **Modo Página (`page`):** Avança uma tela completa ao atingir a borda direita (com 5% de margem), com suporte idêntico para reprodução reversa.
+  - **Modo Suave (`smooth`):** Rolagem contínua e amortecida com interpolação suave (*lerp*) e controle de âncora ajustável entre 30% e 70% com preview em tempo real.
+
+- **Timecode Interativo e Navegação Numérica Direta (`Ctrl + G` / `Ctrl + P`).** Caixas de timecode no Source, Program e cabeçalho da timeline funcionam como entradas numéricas interativas inline (`.interactive-timecode`):
+  - Suporta deslocamentos relativos em quadros (`+50`, `-24`), segundos (`+2s`, `-1.5s`), notação de ponto NLE (`1.` = 1s, `10.` = 10s, `1..` = 1m) e timecode SMPTE tradicional.
+  - Base nominal inteira para taxas fracionárias (29.97 fps) eliminando ticks repetidos na régua e alinhando com perfeição milimétrica a agulha, com histórico Undo/Redo completo.
+
+- **Subclipes Virtuais Não-Destrutivos (`Ctrl + U`).** Crie subclipes a partir do monitor Source Player:
+  - Sugestões inteligentes de títulos geradas por IA em chips clicáveis, limites rígidos (*hard boundaries*) impedindo estiramento acidental para fora do intervalo, miniaturas HQ e prefixo visual **`✂`** na timeline.
+
+- **Substituição de Clipe (Replace Edit - `Ctrl + Shift + R` / `Alt + Arraste`).** Troque a mídia de um clipe selecionado na timeline mantendo intactos seu ponto temporal de início, duração exata, velocidade, cor e parâmetros de enquadramento (Ken Burns).
+
+- **Indicadores Visuais de Sincronia A/V & Ressincronização.** Monitoramento em tempo real de pares de áudio e vídeo vinculados:
+  - Badges visuais indicando descompasso de frames (`+Xf`, `-Xf`) e opções de restauração no menu de contexto (*Mover para Sincronia* ou *Deslizar Conteúdo via Slip*), além de blindagem de avanço no Ripple Delete.
 
 - **Montagem Clássica de 3 e 4 Pontos & Roteamento de Canais (Insert & Overwrite).** Inserção de alta precisão diretamente a partir do monitor de origem (Source Player):
   - **Inserção Ripple / Insert (`,`)**: Divide o clipe na agulha da timeline e insere o trecho demarcado entre os pontos [In–Out] do Source Player, empurrando cortes subsequentes com sincronismo atômico.
