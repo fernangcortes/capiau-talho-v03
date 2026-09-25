@@ -69,8 +69,12 @@ function setupSidebarCustomization(containerId, orderKey, visibilityKey, activeK
             e.dataTransfer.effectAllowed = "move";
         });
 
-        btn.addEventListener("dragend", () => {
+        btn.addEventListener("dragend", (e) => {
             btn.classList.remove("dragging");
+            // F5a: aba do Painel Lateral solta fora do editor ou sobre uma janela destacada vira painel.
+            if (containerId === "right-tabs" && window.tabPanels) {
+                window.tabPanels.onTabDragEnd(btn.getAttribute(attrName), e);
+            }
             // Salvar nova ordenação
             const newOrder = Array.from(container.children).map(c => c.getAttribute(attrName));
             localStorage.setItem(orderKey, JSON.stringify(newOrder));
@@ -99,11 +103,12 @@ function setupSidebarCustomization(containerId, orderKey, visibilityKey, activeK
     // 5. Implementar Menu de Contexto (Mostrar/Ocultar Abas)
     container.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        showTabsContextMenu(e.clientX, e.clientY, container, visibilityKey, activeKey, attrName);
+        const clicked = e.target.closest(".tab-btn");
+        showTabsContextMenu(e.clientX, e.clientY, container, visibilityKey, activeKey, attrName, clicked);
     });
 }
 
-function showTabsContextMenu(x, y, container, visibilityKey, activeKey, attrName) {
+function showTabsContextMenu(x, y, container, visibilityKey, activeKey, attrName, clickedBtn = null) {
     const oldMenu = document.getElementById("custom-tabs-context-menu");
     if (oldMenu) oldMenu.remove();
 
@@ -114,6 +119,22 @@ function showTabsContextMenu(x, y, container, visibilityKey, activeKey, attrName
     menu.style.top = `${y}px`;
     menu.style.width = "180px";
     menu.style.padding = "6px 0";
+
+    // F5a: destacar a aba clicada (Painel Lateral) numa janela própria.
+    const clickedTab = clickedBtn ? clickedBtn.getAttribute(attrName) : null;
+    if (clickedTab && container.id === "right-tabs" && window.tabPanels) {
+        const tearItem = document.createElement("div");
+        tearItem.className = "menu-item";
+        tearItem.style.padding = "8px 12px";
+        const label = clickedBtn.querySelector(".tab-text")?.textContent || clickedTab;
+        tearItem.textContent = `Destacar ${label} em nova janela`;
+        tearItem.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            menu.remove();
+            window.tabPanels.tearOff(clickedTab);
+        });
+        menu.appendChild(tearItem);
+    }
 
     const title = document.createElement("div");
     title.style.padding = "6px 12px";

@@ -4541,6 +4541,12 @@ export class WorkspaceManager {
 
     attachPanelToPopout(panelId, win, slot = null) {
         if (!win || win.closed || !win.document) return;
+        // Ordem de empilhamento aproximada (F5): a janela focada por último está por cima.
+        if (!win.__dockZBound) {
+            win.__dockZBound = true;
+            win.__dockZ = Date.now();
+            win.addEventListener("focus", () => { win.__dockZ = Date.now(); });
+        }
         // Janela aberta no meio de um arrasto (F3): segura até soltar, senão a alça sai de baixo do cursor.
         if (this._deferredPopouts.has(panelId)) {
             this._deferredPopouts.set(panelId, win);

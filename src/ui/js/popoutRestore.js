@@ -5,6 +5,7 @@
 
 import { PANEL_IDS } from "./dockModel.js";
 import { DOCK_PANELS } from "./dockDrag.js";
+import { TAB_PANEL_IDS } from "./tabPanels.js";
 
 const MODE_KEY = "capiau_restore_popouts";
 const isOpen = (w) => !!(w && !w.closed);
@@ -35,7 +36,7 @@ export function collectPendingPopouts() {
                 pending.push({ kind: "dual", panels: dualPanels, layout: localStorage.getItem("capiau_dual_popout_layout") || "side-by-side" });
             }
         }
-        PANEL_IDS.forEach(id => {
+        [...PANEL_IDS, ...TAB_PANEL_IDS].forEach(id => {
             if (dualPanels.includes(id) || groupPanels.includes(id)) return;
             if (localStorage.getItem(`capiau_popout_active_${id}`) === "true" && !isOpen(window.popoutWindows?.[id])) {
                 pending.push({ kind: "single", id });

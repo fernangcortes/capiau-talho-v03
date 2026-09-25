@@ -10,6 +10,7 @@ import { EntityManager } from "./entities.js";
 import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
 import { DockDragController } from "./dockDrag.js";
 import { PopoutRestorer } from "./popoutRestore.js";
+import { TabPanels } from "./tabPanels.js";
 import { SettingsPanelManager } from "./settingsPanel.js";
 import { initAutosave, triggerAutosave } from "./timelineAutosave.js";
 import { initExportVideoPanel } from "./exportVideo.js";
@@ -1838,6 +1839,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const workspace = new WorkspaceManager();
     window.workspaceManager = workspace;
     window.dockDrag = new DockDragController(workspace);
+    // Abas do Painel Lateral destacáveis (F5a); antes da restauração, que pode reabrir abas destacadas.
+    window.tabPanels = new TabPanels(workspace, window.dockDrag);
     // Janelas destacadas da sessão anterior: reabre sozinho ou mostra "Restaurar janelas".
     window.popoutRestorer = new PopoutRestorer(workspace, window.dockDrag);
     setTimeout(() => window.popoutRestorer.start(), 1200);
@@ -2687,9 +2690,14 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     STATE.on("rightTabChanged", (tab) => {
-        // Ocultar todos os containers
+        // Aba destacada numa janela (F5a): não mexe na faixa, só traz a janela para frente.
+        if (rightContainers[tab]?.dataset.dockOut) {
+            window.tabPanels?.focus(tab);
+            return;
+        }
+        // Ocultar todos os containers (menos os destacados em janelas)
         Object.values(rightContainers).forEach(c => {
-            if (c) c.style.display = "none";
+            if (c && !c.dataset.dockOut) c.style.display = "none";
         });
         
         // Exibir container ativo.
@@ -2715,6 +2723,7 @@ window.addEventListener("DOMContentLoaded", () => {
     STATE.on("activeVideoChanged", (video) => {
         const btnTabVision = document.getElementById("btn-tab-vision");
         if (!btnTabVision) return;
+        if (btnTabVision.dataset.dockOut) return; // aba Visão está numa janela destacada (F5a)
 
         // Verifica se a visão foi desativada explicitamente pelo usuário
         const savedVisibility = localStorage.getItem("right-tabs-visibility");
