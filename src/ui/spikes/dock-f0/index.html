@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Spike F0 - Drag &amp; Dock</title>
+    <!-- Protótipo isolado da fase F0 do plano docs/PLANO_JANELAS_DRAG_DOCK.md.
+         Não é carregado pelo editor; abra em http://localhost:<porta>/spikes/dock-f0/ -->
+    <style>
+        :root { color-scheme: dark; }
+        body { margin: 0; padding: 16px 20px 40px; background: #0b0f19; color: #e6eaf5; font: 14px/1.5 "Segoe UI", system-ui, sans-serif; }
+        h1 { font-size: 20px; margin: 0 0 4px; }
+        h2 { font-size: 15px; margin: 0 0 6px; }
+        p { margin: 4px 0; color: #8e97b0; max-width: 80ch; }
+        code { background: #182036; padding: 1px 4px; border-radius: 3px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; margin-top: 12px; }
+        section { background: #121829; border: 1px solid rgba(226,232,255,.09); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .home { min-height: 120px; border: 1px dashed rgba(226,232,255,.15); border-radius: 6px; padding: 6px; }
+        .panel { background: #182036; border: 1px solid rgba(226,232,255,.12); border-radius: 6px; overflow: hidden; }
+        .handle { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: rgba(139,92,246,.2); cursor: grab; user-select: none; touch-action: none; font-weight: 600; font-size: 13px; }
+        .handle:active { cursor: grabbing; }
+        .body { padding: 8px; font-size: 13px; color: #8e97b0; }
+        video, canvas.tl { display: block; width: 100%; max-width: 320px; background: #000; border-radius: 4px; }
+        canvas.tl { height: 60px; margin-top: 6px; }
+        #dock-zone { min-height: 70px; border: 2px dashed #22d3ee; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #22d3ee; }
+        #dock-zone.hot { background: rgba(34,211,238,.18); }
+        button { background: #182036; color: #e6eaf5; border: 1px solid rgba(226,232,255,.2); border-radius: 5px; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 13px; }
+        label { font-size: 13px; color: #c7cde0; }
+        .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        #ghost { position: fixed; pointer-events: none; z-index: 50; padding: 4px 8px; border: 1.5px solid #a78bfa; background: rgba(139,92,246,.25); border-radius: 5px; font-size: 12px; display: none; transform: translate(-50%, -10%); }
+        #ghost.out { border-color: #22d3ee; background: rgba(34,211,238,.25); }
+        #cross { position: fixed; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid #f472b6; border-radius: 50%; pointer-events: none; z-index: 60; display: none; }
+        table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+        td, th { border-bottom: 1px solid rgba(226,232,255,.09); padding: 4px 6px; text-align: left; vertical-align: top; }
+        .ok { color: #4ade80; } .fail { color: #fb7185; } .info { color: #fbbf24; }
+        #log { font: 12px/1.45 ui-monospace, monospace; background: #080b14; border-radius: 6px; padding: 8px; max-height: 260px; overflow: auto; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Spike F0 · Drag &amp; Dock</h1>
+    <p id="ua"></p>
+    <p>Cada experimento grava o resultado na tabela. Ao terminar, clique em <b>Copiar resultados</b> e cole no chat.</p>
+
+    <div class="grid">
+        <section>
+            <h2>E1 · Destacar com Pointer Events</h2>
+            <p>Segure a alça, arraste para <b>fora da janela do navegador</b> e solte. Depois, na janela destacada, arraste a mesma alça até a zona ciano (E4).</p>
+            <div class="home" id="home-p-pointer">
+                <div class="panel" id="p-pointer" data-mode="pointer">
+                    <div class="handle">⋮⋮ Painel Pointer</div>
+                    <div class="body">Conteúdo qualquer · <span class="clicks">0</span> cliques</div>
+                </div>
+            </div>
+            <label><input type="checkbox" id="force-out"> Tratar qualquer soltura como "fora" (teste automático)</label>
+        </section>
+
+        <section>
+            <h2>E2 · Destacar com arrasto HTML5</h2>
+            <p>Mesmo gesto, com arrasto nativo. Depois, na janela destacada, arraste a alça até a zona ciano (E3).</p>
+            <div class="home" id="home-p-html5">
+                <div class="panel" id="p-html5" data-mode="html5">
+                    <div class="handle" draggable="true">⋮⋮ Painel HTML5</div>
+                    <div class="body">Conteúdo qualquer · <span class="clicks">0</span> cliques</div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>E3 / E4 · Zona de encaixe (janela principal)</h2>
+            <p>Solte aqui um painel vindo da janela destacada. Antes do E4, passe o mouse sobre esta página para calibrar as coordenadas.</p>
+            <div id="dock-zone">Solte aqui para re-acoplar</div>
+            <p id="calib">Calibração: ainda não medida</p>
+        </section>
+
+        <section>
+            <h2>E5 · Vídeo e canvas indo e voltando</h2>
+            <p>Usa um vídeo gerado por canvas. Opcional: cole a URL de uma mídia do projeto (ex.: <code>/proxies/…mp4</code>) para testar arquivo real.</p>
+            <div class="row"><input id="video-url" placeholder="URL de vídeo (opcional)" style="flex:1;min-width:160px"><button id="btn-video-url">Usar</button></div>
+            <div class="home" id="home-p-media">
+                <div class="panel" id="p-media" data-mode="button">
+                    <div class="handle">⋮⋮ Painel Mídia</div>
+                    <div class="body">
+                        <video id="vid" muted playsinline loop></video>
+                        <canvas class="tl" id="tl" width="320" height="60"></canvas>
+                        <span class="clicks">0</span> cliques no canvas
+                    </div>
+                </div>
+            </div>
+            <div class="row"><button id="btn-video-file">Usar vídeo de arquivo (WebM)</button><button id="btn-media-roundtrip">Rodar ida e volta</button></div>
+            <label><input type="checkbox" id="restore-media"> Restaurar tempo e reprodução após mover</label>
+        </section>
+
+        <section>
+            <h2>E6 · Recursos do navegador</h2>
+            <p>Window Management API (escolher monitor) e Document Picture-in-Picture.</p>
+            <div class="row"><button id="btn-screens">Listar monitores</button><button id="btn-open-last-screen">Abrir janela no último monitor</button><button id="btn-pip">Abrir Picture-in-Picture</button></div>
+        </section>
+
+        <section>
+            <h2>E7 / E8 · Bloqueador de popups</h2>
+            <p>E7: reabrir janela ao carregar a página, sem clique. E8: quanto tempo o gesto do usuário continua valendo. E9: quantas janelas um clique consegue abrir.</p>
+            <label><input type="checkbox" id="auto-open"> Ao recarregar, tentar abrir uma janela sozinho (E7)</label>
+            <div class="row"><button id="btn-open-three">Abrir 3 janelas num clique (E9)</button></div>
+            <div class="row"><button data-delay="1000">Abrir após 1 s</button><button data-delay="3000">Após 3 s</button><button data-delay="6000">Após 6 s</button></div>
+        </section>
+    </div>
+
+    <section style="margin-top:12px">
+        <div class="row" style="justify-content:space-between"><h2>Resultados</h2><button id="btn-copy">Copiar resultados</button></div>
+        <table><thead><tr><th>Teste</th><th>Resultado</th><th>Detalhe</th></tr></thead><tbody id="results"></tbody></table>
+        <div id="log"></div>
+    </section>
+
+    <div id="ghost"></div>
+    <div id="cross"></div>
+    <script type="module" src="spike.js"></script>
+</body>
+</html>
