@@ -73,6 +73,29 @@ export function getActiveQuerySelector(selector) {
     return document.querySelector(selector);
 }
 
+/**
+ * Mudar um <video>/<audio> de documento (adoptNode) faz o navegador reiniciar o elemento:
+ * volta a 0 s e pausa (medido no spike F0). Guarda tempo e reprodução antes e reaplica depois,
+ * já e de novo quando os metadados recarregam.
+ */
+export function preserveMediaAcrossDocuments(root) {
+    const states = Array.from(root.querySelectorAll("video, audio"))
+        .filter(m => m.currentSrc || m.srcObject)
+        .map(m => ({ m, time: m.currentTime, paused: m.paused }));
+    return () => {
+        states.forEach(({ m, time, paused }) => {
+            const apply = () => {
+                if (!m.srcObject && Number.isFinite(time) && time > 0) m.currentTime = time;
+                if (!paused) m.play().catch(() => {});
+            };
+            const onMeta = () => { m.removeEventListener("loadedmetadata", onMeta); apply(); };
+            m.addEventListener("loadedmetadata", onMeta);
+            setTimeout(() => m.removeEventListener("loadedmetadata", onMeta), 5000);
+            apply();
+        });
+    };
+}
+
 export class WorkspaceManager {
     constructor() {
         this.channel = new BroadcastChannel("capiau-workspace-sync");
@@ -153,6 +176,8 @@ export class WorkspaceManager {
         // Histórico de layout (F1 do plano de janelas drag & dock): cada método que muda a
         // disposição dos painéis registra o novo estado, uma entrada por ação do usuário.
         this.layoutHistory = new LayoutHistory();
+        // F3: janelas abertas durante um arrasto; o painel só entra nelas quando o mouse é solto.
+        this._deferredPopouts = new Map();
         this._layoutHistoryReady = false;
         this._applyingLayout = false;
         this._layoutCommitTimer = null;
@@ -3758,6 +3783,59 @@ export class WorkspaceManager {
         }
     }
 
+    /** Tamanho salvo da janela destacada do painel (ou o padrão). */
+    readPopoutSize(panelId) {
+        let width = panelId.includes("player") ? 640 : 800;
+        let height = panelId.includes("player") ? 480 : 600;
+        try {
+            const b = JSON.parse(localStorage.getItem(`capiau_popout_bounds_${panelId}`) || "null");
+            const w = b && (b.outerWidth || b.width);
+            const h = b && (b.outerHeight || b.height);
+            if (w > 150 && h > 150) { width = w; height = h; }
+        } catch (e) {}
+        return { width, height };
+    }
+
+    /**
+     * F3: abre a janela destacada durante o arrasto, na posição do cursor e ainda sem o painel.
+     * Precisa ser chamada enquanto o gesto do usuário vale (~5 s após pressionar o mouse).
+     * Retorna a janela ou null se o navegador bloquear.
+     */
+    openLivePopout(panelId, left, top) {
+        const { width, height } = this.readPopoutSize(panelId);
+        const features = `popup=yes,width=${width},height=${height},left=${Math.round(left)},top=${Math.round(top)},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`;
+        this._deferredPopouts.set(panelId, true);
+        const popup = window.open(`panel.html?panel=${panelId}&dock=live`, getPopoutWindowName(panelId), features);
+        if (!popup) {
+            this._deferredPopouts.delete(panelId);
+            return null;
+        }
+        window.popoutWindows[panelId] = popup;
+        return popup;
+    }
+
+    /** F3: o mouse foi solto fora do editor — o painel entra na janela que acompanhou o cursor. */
+    commitLivePopout(panelId, popup) {
+        this.detachFromStack(panelId);
+        localStorage.setItem(`capiau_popout_active_${panelId}`, "true");
+        const pending = this._deferredPopouts.get(panelId);
+        this._deferredPopouts.delete(panelId);
+        // Se a janela já carregou, anexa agora; senão os retries do panel.html anexam ao carregar.
+        if (pending && pending !== true && !pending.closed) this.attachPanelToPopout(panelId, pending);
+        const timer = setInterval(() => {
+            if (!popup.closed) return;
+            clearInterval(timer);
+            if (window.popoutWindows[panelId] === popup) this.restorePanel(panelId);
+        }, 500);
+    }
+
+    /** F3: o cursor voltou para dentro do editor antes de soltar — fecha a janela prévia. */
+    cancelLivePopout(panelId, popup) {
+        this._deferredPopouts.delete(panelId);
+        if (window.popoutWindows[panelId] === popup) delete window.popoutWindows[panelId];
+        try { popup.close(); } catch (e) {}
+    }
+
     registerPopout(panelId, win) {
         if (!win || win.closed) return;
         window.popoutWindows[panelId] = win;
@@ -3889,14 +3967,18 @@ export class WorkspaceManager {
             slot1.innerHTML = "";
             p1.classList.remove("collapsed");
             p1.classList.remove("popped-out-hidden");
+            const restoreMedia1 = preserveMediaAcrossDocuments(p1);
             win.document.adoptNode(p1);
             slot1.appendChild(p1);
+            restoreMedia1();
 
             slot2.innerHTML = "";
             p2.classList.remove("collapsed");
             p2.classList.remove("popped-out-hidden");
+            const restoreMedia2 = preserveMediaAcrossDocuments(p2);
             win.document.adoptNode(p2);
             slot2.appendChild(p2);
+            restoreMedia2();
 
             // Esconde linhas restauradoras do editor principal para evitar falso estado recolhido
             const r1 = document.getElementById("reopen-left");
@@ -4146,6 +4228,11 @@ export class WorkspaceManager {
 
     attachPanelToPopout(panelId, win) {
         if (!win || win.closed || !win.document) return;
+        // Janela aberta no meio de um arrasto (F3): segura até soltar, senão a alça sai de baixo do cursor.
+        if (this._deferredPopouts.has(panelId)) {
+            this._deferredPopouts.set(panelId, win);
+            return;
+        }
         
         const localPanel = document.getElementById(panelId) || this.poppedElements[panelId];
         if (!localPanel) {
@@ -4164,8 +4251,10 @@ export class WorkspaceManager {
         if (container) {
             // Limpa loader da janela popout e injeta o elemento
             container.innerHTML = "";
+            const restoreMedia = preserveMediaAcrossDocuments(localPanel);
             win.document.adoptNode(localPanel);
             container.appendChild(localPanel);
+            restoreMedia();
             localPanel.classList.remove("popped-out-hidden");
             
             // Transforma o botão de pop-out em botão de reanexação na janela destacada

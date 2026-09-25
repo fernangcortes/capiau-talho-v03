@@ -1,4 +1,6 @@
-// Arrastar painéis pela alça ⋮⋮ (fase F2a do plano docs/PLANO_JANELAS_DRAG_DOCK.md).
+// Arrastar painéis pela alça ⋮⋮ (fases F2 e F3 do plano docs/PLANO_JANELAS_DRAG_DOCK.md).
+// F3: soltar fora do editor destaca o painel numa janela que nasce ao cruzar a borda e segue o
+// cursor; arrastar a alça da janela destacada de volta ao editor reacopla (com as mesmas zonas).
 // Motor de Pointer Events (validado na F0): fantasma que segue o cursor, zonas de encaixe e
 // sombra de prévia. Encaixes: laterais ao lado, trocadas, na ponta ou empilhadas numa mesma
 // coluna (F2b); timeline nas 4 posições; monitores lado a lado ou empilhados.
@@ -34,7 +36,9 @@ export class DockDragController {
         this.wm = workspaceManager;
         this.drag = null;
         this.toastTimer = null;
-        this.toastMode = null; // "undo" | "redo"
+        this.toastMode = null; // "undo" | "redo" | "action"
+        this.toastAction = null;
+        this.calib = null;
 
         this.ghost = this.createEl("div", "dock-ghost");
         this.overlay = this.createEl("div", "dock-overlay");
@@ -50,6 +54,11 @@ export class DockDragController {
         this.injectHandles();
         // Fase de captura: o aviso de desfazer precisa ver o Ctrl+Z antes do atalho da timeline.
         window.addEventListener("keydown", this.onKey, true);
+        // Calibração tela → página da janela principal (ponte de coordenadas validada na F0):
+        // guarda o deslocamento da borda, que continua certo se a janela for movida.
+        document.addEventListener("pointermove", (e) => {
+            this.calib = { bx: e.screenX - e.clientX - window.screenX, by: e.screenY - e.clientY - window.screenY };
+        }, { passive: true });
     }
 
     createEl(tag, className) {
@@ -66,7 +75,12 @@ export class DockDragController {
         toast.innerHTML = '<span class="dock-undo-text"></span><button type="button" class="dock-undo-btn"></button>';
         toast.querySelector("button").addEventListener("click", () => {
             if (this.toastMode === "undo") this.undo();
-            else this.redo();
+            else if (this.toastMode === "redo") this.redo();
+            else if (this.toastMode === "action" && this.toastAction) {
+                const action = this.toastAction;
+                this.toast.hidden = true;
+                action();
+            }
         });
         return toast;
     }
@@ -79,7 +93,7 @@ export class DockDragController {
             const handle = document.createElement("span");
             handle.className = "dock-handle";
             handle.dataset.dockPanel = panelId;
-            handle.setAttribute("data-tooltip", `Arrastar ${meta.title} para outro lugar`);
+            handle.setAttribute("data-tooltip", `Arrastar ${meta.title}: solte fora do editor para destacar`);
             handle.setAttribute("aria-hidden", "true");
             handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
             handle.addEventListener("pointerdown", (e) => this.handleDown(e, panelId, handle));
@@ -87,55 +101,122 @@ export class DockDragController {
         });
     }
 
+    /** Converte coordenadas de tela em coordenadas da página principal. */
+    screenToMain(sx, sy) {
+        let bx, by;
+        if (this.calib) {
+            ({ bx, by } = this.calib);
+        } else {
+            bx = (window.outerWidth - window.innerWidth) / 2;
+            by = window.outerHeight - window.innerHeight - bx;
+        }
+        return { x: sx - window.screenX - bx, y: sy - window.screenY - by };
+    }
+
     // ── Arrasto ────────────────────────────────────────────────────────────
 
     handleDown(e, panelId, handle) {
         if (e.button !== 0 || this.drag) return;
-        // Painel numa janela destacada: arrastar de lá chega na F3.
-        if (handle.ownerDocument !== document) return;
+        const win = handle.ownerDocument.defaultView;
+        const fromPopout = handle.ownerDocument !== document;
+        // Na Janela Dupla o arrasto chega na F4 (a alça fica escondida pelo CSS do panel.html).
+        if (fromPopout && window.popoutWindows?.["dual-sidebar"] === win) return;
         e.preventDefault();
         e.stopPropagation();
         handle.setPointerCapture(e.pointerId);
-        this.drag = { panelId, handle, pointerId: e.pointerId, x0: e.clientX, y0: e.clientY, started: false, target: null };
+        this.drag = {
+            panelId, handle, win, fromPopout, pointerId: e.pointerId,
+            x0: e.screenX, y0: e.screenY, grabDx: e.screenX - win.screenX, grabDy: e.screenY - win.screenY,
+            started: false, target: null, live: null, liveFailed: false, outside: false
+        };
         handle.addEventListener("pointermove", this.onMove);
         handle.addEventListener("pointerup", this.onUp);
         handle.addEventListener("pointercancel", this.onUp);
+        if (fromPopout) win.addEventListener("keydown", this.onKey, true);
     }
 
     handleMove(e) {
         const d = this.drag;
         if (!d) return;
         if (!d.started) {
-            if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < START_DISTANCE) return;
+            if (Math.hypot(e.screenX - d.x0, e.screenY - d.y0) < START_DISTANCE) return;
             d.started = true;
             document.body.classList.add("dock-dragging");
-            document.getElementById(d.panelId)?.classList.add("dock-drag-source");
+            (d.fromPopout ? null : document.getElementById(d.panelId))?.classList.add("dock-drag-source");
             this.ghost.textContent = DOCK_PANELS[d.panelId].title;
-            this.ghost.hidden = false;
             this.overlay.hidden = false;
         }
-        this.ghost.style.left = `${e.clientX}px`;
-        this.ghost.style.top = `${e.clientY}px`;
-        d.target = this.resolveTarget(d.panelId, e.clientX, e.clientY);
+        const p = d.fromPopout ? this.screenToMain(e.screenX, e.screenY) : { x: e.clientX, y: e.clientY };
+        const outside = p.x < 0 || p.y < 0 || p.x > window.innerWidth || p.y > window.innerHeight;
+        d.outside = outside;
+
+        if (d.fromPopout) {
+            // Voltando da janela destacada: zonas do editor principal no ponto convertido.
+            this.ghost.hidden = outside;
+            d.target = outside ? null : (this.resolveTarget(d.panelId, p.x, p.y) || this.homeTarget(d.panelId));
+        } else if (outside) {
+            // Saiu do editor: a janela nasce agora (o gesto ainda vale) e passa a seguir o cursor.
+            if (!d.live && !d.liveFailed) {
+                d.live = this.wm.openLivePopout(d.panelId, e.screenX - 60, e.screenY - 16);
+                if (!d.live) d.liveFailed = true;
+            }
+            if (d.live) {
+                try { d.live.moveTo(Math.round(e.screenX - 60), Math.round(e.screenY - 16)); } catch (err) {}
+            }
+            this.ghost.hidden = !!d.live;
+            this.ghost.textContent = d.live ? DOCK_PANELS[d.panelId].title : `${DOCK_PANELS[d.panelId].title}: solte para destacar`;
+            d.target = null;
+        } else {
+            if (d.live) {
+                this.wm.cancelLivePopout(d.panelId, d.live);
+                d.live = null;
+            }
+            this.ghost.hidden = false;
+            this.ghost.textContent = DOCK_PANELS[d.panelId].title;
+            d.target = this.resolveTarget(d.panelId, p.x, p.y);
+        }
+        this.ghost.style.left = `${p.x}px`;
+        this.ghost.style.top = `${p.y}px`;
         this.drawTarget(d.target);
     }
 
     handleUp(e) {
         const d = this.drag;
         if (!d) return;
-        const apply = e.type === "pointerup" && d.started && d.target;
+        const released = e.type === "pointerup" && d.started;
         const target = d.target;
-        this.endDrag();
-        if (apply) this.applyTarget(target);
+        this.endDrag(!released);
+        if (!released) return;
+
+        const title = DOCK_PANELS[d.panelId].title;
+        if (d.fromPopout) {
+            if (target) this.dockBack(d.panelId, target);
+            else if (d.outside) {
+                // Solto fora do editor: leva a janela destacada para onde o mouse foi solto.
+                try { d.win.moveTo(Math.round(e.screenX - d.grabDx), Math.round(e.screenY - d.grabDy)); } catch (err) {}
+            }
+            return;
+        }
+        if (d.live) {
+            this.wm.commitLivePopout(d.panelId, d.live);
+            this.showToast("undo", `${title} destacado em nova janela`);
+        } else if (d.outside && d.liveFailed) {
+            // Plano B: o navegador bloqueou a janela (gesto expirou). Um clique abre.
+            this.showActionToast(`O navegador bloqueou a janela de ${title}.`, "Abrir em janela", () => this.wm.togglePopout(d.panelId));
+        } else if (target) {
+            this.applyTarget(target);
+        }
     }
 
-    endDrag() {
+    endDrag(cancelled = false) {
         const d = this.drag;
         if (!d) return;
         d.handle.removeEventListener("pointermove", this.onMove);
         d.handle.removeEventListener("pointerup", this.onUp);
         d.handle.removeEventListener("pointercancel", this.onUp);
+        if (d.fromPopout) d.win.removeEventListener("keydown", this.onKey, true);
         try { d.handle.releasePointerCapture(d.pointerId); } catch (err) {}
+        if (cancelled && d.live) this.wm.cancelLivePopout(d.panelId, d.live);
         document.body.classList.remove("dock-dragging");
         document.getElementById(d.panelId)?.classList.remove("dock-drag-source");
         this.ghost.hidden = true;
@@ -143,14 +224,28 @@ export class DockDragController {
         this.drag = null;
     }
 
+    /** Solto em cima do editor sem zona específica: volta para o lugar de antes. */
+    homeTarget(panelId) {
+        const ws = this.rectOf(document.querySelector(".workspace"));
+        if (!ws) return null;
+        return { type: "home", preview: { left: ws.left + 8, top: ws.top + 8, width: ws.width - 16, height: ws.height - 16 }, label: `Reacoplar ${DOCK_PANELS[panelId].title} no lugar de antes` };
+    }
+
+    /** Reacopla o painel da janela destacada e aplica o encaixe escolhido. */
+    dockBack(panelId, target) {
+        this.wm.togglePopout(panelId);
+        if (target.type !== "home") setTimeout(() => this.applyTarget(target, false), 30);
+        this.showToast("undo", target.type === "home" ? target.label.replace("Reacoplar", "Reacoplado:") : `Reacoplado: ${target.label}`);
+    }
+
     handleKey(e) {
         if (this.drag && e.key === "Escape") {
             e.preventDefault();
             e.stopPropagation();
-            this.endDrag();
+            this.endDrag(true);
             return;
         }
-        if (this.toast.hidden || !(e.ctrlKey || e.metaKey) || e.altKey) return;
+        if (this.toast.hidden || this.toastMode === "action" || !(e.ctrlKey || e.metaKey) || e.altKey) return;
         const t = e.target;
         if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
         const isZ = e.code === "KeyZ" || e.key === "z" || e.key === "Z";
@@ -286,12 +381,12 @@ export class DockDragController {
         Object.assign(this.label.style, { left: `${p.left + p.width / 2}px`, top: `${p.top + 14}px` });
     }
 
-    applyTarget(target) {
+    applyTarget(target, toast = true) {
         if (target.type === "columns") this.wm.setColumnLayout(target.next.order, target.next.stacks);
         else if (target.type === "timeline") this.wm.setTimelinePosition(target.position);
         else if (target.type === "monitors") this.wm.setMonitorsLayout(target.layout);
         else return;
-        this.showToast("undo", `Layout alterado: ${target.label}`);
+        if (toast) this.showToast("undo", `Layout alterado: ${target.label}`);
     }
 
     // ── Aviso de desfazer ──────────────────────────────────────────────────
@@ -303,6 +398,16 @@ export class DockDragController {
         this.toast.hidden = false;
         clearTimeout(this.toastTimer);
         this.toastTimer = setTimeout(() => { this.toast.hidden = true; }, TOAST_MS);
+    }
+
+    showActionToast(text, buttonLabel, action) {
+        this.toastMode = "action";
+        this.toastAction = action;
+        this.toast.querySelector(".dock-undo-text").textContent = text;
+        this.toast.querySelector(".dock-undo-btn").textContent = buttonLabel;
+        this.toast.hidden = false;
+        clearTimeout(this.toastTimer);
+        this.toastTimer = setTimeout(() => { this.toast.hidden = true; }, TOAST_MS * 2);
     }
 
     undo() {
