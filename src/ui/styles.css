@@ -13158,3 +13158,118 @@ input[type="number"] {
 
 
 
+
+/* ══════════════════════════════════════════════════════════════════════
+   DRAG & DOCK (F2a): alça ⋮⋮, fantasma, zonas de encaixe e aviso de desfazer
+   ══════════════════════════════════════════════════════════════════════ */
+.dock-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 14px;
+    height: 20px;
+    margin-right: 4px;
+    border-radius: 4px;
+    color: var(--text-muted, rgba(255, 255, 255, 0.35));
+    font-size: 11px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    transition: color 0.15s, background 0.15s;
+}
+.dock-handle:hover {
+    color: var(--color-cyan);
+    background: rgba(34, 211, 238, 0.1);
+}
+body.dock-dragging,
+body.dock-dragging * {
+    cursor: grabbing !important;
+    user-select: none !important;
+}
+.dock-drag-source {
+    opacity: 0.45;
+    transition: opacity 0.15s;
+}
+.dock-ghost {
+    position: fixed;
+    z-index: 20000;
+    pointer-events: none;
+    transform: translate(-50%, -30%);
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1.5px solid rgba(167, 139, 250, 0.9);
+    background: rgba(24, 20, 40, 0.92);
+    color: #f1f5f9;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.dock-ghost.has-target {
+    border-color: var(--color-cyan);
+}
+.dock-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 19999;
+    pointer-events: none;
+}
+.dock-preview {
+    position: fixed;
+    border: 2px solid var(--color-cyan);
+    border-radius: 6px;
+    background: rgba(34, 211, 238, 0.16);
+    transition: left 0.08s, top 0.08s, width 0.08s, height 0.08s;
+}
+.dock-drop-label {
+    position: fixed;
+    transform: translateX(-50%);
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: var(--color-cyan);
+    color: #04222a;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.dock-undo-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    transform: translateX(-50%);
+    z-index: 20001;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(34, 211, 238, 0.45);
+    background: rgba(15, 18, 28, 0.96);
+    color: #e2e8f0;
+    font-size: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.dock-undo-toast[hidden],
+.dock-ghost[hidden],
+.dock-overlay[hidden],
+.dock-preview[hidden],
+.dock-drop-label[hidden] {
+    display: none;
+}
+.dock-undo-btn {
+    background: rgba(34, 211, 238, 0.15);
+    border: 1px solid rgba(34, 211, 238, 0.5);
+    color: var(--color-cyan);
+    border-radius: 5px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.dock-undo-btn:hover {
+    background: rgba(34, 211, 238, 0.28);
+}
+@media (prefers-reduced-motion: reduce) {
+    .dock-preview { transition: none; }
+}
