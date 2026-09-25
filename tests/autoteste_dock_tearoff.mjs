@@ -46,4 +46,20 @@ assert.ok(wm.includes("export function preserveMediaAcrossDocuments(root)"));
 assert.equal((wm.match(/const restoreMedia\w* = preserveMediaAcrossDocuments\(/g) || []).length, 3, "janela simples e os dois lados da dupla");
 console.log("✔ 5 passou: tempo e reprodução preservados ao destacar (simples e dupla).");
 
+// 6. Restaurar janelas da sessão anterior (decisão 8 ajustada pela F0)
+const restore = read("src", "ui", "js", "popoutRestore.js");
+const mainJs = read("src", "ui", "js", "main.js");
+assert.ok(restore.includes("const blocked = this.pending.filter(item => !this.open(item, true));"), "modo auto tenta cada janela e manda as bloqueadas para a faixa");
+assert.ok(restore.includes("Restaurar ${titleOf(next)}"), "faixa reabre uma janela por clique");
+assert.ok(restore.includes('"Perguntar da próxima vez"') && restore.includes('"Reabrir sozinhas sempre"'), "opção de modo no próprio aviso");
+assert.ok(/if \(!options\.quiet\) alert\("Bloqueador de popups/.test(wm), "restauração sem clique não mostra alert");
+assert.ok(mainJs.includes("new PopoutRestorer(workspace, window.dockDrag)"));
+console.log("✔ 6 passou: janelas voltam sozinhas quando o navegador permite; senão, faixa com um clique por janela.");
+
+// 7. Alternativas sem arrastar
+const dd = read("src", "ui", "js", "dockDrag.js");
+assert.ok(/addEventListener\("dblclick"[\s\S]{0,120}e\.ctrlKey \|\| e\.metaKey[\s\S]{0,160}this\.wm\.togglePopout\(panelId\)/.test(dd), "Ctrl+duplo-clique alterna destacado/último lugar");
+assert.ok(dd.includes('addEventListener("contextmenu"') && dd.includes("showHandleMenu(panelId, handle, e)"), "menu da alça no botão direito");
+console.log("✔ 7 passou: Ctrl+duplo-clique e menu da alça.");
+
 console.log("\n=== AUTOTESTE DOCK TEAR-OFF CONCLUÍDO COM SUCESSO ===");

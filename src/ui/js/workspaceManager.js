@@ -3703,7 +3703,7 @@ export class WorkspaceManager {
         setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
     }
 
-    togglePopout(panelId) {
+    togglePopout(panelId, options = {}) {
         const win = window.popoutWindows[panelId];
         const isPoppedWindowOpen = win && !win.closed;
         const localPanel = this.poppedElements[panelId] || document.getElementById(panelId);
@@ -3779,7 +3779,8 @@ export class WorkspaceManager {
                 }
             }, 500);
         } else {
-            alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
+            // quiet: a restauração ao iniciar (sem clique) trata o bloqueio com o aviso "Restaurar janelas".
+            if (!options.quiet) alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
         }
     }
 
@@ -3842,7 +3843,7 @@ export class WorkspaceManager {
         this.attachPanelToPopout(panelId, win);
     }
 
-    openDualPopout(panelId1, panelId2, layout = "side-by-side") {
+    openDualPopout(panelId1, panelId2, layout = "side-by-side", options = {}) {
         if (!panelId1 || !panelId2 || panelId1 === panelId2) {
             alert("Selecione dois menus laterais diferentes para destacar juntos.");
             return;
@@ -3927,7 +3928,8 @@ export class WorkspaceManager {
                 }
             }, 500);
         } else {
-            alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
+            // quiet: a restauração ao iniciar (sem clique) trata o bloqueio com o aviso "Restaurar janelas".
+            if (!options.quiet) alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
         }
     }
 
