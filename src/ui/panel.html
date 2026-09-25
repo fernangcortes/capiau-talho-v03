@@ -918,15 +918,18 @@
         // Fechamento da janela destacada
         window.addEventListener("beforeunload", () => {
             saveCurrentBounds();
+            // windowName: o editor ignora o aviso se o painel já está em outra janela (troca de modo, F4).
             if (isDual) {
                 channel.postMessage({
                     type: "DUAL_POPOUT_CLOSED",
-                    panels: [panel1Name, panel2Name]
+                    panels: [panel1Name, panel2Name],
+                    windowName: window.name
                 });
             } else {
                 channel.postMessage({
                     type: "POPOUT_CLOSED",
-                    panel: panel1Name
+                    panel: panel1Name,
+                    windowName: window.name
                 });
             }
         });

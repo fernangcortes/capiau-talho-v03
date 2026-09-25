@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>CapIAu-Talho - Janela com vários painéis</title>
+    <!-- F4b do plano docs/PLANO_JANELAS_DRAG_DOCK.md: janela destacada com 2 a 4 painéis de qualquer tipo.
+         Os painéis são movidos para cá pelo WorkspaceManager (registerGroupPopout); esta página só
+         cuida da disposição, dos divisores e de avisar o editor quando abre/fecha. -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css?v=73">
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #0b0f19;
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+        }
+        #group-toolbar {
+            height: 32px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 0 8px;
+            background: rgba(15, 18, 28, 0.96);
+            border-bottom: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+            user-select: none;
+        }
+        .group-toolbar-section { display: flex; align-items: center; gap: 4px; }
+        .group-title { font-size: 11px; font-weight: 600; color: var(--text-secondary, #a1a1aa); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .group-btn {
+            width: 26px;
+            height: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-secondary, #a1a1aa);
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .group-btn:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+        .group-btn.active { border-color: rgba(34, 211, 238, 0.5); color: var(--color-cyan, #22d3ee); background: rgba(34, 211, 238, 0.1); }
+        .group-btn[disabled] { opacity: 0.35; cursor: default; }
+        #group-workspace { flex: 1; min-height: 0; display: flex; }
+        .group-box { display: flex; flex: 1 1 0%; min-width: 0; min-height: 0; }
+        .group-box.row { flex-direction: row; }
+        .group-box.column { flex-direction: column; }
+        .group-slot { position: relative; display: flex; flex-direction: column; flex: 1 1 0%; min-width: 120px; min-height: 100px; overflow: hidden; }
+        .group-slot > section, .group-slot > aside {
+            flex: 1 1 auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            height: 100% !important;
+            border-radius: 0 !important;
+            border: none !important;
+        }
+        .group-slot .timeline-track-area { flex: 1 !important; height: calc(100% - 60px) !important; }
+        .group-slot .timeline-canvas-wrapper { height: 100% !important; flex: 1 !important; }
+        .group-slot-loading { margin: auto; font-size: 12px; color: var(--text-secondary, #a1a1aa); }
+        .group-splitter { flex: 0 0 5px; background: var(--border-glass, rgba(255, 255, 255, 0.08)); touch-action: none; }
+        .group-box.row > .group-splitter { cursor: col-resize; }
+        .group-box.column > .group-splitter { cursor: row-resize; }
+        .group-splitter:hover, .group-splitter.active { background: var(--color-cyan, #22d3ee); }
+    </style>
+</head>
+<body>
+    <header id="group-toolbar">
+        <div class="group-toolbar-section" style="min-width: 0;">
+            <span class="group-title" id="group-title"></span>
+        </div>
+        <div class="group-toolbar-section">
+            <button class="group-btn" data-arrangement="row" data-tooltip="Lado a lado"><i class="fa-solid fa-table-columns"></i></button>
+            <button class="group-btn" data-arrangement="column" data-tooltip="Empilhados"><i class="fa-solid fa-grip-lines"></i></button>
+            <button class="group-btn" data-arrangement="grid" data-tooltip="Grade 2×2"><i class="fa-solid fa-table-cells-large"></i></button>
+            <button class="group-btn" data-arrangement="main" data-tooltip="Principal + coluna"><i class="fa-solid fa-table-list"></i></button>
+        </div>
+        <div class="group-toolbar-section">
+            <button class="group-btn" id="btn-group-reattach" data-tooltip="Reacoplar todos ao editor principal"><i class="fa-solid fa-down-left-and-up-right-to-center"></i></button>
+        </div>
+    </header>
+    <main id="group-workspace"></main>
+
+    <script type="module">
+        const params = new URLSearchParams(window.location.search);
+        const panels = (params.get("group") || "").split(",").map(p => p.trim()).filter(Boolean).slice(0, 4);
+        const TITLES = {
+            "sidebar-left": "Biblioteca",
+            "inspector-panel": "Ajustes & Efeitos",
+            "sidebar-right": "Painel Lateral",
+            "timeline-panel": "Timeline",
+            "source-player-panel": "Source",
+            "program-player-panel": "Program"
+        };
+        const ARRANGEMENTS = ["row", "column", "grid", "main"];
+        let arrangement = ARRANGEMENTS.includes(params.get("arrangement")) ? params.get("arrangement") : "row";
+
+        window.name = "CapIAu_Group_Window";
+        const title = panels.map(id => TITLES[id] || id).join(" + ");
+        document.title = `CapIAu-Talho — ${title}`;
+        document.getElementById("group-title").textContent = title;
+
+        // ── Posição e tamanho: dock=keep/live = a janela veio de outra (troca de modo ou arrasto) ──
+        const boundsKey = "capiau_popout_bounds_group";
+        if (!params.get("dock")) {
+            try {
+                const b = JSON.parse(localStorage.getItem(boundsKey) || "null");
+                if (b && b.outerWidth > 200 && b.outerHeight > 200) {
+                    window.moveTo(b.screenX, b.screenY);
+                    window.resizeTo(b.outerWidth, b.outerHeight);
+                }
+            } catch (e) {}
+        }
+        function saveBounds() {
+            if (window.outerWidth < 120 || window.outerHeight < 120) return;
+            try {
+                localStorage.setItem(boundsKey, JSON.stringify({ screenX: window.screenX, screenY: window.screenY, outerWidth: window.outerWidth, outerHeight: window.outerHeight }));
+            } catch (e) {}
+        }
+        window.addEventListener("resize", () => { clearTimeout(window.__bt); window.__bt = setTimeout(saveBounds, 250); });
+        setInterval(saveBounds, 3000);
+
+        // ── Espaços: um por painel; o editor move cada painel para o seu ──
+        const slots = {};
+        panels.forEach(id => {
+            const slot = document.createElement("div");
+            slot.className = "group-slot";
+            slot.dataset.groupSlot = id;
+            slot.innerHTML = `<span class="group-slot-loading">Trazendo ${TITLES[id] || id}...</span>`;
+            slots[id] = slot;
+        });
+
+        function box(direction, children) {
+            const el = document.createElement("div");
+            el.className = `group-box ${direction}`;
+            children.forEach((child, i) => {
+                if (i > 0) {
+                    const splitter = document.createElement("div");
+                    splitter.className = "group-splitter";
+                    splitter.setAttribute("data-tooltip", "Arraste para redimensionar (duplo clique iguala)");
+                    el.appendChild(splitter);
+                }
+                el.appendChild(child);
+            });
+            return el;
+        }
+
+        /** Monta a disposição movendo os espaços (com os painéis dentro) para as caixas novas. */
+        function render(next) {
+            arrangement = next;
+            const list = panels.map(id => slots[id]);
+            let root;
+            if (arrangement === "column") root = box("column", list);
+            else if (arrangement === "grid" && list.length > 2) root = box("column", [box("row", list.slice(0, 2)), box("row", list.slice(2))]);
+            else if (arrangement === "main" && list.length > 2) root = box("row", [list[0], box("column", list.slice(1))]);
+            else root = box("row", list);
+            list.forEach(slot => { slot.style.flex = ""; });
+            const ws = document.getElementById("group-workspace");
+            ws.replaceChildren(root);
+            document.querySelectorAll(".group-btn[data-arrangement]").forEach(btn => {
+                const a = btn.dataset.arrangement;
+                btn.classList.toggle("active", a === arrangement);
+                btn.disabled = (a === "grid" || a === "main") && panels.length < 3;
+            });
+            try { localStorage.setItem("capiau_group_popout_arrangement", arrangement); } catch (e) {}
+            window.dispatchEvent(new Event("resize"));
+        }
+
+        document.querySelectorAll(".group-btn[data-arrangement]").forEach(btn => {
+            btn.addEventListener("click", () => {
+                render(btn.dataset.arrangement);
+                try { window.opener?.workspaceManager?.setGroupArrangement?.(arrangement); } catch (e) {}
+            });
+        });
+
+        // Divisores: arrastar muda o tamanho do item anterior; duplo clique iguala a caixa.
+        document.addEventListener("pointerdown", (e) => {
+            const splitter = e.target.closest(".group-splitter");
+            if (!splitter || e.button !== 0) return;
+            e.preventDefault();
+            const prev = splitter.previousElementSibling;
+            const isRow = splitter.parentElement.classList.contains("row");
+            const start = isRow ? e.clientX : e.clientY;
+            const startSize = isRow ? prev.getBoundingClientRect().width : prev.getBoundingClientRect().height;
+            splitter.setPointerCapture(e.pointerId);
+            splitter.classList.add("active");
+            const move = (ev) => {
+                const size = Math.max(100, startSize + (isRow ? ev.clientX : ev.clientY) - start);
+                prev.style.flex = `0 0 ${Math.round(size)}px`;
+            };
+            const up = () => {
+                splitter.classList.remove("active");
+                splitter.removeEventListener("pointermove", move);
+                splitter.removeEventListener("pointerup", up);
+                window.dispatchEvent(new Event("resize"));
+            };
+            splitter.addEventListener("pointermove", move);
+            splitter.addEventListener("pointerup", up);
+        });
+        document.addEventListener("dblclick", (e) => {
+            const splitter = e.target.closest(".group-splitter");
+            if (!splitter) return;
+            [...splitter.parentElement.children].forEach(c => { if (!c.classList.contains("group-splitter")) c.style.flex = ""; });
+            window.dispatchEvent(new Event("resize"));
+        });
+
+        render(arrangement);
+
+        // ── Conexão com o editor principal ──
+        const channel = new BroadcastChannel("capiau-workspace-sync");
+        function connect() {
+            try {
+                if (window.opener && !window.opener.closed && window.opener.workspaceManager?.registerGroupPopout) {
+                    window.opener.workspaceManager.registerGroupPopout(panels, window, arrangement);
+                }
+            } catch (e) {}
+            channel.postMessage({ type: "GROUP_POPOUT_READY", panels, arrangement, timestamp: Date.now() });
+        }
+        connect();
+        setTimeout(connect, 150);
+        setTimeout(connect, 500);
+
+        document.getElementById("btn-group-reattach").addEventListener("click", () => {
+            try {
+                if (window.opener && !window.opener.closed && window.opener.workspaceManager?.restoreGroupPopout) {
+                    window.opener.workspaceManager.restoreGroupPopout();
+                    return;
+                }
+            } catch (e) {}
+            channel.postMessage({ type: "GROUP_POPOUT_CLOSED", panels });
+            window.close();
+        });
+
+        window.addEventListener("beforeunload", () => {
+            saveBounds();
+            channel.postMessage({ type: "GROUP_POPOUT_CLOSED", panels, windowName: window.name });
+        });
+    </script>
+    <div id="global-tooltip"></div>
+</body>
+</html>

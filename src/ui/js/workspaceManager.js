@@ -207,8 +207,14 @@ export class WorkspaceManager {
                 dual = { panels, layout: localStorage.getItem("capiau_dual_popout_layout") || "side-by-side" };
             }
         }
+        const groupWin = window.popoutWindows?.["group"];
+        const groupPanels = this.getGroupPanels();
+        const group = groupPanels.length >= 2
+            ? { panels: groupPanels, arrangement: localStorage.getItem("capiau_group_popout_arrangement") || "row" }
+            : null;
         const popped = Object.keys(window.popoutWindows || {}).filter(id =>
-            id !== "dual-sidebar" && isOpen(window.popoutWindows[id]) && window.popoutWindows[id] !== dualWin
+            id !== "dual-sidebar" && id !== "group" && isOpen(window.popoutWindows[id])
+            && window.popoutWindows[id] !== dualWin && window.popoutWindows[id] !== groupWin
         );
         return {
             columnOrder: [...this.columnOrder],
@@ -216,7 +222,8 @@ export class WorkspaceManager {
             monitorsLayout: this.monitorsLayout,
             columnStacks: this.columnStacks.map(st => [...st]),
             popped,
-            dual
+            dual,
+            group
         };
     }
 
@@ -335,7 +342,14 @@ export class WorkspaceManager {
                 try { window.popoutWindows["dual-sidebar"]?.close(); } catch (e) {}
                 this.restoreDualPopout(current.dual.panels[0], current.dual.panels[1]);
             }
+            const sameGroup = (a, b) => !!a && !!b && a.panels.join() === b.panels.join();
+            if (current.group && !sameGroup(current.group, legacy.group)) this.restoreGroupPopout();
             current.popped.filter(id => !legacy.popped.includes(id)).forEach(id => this.togglePopout(id));
+            if (legacy.group && !sameGroup(current.group, legacy.group)) {
+                this.openGroupPopout(legacy.group.panels, legacy.group.arrangement);
+            } else if (legacy.group && current.group && legacy.group.arrangement !== current.group.arrangement) {
+                this.setGroupArrangement(legacy.group.arrangement, true);
+            }
             if (legacy.dual && !sameDual(current.dual, legacy.dual)) {
                 this.openDualPopout(legacy.dual.panels[0], legacy.dual.panels[1], legacy.dual.layout);
             }
@@ -3704,6 +3718,11 @@ export class WorkspaceManager {
     }
 
     togglePopout(panelId, options = {}) {
+        // Painel numa janela com vários painéis: sai só ele; a janela continua com os outros.
+        if (this.getGroupPanels().includes(panelId)) {
+            this.removeFromGroup(panelId);
+            return;
+        }
         const win = window.popoutWindows[panelId];
         const isPoppedWindowOpen = win && !win.closed;
         const localPanel = this.poppedElements[panelId] || document.getElementById(panelId);
@@ -3724,6 +3743,9 @@ export class WorkspaceManager {
         this.detachFromStack(panelId);
 
         const winName = getPopoutWindowName(panelId);
+        // window.open pelo nome pode navegar uma janela ainda aberta (editor recarregado): o aviso
+        // de "fechei" da página antiga não pode desfazer esta abertura.
+        this.suppressCloseMessages([panelId]);
         
         // Lê dimensões e coordenadas salvas no localStorage
         let width = panelId.includes("player") ? 640 : 800;
@@ -3842,12 +3864,25 @@ export class WorkspaceManager {
      * O beforeunload dela avisa "fechou"; durante a troca esse aviso não pode restaurar nada.
      */
     suppressCloseMessages(panels) {
-        this._suppressedClose = { panels: new Set(panels), until: Date.now() + 4000 };
+        const prev = this._suppressedClose && Date.now() < this._suppressedClose.until ? this._suppressedClose.panels : [];
+        this._suppressedClose = { panels: new Set([...prev, ...panels]), until: Date.now() + 4000 };
     }
 
     isCloseMessageSuppressed(panels) {
         const s = this._suppressedClose;
         return !!s && Date.now() < s.until && panels.filter(Boolean).every(id => s.panels.has(id));
+    }
+
+    /**
+     * Aviso de "fechei" atrasado: os painéis já vivem numa janela aberta com outro nome
+     * (ex.: a janela simples fechou durante a troca para um grupo). Nada a restaurar.
+     */
+    isStaleCloseMessage(panels, windowName) {
+        if (!windowName) return false;
+        return panels.filter(Boolean).every(id => {
+            const w = window.popoutWindows[id];
+            try { return !!w && !w.closed && w.name !== windowName; } catch (e) { return false; }
+        });
     }
 
     watchWindowClosed(win, onClosed) {
@@ -3931,6 +3966,174 @@ export class WorkspaceManager {
         return true;
     }
 
+    // ── F4b: janela com 2 a 4 painéis (panel-group.html) ────────────────────
+
+    /** Painéis na janela de grupo aberta (vazio se não houver). */
+    getGroupPanels() {
+        const win = window.popoutWindows?.["group"];
+        if (!win || win.closed) return [];
+        return (localStorage.getItem("capiau_group_popout_panels") || "").split(",").filter(Boolean);
+    }
+
+    setGroupState(win, panels, arrangement) {
+        window.popoutWindows["group"] = win;
+        panels.forEach(id => {
+            window.popoutWindows[id] = win;
+            localStorage.setItem(`capiau_popout_active_${id}`, "true");
+        });
+        localStorage.setItem("capiau_group_popout_active", "true");
+        localStorage.setItem("capiau_group_popout_panels", panels.join(","));
+        localStorage.setItem("capiau_group_popout_arrangement", arrangement);
+        this.watchWindowClosed(win, () => {
+            if (window.popoutWindows["group"] === win) this.restoreGroupPopout();
+        });
+    }
+
+    clearGroupState(panels) {
+        delete window.popoutWindows["group"];
+        localStorage.removeItem("capiau_group_popout_active");
+        localStorage.removeItem("capiau_group_popout_panels");
+        panels.forEach(id => delete window.popoutWindows[id]);
+    }
+
+    /** Chamado pelo panel-group.html ao carregar: move cada painel para o seu espaço. */
+    registerGroupPopout(panels, win, arrangement) {
+        if (!win || win.closed || window.popoutWindows["group"] !== win) return;
+        panels.forEach(id => {
+            const slot = win.document.querySelector(`[data-group-slot="${id}"]`);
+            const el = this.poppedElements[id] || document.getElementById(id);
+            if (!slot || (el && el.parentNode === slot)) return;
+            this.attachPanelToPopout(id, win, slot);
+        });
+        if (arrangement) localStorage.setItem("capiau_group_popout_arrangement", arrangement);
+    }
+
+    /** Disposição escolhida na barra da janela de grupo (entra no histórico de layout). */
+    setGroupArrangement(arrangement, apply = false) {
+        localStorage.setItem("capiau_group_popout_arrangement", arrangement);
+        const win = window.popoutWindows["group"];
+        if (apply && win && !win.closed) {
+            try { win.document.querySelector(`.group-btn[data-arrangement="${arrangement}"]`)?.click(); } catch (e) {}
+        }
+        this.scheduleLayoutCommit();
+    }
+
+    /** Abre uma janela de grupo nova (desfazer, restaurar sessão). Precisa do gesto do usuário. */
+    openGroupPopout(panels, arrangement = "row", options = {}) {
+        panels.forEach(id => {
+            const own = window.popoutWindows[id];
+            if (own && !own.closed) this.togglePopout(id);
+            this.detachFromStack(id);
+        });
+        let width = 1200, height = 800, left = null, top = null;
+        try {
+            const b = JSON.parse(localStorage.getItem("capiau_popout_bounds_group") || "null");
+            if (b && b.outerWidth > 200) ({ outerWidth: width, outerHeight: height, screenX: left, screenY: top } = b);
+        } catch (e) {}
+        let features = `popup=yes,width=${width},height=${height},resizable=yes,scrollbars=yes`;
+        if (left !== null && top !== null) features += `,left=${left},top=${top}`;
+        // O nome pode achar uma janela de grupo ainda aberta (ex.: editor recarregado): ela é
+        // navegada, e o aviso de "fechei" da página antiga não pode desfazer a restauração.
+        this.suppressCloseMessages(panels);
+        const win = window.open(`panel-group.html?group=${panels.join(",")}&arrangement=${arrangement}`, "CapIAu_Group_Window", features);
+        if (!win) {
+            if (!options.quiet) alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
+            return null;
+        }
+        this.setGroupState(win, panels, arrangement);
+        return win;
+    }
+
+    /**
+     * Troca o conteúdo de uma janela destacada já aberta (simples, dupla ou grupo) para um grupo
+     * com panels, navegando a própria janela: não abre outra nem depende do gesto do usuário.
+     */
+    convertWindowToGroup(win, panels, arrangement) {
+        const inside = Object.keys(window.popoutWindows).filter(id => window.popoutWindows[id] === win && id !== "group" && id !== "dual-sidebar");
+        this.suppressCloseMessages([...new Set([...inside, ...panels])]);
+        if (window.popoutWindows["dual-sidebar"] === win) {
+            delete window.popoutWindows["dual-sidebar"];
+            localStorage.removeItem("capiau_dual_popout_active");
+            localStorage.removeItem("capiau_dual_popout_panels");
+        }
+        if (window.popoutWindows["group"] === win) this.clearGroupState(inside);
+        // Os painéis voltam ao editor antes de a janela recarregar (o documento antigo é descartado).
+        inside.forEach(id => {
+            delete window.popoutWindows[id];
+            this.restorePanel(id);
+        });
+        panels.forEach(id => this.detachFromStack(id));
+        this.setGroupState(win, panels, arrangement);
+        win.location.href = `panel-group.html?group=${panels.join(",")}&arrangement=${arrangement}&dock=keep`;
+    }
+
+    /** Tira um painel da janela de grupo; com 1 restante ela vira janela simples. */
+    removeFromGroup(panelId) {
+        const win = window.popoutWindows["group"];
+        const panels = this.getGroupPanels();
+        if (!win || !panels.includes(panelId)) return false;
+        const rest = panels.filter(id => id !== panelId);
+        const arrangement = localStorage.getItem("capiau_group_popout_arrangement") || "row";
+        if (rest.length >= 2) {
+            this.convertWindowToGroup(win, rest, arrangement);
+            return true;
+        }
+        this.suppressCloseMessages(panels);
+        this.clearGroupState(panels);
+        panels.forEach(id => this.restorePanel(id));
+        const other = rest[0];
+        window.popoutWindows[other] = win;
+        localStorage.setItem(`capiau_popout_active_${other}`, "true");
+        win.location.href = `panel.html?panel=${other}&dock=keep`;
+        this.watchWindowClosed(win, () => {
+            if (window.popoutWindows[other] === win) this.restorePanel(other);
+        });
+        return true;
+    }
+
+    /** Reacopla todos os painéis da janela de grupo e a fecha. */
+    restoreGroupPopout() {
+        const win = window.popoutWindows["group"];
+        const panels = (localStorage.getItem("capiau_group_popout_panels") || "").split(",").filter(Boolean);
+        this.suppressCloseMessages(panels);
+        this.clearGroupState(panels);
+        if (win && !win.closed) {
+            try { win.close(); } catch (e) {}
+        }
+        panels.forEach(id => this.restorePanel(id));
+        this.rebindMainSidebarToggles();
+        this.updateAllPanelsDockDirection();
+        this.reinitSplitters();
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 40);
+    }
+
+    /**
+     * F4b: junta panelId à janela destacada win (simples, dupla ou grupo), no começo ("start") ou
+     * no fim ("end"), com a disposição dada. Duas laterais sozinhas viram a Janela Dupla (F4a).
+     */
+    joinIntoWindow(win, panelId, position, arrangement) {
+        if (!win || win.closed) return false;
+        const inside = Object.keys(window.popoutWindows).filter(id => window.popoutWindows[id] === win && id !== "group" && id !== "dual-sidebar");
+        const ordered = window.popoutWindows["group"] === win ? this.getGroupPanels()
+            : window.popoutWindows["dual-sidebar"] === win ? (localStorage.getItem("capiau_dual_popout_panels") || "").split(",").filter(Boolean)
+            : inside;
+        if (ordered.includes(panelId) || ordered.length >= 4) return false;
+        const group = window.popoutWindows["group"];
+        if (group && !group.closed && group !== win) return false; // uma janela de grupo por vez
+
+        // O painel arrastado sai de onde estiver.
+        const own = window.popoutWindows[panelId];
+        if (own && !own.closed && own !== win) {
+            if (own === group) this.removeFromGroup(panelId);
+            else if (own === window.popoutWindows["dual-sidebar"]) this.splitFromDual(panelId);
+            else this.togglePopout(panelId);
+        }
+        this.detachFromStack(panelId);
+        const panels = position === "start" ? [panelId, ...ordered] : [...ordered, panelId];
+        this.convertWindowToGroup(win, panels, arrangement);
+        return true;
+    }
+
     registerPopout(panelId, win) {
         if (!win || win.closed) return;
         window.popoutWindows[panelId] = win;
@@ -3996,6 +4199,7 @@ export class WorkspaceManager {
             features += `,left=${left},top=${top},screenX=${left},screenY=${top}`;
         }
 
+        this.suppressCloseMessages([panelId1, panelId2]);
         const popup = window.open(
             `panel.html?panels=${panelId1},${panelId2}&layout=${layout}`,
             "CapIAu_DualSidebar_Window",
@@ -4314,17 +4518,28 @@ export class WorkspaceManager {
             }
         }
         else if (data.type === "POPOUT_CLOSED") {
-            if (this.isCloseMessageSuppressed([data.panel])) return;
+            if (this.isCloseMessageSuppressed([data.panel]) || this.isStaleCloseMessage([data.panel], data.windowName)) return;
             this.restorePanel(data.panel);
+        }
+        else if (data.type === "GROUP_POPOUT_READY") {
+            const win = window.popoutWindows["group"];
+            if (win && !win.closed) this.registerGroupPopout(data.panels || [], win, data.arrangement);
+        }
+        else if (data.type === "GROUP_POPOUT_CLOSED") {
+            const panels = data.panels || [];
+            const groupWin = window.popoutWindows["group"];
+            // Já reacoplado por nós (grupo não está mais aberto) ou painéis já em outra janela: nada a fazer.
+            if (!groupWin || this.isCloseMessageSuppressed(panels) || this.isStaleCloseMessage(panels, data.windowName)) return;
+            this.restoreGroupPopout();
         }
         else if (data.type === "DUAL_POPOUT_CLOSED") {
             const panels = data.panels || [];
-            if (this.isCloseMessageSuppressed(panels)) return;
+            if (this.isCloseMessageSuppressed(panels) || this.isStaleCloseMessage(panels, data.windowName)) return;
             this.restoreDualPopout(panels[0], panels[1]);
         }
     }
 
-    attachPanelToPopout(panelId, win) {
+    attachPanelToPopout(panelId, win, slot = null) {
         if (!win || win.closed || !win.document) return;
         // Janela aberta no meio de um arrasto (F3): segura até soltar, senão a alça sai de baixo do cursor.
         if (this._deferredPopouts.has(panelId)) {
@@ -4345,7 +4560,8 @@ export class WorkspaceManager {
             this.originalNextSiblings[panelId] = localPanel.nextSibling;
         }
 
-        const container = win.document.getElementById("panel-container");
+        // F4b: numa janela com vários painéis, cada um vai para o seu espaço (slot).
+        const container = slot || win.document.getElementById("panel-container");
         if (container) {
             // Limpa loader da janela popout e injeta o elemento
             container.innerHTML = "";
@@ -4370,7 +4586,8 @@ export class WorkspaceManager {
                 popBtn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    this.togglePopout(panelId);
+                    if (this.getGroupPanels().includes(panelId)) this.removeFromGroup(panelId);
+                    else this.togglePopout(panelId);
                 };
             }
         }

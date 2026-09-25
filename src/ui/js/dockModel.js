@@ -41,7 +41,9 @@ export function layoutFromLegacy(state) {
     const position = TIMELINE_POSITIONS.includes(state.timelinePosition) ? state.timelinePosition : "center";
     const monitorsLayout = MONITOR_LAYOUTS.includes(state.monitorsLayout) ? state.monitorsLayout : "auto";
     const dual = state.dual && Array.isArray(state.dual.panels) && state.dual.panels.length === 2 ? state.dual : null;
-    const away = new Set([...(state.popped || []), ...(dual ? dual.panels : [])]);
+    // F4b: janela com 2 a 4 painéis de qualquer tipo (panel-group.html), com disposição pronta.
+    const group = state.group && Array.isArray(state.group.panels) && state.group.panels.length >= 2 ? state.group : null;
+    const away = new Set([...(state.popped || []), ...(dual ? dual.panels : []), ...(group ? group.panels : [])]);
 
     const monitors = {
         split: monitorsLayout === "stacked" ? "column" : "row",
@@ -88,8 +90,14 @@ export function layoutFromLegacy(state) {
             root: { split: dual.layout === "stacked" ? "column" : "row", children: dual.panels.map(id => leaf(id)) }
         });
     }
+    if (group) {
+        floats.push({
+            id: "float:group",
+            root: { split: group.arrangement === "column" ? "column" : "row", arrangement: group.arrangement || "row", children: group.panels.map(id => leaf(id)) }
+        });
+    }
     (state.popped || []).forEach(id => {
-        if (!dual || !dual.panels.includes(id)) floats.push({ id: `float:${id}`, root: leaf(id) });
+        if ((!dual || !dual.panels.includes(id)) && (!group || !group.panels.includes(id))) floats.push({ id: `float:${id}`, root: leaf(id) });
     });
 
     return { v: LAYOUT_VERSION, main, floats };
@@ -163,10 +171,13 @@ export function legacyFromLayout(layout) {
     if ([...columnOrder].sort().join(",") !== expected) return null;
 
     let dual = null;
+    let group = null;
     const popped = [];
     for (const float of layout.floats || []) {
         const panels = panelsIn(float.root);
-        if (panels.length === 1) {
+        if (float.id === "float:group" && panels.length >= 2 && !group) {
+            group = { panels, arrangement: float.root.arrangement || (float.root.split === "column" ? "column" : "row") };
+        } else if (panels.length === 1) {
             popped.push(panels[0]);
         } else if (panels.length === 2 && isSplit(float.root) && !dual) {
             dual = { panels, layout: float.root.split === "column" ? "stacked" : "side-by-side" };
@@ -174,7 +185,7 @@ export function legacyFromLayout(layout) {
             return null;
         }
     }
-    return { columnOrder, timelinePosition, monitorsLayout, columnStacks, popped, dual };
+    return { columnOrder, timelinePosition, monitorsLayout, columnStacks, popped, dual, group };
 }
 
 /** Lista os painéis presentes (não "away") de um nó, na ordem da árvore. */
