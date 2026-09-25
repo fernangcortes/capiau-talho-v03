@@ -21,7 +21,7 @@ const panelHtml = read("src", "ui", "panel.html");
 console.log("=== INICIANDO AUTOTESTE: DOCK TABS (F5a) ===\n");
 
 // 1. Cada aba do Painel Lateral aponta para um contêiner e um botão que existem
-const ids = [...tabs.matchAll(/^\s{4}(\w+): \{ title: "[^"]+", icon: "[^"]+", container: "([\w-]+)" \}/gm)];
+const ids = [...tabs.matchAll(/^\s{4}(\w+): \{ title: "[^"]+", icon: "[^"]+", container: "([\w-]+)" \}/gm)].filter(([, , c]) => !c.startsWith("tab-"));
 assert.equal(ids.length, 6, "6 abas do Painel Lateral");
 for (const [, tab, container] of ids) {
     assert.ok(indexHtml.includes(`id="${container}"`), `contêiner ${container} existe`);
@@ -31,14 +31,14 @@ for (const [, tab, container] of ids) {
 console.log("✔ 1 passou: 6 abas com contêiner, botão e título nas janelas.");
 
 // 2. Máquina existente reaproveitada: invólucro montado em qualquer caminho, conteúdo volta à faixa
-assert.ok(/this\.wm\.attachPanelToPopout = \(panelId, \.\.\.rest\) => \{[\s\S]{0,120}if \(tab\) this\.prepare\(tab\);/.test(tabs), "attach monta o invólucro (janela, grupo, desfazer, restaurar)");
+assert.ok(/this\.wm\.attachPanelToPopout = \(panelId, win, \.\.\.rest\) => \{[\s\S]{0,120}if \(tab\) this\.prepare\(tab\);/.test(tabs), "attach monta o invólucro (janela, grupo, desfazer, restaurar)");
 assert.ok(/this\.wm\.restorePanel = \(panelId, \.\.\.rest\) => \{[\s\S]{0,160}if \(tab\) this\.returnToStrip\(tab\);/.test(tabs), "ao reacoplar, o conteúdo volta à faixa");
 assert.ok(/if \(!opened \|\| opened\.closed\) this\.returnToStrip\(tab\);/.test(tabs), "bloqueio do navegador devolve a aba");
 assert.ok(restore.includes("[...PANEL_IDS, ...TAB_PANEL_IDS].forEach"), "abas destacadas voltam ao abrir o Talho");
 console.log("✔ 2 passou: janelas, grupos, desfazer e restauração valem para abas.");
 
 // 3. Gestos: arrastar a aba (mesmo arrasto do reordenar) e menu da faixa
-assert.ok(/containerId === "right-tabs" && window\.tabPanels[\s\S]{0,80}onTabDragEnd\(btn\.getAttribute\(attrName\), e\)/.test(strip), "fim do arrasto da aba decide destacar/juntar");
+assert.ok(strip.includes("window.tabPanelTabFromValue?.(btn.getAttribute(attrName))") && strip.includes("window.tabPanels.onTabDragEnd(tab, e)"), "fim do arrasto da aba decide destacar/juntar (das duas faixas)");
 assert.ok(strip.includes("window.tabPanels.tearOff(clickedTab)"), "menu da faixa: destacar em nova janela");
 assert.ok(/const join = this\.dockDrag\?\.findJoinTarget\(id, sx, sy\);[\s\S]{0,700}if \(insideMain\) return false;/.test(tabs), "dentro do editor só reordena");
 console.log("✔ 3 passou: arrastar para fora destaca, sobre janela junta, dentro reordena; menu da faixa.");
@@ -53,5 +53,25 @@ console.log("✔ 4 passou: faixa respeita abas destacadas; Painel Lateral some e
 const dd = read("src", "ui", "js", "dockDrag.js");
 assert.ok(dd.includes(".sort((a, b) => (b.__dockZ || 0) - (a.__dockZ || 0));"));
 console.log("✔ 5 passou: alvo de juntar é a janela focada por último.");
+
+// 6. F5b: abas da Biblioteca (Mídias fica: é o corpo da Biblioteca)
+const left = [...tabs.matchAll(/^\s{4}(\w+): \{ title: "[^"]+", icon: "[^"]+", container: "(tab-[\w-]+)"/gm)];
+assert.deepEqual(left.map(m => m[2]).sort(), ["tab-docs", "tab-faces", "tab-themes", "tab-titles"], "Temas, Rostos, Títulos e Docs saem; Mídias não");
+for (const [, tab, container] of left) {
+    assert.ok(indexHtml.includes(`id="${container}"`) && indexHtml.includes(`data-tab="${container}"`), `aba ${container} existe`);
+    assert.ok(groupHtml.includes(`"tabpanel-${tab}":`) && panelHtml.includes(`"tabpanel-${tab}":`), `título da aba ${tab} nas janelas`);
+}
+const faces = read("src", "ui", "js", "faces.js");
+const panelsJs = read("src", "ui", "js", "panels.js");
+const library = read("src", "ui", "js", "library.js");
+assert.ok(faces.includes('window.dockTabSearchQuery?.("tab-faces") ??'), "Rostos destacados usam busca própria");
+assert.ok(panelsJs.includes('window.dockTabSearchQuery?.("tab-themes") ??'), "Temas destacados usam busca própria");
+assert.ok(library.includes('window.dockTabSearchQuery?.("tab-docs") ??'), "Docs destacados usam busca própria");
+assert.ok(tabs.includes('input.className = "tab-panel-search";'), "campo de busca no cabeçalho da aba destacada");
+assert.ok(/if \(tab === "faces"\) window\.FaceManager\?\.onPopoutReady\?\.\(win\);/.test(tabs) && tabs.includes("window.FaceManager?.onPopoutRestored?.()"), "modais e atalhos dos Rostos acompanham a janela");
+assert.ok(!/libraryInstance\?\.onPopoutReady/.test(tabs), "não troca o documento da Biblioteca inteira ao destacar Docs");
+assert.ok(tabs.includes("if (wrapper && !wrapper.isConnected) this.host.appendChild(wrapper);"), "invólucro reaproveitado não é tomado por 'já destacado' (desfazer)");
+assert.ok(strip.includes("container._orderBeforeDrag.forEach(child => container.appendChild(child));"), "destacar não reordena a faixa");
+console.log("✔ 6 passou: abas da Biblioteca com busca própria e ganchos; Mídias fica; ordem da faixa preservada.");
 
 console.log("\n=== AUTOTESTE DOCK TABS CONCLUÍDO COM SUCESSO ===");

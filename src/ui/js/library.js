@@ -8136,9 +8136,9 @@ export class LibraryManager {
             return;
         }
 
-        // Apply search input query filter
+        // Apply search input query filter (aba destacada numa janela usa a busca própria — F5b)
         const searchInput = document.getElementById("library-search-input");
-        const query = searchInput ? searchInput.value.trim() : "";
+        const query = window.dockTabSearchQuery?.("tab-docs") ?? (searchInput ? searchInput.value.trim() : "");
         
         let filtered = docs;
         if (query) {

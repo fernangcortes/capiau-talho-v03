@@ -65,16 +65,20 @@ function setupSidebarCustomization(containerId, orderKey, visibilityKey, activeK
         btn.setAttribute("draggable", "true");
 
         btn.addEventListener("dragstart", (e) => {
+            // Ordem de antes do arrasto: se a aba for destacada (F5), a passagem pela faixa não reordena.
+            container._orderBeforeDrag = Array.from(container.children);
             btn.classList.add("dragging");
             e.dataTransfer.effectAllowed = "move";
         });
 
         btn.addEventListener("dragend", (e) => {
             btn.classList.remove("dragging");
-            // F5a: aba do Painel Lateral solta fora do editor ou sobre uma janela destacada vira painel.
-            if (containerId === "right-tabs" && window.tabPanels) {
-                window.tabPanels.onTabDragEnd(btn.getAttribute(attrName), e);
+            // F5: aba solta fora do editor ou sobre uma janela destacada vira painel (Mídias não sai).
+            const tab = window.tabPanels ? window.tabPanelTabFromValue?.(btn.getAttribute(attrName)) : null;
+            if (tab && window.tabPanels.onTabDragEnd(tab, e) && container._orderBeforeDrag) {
+                container._orderBeforeDrag.forEach(child => container.appendChild(child));
             }
+            container._orderBeforeDrag = null;
             // Salvar nova ordenação
             const newOrder = Array.from(container.children).map(c => c.getAttribute(attrName));
             localStorage.setItem(orderKey, JSON.stringify(newOrder));
@@ -120,9 +124,9 @@ function showTabsContextMenu(x, y, container, visibilityKey, activeKey, attrName
     menu.style.width = "180px";
     menu.style.padding = "6px 0";
 
-    // F5a: destacar a aba clicada (Painel Lateral) numa janela própria.
-    const clickedTab = clickedBtn ? clickedBtn.getAttribute(attrName) : null;
-    if (clickedTab && container.id === "right-tabs" && window.tabPanels) {
+    // F5: destacar a aba clicada numa janela própria (Mídias não sai: é o corpo da Biblioteca).
+    const clickedTab = clickedBtn && window.tabPanels ? window.tabPanelTabFromValue?.(clickedBtn.getAttribute(attrName)) : null;
+    if (clickedTab) {
         const tearItem = document.createElement("div");
         tearItem.className = "menu-item";
         tearItem.style.padding = "8px 12px";

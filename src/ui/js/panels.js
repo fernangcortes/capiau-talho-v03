@@ -1982,7 +1982,8 @@ export class PanelsManager {
         const themes = this.allThemes || [];
         
         const searchInput = getActiveElement("library-search-input");
-        const query = searchInput ? searchInput.value.trim() : "";
+        // Aba destacada numa janela (F5b) usa a busca própria dela.
+        const query = window.dockTabSearchQuery?.("tab-themes") ?? (searchInput ? searchInput.value.trim() : "");
         
         let filtered = themes;
         if (query) {

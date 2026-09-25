@@ -10,7 +10,7 @@ import { EntityManager } from "./entities.js";
 import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
 import { DockDragController } from "./dockDrag.js";
 import { PopoutRestorer } from "./popoutRestore.js";
-import { TabPanels } from "./tabPanels.js";
+import { TabPanels, tabFromButtonValue } from "./tabPanels.js";
 import { SettingsPanelManager } from "./settingsPanel.js";
 import { initAutosave, triggerAutosave } from "./timelineAutosave.js";
 import { initExportVideoPanel } from "./exportVideo.js";
@@ -1841,6 +1841,7 @@ window.addEventListener("DOMContentLoaded", () => {
     window.dockDrag = new DockDragController(workspace);
     // Abas do Painel Lateral destacáveis (F5a); antes da restauração, que pode reabrir abas destacadas.
     window.tabPanels = new TabPanels(workspace, window.dockDrag);
+    window.tabPanelTabFromValue = tabFromButtonValue;
     // Janelas destacadas da sessão anterior: reabre sozinho ou mostra "Restaurar janelas".
     window.popoutRestorer = new PopoutRestorer(workspace, window.dockDrag);
     setTimeout(() => window.popoutRestorer.start(), 1200);
