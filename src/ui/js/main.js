@@ -8,6 +8,7 @@ import { ProjectsManager } from "./projects.js";
 import { FaceManager } from "./faces.js";
 import { EntityManager } from "./entities.js";
 import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
+import { DockDragController } from "./dockDrag.js";
 import { SettingsPanelManager } from "./settingsPanel.js";
 import { initAutosave, triggerAutosave } from "./timelineAutosave.js";
 import { initExportVideoPanel } from "./exportVideo.js";
@@ -1835,6 +1836,7 @@ window.addEventListener("DOMContentLoaded", () => {
     // Instanciando os gerenciadores
     const workspace = new WorkspaceManager();
     window.workspaceManager = workspace;
+    window.dockDrag = new DockDragController(workspace);
     const player = new VideoPlayer();
     window.player = player;
     const library = new LibraryManager();
