@@ -97,8 +97,62 @@ export class DockDragController {
             handle.setAttribute("aria-hidden", "true");
             handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
             handle.addEventListener("pointerdown", (e) => this.handleDown(e, panelId, handle));
+            // Sem arrastar: Ctrl+duplo-clique alterna entre janela destacada e o último lugar no editor;
+            // botão direito abre o menu da alça.
+            handle.addEventListener("dblclick", (e) => {
+                if (!(e.ctrlKey || e.metaKey)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                this.wm.togglePopout(panelId);
+            });
+            handle.addEventListener("contextmenu", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.showHandleMenu(panelId, handle, e);
+            });
             header.prepend(handle);
         });
+    }
+
+    /** Menu da alça: alternativa sem arrastar. */
+    showHandleMenu(panelId, handle, e) {
+        const doc = handle.ownerDocument;
+        doc.querySelector(".dock-handle-menu")?.remove();
+        const popped = doc !== document;
+        const menu = doc.createElement("div");
+        menu.className = "dock-handle-menu";
+        menu.setAttribute("role", "menu");
+        const items = [
+            [popped ? "Reacoplar no editor (Ctrl+duplo-clique)" : "Destacar em nova janela (Ctrl+duplo-clique)", () => this.wm.togglePopout(panelId)],
+            ["Desfazer mudança de layout (Ctrl+Alt+Z)", () => this.wm.undoLayout()],
+            ["Restaurar layout do workspace", () => this.wm.resetLayoutToWorkspace()]
+        ];
+        items.forEach(([label, action]) => {
+            const item = doc.createElement("button");
+            item.type = "button";
+            item.setAttribute("role", "menuitem");
+            item.textContent = label;
+            item.addEventListener("click", () => { menu.remove(); action(); });
+            menu.appendChild(item);
+        });
+        // Estilo inline: a janela destacada pode ter um styles.css em cache sem estas regras.
+        Object.assign(menu.style, {
+            position: "fixed", left: `${e.clientX}px`, top: `${e.clientY}px`, zIndex: "20002",
+            display: "flex", flexDirection: "column", minWidth: "240px", padding: "4px",
+            background: "rgba(15, 18, 28, 0.98)", border: "1px solid rgba(167, 139, 250, 0.45)",
+            borderRadius: "8px", boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
+        });
+        menu.querySelectorAll("button").forEach(b => Object.assign(b.style, {
+            background: "transparent", border: "none", color: "#e2e8f0", textAlign: "left",
+            padding: "7px 10px", fontSize: "12px", borderRadius: "5px", cursor: "pointer"
+        }));
+        doc.body.appendChild(menu);
+        const close = (ev) => {
+            if (menu.contains(ev.target)) return;
+            menu.remove();
+            doc.removeEventListener("pointerdown", close, true);
+        };
+        setTimeout(() => doc.addEventListener("pointerdown", close, true), 0);
     }
 
     /** Converte coordenadas de tela em coordenadas da página principal. */

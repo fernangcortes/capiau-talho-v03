@@ -9,6 +9,7 @@ import { FaceManager } from "./faces.js";
 import { EntityManager } from "./entities.js";
 import { WorkspaceManager, getActiveElement } from "./workspaceManager.js";
 import { DockDragController } from "./dockDrag.js";
+import { PopoutRestorer } from "./popoutRestore.js";
 import { SettingsPanelManager } from "./settingsPanel.js";
 import { initAutosave, triggerAutosave } from "./timelineAutosave.js";
 import { initExportVideoPanel } from "./exportVideo.js";
@@ -1837,6 +1838,9 @@ window.addEventListener("DOMContentLoaded", () => {
     const workspace = new WorkspaceManager();
     window.workspaceManager = workspace;
     window.dockDrag = new DockDragController(workspace);
+    // Janelas destacadas da sessão anterior: reabre sozinho ou mostra "Restaurar janelas".
+    window.popoutRestorer = new PopoutRestorer(workspace, window.dockDrag);
+    setTimeout(() => window.popoutRestorer.start(), 1200);
     const player = new VideoPlayer();
     window.player = player;
     const library = new LibraryManager();

@@ -13313,3 +13313,47 @@ body.dock-dragging * {
 .dock-stack-splitter.active {
     background: var(--color-cyan);
 }
+
+/* ── DRAG & DOCK (F3): faixa "Restaurar janelas" da sessão anterior ── */
+.dock-restore-banner {
+    position: fixed;
+    top: 54px;
+    right: 16px;
+    z-index: 20001;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    max-width: min(560px, calc(100vw - 32px));
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(167, 139, 250, 0.5);
+    background: rgba(15, 18, 28, 0.97);
+    color: #e2e8f0;
+    font-size: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.dock-restore-text {
+    flex: 1 1 100%;
+    line-height: 1.45;
+}
+.dock-restore-banner button {
+    border-radius: 5px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid rgba(226, 232, 240, 0.25);
+    color: #cbd5e1;
+}
+.dock-restore-banner .dock-restore-open {
+    background: rgba(34, 211, 238, 0.15);
+    border-color: rgba(34, 211, 238, 0.5);
+    color: var(--color-cyan);
+}
+.dock-restore-banner .dock-restore-mode {
+    border: none;
+    text-decoration: underline;
+    color: var(--text-secondary);
+}
