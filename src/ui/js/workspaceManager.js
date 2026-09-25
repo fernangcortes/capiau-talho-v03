@@ -1,5 +1,6 @@
 import { STATE } from "./state.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
+import { layoutFromLegacy, legacyFromLayout, LayoutHistory, serializeLayout } from "./dockModel.js";
 
 window.popoutWindows = {};
 
@@ -142,7 +143,142 @@ export class WorkspaceManager {
         this._timelineResizeAnimRaf = null;
         this._lastTimelineCustomHeight = null;
 
+        // Histórico de layout (F1 do plano de janelas drag & dock): cada método que muda a
+        // disposição dos painéis registra o novo estado, uma entrada por ação do usuário.
+        this.layoutHistory = new LayoutHistory();
+        this._layoutHistoryReady = false;
+        this._applyingLayout = false;
+        this._layoutCommitTimer = null;
+        [
+            "setTimelinePosition", "setMonitorsLayout", "applyColumnsOrder", "applyWorkspace",
+            "attachPanelToPopout", "attachDualPanelsToPopout", "restorePanel", "restoreDualPopout"
+        ].forEach((name) => {
+            const original = this[name].bind(this);
+            this[name] = (...args) => {
+                const result = original(...args);
+                this.scheduleLayoutCommit();
+                return result;
+            };
+        });
+
         this.init();
+    }
+
+    /** Estado legado atual (colunas, timeline, monitores e janelas destacadas) para o DockModel. */
+    getLegacyLayoutState() {
+        const isOpen = (w) => !!(w && !w.closed);
+        const dualWin = window.popoutWindows?.["dual-sidebar"];
+        let dual = null;
+        if (isOpen(dualWin)) {
+            const panels = (localStorage.getItem("capiau_dual_popout_panels") || "").split(",").filter(Boolean);
+            if (panels.length === 2) {
+                dual = { panels, layout: localStorage.getItem("capiau_dual_popout_layout") || "side-by-side" };
+            }
+        }
+        const popped = Object.keys(window.popoutWindows || {}).filter(id =>
+            id !== "dual-sidebar" && isOpen(window.popoutWindows[id]) && window.popoutWindows[id] !== dualWin
+        );
+        return {
+            columnOrder: [...this.columnOrder],
+            timelinePosition: this.timelinePosition,
+            monitorsLayout: this.monitorsLayout,
+            popped,
+            dual
+        };
+    }
+
+    getDockLayout() {
+        return layoutFromLegacy(this.getLegacyLayoutState());
+    }
+
+    /** Agrupa as chamadas encadeadas de uma mesma ação num único passo do histórico. */
+    scheduleLayoutCommit() {
+        if (!this._layoutHistoryReady || this._applyingLayout) return;
+        clearTimeout(this._layoutCommitTimer);
+        this._layoutCommitTimer = setTimeout(() => {
+            const layout = this.getDockLayout();
+            this.layoutHistory.record(layout);
+            try {
+                localStorage.setItem("capiau_dock_layout", serializeLayout(layout));
+            } catch (e) {}
+        }, 80);
+    }
+
+    /** Aplica uma árvore de layout usando o renderizador atual. Retorna false se não for representável. */
+    applyDockLayout(layout) {
+        const legacy = legacyFromLayout(layout);
+        if (!legacy) return false;
+
+        this._applyingLayout = true;
+        clearTimeout(this._layoutCommitTimer);
+        try {
+            this.setTimelinePosition(legacy.timelinePosition, true);
+            this.setMonitorsLayout(legacy.monitorsLayout, true);
+            this.applyColumnsOrder(legacy.columnOrder, true);
+
+            // Janelas destacadas: primeiro fecha as que sobram, depois abre as que faltam.
+            // Abrir precisa do gesto do usuário (o atalho de teclado conta) e o navegador
+            // só permite uma janela por gesto.
+            const current = this.getLegacyLayoutState();
+            const sameDual = (a, b) => !!a && !!b && a.panels.join() === b.panels.join() && a.layout === b.layout;
+            if (current.dual && !sameDual(current.dual, legacy.dual)) {
+                try { window.popoutWindows["dual-sidebar"]?.close(); } catch (e) {}
+                this.restoreDualPopout(current.dual.panels[0], current.dual.panels[1]);
+            }
+            current.popped.filter(id => !legacy.popped.includes(id)).forEach(id => this.togglePopout(id));
+            if (legacy.dual && !sameDual(current.dual, legacy.dual)) {
+                this.openDualPopout(legacy.dual.panels[0], legacy.dual.panels[1], legacy.dual.layout);
+            }
+            legacy.popped.filter(id => !current.popped.includes(id)).forEach(id => this.togglePopout(id));
+        } finally {
+            setTimeout(() => { this._applyingLayout = false; }, 150);
+        }
+        return true;
+    }
+
+    undoLayout() {
+        const target = this.layoutHistory.undo();
+        if (!target) {
+            showToast("Nada para desfazer no layout");
+            return false;
+        }
+        this.applyDockLayout(target);
+        showToast("Layout desfeito (Ctrl+Alt+Shift+Z refaz)", "success");
+        return true;
+    }
+
+    redoLayout() {
+        const target = this.layoutHistory.redo();
+        if (!target) {
+            showToast("Nada para refazer no layout");
+            return false;
+        }
+        this.applyDockLayout(target);
+        showToast("Layout refeito", "success");
+        return true;
+    }
+
+    /** "Restaurar padrão": reaplica a versão salva do workspace carregado (ou o Padrão). */
+    resetLayoutToWorkspace() {
+        const ws = localStorage.getItem("capiau_active_workspace") || "default";
+        const known = this.getCustomWorkspaces()[ws] || this.workspacePresets[ws] || ws === "multitela";
+        const target = known ? ws : "default";
+        this.applyWorkspace(target);
+        const name = this.getCustomWorkspaces()[target]?.name || this.workspacePresets[target]?.name || target;
+        showToast(`Layout restaurado: ${name} (Ctrl+Alt+Z desfaz)`, "success");
+    }
+
+    /** Atalhos do histórico de layout. Usado pela janela principal e pelas destacadas. */
+    handleLayoutShortcut(e) {
+        let action = null;
+        if (KEYMAP_SERVICE.matches(e, "layout.redo")) action = () => this.redoLayout();
+        else if (KEYMAP_SERVICE.matches(e, "layout.undo")) action = () => this.undoLayout();
+        else if (KEYMAP_SERVICE.matches(e, "layout.reset")) action = () => this.resetLayoutToWorkspace();
+        if (!action) return false;
+        e.preventDefault();
+        e.stopPropagation();
+        action();
+        return true;
     }
 
     sendHandshake() {
@@ -157,6 +293,23 @@ export class WorkspaceManager {
     init() {
         // Escuta mensagens do BroadcastChannel para sincronia bidirecional
         this.channel.addEventListener("message", (e) => this.handleMessage(e));
+
+        // O layout inicial (restaurado do localStorage, janelas destacadas reabrindo) não entra
+        // no histórico: a linha de base é fixada depois que a página assenta.
+        const startLayoutHistory = () => setTimeout(() => {
+            this.layoutHistory.reset(this.getDockLayout());
+            this._layoutHistoryReady = true;
+        }, 1500);
+        if (document.readyState === "complete") startLayoutHistory();
+        else window.addEventListener("load", startLayoutHistory, { once: true });
+
+        const btnResetLayout = document.getElementById("btn-reset-workspace-layout");
+        if (btnResetLayout) {
+            btnResetLayout.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.resetLayoutToWorkspace();
+            });
+        }
 
         // Dispara handshake inicial e retries para reconectar janelas já abertas no segundo monitor
         this.sendHandshake();
@@ -3762,6 +3915,7 @@ export class WorkspaceManager {
                 if (activeTag === "input" || activeTag === "textarea") return;
                 
                 if (window.isAnyModalOpen && window.isAnyModalOpen(win.document)) return;
+                if (this.handleLayoutShortcut(e)) return;
                 if (window.FaceManager && window.FaceManager.inspectorCard) return;
 
                 // Intercepta atalho de rotação de mídia sob o cursor (R / Shift+R) no popout
@@ -4003,6 +4157,7 @@ export class WorkspaceManager {
                 if (activeTag === "input" || activeTag === "textarea") return;
                 
                 if (window.isAnyModalOpen && window.isAnyModalOpen(win.document)) return;
+                if (this.handleLayoutShortcut(e)) return;
                 if (window.FaceManager && window.FaceManager.inspectorCard) return;
 
                 // Intercepta atalho de rotação de mídia sob o cursor (R / Shift+R) no popout
@@ -4690,6 +4845,9 @@ export class WorkspaceManager {
                     return;
                 }
             }
+
+            // 0. Histórico de layout (Ctrl + Alt + Z / Ctrl + Alt + Shift + Z)
+            if (this.handleLayoutShortcut(e)) return;
 
             // 1. Slots de Workspace: Salvar (Ctrl + Alt + Shift + [1-9])
             if (e.ctrlKey && e.altKey && e.shiftKey) {

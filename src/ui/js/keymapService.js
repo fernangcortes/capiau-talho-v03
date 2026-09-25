@@ -554,6 +554,24 @@ export const COMMANDS_CATALOG = [
 
     // ── LAYOUT & WORKSPACE (NUMPAD & SLOTS) ──────────────────────────────────
     {
+        id: "layout.undo",
+        category: "workspace_numpad",
+        label: "Desfazer Mudança de Layout",
+        description: "Desfaz a última mudança na disposição dos painéis (histórico separado do da timeline)"
+    },
+    {
+        id: "layout.redo",
+        category: "workspace_numpad",
+        label: "Refazer Mudança de Layout",
+        description: "Refaz a mudança de layout desfeita anteriormente"
+    },
+    {
+        id: "layout.reset",
+        category: "workspace_numpad",
+        label: "Restaurar Layout do Workspace",
+        description: "Volta à versão salva do workspace carregado (ou ao Padrão); pode ser desfeito"
+    },
+    {
         id: "workspace.numpad_1",
         category: "workspace_numpad",
         label: "Timeline: Expansão Direcional Esquerda",
@@ -846,6 +864,9 @@ export const KEYMAP_PRESETS = {
         "history.undo": ["Ctrl+KeyZ"],
         "history.redo": ["Ctrl+Shift+KeyZ", "Ctrl+KeyY"],
         "workspace.save": ["Ctrl+Shift+KeyS"],
+        "layout.undo": ["Ctrl+Alt+KeyZ"],
+        "layout.redo": ["Ctrl+Alt+Shift+KeyZ"],
+        "layout.reset": [],
 
         "timeline.zoom_fit": ["Backslash", "Shift+KeyZ"],
         "timeline.zoom_in": ["Equal", "NumpadAdd"],
