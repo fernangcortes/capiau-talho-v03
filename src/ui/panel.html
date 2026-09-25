@@ -33,9 +33,7 @@
             flex-direction: column;
         }
 
-        /* Alça de arrastar (F3): na janela destacada simples arrasta de volta ao editor;
-           na Janela Dupla chega na F4 */
-        #dual-workspace .dock-handle { display: none !important; }
+        /* Alça de arrastar (F3/F4): arrasta o painel de volta ao editor, também da Janela Dupla */
 
         /* ── SINGLE PANEL CONTAINER (RETROCOMPATIBILIDADE) ── */
         #panel-container {
@@ -443,7 +441,8 @@
                     const y = b.screenY !== undefined ? b.screenY : b.top;
                     const w = b.outerWidth || b.width;
                     const h = b.outerHeight || b.height;
-                    if (w > 200 && h > 200) {
+                    // dock=keep (F4): a janela só trocou de modo (simples ↔ dupla); mantém posição e tamanho.
+                    if (w > 200 && h > 200 && params.get("dock") !== "keep") {
                         // Janela nascida de um arrasto (F3) já está onde o cursor soltou: não volta à posição salva.
                         if (params.get("dock") !== "live" && x !== undefined && y !== undefined && !isNaN(x) && !isNaN(y)) {
                             window.moveTo(x, y);

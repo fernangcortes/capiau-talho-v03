@@ -173,8 +173,6 @@ export class DockDragController {
         if (e.button !== 0 || this.drag) return;
         const win = handle.ownerDocument.defaultView;
         const fromPopout = handle.ownerDocument !== document;
-        // Na Janela Dupla o arrasto chega na F4 (a alça fica escondida pelo CSS do panel.html).
-        if (fromPopout && window.popoutWindows?.["dual-sidebar"] === win) return;
         e.preventDefault();
         e.stopPropagation();
         handle.setPointerCapture(e.pointerId);
@@ -205,9 +203,20 @@ export class DockDragController {
         d.outside = outside;
 
         if (d.fromPopout) {
-            // Voltando da janela destacada: zonas do editor principal no ponto convertido.
+            // Voltando da janela destacada: zonas do editor principal no ponto convertido;
+            // fora do editor, sobre outra janela destacada: juntar (F4).
             this.ghost.hidden = outside;
-            d.target = outside ? null : (this.resolveTarget(d.panelId, p.x, p.y) || this.homeTarget(d.panelId));
+            d.target = outside
+                ? this.findJoinTarget(d.panelId, e.screenX, e.screenY)
+                : (this.resolveTarget(d.panelId, p.x, p.y) || this.homeTarget(d.panelId));
+        } else if (outside && (d.join = this.findJoinTarget(d.panelId, e.screenX, e.screenY))) {
+            // Sobre outra janela destacada: juntar (F4). A janela prévia sairia por cima dela, então fecha.
+            if (d.live) {
+                this.wm.cancelLivePopout(d.panelId, d.live);
+                d.live = null;
+            }
+            this.ghost.hidden = true;
+            d.target = d.join;
         } else if (outside) {
             // Saiu do editor: a janela nasce agora (o gesto ainda vale) e passa a seguir o cursor.
             if (!d.live && !d.liveFailed) {
@@ -231,7 +240,8 @@ export class DockDragController {
         }
         this.ghost.style.left = `${p.x}px`;
         this.ghost.style.top = `${p.y}px`;
-        this.drawTarget(d.target);
+        this.drawJoin(d.target?.type === "join" ? d.target : null);
+        this.drawTarget(d.target?.type === "join" ? null : d.target);
     }
 
     handleUp(e) {
@@ -243,6 +253,12 @@ export class DockDragController {
         if (!released) return;
 
         const title = DOCK_PANELS[d.panelId].title;
+        if (target?.type === "join") {
+            if (this.wm.joinIntoPopout(target.targetPanel, d.panelId, target.side)) {
+                this.showToast("undo", `Janela Dupla: ${target.label}`);
+            }
+            return;
+        }
         if (d.fromPopout) {
             if (target) this.dockBack(d.panelId, target);
             else if (d.outside) {
@@ -271,11 +287,62 @@ export class DockDragController {
         if (d.fromPopout) d.win.removeEventListener("keydown", this.onKey, true);
         try { d.handle.releasePointerCapture(d.pointerId); } catch (err) {}
         if (cancelled && d.live) this.wm.cancelLivePopout(d.panelId, d.live);
+        this.drawJoin(null);
         document.body.classList.remove("dock-dragging");
         document.getElementById(d.panelId)?.classList.remove("dock-drag-source");
         this.ghost.hidden = true;
         this.overlay.hidden = true;
         this.drag = null;
+    }
+
+    /**
+     * F4: janela destacada simples (de uma lateral) sob o ponto de tela, para juntar os dois numa
+     * Janela Dupla. A borda mais próxima decide: esquerda/direita = lado a lado, cima/baixo = empilhados.
+     */
+    findJoinTarget(panelId, sx, sy) {
+        if (!COLUMN_PANELS.includes(panelId)) return null;
+        const dual = window.popoutWindows?.["dual-sidebar"];
+        if (dual && !dual.closed) return null;
+        for (const id of COLUMN_PANELS) {
+            if (id === panelId) continue;
+            const w = window.popoutWindows?.[id];
+            if (!w || w.closed) continue;
+            if (sx < w.screenX || sx > w.screenX + w.outerWidth || sy < w.screenY || sy > w.screenY + w.outerHeight) continue;
+            const border = (w.outerWidth - w.innerWidth) / 2;
+            const left = w.screenX + border;
+            const top = w.screenY + (w.outerHeight - w.innerHeight) - border;
+            const rx = (sx - left) / w.innerWidth;
+            const ry = (sy - top) / w.innerHeight;
+            const side = [["left", rx], ["right", 1 - rx], ["top", ry], ["bottom", 1 - ry]].sort((a, b) => a[1] - b[1])[0][0];
+            const pair = side === "left" || side === "top"
+                ? `${DOCK_PANELS[panelId].title} + ${DOCK_PANELS[id].title}`
+                : `${DOCK_PANELS[id].title} + ${DOCK_PANELS[panelId].title}`;
+            return { type: "join", targetPanel: id, win: w, side, label: `${pair} ${side === "left" || side === "right" ? "lado a lado" : "empilhados"}` };
+        }
+        return null;
+    }
+
+    /** Desenha a prévia do "juntar" dentro da janela destacada alvo (estilo inline: CSS dela pode estar em cache). */
+    drawJoin(join) {
+        if (this.joinPreview && (!join || this.joinPreview.ownerDocument !== join.win.document)) {
+            this.joinPreview.remove();
+            this.joinPreview = null;
+        }
+        if (!join) return;
+        let doc;
+        try { doc = join.win.document; } catch (err) { return; }
+        if (!this.joinPreview) {
+            this.joinPreview = doc.createElement("div");
+            this.joinPreview.innerHTML = "<span></span>";
+            doc.body.appendChild(this.joinPreview);
+        }
+        const half = { left: "left:0;top:0;width:50%;height:100%", right: "right:0;top:0;width:50%;height:100%",
+            top: "left:0;top:0;width:100%;height:50%", bottom: "left:0;bottom:0;width:100%;height:50%" }[join.side];
+        this.joinPreview.style.cssText = `position:fixed;${half};z-index:20000;pointer-events:none;box-sizing:border-box;` +
+            "border:2px solid #22d3ee;background:rgba(34,211,238,0.16);border-radius:6px;display:flex;align-items:flex-start;justify-content:center;padding-top:14px";
+        const tag = this.joinPreview.firstChild;
+        tag.textContent = join.label;
+        tag.style.cssText = "background:#22d3ee;color:#04222a;font:700 11px system-ui,sans-serif;padding:4px 10px;border-radius:4px;white-space:nowrap";
     }
 
     /** Solto em cima do editor sem zona específica: volta para o lugar de antes. */
@@ -287,7 +354,10 @@ export class DockDragController {
 
     /** Reacopla o painel da janela destacada e aplica o encaixe escolhido. */
     dockBack(panelId, target) {
-        this.wm.togglePopout(panelId);
+        const dual = window.popoutWindows?.["dual-sidebar"];
+        // Da Janela Dupla (F4): só este painel volta; o outro continua sozinho na mesma janela.
+        if (dual && !dual.closed && window.popoutWindows[panelId] === dual) this.wm.splitFromDual(panelId);
+        else this.wm.togglePopout(panelId);
         if (target.type !== "home") setTimeout(() => this.applyTarget(target, false), 30);
         this.showToast("undo", target.type === "home" ? target.label.replace("Reacoplar", "Reacoplado:") : `Reacoplado: ${target.label}`);
     }
