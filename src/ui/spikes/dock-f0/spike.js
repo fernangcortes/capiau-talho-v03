@@ -29,7 +29,10 @@ const LABELS = {
     "E8.delay1000": "E8 · gesto vale após 1 s",
     "E8.delay3000": "E8 · gesto vale após 3 s",
     "E8.delay6000": "E8 · gesto vale após 6 s",
-    "E9.threeInOneClick": "E9 · 3 janelas num único clique"
+    "E9.threeInOneClick": "E9 · 3 janelas num único clique",
+    "E10.open": "E10 · janela nasce ao cruzar a borda",
+    "E10.attach": "E10 · painel entra na janela ao soltar",
+    "E10.follow": "E10 · janela segue o cursor"
 };
 
 const results = {};
@@ -112,21 +115,31 @@ function waitReady(win) {
     });
 }
 
-async function openPopup(panelId, screenX, screenY, testId, t0) {
+function popupFeatures(screenX, screenY) {
     const left = Math.round((screenX || window.screenX + 80) - 60);
     const top = Math.round((screenY || window.screenY + 80) - 20);
-    const win = window.open(`popup.html?panel=${panelId}`, `spike_${panelId}`, `popup=yes,width=520,height=420,left=${left},top=${top}`);
-    const when = t0 ? ` (${ms(t0)} ms após o início do gesto)` : "";
+    return `popup=yes,width=520,height=420,left=${left},top=${top}`;
+}
+
+async function openPopup(panelId, screenX, screenY, testId, t0) {
+    const win = window.open(`popup.html?panel=${panelId}`, `spike_${panelId}`, popupFeatures(screenX, screenY));
     if (!win) {
-        record(testId, "fail", `window.open bloqueado${when}`);
+        record(testId, "fail", `window.open bloqueado${t0 ? ` (${ms(t0)} ms após o início do gesto)` : ""}`);
         return null;
     }
+    return attachPopup(panelId, win, testId, t0);
+}
+
+// Move o painel para uma janela já aberta (por openPopup ou pelo modo "nasce ao cruzar a borda").
+async function attachPopup(panelId, win, testId, t0) {
+    const when = t0 ? ` (${ms(t0)} ms após o início do gesto)` : "";
     popups[panelId] = win;
     if (!(await waitReady(win))) {
         record(testId, "fail", "a janela abriu, mas o documento não ficou pronto");
         return null;
     }
     moveTo(panelId, win.document.getElementById("slot"));
+    win.document.addEventListener("pointermove", (e) => { popupCalib.set(win.document, { dx: e.screenX - e.clientX, dy: e.screenY - e.clientY }); });
     record(testId, "ok", `janela aberta${when}`);
     const timer = setInterval(() => {
         if (!win.closed) return;
@@ -159,6 +172,18 @@ Object.values(panels).forEach(panel => {
 // Cada evento de ponteiro na principal dá o deslocamento exato entre tela e página.
 
 let calib = null;
+const popupCalib = new WeakMap();
+
+// Centro de um elemento em coordenadas de tela, usando a calibração do documento dele.
+// Usado pelo teste com mouse real (xdnd.mjs) para saber onde clicar.
+function screenPoint(panelId, selector) {
+    const el = selector ? panels[panelId].querySelector(selector) : panels[panelId];
+    const doc = el.ownerDocument;
+    const o = doc === document ? calib : popupCalib.get(doc);
+    if (!o) return null;
+    const r = el.getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2 + o.dx), y: Math.round(r.top + r.height / 2 + o.dy), inPopup: doc !== document };
+}
 document.addEventListener("pointermove", (e) => {
     calib = { dx: e.screenX - e.clientX, dy: e.screenY - e.clientY };
     $("calib").textContent = `Calibração: tela − página = (${calib.dx}, ${calib.dy})`;
@@ -197,6 +222,22 @@ function inDockZone(p) {
         if (!drag) return;
         if (!drag.inPopup) {
             const out = isOutside(e, window);
+            if ($("live-tearoff").checked) {
+                // E10: a janela nasce ao cruzar a borda (gesto ainda válido) e segue o cursor.
+                if (out && !drag.live && !drag.liveFailed) {
+                    drag.live = window.open("popup.html?panel=p-pointer", "spike_p-pointer", popupFeatures(e.screenX, e.screenY));
+                    drag.liveMoves = 0;
+                    if (drag.live) record("E10.open", "ok", `janela nasceu ao cruzar a borda, ${ms(drag.t0)} ms após o início do gesto`);
+                    else { drag.liveFailed = true; record("E10.open", "fail", `bloqueado ao cruzar a borda, ${ms(drag.t0)} ms após o início do gesto`); }
+                } else if (drag.live && out) {
+                    try { drag.live.moveTo(e.screenX - 60, e.screenY - 20); drag.liveMoves++; } catch (err) {}
+                } else if (drag.live && !out) {
+                    drag.live.close();
+                    drag.live = null;
+                    log("E10: cursor voltou para dentro; janela prévia fechada");
+                }
+                if (drag.live) { ghost.style.display = "none"; return; }
+            }
             ghost.style.display = "block";
             ghost.style.left = `${e.clientX}px`;
             ghost.style.top = `${e.clientY}px`;
@@ -221,6 +262,16 @@ function inDockZone(p) {
         if (e.type === "pointercancel") { log("E1/E4: pointercancel"); return; }
 
         const act = activationOf(d.win);
+        if (!d.inPopup && d.live) {
+            const win = d.live;
+            const expected = { x: e.screenX - 60, y: e.screenY - 20 };
+            attachPopup("p-pointer", win, "E10.attach", d.t0).then(() => {
+                const dx = Math.abs(win.screenX - expected.x), dy = Math.abs(win.screenY - expected.y);
+                record("E10.follow", dx <= 12 && dy <= 12 ? "ok" : "fail",
+                    `${d.liveMoves} movimentos da janela durante o arrasto; parou em (${win.screenX}, ${win.screenY}), cursor pedia (${expected.x}, ${expected.y})`);
+            });
+            return;
+        }
         if (!d.inPopup) {
             record("E1.activation", act === true ? "ok" : act === false ? "fail" : "info", `userActivation.isActive=${act} após ${ms(d.t0)} ms`);
             const out = isOutside(e, window);
@@ -496,5 +547,12 @@ $("btn-copy").addEventListener("click", () => {
     navigator.clipboard.writeText(text).then(() => log("resultados copiados")).catch(() => log(`copie manualmente:\n${text}`));
 });
 
-window.__spike = { results, openPopup, dockBack, mediaRoundTrip, snapshot, makeFileVideo };
+window.__spike = {
+    results, openPopup, dockBack, mediaRoundTrip, snapshot, makeFileVideo, screenPoint,
+    zonePoint: () => {
+        if (!calib) return null;
+        const r = dockZone.getBoundingClientRect();
+        return { x: Math.round(r.left + r.width / 2 + calib.dx), y: Math.round(r.top + r.height / 2 + calib.dy) };
+    }
+};
 log("spike pronto");
