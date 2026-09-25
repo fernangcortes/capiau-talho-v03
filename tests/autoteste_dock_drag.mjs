@@ -41,10 +41,22 @@ assert.ok(/this\.drag && e\.key === "Escape"/.test(dockDrag), "Esc cancela o arr
 console.log("✔ 2 passou: Pointer Events com captura; Esc cancela.");
 
 // 3. Encaixes limitados ao que o layout atual monta, via métodos que registram histórico
-for (const call of ["this.wm.applyColumnsOrder(", "this.wm.setTimelinePosition(", "this.wm.setMonitorsLayout("]) {
+for (const call of ["this.wm.setColumnLayout(", "this.wm.setTimelinePosition(", "this.wm.setMonitorsLayout("]) {
     assert.ok(dockDrag.includes(call), `aplica encaixe com ${call}`);
 }
-console.log("✔ 3 passou: colunas, posição da timeline e monitores aplicados pelos métodos com histórico.");
+for (const op of ["moveBeside", "moveToEdge", "stackWith", "swapPanels"]) {
+    assert.ok(dockDrag.includes(`${op}(state`), `zona de coluna usa ${op} do dockOps`);
+}
+console.log("✔ 3 passou: colunas (ao lado, ponta, empilhar, trocar), timeline e monitores aplicados pelos métodos com histórico.");
+
+// 3b. Pilhas no WorkspaceManager (F2b)
+const wm = read("src", "ui", "js", "workspaceManager.js");
+assert.ok(wm.includes("mountStackGuests(colId, colEl)"), "arranjo das colunas monta as pilhas");
+assert.ok(/this\.detachFromStack\(panelId\);\s*\n\s*const winName = getPopoutWindowName\(panelId\);/.test(wm), "destacar tira o painel da pilha antes");
+assert.ok(wm.includes("this.detachFromStack(panelId1);") && wm.includes("this.detachFromStack(panelId2);"), "janela dupla tira os dois painéis das pilhas");
+assert.ok(wm.includes("columnStacks: this.columnStacks.map(st => [...st]),\n            popouts:"), "workspace salvo guarda as pilhas");
+assert.ok(css.includes(".dock-stack-guest {") && css.includes(".dock-stack-splitter {"), "estilos das pilhas");
+console.log("✔ 3b passou: pilhas montadas no arranjo, desfeitas ao destacar e salvas no workspace.");
 
 // 4. Aviso de desfazer: Ctrl+Z/Ctrl+Shift+Z/Ctrl+Y só enquanto visível, sem roubar campos de texto
 assert.ok(dockDrag.includes('window.addEventListener("keydown", this.onKey, true)'), "atalhos do aviso na fase de captura");

@@ -1,10 +1,11 @@
 // Arrastar painéis pela alça ⋮⋮ (fase F2a do plano docs/PLANO_JANELAS_DRAG_DOCK.md).
 // Motor de Pointer Events (validado na F0): fantasma que segue o cursor, zonas de encaixe e
-// sombra de prévia. Nesta etapa os encaixes se limitam ao que o layout atual sabe montar:
-// reordenar/trocar colunas, mover a timeline entre as 4 posições e alinhar/empilhar os monitores.
+// sombra de prévia. Encaixes: laterais ao lado, trocadas, na ponta ou empilhadas numa mesma
+// coluna (F2b); timeline nas 4 posições; monitores lado a lado ou empilhados.
 // Cada soltura vira um passo do histórico de layout e mostra o aviso "Layout alterado · Desfazer".
 
 import { CENTER_STAGE } from "./dockModel.js";
+import { moveBeside, moveToEdge, stackWith, swapPanels, stackGuests, sameColumnState } from "./dockOps.js";
 
 const EDGE = 26;          // largura das faixas de borda do editor (px)
 const START_DISTANCE = 5; // px de movimento antes de o arrasto começar
@@ -182,36 +183,54 @@ export class DockDragController {
     }
 
     resolveColumnTarget(panelId, x, y, ws) {
-        const order = [...this.wm.columnOrder];
-        const without = order.filter(id => id !== panelId);
-        const make = (newOrder, preview, label) =>
-            newOrder.join() === order.join() ? null : { type: "columns", order: newOrder, preview, label };
+        const state = { order: [...this.wm.columnOrder], stacks: this.wm.columnStacks.map(st => [...st]) };
         const title = DOCK_PANELS[panelId].title;
+        const make = (next, preview, label) =>
+            !next || sameColumnState(next, state) ? null : { type: "columns", next, preview, label };
 
         if (x < ws.left + EDGE) {
-            return make([panelId, ...without], { left: ws.left, top: ws.top, width: ws.width * 0.16, height: ws.height }, `${title} na ponta esquerda`);
+            return make(moveToEdge(state, panelId, "start"), { left: ws.left, top: ws.top, width: ws.width * 0.16, height: ws.height }, `${title} na ponta esquerda`);
         }
         if (x > ws.right - EDGE) {
-            return make([...without, panelId], { left: ws.right - ws.width * 0.16, top: ws.top, width: ws.width * 0.16, height: ws.height }, `${title} na ponta direita`);
+            return make(moveToEdge(state, panelId, "end"), { left: ws.right - ws.width * 0.16, top: ws.top, width: ws.width * 0.16, height: ws.height }, `${title} na ponta direita`);
         }
 
-        for (const id of [...COLUMN_PANELS, CENTER_STAGE]) {
+        // Painéis empilhados ficam dentro do anfitrião: testa os convidados antes.
+        const guests = stackGuests(state.stacks);
+        const candidates = [...COLUMN_PANELS].sort((a, b) => Number(guests.has(b)) - Number(guests.has(a)));
+        for (const id of [...candidates, CENTER_STAGE]) {
             if (id === panelId) continue;
-            const r = this.rectOf(id === CENTER_STAGE ? document.querySelector(".center-stage") : document.getElementById(id));
+            const el = id === CENTER_STAGE ? document.querySelector(".center-stage") : document.getElementById(id);
+            const r = this.rectOf(el);
             if (!r || x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
-            const rel = (x - r.left) / r.width;
             const name = id === CENTER_STAGE ? "centro" : DOCK_PANELS[id].title;
-            if (id !== CENTER_STAGE && rel > 0.3 && rel < 0.7) {
-                const swapped = order.map(c => (c === panelId ? id : c === id ? panelId : c));
-                return make(swapped, { left: r.left, top: r.top, width: r.width, height: r.height }, `Trocar com ${name}`);
+            const rx = (x - r.left) / r.width;
+            const ry = (y - r.top) / r.height;
+
+            if (id === CENTER_STAGE) {
+                const before = rx < 0.5;
+                const w = Math.min(r.width * 0.4, 260);
+                return make(moveBeside(state, panelId, id, before ? "before" : "after"),
+                    { left: before ? r.left : r.right - w, top: r.top, width: w, height: r.height },
+                    `${title} ${before ? "à esquerda" : "à direita"} do centro`);
             }
-            const before = id === CENTER_STAGE ? rel < 0.5 : rel <= 0.3;
-            const idx = without.indexOf(id);
-            const newOrder = [...without];
-            newOrder.splice(before ? idx : idx + 1, 0, panelId);
-            const w = Math.min(r.width * 0.4, 260);
-            return make(newOrder, { left: before ? r.left : r.right - w, top: r.top, width: w, height: r.height },
-                `${title} ${before ? "à esquerda" : "à direita"} de ${name}`);
+            // Retângulo da coluna inteira (anfitrião + convidados) para "ao lado"; do painel para "empilhar".
+            const hostEl = el.classList.contains("dock-stack-guest") ? el.closest(".dock-stack-host") : el;
+            const col = this.rectOf(hostEl) || r;
+            if (rx > 0.3 && rx < 0.7 && ry > 0.3 && ry < 0.7) {
+                return make(swapPanels(state, panelId, id), { left: r.left, top: r.top, width: r.width, height: r.height }, `Trocar com ${name}`);
+            }
+            const edge = [["left", rx], ["right", 1 - rx], ["top", ry], ["bottom", 1 - ry]].sort((a, b) => a[1] - b[1])[0][0];
+            if (edge === "top" || edge === "bottom") {
+                const h = r.height / 2;
+                return make(stackWith(state, panelId, id, edge),
+                    { left: r.left, top: edge === "top" ? r.top : r.bottom - h, width: r.width, height: h },
+                    `${title} ${edge === "top" ? "acima" : "abaixo"} de ${name}`);
+            }
+            const w = Math.min(col.width * 0.4, 260);
+            return make(moveBeside(state, panelId, id, edge === "left" ? "before" : "after"),
+                { left: edge === "left" ? col.left : col.right - w, top: col.top, width: w, height: col.height },
+                `${title} ${edge === "left" ? "à esquerda" : "à direita"} de ${name}`);
         }
         return null;
     }
@@ -268,7 +287,7 @@ export class DockDragController {
     }
 
     applyTarget(target) {
-        if (target.type === "columns") this.wm.applyColumnsOrder(target.order);
+        if (target.type === "columns") this.wm.setColumnLayout(target.next.order, target.next.stacks);
         else if (target.type === "timeline") this.wm.setTimelinePosition(target.position);
         else if (target.type === "monitors") this.wm.setMonitorsLayout(target.layout);
         else return;

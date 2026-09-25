@@ -13273,3 +13273,43 @@ body.dock-dragging * {
 @media (prefers-reduced-motion: reduce) {
     .dock-preview { transition: none; }
 }
+
+/* ── DRAG & DOCK (F2b): laterais empilhadas numa mesma coluna ── */
+.dock-stack-host > :not(.dock-stack-guest):not(.dock-stack-splitter) {
+    min-height: 0;
+}
+.dock-stack-host > #library-main-view {
+    flex: 1 1 0% !important;
+    height: auto !important;
+}
+.dock-stack-guest {
+    flex: 0 1 var(--dock-guest-h, 45%) !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 120px;
+    /* As laterais animam tudo (var(--transition-smooth)); aqui a altura segue o divisor sem atraso. */
+    transition: none !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+.dock-stack-host:has(.dock-stack-guest ~ .dock-stack-guest) > .dock-stack-guest {
+    flex-basis: var(--dock-guest-h, 33%) !important;
+}
+.dock-stack-guest .btn-toggle-sidebar,
+.dock-stack-guest [id^="btn-maximize"] {
+    display: none !important;
+}
+.dock-stack-splitter {
+    flex: 0 0 5px;
+    cursor: row-resize;
+    background: var(--border-glass);
+    touch-action: none;
+    transition: background 0.15s;
+}
+.dock-stack-splitter:hover,
+.dock-stack-splitter.active {
+    background: var(--color-cyan);
+}

@@ -1,6 +1,7 @@
 import { STATE } from "./state.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
 import { layoutFromLegacy, legacyFromLayout, LayoutHistory, serializeLayout } from "./dockModel.js";
+import { normalizeStacks, stackGuests, stackOf, removeFromStack } from "./dockOps.js";
 
 window.popoutWindows = {};
 
@@ -102,6 +103,12 @@ export class WorkspaceManager {
             } catch (e) {}
         }
 
+        // Laterais empilhadas numa mesma coluna (F2b drag & dock), de cima para baixo.
+        this.columnStacks = [];
+        try {
+            this.columnStacks = normalizeStacks(JSON.parse(localStorage.getItem("capiau_column_stacks") || "[]"));
+        } catch (e) {}
+
         this.pendingColumnOrder = [...this.columnOrder];
         this.pendingTimelinePosition = this.timelinePosition;
         this.pendingMonitorsLayout = this.monitorsLayout;
@@ -150,7 +157,7 @@ export class WorkspaceManager {
         this._applyingLayout = false;
         this._layoutCommitTimer = null;
         [
-            "setTimelinePosition", "setMonitorsLayout", "applyColumnsOrder", "applyWorkspace",
+            "setTimelinePosition", "setMonitorsLayout", "applyColumnsOrder", "setColumnLayout", "applyWorkspace",
             "attachPanelToPopout", "attachDualPanelsToPopout", "restorePanel", "restoreDualPopout"
         ].forEach((name) => {
             const original = this[name].bind(this);
@@ -182,9 +189,87 @@ export class WorkspaceManager {
             columnOrder: [...this.columnOrder],
             timelinePosition: this.timelinePosition,
             monitorsLayout: this.monitorsLayout,
+            columnStacks: this.columnStacks.map(st => [...st]),
             popped,
             dual
         };
+    }
+
+    /** Aplica ordem das colunas + pilhas de laterais de uma vez (um passo no histórico). */
+    setColumnLayout(order, stacks) {
+        this.columnStacks = normalizeStacks(stacks);
+        try {
+            localStorage.setItem("capiau_column_stacks", JSON.stringify(this.columnStacks));
+        } catch (e) {}
+        this.applyColumnsOrder(order, true);
+    }
+
+    /** Tira um painel da pilha antes de destacá-lo (ele sai sozinho para a janela nova). */
+    detachFromStack(panelId) {
+        if (!stackOf(this.columnStacks, panelId)) return;
+        const next = removeFromStack({ order: this.columnOrder, stacks: this.columnStacks }, panelId);
+        this.setColumnLayout(next.order, next.stacks);
+    }
+
+    /** Monta embaixo do anfitrião os painéis empilhados com ele, cada um com seu divisor de altura. */
+    mountStackGuests(hostId, hostEl) {
+        const stack = this.columnStacks.find(st => st[0] === hostId);
+        if (!stack || !hostEl) return;
+        hostEl.classList.add("dock-stack-host");
+        const side = hostEl.classList.contains("dock-right") ? "right" : "left";
+        stack.slice(1).forEach((guestId) => {
+            const isPopped = !!(window.popoutWindows?.[guestId] && !window.popoutWindows[guestId].closed);
+            // O anfitrião pode estar num contêiner ainda fora da página (studioTop/compoundStage recém-criados).
+            const guestEl = hostEl.querySelector(`:scope > #${guestId}`)
+                || document.getElementById(guestId)
+                || this.studioTop?.querySelector(`#${guestId}`)
+                || this.compoundStage?.querySelector(`#${guestId}`)
+                || this.poppedElements?.[guestId];
+            if (!guestEl || isPopped || guestEl.ownerDocument !== document) return;
+            const splitter = document.createElement("div");
+            splitter.className = "dock-stack-splitter";
+            splitter.dataset.guest = guestId;
+            splitter.setAttribute("data-tooltip", "Arraste para redimensionar");
+            hostEl.appendChild(splitter);
+            hostEl.appendChild(guestEl);
+            guestEl.classList.add("dock-stack-guest");
+            guestEl.classList.remove("collapsed");
+            this.updatePanelDockDirection(guestId, side);
+            const saved = parseFloat(localStorage.getItem(`capiau_stack_h_${guestId}`));
+            if (!isNaN(saved) && saved > 80) guestEl.style.setProperty("--dock-guest-h", `${saved}px`);
+            else guestEl.style.removeProperty("--dock-guest-h");
+            this.bindStackSplitter(splitter, guestEl, hostEl);
+        });
+    }
+
+    bindStackSplitter(splitter, guestEl, hostEl) {
+        splitter.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            splitter.setPointerCapture(e.pointerId);
+            const startY = e.clientY;
+            const startH = guestEl.getBoundingClientRect().height;
+            const maxH = hostEl.getBoundingClientRect().height - 140;
+            splitter.classList.add("active");
+            const move = (ev) => {
+                const h = Math.max(120, Math.min(maxH, startH - (ev.clientY - startY)));
+                guestEl.style.setProperty("--dock-guest-h", `${Math.round(h)}px`);
+            };
+            const up = () => {
+                splitter.classList.remove("active");
+                splitter.removeEventListener("pointermove", move);
+                splitter.removeEventListener("pointerup", up);
+                splitter.removeEventListener("pointercancel", up);
+                const h = parseFloat(guestEl.style.getPropertyValue("--dock-guest-h"));
+                if (!isNaN(h)) {
+                    try { localStorage.setItem(`capiau_stack_h_${guestEl.id}`, String(h)); } catch (err) {}
+                }
+                window.dispatchEvent(new Event("resize"));
+            };
+            splitter.addEventListener("pointermove", move);
+            splitter.addEventListener("pointerup", up);
+            splitter.addEventListener("pointercancel", up);
+        });
     }
 
     getDockLayout() {
@@ -214,7 +299,7 @@ export class WorkspaceManager {
         try {
             this.setTimelinePosition(legacy.timelinePosition, true);
             this.setMonitorsLayout(legacy.monitorsLayout, true);
-            this.applyColumnsOrder(legacy.columnOrder, true);
+            this.setColumnLayout(legacy.columnOrder, legacy.columnStacks || []);
 
             // Janelas destacadas: primeiro fecha as que sobram, depois abre as que faltam.
             // Abrir precisa do gesto do usuário (o atalho de teclado conta) e o navegador
@@ -1911,7 +1996,26 @@ export class WorkspaceManager {
                 || this.poppedElements?.[id];
         };
 
+        // Pilhas (F2b): convidados ficam dentro do anfitrião; limpa montagens antigas das colunas deste lote.
+        const guests = stackGuests(this.columnStacks);
         colIds.forEach((colId) => {
+            if (colId === "center-stage") return;
+            const el = findColumnElement(colId);
+            if (!el) return;
+            el.querySelectorAll(":scope > .dock-stack-splitter").forEach(sp => sp.remove());
+            el.classList.remove("dock-stack-host");
+            if (!guests.has(colId)) {
+                el.classList.remove("dock-stack-guest");
+                el.style.removeProperty("--dock-guest-h");
+            }
+        });
+
+        colIds.forEach((colId) => {
+            if (guests.has(colId)) {
+                const reopenGuest = reopenMap[colId] ? findColumnElement(reopenMap[colId]) : null;
+                if (reopenGuest) reopenGuest.style.display = "none";
+                return;
+            }
             if (colId === "center-stage") {
                 const centerEl = findColumnElement("center-stage");
                 if (centerEl) {
@@ -1946,6 +2050,7 @@ export class WorkspaceManager {
                     targetContainer.appendChild(reopenEl);
                 }
             }
+            if (colEl && !isPopped) this.mountStackGuests(colId, colEl);
         });
     }
 
@@ -3043,6 +3148,7 @@ export class WorkspaceManager {
             monitorsLayout: monitorsLayout,
             timelinePosition: timelinePosition,
             columnOrder: [...this.columnOrder],
+            columnStacks: this.columnStacks.map(st => [...st]),
             popouts: Object.keys(window.popoutWindows || {}).filter(k => window.popoutWindows[k] && !window.popoutWindows[k].closed),
             splitters: {
                 "layout-dim-splitter-sidebar-left": getDim("layout-dim-splitter-sidebar-left"),
@@ -3209,8 +3315,11 @@ export class WorkspaceManager {
             this.setTimelinePosition(wantTimelinePosition, true);
             this.setMonitorsLayout(wantMonitorsLayout, true);
 
+            const stacks = Array.isArray(customConfig.columnStacks) ? customConfig.columnStacks : [];
             if (customConfig.columnOrder && Array.isArray(customConfig.columnOrder) && customConfig.columnOrder.length > 0) {
-                this.applyColumnsOrder(customConfig.columnOrder, true);
+                this.setColumnLayout(customConfig.columnOrder, stacks);
+            } else {
+                this.setColumnLayout(this.columnOrder, stacks);
             }
 
             // Restaura dimensões gravadas nos Splitters
@@ -3493,7 +3602,7 @@ export class WorkspaceManager {
             if (preset) {
                 this.setTimelinePosition(preset.timeline, true);
                 this.setMonitorsLayout(preset.monitors, true);
-                this.applyColumnsOrder(preset.columns, true);
+                this.setColumnLayout(preset.columns, []);
             }
 
             if (ws === "montagem") {
@@ -3586,6 +3695,9 @@ export class WorkspaceManager {
             return;
         }
 
+        // Painel empilhado sai da pilha antes de ir para a janela nova.
+        this.detachFromStack(panelId);
+
         const winName = getPopoutWindowName(panelId);
         
         // Lê dimensões e coordenadas salvas no localStorage
@@ -3663,6 +3775,9 @@ export class WorkspaceManager {
             dualWin.focus();
             return;
         }
+
+        this.detachFromStack(panelId1);
+        this.detachFromStack(panelId2);
 
         // Se algum dos painéis já estiver destacado individualmente, fecha e restaura antes
         if (window.popoutWindows[panelId1] && !window.popoutWindows[panelId1].closed && window.popoutWindows[panelId1] !== dualWin) {
