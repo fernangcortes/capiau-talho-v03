@@ -11,6 +11,7 @@
 //   nó divisão: { split: "row" | "column", children: [...], role?, auto? }
 //               role "center"   = o bloco central legado (monitores e, às vezes, timeline)
 //               role "monitors" = Source + Program; auto: true = orientação automática
+//               role "stack"    = laterais empilhadas numa mesma coluna (F2b), de cima para baixo
 
 export const LAYOUT_VERSION = 1;
 export const MAX_PANELS_PER_FLOAT = 4;
@@ -31,7 +32,7 @@ const isSplit = (node) => !!node && (node.split === "row" || node.split === "col
 /**
  * Constrói a árvore a partir do estado legado do WorkspaceManager.
  * @param {{columnOrder: string[], timelinePosition: string, monitorsLayout: string,
- *          popped?: string[], dual?: {panels: string[], layout?: string} | null}} state
+ *          columnStacks?: string[][], popped?: string[], dual?: {panels: string[], layout?: string} | null}} state
  */
 export function layoutFromLegacy(state) {
     const order = Array.isArray(state.columnOrder) && state.columnOrder.length
@@ -52,16 +53,30 @@ export function layoutFromLegacy(state) {
     const timeline = leaf(TIMELINE_ID, away.has(TIMELINE_ID));
     const center = { split: "column", role: "center", children: position === "center" ? [monitors, timeline] : [monitors] };
     const column = (id) => (id === CENTER_STAGE ? center : leaf(id, away.has(id)));
-    const row = (ids) => ({ split: "row", children: ids.map(column) });
+    const stacks = (state.columnStacks || []).filter(st => Array.isArray(st) && st.length >= 2);
+    // Membros de uma pilha ficam juntos em order (dockOps garante); viram um nó "stack" no lugar deles.
+    const row = (ids) => {
+        const children = [];
+        for (let i = 0; i < ids.length; i++) {
+            const stack = stacks.find(st => st[0] === ids[i]);
+            if (stack && stack.every((id, k) => ids[i + k] === id)) {
+                children.push({ split: "column", role: "stack", children: stack.map(id => leaf(id, away.has(id))) });
+                i += stack.length - 1;
+            } else {
+                children.push(column(ids[i]));
+            }
+        }
+        return { split: "row", children };
+    };
 
     const ci = order.indexOf(CENTER_STAGE);
     let main;
     if (position === "bottom-full") {
         main = { split: "column", children: [row(order), timeline] };
     } else if (position === "bottom-left" && ci !== -1) {
-        main = { split: "row", children: [{ split: "column", children: [row(order.slice(0, ci + 1)), timeline] }, ...order.slice(ci + 1).map(column)] };
+        main = { split: "row", children: [{ split: "column", children: [row(order.slice(0, ci + 1)), timeline] }, ...row(order.slice(ci + 1)).children] };
     } else if (position === "bottom-right" && ci !== -1) {
-        main = { split: "row", children: [...order.slice(0, ci).map(column), { split: "column", children: [row(order.slice(ci)), timeline] }] };
+        main = { split: "row", children: [...row(order.slice(0, ci)).children, { split: "column", children: [row(order.slice(ci)), timeline] }] };
     } else {
         main = row(order);
     }
@@ -103,12 +118,18 @@ export function legacyFromLayout(layout) {
 
     const monitorsLayout = monitors.auto ? "auto" : (monitors.split === "column" ? "stacked" : "side-by-side");
     const isTimeline = (node) => isLeaf(node) && node.panel === TIMELINE_ID;
+    const columnStacks = [];
     const colsOf = (nodes) => {
         const ids = [];
         for (const node of nodes) {
             if (node === center) ids.push(CENTER_STAGE);
             else if (isLeaf(node) && COLUMN_IDS.includes(node.panel)) ids.push(node.panel);
-            else return null;
+            else if (isSplit(node) && node.role === "stack" && node.children.length >= 2
+                && node.children.every(c => isLeaf(c) && COLUMN_IDS.includes(c.panel))) {
+                const members = node.children.map(c => c.panel);
+                columnStacks.push(members);
+                ids.push(...members);
+            } else return null;
         }
         return ids;
     };
@@ -153,7 +174,7 @@ export function legacyFromLayout(layout) {
             return null;
         }
     }
-    return { columnOrder, timelinePosition, monitorsLayout, popped, dual };
+    return { columnOrder, timelinePosition, monitorsLayout, columnStacks, popped, dual };
 }
 
 /** Lista os painéis presentes (não "away") de um nó, na ordem da árvore. */

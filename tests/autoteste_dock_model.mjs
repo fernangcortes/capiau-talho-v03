@@ -34,7 +34,7 @@ let combos = 0;
 for (const columnOrder of orders) {
     for (const timelinePosition of positions) {
         for (const monitorsLayout of monitors) {
-            const state = { columnOrder, timelinePosition, monitorsLayout, popped: [], dual: null };
+            const state = { columnOrder, timelinePosition, monitorsLayout, columnStacks: [], popped: [], dual: null };
             const layout = layoutFromLegacy(state);
             assert.deepEqual(validateLayout(layout), [], `layout inválido para ${JSON.stringify(state)}`);
             assert.deepEqual(legacyFromLayout(layout), state, `ida e volta falhou para ${JSON.stringify(state)}`);
@@ -50,7 +50,7 @@ const presets = {
 };
 for (const [name, columnOrder] of Object.entries(presets)) {
     const popped = ["timeline-panel", "program-player-panel"];
-    const state = { columnOrder, timelinePosition: "bottom-full", monitorsLayout: "stacked", popped, dual: null };
+    const state = { columnOrder, timelinePosition: "bottom-full", monitorsLayout: "stacked", columnStacks: [], popped, dual: null };
     const layout = layoutFromLegacy(state);
     assert.deepEqual(validateLayout(layout), [], `preset ${name} com janelas destacadas inválido`);
     assert.deepEqual(legacyFromLayout(layout), state);
@@ -62,7 +62,7 @@ console.log("✔ 1.2 passou: janelas destacadas individuais guardam o lugar de v
 
 {
     const dual = { panels: ["inspector-panel", "sidebar-right"], layout: "stacked" };
-    const state = { columnOrder: presets.padrao, timelinePosition: "center", monitorsLayout: "auto", popped: ["source-player-panel"], dual };
+    const state = { columnOrder: presets.padrao, timelinePosition: "center", monitorsLayout: "auto", columnStacks: [], popped: ["source-player-panel"], dual };
     const layout = layoutFromLegacy(state);
     assert.deepEqual(validateLayout(layout), []);
     assert.deepEqual(legacyFromLayout(layout), state);
@@ -70,6 +70,26 @@ console.log("✔ 1.2 passou: janelas destacadas individuais guardam o lugar de v
     assert.equal(dualFloat.root.split, "column", "janela dupla empilhada vira divisão em coluna");
 }
 console.log("✔ 1.3 passou: Janela Dupla (lado a lado/empilhada) é uma janela destacada com 2 painéis.");
+
+{
+    // Pilhas (F2b): em todas as ordens e posições da timeline, a pilha vira um nó "stack" e volta igual.
+    const ops = await import(pathToFileURL(path.join(rootDir, "src", "ui", "js", "dockOps.js")).href);
+    let stackCombos = 0;
+    for (const baseOrder of orders) {
+        for (const timelinePosition of positions) {
+            for (const stack of [["sidebar-left", "sidebar-right"], ["inspector-panel", "sidebar-left", "sidebar-right"]]) {
+                const columnStacks = ops.normalizeStacks([stack]);
+                const columnOrder = ops.syncOrderWithStacks(baseOrder, columnStacks);
+                const state = { columnOrder, timelinePosition, monitorsLayout: "auto", columnStacks, popped: [], dual: null };
+                const layout = layoutFromLegacy(state);
+                assert.deepEqual(validateLayout(layout), [], `pilha inválida: ${JSON.stringify(state)}`);
+                assert.deepEqual(legacyFromLayout(layout), state, `pilha não voltou igual: ${JSON.stringify(state)}`);
+                stackCombos++;
+            }
+        }
+    }
+    console.log(`✔ 1.4 passou: ${stackCombos} combinações com pilhas de 2 e 3 laterais vão e voltam iguais.`);
+}
 
 // ----------------------------------------------------------------------
 // PARTE 2: Validação
