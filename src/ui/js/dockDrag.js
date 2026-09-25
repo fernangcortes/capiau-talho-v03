@@ -87,31 +87,34 @@ export class DockDragController {
 
     /** Insere a alça ⋮⋮ no começo do cabeçalho de cada painel arrastável. */
     injectHandles() {
-        Object.entries(DOCK_PANELS).forEach(([panelId, meta]) => {
-            const header = document.querySelector(meta.header);
-            if (!header || header.querySelector(":scope > .dock-handle")) return;
-            const handle = document.createElement("span");
-            handle.className = "dock-handle";
-            handle.dataset.dockPanel = panelId;
-            handle.setAttribute("data-tooltip", `Arrastar ${meta.title}: solte fora do editor para destacar`);
-            handle.setAttribute("aria-hidden", "true");
-            handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
-            handle.addEventListener("pointerdown", (e) => this.handleDown(e, panelId, handle));
-            // Sem arrastar: Ctrl+duplo-clique alterna entre janela destacada e o último lugar no editor;
-            // botão direito abre o menu da alça.
-            handle.addEventListener("dblclick", (e) => {
-                if (!(e.ctrlKey || e.metaKey)) return;
-                e.preventDefault();
-                e.stopPropagation();
-                this.wm.togglePopout(panelId);
-            });
-            handle.addEventListener("contextmenu", (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.showHandleMenu(panelId, handle, e);
-            });
-            header.prepend(handle);
+        Object.entries(DOCK_PANELS).forEach(([panelId, meta]) => this.addHandle(panelId, document.querySelector(meta.header)));
+    }
+
+    /** Alça num cabeçalho (também para painéis criados na hora, como abas destacadas — F5). */
+    addHandle(panelId, header) {
+        const meta = DOCK_PANELS[panelId];
+        if (!header || !meta || header.querySelector(":scope > .dock-handle")) return;
+        const handle = document.createElement("span");
+        handle.className = "dock-handle";
+        handle.dataset.dockPanel = panelId;
+        handle.setAttribute("data-tooltip", `Arrastar ${meta.title}: solte fora do editor para destacar`);
+        handle.setAttribute("aria-hidden", "true");
+        handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
+        handle.addEventListener("pointerdown", (e) => this.handleDown(e, panelId, handle));
+        // Sem arrastar: Ctrl+duplo-clique alterna entre janela destacada e o último lugar no editor;
+        // botão direito abre o menu da alça.
+        handle.addEventListener("dblclick", (e) => {
+            if (!(e.ctrlKey || e.metaKey)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this.wm.togglePopout(panelId);
         });
+        handle.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showHandleMenu(panelId, handle, e);
+        });
+        header.prepend(handle);
     }
 
     /** Menu da alça: alternativa sem arrastar. */
@@ -317,11 +320,13 @@ export class DockDragController {
         const ownWin = popouts[panelId];
         const groupWin = popouts["group"] && !popouts["group"].closed ? popouts["group"] : null;
         const dualWin = popouts["dual-sidebar"] && !popouts["dual-sidebar"].closed ? popouts["dual-sidebar"] : null;
-        const seen = new Set();
-        for (const [key, w] of Object.entries(popouts)) {
-            if (!w || w.closed || seen.has(w) || w === ownWin || key === "group" || key === "dual-sidebar") continue;
-            seen.add(w);
-            if (sx < w.screenX || sx > w.screenX + w.outerWidth || sy < w.screenY || sy > w.screenY + w.outerHeight) continue;
+        // Janelas sob o ponto; com sobreposição, vale a focada por último (a que está por cima).
+        const candidates = [...new Set(Object.entries(popouts)
+            .filter(([key, w]) => w && !w.closed && w !== ownWin && key !== "group" && key !== "dual-sidebar")
+            .map(([, w]) => w))]
+            .filter(w => sx >= w.screenX && sx <= w.screenX + w.outerWidth && sy >= w.screenY && sy <= w.screenY + w.outerHeight)
+            .sort((a, b) => (b.__dockZ || 0) - (a.__dockZ || 0));
+        for (const w of candidates.slice(0, 1)) {
             const inside = w === groupWin ? this.wm.getGroupPanels()
                 : w === dualWin ? (localStorage.getItem("capiau_dual_popout_panels") || "").split(",").filter(Boolean)
                 : Object.keys(popouts).filter(id => popouts[id] === w && DOCK_PANELS[id]);
