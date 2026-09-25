@@ -71,7 +71,7 @@ assert.ok(mainJs.includes("new DockDragController(workspace)"));
 for (const cls of [".dock-handle", ".dock-ghost", ".dock-preview", ".dock-drop-label", ".dock-undo-toast"]) {
     assert.ok(css.includes(`${cls} {`) || css.includes(`${cls},`), `estilo ${cls}`);
 }
-assert.ok(/\.dock-handle \{ display: none !important; \}/.test(panelHtml), "alça escondida nas janelas destacadas até a F3");
-console.log("✔ 5 passou: controlador criado no main.js, estilos presentes, alça escondida nas janelas destacadas.");
+assert.ok(!/\.dock-handle \{ display: none !important; \}/.test(panelHtml), "alça visível nas janelas destacadas (F3/F4)");
+console.log("✔ 5 passou: controlador criado no main.js, estilos presentes, alça visível nas janelas destacadas.");
 
 console.log("\n=== AUTOTESTE DOCK DRAG CONCLUÍDO COM SUCESSO ===");

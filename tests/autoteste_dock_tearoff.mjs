@@ -37,8 +37,8 @@ console.log("✔ 3 passou: plano B com botão 'Abrir em janela'.");
 assert.ok(dockDrag.includes("this.calib = { bx: e.screenX - e.clientX - window.screenX"), "calibração guarda o deslocamento da borda da janela");
 assert.ok(/d\.fromPopout \? this\.screenToMain\(e\.screenX, e\.screenY\)/.test(dockDrag), "ponteiro da janela destacada convertido para o editor");
 assert.ok(dockDrag.includes("this.homeTarget(d.panelId)"), "solto no editor sem zona: volta para o lugar de antes");
-assert.ok(/dockBack\(panelId, target\) \{\s*this\.wm\.togglePopout\(panelId\);/.test(dockDrag), "reacoplar fecha a janela e restaura o painel");
-assert.ok(panelHtml.includes("#dual-workspace .dock-handle { display: none !important; }"), "alça visível na janela simples, escondida na dupla até a F4");
+assert.ok(/dockBack\(panelId, target\) \{[\s\S]{0,400}else this\.wm\.togglePopout\(panelId\);/.test(dockDrag), "reacoplar fecha a janela e restaura o painel (Janela Dupla: separa)");
+assert.ok(!panelHtml.includes("#dual-workspace .dock-handle { display: none !important; }"), "alça visível na janela simples e na dupla (F4)");
 console.log("✔ 4 passou: arrastar de volta usa a ponte de coordenadas e as zonas do editor.");
 
 // 5. Continuidade de mídia ao destacar (vídeo não volta a 0 s)

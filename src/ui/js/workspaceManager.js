@@ -3837,6 +3837,100 @@ export class WorkspaceManager {
         try { popup.close(); } catch (e) {}
     }
 
+    /**
+     * F4: uma janela destacada troca de modo navegando para outro panel.html (simples ↔ dupla).
+     * O beforeunload dela avisa "fechou"; durante a troca esse aviso não pode restaurar nada.
+     */
+    suppressCloseMessages(panels) {
+        this._suppressedClose = { panels: new Set(panels), until: Date.now() + 4000 };
+    }
+
+    isCloseMessageSuppressed(panels) {
+        const s = this._suppressedClose;
+        return !!s && Date.now() < s.until && panels.filter(Boolean).every(id => s.panels.has(id));
+    }
+
+    watchWindowClosed(win, onClosed) {
+        const timer = setInterval(() => {
+            if (!win.closed) return;
+            clearInterval(timer);
+            onClosed();
+        }, 500);
+    }
+
+    /**
+     * F4: junta panelId à janela destacada de targetPanel, que vira a Janela Dupla sem abrir janela
+     * nova (sem depender do gesto do usuário). side: "left" | "right" | "top" | "bottom".
+     * Retorna false se não for possível (já existe Janela Dupla, janela fechada, painel inválido).
+     */
+    joinIntoPopout(targetPanel, panelId, side) {
+        const win = window.popoutWindows[targetPanel];
+        const dual = window.popoutWindows["dual-sidebar"];
+        if (!win || win.closed || (dual && !dual.closed) || targetPanel === panelId) return false;
+
+        // O painel arrastado sai de onde estiver (outra janela destacada ou pilha).
+        const own = window.popoutWindows[panelId];
+        if (own && !own.closed) this.togglePopout(panelId);
+        this.detachFromStack(panelId);
+
+        // Traz o painel da janela de volta antes de ela recarregar (o documento antigo será descartado).
+        this.suppressCloseMessages([targetPanel]);
+        delete window.popoutWindows[targetPanel];
+        this.restorePanel(targetPanel);
+
+        const order = side === "left" || side === "top" ? [panelId, targetPanel] : [targetPanel, panelId];
+        const layout = side === "top" || side === "bottom" ? "stacked" : "side-by-side";
+        order.forEach(id => {
+            window.popoutWindows[id] = win;
+            localStorage.setItem(`capiau_popout_active_${id}`, "true");
+        });
+        window.popoutWindows["dual-sidebar"] = win;
+        localStorage.setItem("capiau_dual_popout_active", "true");
+        localStorage.setItem("capiau_dual_popout_panels", order.join(","));
+        localStorage.setItem("capiau_dual_popout_layout", layout);
+        try {
+            if (layout === "side-by-side") win.resizeTo(Math.min(screen.availWidth, Math.max(win.outerWidth, 1000)), win.outerHeight);
+            else win.resizeTo(win.outerWidth, Math.min(screen.availHeight, Math.max(win.outerHeight, 880)));
+        } catch (e) {}
+        win.location.href = `panel.html?panels=${order.join(",")}&layout=${layout}&dock=keep`;
+        this.watchWindowClosed(win, () => {
+            if (window.popoutWindows["dual-sidebar"] === win) this.restoreDualPopout(order[0], order[1]);
+        });
+        return true;
+    }
+
+    /**
+     * F4: tira panelId da Janela Dupla. Ele volta ao editor; o outro painel continua sozinho
+     * na mesma janela (que recarrega no modo simples).
+     */
+    splitFromDual(panelId) {
+        const win = window.popoutWindows["dual-sidebar"];
+        const panels = (localStorage.getItem("capiau_dual_popout_panels") || "").split(",").filter(Boolean);
+        if (!win || win.closed || !panels.includes(panelId)) return false;
+        const other = panels.find(id => id !== panelId);
+
+        this.suppressCloseMessages(panels);
+        delete window.popoutWindows["dual-sidebar"];
+        localStorage.removeItem("capiau_dual_popout_active");
+        localStorage.removeItem("capiau_dual_popout_panels");
+        panels.forEach(id => {
+            delete window.popoutWindows[id];
+            this.restorePanel(id);
+        });
+        this.rebindMainSidebarToggles();
+        this.updateAllPanelsDockDirection();
+        this.reinitSplitters();
+
+        window.popoutWindows[other] = win;
+        localStorage.setItem(`capiau_popout_active_${other}`, "true");
+        win.location.href = `panel.html?panel=${other}&dock=keep`;
+        this.watchWindowClosed(win, () => {
+            if (window.popoutWindows[other] === win) this.restorePanel(other);
+        });
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 40);
+        return true;
+    }
+
     registerPopout(panelId, win) {
         if (!win || win.closed) return;
         window.popoutWindows[panelId] = win;
@@ -4220,10 +4314,12 @@ export class WorkspaceManager {
             }
         }
         else if (data.type === "POPOUT_CLOSED") {
+            if (this.isCloseMessageSuppressed([data.panel])) return;
             this.restorePanel(data.panel);
         }
         else if (data.type === "DUAL_POPOUT_CLOSED") {
             const panels = data.panels || [];
+            if (this.isCloseMessageSuppressed(panels)) return;
             this.restoreDualPopout(panels[0], panels[1]);
         }
     }
