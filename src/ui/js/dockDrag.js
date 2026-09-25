@@ -248,15 +248,26 @@ export class DockDragController {
         const d = this.drag;
         if (!d) return;
         const released = e.type === "pointerup" && d.started;
-        const target = d.target;
+        let target = d.target;
+        // Confere de novo no ponto de soltar: o último movimento pode ter sido processado enquanto
+        // a janela prévia nascia e perdido a janela destacada embaixo do cursor.
+        if (released && !target && d.outside) {
+            const join = this.findJoinTarget(d.panelId, e.screenX, e.screenY);
+            if (join) {
+                if (d.live) this.wm.cancelLivePopout(d.panelId, d.live);
+                d.live = null;
+                target = join;
+            }
+        }
         this.endDrag(!released);
         if (!released) return;
 
         const title = DOCK_PANELS[d.panelId].title;
         if (target?.type === "join") {
-            if (this.wm.joinIntoPopout(target.targetPanel, d.panelId, target.side)) {
-                this.showToast("undo", `Janela Dupla: ${target.label}`);
-            }
+            const ok = target.pairOfColumns
+                ? this.wm.joinIntoPopout(target.targetPanel, d.panelId, target.side)
+                : this.wm.joinIntoWindow(target.win, d.panelId, target.position, target.arrangement);
+            if (ok) this.showToast("undo", `${target.pairOfColumns ? "Janela Dupla" : "Janela destacada"}: ${target.label}`);
             return;
         }
         if (d.fromPopout) {
@@ -296,28 +307,40 @@ export class DockDragController {
     }
 
     /**
-     * F4: janela destacada simples (de uma lateral) sob o ponto de tela, para juntar os dois numa
-     * Janela Dupla. A borda mais próxima decide: esquerda/direita = lado a lado, cima/baixo = empilhados.
+     * F4: janela destacada sob o ponto de tela, para juntar o painel a ela (até 4 por janela).
+     * A borda mais próxima decide: esquerda/direita = lado a lado, cima/baixo = empilhados;
+     * esquerda/cima põem o painel no começo. Duas laterais sozinhas viram a Janela Dupla (F4a);
+     * o resto vira janela de grupo (F4b, panel-group.html).
      */
     findJoinTarget(panelId, sx, sy) {
-        if (!COLUMN_PANELS.includes(panelId)) return null;
-        const dual = window.popoutWindows?.["dual-sidebar"];
-        if (dual && !dual.closed) return null;
-        for (const id of COLUMN_PANELS) {
-            if (id === panelId) continue;
-            const w = window.popoutWindows?.[id];
-            if (!w || w.closed) continue;
+        const popouts = window.popoutWindows || {};
+        const ownWin = popouts[panelId];
+        const groupWin = popouts["group"] && !popouts["group"].closed ? popouts["group"] : null;
+        const dualWin = popouts["dual-sidebar"] && !popouts["dual-sidebar"].closed ? popouts["dual-sidebar"] : null;
+        const seen = new Set();
+        for (const [key, w] of Object.entries(popouts)) {
+            if (!w || w.closed || seen.has(w) || w === ownWin || key === "group" || key === "dual-sidebar") continue;
+            seen.add(w);
             if (sx < w.screenX || sx > w.screenX + w.outerWidth || sy < w.screenY || sy > w.screenY + w.outerHeight) continue;
+            const inside = w === groupWin ? this.wm.getGroupPanels()
+                : w === dualWin ? (localStorage.getItem("capiau_dual_popout_panels") || "").split(",").filter(Boolean)
+                : Object.keys(popouts).filter(id => popouts[id] === w && DOCK_PANELS[id]);
+            if (inside.length === 0 || inside.length >= 4) return null;
             const border = (w.outerWidth - w.innerWidth) / 2;
             const left = w.screenX + border;
             const top = w.screenY + (w.outerHeight - w.innerHeight) - border;
             const rx = (sx - left) / w.innerWidth;
             const ry = (sy - top) / w.innerHeight;
             const side = [["left", rx], ["right", 1 - rx], ["top", ry], ["bottom", 1 - ry]].sort((a, b) => a[1] - b[1])[0][0];
-            const pair = side === "left" || side === "top"
-                ? `${DOCK_PANELS[panelId].title} + ${DOCK_PANELS[id].title}`
-                : `${DOCK_PANELS[id].title} + ${DOCK_PANELS[panelId].title}`;
-            return { type: "join", targetPanel: id, win: w, side, label: `${pair} ${side === "left" || side === "right" ? "lado a lado" : "empilhados"}` };
+            const position = side === "left" || side === "top" ? "start" : "end";
+            const titles = inside.map(id => DOCK_PANELS[id]?.title || id);
+            const pairOfColumns = inside.length === 1 && COLUMN_PANELS.includes(inside[0]) && COLUMN_PANELS.includes(panelId) && !dualWin;
+            if (!pairOfColumns && groupWin && groupWin !== w) return null; // uma janela de grupo por vez
+            const count = inside.length + 1;
+            const arrangement = count >= 4 ? "grid" : (side === "left" || side === "right" ? "row" : "column");
+            const names = position === "start" ? [DOCK_PANELS[panelId].title, ...titles] : [...titles, DOCK_PANELS[panelId].title];
+            const how = arrangement === "grid" ? "em grade" : arrangement === "row" ? "lado a lado" : "empilhados";
+            return { type: "join", win: w, targetPanel: inside[0], side, position, arrangement, pairOfColumns, label: `${names.join(" + ")} ${how}` };
         }
         return null;
     }
@@ -357,7 +380,7 @@ export class DockDragController {
         const dual = window.popoutWindows?.["dual-sidebar"];
         // Da Janela Dupla (F4): só este painel volta; o outro continua sozinho na mesma janela.
         if (dual && !dual.closed && window.popoutWindows[panelId] === dual) this.wm.splitFromDual(panelId);
-        else this.wm.togglePopout(panelId);
+        else this.wm.togglePopout(panelId); // painel de grupo: togglePopout tira só ele (F4b)
         if (target.type !== "home") setTimeout(() => this.applyTarget(target, false), 30);
         this.showToast("undo", target.type === "home" ? target.label.replace("Reacoplar", "Reacoplado:") : `Reacoplado: ${target.label}`);
     }

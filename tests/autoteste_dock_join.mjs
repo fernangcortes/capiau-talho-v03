@@ -29,14 +29,14 @@ assert.ok(/dual && !dual\.closed && window\.popoutWindows\[panelId\] === dual\) 
 console.log("✔ 2 passou: separar deixa o outro painel sozinho na mesma janela.");
 
 // 3. O aviso de 'fechou' da janela que troca de modo não restaura nada
-assert.ok(wm.includes("if (this.isCloseMessageSuppressed([data.panel])) return;"));
-assert.ok(wm.includes("if (this.isCloseMessageSuppressed(panels)) return;"));
+assert.ok(wm.includes("if (this.isCloseMessageSuppressed([data.panel]) || this.isStaleCloseMessage([data.panel], data.windowName)) return;"));
+assert.ok(wm.includes("if (this.isCloseMessageSuppressed(panels) || this.isStaleCloseMessage(panels, data.windowName)) return;"));
 console.log("✔ 3 passou: avisos de fechamento suprimidos durante a troca de modo.");
 
 // 4. Alvo de juntar: só janelas simples de laterais, e só sem Janela Dupla aberta
-assert.ok(/findJoinTarget\(panelId, sx, sy\) \{\s*if \(!COLUMN_PANELS\.includes\(panelId\)\) return null;[\s\S]{0,160}if \(dual && !dual\.closed\) return null;/.test(dd));
+assert.ok(dd.includes("const pairOfColumns = inside.length === 1 && COLUMN_PANELS.includes(inside[0]) && COLUMN_PANELS.includes(panelId) && !dualWin;"), "duas laterais sozinhas viram a Janela Dupla (F4b generaliza o resto)");
 assert.ok(dd.includes("drawJoin(join)") && dd.includes("this.drawJoin(null);"), "prévia desenhada na janela alvo e removida ao terminar");
 assert.ok(!panelHtml.includes("#dual-workspace .dock-handle { display: none"), "alça visível também na Janela Dupla");
-console.log("✔ 4 passou: juntar só laterais em janela simples; prévia na janela alvo; alça na dupla.");
+console.log("✔ 4 passou: par de laterais vira a Janela Dupla; prévia na janela alvo; alça na dupla.");
 
 console.log("\n=== AUTOTESTE DOCK JOIN CONCLUÍDO COM SUCESSO ===");

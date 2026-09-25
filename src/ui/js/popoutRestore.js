@@ -21,7 +21,14 @@ function setRestoreMode(mode) {
 export function collectPendingPopouts() {
     const pending = [];
     let dualPanels = [];
+    let groupPanels = [];
     try {
+        if (localStorage.getItem("capiau_group_popout_active") === "true") {
+            groupPanels = (localStorage.getItem("capiau_group_popout_panels") || "").split(",").filter(Boolean);
+            if (groupPanels.length >= 2 && !isOpen(window.popoutWindows?.["group"])) {
+                pending.push({ kind: "group", panels: groupPanels, arrangement: localStorage.getItem("capiau_group_popout_arrangement") || "row" });
+            }
+        }
         if (localStorage.getItem("capiau_dual_popout_active") === "true") {
             dualPanels = (localStorage.getItem("capiau_dual_popout_panels") || "").split(",").filter(Boolean);
             if (dualPanels.length === 2 && !isOpen(window.popoutWindows?.["dual-sidebar"])) {
@@ -29,7 +36,7 @@ export function collectPendingPopouts() {
             }
         }
         PANEL_IDS.forEach(id => {
-            if (dualPanels.includes(id)) return;
+            if (dualPanels.includes(id) || groupPanels.includes(id)) return;
             if (localStorage.getItem(`capiau_popout_active_${id}`) === "true" && !isOpen(window.popoutWindows?.[id])) {
                 pending.push({ kind: "single", id });
             }
@@ -39,13 +46,17 @@ export function collectPendingPopouts() {
 }
 
 function titleOf(item) {
+    if (item.kind === "group") return `janela com ${item.panels.map(id => DOCK_PANELS[id]?.title || id).join(" + ")}`;
     if (item.kind === "dual") return `Janela Dupla (${item.panels.map(id => DOCK_PANELS[id]?.title || id).join(" + ")})`;
     return DOCK_PANELS[item.id]?.title || item.id;
 }
 
 function forget(item) {
     try {
-        if (item.kind === "dual") {
+        if (item.kind === "group") {
+            localStorage.removeItem("capiau_group_popout_active");
+            item.panels.forEach(id => localStorage.removeItem(`capiau_popout_active_${id}`));
+        } else if (item.kind === "dual") {
             localStorage.removeItem("capiau_dual_popout_active");
             item.panels.forEach(id => localStorage.removeItem(`capiau_popout_active_${id}`));
         } else {
@@ -64,6 +75,10 @@ export class PopoutRestorer {
 
     /** Abre uma janela pendente. Retorna true se abriu. */
     open(item, quiet) {
+        if (item.kind === "group") {
+            this.wm.openGroupPopout(item.panels, item.arrangement, { quiet });
+            return isOpen(window.popoutWindows?.["group"]);
+        }
         if (item.kind === "dual") {
             this.wm.openDualPopout(item.panels[0], item.panels[1], item.layout, { quiet });
             return isOpen(window.popoutWindows?.["dual-sidebar"]);

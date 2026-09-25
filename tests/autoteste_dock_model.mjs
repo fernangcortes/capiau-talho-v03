@@ -34,7 +34,7 @@ let combos = 0;
 for (const columnOrder of orders) {
     for (const timelinePosition of positions) {
         for (const monitorsLayout of monitors) {
-            const state = { columnOrder, timelinePosition, monitorsLayout, columnStacks: [], popped: [], dual: null };
+            const state = { columnOrder, timelinePosition, monitorsLayout, columnStacks: [], popped: [], dual: null, group: null };
             const layout = layoutFromLegacy(state);
             assert.deepEqual(validateLayout(layout), [], `layout inválido para ${JSON.stringify(state)}`);
             assert.deepEqual(legacyFromLayout(layout), state, `ida e volta falhou para ${JSON.stringify(state)}`);
@@ -50,7 +50,7 @@ const presets = {
 };
 for (const [name, columnOrder] of Object.entries(presets)) {
     const popped = ["timeline-panel", "program-player-panel"];
-    const state = { columnOrder, timelinePosition: "bottom-full", monitorsLayout: "stacked", columnStacks: [], popped, dual: null };
+    const state = { columnOrder, timelinePosition: "bottom-full", monitorsLayout: "stacked", columnStacks: [], popped, dual: null, group: null };
     const layout = layoutFromLegacy(state);
     assert.deepEqual(validateLayout(layout), [], `preset ${name} com janelas destacadas inválido`);
     assert.deepEqual(legacyFromLayout(layout), state);
@@ -62,7 +62,7 @@ console.log("✔ 1.2 passou: janelas destacadas individuais guardam o lugar de v
 
 {
     const dual = { panels: ["inspector-panel", "sidebar-right"], layout: "stacked" };
-    const state = { columnOrder: presets.padrao, timelinePosition: "center", monitorsLayout: "auto", columnStacks: [], popped: ["source-player-panel"], dual };
+    const state = { columnOrder: presets.padrao, timelinePosition: "center", monitorsLayout: "auto", columnStacks: [], popped: ["source-player-panel"], dual, group: null };
     const layout = layoutFromLegacy(state);
     assert.deepEqual(validateLayout(layout), []);
     assert.deepEqual(legacyFromLayout(layout), state);
@@ -80,7 +80,7 @@ console.log("✔ 1.3 passou: Janela Dupla (lado a lado/empilhada) é uma janela 
             for (const stack of [["sidebar-left", "sidebar-right"], ["inspector-panel", "sidebar-left", "sidebar-right"]]) {
                 const columnStacks = ops.normalizeStacks([stack]);
                 const columnOrder = ops.syncOrderWithStacks(baseOrder, columnStacks);
-                const state = { columnOrder, timelinePosition, monitorsLayout: "auto", columnStacks, popped: [], dual: null };
+                const state = { columnOrder, timelinePosition, monitorsLayout: "auto", columnStacks, popped: [], dual: null, group: null };
                 const layout = layoutFromLegacy(state);
                 assert.deepEqual(validateLayout(layout), [], `pilha inválida: ${JSON.stringify(state)}`);
                 assert.deepEqual(legacyFromLayout(layout), state, `pilha não voltou igual: ${JSON.stringify(state)}`);
@@ -89,6 +89,20 @@ console.log("✔ 1.3 passou: Janela Dupla (lado a lado/empilhada) é uma janela 
         }
     }
     console.log(`✔ 1.4 passou: ${stackCombos} combinações com pilhas de 2 e 3 laterais vão e voltam iguais.`);
+}
+
+{
+    // Janela com vários painéis (F4b): 3 e 4 painéis, com disposição, junto de uma janela simples.
+    for (const [panels, arrangement] of [[["timeline-panel", "program-player-panel", "inspector-panel"], "main"], [["sidebar-left", "inspector-panel", "sidebar-right", "source-player-panel"], "grid"], [["timeline-panel", "sidebar-right"], "column"]]) {
+        const state = { columnOrder: presets.padrao, timelinePosition: "bottom-full", monitorsLayout: "auto", columnStacks: [], popped: panels.includes("sidebar-left") ? [] : ["sidebar-left"], dual: null, group: { panels, arrangement } };
+        const layout = layoutFromLegacy(state);
+        assert.deepEqual(validateLayout(layout), [], `grupo inválido: ${panels}`);
+        assert.deepEqual(legacyFromLayout(layout), state, `grupo não voltou igual: ${panels}`);
+        panels.forEach(id => assert.ok(panelsIn(layout.main, { includeAway: true }).includes(id), `lugar de ${id} guardado no editor`));
+    }
+    const five = layoutFromLegacy({ columnOrder: presets.padrao, timelinePosition: "center", monitorsLayout: "auto", group: { panels: ["sidebar-left", "inspector-panel", "sidebar-right", "source-player-panel", "program-player-panel"], arrangement: "grid" } });
+    assert.ok(validateLayout(five).some(e => e.includes("máximo 4")), "grupo com 5 painéis é inválido");
+    console.log("✔ 1.5 passou: janelas com 2–4 painéis (qualquer tipo) e disposição vão e voltam; 5 é inválido.");
 }
 
 // ----------------------------------------------------------------------
