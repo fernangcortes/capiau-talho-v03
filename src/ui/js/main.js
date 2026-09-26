@@ -1842,6 +1842,8 @@ window.addEventListener("DOMContentLoaded", () => {
     // Abas do Painel Lateral destacáveis (F5a); antes da restauração, que pode reabrir abas destacadas.
     window.tabPanels = new TabPanels(workspace, window.dockDrag);
     window.tabPanelTabFromValue = tabFromButtonValue;
+    // P14: abas que estavam no outro menu voltam para lá (depois dos cliques nativos das faixas).
+    setTimeout(() => window.tabPanels.mountSavedStrips(), 0);
     // Janelas destacadas da sessão anterior: reabre sozinho ou mostra "Restaurar janelas".
     window.popoutRestorer = new PopoutRestorer(workspace, window.dockDrag);
     setTimeout(() => window.popoutRestorer.start(), 1200);

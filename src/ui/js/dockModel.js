@@ -32,7 +32,8 @@ const isSplit = (node) => !!node && (node.split === "row" || node.split === "col
 /**
  * Constrói a árvore a partir do estado legado do WorkspaceManager.
  * @param {{columnOrder: string[], timelinePosition: string, monitorsLayout: string,
- *          columnStacks?: string[][], popped?: string[], dual?: {panels: string[], layout?: string} | null}} state
+ *          columnStacks?: string[][], popped?: string[], dual?: {panels: string[], layout?: string} | null,
+ *          group?: {panels: string[], arrangement?: string} | null, tabStrips?: Object<string, string>}} state
  */
 export function layoutFromLegacy(state) {
     const order = Array.isArray(state.columnOrder) && state.columnOrder.length
@@ -100,7 +101,12 @@ export function layoutFromLegacy(state) {
         if ((!dual || !dual.panels.includes(id)) && (!group || !group.panels.includes(id))) floats.push({ id: `float:${id}`, root: leaf(id) });
     });
 
-    return { v: LAYOUT_VERSION, main, floats };
+    const layout = { v: LAYOUT_VERSION, main, floats };
+    // P14: abas que mudaram de menu ({ aba: "left" | "right" }); ausente = todas no menu de origem.
+    const strips = state.tabStrips && typeof state.tabStrips === "object" ? state.tabStrips : {};
+    const tabs = Object.keys(strips).filter(tab => strips[tab] === "left" || strips[tab] === "right").sort();
+    if (tabs.length) layout.tabStrips = Object.fromEntries(tabs.map(tab => [tab, strips[tab]]));
+    return layout;
 }
 
 /**
@@ -185,7 +191,9 @@ export function legacyFromLayout(layout) {
             return null;
         }
     }
-    return { columnOrder, timelinePosition, monitorsLayout, columnStacks, popped, dual, group };
+    const legacy = { columnOrder, timelinePosition, monitorsLayout, columnStacks, popped, dual, group };
+    if (layout.tabStrips && typeof layout.tabStrips === "object") legacy.tabStrips = { ...layout.tabStrips };
+    return legacy;
 }
 
 /** Lista os painéis presentes (não "away") de um nó, na ordem da árvore. */

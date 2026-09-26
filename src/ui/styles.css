@@ -13421,3 +13421,53 @@ body.dock-dragging * {
 .tab-panel-search:focus {
     border-color: rgba(34, 211, 238, 0.5);
 }
+
+/* ── DRAG & DOCK (P14): aba no outro menu ── */
+.tab-btn.dock-guest-active {
+    background: transparent;
+    color: var(--color-violet);
+    border-bottom: 2px solid var(--color-violet);
+    box-shadow: none;
+}
+.tab-panel.dock-strip-guest {
+    display: none;
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    backdrop-filter: none;
+}
+.tab-panel.dock-strip-guest.dock-guest-active {
+    display: flex;
+}
+/* No menu, a faixa já diz qual aba é: o cabeçalho só aparece para a busca própria. */
+.dock-strip-guest .tab-panel-header h2,
+.dock-strip-guest .tab-panel-header .tab-panel-return,
+.dock-strip-guest .tab-panel-header .dock-handle {
+    display: none;
+}
+.dock-strip-guest .tab-panel-search {
+    flex: 1 1 auto;
+}
+.dock-strip-guest.dock-strip-guest-nosearch .tab-panel-header {
+    display: none;
+}
+.dock-strip-marker {
+    display: inline-block;
+    flex: 0 0 3px;
+    width: 3px;
+    align-self: stretch;
+    min-height: 22px;
+    margin: 0 2px;
+    border-radius: 2px;
+    background: var(--color-cyan);
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.7);
+    pointer-events: none;
+}
+.dock-strip-drop {
+    outline: 2px dashed rgba(34, 211, 238, 0.55);
+    outline-offset: -3px;
+}

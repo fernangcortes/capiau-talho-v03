@@ -217,4 +217,17 @@ for (const combo of ["Ctrl+Alt+KeyZ", "Ctrl+Alt+Shift+KeyZ", "Ctrl+Shift+Alt+Key
 }
 console.log("✔ 4.1 passou: histórico ligado aos métodos de layout, atalhos sem conflito, botão presente.");
 
+// 4.2 P14: menu de cada aba viaja no layout (desfazer/refazer, histórico)
+{
+    const base = { columnOrder: ["sidebar-left", "inspector-panel", "center-stage", "sidebar-right"], timelinePosition: "center", monitorsLayout: "auto" };
+    const plain = layoutFromLegacy(base);
+    assert.equal(plain.tabStrips, undefined, "sem abas trocadas, o layout não muda de formato");
+    assert.equal(legacyFromLayout(plain).tabStrips, undefined, "layout antigo = todas no menu de origem");
+    const moved = layoutFromLegacy({ ...base, tabStrips: { transcript: "left", themes: "right", bogus: "top" } });
+    assert.deepEqual(moved.tabStrips, { themes: "right", transcript: "left" });
+    assert.deepEqual(legacyFromLayout(moved).tabStrips, { themes: "right", transcript: "left" });
+    assert.notEqual(serializeLayout(plain), serializeLayout(moved), "mudar aba de menu é um passo do histórico");
+}
+console.log("✔ 4.2 passou: menu das abas no layout.");
+
 console.log("\n=== AUTOTESTE DOCK MODEL CONCLUÍDO COM SUCESSO ===");

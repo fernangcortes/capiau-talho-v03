@@ -38,7 +38,7 @@ assert.ok(restore.includes("[...PANEL_IDS, ...TAB_PANEL_IDS].forEach"), "abas de
 console.log("✔ 2 passou: janelas, grupos, desfazer e restauração valem para abas.");
 
 // 3. Gestos: arrastar a aba (mesmo arrasto do reordenar) e menu da faixa
-assert.ok(strip.includes("window.tabPanelTabFromValue?.(btn.getAttribute(attrName))") && strip.includes("window.tabPanels.onTabDragEnd(tab, e)"), "fim do arrasto da aba decide destacar/juntar (das duas faixas)");
+assert.ok(strip.includes('window.tabPanelTabFromValue?.(btn.getAttribute("data-tab") || btn.getAttribute("data-right-tab"))') && strip.includes("window.tabPanels.onTabDragEnd(tab, e)"), "fim do arrasto da aba decide destacar/juntar (das duas faixas)");
 assert.ok(strip.includes("window.tabPanels.tearOff(clickedTab)"), "menu da faixa: destacar em nova janela");
 assert.ok(/const join = this\.dockDrag\?\.findJoinTarget\(id, sx, sy\);[\s\S]{0,700}if \(insideMain\) return false;/.test(tabs), "dentro do editor só reordena");
 console.log("✔ 3 passou: arrastar para fora destaca, sobre janela junta, dentro reordena; menu da faixa.");
@@ -71,7 +71,25 @@ assert.ok(tabs.includes('input.className = "tab-panel-search";'), "campo de busc
 assert.ok(/if \(tab === "faces"\) window\.FaceManager\?\.onPopoutReady\?\.\(win\);/.test(tabs) && tabs.includes("window.FaceManager?.onPopoutRestored?.()"), "modais e atalhos dos Rostos acompanham a janela");
 assert.ok(!/libraryInstance\?\.onPopoutReady/.test(tabs), "não troca o documento da Biblioteca inteira ao destacar Docs");
 assert.ok(tabs.includes("if (wrapper && !wrapper.isConnected) this.host.appendChild(wrapper);"), "invólucro reaproveitado não é tomado por 'já destacado' (desfazer)");
-assert.ok(strip.includes("container._orderBeforeDrag.forEach(child => container.appendChild(child));"), "destacar não reordena a faixa");
+assert.ok(strip.includes("source?._orderBeforeDrag?.forEach(child => {") && /if \(tab && window\.tabPanels\.onTabDragEnd\(tab, e\)\) restoreOrder\(\);/.test(strip), "destacar não reordena a faixa");
 console.log("✔ 6 passou: abas da Biblioteca com busca própria e ganchos; Mídias fica; ordem da faixa preservada.");
+
+// 7. P14: aba muda de menu (convidada no outro menu, mesmo invólucro)
+assert.ok(tabs.includes("export function normalizeTabStrips(strips)"), "normalizador do menu das abas");
+assert.ok(strip.includes('if (window.tabPanels.moveToStrip(t.tab, t.side, before)) t.dragging.dataset.stripMoved = "true";'), "soltar no outro menu move a aba");
+assert.ok(/window\.addEventListener\("drop", \(e\) => \{[\s\S]{0,120}e\.stopPropagation\(\);/.test(strip), "soltura de aba não chega ao arrastar de arquivos da Biblioteca");
+assert.ok(strip.includes("window.tabPanels.moveToStrip(clickedTab, otherSide);"), "menu da faixa: mover para o outro menu");
+assert.ok(strip.includes("if (btn.dataset.stripMoved) {"), "mudar de menu não destaca a aba");
+assert.ok(strip.includes('`guest:${btn.dataset.guestTab}`') && tabs.includes("insertBySavedOrder(btn, strip)"), "posição da convidada fica salva na ordem da faixa");
+assert.ok(/if \(this\.strips\[tab\]\) \{[\s\S]{0,400}this\.mountGuest\(tab, null\);/.test(tabs), "ao voltar da janela, a aba volta ao menu onde estava");
+assert.ok(tabs.includes('if (tab) this.leaveGuestStrip(tab);'), "convidada sai do modo menu ao ir para uma janela");
+assert.ok(/if \(this\.strips\[tab\] && !this\.inWindow\(tab\)\) \{\s*this\.activateGuest\(tab\);/.test(tabs), "pedido da aba (ex.: Tarefas) mostra ela no outro menu");
+assert.ok(mainJs.includes("setTimeout(() => window.tabPanels.mountSavedStrips(), 0);"), "menus salvos voltam ao abrir o Talho");
+const wm = read("src", "ui", "js", "workspaceManager.js");
+assert.ok(wm.includes("tabStrips: window.tabPanels?.getStrips?.() || {}") && wm.includes("window.tabPanels?.applyStrips?.(legacy.tabStrips || {});"), "menu das abas entra no desfazer/refazer");
+assert.ok(wm.includes("window.tabPanels?.applyStrips?.(customConfig?.tabsCustomization?.tabStrips || {});"), "workspaces guardam e restauram o menu das abas");
+const css = read("src", "ui", "styles.css");
+assert.ok(css.includes(".tab-panel.dock-strip-guest.dock-guest-active") && css.includes(".dock-strip-marker"), "estilos da convidada e do marcador");
+console.log("✔ 7 passou: aba muda de menu por arrasto ou menu, com posição, desfazer e workspaces.");
 
 console.log("\n=== AUTOTESTE DOCK TABS CONCLUÍDO COM SUCESSO ===");
