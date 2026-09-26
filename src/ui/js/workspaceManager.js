@@ -223,7 +223,8 @@ export class WorkspaceManager {
             columnStacks: this.columnStacks.map(st => [...st]),
             popped,
             dual,
-            group
+            group,
+            tabStrips: window.tabPanels?.getStrips?.() || {}
         };
     }
 
@@ -332,6 +333,8 @@ export class WorkspaceManager {
             this.setTimelinePosition(legacy.timelinePosition, true);
             this.setMonitorsLayout(legacy.monitorsLayout, true);
             this.setColumnLayout(legacy.columnOrder, legacy.columnStacks || []);
+            // P14: menu de cada aba (antes das janelas: ao voltar de uma janela, a aba vai para o menu certo).
+            window.tabPanels?.applyStrips?.(legacy.tabStrips || {});
 
             // Janelas destacadas: primeiro fecha as que sobram, depois abre as que faltam.
             // Abrir precisa do gesto do usuário (o atalho de teclado conta) e o navegador
@@ -3179,7 +3182,8 @@ export class WorkspaceManager {
             leftOrder: localStorage.getItem("left-tabs-order"),
             leftVisibility: localStorage.getItem("left-tabs-visibility"),
             rightOrder: localStorage.getItem("right-tabs-order"),
-            rightVisibility: localStorage.getItem("right-tabs-visibility")
+            rightVisibility: localStorage.getItem("right-tabs-visibility"),
+            tabStrips: window.tabPanels?.getStrips?.() || {}
         };
 
         return {
@@ -3695,6 +3699,12 @@ export class WorkspaceManager {
                 setTimeout(() => this.togglePopout("timeline-panel"), 100);
                 setTimeout(() => this.togglePopout("program-player-panel"), 500);
             }
+        }
+
+        // P14: menu de cada aba vem do workspace (os prontos: todas no menu de origem). Na abertura
+        // da página (antes do histórico começar) fica o que o usuário deixou, não o do workspace.
+        if (this._layoutHistoryReady) {
+            window.tabPanels?.applyStrips?.(customConfig?.tabsCustomization?.tabStrips || {});
         }
 
         // Armazena a workspace ativa e atualiza a UI

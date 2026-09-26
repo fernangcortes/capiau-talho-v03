@@ -8,8 +8,17 @@
 // A aba destacada é um painel "tabpanel-<aba>": um invólucro com cabeçalho (alça, título, busca
 // própria quando a aba usa busca, devolver) que usa toda a máquina existente de janelas, grupos,
 // desfazer e restauração ao abrir.
+//
+// P14: a aba também pode mudar de menu (Temas no Painel Lateral, Falas na Biblioteca...). No outro
+// menu ela é uma "convidada": o mesmo invólucro, montado no corpo daquele menu, com um botão próprio
+// na faixa. Destacar, juntar e devolver continuam iguais; ao voltar da janela ela volta ao menu
+// onde estava. O menu de cada aba entra no layout (desfazer/refazer e workspaces).
 
 import { DOCK_PANELS } from "./dockDrag.js";
+import { bindTabButtonDrag, saveStripOrder } from "./tabsCustomization.js";
+
+const STRIPS_KEY = "capiau_tab_strips";
+const SIDE_LABEL = { left: "a Biblioteca", right: "o Painel Lateral" };
 
 export const RIGHT_TABS = {
     transcript: { title: "Falas", icon: "fa-microphone", container: "transcript-container" },
@@ -34,6 +43,28 @@ const TABS = {
 };
 
 export const tabPanelId = (tab) => `tabpanel-${tab}`;
+
+/** Faixa e corpo de cada menu. */
+function stripEl(side) {
+    return document.getElementById(side === "right" ? "right-tabs" : "left-tabs");
+}
+function stripBody(side) {
+    return document.querySelector(side === "right" ? "#sidebar-right .sidebar-content" : "#sidebar-left .sidebar-content.scrollable");
+}
+
+/** Chave do botão na ordem salva da faixa (a mesma do tabsCustomization). */
+const stripKey = (c) => c.getAttribute("data-tab") || c.getAttribute("data-right-tab") || (c.dataset.guestTab ? `guest:${c.dataset.guestTab}` : null);
+
+/** Só as abas que mudaram de menu: { aba: "left" | "right" }. */
+export function normalizeTabStrips(strips) {
+    const out = {};
+    if (!strips || typeof strips !== "object") return out;
+    Object.keys(strips).sort().forEach(tab => {
+        const side = strips[tab];
+        if (TABS[tab] && (side === "left" || side === "right") && side !== TABS[tab].side) out[tab] = side;
+    });
+    return out;
+}
 export const TAB_PANEL_IDS = Object.keys(TABS).map(tabPanelId);
 const tabOf = (panelId) => (typeof panelId === "string" && panelId.startsWith("tabpanel-") && TABS[panelId.slice(9)] ? panelId.slice(9) : null);
 
@@ -63,6 +94,17 @@ export class TabPanels {
         this.host.hidden = true;
         document.body.appendChild(this.host);
 
+        // P14: menu de cada aba que mudou de menu.
+        this.strips = {};
+        try { this.strips = normalizeTabStrips(JSON.parse(localStorage.getItem(STRIPS_KEY) || "{}")); } catch (e) {}
+        // Clicar numa aba nativa esconde a convidada ativa daquele menu (o clique nativo faz o resto).
+        ["left", "right"].forEach(side => {
+            stripEl(side)?.addEventListener("click", (e) => {
+                const btn = e.target.closest(".tab-btn");
+                if (btn && !btn.dataset.guestTab) this.deactivateGuests(side);
+            }, true);
+        });
+
         Object.entries(TABS).forEach(([tab, meta]) => {
             DOCK_PANELS[tabPanelId(tab)] = { title: meta.title, header: `#${tabPanelId(tab)} .tab-panel-header`, kind: "tab" };
         });
@@ -79,9 +121,11 @@ export class TabPanels {
         const attach = this.wm.attachPanelToPopout.bind(this.wm);
         this.wm.attachPanelToPopout = (panelId, win, ...rest) => {
             const tab = tabOf(panelId);
+            if (tab) this.leaveGuestStrip(tab);
             if (tab) this.prepare(tab);
             const result = attach(panelId, win, ...rest);
             if (tab) this.onWindowReady(tab, win);
+            if (tab) this.syncGuestButton(tab);
             return result;
         };
         const toggle = this.wm.togglePopout.bind(this.wm);
@@ -94,6 +138,7 @@ export class TabPanels {
             if (opening) {
                 const opened = window.popoutWindows?.[panelId];
                 if (!opened || opened.closed) this.returnToStrip(tab); // bloqueado pelo navegador
+                else this.syncGuestButton(tab);
             }
             return result;
         };
@@ -110,6 +155,216 @@ export class TabPanels {
         const meta = TABS[tab];
         return !!document.getElementById(meta?.container)?.dataset.dockOut
             || !!this.wm.poppedElements?.[tabPanelId(tab)]?.querySelector?.(`#${meta.container}`);
+    }
+
+    /** O invólucro está numa janela destacada (simples ou com vários painéis). */
+    inWindow(tab) {
+        const id = tabPanelId(tab);
+        const wrapper = document.getElementById(id) || this.wm.poppedElements?.[id];
+        return !!wrapper && wrapper.ownerDocument !== document;
+    }
+
+    /** Monta as abas que estavam no outro menu (sessão anterior). Chamado quando a página assenta. */
+    mountSavedStrips() {
+        Object.keys(this.strips).forEach(tab => this.mountGuest(tab, null));
+        // A aba ativa salva pode ter mudado de menu: cada faixa sem aba ativa ativa a primeira.
+        ["left", "right"].forEach(side => {
+            const strip = stripEl(side);
+            if (strip && !strip.querySelector(".tab-btn.active, .tab-btn.dock-guest-active")) this.activateFirst(strip);
+        });
+    }
+
+    /**
+     * P14: leva a aba para o menu "side" (antes do botão "before" na faixa, ou no fim).
+     * Voltar ao menu de origem desfaz a convidada. Retorna true se mudou algo.
+     */
+    moveToStrip(tab, side, before = null, { commit = true, activate = true } = {}) {
+        const meta = TABS[tab];
+        if (!meta || (side !== "left" && side !== "right")) return false;
+        const current = this.strips[tab] || meta.side;
+        if (current === side) return false;
+        if (side === meta.side) {
+            delete this.strips[tab];
+            this.saveStrips();
+            this.removeGuestButton(tab);
+            if (!this.inWindow(tab)) {
+                this.returnToStrip(tab, { activate });
+                const btn = tabButton(tab);
+                if (btn && before && before.parentElement === btn.parentElement) btn.parentElement.insertBefore(btn, before);
+            }
+        } else {
+            this.strips[tab] = side;
+            this.saveStrips();
+            this.mountGuest(tab, before);
+            if (activate && !this.inWindow(tab)) this.activateGuest(tab);
+        }
+        this.revealSidebar(tab, side);
+        this.syncSidebarVisibility();
+        saveStripOrder(stripEl("left"));
+        saveStripOrder(stripEl("right"));
+        if (commit) {
+            this.wm.scheduleLayoutCommit?.();
+            this.dockDrag?.showToast("undo", `${meta.title} movida para ${SIDE_LABEL[side]}`);
+        }
+        return true;
+    }
+
+    getStrips() {
+        return { ...this.strips };
+    }
+
+    /** Aplica o menu de cada aba (desfazer/refazer, workspaces). */
+    applyStrips(target) {
+        const want = normalizeTabStrips(target);
+        Object.keys(TABS).forEach(tab => {
+            const side = want[tab] || TABS[tab].side;
+            if ((this.strips[tab] || TABS[tab].side) !== side) this.moveToStrip(tab, side, null, { commit: false, activate: false });
+        });
+    }
+
+    saveStrips() {
+        try { localStorage.setItem(STRIPS_KEY, JSON.stringify(this.strips)); } catch (e) {}
+    }
+
+    /** Recolhido na mão, o Painel Lateral abre quando recebe uma aba. */
+    revealSidebar(tab, side) {
+        if (side !== "right") return;
+        const sidebar = document.getElementById("sidebar-right");
+        const btn = this.strips[tab] ? this.guestButton(tab) : tabButton(tab);
+        if (sidebar?.classList.contains("collapsed") && btn && btn.style.display !== "none") {
+            this.autoCollapsed = false;
+            document.getElementById("reopen-right")?.click();
+        }
+    }
+
+    /** Monta a aba como convidada no outro menu: invólucro no corpo do menu + botão na faixa. */
+    mountGuest(tab, before) {
+        const side = this.strips[tab];
+        const strip = stripEl(side);
+        const body = stripBody(side);
+        if (!side || !strip || !body) return;
+        let btn = this.guestButton(tab);
+        if (!btn || btn.parentElement !== strip) {
+            btn?.remove();
+            btn = this.createGuestButton(tab, side);
+        }
+        const remembered = this.lastNext?.[tab] ? [...strip.children].find(c => stripKey(c) === this.lastNext[tab]) : null;
+        if (before && before.parentElement === strip && before !== btn) strip.insertBefore(btn, before);
+        else if (!btn.parentElement && remembered) strip.insertBefore(btn, remembered);
+        else if (!btn.parentElement) this.insertBySavedOrder(btn, strip);
+        const wrapper = this.prepare(tab);
+        if (wrapper && wrapper.ownerDocument === document) {
+            wrapper.classList.add("dock-strip-guest");
+            wrapper.classList.toggle("dock-strip-guest-nosearch", !this.searchInputs[tab]);
+            body.appendChild(wrapper);
+        }
+        this.syncGuestButton(tab);
+    }
+
+    createGuestButton(tab, side) {
+        const meta = TABS[tab];
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tab-btn dock-guest-tab-btn";
+        btn.dataset.guestTab = tab;
+        btn.title = meta.title;
+        btn.innerHTML = `<i class="fa-solid ${meta.icon}"></i> <span class="tab-text"></span>`;
+        btn.querySelector(".tab-text").textContent = tabButton(tab)?.querySelector(".tab-text")?.textContent || meta.title;
+        if (side === "right") btn.style.flex = "1";
+        btn.addEventListener("click", () => this.activateGuest(tab));
+        bindTabButtonDrag(btn);
+        return btn;
+    }
+
+    /** Posição salva da convidada na faixa ("guest:<aba>" na ordem do tabsCustomization). */
+    insertBySavedOrder(btn, strip) {
+        let order = [];
+        try { order = JSON.parse(localStorage.getItem(strip.id === "right-tabs" ? "right-tabs-order" : "left-tabs-order") || "[]"); } catch (e) {}
+        const idx = order.indexOf(`guest:${btn.dataset.guestTab}`);
+        if (idx !== -1) {
+            for (const key of order.slice(idx + 1)) {
+                const next = [...strip.children].find(c => stripKey(c) === key);
+                if (next) { strip.insertBefore(btn, next); return; }
+            }
+        }
+        strip.appendChild(btn);
+    }
+
+    guestButton(tab) {
+        return document.querySelector(`.tab-btn[data-guest-tab="${tab}"]`);
+    }
+
+    removeGuestButton(tab) {
+        const btn = this.guestButton(tab);
+        if (!btn) return;
+        const strip = btn.parentElement;
+        const wasActive = btn.classList.contains("dock-guest-active");
+        // Lembra o vizinho: refazer põe a aba de volta no mesmo lugar da faixa.
+        this.lastNext = this.lastNext || {};
+        this.lastNext[tab] = btn.nextElementSibling ? stripKey(btn.nextElementSibling) : null;
+        btn.remove();
+        if (wasActive) this.activateFirst(strip);
+        this.syncSidebarVisibility();
+    }
+
+    /** Botão da convidada só aparece enquanto ela está no menu (numa janela, some). */
+    syncGuestButton(tab) {
+        const btn = this.guestButton(tab);
+        if (!btn) return;
+        const away = !this.strips[tab] || this.inWindow(tab);
+        btn.style.display = away ? "none" : "";
+        if (away && btn.classList.contains("dock-guest-active")) {
+            btn.classList.remove("dock-guest-active");
+            this.activateFirst(btn.parentElement);
+        }
+        this.syncSidebarVisibility();
+    }
+
+    /** O invólucro vai para uma janela: sai do modo convidada (a classe o esconderia lá). */
+    leaveGuestStrip(tab) {
+        const wrapper = document.getElementById(tabPanelId(tab));
+        if (!wrapper || !wrapper.classList.contains("dock-strip-guest")) return;
+        wrapper.classList.remove("dock-strip-guest", "dock-guest-active", "dock-strip-guest-nosearch");
+    }
+
+    /** Ativa a primeira aba visível da faixa (quando a ativa sai). */
+    activateFirst(strip) {
+        if (!strip) return;
+        const next = [...strip.querySelectorAll(".tab-btn")].find(b => b.style.display !== "none" && !b.dataset.dockOut);
+        next?.click();
+    }
+
+    /** Mostra a convidada no seu menu, escondendo o conteúdo da aba nativa ativa. */
+    activateGuest(tab) {
+        const side = this.strips[tab];
+        const btn = this.guestButton(tab);
+        const wrapper = document.getElementById(tabPanelId(tab));
+        if (!side || !btn || !wrapper || !wrapper.classList.contains("dock-strip-guest")) return;
+        const strip = stripEl(side);
+        strip.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active", "dock-guest-active"));
+        this.deactivateGuests(side);
+        if (side === "left") {
+            document.querySelectorAll(".sidebar-left .tab-content").forEach(c => { if (!c.dataset.dockOut) c.classList.remove("active"); });
+            const filterBar = document.getElementById("library-filter-bar");
+            if (filterBar) filterBar.style.display = "none";
+            document.getElementById("sidebar-left")?.setAttribute("data-active-tab", tabPanelId(tab));
+        } else {
+            Object.values(RIGHT_TABS).forEach(m => {
+                const c = document.getElementById(m.container);
+                if (c && !c.dataset.dockOut) c.style.display = "none";
+            });
+        }
+        btn.classList.add("dock-guest-active");
+        wrapper.classList.add("dock-guest-active");
+        const body = stripBody(side);
+        if (body) body.scrollTop = 0;
+        if (TABS[tab].side === "left") this.render(tab);
+        window.dispatchEvent(new Event("resize"));
+    }
+
+    deactivateGuests(side) {
+        stripEl(side)?.querySelectorAll(".dock-guest-tab-btn.dock-guest-active").forEach(b => b.classList.remove("dock-guest-active"));
+        stripBody(side)?.querySelectorAll(":scope > .dock-strip-guest.dock-guest-active").forEach(w => w.classList.remove("dock-guest-active"));
     }
 
     /** Monta o invólucro da aba (no contêiner escondido) e move o conteúdo da aba para dentro. */
@@ -194,11 +449,20 @@ export class TabPanels {
     }
 
     /** Devolve o conteúdo da aba à faixa do seu menu e ativa a aba. */
-    returnToStrip(tab) {
+    returnToStrip(tab, { activate = true } = {}) {
         const meta = TABS[tab];
         const content = document.getElementById(meta.container)
             || this.wm.poppedElements?.[tabPanelId(tab)]?.querySelector(`#${meta.container}`);
         if (!content) return;
+        if (this.strips[tab]) {
+            // P14: a aba mora no outro menu: volta para lá como convidada.
+            const wrapper = this.wm.poppedElements?.[tabPanelId(tab)] || document.getElementById(tabPanelId(tab));
+            if (wrapper && wrapper.ownerDocument !== document) document.adoptNode(wrapper);
+            if (meta.side === "left") this.restoredHooks(tab);
+            this.mountGuest(tab, null);
+            if (activate) this.activateGuest(tab);
+            return;
+        }
         if (content.ownerDocument !== document) {
             // Ainda na janela destacada (ex.: restauração interrompida): traz de volta primeiro.
             document.adoptNode(content);
@@ -215,17 +479,22 @@ export class TabPanels {
         this.setButtonHidden(tab, false);
         // O invólucro fica guardado no contêiner escondido (reaproveitado ao destacar de novo).
         const wrapper = document.getElementById(tabPanelId(tab)) || this.wm.poppedElements?.[tabPanelId(tab)];
-        if (wrapper && wrapper.ownerDocument === document) this.host.appendChild(wrapper);
+        if (wrapper && wrapper.ownerDocument === document) {
+            wrapper.classList.remove("dock-strip-guest", "dock-guest-active", "dock-strip-guest-nosearch");
+            this.host.appendChild(wrapper);
+        }
         const input = this.searchInputs[tab];
         if (input) input.value = "";
-        if (wasOut && meta.side === "left") {
-            try {
-                if (tab === "faces") window.FaceManager?.onPopoutRestored?.();
-                else if (tab === "titles") window.TITLES_TAB?.onPopoutRestored?.();
-                else if (tab === "themes") window.panelsManager?.onLibraryPopoutRestored?.();
-            } catch (err) {}
-        }
-        tabButton(tab)?.click();
+        if (wasOut && meta.side === "left") this.restoredHooks(tab);
+        if (activate) tabButton(tab)?.click();
+    }
+
+    restoredHooks(tab) {
+        try {
+            if (tab === "faces") window.FaceManager?.onPopoutRestored?.();
+            else if (tab === "titles") window.TITLES_TAB?.onPopoutRestored?.();
+            else if (tab === "themes") window.panelsManager?.onLibraryPopoutRestored?.();
+        } catch (err) {}
     }
 
     setButtonHidden(tab, hidden) {
@@ -307,6 +576,10 @@ export class TabPanels {
 
     /** Aba pedida pela faixa (ex.: busca muda para "search") mas ela está numa janela: foca a janela. */
     focus(tab) {
+        if (this.strips[tab] && !this.inWindow(tab)) {
+            this.activateGuest(tab); // P14: aba no outro menu: mostra ela lá
+            return;
+        }
         try { window.popoutWindows?.[tabPanelId(tab)]?.focus(); } catch (e) {}
     }
 }
