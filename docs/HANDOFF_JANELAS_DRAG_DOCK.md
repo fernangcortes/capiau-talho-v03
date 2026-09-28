@@ -10,6 +10,24 @@ O arquivo `docs/PLANO_JANELAS_DRAG_DOCK.md` é ignorado pelo git (fica só local
 > Os botões de recolher painel e os atalhos Numpad de **Ajustes & Efeitos** (Numpad5) e
 > **Transcrição & Falas** (Numpad6) não estão funcionando.
 
+Retorno do usuário depois de testar no Windows (28/09):
+- Sem erro no Console. Depois do **Ctrl+F5** o comportamento melhorou no layout simples.
+- Continua falhando com painéis **empilhados** (pilha de coluna da F2b) e na **Janela Dupla /
+  janela com vários painéis**. **Destacados (em janela) fica pior: não recolhe nada.**
+
+Comportamento esperado (definido pelo usuário):
+1. **Recolher dentro de uma pilha ou janela com vários painéis**: o painel recolhido some e o(s)
+   outro(s) **ocupa(m) todo o espaço**. A **linha de expandir** fica no lugar dele: **acima**, se ele
+   estava em cima; **abaixo**, se estava embaixo (o mesmo vale para esquerda/direita lado a lado).
+2. **Setinha de recolher na direção lógica**: painel de cima → seta para **cima** (recolhe para
+   cima); painel de baixo → seta para **baixo**; lado a lado mantém esquerda/direita. A seta
+   acompanha a posição quando o painel muda de lugar (trocar, empilhar, destacar, juntar).
+3. Vale no editor e **nas janelas destacadas** (simples, Janela Dupla `panel.html?panel=dual-sidebar`
+   e grupo `panel-group.html`), pelo botão e pelo Numpad (Numpad5/6 e Alt/Ctrl+Numpad), inclusive
+   com o foco dentro da janela destacada.
+4. Recolher/expandir entra no layout salvo (reabrir o Talho mantém) — decidir com o usuário se também
+   entra no Ctrl+Alt+Z.
+
 ### O que já se sabe (diagnóstico de 28/09)
 
 `node scripts/dock_collapse_check.mjs` (headless, sem backend, localStorage limpo) testa os botões
@@ -22,8 +40,8 @@ O arquivo `docs/PLANO_JANELAS_DRAG_DOCK.md` é ignorado pelo git (fica só local
 | todas as abas do Painel Lateral movidas para a Biblioteca (P14) | recolhem | recolhem |
 | **Ajustes empilhado** sob a Biblioteca ou sob o Painel Lateral (F2b) | **`#toggle-inspector` coberto** (o clique cai no `.sidebar-header` do anfitrião) | recolhem |
 
-Ou seja: **no estado limpo funciona**. O defeito do usuário depende do estado real dele. Próximos
-passos sugeridos:
+Ou seja: **no estado limpo funciona**; falha em pilhas e janelas destacadas (confirmado pelo usuário).
+Próximos passos sugeridos:
 1. Pedir ao usuário, no navegador onde falha (F12 → Console):
    `JSON.stringify({ws: localStorage.capiau_active_workspace, cols: localStorage.capiau_column_order, stacks: localStorage.capiau_column_stacks, strips: localStorage.capiau_tab_strips, layout: localStorage.capiau_dock_layout})`,
    e se aparece algum erro vermelho ao clicar no botão ou apertar a tecla.
