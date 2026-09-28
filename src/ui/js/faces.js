@@ -911,8 +911,8 @@ export class FaceManager {
             grid.innerHTML = `
                 <div style="grid-column: 1/-1; text-align: center; padding: 60px; color: var(--text-muted);">
                     <i class="fa-solid fa-circle-check fa-4x" style="color: var(--color-emerald); margin-bottom: 20px;"></i>
-                    <h3 style="font-size: 18px; color: var(--text-primary); margin: 0 0 8px 0;">Tudo limpo!</h3>
-                    <p style="margin: 0; font-size: 13px;">Todos os rostos detectados no projeto já foram identificados.</p>
+                    <h3 style="font-size: calc(18px * var(--font-scale, 1)); color: var(--text-primary); margin: 0 0 8px 0;">Tudo limpo!</h3>
+                    <p style="margin: 0; font-size: calc(13px * var(--font-scale, 1));">Todos os rostos detectados no projeto já foram identificados.</p>
                 </div>
             `;
             return;
@@ -940,7 +940,7 @@ export class FaceManager {
 
             card.innerHTML = `
                 <div class="fullscreen-face-select-badge">
-                    <i class="fa-solid fa-check" style="color: #000; font-size: 10px; display: none;"></i>
+                    <i class="fa-solid fa-check" style="color: #000; font-size: calc(10px * var(--font-scale, 1)); display: none;"></i>
                 </div>
                 <div class="fullscreen-face-thumb-container">
                     <img class="fullscreen-face-thumb" src="${thumbUrl}" alt="Rosto" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22><rect width=%22120%22 height=%22120%22 fill=%22%23222%22/><text x=%2250%%22 y=%2250%%22 font-size=%2224%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23666%22>?</text></svg>'">
@@ -1161,7 +1161,7 @@ export class FaceManager {
             
             const btn = doc.createElement("button");
             btn.className = "btn-secondary";
-            btn.style.cssText = "padding: 10px 24px; font-size: 13px; font-weight: 600; cursor: pointer; border-color: var(--t-line-strong, rgba(6, 182, 212, 0.3)); color: var(--color-cyan);";
+            btn.style.cssText = "padding: 10px 24px; font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; cursor: pointer; border-color: var(--t-line-strong, rgba(6, 182, 212, 0.3)); color: var(--color-cyan);";
             btn.innerHTML = `<i class="fa-solid fa-angles-down"></i> Carregar Mais Rostos (${this.unlabeledFaces.length - endIdx} restantes)`;
             
             btn.addEventListener("click", () => this.renderNextPage());
@@ -1391,13 +1391,13 @@ export class FaceManager {
         popover.style.display = "flex";
 
         popover.innerHTML = `
-            <div style="font-size:10px; color:var(--text-secondary); text-transform:uppercase; font-weight:600; display:flex; align-items:center; gap:5px;">
+            <div style="font-size:calc(10px * var(--font-scale, 1)); color:var(--text-secondary); text-transform:uppercase; font-weight:600; display:flex; align-items:center; gap:5px;">
                 <i class="fa-solid fa-eye" style="color:var(--color-cyan);"></i> Visualização do Contexto
             </div>
             <div id="popover-media-container" style="width:100%; height:180px; border-radius:6px; overflow:hidden; background:#000; position:relative; display:flex; align-items:center; justify-content:center;">
-                <div class="loading-state-text" style="font-size:11px;">Carregando mídia...</div>
+                <div class="loading-state-text" style="font-size:calc(11px * var(--font-scale, 1));">Carregando mídia...</div>
             </div>
-            <div style="font-size:10px; color:var(--text-muted); text-align:center; font-style:italic;">
+            <div style="font-size:calc(10px * var(--font-scale, 1)); color:var(--text-muted); text-align:center; font-style:italic;">
                 ${face.photo_id ? 'Foto original completa' : `Vídeo no frame ${face.timestamp}s`}
             </div>
         `;
@@ -1917,15 +1917,15 @@ export class FaceManager {
                     <td style="padding: 10px 12px; width: 40px; text-align: center;">
                         <input type="checkbox" class="name-select-checkbox" data-name="${sp}" style="cursor: pointer;">
                     </td>
-                    <td style="padding: 10px 12px; font-weight: 500; color: #fff; font-size: 13px;">${sp}</td>
+                    <td style="padding: 10px 12px; font-weight: 500; color: #fff; font-size: calc(13px * var(--font-scale, 1));">${sp}</td>
                     <td class="names-actions-cell" style="padding: 10px 12px; text-align: right; display: flex; gap: 8px; justify-content: flex-end; align-items: center; width: 280px;">
-                        <button class="btn-flat-action cyan btn-rename" title="Renomear" style="background: transparent; border: none; padding: 4px 8px; font-size: 11px; cursor: pointer;">
+                        <button class="btn-flat-action cyan btn-rename" title="Renomear" style="background: transparent; border: none; padding: 4px 8px; font-size: calc(11px * var(--font-scale, 1)); cursor: pointer;">
                             <i class="fa-solid fa-user-pen"></i> Renomear
                         </button>
-                        <button class="btn-flat-action violet btn-merge" title="Mesclar" style="background: transparent; border: none; padding: 4px 8px; font-size: 11px; cursor: pointer;">
+                        <button class="btn-flat-action violet btn-merge" title="Mesclar" style="background: transparent; border: none; padding: 4px 8px; font-size: calc(11px * var(--font-scale, 1)); cursor: pointer;">
                             <i class="fa-solid fa-code-merge"></i> Mesclar
                         </button>
-                        <button class="btn-flat-action rose btn-delete" title="Deletar" style="background: transparent; border: none; padding: 4px 8px; font-size: 11px; cursor: pointer;">
+                        <button class="btn-flat-action rose btn-delete" title="Deletar" style="background: transparent; border: none; padding: 4px 8px; font-size: calc(11px * var(--font-scale, 1)); cursor: pointer;">
                             <i class="fa-solid fa-trash"></i> Deletar
                         </button>
                     </td>
@@ -1943,10 +1943,10 @@ export class FaceManager {
                     const actionsCell = tr.querySelector(".names-actions-cell");
                     actionsCell.innerHTML = `
                         <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end; width: 100%;">
-                            <span style="font-size: 11px; color: var(--text-secondary);">Mesclar em:</span>
-                            <input type="text" list="speakers-datalist" class="merge-target-input" placeholder="Digite/Selecione..." style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; font-size: 11px; width: 130px; outline: none;">
-                            <button class="btn-flat-action cyan btn-confirm-merge-inline" style="font-size: 11px; padding: 4px 6px;" title="Confirmar"><i class="fa-solid fa-check"></i></button>
-                            <button class="btn-flat-action rose btn-cancel-merge-inline" style="font-size: 11px; padding: 4px 6px;" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>
+                            <span style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary);">Mesclar em:</span>
+                            <input type="text" list="speakers-datalist" class="merge-target-input" placeholder="Digite/Selecione..." style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; font-size: calc(11px * var(--font-scale, 1)); width: 130px; outline: none;">
+                            <button class="btn-flat-action cyan btn-confirm-merge-inline" style="font-size: calc(11px * var(--font-scale, 1)); padding: 4px 6px;" title="Confirmar"><i class="fa-solid fa-check"></i></button>
+                            <button class="btn-flat-action rose btn-cancel-merge-inline" style="font-size: calc(11px * var(--font-scale, 1)); padding: 4px 6px;" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     `;
 

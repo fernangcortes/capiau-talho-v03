@@ -49,3 +49,19 @@
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
 }
+
+/* ── PERSONALIZADO ───────────────────────────────────────────────────────────
+   Os valores dos tokens são calculados em js/themeManager.js a partir das Configurações → Aparência
+   e aplicados como estilo inline no <html> (por js/themeBoot.js). Aqui só o que não é valor. */
+:root[data-theme="custom"] * {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+
+/* ── TEXTO (qualquer tema) ───────────────────────────────────────────────────
+   --font-weight-ui: peso do texto comum (negritos explícitos continuam valendo).
+   --font-scale: multiplica todo font-size da UI (calc(Npx * var(--font-scale, 1))).
+   --font-body / --font-heading: redefinidos quando se escolhe uma fonte que não a padrão. */
+body {
+    font-weight: var(--font-weight-ui, 400);
+}

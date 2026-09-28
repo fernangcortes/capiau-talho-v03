@@ -1241,7 +1241,7 @@ export class SourcePlayer {
         if (!osd) {
             osd = document.createElement("div");
             osd.className = "player-shuttle-osd";
-            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:var(--t-surface-2, rgba(18,18,24,0.85)); color:var(--color-cyan); padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700; font-family:'Outfit',sans-serif; letter-spacing:0.5px; border:1px solid var(--t-line-strong, rgba(6,182,212,0.4)); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
+            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:var(--t-surface-2, rgba(18,18,24,0.85)); color:var(--color-cyan); padding:4px 12px; border-radius:12px; font-size:calc(11px * var(--font-scale, 1)); font-weight:700; font-family:var(--font-heading); letter-spacing:0.5px; border:1px solid var(--t-line-strong, rgba(6,182,212,0.4)); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
             panel.appendChild(osd);
         }
         osd.textContent = text;
@@ -3189,7 +3189,7 @@ export class ProgramPlayer {
         if (!osd) {
             osd = document.createElement("div");
             osd.className = "player-shuttle-osd";
-            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:var(--t-surface-2, rgba(18,18,24,0.85)); color:#a855f7; padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700; font-family:'Outfit',sans-serif; letter-spacing:0.5px; border:1px solid var(--t-line-strong, rgba(168,85,247,0.4)); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
+            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:var(--t-surface-2, rgba(18,18,24,0.85)); color:#a855f7; padding:4px 12px; border-radius:12px; font-size:calc(11px * var(--font-scale, 1)); font-weight:700; font-family:var(--font-heading); letter-spacing:0.5px; border:1px solid var(--t-line-strong, rgba(168,85,247,0.4)); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
             panel.appendChild(osd);
         }
         osd.textContent = text;
@@ -5445,7 +5445,7 @@ export class ProgramPlayer {
                     </div>
                     <video id="nle-2up-outgoing-vid" preload="auto" playsinline muted style="max-width:100%; max-height:100%; object-fit:contain;"></video>
                     <img id="nle-2up-outgoing-img" style="display:none; max-width:100%; max-height:100%; object-fit:contain;" />
-                    <div id="nle-2up-outgoing-empty" style="display:none; color:var(--text-muted); font-size:12px; font-family:'Outfit',sans-serif;">Espaço Vazio</div>
+                    <div id="nle-2up-outgoing-empty" style="display:none; color:var(--text-muted); font-size:calc(12px * var(--font-scale, 1)); font-family:var(--font-heading);">Espaço Vazio</div>
                 </div>
                 <div class="nle-2up-col incoming">
                     <div class="nle-2up-badge incoming">
@@ -5454,7 +5454,7 @@ export class ProgramPlayer {
                     </div>
                     <video id="nle-2up-incoming-vid" preload="auto" playsinline muted style="max-width:100%; max-height:100%; object-fit:contain;"></video>
                     <img id="nle-2up-incoming-img" style="display:none; max-width:100%; max-height:100%; object-fit:contain;" />
-                    <div id="nle-2up-incoming-empty" style="display:none; color:var(--text-muted); font-size:12px; font-family:'Outfit',sans-serif;">Espaço Vazio</div>
+                    <div id="nle-2up-incoming-empty" style="display:none; color:var(--text-muted); font-size:calc(12px * var(--font-scale, 1)); font-family:var(--font-heading);">Espaço Vazio</div>
                 </div>
             `;
             targetContainer.appendChild(overlay);
@@ -6959,11 +6959,11 @@ export class VideoPlayer {
             item.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <span style="color: var(--color-cyan, #06b6d4); font-weight: bold; font-family: monospace;">${idx + 1}.</span>
-                    <span style="background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: 10px;">${track}</span>
-                    <span style="font-family: monospace; font-size: 11px;">${tc}</span>
+                    <span style="background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: calc(10px * var(--font-scale, 1));">${track}</span>
+                    <span style="font-family: monospace; font-size: calc(11px * var(--font-scale, 1));">${tc}</span>
                     <span style="color: var(--text-secondary, #94a3b8); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${clipName}</span>
                 </div>
-                <span class="rm-item-check-slot">${idx === currentIndex ? '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: 11px;"></i>' : ''}</span>
+                <span class="rm-item-check-slot">${idx === currentIndex ? '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: calc(11px * var(--font-scale, 1));"></i>' : ''}</span>
             `;
             item.addEventListener("click", (e) => {
                 e.stopPropagation();
@@ -6974,7 +6974,7 @@ export class VideoPlayer {
                     const checkSlot = el.querySelector(".rm-item-check-slot");
                     if (elIdx === idx) {
                         el.classList.add("is-active");
-                        if (checkSlot) checkSlot.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: 11px;"></i>';
+                        if (checkSlot) checkSlot.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: calc(11px * var(--font-scale, 1));"></i>';
                     } else {
                         el.classList.remove("is-active");
                         if (checkSlot) checkSlot.innerHTML = '';
@@ -7056,10 +7056,10 @@ export function showAnnotationModal(speakers, initialValue = "") {
         header.style.borderBottom = "1px solid var(--border-glass)";
         header.style.paddingBottom = "10px";
         header.innerHTML = `
-            <h2 style="margin:0; font-size:16px; color:#fff; display:flex; align-items:center; gap:8px;">
+            <h2 style="margin:0; font-size:calc(16px * var(--font-scale, 1)); color:#fff; display:flex; align-items:center; gap:8px;">
                 <i class="fa-solid fa-tags" style="color:var(--color-cyan);"></i> Identificar Elemento
             </h2>
-            <button class="btn-close-modal" style="font-size:24px; color:var(--text-secondary); background:transparent; border:none; cursor:pointer;">&times;</button>
+            <button class="btn-close-modal" style="font-size:calc(24px * var(--font-scale, 1)); color:var(--text-secondary); background:transparent; border:none; cursor:pointer;">&times;</button>
         `;
 
         const body = document.createElement("div");
@@ -7070,7 +7070,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
 
         const inputLabel = document.createElement("label");
         inputLabel.textContent = "Nome da Pessoa ou Objeto:";
-        inputLabel.style.fontSize = "11px";
+        inputLabel.style.fontSize = "calc(11px * var(--font-scale, 1))";
         inputLabel.style.color = "var(--text-secondary)";
 
         const input = document.createElement("input");
@@ -7083,7 +7083,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         input.style.border = "1px solid var(--border-glass)";
         input.style.background = "rgba(255, 255, 255, 0.05)";
         input.style.color = "#fff";
-        input.style.fontSize = "13px";
+        input.style.fontSize = "calc(13px * var(--font-scale, 1))";
         input.style.outline = "none";
         input.style.boxSizing = "border-box";
 
@@ -7093,7 +7093,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         if (speakers && speakers.length > 0) {
             const suggestionsLabel = document.createElement("label");
             suggestionsLabel.textContent = "Selecionar existente:";
-            suggestionsLabel.style.fontSize = "11px";
+            suggestionsLabel.style.fontSize = "calc(11px * var(--font-scale, 1))";
             suggestionsLabel.style.color = "var(--text-secondary)";
             suggestionsLabel.style.marginTop = "5px";
             body.appendChild(suggestionsLabel);
@@ -7117,7 +7117,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
                 btn.style.color = "var(--color-cyan)";
                 btn.style.padding = "3px 8px";
                 btn.style.borderRadius = "15px";
-                btn.style.fontSize = "10px";
+                btn.style.fontSize = "calc(10px * var(--font-scale, 1))";
                 btn.style.cursor = "pointer";
                 btn.style.transition = "all 0.15s";
 
@@ -7153,7 +7153,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         btnCancel.style.background = "transparent";
         btnCancel.style.color = "var(--text-secondary)";
         btnCancel.style.cursor = "pointer";
-        btnCancel.style.fontSize = "12px";
+        btnCancel.style.fontSize = "calc(12px * var(--font-scale, 1))";
 
         const btnConfirm = document.createElement("button");
         btnConfirm.textContent = "Confirmar";
@@ -7164,7 +7164,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         btnConfirm.style.color = "#000";
         btnConfirm.style.fontWeight = "600";
         btnConfirm.style.cursor = "pointer";
-        btnConfirm.style.fontSize = "12px";
+        btnConfirm.style.fontSize = "calc(12px * var(--font-scale, 1))";
 
         footer.appendChild(btnCancel);
         footer.appendChild(btnConfirm);

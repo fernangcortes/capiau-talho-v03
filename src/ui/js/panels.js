@@ -1041,7 +1041,7 @@ export class PanelsManager {
         
         const cluesList = document.getElementById("assistant-clues-list");
         if (!cluesList) return;
-        cluesList.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: 10px; text-align: center; padding: 10px 0;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando pistas...</div>`;
+        cluesList.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: calc(10px * var(--font-scale, 1)); text-align: center; padding: 10px 0;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando pistas...</div>`;
         
         try {
             const clues = await CapIAuAPI.fetchDiarizationClues(
@@ -1054,7 +1054,7 @@ export class PanelsManager {
             
             cluesList.innerHTML = "";
             if (clues.length === 0) {
-                cluesList.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: 10px; text-align: center; padding: 10px 0;">Nenhuma pista detectada com as configurações atuais.</div>`;
+                cluesList.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: calc(10px * var(--font-scale, 1)); text-align: center; padding: 10px 0;">Nenhuma pista detectada com as configurações atuais.</div>`;
                 return;
             }
             
@@ -1079,12 +1079,12 @@ export class PanelsManager {
                 card.innerHTML = `
                     <div class="clue-meta" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                         <span class="clue-badge ${badgeClass}">${badgeLabel}</span>
-                        <span style="color:var(--text-muted); font-size:9px;">${formatTimecode(clue.timestamp)}</span>
+                        <span style="color:var(--text-muted); font-size:calc(9px * var(--font-scale, 1));">${formatTimecode(clue.timestamp)}</span>
                     </div>
-                    <div class="clue-context" style="font-style:italic; color:var(--text-muted); font-size:10px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">"${clue.context}"</div>
+                    <div class="clue-context" style="font-style:italic; color:var(--text-muted); font-size:calc(10px * var(--font-scale, 1)); line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">"${clue.context}"</div>
                     <div class="clue-actions" style="display:flex; gap:6px; margin-top:6px;">
-                        <button class="btn-flat-action cyan btn-listen-clue" style="font-size:9px; padding:2px 4px; background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-play"></i> Ouvir</button>
-                        <button class="btn-flat-action rose btn-inspect-clue" style="font-size:9px; padding:2px 4px; background:var(--t-tint-2, rgba(244, 63, 94, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-magnifying-glass"></i> Ajustar</button>
+                        <button class="btn-flat-action cyan btn-listen-clue" style="font-size:calc(9px * var(--font-scale, 1)); padding:2px 4px; background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-play"></i> Ouvir</button>
+                        <button class="btn-flat-action rose btn-inspect-clue" style="font-size:calc(9px * var(--font-scale, 1)); padding:2px 4px; background:var(--t-tint-2, rgba(244, 63, 94, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-magnifying-glass"></i> Ajustar</button>
                     </div>
                 `;
                 
@@ -1105,7 +1105,7 @@ export class PanelsManager {
                 cluesList.appendChild(card);
             });
         } catch (err) {
-            cluesList.innerHTML = `<div style="color: var(--color-rose); font-size: 10px; text-align: center; padding: 10px 0;">Erro: ${err.message}</div>`;
+            cluesList.innerHTML = `<div style="color: var(--color-rose); font-size: calc(10px * var(--font-scale, 1)); text-align: center; padding: 10px 0;">Erro: ${err.message}</div>`;
         }
     }
 
@@ -1190,7 +1190,7 @@ export class PanelsManager {
         header.className = "inspector-header";
         header.innerHTML = `
             <span><i class="fa-solid fa-magnifying-glass-chart"></i> Inspetor de Falas</span>
-            <button id="btn-close-inspector" class="btn-flat-action" title="Fechar Inspetor" style="color:var(--text-secondary); font-size:14px; background:none; border:none; cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+            <button id="btn-close-inspector" class="btn-flat-action" title="Fechar Inspetor" style="color:var(--text-secondary); font-size:calc(14px * var(--font-scale, 1)); background:none; border:none; cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
         `;
         header.querySelector("#btn-close-inspector").addEventListener("click", () => this.closeBubbleInspector());
         this.inspectorPanel.appendChild(header);
@@ -1202,10 +1202,10 @@ export class PanelsManager {
         const secText = document.createElement("div");
         secText.innerHTML = `
             <div class="inspector-section-title"><i class="fa-solid fa-quote-left" style="color:var(--color-cyan);"></i> Trecho Selecionado</div>
-            <div style="font-size:11px; color:#fff; line-height:1.4; padding:8px; background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:6px; font-style:italic;">
+            <div style="font-size:calc(11px * var(--font-scale, 1)); color:#fff; line-height:1.4; padding:8px; background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:6px; font-style:italic;">
                 "${d.text}"
             </div>
-            <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:10px; color:var(--text-muted);">
+            <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:calc(10px * var(--font-scale, 1)); color:var(--text-muted);">
                 <span>Início: ${formatTimecode(d.start_time)}</span>
                 <span>Fim: ${formatTimecode(d.end_time)}</span>
             </div>
@@ -1219,14 +1219,14 @@ export class PanelsManager {
         secWave.innerHTML = `
             <div class="inspector-section-title" style="display:flex; justify-content:space-between; align-items:center;">
                 <span><i class="fa-solid fa-chart-simple" style="color:var(--color-rose);"></i> Waveform de Fala & Silêncio</span>
-                <button id="btn-toggle-inspector-words" class="btn-flat-action" style="font-size:10px; padding:2px 8px; border-radius:4px; cursor:pointer; background:${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.06)'}; color:${this.inspectorShowWords ? '#22d3ee' : '#94a3b8'}; border:1px solid ${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.4)' : 'var(--t-line-weak, rgba(255,255,255,0.08))'};" title="Mostrar/Esconder marcação de palavras sobre a onda">
+                <button id="btn-toggle-inspector-words" class="btn-flat-action" style="font-size:calc(10px * var(--font-scale, 1)); padding:2px 8px; border-radius:4px; cursor:pointer; background:${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.06)'}; color:${this.inspectorShowWords ? '#22d3ee' : '#94a3b8'}; border:1px solid ${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.4)' : 'var(--t-line-weak, rgba(255,255,255,0.08))'};" title="Mostrar/Esconder marcação de palavras sobre a onda">
                     <i class="fa-solid fa-font"></i> Palavras
                 </button>
             </div>
             <div class="waveform-container">
                 <canvas id="inspector-waveform" class="waveform-canvas"></canvas>
             </div>
-            <div style="font-size:9px; color:var(--text-muted); margin-top:4px; text-align:center;">
+            <div style="font-size:calc(9px * var(--font-scale, 1)); color:var(--text-muted); margin-top:4px; text-align:center;">
                 Clique para navegar. Duplo clique para adicionar corte.
             </div>
         `;
@@ -1250,11 +1250,11 @@ export class PanelsManager {
             <div class="inspector-section-title"><i class="fa-solid fa-user-pen" style="color:var(--color-violet);"></i> Identificação do Falante</div>
             <div style="display:flex; flex-direction:column; gap:8px;">
                 <div style="display:flex; gap:6px;">
-                    <select id="sel-inspector-speaker" class="nle-select" style="flex:1; padding:6px; border-radius:6px; border:1px solid var(--border-glass); background:rgba(0,0,0,0.3); color:#fff; font-size:11px;">
+                    <select id="sel-inspector-speaker" class="nle-select" style="flex:1; padding:6px; border-radius:6px; border:1px solid var(--border-glass); background:rgba(0,0,0,0.3); color:#fff; font-size:calc(11px * var(--font-scale, 1));">
                         <!-- Carregado via autocomplete -->
                     </select>
                 </div>
-                <label style="font-size:10px; color:var(--text-secondary); display:flex; align-items:center; gap:4px; cursor:pointer;">
+                <label style="font-size:calc(10px * var(--font-scale, 1)); color:var(--text-secondary); display:flex; align-items:center; gap:4px; cursor:pointer;">
                     <input type="checkbox" id="chk-global-rename"> Aplicar a TODOS os blocos de "${d.speaker_id}" neste vídeo
                 </label>
                 <div style="display:flex; gap:6px; margin-top:4px;">
@@ -1268,7 +1268,7 @@ export class PanelsManager {
         const secLocalSilences = document.createElement("div");
         secLocalSilences.innerHTML = `
             <div class="inspector-section-title"><i class="fa-solid fa-scissors" style="color:var(--color-rose);"></i> Sugestões de Divisão Internas</div>
-            <div id="inspector-local-silences-list" style="display:flex; flex-direction:column; gap:6px; font-size:10px;">
+            <div id="inspector-local-silences-list" style="display:flex; flex-direction:column; gap:6px; font-size:calc(10px * var(--font-scale, 1));">
                 <!-- Carregado via JS -->
             </div>
         `;
@@ -1279,7 +1279,7 @@ export class PanelsManager {
         secFaces.innerHTML = `
             <div class="inspector-section-title"><i class="fa-solid fa-face-smile" style="color:var(--color-cyan);"></i> Rostos na Tela (Coincidências)</div>
             <div id="inspector-faces-grid" class="faces-grid">
-                <div style="font-style:italic; color:var(--text-muted); font-size:9px; text-align:center; grid-column: 1 / -1;">Buscando rostos coincidentes no banco de dados...</div>
+                <div style="font-style:italic; color:var(--text-muted); font-size:calc(9px * var(--font-scale, 1)); text-align:center; grid-column: 1 / -1;">Buscando rostos coincidentes no banco de dados...</div>
             </div>
         `;
         body.appendChild(secFaces);
@@ -1597,7 +1597,7 @@ export class PanelsManager {
         }
         
         if (localSilences.length === 0) {
-            listDiv.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: 9px; text-align: center; padding: 5px 0;">Nenhuma pausa longa dentro deste balão.</div>`;
+            listDiv.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: calc(9px * var(--font-scale, 1)); text-align: center; padding: 5px 0;">Nenhuma pausa longa dentro deste balão.</div>`;
             return;
         }
         
@@ -1615,11 +1615,11 @@ export class PanelsManager {
             row.innerHTML = `
                 <div style="display:flex; flex-direction:column; gap:2px;">
                     <span style="font-weight:600; color:var(--color-rose);"><i class="fa-solid fa-volume-xmark"></i> Pausa de ${s.duration.toFixed(1)}s</span>
-                    <span style="color:var(--text-muted); font-size:9px;">Entre "${s.wordBefore}" e "${s.wordAfter}" às ${formatTimecode(s.timestamp)}</span>
+                    <span style="color:var(--text-muted); font-size:calc(9px * var(--font-scale, 1));">Entre "${s.wordBefore}" e "${s.wordAfter}" às ${formatTimecode(s.timestamp)}</span>
                 </div>
                 <div style="display:flex; gap:4px;">
                     <button class="btn-flat-action cyan btn-listen-silence" title="Ouvir" style="background:none; border:none; cursor:pointer;"><i class="fa-solid fa-play"></i></button>
-                    <button class="btn-flat-action rose btn-split-silence" title="Dividir aqui" style="font-size:9px; padding:2px 4px; background:var(--t-tint-2, rgba(244, 63, 94, 0.1)) !important; border-radius:3px; cursor:pointer;"><i class="fa-solid fa-scissors"></i> Dividir</button>
+                    <button class="btn-flat-action rose btn-split-silence" title="Dividir aqui" style="font-size:calc(9px * var(--font-scale, 1)); padding:2px 4px; background:var(--t-tint-2, rgba(244, 63, 94, 0.1)) !important; border-radius:3px; cursor:pointer;"><i class="fa-solid fa-scissors"></i> Dividir</button>
                 </div>
             `;
             
@@ -1660,7 +1660,7 @@ export class PanelsManager {
             
             grid.innerHTML = "";
             if (localFaces.length === 0) {
-                grid.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: 9px; text-align: center; grid-column: 1 / -1; padding: 5px 0;">Nenhum rosto detectado neste trecho do vídeo.</div>`;
+                grid.innerHTML = `<div style="font-style: italic; color: var(--text-muted); font-size: calc(9px * var(--font-scale, 1)); text-align: center; grid-column: 1 / -1; padding: 5px 0;">Nenhum rosto detectado neste trecho do vídeo.</div>`;
                 return;
             }
             
@@ -1679,8 +1679,8 @@ export class PanelsManager {
                 
                 card.innerHTML = `
                     <img src="/api/face/${face.id}/thumbnail" alt="${label}" onerror="this.src='https://placehold.co/45x45/181824/ffffff?text=?'">
-                    <span style="font-size:9px; text-overflow:ellipsis; overflow:hidden; width:100%; white-space:nowrap;">${label}</span>
-                    <button class="btn-flat-action cyan" style="font-size: 9px; padding: 2px 4px; margin-top:2px; background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px; cursor:pointer;" title="Usar este nome"><i class="fa-solid fa-check"></i> Atribuir</button>
+                    <span style="font-size:calc(9px * var(--font-scale, 1)); text-overflow:ellipsis; overflow:hidden; width:100%; white-space:nowrap;">${label}</span>
+                    <button class="btn-flat-action cyan" style="font-size: calc(9px * var(--font-scale, 1)); padding: 2px 4px; margin-top:2px; background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px; cursor:pointer;" title="Usar este nome"><i class="fa-solid fa-check"></i> Atribuir</button>
                 `;
                 
                 const actionBtn = card.querySelector("button");
@@ -1728,7 +1728,7 @@ export class PanelsManager {
                 grid.appendChild(card);
             });
         } catch (err) {
-            grid.innerHTML = `<div style="color: var(--color-rose); font-size: 9px; text-align: center; grid-column: 1 / -1;">Erro ao carregar rostos: ${err.message}</div>`;
+            grid.innerHTML = `<div style="color: var(--color-rose); font-size: calc(9px * var(--font-scale, 1)); text-align: center; grid-column: 1 / -1;">Erro ao carregar rostos: ${err.message}</div>`;
         }
     }
 
@@ -1812,11 +1812,11 @@ export class PanelsManager {
         tagsHeader.style.border = "1px solid var(--border-glass)";
         tagsHeader.style.background = "rgba(0, 0, 0, 0.2)";
         tagsHeader.innerHTML = `
-            <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; display:flex; align-items:center; gap:6px;">
+            <div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; display:flex; align-items:center; gap:6px;">
                 <i class="fa-solid fa-tags" style="color:var(--color-cyan);"></i> Pessoas/Objetos Marcados:
             </div>
             <div class="vision-tags-list" style="display:flex; flex-wrap:wrap; gap:6px;">
-                <span style="font-size:11px; color:var(--text-secondary); font-style:italic;">Carregando marcações...</span>
+                <span style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-secondary); font-style:italic;">Carregando marcações...</span>
             </div>
         `;
         this.visionContainer.appendChild(tagsHeader);
@@ -1838,11 +1838,11 @@ export class PanelsManager {
             row.style.cursor = "pointer";
             row.innerHTML = `
                 <div class="bubble-meta" style="margin-bottom: 6px; display: flex; align-items: center; width: 100%;">
-                    <span class="speaker-name" style="color: var(--color-cyan); font-weight:700;"><i class="fa-solid fa-eye" style="font-size: 9px; margin-right: 4px;"></i> VISÃO IA</span>
-                    <span class="bubble-time" style="font-family: monospace; font-size:10px; color: var(--text-secondary); margin-left: auto;">${formatTimecode(f.timestamp)}</span>
+                    <span class="speaker-name" style="color: var(--color-cyan); font-weight:700;"><i class="fa-solid fa-eye" style="font-size: calc(9px * var(--font-scale, 1)); margin-right: 4px;"></i> VISÃO IA</span>
+                    <span class="bubble-time" style="font-family: monospace; font-size:calc(10px * var(--font-scale, 1)); color: var(--text-secondary); margin-left: auto;">${formatTimecode(f.timestamp)}</span>
                     <button class="btn-card-action btn-play-vision" style="margin-left: 10px; color: var(--text-muted); background: transparent; border:none; cursor:pointer;" title="Assistir"><i class="fa-solid fa-play"></i></button>
                 </div>
-                <div class="bubble-text vision-description" style="user-select: text; cursor: text; font-size: 12px; line-height: 1.5; color: var(--text-primary);">${f.description}</div>
+                <div class="bubble-text vision-description" style="user-select: text; cursor: text; font-size: calc(12px * var(--font-scale, 1)); line-height: 1.5; color: var(--text-primary);">${f.description}</div>
             `;
             
             const descDiv = row.querySelector(".vision-description");
@@ -1877,13 +1877,13 @@ export class PanelsManager {
                 const uniqueNames = [...new Set(faces.map(face => face.name).filter(n => n))];
                 tagsListEl.innerHTML = "";
                 if (uniqueNames.length === 0) {
-                    tagsListEl.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); font-style:italic;">Nenhuma pessoa ou objeto marcado neste vídeo.</span>`;
+                    tagsListEl.innerHTML = `<span style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-secondary); font-style:italic;">Nenhuma pessoa ou objeto marcado neste vídeo.</span>`;
                 } else {
                     uniqueNames.forEach(name => {
                         const tag = document.createElement("span");
                         tag.textContent = name;
                         tag.className = "badge";
-                        tag.style.fontSize = "10px";
+                        tag.style.fontSize = "calc(10px * var(--font-scale, 1))";
                         tag.style.padding = "3px 8px";
                         tag.style.borderRadius = "12px";
                         tag.style.background = "rgba(6, 182, 212, 0.15)";
@@ -1894,7 +1894,7 @@ export class PanelsManager {
                 }
             } catch (err) {
                 console.error("Erro ao carregar faces do vídeo para tags da visão:", err);
-                tagsListEl.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); font-style:italic;">Erro ao carregar marcações.</span>`;
+                tagsListEl.innerHTML = `<span style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-secondary); font-style:italic;">Erro ao carregar marcações.</span>`;
             }
         }
     }
@@ -1995,7 +1995,7 @@ export class PanelsManager {
         
         if (filtered.length === 0) {
             container.innerHTML = `
-                <div style="color:var(--text-muted); font-size:11px; padding:12px; text-align:center;">
+                <div style="color:var(--text-muted); font-size:calc(11px * var(--font-scale, 1)); padding:12px; text-align:center;">
                     Nenhum tema encontrado.
                 </div>
             `;
@@ -2013,20 +2013,20 @@ export class PanelsManager {
             card.style.padding = "12px";
 
             const segmentsBadge = t.segments_count
-                ? `<span style="font-size: 9px; color: var(--color-emerald); background: var(--t-tint-2, rgba(16,185,129,0.1)); border: 1px solid var(--t-line-strong, rgba(16,185,129,0.25)); border-radius: 10px; padding: 1px 7px; font-weight: 600;">${t.segments_count} trechos</span>`
+                ? `<span style="font-size: calc(9px * var(--font-scale, 1)); color: var(--color-emerald); background: var(--t-tint-2, rgba(16,185,129,0.1)); border: 1px solid var(--t-line-strong, rgba(16,185,129,0.25)); border-radius: 10px; padding: 1px 7px; font-weight: 600;">${t.segments_count} trechos</span>`
                 : "";
 
             card.innerHTML = `
-                <h4 style="color: var(--color-cyan); margin: 0; font-size: 12px; font-weight: 600; display:flex; align-items:center; gap:6px; width: 100%;"><i class="fa-solid fa-brain"></i> <span style="flex:1;">${t.title}</span> ${segmentsBadge}</h4>
-                <p style="font-size: 11px; color: var(--text-secondary); margin: 0; line-height: 1.4; text-align: left;">${t.description}</p>
+                <h4 style="color: var(--color-cyan); margin: 0; font-size: calc(12px * var(--font-scale, 1)); font-weight: 600; display:flex; align-items:center; gap:6px; width: 100%;"><i class="fa-solid fa-brain"></i> <span style="flex:1;">${t.title}</span> ${segmentsBadge}</h4>
+                <p style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary); margin: 0; line-height: 1.4; text-align: left;">${t.description}</p>
                 <div style="display:flex; gap:6px; margin-top:6px; width: 100%; flex-wrap: wrap;">
-                    ${t.segments_count ? `<button class="btn-secondary btn-theme-segments" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--color-emerald); border: 1px solid var(--t-line-strong, rgba(16,185,129,0.3)); background: var(--t-tint-1, rgba(16,185,129,0.06));" data-theme-id="${t.id}">
+                    ${t.segments_count ? `<button class="btn-secondary btn-theme-segments" style="padding: 4px 8px; font-size: calc(9px * var(--font-scale, 1)); height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--color-emerald); border: 1px solid var(--t-line-strong, rgba(16,185,129,0.3)); background: var(--t-tint-1, rgba(16,185,129,0.06));" data-theme-id="${t.id}">
                         <i class="fa-solid fa-clock"></i> Ver Trechos
                     </button>` : ""}
-                    <button class="btn-primary btn-theme-search" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; border: none;" data-title="${t.title}">
+                    <button class="btn-primary btn-theme-search" style="padding: 4px 8px; font-size: calc(9px * var(--font-scale, 1)); height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; border: none;" data-title="${t.title}">
                         <i class="fa-solid fa-magnifying-glass"></i> Buscar Cortes
                     </button>
-                    <button class="btn-secondary btn-theme-chat" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--text-primary); border: none;" data-title="${t.title}">
+                    <button class="btn-secondary btn-theme-chat" style="padding: 4px 8px; font-size: calc(9px * var(--font-scale, 1)); height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--text-primary); border: none;" data-title="${t.title}">
                         <i class="fa-solid fa-comments"></i> Perguntar IA
                     </button>
                 </div>
@@ -2044,13 +2044,13 @@ export class PanelsManager {
                         return;
                     }
                     listEl.style.display = "flex";
-                    listEl.innerHTML = `<span style="font-size: 10px; color: var(--text-muted);">Carregando trechos...</span>`;
+                    listEl.innerHTML = `<span style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted);">Carregando trechos...</span>`;
                     try {
                         const data = await CapIAuAPI.fetchThemeSegments(t.id);
                         const segments = data.segments || [];
                         listEl.innerHTML = "";
                         if (segments.length === 0) {
-                            listEl.innerHTML = `<span style="font-size: 10px; color: var(--text-muted);">Nenhum trecho registrado. Rode o agrupamento temático novamente.</span>`;
+                            listEl.innerHTML = `<span style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted);">Nenhum trecho registrado. Rode o agrupamento temático novamente.</span>`;
                             return;
                         }
                         segments.forEach(seg => {
@@ -2061,8 +2061,8 @@ export class PanelsManager {
                                 ? `<i class="fa-solid fa-image"></i> ${seg.photo_filename || 'Foto ' + seg.photo_id}`
                                 : `<i class="fa-solid fa-film"></i> ${seg.video_filename || 'Vídeo ' + seg.video_id} · ${formatTimecode(seg.start_time || 0).substring(3)}${seg.speaker_id ? ' · ' + seg.speaker_id : ''}`;
                             item.innerHTML = `
-                                <span style="font-size: 9px; font-weight: 700; color: var(--color-cyan);">${mediaLabel}</span>
-                                <span style="font-size: 10px; color: var(--text-secondary); line-height: 1.35;">${(seg.text_excerpt || '').substring(0, 140)}${(seg.text_excerpt || '').length > 140 ? '…' : ''}</span>
+                                <span style="font-size: calc(9px * var(--font-scale, 1)); font-weight: 700; color: var(--color-cyan);">${mediaLabel}</span>
+                                <span style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-secondary); line-height: 1.35;">${(seg.text_excerpt || '').substring(0, 140)}${(seg.text_excerpt || '').length > 140 ? '…' : ''}</span>
                             `;
                             item.addEventListener("mouseenter", () => item.style.background = "rgba(6,182,212,0.08)");
                             item.addEventListener("mouseleave", () => item.style.background = "rgba(255,255,255,0.03)");
@@ -2088,7 +2088,7 @@ export class PanelsManager {
                             listEl.appendChild(item);
                         });
                     } catch (err) {
-                        listEl.innerHTML = `<span style="font-size: 10px; color: var(--color-rose);">Erro ao carregar trechos.</span>`;
+                        listEl.innerHTML = `<span style="font-size: calc(10px * var(--font-scale, 1)); color: var(--color-rose);">Erro ao carregar trechos.</span>`;
                     }
                 });
             }
@@ -2193,7 +2193,7 @@ export class PanelsManager {
         if (!this.exportModal) return;
 
         this.exportTimelines = [];
-        this.exportListEl.innerHTML = '<p style="font-size:11px;color:var(--text-secondary);margin:0;">Carregando…</p>';
+        this.exportListEl.innerHTML = '<p style="font-size:calc(11px * var(--font-scale, 1));color:var(--text-secondary);margin:0;">Carregando…</p>';
         this.exportModal.classList.add("active");
 
         try {
@@ -2201,7 +2201,7 @@ export class PanelsManager {
             this.exportTimelines = timelines || [];
             this.renderExportTimelineList();
         } catch (e) {
-            this.exportListEl.innerHTML = '<p style="font-size:11px;color:#ef4444;margin:0;">Falha ao carregar as timelines do projeto.</p>';
+            this.exportListEl.innerHTML = '<p style="font-size:calc(11px * var(--font-scale, 1));color:#ef4444;margin:0;">Falha ao carregar as timelines do projeto.</p>';
             this.updateExportHint();
         }
     }
@@ -2211,7 +2211,7 @@ export class PanelsManager {
 
         if (this.exportTimelines.length === 0) {
             this.exportListEl.innerHTML =
-                '<p style="font-size:11px;color:var(--text-secondary);margin:0;">Nenhuma timeline salva neste projeto. Salve a timeline antes de exportar.</p>';
+                '<p style="font-size:calc(11px * var(--font-scale, 1));color:var(--text-secondary);margin:0;">Nenhuma timeline salva neste projeto. Salve a timeline antes de exportar.</p>';
             this.updateExportHint();
             return;
         }
@@ -2239,8 +2239,8 @@ export class PanelsManager {
             const texto = document.createElement("div");
             texto.style.cssText = "display:flex;flex-direction:column;gap:2px;min-width:0;";
             texto.innerHTML =
-                `<span style="font-size:12px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(tl.name || "(sem nome)")}</span>` +
-                `<span style="font-size:10px;color:var(--text-secondary);">${clipes} clipe${clipes === 1 ? "" : "s"} &middot; criada em ${data}</span>`;
+                `<span style="font-size:calc(12px * var(--font-scale, 1));color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(tl.name || "(sem nome)")}</span>` +
+                `<span style="font-size:calc(10px * var(--font-scale, 1));color:var(--text-secondary);">${clipes} clipe${clipes === 1 ? "" : "s"} &middot; criada em ${data}</span>`;
 
             linha.appendChild(radio);
             linha.appendChild(texto);
@@ -2619,7 +2619,7 @@ export class PanelsManager {
                 <div class="task-log-drawer ${isExpanded ? 'expanded' : ''}" id="task-log-drawer-${key}">
                     <div class="task-log-header">
                         <span class="task-log-header-title"><i class="fa-solid fa-terminal"></i> CONSOLE LOG (${logs.length} linhas)</span>
-                        <span style="opacity: 0.6; font-size: 9px;">Estilo CMD · Tempo Real</span>
+                        <span style="opacity: 0.6; font-size: calc(9px * var(--font-scale, 1));">Estilo CMD · Tempo Real</span>
                     </div>
                     <pre class="task-log-box" id="task-log-box-${key}">${formatLogLines(logs)}</pre>
                 </div>
@@ -2952,7 +2952,7 @@ export class PanelsManager {
         btn.style.border = "none";
         btn.style.padding = "6px 12px";
         btn.style.borderRadius = "20px";
-        btn.style.fontSize = "11px";
+        btn.style.fontSize = "calc(11px * var(--font-scale, 1))";
         btn.style.fontWeight = "600";
         btn.style.cursor = "pointer";
         btn.style.boxShadow = "0 4px 10px rgba(0,0,0,0.5)";
@@ -3181,7 +3181,7 @@ export class PanelsManager {
 
             row.className = "timeline-header-track";
             row.dataset.compact = (h < 40) ? "true" : "false";
-            row.style.cssText = `height: ${h}px; border-bottom: 1px solid var(--border-glass); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding: 4px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); font-family: var(--font-heading); gap: 4px; overflow: hidden;`;
+            row.style.cssText = `height: ${h}px; border-bottom: 1px solid var(--border-glass); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding: 4px 8px; font-size: calc(10px * var(--font-scale, 1)); font-weight: 700; color: var(--text-secondary); font-family: var(--font-heading); gap: 4px; overflow: hidden;`;
 
             this.renderTrackRowContent(row, track, h);
 
@@ -3271,22 +3271,22 @@ export class PanelsManager {
             if (h >= 40) {
                 row.innerHTML = `
                     <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px;">
-                        <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: 9px;"></i> ${track.name}</span>
+                        <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: calc(9px * var(--font-scale, 1));"></i> ${track.name}</span>
                         <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
-                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;"><i class="fa-solid fa-eye"></i></button>
+                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: calc(9px * var(--font-scale, 1));"><i class="fa-solid fa-eye"></i></button>
                         </div>
                     </div>
                     <div style="display: flex; justify-content: flex-end; align-items: center; width: 100%; gap: 4px; margin-top: 2px;">
-                        <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid var(--t-line-strong, rgba(34,197,94,0.35)); background: var(--t-tint-2, rgba(34,197,94,0.08)); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Analisar</button>
+                        <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid var(--t-line-strong, rgba(34,197,94,0.35)); background: var(--t-tint-2, rgba(34,197,94,0.08)); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: calc(9px * var(--font-scale, 1)); border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Analisar</button>
                     </div>
                 `;
             } else {
                 row.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 4px;">
-                        <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: 9px;"></i> ${track.name}</span>
+                        <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: calc(9px * var(--font-scale, 1));"></i> ${track.name}</span>
                         <div style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">
-                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;"><i class="fa-solid fa-eye"></i></button>
-                            <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid var(--t-line-strong, rgba(34,197,94,0.35)); background: var(--t-tint-2, rgba(34,197,94,0.08)); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: calc(9px * var(--font-scale, 1));"><i class="fa-solid fa-eye"></i></button>
+                            <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid var(--t-line-strong, rgba(34,197,94,0.35)); background: var(--t-tint-2, rgba(34,197,94,0.08)); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: calc(9px * var(--font-scale, 1)); border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                         </div>
                     </div>
                 `;
@@ -3313,8 +3313,8 @@ export class PanelsManager {
                 : `<i class="fa-solid fa-lock-open" style="color: ${lockColor};"></i>`;
             const isSyncLocked = track.syncLocked !== undefined ? !!track.syncLocked : true;
             const syncColor = isSyncLocked ? "var(--color-cyan)" : "var(--text-muted)";
-            const syncBtn = `<button class="btn-track-sync-lock btn-track-action" title="${isSyncLocked ? 'Sync Lock ativado: esta pista acompanha operações de Ripple e Inserção' : 'Sync Lock desativado: esta pista permanece fixa no tempo'}" style="color: ${syncColor}; font-size: 9px;"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>`;
-            const lockBtn = `<button class="btn-track-lock btn-track-action ${isLocked ? 'locked' : 'unlocked'}" title="${isLocked ? 'Pista travada (clique para destravar)' : 'Pista destravada (clique para travar)'}" style="color: ${lockColor}; font-size: 9px;">${lockIcon}</button>`;
+            const syncBtn = `<button class="btn-track-sync-lock btn-track-action" title="${isSyncLocked ? 'Sync Lock ativado: esta pista acompanha operações de Ripple e Inserção' : 'Sync Lock desativado: esta pista permanece fixa no tempo'}" style="color: ${syncColor}; font-size: calc(9px * var(--font-scale, 1));"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>`;
+            const lockBtn = `<button class="btn-track-lock btn-track-action ${isLocked ? 'locked' : 'unlocked'}" title="${isLocked ? 'Pista travada (clique para destravar)' : 'Pista destravada (clique para travar)'}" style="color: ${lockColor}; font-size: calc(9px * var(--font-scale, 1));">${lockIcon}</button>`;
 
             const visibilityIcon = `<i class="fa-solid fa-eye"></i>`;
             const thumbIcon = track.thumbnailsEnabled
@@ -3323,21 +3323,21 @@ export class PanelsManager {
 
             let kindIcon = "";
             if (isAudio) {
-                kindIcon = `<i class="fa-solid fa-music" style="font-size: 8px; color: var(--color-emerald, #10b981);"></i> `;
+                kindIcon = `<i class="fa-solid fa-music" style="font-size: calc(8px * var(--font-scale, 1)); color: var(--color-emerald, #10b981);"></i> `;
             } else if (isText) {
-                kindIcon = `<i class="fa-solid fa-font" style="font-size: 8px; color: #f59e0b;"></i> `;
+                kindIcon = `<i class="fa-solid fa-font" style="font-size: calc(8px * var(--font-scale, 1)); color: #f59e0b;"></i> `;
             }
-            const muteBtn = isAudio ? `<button class="btn-track-mute btn-track-action" title="Mutar Trilha (Duplo clique para 100%)" style="color: var(--text-secondary); font-size: 10px;">${muteIcon}</button>` : "";
+            const muteBtn = isAudio ? `<button class="btn-track-mute btn-track-action" title="Mutar Trilha (Duplo clique para 100%)" style="color: var(--text-secondary); font-size: calc(10px * var(--font-scale, 1));">${muteIcon}</button>` : "";
             const volumeSlider = isAudio ? `<input type="range" class="slider-track-volume" min="0" max="1" step="0.01" value="${trackVol}" data-tooltip="Volume: ${volPct}%" title="Volume: ${volPct}%" style="flex: 1; min-width: 30px;">` : "";
-            const thumbBtn = (isAudio || isText) ? "" : `<button class="btn-track-thumbnails btn-track-action" title="${track.thumbnailsEnabled ? 'Desativar miniaturas na pista' : 'Ativar miniaturas na pista'}" style="font-size: 9px;">${thumbIcon}</button>`;
+            const thumbBtn = (isAudio || isText) ? "" : `<button class="btn-track-thumbnails btn-track-action" title="${track.thumbnailsEnabled ? 'Desativar miniaturas na pista' : 'Ativar miniaturas na pista'}" style="font-size: calc(9px * var(--font-scale, 1));">${thumbIcon}</button>`;
 
             if (h >= 40) {
                 row.innerHTML = `
                     <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px;">
                         <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${kindIcon}${track.id} ${track.name}</span>
                         <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
-                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
-                            <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
+                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: calc(9px * var(--font-scale, 1));">${visibilityIcon}</button>
+                            <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: calc(9px * var(--font-scale, 1));"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     </div>
                     <div style="display: flex; align-items: center; width: 100%; gap: 6px; margin-top: 2px;">
@@ -3347,7 +3347,7 @@ export class PanelsManager {
                             ${lockBtn}
                             ${muteBtn}
                         </div>
-                        ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="flex: 1; display: flex; align-items: center; min-width: 40px; gap: 4px; margin-left: 2px;">${volumeSlider}<span class="track-volume-val" style="font-size: 9px; font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
+                        ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="flex: 1; display: flex; align-items: center; min-width: 40px; gap: 4px; margin-left: 2px;">${volumeSlider}<span class="track-volume-val" style="font-size: calc(9px * var(--font-scale, 1)); font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
                     </div>
                 `;
             } else {
@@ -3356,14 +3356,14 @@ export class PanelsManager {
                         <span class="track-name-label" title="Clique duplo para renomear: ${track.name}" style="cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">${kindIcon}${track.id}</span>
                         <div style="display: flex; gap: 4px; flex-shrink: 0; align-items: center;">
                             ${thumbBtn}
-                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;">${visibilityIcon}</button>
+                            <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: calc(9px * var(--font-scale, 1));">${visibilityIcon}</button>
                             ${syncBtn}
                             ${lockBtn}
                             ${muteBtn}
-                            <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: 9px;"><i class="fa-solid fa-xmark"></i></button>
+                            <button class="btn-track-remove btn-track-action" title="Remover pista (clipes vão para outra pista do mesmo tipo)" style="color: var(--text-muted); font-size: calc(9px * var(--font-scale, 1));"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     </div>
-                    ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="width: 100%; display: flex; align-items: center; gap: 4px; margin-top: 2px;">${volumeSlider}<span class="track-volume-val" style="font-size: 9px; font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
+                    ${volumeSlider ? `<div class="track-volume-wrapper" title="Volume: ${volPct}% (Duplo clique para 100%)" style="width: 100%; display: flex; align-items: center; gap: 4px; margin-top: 2px;">${volumeSlider}<span class="track-volume-val" style="font-size: calc(9px * var(--font-scale, 1)); font-family: monospace; color: var(--color-cyan); min-width: 26px; text-align: right; flex-shrink: 0; user-select: none;">${volPct}%</span></div>` : ''}
                 `;
             }
 
@@ -3610,7 +3610,7 @@ export class PanelsManager {
         }
 
         this.importResultEl.style.cssText =
-            "display:block; font-size:11px; line-height:1.55; margin:0; padding:8px 10px; border-radius:6px;" +
+            "display:block; font-size:calc(11px * var(--font-scale, 1)); line-height:1.55; margin:0; padding:8px 10px; border-radius:6px;" +
             (faltantes.length > 0
                 ? "background:rgba(234,179,8,0.12); border:1px solid rgba(234,179,8,0.35); color:#d9d9e3;"
                 : "background:rgba(52,211,153,0.10); border:1px solid rgba(52,211,153,0.35); color:#d9d9e3;");
@@ -3660,7 +3660,7 @@ export class PanelsManager {
             const msg = this.extractApiError(err);
             if (this.importResultEl) {
                 this.importResultEl.style.cssText =
-                    "display:block; font-size:11px; line-height:1.55; margin:0; padding:8px 10px; border-radius:6px;" +
+                    "display:block; font-size:calc(11px * var(--font-scale, 1)); line-height:1.55; margin:0; padding:8px 10px; border-radius:6px;" +
                     "background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.4); color:#fca5a5;";
                 this.importResultEl.textContent = msg;
             }
@@ -3942,10 +3942,10 @@ export class PanelsManager {
 
             item.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-                    <kbd style="padding: 1px 5px; border-radius: 3px; background: rgba(0,0,0,0.5); border: 1px solid var(--t-line-strong, rgba(255,255,255,0.12)); font-family: monospace; font-weight: 700; font-size: 10px; color: ${badgeColor}; white-space: nowrap;">${cleanKey}</kbd>
-                    <span style="font-weight: 600; color: rgba(255,255,255,0.9); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cmdName}</span>
+                    <kbd style="padding: 1px 5px; border-radius: 3px; background: rgba(0,0,0,0.5); border: 1px solid var(--t-line-strong, rgba(255,255,255,0.12)); font-family: monospace; font-weight: 700; font-size: calc(10px * var(--font-scale, 1)); color: ${badgeColor}; white-space: nowrap;">${cleanKey}</kbd>
+                    <span style="font-weight: 600; color: rgba(255,255,255,0.9); font-size: calc(11px * var(--font-scale, 1)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cmdName}</span>
                 </div>
-                <span style="font-size: 9px; color: var(--text-muted); font-family: monospace; margin-left: 4px;">→</span>
+                <span style="font-size: calc(9px * var(--font-scale, 1)); color: var(--text-muted); font-family: monospace; margin-left: 4px;">→</span>
             `;
 
             // Hover bidirecional: passa no índice -> ilumina a tecla
@@ -4225,10 +4225,10 @@ export class PanelsManager {
 
             html += `
             <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); border-radius: 8px; padding: 10px 12px;">
-                <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid ${icon}" style="color: var(--color-cyan); font-size: 10px;"></i> ${catTitle}
+                <h4 style="color: #fff; margin: 0 0 8px 0; font-size: calc(12px * var(--font-scale, 1)); font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid ${icon}" style="color: var(--color-cyan); font-size: calc(10px * var(--font-scale, 1));"></i> ${catTitle}
                 </h4>
-                <div style="display: grid; grid-template-columns: minmax(190px, 240px) 1fr; gap: 8px 12px; font-size: 11.5px; align-items: start;">
+                <div style="display: grid; grid-template-columns: minmax(190px, 240px) 1fr; gap: 8px 12px; font-size: calc(11.5px * var(--font-scale, 1)); align-items: start;">
             `;
 
             cmds.forEach(cmd => {
@@ -4237,8 +4237,8 @@ export class PanelsManager {
                 html += `
                     <div>${badgesHtml}</div>
                     <div>
-                        <strong style="color: #fff; display: block; font-size: 11.5px; margin-bottom: 2px;">${cmdName}</strong>
-                        <span style="color: rgba(255,255,255,0.7); font-size: 11px; line-height: 1.4; display: block;">${cmd.description}</span>
+                        <strong style="color: #fff; display: block; font-size: calc(11.5px * var(--font-scale, 1)); margin-bottom: 2px;">${cmdName}</strong>
+                        <span style="color: rgba(255,255,255,0.7); font-size: calc(11px * var(--font-scale, 1)); line-height: 1.4; display: block;">${cmd.description}</span>
                     </div>
                 `;
             });
@@ -4252,11 +4252,11 @@ export class PanelsManager {
         // 8. Pistas Dinâmicas (Multipista)
         html += `
         <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); border-radius: 8px; padding: 10px 12px;">
-            <h4 style="color: #fff; margin: 0 0 6px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                <i class="fa-solid fa-layer-group" style="color: var(--color-cyan); font-size: 10px;"></i> 8. Pistas Dinâmicas (Multipista)
+            <h4 style="color: #fff; margin: 0 0 6px 0; font-size: calc(12px * var(--font-scale, 1)); font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-layer-group" style="color: var(--color-cyan); font-size: calc(10px * var(--font-scale, 1));"></i> 8. Pistas Dinâmicas (Multipista)
             </h4>
-            <p style="margin: 0; font-size: 11.5px; color: rgba(255,255,255,0.85); line-height: 1.5;">
-                Crie quantas pistas precisar pelo botão <strong>+</strong> no topo da sidebar de trilhas. Cada faixa possui <strong>volume, mute, trava (cadeado)</strong> e o modo <strong>ímã <i class="fa-solid fa-magnet" style="font-size: 9px;"></i></strong>: faixas magnéticas mantêm clipes grudados em sequência contínua; faixas livres permitem posicionamento em qualquer ponto no tempo.
+            <p style="margin: 0; font-size: calc(11.5px * var(--font-scale, 1)); color: rgba(255,255,255,0.85); line-height: 1.5;">
+                Crie quantas pistas precisar pelo botão <strong>+</strong> no topo da sidebar de trilhas. Cada faixa possui <strong>volume, mute, trava (cadeado)</strong> e o modo <strong>ímã <i class="fa-solid fa-magnet" style="font-size: calc(9px * var(--font-scale, 1));"></i></strong>: faixas magnéticas mantêm clipes grudados em sequência contínua; faixas livres permitem posicionamento em qualquer ponto no tempo.
             </p>
         </div>
         `;
@@ -4285,7 +4285,7 @@ export class PanelsManager {
         if (cmds.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="4" style="text-align: center; padding: 25px; color: var(--text-muted); font-size: 12px;">
+                    <td colspan="4" style="text-align: center; padding: 25px; color: var(--text-muted); font-size: calc(12px * var(--font-scale, 1));">
                         Nenhum comando encontrado com os filtros atuais.
                     </td>
                 </tr>
@@ -4305,7 +4305,7 @@ export class PanelsManager {
                 const catTitle = catMeta ? (catMeta.label || catMeta.name) : currentCat;
                 html += `
                     <tr style="background: rgba(255,255,255,0.03);">
-                        <td colspan="4" style="padding: 6px 12px; font-weight: 700; color: var(--color-cyan); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <td colspan="4" style="padding: 6px 12px; font-weight: 700; color: var(--color-cyan); font-size: calc(10.5px * var(--font-scale, 1)); text-transform: uppercase; letter-spacing: 0.5px;">
                             ${catTitle}
                         </td>
                     </tr>
@@ -4320,15 +4320,15 @@ export class PanelsManager {
                 <tr data-cmd-id="${cmd.id}">
                     <td style="font-weight: 600; color: #fff;">
                         ${cmdDisplayName}
-                        ${isOverridden ? '<span style="font-size: 9px; color: var(--color-cyan); margin-left: 4px; background: var(--t-tint-3, rgba(6,182,212,0.15)); padding: 1px 4px; border-radius: 3px;">MODIFICADO</span>' : ''}
+                        ${isOverridden ? '<span style="font-size: calc(9px * var(--font-scale, 1)); color: var(--color-cyan); margin-left: 4px; background: var(--t-tint-3, rgba(6,182,212,0.15)); padding: 1px 4px; border-radius: 3px;">MODIFICADO</span>' : ''}
                     </td>
-                    <td style="color: var(--text-secondary); font-size: 11px;">
+                    <td style="color: var(--text-secondary); font-size: calc(11px * var(--font-scale, 1));">
                         ${cmd.description}
                     </td>
                     <td style="text-align: center;">
                         <button class="keymap-badge-btn btn-trigger-record" data-cmd-id="${cmd.id}" title="Clique para gravar um novo atalho">
                             ${badgesHtml}
-                            <i class="fa-solid fa-pen-to-square" style="font-size: 10px; margin-left: 4px; opacity: 0.7;"></i>
+                            <i class="fa-solid fa-pen-to-square" style="font-size: calc(10px * var(--font-scale, 1)); margin-left: 4px; opacity: 0.7;"></i>
                         </button>
                     </td>
                     <td style="text-align: center;">

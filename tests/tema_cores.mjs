@@ -225,3 +225,35 @@ export function applyTokens(text, found) {
 export function unwrapTokens(text) {
     return text.replace(/var\(--t-[a-z0-9-]+, (#[0-9a-fA-F]+|(?:rgba?|hsla?)\([^()]*\))\)/g, "$1");
 }
+
+// ── Tamanho de fonte (F3) ────────────────────────────────────────────────────
+// Todo font-size em px da UI vira calc(Npx * var(--font-scale, 1)): idêntico em escala 1,
+// e o slider "Tamanho do texto" multiplica tudo de uma vez.
+
+/** Acha font-size em px ainda não escalados. CSS usa o texto mascarado (ignora comentários). */
+export function scanFontSizes(text, kind) {
+    const src = kind === "css" ? maskCss(text) : text;
+    const out = [];
+    const res = [/(font-size\s*:\s*)(\d+(?:\.\d+)?px)/g];
+    if (kind === "js") res.push(/(\.style\.fontSize\s*=\s*["'`])(\d+(?:\.\d+)?px)/g);
+    for (const re of res) {
+        for (const m of src.matchAll(re)) {
+            const index = m.index + m[1].length;
+            if (/calc\(\s*$/.test(src.slice(Math.max(0, index - 10), index))) continue;
+            out.push({ index, size: m[2] });
+        }
+    }
+    return out;
+}
+
+export function applyFontScale(text, found) {
+    let res = text;
+    for (const f of [...found].sort((a, b) => b.index - a.index)) {
+        res = res.slice(0, f.index) + `calc(${f.size} * var(--font-scale, 1))` + res.slice(f.index + f.size.length);
+    }
+    return res;
+}
+
+export function unwrapFontScale(text) {
+    return text.replace(/calc\((\d+(?:\.\d+)?px) \* var\(--font-scale, 1\)\)/g, "$1");
+}

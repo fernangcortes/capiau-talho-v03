@@ -21,3 +21,8 @@ export function notifyThemeChanged() {
     cache.clear();
     if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(THEME_CHANGED_EVENT));
 }
+
+// O js/themeBoot.js avisa quando aplica um tema (nesta janela ou vindo de outra): recalcula os canvas.
+if (typeof window !== "undefined" && window.addEventListener) {
+    window.addEventListener("capiau:theme-applied", () => notifyThemeChanged());
+}

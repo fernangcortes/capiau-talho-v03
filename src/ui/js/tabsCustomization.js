@@ -288,7 +288,7 @@ function showTabsContextMenu(x, y, container, visibilityKey, activeKey, attrName
 
     const title = document.createElement("div");
     title.style.padding = "6px 12px";
-    title.style.fontSize = "10px";
+    title.style.fontSize = "calc(10px * var(--font-scale, 1))";
     title.style.fontWeight = "bold";
     title.style.color = "var(--text-muted)";
     title.style.borderBottom = "1px solid var(--border-glass)";

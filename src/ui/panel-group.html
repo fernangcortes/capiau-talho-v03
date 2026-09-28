@@ -7,13 +7,11 @@
          Os painéis são movidos para cá pelo WorkspaceManager (registerGroupPopout); esta página só
          cuida da disposição, dos divisores e de avisar o editor quando abre/fecha. -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="fonts/fonts.css?v=1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=78">
-    <link rel="stylesheet" href="theme.css?v=2">
-    <script src="js/themeBoot.js?v=1"></script>
+    <link rel="stylesheet" href="styles.css?v=79">
+    <link rel="stylesheet" href="theme.css?v=3">
+    <script src="js/themeBoot.js?v=2"></script>
     <style>
         body {
             margin: 0;
@@ -24,7 +22,7 @@
             flex-direction: column;
             background: #0b0f19;
             color: #f8fafc;
-            font-family: 'Inter', sans-serif;
+            font-family: var(--font-body);
         }
         #group-toolbar {
             height: 32px;
@@ -39,7 +37,7 @@
             user-select: none;
         }
         .group-toolbar-section { display: flex; align-items: center; gap: 4px; }
-        .group-title { font-size: 11px; font-weight: 600; color: var(--text-secondary, #a1a1aa); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .group-title { font-size: calc(11px * var(--font-scale, 1)); font-weight: 600; color: var(--text-secondary, #a1a1aa); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .group-btn {
             width: 26px;
             height: 24px;
@@ -50,7 +48,7 @@
             border: 1px solid transparent;
             background: transparent;
             color: var(--text-secondary, #a1a1aa);
-            font-size: 12px;
+            font-size: calc(12px * var(--font-scale, 1));
             cursor: pointer;
         }
         .group-btn:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
@@ -72,7 +70,7 @@
         }
         .group-slot .timeline-track-area { flex: 1 !important; height: calc(100% - 60px) !important; }
         .group-slot .timeline-canvas-wrapper { height: 100% !important; flex: 1 !important; }
-        .group-slot-loading { margin: auto; font-size: 12px; color: var(--text-secondary, #a1a1aa); }
+        .group-slot-loading { margin: auto; font-size: calc(12px * var(--font-scale, 1)); color: var(--text-secondary, #a1a1aa); }
         .group-splitter { flex: 0 0 5px; background: var(--border-glass, rgba(255, 255, 255, 0.08)); touch-action: none; }
         .group-box.row > .group-splitter { cursor: col-resize; }
         .group-box.column > .group-splitter { cursor: row-resize; }
@@ -101,7 +99,7 @@
             border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
             background: rgba(255, 255, 255, 0.04);
             color: var(--text-secondary, #a1a1aa);
-            font-size: 11px;
+            font-size: calc(11px * var(--font-scale, 1));
         }
         /* Caixa com tudo recolhido: fica fininha e as linhas se deitam na outra direção. */
         .group-box.row.group-box-collapsed { flex: 0 0 auto; flex-direction: column; }

@@ -491,10 +491,10 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                 <!-- Header -->
                 <div style="padding: 14px 18px; border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3);">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <i class="fa-solid fa-wand-magic-sparkles" style="color: #f59e0b; font-size: 16px;"></i>
-                        <h2 style="font-size: 14px; font-weight: 700; color: #fff; margin: 0;">Extração Inteligente de Ficha Técnica & Créditos</h2>
+                        <i class="fa-solid fa-wand-magic-sparkles" style="color: #f59e0b; font-size: calc(16px * var(--font-scale, 1));"></i>
+                        <h2 style="font-size: calc(14px * var(--font-scale, 1)); font-weight: 700; color: #fff; margin: 0;">Extração Inteligente de Ficha Técnica & Créditos</h2>
                     </div>
-                    <button id="btn-close-extraction-modal" class="btn-flat-action" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; font-size: 14px;"><i class="fa-solid fa-xmark"></i></button>
+                    <button id="btn-close-extraction-modal" class="btn-flat-action" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; font-size: calc(14px * var(--font-scale, 1));"><i class="fa-solid fa-xmark"></i></button>
                 </div>
 
                 <!-- Body (Split Layout: Textarea + Live Preview) -->
@@ -502,11 +502,11 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                     <!-- Coluna da Esquerda: Área de Colagem -->
                     <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <label style="font-size: 11px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px;">Cole o Documento / Créditos</label>
-                            <span style="font-size: 10px; color: var(--text-muted);">Markdown, rolos de créditos, roteiros ou TXT</span>
+                            <label style="font-size: calc(11px * var(--font-scale, 1)); font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px;">Cole o Documento / Créditos</label>
+                            <span style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted);">Markdown, rolos de créditos, roteiros ou TXT</span>
                         </div>
-                        <textarea id="ai-extract-textarea" placeholder="Cole aqui o texto dos créditos finais, roteiro de elenco ou ficha técnica completa..." style="flex: 1; background: rgba(0,0,0,0.35); border: 1px solid var(--border-glass); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 11px; color: #fff; line-height: 1.4; resize: none; outline: none; white-space: pre;">${currentRawText}</textarea>
-                        <button id="btn-run-ai-extract" class="btn-primary" style="height: 34px; font-size: 11.5px; font-weight: 700; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <textarea id="ai-extract-textarea" placeholder="Cole aqui o texto dos créditos finais, roteiro de elenco ou ficha técnica completa..." style="flex: 1; background: rgba(0,0,0,0.35); border: 1px solid var(--border-glass); border-radius: 6px; padding: 12px; font-family: monospace; font-size: calc(11px * var(--font-scale, 1)); color: #fff; line-height: 1.4; resize: none; outline: none; white-space: pre;">${currentRawText}</textarea>
+                        <button id="btn-run-ai-extract" class="btn-primary" style="height: 34px; font-size: calc(11.5px * var(--font-scale, 1)); font-weight: 700; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Analisar com IA & Padronizar
                         </button>
                     </div>
@@ -514,12 +514,12 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                     <!-- Coluna da Direita: Tabela de Pré-visualização & Ajustes -->
                     <div style="flex: 1.25; display: flex; flex-direction: column; gap: 10px; min-width: 0; background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); border-radius: 6px; padding: 12px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px;">
-                            <div style="font-size: 11px; font-weight: 700; color: var(--color-cyan);">
+                            <div style="font-size: calc(11px * var(--font-scale, 1)); font-weight: 700; color: var(--color-cyan);">
                                 ${count > 0 ? `${count} Pessoa(s) e Cargo(s) Detectados` : 'Aguardando Análise'}
                             </div>
                             ${count > 0 ? `
                                 <div style="display: flex; gap: 8px; align-items: center;">
-                                    <label style="font-size: 10px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                    <label style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px;">
                                         <input type="checkbox" id="chk-extract-select-all" checked> Marcar Todos
                                     </label>
                                 </div>
@@ -528,15 +528,15 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
 
                         <div style="flex: 1; overflow-y: auto;">
                             ${count === 0 ? `
-                                <div style="text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 11.5px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                                    <i class="fa-solid fa-file-lines" style="font-size: 28px; opacity: 0.3;"></i>
+                                <div style="text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: calc(11.5px * var(--font-scale, 1)); display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                    <i class="fa-solid fa-file-lines" style="font-size: calc(28px * var(--font-scale, 1)); opacity: 0.3;"></i>
                                     <div>Cole o documento ao lado e clique em <strong>"Analisar com IA"</strong>.</div>
-                                    <div style="font-size: 10px; color: var(--text-secondary); max-width: 320px;">O motor detecta automaticamente seções de elenco, direção, equipe, expande múltiplos nomes e formata acentuações.</div>
+                                    <div style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-secondary); max-width: 320px;">O motor detecta automaticamente seções de elenco, direção, equipe, expande múltiplos nomes e formata acentuações.</div>
                                 </div>
                             ` : `
-                                <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: calc(11px * var(--font-scale, 1)); text-align: left;">
                                     <thead>
-                                        <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); font-size: 9.5px; text-transform: uppercase;">
+                                        <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); font-size: calc(9.5px * var(--font-scale, 1)); text-transform: uppercase;">
                                             <th style="padding: 6px 4px; width: 28px; text-align: center;"></th>
                                             <th style="padding: 6px 8px; width: 44%;">Nome Padronizado</th>
                                             <th style="padding: 6px 8px; width: 44%;">Função / Cargo</th>
@@ -550,13 +550,13 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                                                     <input type="checkbox" class="extract-item-chk" data-idx="${idx}" ${item.selected ? 'checked' : ''}>
                                                 </td>
                                                 <td style="padding: 4px 6px;">
-                                                    <input type="text" class="nle-input-flat extract-edit-name" data-idx="${idx}" value="${item.name}" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: 11px; color: #fff; font-weight: 600;">
+                                                    <input type="text" class="nle-input-flat extract-edit-name" data-idx="${idx}" value="${item.name}" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: calc(11px * var(--font-scale, 1)); color: #fff; font-weight: 600;">
                                                 </td>
                                                 <td style="padding: 4px 6px;">
-                                                    <input type="text" class="nle-input-flat extract-edit-role" data-idx="${idx}" value="${item.role}" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: 10.5px; color: var(--color-cyan);">
+                                                    <input type="text" class="nle-input-flat extract-edit-role" data-idx="${idx}" value="${item.role}" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: calc(10.5px * var(--font-scale, 1)); color: var(--color-cyan);">
                                                 </td>
                                                 <td style="padding: 4px; text-align: center;">
-                                                    <button class="btn-remove-extract-item" data-idx="${idx}" style="background: none; border: none; color: var(--color-rose); cursor: pointer; padding: 2px 4px; font-size: 10px;"><i class="fa-solid fa-xmark"></i></button>
+                                                    <button class="btn-remove-extract-item" data-idx="${idx}" style="background: none; border: none; color: var(--color-rose); cursor: pointer; padding: 2px 4px; font-size: calc(10px * var(--font-scale, 1));"><i class="fa-solid fa-xmark"></i></button>
                                                 </td>
                                             </tr>
                                         `).join('')}
@@ -570,21 +570,21 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                 <!-- Footer -->
                 <div style="padding: 12px 18px; border-top: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3);">
                     <div style="display: flex; gap: 16px; align-items: center;">
-                        <label style="font-size: 11px; color: #fff; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <label style="font-size: calc(11px * var(--font-scale, 1)); color: #fff; display: flex; align-items: center; gap: 6px; cursor: pointer;">
                             <input type="radio" name="import-mode" value="replace" checked>
                             <span><strong>Substituir</strong> Ficha Oficial (Limpa anteriores)</span>
                         </label>
-                        <label style="font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <label style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary); display: flex; align-items: center; gap: 6px; cursor: pointer;">
                             <input type="radio" name="import-mode" value="merge">
                             <span>Adicionar aos nomes já cadastrados</span>
                         </label>
                     </div>
 
                     <div style="display: flex; gap: 8px;">
-                        <button id="btn-cancel-extraction" class="btn-secondary" style="font-size: 11px; height: 32px; padding: 0 14px; border: 1px solid var(--border-glass); color: #fff; cursor: pointer; border-radius: 4px;">
+                        <button id="btn-cancel-extraction" class="btn-secondary" style="font-size: calc(11px * var(--font-scale, 1)); height: 32px; padding: 0 14px; border: 1px solid var(--border-glass); color: #fff; cursor: pointer; border-radius: 4px;">
                             Cancelar
                         </button>
-                        <button id="btn-confirm-import-credits" class="btn-primary" ${count === 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''} style="font-size: 11px; font-weight: 700; height: 32px; padding: 0 18px; border: none; background: var(--color-cyan); color: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+                        <button id="btn-confirm-import-credits" class="btn-primary" ${count === 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''} style="font-size: calc(11px * var(--font-scale, 1)); font-weight: 700; height: 32px; padding: 0 18px; border: none; background: var(--color-cyan); color: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-file-import"></i> Importar para a Ficha Técnica
                         </button>
                     </div>
@@ -727,19 +727,19 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                 <!-- Header -->
                 <div style="padding: 14px 18px; border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <i class="fa-solid fa-address-book" style="color: #f59e0b; font-size: 16px;"></i>
-                        <h2 style="font-size: 14px; font-weight: 700; color: #fff; margin: 0;">Central de Ficha Técnica & Normalização de Nomes</h2>
+                        <i class="fa-solid fa-address-book" style="color: #f59e0b; font-size: calc(16px * var(--font-scale, 1));"></i>
+                        <h2 style="font-size: calc(14px * var(--font-scale, 1)); font-weight: 700; color: #fff; margin: 0;">Central de Ficha Técnica & Normalização de Nomes</h2>
                     </div>
-                    <button id="btn-close-credits-modal" class="btn-flat-action" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; font-size: 14px;"><i class="fa-solid fa-xmark"></i></button>
+                    <button id="btn-close-credits-modal" class="btn-flat-action" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; font-size: calc(14px * var(--font-scale, 1));"><i class="fa-solid fa-xmark"></i></button>
                 </div>
 
                 <!-- Info e Ações de Entrada -->
                 <div style="padding: 12px 18px; border-bottom: 1px solid var(--border-glass); display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.12);">
                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                        <div style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary); line-height: 1.4;">
                             A lista oficial de créditos é utilizada pela Inteligência Artificial para identificar entrevistados na agulha e padronizar nomes e cargos em Lower Thirds (GCs).
                         </div>
-                        <button id="btn-download-credits-template" class="btn-secondary" style="font-size: 10.5px; height: 28px; padding: 0 10px; display: flex; align-items: center; gap: 6px; white-space: nowrap; border: 1px solid var(--border-glass); color: var(--color-cyan); cursor: pointer; border-radius: 4px;">
+                        <button id="btn-download-credits-template" class="btn-secondary" style="font-size: calc(10.5px * var(--font-scale, 1)); height: 28px; padding: 0 10px; display: flex; align-items: center; gap: 6px; white-space: nowrap; border: 1px solid var(--border-glass); color: var(--color-cyan); cursor: pointer; border-radius: 4px;">
                             <i class="fa-solid fa-download"></i> Baixar Modelo TXT
                         </button>
                     </div>
@@ -747,19 +747,19 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                     <!-- Botões de Ingestão -->
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <div class="search-area glassmorphism" style="flex: 1; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px;">
-                            <i class="fa-solid fa-magnifying-glass" style="color: var(--text-muted); font-size: 11px;"></i>
-                            <input type="text" id="credits-search-input" placeholder="Buscar por nome ou cargo oficial..." value="${this.searchQuery}" style="flex: 1; background: transparent; border: none; outline: none; font-size: 11px; color: #fff;">
+                            <i class="fa-solid fa-magnifying-glass" style="color: var(--text-muted); font-size: calc(11px * var(--font-scale, 1));"></i>
+                            <input type="text" id="credits-search-input" placeholder="Buscar por nome ou cargo oficial..." value="${this.searchQuery}" style="flex: 1; background: transparent; border: none; outline: none; font-size: calc(11px * var(--font-scale, 1)); color: #fff;">
                         </div>
 
-                        <button id="btn-paste-credits-text" class="btn-primary" style="font-size: 11px; height: 30px; padding: 0 12px; display: flex; align-items: center; gap: 6px; background: var(--t-tint-3, rgba(245,158,11,0.15)); border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); color: #f59e0b; cursor: pointer; border-radius: 4px;">
+                        <button id="btn-paste-credits-text" class="btn-primary" style="font-size: calc(11px * var(--font-scale, 1)); height: 30px; padding: 0 12px; display: flex; align-items: center; gap: 6px; background: var(--t-tint-3, rgba(245,158,11,0.15)); border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); color: #f59e0b; cursor: pointer; border-radius: 4px;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Colar e Extrair com IA
                         </button>
 
-                        <button id="btn-add-single-credit" class="btn-secondary" style="font-size: 11px; height: 30px; padding: 0 12px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--border-glass); color: #fff; cursor: pointer; border-radius: 4px;">
+                        <button id="btn-add-single-credit" class="btn-secondary" style="font-size: calc(11px * var(--font-scale, 1)); height: 30px; padding: 0 12px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--border-glass); color: #fff; cursor: pointer; border-radius: 4px;">
                             <i class="fa-solid fa-plus"></i> Novo Nome
                         </button>
 
-                        <button id="btn-clear-all-credits" class="btn-secondary" title="Limpar todos os nomes da ficha oficial" style="font-size: 11px; height: 30px; padding: 0 10px; border: 1px solid var(--t-line-strong, rgba(244,63,94,0.3)); background: var(--t-tint-1, rgba(244,63,94,0.06)); color: var(--color-rose); cursor: pointer; border-radius: 4px;">
+                        <button id="btn-clear-all-credits" class="btn-secondary" title="Limpar todos os nomes da ficha oficial" style="font-size: calc(11px * var(--font-scale, 1)); height: 30px; padding: 0 10px; border: 1px solid var(--t-line-strong, rgba(244,63,94,0.3)); background: var(--t-tint-1, rgba(244,63,94,0.06)); color: var(--color-rose); cursor: pointer; border-radius: 4px;">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </div>
@@ -768,15 +768,15 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                 <!-- Tabela de Nomes & Cargos -->
                 <div style="flex: 1; overflow-y: auto; padding: 14px 18px;">
                     ${filtered.length === 0 ? `
-                        <div style="text-align: center; padding: 50px 20px; color: var(--text-muted); font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                            <i class="fa-solid fa-address-book" style="font-size: 32px; opacity: 0.3;"></i>
+                        <div style="text-align: center; padding: 50px 20px; color: var(--text-muted); font-size: calc(12px * var(--font-scale, 1)); display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                            <i class="fa-solid fa-address-book" style="font-size: calc(32px * var(--font-scale, 1)); opacity: 0.3;"></i>
                             <div>Nenhum nome cadastrado na Ficha Técnica Oficial deste projeto.</div>
-                            <div style="font-size: 11px; color: var(--text-secondary);">Clique em <strong>"Colar e Extrair com IA"</strong> para analisar seu documento ou rolo de créditos automaticamente.</div>
+                            <div style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary);">Clique em <strong>"Colar e Extrair com IA"</strong> para analisar seu documento ou rolo de créditos automaticamente.</div>
                         </div>
                     ` : `
-                        <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: calc(11.5px * var(--font-scale, 1)); text-align: left;">
                             <thead>
-                                <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); font-size: 10px; text-transform: uppercase;">
+                                <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); font-size: calc(10px * var(--font-scale, 1)); text-transform: uppercase;">
                                     <th style="padding: 8px 10px; width: 35%;">Nome Completo Oficial</th>
                                     <th style="padding: 8px 10px; width: 35%;">Cargo / Função / Identificação</th>
                                     <th style="padding: 8px 10px; width: 20%;">Variações Fonéticas</th>
@@ -787,16 +787,16 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                                 ${filtered.map(item => `
                                     <tr style="border-bottom: 1px solid var(--t-line-weak, rgba(255,255,255,0.03)); transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
                                         <td style="padding: 8px 10px; font-weight: 600; color: #fff;">
-                                            <input type="text" class="nle-input-flat edit-credit-name" data-id="${item.id}" value="${item.name}" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: 11.5px; color: #fff; outline: none;">
+                                            <input type="text" class="nle-input-flat edit-credit-name" data-id="${item.id}" value="${item.name}" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: calc(11.5px * var(--font-scale, 1)); color: #fff; outline: none;">
                                         </td>
                                         <td style="padding: 8px 10px; color: var(--color-cyan);">
-                                            <input type="text" class="nle-input-flat edit-credit-role" data-id="${item.id}" value="${item.role || ''}" placeholder="Ex: Entrevistado / Diretor" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: 11px; color: var(--color-cyan); outline: none;">
+                                            <input type="text" class="nle-input-flat edit-credit-role" data-id="${item.id}" value="${item.role || ''}" placeholder="Ex: Entrevistado / Diretor" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: calc(11px * var(--font-scale, 1)); color: var(--color-cyan); outline: none;">
                                         </td>
-                                        <td style="padding: 8px 10px; color: var(--text-muted); font-size: 10px;">
+                                        <td style="padding: 8px 10px; color: var(--text-muted); font-size: calc(10px * var(--font-scale, 1));">
                                             ${(item.variations || []).join(', ') || '--'}
                                         </td>
                                         <td style="padding: 8px 10px; text-align: center;">
-                                            <button class="btn-delete-credit" data-id="${item.id}" title="Excluir da ficha oficial" style="background: none; border: none; color: var(--color-rose); cursor: pointer; padding: 2px 6px; font-size: 11px;">
+                                            <button class="btn-delete-credit" data-id="${item.id}" title="Excluir da ficha oficial" style="background: none; border: none; color: var(--color-rose); cursor: pointer; padding: 2px 6px; font-size: calc(11px * var(--font-scale, 1));">
                                                 <i class="fa-solid fa-trash-can"></i>
                                             </button>
                                         </td>
@@ -809,14 +809,14 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
 
                 <!-- Footer com Ações Globais -->
                 <div style="padding: 12px 18px; border-top: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
-                    <span style="font-size: 11px; color: var(--text-muted);">
+                    <span style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-muted);">
                         ${credits.length} pessoa(s) e cargo(s) cadastrados oficialmente
                     </span>
                     <div style="display: flex; gap: 8px;">
-                        <button id="btn-normalize-all-gcs" class="btn-secondary" style="font-size: 11px; height: 32px; padding: 0 14px; border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); background: var(--t-tint-2, rgba(245,158,11,0.08)); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+                        <button id="btn-normalize-all-gcs" class="btn-secondary" style="font-size: calc(11px * var(--font-scale, 1)); height: 32px; padding: 0 14px; border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); background: var(--t-tint-2, rgba(245,158,11,0.08)); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Validar e Corrigir Todos os GCs da Timeline
                         </button>
-                        <button id="btn-save-credits-done" class="btn-primary" style="font-size: 11px; font-weight: 700; height: 32px; padding: 0 18px; border: none; background: var(--color-cyan); color: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+                        <button id="btn-save-credits-done" class="btn-primary" style="font-size: calc(11px * var(--font-scale, 1)); font-weight: 700; height: 32px; padding: 0 18px; border: none; background: var(--color-cyan); color: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-check"></i> Concluir
                         </button>
                     </div>
