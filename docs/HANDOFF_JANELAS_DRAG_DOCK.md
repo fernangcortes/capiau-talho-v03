@@ -1,84 +1,90 @@
-# Passagem: janelas drag & dock (F0–F5 + P14) e próxima tarefa
+# Passagem: janelas drag & dock (F0–F5, P14, recolher) → próxima: F2c
 
-Branch: `talho-windows-drag-dock-6mtidh` (a partir de `main`). Commits no nome do autor, **sem assinatura
-de IA** (sem `Co-Authored-By`/`Claude-Session`, sem branch `claude/...`).
-Plano completo, com decisões e animações: página do plano (artifact "talho-dock-plan", versão 14).
-O arquivo `docs/PLANO_JANELAS_DRAG_DOCK.md` é ignorado pelo git (fica só local).
+Branch: `talho-windows-drag-dock-6mtidh` (a partir de `main`), em dia com o remoto em 28/09.
+Commits no nome do autor (`fernangcortes <escrevaprofernando@gmail.com>`), **sem assinatura de IA**
+(sem `Co-Authored-By`/`Claude-Session`, sem branch `claude/...`). Confirmar antes de dar push.
 
-## Próxima tarefa (pedido do usuário)
+Plano completo, com decisões e animações: página "Talho Drag & Dock"
+(https://claude.ai/artifact/SF8tDpe1VVSy4brs938X3V). O `docs/PLANO_JANELAS_DRAG_DOCK.md` é ignorado
+pelo git e não existe em todas as máquinas: a página é a fonte do plano.
 
-> **Feito em 28/09** (commit "recolher painéis em pilha e janelas"). Resumo:
-> - Estado de recolher central no `WorkspaceManager` (`setPanelCollapsed` / `isPanelCollapsed` /
->   `applyAllCollapse`), salvo em `capiau_collapsed_panels`. **Não** entra no Ctrl+Alt+Z (decisão do usuário).
->   Recolher automático do Painel Lateral sem abas (`auto: true`) não vai para o salvo.
-> - `panelPlacement` diz onde o painel está (coluna, pilha, janela simples/dupla/grupo) e cada lugar
->   desenha o recolher: pilha = linha deitada no lugar do painel (`restore-line-h`), anfitrião recolhido =
->   `dock-stack-self-collapsed`, todos recolhidos = coluna some e as linhas ficam em pé; janelas =
->   `capiauSetPanelCollapsed` / `capiauPanelEdge` em `panel.html` e `panel-group.html`.
-> - Seta: `collapseEdge` (`js/panelCollapse.js`, `edgeInLine`), recalculada em toda reorganização.
-> - Numpad: `handleWorkspaceShortcut` também é chamado pelas janelas destacadas.
-> - Autoteste: `tests/autoteste_panel_collapse.mjs`. As janelas foram testadas no navegador com
->   `window.open` simulado por iframe (mesmo `adoptNode`/`BroadcastChannel`); falta o teste com janelas reais.
->
-> Texto original do pedido, para referência:
+## Próxima sessão: F2c
 
-> Os botões de recolher painel e os atalhos Numpad de **Ajustes & Efeitos** (Numpad5) e
-> **Transcrição & Falas** (Numpad6) não estão funcionando.
+**Objetivo (do plano):** a animação 3 da página. Encostar um painel numa **borda do editor** cria uma
+**área nova do lado inteiro** (faixa inteira embaixo/em cima, coluna na ponta), inclusive trazendo o
+painel de uma janela destacada; e os **monitores podem sair do centro**. A página registra a F2 como
+"F2a/F2b concluídas; em aberto: monitores fora do centro e faixa inteira nova".
 
-Retorno do usuário depois de testar no Windows (28/09):
-- Sem erro no Console. Depois do **Ctrl+F5** o comportamento melhorou no layout simples.
-- Continua falhando com painéis **empilhados** (pilha de coluna da F2b) e na **Janela Dupla /
-  janela com vários painéis**. **Destacados (em janela) fica pior: não recolhe nada.**
+### Como o editor é montado hoje (o que a F2c mexe)
 
-Comportamento esperado (definido pelo usuário):
-1. **Recolher dentro de uma pilha ou janela com vários painéis**: o painel recolhido some e o(s)
-   outro(s) **ocupa(m) todo o espaço**. A **linha de expandir** fica no lugar dele: **acima**, se ele
-   estava em cima; **abaixo**, se estava embaixo (o mesmo vale para esquerda/direita lado a lado).
-2. **Setinha de recolher na direção lógica**: painel de cima → seta para **cima** (recolhe para
-   cima); painel de baixo → seta para **baixo**; lado a lado mantém esquerda/direita. A seta
-   acompanha a posição quando o painel muda de lugar (trocar, empilhar, destacar, juntar).
-3. Vale no editor e **nas janelas destacadas** (simples, Janela Dupla `panel.html?panel=dual-sidebar`
-   e grupo `panel-group.html`), pelo botão e pelo Numpad (Numpad5/6 e Alt/Ctrl+Numpad), inclusive
-   com o foco dentro da janela destacada.
-4. Recolher/expandir entra no layout salvo (reabrir o Talho mantém) — decidir com o usuário se também
-   entra no Ctrl+Alt+Z.
+- O layout principal **não** é renderizado pela árvore. O estado real é o legado do `WorkspaceManager`:
+  `columnOrder` (colunas + `center-stage`), `columnStacks` (F2b), `timelinePosition`
+  (`center` | `bottom-left` | `bottom-right` | `bottom-full`) e `monitorsLayout`.
+- Montagem no DOM: `arrangeColumnsIntoContainer` / `arrangeTopColumns` (colunas, linhas de expandir,
+  pilhas) e `setTimelinePosition` (cria `studioTop` / `compoundStage` para a timeline embaixo).
+- `dockModel.js` converte legado ↔ árvore (`layoutFromLegacy` / `legacyFromLayout`) para o histórico
+  (Ctrl+Alt+Z) e para salvar. `legacyFromLayout` devolve `null` para qualquer árvore que o legado não
+  representa: é exatamente o que a F2c precisa ampliar.
+- Alvos do arrasto: `dockDrag.js` → `resolveTarget` → `resolveColumnTarget` (hoje as bordas do editor
+  só mandam a coluna para a ponta esquerda/direita via `moveToEdge`), `resolveTimelineTarget`
+  (as 4 posições da timeline) e `resolveMonitorTarget` (só lado a lado / empilhados).
+- Operações puras em `dockOps.js` (`moveBeside`, `moveToEdge`, `stackWith`, `swapPanels`,
+  `removeFromStack`), testadas em `tests/autoteste_dock_ops.mjs`.
+- Recolher (esta sessão) já sabe desenhar linha deitada (`restore-line-h`) e seta cima/baixo:
+  uma faixa nova deve reaproveitar `panelPlacement` / `applyPanelCollapse` / `collapseEdge`.
 
-### O que já se sabe (diagnóstico de 28/09)
+### Decidir com o usuário no começo da F2c
 
-`node scripts/dock_collapse_check.mjs` (headless, sem backend, localStorage limpo) testa os botões
-`#toggle-inspector` / `#toggle-right` e as teclas Numpad5 / Numpad6 em vários layouts:
+1. **Caminho técnico.** (a) *Incremental (recomendado):* acrescentar ao estado legado faixas
+   inteiras, por exemplo `bands: { top: [...], bottom: [...] }`, com papel próprio no `dockModel`
+   e novas operações em `dockOps`, mantendo o renderizador atual. (b) *Renderizar o editor inteiro
+   pela árvore:* o que o plano previa, mas reescreve `arrangeColumnsIntoContainer` +
+   `setTimelinePosition` (maior risco de regressão).
+2. **Quem pode ir para uma faixa inteira:** só as laterais (Biblioteca, Ajustes, Painel Lateral)? Abas
+   destacadas (F5)? Monitores?
+3. **Faixa e timeline embaixo:** com a timeline em `bottom-full`, uma faixa embaixo fica acima ou
+   abaixo dela? Pode haver faixa em cima **e** embaixo ao mesmo tempo? Mais de um painel na mesma
+   faixa (lado a lado)?
+4. **Monitores fora do centro:** Source/Program viram coluna lateral? Podem ir para uma faixa? O que
+   o centro vira se os dois saírem (a timeline continua âncora do centro, por decisão anterior)?
+5. **Ponta esquerda/direita:** continua "coluna na ponta" (como hoje) ou vira coluna da altura inteira,
+   passando também por cima/baixo da timeline em `bottom-full`?
 
-| Layout | Botões | Numpad5/6 |
-|---|---|---|
-| padrão, inspector-right, decupagem, montagem | recolhem | recolhem |
-| Timeline bottom-full / bottom-left / bottom-right | recolhem | recolhem |
-| todas as abas do Painel Lateral movidas para a Biblioteca (P14) | recolhem | recolhem |
-| **Ajustes empilhado** sob a Biblioteca ou sob o Painel Lateral (F2b) | **`#toggle-inspector` coberto** (o clique cai no `.sidebar-header` do anfitrião) | recolhem |
+### Pontos de partida no código
 
-Ou seja: **no estado limpo funciona**; falha em pilhas e janelas destacadas (confirmado pelo usuário).
-Próximos passos sugeridos:
-1. Pedir ao usuário, no navegador onde falha (F12 → Console):
-   `JSON.stringify({ws: localStorage.capiau_active_workspace, cols: localStorage.capiau_column_order, stacks: localStorage.capiau_column_stacks, strips: localStorage.capiau_tab_strips, layout: localStorage.capiau_dock_layout})`,
-   e se aparece algum erro vermelho ao clicar no botão ou apertar a tecla.
-2. Perguntar: o painel não recolhe, recolhe e volta sozinho, ou recolhe mas o espaço não é
-   reaproveitado? A tecla falha com o foco em algum campo (busca, player)? NumLock ligado?
-3. Suspeitas para conferir no código:
-   - **Pilha (F2b)**: `mountStackGuests` (`workspaceManager.js`) tira `collapsed` do convidado e o
-     cabeçalho do convidado fica sob o do anfitrião. Recolher um painel empilhado nunca foi desenhado
-     (o que deve acontecer: some da pilha? a pilha encolhe?).
-   - **Painel em janela destacada**: `collapseSidebar`/`expandSidebar` (`main.js` ~1931) retornam cedo se
-     `ownerDocument !== document`; o `toggle*` de `workspaceManager.js` (~5035/5068) também.
-   - **Recolher automático do Painel Lateral (F5a/P14)**: `TabPanels.syncSidebarVisibility`
-     (`tabPanels.js`) clica `#toggle-right`/`#reopen-right` quando a faixa fica vazia/volta a ter abas
-     (flag `autoCollapsed`). Pode brigar com o recolher manual.
-   - **Atalhos**: handler do Numpad em `workspaceManager.js` (~5395–5560; Numpad5 → `toggleInspector`,
-     Numpad6 → `toggleRightSidebar`). Conferir se algum `keydown` em captura (ex.: `dockDrag.js` desfazer
-     do aviso, `handleLayoutShortcut`) ou foco em input bloqueia antes.
-   - `restore line` (`#reopen-inspector`, `#reopen-right`) depois de `arrangeTopColumns`/mudar ordem das
-     colunas: se a linha ficar fora de lugar, o painel "recolhe" mas não dá para reabrir.
-4. Corrigir, cobrir com autoteste (`tests/`) e rodar `scripts/dock_collapse_check.mjs` + regressões abaixo.
+- `src/ui/js/dockModel.js`: `layoutFromLegacy` / `legacyFromLayout` / `validateLayout` (+
+  `tests/autoteste_dock_model.mjs`, que testa todas as combinações do legado).
+- `src/ui/js/dockOps.js`: operações novas de faixa (+ `tests/autoteste_dock_ops.mjs`).
+- `src/ui/js/dockDrag.js`: `resolveColumnTarget` (bordas do editor, constante `EDGE`) e a volta
+  de janela destacada (`dockBack`, `homeTarget`).
+- `src/ui/js/workspaceManager.js`: `setColumnLayout`, `arrangeColumnsIntoContainer`,
+  `setTimelinePosition`, `reinitSplitters`, `getLegacyLayoutState`, `applyDockLayout`,
+  `captureCurrentState` / `applyWorkspace` (workspaces salvos) e `applyAllCollapse`.
+- CSS: `styles.css` seções "DRAG & DOCK" (pilhas F2b) e regras `.workspace:has(...)` dos divisores.
 
-## O que a sessão entregou (resumo)
+## Esta sessão (28/09): recolher painéis e janela de grupo
+
+| Entrega | Onde |
+|---|---|
+| Recolher central (`setPanelCollapsed` / `isPanelCollapsed` / `applyAllCollapse`), salvo em `capiau_collapsed_panels`; **fora** do Ctrl+Alt+Z (decisão do usuário). Recolher automático do Painel Lateral sem abas (`auto: true`) não é salvo. | `workspaceManager.js`, `main.js`, `tabPanels.js`, `library.js` |
+| Pilha de coluna: recolhido some, os outros ocupam o espaço, linha deitada no lugar dele; anfitrião recolhido = `dock-stack-self-collapsed`; todos recolhidos = coluna some e as linhas ficam em pé. | `applyStackCollapse`, `styles.css` |
+| Janelas destacadas (simples, Janela Dupla, grupo) recolhem pelo botão e pelo Numpad, com foco nelas também (`handleWorkspaceShortcut`). Páginas expõem `capiauSetPanelCollapsed` / `capiauPanelEdge`. | `panel.html`, `panel-group.html` |
+| Seta de recolher pela posição (cima/baixo empilhado, esquerda/direita lado a lado), recalculada em toda reorganização; painel sozinho numa linha da grade usa a posição da linha. | `js/panelCollapse.js` (`edgeInLine`, `visibleSplitters`) |
+| Janela de grupo: arrastar a alça de um painel sobre outro **na mesma janela** troca os dois (qualquer disposição, sem recarregar, entra no desfazer). Grade com 3: seletor "Sozinho: X" + botão em cima/embaixo (salvo em `capiau_group_grid_single`). | `dockDrag.js` (`findSwapInWindow`), `workspaceManager.js` (`swapGroupPanels`, `setGroupOrder`), `panel-group.html` |
+
+Commits: `7823b45`, `b943b27`, `4fc6402` (depois de `079b0b4`).
+
+### Pendências anotadas nesta sessão
+
+- Workspaces prontos (Padrão, Montagem, Decupagem, Inspetor à Direita) têm um trecho antigo que tenta
+  reabrir Biblioteca/Painel Lateral recolhidos mas clica no botão de **recolher** (`toggle-*`) em vez do
+  de expandir: aplicar um workspace pronto não reabre painel recolhido (`applyWorkspace`, ramo dos presets).
+- Trocar painéis por arrasto só na janela de grupo; na Janela Dupla, não.
+- Numa linha com 3 painéis lado a lado, a seta do painel do meio aponta para a esquerda.
+- Arrasto real dentro da janela de grupo (troca) e o recolher nas janelas foram verificados com janelas
+  simuladas; o usuário testou no Chrome com janelas reais e aprovou a seta.
+
+## O que as sessões anteriores entregaram
 
 | Fase | Entrega |
 |---|---|
@@ -93,20 +99,26 @@ Próximos passos sugeridos:
 Decisões do usuário que valem para o resto: Timeline sempre no centro ou em janela; máx. 4 painéis
 por janela; soltar no centro = trocar; Chrome principal mas funcionar nos outros; Source/Program
 separados; arrastar pela alça; muda na hora com Ctrl+Z e restaurar padrão; janelas reabrem sozinhas
-(bloqueadas vão para "Restaurar janelas").
+(bloqueadas vão para "Restaurar janelas"); recolher é salvo mas não entra no Ctrl+Alt+Z.
 
-Pendências conhecidas: F6 (escolher monitor via Window Management API, animações FLIP,
-teclado/acessibilidade, Manual/Wiki cap. 03); F2c (monitores fora do centro, faixa inteira nova);
-aba destacada virar coluna no editor; rolagem infinita da Busca destacada; só uma janela de grupo por
-vez; título do Painel Lateral não muda quando Falas sai.
+Pendências conhecidas (além da F2c): F6 (escolher monitor via Window Management API, animações FLIP,
+teclado/acessibilidade, Manual/Wiki cap. 03); aba destacada virar coluna no editor; rolagem infinita
+da Busca destacada; só uma janela de grupo por vez; título do Painel Lateral não muda quando Falas sai.
 
 ## Testes
 
-- Autotestes (54): `for f in tests/autoteste_*.mjs; do node $f || echo FAIL $f; done`
-  (drag & dock: `autoteste_dock_{model,ops,drag,tearoff,join,group,tabs}.mjs`).
+- Autotestes (55): `for f in tests/autoteste_*.mjs; do node $f || echo FAIL $f; done`
+  (drag & dock: `autoteste_dock_{model,ops,drag,tearoff,join,group,tabs}.mjs`, `autoteste_panel_collapse.mjs`).
+  **No Windows**, `autoteste_dock_drag` e `autoteste_dock_group` falham por procurar trechos com `\n`
+  numa cópia de trabalho em CRLF (falso positivo, já falhavam antes). Rodar numa cópia com LF
+  (como o CI) para conferir de verdade.
 - Mouse real (Linux, Xvfb + xdotool + Playwright global): `scripts/dock_real_mouse_check.mjs` (F3),
   `dock_group_real_mouse_check.mjs` (F4), `dock_tabs_real_mouse_check.mjs` (F5),
-  `dock_strips_real_mouse_check.mjs` (P14).
-- Headless: `scripts/dock_collapse_check.mjs` (recolher painéis / Numpad).
+  `dock_strips_real_mouse_check.mjs` (P14). Headless: `scripts/dock_collapse_check.mjs`.
+- **No Windows sem Playwright:** servir `src/ui` estático (sem backend, `/api` responde `[]`) e abrir no
+  navegador do app. Ele não abre janelas reais; para testar janelas destacadas, trocar `window.open`
+  por um iframe na mesma origem (devolver `iframe.contentWindow` e manter `w.opener = window`): o
+  Talho funciona igual (mesmo `adoptNode` e `BroadcastChannel`). Cuidado: remover o iframe dispara o
+  aviso de "fechei" da página e pode reacoplar painéis.
 - Local (Windows): pasta `C:\Users\FGC\dev\capiau\talho`, rodar como de costume, http://localhost:8000,
   Ctrl+F5 após atualizar; permitir pop-ups de localhost:8000.
