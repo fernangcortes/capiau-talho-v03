@@ -33,22 +33,27 @@ painel de uma janela destacada; e os **monitores podem sair do centro**. A pági
 - Recolher (esta sessão) já sabe desenhar linha deitada (`restore-line-h`) e seta cima/baixo:
   uma faixa nova deve reaproveitar `panelPlacement` / `applyPanelCollapse` / `collapseEdge`.
 
-### Decidir com o usuário no começo da F2c
+### Decisões da F2c (usuário, 28/09)
 
-1. **Caminho técnico.** (a) *Incremental (recomendado):* acrescentar ao estado legado faixas
-   inteiras, por exemplo `bands: { top: [...], bottom: [...] }`, com papel próprio no `dockModel`
-   e novas operações em `dockOps`, mantendo o renderizador atual. (b) *Renderizar o editor inteiro
-   pela árvore:* o que o plano previa, mas reescreve `arrangeColumnsIntoContainer` +
-   `setTimelinePosition` (maior risco de regressão).
-2. **Quem pode ir para uma faixa inteira:** só as laterais (Biblioteca, Ajustes, Painel Lateral)? Abas
-   destacadas (F5)? Monitores?
-3. **Faixa e timeline embaixo:** com a timeline em `bottom-full`, uma faixa embaixo fica acima ou
-   abaixo dela? Pode haver faixa em cima **e** embaixo ao mesmo tempo? Mais de um painel na mesma
-   faixa (lado a lado)?
-4. **Monitores fora do centro:** Source/Program viram coluna lateral? Podem ir para uma faixa? O que
-   o centro vira se os dois saírem (a timeline continua âncora do centro, por decisão anterior)?
-5. **Ponta esquerda/direita:** continua "coluna na ponta" (como hoje) ou vira coluna da altura inteira,
-   passando também por cima/baixo da timeline em `bottom-full`?
+1. **Caminho técnico: incremental.** Faixas entram no estado legado (ex.: `bands: { top: [...], bottom: [...] }`),
+   com papel próprio no `dockModel` e operações novas em `dockOps`; o renderizador atual continua.
+2. **Vão para faixas: laterais e abas** (as abas destacáveis da F5). Monitores: ver "Em aberto".
+3. **Faixa em cima e embaixo ao mesmo tempo; vários painéis na mesma faixa.** Seguir a Seção IX da skill
+   `.agents/skills/capiau-nle-design-system` (criada nesta sessão): seta de recolher pela posição dentro
+   da faixa, linha de expandir no lugar do painel, divisores só entre visíveis e **trocar de lugar dentro
+   da faixa** arrastando a alça, como na janela de grupo.
+4. **O centro vira o que o usuário quiser.**
+
+### Em aberto (responder no começo da F2c)
+
+- **Monitores** (explicado ao usuário em 28/09): (a) mover Source + Program juntos como um bloco
+  "Monitores" para coluna/faixa; (b) cada monitor sozinho em qualquer lugar. Sugestão: (a) primeiro.
+- **Item 4 × âncora da Timeline:** a decisão antiga era "Timeline sempre no centro ou em janela".
+  "O centro vira o que o usuário quiser" libera a Timeline para faixa/coluna também? Confirmar.
+- **Ponta esquerda/direita e cantos** (explicado ao usuário em 28/09): coluna da ponta com altura só
+  da parte de cima (como hoje) ou altura inteira; e quem fica com os cantos quando há faixa e coluna de
+  ponta ao mesmo tempo. Sugestão: faixas sempre com a largura inteira (donas dos cantos) e colunas da
+  ponta entre as faixas.
 
 ### Pontos de partida no código
 
