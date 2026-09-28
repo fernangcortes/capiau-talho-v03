@@ -539,13 +539,15 @@ export class WorkspaceManager {
                 try { window.popoutWindows["dual-sidebar"]?.close(); } catch (e) {}
                 this.restoreDualPopout(current.dual.panels[0], current.dual.panels[1]);
             }
-            const sameGroup = (a, b) => !!a && !!b && a.panels.join() === b.panels.join();
+            // Mesmos painéis em outra ordem não reabrem a janela: a troca de lugar é feita nela mesma.
+            const sameGroup = (a, b) => !!a && !!b && [...a.panels].sort().join() === [...b.panels].sort().join();
             if (current.group && !sameGroup(current.group, legacy.group)) this.restoreGroupPopout();
             current.popped.filter(id => !legacy.popped.includes(id)).forEach(id => this.togglePopout(id));
             if (legacy.group && !sameGroup(current.group, legacy.group)) {
                 this.openGroupPopout(legacy.group.panels, legacy.group.arrangement);
-            } else if (legacy.group && current.group && legacy.group.arrangement !== current.group.arrangement) {
-                this.setGroupArrangement(legacy.group.arrangement, true);
+            } else if (legacy.group && current.group) {
+                if (legacy.group.panels.join() !== current.group.panels.join()) this.setGroupOrder(legacy.group.panels);
+                if (legacy.group.arrangement !== current.group.arrangement) this.setGroupArrangement(legacy.group.arrangement, true);
             }
             if (legacy.dual && !sameDual(current.dual, legacy.dual)) {
                 this.openDualPopout(legacy.dual.panels[0], legacy.dual.panels[1], legacy.dual.layout);
@@ -4226,6 +4228,27 @@ export class WorkspaceManager {
             try { win.document.querySelector(`.group-btn[data-arrangement="${arrangement}"]`)?.click(); } catch (e) {}
         }
         this.scheduleLayoutCommit();
+    }
+
+    /** Nova ordem dos painéis na janela de grupo (mesmos painéis), sem recarregar a janela. */
+    setGroupOrder(order) {
+        const win = window.popoutWindows["group"];
+        const panels = this.getGroupPanels();
+        if (!win || win.closed || [...order].sort().join() !== [...panels].sort().join()) return false;
+        localStorage.setItem("capiau_group_popout_panels", order.join(","));
+        try { win.capiauSetGroupOrder?.(order); } catch (e) {}
+        this.refreshCollapseArrows();
+        this.scheduleLayoutCommit();
+        return true;
+    }
+
+    /** Troca dois painéis de lugar dentro da janela de grupo (arrastar um sobre o outro). */
+    swapGroupPanels(a, b) {
+        const order = this.getGroupPanels();
+        const i = order.indexOf(a), j = order.indexOf(b);
+        if (i < 0 || j < 0 || i === j) return false;
+        [order[i], order[j]] = [order[j], order[i]];
+        return this.setGroupOrder(order);
     }
 
     /** Abre uma janela de grupo nova (desfazer, restaurar sessão). Precisa do gesto do usuário. */

@@ -205,6 +205,17 @@ export class DockDragController {
         const outside = p.x < 0 || p.y < 0 || p.x > window.innerWidth || p.y > window.innerHeight;
         d.outside = outside;
 
+        // Dentro da própria janela de grupo: soltar sobre outro painel troca os dois de lugar.
+        const inOwn = d.fromPopout ? this.findSwapInWindow(d, e) : undefined;
+        d.insideOwn = inOwn !== undefined;
+        if (d.insideOwn) {
+            this.ghost.hidden = true;
+            d.target = inOwn;
+            this.drawTarget(null);
+            this.drawJoin(inOwn);
+            return;
+        }
+
         if (d.fromPopout) {
             // Voltando da janela destacada: zonas do editor principal no ponto convertido;
             // fora do editor, sobre outra janela destacada: juntar (F4).
@@ -254,7 +265,7 @@ export class DockDragController {
         let target = d.target;
         // Confere de novo no ponto de soltar: o último movimento pode ter sido processado enquanto
         // a janela prévia nascia e perdido a janela destacada embaixo do cursor.
-        if (released && !target && d.outside) {
+        if (released && !target && d.outside && !d.insideOwn) {
             const join = this.findJoinTarget(d.panelId, e.screenX, e.screenY);
             if (join) {
                 if (d.live) this.wm.cancelLivePopout(d.panelId, d.live);
@@ -266,6 +277,11 @@ export class DockDragController {
         if (!released) return;
 
         const title = DOCK_PANELS[d.panelId].title;
+        if (target?.type === "swap") {
+            if (this.wm.swapGroupPanels(target.panelId, target.otherId)) this.showToast("undo", `${title} ${target.label.toLowerCase()}`);
+            return;
+        }
+        if (d.insideOwn) return; // solto dentro da própria janela, fora de outro painel: nada muda
         if (target?.type === "join") {
             const ok = target.pairOfColumns
                 ? this.wm.joinIntoPopout(target.targetPanel, d.panelId, target.side)
@@ -350,6 +366,27 @@ export class DockDragController {
         return null;
     }
 
+    /**
+     * Cursor dentro da janela de onde o painel saiu: undefined se está fora dela; na janela de grupo,
+     * sobre o espaço de outro painel, o alvo de troca; senão null (soltar ali não muda nada).
+     */
+    findSwapInWindow(d, e) {
+        const w = d.win;
+        let x, y;
+        try {
+            x = e.clientX; y = e.clientY;
+            if (w.closed || x < 0 || y < 0 || x > w.innerWidth || y > w.innerHeight) return undefined;
+        } catch (err) {
+            return undefined;
+        }
+        if (w !== window.popoutWindows?.["group"]) return null;
+        const slot = w.document.elementFromPoint(x, y)?.closest?.("[data-group-slot]");
+        const otherId = slot?.dataset.groupSlot;
+        if (!otherId || otherId === d.panelId) return null;
+        const r = slot.getBoundingClientRect();
+        return { type: "swap", win: w, panelId: d.panelId, otherId, rect: { left: r.left, top: r.top, width: r.width, height: r.height }, label: `Trocar com ${DOCK_PANELS[otherId]?.title || otherId}` };
+    }
+
     /** Desenha a prévia do "juntar" dentro da janela destacada alvo (estilo inline: CSS dela pode estar em cache). */
     drawJoin(join) {
         if (this.joinPreview && (!join || this.joinPreview.ownerDocument !== join.win.document)) {
@@ -364,8 +401,10 @@ export class DockDragController {
             this.joinPreview.innerHTML = "<span></span>";
             doc.body.appendChild(this.joinPreview);
         }
-        const half = { left: "left:0;top:0;width:50%;height:100%", right: "right:0;top:0;width:50%;height:100%",
-            top: "left:0;top:0;width:100%;height:50%", bottom: "left:0;bottom:0;width:100%;height:50%" }[join.side];
+        const half = join.rect
+            ? `left:${join.rect.left}px;top:${join.rect.top}px;width:${join.rect.width}px;height:${join.rect.height}px`
+            : { left: "left:0;top:0;width:50%;height:100%", right: "right:0;top:0;width:50%;height:100%",
+                top: "left:0;top:0;width:100%;height:50%", bottom: "left:0;bottom:0;width:100%;height:50%" }[join.side];
         this.joinPreview.style.cssText = `position:fixed;${half};z-index:20000;pointer-events:none;box-sizing:border-box;` +
             "border:2px solid #22d3ee;background:rgba(34,211,238,0.16);border-radius:6px;display:flex;align-items:flex-start;justify-content:center;padding-top:14px";
         const tag = this.joinPreview.firstChild;

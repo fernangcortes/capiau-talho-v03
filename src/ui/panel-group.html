@@ -91,6 +91,16 @@
             box-shadow: 0 0 12px rgba(6, 182, 212, 0.8);
         }
         .group-fill { flex: 1 1 0% !important; }
+        .group-select {
+            height: 24px;
+            margin-left: 6px;
+            padding: 0 4px;
+            border-radius: 5px;
+            border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-secondary, #a1a1aa);
+            font-size: 11px;
+        }
         /* Caixa com tudo recolhido: fica fininha e as linhas se deitam na outra direção. */
         .group-box.row.group-box-collapsed { flex: 0 0 auto; flex-direction: column; }
         .group-box.column.group-box-collapsed { flex: 0 0 auto; flex-direction: row; }
@@ -107,6 +117,7 @@
             <button class="group-btn" data-arrangement="grid" data-tooltip="Grade 2×2"><i class="fa-solid fa-table-cells-large"></i></button>
             <button class="group-btn" data-arrangement="main" data-tooltip="Principal + coluna"><i class="fa-solid fa-table-list"></i></button>
             <!-- Grade com 3 painéis: o painel sozinho fica embaixo ou em cima dos outros dois -->
+            <select id="grid-single-select" class="group-select" data-tooltip="Painel que fica sozinho na grade" style="display: none;"></select>
             <button class="group-btn" id="btn-grid-single" style="display: none;"><i class="fa-solid fa-arrows-up-down"></i></button>
         </div>
         <div class="group-toolbar-section">
@@ -143,9 +154,12 @@
         let arrangement = ARRANGEMENTS.includes(params.get("arrangement")) ? params.get("arrangement") : "row";
 
         window.name = "CapIAu_Group_Window";
-        const title = panels.map(id => TITLES[id] || id).join(" + ");
-        document.title = `CapIAu-Talho — ${title}`;
-        document.getElementById("group-title").textContent = title;
+        function updateTitle() {
+            const title = panels.map(id => TITLES[id] || id).join(" + ");
+            document.title = `CapIAu-Talho — ${title}`;
+            document.getElementById("group-title").textContent = title;
+        }
+        updateTitle();
 
         // ── Posição e tamanho: dock=keep/live = a janela veio de outra (troca de modo ou arrasto) ──
         const boundsKey = "capiau_popout_bounds_group";
@@ -195,6 +209,7 @@
         // Grade com 3 painéis: o terceiro fica sozinho embaixo ("bottom") ou em cima ("top").
         let gridSingle = localStorage.getItem("capiau_group_grid_single") === "top" ? "top" : "bottom";
         const btnGridSingle = document.getElementById("btn-grid-single");
+        const gridSingleSelect = document.getElementById("grid-single-select");
 
         /** Monta a disposição movendo os espaços (com os painéis dentro) para as caixas novas. */
         function render(next) {
@@ -214,7 +229,11 @@
                 btn.classList.toggle("active", a === arrangement);
                 btn.disabled = (a === "grid" || a === "main") && panels.length < 3;
             });
-            btnGridSingle.style.display = arrangement === "grid" && panels.length === 3 ? "" : "none";
+            const gridOf3 = arrangement === "grid" && panels.length === 3;
+            btnGridSingle.style.display = gridOf3 ? "" : "none";
+            gridSingleSelect.style.display = gridOf3 ? "" : "none";
+            gridSingleSelect.innerHTML = panels.map(id => `<option value="${id}">Sozinho: ${TITLES[id] || id}</option>`).join("");
+            gridSingleSelect.value = panels[2] || "";
             btnGridSingle.setAttribute("data-tooltip", gridSingle === "top"
                 ? `${TITLES[panels[2]] || panels[2]} em cima — clique para pôr embaixo`
                 : `${TITLES[panels[2]] || panels[2]} embaixo — clique para pôr em cima`);
@@ -282,6 +301,34 @@
             const items = itemsOf(boxEl);
             return edgeInLine(boxEl.classList.contains("column") ? "column" : "row", items.indexOf(item), items.length);
         };
+
+        /** Nova ordem (mesmos painéis): os espaços trocam de lugar, os painéis vão junto. */
+        window.capiauSetGroupOrder = (order) => {
+            if ([...order].sort().join() !== [...panels].sort().join()) return;
+            panels.splice(0, panels.length, ...order);
+            updateTitle();
+            render(arrangement);
+        };
+
+        // Trocar de lugar passa pelo editor (salva e entra no desfazer); sem editor, só aqui.
+        function swapPanels(a, b) {
+            try {
+                if (window.opener && !window.opener.closed && window.opener.workspaceManager?.swapGroupPanels) {
+                    window.opener.workspaceManager.swapGroupPanels(a, b);
+                    return;
+                }
+            } catch (e) {}
+            const order = [...panels];
+            const i = order.indexOf(a), j = order.indexOf(b);
+            if (i < 0 || j < 0) return;
+            [order[i], order[j]] = [order[j], order[i]];
+            window.capiauSetGroupOrder(order);
+        }
+
+        gridSingleSelect.addEventListener("change", () => {
+            const chosen = gridSingleSelect.value;
+            if (chosen && chosen !== panels[2]) swapPanels(chosen, panels[2]);
+        });
 
         btnGridSingle.addEventListener("click", () => {
             gridSingle = gridSingle === "top" ? "bottom" : "top";
