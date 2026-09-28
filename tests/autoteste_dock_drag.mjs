@@ -54,7 +54,7 @@ const wm = read("src", "ui", "js", "workspaceManager.js");
 assert.ok(wm.includes("mountStackGuests(colId, colEl)"), "arranjo das colunas monta as pilhas");
 assert.ok(/this\.detachFromStack\(panelId\);\s*\n\s*const winName = getPopoutWindowName\(panelId\);/.test(wm), "destacar tira o painel da pilha antes");
 assert.ok(wm.includes("this.detachFromStack(panelId1);") && wm.includes("this.detachFromStack(panelId2);"), "janela dupla tira os dois painéis das pilhas");
-assert.ok(wm.includes("columnStacks: this.columnStacks.map(st => [...st]),\n            popouts:"), "workspace salvo guarda as pilhas");
+assert.ok(/columnStacks: this\.columnStacks\.map\(st => \[\.\.\.st\]\),\s*\n\s*bands: \{ top: \[\.\.\.this\.bands\.top\], bottom: \[\.\.\.this\.bands\.bottom\] \},\s*\n\s*bandCorners: \{ \.\.\.this\.bandCorners \},\s*\n\s*popouts:/.test(wm), "workspace salvo guarda as pilhas e as faixas (F2c)");
 assert.ok(css.includes(".dock-stack-guest {") && css.includes(".dock-stack-splitter {"), "estilos das pilhas");
 console.log("✔ 3b passou: pilhas montadas no arranjo, desfeitas ao destacar e salvas no workspace.");
 

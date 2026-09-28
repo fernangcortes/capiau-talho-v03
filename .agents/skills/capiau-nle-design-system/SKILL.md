@@ -433,7 +433,7 @@ Vale para colunas do editor, pilhas de coluna, faixas, janelas destacadas simple
   * Todo recolher/expandir passa por `setPanelCollapsed(id, bool)`, venha de botão, linha, duplo clique ou atalho.
   * Recolher feito pelo próprio sistema (ex.: menu que ficou sem abas) usa `{ auto: true }` e não vai para o estado salvo.
   * Recolher/expandir **não** entra no desfazer de layout (Ctrl+Alt+Z); fica salvo ao reabrir.
-* **Onde o painel está (`panelPlacement`):** `column`, `stack`, `single`, `dual`, `group` (e faixas, quando existirem). Contêiner novo = novo tipo aqui + seu desenho de recolhido. Ao mudar o painel de lugar, chame o reaplicar (`applyAllCollapse`) para ele aparecer recolhido/expandido no lugar novo.
+* **Onde o painel está (`panelPlacement`):** `column`, `stack`, `band` (faixa inteira em cima/embaixo, `applyBandCollapse`), `single`, `dual`, `group`. Contêiner novo = novo tipo aqui + seu desenho de recolhido. Ao mudar o painel de lugar, chame o reaplicar (`applyAllCollapse`) para ele aparecer recolhido/expandido no lugar novo.
 * **Regra do espaço:**
   * O painel recolhido some; os vizinhos **ocupam todo o espaço** (o último visível do contêiner recebe `flex: 1 1 0% !important`).
   * Divisores só entre dois painéis visíveis. Havendo vários candidatos entre eles, fica o que encosta no visível seguinte (`visibleSplitters`). Arrastar um divisor redimensiona o **visível** anterior, pulando recolhidos.
@@ -454,6 +454,11 @@ Vale para colunas do editor, pilhas de coluna, faixas, janelas destacadas simple
   * A troca move os invólucros (slots) com o painel dentro: **não** recarrega a janela nem re-adota o DOM (vídeo e rolagem continuam).
   * Entra no desfazer de layout. Soltar dentro do próprio contêiner, fora de outro painel, não faz nada.
   * Disposições com posição especial (ex.: painel sozinho na grade de 3) oferecem também escolha explícita na barra (seletor + botão), além do arrasto.
+* **Cantos disputados entre coluna e faixa (F2c):**
+  * Onde uma coluna da ponta encontra uma faixa inteira, o canto é de um dos dois: `"band"` (a faixa passa com a largura inteira e a coluna para antes dela) ou `"column"` (a coluna vai até o fim e a faixa encurta). Estado em `bandCorners` (`tl`, `tr`, `bl`, `br`), só para faixas que existem; faixa nova começa com `"band"`.
+  * O usuário escolhe **no arrasto**: na borda esquerda/direita do editor, soltar na altura da faixa (o canto) = `"column"`; soltar ao lado do centro = `"band"`. A sombra de prévia mostra o retângulo exato.
+  * E **depois**: setinha no rodapé da coluna (no topo, se a faixa é em cima), `.dock-corner-toggle`. A seta aponta para onde a coluna vai crescer/encolher; dica "Estender até embaixo/em cima" ou "Deixar a faixa passar". Entra no desfazer de layout e no workspace salvo.
+  * Implementação: a moldura `.dock-frame` é uma grade 3 × 3 em volta do `.workspace`; a coluna que fica com o canto sai para a célula `.dock-edge` da ponta (com seu próprio divisor), e a faixa ocupa só as colunas da grade que sobram. Vale para qualquer contêiner de borda novo.
 * **Checklist para um contêiner novo:**
   1. Registrar o tipo em `panelPlacement` e desenhar o recolhido (espaço, divisores, linha no lugar).
   2. Implementar a direção da seta (`edgeInLine`) e chamar o recálculo após reorganizar.

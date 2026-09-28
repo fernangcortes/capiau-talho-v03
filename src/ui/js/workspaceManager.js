@@ -1,7 +1,7 @@
 import { STATE } from "./state.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
-import { layoutFromLegacy, legacyFromLayout, LayoutHistory, serializeLayout } from "./dockModel.js";
-import { normalizeStacks, stackGuests, stackOf, removeFromStack } from "./dockOps.js";
+import { layoutFromLegacy, legacyFromLayout, LayoutHistory, serializeLayout, normalizeBands, hasBands, BAND_EDGES, CENTER_STAGE } from "./dockModel.js";
+import { normalizeStacks, stackGuests, stackOf, removeFromStack, setCorner } from "./dockOps.js";
 import { COLLAPSIBLE_PANELS, REOPEN_LINE_IDS, edgeInLine, collapseButtonFor, visibleSplitters, loadCollapsed, saveCollapsed } from "./panelCollapse.js";
 
 window.popoutWindows = {};
@@ -133,6 +133,14 @@ export class WorkspaceManager {
             this.columnStacks = normalizeStacks(JSON.parse(localStorage.getItem("capiau_column_stacks") || "[]"));
         } catch (e) {}
 
+        // Faixas inteiras em cima/embaixo do editor (F2c) e quem fica com cada canto.
+        this.bands = { top: [], bottom: [] };
+        this.bandCorners = {};
+        try {
+            const saved = JSON.parse(localStorage.getItem("capiau_dock_bands") || "null");
+            if (saved) ({ bands: this.bands, corners: this.bandCorners } = normalizeBands(saved.bands, saved.corners));
+        } catch (e) {}
+
         // Painéis recolhidos (Biblioteca, Ajustes, Painel Lateral), valem em qualquer lugar e ficam
         // salvos ao reabrir. Os recolhidos sozinhos (Painel Lateral sem abas) não vão para o salvo.
         this.collapsedPanels = loadCollapsed(localStorage);
@@ -222,7 +230,7 @@ export class WorkspaceManager {
             id !== "dual-sidebar" && id !== "group" && isOpen(window.popoutWindows[id])
             && window.popoutWindows[id] !== dualWin && window.popoutWindows[id] !== groupWin
         );
-        return {
+        const legacy = {
             columnOrder: [...this.columnOrder],
             timelinePosition: this.timelinePosition,
             monitorsLayout: this.monitorsLayout,
@@ -232,11 +240,35 @@ export class WorkspaceManager {
             group,
             tabStrips: window.tabPanels?.getStrips?.() || {}
         };
+        if (hasBands(this.bands)) {
+            legacy.bands = { top: [...this.bands.top], bottom: [...this.bands.bottom] };
+            legacy.bandCorners = { ...this.bandCorners };
+        }
+        return legacy;
     }
 
-    /** Aplica ordem das colunas + pilhas de laterais de uma vez (um passo no histórico). */
-    setColumnLayout(order, stacks) {
+    /** Colunas no formato do dockOps: ordem, pilhas e, se houver, faixas e cantos. */
+    getColumnState() {
+        const state = { order: [...this.columnOrder], stacks: this.columnStacks.map(st => [...st]) };
+        if (hasBands(this.bands)) {
+            state.bands = { top: [...this.bands.top], bottom: [...this.bands.bottom] };
+            state.corners = { ...this.bandCorners };
+        }
+        return state;
+    }
+
+    /**
+     * Aplica ordem das colunas + pilhas de laterais de uma vez (um passo no histórico).
+     * bands/corners (F2c): ausentes = faixas continuam como estão; { top: [], bottom: [] } = sem faixas.
+     */
+    setColumnLayout(order, stacks, bands, corners) {
         this.columnStacks = normalizeStacks(stacks);
+        if (bands !== undefined) {
+            ({ bands: this.bands, corners: this.bandCorners } = normalizeBands(bands, corners));
+            try {
+                localStorage.setItem("capiau_dock_bands", JSON.stringify({ bands: this.bands, corners: this.bandCorners }));
+            } catch (e) {}
+        }
         try {
             localStorage.setItem("capiau_column_stacks", JSON.stringify(this.columnStacks));
         } catch (e) {}
@@ -246,8 +278,299 @@ export class WorkspaceManager {
     /** Tira um painel da pilha antes de destacá-lo (ele sai sozinho para a janela nova). */
     detachFromStack(panelId) {
         if (!stackOf(this.columnStacks, panelId)) return;
-        const next = removeFromStack({ order: this.columnOrder, stacks: this.columnStacks }, panelId);
+        const next = removeFromStack(this.getColumnState(), panelId);
         this.setColumnLayout(next.order, next.stacks);
+    }
+
+    // ── Faixas inteiras em cima/embaixo do editor (F2c) ──────────────────────
+    //
+    // O .workspace fica dentro de uma moldura em grade (.dock-frame) de 3 × 3:
+    //   linha 1 = faixa de cima, linha 3 = faixa de baixo, coluna 1/3 = coluna da ponta que ficou
+    //   com um canto ("column"): ela sai do .workspace e vai até o fim, e a faixa encurta.
+    // O renderizador legado continua montando colunas e timeline dentro do .workspace; renderBands
+    // roda depois dele e leva os membros de faixa e as colunas da ponta para a moldura.
+
+    ensureDockFrame(workspace) {
+        if (workspace.parentElement?.classList.contains("dock-frame")) return workspace.parentElement;
+        const frame = document.createElement("div");
+        frame.className = "dock-frame";
+        workspace.before(frame);
+        frame.appendChild(workspace);
+        return frame;
+    }
+
+    /** Colunas da ponta (primeira e última de columnOrder, fora das faixas). */
+    edgeColumns() {
+        const members = new Set([...this.bands.top, ...this.bands.bottom]);
+        const cols = this.columnOrder.filter(id => !members.has(id));
+        return { left: cols[0], right: cols[cols.length - 1] };
+    }
+
+    cornerOwnedByColumn(side, edge) {
+        const key = (edge === "top" ? "t" : "b") + (side === "left" ? "l" : "r");
+        return this.bands[edge].length > 0 && this.bandCorners[key] === "column";
+    }
+
+    renderBands() {
+        const workspace = document.querySelector(".workspace");
+        if (!workspace) return;
+        const frame = this.ensureDockFrame(workspace);
+        const isPopped = (id) => !!(window.popoutWindows?.[id] && !window.popoutWindows[id].closed);
+        const members = new Set([...this.bands.top, ...this.bands.bottom]);
+        const local = (id) => {
+            if (!id || id === CENTER_STAGE || isPopped(id)) return null;
+            const el = this.findPanelElement(id);
+            return el && el.ownerDocument === document ? el : null;
+        };
+
+        document.querySelectorAll(".dock-band-member").forEach(el => {
+            if (!members.has(el.id)) el.classList.remove("dock-band-member", "dock-band-last");
+        });
+
+        // Colunas da ponta que ficam com um canto.
+        const edges = this.edgeColumns();
+        const pulled = {};
+        ["left", "right"].forEach(side => {
+            let cell = frame.querySelector(`:scope > .dock-edge[data-side="${side}"]`);
+            const el = local(edges[side]);
+            const top = this.cornerOwnedByColumn(side, "top");
+            const bottom = this.cornerOwnedByColumn(side, "bottom");
+            if (!el || (!top && !bottom)) {
+                if (cell) {
+                    // Sobrou algo dentro (painel ou linha)? Volta para o editor; o arranjo seguinte acerta a ordem.
+                    [...cell.children].filter(c => !c.classList.contains("dock-edge-resizer")).forEach(c => {
+                        if (side === "left") workspace.prepend(c); else workspace.appendChild(c);
+                    });
+                    cell.remove();
+                }
+                return;
+            }
+            if (!cell) {
+                cell = document.createElement("div");
+                cell.className = "dock-edge";
+                cell.dataset.side = side;
+                const resizer = document.createElement("div");
+                resizer.className = "dock-edge-resizer";
+                resizer.setAttribute("data-tooltip", "Arraste para redimensionar");
+                cell.appendChild(resizer);
+                this.bindEdgeResizer(resizer, cell, side);
+                frame.appendChild(cell);
+            }
+            const resizer = cell.querySelector(":scope > .dock-edge-resizer");
+            [...cell.children].forEach(c => { if (c !== resizer && c !== el) workspace.appendChild(c); });
+            const line = document.getElementById(REOPEN_LINE_IDS[el.id]);
+            if (side === "left") {
+                cell.prepend(el);
+                if (line) el.before(line);
+                cell.appendChild(resizer);
+            } else {
+                cell.prepend(resizer);
+                resizer.after(el);
+                if (line) el.after(line);
+            }
+            cell.dataset.panel = el.id;
+            cell.style.gridColumn = side === "left" ? "1" : "3";
+            cell.style.gridRow = `${top ? 1 : 2} / ${bottom ? 4 : 3}`;
+            pulled[side] = { top, bottom };
+        });
+
+        BAND_EDGES.forEach(edge => {
+            let band = frame.querySelector(`:scope > .dock-band[data-edge="${edge}"]`);
+            const ids = this.bands[edge];
+            if (!ids.length) {
+                if (band) {
+                    band.querySelectorAll(".dock-band-row > :not(.dock-band-splitter)").forEach(c => workspace.appendChild(c));
+                    band.remove();
+                }
+                return;
+            }
+            if (!band) {
+                band = document.createElement("div");
+                band.className = "dock-band";
+                band.dataset.edge = edge;
+                band.innerHTML = '<div class="dock-band-resizer" data-tooltip="Arraste para redimensionar"></div><div class="dock-band-row"></div>';
+                const resizer = band.firstElementChild;
+                if (edge === "top") band.appendChild(resizer);
+                this.bindBandResizer(resizer, band, edge);
+                frame.appendChild(band);
+            }
+            const row = band.querySelector(":scope > .dock-band-row");
+            row.querySelectorAll(":scope > .dock-band-splitter").forEach(sp => sp.remove());
+            let present = 0;
+            ids.forEach(id => {
+                const el = local(id);
+                if (!el) return;
+                if (present > 0) {
+                    const splitter = document.createElement("div");
+                    splitter.className = "dock-band-splitter";
+                    splitter.dataset.next = id;
+                    splitter.setAttribute("data-tooltip", "Arraste para redimensionar");
+                    row.appendChild(splitter);
+                    this.bindBandSplitter(splitter, row);
+                }
+                const line = document.getElementById(REOPEN_LINE_IDS[id]);
+                if (line) row.appendChild(line);
+                el.classList.remove("dock-stack-host", "dock-stack-guest", "dock-stack-self-collapsed");
+                el.style.removeProperty("--dock-guest-h");
+                el.classList.add("dock-band-member");
+                const w = parseFloat(localStorage.getItem(`capiau_band_w_${id}`));
+                el.classList.toggle("has-band-w", !isNaN(w) && w > 120);
+                if (!isNaN(w) && w > 120) el.style.setProperty("--dock-band-w", `${w}px`);
+                row.appendChild(el);
+                present++;
+            });
+            band.hidden = present === 0;
+            const h = parseFloat(localStorage.getItem(`capiau_band_h_${edge}`));
+            band.style.setProperty("--dock-band-h", `${!isNaN(h) && h > 80 ? h : 260}px`);
+            band.style.gridRow = edge === "top" ? "1" : "3";
+            band.style.gridColumn = `${pulled.left?.[edge] ? 2 : 1} / ${pulled.right?.[edge] ? 3 : 4}`;
+        });
+
+        this.renderCornerToggles(edges, local);
+    }
+
+    /** Setinha no rodapé (e no topo) da coluna da ponta: alterna quem fica com o canto. */
+    renderCornerToggles(edges, local) {
+        document.querySelectorAll(".dock-corner-toggle").forEach(b => b.remove());
+        ["left", "right"].forEach(side => {
+            const el = local(edges[side]);
+            if (!el) return;
+            BAND_EDGES.forEach(edge => {
+                if (!this.bands[edge].length) return;
+                const corner = (edge === "top" ? "t" : "b") + (side === "left" ? "l" : "r");
+                const grow = !this.cornerOwnedByColumn(side, edge);
+                const up = edge === "top" ? grow : !grow;
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = `dock-corner-toggle dock-corner-${edge}`;
+                btn.innerHTML = `<i class="fa-solid fa-chevron-${up ? "up" : "down"}"></i>`;
+                btn.setAttribute("data-tooltip", grow ? `Estender até ${edge === "top" ? "em cima" : "embaixo"}` : "Deixar a faixa passar");
+                btn.addEventListener("pointerdown", (e) => e.stopPropagation());
+                btn.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.setBandCorner(corner, grow ? "column" : "band");
+                });
+                el.appendChild(btn);
+            });
+        });
+    }
+
+    setBandCorner(corner, mode) {
+        const next = setCorner(this.getColumnState(), corner, mode);
+        if (!next) return false;
+        this.setColumnLayout(next.order, next.stacks, next.bands || { top: [], bottom: [] }, next.corners || {});
+        window.dockDrag?.showToast?.("undo", mode === "column" ? "Layout alterado: coluna até o fim" : "Layout alterado: faixa passa inteira");
+        return true;
+    }
+
+    /** Arrasto de redimensionar (pointer capture): onMove(dx, dy), onEnd(). */
+    bindResizeDrag(handle, onStart, onMove, onEnd) {
+        handle.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            handle.setPointerCapture(e.pointerId);
+            const x0 = e.clientX, y0 = e.clientY;
+            if (onStart() === false) return;
+            handle.classList.add("active");
+            document.body.classList.add("layout-resizing");
+            const move = (ev) => onMove(ev.clientX - x0, ev.clientY - y0);
+            const up = () => {
+                handle.classList.remove("active");
+                document.body.classList.remove("layout-resizing");
+                handle.removeEventListener("pointermove", move);
+                handle.removeEventListener("pointerup", up);
+                handle.removeEventListener("pointercancel", up);
+                onEnd();
+                window.dispatchEvent(new Event("resize"));
+            };
+            handle.addEventListener("pointermove", move);
+            handle.addEventListener("pointerup", up);
+            handle.addEventListener("pointercancel", up);
+        });
+    }
+
+    bindBandResizer(resizer, band, edge) {
+        let h0 = 0;
+        this.bindResizeDrag(resizer, () => { h0 = band.getBoundingClientRect().height; }, (dx, dy) => {
+            const max = (band.parentElement?.getBoundingClientRect().height || 800) - 180;
+            const h = Math.max(120, Math.min(max, h0 + (edge === "top" ? dy : -dy)));
+            band.style.setProperty("--dock-band-h", `${Math.round(h)}px`);
+        }, () => {
+            const h = parseFloat(band.style.getPropertyValue("--dock-band-h"));
+            if (!isNaN(h)) { try { localStorage.setItem(`capiau_band_h_${edge}`, String(h)); } catch (e) {} }
+        });
+    }
+
+    /** Divisor dentro da faixa: redimensiona o painel visível antes dele. */
+    bindBandSplitter(splitter, row) {
+        let prev = null, w0 = 0;
+        this.bindResizeDrag(splitter, () => {
+            prev = splitter.previousElementSibling;
+            while (prev && !(prev.classList.contains("dock-band-member") && !prev.classList.contains("collapsed"))) prev = prev.previousElementSibling;
+            if (!prev) return false;
+            w0 = prev.getBoundingClientRect().width;
+        }, (dx) => {
+            const w = Math.max(160, Math.min(row.getBoundingClientRect().width - 160, w0 + dx));
+            prev.style.setProperty("--dock-band-w", `${Math.round(w)}px`);
+            prev.classList.add("has-band-w");
+        }, () => {
+            const w = parseFloat(prev.style.getPropertyValue("--dock-band-w"));
+            if (!isNaN(w)) { try { localStorage.setItem(`capiau_band_w_${prev.id}`, String(w)); } catch (e) {} }
+        });
+    }
+
+    /** Divisor da coluna da ponta que ficou com o canto (fora do .workspace, sem o divisor legado). */
+    bindEdgeResizer(resizer, cell, side) {
+        const keys = { "sidebar-left": "layout-dim-splitter-sidebar-left", "inspector-panel": "layout-dim-splitter-inspector", "sidebar-right": "layout-dim-splitter-sidebar-right" };
+        let el = null, w0 = 0;
+        this.bindResizeDrag(resizer, () => {
+            el = document.getElementById(cell.dataset.panel);
+            if (!el || el.classList.contains("collapsed")) return false;
+            w0 = el.getBoundingClientRect().width;
+        }, (dx) => {
+            const w = Math.round(Math.max(200, Math.min(900, w0 + (side === "left" ? dx : -dx))));
+            el.style.width = `${w}px`;
+            el.style.flex = `0 0 ${w}px`;
+        }, () => {
+            const w = parseFloat(el.style.width);
+            if (!isNaN(w) && keys[el.id]) { try { localStorage.setItem(keys[el.id], String(w)); } catch (e) {} }
+        });
+    }
+
+    /**
+     * Faixa: o recolhido some e os outros ocupam o espaço; a linha de expandir fica em pé no lugar
+     * dele. Todos recolhidos: a faixa encolhe e as linhas deitam, uma embaixo da outra.
+     */
+    applyBandCollapse(row) {
+        const band = row.closest(".dock-band");
+        if (!band) return;
+        const members = this.bands[band.dataset.edge].map(id => row.querySelector(`:scope > #${id}`)).filter(Boolean);
+        const states = members.map(m => this.isPanelCollapsed(m.id));
+        const all = members.length > 0 && states.every(Boolean);
+        band.classList.toggle("dock-band-all-collapsed", all);
+        members.forEach((m, i) => {
+            m.classList.toggle("collapsed", states[i]);
+            m.classList.remove("dock-stack-self-collapsed", "dock-band-last");
+            const line = document.getElementById(REOPEN_LINE_IDS[m.id]);
+            if (!line) return;
+            if (line.nextElementSibling !== m) row.insertBefore(line, m);
+            line.classList.toggle("restore-line-h", all);
+            line.style.display = states[i] ? "block" : "none";
+        });
+        const visible = members.filter((m, i) => !states[i]);
+        if (visible.length) visible[visible.length - 1].classList.add("dock-band-last");
+
+        const seq = [!states[0]];
+        const splitters = [null];
+        members.slice(1).forEach((m, i) => {
+            seq.push("splitter", !states[i + 1]);
+            splitters.push(row.querySelector(`:scope > .dock-band-splitter[data-next="${m.id}"]`), null);
+        });
+        visibleSplitters(seq).forEach((show, i) => {
+            if (splitters[i]) splitters[i].style.display = show ? "" : "none";
+        });
+        members.forEach(m => this.refreshCollapseArrow(m.id));
     }
 
     /** Monta embaixo do anfitrião os painéis empilhados com ele, cada um com seu divisor de altura. */
@@ -332,6 +655,7 @@ export class WorkspaceManager {
                 : "single";
             return { kind, el, win };
         }
+        if (el.parentElement?.classList.contains("dock-band-row")) return { kind: "band", el, row: el.parentElement };
         if (el.classList.contains("dock-stack-host")) return { kind: "stack", el, host: el };
         if (el.classList.contains("dock-stack-guest") && el.parentElement?.classList.contains("dock-stack-host")) {
             return { kind: "stack", el, host: el.parentElement };
@@ -372,6 +696,10 @@ export class WorkspaceManager {
         if (!place) return;
         if (place.kind === "stack") {
             this.applyStackCollapse(place.host);
+            return;
+        }
+        if (place.kind === "band") {
+            this.applyBandCollapse(place.row);
             return;
         }
         const collapsed = this.isPanelCollapsed(panelId);
@@ -460,13 +788,16 @@ export class WorkspaceManager {
 
     applyAllCollapse() {
         const hosts = new Set();
+        const rows = new Set();
         COLLAPSIBLE_PANELS.forEach(id => {
             const place = this.panelPlacement(id);
             if (!place) return;
             if (place.kind === "stack") hosts.add(place.host);
+            else if (place.kind === "band") rows.add(place.row);
             else this.applyPanelCollapse(id);
         });
         hosts.forEach(host => this.applyStackCollapse(host));
+        rows.forEach(row => this.applyBandCollapse(row));
     }
 
     /** Para onde o painel recolhe: esquerda/direita lado a lado, cima/baixo empilhado. */
@@ -476,6 +807,12 @@ export class WorkspaceManager {
         if (place.kind === "stack") {
             const members = [place.host, ...place.host.querySelectorAll(":scope > .dock-stack-guest")];
             return edgeInLine("column", members.indexOf(place.el), members.length);
+        }
+        if (place.kind === "band") {
+            // Sozinho na faixa: recolhe para o lado da faixa no editor (cima/baixo).
+            const members = [...place.row.querySelectorAll(":scope > .dock-band-member")];
+            if (members.length === 1) return place.row.closest(".dock-band")?.dataset.edge === "top" ? "up" : "down";
+            return edgeInLine("row", members.indexOf(place.el), members.length);
         }
         if (place.kind === "column") return place.el.classList.contains("dock-right") ? "right" : "left";
         try {
@@ -505,6 +842,9 @@ export class WorkspaceManager {
 
     /** Agrupa as chamadas encadeadas de uma mesma ação num único passo do histórico. */
     scheduleLayoutCommit() {
+        // Painel de faixa que foi para uma janela ou voltou dela: a faixa se redesenha (F2c).
+        clearTimeout(this._bandsRenderTimer);
+        this._bandsRenderTimer = setTimeout(() => { this.renderBands(); this.applyAllCollapse(); }, 60);
         if (!this._layoutHistoryReady || this._applyingLayout) return;
         clearTimeout(this._layoutCommitTimer);
         this._layoutCommitTimer = setTimeout(() => {
@@ -526,7 +866,7 @@ export class WorkspaceManager {
         try {
             this.setTimelinePosition(legacy.timelinePosition, true);
             this.setMonitorsLayout(legacy.monitorsLayout, true);
-            this.setColumnLayout(legacy.columnOrder, legacy.columnStacks || []);
+            this.setColumnLayout(legacy.columnOrder, legacy.columnStacks || [], legacy.bands || { top: [], bottom: [] }, legacy.bandCorners || {});
             // P14: menu de cada aba (antes das janelas: ao voltar de uma janela, a aba vai para o menu certo).
             window.tabPanels?.applyStrips?.(legacy.tabStrips || {});
 
@@ -2239,8 +2579,10 @@ export class WorkspaceManager {
 
         // Pilhas (F2b): convidados ficam dentro do anfitrião; limpa montagens antigas das colunas deste lote.
         const guests = stackGuests(this.columnStacks);
+        // Membros de faixa (F2c) não ocupam coluna: renderBands os leva para a faixa.
+        const inBand = new Set([...this.bands.top, ...this.bands.bottom]);
         colIds.forEach((colId) => {
-            if (colId === "center-stage") return;
+            if (colId === "center-stage" || inBand.has(colId)) return;
             const el = findColumnElement(colId);
             if (!el) return;
             el.querySelectorAll(":scope > .dock-stack-splitter").forEach(sp => sp.remove());
@@ -2252,6 +2594,7 @@ export class WorkspaceManager {
         });
 
         colIds.forEach((colId) => {
+            if (inBand.has(colId)) return;
             if (guests.has(colId)) {
                 const reopenGuest = reopenMap[colId] ? findColumnElement(reopenMap[colId]) : null;
                 if (reopenGuest) reopenGuest.style.display = "none";
@@ -2294,7 +2637,8 @@ export class WorkspaceManager {
             if (colEl && !isPopped) this.mountStackGuests(colId, colEl);
         });
 
-        // Recolhidos: cada painel volta a mostrar seu estado no lugar novo (linha e seta).
+        // Faixas e colunas da ponta com canto (F2c), depois os recolhidos no lugar novo (linha e seta).
+        this.renderBands();
         this.applyAllCollapse();
     }
 
@@ -3394,6 +3738,8 @@ export class WorkspaceManager {
             timelinePosition: timelinePosition,
             columnOrder: [...this.columnOrder],
             columnStacks: this.columnStacks.map(st => [...st]),
+            bands: { top: [...this.bands.top], bottom: [...this.bands.bottom] },
+            bandCorners: { ...this.bandCorners },
             popouts: Object.keys(window.popoutWindows || {}).filter(k => window.popoutWindows[k] && !window.popoutWindows[k].closed),
             splitters: {
                 "layout-dim-splitter-sidebar-left": getDim("layout-dim-splitter-sidebar-left"),
@@ -3562,9 +3908,9 @@ export class WorkspaceManager {
 
             const stacks = Array.isArray(customConfig.columnStacks) ? customConfig.columnStacks : [];
             if (customConfig.columnOrder && Array.isArray(customConfig.columnOrder) && customConfig.columnOrder.length > 0) {
-                this.setColumnLayout(customConfig.columnOrder, stacks);
+                this.setColumnLayout(customConfig.columnOrder, stacks, customConfig.bands || { top: [], bottom: [] }, customConfig.bandCorners || {});
             } else {
-                this.setColumnLayout(this.columnOrder, stacks);
+                this.setColumnLayout(this.columnOrder, stacks, customConfig.bands || { top: [], bottom: [] }, customConfig.bandCorners || {});
             }
 
             // Restaura dimensões gravadas nos Splitters
@@ -3847,7 +4193,7 @@ export class WorkspaceManager {
             if (preset) {
                 this.setTimelinePosition(preset.timeline, true);
                 this.setMonitorsLayout(preset.monitors, true);
-                this.setColumnLayout(preset.columns, []);
+                this.setColumnLayout(preset.columns, [], { top: [], bottom: [] }, {});
             }
 
             if (ws === "montagem") {

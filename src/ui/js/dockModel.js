@@ -12,6 +12,12 @@
 //               role "center"   = o bloco central legado (monitores e, às vezes, timeline)
 //               role "monitors" = Source + Program; auto: true = orientação automática
 //               role "stack"    = laterais empilhadas numa mesma coluna (F2b), de cima para baixo
+//               role "band"     = faixa inteira em cima ou embaixo do editor (F2c), edge "top" | "bottom",
+//                                 painéis lado a lado da esquerda para a direita
+//               role "frame"    = moldura com as faixas (F2c): [faixa de cima?, resto do editor, faixa de baixo?];
+//                                 corners diz quem fica com cada canto entre a coluna da ponta e a faixa:
+//                                 { tl, tr, bl, br: "band" (a faixa passa por baixo/cima da coluna) |
+//                                   "column" (a coluna vai até o fim e a faixa encurta) }
 
 export const LAYOUT_VERSION = 1;
 export const MAX_PANELS_PER_FLOAT = 4;
@@ -24,6 +30,33 @@ export const CENTER_STAGE = "center-stage";
 
 const TIMELINE_POSITIONS = ["center", "bottom-left", "bottom-right", "bottom-full"];
 const MONITOR_LAYOUTS = ["auto", "side-by-side", "stacked"];
+export const BAND_EDGES = ["top", "bottom"];
+export const CORNERS = { top: ["tl", "tr"], bottom: ["bl", "br"] };
+
+/**
+ * Faixas (F2c) normalizadas: só laterais, cada uma uma vez só. Devolve { top, bottom } sempre com
+ * as duas listas e os cantos só das faixas que existem ("band" quando não informado).
+ */
+export function normalizeBands(bands, corners) {
+    const seen = new Set();
+    const out = { top: [], bottom: [] };
+    BAND_EDGES.forEach(edge => {
+        const list = bands && Array.isArray(bands[edge]) ? bands[edge] : [];
+        list.forEach(id => {
+            if (COLUMN_IDS.includes(id) && !seen.has(id)) { seen.add(id); out[edge].push(id); }
+        });
+    });
+    const outCorners = {};
+    BAND_EDGES.forEach(edge => {
+        if (!out[edge].length) return;
+        CORNERS[edge].forEach(k => { outCorners[k] = corners && corners[k] === "column" ? "column" : "band"; });
+    });
+    return { bands: out, corners: outCorners };
+}
+
+export function hasBands(bands) {
+    return !!bands && BAND_EDGES.some(edge => Array.isArray(bands[edge]) && bands[edge].length > 0);
+}
 
 const leaf = (panel, away = false) => (away ? { panel, away: true } : { panel });
 const isLeaf = (node) => !!node && typeof node.panel === "string";
@@ -33,12 +66,16 @@ const isSplit = (node) => !!node && (node.split === "row" || node.split === "col
  * Constrói a árvore a partir do estado legado do WorkspaceManager.
  * @param {{columnOrder: string[], timelinePosition: string, monitorsLayout: string,
  *          columnStacks?: string[][], popped?: string[], dual?: {panels: string[], layout?: string} | null,
- *          group?: {panels: string[], arrangement?: string} | null, tabStrips?: Object<string, string>}} state
+ *          group?: {panels: string[], arrangement?: string} | null, tabStrips?: Object<string, string>,
+ *          bands?: {top: string[], bottom: string[]}, bandCorners?: Object<string, string>}} state
  */
 export function layoutFromLegacy(state) {
-    const order = Array.isArray(state.columnOrder) && state.columnOrder.length
+    const { bands, corners } = normalizeBands(state.bands, state.bandCorners);
+    const inBand = new Set([...bands.top, ...bands.bottom]);
+    // Laterais numa faixa continuam em columnOrder (no fim), mas não ocupam coluna.
+    const order = (Array.isArray(state.columnOrder) && state.columnOrder.length
         ? state.columnOrder
-        : ["sidebar-left", "inspector-panel", CENTER_STAGE, "sidebar-right"];
+        : ["sidebar-left", "inspector-panel", CENTER_STAGE, "sidebar-right"]).filter(id => !inBand.has(id));
     const position = TIMELINE_POSITIONS.includes(state.timelinePosition) ? state.timelinePosition : "center";
     const monitorsLayout = MONITOR_LAYOUTS.includes(state.monitorsLayout) ? state.monitorsLayout : "auto";
     const dual = state.dual && Array.isArray(state.dual.panels) && state.dual.panels.length === 2 ? state.dual : null;
@@ -83,6 +120,13 @@ export function layoutFromLegacy(state) {
     } else {
         main = row(order);
     }
+    if (inBand.size) {
+        const band = (edge) => ({ split: "row", role: "band", edge, children: bands[edge].map(id => leaf(id, away.has(id))) });
+        main = {
+            split: "column", role: "frame", corners,
+            children: [...(bands.top.length ? [band("top")] : []), main, ...(bands.bottom.length ? [band("bottom")] : [])]
+        };
+    }
 
     const floats = [];
     if (dual) {
@@ -115,7 +159,26 @@ export function layoutFromLegacy(state) {
  */
 export function legacyFromLayout(layout) {
     if (!layout || !layout.main) return null;
-    const main = layout.main;
+    let main = layout.main;
+    let bands = null;
+    let bandCorners = null;
+    if (isSplit(main) && main.role === "frame") {
+        const found = { top: [], bottom: [] };
+        const rest = [];
+        for (const child of main.children) {
+            if (isSplit(child) && child.role === "band" && BAND_EDGES.includes(child.edge)) {
+                if (!child.children.every(c => isLeaf(c) && COLUMN_IDS.includes(c.panel))) return null;
+                found[child.edge].push(...child.children.map(c => c.panel));
+            } else rest.push(child);
+        }
+        if (rest.length !== 1) return null;
+        main = rest[0];
+        const normalized = normalizeBands(found, layout.main.corners);
+        if (hasBands(normalized.bands)) {
+            bands = normalized.bands;
+            bandCorners = normalized.corners;
+        }
+    }
 
     const findRole = (node, role) => {
         if (!isSplit(node)) return null;
@@ -173,6 +236,7 @@ export function legacyFromLayout(layout) {
         }
     }
     if (!columnOrder || !timelinePosition) return null;
+    if (bands) columnOrder = [...columnOrder, ...bands.top, ...bands.bottom];
     const expected = [...COLUMN_IDS, CENTER_STAGE].sort().join(",");
     if ([...columnOrder].sort().join(",") !== expected) return null;
 
@@ -193,6 +257,7 @@ export function legacyFromLayout(layout) {
     }
     const legacy = { columnOrder, timelinePosition, monitorsLayout, columnStacks, popped, dual, group };
     if (layout.tabStrips && typeof layout.tabStrips === "object") legacy.tabStrips = { ...layout.tabStrips };
+    if (bands) { legacy.bands = bands; legacy.bandCorners = bandCorners; }
     return legacy;
 }
 

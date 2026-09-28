@@ -79,4 +79,68 @@ for (const a of actions) {
 }
 console.log(`✔ 5 passou: ${checked} estados gerados por sequências de até 3 operações respeitam as invariantes.`);
 
+// 6. Faixas inteiras em cima/embaixo (F2c)
+const { moveToBand, moveBesideInBand, setCorner, bandOf } = ops;
+const faixa = moveToBand(padrao, I, "bottom");
+assert.deepEqual(faixa, { order: [L, C, R, I], stacks: [], bands: { top: [], bottom: [I] }, corners: { bl: "band", br: "band" } },
+    "Ajustes vai para a faixa de baixo; membros de faixa ficam no fim de order; faixa nova passa inteira pelos cantos");
+const duas = moveToBand(faixa, L, "bottom", 0);
+assert.deepEqual(duas.bands.bottom, [L, I], "vários painéis na mesma faixa, na posição escolhida");
+assert.deepEqual(duas.order, [C, R, L, I]);
+assert.deepEqual(moveBesideInBand(duas, R, L, "after").bands.bottom, [L, R, I]);
+assert.deepEqual(moveBeside(duas, R, I, "before").bands.bottom, [L, R, I], "ao lado de um painel de faixa = dentro da faixa");
+const cimaEBaixo = moveToBand(faixa, R, "top");
+assert.deepEqual(cimaEBaixo.bands, { top: [R], bottom: [I] }, "faixa em cima e embaixo ao mesmo tempo");
+assert.deepEqual(cimaEBaixo.corners, { tl: "band", tr: "band", bl: "band", br: "band" });
+assert.deepEqual(moveToEdge(faixa, I, "start"), { order: [I, L, C, R], stacks: [] }, "sair da última vaga da faixa apaga a faixa e seus cantos");
+assert.deepEqual(moveBeside(duas, I, C, "after").bands.bottom, [L]);
+assert.deepEqual(moveBeside(duas, I, C, "after").order, [C, I, R, L]);
+assert.equal(stackWith(faixa, L, I, "top"), null, "faixa não empilha");
+assert.deepEqual(stackWith(faixa, I, L, "bottom"), { order: [L, I, C, R], stacks: [[L, I]] }, "sair da faixa para uma pilha");
+const empilhadoNaFaixa = moveToBand(empilhado, R, "bottom");
+assert.deepEqual(empilhadoNaFaixa.stacks, [], "sair da pilha para a faixa desfaz a pilha de 2");
+console.log("✔ 6 passou: faixa nova, vários painéis, cima e baixo, sair da faixa, pilhas.");
+
+// 7. Trocar dentro da faixa e entre coluna e faixa; cantos
+assert.deepEqual(swapPanels(duas, L, I).bands.bottom, [I, L], "trocar de lugar dentro da faixa");
+const troca = swapPanels(faixa, L, I);
+assert.deepEqual(troca.order, [I, C, R, L]);
+assert.equal(bandOf(troca.bands, L), "bottom", "trocar coluna com faixa: cada um ocupa o lugar do outro");
+assert.equal(setCorner(padrao, "bl", "column"), null, "sem faixa embaixo não há canto embaixo");
+const canto = setCorner(faixa, "bl", "column");
+assert.deepEqual(canto.corners, { bl: "column", br: "band" });
+assert.deepEqual(moveToBand(canto, L, "bottom").corners, { bl: "column", br: "band" }, "entrar numa faixa existente não mexe nos cantos");
+assert.deepEqual(moveToBand(padrao, R, "top", null, { tr: "column" }).corners, { tl: "band", tr: "column" }, "faixa nova com canto escolhido no arrasto");
+assert.ok(!sameColumnState(faixa, canto), "mudar um canto é mudança de layout");
+console.log("✔ 7 passou: trocar na faixa, trocar coluna com faixa e cantos.");
+
+// 8. Invariantes com faixas em todas as sequências de 3 operações
+const bandActions = [...actions];
+for (const id of all) {
+    for (const edge of ["top", "bottom"]) bandActions.push(s => moveToBand(s, id, edge), s => moveToBand(s, id, edge, 0));
+    for (const target of all) bandActions.push(s => moveBesideInBand(s, id, target, "before"));
+}
+bandActions.push(s => setCorner(s, "bl", "column"), s => setCorner(s, "tr", "column"));
+let checkedBands = 0;
+const checkBands = (s) => {
+    check(s);
+    const members = [...(s.bands?.top || []), ...(s.bands?.bottom || [])];
+    assert.deepEqual(s.order.slice(s.order.length - members.length), members, "membros de faixa no fim de order, cima depois baixo");
+    assert.equal(new Set(members).size, members.length, "painel em uma faixa só");
+    s.stacks.forEach(st => st.forEach(id => assert.ok(!members.includes(id), "painel de faixa fora das pilhas")));
+    if (s.bands) {
+        assert.ok(s.bands.top.length || s.bands.bottom.length, "bands só com alguma faixa");
+        assert.deepEqual(Object.keys(s.corners).sort(), [...(s.bands.top.length ? ["tl", "tr"] : []), ...(s.bands.bottom.length ? ["bl", "br"] : [])].sort());
+    } else assert.equal(s.corners, undefined);
+    checkedBands++;
+};
+for (const a of bandActions) {
+    const s1 = a(padrao); if (!s1) continue; checkBands(s1);
+    for (const b of bandActions) {
+        const s2 = b(s1); if (!s2) continue; checkBands(s2);
+        for (const c of bandActions) { const s3 = c(s2); if (s3) checkBands(s3); }
+    }
+}
+console.log(`✔ 8 passou: ${checkedBands} estados com faixas respeitam as invariantes.`);
+
 console.log("\n=== AUTOTESTE DOCK OPS CONCLUÍDO COM SUCESSO ===");

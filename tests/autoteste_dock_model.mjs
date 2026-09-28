@@ -105,6 +105,36 @@ console.log("✔ 1.3 passou: Janela Dupla (lado a lado/empilhada) é uma janela 
     console.log("✔ 1.5 passou: janelas com 2–4 painéis (qualquer tipo) e disposição vão e voltam; 5 é inválido.");
 }
 
+{
+    // F2c: faixas inteiras em cima/embaixo, com cantos, em todas as posições da timeline.
+    const L = "sidebar-left", I = "inspector-panel", R = "sidebar-right";
+    let n = 0;
+    const casos = [
+        { bands: { top: [], bottom: [I] }, bandCorners: { bl: "band", br: "column" }, cols: [L, CENTER_STAGE, R] },
+        { bands: { top: [R], bottom: [L] }, bandCorners: { tl: "column", tr: "band", bl: "band", br: "band" }, cols: [CENTER_STAGE, I] },
+        { bands: { top: [L, R], bottom: [] }, bandCorners: { tl: "band", tr: "band" }, cols: [I, CENTER_STAGE] }
+    ];
+    for (const caso of casos) {
+        for (const timelinePosition of positions) {
+            const columnOrder = [...caso.cols, ...caso.bands.top, ...caso.bands.bottom];
+            const state = { columnOrder, timelinePosition, monitorsLayout: "auto", columnStacks: [], popped: [], dual: null, group: null, bands: caso.bands, bandCorners: caso.bandCorners };
+            const layout = layoutFromLegacy(state);
+            assert.deepEqual(validateLayout(layout), [], `faixas inválidas: ${JSON.stringify(state)}`);
+            assert.equal(layout.main.role, "frame");
+            assert.deepEqual(legacyFromLayout(layout), state, `faixas não voltaram iguais: ${JSON.stringify(state)}`);
+            n++;
+        }
+    }
+    const destacado = layoutFromLegacy({ columnOrder: [L, CENTER_STAGE, R, I], timelinePosition: "center", monitorsLayout: "auto", popped: [I], bands: { top: [], bottom: [I] } });
+    assert.deepEqual(validateLayout(destacado), []);
+    assert.deepEqual(destacado.main.children[1], { split: "row", role: "band", edge: "bottom", children: [{ panel: I, away: true }] }, "painel de faixa destacado guarda o lugar na faixa");
+    assert.equal(legacyFromLayout(destacado).bands.bottom[0], I);
+    const semFaixa = layoutFromLegacy({ columnOrder: presets.padrao, timelinePosition: "center", monitorsLayout: "auto", bands: { top: [], bottom: [] } });
+    assert.notEqual(semFaixa.main.role, "frame", "faixas vazias não criam moldura");
+    assert.equal(legacyFromLayout(semFaixa).bands, undefined);
+    console.log(`✔ 1.6 passou: ${n} layouts com faixas e cantos vão e voltam; painel destacado guarda o lugar na faixa.`);
+}
+
 // ----------------------------------------------------------------------
 // PARTE 2: Validação
 // ----------------------------------------------------------------------

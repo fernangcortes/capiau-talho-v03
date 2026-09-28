@@ -7,7 +7,7 @@
 // Cada soltura vira um passo do histórico de layout e mostra o aviso "Layout alterado · Desfazer".
 
 import { CENTER_STAGE } from "./dockModel.js";
-import { moveBeside, moveToEdge, stackWith, swapPanels, stackGuests, sameColumnState } from "./dockOps.js";
+import { moveBeside, moveToEdge, moveToBand, setCorner, stackWith, swapPanels, stackGuests, sameColumnState, bandOf } from "./dockOps.js";
 
 const EDGE = 26;          // largura das faixas de borda do editor (px)
 const START_DISTANCE = 5; // px de movimento antes de o arrasto começar
@@ -414,7 +414,7 @@ export class DockDragController {
 
     /** Solto em cima do editor sem zona específica: volta para o lugar de antes. */
     homeTarget(panelId) {
-        const ws = this.rectOf(document.querySelector(".workspace"));
+        const ws = this.editorRect();
         if (!ws) return null;
         return { type: "home", preview: { left: ws.left + 8, top: ws.top + 8, width: ws.width - 16, height: ws.height - 16 }, label: `Reacoplar ${DOCK_PANELS[panelId].title} no lugar de antes` };
     }
@@ -458,28 +458,35 @@ export class DockDragController {
         return r.width > 40 && r.height > 40 ? r : null;
     }
 
+    /** Área inteira do editor: a moldura com as faixas (F2c) ou, sem ela, o .workspace. */
+    editorRect() {
+        return this.rectOf(document.querySelector(".dock-frame")) || this.rectOf(document.querySelector(".workspace"));
+    }
+
     resolveTarget(panelId, x, y) {
-        const ws = this.rectOf(document.querySelector(".workspace"));
+        const ws = this.editorRect();
         if (!ws || x < ws.left || x > ws.right || y < ws.top || y > ws.bottom) return null;
         const kind = DOCK_PANELS[panelId].kind;
         if (kind === "column") return this.resolveColumnTarget(panelId, x, y, ws);
-        if (kind === "timeline") return this.resolveTimelineTarget(x, y, ws);
+        // A timeline se move dentro do .workspace (as faixas ficam fora dele).
+        if (kind === "timeline") return this.resolveTimelineTarget(x, y, this.rectOf(document.querySelector(".workspace")) || ws);
         if (kind === "monitor") return this.resolveMonitorTarget(panelId, x, y);
         return null;
     }
 
     resolveColumnTarget(panelId, x, y, ws) {
-        const state = { order: [...this.wm.columnOrder], stacks: this.wm.columnStacks.map(st => [...st]) };
+        const state = this.wm.getColumnState();
         const title = DOCK_PANELS[panelId].title;
         const make = (next, preview, label) =>
             !next || sameColumnState(next, state) ? null : { type: "columns", next, preview, label };
 
-        if (x < ws.left + EDGE) {
-            return make(moveToEdge(state, panelId, "start"), { left: ws.left, top: ws.top, width: ws.width * 0.16, height: ws.height }, `${title} na ponta esquerda`);
+        // F2c: bordas de cima/embaixo criam (ou recebem) uma faixa inteira.
+        if (x > ws.left + EDGE && x < ws.right - EDGE) {
+            if (y < ws.top + EDGE) return this.resolveBandEdgeTarget(state, panelId, "top", x, ws, make);
+            if (y > ws.bottom - EDGE) return this.resolveBandEdgeTarget(state, panelId, "bottom", x, ws, make);
         }
-        if (x > ws.right - EDGE) {
-            return make(moveToEdge(state, panelId, "end"), { left: ws.right - ws.width * 0.16, top: ws.top, width: ws.width * 0.16, height: ws.height }, `${title} na ponta direita`);
-        }
+        if (x < ws.left + EDGE) return this.resolveSideEdgeTarget(state, panelId, "left", y, ws, make);
+        if (x > ws.right - EDGE) return this.resolveSideEdgeTarget(state, panelId, "right", y, ws, make);
 
         // Painéis empilhados ficam dentro do anfitrião: testa os convidados antes.
         const guests = stackGuests(state.stacks);
@@ -500,6 +507,17 @@ export class DockDragController {
                     { left: before ? r.left : r.right - w, top: r.top, width: w, height: r.height },
                     `${title} ${before ? "à esquerda" : "à direita"} do centro`);
             }
+            // Painel de faixa (F2c): centro troca, metade esquerda/direita põe ao lado dentro da faixa.
+            if (bandOf(state.bands, id)) {
+                if (rx > 0.3 && rx < 0.7) {
+                    return make(swapPanels(state, panelId, id), { left: r.left, top: r.top, width: r.width, height: r.height }, `Trocar com ${name}`);
+                }
+                const before = rx <= 0.3;
+                const w = Math.min(r.width * 0.45, 260);
+                return make(moveBeside(state, panelId, id, before ? "before" : "after"),
+                    { left: before ? r.left : r.right - w, top: r.top, width: w, height: r.height },
+                    `${title} ${before ? "à esquerda" : "à direita"} de ${name} na faixa`);
+            }
             // Retângulo da coluna inteira (anfitrião + convidados) para "ao lado"; do painel para "empilhar".
             const hostEl = el.classList.contains("dock-stack-guest") ? el.closest(".dock-stack-host") : el;
             const col = this.rectOf(hostEl) || r;
@@ -519,6 +537,66 @@ export class DockDragController {
                 `${title} ${edge === "left" ? "à esquerda" : "à direita"} de ${name}`);
         }
         return null;
+    }
+
+    /** Retângulo de uma faixa na tela (null se não existe ou está vazia). */
+    bandRect(edge) {
+        const band = document.querySelector(`.dock-frame > .dock-band[data-edge="${edge}"]`);
+        return band && !band.hidden ? band.getBoundingClientRect() : null;
+    }
+
+    /**
+     * F2c: borda de cima/embaixo do editor. Sem faixa: faixa nova com a largura inteira. Com faixa:
+     * entra nela, na posição mais perto do cursor (a sombra mostra a vaga).
+     */
+    resolveBandEdgeTarget(state, panelId, edge, x, ws, make) {
+        const title = DOCK_PANELS[panelId].title;
+        const where = edge === "top" ? "em cima" : "embaixo";
+        const band = this.bandRect(edge);
+        const current = (state.bands?.[edge] || []).filter(id => id !== panelId);
+        if (!band || current.length === 0) {
+            const h = Math.min(ws.height * 0.32, 300);
+            return make(moveToBand(state, panelId, edge),
+                { left: ws.left, top: edge === "top" ? ws.top : ws.bottom - h, width: ws.width, height: h },
+                `${title} numa faixa inteira ${where}`);
+        }
+        // Posição: antes do primeiro painel da faixa cujo meio está à direita do cursor.
+        const rects = current.map(id => document.getElementById(id)?.getBoundingClientRect()).filter(Boolean);
+        let index = rects.findIndex(r => x < r.left + r.width / 2);
+        if (index === -1) index = current.length;
+        const slot = band.width / (current.length + 1);
+        return make(moveToBand(state, panelId, edge, index),
+            { left: band.left + slot * index, top: band.top, width: slot, height: band.height },
+            `${title} na faixa ${where}`);
+    }
+
+    /**
+     * Borda esquerda/direita do editor: coluna na ponta. Com faixa, a altura tem zonas (F2c):
+     * ao lado da faixa (o canto) = a coluna vai até o fim e a faixa encurta; ao lado do centro =
+     * a coluna fica só no meio e a faixa passa inteira.
+     */
+    resolveSideEdgeTarget(state, panelId, side, y, ws, make) {
+        const title = DOCK_PANELS[panelId].title;
+        let next = moveToEdge(state, panelId, side === "left" ? "start" : "end");
+        if (!next) return null;
+        const bandsNow = next.bands || { top: [], bottom: [] };
+        const top = bandsNow.top.length ? this.bandRect("top") : null;
+        const bottom = bandsNow.bottom.length ? this.bandRect("bottom") : null;
+        const k = side === "left" ? "l" : "r";
+        const own = { top: !!top && y < top.bottom, bottom: !!bottom && y > bottom.top };
+        ["top", "bottom"].forEach(edge => {
+            if (next && bandsNow[edge].length) next = setCorner(next, (edge === "top" ? "t" : "b") + k, own[edge] ? "column" : "band");
+        });
+        const w = ws.width * 0.16;
+        const preview = {
+            left: side === "left" ? ws.left : ws.right - w,
+            top: own.top || !top ? ws.top : top.bottom,
+            width: w
+        };
+        preview.height = (own.bottom || !bottom ? ws.bottom : bottom.top) - preview.top;
+        const place = side === "left" ? "na ponta esquerda" : "na ponta direita";
+        const how = own.top || own.bottom ? " (coluna até o fim)" : (top || bottom ? " (a faixa passa inteira)" : "");
+        return make(next, preview, `${title} ${place}${how}`);
     }
 
     resolveTimelineTarget(x, y, ws) {
@@ -573,7 +651,10 @@ export class DockDragController {
     }
 
     applyTarget(target, toast = true) {
-        if (target.type === "columns") this.wm.setColumnLayout(target.next.order, target.next.stacks);
+        if (target.type === "columns") {
+            const next = target.next;
+            this.wm.setColumnLayout(next.order, next.stacks, next.bands || { top: [], bottom: [] }, next.corners || {});
+        }
         else if (target.type === "timeline") this.wm.setTimelinePosition(target.position);
         else if (target.type === "monitors") this.wm.setMonitorsLayout(target.layout);
         else return;
