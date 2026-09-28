@@ -1,12 +1,12 @@
-# Passagem: janelas drag & dock (F0–F5, P14, recolher, F2c partes 1 e 2a) → próxima: F2c parte 2b (monitores)
+# Passagem: janelas drag & dock (F0–F5, P14, recolher, F2c partes 1, 2a e 2b) → próxima: F2c parte 2c (abas em faixas e detalhes)
 
 > **Ideia futura do usuário (28/09):** timeline "prédio", que começa em cima e continua em faixas
 > abaixo (como linhas de texto), para monitores verticais e para vários editores. A timeline como
 > coluna (parte 2a) é o primeiro passo: ela já ocupa a altura inteira ao lado dos monitores.
 
-Branch: `talho-windows-drag-dock-6mtidh` (a partir de `main`). Até `450647e` está no remoto; a F2c
-parte 2a (timeline em faixa ou coluna, 28/09 à tarde) está nos commits `59dbe80` (código) e o de docs
-desta passagem, **sem push** (confirmar com o usuário antes).
+Branch: `talho-windows-drag-dock-6mtidh` (a partir de `main`). Até `48f0364` está no remoto; a F2c
+parte 2b (monitores em bloco ou sozinhos, 28/09 à noite) está na cópia de trabalho, **sem commit**
+(o usuário prefere commitar ele mesmo; perguntar).
 
 Commits no nome do autor (`fernangcortes <escrevaprofernando@gmail.com>`), **sem assinatura de IA**
 (sem `Co-Authored-By`/`Claude-Session`, sem branch `claude/...`). Atenção: o `git config --global
@@ -18,36 +18,61 @@ Plano completo, com decisões e animações: página "Talho Drag & Dock"
 (https://claude.ai/artifact/SF8tDpe1VVSy4brs938X3V). O `docs/PLANO_JANELAS_DRAG_DOCK.md` é ignorado
 pelo git e não existe em todas as máquinas: a página é a fonte do plano.
 
-## Próxima sessão: F2c parte 2b
+## Próxima sessão: F2c parte 2c
 
-Itens que faltam das decisões da F2c (lista completa mais abaixo, "Decisões da F2c"), do mais usado
-para o mais raro, cada um com autotestes de modelo/operações antes da interface:
-
-1. **Monitores em bloco ou sozinhos** (decisão 6). A alça do bloco "Monitores" move os dois
-   (lado a lado/empilhados automático continua); a alça de cada player move só ele, que vira painel
-   comum (faixa, coluna, pilha?). Hoje `resolveMonitorTarget` só troca lado a lado/empilhados.
-   Rever maximizar e Numpad7/9 com um monitor fora do bloco. Caminho natural: o mesmo da timeline
-   (monitor vira membro de faixa em `BAND_PANEL_IDS`, nunca em `columnOrder`), decidir com o usuário
-   se monitor sozinho também vira coluna.
-2. **O centro vira o que o usuário quiser** (decisão 4). Hoje `center-stage` é fixo (monitores +
-   timeline). Com 1 pronto, o centro pode ficar vazio: definir o que ocupa o espaço (a coluna
-   mais próxima? um lateral solto no centro?). Conversar com o usuário antes.
-3. **Abas destacáveis (F5) em faixas** (decisão 2). Hoje laterais e timeline entram em faixas;
-   aba destacada ainda nem vira coluna no editor (pendência antiga).
-4. Detalhes: o modal "Configurar workspace" (cards de colunas) ainda mostra laterais que estão em
+1. **Abas destacáveis (F5) em faixas** (decisão 2). Hoje laterais, timeline e monitores entram em
+   faixas; aba destacada ainda nem vira coluna no editor (pendência antiga).
+2. Detalhes: o modal "Configurar workspace" (cards de colunas) ainda mostra laterais que estão em
    faixa como colunas; teste com mouse real em Linux (`scripts/dock_bands_real_mouse_check.mjs`, no
-   molde de `dock_strips_real_mouse_check.mjs`); a setinha do canto é recriada a cada `renderBands`
-   (inofensivo, mas dá para reaproveitar como os divisores); o seletor escondido
-   `select-timeline-position` fica vazio quando a timeline está numa faixa sem nome antigo (faixa de
-   cima, ou só sob o centro) e o botão mostra "Faixa de cima"/"Faixa de baixo (sob o centro)".
+   molde de `dock_strips_real_mouse_check.mjs`, incluindo as alças dos monitores e do bloco); a setinha
+   do canto é recriada a cada `renderBands`; o seletor escondido `select-timeline-position` fica vazio
+   quando a timeline está numa faixa sem nome antigo.
+3. Pendências da parte 2b (abaixo): faixas que espremem o editor até 0; Numpad7/9 com monitor fora do
+   bloco; destacar/voltar monitor de faixa não verificado na tela.
 
-Onde mexer: `dockModel.js` (`normalizeBands`, `BAND_PANEL_IDS`, `layoutFromLegacy`/`legacyFromLayout`),
-`dockOps.js`, `dockDrag.js` (`resolveMonitorTarget`, `resolveBandEdgeTarget`), `workspaceManager.js`
-(`renderBands`, `renderTimelinePlacement`, `reinitSplitters`, `restorePanel` ramo dos monitores).
+Onde mexer: `dockModel.js` (`normalizeBands`, `BAND_PANEL_IDS`, `CENTER_PANEL_IDS`), `dockOps.js`,
+`dockDrag.js` (`resolveMonitorTarget`, `resolveBlockTarget`, `resolveBandEdgeTarget`),
+`workspaceManager.js` (`renderBands`, `renderMonitorPlacement`, `refreshCenterContent`,
+`reinitSplitters`/`growingColumn`, `restorePanel`), `tabPanels.js` (abas).
 
 **Regra aprendida na parte 1:** nunca recolocar no DOM um painel que já está no lugar durante um
 arrasto (a alça perde a captura do ponteiro e o arrasto trava). Usar `placeInOrder` e deixar
 redesenhos para depois do soltar (`window.dockDrag.drag`).
+
+## F2c parte 2b (28/09, noite): monitores em bloco ou sozinhos, centro que some — feito
+
+Decisões do usuário nesta sessão: monitor sozinho vai para **faixa e coluna** (como a timeline);
+quando o centro esvazia, o **vizinho mais perto cresce**; a alça do bloco é **uma segunda alça no
+cabeçalho do Source** (do primeiro monitor que estiver no bloco).
+
+| Entrega | Onde |
+|---|---|
+| `CENTER_PANEL_IDS` (timeline + monitores) e `BAND_PANEL_IDS` com os monitores. Monitor fora do bloco = numa faixa ou em `columnOrder` (nunca em pilha; faixa vence coluna). Árvore: nó `monitors` só com os que ficaram (pode ficar vazio e guarda a orientação); nó `center` pode ficar vazio. `legacyFromLayout` confere cada monitor num lugar só. | `dockModel.js`, `tests/autoteste_dock_model.mjs` 1.8 |
+| Operações `panelToCenter` (timeline ou monitor de volta ao centro/bloco), `isPlaced`, `monitorsInBlock`, `centerContent`, `moveBlock` (centro muda de vaga nas colunas ou os monitores do bloco vão juntos para uma faixa). `swapPanels` vale para timeline e monitores (só fora do centro, sem pilha). 46 mil estados testados, com ida e volta no modelo. | `dockOps.js`, `tests/autoteste_dock_ops.mjs` 11–12 |
+| `renderMonitorPlacement`: monitores do bloco voltam ao `.monitors-container` (Source antes de Program), sem a largura de coluna; sozinho no bloco ocupa tudo; fora do bloco `.dock-monitor-out` (desmaximiza). `refreshCenterContent`: `.center-no-monitors` (timeline ocupa a altura toda, sem o divisor monitores/timeline) e `.center-empty` (centro some). `body.layout-monitors-split` esconde maximizar/trocar. | `workspaceManager.js`, `styles.css` |
+| Centro vazio: `growingColumn` escolhe a vizinha que cresce (`.dock-growing`; de conteúdo antes de lateral; empate, esquerda) e os divisores redimensionam para fora dela. Monitor como coluna: divisor próprio (`layout-dim-splitter-<id>`, padrão 480 px, mín. 200, encolhe). Altura da timeline ao sair de um centro sem monitores = a salva (não a do centro inteiro). | `reinitSplitters`, `currentTimelineHeight`, `bindEdgeResizer` |
+| Arrasto do monitor: sobre o outro monitor do bloco = orientação (fora do bloco, volta assim); bordas = faixa/coluna na ponta (com cantos); fora do bloco sobre o centro = volta ao bloco; sobre painel de faixa ou coluna = troca (meio) ou ao lado (metades); no bloco sobre o centro = vira coluna ao lado. Laterais e timeline também vão ao lado de/trocam com monitor fora do bloco. | `dockDrag.js` (`resolveMonitorTarget`, `resolveColumnTarget`, `resolveTimelineTarget`) |
+| Alça do bloco `.dock-handle-block` (ícone de colunas) logo depois da ⋮⋮ do primeiro monitor do bloco (`placeBlockHandle`, não mexe durante arrasto). Bordas de cima/embaixo = faixa; esquerda/direita = centro na ponta; sobre coluna = à esquerda/direita dela. Fora do editor não faz nada (o bloco não vira janela). | `dockDrag.js` (`injectHandles`, `resolveBlockTarget`), `styles.css` |
+| Volta de janela destacada: painel de faixa (inclusive monitor) volta para a vaga dele. Cards do modal de colunas com Source/Program. Regra registrada na Seção IX da skill. | `restorePanel`, `columnMetadata`, `SKILL.md` |
+| **Correção (pedido do usuário): Source destacado abria "Identificar Elemento" ao clicar.** Desenhar caixa no vídeo, arrastar a barra de tempo (Source e Program) e mover/redimensionar a imagem no Program ouviam `mousemove`/`mouseup` no `document` da janela principal; na janela destacada o soltar nunca chegava, a caixa ficava presa (tracejados) e esticava ao passar pela principal, virando "caixa desenhada". Agora ouvem no documento do clique (`ownerDocument`). Depois: com o vídeo tocando, clicar não pausava (a camada de rostos some nos quadros sem rosto e o clique cai no contêiner, cujo play/pause procurava vídeo e botão na janela principal); agora usa o documento do contêiner e ignora cliques da camada de rostos (antes, com ela visível, os dois alternavam e o clique se anulava). Verificado com o Source num iframe registrado como janela destacada. | `player.js` (`onMouseDown`/`onMouseUp` do Source, `startScrubberDrag` x2, arrasto do Program), `workspaceManager.js` (`setupPlayerClickHandlers`) |
+
+Verificado (28/09) no **navegador do app** (estático, 1440×900), pelo motor do arrasto
+(`dockDrag.resolveTarget` no ponto + `applyTarget`, o mesmo caminho do soltar; o painel parou de
+desenhar e não deu para usar o mouse): Program para a borda direita (coluna), Source sobre a metade
+esquerda do centro (coluna), Source de volta sobre o centro, Program sobre a borda de baixo do Source
+(volta empilhado); bloco na ponta esquerda, à direita da Biblioteca e na faixa de baixo; desfazer passo
+a passo; Source numa faixa + Program coluna + timeline numa faixa (centro vazio, vizinho cresce) e
+recarregar. Sem erro de console do layout.
+
+### Pendências da parte 2b
+
+- Com duas faixas altas numa tela baixa, o `.workspace` pode ficar com 0 px de altura (faixas têm
+  altura fixa). Pensar num mínimo para o editor ou em faixas que encolhem.
+- Numpad7/9 escondem o monitor com `display: none` onde ele estiver; como coluna, o divisor ao lado
+  fica sobrando. Tratar como recolher (linha no lugar) ou tirar o divisor.
+- Destacar e voltar um monitor que está numa faixa/coluna não foi verificado na tela (o ramo do
+  `restorePanel` é o mesmo das laterais).
+- Arrasto real com mouse das alças dos monitores e do bloco não verificado (só pelo motor).
 
 ## F2c parte 2a (28/09, tarde): timeline em faixa ou coluna — feito
 
