@@ -16,3 +16,36 @@
 
    Canvas (timeline, player) lê os mesmos tokens via js/themeTokens.js.
    ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── NEUTRO (padrão) ─────────────────────────────────────────────────────────
+   Quase preto, sem saturação, chapado. Separação por nível de cinza e linha fina. */
+:root[data-theme="neutro"] {
+    --t-surface-0: #080808;
+    --t-surface-1: #0d0d0d;
+    --t-surface-2: #101010;
+    --t-surface-3: #161616;
+    --t-surface-4: #1e1e1e;
+
+    --t-tint-1: rgba(255, 255, 255, 0.025);
+    --t-tint-2: rgba(255, 255, 255, 0.05);
+    --t-tint-3: rgba(255, 255, 255, 0.09);
+
+    --t-line-weak: rgba(255, 255, 255, 0.06);
+    --t-line-strong: rgba(255, 255, 255, 0.12);
+
+    --t-glow: transparent;
+
+    /* tokens antigos */
+    --bg-base: #080808;
+    --bg-glass: #101010;
+    --bg-glass-active: #161616;
+    --border-glass: rgba(255, 255, 255, 0.06);
+    --border-glass-glow: rgba(255, 255, 255, 0.12);
+    --shadow-premium: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* Chapado: com fundos opacos o desfoque não aparece e só custa GPU. */
+:root[data-theme="neutro"] * {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}

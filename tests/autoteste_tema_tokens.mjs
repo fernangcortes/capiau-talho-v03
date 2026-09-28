@@ -100,4 +100,35 @@ console.log("✔ 3.1 passou: styles.css, HTMLs e JS da UI estão tokenizados.");
 }
 console.log("✔ 3.2 passou: theme.css ligado nas três páginas e o Clássico sem tokens.");
 
+// ----------------------------------------------------------------------
+// PARTE 4: Presets
+// ----------------------------------------------------------------------
+console.log("\n--- PARTE 4: Presets ---");
+{
+    const theme = readFileSync(path.join(rootDir, "src", "ui", "theme.css"), "utf8");
+    const bloco = theme.match(/:root\[data-theme="neutro"\]\s*\{([^}]*)\}/);
+    assert.ok(bloco, "theme.css tem o preset Neutro");
+    const definidos = new Set([...bloco[1].matchAll(/(--[\w-]+)\s*:/g)].map(m => m[1]));
+    const usados = new Set();
+    for (const { file } of temaArquivos()) for (const m of readFileSync(file, "utf8").matchAll(/var\((--t-[\w-]+)/g)) usados.add(m[1]);
+    for (const f of ["timelineRenderer.js", "player.js"]) {
+        for (const m of readFileSync(path.join(rootDir, "src", "ui", "js", f), "utf8").matchAll(/themeColor\("([\w-]+)"/g)) usados.add("--t-" + m[1]);
+    }
+    const faltando = [...usados].filter(t => !definidos.has(t));
+    assert.deepEqual(faltando, [], "todo token usado no código precisa de valor no Neutro");
+    for (const antigo of ["--bg-base", "--bg-glass", "--bg-glass-active", "--border-glass", "--border-glass-glow"]) {
+        assert.ok(definidos.has(antigo), `Neutro redefine ${antigo}`);
+    }
+}
+console.log("✔ 4.1 passou: o Neutro define todos os tokens usados na UI e no canvas.");
+{
+    for (const html of ["index.html", "panel.html", "panel-group.html"]) {
+        const text = readFileSync(path.join(rootDir, "src", "ui", html), "utf8");
+        const boot = text.indexOf("js/themeBoot.js");
+        assert.ok(boot > 0 && boot < text.indexOf("</head>"), `${html}: themeBoot.js no <head> (tema antes do primeiro paint)`);
+        assert.doesNotMatch(text.slice(text.lastIndexOf("<script", boot), boot), /type="module"|defer|async/, `${html}: themeBoot é síncrono`);
+    }
+}
+console.log("✔ 4.2 passou: tema aplicado no <head>, de forma síncrona, nas três páginas.");
+
 console.log("\n=== AUTOTESTE TOKENS DE TEMA CONCLUÍDO COM SUCESSO ===");
