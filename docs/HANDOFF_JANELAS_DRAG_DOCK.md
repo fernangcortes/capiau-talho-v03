@@ -43,6 +43,18 @@ painel de uma janela destacada; e os **monitores podem sair do centro**. A pági
    da faixa, linha de expandir no lugar do painel, divisores só entre visíveis e **trocar de lugar dentro
    da faixa** arrastando a alça, como na janela de grupo.
 4. **O centro vira o que o usuário quiser.**
+5. **Coluna da ponta × faixa inteira: o usuário escolhe, no arrasto e depois.**
+   - *No arrasto:* a borda esquerda/direita do editor tem duas zonas na altura. Soltando na parte de
+     cima (ao lado do centro), a coluna fica só em cima e a faixa passa por baixo dela com a largura
+     inteira ("faixa manda no canto"). Soltando na parte da borda que fica ao lado da faixa (o canto),
+     a coluna desce até o fim e a faixa encurta ("coluna completa"). A sombra de prévia mostra o
+     retângulo exato de cada caso enquanto o cursor anda. Vale igual para faixa em cima (canto de cima).
+   - *Depois:* uma setinha no rodapé da coluna (e no topo, se houver faixa em cima) alterna entre
+     "coluna completa" e "faixa manda no canto". Seta aponta para onde a coluna vai crescer/encolher;
+     dica em texto ("Estender até embaixo" / "Deixar a faixa passar"). Entra no Ctrl+Alt+Z (é mudança
+     de layout) e fica salvo no workspace.
+   - Registrar a regra genérica (cantos disputados entre coluna e faixa) na Seção IX da skill do design
+     system quando implementar.
 
 ### Em aberto (responder no começo da F2c)
 
@@ -50,10 +62,6 @@ painel de uma janela destacada; e os **monitores podem sair do centro**. A pági
   "Monitores" para coluna/faixa; (b) cada monitor sozinho em qualquer lugar. Sugestão: (a) primeiro.
 - **Item 4 × âncora da Timeline:** a decisão antiga era "Timeline sempre no centro ou em janela".
   "O centro vira o que o usuário quiser" libera a Timeline para faixa/coluna também? Confirmar.
-- **Ponta esquerda/direita e cantos** (explicado ao usuário em 28/09): coluna da ponta com altura só
-  da parte de cima (como hoje) ou altura inteira; e quem fica com os cantos quando há faixa e coluna de
-  ponta ao mesmo tempo. Sugestão: faixas sempre com a largura inteira (donas dos cantos) e colunas da
-  ponta entre as faixas.
 
 ### Pontos de partida no código
 
