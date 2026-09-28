@@ -1,8 +1,12 @@
-# Passagem: janelas drag & dock (F0–F5, P14, recolher, F2c parte 1) → próxima: F2c parte 2
+# Passagem: janelas drag & dock (F0–F5, P14, recolher, F2c partes 1 e 2a) → próxima: F2c parte 2b (monitores)
 
-Branch: `talho-windows-drag-dock-6mtidh` (a partir de `main`). Em 28/09 ficou **3 commits à frente do
-remoto** (`34fd8a4` F2c parte 1, `0525ab6` correção do arrasto travado, e o commit desta passagem):
-**não foi dado push**, confirmar com o usuário antes.
+> **Ideia futura do usuário (28/09):** timeline "prédio", que começa em cima e continua em faixas
+> abaixo (como linhas de texto), para monitores verticais e para vários editores. A timeline como
+> coluna (parte 2a) é o primeiro passo: ela já ocupa a altura inteira ao lado dos monitores.
+
+Branch: `talho-windows-drag-dock-6mtidh` (a partir de `main`). Até `450647e` está no remoto; a F2c
+parte 2a (timeline em faixa ou coluna, 28/09 à tarde) está nos commits `59dbe80` (código) e o de docs
+desta passagem, **sem push** (confirmar com o usuário antes).
 
 Commits no nome do autor (`fernangcortes <escrevaprofernando@gmail.com>`), **sem assinatura de IA**
 (sem `Co-Authored-By`/`Claude-Session`, sem branch `claude/...`). Atenção: o `git config --global
@@ -12,55 +16,75 @@ a config) e mensagem por arquivo (`git commit -F`).
 
 Plano completo, com decisões e animações: página "Talho Drag & Dock"
 (https://claude.ai/artifact/SF8tDpe1VVSy4brs938X3V). O `docs/PLANO_JANELAS_DRAG_DOCK.md` é ignorado
-pelo git e não existe em todas as máquinas: a página é a fonte do plano. **A página ainda não registra
-a F2c parte 1**: atualizar a fase F2 (texto "F2c, próxima") e a linha "Feito:" no fim.
+pelo git e não existe em todas as máquinas: a página é a fonte do plano.
 
-## Próxima sessão: F2c parte 2
+## Próxima sessão: F2c parte 2b
 
-O que falta das decisões da F2c (lista completa mais abaixo, "Decisões da F2c"). Ordem sugerida, do
-mais usado para o mais raro, cada item com autotestes de modelo/operações antes da interface:
+Itens que faltam das decisões da F2c (lista completa mais abaixo, "Decisões da F2c"), do mais usado
+para o mais raro, cada um com autotestes de modelo/operações antes da interface:
 
-1. **Timeline em faixa ou coluna** (decisão 7). Caminho sugerido: a timeline vira membro de faixa
-   como as laterais (`BAND_PANEL_IDS` = laterais + timeline em `normalizeBands`, hoje filtra só
-   `COLUMN_IDS`), com `timelinePosition` novo `"band"` para o legado saber que ela saiu do centro.
-   **Decidido (usuário, 28/09): converter** as posições antigas para faixa, mantendo o visual de hoje:
-   `center` = timeline no centro (fora de faixa); `bottom-full` = faixa de baixo com os dois cantos
-   `"band"`; `bottom-left` = faixa de baixo, `bl: "band"`, `br: "column"`; `bottom-right` = o espelho.
-   Workspaces salvos e `capiau_timeline_position` com os valores antigos são convertidos na leitura.
-   **Atalhos com o mesmo efeito de hoje:** Numpad2 = centro ↔ faixa de baixo (largura total);
-   Numpad1/Numpad3 = alternar o canto esquerdo/direito da faixa da timeline ("expandir para a
-   esquerda/direita"); com a timeline no centro, levam para a faixa já expandida daquele lado. O ciclo
-   continua o de hoje (`toggleTimelineExpandLeft/Right`, `toggleTimelinePosition`), e os checkboxes/botões
-   de expandir (modal e barra da timeline, `chk-timeline-*`, `btn-timeline-expand-*`) chamam as mesmas funções.
-   **Decidido também: "coluna até o fim" vale para TODAS as colunas daquele lado do centro**, não só a
-   da ponta (hoje, parte 1, `renderBands` puxa só a da ponta para `.dock-edge`). Assim "sob esquerda +
-   centro" com centro, Ajustes, Painel Lateral deixa os dois em altura inteira, como hoje. Vale igual
-   para as faixas de laterais da parte 1: ajustar `renderBands`/`edgeColumns` (célula da ponta com
-   várias colunas e seus divisores), a prévia de `resolveSideEdgeTarget` e a Seção IX da skill.
-   Cuidados: `setTimelinePosition` reposiciona a timeline sozinho (studioTop/compoundStage); o
-   canvas precisa redimensionar sem piscar (Seção I.3 da skill); Numpad2/1/3 (`toggleTimeline*`).
-2. **Monitores em bloco ou sozinhos** (decisão 6). A alça do bloco "Monitores" move os dois
+1. **Monitores em bloco ou sozinhos** (decisão 6). A alça do bloco "Monitores" move os dois
    (lado a lado/empilhados automático continua); a alça de cada player move só ele, que vira painel
    comum (faixa, coluna, pilha?). Hoje `resolveMonitorTarget` só troca lado a lado/empilhados.
-   Rever maximizar e Numpad7/9 com um monitor fora do bloco.
-3. **O centro vira o que o usuário quiser** (decisão 4). Hoje `center-stage` é fixo (monitores +
-   timeline). Com 1 e 2 prontos, o centro pode ficar vazio: definir o que ocupa o espaço (a coluna
+   Rever maximizar e Numpad7/9 com um monitor fora do bloco. Caminho natural: o mesmo da timeline
+   (monitor vira membro de faixa em `BAND_PANEL_IDS`, nunca em `columnOrder`), decidir com o usuário
+   se monitor sozinho também vira coluna.
+2. **O centro vira o que o usuário quiser** (decisão 4). Hoje `center-stage` é fixo (monitores +
+   timeline). Com 1 pronto, o centro pode ficar vazio: definir o que ocupa o espaço (a coluna
    mais próxima? um lateral solto no centro?). Conversar com o usuário antes.
-4. **Abas destacáveis (F5) em faixas** (decisão 2). Hoje só as três laterais entram em faixas;
+3. **Abas destacáveis (F5) em faixas** (decisão 2). Hoje laterais e timeline entram em faixas;
    aba destacada ainda nem vira coluna no editor (pendência antiga).
-5. Detalhes da parte 1: o modal "Configurar workspace" (cards de colunas) ainda mostra laterais que
-   estão em faixa como colunas; teste com mouse real em Linux (`scripts/dock_bands_real_mouse_check.mjs`,
-   no molde de `dock_strips_real_mouse_check.mjs`); a setinha do canto é recriada a cada
-   `renderBands` (inofensivo, mas dá para reaproveitar como os divisores).
+4. Detalhes: o modal "Configurar workspace" (cards de colunas) ainda mostra laterais que estão em
+   faixa como colunas; teste com mouse real em Linux (`scripts/dock_bands_real_mouse_check.mjs`, no
+   molde de `dock_strips_real_mouse_check.mjs`); a setinha do canto é recriada a cada `renderBands`
+   (inofensivo, mas dá para reaproveitar como os divisores); o seletor escondido
+   `select-timeline-position` fica vazio quando a timeline está numa faixa sem nome antigo (faixa de
+   cima, ou só sob o centro) e o botão mostra "Faixa de cima"/"Faixa de baixo (sob o centro)".
 
-Onde mexer: `dockModel.js` (`normalizeBands`, `layoutFromLegacy`/`legacyFromLayout`), `dockOps.js`
-(`moveToBand` aceita só `COLUMN_IDS`), `dockDrag.js` (`resolveTimelineTarget`, `resolveMonitorTarget`,
-`resolveBandEdgeTarget`), `workspaceManager.js` (`renderBands`, `setTimelinePosition`,
-`reinitSplitters`, `restorePanel` ramo da timeline/monitores).
+Onde mexer: `dockModel.js` (`normalizeBands`, `BAND_PANEL_IDS`, `layoutFromLegacy`/`legacyFromLayout`),
+`dockOps.js`, `dockDrag.js` (`resolveMonitorTarget`, `resolveBandEdgeTarget`), `workspaceManager.js`
+(`renderBands`, `renderTimelinePlacement`, `reinitSplitters`, `restorePanel` ramo dos monitores).
 
-**Regra aprendida nesta sessão:** nunca recolocar no DOM um painel que já está no lugar durante um
+**Regra aprendida na parte 1:** nunca recolocar no DOM um painel que já está no lugar durante um
 arrasto (a alça perde a captura do ponteiro e o arrasto trava). Usar `placeInOrder` e deixar
 redesenhos para depois do soltar (`window.dockDrag.drag`).
+
+## F2c parte 2a (28/09, tarde): timeline em faixa ou coluna — feito
+
+A timeline fica embaixo dos monitores, numa faixa (em cima ou embaixo, sozinha ou com laterais) ou
+como coluna do editor (pedido do usuário, base da futura timeline "prédio").
+As posições antigas viraram faixa de baixo + cantos, com o mesmo desenho e os mesmos atalhos.
+"Coluna até o fim" passou a valer para todas as colunas daquele lado do centro.
+
+| Entrega | Onde |
+|---|---|
+| Timeline entra em faixa (`BAND_PANEL_IDS` = laterais + timeline), nunca em `columnOrder`. `timelinePosition` agora é `"center"` \| `"band"` e sai das faixas (`storeBands`). `convertTimelinePosition` converte as antigas: `bottom-full` = faixa de baixo com `bl`/`br` `"band"`; `bottom-left` = `bl` `"band"`, `br` `"column"`; `bottom-right` = o espelho (timeline entra na frente de quem já estiver na faixa de baixo). Vale para `capiau_timeline_position` salvo, workspaces salvos, presets (Montagem) e histórico antigo (árvores com a timeline embaixo continuam sendo lidas). | `dockModel.js`, `tests/autoteste_dock_model.mjs` 1.1 e 1.7 |
+| Operações `placeTimeline` (nomes antigos → faixa/cantos), `timelineToCenter`, `toggleTimelineSide` (Numpad1/3: mesmo ciclo de antes, testado posição a posição), `timelineExpanded`. A timeline não vai para a ponta, não fica ao lado de coluna, não troca com coluna nem empilha; dentro das faixas troca e fica ao lado normalmente. 270 mil estados testados. | `dockOps.js`, `tests/autoteste_dock_ops.mjs` 9–10 |
+| Renderizador: `setTimelinePosition` aceita os nomes antigos e vira `placeTimeline` + `setColumnLayout`; `renderTimelinePlacement` põe a timeline embaixo dos monitores (na faixa quem a leva é o `renderBands`). **Removido o renderizador antigo** (`studioTop`/`compoundStage`, ramos `bottom-*` de `setTimelinePosition` e `reinitSplitters`). Classe `layout-timeline-band` + `layout-timeline-expanded` no body; `studio` não é mais posta (virava o editor em coluna). Larguras das laterais do lado por onde a timeline passa continuam nas chaves `studio-*`, como antes. | `workspaceManager.js` |
+| Altura vai junto: faixa nova só com a timeline = altura dela + 5px do divisor; de volta ao centro, a altura salva de lá (`keepTimelineHeight`, `loadTimelinePosition`). Divisor da faixa redesenha o canvas a cada quadro (rAF, Seção I.3) e o duplo clique nele ajusta às pistas (`fitTimelineHeightToTracks` sabe mexer na faixa). Workspace salvo guarda `capiau_band_h_top/bottom`. | `bindBandResizer`, `fitTimelineHeightToTracks`, `captureCurrentState` |
+| Coluna até o fim = **lado inteiro**: `sideColumns()` e a célula `.dock-edge` leva todas as colunas daquele lado, com `.dock-edge-splitter` entre elas (redimensiona a de fora; some se uma das duas estiver recolhida) e o `.dock-edge-resizer` na vizinha do centro. Setinha do canto na coluna da ponta ou, recolhida, na próxima aberta. | `renderBands`, `renderCornerToggles`, `bindEdgeResizer`, `refreshEdgeSplitters`, `styles.css` |
+| Recolher a timeline numa faixa: `isPanelCollapsed("timeline-panel")` lê a classe dela; linha `#reopen-timeline` em pé no lugar (deitada quando todos da faixa estão recolhidos); `main.js` chama `applyAllCollapse` ao recolher/expandir a timeline. | `applyBandCollapse`, `applyAllCollapse`, `main.js`, `styles.css` |
+| Arrasto da timeline: bordas de cima/embaixo da moldura = faixa (nova ou vaga), sobre lateral de faixa = trocar/ao lado; parte de baixo do editor = as posições de antes (sob os monitores, sob esquerda + centro, sob centro + direita). Laterais podem ir ao lado da timeline na faixa. Alvo `type: "timeline"` saiu: tudo é `type: "columns"`. | `dockDrag.js` (`resolveTimelineTarget`, `resolveColumnTarget`) |
+| Volta da janela destacada: timeline volta para a vaga dela na faixa (a faixa some enquanto ela está fora). | `restorePanel` |
+| **Timeline como coluna:** entra em `columnOrder` (nunca em pilha); `timelinePosition` `"column"`, derivado das faixas e de `columnOrder` (`deriveTimelinePosition`; faixa vence coluna). `moveToEdge`/`moveBeside` aceitam a timeline; `swapPanels` troca timeline com coluna ou faixa, mas não com membro de pilha nem estando ela embaixo dos monitores; `placeTimeline(state, "column")` = onde já está ou à direita do centro. 380 mil estados testados. | `dockModel.js`, `dockOps.js`, testes 1.7 e 9–10 |
+| Coluna na tela: largura pelo divisor (`splitter-timeline-panel`, padrão 420 px), altura inteira, única coluna que encolhe (mín. 200 px; em 1424 px, 5 colunas com larguras padrão não cabem e a última sai da tela: é falta de espaço, mover laterais para faixas). Linha de expandir em pé; recolhida some. Vai para a célula da ponta com as laterais do lado dela. Ajustar às pistas não faz nada na coluna. Menu de posição ganhou "Timeline: Coluna"; card da timeline no modal de colunas. | `workspaceManager.js` (`reinitSplitters`, `renderTimelinePlacement`, `renderBands`), `styles.css` |
+| Arrasto da timeline: bordas esquerda/direita = coluna na ponta (com zonas de canto); na parte de cima do editor, sobre coluna ou centro = coluna ao lado (metades) ou troca (meio da coluna). Laterais vão ao lado da timeline coluna ou trocam com ela. | `dockDrag.js` (`resolveTimelineTarget`, `resolveTimelineColumnTarget`) |
+| Regras novas na Seção IX da skill (lado inteiro, timeline em faixa ou coluna, exceção do `isPanelCollapsed`). | `.agents/skills/capiau-nle-design-system/SKILL.md` |
+
+Verificado (28/09) no **Chrome headless via DevTools Protocol** (o navegador do app negou `localhost`
+nesta sessão): conversão de `bottom-left` salvo ao abrir; ciclo Numpad1/3/2 completo (formas, alturas
+320/325 px, canvas = contêiner); arrasto real da timeline para a faixa de cima e de Ajustes para o
+lado dela; recolher a timeline na faixa; desfazer passo a passo; arrastar o divisor da faixa (canvas
+certo **no meio** do arrasto) e duplo clique; workspace salvo antigo (`bottom-right`), Montagem e
+Padrão; salvar workspace; destacar e voltar (janela simulada por iframe); lado inteiro com Biblioteca
+recolhida; sem erro de console do layout. Timeline como coluna: arrasto para a borda direita, Ajustes
+para a faixa de baixo, Painel Lateral trocando com a timeline, recolher, canto `br` "column" (timeline +
+Painel Lateral até embaixo), desfazer, arrastar de volta para baixo dos monitores (volta com 300 px),
+recarregar e workspace salvo. Como repetir: servir `src/ui` estático (configuração
+`ui-static` do `.claude/launch.json` aponta para um script de scratchpad de outra sessão; se sumir,
+recriar: http que devolve `[]` em `/api`), abrir o Chrome com `--headless=new
+--remote-debugging-port=9333 --user-data-dir=<pasta temporária>` e mandar `Page.navigate`,
+`Runtime.evaluate` e `Input.dispatchMouseEvent` pelo WebSocket de `http://127.0.0.1:9333/json`.
 
 ## F2c parte 1 (28/09): faixas inteiras e cantos — feito
 
@@ -187,7 +211,7 @@ Commits: `7823b45`, `b943b27`, `4fc6402` (depois de `079b0b4`).
 | F5a/b | Abas viram painéis (`tabPanels.js`): Falas+inspetor, Visão, Chat, Busca, Tarefas, Logs, Temas, Rostos, Títulos, Docs (Mídias fica). Busca própria em Temas/Rostos/Docs. |
 | P14 | Aba muda entre Biblioteca e Painel Lateral (arrasto ou "Mover X para…" no botão direito); entra no desfazer, workspaces e Restaurar padrão. |
 
-Decisões do usuário que valem para o resto: Timeline pode ir para centro, faixa, coluna ou janela (desde a F2c); máx. 4 painéis
+Decisões do usuário que valem para o resto: Timeline pode ir para centro, faixa, coluna ou janela (desde a F2c; feito na parte 2a); máx. 4 painéis
 por janela; soltar no centro = trocar; Chrome principal mas funcionar nos outros; Source/Program
 separados; arrastar pela alça; muda na hora com Ctrl+Z e restaurar padrão; janelas reabrem sozinhas
 (bloqueadas vão para "Restaurar janelas"); recolher é salvo mas não entra no Ctrl+Alt+Z.
@@ -200,9 +224,9 @@ da Busca destacada; só uma janela de grupo por vez; título do Painel Lateral n
 
 - Autotestes (55): `for f in tests/autoteste_*.mjs; do node $f || echo FAIL $f; done`
   (drag & dock: `autoteste_dock_{model,ops,drag,tearoff,join,group,tabs}.mjs`, `autoteste_panel_collapse.mjs`).
-  **No Windows**, `autoteste_dock_drag` e `autoteste_dock_group` falham por procurar trechos com `\n`
-  numa cópia de trabalho em CRLF (falso positivo, já falhavam antes). Rodar numa cópia com LF
-  (como o CI) para conferir de verdade.
+  **No Windows**, `autoteste_dock_group` falha por procurar trechos com `\n` em `panel.html` numa
+  cópia de trabalho em CRLF (falso positivo, já falhava antes). Rodar numa cópia com LF (como o CI)
+  para conferir de verdade. Em 28/09 à tarde todos os outros passaram.
 - Mouse real (Linux, Xvfb + xdotool + Playwright global): `scripts/dock_real_mouse_check.mjs` (F3),
   `dock_group_real_mouse_check.mjs` (F4), `dock_tabs_real_mouse_check.mjs` (F5),
   `dock_strips_real_mouse_check.mjs` (P14). Headless: `scripts/dock_collapse_check.mjs`.
