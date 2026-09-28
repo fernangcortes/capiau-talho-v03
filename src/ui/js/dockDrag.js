@@ -4,11 +4,12 @@
 // Motor de Pointer Events (validado na F0): fantasma que segue o cursor, zonas de encaixe e
 // sombra de prévia. Encaixes: laterais ao lado, trocadas, na ponta ou empilhadas numa mesma
 // coluna (F2b); faixas inteiras em cima/embaixo e cantos (F2c); timeline embaixo dos monitores ou
-// numa faixa (F2c parte 2); monitores lado a lado ou empilhados.
+// numa faixa (F2c parte 2); monitores lado a lado ou empilhados, e cada monitor sozinho numa faixa ou
+// coluna, ou o bloco dos dois (alça própria no cabeçalho do primeiro monitor do bloco) (F2c parte 2b).
 // Cada soltura vira um passo do histórico de layout e mostra o aviso "Layout alterado · Desfazer".
 
-import { CENTER_STAGE, TIMELINE_ID } from "./dockModel.js";
-import { moveBeside, moveToEdge, moveToBand, setCorner, stackWith, swapPanels, stackGuests, sameColumnState, bandOf, placeTimeline, timelineIsColumn } from "./dockOps.js";
+import { CENTER_STAGE, TIMELINE_ID, MONITOR_IDS } from "./dockModel.js";
+import { moveBeside, moveToEdge, moveToBand, setCorner, stackWith, swapPanels, stackGuests, sameColumnState, bandOf, placeTimeline, timelineIsColumn, panelToCenter, monitorsInBlock, isPlaced, moveBlock } from "./dockOps.js";
 
 const EDGE = 26;          // largura das faixas de borda do editor (px)
 const START_DISTANCE = 5; // px de movimento antes de o arrasto começar
@@ -22,7 +23,9 @@ export const DOCK_PANELS = {
     "sidebar-right": { title: "Painel Lateral", header: "#sidebar-right .sidebar-header", kind: "column" },
     "source-player-panel": { title: "Source", header: "#source-player-panel .player-header", kind: "monitor" },
     "program-player-panel": { title: "Program", header: "#program-player-panel .player-header", kind: "monitor" },
-    "timeline-panel": { title: "Timeline", header: "#timeline-panel .timeline-header-left", kind: "timeline" }
+    "timeline-panel": { title: "Timeline", header: "#timeline-panel .timeline-header-left", kind: "timeline" },
+    // O bloco dos monitores (F2c parte 2b): alça própria, ver placeBlockHandle.
+    [CENTER_STAGE]: { title: "Monitores", header: null, kind: "block" }
 };
 
 const TIMELINE_LABELS = {
@@ -88,7 +91,35 @@ export class DockDragController {
 
     /** Insere a alça ⋮⋮ no começo do cabeçalho de cada painel arrastável. */
     injectHandles() {
-        Object.entries(DOCK_PANELS).forEach(([panelId, meta]) => this.addHandle(panelId, document.querySelector(meta.header)));
+        Object.entries(DOCK_PANELS).forEach(([panelId, meta]) => {
+            if (meta.header) this.addHandle(panelId, document.querySelector(meta.header));
+        });
+        this.blockHandle = document.createElement("span");
+        this.blockHandle.className = "dock-handle dock-handle-block";
+        this.blockHandle.dataset.dockPanel = CENTER_STAGE;
+        this.blockHandle.setAttribute("data-tooltip", "Arrastar os monitores juntos (Source + Program)");
+        this.blockHandle.setAttribute("aria-hidden", "true");
+        this.blockHandle.innerHTML = '<i class="fa-solid fa-table-columns"></i>';
+        this.blockHandle.addEventListener("pointerdown", (e) => this.handleDown(e, CENTER_STAGE, this.blockHandle));
+        this.placeBlockHandle();
+    }
+
+    /**
+     * A alça do bloco fica no cabeçalho do primeiro monitor que está no bloco, logo depois da alça
+     * dele; sem monitor no bloco, some. Não mexe durante um arrasto (a alça perderia a captura).
+     */
+    placeBlockHandle() {
+        const handle = this.blockHandle;
+        if (!handle || this.drag) return;
+        const inBlock = monitorsInBlock(this.wm.getColumnState())
+            .map(id => document.getElementById(id))
+            .filter(el => el && el.ownerDocument === document);
+        const header = inBlock[0]?.querySelector(".player-header");
+        if (!header) { handle.remove(); return; }
+        const own = header.querySelector(":scope > .dock-handle:not(.dock-handle-block)");
+        if (own ? own.nextElementSibling !== handle : header.firstElementChild !== handle) {
+            if (own) own.after(handle); else header.prepend(handle);
+        }
     }
 
     /** Alça num cabeçalho (também para painéis criados na hora, como abas destacadas — F5). */
@@ -247,7 +278,12 @@ export class DockDragController {
             return;
         }
 
-        if (d.fromPopout) {
+        if (!d.fromPopout && outside && DOCK_PANELS[d.panelId].kind === "block") {
+            // O bloco não vira janela: fora do editor, soltar não muda nada.
+            this.ghost.hidden = false;
+            this.ghost.textContent = DOCK_PANELS[d.panelId].title;
+            d.target = null;
+        } else if (d.fromPopout) {
             // Voltando da janela destacada: zonas do editor principal no ponto convertido;
             // fora do editor, sobre outra janela destacada: juntar (F4).
             this.ghost.hidden = outside;
@@ -504,7 +540,8 @@ export class DockDragController {
         const kind = DOCK_PANELS[panelId].kind;
         if (kind === "column") return this.resolveColumnTarget(panelId, x, y, ws);
         if (kind === "timeline") return this.resolveTimelineTarget(x, y, ws);
-        if (kind === "monitor") return this.resolveMonitorTarget(panelId, x, y);
+        if (kind === "monitor") return this.resolveMonitorTarget(panelId, x, y, ws);
+        if (kind === "block") return this.resolveBlockTarget(x, y, ws);
         return null;
     }
 
@@ -525,8 +562,8 @@ export class DockDragController {
         // Painéis empilhados ficam dentro do anfitrião: testa os convidados antes.
         const guests = stackGuests(state.stacks);
         const candidates = [...COLUMN_PANELS].sort((a, b) => Number(guests.has(b)) - Number(guests.has(a)));
-        // A timeline numa faixa ou como coluna também recebe laterais ao lado dela (F2c parte 2).
-        if (bandOf(state.bands, TIMELINE_ID) || timelineIsColumn(state)) candidates.push(TIMELINE_ID);
+        // Timeline e monitores numa faixa ou como coluna também recebem laterais ao lado (F2c partes 2 e 2b).
+        [TIMELINE_ID, ...MONITOR_IDS].forEach(id => { if (isPlaced(state, id)) candidates.push(id); });
         for (const id of [...candidates, CENTER_STAGE]) {
             if (id === panelId) continue;
             const el = id === CENTER_STAGE ? document.querySelector(".center-stage") : document.getElementById(id);
@@ -585,14 +622,14 @@ export class DockDragController {
      * F2c: borda de cima/embaixo do editor. Sem faixa: faixa nova com a largura inteira. Com faixa:
      * entra nela, na posição mais perto do cursor (a sombra mostra a vaga).
      */
-    resolveBandEdgeTarget(state, panelId, edge, x, ws, make) {
+    resolveBandEdgeTarget(state, panelId, edge, x, ws, make, op = (index) => moveToBand(state, panelId, edge, index)) {
         const title = DOCK_PANELS[panelId].title;
         const where = edge === "top" ? "em cima" : "embaixo";
         const band = this.bandRect(edge);
         const current = (state.bands?.[edge] || []).filter(id => id !== panelId);
         if (!band || current.length === 0) {
             const h = Math.min(ws.height * 0.32, 300);
-            return make(moveToBand(state, panelId, edge),
+            return make(op(null),
                 { left: ws.left, top: edge === "top" ? ws.top : ws.bottom - h, width: ws.width, height: h },
                 `${title} numa faixa inteira ${where}`);
         }
@@ -601,7 +638,7 @@ export class DockDragController {
         let index = rects.findIndex(r => x < r.left + r.width / 2);
         if (index === -1) index = current.length;
         const slot = band.width / (current.length + 1);
-        return make(moveToBand(state, panelId, edge, index),
+        return make(op(index),
             { left: band.left + slot * index, top: band.top, width: slot, height: band.height },
             `${title} na faixa ${where}`);
     }
@@ -654,7 +691,7 @@ export class DockDragController {
         if (x < ws.left + EDGE) return this.resolveSideEdgeTarget(state, TIMELINE_ID, "left", y, ws, make);
         if (x > ws.right - EDGE) return this.resolveSideEdgeTarget(state, TIMELINE_ID, "right", y, ws, make);
 
-        for (const id of COLUMN_PANELS) {
+        for (const id of [...COLUMN_PANELS, ...MONITOR_IDS]) {
             if (!bandOf(state.bands, id)) continue;
             const r = this.rectOf(document.getElementById(id));
             if (!r || x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
@@ -694,7 +731,8 @@ export class DockDragController {
     resolveTimelineColumnTarget(state, x, y, make) {
         const guests = stackGuests(state.stacks);
         const ids = [...COLUMN_PANELS].sort((a, b) => Number(guests.has(b)) - Number(guests.has(a)));
-        for (const id of [...ids, CENTER_STAGE]) {
+        const monitorCols = MONITOR_IDS.filter(id => state.order.includes(id));
+        for (const id of [...ids, ...monitorCols, CENTER_STAGE]) {
             if (id !== CENTER_STAGE && bandOf(state.bands, id)) continue;
             const el = id === CENTER_STAGE ? document.querySelector(".center-stage") : document.getElementById(id);
             const r = this.rectOf(el);
@@ -715,20 +753,107 @@ export class DockDragController {
         return null;
     }
 
-    resolveMonitorTarget(panelId, x, y) {
-        const otherId = panelId === "source-player-panel" ? "program-player-panel" : "source-player-panel";
-        const r = this.rectOf(document.getElementById(otherId));
-        if (!r || x < r.left || x > r.right || y < r.top || y > r.bottom) return null;
-        const dLeft = x - r.left, dRight = r.right - x, dTop = y - r.top, dBottom = r.bottom - y;
-        const nearest = Math.min(dLeft, dRight, dTop, dBottom);
-        const stacked = nearest === dTop || nearest === dBottom;
-        const layout = stacked ? "stacked" : "side-by-side";
-        const effective = this.wm.monitorsLayout === "auto" ? this.wm.resolvedMonitorsLayout : this.wm.monitorsLayout;
-        if (layout === effective && this.wm.monitorsLayout !== "auto") return null;
-        const preview = stacked
-            ? { left: r.left, top: nearest === dTop ? r.top : r.top + r.height / 2, width: r.width, height: r.height / 2 }
-            : { left: nearest === dLeft ? r.left : r.left + r.width / 2, top: r.top, width: r.width / 2, height: r.height };
-        return { type: "monitors", layout, preview, label: stacked ? "Monitores empilhados" : "Monitores lado a lado" };
+    /**
+     * Monitor sozinho (F2c parte 2b). Sobre o outro monitor do bloco: orientação do bloco (lado a
+     * lado ou empilhados; estando fora, volta para o bloco assim). Bordas do editor: faixa ou coluna
+     * na ponta, como a timeline. Fora do bloco, sobre o centro: volta para o bloco. Sobre painel de
+     * faixa ou coluna: meio troca, metades põem ao lado (na faixa ou como coluna). Sobre o centro,
+     * estando no bloco: sai dele e vira coluna ao lado.
+     */
+    resolveMonitorTarget(panelId, x, y, ws) {
+        const state = this.wm.getColumnState();
+        const title = DOCK_PANELS[panelId].title;
+        const make = (next, preview, label, extra = {}) =>
+            !next || (sameColumnState(next, state) && !extra.monitorsLayout) ? null : { type: "columns", next, preview, label, ...extra };
+        const out = isPlaced(state, panelId);
+        const inside = (r) => !!r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+        const otherId = MONITOR_IDS.find(id => id !== panelId);
+        const other = monitorsInBlock(state).includes(otherId) ? this.rectOf(document.getElementById(otherId)) : null;
+        if (inside(other)) {
+            const dLeft = x - other.left, dRight = other.right - x, dTop = y - other.top, dBottom = other.bottom - y;
+            const nearest = Math.min(dLeft, dRight, dTop, dBottom);
+            const stacked = nearest === dTop || nearest === dBottom;
+            const layout = stacked ? "stacked" : "side-by-side";
+            const preview = stacked
+                ? { left: other.left, top: nearest === dTop ? other.top : other.top + other.height / 2, width: other.width, height: other.height / 2 }
+                : { left: nearest === dLeft ? other.left : other.left + other.width / 2, top: other.top, width: other.width / 2, height: other.height };
+            const how = stacked ? "empilhados" : "lado a lado";
+            if (out) return make(panelToCenter(state, panelId), preview, `${title} de volta ao bloco (monitores ${how})`, { monitorsLayout: layout });
+            const effective = this.wm.monitorsLayout === "auto" ? this.wm.resolvedMonitorsLayout : this.wm.monitorsLayout;
+            if (layout === effective && this.wm.monitorsLayout !== "auto") return null;
+            return { type: "monitors", layout, preview, label: stacked ? "Monitores empilhados" : "Monitores lado a lado" };
+        }
+        if (x > ws.left + EDGE && x < ws.right - EDGE) {
+            if (y < ws.top + EDGE) return this.resolveBandEdgeTarget(state, panelId, "top", x, ws, make);
+            if (y > ws.bottom - EDGE) return this.resolveBandEdgeTarget(state, panelId, "bottom", x, ws, make);
+        }
+        if (x < ws.left + EDGE) return this.resolveSideEdgeTarget(state, panelId, "left", y, ws, make);
+        if (x > ws.right - EDGE) return this.resolveSideEdgeTarget(state, panelId, "right", y, ws, make);
+
+        const center = this.rectOf(document.querySelector(".center-stage"));
+        if (out && inside(center)) {
+            return make(panelToCenter(state, panelId), { left: center.left, top: center.top, width: center.width, height: center.height }, `${title} de volta ao bloco dos monitores`);
+        }
+        // Painéis de faixa e colunas (laterais; timeline e o outro monitor quando estão fora do centro).
+        const guests = stackGuests(state.stacks);
+        const ids = [...COLUMN_PANELS, TIMELINE_ID, otherId]
+            .filter(id => COLUMN_PANELS.includes(id) || isPlaced(state, id))
+            .sort((a, b) => Number(guests.has(b)) - Number(guests.has(a)));
+        for (const id of [...ids, CENTER_STAGE]) {
+            const el = id === CENTER_STAGE ? document.querySelector(".center-stage") : document.getElementById(id);
+            const r = this.rectOf(el);
+            if (!inside(r)) continue;
+            const rx = (x - r.left) / r.width;
+            const name = id === CENTER_STAGE ? "do centro" : `de ${DOCK_PANELS[id].title}`;
+            const inBand = !!bandOf(state.bands, id);
+            if (id !== CENTER_STAGE && rx > 0.3 && rx < 0.7) {
+                return make(swapPanels(state, panelId, id), { left: r.left, top: r.top, width: r.width, height: r.height }, `Trocar com ${DOCK_PANELS[id].title}`);
+            }
+            const before = rx < 0.5;
+            const hostEl = el.classList.contains("dock-stack-guest") ? el.closest(".dock-stack-host") : el;
+            const col = inBand ? r : (this.rectOf(hostEl) || r);
+            const w = Math.min(col.width * (inBand ? 0.45 : 0.4), 260);
+            const where = before ? "à esquerda" : "à direita";
+            return make(moveBeside(state, panelId, id, before ? "before" : "after"),
+                { left: before ? col.left : col.right - w, top: col.top, width: w, height: col.height },
+                inBand ? `${title} ${where} ${name} na faixa` : `${title} como coluna ${where} ${name}`);
+        }
+        return null;
+    }
+
+    /**
+     * Bloco dos monitores (F2c parte 2b). Bordas de cima/embaixo: os monitores do bloco vão juntos
+     * para a faixa (nova ou na vaga do cursor). Bordas esquerda/direita: o bloco (o centro) vai para a
+     * ponta. Sobre uma coluna: o bloco fica à esquerda ou à direita dela.
+     */
+    resolveBlockTarget(x, y, ws) {
+        const state = this.wm.getColumnState();
+        const make = (next, preview, label) =>
+            !next || sameColumnState(next, state) ? null : { type: "columns", next, preview, label };
+        if (x > ws.left + EDGE && x < ws.right - EDGE) {
+            if (y < ws.top + EDGE) return this.resolveBandEdgeTarget(state, CENTER_STAGE, "top", x, ws, make, (index) => moveBlock(state, { band: "top", index }));
+            if (y > ws.bottom - EDGE) return this.resolveBandEdgeTarget(state, CENTER_STAGE, "bottom", x, ws, make, (index) => moveBlock(state, { band: "bottom", index }));
+        }
+        const wsr = this.rectOf(document.querySelector(".workspace")) || ws;
+        const w = Math.min(wsr.width * 0.4, 520);
+        if (x < ws.left + EDGE || x > ws.right - EDGE) {
+            const start = x < ws.left + EDGE;
+            return make(moveBlock(state, { edge: start ? "start" : "end" }),
+                { left: start ? wsr.left : wsr.right - w, top: wsr.top, width: w, height: wsr.height },
+                `Monitores na ponta ${start ? "esquerda" : "direita"}`);
+        }
+        const guests = stackGuests(state.stacks);
+        const ids = [...COLUMN_PANELS, TIMELINE_ID, ...MONITOR_IDS].filter(id => state.order.includes(id) && !bandOf(state.bands, id) && !guests.has(id));
+        for (const id of ids) {
+            const r = this.rectOf(document.getElementById(id));
+            if (!r || x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+            const before = (x - r.left) / r.width < 0.5;
+            const pw = Math.min(r.width * 0.5, 320);
+            return make(moveBlock(state, { targetId: id, side: before ? "before" : "after" }),
+                { left: before ? r.left : r.right - pw, top: r.top, width: pw, height: r.height },
+                `Monitores ${before ? "à esquerda" : "à direita"} de ${DOCK_PANELS[id].title}`);
+        }
+        return null;
     }
 
     drawTarget(target) {
@@ -747,6 +872,7 @@ export class DockDragController {
         if (target.type === "columns") {
             const next = target.next;
             this.wm.setColumnLayout(next.order, next.stacks, next.bands || { top: [], bottom: [] }, next.corners || {});
+            if (target.monitorsLayout) this.wm.setMonitorsLayout(target.monitorsLayout);
         }
         else if (target.type === "monitors") this.wm.setMonitorsLayout(target.layout);
         else return;

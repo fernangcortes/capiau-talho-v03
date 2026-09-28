@@ -1,7 +1,7 @@
 import { STATE } from "./state.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
-import { layoutFromLegacy, legacyFromLayout, LayoutHistory, serializeLayout, normalizeBands, hasBands, convertTimelinePosition, BAND_EDGES, CENTER_STAGE, TIMELINE_ID } from "./dockModel.js";
-import { normalizeStacks, stackGuests, stackOf, removeFromStack, setCorner, bandOf, placeTimeline, toggleTimelineSide, timelineExpanded, timelineIsColumn } from "./dockOps.js";
+import { layoutFromLegacy, legacyFromLayout, LayoutHistory, serializeLayout, normalizeBands, hasBands, convertTimelinePosition, BAND_EDGES, CENTER_STAGE, TIMELINE_ID, MONITOR_IDS, CENTER_PANEL_IDS } from "./dockModel.js";
+import { normalizeStacks, stackGuests, stackOf, removeFromStack, setCorner, bandOf, placeTimeline, toggleTimelineSide, timelineExpanded, timelineIsColumn, monitorsInBlock } from "./dockOps.js";
 import { COLLAPSIBLE_PANELS, REOPEN_LINE_IDS, edgeInLine, collapseButtonFor, visibleSplitters, loadCollapsed, saveCollapsed } from "./panelCollapse.js";
 
 window.popoutWindows = {};
@@ -169,6 +169,8 @@ export class WorkspaceManager {
             "inspector-panel": { title: "Inspetor / Efeitos", icon: "fa-sliders", desc: "Propriedades, transformações e ajustes" },
             "center-stage": { title: "Monitores & Preview", icon: "fa-desktop", desc: "Source Player, Program Player e Timeline Central" },
             "timeline-panel": { title: "Timeline", icon: "fa-film", desc: "Linha do tempo como coluna do editor" },
+            "source-player-panel": { title: "Source", icon: "fa-tv", desc: "Monitor Source fora do bloco, como coluna" },
+            "program-player-panel": { title: "Program", icon: "fa-tv", desc: "Monitor Program fora do bloco, como coluna" },
             "sidebar-right": { title: "Ferramentas / Painel Direito", icon: "fa-toolbox", desc: "Ferramentas secundárias, exportação e IA" }
         };
 
@@ -647,14 +649,15 @@ export class WorkspaceManager {
      * divisores legados). getEl diz qual coluna ele redimensiona.
      */
     bindEdgeResizer(handle, side, getEl) {
-        const keys = { "sidebar-left": "layout-dim-splitter-sidebar-left", "inspector-panel": "layout-dim-splitter-inspector", "sidebar-right": "layout-dim-splitter-sidebar-right", "timeline-panel": "layout-dim-splitter-timeline-panel" };
+        const keys = { "sidebar-left": "layout-dim-splitter-sidebar-left", "inspector-panel": "layout-dim-splitter-inspector", "sidebar-right": "layout-dim-splitter-sidebar-right", "timeline-panel": "layout-dim-splitter-timeline-panel",
+            "source-player-panel": "layout-dim-splitter-source-player-panel", "program-player-panel": "layout-dim-splitter-program-player-panel" };
         let el = null, w0 = 0;
         this.bindResizeDrag(handle, () => {
             el = getEl();
             if (!el || el.classList.contains("collapsed")) return false;
             w0 = el.getBoundingClientRect().width;
         }, (dx) => {
-            const w = Math.round(Math.max(200, Math.min(el.id === TIMELINE_ID ? 1600 : 900, w0 + (side === "left" ? dx : -dx))));
+            const w = Math.round(Math.max(200, Math.min(CENTER_PANEL_IDS.includes(el.id) ? 1600 : 900, w0 + (side === "left" ? dx : -dx))));
             el.style.width = `${w}px`;
             el.style.flex = `0 0 ${w}px`;
         }, () => {
@@ -2769,7 +2772,9 @@ export class WorkspaceManager {
             if (colEl && !isPopped) this.mountStackGuests(colId, colEl);
         });
 
-        // Faixas e colunas da ponta com canto (F2c), depois os recolhidos no lugar novo (linha e seta).
+        // Monitores no bloco ou fora dele (F2c parte 2b), faixas e colunas da ponta com canto (F2c),
+        // depois os recolhidos no lugar novo (linha e seta).
+        this.renderMonitorPlacement();
         this.renderBands();
         this.applyAllCollapse();
     }
@@ -2813,7 +2818,10 @@ export class WorkspaceManager {
     /** Altura atual da timeline no editor (px), ou a salva; null se não houver. */
     currentTimelineHeight() {
         const panel = document.getElementById(TIMELINE_ID);
-        const lying = panel?.parentElement?.classList.contains("center-stage") || panel?.parentElement?.classList.contains("dock-band-row");
+        // No centro sem monitores ela ocupa a altura toda: aí vale a altura salva (F2c parte 2b).
+        const parent = panel?.parentElement;
+        const lying = (parent?.classList.contains("center-stage") && !parent.classList.contains("center-no-monitors"))
+            || parent?.classList.contains("dock-band-row");
         if (panel && lying && panel.ownerDocument === document && !panel.classList.contains("collapsed")) {
             const h = panel.getBoundingClientRect().height;
             if (h > 50) return Math.round(h);
@@ -2821,6 +2829,59 @@ export class WorkspaceManager {
         const saved = parseFloat(localStorage.getItem("layout-dim-splitter-timeline"))
             || parseFloat(localStorage.getItem("layout-dim-splitter-studio-timeline"));
         return saved > 50 ? Math.round(saved) : null;
+    }
+
+    /**
+     * Monitores (F2c parte 2b): os que estão no bloco ficam no .monitors-container (Source antes de
+     * Program); os de faixa ou coluna saem dele (quem os leva é o renderBands ou o arranjo das
+     * colunas). O centro mostra o que sobrou: monitores, só a timeline (ela ocupa a altura toda) ou
+     * nada (some, e o vizinho mais perto cresce no lugar: reinitSplitters).
+     */
+    renderMonitorPlacement() {
+        const container = document.querySelector(".monitors-container");
+        const centerStage = document.querySelector(".center-stage");
+        if (!container || !centerStage) return;
+        const inBlock = monitorsInBlock(this.getColumnState());
+        MONITOR_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el || el.ownerDocument !== document) return; // destacado: volta pelo restorePanel
+            const out = !inBlock.includes(id);
+            el.classList.toggle("dock-monitor-out", out);
+            if (out) {
+                // Maximizar é dentro do bloco; fora dele não há o que esconder.
+                if (el.classList.contains("maximized")) document.getElementById(id === MONITOR_IDS[0] ? "btn-expand-source" : "btn-expand-program")?.click();
+                return;
+            }
+            el.style.removeProperty("--dock-band-w");
+            el.classList.remove("dock-band-member", "dock-band-last", "has-band-w");
+            if (el.parentElement === container) return;
+            // Volta ao bloco: sem a largura de quando era coluna; a orientação do bloco reaplica o resto.
+            el.style.width = "";
+            el.style.flex = "1";
+            if (id === MONITOR_IDS[0]) container.prepend(el);
+            else container.appendChild(el);
+        });
+        const inside = MONITOR_IDS.filter(id => document.getElementById(id)?.parentElement === container);
+        // Sozinho no bloco: ocupa tudo (sem a porcentagem do divisor entre os dois).
+        if (inside.length === 1) {
+            const el = document.getElementById(inside[0]);
+            el.style.flex = "1 1 0%";
+            el.style.width = "";
+        }
+        document.body.classList.toggle("layout-monitors-split", inBlock.length < MONITOR_IDS.length);
+        this.refreshCenterContent();
+        window.dockDrag?.placeBlockHandle?.();
+    }
+
+    /** Classes do centro pelo que está nele: sem monitores (a timeline cresce) ou vazio (some). */
+    refreshCenterContent() {
+        const container = document.querySelector(".monitors-container");
+        const centerStage = document.querySelector(".center-stage");
+        if (!container || !centerStage) return;
+        const monitors = MONITOR_IDS.some(id => document.getElementById(id)?.parentElement === container);
+        const timeline = document.getElementById(TIMELINE_ID)?.parentElement === centerStage && this.timelinePosition === "center";
+        centerStage.classList.toggle("center-no-monitors", !monitors);
+        centerStage.classList.toggle("center-empty", !monitors && !timeline);
     }
 
     /**
@@ -2859,6 +2920,7 @@ export class WorkspaceManager {
             }
         }
 
+        this.refreshCenterContent();
         const inColumn = this.timelinePosition === "column";
         document.body.classList.remove("layout-timeline-bottom", "layout-timeline-bottom-left", "layout-timeline-bottom-right", "studio");
         document.body.classList.toggle("layout-timeline-expanded", inBand || inColumn);
@@ -2938,6 +3000,19 @@ export class WorkspaceManager {
         }
     }
 
+    /**
+     * Centro vazio (F2c parte 2b): a coluna vizinha dele que cresce no lugar. Entre as duas vizinhas,
+     * a de conteúdo (monitor ou timeline); empate, a da esquerda. present = colunas no editor, com o centro.
+     */
+    growingColumn(present) {
+        const ci = present.indexOf(CENTER_STAGE);
+        if (ci === -1) return present[0] || CENTER_STAGE;
+        const left = present[ci - 1];
+        const right = present[ci + 1];
+        if (!left || !right) return left || right || CENTER_STAGE;
+        return !CENTER_PANEL_IDS.includes(left) && CENTER_PANEL_IDS.includes(right) ? right : left;
+    }
+
     /** Remove todos os divisores da árvore do workspace. */
     removeAllSplitters() {
         document
@@ -2998,6 +3073,11 @@ export class WorkspaceManager {
                 maxVal = 1600;
                 defaultVal = 420;
                 className = "splitter-timeline-panel";
+            } else if (MONITOR_IDS.includes(targetCol)) {
+                // Monitor como coluna (F2c parte 2b): chave própria por monitor.
+                minVal = 240;
+                maxVal = 1600;
+                defaultVal = 480;
             }
             return { minVal, maxVal, defaultVal, className };
         };
@@ -3006,16 +3086,34 @@ export class WorkspaceManager {
             // Garante que a ordem visual e de DOM das colunas superiores esteja correta
             this.arrangeTopColumns(workspace);
 
-            // Colunas presentes no editor (não destacadas nem levadas para a ponta ou para uma faixa)
-            const activeCols = this.columnOrder.filter(colId => {
+            // Colunas presentes no editor (não destacadas nem levadas para a ponta ou para uma faixa;
+            // o centro vazio também não conta, F2c parte 2b)
+            const present = this.columnOrder.filter(colId => {
                 const el = colId === "center-stage"
                     ? workspace.querySelector(".center-stage")
                     : workspace.querySelector(`#${colId}`);
                 const isPopped = !!(window.popoutWindows?.[colId] && !window.popoutWindows[colId].closed);
                 return el && !isPopped && el.parentNode === workspace;
             });
+            const centerEmpty = !!centerStage?.classList.contains("center-empty");
+            const activeCols = centerEmpty ? present.filter(id => id !== CENTER_STAGE) : present;
+            const pivot = centerEmpty ? this.growingColumn(present) : CENTER_STAGE;
+            this.growing = pivot === CENTER_STAGE ? null : pivot;
+            document.querySelectorAll(".dock-growing").forEach(el => {
+                if (el.id === pivot) return;
+                el.classList.remove("dock-growing");
+                el.style.flex = ""; // o divisor dele (se tiver) põe a largura de volta
+            });
+            if (this.growing) {
+                // Ocupa o lugar do centro: cresce com o editor, sem a largura de quando tinha divisor.
+                const el = document.getElementById(this.growing);
+                el.classList.add("dock-growing");
+                el.style.removeProperty("width");
+                el.style.flex = "1 1 0%";
+            }
 
-            const centerIndex = activeCols.indexOf("center-stage");
+            // As colunas de cada lado redimensionam para fora de quem cresce (o centro ou quem ficou no lugar dele).
+            const centerIndex = activeCols.indexOf(pivot);
 
             // Instancia os divisores dinamicamente entre cada par de colunas adjacentes ativas
             for (let i = 0; i < activeCols.length - 1; i++) {
@@ -3034,10 +3132,10 @@ export class WorkspaceManager {
                     } else if (i >= centerIndex) {
                         resizeTarget = "right";
                         targetCol = colB;
-                    } else if (colB === "center-stage") {
+                    } else if (colB === pivot) {
                         resizeTarget = "left";
                         targetCol = colA;
-                    } else if (colA === "center-stage") {
+                    } else if (colA === pivot) {
                         resizeTarget = "right";
                         targetCol = colB;
                     }
@@ -3057,7 +3155,7 @@ export class WorkspaceManager {
             }
         }
 
-        if (this.timelinePosition === "center" && centerStage) {
+        if (this.timelinePosition === "center" && centerStage && !centerStage.classList.contains("center-no-monitors")) {
             // Monitors Container <-> Timeline Panel no center-stage
             SplitterHelper.initSplitter(centerStage, ".monitors-container", "#timeline-panel", {
                 direction: "vertical",
@@ -5119,6 +5217,10 @@ export class WorkspaceManager {
                 if (panelId === "inspector-panel" && window.timelineInteraction && typeof window.timelineInteraction.onInspectorPopoutRestored === "function") {
                     window.timelineInteraction.onInspectorPopoutRestored();
                 }
+            } else if (bandOf(this.bands, panelId) && workspace) {
+                // Volta para a vaga dele na faixa (laterais, timeline e monitores).
+                workspace.appendChild(localPanel);
+                this.renderBands();
             } else if (panelId === "timeline-panel") {
                 const centerStage = document.querySelector(".center-stage");
                 if (this.timelinePosition === "band" && workspace) {

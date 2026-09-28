@@ -9,13 +9,16 @@
 //               { panel: "sidebar-left", away: true } painel está numa janela destacada; a folha
 //                                                   guarda o lugar para onde ele volta
 //   nó divisão: { split: "row" | "column", children: [...], role?, auto? }
-//               role "center"   = o bloco central legado (monitores e, às vezes, timeline)
-//               role "monitors" = Source + Program; auto: true = orientação automática
+//               role "center"   = o bloco central legado (monitores e, às vezes, timeline); pode ficar
+//                                 vazio quando tudo saiu dele (F2c parte 2b): o vizinho cresce no lugar
+//               role "monitors" = os monitores que estão no bloco (Source antes de Program); auto: true =
+//                                 orientação automática. Fica na árvore mesmo vazio, para guardar a orientação
 //               role "stack"    = laterais empilhadas numa mesma coluna (F2b), de cima para baixo
 //               role "band"     = faixa inteira em cima ou embaixo do editor (F2c), edge "top" | "bottom",
 //                                 painéis lado a lado da esquerda para a direita (laterais e timeline)
 //   A timeline fica em um lugar só: dentro do nó "center" (embaixo dos monitores), numa faixa ou
-//   como coluna do editor, folha direta da linha principal (F2c parte 2).
+//   como coluna do editor, folha direta da linha principal (F2c parte 2). Cada monitor também
+//   (F2c parte 2b): no bloco "monitors", numa faixa ou como coluna.
 //               role "frame"    = moldura com as faixas (F2c): [faixa de cima?, resto do editor, faixa de baixo?];
 //                                 corners diz quem fica com cada canto entre a coluna da ponta e a faixa:
 //                                 { tl, tr, bl, br: "band" (a faixa passa por baixo/cima da coluna) |
@@ -33,8 +36,13 @@ export const CENTER_STAGE = "center-stage";
 const MONITOR_LAYOUTS = ["auto", "side-by-side", "stacked"];
 export const BAND_EDGES = ["top", "bottom"];
 export const CORNERS = { top: ["tl", "tr"], bottom: ["bl", "br"] };
-/** Painéis que podem ir para uma faixa (F2c): as laterais e a timeline. */
-export const BAND_PANEL_IDS = [...COLUMN_IDS, TIMELINE_ID];
+/**
+ * Painéis que moram no centro (timeline e monitores): em columnOrder só quando viram coluna; numa
+ * faixa ou no centro, ficam fora dele (F2c partes 2 e 2b).
+ */
+export const CENTER_PANEL_IDS = [TIMELINE_ID, ...MONITOR_IDS];
+/** Painéis que podem ir para uma faixa (F2c): as laterais, a timeline e cada monitor. */
+export const BAND_PANEL_IDS = [...COLUMN_IDS, ...CENTER_PANEL_IDS];
 
 /**
  * Posição da timeline: "center" (embaixo dos monitores), "band" (numa faixa) ou "column" (coluna do
@@ -113,17 +121,19 @@ export function layoutFromLegacy(state) {
     const order = (Array.isArray(state.columnOrder) && state.columnOrder.length
         ? state.columnOrder
         : ["sidebar-left", "inspector-panel", CENTER_STAGE, "sidebar-right"])
-        .filter(id => !inBand.has(id) && (id !== TIMELINE_ID || position === "column"));
+        .filter(id => !inBand.has(id) && (id !== TIMELINE_ID || position === "column"))
+        .filter((id, i, list) => list.indexOf(id) === i);
     const monitorsLayout = MONITOR_LAYOUTS.includes(state.monitorsLayout) ? state.monitorsLayout : "auto";
     const dual = state.dual && Array.isArray(state.dual.panels) && state.dual.panels.length === 2 ? state.dual : null;
     // F4b: janela com 2 a 4 painéis de qualquer tipo (panel-group.html), com disposição pronta.
     const group = state.group && Array.isArray(state.group.panels) && state.group.panels.length >= 2 ? state.group : null;
     const away = new Set([...(state.popped || []), ...(dual ? dual.panels : []), ...(group ? group.panels : [])]);
 
+    // Monitor numa faixa ou em coluna saiu do bloco; o bloco fica com os outros (ou vazio).
     const monitors = {
         split: monitorsLayout === "stacked" ? "column" : "row",
         role: "monitors",
-        children: MONITOR_IDS.map(id => leaf(id, away.has(id)))
+        children: MONITOR_IDS.filter(id => !inBand.has(id) && !order.includes(id)).map(id => leaf(id, away.has(id)))
     };
     if (monitorsLayout === "auto") monitors.auto = true;
 
@@ -227,7 +237,7 @@ export function legacyFromLayout(layout) {
         const ids = [];
         for (const node of nodes) {
             if (node === center) ids.push(CENTER_STAGE);
-            else if (isLeaf(node) && (COLUMN_IDS.includes(node.panel) || node.panel === TIMELINE_ID)) ids.push(node.panel);
+            else if (isLeaf(node) && (COLUMN_IDS.includes(node.panel) || CENTER_PANEL_IDS.includes(node.panel))) ids.push(node.panel);
             else if (isSplit(node) && node.role === "stack" && node.children.length >= 2
                 && node.children.every(c => isLeaf(c) && COLUMN_IDS.includes(c.panel))) {
                 const members = node.children.map(c => c.panel);
@@ -272,8 +282,16 @@ export function legacyFromLayout(layout) {
         }
     }
     if (!columnOrder || !timelinePosition) return null;
-    if (bands) columnOrder = [...columnOrder, ...[...bands.top, ...bands.bottom].filter(id => id !== TIMELINE_ID)];
-    const expected = [...COLUMN_IDS, CENTER_STAGE, ...(timelinePosition === "column" ? [TIMELINE_ID] : [])].sort().join(",");
+    // Cada monitor num lugar só: no bloco, numa faixa ou como coluna (F2c parte 2b).
+    const inBlock = monitors.children.filter(isLeaf).map(c => c.panel);
+    if (monitors.children.length !== inBlock.length) return null;
+    const bandIds = bands ? [...bands.top, ...bands.bottom] : [];
+    const monitorColumns = MONITOR_IDS.filter(id => columnOrder.includes(id));
+    for (const id of MONITOR_IDS) {
+        if ([inBlock.includes(id), bandIds.includes(id), monitorColumns.includes(id)].filter(Boolean).length !== 1) return null;
+    }
+    if (bands) columnOrder = [...columnOrder, ...bandIds.filter(id => !CENTER_PANEL_IDS.includes(id))];
+    const expected = [...COLUMN_IDS, CENTER_STAGE, ...monitorColumns, ...(timelinePosition === "column" ? [TIMELINE_ID] : [])].sort().join(",");
     if ([...columnOrder].sort().join(",") !== expected) return null;
 
     let dual = null;
@@ -323,7 +341,8 @@ export function validateLayout(layout) {
             return;
         }
         if (!isSplit(node)) { errors.push(`nó inválido em ${where}`); return; }
-        if (node.children.length === 0) errors.push(`divisão vazia em ${where}`);
+        // O centro e o bloco dos monitores podem ficar vazios (F2c parte 2b); o resto não.
+        if (node.children.length === 0 && node.role !== "center" && node.role !== "monitors") errors.push(`divisão vazia em ${where}`);
         node.children.forEach(child => walk(child, where));
     };
     walk(layout.main, "editor");

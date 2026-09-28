@@ -2336,7 +2336,7 @@ button {
 /* ── ADVANCED VIDEO PLAYER CONTROLLER ───────────────────────────────── */
 .video-container {
     flex: 1;
-    background: #000;
+    background: #101010;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -10074,7 +10074,7 @@ input[type="number"] {
 #program-video-wrapper {
     position: relative;
     overflow: hidden;
-    background: #000;
+    background: #101010;
     width: 100%;
     height: 100%;
 }
@@ -13508,6 +13508,54 @@ body.dock-dragging * {
     flex: 0 0 4px !important;
     border-top: none !important;
     border-left: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+/* Monitores fora do bloco (F2c parte 2b): cada um vira painel comum, numa faixa ou como coluna
+   (cabeçalho e controles aparecem ao passar o mouse, como no bloco). A largura vem do divisor pelo
+   flex; maximizar e trocar são coisas do bloco e somem quando ele se divide. */
+body .player-panel.dock-monitor-out {
+    width: auto !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    border-radius: 0 !important;
+}
+.workspace > .player-panel.dock-monitor-out,
+.dock-edge > .player-panel.dock-monitor-out {
+    flex-shrink: 1 !important;
+    min-width: 200px !important;
+}
+body.layout-monitors-split #btn-expand-source,
+body.layout-monitors-split #btn-expand-program,
+body.layout-monitors-split .btn-swap-player {
+    display: none !important;
+}
+/* Centro sem monitores: a timeline ocupa a altura toda. Centro vazio: some, e o vizinho mais perto
+   (.dock-growing) cresce no lugar dele. */
+.center-stage.center-empty {
+    display: none !important;
+}
+.center-stage.center-no-monitors > .monitors-container,
+.center-stage.center-no-monitors > .splitter-timeline {
+    display: none !important;
+}
+.center-stage.center-no-monitors > #timeline-panel:not(.collapsed) {
+    flex: 1 1 auto !important;
+    height: auto !important;
+}
+.workspace > .dock-growing {
+    flex: 1 1 0% !important;
+    width: auto !important;
+    max-width: none !important;
+}
+/* Alça do bloco dos monitores (move Source + Program juntos), ao lado da alça do monitor. */
+.dock-handle.dock-handle-block {
+    width: 18px;
+    font-size: 10px;
+}
+/* O cabeçalho do player espalha os itens (space-between): o espaço livre vai para depois das alças. */
+.player-header > .dock-handle-block {
+    margin-right: auto;
 }
 
 /* Colunas do lado que ficou com o canto: fora do .workspace, altura inteira da moldura. */

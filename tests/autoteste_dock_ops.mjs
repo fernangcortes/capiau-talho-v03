@@ -244,4 +244,85 @@ for (const a of tlActions) {
 }
 console.log(`✔ 10 passou: ${checkedTl} estados com a timeline em faixa ou coluna respeitam as invariantes.`);
 
+
+// 11. Monitores fora do bloco (F2c parte 2b): faixa, coluna, bloco, centro vazio
+const { panelToCenter, monitorsInBlock, centerContent, moveBlock, isPlaced } = ops;
+const S = "source-player-panel", P = "program-player-panel";
+assert.deepEqual(monitorsInBlock(padrao), [S, P]);
+assert.equal(centerContent(padrao), "monitors");
+const srcFaixa = moveToBand(padrao, S, "bottom");
+assert.deepEqual(srcFaixa, { order: [L, I, C, R], stacks: [], bands: { top: [], bottom: [S] }, corners: { bl: "band", br: "band" } },
+    "monitor na faixa não entra em order");
+assert.deepEqual(monitorsInBlock(srcFaixa), [P], "o bloco fica com o outro");
+const prgCol = moveBeside(srcFaixa, P, C, "after");
+assert.deepEqual(prgCol.order, [L, I, C, P, R], "monitor vira coluna ao lado do centro");
+assert.equal(centerContent(prgCol), "timeline", "sem monitores no bloco, a timeline ocupa o centro");
+assert.equal(centerContent(moveToBand(prgCol, T, "top")), null, "centro vazio: nada sobrou nele");
+assert.deepEqual(panelToCenter(prgCol, P), srcFaixa, "de volta ao bloco");
+assert.deepEqual(panelToCenter(srcFaixa, S), padrao, "da faixa de volta ao bloco (a faixa some)");
+assert.equal(panelToCenter(padrao, L), null, "lateral não mora no centro");
+assert.equal(swapPanels(padrao, S, L), null, "monitor no bloco não tem vaga para trocar");
+assert.equal(swapPanels(padrao, S, P), null);
+const trocaMon = swapPanels(prgCol, P, R);
+assert.deepEqual(trocaMon.order, [L, I, C, R, P], "monitor coluna troca com coluna");
+const trocaFaixa = swapPanels(prgCol, S, L);
+assert.deepEqual([trocaFaixa.order, trocaFaixa.bands.bottom], [[S, I, C, P, R, L], [L]], "monitor da faixa troca com coluna");
+assert.deepEqual(swapPanels(prgCol, S, P).order, [L, I, C, S, R], "os dois monitores fora trocam de lugar");
+assert.equal(stackWith(prgCol, P, L, "top"), null, "monitor não empilha");
+assert.equal(stackWith(prgCol, L, P, "top"), null, "não empilha sobre monitor");
+assert.equal(swapPanels(moveBeside(empilhado, P, C, "after"), P, R), null, "monitor não entra em pilha trocando");
+assert.ok(isPlaced(prgCol, P) && isPlaced(prgCol, S) && !isPlaced(padrao, S));
+// Bloco: muda a vaga do centro nas colunas ou leva os monitores do bloco juntos para uma faixa.
+assert.deepEqual(moveBlock(padrao, { targetId: L, side: "before" }).order, [C, L, I, R]);
+assert.deepEqual(moveBlock(padrao, { edge: "end" }).order, [L, I, R, C]);
+assert.equal(moveBlock(padrao, { targetId: C, side: "after" }), null);
+assert.equal(moveBlock(faixa, { targetId: I, side: "after" }), null, "bloco não vai para o lado de painel de faixa");
+const blocoFaixa = moveBlock(faixa, { band: "bottom", index: 0 });
+assert.deepEqual([blocoFaixa.bands.bottom, blocoFaixa.order], [[S, P, I], [L, C, R, I]], "bloco na faixa: Source e Program juntos, na vaga");
+assert.equal(centerContent(blocoFaixa), "timeline");
+assert.deepEqual(moveBlock(srcFaixa, { band: "top" }).bands, { top: [P], bottom: [S] }, "só os monitores que estão no bloco");
+assert.equal(moveBlock(blocoFaixa, { band: "top" }), null, "bloco vazio não se move");
+assert.deepEqual(moveBlock(padrao, { band: "top", corners: { tl: "column" } }).corners, { tl: "column", tr: "band" });
+console.log("✔ 11 passou: monitor sozinho em faixa ou coluna, volta ao bloco, troca sem pilha, bloco nas colunas e na faixa.");
+
+// 12. Invariantes com monitores, timeline e laterais nas sequências de 3 operações, e ida e volta no modelo
+const model = await import(pathToFileURL(path.join(rootDir, "src", "ui", "js", "dockModel.js")).href);
+const centro = [T, S, P];
+const monActions = [...bandActions.filter((_, i) => i % 3 === 0),
+    s => placeTimeline(s, "bottom-full"), s => placeTimeline(s, "column"), s => panelToCenter(s, T),
+    ...[S, P].flatMap(id => [
+        s => moveToBand(s, id, "top"), s => moveToBand(s, id, "bottom", 0), s => moveToEdge(s, id, "start"),
+        s => moveBeside(s, id, C, "after"), s => panelToCenter(s, id), s => swapPanels(s, id, L), s => swapPanels(s, id, T),
+        s => moveBeside(s, I, id, "before"), s => stackWith(s, R, id, "top")
+    ]),
+    s => moveBlock(s, { band: "bottom" }), s => moveBlock(s, { edge: "start" }), s => moveBlock(s, { targetId: R, side: "after" })];
+let checkedMon = 0;
+const checkMon = (s) => {
+    const members = [...(s.bands?.top || []), ...(s.bands?.bottom || [])];
+    centro.forEach(id => {
+        assert.ok(members.filter(x => x === id).length + s.order.filter(x => x === id).length <= 1, `${id} num lugar só`);
+        s.stacks.forEach(st => assert.ok(!st.includes(id), `${id} nunca em pilha`));
+    });
+    assert.equal(s.order.filter(x => x === C).length, 1, "centro sempre em order");
+    const laterais = members.filter(id => !centro.includes(id));
+    assert.deepEqual(s.order.slice(s.order.length - laterais.length), laterais, "laterais de faixa no fim de order");
+    // O modelo representa o estado e devolve igual (monitor fora do bloco, centro vazio).
+    const legacy = { columnOrder: s.order, timelinePosition: "center", monitorsLayout: "auto", columnStacks: s.stacks, popped: [], dual: null, group: null };
+    if (s.bands) { legacy.bands = s.bands; legacy.bandCorners = s.corners; }
+    const layout = model.layoutFromLegacy(legacy);
+    assert.deepEqual(model.validateLayout(layout), [], `layout inválido: ${JSON.stringify(s)}`);
+    const volta = model.legacyFromLayout(layout);
+    assert.ok(volta, `sem volta: ${JSON.stringify(s)}`);
+    assert.deepEqual([volta.columnOrder, volta.columnStacks, volta.bands, volta.bandCorners], [s.order, s.stacks, s.bands, s.corners], `volta diferente: ${JSON.stringify(s)}`);
+    checkedMon++;
+};
+for (const a of monActions) {
+    const s1 = a(padrao); if (!s1) continue; checkMon(s1);
+    for (const b of monActions) {
+        const s2 = b(s1); if (!s2) continue; checkMon(s2);
+        for (const c of monActions) { const s3 = c(s2); if (s3) checkMon(s3); }
+    }
+}
+console.log(`✔ 12 passou: ${checkedMon} estados com monitores fora do bloco respeitam as invariantes e vão e voltam no modelo.`);
+
 console.log("\n=== AUTOTESTE DOCK OPS CONCLUÍDO COM SUCESSO ===");

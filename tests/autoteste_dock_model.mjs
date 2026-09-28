@@ -214,6 +214,49 @@ console.log("✔ 1.3 passou: Janela Dupla (lado a lado/empilhada) é uma janela 
     console.log("✔ 1.7 passou: timeline em faixa (cima/baixo, com laterais, cantos livres) ou coluna vai e volta; árvores antigas viram faixa.");
 }
 
+{
+    // F2c parte 2b: monitor fora do bloco, numa faixa ou como coluna; bloco e centro podem ficar vazios.
+    const L = "sidebar-left", I = "inspector-panel", R = "sidebar-right", T = "timeline-panel";
+    const S = "source-player-panel", P = "program-player-panel";
+    const centerOf = (layout) => {
+        const row = layout.main.role === "frame" ? layout.main.children.find(c => c.role !== "band") : layout.main;
+        return row.children.find(c => c.role === "center");
+    };
+    for (const extra of [
+        { columnOrder: [L, I, CENTER_STAGE, R], bands: { top: [], bottom: [S] }, bandCorners: { bl: "band", br: "band" } },
+        { columnOrder: [L, I, CENTER_STAGE, P, R] },
+        { columnOrder: [S, L, CENTER_STAGE, P, R, I], bands: { top: [I], bottom: [] }, bandCorners: { tl: "band", tr: "column" } },
+        { columnOrder: [L, I, CENTER_STAGE, R], bands: { top: [S, P], bottom: [T] }, bandCorners: { tl: "band", tr: "band", bl: "column", br: "band" }, timelinePosition: "band" },
+        { columnOrder: [L, P, I, CENTER_STAGE, T, R], bands: { top: [], bottom: [S] }, bandCorners: { bl: "band", br: "band" }, timelinePosition: "column", monitorsLayout: "stacked" }
+    ]) {
+        const state = { timelinePosition: "center", monitorsLayout: "auto", columnStacks: [], popped: [], dual: null, group: null, ...extra };
+        const layout = layoutFromLegacy(state);
+        assert.deepEqual(validateLayout(layout), [], `monitor fora do bloco inválido: ${JSON.stringify(state)}`);
+        assert.deepEqual(legacyFromLayout(layout), state, `monitor fora do bloco não voltou igual: ${JSON.stringify(state)}`);
+        const fora = [...(state.bands?.top || []), ...(state.bands?.bottom || []), ...state.columnOrder];
+        const bloco = centerOf(layout).children.find(c => c.role === "monitors");
+        assert.deepEqual(panelsIn(bloco), [S, P].filter(id => !fora.includes(id)), "o bloco fica só com os monitores que não saíram");
+    }
+    // Centro vazio: bloco sem monitores e a timeline fora; a orientação continua guardada no bloco.
+    const vazio = layoutFromLegacy({ columnOrder: [L, S, CENTER_STAGE, P, R, I], timelinePosition: "band", monitorsLayout: "stacked", bands: { top: [], bottom: [I, T] } });
+    assert.deepEqual(validateLayout(vazio), []);
+    assert.deepEqual(centerOf(vazio).children, [{ split: "column", role: "monitors", children: [] }]);
+    assert.equal(legacyFromLayout(vazio).monitorsLayout, "stacked");
+    // Monitor destacado guarda o lugar na coluna ou na faixa.
+    const destacado = layoutFromLegacy({ columnOrder: [L, I, CENTER_STAGE, P, R], timelinePosition: "center", monitorsLayout: "auto", popped: [P, S], bands: { top: [S], bottom: [] } });
+    assert.deepEqual(validateLayout(destacado), []);
+    assert.deepEqual(legacyFromLayout(destacado).columnOrder, [L, I, CENTER_STAGE, P, R]);
+    assert.deepEqual(legacyFromLayout(destacado).bands.top, [S]);
+    // Monitor em dois lugares (bloco e coluna): a árvore não é representável.
+    const dois = layoutFromLegacy({ columnOrder: [L, I, CENTER_STAGE, P, R], timelinePosition: "center", monitorsLayout: "auto" });
+    centerOf(dois).children[0].children.push({ panel: P });
+    assert.equal(legacyFromLayout(dois), null);
+    // Faixa vence coluna para monitor também.
+    const ambos = legacyFromLayout(layoutFromLegacy({ columnOrder: [L, I, CENTER_STAGE, S, R], timelinePosition: "center", monitorsLayout: "auto", bands: { top: [S], bottom: [] } }));
+    assert.deepEqual([ambos.columnOrder, ambos.bands.top], [[L, I, CENTER_STAGE, R], [S]]);
+    console.log("✔ 1.8 passou: monitor sozinho em faixa ou coluna vai e volta; bloco e centro vazios; destacado guarda o lugar.");
+}
+
 // ----------------------------------------------------------------------
 // PARTE 2: Validação
 // ----------------------------------------------------------------------

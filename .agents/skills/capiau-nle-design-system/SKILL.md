@@ -465,6 +465,11 @@ Vale para colunas do editor, pilhas de coluna, faixas, janelas destacadas simple
   * As posições antigas são nomes de faixa de baixo + cantos: `bottom-full` = `bl`/`br` `"band"`; `bottom-left` = `bl` `"band"`, `br` `"column"`; `bottom-right` = o espelho. Numpad2 = centro ↔ largura total; Numpad1/Numpad3 alternam o canto esquerdo/direito da faixa dela (no centro, vão para a faixa já expandida para o lado; recolher o único lado expandido volta ao centro).
   * Mudar de lugar leva a altura junto (faixa nova só com ela = altura dela + divisor; de volta ao centro, a altura salva de lá). O divisor de altura da faixa redesenha o canvas a cada quadro (Seção I.3) e o duplo clique nele ajusta às pistas.
   * Recolhida numa faixa: linha de expandir (`.timeline-restore-line`) em pé no lugar dela; sozinha na faixa, a faixa encolhe e a linha deita.
+* **Monitores em bloco ou sozinhos, e o centro que some (F2c parte 2b):**
+  * Duas alças no cabeçalho do primeiro monitor do bloco: ⋮⋮ move só ele; a do bloco (`.dock-handle-block`, logo depois) move os monitores do bloco juntos. Sem monitor no bloco, a alça do bloco some.
+  * Monitor sozinho segue as regras da timeline: um lugar só (no bloco, numa faixa ou como coluna em `columnOrder`, nunca em pilha); faixa vence coluna. Fora do bloco, solto sobre o centro ou sobre o monitor que ficou, volta para o bloco (sobre o outro monitor, a borda escolhe lado a lado ou empilhados). Maximizar e trocar são do bloco: somem quando ele se divide (`body.layout-monitors-split`).
+  * O bloco: bordas de cima/embaixo = os monitores dele vão juntos para a faixa; bordas esquerda/direita e sobre uma coluna = o centro muda de vaga nas colunas.
+  * **Centro que esvazia:** sem monitores, a timeline que estiver nele ocupa a altura toda (`.center-no-monitors`); sem nada, o centro some (`.center-empty`) e a coluna vizinha mais perto cresce no lugar dele (`.dock-growing`; entre duas, a de conteúdo, monitor ou timeline; empate, a da esquerda). Os divisores passam a redimensionar para fora de quem cresce. Qualquer painel novo que possa esvaziar um contêiner deve seguir essa regra: nunca deixar buraco.
 * **Checklist para um contêiner novo:**
   1. Registrar o tipo em `panelPlacement` e desenhar o recolhido (espaço, divisores, linha no lugar).
   2. Implementar a direção da seta (`edgeInLine`) e chamar o recálculo após reorganizar.
