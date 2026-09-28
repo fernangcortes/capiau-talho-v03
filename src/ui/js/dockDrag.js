@@ -50,6 +50,7 @@ export class DockDragController {
         this.onMove = (e) => this.handleMove(e);
         this.onUp = (e) => this.handleUp(e);
         this.onKey = (e) => this.handleKey(e);
+        this.onLost = () => this.handleLostCapture();
 
         this.injectHandles();
         // Fase de captura: o aviso de desfazer precisa ver o Ctrl+Z antes do atalho da timeline.
@@ -187,12 +188,42 @@ export class DockDragController {
         handle.addEventListener("pointermove", this.onMove);
         handle.addEventListener("pointerup", this.onUp);
         handle.addEventListener("pointercancel", this.onUp);
+        handle.addEventListener("lostpointercapture", this.onLost);
+        // Rede de segurança: se a captura se perder (painel recolocado no DOM durante o arrasto),
+        // o soltar ainda chega pela janela.
+        win.addEventListener("pointerup", this.onUp, true);
+        win.addEventListener("pointercancel", this.onUp, true);
         if (fromPopout) win.addEventListener("keydown", this.onKey, true);
+    }
+
+    /**
+     * A alça perdeu a captura do ponteiro sem o soltar ter chegado (ex.: o painel foi movido no DOM
+     * no meio do arrasto). Tenta recapturar; se não der, segue o arrasto pelo documento.
+     */
+    handleLostCapture() {
+        const d = this.drag;
+        if (!d || d.lost) return;
+        setTimeout(() => {
+            if (this.drag !== d) return;
+            try {
+                if (d.handle.isConnected) {
+                    d.handle.setPointerCapture(d.pointerId);
+                    if (d.handle.hasPointerCapture(d.pointerId)) return;
+                }
+            } catch (err) {}
+            d.lost = true;
+            d.win.document.addEventListener("pointermove", this.onMove, true);
+        }, 0);
     }
 
     handleMove(e) {
         const d = this.drag;
         if (!d) return;
+        // O botão já foi solto mas o pointerup se perdeu: termina aqui, como se tivesse soltado.
+        if (e.pointerType === "mouse" && e.buttons === 0) {
+            this.handleUp({ type: "pointerup", screenX: e.screenX, screenY: e.screenY, clientX: e.clientX, clientY: e.clientY });
+            return;
+        }
         if (!d.started) {
             if (Math.hypot(e.screenX - d.x0, e.screenY - d.y0) < START_DISTANCE) return;
             d.started = true;
@@ -314,6 +345,10 @@ export class DockDragController {
         d.handle.removeEventListener("pointermove", this.onMove);
         d.handle.removeEventListener("pointerup", this.onUp);
         d.handle.removeEventListener("pointercancel", this.onUp);
+        d.handle.removeEventListener("lostpointercapture", this.onLost);
+        d.win.removeEventListener("pointerup", this.onUp, true);
+        d.win.removeEventListener("pointercancel", this.onUp, true);
+        try { d.win.document.removeEventListener("pointermove", this.onMove, true); } catch (err) {}
         if (d.fromPopout) d.win.removeEventListener("keydown", this.onKey, true);
         try { d.handle.releasePointerCapture(d.pointerId); } catch (err) {}
         if (cancelled && d.live) this.wm.cancelLivePopout(d.panelId, d.live);

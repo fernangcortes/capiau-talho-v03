@@ -97,6 +97,17 @@ export function preserveMediaAcrossDocuments(root) {
     };
 }
 
+/**
+ * Põe os nós (ignorando null) no começo do contêiner, nessa ordem, movendo só o que está fora do
+ * lugar. Mover um painel no DOM faz a alça perder a captura do ponteiro no meio de um arrasto.
+ */
+function placeInOrder(container, nodes) {
+    nodes.filter(Boolean).forEach((node, i) => {
+        const current = container.children[i];
+        if (current !== node) container.insertBefore(node, current || null);
+    });
+}
+
 export class WorkspaceManager {
     constructor() {
         this.channel = new BroadcastChannel("capiau-workspace-sync");
@@ -357,17 +368,10 @@ export class WorkspaceManager {
                 frame.appendChild(cell);
             }
             const resizer = cell.querySelector(":scope > .dock-edge-resizer");
-            [...cell.children].forEach(c => { if (c !== resizer && c !== el) workspace.appendChild(c); });
             const line = document.getElementById(REOPEN_LINE_IDS[el.id]);
-            if (side === "left") {
-                cell.prepend(el);
-                if (line) el.before(line);
-                cell.appendChild(resizer);
-            } else {
-                cell.prepend(resizer);
-                resizer.after(el);
-                if (line) el.after(line);
-            }
+            const want = side === "left" ? [line, el, resizer] : [resizer, el, line];
+            [...cell.children].forEach(c => { if (!want.includes(c)) workspace.appendChild(c); });
+            placeInOrder(cell, want);
             cell.dataset.panel = el.id;
             cell.style.gridColumn = side === "left" ? "1" : "3";
             cell.style.gridRow = `${top ? 1 : 2} / ${bottom ? 4 : 3}`;
@@ -395,30 +399,34 @@ export class WorkspaceManager {
                 frame.appendChild(band);
             }
             const row = band.querySelector(":scope > .dock-band-row");
-            row.querySelectorAll(":scope > .dock-band-splitter").forEach(sp => sp.remove());
+            const oldSplitters = [...row.querySelectorAll(":scope > .dock-band-splitter")];
+            const want = [];
             let present = 0;
             ids.forEach(id => {
                 const el = local(id);
                 if (!el) return;
                 if (present > 0) {
-                    const splitter = document.createElement("div");
-                    splitter.className = "dock-band-splitter";
-                    splitter.dataset.next = id;
-                    splitter.setAttribute("data-tooltip", "Arraste para redimensionar");
-                    row.appendChild(splitter);
-                    this.bindBandSplitter(splitter, row);
+                    let splitter = oldSplitters.find(sp => sp.dataset.next === id);
+                    if (!splitter) {
+                        splitter = document.createElement("div");
+                        splitter.className = "dock-band-splitter";
+                        splitter.dataset.next = id;
+                        splitter.setAttribute("data-tooltip", "Arraste para redimensionar");
+                        this.bindBandSplitter(splitter, row);
+                    }
+                    want.push(splitter);
                 }
-                const line = document.getElementById(REOPEN_LINE_IDS[id]);
-                if (line) row.appendChild(line);
+                want.push(document.getElementById(REOPEN_LINE_IDS[id]), el);
                 el.classList.remove("dock-stack-host", "dock-stack-guest", "dock-stack-self-collapsed");
                 el.style.removeProperty("--dock-guest-h");
                 el.classList.add("dock-band-member");
                 const w = parseFloat(localStorage.getItem(`capiau_band_w_${id}`));
                 el.classList.toggle("has-band-w", !isNaN(w) && w > 120);
                 if (!isNaN(w) && w > 120) el.style.setProperty("--dock-band-w", `${w}px`);
-                row.appendChild(el);
                 present++;
             });
+            oldSplitters.forEach(sp => { if (!want.includes(sp)) sp.remove(); });
+            placeInOrder(row, want);
             band.hidden = present === 0;
             const h = parseFloat(localStorage.getItem(`capiau_band_h_${edge}`));
             band.style.setProperty("--dock-band-h", `${!isNaN(h) && h > 80 ? h : 260}px`);
@@ -844,7 +852,13 @@ export class WorkspaceManager {
     scheduleLayoutCommit() {
         // Painel de faixa que foi para uma janela ou voltou dela: a faixa se redesenha (F2c).
         clearTimeout(this._bandsRenderTimer);
-        this._bandsRenderTimer = setTimeout(() => { this.renderBands(); this.applyAllCollapse(); }, 60);
+        const renderWhenIdle = () => {
+            // No meio de um arrasto espera o soltar: redesenhar agora poderia mover o painel da alça.
+            if (window.dockDrag?.drag) { this._bandsRenderTimer = setTimeout(renderWhenIdle, 200); return; }
+            this.renderBands();
+            this.applyAllCollapse();
+        };
+        this._bandsRenderTimer = setTimeout(renderWhenIdle, 60);
         if (!this._layoutHistoryReady || this._applyingLayout) return;
         clearTimeout(this._layoutCommitTimer);
         this._layoutCommitTimer = setTimeout(() => {

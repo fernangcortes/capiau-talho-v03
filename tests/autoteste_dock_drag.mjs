@@ -38,6 +38,9 @@ console.log("✔ 1 passou: os 6 painéis arrastáveis têm cabeçalho para receb
 assert.ok(dockDrag.includes("setPointerCapture(e.pointerId)"), "arrasto usa captura de ponteiro");
 assert.ok(!/draggable\s*=\s*true|dragstart/.test(dockDrag), "não usa arrasto HTML5");
 assert.ok(/this\.drag && e\.key === "Escape"/.test(dockDrag), "Esc cancela o arrasto");
+assert.ok(dockDrag.includes('handle.addEventListener("lostpointercapture", this.onLost)'), "arrasto percebe captura perdida");
+assert.ok(dockDrag.includes('win.addEventListener("pointerup", this.onUp, true)'), "soltar chega pela janela mesmo sem captura");
+assert.ok(dockDrag.includes('e.pointerType === "mouse" && e.buttons === 0'), "botão já solto termina o arrasto no próximo movimento");
 console.log("✔ 2 passou: Pointer Events com captura; Esc cancela.");
 
 // 3. Encaixes limitados ao que o layout atual monta, via métodos que registram histórico
