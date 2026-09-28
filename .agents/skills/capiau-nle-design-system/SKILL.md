@@ -429,7 +429,7 @@ Vale para colunas do editor, pilhas de coluna, faixas, janelas destacadas simple
 
 * **Estado único, desenho local:**
   * "Recolhido" é um estado do painel guardado num lugar só (um `Set` no `WorkspaceManager`, salvo no `localStorage`), não uma classe CSS solta. Cada contêiner apenas **desenha** esse estado do seu jeito.
-  * Para saber se um painel está recolhido, use `isPanelCollapsed(id)`. **Nunca** `classList.contains("collapsed")`: dentro de pilha ou janela a classe pode não existir.
+  * Para saber se um painel está recolhido, use `isPanelCollapsed(id)`. **Nunca** `classList.contains("collapsed")`: dentro de pilha ou janela a classe pode não existir. (Exceção interna: a timeline recolhe pelo próprio botão e guarda o estado na classe; `isPanelCollapsed("timeline-panel")` lê essa classe, então continue usando `isPanelCollapsed`.)
   * Todo recolher/expandir passa por `setPanelCollapsed(id, bool)`, venha de botão, linha, duplo clique ou atalho.
   * Recolher feito pelo próprio sistema (ex.: menu que ficou sem abas) usa `{ auto: true }` e não vai para o estado salvo.
   * Recolher/expandir **não** entra no desfazer de layout (Ctrl+Alt+Z); fica salvo ao reabrir.
@@ -455,10 +455,16 @@ Vale para colunas do editor, pilhas de coluna, faixas, janelas destacadas simple
   * Entra no desfazer de layout. Soltar dentro do próprio contêiner, fora de outro painel, não faz nada.
   * Disposições com posição especial (ex.: painel sozinho na grade de 3) oferecem também escolha explícita na barra (seletor + botão), além do arrasto.
 * **Cantos disputados entre coluna e faixa (F2c):**
-  * Onde uma coluna da ponta encontra uma faixa inteira, o canto é de um dos dois: `"band"` (a faixa passa com a largura inteira e a coluna para antes dela) ou `"column"` (a coluna vai até o fim e a faixa encurta). Estado em `bandCorners` (`tl`, `tr`, `bl`, `br`), só para faixas que existem; faixa nova começa com `"band"`.
+  * Onde as colunas de um lado encontram uma faixa inteira, o canto é de um dos dois: `"band"` (a faixa passa com a largura inteira e as colunas param antes dela) ou `"column"` (**todas as colunas daquele lado do centro** vão até o fim, juntas, e a faixa encurta até o centro). Estado em `bandCorners` (`tl`, `tr`, `bl`, `br`), só para faixas que existem; faixa nova começa com `"band"`.
   * O usuário escolhe **no arrasto**: na borda esquerda/direita do editor, soltar na altura da faixa (o canto) = `"column"`; soltar ao lado do centro = `"band"`. A sombra de prévia mostra o retângulo exato.
   * E **depois**: setinha no rodapé da coluna (no topo, se a faixa é em cima), `.dock-corner-toggle`. A seta aponta para onde a coluna vai crescer/encolher; dica "Estender até embaixo/em cima" ou "Deixar a faixa passar". Entra no desfazer de layout e no workspace salvo.
-  * Implementação: a moldura `.dock-frame` é uma grade 3 × 3 em volta do `.workspace`; a coluna que fica com o canto sai para a célula `.dock-edge` da ponta (com seu próprio divisor), e a faixa ocupa só as colunas da grade que sobram. Vale para qualquer contêiner de borda novo.
+  * Implementação: a moldura `.dock-frame` é uma grade 3 × 3 em volta do `.workspace`; as colunas do lado que fica com o canto saem para a célula `.dock-edge` daquele lado, na mesma ordem, com divisores entre elas (`.dock-edge-splitter`, redimensiona a de fora; só aparece entre duas abertas) e o divisor da célula (`.dock-edge-resizer`, redimensiona a vizinha do centro). A faixa ocupa só as colunas da grade que sobram. A setinha fica na coluna da ponta (recolhida, na próxima aberta). Vale para qualquer contêiner de borda novo.
+* **Timeline em faixa ou coluna (F2c parte 2):**
+  * A timeline fica em um lugar só: embaixo dos monitores, numa faixa ou como coluna do editor (em `columnOrder`, como as laterais, mas nunca em pilha). Faixas e colunas mandam: `timelinePosition` é `"band"`, `"column"` ou `"center"` conforme onde ela está (faixa vence coluna).
+  * Como coluna: altura inteira, largura pelo divisor (`layout-dim-splitter-timeline-panel`, padrão 420 px) e é a única coluna que encolhe quando falta espaço (mín. 200 px). Recolhida some e a linha `.timeline-restore-line` fica em pé no lugar. Entra na célula da ponta com as laterais do lado dela. É a base da futura timeline "prédio" (monitor vertical).
+  * As posições antigas são nomes de faixa de baixo + cantos: `bottom-full` = `bl`/`br` `"band"`; `bottom-left` = `bl` `"band"`, `br` `"column"`; `bottom-right` = o espelho. Numpad2 = centro ↔ largura total; Numpad1/Numpad3 alternam o canto esquerdo/direito da faixa dela (no centro, vão para a faixa já expandida para o lado; recolher o único lado expandido volta ao centro).
+  * Mudar de lugar leva a altura junto (faixa nova só com ela = altura dela + divisor; de volta ao centro, a altura salva de lá). O divisor de altura da faixa redesenha o canvas a cada quadro (Seção I.3) e o duplo clique nele ajusta às pistas.
+  * Recolhida numa faixa: linha de expandir (`.timeline-restore-line`) em pé no lugar dela; sozinha na faixa, a faixa encolhe e a linha deita.
 * **Checklist para um contêiner novo:**
   1. Registrar o tipo em `panelPlacement` e desenhar o recolhido (espaço, divisores, linha no lugar).
   2. Implementar a direção da seta (`edgeInLine`) e chamar o recálculo após reorganizar.

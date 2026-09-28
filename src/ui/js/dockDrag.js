@@ -3,11 +3,12 @@
 // cursor; arrastar a alça da janela destacada de volta ao editor reacopla (com as mesmas zonas).
 // Motor de Pointer Events (validado na F0): fantasma que segue o cursor, zonas de encaixe e
 // sombra de prévia. Encaixes: laterais ao lado, trocadas, na ponta ou empilhadas numa mesma
-// coluna (F2b); timeline nas 4 posições; monitores lado a lado ou empilhados.
+// coluna (F2b); faixas inteiras em cima/embaixo e cantos (F2c); timeline embaixo dos monitores ou
+// numa faixa (F2c parte 2); monitores lado a lado ou empilhados.
 // Cada soltura vira um passo do histórico de layout e mostra o aviso "Layout alterado · Desfazer".
 
-import { CENTER_STAGE } from "./dockModel.js";
-import { moveBeside, moveToEdge, moveToBand, setCorner, stackWith, swapPanels, stackGuests, sameColumnState, bandOf } from "./dockOps.js";
+import { CENTER_STAGE, TIMELINE_ID } from "./dockModel.js";
+import { moveBeside, moveToEdge, moveToBand, setCorner, stackWith, swapPanels, stackGuests, sameColumnState, bandOf, placeTimeline, timelineIsColumn } from "./dockOps.js";
 
 const EDGE = 26;          // largura das faixas de borda do editor (px)
 const START_DISTANCE = 5; // px de movimento antes de o arrasto começar
@@ -26,9 +27,8 @@ export const DOCK_PANELS = {
 
 const TIMELINE_LABELS = {
     "center": "Timeline sob os monitores",
-    "bottom-left": "Timeline sob a esquerda e o centro",
-    "bottom-right": "Timeline sob o centro e a direita",
-    "bottom-full": "Timeline em largura total"
+    "bottom-left": "Timeline sob a esquerda e o centro (a direita vai até o fim)",
+    "bottom-right": "Timeline sob o centro e a direita (a esquerda vai até o fim)"
 };
 
 export class DockDragController {
@@ -503,8 +503,7 @@ export class DockDragController {
         if (!ws || x < ws.left || x > ws.right || y < ws.top || y > ws.bottom) return null;
         const kind = DOCK_PANELS[panelId].kind;
         if (kind === "column") return this.resolveColumnTarget(panelId, x, y, ws);
-        // A timeline se move dentro do .workspace (as faixas ficam fora dele).
-        if (kind === "timeline") return this.resolveTimelineTarget(x, y, this.rectOf(document.querySelector(".workspace")) || ws);
+        if (kind === "timeline") return this.resolveTimelineTarget(x, y, ws);
         if (kind === "monitor") return this.resolveMonitorTarget(panelId, x, y);
         return null;
     }
@@ -526,6 +525,8 @@ export class DockDragController {
         // Painéis empilhados ficam dentro do anfitrião: testa os convidados antes.
         const guests = stackGuests(state.stacks);
         const candidates = [...COLUMN_PANELS].sort((a, b) => Number(guests.has(b)) - Number(guests.has(a)));
+        // A timeline numa faixa ou como coluna também recebe laterais ao lado dela (F2c parte 2).
+        if (bandOf(state.bands, TIMELINE_ID) || timelineIsColumn(state)) candidates.push(TIMELINE_ID);
         for (const id of [...candidates, CENTER_STAGE]) {
             if (id === panelId) continue;
             const el = id === CENTER_STAGE ? document.querySelector(".center-stage") : document.getElementById(id);
@@ -634,16 +635,48 @@ export class DockDragController {
         return make(next, preview, `${title} ${place}${how}`);
     }
 
+    /**
+     * Timeline (F2c parte 2). Bordas do editor, como as laterais: em cima/embaixo = faixa (nova com a
+     * largura inteira, ou a vaga mais perto do cursor); esquerda/direita = coluna na ponta (com as
+     * zonas de canto). Sobre um painel de faixa: centro troca, metades põem ao lado. Na parte de baixo
+     * do editor, as posições de antes: embaixo dos monitores, ou a faixa de baixo sob a esquerda e o
+     * centro (a direita vai até o fim) e o espelho. Na parte de cima, sobre uma coluna ou o centro:
+     * vira coluna ao lado (metades) ou troca com a coluna (meio).
+     */
     resolveTimelineTarget(x, y, ws) {
-        const center = this.rectOf(document.querySelector(".center-stage")) || ws;
-        if (y < ws.top + ws.height * 0.55) return null;
-        const h = ws.height * 0.34;
+        const state = this.wm.getColumnState();
+        const make = (next, preview, label) =>
+            !next || sameColumnState(next, state) ? null : { type: "columns", next, preview, label };
+        if (x > ws.left + EDGE && x < ws.right - EDGE) {
+            if (y < ws.top + EDGE) return this.resolveBandEdgeTarget(state, TIMELINE_ID, "top", x, ws, make);
+            if (y > ws.bottom - EDGE) return this.resolveBandEdgeTarget(state, TIMELINE_ID, "bottom", x, ws, make);
+        }
+        if (x < ws.left + EDGE) return this.resolveSideEdgeTarget(state, TIMELINE_ID, "left", y, ws, make);
+        if (x > ws.right - EDGE) return this.resolveSideEdgeTarget(state, TIMELINE_ID, "right", y, ws, make);
+
+        for (const id of COLUMN_PANELS) {
+            if (!bandOf(state.bands, id)) continue;
+            const r = this.rectOf(document.getElementById(id));
+            if (!r || x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+            const rx = (x - r.left) / r.width;
+            if (rx > 0.3 && rx < 0.7) {
+                return make(swapPanels(state, TIMELINE_ID, id), { left: r.left, top: r.top, width: r.width, height: r.height }, `Trocar com ${DOCK_PANELS[id].title}`);
+            }
+            const before = rx <= 0.3;
+            const w = Math.min(r.width * 0.45, 260);
+            return make(moveBeside(state, TIMELINE_ID, id, before ? "before" : "after"),
+                { left: before ? r.left : r.right - w, top: r.top, width: w, height: r.height },
+                `Timeline ${before ? "à esquerda" : "à direita"} de ${DOCK_PANELS[id].title} na faixa`);
+        }
+
+        const wsr = this.rectOf(document.querySelector(".workspace")) || ws;
+        const center = this.rectOf(document.querySelector(".center-stage")) || wsr;
+        if (y < wsr.top + wsr.height * 0.55) return this.resolveTimelineColumnTarget(state, x, y, make);
+        if (y > wsr.bottom) return null;
+        const h = wsr.height * 0.34;
         let position;
         let preview;
-        if (y > ws.bottom - EDGE) {
-            position = "bottom-full";
-            preview = { left: ws.left, top: ws.bottom - h, width: ws.width, height: h };
-        } else if (x < center.left) {
+        if (x < center.left) {
             position = "bottom-left";
             preview = { left: ws.left, top: ws.bottom - h, width: center.right - ws.left, height: h };
         } else if (x > center.right) {
@@ -651,10 +684,35 @@ export class DockDragController {
             preview = { left: center.left, top: ws.bottom - h, width: ws.right - center.left, height: h };
         } else {
             position = "center";
-            preview = { left: center.left, top: center.bottom - Math.min(h, center.height * 0.45), width: center.width, height: Math.min(h, center.height * 0.45) };
+            const ch = Math.min(h, center.height * 0.45);
+            preview = { left: center.left, top: center.bottom - ch, width: center.width, height: ch };
         }
-        if (position === this.wm.timelinePosition) return null;
-        return { type: "timeline", position, preview, label: TIMELINE_LABELS[position] };
+        return make(placeTimeline(state, position), preview, TIMELINE_LABELS[position]);
+    }
+
+    /** Timeline sobre uma coluna ou sobre o centro (parte de cima do editor): vira coluna. */
+    resolveTimelineColumnTarget(state, x, y, make) {
+        const guests = stackGuests(state.stacks);
+        const ids = [...COLUMN_PANELS].sort((a, b) => Number(guests.has(b)) - Number(guests.has(a)));
+        for (const id of [...ids, CENTER_STAGE]) {
+            if (id !== CENTER_STAGE && bandOf(state.bands, id)) continue;
+            const el = id === CENTER_STAGE ? document.querySelector(".center-stage") : document.getElementById(id);
+            const r = this.rectOf(el);
+            if (!r || x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+            const name = id === CENTER_STAGE ? "do centro" : `de ${DOCK_PANELS[id].title}`;
+            const rx = (x - r.left) / r.width;
+            if (id !== CENTER_STAGE && rx > 0.3 && rx < 0.7) {
+                return make(swapPanels(state, TIMELINE_ID, id), { left: r.left, top: r.top, width: r.width, height: r.height }, `Trocar com ${DOCK_PANELS[id].title}`);
+            }
+            const before = rx < 0.5;
+            const hostEl = el.classList.contains("dock-stack-guest") ? el.closest(".dock-stack-host") : el;
+            const col = this.rectOf(hostEl) || r;
+            const w = Math.min(col.width * 0.4, 260);
+            return make(moveBeside(state, TIMELINE_ID, id, before ? "before" : "after"),
+                { left: before ? col.left : col.right - w, top: col.top, width: w, height: col.height },
+                `Timeline como coluna ${before ? "à esquerda" : "à direita"} ${name}`);
+        }
+        return null;
     }
 
     resolveMonitorTarget(panelId, x, y) {
@@ -690,7 +748,6 @@ export class DockDragController {
             const next = target.next;
             this.wm.setColumnLayout(next.order, next.stacks, next.bands || { top: [], bottom: [] }, next.corners || {});
         }
-        else if (target.type === "timeline") this.wm.setTimelinePosition(target.position);
         else if (target.type === "monitors") this.wm.setMonitorsLayout(target.layout);
         else return;
         if (toast) this.showToast("undo", `Layout alterado: ${target.label}`);

@@ -44,9 +44,11 @@ assert.ok(dockDrag.includes('e.pointerType === "mouse" && e.buttons === 0'), "bo
 console.log("✔ 2 passou: Pointer Events com captura; Esc cancela.");
 
 // 3. Encaixes limitados ao que o layout atual monta, via métodos que registram histórico
-for (const call of ["this.wm.setColumnLayout(", "this.wm.setTimelinePosition(", "this.wm.setMonitorsLayout("]) {
+for (const call of ["this.wm.setColumnLayout(", "this.wm.setMonitorsLayout("]) {
     assert.ok(dockDrag.includes(call), `aplica encaixe com ${call}`);
 }
+// F2c parte 2: a timeline vai para faixa pelas mesmas operações (placeTimeline = posições de antes).
+assert.ok(dockDrag.includes("placeTimeline(state, position)") && dockDrag.includes("resolveBandEdgeTarget(state, TIMELINE_ID,"), "timeline usa faixa e posições de antes pelo dockOps");
 for (const op of ["moveBeside", "moveToEdge", "stackWith", "swapPanels"]) {
     assert.ok(dockDrag.includes(`${op}(state`), `zona de coluna usa ${op} do dockOps`);
 }

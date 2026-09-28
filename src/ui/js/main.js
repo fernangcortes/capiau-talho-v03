@@ -1943,6 +1943,8 @@ window.addEventListener("DOMContentLoaded", () => {
             if (timelinePanel.ownerDocument !== document) return;
             timelinePanel.classList.add("collapsed");
             reopenTimeline.style.display = "block";
+            // Numa faixa (F2c), os vizinhos ocupam o espaço e a linha fica no lugar dela.
+            window.workspaceManager?.applyAllCollapse?.();
             window.dispatchEvent(new Event("resize"));
         }
     };
@@ -1954,6 +1956,7 @@ window.addEventListener("DOMContentLoaded", () => {
             if (timelinePanel.ownerDocument !== document) return;
             timelinePanel.classList.remove("collapsed");
             reopenTimeline.style.display = "none";
+            window.workspaceManager?.applyAllCollapse?.();
             window.dispatchEvent(new Event("resize"));
         }
     };

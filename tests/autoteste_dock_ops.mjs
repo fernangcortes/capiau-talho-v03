@@ -1,5 +1,5 @@
 // ======================================================================
-// Autoteste: Operações de encaixe das colunas (F2b do plano drag & dock)
+// Autoteste: Operações de encaixe das colunas (F2b/F2c do plano drag & dock)
 // Execução: node tests/autoteste_dock_ops.mjs
 // ======================================================================
 
@@ -142,5 +142,106 @@ for (const a of bandActions) {
     }
 }
 console.log(`✔ 8 passou: ${checkedBands} estados com faixas respeitam as invariantes.`);
+
+// 9. Timeline em faixa (F2c parte 2)
+const { placeTimeline, timelineToCenter, toggleTimelineSide, timelineExpanded, timelineIsColumn } = ops;
+const T = "timeline-panel";
+const full = placeTimeline(padrao, "bottom-full");
+assert.deepEqual(full, { order: [L, I, C, R], stacks: [], bands: { top: [], bottom: [T] }, corners: { bl: "band", br: "band" } },
+    "timeline na faixa de baixo não entra em order");
+assert.deepEqual(placeTimeline(padrao, "bottom-left").corners, { bl: "band", br: "column" }, "sob a esquerda = a direita vai até o fim");
+assert.deepEqual(placeTimeline(padrao, "bottom-right").corners, { bl: "column", br: "band" });
+assert.deepEqual(placeTimeline(padrao, "band"), full, "\"band\" fora de faixa = largura total");
+assert.deepEqual(placeTimeline(full, "center"), padrao);
+assert.deepEqual(timelineToCenter(faixa), faixa, "sem timeline na faixa, nada muda");
+const comAjustes = placeTimeline(faixa, "bottom-left");
+assert.deepEqual(comAjustes.bands.bottom, [T, I], "entra na frente de quem já está na faixa de baixo");
+const naVaga = moveToBand(faixa, T, "bottom", 1);
+assert.deepEqual(placeTimeline(naVaga, "bottom-right").bands.bottom, [I, T], "já na faixa de baixo: fica na mesma vaga, só mudam os cantos");
+const emCima = moveToBand(padrao, T, "top");
+assert.deepEqual(placeTimeline(emCima, "band"), emCima, "\"band\" já numa faixa não mexe");
+assert.deepEqual(placeTimeline(emCima, "bottom-full").bands, { top: [], bottom: [T] }, "posição antiga leva para a faixa de baixo");
+assert.equal(placeTimeline(padrao, "lado"), null);
+
+// Atalhos: mesmo ciclo das posições antigas (Numpad1 = esquerda, Numpad3 = direita, Numpad2 = centro ↔ total).
+const nome = (s) => {
+    if (bandOf(s.bands, T) !== "bottom") return bandOf(s.bands, T) ? "outra" : "center";
+    return { "band,band": "bottom-full", "band,column": "bottom-left", "column,band": "bottom-right", "column,column": "sob o centro" }[`${s.corners.bl},${s.corners.br}`];
+};
+const cicloAntigo = {
+    left: { "center": "bottom-left", "bottom-left": "center", "bottom-full": "bottom-right", "bottom-right": "bottom-full" },
+    right: { "center": "bottom-right", "bottom-right": "center", "bottom-full": "bottom-left", "bottom-left": "bottom-full" }
+};
+for (const side of ["left", "right"]) {
+    for (const [de, para] of Object.entries(cicloAntigo[side])) {
+        assert.equal(nome(toggleTimelineSide(placeTimeline(padrao, de), side)), para, `${side} a partir de ${de}`);
+    }
+}
+assert.equal(nome(toggleTimelineSide(placeTimeline(padrao, "bottom-left"), "right")), "bottom-full");
+assert.ok(timelineExpanded(full, "left") && timelineExpanded(full, "right"));
+assert.ok(!timelineExpanded(padrao, "left"), "no centro não está expandida");
+const soCentro = setCorner(setCorner(full, "bl", "column"), "br", "column");
+assert.equal(nome(toggleTimelineSide(soCentro, "left")), "bottom-left", "sob o centro só: expandir abre o lado");
+const cimaDireita = toggleTimelineSide(setCorner(emCima, "tr", "column"), "right");
+assert.deepEqual([cimaDireita.bands.top, cimaDireita.corners], [[T], { tl: "band", tr: "band" }], "na faixa de cima os atalhos mexem nos cantos de cima");
+assert.deepEqual(toggleTimelineSide(comAjustes, "left").bands, { top: [], bottom: [I] }, "recolher o único lado leva ao centro; os outros ficam na faixa");
+
+// Timeline como coluna: ponta, ao lado de coluna ou do centro, troca com coluna; nunca em pilha.
+assert.deepEqual(moveToEdge(full, T, "start"), { order: [T, L, I, C, R], stacks: [] }, "da faixa para a ponta esquerda");
+assert.deepEqual(moveBeside(full, T, L, "after").order, [L, T, I, C, R]);
+assert.deepEqual(moveBeside(padrao, T, C, "before").order, [L, I, T, C, R], "do centro para uma coluna");
+assert.ok(timelineIsColumn(moveBeside(padrao, T, C, "before")) && !timelineIsColumn(full) && !timelineIsColumn(padrao));
+const troca2 = swapPanels(full, T, L);
+assert.deepEqual([troca2.order, troca2.bands.bottom], [[T, I, C, R, L], [L]], "timeline (faixa) troca com coluna: cada um no lugar do outro");
+assert.equal(swapPanels(padrao, T, L), null, "timeline embaixo dos monitores não tem vaga para trocar");
+assert.equal(swapPanels(moveBeside(empilhado, T, C, "after"), T, R), null, "timeline não entra em pilha trocando");
+assert.equal(stackWith(full, T, L, "top"), null);
+assert.equal(stackWith(full, L, T, "top"), null);
+const tlCol = placeTimeline(padrao, "column");
+assert.deepEqual(tlCol.order, [L, I, C, T, R], "\"column\" = à direita do centro");
+assert.deepEqual(placeTimeline(moveToEdge(padrao, T, "start"), "column").order, [T, L, I, C, R], "já coluna: fica onde está");
+assert.deepEqual(timelineToCenter(tlCol), padrao, "da coluna de volta para baixo dos monitores");
+assert.deepEqual(placeTimeline(tlCol, "bottom-full"), full, "da coluna para a faixa de baixo");
+assert.equal(toggleTimelineSide(tlCol, "left").bands.bottom[0], T, "atalhos da coluna levam para a faixa");
+assert.deepEqual(moveBeside(tlCol, R, T, "before").order, [L, I, C, R, T], "lateral ao lado da timeline coluna");
+assert.deepEqual(swapPanels(comAjustes, T, I).bands.bottom, [I, T], "dentro da faixa troca normal");
+const lateralAoLado = moveBeside(full, R, T, "after");
+assert.deepEqual([lateralAoLado.bands.bottom, lateralAoLado.order], [[T, R], [L, I, C, R]], "lateral ao lado da timeline na faixa");
+const ladoAlado = moveBesideInBand(comAjustes, T, I, "after");
+assert.deepEqual(ladoAlado.bands.bottom, [I, T]);
+console.log("✔ 9 passou: posições antigas viram faixa, atalhos com o ciclo de antes, timeline como coluna (sem pilha).");
+
+// 10. Invariantes com a timeline nas sequências de 3 operações
+const tlActions = [...bandActions,
+    s => placeTimeline(s, "bottom-full"), s => placeTimeline(s, "bottom-left"), s => placeTimeline(s, "center"),
+    s => moveToBand(s, T, "top"), s => moveToBand(s, T, "bottom", 0),
+    s => toggleTimelineSide(s, "left"), s => toggleTimelineSide(s, "right"),
+    s => moveToEdge(s, T, "start"), s => moveToEdge(s, T, "end"), s => placeTimeline(s, "column"),
+    s => moveBeside(s, T, C, "before"), s => swapPanels(s, T, C),
+    ...all.map(id => s => swapPanels(s, T, id)), ...all.map(id => s => moveBeside(s, T, id, "after")),
+    ...all.map(id => s => moveBeside(s, id, T, "before")), ...all.map(id => s => stackWith(s, id, T, "bottom"))];
+let checkedTl = 0;
+const checkTl = (s) => {
+    const onde = ["top", "bottom"].filter(edge => s.bands?.[edge]?.includes(T));
+    assert.ok(onde.length + (s.order.includes(T) ? 1 : 0) <= 1, "timeline num lugar só (uma faixa ou coluna)");
+    assert.equal(s.order.filter(id => id === T).length <= 1, true);
+    s.stacks.forEach(st => assert.ok(!st.includes(T), "timeline nunca em pilha"));
+    const semTl = { ...s, order: s.order.filter(id => id !== T) };
+    if (s.bands) {
+        semTl.bands = { top: s.bands.top.filter(id => id !== T), bottom: s.bands.bottom.filter(id => id !== T) };
+        if (!semTl.bands.top.length && !semTl.bands.bottom.length) { delete semTl.bands; delete semTl.corners; }
+        else semTl.corners = Object.fromEntries(Object.entries(s.corners).filter(([k]) => semTl.bands[k[0] === "t" ? "top" : "bottom"].length));
+    }
+    checkBands(semTl);
+    checkedTl++;
+};
+for (const a of tlActions) {
+    const s1 = a(padrao); if (!s1) continue; checkTl(s1);
+    for (const b of tlActions) {
+        const s2 = b(s1); if (!s2) continue; checkTl(s2);
+        for (const c of tlActions) { const s3 = c(s2); if (s3) checkTl(s3); }
+    }
+}
+console.log(`✔ 10 passou: ${checkedTl} estados com a timeline em faixa ou coluna respeitam as invariantes.`);
 
 console.log("\n=== AUTOTESTE DOCK OPS CONCLUÍDO COM SUCESSO ===");

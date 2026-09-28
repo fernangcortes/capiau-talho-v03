@@ -13,7 +13,9 @@
 //               role "monitors" = Source + Program; auto: true = orientação automática
 //               role "stack"    = laterais empilhadas numa mesma coluna (F2b), de cima para baixo
 //               role "band"     = faixa inteira em cima ou embaixo do editor (F2c), edge "top" | "bottom",
-//                                 painéis lado a lado da esquerda para a direita
+//                                 painéis lado a lado da esquerda para a direita (laterais e timeline)
+//   A timeline fica em um lugar só: dentro do nó "center" (embaixo dos monitores), numa faixa ou
+//   como coluna do editor, folha direta da linha principal (F2c parte 2).
 //               role "frame"    = moldura com as faixas (F2c): [faixa de cima?, resto do editor, faixa de baixo?];
 //                                 corners diz quem fica com cada canto entre a coluna da ponta e a faixa:
 //                                 { tl, tr, bl, br: "band" (a faixa passa por baixo/cima da coluna) |
@@ -28,14 +30,28 @@ export const TIMELINE_ID = "timeline-panel";
 export const PANEL_IDS = [...COLUMN_IDS, ...MONITOR_IDS, TIMELINE_ID];
 export const CENTER_STAGE = "center-stage";
 
-const TIMELINE_POSITIONS = ["center", "bottom-left", "bottom-right", "bottom-full"];
 const MONITOR_LAYOUTS = ["auto", "side-by-side", "stacked"];
 export const BAND_EDGES = ["top", "bottom"];
 export const CORNERS = { top: ["tl", "tr"], bottom: ["bl", "br"] };
+/** Painéis que podem ir para uma faixa (F2c): as laterais e a timeline. */
+export const BAND_PANEL_IDS = [...COLUMN_IDS, TIMELINE_ID];
 
 /**
- * Faixas (F2c) normalizadas: só laterais, cada uma uma vez só. Devolve { top, bottom } sempre com
- * as duas listas e os cantos só das faixas que existem ("band" quando não informado).
+ * Posição da timeline: "center" (embaixo dos monitores), "band" (numa faixa) ou "column" (coluna do
+ * editor, em columnOrder como as laterais; F2c parte 2). As posições antigas viram a faixa de baixo
+ * com os cantos que davam o mesmo desenho: a timeline passa sob o lado "band"; as colunas do lado
+ * "column" vão até o fim.
+ */
+export const TIMELINE_POSITIONS = ["center", "band", "column"];
+export const LEGACY_TIMELINE_CORNERS = {
+    "bottom-full": { bl: "band", br: "band" },
+    "bottom-left": { bl: "band", br: "column" },
+    "bottom-right": { bl: "column", br: "band" }
+};
+
+/**
+ * Faixas (F2c) normalizadas: só laterais e timeline, cada uma uma vez só. Devolve { top, bottom }
+ * sempre com as duas listas e os cantos só das faixas que existem ("band" quando não informado).
  */
 export function normalizeBands(bands, corners) {
     const seen = new Set();
@@ -43,7 +59,7 @@ export function normalizeBands(bands, corners) {
     BAND_EDGES.forEach(edge => {
         const list = bands && Array.isArray(bands[edge]) ? bands[edge] : [];
         list.forEach(id => {
-            if (COLUMN_IDS.includes(id) && !seen.has(id)) { seen.add(id); out[edge].push(id); }
+            if (BAND_PANEL_IDS.includes(id) && !seen.has(id)) { seen.add(id); out[edge].push(id); }
         });
     });
     const outCorners = {};
@@ -58,6 +74,26 @@ export function hasBands(bands) {
     return !!bands && BAND_EDGES.some(edge => Array.isArray(bands[edge]) && bands[edge].length > 0);
 }
 
+/**
+ * Posição da timeline no formato novo, convertendo as antigas (bottom-left/right/full) para a faixa
+ * de baixo, na frente de quem já estiver nela. Faixas e colunas mandam: timeline numa faixa = "band",
+ * em columnOrder = "column", mesmo que a posição diga outra coisa (faixa vence coluna).
+ * Devolve { timelinePosition, bands, bandCorners } normalizados.
+ */
+export function convertTimelinePosition(position, bands, corners, columnOrder = null) {
+    const nb = normalizeBands(bands, corners);
+    if (BAND_EDGES.some(edge => nb.bands[edge].includes(TIMELINE_ID))) {
+        return { timelinePosition: "band", bands: nb.bands, bandCorners: nb.corners };
+    }
+    if (Array.isArray(columnOrder) && columnOrder.includes(TIMELINE_ID)) {
+        return { timelinePosition: "column", bands: nb.bands, bandCorners: nb.corners };
+    }
+    const legacy = LEGACY_TIMELINE_CORNERS[position === "band" ? "bottom-full" : position];
+    if (!legacy) return { timelinePosition: "center", bands: nb.bands, bandCorners: nb.corners };
+    const out = normalizeBands({ top: nb.bands.top, bottom: [TIMELINE_ID, ...nb.bands.bottom] }, { ...nb.corners, ...legacy });
+    return { timelinePosition: "band", bands: out.bands, bandCorners: out.corners };
+}
+
 const leaf = (panel, away = false) => (away ? { panel, away: true } : { panel });
 const isLeaf = (node) => !!node && typeof node.panel === "string";
 const isSplit = (node) => !!node && (node.split === "row" || node.split === "column") && Array.isArray(node.children);
@@ -70,13 +106,14 @@ const isSplit = (node) => !!node && (node.split === "row" || node.split === "col
  *          bands?: {top: string[], bottom: string[]}, bandCorners?: Object<string, string>}} state
  */
 export function layoutFromLegacy(state) {
-    const { bands, corners } = normalizeBands(state.bands, state.bandCorners);
+    const { timelinePosition: position, bands, bandCorners: corners } =
+        convertTimelinePosition(state.timelinePosition, state.bands, state.bandCorners, state.columnOrder);
     const inBand = new Set([...bands.top, ...bands.bottom]);
     // Laterais numa faixa continuam em columnOrder (no fim), mas não ocupam coluna.
     const order = (Array.isArray(state.columnOrder) && state.columnOrder.length
         ? state.columnOrder
-        : ["sidebar-left", "inspector-panel", CENTER_STAGE, "sidebar-right"]).filter(id => !inBand.has(id));
-    const position = TIMELINE_POSITIONS.includes(state.timelinePosition) ? state.timelinePosition : "center";
+        : ["sidebar-left", "inspector-panel", CENTER_STAGE, "sidebar-right"])
+        .filter(id => !inBand.has(id) && (id !== TIMELINE_ID || position === "column"));
     const monitorsLayout = MONITOR_LAYOUTS.includes(state.monitorsLayout) ? state.monitorsLayout : "auto";
     const dual = state.dual && Array.isArray(state.dual.panels) && state.dual.panels.length === 2 ? state.dual : null;
     // F4b: janela com 2 a 4 painéis de qualquer tipo (panel-group.html), com disposição pronta.
@@ -109,17 +146,7 @@ export function layoutFromLegacy(state) {
         return { split: "row", children };
     };
 
-    const ci = order.indexOf(CENTER_STAGE);
-    let main;
-    if (position === "bottom-full") {
-        main = { split: "column", children: [row(order), timeline] };
-    } else if (position === "bottom-left" && ci !== -1) {
-        main = { split: "row", children: [{ split: "column", children: [row(order.slice(0, ci + 1)), timeline] }, ...row(order.slice(ci + 1)).children] };
-    } else if (position === "bottom-right" && ci !== -1) {
-        main = { split: "row", children: [...row(order.slice(0, ci)).children, { split: "column", children: [row(order.slice(ci)), timeline] }] };
-    } else {
-        main = row(order);
-    }
+    let main = row(order);
     if (inBand.size) {
         const band = (edge) => ({ split: "row", role: "band", edge, children: bands[edge].map(id => leaf(id, away.has(id))) });
         main = {
@@ -167,7 +194,7 @@ export function legacyFromLayout(layout) {
         const rest = [];
         for (const child of main.children) {
             if (isSplit(child) && child.role === "band" && BAND_EDGES.includes(child.edge)) {
-                if (!child.children.every(c => isLeaf(c) && COLUMN_IDS.includes(c.panel))) return null;
+                if (!child.children.every(c => isLeaf(c) && BAND_PANEL_IDS.includes(c.panel))) return null;
                 found[child.edge].push(...child.children.map(c => c.panel));
             } else rest.push(child);
         }
@@ -200,7 +227,7 @@ export function legacyFromLayout(layout) {
         const ids = [];
         for (const node of nodes) {
             if (node === center) ids.push(CENTER_STAGE);
-            else if (isLeaf(node) && COLUMN_IDS.includes(node.panel)) ids.push(node.panel);
+            else if (isLeaf(node) && (COLUMN_IDS.includes(node.panel) || node.panel === TIMELINE_ID)) ids.push(node.panel);
             else if (isSplit(node) && node.role === "stack" && node.children.length >= 2
                 && node.children.every(c => isLeaf(c) && COLUMN_IDS.includes(c.panel))) {
                 const members = node.children.map(c => c.panel);
@@ -216,9 +243,18 @@ export function legacyFromLayout(layout) {
     let columnOrder = null;
     let timelinePosition = null;
 
-    if (main.split === "row" && main.children.includes(center) && center.children.some(isTimeline)) {
-        timelinePosition = "center";
-        columnOrder = colsOf(main.children);
+    // Timeline embaixo dos monitores, numa faixa ou como coluna (F2c), num lugar só; as outras
+    // formas são árvores antigas.
+    const timelineInBand = !!bands && BAND_EDGES.some(edge => bands[edge].includes(TIMELINE_ID));
+    if (main.split === "row" && main.children.includes(center)) {
+        const cols = colsOf(main.children);
+        const inColumn = !!cols && cols.includes(TIMELINE_ID);
+        const places = [center.children.some(isTimeline), timelineInBand, inColumn].filter(Boolean).length;
+        if (!cols || places !== 1) return null;
+        timelinePosition = timelineInBand ? "band" : inColumn ? "column" : "center";
+        columnOrder = cols;
+    } else if (timelineInBand) {
+        return null;
     } else if (isTimelineColumn(main) && main.children[0].children.includes(center)) {
         timelinePosition = "bottom-full";
         columnOrder = colsOf(main.children[0].children);
@@ -236,8 +272,8 @@ export function legacyFromLayout(layout) {
         }
     }
     if (!columnOrder || !timelinePosition) return null;
-    if (bands) columnOrder = [...columnOrder, ...bands.top, ...bands.bottom];
-    const expected = [...COLUMN_IDS, CENTER_STAGE].sort().join(",");
+    if (bands) columnOrder = [...columnOrder, ...[...bands.top, ...bands.bottom].filter(id => id !== TIMELINE_ID)];
+    const expected = [...COLUMN_IDS, CENTER_STAGE, ...(timelinePosition === "column" ? [TIMELINE_ID] : [])].sort().join(",");
     if ([...columnOrder].sort().join(",") !== expected) return null;
 
     let dual = null;
@@ -255,9 +291,11 @@ export function legacyFromLayout(layout) {
             return null;
         }
     }
-    const legacy = { columnOrder, timelinePosition, monitorsLayout, columnStacks, popped, dual, group };
+    // Árvores antigas (timeline embaixo sem faixa, histórico salvo antes da F2c parte 2) viram faixa.
+    const converted = convertTimelinePosition(timelinePosition, bands, bandCorners, columnOrder);
+    const legacy = { columnOrder, timelinePosition: converted.timelinePosition, monitorsLayout, columnStacks, popped, dual, group };
     if (layout.tabStrips && typeof layout.tabStrips === "object") legacy.tabStrips = { ...layout.tabStrips };
-    if (bands) { legacy.bands = bands; legacy.bandCorners = bandCorners; }
+    if (hasBands(converted.bands)) { legacy.bands = converted.bands; legacy.bandCorners = converted.bandCorners; }
     return legacy;
 }
 

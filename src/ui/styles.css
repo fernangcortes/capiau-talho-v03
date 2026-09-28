@@ -13425,7 +13425,8 @@ body.dock-dragging * {
 }
 .dock-band-resizer,
 .dock-band-splitter,
-.dock-edge-resizer {
+.dock-edge-resizer,
+.dock-edge-splitter {
     flex: 0 0 5px;
     background: var(--border-glass);
     touch-action: none;
@@ -13433,10 +13434,12 @@ body.dock-dragging * {
 }
 .dock-band-resizer { cursor: row-resize; }
 .dock-band-splitter,
-.dock-edge-resizer { cursor: col-resize; }
+.dock-edge-resizer,
+.dock-edge-splitter { cursor: col-resize; }
 .dock-band-resizer:hover, .dock-band-resizer.active,
 .dock-band-splitter:hover, .dock-band-splitter.active,
-.dock-edge-resizer:hover, .dock-edge-resizer.active {
+.dock-edge-resizer:hover, .dock-edge-resizer.active,
+.dock-edge-splitter:hover, .dock-edge-splitter.active {
     background: var(--color-cyan);
 }
 .dock-band-row > .dock-band-member {
@@ -13473,7 +13476,41 @@ body.dock-dragging * {
     flex-direction: column;
 }
 
-/* Coluna da ponta que ficou com o canto: fora do .workspace, altura inteira da moldura. */
+/* Timeline numa faixa (F2c parte 2): linha de expandir em pé entre os vizinhos; deitada quando
+   todos da faixa estão recolhidos (.restore-line-h), como a linha dela embaixo dos monitores. */
+.dock-band-row > .timeline-restore-line:not(.restore-line-h) {
+    width: 4px !important;
+    height: auto !important;
+    flex: 0 0 4px !important;
+    border-top: none !important;
+    border-left: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+/* Timeline como coluna (F2c parte 2): altura inteira, largura pelo divisor; recolhida some e a
+   linha de expandir fica em pé no lugar dela. */
+.workspace > #timeline-panel,
+.dock-edge > #timeline-panel {
+    height: 100% !important;
+    /* Encolhe quando as colunas não cabem (as laterais não encolhem). */
+    flex-shrink: 1 !important;
+    min-width: 200px;
+    position: relative;
+    border-radius: 0 !important;
+}
+.workspace > #timeline-panel.collapsed,
+.dock-edge > #timeline-panel.collapsed {
+    display: none !important;
+}
+.workspace > .timeline-restore-line,
+.dock-edge > .timeline-restore-line {
+    width: 4px !important;
+    height: auto !important;
+    flex: 0 0 4px !important;
+    border-top: none !important;
+    border-left: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+/* Colunas do lado que ficou com o canto: fora do .workspace, altura inteira da moldura. */
 .dock-edge {
     display: flex;
     flex-direction: row;

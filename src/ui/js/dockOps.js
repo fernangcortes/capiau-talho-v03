@@ -3,7 +3,9 @@
 //   order   = ordem das colunas do editor (ids das laterais + "center-stage"), como columnOrder;
 //   stacks  = pilhas de laterais numa mesma coluna, de cima para baixo (ex.: [["sidebar-left", "sidebar-right"]]);
 //   bands   = faixas inteiras em cima/embaixo do editor (F2c): { top: [...], bottom: [...] }, da esquerda
-//             para a direita. Membros de faixa continuam em order, sempre no fim, e não ocupam coluna;
+//             para a direita. Laterais de faixa continuam em order, sempre no fim, e não ocupam coluna.
+//             A timeline (F2c parte 2) fica em order quando é coluna; numa faixa ou embaixo dos
+//             monitores, não está em order. Nunca entra em pilha;
 //   corners = quem fica com cada canto entre a coluna da ponta e a faixa ({ tl, tr, bl, br }:
 //             "band" = a faixa passa inteira; "column" = a coluna vai até o fim e a faixa encurta).
 // bands/corners só aparecem no resultado quando existe alguma faixa.
@@ -11,7 +13,7 @@
 // Toda operação devolve um estado novo e normalizado (membros de uma pilha ficam juntos em order)
 // ou null quando o encaixe não é possível.
 
-import { COLUMN_IDS, BAND_EDGES, CORNERS, normalizeBands, hasBands } from "./dockModel.js";
+import { COLUMN_IDS, BAND_EDGES, BAND_PANEL_IDS, CORNERS, TIMELINE_ID, LEGACY_TIMELINE_CORNERS, normalizeBands, hasBands } from "./dockModel.js";
 
 export const MAX_STACK = 3;
 
@@ -65,7 +67,8 @@ function finalize(order, stacks, bands, corners) {
     const members = bandMembers(nb.bands);
     const normalized = normalizeStacks((stacks || []).map(stack => stack.filter(id => !members.has(id))));
     const cols = syncOrderWithStacks(order.filter(id => !members.has(id)), normalized);
-    const out = { order: [...cols, ...nb.bands.top, ...nb.bands.bottom], stacks: normalized };
+    const laterals = [...nb.bands.top, ...nb.bands.bottom].filter(id => id !== TIMELINE_ID);
+    const out = { order: [...cols, ...laterals], stacks: normalized };
     if (hasBands(nb.bands)) {
         out.bands = nb.bands;
         out.corners = nb.corners;
@@ -127,7 +130,7 @@ export function moveToEdge(state, id, edge) {
  * (padrão: no fim, à direita). Faixa nova passa inteira pelos cantos ("band"), salvo corners.
  */
 export function moveToBand(state, id, edge, index = null, corners = null) {
-    if (!COLUMN_IDS.includes(id) || !BAND_EDGES.includes(edge)) return null;
+    if (!BAND_PANEL_IDS.includes(id) || !BAND_EDGES.includes(edge)) return null;
     const s = detach(state, id);
     const list = s.bands[edge];
     if (list.length === 0) CORNERS[edge].forEach(k => { s.corners[k] = "band"; });
@@ -174,12 +177,74 @@ export function stackWith(state, id, targetId, where) {
 /** Troca dois painéis de lugar (também dentro de pilhas e faixas, e entre coluna e faixa). */
 export function swapPanels(state, a, b) {
     if (a === b) return null;
+    // A timeline troca com quem tem lugar (coluna ou faixa), mas não entra em pilha nem troca
+    // estando embaixo dos monitores (lá não há vaga de coluna para dar ao outro).
+    if (a === TIMELINE_ID || b === TIMELINE_ID) {
+        const other = a === TIMELINE_ID ? b : a;
+        const placed = bandOf(state.bands, TIMELINE_ID) || state.order.includes(TIMELINE_ID);
+        if (!placed || stackOf(state.stacks, other)) return null;
+    }
     const swap = (x) => (x === a ? b : x === b ? a : x);
     const bands = cloneBands(state);
     BAND_EDGES.forEach(edge => { bands[edge] = bands[edge].map(swap); });
     // Numa troca entre coluna e faixa, o que sai da faixa ocupa a coluna do outro.
     const order = [...columnsOnly(state), ...bandMembers(state.bands)].map(swap);
     return finalize(order, (state.stacks || []).map(stack => stack.map(swap)), bands, state.corners);
+}
+
+/** F2c parte 2: tira a timeline da faixa ou da coluna; ela volta para baixo dos monitores. */
+export function timelineToCenter(state) {
+    const s = detach(state, TIMELINE_ID);
+    return finalize(s.order.filter(id => id !== TIMELINE_ID), s.stacks, s.bands, s.corners);
+}
+
+/**
+ * Posições da timeline com os nomes de antes: "center", ou a faixa de baixo com os cantos que davam
+ * o mesmo desenho ("bottom-full" | "bottom-left" | "bottom-right"; "band" = já numa faixa, ou
+ * "bottom-full" se não estiver). Já estando na faixa de baixo, ela fica na mesma vaga.
+ * "column" = coluna do editor (onde já estiver, ou à direita do centro).
+ */
+export function placeTimeline(state, position) {
+    if (position === "center") return timelineToCenter(state);
+    // "column": fica onde está se já é coluna; senão, coluna logo à direita do centro.
+    if (position === "column") {
+        if (timelineIsColumn(state)) return finalize(state.order, state.stacks, state.bands, state.corners);
+        return moveBeside(state, TIMELINE_ID, "center-stage", "after");
+    }
+    const edge = bandOf(state.bands, TIMELINE_ID);
+    if (position === "band" && edge) return finalize(state.order, state.stacks, state.bands, state.corners);
+    const corners = LEGACY_TIMELINE_CORNERS[position === "band" ? "bottom-full" : position];
+    if (!corners) return null;
+    if (edge === "bottom") return finalize(state.order, state.stacks, state.bands, { ...(state.corners || {}), ...corners });
+    return moveToBand(state, TIMELINE_ID, "bottom", 0, corners);
+}
+
+/** Timeline como coluna do editor (em order)? */
+export function timelineIsColumn(state) {
+    return !bandOf(state.bands, TIMELINE_ID) && (state.order || []).includes(TIMELINE_ID);
+}
+
+/** Lado ("left" | "right") para onde a timeline passa inteira: está numa faixa com esse canto "band". */
+export function timelineExpanded(state, side) {
+    const edge = bandOf(state.bands, TIMELINE_ID);
+    if (!edge) return false;
+    const key = (edge === "top" ? "t" : "b") + (side === "left" ? "l" : "r");
+    return (state.corners?.[key] || "band") === "band";
+}
+
+/**
+ * Numpad1/Numpad3 e os botões de expandir: alterna o canto daquele lado na faixa da timeline.
+ * No centro, leva para a faixa de baixo já expandida para o lado; recolher o único lado expandido
+ * devolve a timeline para o centro. Mesmo efeito dos atalhos com as posições antigas.
+ */
+export function toggleTimelineSide(state, side) {
+    const edge = bandOf(state.bands, TIMELINE_ID);
+    if (!edge) return placeTimeline(state, side === "left" ? "bottom-left" : "bottom-right");
+    const t = edge === "top" ? "t" : "b";
+    const key = t + (side === "left" ? "l" : "r");
+    if (!timelineExpanded(state, side)) return setCorner(state, key, "band");
+    if (!timelineExpanded(state, side === "left" ? "right" : "left")) return timelineToCenter(state);
+    return setCorner(state, key, "column");
 }
 
 export function sameColumnState(a, b) {

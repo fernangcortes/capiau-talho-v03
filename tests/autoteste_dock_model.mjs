@@ -30,6 +30,25 @@ const orders = permutations([...COLUMN_IDS, CENTER_STAGE]);
 const positions = ["center", "bottom-left", "bottom-right", "bottom-full"];
 const monitors = ["auto", "side-by-side", "stacked"];
 
+// F2c parte 2: as posições antigas da timeline voltam como a faixa de baixo (timeline na frente),
+// com os cantos que davam o mesmo desenho. "center" volta igual.
+const CANTOS_ANTIGOS = {
+    "bottom-full": { bl: "band", br: "band" },
+    "bottom-left": { bl: "band", br: "column" },
+    "bottom-right": { bl: "column", br: "band" }
+};
+const esperado = (state) => {
+    if (!CANTOS_ANTIGOS[state.timelinePosition]) return state;
+    const top = state.bands?.top || [];
+    const topCorners = top.length ? { tl: state.bandCorners?.tl || "band", tr: state.bandCorners?.tr || "band" } : {};
+    return {
+        ...state,
+        timelinePosition: "band",
+        bands: { top, bottom: ["timeline-panel", ...(state.bands?.bottom || [])] },
+        bandCorners: { ...topCorners, ...CANTOS_ANTIGOS[state.timelinePosition] }
+    };
+};
+
 let combos = 0;
 for (const columnOrder of orders) {
     for (const timelinePosition of positions) {
@@ -37,12 +56,14 @@ for (const columnOrder of orders) {
             const state = { columnOrder, timelinePosition, monitorsLayout, columnStacks: [], popped: [], dual: null, group: null };
             const layout = layoutFromLegacy(state);
             assert.deepEqual(validateLayout(layout), [], `layout inválido para ${JSON.stringify(state)}`);
-            assert.deepEqual(legacyFromLayout(layout), state, `ida e volta falhou para ${JSON.stringify(state)}`);
+            const volta = legacyFromLayout(layout);
+            assert.deepEqual(volta, esperado(state), `ida e volta falhou para ${JSON.stringify(state)}`);
+            assert.deepEqual(legacyFromLayout(layoutFromLegacy(volta)), volta, "o formato novo vai e volta igual");
             combos++;
         }
     }
 }
-console.log(`✔ 1.1 passou: ${combos} combinações (24 ordens × 4 posições da timeline × 3 monitores) vão e voltam iguais.`);
+console.log(`✔ 1.1 passou: ${combos} combinações (24 ordens × 4 posições da timeline × 3 monitores) vão e voltam (antigas viram faixa).`);
 
 const presets = {
     padrao: ["sidebar-left", "inspector-panel", CENTER_STAGE, "sidebar-right"],
@@ -53,7 +74,7 @@ for (const [name, columnOrder] of Object.entries(presets)) {
     const state = { columnOrder, timelinePosition: "bottom-full", monitorsLayout: "stacked", columnStacks: [], popped, dual: null, group: null };
     const layout = layoutFromLegacy(state);
     assert.deepEqual(validateLayout(layout), [], `preset ${name} com janelas destacadas inválido`);
-    assert.deepEqual(legacyFromLayout(layout), state);
+    assert.deepEqual(legacyFromLayout(layout), esperado(state));
     assert.equal(layout.floats.length, 2);
     assert.ok(panelsIn(layout.main, { includeAway: true }).includes("timeline-panel"), "o lugar da timeline destacada fica guardado no editor");
     assert.ok(!panelsIn(layout.main).includes("timeline-panel"), "a timeline destacada não conta como presente no editor");
@@ -83,7 +104,7 @@ console.log("✔ 1.3 passou: Janela Dupla (lado a lado/empilhada) é uma janela 
                 const state = { columnOrder, timelinePosition, monitorsLayout: "auto", columnStacks, popped: [], dual: null, group: null };
                 const layout = layoutFromLegacy(state);
                 assert.deepEqual(validateLayout(layout), [], `pilha inválida: ${JSON.stringify(state)}`);
-                assert.deepEqual(legacyFromLayout(layout), state, `pilha não voltou igual: ${JSON.stringify(state)}`);
+                assert.deepEqual(legacyFromLayout(layout), esperado(state), `pilha não voltou igual: ${JSON.stringify(state)}`);
                 stackCombos++;
             }
         }
@@ -97,7 +118,7 @@ console.log("✔ 1.3 passou: Janela Dupla (lado a lado/empilhada) é uma janela 
         const state = { columnOrder: presets.padrao, timelinePosition: "bottom-full", monitorsLayout: "auto", columnStacks: [], popped: panels.includes("sidebar-left") ? [] : ["sidebar-left"], dual: null, group: { panels, arrangement } };
         const layout = layoutFromLegacy(state);
         assert.deepEqual(validateLayout(layout), [], `grupo inválido: ${panels}`);
-        assert.deepEqual(legacyFromLayout(layout), state, `grupo não voltou igual: ${panels}`);
+        assert.deepEqual(legacyFromLayout(layout), esperado(state), `grupo não voltou igual: ${panels}`);
         panels.forEach(id => assert.ok(panelsIn(layout.main, { includeAway: true }).includes(id), `lugar de ${id} guardado no editor`));
     }
     const five = layoutFromLegacy({ columnOrder: presets.padrao, timelinePosition: "center", monitorsLayout: "auto", group: { panels: ["sidebar-left", "inspector-panel", "sidebar-right", "source-player-panel", "program-player-panel"], arrangement: "grid" } });
@@ -121,7 +142,7 @@ console.log("✔ 1.3 passou: Janela Dupla (lado a lado/empilhada) é uma janela 
             const layout = layoutFromLegacy(state);
             assert.deepEqual(validateLayout(layout), [], `faixas inválidas: ${JSON.stringify(state)}`);
             assert.equal(layout.main.role, "frame");
-            assert.deepEqual(legacyFromLayout(layout), state, `faixas não voltaram iguais: ${JSON.stringify(state)}`);
+            assert.deepEqual(legacyFromLayout(layout), esperado(state), `faixas não voltaram iguais: ${JSON.stringify(state)}`);
             n++;
         }
     }
@@ -133,6 +154,64 @@ console.log("✔ 1.3 passou: Janela Dupla (lado a lado/empilhada) é uma janela 
     assert.notEqual(semFaixa.main.role, "frame", "faixas vazias não criam moldura");
     assert.equal(legacyFromLayout(semFaixa).bands, undefined);
     console.log(`✔ 1.6 passou: ${n} layouts com faixas e cantos vão e voltam; painel destacado guarda o lugar na faixa.`);
+}
+
+{
+    // F2c parte 2: timeline numa faixa, sozinha ou com laterais, em cima ou embaixo.
+    const L = "sidebar-left", I = "inspector-panel", R = "sidebar-right", T = "timeline-panel";
+    const casos = [
+        { bands: { top: [], bottom: [T] }, bandCorners: { bl: "column", br: "column" }, cols: [L, I, CENTER_STAGE, R] },
+        { bands: { top: [T, R], bottom: [] }, bandCorners: { tl: "band", tr: "column" }, cols: [L, CENTER_STAGE, I] },
+        { bands: { top: [L], bottom: [I, T] }, bandCorners: { tl: "band", tr: "band", bl: "column", br: "band" }, cols: [CENTER_STAGE, R] }
+    ];
+    for (const caso of casos) {
+        const state = { columnOrder: [...caso.cols, ...[...caso.bands.top, ...caso.bands.bottom].filter(id => id !== T)], timelinePosition: "band", monitorsLayout: "auto", columnStacks: [], popped: [], dual: null, group: null, bands: caso.bands, bandCorners: caso.bandCorners };
+        const layout = layoutFromLegacy(state);
+        assert.deepEqual(validateLayout(layout), [], `timeline em faixa inválida: ${JSON.stringify(state)}`);
+        const center = layout.main.children.find(c => c.role !== "band").children.find(c => c.role === "center");
+        assert.deepEqual(panelsIn(center), ["source-player-panel", "program-player-panel"], "com a timeline na faixa, o centro fica só com os monitores");
+        assert.deepEqual(legacyFromLayout(layout), state, `timeline em faixa não voltou igual: ${JSON.stringify(state)}`);
+    }
+    // As faixas mandam: timeline numa faixa com a posição dizendo "center" é "band".
+    const manda = legacyFromLayout(layoutFromLegacy({ columnOrder: presets.padrao, timelinePosition: "center", monitorsLayout: "auto", bands: { top: [T], bottom: [] } }));
+    assert.equal(manda.timelinePosition, "band");
+    // "band" sem timeline em faixa (estado torto): faixa de baixo inteira.
+    const torto = legacyFromLayout(layoutFromLegacy({ columnOrder: presets.padrao, timelinePosition: "band", monitorsLayout: "auto" }));
+    assert.deepEqual([torto.bands, torto.bandCorners], [{ top: [], bottom: [T] }, { bl: "band", br: "band" }]);
+    // Timeline destacada de uma faixa guarda o lugar nela.
+    const fora = layoutFromLegacy({ columnOrder: presets.padrao, timelinePosition: "band", monitorsLayout: "auto", popped: [T], bands: { top: [], bottom: [T] } });
+    assert.deepEqual(validateLayout(fora), []);
+    assert.deepEqual(fora.main.children[1].children, [{ panel: T, away: true }]);
+    // Histórico antigo (árvore com a timeline embaixo, sem faixa) ainda é lido e vira faixa.
+    const antiga = { v: 1, floats: [], main: { split: "column", children: [
+        { split: "row", children: [{ panel: L }, { panel: I }, { split: "column", role: "center", children: [{ split: "row", role: "monitors", auto: true, children: [{ panel: "source-player-panel" }, { panel: "program-player-panel" }] }] }, { panel: R }] },
+        { panel: T }
+    ] } };
+    assert.deepEqual(legacyFromLayout(antiga).bands, { top: [], bottom: [T] });
+    assert.equal(legacyFromLayout(antiga).timelinePosition, "band");
+    // Timeline na faixa e embaixo dos monitores ao mesmo tempo: a árvore não é representável.
+    const dupla = layoutFromLegacy({ columnOrder: presets.padrao, timelinePosition: "band", monitorsLayout: "auto", bands: { top: [], bottom: [T] } });
+    dupla.main.children[0].children.find(c => c.role === "center").children.push({ panel: T });
+    assert.equal(legacyFromLayout(dupla), null);
+    // Timeline como coluna: folha direta da linha do editor, em qualquer vaga, com pilhas e faixas.
+    for (const [columnOrder, extra] of [
+        [[T, L, I, CENTER_STAGE, R], {}],
+        [[L, CENTER_STAGE, T, R, I], {}],
+        [[L, R, CENTER_STAGE, T, I], { columnStacks: [[L, R]] }],
+        [[I, CENTER_STAGE, T, R, L], { bands: { top: [], bottom: [L] }, bandCorners: { bl: "band", br: "column" } }]
+    ]) {
+        const state = { columnOrder, timelinePosition: "column", monitorsLayout: "auto", columnStacks: [], popped: [], dual: null, group: null, ...extra };
+        const layout = layoutFromLegacy(state);
+        assert.deepEqual(validateLayout(layout), [], `timeline coluna inválida: ${JSON.stringify(state)}`);
+        const row = layout.main.role === "frame" ? layout.main.children.find(c => c.role !== "band") : layout.main;
+        assert.ok(row.children.some(c => c.panel === T), "timeline é folha da linha do editor");
+        assert.deepEqual(legacyFromLayout(layout), state, `timeline coluna não voltou igual: ${JSON.stringify(state)}`);
+    }
+    // columnOrder manda: a posição "column" sem a timeline em columnOrder é "center"; faixa vence coluna.
+    assert.equal(legacyFromLayout(layoutFromLegacy({ columnOrder: presets.padrao, timelinePosition: "column", monitorsLayout: "auto" })).timelinePosition, "center");
+    const ambos = legacyFromLayout(layoutFromLegacy({ columnOrder: [T, ...presets.padrao], timelinePosition: "column", monitorsLayout: "auto", bands: { top: [T], bottom: [] } }));
+    assert.deepEqual([ambos.timelinePosition, ambos.columnOrder], ["band", presets.padrao]);
+    console.log("✔ 1.7 passou: timeline em faixa (cima/baixo, com laterais, cantos livres) ou coluna vai e volta; árvores antigas viram faixa.");
 }
 
 // ----------------------------------------------------------------------
@@ -204,10 +283,10 @@ console.log("✔ 3.1 passou: serialização estável e parse rejeita texto invá
     assert.equal(h.record(L("center")), false, "estado igual não vira passo");
     assert.equal(h.record(L("bottom-full")), true);
     assert.equal(h.record(L("bottom-left")), true);
-    assert.equal(legacyFromLayout(h.undo()).timelinePosition, "bottom-full");
+    assert.deepEqual(legacyFromLayout(h.undo()).bandCorners, { bl: "band", br: "band" });
     assert.equal(legacyFromLayout(h.undo()).timelinePosition, "center");
     assert.equal(h.undo(), null, "nada além da linha de base");
-    assert.equal(legacyFromLayout(h.redo()).timelinePosition, "bottom-full");
+    assert.deepEqual(legacyFromLayout(h.redo()).bandCorners, { bl: "band", br: "band" });
     h.record(L("bottom-right"));
     assert.equal(h.canRedo, false, "novo passo descarta o refazer");
     ["center", "bottom-full", "bottom-left", "bottom-right"].forEach(p => h.record(L(p)));
