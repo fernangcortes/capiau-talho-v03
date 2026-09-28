@@ -7,6 +7,21 @@ O arquivo `docs/PLANO_JANELAS_DRAG_DOCK.md` é ignorado pelo git (fica só local
 
 ## Próxima tarefa (pedido do usuário)
 
+> **Feito em 28/09** (commit "recolher painéis em pilha e janelas"). Resumo:
+> - Estado de recolher central no `WorkspaceManager` (`setPanelCollapsed` / `isPanelCollapsed` /
+>   `applyAllCollapse`), salvo em `capiau_collapsed_panels`. **Não** entra no Ctrl+Alt+Z (decisão do usuário).
+>   Recolher automático do Painel Lateral sem abas (`auto: true`) não vai para o salvo.
+> - `panelPlacement` diz onde o painel está (coluna, pilha, janela simples/dupla/grupo) e cada lugar
+>   desenha o recolher: pilha = linha deitada no lugar do painel (`restore-line-h`), anfitrião recolhido =
+>   `dock-stack-self-collapsed`, todos recolhidos = coluna some e as linhas ficam em pé; janelas =
+>   `capiauSetPanelCollapsed` / `capiauPanelEdge` em `panel.html` e `panel-group.html`.
+> - Seta: `collapseEdge` (`js/panelCollapse.js`, `edgeInLine`), recalculada em toda reorganização.
+> - Numpad: `handleWorkspaceShortcut` também é chamado pelas janelas destacadas.
+> - Autoteste: `tests/autoteste_panel_collapse.mjs`. As janelas foram testadas no navegador com
+>   `window.open` simulado por iframe (mesmo `adoptNode`/`BroadcastChannel`); falta o teste com janelas reais.
+>
+> Texto original do pedido, para referência:
+
 > Os botões de recolher painel e os atalhos Numpad de **Ajustes & Efeitos** (Numpad5) e
 > **Transcrição & Falas** (Numpad6) não estão funcionando.
 

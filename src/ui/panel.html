@@ -17,7 +17,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- CSS e FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=76">
+    <link rel="stylesheet" href="styles.css?v=77">
     <style>
         body {
             margin: 0;
@@ -281,6 +281,34 @@
             box-shadow: 0 0 12px rgba(139, 92, 246, 0.8) !important;
         }
 
+        /* Painel único recolhido */
+        .single-restore {
+            flex: 1;
+            display: flex;
+            cursor: pointer;
+            background: #090d16;
+        }
+        .single-restore.edge-right { flex-direction: row-reverse; }
+        .single-restore-line {
+            flex: 0 0 4px;
+            background: rgba(6, 182, 212, 0.18);
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .single-restore-msg {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary, #94a3b8);
+        }
+        .single-restore:hover .single-restore-line {
+            background: rgba(6, 182, 212, 0.9);
+            box-shadow: 0 0 12px rgba(6, 182, 212, 0.8);
+        }
+        .single-restore:hover .single-restore-msg { color: #e2e8f0; }
+
         .popout-loading-state {
             display: flex;
             flex-direction: column;
@@ -373,6 +401,12 @@
         <!-- Linha Restauradora do Painel 2 (Borda Externa: Direita / Baixo) -->
         <div id="dual-restore-line-2" class="dual-restore-line cyan-theme" style="display: none;" data-tooltip="Restaurar Painel 2"></div>
     </main>
+
+    <!-- Painel único recolhido: linha de expandir na borda e o resto da janela também expande -->
+    <div id="single-restore" class="single-restore" style="display: none;">
+        <div class="single-restore-line"></div>
+        <div class="single-restore-msg"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> <span id="single-restore-text"></span></div>
+    </div>
 
     <!-- ── CONTAINER TRADICIONAL (PAINEL ÚNICO) ── -->
     <div id="panel-container">
@@ -707,25 +741,34 @@
                 window.dispatchEvent(new Event("resize"));
             }
 
-            btnToggleSlot1?.addEventListener("click", () => {
-                isSlot1Collapsed = !isSlot1Collapsed;
+            // O estado de recolher mora no editor (fica salvo e vale para o Numpad);
+            // ele chama capiauSetPanelCollapsed de volta. Sem editor, muda só aqui.
+            function requestCollapsed(panelId, collapsed) {
+                try {
+                    if (window.opener && !window.opener.closed && window.opener.workspaceManager?.setPanelCollapsed) {
+                        window.opener.workspaceManager.setPanelCollapsed(panelId, collapsed);
+                        return;
+                    }
+                } catch (e) {}
+                window.capiauSetPanelCollapsed(panelId, collapsed);
+            }
+            window.capiauSetPanelCollapsed = (panelId, collapsed) => {
+                if (panelId === panel1Name) isSlot1Collapsed = !!collapsed;
+                else if (panelId === panel2Name) isSlot2Collapsed = !!collapsed;
+                else return;
                 updateRetractionUI();
-            });
+            };
+            window.capiauPanelEdge = (panelId) => {
+                const stacked = currentLayout === "stacked";
+                if (panelId === panel1Name) return stacked ? "up" : "left";
+                if (panelId === panel2Name) return stacked ? "down" : "right";
+                return null;
+            };
 
-            btnToggleSlot2?.addEventListener("click", () => {
-                isSlot2Collapsed = !isSlot2Collapsed;
-                updateRetractionUI();
-            });
-
-            restoreLine1?.addEventListener("click", () => {
-                isSlot1Collapsed = false;
-                updateRetractionUI();
-            });
-
-            restoreLine2?.addEventListener("click", () => {
-                isSlot2Collapsed = false;
-                updateRetractionUI();
-            });
+            btnToggleSlot1?.addEventListener("click", () => requestCollapsed(panel1Name, !isSlot1Collapsed));
+            btnToggleSlot2?.addEventListener("click", () => requestCollapsed(panel2Name, !isSlot2Collapsed));
+            restoreLine1?.addEventListener("click", () => requestCollapsed(panel1Name, false));
+            restoreLine2?.addEventListener("click", () => requestCollapsed(panel2Name, false));
 
             // ── DRAG & DROP DO DIVISOR (SPLITTER) ──
             let isDraggingSplitter = false;
@@ -832,6 +875,36 @@
             if (localStorage.getItem("capiau_dual_header_collapsed") === "true") {
                 setDualHeaderCollapsed(true);
             }
+        }
+
+        // ── PAINEL ÚNICO: RECOLHER (botão, Numpad) ──
+        if (!isDual) {
+            const singleRestore = document.getElementById("single-restore");
+            document.getElementById("single-restore-text").textContent =
+                `${TITLE_MAP[panel1Name] || panel1Name} recolhido — clique para expandir`;
+            window.capiauSetPanelCollapsed = (panelId, collapsed) => {
+                if (panelId !== panel1Name) return;
+                const panel = singleContainer.firstElementChild;
+                const edge = window.capiauPanelEdge(panelId);
+                singleRestore.classList.toggle("edge-right", edge === "right");
+                singleRestore.style.display = collapsed ? "flex" : "none";
+                singleContainer.style.display = collapsed ? "none" : "flex";
+                if (panel) panel.classList.remove("collapsed");
+                window.dispatchEvent(new Event("resize"));
+            };
+            window.capiauPanelEdge = (panelId) => {
+                const panel = singleContainer.firstElementChild;
+                return panel && panel.classList.contains("dock-right") ? "right" : "left";
+            };
+            singleRestore.addEventListener("click", () => {
+                try {
+                    if (window.opener && !window.opener.closed && window.opener.workspaceManager?.setPanelCollapsed) {
+                        window.opener.workspaceManager.setPanelCollapsed(panel1Name, false);
+                        return;
+                    }
+                } catch (e) {}
+                window.capiauSetPanelCollapsed(panel1Name, false);
+            });
         }
 
         // ── COMUNICAÇÃO BIDIRECIONAL VIA BROADCASTCHANNEL ──

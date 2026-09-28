@@ -9864,7 +9864,7 @@ export class LibraryManager {
         // Salva dimensões anteriores do estado normal
         this.preInspectorLeftWidth = sidebarLeft.style.width || "350px";
         this.preInspectorLeftFlex = sidebarLeft.style.flex || "0 0 350px";
-        this.preInspectorRightCollapsed = sidebarRight ? sidebarRight.classList.contains("collapsed") : true;
+        this.preInspectorRightCollapsed = window.workspaceManager ? window.workspaceManager.isPanelCollapsed("sidebar-right") : (sidebarRight ? sidebarRight.classList.contains("collapsed") : true);
 
         // Salva a aba ativa da biblioteca antes de trocar
         const activeTabBtn = document.querySelector(".sidebar-left .tab-btn.active");
@@ -9877,9 +9877,8 @@ export class LibraryManager {
         this.preInspectorProgramMaximized = programPanel ? programPanel.classList.contains("maximized") : false;
 
         // Recolhe a barra direita
-        if (sidebarRight && !sidebarRight.classList.contains("collapsed")) {
-            const toggleRight = document.getElementById("toggle-right");
-            if (toggleRight) toggleRight.click();
+        if (sidebarRight && !this.preInspectorRightCollapsed) {
+            if (window.collapseSidebar) window.collapseSidebar("right");
         }
 
         // Maximiza o source player se o program estiver visível (não maximizado)
@@ -9936,10 +9935,7 @@ export class LibraryManager {
 
         // Restaura barra direita se necessário
         if (sidebarRight && !this.preInspectorRightCollapsed) {
-            const reopenRight = document.getElementById("reopen-right");
-            if (reopenRight && reopenRight.style.display !== "none") {
-                reopenRight.click();
-            }
+            if (window.expandSidebar) window.expandSidebar("right");
         }
 
         // Restaura estado dos players

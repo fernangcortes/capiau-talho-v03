@@ -231,9 +231,9 @@ export class TabPanels {
         if (side !== "right") return;
         const sidebar = document.getElementById("sidebar-right");
         const btn = this.strips[tab] ? this.guestButton(tab) : tabButton(tab);
-        if (sidebar?.classList.contains("collapsed") && btn && btn.style.display !== "none") {
+        if (sidebar && window.workspaceManager?.isPanelCollapsed("sidebar-right") && btn && btn.style.display !== "none") {
             this.autoCollapsed = false;
-            document.getElementById("reopen-right")?.click();
+            window.workspaceManager.setPanelCollapsed("sidebar-right", false);
         }
     }
 
@@ -525,13 +525,16 @@ export class TabPanels {
         const sidebar = document.getElementById("sidebar-right");
         if (!sidebar || sidebar.ownerDocument !== document) return;
         const anyLeft = [...document.querySelectorAll("#right-tabs .tab-btn")].some(b => !b.dataset.dockOut && b.style.display !== "none");
-        const collapsed = sidebar.classList.contains("collapsed");
+        const wm = window.workspaceManager;
+        if (!wm) return;
+        const collapsed = wm.isPanelCollapsed("sidebar-right");
         if (!anyLeft && !collapsed) {
+            // auto: recolhido pelo editor, não vai para o estado salvo.
             this.autoCollapsed = true;
-            document.getElementById("toggle-right")?.click();
+            wm.setPanelCollapsed("sidebar-right", true, { auto: true });
         } else if (anyLeft && collapsed && this.autoCollapsed) {
             this.autoCollapsed = false;
-            document.getElementById("reopen-right")?.click();
+            wm.setPanelCollapsed("sidebar-right", false);
         }
     }
 

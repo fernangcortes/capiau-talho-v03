@@ -46,7 +46,7 @@ console.log("✔ 3 passou: arrastar para fora destaca, sobre janela junta, dentr
 // 4. Faixa e Painel Lateral
 assert.ok(mainJs.includes("if (rightContainers[tab]?.dataset.dockOut) {") && mainJs.includes("if (c && !c.dataset.dockOut) c.style.display = \"none\";"), "troca de aba não esconde abas destacadas");
 assert.ok(mainJs.includes("if (btnTabVision.dataset.dockOut) return;"), "botão da Visão não reaparece enquanto destacada");
-assert.ok(tabs.includes("syncSidebarVisibility()") && tabs.includes('document.getElementById("toggle-right")?.click();'), "Painel Lateral some sem abas e volta com uma");
+assert.ok(tabs.includes("syncSidebarVisibility()") && tabs.includes('wm.setPanelCollapsed("sidebar-right", true, { auto: true });'), "Painel Lateral some sem abas e volta com uma");
 console.log("✔ 4 passou: faixa respeita abas destacadas; Painel Lateral some e volta.");
 
 // 5. Com janelas sobrepostas, juntar vai para a de cima (focada por último)

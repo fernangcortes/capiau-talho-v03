@@ -2,6 +2,7 @@ import { STATE } from "./state.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
 import { layoutFromLegacy, legacyFromLayout, LayoutHistory, serializeLayout } from "./dockModel.js";
 import { normalizeStacks, stackGuests, stackOf, removeFromStack } from "./dockOps.js";
+import { COLLAPSIBLE_PANELS, REOPEN_LINE_IDS, edgeInLine, collapseButtonFor, visibleSplitters, loadCollapsed, saveCollapsed } from "./panelCollapse.js";
 
 window.popoutWindows = {};
 
@@ -131,6 +132,11 @@ export class WorkspaceManager {
         try {
             this.columnStacks = normalizeStacks(JSON.parse(localStorage.getItem("capiau_column_stacks") || "[]"));
         } catch (e) {}
+
+        // Painéis recolhidos (Biblioteca, Ajustes, Painel Lateral), valem em qualquer lugar e ficam
+        // salvos ao reabrir. Os recolhidos sozinhos (Painel Lateral sem abas) não vão para o salvo.
+        this.collapsedPanels = loadCollapsed(localStorage);
+        this.autoCollapsedPanels = new Set();
 
         this.pendingColumnOrder = [...this.columnOrder];
         this.pendingTimelinePosition = this.timelinePosition;
@@ -266,7 +272,6 @@ export class WorkspaceManager {
             hostEl.appendChild(splitter);
             hostEl.appendChild(guestEl);
             guestEl.classList.add("dock-stack-guest");
-            guestEl.classList.remove("collapsed");
             this.updatePanelDockDirection(guestId, side);
             const saved = parseFloat(localStorage.getItem(`capiau_stack_h_${guestId}`));
             if (!isNaN(saved) && saved > 80) guestEl.style.setProperty("--dock-guest-h", `${saved}px`);
@@ -303,6 +308,195 @@ export class WorkspaceManager {
             splitter.addEventListener("pointerup", up);
             splitter.addEventListener("pointercancel", up);
         });
+    }
+
+    // ── Recolher painéis: coluna, pilha e janelas destacadas ─────────────────
+
+    findPanelElement(panelId) {
+        return document.getElementById(panelId)
+            || this.studioTop?.querySelector(`#${panelId}`)
+            || this.compoundStage?.querySelector(`#${panelId}`)
+            || this.poppedElements?.[panelId]
+            || null;
+    }
+
+    /** Onde o painel está: "column", "stack" (com host), ou numa janela: "single", "dual", "group" (com win). */
+    panelPlacement(panelId) {
+        const el = this.findPanelElement(panelId);
+        if (!el) return null;
+        if (el.ownerDocument !== document) {
+            const win = el.ownerDocument.defaultView;
+            if (!win || win.closed) return null;
+            const kind = win === window.popoutWindows?.["group"] ? "group"
+                : win === window.popoutWindows?.["dual-sidebar"] ? "dual"
+                : "single";
+            return { kind, el, win };
+        }
+        if (el.classList.contains("dock-stack-host")) return { kind: "stack", el, host: el };
+        if (el.classList.contains("dock-stack-guest") && el.parentElement?.classList.contains("dock-stack-host")) {
+            return { kind: "stack", el, host: el.parentElement };
+        }
+        return { kind: "column", el };
+    }
+
+    isPanelCollapsed(panelId) {
+        return this.collapsedPanels.has(panelId);
+    }
+
+    /**
+     * Recolhe ou expande um painel onde ele estiver. auto = recolhido pelo próprio editor
+     * (ex.: Painel Lateral sem abas): vale agora, mas não vai para o estado salvo.
+     */
+    setPanelCollapsed(panelId, collapsed, { auto = false } = {}) {
+        if (!COLLAPSIBLE_PANELS.includes(panelId)) return;
+        if (collapsed) this.collapsedPanels.add(panelId);
+        else this.collapsedPanels.delete(panelId);
+        if (collapsed && auto) this.autoCollapsedPanels.add(panelId);
+        else this.autoCollapsedPanels.delete(panelId);
+        saveCollapsed(localStorage, [...this.collapsedPanels].filter(id => !this.autoCollapsedPanels.has(id)));
+        if (!collapsed && panelId === "inspector-panel") {
+            document.getElementById("reopen-inspector")?.classList.remove("has-updates");
+        }
+        this.applyPanelCollapse(panelId);
+        window.dispatchEvent(new Event("resize"));
+    }
+
+    togglePanelCollapsed(panelId) {
+        this.setPanelCollapsed(panelId, !this.isPanelCollapsed(panelId));
+        return this.isPanelCollapsed(panelId);
+    }
+
+    /** Mostra o estado guardado de um painel no lugar onde ele está agora. */
+    applyPanelCollapse(panelId) {
+        const place = this.panelPlacement(panelId);
+        if (!place) return;
+        if (place.kind === "stack") {
+            this.applyStackCollapse(place.host);
+            return;
+        }
+        const collapsed = this.isPanelCollapsed(panelId);
+        const line = document.getElementById(REOPEN_LINE_IDS[panelId]);
+        if (line) line.classList.remove("restore-line-h");
+        if (place.kind === "column") {
+            // A linha fica ao lado do painel (pode ter ficado dentro de uma pilha desfeita).
+            if (line && line.parentElement !== place.el.parentElement) {
+                if (place.el.classList.contains("dock-right")) place.el.after(line);
+                else place.el.before(line);
+            }
+            place.el.classList.remove("dock-stack-self-collapsed");
+            place.el.classList.toggle("collapsed", collapsed);
+            if (line) line.style.display = collapsed ? "block" : "none";
+        } else {
+            // Na janela destacada quem desenha o recolher é a própria página (panel.html / panel-group.html).
+            place.el.classList.remove("collapsed", "dock-stack-self-collapsed");
+            if (line) line.style.display = "none";
+            try { place.win.capiauSetPanelCollapsed?.(panelId, collapsed); } catch (e) {}
+        }
+        this.refreshCollapseArrow(panelId);
+    }
+
+    /**
+     * Pilha de coluna: o recolhido some e os outros ocupam o espaço; a linha de expandir fica no
+     * lugar dele (em cima, se era o de cima). Todos recolhidos: a coluna some e as linhas ficam
+     * em pé onde ela estava, como uma coluna recolhida.
+     */
+    applyStackCollapse(host) {
+        if (!host) return;
+        const guests = [...host.querySelectorAll(":scope > .dock-stack-guest")];
+        const members = [host, ...guests];
+        const states = members.map(m => this.isPanelCollapsed(m.id));
+        const lines = members.map(m => document.getElementById(REOPEN_LINE_IDS[m.id]));
+        const all = states.every(Boolean);
+
+        host.classList.toggle("collapsed", all);
+        host.classList.toggle("dock-stack-self-collapsed", states[0] && !all);
+        guests.forEach((g, i) => g.classList.toggle("collapsed", states[i + 1]));
+
+        if (all) {
+            const isRight = host.classList.contains("dock-right");
+            let ref = host;
+            lines.forEach(line => {
+                if (!line) return;
+                line.classList.remove("restore-line-h");
+                line.style.display = "block";
+                if (isRight) { ref.after(line); ref = line; }
+                else host.before(line);
+            });
+        } else {
+            members.forEach((m, i) => {
+                const line = lines[i];
+                if (!line) return;
+                if (!states[i]) {
+                    // Escondida fora da coluna, para não sobrar dentro de um painel quando a pilha mudar.
+                    line.style.display = "none";
+                    line.classList.remove("restore-line-h");
+                    if (line.parentElement === host) host.before(line);
+                    return;
+                }
+                line.classList.add("restore-line-h");
+                line.style.display = "block";
+                if (i === 0) {
+                    host.insertBefore(line, host.firstChild);
+                } else {
+                    const splitter = host.querySelector(`:scope > .dock-stack-splitter[data-guest="${m.id}"]`);
+                    host.insertBefore(line, splitter || m);
+                }
+            });
+        }
+
+        // Divisores só entre dois painéis visíveis.
+        const seq = [!states[0]];
+        const splitters = [null];
+        guests.forEach((g, i) => {
+            seq.push("splitter", !states[i + 1]);
+            splitters.push(host.querySelector(`:scope > .dock-stack-splitter[data-guest="${g.id}"]`), null);
+        });
+        visibleSplitters(seq).forEach((show, i) => {
+            if (splitters[i]) splitters[i].style.display = show ? "" : "none";
+        });
+
+        members.forEach(m => this.refreshCollapseArrow(m.id));
+    }
+
+    applyAllCollapse() {
+        const hosts = new Set();
+        COLLAPSIBLE_PANELS.forEach(id => {
+            const place = this.panelPlacement(id);
+            if (!place) return;
+            if (place.kind === "stack") hosts.add(place.host);
+            else this.applyPanelCollapse(id);
+        });
+        hosts.forEach(host => this.applyStackCollapse(host));
+    }
+
+    /** Para onde o painel recolhe: esquerda/direita lado a lado, cima/baixo empilhado. */
+    collapseEdge(panelId) {
+        const place = this.panelPlacement(panelId);
+        if (!place) return null;
+        if (place.kind === "stack") {
+            const members = [place.host, ...place.host.querySelectorAll(":scope > .dock-stack-guest")];
+            return edgeInLine("column", members.indexOf(place.el), members.length);
+        }
+        if (place.kind === "column") return place.el.classList.contains("dock-right") ? "right" : "left";
+        try {
+            return place.win.capiauPanelEdge?.(panelId) || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    refreshCollapseArrow(panelId) {
+        const edge = this.collapseEdge(panelId);
+        const btn = edge && this.findPanelElement(panelId)?.querySelector(".btn-toggle-sidebar");
+        if (!btn) return;
+        const { html, tooltip } = collapseButtonFor(edge);
+        if (btn.innerHTML !== html) btn.innerHTML = html;
+        btn.removeAttribute("title");
+        btn.setAttribute("data-tooltip", tooltip);
+    }
+
+    refreshCollapseArrows() {
+        COLLAPSIBLE_PANELS.forEach(id => this.refreshCollapseArrow(id));
     }
 
     getDockLayout() {
@@ -813,6 +1007,8 @@ export class WorkspaceManager {
 
         // Atualiza a direcionalidade inteligente dos botões das colunas
         this.updateAllPanelsDockDirection();
+        // Painéis recolhidos na sessão anterior.
+        this.applyAllCollapse();
 
         this.initMaximizeButtons();
         this.initSidebarObservers();
@@ -1381,6 +1577,11 @@ export class WorkspaceManager {
         if (!panelId || panelId === "center-stage") return;
         const panel = document.getElementById(panelId) || this.poppedElements?.[panelId] || getActiveElement(panelId);
         if (!panel) return;
+        // Em janela destacada a página decide o lado (Janela Dupla empilhada = cima/baixo).
+        if (panel.ownerDocument !== document) {
+            this.refreshCollapseArrow(panelId);
+            return;
+        }
 
         const isLeft = side === "left";
         panel.classList.toggle("dock-left", isLeft);
@@ -1392,13 +1593,9 @@ export class WorkspaceManager {
             if (header && toggleBtn.parentElement !== header) {
                 header.insertBefore(toggleBtn, header.firstChild);
             }
-            toggleBtn.innerHTML = isLeft 
-                ? `<i class="fa-solid fa-chevron-left"></i>` 
-                : `<i class="fa-solid fa-chevron-right"></i>`;
-            const title = isLeft ? "Recolher Painel (Esquerda)" : "Recolher Painel (Direita)";
-            toggleBtn.removeAttribute("title");
-            toggleBtn.setAttribute("data-tooltip", title);
         }
+        // Seta: esquerda/direita na coluna, cima/baixo na pilha.
+        this.refreshCollapseArrow(panelId);
     }
 
     /**
@@ -2045,7 +2242,7 @@ export class WorkspaceManager {
             const el = findColumnElement(colId);
             if (!el) return;
             el.querySelectorAll(":scope > .dock-stack-splitter").forEach(sp => sp.remove());
-            el.classList.remove("dock-stack-host");
+            el.classList.remove("dock-stack-host", "dock-stack-self-collapsed");
             if (!guests.has(colId)) {
                 el.classList.remove("dock-stack-guest");
                 el.style.removeProperty("--dock-guest-h");
@@ -2094,6 +2291,9 @@ export class WorkspaceManager {
             }
             if (colEl && !isPopped) this.mountStackGuests(colId, colEl);
         });
+
+        // Recolhidos: cada painel volta a mostrar seu estado no lugar novo (linha e seta).
+        this.applyAllCollapse();
     }
 
     /**
@@ -3206,9 +3406,9 @@ export class WorkspaceManager {
                 "layout-dim-splitter-timeline-headers": getDim("layout-dim-splitter-timeline-headers")
             },
             collapsed: {
-                sidebarLeft: sidebarLeft ? sidebarLeft.classList.contains("collapsed") : false,
-                inspectorPanel: inspectorPanel ? inspectorPanel.classList.contains("collapsed") : false,
-                sidebarRight: sidebarRight ? sidebarRight.classList.contains("collapsed") : false,
+                sidebarLeft: this.isPanelCollapsed("sidebar-left"),
+                inspectorPanel: this.isPanelCollapsed("inspector-panel"),
+                sidebarRight: this.isPanelCollapsed("sidebar-right"),
                 timelinePanel: timelinePanel ? timelinePanel.classList.contains("collapsed") : false,
                 header: appContainer ? appContainer.classList.contains("header-collapsed") : false,
                 timelineToolbar: timelineActions ? timelineActions.classList.contains("collapsed") : false,
@@ -3429,7 +3629,7 @@ export class WorkspaceManager {
                 const toggleLeft = document.getElementById("toggle-left");
                 const reopenLeft = document.getElementById("reopen-left");
                 if (sidebarLeft && reopenLeft) {
-                    const isCollapsed = sidebarLeft.classList.contains("collapsed");
+                    const isCollapsed = this.isPanelCollapsed("sidebar-left");
                     if (c.sidebarLeft && !isCollapsed) {
                         if (toggleLeft) toggleLeft.click(); else sidebarLeft.classList.add("collapsed");
                     } else if (!c.sidebarLeft && isCollapsed) {
@@ -3441,7 +3641,7 @@ export class WorkspaceManager {
                 const toggleInspector = document.getElementById("toggle-inspector");
                 const reopenInspector = document.getElementById("reopen-inspector");
                 if (inspectorPanel && reopenInspector) {
-                    const isCollapsed = inspectorPanel.classList.contains("collapsed");
+                    const isCollapsed = this.isPanelCollapsed("inspector-panel");
                     if (c.inspectorPanel && !isCollapsed) {
                         if (toggleInspector) toggleInspector.click(); else inspectorPanel.classList.add("collapsed");
                     } else if (!c.inspectorPanel && isCollapsed) {
@@ -3452,7 +3652,7 @@ export class WorkspaceManager {
                 const toggleRight = document.getElementById("toggle-right");
                 const reopenRight = document.getElementById("reopen-right");
                 if (sidebarRight && reopenRight) {
-                    const isCollapsed = sidebarRight.classList.contains("collapsed");
+                    const isCollapsed = this.isPanelCollapsed("sidebar-right");
                     if (c.sidebarRight && !isCollapsed) {
                         if (toggleRight) toggleRight.click(); else sidebarRight.classList.add("collapsed");
                     } else if (!c.sidebarRight && isCollapsed) {
@@ -4345,8 +4545,7 @@ export class WorkspaceManager {
                         e.preventDefault();
                         e.stopPropagation();
                         e.stopImmediatePropagation();
-                        const slotBtnId = idx === 0 ? "btn-toggle-slot-1" : "btn-toggle-slot-2";
-                        win.document.getElementById(slotBtnId)?.click();
+                        this.setPanelCollapsed(currentId, true);
                     });
 
                     // Duplo clique no espaço vazio do cabeçalho da sidebar na janela destacada recolhe o slot correspondente
@@ -4369,6 +4568,10 @@ export class WorkspaceManager {
         localStorage.setItem(`capiau_popout_active_${panelId1}`, "true");
         localStorage.setItem(`capiau_popout_active_${panelId2}`, "true");
         localStorage.setItem("capiau_dual_popout_active", "true");
+
+        // Recolhido continua recolhido na janela (e a seta aponta para cima/baixo se empilhados).
+        this.applyPanelCollapse(panelId1);
+        this.applyPanelCollapse(panelId2);
 
         // Reorganiza os divisores e atualiza o layout do editor principal imediatamente
         this.reinitSplitters();
@@ -4423,6 +4626,8 @@ export class WorkspaceManager {
                 
                 if (window.isAnyModalOpen && window.isAnyModalOpen(win.document)) return;
                 if (this.handleLayoutShortcut(e)) return;
+                // Numpad (recolher/destacar painéis) vale também com o foco na janela destacada.
+                if (this.handleWorkspaceShortcut(e)) return;
                 if (window.FaceManager && window.FaceManager.inspectorCard) return;
 
                 // Intercepta atalho de rotação de mídia sob o cursor (R / Shift+R) no popout
@@ -4610,6 +4815,10 @@ export class WorkspaceManager {
 
         localStorage.setItem(`capiau_popout_active_${panelId}`, "true");
 
+        // Recolhido continua recolhido na janela; a seta segue a posição dentro dela.
+        localPanel.classList.remove("collapsed");
+        if (COLLAPSIBLE_PANELS.includes(panelId)) this.applyPanelCollapse(panelId);
+
         // Reorganiza os divisores e atualiza o layout do editor principal imediatamente após a remoção do painel
         this.reinitSplitters();
         setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
@@ -4693,6 +4902,8 @@ export class WorkspaceManager {
                 
                 if (window.isAnyModalOpen && window.isAnyModalOpen(win.document)) return;
                 if (this.handleLayoutShortcut(e)) return;
+                // Numpad (recolher/destacar painéis) vale também com o foco na janela destacada.
+                if (this.handleWorkspaceShortcut(e)) return;
                 if (window.FaceManager && window.FaceManager.inspectorCard) return;
 
                 // Intercepta atalho de rotação de mídia sob o cursor (R / Shift+R) no popout
@@ -4868,6 +5079,8 @@ export class WorkspaceManager {
             this.reinitSplitters();
             setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
         }
+        // De volta ao editor: recolhido fica recolhido, com a linha e a seta do lugar novo.
+        if (COLLAPSIBLE_PANELS.includes(panelId)) this.applyAllCollapse();
     }
 
     syncTimelineCanvasToPopout(retries = 0) {
@@ -5003,14 +5216,12 @@ export class WorkspaceManager {
      * Alterna a Biblioteca (Sidebar Esquerda)
      */
     toggleLibrary() {
-        const lib = document.getElementById("sidebar-left");
-        const reopen = document.getElementById("reopen-left");
-        const toggleBtn = document.getElementById("toggle-left");
-        if (lib && lib.classList.contains("collapsed")) {
-            if (reopen) reopen.click(); else lib.classList.remove("collapsed");
+        if (!this.panelPlacement("sidebar-left")) return;
+        if (this.isPanelCollapsed("sidebar-left")) {
+            window.expandSidebar ? window.expandSidebar("left") : this.setPanelCollapsed("sidebar-left", false);
             if (window.showToast) window.showToast("Biblioteca: Visível", "info");
-        } else if (lib) {
-            if (toggleBtn) toggleBtn.click(); else lib.classList.add("collapsed");
+        } else {
+            window.collapseSidebar ? window.collapseSidebar("left") : this.setPanelCollapsed("sidebar-left", true);
             if (window.showToast) window.showToast("Biblioteca: Oculta", "info");
         }
     }
@@ -5033,16 +5244,9 @@ export class WorkspaceManager {
      * Alterna o Inspetor de Propriedades e Efeitos
      */
     toggleInspector() {
-        const insp = document.getElementById("inspector-panel");
-        const reopen = document.getElementById("reopen-inspector");
-        const toggleBtn = document.getElementById("toggle-inspector");
-        if (insp && insp.classList.contains("collapsed")) {
-            if (reopen) reopen.click(); else insp.classList.remove("collapsed");
-            if (window.showToast) window.showToast("Inspetor: Visível", "info");
-        } else if (insp) {
-            if (toggleBtn) toggleBtn.click(); else insp.classList.add("collapsed");
-            if (window.showToast) window.showToast("Inspetor: Oculto", "info");
-        }
+        if (!this.panelPlacement("inspector-panel")) return;
+        const collapsed = this.togglePanelCollapsed("inspector-panel");
+        if (window.showToast) window.showToast(collapsed ? "Inspetor: Oculto" : "Inspetor: Visível", "info");
     }
 
     /**
@@ -5066,16 +5270,9 @@ export class WorkspaceManager {
      * Alterna o Painel Lateral Direito (Ferramentas, IA, Exportação)
      */
     toggleRightSidebar() {
-        const r = document.getElementById("sidebar-right");
-        const reopen = document.getElementById("reopen-right");
-        const toggleBtn = document.getElementById("toggle-right");
-        if (r && r.classList.contains("collapsed")) {
-            if (reopen) reopen.click(); else r.classList.remove("collapsed");
-            if (window.showToast) window.showToast("Painel Direito: Visível", "info");
-        } else if (r) {
-            if (toggleBtn) toggleBtn.click(); else r.classList.add("collapsed");
-            if (window.showToast) window.showToast("Painel Direito: Oculto", "info");
-        }
+        if (!this.panelPlacement("sidebar-right")) return;
+        const collapsed = this.togglePanelCollapsed("sidebar-right");
+        if (window.showToast) window.showToast(collapsed ? "Painel Direito: Oculto" : "Painel Direito: Visível", "info");
     }
 
     /**
@@ -5384,222 +5581,231 @@ export class WorkspaceManager {
             // 0. Histórico de layout (Ctrl + Alt + Z / Ctrl + Alt + Shift + Z)
             if (this.handleLayoutShortcut(e)) return;
 
-            // 1. Slots de Workspace: Salvar (Ctrl + Alt + Shift + [1-9])
-            if (e.ctrlKey && e.altKey && e.shiftKey) {
-                for (let i = 1; i <= 9; i++) {
-                    if (e.code === `Digit${i}` || e.code === `Numpad${i}` || KEYMAP_SERVICE.matches(e, `workspace.save_slot_${i}`)) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.saveWorkspaceSlot(i);
-                        return;
-                    }
-                }
-            }
-
-            // 2. Slots de Workspace: Carregar (Ctrl + Alt + [1-9])
-            if (e.ctrlKey && e.altKey && !e.shiftKey) {
-                for (let i = 1; i <= 9; i++) {
-                    if (e.code === `Digit${i}` || e.code === `Numpad${i}` || KEYMAP_SERVICE.matches(e, `workspace.load_slot_${i}`)) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.loadWorkspaceSlot(i);
-                        return;
-                    }
-                }
-            }
-
-            // 3. Alt + Numpad
-            if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
-                if (e.code === "Numpad1" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_1")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTrackHeaders();
-                    return;
-                }
-                if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_2")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelinePanelVertical();
-                    return;
-                }
-                if (e.code === "Numpad3" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_3")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelineToolbar();
-                    return;
-                }
-                if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_4")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeLibraryStudio();
-                    return;
-                }
-                if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_5")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeInspector();
-                    return;
-                }
-                if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_6")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeRightSidebar();
-                    return;
-                }
-                if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_7")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeSourcePlayer();
-                    return;
-                }
-                if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_9")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeProgramPlayer();
-                    return;
-                }
-            }
-
-            // 4. Ctrl + Numpad (Destacar / Popout)
-            if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
-                if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_2")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("timeline-panel");
-                    return;
-                }
-                if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_4")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("sidebar-left");
-                    return;
-                }
-                if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_5")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("inspector-panel");
-                    return;
-                }
-                if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_6")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("sidebar-right");
-                    return;
-                }
-                if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_7")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("source-player-panel");
-                    return;
-                }
-                if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_9")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("program-player-panel");
-                    return;
-                }
-            }
-
-            // 5. Teclas Simples do Numpad (sem modificadores)
-            if (!e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
-                if (e.code === "Numpad1" || KEYMAP_SERVICE.matches(e, "workspace.numpad_1")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelineExpandLeft();
-                    return;
-                }
-                if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.numpad_2")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelinePosition();
-                    return;
-                }
-                if (e.code === "Numpad3" || KEYMAP_SERVICE.matches(e, "workspace.numpad_3")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelineExpandRight();
-                    return;
-                }
-                if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.numpad_4")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleLibrary();
-                    return;
-                }
-                if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.numpad_5")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleInspector();
-                    return;
-                }
-                if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.numpad_6")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleRightSidebar();
-                    return;
-                }
-                if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.numpad_7")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleSourcePlayer();
-                    return;
-                }
-                if (e.code === "Numpad8" || KEYMAP_SERVICE.matches(e, "workspace.numpad_8")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleHeader();
-                    return;
-                }
-                if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.numpad_9")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleProgramPlayer();
-                    return;
-                }
-                if (e.code === "Numpad0" || KEYMAP_SERVICE.matches(e, "workspace.numpad_0")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleZenMode();
-                    return;
-                }
-                if (e.code === "NumpadDecimal" || KEYMAP_SERVICE.matches(e, "workspace.numpad_decimal")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelineHeader();
-                    return;
-                }
-                if (e.code === "NumpadAdd" || KEYMAP_SERVICE.matches(e, "workspace.numpad_add")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.adjustTrackHeight(10);
-                    return;
-                }
-                if (e.code === "NumpadSubtract" || KEYMAP_SERVICE.matches(e, "workspace.numpad_subtract")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.adjustTrackHeight(-10);
-                    return;
-                }
-                if (e.code === "NumpadDivide" || KEYMAP_SERVICE.matches(e, "workspace.numpad_divide")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleMonitorsLayout();
-                    return;
-                }
-                if (e.code === "NumpadMultiply" || KEYMAP_SERVICE.matches(e, "workspace.numpad_multiply")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.swapMonitorsFocus();
-                    return;
-                }
-                if (e.code === "NumpadEnter" || KEYMAP_SERVICE.matches(e, "workspace.numpad_enter")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeFocusedOrHovered();
-                    return;
-                }
-            }
+            this.handleWorkspaceShortcut(e);
         });
+    }
+
+    /**
+     * Atalhos do Numpad e slots de workspace. Também chamado pelas janelas destacadas, para o
+     * Numpad valer com o foco dentro delas. Devolve true se tratou a tecla.
+     */
+    handleWorkspaceShortcut(e) {
+        // 1. Slots de Workspace: Salvar (Ctrl + Alt + Shift + [1-9])
+        if (e.ctrlKey && e.altKey && e.shiftKey) {
+            for (let i = 1; i <= 9; i++) {
+                if (e.code === `Digit${i}` || e.code === `Numpad${i}` || KEYMAP_SERVICE.matches(e, `workspace.save_slot_${i}`)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.saveWorkspaceSlot(i);
+                    return true;
+                }
+            }
+        }
+
+        // 2. Slots de Workspace: Carregar (Ctrl + Alt + [1-9])
+        if (e.ctrlKey && e.altKey && !e.shiftKey) {
+            for (let i = 1; i <= 9; i++) {
+                if (e.code === `Digit${i}` || e.code === `Numpad${i}` || KEYMAP_SERVICE.matches(e, `workspace.load_slot_${i}`)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.loadWorkspaceSlot(i);
+                    return true;
+                }
+            }
+        }
+
+        // 3. Alt + Numpad
+        if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
+            if (e.code === "Numpad1" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_1")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTrackHeaders();
+                return true;
+            }
+            if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_2")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelinePanelVertical();
+                return true;
+            }
+            if (e.code === "Numpad3" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_3")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelineToolbar();
+                return true;
+            }
+            if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_4")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeLibraryStudio();
+                return true;
+            }
+            if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_5")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeInspector();
+                return true;
+            }
+            if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_6")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeRightSidebar();
+                return true;
+            }
+            if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_7")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeSourcePlayer();
+                return true;
+            }
+            if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_9")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeProgramPlayer();
+                return true;
+            }
+        }
+
+        // 4. Ctrl + Numpad (Destacar / Popout)
+        if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+            if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_2")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("timeline-panel");
+                return true;
+            }
+            if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_4")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("sidebar-left");
+                return true;
+            }
+            if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_5")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("inspector-panel");
+                return true;
+            }
+            if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_6")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("sidebar-right");
+                return true;
+            }
+            if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_7")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("source-player-panel");
+                return true;
+            }
+            if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_9")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("program-player-panel");
+                return true;
+            }
+        }
+
+        // 5. Teclas Simples do Numpad (sem modificadores)
+        if (!e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+            if (e.code === "Numpad1" || KEYMAP_SERVICE.matches(e, "workspace.numpad_1")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelineExpandLeft();
+                return true;
+            }
+            if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.numpad_2")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelinePosition();
+                return true;
+            }
+            if (e.code === "Numpad3" || KEYMAP_SERVICE.matches(e, "workspace.numpad_3")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelineExpandRight();
+                return true;
+            }
+            if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.numpad_4")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleLibrary();
+                return true;
+            }
+            if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.numpad_5")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleInspector();
+                return true;
+            }
+            if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.numpad_6")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleRightSidebar();
+                return true;
+            }
+            if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.numpad_7")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleSourcePlayer();
+                return true;
+            }
+            if (e.code === "Numpad8" || KEYMAP_SERVICE.matches(e, "workspace.numpad_8")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleHeader();
+                return true;
+            }
+            if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.numpad_9")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleProgramPlayer();
+                return true;
+            }
+            if (e.code === "Numpad0" || KEYMAP_SERVICE.matches(e, "workspace.numpad_0")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleZenMode();
+                return true;
+            }
+            if (e.code === "NumpadDecimal" || KEYMAP_SERVICE.matches(e, "workspace.numpad_decimal")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelineHeader();
+                return true;
+            }
+            if (e.code === "NumpadAdd" || KEYMAP_SERVICE.matches(e, "workspace.numpad_add")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.adjustTrackHeight(10);
+                return true;
+            }
+            if (e.code === "NumpadSubtract" || KEYMAP_SERVICE.matches(e, "workspace.numpad_subtract")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.adjustTrackHeight(-10);
+                return true;
+            }
+            if (e.code === "NumpadDivide" || KEYMAP_SERVICE.matches(e, "workspace.numpad_divide")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleMonitorsLayout();
+                return true;
+            }
+            if (e.code === "NumpadMultiply" || KEYMAP_SERVICE.matches(e, "workspace.numpad_multiply")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.swapMonitorsFocus();
+                return true;
+            }
+            if (e.code === "NumpadEnter" || KEYMAP_SERVICE.matches(e, "workspace.numpad_enter")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeFocusedOrHovered();
+                return true;
+            }
+        }
+        return false;
     }
 }
 

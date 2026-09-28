@@ -13298,9 +13298,28 @@ body.dock-dragging * {
 .dock-stack-host:has(.dock-stack-guest ~ .dock-stack-guest) > .dock-stack-guest {
     flex-basis: var(--dock-guest-h, 33%) !important;
 }
-.dock-stack-guest .btn-toggle-sidebar,
 .dock-stack-guest [id^="btn-maximize"] {
     display: none !important;
+}
+/* Recolher dentro da pilha: o recolhido some, os outros ocupam o espaço e a linha de expandir
+   (deitada) fica no lugar dele. */
+.dock-stack-guest.collapsed {
+    display: none !important;
+}
+.dock-stack-host.dock-stack-self-collapsed > :not(.dock-stack-guest):not(.dock-stack-splitter):not(.restore-line-h) {
+    display: none !important;
+}
+.dock-stack-host.dock-stack-self-collapsed:has(.dock-stack-guest) > .dock-stack-guest:not(.collapsed) {
+    flex: 1 1 0% !important;
+}
+.left-restore-line.restore-line-h,
+.inspector-restore-line.restore-line-h,
+.right-restore-line.restore-line-h {
+    width: 100% !important;
+    height: 4px !important;
+    flex: 0 0 4px !important;
+    border-left: none !important;
+    border-right: none !important;
 }
 .dock-stack-splitter {
     flex: 0 0 5px;

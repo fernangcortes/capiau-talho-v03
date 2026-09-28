@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=76">
+    <link rel="stylesheet" href="styles.css?v=77">
     <style>
         body {
             margin: 0;
@@ -75,6 +75,25 @@
         .group-box.row > .group-splitter { cursor: col-resize; }
         .group-box.column > .group-splitter { cursor: row-resize; }
         .group-splitter:hover, .group-splitter.active { background: var(--color-cyan, #22d3ee); }
+        /* Recolhido: o espaço vira a linha de expandir, no mesmo lugar; os outros ocupam o resto. */
+        .group-slot.group-slot-collapsed { flex: 0 0 4px !important; min-width: 0; min-height: 0; }
+        .group-slot.group-slot-collapsed > :not(.group-restore-line) { display: none !important; }
+        .group-restore-line { display: none; }
+        .group-slot-collapsed > .group-restore-line {
+            display: block;
+            flex: 1 1 auto;
+            cursor: pointer;
+            background: rgba(6, 182, 212, 0.18);
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .group-slot-collapsed > .group-restore-line:hover {
+            background: rgba(6, 182, 212, 0.9);
+            box-shadow: 0 0 12px rgba(6, 182, 212, 0.8);
+        }
+        .group-fill { flex: 1 1 0% !important; }
+        /* Caixa com tudo recolhido: fica fininha e as linhas se deitam na outra direção. */
+        .group-box.row.group-box-collapsed { flex: 0 0 auto; flex-direction: column; }
+        .group-box.column.group-box-collapsed { flex: 0 0 auto; flex-direction: row; }
     </style>
 </head>
 <body>
@@ -95,6 +114,7 @@
     <main id="group-workspace"></main>
 
     <script type="module">
+        import { edgeInLine, visibleSplitters } from "./js/panelCollapse.js";
         const params = new URLSearchParams(window.location.search);
         const panels = (params.get("group") || "").split(",").map(p => p.trim()).filter(Boolean).slice(0, 4);
         const TITLES = {
@@ -188,8 +208,64 @@
                 btn.disabled = (a === "grid" || a === "main") && panels.length < 3;
             });
             try { localStorage.setItem("capiau_group_popout_arrangement", arrangement); } catch (e) {}
+            applyCollapsed();
+            // A seta de recolher segue a posição nova (esquerda/direita ou cima/baixo).
+            try { window.opener?.workspaceManager?.refreshCollapseArrows?.(); } catch (e) {}
             window.dispatchEvent(new Event("resize"));
         }
+
+        // ── Recolher: o estado mora no editor (salvo, Numpad); ele chama capiauSetPanelCollapsed ──
+        const collapsed = new Set();
+        const isGone = (el) => el.classList.contains("group-slot-collapsed") || el.classList.contains("group-box-collapsed");
+
+        /** Linha de expandir dentro do espaço (o editor limpa o espaço ao trazer o painel). */
+        function ensureLine(id) {
+            if (slots[id].querySelector(":scope > .group-restore-line")) return;
+            const line = document.createElement("div");
+            line.className = "group-restore-line";
+            line.setAttribute("data-tooltip", `Expandir ${TITLES[id] || id}`);
+            line.addEventListener("click", () => {
+                try {
+                    if (window.opener && !window.opener.closed && window.opener.workspaceManager?.setPanelCollapsed) {
+                        window.opener.workspaceManager.setPanelCollapsed(id, false);
+                        return;
+                    }
+                } catch (e) {}
+                window.capiauSetPanelCollapsed(id, false);
+            });
+            slots[id].appendChild(line);
+        }
+
+        function applyCollapsed() {
+            panels.forEach(id => {
+                ensureLine(id);
+                slots[id].classList.toggle("group-slot-collapsed", collapsed.has(id));
+            });
+            // Das caixas de dentro para as de fora: divisores só entre visíveis, o último visível enche.
+            [...document.querySelectorAll("#group-workspace .group-box")].reverse().forEach(b => {
+                const kids = [...b.children];
+                const seq = kids.map(k => k.classList.contains("group-splitter") ? "splitter" : !isGone(k));
+                visibleSplitters(seq).forEach((show, i) => { if (show !== null) kids[i].style.display = show ? "" : "none"; });
+                b.classList.toggle("group-box-collapsed", !seq.includes(true));
+                kids.forEach(k => k.classList.remove("group-fill"));
+                if (seq.includes(false)) kids.filter((k, i) => seq[i] === true).pop()?.classList.add("group-fill");
+            });
+            window.dispatchEvent(new Event("resize"));
+        }
+
+        window.capiauSetPanelCollapsed = (id, isCollapsed) => {
+            if (!slots[id]) return;
+            if (isCollapsed) collapsed.add(id); else collapsed.delete(id);
+            applyCollapsed();
+        };
+        window.capiauPanelEdge = (id) => {
+            const slot = slots[id];
+            const boxEl = slot?.parentElement;
+            if (!boxEl) return null;
+            const items = [...boxEl.children].filter(k => !k.classList.contains("group-splitter"));
+            return edgeInLine(boxEl.classList.contains("column") ? "column" : "row", items.indexOf(slot), items.length);
+        };
+
 
         document.querySelectorAll(".group-btn[data-arrangement]").forEach(btn => {
             btn.addEventListener("click", () => {
@@ -203,7 +279,9 @@
             const splitter = e.target.closest(".group-splitter");
             if (!splitter || e.button !== 0) return;
             e.preventDefault();
-            const prev = splitter.previousElementSibling;
+            let prev = splitter.previousElementSibling;
+            while (prev && (prev.classList.contains("group-splitter") || isGone(prev))) prev = prev.previousElementSibling;
+            if (!prev) return;
             const isRow = splitter.parentElement.classList.contains("row");
             const start = isRow ? e.clientX : e.clientY;
             const startSize = isRow ? prev.getBoundingClientRect().width : prev.getBoundingClientRect().height;
