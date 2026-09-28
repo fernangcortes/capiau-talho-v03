@@ -1232,8 +1232,11 @@ export class WorkspaceManager {
             
             // Ouvinte de clique geral no wrapper (e elementos internos que propagam)
             wrapper.addEventListener("click", (e) => {
-                // Ignora se clicou em algum botão ou controle, ou se clicou em face-box (desambiguação)
-                if (e.target.closest("button") || e.target.closest(".face-box") || e.target.closest(".player-controls")) return;
+                // Ignora se clicou em algum botão ou controle, ou se clicou em face-box (desambiguação).
+                // A camada de rostos do Source trata o próprio clique (play/pause ou desenhar caixa):
+                // tratar aqui também alternava duas vezes e o clique se anulava.
+                if (e.target.closest("button") || e.target.closest(".face-box") || e.target.closest(".player-controls")
+                    || e.target.closest("#source-video-face-overlay-container")) return;
                 
                 // Evita disparar se o usuário acabou de desenhar um retângulo de rosto no overlayContainer
                 if (window.player && window.player.isDrawing) return;
@@ -1246,18 +1249,20 @@ export class WorkspaceManager {
                 
                 clickTimer = setTimeout(() => {
                     clickTimer = null;
+                    // No documento do player: destacado, ele está na outra janela (não aqui).
+                    const doc = wrapper.ownerDocument || document;
                     // Play/Pause. Sem videoId (Program) o clique vai para o botão do painel:
                     // o Program compõe a timeline num pool de buffers <video>, então não há
                     // um elemento fixo para dar play — quem manda é o ProgramPlayer.
                     if (!videoId) {
-                        const btnPlay = document.getElementById(btnPlayId);
+                        const btnPlay = doc.getElementById(btnPlayId);
                         if (btnPlay) btnPlay.click();
                         return;
                     }
-                    const vid = document.getElementById(videoId);
+                    const vid = doc.getElementById(videoId);
                     if (vid && vid.src) {
                         if (vid.paused) vid.play(); else vid.pause();
-                        const btnPlay = document.getElementById(btnPlayId);
+                        const btnPlay = doc.getElementById(btnPlayId);
                         if (btnPlay) {
                             btnPlay.innerHTML = vid.paused
                                 ? `<i class="fa-solid fa-play"></i>`
@@ -1268,8 +1273,9 @@ export class WorkspaceManager {
             });
 
             wrapper.addEventListener("dblclick", (e) => {
-                if (e.target.closest("button") || e.target.closest(".face-box") || e.target.closest(".player-controls")) return;
-                const btnExpand = document.getElementById(btnExpandId);
+                if (e.target.closest("button") || e.target.closest(".face-box") || e.target.closest(".player-controls")
+                    || e.target.closest("#source-video-face-overlay-container")) return;
+                const btnExpand = (wrapper.ownerDocument || document).getElementById(btnExpandId);
                 if (btnExpand) btnExpand.click();
             });
         };

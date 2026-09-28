@@ -1047,13 +1047,15 @@ export class SourcePlayer {
     }
 
     startScrubberDrag(e) {
+        // No documento do clique: com o player numa janela destacada, o mouse anda lá, não aqui.
+        const doc = e?.target?.ownerDocument || document;
         const onMouseMove = (moveEvent) => this.seekScrubber(moveEvent);
         const onMouseUp = () => {
-            document.removeEventListener("mousemove", onMouseMove);
-            document.removeEventListener("mouseup", onMouseUp);
+            doc.removeEventListener("mousemove", onMouseMove);
+            doc.removeEventListener("mouseup", onMouseUp);
         };
-        document.addEventListener("mousemove", onMouseMove);
-        document.addEventListener("mouseup", onMouseUp);
+        doc.addEventListener("mousemove", onMouseMove);
+        doc.addEventListener("mouseup", onMouseUp);
     }
 
     setSpeed(speed) {
@@ -1896,8 +1898,11 @@ export class SourcePlayer {
         this.mouseMoveHandler = (ev) => this.onMouseMove(ev);
         this.mouseUpHandler = (ev) => this.onMouseUp(ev);
 
-        document.addEventListener("mousemove", this.mouseMoveHandler);
-        document.addEventListener("mouseup", this.mouseUpHandler);
+        // No documento do clique: com o Source numa janela destacada, o mouse anda lá. Ouvindo aqui,
+        // o soltar nunca chegava, a caixa ficava presa e esticava ao passar pela janela principal.
+        this.drawingDoc = this.overlayContainer.ownerDocument || document;
+        this.drawingDoc.addEventListener("mousemove", this.mouseMoveHandler);
+        this.drawingDoc.addEventListener("mouseup", this.mouseUpHandler);
     }
 
     onMouseMove(e) {
@@ -1922,8 +1927,9 @@ export class SourcePlayer {
         if (!this.isDrawing) return;
         this.isDrawing = false;
 
-        document.removeEventListener("mousemove", this.mouseMoveHandler);
-        document.removeEventListener("mouseup", this.mouseUpHandler);
+        const doc = this.drawingDoc || document;
+        doc.removeEventListener("mousemove", this.mouseMoveHandler);
+        doc.removeEventListener("mouseup", this.mouseUpHandler);
 
         if (!this.drawingBox) return;
 
@@ -1949,7 +1955,7 @@ export class SourcePlayer {
                     clearTimeout(this.clickTimeout);
                     this.clickTimeout = null;
                 }
-                const btnExpand = document.getElementById("btn-expand-source");
+                const btnExpand = this.el("btn-expand-source");
                 if (btnExpand) btnExpand.click();
             } else {
                 this.clickTimeout = setTimeout(() => {
@@ -5369,8 +5375,8 @@ export class ProgramPlayer {
             };
 
             const onMouseUp = (upEv) => {
-                document.removeEventListener("mousemove", onMouseMove);
-                document.removeEventListener("mouseup", onMouseUp);
+                doc.removeEventListener("mousemove", onMouseMove);
+                doc.removeEventListener("mouseup", onMouseUp);
                 this.hideSnapGuides();
                 TIMELINE_HISTORY.commit();
 
@@ -5381,8 +5387,10 @@ export class ProgramPlayer {
                 }
             };
 
-            document.addEventListener("mousemove", onMouseMove);
-            document.addEventListener("mouseup", onMouseUp);
+            // No documento do clique: com o Program numa janela destacada, o mouse anda lá.
+            const doc = overlay.ownerDocument || document;
+            doc.addEventListener("mousemove", onMouseMove);
+            doc.addEventListener("mouseup", onMouseUp);
         };
 
         overlay.addEventListener("mousedown", onMouseDown);
@@ -5399,13 +5407,15 @@ export class ProgramPlayer {
     }
 
     startScrubberDrag(e) {
+        // No documento do clique: com o player numa janela destacada, o mouse anda lá, não aqui.
+        const doc = e?.target?.ownerDocument || document;
         const onMouseMove = (moveEvent) => this.seekScrubber(moveEvent);
         const onMouseUp = () => {
-            document.removeEventListener("mousemove", onMouseMove);
-            document.removeEventListener("mouseup", onMouseUp);
+            doc.removeEventListener("mousemove", onMouseMove);
+            doc.removeEventListener("mouseup", onMouseUp);
         };
-        document.addEventListener("mousemove", onMouseMove);
-        document.addEventListener("mouseup", onMouseUp);
+        doc.addEventListener("mousemove", onMouseMove);
+        doc.addEventListener("mouseup", onMouseUp);
     }
 
     /**
