@@ -23,9 +23,20 @@ mais usado para o mais raro, cada item com autotestes de modelo/operações ante
 1. **Timeline em faixa ou coluna** (decisão 7). Caminho sugerido: a timeline vira membro de faixa
    como as laterais (`BAND_PANEL_IDS` = laterais + timeline em `normalizeBands`, hoje filtra só
    `COLUMN_IDS`), com `timelinePosition` novo `"band"` para o legado saber que ela saiu do centro.
-   As posições antigas continuam: `bottom-full` ≈ faixa de baixo com cantos `"band"`,
-   `bottom-left`/`bottom-right` ≈ faixa de baixo com a coluna da ponta do outro lado dona do canto.
-   Decidir com o usuário se converte as antigas ou se as duas formas convivem.
+   **Decidido (usuário, 28/09): converter** as posições antigas para faixa, mantendo o visual de hoje:
+   `center` = timeline no centro (fora de faixa); `bottom-full` = faixa de baixo com os dois cantos
+   `"band"`; `bottom-left` = faixa de baixo, `bl: "band"`, `br: "column"`; `bottom-right` = o espelho.
+   Workspaces salvos e `capiau_timeline_position` com os valores antigos são convertidos na leitura.
+   **Atalhos com o mesmo efeito de hoje:** Numpad2 = centro ↔ faixa de baixo (largura total);
+   Numpad1/Numpad3 = alternar o canto esquerdo/direito da faixa da timeline ("expandir para a
+   esquerda/direita"); com a timeline no centro, levam para a faixa já expandida daquele lado. O ciclo
+   continua o de hoje (`toggleTimelineExpandLeft/Right`, `toggleTimelinePosition`), e os checkboxes/botões
+   de expandir (modal e barra da timeline, `chk-timeline-*`, `btn-timeline-expand-*`) chamam as mesmas funções.
+   **Decidido também: "coluna até o fim" vale para TODAS as colunas daquele lado do centro**, não só a
+   da ponta (hoje, parte 1, `renderBands` puxa só a da ponta para `.dock-edge`). Assim "sob esquerda +
+   centro" com centro, Ajustes, Painel Lateral deixa os dois em altura inteira, como hoje. Vale igual
+   para as faixas de laterais da parte 1: ajustar `renderBands`/`edgeColumns` (célula da ponta com
+   várias colunas e seus divisores), a prévia de `resolveSideEdgeTarget` e a Seção IX da skill.
    Cuidados: `setTimelinePosition` reposiciona a timeline sozinho (studioTop/compoundStage); o
    canvas precisa redimensionar sem piscar (Seção I.3 da skill); Numpad2/1/3 (`toggleTimeline*`).
 2. **Monitores em bloco ou sozinhos** (decisão 6). A alça do bloco "Monitores" move os dois
