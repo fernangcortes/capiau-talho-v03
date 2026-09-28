@@ -32,6 +32,13 @@ export const MONITOR_IDS = ["source-player-panel", "program-player-panel"];
 export const TIMELINE_ID = "timeline-panel";
 export const PANEL_IDS = [...COLUMN_IDS, ...MONITOR_IDS, TIMELINE_ID];
 export const CENTER_STAGE = "center-stage";
+/**
+ * Abas que viram painel (F5, tabPanels.js): "tabpanel-<aba>". São opcionais: moram no menu (Biblioteca
+ * ou Painel Lateral) e só aparecem na árvore quando estão numa janela destacada, numa faixa ou como
+ * coluna do editor (F2c parte 2c).
+ */
+export const TAB_NAMES = ["transcript", "vision", "chat", "search", "tasks", "logs", "themes", "faces", "titles", "docs"];
+export const TAB_PANEL_IDS = TAB_NAMES.map(tab => `tabpanel-${tab}`);
 
 const MONITOR_LAYOUTS = ["auto", "side-by-side", "stacked"];
 export const BAND_EDGES = ["top", "bottom"];
@@ -41,8 +48,13 @@ export const CORNERS = { top: ["tl", "tr"], bottom: ["bl", "br"] };
  * faixa ou no centro, ficam fora dele (F2c partes 2 e 2b).
  */
 export const CENTER_PANEL_IDS = [TIMELINE_ID, ...MONITOR_IDS];
-/** Painéis que podem ir para uma faixa (F2c): as laterais, a timeline e cada monitor. */
-export const BAND_PANEL_IDS = [...COLUMN_IDS, ...CENTER_PANEL_IDS];
+/**
+ * Painéis que só estão em columnOrder quando são coluna (numa faixa, no centro ou no menu, ficam fora):
+ * os do centro e as abas (F2c parte 2c).
+ */
+export const PLACED_ONLY_IDS = [...CENTER_PANEL_IDS, ...TAB_PANEL_IDS];
+/** Painéis que podem ir para uma faixa (F2c): as laterais, a timeline, cada monitor e as abas. */
+export const BAND_PANEL_IDS = [...COLUMN_IDS, ...PLACED_ONLY_IDS];
 
 /**
  * Posição da timeline: "center" (embaixo dos monitores), "band" (numa faixa) ou "column" (coluna do
@@ -237,7 +249,7 @@ export function legacyFromLayout(layout) {
         const ids = [];
         for (const node of nodes) {
             if (node === center) ids.push(CENTER_STAGE);
-            else if (isLeaf(node) && (COLUMN_IDS.includes(node.panel) || CENTER_PANEL_IDS.includes(node.panel))) ids.push(node.panel);
+            else if (isLeaf(node) && (COLUMN_IDS.includes(node.panel) || PLACED_ONLY_IDS.includes(node.panel))) ids.push(node.panel);
             else if (isSplit(node) && node.role === "stack" && node.children.length >= 2
                 && node.children.every(c => isLeaf(c) && COLUMN_IDS.includes(c.panel))) {
                 const members = node.children.map(c => c.panel);
@@ -290,8 +302,10 @@ export function legacyFromLayout(layout) {
     for (const id of MONITOR_IDS) {
         if ([inBlock.includes(id), bandIds.includes(id), monitorColumns.includes(id)].filter(Boolean).length !== 1) return null;
     }
-    if (bands) columnOrder = [...columnOrder, ...bandIds.filter(id => !CENTER_PANEL_IDS.includes(id))];
-    const expected = [...COLUMN_IDS, CENTER_STAGE, ...monitorColumns, ...(timelinePosition === "column" ? [TIMELINE_ID] : [])].sort().join(",");
+    if (bands) columnOrder = [...columnOrder, ...bandIds.filter(id => !PLACED_ONLY_IDS.includes(id))];
+    const tabColumns = TAB_PANEL_IDS.filter(id => columnOrder.includes(id));
+    if (tabColumns.some(id => bandIds.includes(id))) return null;
+    const expected = [...COLUMN_IDS, CENTER_STAGE, ...monitorColumns, ...tabColumns, ...(timelinePosition === "column" ? [TIMELINE_ID] : [])].sort().join(",");
     if ([...columnOrder].sort().join(",") !== expected) return null;
 
     let dual = null;
@@ -337,7 +351,7 @@ export function validateLayout(layout) {
 
     const walk = (node, where) => {
         if (isLeaf(node)) {
-            if (!PANEL_IDS.includes(node.panel)) errors.push(`painel desconhecido: ${node.panel}`);
+            if (!PANEL_IDS.includes(node.panel) && !TAB_PANEL_IDS.includes(node.panel)) errors.push(`painel desconhecido: ${node.panel}`);
             return;
         }
         if (!isSplit(node)) { errors.push(`nó inválido em ${where}`); return; }
@@ -359,9 +373,10 @@ export function validateLayout(layout) {
         panels.forEach(id => { count(id, f.id); floating.add(id); });
     });
 
-    PANEL_IDS.forEach(id => {
+    [...PANEL_IDS, ...TAB_PANEL_IDS].forEach(id => {
         const places = present.get(id) || [];
-        if (places.length === 0) errors.push(`${id} não está em lugar nenhum`);
+        // Aba ausente está no menu dela: é o lugar normal (F2c parte 2c).
+        if (places.length === 0 && PANEL_IDS.includes(id)) errors.push(`${id} não está em lugar nenhum`);
         if (places.length > 1) errors.push(`${id} aparece mais de uma vez (${places.join(", ")})`);
     });
     const awayLeaves = panelsIn(layout.main, { includeAway: true }).filter(id => !panelsIn(layout.main).includes(id));

@@ -1,6 +1,6 @@
 import { STATE } from "./state.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
-import { layoutFromLegacy, legacyFromLayout, LayoutHistory, serializeLayout, normalizeBands, hasBands, convertTimelinePosition, BAND_EDGES, CENTER_STAGE, TIMELINE_ID, MONITOR_IDS, CENTER_PANEL_IDS } from "./dockModel.js";
+import { layoutFromLegacy, legacyFromLayout, LayoutHistory, serializeLayout, normalizeBands, hasBands, convertTimelinePosition, BAND_EDGES, CENTER_STAGE, TIMELINE_ID, MONITOR_IDS, CENTER_PANEL_IDS, PLACED_ONLY_IDS } from "./dockModel.js";
 import { normalizeStacks, stackGuests, stackOf, removeFromStack, setCorner, bandOf, placeTimeline, toggleTimelineSide, timelineExpanded, timelineIsColumn, monitorsInBlock } from "./dockOps.js";
 import { COLLAPSIBLE_PANELS, REOPEN_LINE_IDS, edgeInLine, collapseButtonFor, visibleSplitters, loadCollapsed, saveCollapsed } from "./panelCollapse.js";
 
@@ -657,12 +657,14 @@ export class WorkspaceManager {
             if (!el || el.classList.contains("collapsed")) return false;
             w0 = el.getBoundingClientRect().width;
         }, (dx) => {
-            const w = Math.round(Math.max(200, Math.min(CENTER_PANEL_IDS.includes(el.id) ? 1600 : 900, w0 + (side === "left" ? dx : -dx))));
+            const w = Math.round(Math.max(200, Math.min(PLACED_ONLY_IDS.includes(el.id) ? 1600 : 900, w0 + (side === "left" ? dx : -dx))));
             el.style.width = `${w}px`;
             el.style.flex = `0 0 ${w}px`;
         }, () => {
             const w = parseFloat(el.style.width);
-            if (!isNaN(w) && keys[el.id]) { try { localStorage.setItem(keys[el.id], String(w)); } catch (e) {} }
+            // Abas (F2c parte 2c): a mesma chave do divisor do editor (splitter-<id>).
+            const key = keys[el.id] || (PLACED_ONLY_IDS.includes(el.id) ? `layout-dim-splitter-${el.id}` : null);
+            if (!isNaN(w) && key) { try { localStorage.setItem(key, String(w)); } catch (e) {} }
         });
     }
 
@@ -2692,6 +2694,8 @@ export class WorkspaceManager {
      */
     arrangeColumnsIntoContainer(targetContainer, colIds) {
         if (!targetContainer || !Array.isArray(colIds) || colIds.length === 0) return;
+        // Abas (F2c parte 2c): as que entram no editor montam o invólucro antes; as que saem voltam ao menu.
+        this.onBeforeArrange?.();
 
         const reopenMap = {
             "sidebar-left": "reopen-left",

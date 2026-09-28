@@ -5,10 +5,11 @@
 // sombra de prévia. Encaixes: laterais ao lado, trocadas, na ponta ou empilhadas numa mesma
 // coluna (F2b); faixas inteiras em cima/embaixo e cantos (F2c); timeline embaixo dos monitores ou
 // numa faixa (F2c parte 2); monitores lado a lado ou empilhados, e cada monitor sozinho numa faixa ou
-// coluna, ou o bloco dos dois (alça própria no cabeçalho do primeiro monitor do bloco) (F2c parte 2b).
+// coluna, ou o bloco dos dois (alça própria no cabeçalho do primeiro monitor do bloco) (F2c parte 2b);
+// abas destacáveis numa faixa ou coluna, e de volta a um menu soltas sobre ele (F2c parte 2c).
 // Cada soltura vira um passo do histórico de layout e mostra o aviso "Layout alterado · Desfazer".
 
-import { CENTER_STAGE, TIMELINE_ID, MONITOR_IDS } from "./dockModel.js";
+import { CENTER_STAGE, TIMELINE_ID, MONITOR_IDS, PLACED_ONLY_IDS } from "./dockModel.js";
 import { moveBeside, moveToEdge, moveToBand, setCorner, stackWith, swapPanels, stackGuests, sameColumnState, bandOf, placeTimeline, timelineIsColumn, panelToCenter, monitorsInBlock, isPlaced, moveBlock } from "./dockOps.js";
 
 const EDGE = 26;          // largura das faixas de borda do editor (px)
@@ -542,6 +543,7 @@ export class DockDragController {
         if (kind === "timeline") return this.resolveTimelineTarget(x, y, ws);
         if (kind === "monitor") return this.resolveMonitorTarget(panelId, x, y, ws);
         if (kind === "block") return this.resolveBlockTarget(x, y, ws);
+        if (kind === "tab") return this.resolveTabTarget(panelId, x, y, ws);
         return null;
     }
 
@@ -563,7 +565,7 @@ export class DockDragController {
         const guests = stackGuests(state.stacks);
         const candidates = [...COLUMN_PANELS].sort((a, b) => Number(guests.has(b)) - Number(guests.has(a)));
         // Timeline e monitores numa faixa ou como coluna também recebem laterais ao lado (F2c partes 2 e 2b).
-        [TIMELINE_ID, ...MONITOR_IDS].forEach(id => { if (isPlaced(state, id)) candidates.push(id); });
+        PLACED_ONLY_IDS.forEach(id => { if (isPlaced(state, id)) candidates.push(id); });
         for (const id of [...candidates, CENTER_STAGE]) {
             if (id === panelId) continue;
             const el = id === CENTER_STAGE ? document.querySelector(".center-stage") : document.getElementById(id);
@@ -610,6 +612,13 @@ export class DockDragController {
                 `${title} ${edge === "left" ? "à esquerda" : "à direita"} de ${name}`);
         }
         return null;
+    }
+
+    /** Ponto na faixa fina das bordas do editor (onde soltar cria faixa ou coluna na ponta)? */
+    isEditorEdge(x, y) {
+        const ws = this.editorRect();
+        if (!ws || x < ws.left || x > ws.right || y < ws.top || y > ws.bottom) return false;
+        return x < ws.left + EDGE || x > ws.right - EDGE || y < ws.top + EDGE || y > ws.bottom - EDGE;
     }
 
     /** Retângulo de uma faixa na tela (null se não existe ou está vazia). */
@@ -691,8 +700,8 @@ export class DockDragController {
         if (x < ws.left + EDGE) return this.resolveSideEdgeTarget(state, TIMELINE_ID, "left", y, ws, make);
         if (x > ws.right - EDGE) return this.resolveSideEdgeTarget(state, TIMELINE_ID, "right", y, ws, make);
 
-        for (const id of [...COLUMN_PANELS, ...MONITOR_IDS]) {
-            if (!bandOf(state.bands, id)) continue;
+        for (const id of [...COLUMN_PANELS, ...PLACED_ONLY_IDS]) {
+            if (id === TIMELINE_ID || !bandOf(state.bands, id)) continue;
             const r = this.rectOf(document.getElementById(id));
             if (!r || x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
             const rx = (x - r.left) / r.width;
@@ -731,7 +740,7 @@ export class DockDragController {
     resolveTimelineColumnTarget(state, x, y, make) {
         const guests = stackGuests(state.stacks);
         const ids = [...COLUMN_PANELS].sort((a, b) => Number(guests.has(b)) - Number(guests.has(a)));
-        const monitorCols = MONITOR_IDS.filter(id => state.order.includes(id));
+        const monitorCols = PLACED_ONLY_IDS.filter(id => id !== TIMELINE_ID && state.order.includes(id));
         for (const id of [...ids, ...monitorCols, CENTER_STAGE]) {
             if (id !== CENTER_STAGE && bandOf(state.bands, id)) continue;
             const el = id === CENTER_STAGE ? document.querySelector(".center-stage") : document.getElementById(id);
@@ -794,20 +803,30 @@ export class DockDragController {
         if (out && inside(center)) {
             return make(panelToCenter(state, panelId), { left: center.left, top: center.top, width: center.width, height: center.height }, `${title} de volta ao bloco dos monitores`);
         }
-        // Painéis de faixa e colunas (laterais; timeline e o outro monitor quando estão fora do centro).
+        return this.resolveSlotTarget(state, panelId, x, y, make);
+    }
+
+    /**
+     * Painel "de lugar" (monitor ou aba) sobre painéis de faixa e colunas (laterais; timeline, monitores
+     * e abas quando estão fora de casa) ou sobre o centro: meio troca, metades põem ao lado (na faixa ou
+     * como coluna). Sobre o centro: vira coluna ao lado dele.
+     */
+    resolveSlotTarget(state, panelId, x, y, make, skip = []) {
+        const title = DOCK_PANELS[panelId].title;
+        const inside = (r) => !!r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
         const guests = stackGuests(state.stacks);
-        const ids = [...COLUMN_PANELS, TIMELINE_ID, otherId]
-            .filter(id => COLUMN_PANELS.includes(id) || isPlaced(state, id))
+        const ids = [...COLUMN_PANELS, ...PLACED_ONLY_IDS]
+            .filter(id => id !== panelId && !skip.includes(id) && (COLUMN_PANELS.includes(id) || isPlaced(state, id)))
             .sort((a, b) => Number(guests.has(b)) - Number(guests.has(a)));
         for (const id of [...ids, CENTER_STAGE]) {
             const el = id === CENTER_STAGE ? document.querySelector(".center-stage") : document.getElementById(id);
             const r = this.rectOf(el);
             if (!inside(r)) continue;
             const rx = (x - r.left) / r.width;
-            const name = id === CENTER_STAGE ? "do centro" : `de ${DOCK_PANELS[id].title}`;
+            const name = id === CENTER_STAGE ? "do centro" : `de ${DOCK_PANELS[id]?.title || id}`;
             const inBand = !!bandOf(state.bands, id);
             if (id !== CENTER_STAGE && rx > 0.3 && rx < 0.7) {
-                return make(swapPanels(state, panelId, id), { left: r.left, top: r.top, width: r.width, height: r.height }, `Trocar com ${DOCK_PANELS[id].title}`);
+                return make(swapPanels(state, panelId, id), { left: r.left, top: r.top, width: r.width, height: r.height }, `Trocar com ${DOCK_PANELS[id]?.title || id}`);
             }
             const before = rx < 0.5;
             const hostEl = el.classList.contains("dock-stack-guest") ? el.closest(".dock-stack-host") : el;
@@ -819,6 +838,30 @@ export class DockDragController {
                 inBand ? `${title} ${where} ${name} na faixa` : `${title} como coluna ${where} ${name}`);
         }
         return null;
+    }
+
+    /**
+     * Aba destacável (F2c parte 2c). Sobre a Biblioteca ou o Painel Lateral: volta para aquele menu.
+     * Bordas do editor: faixa ou coluna na ponta. Sobre painéis e o centro: como os monitores.
+     */
+    resolveTabTarget(panelId, x, y, ws) {
+        const state = this.wm.getColumnState();
+        const title = DOCK_PANELS[panelId].title;
+        const make = (next, preview, label) =>
+            !next || sameColumnState(next, state) ? null : { type: "columns", next, preview, label };
+        // As bordas do editor vêm antes: a coluna da ponta costuma ser um dos menus.
+        if (x > ws.left + EDGE && x < ws.right - EDGE) {
+            if (y < ws.top + EDGE) return this.resolveBandEdgeTarget(state, panelId, "top", x, ws, make);
+            if (y > ws.bottom - EDGE) return this.resolveBandEdgeTarget(state, panelId, "bottom", x, ws, make);
+        }
+        if (x < ws.left + EDGE) return this.resolveSideEdgeTarget(state, panelId, "left", y, ws, make);
+        if (x > ws.right - EDGE) return this.resolveSideEdgeTarget(state, panelId, "right", y, ws, make);
+        for (const [id, side, name] of [["sidebar-left", "left", "a Biblioteca"], ["sidebar-right", "right", "o Painel Lateral"]]) {
+            const r = this.rectOf(document.getElementById(id));
+            if (!r || x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+            return { type: "tabHome", panelId, side, preview: { left: r.left, top: r.top, width: r.width, height: r.height }, label: `${title} de volta para ${name}` };
+        }
+        return this.resolveSlotTarget(state, panelId, x, y, make, ["sidebar-left", "sidebar-right"]);
     }
 
     /**
@@ -868,7 +911,25 @@ export class DockDragController {
         Object.assign(this.label.style, { left: `${p.left + p.width / 2}px`, top: `${p.top + 14}px` });
     }
 
+    /** Sombra de prévia fora do arrasto por alça (ex.: botão da aba arrastado da faixa, HTML5). */
+    showExternalTarget(target) {
+        if (this.drag) return;
+        this.overlay.hidden = false;
+        this.drawTarget(target);
+    }
+
+    clearExternalTarget() {
+        if (this.drag) return;
+        this.drawTarget(null);
+        this.overlay.hidden = true;
+    }
+
     applyTarget(target, toast = true) {
+        if (target.type === "tabHome") {
+            const tab = target.panelId.replace(/^tabpanel-/, "");
+            window.tabPanels?.sendHome(tab, target.side);
+            return;
+        }
         if (target.type === "columns") {
             const next = target.next;
             this.wm.setColumnLayout(next.order, next.stacks, next.bands || { top: [], bottom: [] }, next.corners || {});

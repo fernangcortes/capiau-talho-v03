@@ -32,7 +32,7 @@ console.log("✔ 1 passou: 6 abas com contêiner, botão e título nas janelas."
 
 // 2. Máquina existente reaproveitada: invólucro montado em qualquer caminho, conteúdo volta à faixa
 assert.ok(/this\.wm\.attachPanelToPopout = \(panelId, win, \.\.\.rest\) => \{[\s\S]{0,120}if \(tab\) this\.prepare\(tab\);/.test(tabs), "attach monta o invólucro (janela, grupo, desfazer, restaurar)");
-assert.ok(/this\.wm\.restorePanel = \(panelId, \.\.\.rest\) => \{[\s\S]{0,160}if \(tab\) this\.returnToStrip\(tab\);/.test(tabs), "ao reacoplar, o conteúdo volta à faixa");
+assert.ok(/this\.wm\.restorePanel = \(panelId, \.\.\.rest\) => \{[\s\S]{0,400}if \(tab && this\.placed\(tab\)\) this\.syncPlaced\(\);\s*else if \(tab\) this\.returnToStrip\(tab\);/.test(tabs), "ao reacoplar, o conteúdo volta à faixa (ou à vaga no editor, F2c parte 2c)");
 assert.ok(/if \(!opened \|\| opened\.closed\) this\.returnToStrip\(tab\);/.test(tabs), "bloqueio do navegador devolve a aba");
 assert.ok(restore.includes("[...PANEL_IDS, ...TAB_PANEL_IDS].forEach"), "abas destacadas voltam ao abrir o Talho");
 console.log("✔ 2 passou: janelas, grupos, desfazer e restauração valem para abas.");
@@ -91,5 +91,14 @@ assert.ok(wm.includes("window.tabPanels?.applyStrips?.(customConfig?.tabsCustomi
 const css = read("src", "ui", "styles.css");
 assert.ok(css.includes(".tab-panel.dock-strip-guest.dock-guest-active") && css.includes(".dock-strip-marker"), "estilos da convidada e do marcador");
 console.log("✔ 7 passou: aba muda de menu por arrasto ou menu, com posição, desfazer e workspaces.");
+
+// 8. F2c parte 2c: a lista de abas do modelo (dockModel.TAB_NAMES) é a mesma do tabPanels.js.
+{
+    const { pathToFileURL } = await import("node:url");
+    const model = await import(pathToFileURL(path.join(rootDir, "src", "ui", "js", "dockModel.js")).href);
+    const names = [...tabs.matchAll(/^    (\w+): \{ title: /gm)].map(m => m[1]);
+    assert.deepEqual([...names].sort(), [...model.TAB_NAMES].sort(), "abas do tabPanels.js = TAB_NAMES do dockModel.js");
+    console.log("✔ 8 passou: abas do modelo iguais às do tabPanels.js.");
+}
 
 console.log("\n=== AUTOTESTE DOCK TABS CONCLUÍDO COM SUCESSO ===");

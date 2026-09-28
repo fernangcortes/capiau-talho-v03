@@ -13558,6 +13558,15 @@ body.layout-monitors-split .btn-swap-player {
     margin-right: auto;
 }
 
+/* Aba no editor (F2c parte 2c): coluna com altura inteira e largura pelo divisor, ou membro de faixa. */
+.workspace > .tab-panel.dock-tab-in-editor,
+.dock-edge > .tab-panel.dock-tab-in-editor {
+    height: 100% !important;
+    flex-shrink: 1 !important;
+    min-width: 200px;
+    border-radius: 0 !important;
+}
+
 /* Colunas do lado que ficou com o canto: fora do .workspace, altura inteira da moldura. */
 .dock-edge {
     display: flex;

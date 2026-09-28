@@ -257,6 +257,38 @@ console.log("✔ 1.3 passou: Janela Dupla (lado a lado/empilhada) é uma janela 
     console.log("✔ 1.8 passou: monitor sozinho em faixa ou coluna vai e volta; bloco e centro vazios; destacado guarda o lugar.");
 }
 
+{
+    // F2c parte 2c: abas (F5) numa faixa ou como coluna; ausentes da árvore = estão no menu.
+    const L = "sidebar-left", I = "inspector-panel", R = "sidebar-right", T = "timeline-panel";
+    const CHAT = "tabpanel-chat", TEMAS = "tabpanel-themes", FALAS = "tabpanel-transcript";
+    assert.equal(model.TAB_PANEL_IDS.length, 10);
+    for (const extra of [
+        { columnOrder: [L, I, CENTER_STAGE, R], bands: { top: [], bottom: [CHAT] }, bandCorners: { bl: "band", br: "band" } },
+        { columnOrder: [L, I, CENTER_STAGE, TEMAS, R] },
+        { columnOrder: [FALAS, L, CENTER_STAGE, R, I], bands: { top: [I, CHAT], bottom: [T] }, bandCorners: { tl: "band", tr: "column", bl: "band", br: "band" }, timelinePosition: "band" },
+        { columnOrder: [L, CENTER_STAGE, CHAT, R, I], bands: { top: [], bottom: [I] }, bandCorners: { bl: "column", br: "band" }, popped: [CHAT] }
+    ]) {
+        const state = { timelinePosition: "center", monitorsLayout: "auto", columnStacks: [], popped: [], dual: null, group: null, ...extra };
+        const layout = layoutFromLegacy(state);
+        assert.deepEqual(validateLayout(layout), [], `aba no editor inválida: ${JSON.stringify(state)}`);
+        assert.deepEqual(legacyFromLayout(layout), state, `aba no editor não voltou igual: ${JSON.stringify(state)}`);
+    }
+    // Aba destacada (fora do editor) é uma janela com ela; aba no menu não aparece.
+    const janela = layoutFromLegacy({ columnOrder: presets.padrao, timelinePosition: "center", monitorsLayout: "auto", popped: [CHAT] });
+    assert.deepEqual(validateLayout(janela), [], "aba destacada é painel conhecido");
+    assert.deepEqual(legacyFromLayout(janela).popped, [CHAT]);
+    assert.ok(!panelsIn(janela.main, { includeAway: true }).includes(TEMAS), "aba no menu não está na árvore");
+    // Aba em faixa e coluna ao mesmo tempo: não representável.
+    const dupla = layoutFromLegacy({ columnOrder: [L, I, CENTER_STAGE, R], timelinePosition: "center", monitorsLayout: "auto", bands: { top: [CHAT], bottom: [] } });
+    dupla.main.children.find(c => c.role !== "band").children.push({ panel: CHAT });
+    assert.equal(legacyFromLayout(dupla), null);
+    assert.ok(validateLayout(dupla).some(e => e.includes("mais de uma vez")));
+    const estranha = layoutFromLegacy({ columnOrder: presets.padrao, timelinePosition: "center", monitorsLayout: "auto" });
+    estranha.main.children.push({ panel: "tabpanel-xyz" });
+    assert.ok(validateLayout(estranha).some(e => e.includes("desconhecido")));
+    console.log("✔ 1.9 passou: aba em faixa ou coluna vai e volta; aba no menu fica fora da árvore; destacada é janela.");
+}
+
 // ----------------------------------------------------------------------
 // PARTE 2: Validação
 // ----------------------------------------------------------------------

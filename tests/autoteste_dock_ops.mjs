@@ -304,7 +304,7 @@ const checkMon = (s) => {
         s.stacks.forEach(st => assert.ok(!st.includes(id), `${id} nunca em pilha`));
     });
     assert.equal(s.order.filter(x => x === C).length, 1, "centro sempre em order");
-    const laterais = members.filter(id => !centro.includes(id));
+    const laterais = members.filter(id => !centro.includes(id) && !id.startsWith("tabpanel-"));
     assert.deepEqual(s.order.slice(s.order.length - laterais.length), laterais, "laterais de faixa no fim de order");
     // O modelo representa o estado e devolve igual (monitor fora do bloco, centro vazio).
     const legacy = { columnOrder: s.order, timelinePosition: "center", monitorsLayout: "auto", columnStacks: s.stacks, popped: [], dual: null, group: null };
@@ -325,4 +325,51 @@ for (const a of monActions) {
 }
 console.log(`✔ 12 passou: ${checkedMon} estados com monitores fora do bloco respeitam as invariantes e vão e voltam no modelo.`);
 
+
+// 13. Abas no editor (F2c parte 2c): faixa, coluna, de volta ao menu, trocas sem pilha
+const { panelHome } = ops;
+const CHAT = "tabpanel-chat", TEMAS = "tabpanel-themes";
+const chatFaixa = moveToBand(padrao, CHAT, "bottom");
+assert.deepEqual(chatFaixa, { order: [L, I, C, R], stacks: [], bands: { top: [], bottom: [CHAT] }, corners: { bl: "band", br: "band" } },
+    "aba na faixa não entra em order");
+const temasCol = moveBeside(chatFaixa, TEMAS, C, "after");
+assert.deepEqual(temasCol.order, [L, I, C, TEMAS, R], "aba vira coluna ao lado do centro");
+assert.deepEqual(panelHome(temasCol, TEMAS), chatFaixa, "coluna de volta ao menu");
+assert.deepEqual(panelHome(chatFaixa, CHAT), padrao, "faixa de volta ao menu (a faixa some)");
+assert.equal(swapPanels(padrao, CHAT, L), null, "aba no menu não tem vaga para trocar");
+assert.deepEqual(swapPanels(temasCol, TEMAS, R).order, [L, I, C, R, TEMAS], "aba coluna troca com coluna");
+const trocaFaixaCol = swapPanels(temasCol, CHAT, L);
+assert.deepEqual([trocaFaixaCol.order, trocaFaixaCol.bands.bottom], [[CHAT, I, C, TEMAS, R, L], [L]], "aba da faixa troca com coluna");
+assert.equal(stackWith(temasCol, TEMAS, L, "top"), null, "aba não empilha");
+assert.equal(stackWith(temasCol, L, TEMAS, "top"), null, "não empilha sobre aba");
+assert.deepEqual(moveBesideInBand(chatFaixa, TEMAS, CHAT, "before").bands.bottom, [TEMAS, CHAT], "aba ao lado de aba na faixa");
+assert.deepEqual(moveToEdge(chatFaixa, CHAT, "start").order, [CHAT, L, I, C, R], "da faixa para a ponta");
+assert.ok(isPlaced(chatFaixa, CHAT) && !isPlaced(padrao, CHAT));
+console.log("✔ 13 passou: aba em faixa ou coluna, de volta ao menu, troca sem pilha.");
+
+// 14. Invariantes com abas, monitores e laterais em sequências de 3 operações, e ida e volta no modelo
+const abas = [CHAT, TEMAS];
+const tabActions = [...bandActions.filter((_, i) => i % 4 === 0), s => moveToBand(s, S, "top"), s => panelToCenter(s, S),
+    ...abas.flatMap(id => [
+        s => moveToBand(s, id, "top"), s => moveToBand(s, id, "bottom", 0), s => moveToEdge(s, id, "end"),
+        s => moveBeside(s, id, C, "before"), s => panelHome(s, id), s => swapPanels(s, id, R), s => swapPanels(s, id, S),
+        s => moveBeside(s, L, id, "after"), s => stackWith(s, I, id, "bottom")
+    ])];
+let checkedTabs = 0;
+for (const a of tabActions) {
+    const s1 = a(padrao); if (!s1) continue; checkMon(s1);
+    for (const b of tabActions) {
+        const s2 = b(s1); if (!s2) continue; checkMon(s2);
+        for (const c of tabActions) {
+            const s3 = c(s2); if (!s3) continue; checkMon(s3);
+            const members = [...(s3.bands?.top || []), ...(s3.bands?.bottom || [])];
+            abas.forEach(id => {
+                assert.ok(members.filter(x => x === id).length + s3.order.filter(x => x === id).length <= 1, `${id} num lugar só`);
+                s3.stacks.forEach(st => assert.ok(!st.includes(id), `${id} nunca em pilha`));
+            });
+            checkedTabs++;
+        }
+    }
+}
+console.log(`✔ 14 passou: ${checkedTabs} estados com abas no editor respeitam as invariantes e vão e voltam no modelo.`);
 console.log("\n=== AUTOTESTE DOCK OPS CONCLUÍDO COM SUCESSO ===");

@@ -95,6 +95,8 @@ function setupCrossStripDrop() {
         const sidebar = e.target?.closest?.("#sidebar-left, #sidebar-right");
         const dragging = document.querySelector(".tab-btn.dragging");
         if (!sidebar || !dragging) return null;
+        // Na borda do editor, a aba vai para faixa/coluna na ponta (F2c parte 2c, tabPanels).
+        if (window.dockDrag?.isEditorEdge?.(e.clientX, e.clientY)) return null;
         const { side, strip: stripId } = SIDES[sidebar.id];
         const strip = document.getElementById(stripId);
         if (!strip || dragging.parentElement === strip) return null;
@@ -268,6 +270,20 @@ function showTabsContextMenu(x, y, container, visibilityKey, activeKey, attrName
             window.tabPanels.moveToStrip(clickedTab, otherSide);
         });
         menu.appendChild(moveItem);
+
+        // F2c parte 2c: levar a aba para o editor (o mesmo que arrastar o botão até lá).
+        [["band", `Colocar ${label} numa faixa embaixo`], ["column", `Colocar ${label} como coluna`]].forEach(([where, text]) => {
+            const item = document.createElement("div");
+            item.className = "menu-item";
+            item.style.padding = "8px 12px";
+            item.textContent = text;
+            item.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                menu.remove();
+                window.tabPanels.placeInEditor(clickedTab, where);
+            });
+            menu.appendChild(item);
+        });
     }
 
     const title = document.createElement("div");

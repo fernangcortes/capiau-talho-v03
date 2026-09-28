@@ -13,8 +13,14 @@
 // menu ela é uma "convidada": o mesmo invólucro, montado no corpo daquele menu, com um botão próprio
 // na faixa. Destacar, juntar e devolver continuam iguais; ao voltar da janela ela volta ao menu
 // onde estava. O menu de cada aba entra no layout (desfazer/refazer e workspaces).
+//
+// F2c parte 2c: a aba também vai para o editor, numa faixa ou como coluna (estado nas faixas e em
+// columnOrder do WorkspaceManager, como a timeline). Sai arrastando o botão da aba até o editor (ou
+// pelo botão direito); volta pelo botão "devolver" ou soltando a alça sobre um menu.
 
 import { DOCK_PANELS } from "./dockDrag.js";
+import { CENTER_STAGE } from "./dockModel.js";
+import { isPlaced, panelHome, moveToBand, moveBeside } from "./dockOps.js";
 import { bindTabButtonDrag, saveStripOrder } from "./tabsCustomization.js";
 
 const STRIPS_KEY = "capiau_tab_strips";
@@ -146,9 +152,127 @@ export class TabPanels {
         this.wm.restorePanel = (panelId, ...rest) => {
             const result = restore(panelId, ...rest);
             const tab = tabOf(panelId);
-            if (tab) this.returnToStrip(tab);
+            // Aba que mora no editor (faixa ou coluna) volta para a vaga dela, não para o menu.
+            if (tab && this.placed(tab)) this.syncPlaced();
+            else if (tab) this.returnToStrip(tab);
             return result;
         };
+        // Antes de cada arranjo do editor: abas que entram montam o invólucro; as que saem voltam ao menu.
+        this.wm.onBeforeArrange = () => this.syncPlaced();
+        this.bindEditorDrop();
+    }
+
+    /** A aba está no editor (numa faixa ou coluna), segundo o estado do WorkspaceManager? */
+    placed(tab) {
+        return isPlaced(this.wm.getColumnState(), tabPanelId(tab));
+    }
+
+    /**
+     * F2c parte 2c: acerta o invólucro de cada aba com o estado. No editor: sai do modo convidada,
+     * o conteúdo vai para o invólucro (o arranjo o leva para a vaga) e o "devolver" leva ao menu.
+     * Fora do editor e fora de janela, mas com o invólucro no editor: volta ao menu.
+     */
+    syncPlaced() {
+        Object.keys(TABS).forEach(tab => {
+            if (this.inWindow(tab)) return;
+            const id = tabPanelId(tab);
+            if (this.placed(tab)) {
+                this.leaveGuestStrip(tab);
+                const wrapper = this.prepare(tab);
+                if (!wrapper) return;
+                wrapper.classList.add("dock-tab-in-editor");
+                if (wrapper.parentElement === this.host) document.querySelector(".workspace")?.appendChild(wrapper);
+                const btn = wrapper.querySelector(".tab-panel-return");
+                if (btn) {
+                    btn.setAttribute("data-tooltip", `Devolver ${TABS[tab].title} ao menu`);
+                    btn.onclick = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.sendHome(tab);
+                    };
+                }
+                this.syncGuestButton(tab);
+                return;
+            }
+            const wrapper = document.getElementById(id);
+            if (!wrapper || !wrapper.classList.contains("dock-tab-in-editor")) return;
+            wrapper.classList.remove("dock-tab-in-editor", "dock-band-member", "dock-band-last", "has-band-w", "dock-growing");
+            wrapper.style.removeProperty("width");
+            wrapper.style.removeProperty("flex");
+            wrapper.style.removeProperty("--dock-band-w");
+            const btn = wrapper.querySelector(".tab-panel-return");
+            if (btn) {
+                btn.onclick = null;
+                btn.setAttribute("data-tooltip", `Devolver ao ${TABS[tab].side === "right" ? "Painel Lateral" : "menu da Biblioteca"}`);
+            }
+            this.returnToStrip(tab, { activate: false });
+        });
+    }
+
+    /** Leva a aba do editor de volta a um menu ("left" | "right"; padrão: o menu em que ela mora). */
+    sendHome(tab, side = null) {
+        const state = this.wm.getColumnState();
+        const next = panelHome(state, tabPanelId(tab));
+        if (!next) return false;
+        if (side && side !== (this.strips[tab] || TABS[tab].side)) this.moveToStrip(tab, side, null, { commit: false, activate: false });
+        this.wm.setColumnLayout(next.order, next.stacks, next.bands || { top: [], bottom: [] }, next.corners || {});
+        this.returnToStrip(tab);
+        const where = SIDE_LABEL[this.strips[tab] || TABS[tab].side];
+        this.dockDrag?.showToast("undo", `${TABS[tab].title} de volta para ${where}`);
+        return true;
+    }
+
+    /** Botão direito da faixa: leva a aba para o editor, numa faixa embaixo ou como coluna à direita do centro. */
+    placeInEditor(tab, where) {
+        const state = this.wm.getColumnState();
+        const id = tabPanelId(tab);
+        const next = where === "column" ? moveBeside(state, id, CENTER_STAGE, "after") : moveToBand(state, id, "bottom");
+        if (!next) return false;
+        this.wm.setColumnLayout(next.order, next.stacks, next.bands || { top: [], bottom: [] }, next.corners || {});
+        this.dockDrag?.showToast("undo", `${TABS[tab].title} ${where === "column" ? "como coluna do editor" : "numa faixa embaixo"}`);
+        return true;
+    }
+
+    /**
+     * Arrastar o botão da aba (HTML5, o mesmo do reordenar) até o editor: fora dos menus, as zonas
+     * do editor mostram a sombra e soltar leva a aba para lá. Sobre os menus, fica como antes
+     * (reordenar ou mudar de menu, P14).
+     */
+    bindEditorDrop() {
+        const tabOfDragging = () => {
+            const btn = document.querySelector(".tab-btn.dragging");
+            if (!btn) return null;
+            const tab = btn.dataset.guestTab || tabFromButtonValue(btn.getAttribute("data-tab") || btn.getAttribute("data-right-tab"));
+            return tab && TABS[tab] ? { btn, tab } : null;
+        };
+        const clear = () => {
+            this.editorTarget = null;
+            this.dockDrag?.clearExternalTarget?.();
+        };
+        window.addEventListener("dragover", (e) => {
+            const d = tabOfDragging();
+            // Sobre um menu vale o reordenar/mudar de menu, exceto na borda do editor (F2c parte 2c).
+            const overMenu = e.target?.closest?.("#sidebar-left, #sidebar-right") && !this.dockDrag?.isEditorEdge?.(e.clientX, e.clientY);
+            if (!d || overMenu) { if (this.editorTarget) clear(); return; }
+            const target = this.dockDrag?.resolveTarget(tabPanelId(d.tab), e.clientX, e.clientY);
+            if (!target || target.type !== "columns") { if (this.editorTarget) clear(); return; }
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            this.editorTarget = target;
+            this.dockDrag.showExternalTarget(target);
+        }, true);
+        window.addEventListener("drop", (e) => {
+            const d = tabOfDragging();
+            const target = this.editorTarget;
+            clear();
+            if (!d || !target) return;
+            e.preventDefault();
+            e.stopPropagation();
+            // Como na mudança de menu: o fim do arrasto devolve a faixa à ordem de antes.
+            d.btn.dataset.stripMoved = "true";
+            this.dockDrag.applyTarget(target);
+        }, true);
+        window.addEventListener("dragend", () => { if (this.editorTarget) clear(); }, true);
     }
 
     isOut(tab) {
@@ -166,7 +290,9 @@ export class TabPanels {
 
     /** Monta as abas que estavam no outro menu (sessão anterior). Chamado quando a página assenta. */
     mountSavedStrips() {
-        Object.keys(this.strips).forEach(tab => this.mountGuest(tab, null));
+        Object.keys(this.strips).forEach(tab => { if (!this.placed(tab)) this.mountGuest(tab, null); });
+        // Abas que ficaram no editor (F2c parte 2c): o primeiro arranjo foi antes de o TabPanels existir.
+        if (Object.keys(TABS).some(tab => this.placed(tab))) this.wm.reinitSplitters();
         // A aba ativa salva pode ter mudado de menu: cada faixa sem aba ativa ativa a primeira.
         ["left", "right"].forEach(side => {
             const strip = stripEl(side);
@@ -187,7 +313,7 @@ export class TabPanels {
             delete this.strips[tab];
             this.saveStrips();
             this.removeGuestButton(tab);
-            if (!this.inWindow(tab)) {
+            if (!this.inWindow(tab) && !this.placed(tab)) {
                 this.returnToStrip(tab, { activate });
                 const btn = tabButton(tab);
                 if (btn && before && before.parentElement === btn.parentElement) btn.parentElement.insertBefore(btn, before);
@@ -195,8 +321,8 @@ export class TabPanels {
         } else {
             this.strips[tab] = side;
             this.saveStrips();
-            this.mountGuest(tab, before);
-            if (activate && !this.inWindow(tab)) this.activateGuest(tab);
+            if (!this.placed(tab)) this.mountGuest(tab, before);
+            if (activate && !this.inWindow(tab) && !this.placed(tab)) this.activateGuest(tab);
         }
         this.revealSidebar(tab, side);
         this.syncSidebarVisibility();
@@ -311,7 +437,7 @@ export class TabPanels {
     syncGuestButton(tab) {
         const btn = this.guestButton(tab);
         if (!btn) return;
-        const away = !this.strips[tab] || this.inWindow(tab);
+        const away = !this.strips[tab] || this.inWindow(tab) || this.placed(tab);
         btn.style.display = away ? "none" : "";
         if (away && btn.classList.contains("dock-guest-active")) {
             btn.classList.remove("dock-guest-active");

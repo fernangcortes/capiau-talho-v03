@@ -4,8 +4,8 @@
 //   stacks  = pilhas de laterais numa mesma coluna, de cima para baixo (ex.: [["sidebar-left", "sidebar-right"]]);
 //   bands   = faixas inteiras em cima/embaixo do editor (F2c): { top: [...], bottom: [...] }, da esquerda
 //             para a direita. Laterais de faixa continuam em order, sempre no fim, e não ocupam coluna.
-//             A timeline (F2c parte 2) e cada monitor (parte 2b) ficam em order quando são coluna;
-//             numa faixa ou no centro, não estão em order. Nunca entram em pilha;
+//             A timeline (F2c parte 2), cada monitor (parte 2b) e as abas (parte 2c) ficam em order
+//             quando são coluna; numa faixa, no centro ou no menu, não estão em order. Nunca entram em pilha;
 //   corners = quem fica com cada canto entre a coluna da ponta e a faixa ({ tl, tr, bl, br }:
 //             "band" = a faixa passa inteira; "column" = a coluna vai até o fim e a faixa encurta).
 // bands/corners só aparecem no resultado quando existe alguma faixa.
@@ -13,7 +13,7 @@
 // Toda operação devolve um estado novo e normalizado (membros de uma pilha ficam juntos em order)
 // ou null quando o encaixe não é possível.
 
-import { COLUMN_IDS, MONITOR_IDS, CENTER_PANEL_IDS, CENTER_STAGE, BAND_EDGES, BAND_PANEL_IDS, CORNERS, TIMELINE_ID, LEGACY_TIMELINE_CORNERS, normalizeBands, hasBands } from "./dockModel.js";
+import { COLUMN_IDS, MONITOR_IDS, CENTER_PANEL_IDS, PLACED_ONLY_IDS, CENTER_STAGE, BAND_EDGES, BAND_PANEL_IDS, CORNERS, TIMELINE_ID, LEGACY_TIMELINE_CORNERS, normalizeBands, hasBands } from "./dockModel.js";
 
 export const MAX_STACK = 3;
 
@@ -67,7 +67,7 @@ function finalize(order, stacks, bands, corners) {
     const members = bandMembers(nb.bands);
     const normalized = normalizeStacks((stacks || []).map(stack => stack.filter(id => !members.has(id))));
     const cols = syncOrderWithStacks(order.filter(id => !members.has(id)), normalized);
-    const laterals = [...nb.bands.top, ...nb.bands.bottom].filter(id => !CENTER_PANEL_IDS.includes(id));
+    const laterals = [...nb.bands.top, ...nb.bands.bottom].filter(id => !PLACED_ONLY_IDS.includes(id));
     const out = { order: [...cols, ...laterals], stacks: normalized };
     if (hasBands(nb.bands)) {
         out.bands = nb.bands;
@@ -177,10 +177,10 @@ export function stackWith(state, id, targetId, where) {
 /** Troca dois painéis de lugar (também dentro de pilhas e faixas, e entre coluna e faixa). */
 export function swapPanels(state, a, b) {
     if (a === b) return null;
-    // Timeline e monitores trocam com quem tem lugar (coluna ou faixa), mas não entram em pilha nem
-    // trocam estando no centro (lá não há vaga de coluna ou faixa para dar ao outro).
+    // Timeline, monitores e abas trocam com quem tem lugar (coluna ou faixa), mas não entram em pilha
+    // nem trocam estando no centro ou no menu (lá não há vaga de coluna ou faixa para dar ao outro).
     for (const [id, other] of [[a, b], [b, a]]) {
-        if (!CENTER_PANEL_IDS.includes(id)) continue;
+        if (!PLACED_ONLY_IDS.includes(id)) continue;
         if (!isPlaced(state, id) || stackOf(state.stacks, other)) return null;
     }
     const swap = (x) => (x === a ? b : x === b ? a : x);
@@ -191,20 +191,23 @@ export function swapPanels(state, a, b) {
     return finalize(order, (state.stacks || []).map(stack => stack.map(swap)), bands, state.corners);
 }
 
-/** Painel do centro (timeline ou monitor) que está numa faixa ou em coluna, fora do centro. */
+/** Timeline, monitor ou aba que está numa faixa ou em coluna (fora do centro ou do menu). */
 export function isPlaced(state, id) {
     return !!bandOf(state.bands, id) || (state.order || []).includes(id);
 }
 
 /**
- * Tira a timeline ou um monitor da faixa ou da coluna e devolve ao centro: a timeline para baixo
- * dos monitores (F2c parte 2); o monitor para o bloco, no lugar dele (Source antes de Program).
+ * Tira a timeline, um monitor ou uma aba da faixa ou da coluna e devolve para casa: a timeline para
+ * baixo dos monitores (F2c parte 2); o monitor para o bloco, no lugar dele (Source antes de Program);
+ * a aba para o menu dela (parte 2c; qual menu é do tabPanels).
  */
 export function panelToCenter(state, id) {
-    if (!CENTER_PANEL_IDS.includes(id)) return null;
+    if (!PLACED_ONLY_IDS.includes(id)) return null;
     const s = detach(state, id);
     return finalize(s.order.filter(x => x !== id), s.stacks, s.bands, s.corners);
 }
+
+export const panelHome = panelToCenter;
 
 export function timelineToCenter(state) {
     return panelToCenter(state, TIMELINE_ID);
