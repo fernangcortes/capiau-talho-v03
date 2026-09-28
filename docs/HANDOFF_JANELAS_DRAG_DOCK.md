@@ -56,12 +56,16 @@ painel de uma janela destacada; e os **monitores podem sair do centro**. A pági
    - Registrar a regra genérica (cantos disputados entre coluna e faixa) na Seção IX da skill do design
      system quando implementar.
 
-### Em aberto (responder no começo da F2c)
+6. **Monitores: em bloco e sozinhos, o usuário escolhe.** Proposta de gesto: a alça do bloco
+   "Monitores" (Source + Program juntos, mantendo lado a lado/empilhados automático) move os dois; a
+   alça de cada player move só ele, que vira painel comum. Rever maximizar e Numpad7/9 quando um
+   monitor estiver fora do bloco.
+7. **Timeline pode ir para faixa ou coluna** (revoga a decisão antiga "Timeline sempre no centro ou em
+   janela"). As posições atuais `bottom-left` / `bottom-right` / `bottom-full` passam a ser casos de
+   faixa/canto; conferir o redimensionamento do canvas (Seção I.3 da skill) e o Numpad2/1/3.
 
-- **Monitores** (explicado ao usuário em 28/09): (a) mover Source + Program juntos como um bloco
-  "Monitores" para coluna/faixa; (b) cada monitor sozinho em qualquer lugar. Sugestão: (a) primeiro.
-- **Item 4 × âncora da Timeline:** a decisão antiga era "Timeline sempre no centro ou em janela".
-  "O centro vira o que o usuário quiser" libera a Timeline para faixa/coluna também? Confirmar.
+Nenhuma pergunta em aberto: a F2c pode começar direto pelo desenho do estado (`bands`, cantos,
+monitores separados, timeline móvel) em `dockModel`/`dockOps`, com autotestes antes da interface.
 
 ### Pontos de partida no código
 
@@ -109,7 +113,7 @@ Commits: `7823b45`, `b943b27`, `4fc6402` (depois de `079b0b4`).
 | F5a/b | Abas viram painéis (`tabPanels.js`): Falas+inspetor, Visão, Chat, Busca, Tarefas, Logs, Temas, Rostos, Títulos, Docs (Mídias fica). Busca própria em Temas/Rostos/Docs. |
 | P14 | Aba muda entre Biblioteca e Painel Lateral (arrasto ou "Mover X para…" no botão direito); entra no desfazer, workspaces e Restaurar padrão. |
 
-Decisões do usuário que valem para o resto: Timeline sempre no centro ou em janela; máx. 4 painéis
+Decisões do usuário que valem para o resto: Timeline pode ir para centro, faixa, coluna ou janela (desde a F2c); máx. 4 painéis
 por janela; soltar no centro = trocar; Chrome principal mas funcionar nos outros; Source/Program
 separados; arrastar pela alça; muda na hora com Ctrl+Z e restaurar padrão; janelas reabrem sozinhas
 (bloqueadas vão para "Restaurar janelas"); recolher é salvo mas não entra no Ctrl+Alt+Z.
