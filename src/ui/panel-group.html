@@ -106,6 +106,8 @@
             <button class="group-btn" data-arrangement="column" data-tooltip="Empilhados"><i class="fa-solid fa-grip-lines"></i></button>
             <button class="group-btn" data-arrangement="grid" data-tooltip="Grade 2×2"><i class="fa-solid fa-table-cells-large"></i></button>
             <button class="group-btn" data-arrangement="main" data-tooltip="Principal + coluna"><i class="fa-solid fa-table-list"></i></button>
+            <!-- Grade com 3 painéis: o painel sozinho fica embaixo ou em cima dos outros dois -->
+            <button class="group-btn" id="btn-grid-single" style="display: none;"><i class="fa-solid fa-arrows-up-down"></i></button>
         </div>
         <div class="group-toolbar-section">
             <button class="group-btn" id="btn-group-reattach" data-tooltip="Reacoplar todos ao editor principal"><i class="fa-solid fa-down-left-and-up-right-to-center"></i></button>
@@ -190,12 +192,17 @@
             return el;
         }
 
+        // Grade com 3 painéis: o terceiro fica sozinho embaixo ("bottom") ou em cima ("top").
+        let gridSingle = localStorage.getItem("capiau_group_grid_single") === "top" ? "top" : "bottom";
+        const btnGridSingle = document.getElementById("btn-grid-single");
+
         /** Monta a disposição movendo os espaços (com os painéis dentro) para as caixas novas. */
         function render(next) {
             arrangement = next;
             const list = panels.map(id => slots[id]);
             let root;
             if (arrangement === "column") root = box("column", list);
+            else if (arrangement === "grid" && list.length === 3 && gridSingle === "top") root = box("column", [box("row", list.slice(2)), box("row", list.slice(0, 2))]);
             else if (arrangement === "grid" && list.length > 2) root = box("column", [box("row", list.slice(0, 2)), box("row", list.slice(2))]);
             else if (arrangement === "main" && list.length > 2) root = box("row", [list[0], box("column", list.slice(1))]);
             else root = box("row", list);
@@ -207,6 +214,10 @@
                 btn.classList.toggle("active", a === arrangement);
                 btn.disabled = (a === "grid" || a === "main") && panels.length < 3;
             });
+            btnGridSingle.style.display = arrangement === "grid" && panels.length === 3 ? "" : "none";
+            btnGridSingle.setAttribute("data-tooltip", gridSingle === "top"
+                ? `${TITLES[panels[2]] || panels[2]} em cima — clique para pôr embaixo`
+                : `${TITLES[panels[2]] || panels[2]} embaixo — clique para pôr em cima`);
             try { localStorage.setItem("capiau_group_popout_arrangement", arrangement); } catch (e) {}
             applyCollapsed();
             // A seta de recolher segue a posição nova (esquerda/direita ou cima/baixo).
@@ -259,12 +270,24 @@
             applyCollapsed();
         };
         window.capiauPanelEdge = (id) => {
-            const slot = slots[id];
-            const boxEl = slot?.parentElement;
-            if (!boxEl) return null;
-            const items = [...boxEl.children].filter(k => !k.classList.contains("group-splitter"));
-            return edgeInLine(boxEl.classList.contains("column") ? "column" : "row", items.indexOf(slot), items.length);
+            // Sozinho na sua caixa (ex.: painel único da grade), vale a posição da caixa na de fora.
+            let item = slots[id];
+            let boxEl = item?.parentElement;
+            if (!boxEl?.classList.contains("group-box")) return null;
+            const itemsOf = (b) => [...b.children].filter(k => !k.classList.contains("group-splitter"));
+            while (itemsOf(boxEl).length === 1 && boxEl.parentElement?.classList.contains("group-box")) {
+                item = boxEl;
+                boxEl = boxEl.parentElement;
+            }
+            const items = itemsOf(boxEl);
+            return edgeInLine(boxEl.classList.contains("column") ? "column" : "row", items.indexOf(item), items.length);
         };
+
+        btnGridSingle.addEventListener("click", () => {
+            gridSingle = gridSingle === "top" ? "bottom" : "top";
+            try { localStorage.setItem("capiau_group_grid_single", gridSingle); } catch (e) {}
+            render("grid");
+        });
 
 
         document.querySelectorAll(".group-btn[data-arrangement]").forEach(btn => {
