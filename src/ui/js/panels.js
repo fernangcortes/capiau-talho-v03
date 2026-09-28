@@ -1083,8 +1083,8 @@ export class PanelsManager {
                     </div>
                     <div class="clue-context" style="font-style:italic; color:var(--text-muted); font-size:10px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">"${clue.context}"</div>
                     <div class="clue-actions" style="display:flex; gap:6px; margin-top:6px;">
-                        <button class="btn-flat-action cyan btn-listen-clue" style="font-size:9px; padding:2px 4px; background:rgba(6, 182, 212, 0.1) !important; border-radius:3px;"><i class="fa-solid fa-play"></i> Ouvir</button>
-                        <button class="btn-flat-action rose btn-inspect-clue" style="font-size:9px; padding:2px 4px; background:rgba(244, 63, 94, 0.1) !important; border-radius:3px;"><i class="fa-solid fa-magnifying-glass"></i> Ajustar</button>
+                        <button class="btn-flat-action cyan btn-listen-clue" style="font-size:9px; padding:2px 4px; background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-play"></i> Ouvir</button>
+                        <button class="btn-flat-action rose btn-inspect-clue" style="font-size:9px; padding:2px 4px; background:var(--t-tint-2, rgba(244, 63, 94, 0.1)) !important; border-radius:3px;"><i class="fa-solid fa-magnifying-glass"></i> Ajustar</button>
                     </div>
                 `;
                 
@@ -1219,7 +1219,7 @@ export class PanelsManager {
         secWave.innerHTML = `
             <div class="inspector-section-title" style="display:flex; justify-content:space-between; align-items:center;">
                 <span><i class="fa-solid fa-chart-simple" style="color:var(--color-rose);"></i> Waveform de Fala & Silêncio</span>
-                <button id="btn-toggle-inspector-words" class="btn-flat-action" style="font-size:10px; padding:2px 8px; border-radius:4px; cursor:pointer; background:${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.06)'}; color:${this.inspectorShowWords ? '#22d3ee' : '#94a3b8'}; border:1px solid ${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.4)' : 'rgba(255,255,255,0.08)'};" title="Mostrar/Esconder marcação de palavras sobre a onda">
+                <button id="btn-toggle-inspector-words" class="btn-flat-action" style="font-size:10px; padding:2px 8px; border-radius:4px; cursor:pointer; background:${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.06)'}; color:${this.inspectorShowWords ? '#22d3ee' : '#94a3b8'}; border:1px solid ${this.inspectorShowWords ? 'rgba(6, 182, 212, 0.4)' : 'var(--t-line-weak, rgba(255,255,255,0.08))'};" title="Mostrar/Esconder marcação de palavras sobre a onda">
                     <i class="fa-solid fa-font"></i> Palavras
                 </button>
             </div>
@@ -1258,7 +1258,7 @@ export class PanelsManager {
                     <input type="checkbox" id="chk-global-rename"> Aplicar a TODOS os blocos de "${d.speaker_id}" neste vídeo
                 </label>
                 <div style="display:flex; gap:6px; margin-top:4px;">
-                    <button id="btn-save-speaker-name" class="btn-flat-action cyan" style="font-weight:600; padding:6px 12px; background:rgba(6, 182, 212, 0.15) !important; border-radius:4px;"><i class="fa-solid fa-floppy-disk"></i> Salvar Rótulo</button>
+                    <button id="btn-save-speaker-name" class="btn-flat-action cyan" style="font-weight:600; padding:6px 12px; background:var(--t-tint-3, rgba(6, 182, 212, 0.15)) !important; border-radius:4px;"><i class="fa-solid fa-floppy-disk"></i> Salvar Rótulo</button>
                 </div>
             </div>
         `;
@@ -1296,7 +1296,7 @@ export class PanelsManager {
             const opt = document.createElement("option");
             opt.value = s;
             opt.textContent = s;
-            opt.style.backgroundColor = "#121218";
+            opt.style.backgroundColor = "var(--t-surface-2, #121218)";
             opt.style.color = "#e2e8f0";
             if (s === d.speaker_id) opt.selected = true;
             selectSpk.appendChild(opt);
@@ -1305,7 +1305,7 @@ export class PanelsManager {
         const optNew = document.createElement("option");
         optNew.value = "_new_";
         optNew.textContent = "+ Novo Falante...";
-        optNew.style.backgroundColor = "#121218";
+        optNew.style.backgroundColor = "var(--t-surface-2, #121218)";
         optNew.style.color = "var(--color-cyan)";
         selectSpk.appendChild(optNew);
         
@@ -1619,7 +1619,7 @@ export class PanelsManager {
                 </div>
                 <div style="display:flex; gap:4px;">
                     <button class="btn-flat-action cyan btn-listen-silence" title="Ouvir" style="background:none; border:none; cursor:pointer;"><i class="fa-solid fa-play"></i></button>
-                    <button class="btn-flat-action rose btn-split-silence" title="Dividir aqui" style="font-size:9px; padding:2px 4px; background:rgba(244, 63, 94, 0.1) !important; border-radius:3px; cursor:pointer;"><i class="fa-solid fa-scissors"></i> Dividir</button>
+                    <button class="btn-flat-action rose btn-split-silence" title="Dividir aqui" style="font-size:9px; padding:2px 4px; background:var(--t-tint-2, rgba(244, 63, 94, 0.1)) !important; border-radius:3px; cursor:pointer;"><i class="fa-solid fa-scissors"></i> Dividir</button>
                 </div>
             `;
             
@@ -1680,7 +1680,7 @@ export class PanelsManager {
                 card.innerHTML = `
                     <img src="/api/face/${face.id}/thumbnail" alt="${label}" onerror="this.src='https://placehold.co/45x45/181824/ffffff?text=?'">
                     <span style="font-size:9px; text-overflow:ellipsis; overflow:hidden; width:100%; white-space:nowrap;">${label}</span>
-                    <button class="btn-flat-action cyan" style="font-size: 9px; padding: 2px 4px; margin-top:2px; background:rgba(6, 182, 212, 0.1) !important; border-radius:3px; cursor:pointer;" title="Usar este nome"><i class="fa-solid fa-check"></i> Atribuir</button>
+                    <button class="btn-flat-action cyan" style="font-size: 9px; padding: 2px 4px; margin-top:2px; background:var(--t-tint-2, rgba(6, 182, 212, 0.1)) !important; border-radius:3px; cursor:pointer;" title="Usar este nome"><i class="fa-solid fa-check"></i> Atribuir</button>
                 `;
                 
                 const actionBtn = card.querySelector("button");
@@ -2013,14 +2013,14 @@ export class PanelsManager {
             card.style.padding = "12px";
 
             const segmentsBadge = t.segments_count
-                ? `<span style="font-size: 9px; color: var(--color-emerald); background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 1px 7px; font-weight: 600;">${t.segments_count} trechos</span>`
+                ? `<span style="font-size: 9px; color: var(--color-emerald); background: var(--t-tint-2, rgba(16,185,129,0.1)); border: 1px solid var(--t-line-strong, rgba(16,185,129,0.25)); border-radius: 10px; padding: 1px 7px; font-weight: 600;">${t.segments_count} trechos</span>`
                 : "";
 
             card.innerHTML = `
                 <h4 style="color: var(--color-cyan); margin: 0; font-size: 12px; font-weight: 600; display:flex; align-items:center; gap:6px; width: 100%;"><i class="fa-solid fa-brain"></i> <span style="flex:1;">${t.title}</span> ${segmentsBadge}</h4>
                 <p style="font-size: 11px; color: var(--text-secondary); margin: 0; line-height: 1.4; text-align: left;">${t.description}</p>
                 <div style="display:flex; gap:6px; margin-top:6px; width: 100%; flex-wrap: wrap;">
-                    ${t.segments_count ? `<button class="btn-secondary btn-theme-segments" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--color-emerald); border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.06);" data-theme-id="${t.id}">
+                    ${t.segments_count ? `<button class="btn-secondary btn-theme-segments" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; color: var(--color-emerald); border: 1px solid var(--t-line-strong, rgba(16,185,129,0.3)); background: var(--t-tint-1, rgba(16,185,129,0.06));" data-theme-id="${t.id}">
                         <i class="fa-solid fa-clock"></i> Ver Trechos
                     </button>` : ""}
                     <button class="btn-primary btn-theme-search" style="padding: 4px 8px; font-size: 9px; height: 22px; display: flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; border: none;" data-title="${t.title}">
@@ -3159,7 +3159,7 @@ export class PanelsManager {
 
             if (track.hidden) {
                 row.className = "timeline-header-track restore-line";
-                row.style.cssText = `height: 4px; border-bottom: 1px solid rgba(6, 182, 212, 0.3); background: rgba(6, 182, 212, 0.15); cursor: pointer; transition: background 0.2s, box-shadow 0.2s; position: relative; flex-shrink: 0;`;
+                row.style.cssText = `height: 4px; border-bottom: 1px solid var(--t-line-strong, rgba(6, 182, 212, 0.3)); background: var(--t-tint-3, rgba(6, 182, 212, 0.15)); cursor: pointer; transition: background 0.2s, box-shadow 0.2s; position: relative; flex-shrink: 0;`;
                 row.setAttribute("data-tooltip", `Expandir pista ${track.id} (${track.name})`);
                 
                 row.addEventListener("click", () => {
@@ -3277,7 +3277,7 @@ export class PanelsManager {
                         </div>
                     </div>
                     <div style="display: flex; justify-content: flex-end; align-items: center; width: 100%; gap: 4px; margin-top: 2px;">
-                        <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Analisar</button>
+                        <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid var(--t-line-strong, rgba(34,197,94,0.35)); background: var(--t-tint-2, rgba(34,197,94,0.08)); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Analisar</button>
                     </div>
                 `;
             } else {
@@ -3286,7 +3286,7 @@ export class PanelsManager {
                         <span style="color: #22c55e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;" title="${track.name}"><i class="fa-solid fa-robot" style="font-size: 9px;"></i> ${track.name}</span>
                         <div style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">
                             <button class="btn-track-visibility btn-track-action" title="Ocultar pista" style="color: var(--text-secondary); font-size: 9px;"><i class="fa-solid fa-eye"></i></button>
-                            <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                            <button class="btn-track-ai-run" title="✨ Analisar corte atual com a persona selecionada" style="border: 1px solid var(--t-line-strong, rgba(34,197,94,0.35)); background: var(--t-tint-2, rgba(34,197,94,0.08)); color: #22c55e; cursor: pointer; padding: 1px 6px; font-size: 9px; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                         </div>
                     </div>
                 `;
@@ -3942,7 +3942,7 @@ export class PanelsManager {
 
             item.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-                    <kbd style="padding: 1px 5px; border-radius: 3px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.12); font-family: monospace; font-weight: 700; font-size: 10px; color: ${badgeColor}; white-space: nowrap;">${cleanKey}</kbd>
+                    <kbd style="padding: 1px 5px; border-radius: 3px; background: rgba(0,0,0,0.5); border: 1px solid var(--t-line-strong, rgba(255,255,255,0.12)); font-family: monospace; font-weight: 700; font-size: 10px; color: ${badgeColor}; white-space: nowrap;">${cleanKey}</kbd>
                     <span style="font-weight: 600; color: rgba(255,255,255,0.9); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cmdName}</span>
                 </div>
                 <span style="font-size: 9px; color: var(--text-muted); font-family: monospace; margin-left: 4px;">→</span>
@@ -4191,7 +4191,7 @@ export class PanelsManager {
             } else {
                 btn.classList.remove("active");
                 btn.style.background = "rgba(255,255,255,0.04)";
-                btn.style.borderColor = "rgba(255,255,255,0.08)";
+                btn.style.borderColor = "var(--t-line-weak, rgba(255,255,255,0.08))";
                 btn.style.color = "var(--text-secondary)";
             }
         });
@@ -4224,7 +4224,7 @@ export class PanelsManager {
             const catTitle = catMeta.label || catMeta.name || catId;
 
             html += `
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); border-radius: 8px; padding: 10px 12px;">
                 <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
                     <i class="fa-solid ${icon}" style="color: var(--color-cyan); font-size: 10px;"></i> ${catTitle}
                 </h4>
@@ -4251,7 +4251,7 @@ export class PanelsManager {
 
         // 8. Pistas Dinâmicas (Multipista)
         html += `
-        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 12px;">
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); border-radius: 8px; padding: 10px 12px;">
             <h4 style="color: #fff; margin: 0 0 6px 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
                 <i class="fa-solid fa-layer-group" style="color: var(--color-cyan); font-size: 10px;"></i> 8. Pistas Dinâmicas (Multipista)
             </h4>
@@ -4320,7 +4320,7 @@ export class PanelsManager {
                 <tr data-cmd-id="${cmd.id}">
                     <td style="font-weight: 600; color: #fff;">
                         ${cmdDisplayName}
-                        ${isOverridden ? '<span style="font-size: 9px; color: var(--color-cyan); margin-left: 4px; background: rgba(6,182,212,0.15); padding: 1px 4px; border-radius: 3px;">MODIFICADO</span>' : ''}
+                        ${isOverridden ? '<span style="font-size: 9px; color: var(--color-cyan); margin-left: 4px; background: var(--t-tint-3, rgba(6,182,212,0.15)); padding: 1px 4px; border-radius: 3px;">MODIFICADO</span>' : ''}
                     </td>
                     <td style="color: var(--text-secondary); font-size: 11px;">
                         ${cmd.description}

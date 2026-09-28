@@ -4658,7 +4658,7 @@ export class CapiauTimelineInteraction {
             tip.style.position = "fixed";
             tip.style.zIndex = "99999";
             tip.style.pointerEvents = "none";
-            tip.style.background = "rgba(18, 18, 24, 0.95)";
+            tip.style.background = "var(--t-surface-2, rgba(18, 18, 24, 0.95))";
             tip.style.color = "#ffffff";
             tip.style.border = "1px solid rgba(6, 182, 212, 0.5)";
             tip.style.borderRadius = "4px";
@@ -4693,7 +4693,7 @@ export class CapiauTimelineInteraction {
             tip.style.position = "fixed";
             tip.style.zIndex = "99999";
             tip.style.pointerEvents = "none";
-            tip.style.background = "rgba(18, 18, 24, 0.95)";
+            tip.style.background = "var(--t-surface-2, rgba(18, 18, 24, 0.95))";
             tip.style.color = "#ffffff";
             tip.style.border = "1px solid rgba(6, 182, 212, 0.5)";
             tip.style.borderRadius = "4px";
@@ -4746,7 +4746,7 @@ export class CapiauTimelineInteraction {
             tip.style.position = "fixed";
             tip.style.zIndex = "99999";
             tip.style.pointerEvents = "none";
-            tip.style.background = "rgba(18, 18, 24, 0.95)";
+            tip.style.background = "var(--t-surface-2, rgba(18, 18, 24, 0.95))";
             tip.style.color = "#ffffff";
             tip.style.border = "1px solid rgba(6, 182, 212, 0.5)";
             tip.style.borderRadius = "4px";
@@ -4783,7 +4783,7 @@ export class CapiauTimelineInteraction {
             tip.style.position = "fixed";
             tip.style.zIndex = "99999";
             tip.style.pointerEvents = "none";
-            tip.style.background = "rgba(18, 18, 24, 0.95)";
+            tip.style.background = "var(--t-surface-2, rgba(18, 18, 24, 0.95))";
             tip.style.color = "#ffffff";
             tip.style.border = "1px solid rgba(168, 85, 247, 0.6)";
             tip.style.borderRadius = "4px";
@@ -4820,7 +4820,7 @@ export class CapiauTimelineInteraction {
             tip.style.position = "fixed";
             tip.style.zIndex = "99999";
             tip.style.pointerEvents = "none";
-            tip.style.background = "rgba(18, 18, 24, 0.95)";
+            tip.style.background = "var(--t-surface-2, rgba(18, 18, 24, 0.95))";
             tip.style.color = "#ffffff";
             tip.style.border = "1px solid rgba(6, 182, 212, 0.7)";
             tip.style.borderRadius = "4px";
@@ -4857,7 +4857,7 @@ export class CapiauTimelineInteraction {
             tip.style.position = "fixed";
             tip.style.zIndex = "99999";
             tip.style.pointerEvents = "none";
-            tip.style.background = "rgba(18, 18, 24, 0.95)";
+            tip.style.background = "var(--t-surface-2, rgba(18, 18, 24, 0.95))";
             tip.style.color = "#ffffff";
             tip.style.border = "1px solid rgba(6, 182, 212, 0.75)";
             tip.style.borderRadius = "4px";
@@ -7706,7 +7706,7 @@ export class CapiauTimelineInteraction {
                             </div>
                         </div>
                         ${STATE.activeTimelineCuts.length > 0 ? `
-                            <div id="seq-warning" style="margin-top:16px; padding:10px; border-radius:6px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:10px; line-height:1.4; display:flex; gap:6px;">
+                            <div id="seq-warning" style="margin-top:16px; padding:10px; border-radius:6px; background:var(--t-tint-2, rgba(234,179,8,0.1)); border:1px solid var(--t-line-strong, rgba(234,179,8,0.25)); color:#facc15; font-size:10px; line-height:1.4; display:flex; gap:6px;">
                                 <i class="fa-solid fa-triangle-exclamation" style="font-size:12px; margin-top:2px;"></i>
                                 <span><strong>Aviso:</strong> A timeline possui clipes. Alterar o FPS irá reescalar os frames físicos para manter a sincronia em segundos.</span>
                             </div>
@@ -7899,7 +7899,7 @@ export class CapiauTimelineInteraction {
             <div style="font-size:11px; font-weight:bold; color:var(--color-cyan); display:flex; gap: 6px; align-items:center; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; margin-bottom: 4px;">
                 <i class="fa-solid fa-sliders"></i>
                 <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${realFilename}">${displayTitle}</span>
-                <span style="font-size:8.5px; padding:2px 6px; border-radius:4px; font-weight:bold; background:rgba(6,182,212,0.1); color:var(--color-cyan); text-transform:uppercase; letter-spacing:0.5px; margin-right: 4px;">${clip.track}</span>
+                <span style="font-size:8.5px; padding:2px 6px; border-radius:4px; font-weight:bold; background:var(--t-tint-2, rgba(6,182,212,0.1)); color:var(--color-cyan); text-transform:uppercase; letter-spacing:0.5px; margin-right: 4px;">${clip.track}</span>
                 ${!isAudioTrack ? `
                 <div style="display:flex; gap:8px; align-items:center; border-left: 1px solid var(--border-glass); padding-left:8px;">
                     <button class="nle-select-btn ${fitMode === 'fill' ? 'active' : ''}" data-action="fit:fill" title="Preencher (Fill)"><i class="fa-solid fa-expand"></i></button>
@@ -8109,8 +8109,8 @@ export class CapiauTimelineInteraction {
             const aoVivoOk = !!ppAoVivo;
             const gatePossivel = aoVivoOk && this._suportaAudioWorklet();
             const gatePronto = gatePossivel && typeof ppAoVivo.gateAoVivoDisponivel === "function" && ppAoVivo.gateAoVivoDisponivel() === true;
-            const avisoSemWebAudio = `<div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:10px;">Ajustes de áudio ao vivo indisponíveis (WebAudio ausente).</div>`;
-            const gateAviso = `<div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:10px;">Gate indisponível (AudioWorklet ausente).</div>`;
+            const avisoSemWebAudio = `<div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:var(--t-tint-2, rgba(234,179,8,0.1)); border:1px solid var(--t-line-strong, rgba(234,179,8,0.25)); color:#facc15; font-size:10px;">Ajustes de áudio ao vivo indisponíveis (WebAudio ausente).</div>`;
+            const gateAviso = `<div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:var(--t-tint-2, rgba(234,179,8,0.1)); border:1px solid var(--t-line-strong, rgba(234,179,8,0.25)); color:#facc15; font-size:10px;">Gate indisponível (AudioWorklet ausente).</div>`;
             const gateNota = `<div style="font-size:9px; color:var(--text-muted); padding:2px 0 4px;">Gate ainda não carregou.</div>`;
 
             const linhaAoVivo = (attr, prop, rotulo, min, max, step, val) => {
@@ -8650,7 +8650,7 @@ export class CapiauTimelineInteraction {
     _audioDiagResultInner(data, expandido = false) {
         this._audioDiagLastData = data;
         const erroBox = (msg) => `
-            <div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:rgba(244,63,94,0.08); border:1px solid rgba(244,63,94,0.25); color:var(--color-rose); font-size:10px; line-height:1.4; display:flex; gap:6px; align-items:flex-start;">
+            <div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:var(--t-tint-2, rgba(244,63,94,0.08)); border:1px solid var(--t-line-strong, rgba(244,63,94,0.25)); color:var(--color-rose); font-size:10px; line-height:1.4; display:flex; gap:6px; align-items:flex-start;">
                 <i class="fa-solid fa-circle-exclamation" style="margin-top:1px;"></i>
                 <span>${this._audioDiagEsc(msg)}</span>
             </div>
@@ -8679,7 +8679,7 @@ export class CapiauTimelineInteraction {
 
         // Contrato C3: fonte "proxy" significa que a medida veio do intermediario, não do arquivo bruto.
         const proxyNota = data.fonte === "proxy" ? `
-            <div style="margin-top:5px; padding:5px 7px; border-radius:4px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:9px; line-height:1.4; display:flex; gap:5px; align-items:flex-start;">
+            <div style="margin-top:5px; padding:5px 7px; border-radius:4px; background:var(--t-tint-2, rgba(234,179,8,0.1)); border:1px solid var(--t-line-strong, rgba(234,179,8,0.25)); color:#facc15; font-size:9px; line-height:1.4; display:flex; gap:5px; align-items:flex-start;">
                 <i class="fa-solid fa-triangle-exclamation" style="margin-top:1px;"></i>
                 <span>Análise medida no proxy (arquivo intermediário): os valores podem diferir do arquivo original.</span>
             </div>
@@ -9058,7 +9058,7 @@ export class CapiauTimelineInteraction {
         if (efeito.status === "failed") {
             const erro = this._erroRenderDe(alvoClipId);
             return `
-                <div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:rgba(244,63,94,0.08); border:1px solid rgba(244,63,94,0.25); color:var(--color-rose); font-size:10px; line-height:1.4; display:flex; gap:6px; align-items:flex-start;">
+                <div style="margin:4px 0; padding:6px 8px; border-radius:4px; background:var(--t-tint-2, rgba(244,63,94,0.08)); border:1px solid var(--t-line-strong, rgba(244,63,94,0.25)); color:var(--color-rose); font-size:10px; line-height:1.4; display:flex; gap:6px; align-items:flex-start;">
                     <i class="fa-solid fa-circle-exclamation" style="margin-top:1px;"></i>
                     <span>O último render falhou${erro ? `: ${esc(erro)}` : "."}</span>
                 </div>
@@ -9155,7 +9155,7 @@ export class CapiauTimelineInteraction {
         const original = body.querySelector('input[name="adj-ar-ab"][value="original"]');
         if (original) original.checked = true;
         const aviso = doc.createElement("div");
-        aviso.style.cssText = "margin-top:4px; padding:5px 7px; border-radius:4px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); color:#facc15; font-size:9px; line-height:1.4;";
+        aviso.style.cssText = "margin-top:4px; padding:5px 7px; border-radius:4px; background:var(--t-tint-2, rgba(234,179,8,0.1)); border:1px solid var(--t-line-strong, rgba(234,179,8,0.25)); color:#facc15; font-size:9px; line-height:1.4;";
         aviso.textContent = "O arquivo tratado ficou indisponível para o player; voltando ao original.";
         body.prepend(aviso);
     }
@@ -9386,7 +9386,7 @@ export class CapiauTimelineInteraction {
         const outS = alvo ? Number(alvo.out) : NaN;
 
         const erroBox = (msg) => `
-            <div style="margin:3px 0; padding:5px 7px; border-radius:4px; background:rgba(244,63,94,0.08); border:1px solid rgba(244,63,94,0.25); color:var(--color-rose); font-size:9px; line-height:1.4;">${this._audioDiagEsc(msg)}</div>
+            <div style="margin:3px 0; padding:5px 7px; border-radius:4px; background:var(--t-tint-2, rgba(244,63,94,0.08)); border:1px solid var(--t-line-strong, rgba(244,63,94,0.25)); color:var(--color-rose); font-size:9px; line-height:1.4;">${this._audioDiagEsc(msg)}</div>
         `;
 
         if (videoId === null || !isFinite(inS) || !isFinite(outS) || outS <= inS) {
@@ -9629,7 +9629,7 @@ export class CapiauTimelineInteraction {
         const esc = this._audioDiagEsc;
         const tam = tamanhoTexto ? `<span style="font-size:9px; color:var(--text-muted); white-space:nowrap; flex-shrink:0;">(${esc(tamanhoTexto)})</span>` : "";
         return `
-            <div style="margin-top:4px; padding:5px 7px; border-radius:4px; background:rgba(16,185,129,0.07); border:1px solid rgba(16,185,129,0.25);">
+            <div style="margin-top:4px; padding:5px 7px; border-radius:4px; background:var(--t-tint-2, rgba(16,185,129,0.07)); border:1px solid var(--t-line-strong, rgba(16,185,129,0.25));">
                 <div style="display:flex; gap:6px; align-items:center;">
                     <i class="fa-solid fa-folder-open" style="color:var(--color-emerald); font-size:10px; flex-shrink:0;"></i>
                     <span id="adj-ar-caminho" style="font-family:monospace; font-size:10px; color:var(--text-primary); word-break:break-all; user-select:all;">${esc(caminho)}</span>
@@ -9682,7 +9682,7 @@ export class CapiauTimelineInteraction {
         const estado = this._estadoRadioAuphonic(this._cotaCacheDados);
         if (!estado.ligado) {
             saida.innerHTML = `
-                <div style="margin:4px 0 2px; padding:5px 8px; border-radius:4px; background:rgba(234,179,8,0.08); border:1px solid rgba(234,179,8,0.3); font-size:10px; color:#facc15; display:flex; gap:5px; align-items:center;">
+                <div style="margin:4px 0 2px; padding:5px 8px; border-radius:4px; background:var(--t-tint-2, rgba(234,179,8,0.08)); border:1px solid var(--t-line-strong, rgba(234,179,8,0.3)); font-size:10px; color:#facc15; display:flex; gap:5px; align-items:center;">
                     <i class="fa-solid fa-circle-info"></i><span>${this._audioDiagEsc(estado.motivo)}</span>
                 </div>
             `;
@@ -9863,7 +9863,7 @@ export class CapiauTimelineInteraction {
         const auto = this._automaticoNuvem || {};
         const linhas = campos.map((def) => this._linhaAjusteNuvemInner(def, manuais[def.campo], auto[def.campo])).join("");
         return `
-            <div style="margin:2px 0 4px; padding:6px 8px; border-radius:4px; background:rgba(139,92,246,0.06); border:1px solid var(--border-glass);">
+            <div style="margin:2px 0 4px; padding:6px 8px; border-radius:4px; background:var(--t-tint-1, rgba(139,92,246,0.06)); border:1px solid var(--border-glass);">
                 <div style="font-size:9px; color:var(--text-muted); line-height:1.45; padding-bottom:3px;">Sem marcar nada, a medição decide tudo sozinha neste clipe. O que você marcar sai como ajuste manual para a nuvem; o resto continua automático.</div>
                 ${linhas}
             </div>
@@ -13169,7 +13169,7 @@ export class CapiauTimelineInteraction {
             popup.id = "ghost-action-popup";
             popup.style.cssText = `
                 position: fixed;
-                background: rgba(15, 23, 42, 0.95);
+                background: var(--t-surface-3, rgba(15, 23, 42, 0.95));
                 border: 1px solid var(--border-glass);
                 border-radius: 8px;
                 padding: 10px 14px;
@@ -13192,7 +13192,7 @@ export class CapiauTimelineInteraction {
                 <button id="btn-popup-accept" class="btn-primary" style="flex: 1; height: 26px; font-size: 11px; font-weight: bold; padding: 0 10px; display: flex; align-items: center; justify-content: center; gap: 4px; border-radius: 4px;">
                      <i class="fa-solid fa-check"></i> Aceitar (Y)
                 </button>
-                <button id="btn-popup-reject" class="btn-secondary" style="flex: 1; height: 26px; font-size: 11px; font-weight: bold; padding: 0 10px; display: flex; align-items: center; justify-content: center; gap: 4px; border-radius: 4px; border-color: rgba(239, 68, 68, 0.3); color: #ef4444; background: rgba(239, 68, 68, 0.08);">
+                <button id="btn-popup-reject" class="btn-secondary" style="flex: 1; height: 26px; font-size: 11px; font-weight: bold; padding: 0 10px; display: flex; align-items: center; justify-content: center; gap: 4px; border-radius: 4px; border-color: var(--t-line-strong, rgba(239, 68, 68, 0.3)); color: #ef4444; background: var(--t-tint-2, rgba(239, 68, 68, 0.08));">
                      <i class="fa-solid fa-xmark"></i> Rejeitar (N)
                 </button>
             </div>
@@ -13447,7 +13447,7 @@ export class CapiauTimelineInteraction {
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                background: rgba(15, 23, 42, 0.98);
+                background: var(--t-surface-3, rgba(15, 23, 42, 0.98));
                 border: 1px solid var(--color-cyan);
                 border-radius: 12px;
                 padding: 20px;
@@ -13481,7 +13481,7 @@ export class CapiauTimelineInteraction {
             const targetSrc = `${videoSrc}#t=${alt.in_s.toFixed(1)},${alt.out_s.toFixed(1)}`;
             
             altsHtml += `
-                <div class="alt-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <div class="alt-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.08)); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
                     <div style="position: relative; border-radius: 6px; overflow: hidden; background: #000; aspect-ratio: 16/9;">
                         <video src="${targetSrc}" autoplay loop muted playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
                         <div style="position: absolute; top: 8px; left: 8px; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px; color: #fff;">
@@ -13491,13 +13491,13 @@ export class CapiauTimelineInteraction {
                     <div style="font-size: 12px; color: #e2e8f0; line-height: 1.4; flex-grow: 1; min-height: 36px;">
                         "${alt.reason || 'Sem justificativa.'}"
                     </div>
-                    <div style="font-size: 11px; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+                    <div style="font-size: 11px; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--t-line-weak, rgba(255,255,255,0.05)); padding-top: 8px;">
                         <span>Duração Ideal: ${alt.ideal_duration_s ? alt.ideal_duration_s.toFixed(1) + 's' : 'N/A'}</span>
                         <div style="display: flex; gap: 8px;">
-                            <button class="btn-alt-swap-fixed btn-icon" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" title="Slot Fixo (substitui mantendo a duração atual)" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; cursor: pointer; outline: none; transition: all 0.2s;">
+                            <button class="btn-alt-swap-fixed btn-icon" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" title="Slot Fixo (substitui mantendo a duração atual)" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 15px; background: rgba(255,255,255,0.05); border: 1px solid var(--t-line-strong, rgba(255,255,255,0.15)); border-radius: 6px; color: #fff; cursor: pointer; outline: none; transition: all 0.2s;">
                                 <i class="fa-solid fa-arrows-left-right"></i>
                             </button>
-                            <button class="btn-alt-swap-ripple btn-icon" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" title="Ripple (aplica duração ideal e empurra os seguintes)" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 15px; background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3); border-radius: 6px; color: var(--color-cyan); cursor: pointer; outline: none; transition: all 0.2s;">
+                            <button class="btn-alt-swap-ripple btn-icon" data-video-id="${alt.video_id}" data-in="${alt.in_s}" data-out="${alt.out_s}" title="Ripple (aplica duração ideal e empurra os seguintes)" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 15px; background: var(--t-tint-2, rgba(6,182,212,0.1)); border: 1px solid var(--t-line-strong, rgba(6,182,212,0.3)); border-radius: 6px; color: var(--color-cyan); cursor: pointer; outline: none; transition: all 0.2s;">
                                 <i class="fa-solid fa-angles-right"></i>
                             </button>
                         </div>
@@ -13520,7 +13520,7 @@ export class CapiauTimelineInteraction {
                     color: #fff !important;
                 }
             </style>
-            <div style="font-size: 14px; color: var(--color-cyan); font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+            <div style="font-size: 14px; color: var(--color-cyan); font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--t-line-strong, rgba(255,255,255,0.1)); padding-bottom: 10px;">
                 <span><i class="fa-solid fa-wand-magic-sparkles"></i> Opções Alternativas da IA</span>
                 <span style="font-size: 11px; color: var(--text-secondary); cursor: pointer; padding: 4px;" class="btn-close-alts"><i class="fa-solid fa-xmark"></i></span>
             </div>

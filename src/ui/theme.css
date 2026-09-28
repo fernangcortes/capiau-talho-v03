@@ -1,0 +1,18 @@
+/* ── TEMA DA INTERFACE ──────────────────────────────────────────────────────
+   Plano: docs/PLANO_TEMA_NEUTRO.md
+
+   Fundos, linhas e brilhos da UI usam var(--t-<token>, <cor original>). O preset
+   Clássico NÃO define os --t-*: vale a cor original de cada lugar (o visual de sempre).
+   Os outros presets definem os tokens abaixo e mudam a interface inteira de uma vez.
+   Texto, ícones e cores com significado (clipes, marcadores, seleção, erro) não passam por aqui.
+
+   Tokens (atribuídos por scripts/tema_tokenizar.mjs, regra em tests/tema_cores.mjs):
+     --t-surface-0 … --t-surface-4   fundos, do mais fundo ao mais alto
+     --t-tint-1 … --t-tint-3         véus translúcidos (hover, cartões, realces decorativos)
+     --t-line-weak / --t-line-strong divisórias e bordas
+     --t-glow                        brilhos coloridos decorativos (box-shadow)
+   E os tokens antigos, que os presets também redefinem:
+     --bg-base --bg-glass --bg-glass-active --border-glass --border-glass-glow
+
+   Canvas (timeline, player) lê os mesmos tokens via js/themeTokens.js.
+   ─────────────────────────────────────────────────────────────────────────── */

@@ -948,7 +948,7 @@ export class FaceManager {
                 <div class="fullscreen-face-meta" title="${metaText}">${metaText}</div>
                 <div class="fullscreen-face-input-wrapper" style="display:flex; gap:6px; margin-top:5px; width:100%;">
                     <input class="fullscreen-face-input" type="text" list="speakers-datalist" value="${inputValue}" placeholder="${inputPlaceholder}" style="flex:1;">
-                    <button class="btn-reject-face" title="Não relevante / Não é rosto" style="background:rgba(239, 68, 68, 0.15); border:1px solid rgba(239, 68, 68, 0.4); color:#ef4444; border-radius:6px; width:34px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
+                    <button class="btn-reject-face" title="Não relevante / Não é rosto" style="background:var(--t-tint-3, rgba(239, 68, 68, 0.15)); border:1px solid var(--t-line-strong, rgba(239, 68, 68, 0.4)); color:#ef4444; border-radius:6px; width:34px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
                         <i class="fa-solid fa-ban"></i>
                     </button>
                 </div>
@@ -1161,7 +1161,7 @@ export class FaceManager {
             
             const btn = doc.createElement("button");
             btn.className = "btn-secondary";
-            btn.style.cssText = "padding: 10px 24px; font-size: 13px; font-weight: 600; cursor: pointer; border-color: rgba(6, 182, 212, 0.3); color: var(--color-cyan);";
+            btn.style.cssText = "padding: 10px 24px; font-size: 13px; font-weight: 600; cursor: pointer; border-color: var(--t-line-strong, rgba(6, 182, 212, 0.3)); color: var(--color-cyan);";
             btn.innerHTML = `<i class="fa-solid fa-angles-down"></i> Carregar Mais Rostos (${this.unlabeledFaces.length - endIdx} restantes)`;
             
             btn.addEventListener("click", () => this.renderNextPage());
@@ -1359,7 +1359,7 @@ export class FaceManager {
             popover.id = "fullscreen-face-context-popover";
             popover.style.position = "fixed";
             popover.style.zIndex = "25000";
-            popover.style.background = "rgba(10, 8, 14, 0.95)";
+            popover.style.background = "var(--t-surface-1, rgba(10, 8, 14, 0.95))";
             popover.style.border = "1px solid rgba(6, 182, 212, 0.5)";
             popover.style.borderRadius = "12px";
             popover.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
@@ -1911,7 +1911,7 @@ export class FaceManager {
             tbody.innerHTML = "";
             filteredSpeakers.forEach(sp => {
                 const tr = doc.createElement("tr");
-                tr.style.borderBottom = "1px solid rgba(255,255,255,0.04)";
+                tr.style.borderBottom = "1px solid var(--t-line-weak, rgba(255,255,255,0.04))";
                 
                 tr.innerHTML = `
                     <td style="padding: 10px 12px; width: 40px; text-align: center;">

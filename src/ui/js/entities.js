@@ -171,7 +171,7 @@ export class EntityManager {
         list.forEach(entity => {
             const tr = document.createElement("tr");
             tr.dataset.entityId = entity.id;
-            tr.style.borderBottom = "1px solid rgba(255,255,255,0.04)";
+            tr.style.borderBottom = "1px solid var(--t-line-weak, rgba(255,255,255,0.04))";
 
             const aliasesHtml = (entity.aliases && entity.aliases.length)
                 ? `<div style="font-size:9px; color:var(--text-muted);">${esc(entity.aliases.join(", "))}</div>` : "";

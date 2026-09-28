@@ -1452,7 +1452,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     const runAllItem = document.createElement("div");
     runAllItem.className = "menu-item";
     runAllItem.style.background = "rgba(6, 182, 212, 0.12)";
-    runAllItem.style.borderBottom = "1px solid rgba(255, 255, 255, 0.08)";
+    runAllItem.style.borderBottom = "1px solid var(--t-line-weak, rgba(255, 255, 255, 0.08))";
     runAllItem.style.marginBottom = "4px";
     runAllItem.innerHTML = `
         <i class="fa-solid fa-bolt" style="color:var(--color-cyan);"></i>
@@ -2648,7 +2648,7 @@ export function promptFolderImportTarget(folderName, targetFolderPath, onChoice)
             <div class="modal-body" style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
                 <p>Como você deseja organizar os arquivos da pasta <b>"${escapeHtml(folderName)}"</b> na biblioteca?</p>
                 <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
-                    <button id="btn-choice-create-bin" class="btn-primary" style="padding: 10px 14px; display: flex; align-items: center; gap: 10px; text-align: left; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.5); color: #fff; cursor: pointer; border-radius: 6px;">
+                    <button id="btn-choice-create-bin" class="btn-primary" style="padding: 10px 14px; display: flex; align-items: center; gap: 10px; text-align: left; background: var(--t-tint-3, rgba(139, 92, 246, 0.2)); border: 1px solid var(--t-line-strong, rgba(139, 92, 246, 0.5)); color: #fff; cursor: pointer; border-radius: 6px;">
                         <i class="fa-solid fa-folder-plus" style="font-size: 16px; color: var(--color-violet);"></i>
                         <div>
                             <div style="font-weight: 700;">Criar Bin "${escapeHtml(folderName)}"</div>
@@ -4141,13 +4141,13 @@ function renderTreeNode(node, container, depth = 0) {
             statusGlow = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-violet);" data-tooltip="Analisando visão com IA..."></i>`;
             actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Análise"><i class="fa-solid fa-circle-stop" style="font-size:10px;"></i></button>`;
         } else if (v.status === "transcribed") {
-            statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: rgba(6, 182, 212, 0.3);">ASR</span>`;
+            statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: var(--t-line-strong, rgba(6, 182, 212, 0.3));">ASR</span>`;
             actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         } else if (v.status === "analyzed") {
             if (hasVisionError) {
-                statusBadge = `<span class="badge" style="color: var(--color-rose); border-color: rgba(244, 63, 94, 0.4);">FALHA VISUAL</span>`;
+                statusBadge = `<span class="badge" style="color: var(--color-rose); border-color: var(--t-line-strong, rgba(244, 63, 94, 0.4));">FALHA VISUAL</span>`;
             } else {
-                statusBadge = `<span class="badge" style="color: var(--color-violet); border-color: rgba(138, 92, 246, 0.3);">VISÃO</span>`;
+                statusBadge = `<span class="badge" style="color: var(--color-violet); border-color: var(--t-line-strong, rgba(138, 92, 246, 0.3));">VISÃO</span>`;
             }
             actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: 10px;"></i></button>`;
         } else if (v.status === "ingested") {
@@ -4189,7 +4189,7 @@ function renderTreeNode(node, container, depth = 0) {
             : `<button class="btn-card-action btn-hover-only btn-quick-override-fail" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" data-tooltip="Sinalizar Falha Visual (Mandar para Reanálise)"><i class="fa-solid fa-triangle-exclamation" style="font-size: 10px;"></i></button>`;
 
         const subclipBadgeHtml = v.is_subclip
-            ? `<span class="badge badge-subclip" style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-scissors"></i> SUBCLIPE</span>`
+            ? `<span class="badge badge-subclip" style="background: var(--t-tint-3, rgba(168, 85, 247, 0.2)); border: 1px solid var(--t-line-strong, rgba(168, 85, 247, 0.4)); color: #c084fc; font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-scissors"></i> SUBCLIPE</span>`
             : `<span class="badge-tag ${badgeClass}">${badgeLabel}</span>`;
 
         card.innerHTML = `
@@ -4531,9 +4531,9 @@ function renderTreeNode(node, container, depth = 0) {
         }
         
         if (isRaw) {
-            statusBadge = `<span class="badge" style="color: var(--color-purple); border-color: rgba(168, 85, 247, 0.3);">RAW</span>`;
+            statusBadge = `<span class="badge" style="color: var(--color-purple); border-color: var(--t-line-strong, rgba(168, 85, 247, 0.3));">RAW</span>`;
         } else {
-            statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: rgba(6, 182, 212, 0.3);">FOTO</span>`;
+            statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: var(--t-line-strong, rgba(6, 182, 212, 0.3));">FOTO</span>`;
         }
         
         const friendlyTitle = p.title || p.description || p.filename;
@@ -10108,7 +10108,7 @@ export class LibraryManager {
                 input.type = "text";
                 input.className = "inline-inspector-title-input";
                 input.value = currentVal;
-                input.style.cssText = "width: 100%; max-width: 280px; background: rgba(0,0,0,0.85); color: #fff; border: 1px solid var(--color-cyan); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-family: inherit; outline: none; box-shadow: 0 0 10px rgba(6,182,212,0.4);";
+                input.style.cssText = "width: 100%; max-width: 280px; background: rgba(0,0,0,0.85); color: #fff; border: 1px solid var(--color-cyan); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-family: inherit; outline: none; box-shadow: 0 0 10px var(--t-glow, rgba(6,182,212,0.4));";
                 
                 titleTextEl.innerHTML = "";
                 titleTextEl.appendChild(input);
@@ -10504,7 +10504,7 @@ export class LibraryManager {
                             <textarea class="inspector-dialogue-text-area txt-dialogue-text">${d.text}</textarea>
                             <div class="inspector-dialogue-actions">
                                 <button class="btn-flat-action cyan btn-dialogue-split" style="font-size: 9px;" title="Dividir fala neste ponto"><i class="fa-solid fa-scissors"></i> Dividir</button>
-                                <button class="btn-primary btn-dialogue-save" style="font-size: 9px; padding: 2px 8px; border-radius: 4px; border:none; background:rgba(6,182,212,0.15); color:var(--color-cyan); font-weight:bold; cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                                <button class="btn-primary btn-dialogue-save" style="font-size: 9px; padding: 2px 8px; border-radius: 4px; border:none; background:var(--t-tint-3, rgba(6,182,212,0.15)); color:var(--color-cyan); font-weight:bold; cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
                             </div>
                         `;
 
@@ -10746,7 +10746,7 @@ export class LibraryManager {
                             <img src="/api/faces/face/${face.id}/thumbnail" class="inspector-face-thumb" onerror="this.src='https://placehold.co/60x60/11131a/cyan?text=Face'">
                             <span class="inspector-face-time" title="Buscar no Source Player">${timecode}</span>
                             <input type="text" class="inspector-face-input" value="${face.name || 'Pessoa Desconhecida'}" placeholder="Nome do rosto...">
-                            <button class="btn-primary btn-face-save" style="font-size: 8px; padding: 2px 6px; border-radius: 4px; border:none; background:rgba(6,182,212,0.1); color:var(--color-cyan); font-weight:bold; cursor:pointer; width: 100%; margin-top:2px;">Salvar Rótulo</button>
+                            <button class="btn-primary btn-face-save" style="font-size: 8px; padding: 2px 6px; border-radius: 4px; border:none; background:var(--t-tint-2, rgba(6,182,212,0.1)); color:var(--color-cyan); font-weight:bold; cursor:pointer; width: 100%; margin-top:2px;">Salvar Rótulo</button>
                         `;
 
                         card.querySelector(".inspector-face-time").addEventListener("click", () => {

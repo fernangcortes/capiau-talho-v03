@@ -6,6 +6,7 @@ import { TIMELINE_STATE, TIMELINE_HISTORY, evaluateFadeCurve, formatRulerTimecod
 import { getActiveElement } from "./workspaceManager.js";
 import { PlayerTextOverlayManager } from "./playerTextOverlay.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
+import { themeColor } from "./themeTokens.js";
 
 // Foco global do teclado para players: "source" ou "program"
 window.activeFocusedPlayer = "source";
@@ -1240,7 +1241,7 @@ export class SourcePlayer {
         if (!osd) {
             osd = document.createElement("div");
             osd.className = "player-shuttle-osd";
-            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:rgba(18,18,24,0.85); color:var(--color-cyan); padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700; font-family:'Outfit',sans-serif; letter-spacing:0.5px; border:1px solid rgba(6,182,212,0.4); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
+            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:var(--t-surface-2, rgba(18,18,24,0.85)); color:var(--color-cyan); padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700; font-family:'Outfit',sans-serif; letter-spacing:0.5px; border:1px solid var(--t-line-strong, rgba(6,182,212,0.4)); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
             panel.appendChild(osd);
         }
         osd.textContent = text;
@@ -2128,7 +2129,7 @@ export function updateProgramMinimap() {
     if (ctx) {
         const mw = canvas.width;
         const mh = canvas.height;
-        ctx.fillStyle = "#0a080e";
+        ctx.fillStyle = themeColor("surface-1", "#0a080e");
         ctx.fillRect(0, 0, mw, mh);
 
         const aspect = tw / th;
@@ -2174,7 +2175,7 @@ export function updateProgramMinimap() {
         }
 
         if (!frameDrawn) {
-            ctx.fillStyle = "#16121f";
+            ctx.fillStyle = themeColor("surface-3", "#16121f");
             ctx.fillRect(dx, dy, dw, dh);
             ctx.strokeStyle = "rgba(168, 85, 247, 0.4)";
             ctx.lineWidth = 1;
@@ -3188,7 +3189,7 @@ export class ProgramPlayer {
         if (!osd) {
             osd = document.createElement("div");
             osd.className = "player-shuttle-osd";
-            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:rgba(18,18,24,0.85); color:#a855f7; padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700; font-family:'Outfit',sans-serif; letter-spacing:0.5px; border:1px solid rgba(168,85,247,0.4); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
+            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:var(--t-surface-2, rgba(18,18,24,0.85)); color:#a855f7; padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700; font-family:'Outfit',sans-serif; letter-spacing:0.5px; border:1px solid var(--t-line-strong, rgba(168,85,247,0.4)); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
             panel.appendChild(osd);
         }
         osd.textContent = text;
@@ -7104,7 +7105,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
             suggestionsContainer.style.maxHeight = "120px";
             suggestionsContainer.style.overflowY = "auto";
             suggestionsContainer.style.padding = "6px";
-            suggestionsContainer.style.border = "1px solid rgba(255, 255, 255, 0.05)";
+            suggestionsContainer.style.border = "1px solid var(--t-line-weak, rgba(255, 255, 255, 0.05))";
             suggestionsContainer.style.borderRadius = "8px";
             suggestionsContainer.style.background = "rgba(0, 0, 0, 0.2)";
 

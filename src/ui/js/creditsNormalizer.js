@@ -545,7 +545,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                                     </thead>
                                     <tbody>
                                         ${this.extractedReviewItems.map((item, idx) => `
-                                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); opacity: ${item.selected ? 1 : 0.45};">
+                                            <tr style="border-bottom: 1px solid var(--t-line-weak, rgba(255,255,255,0.03)); opacity: ${item.selected ? 1 : 0.45};">
                                                 <td style="padding: 6px 4px; text-align: center;">
                                                     <input type="checkbox" class="extract-item-chk" data-idx="${idx}" ${item.selected ? 'checked' : ''}>
                                                 </td>
@@ -751,7 +751,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                             <input type="text" id="credits-search-input" placeholder="Buscar por nome ou cargo oficial..." value="${this.searchQuery}" style="flex: 1; background: transparent; border: none; outline: none; font-size: 11px; color: #fff;">
                         </div>
 
-                        <button id="btn-paste-credits-text" class="btn-primary" style="font-size: 11px; height: 30px; padding: 0 12px; display: flex; align-items: center; gap: 6px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: #f59e0b; cursor: pointer; border-radius: 4px;">
+                        <button id="btn-paste-credits-text" class="btn-primary" style="font-size: 11px; height: 30px; padding: 0 12px; display: flex; align-items: center; gap: 6px; background: var(--t-tint-3, rgba(245,158,11,0.15)); border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); color: #f59e0b; cursor: pointer; border-radius: 4px;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Colar e Extrair com IA
                         </button>
 
@@ -759,7 +759,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                             <i class="fa-solid fa-plus"></i> Novo Nome
                         </button>
 
-                        <button id="btn-clear-all-credits" class="btn-secondary" title="Limpar todos os nomes da ficha oficial" style="font-size: 11px; height: 30px; padding: 0 10px; border: 1px solid rgba(244,63,94,0.3); background: rgba(244,63,94,0.06); color: var(--color-rose); cursor: pointer; border-radius: 4px;">
+                        <button id="btn-clear-all-credits" class="btn-secondary" title="Limpar todos os nomes da ficha oficial" style="font-size: 11px; height: 30px; padding: 0 10px; border: 1px solid var(--t-line-strong, rgba(244,63,94,0.3)); background: var(--t-tint-1, rgba(244,63,94,0.06)); color: var(--color-rose); cursor: pointer; border-radius: 4px;">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </div>
@@ -785,7 +785,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                             </thead>
                             <tbody>
                                 ${filtered.map(item => `
-                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                                    <tr style="border-bottom: 1px solid var(--t-line-weak, rgba(255,255,255,0.03)); transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
                                         <td style="padding: 8px 10px; font-weight: 600; color: #fff;">
                                             <input type="text" class="nle-input-flat edit-credit-name" data-id="${item.id}" value="${item.name}" style="width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: 11.5px; color: #fff; outline: none;">
                                         </td>
@@ -813,7 +813,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                         ${credits.length} pessoa(s) e cargo(s) cadastrados oficialmente
                     </span>
                     <div style="display: flex; gap: 8px;">
-                        <button id="btn-normalize-all-gcs" class="btn-secondary" style="font-size: 11px; height: 32px; padding: 0 14px; border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.08); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+                        <button id="btn-normalize-all-gcs" class="btn-secondary" style="font-size: 11px; height: 32px; padding: 0 14px; border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); background: var(--t-tint-2, rgba(245,158,11,0.08)); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Validar e Corrigir Todos os GCs da Timeline
                         </button>
                         <button id="btn-save-credits-done" class="btn-primary" style="font-size: 11px; font-weight: 700; height: 32px; padding: 0 18px; border: none; background: var(--color-cyan); color: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">

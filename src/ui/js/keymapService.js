@@ -1592,7 +1592,7 @@ class KeymapService {
         }
         return bindings.map(b => {
             const formatted = this.formatCombo(b);
-            return `<kbd class="keymap-badge" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; color: #fff; display: inline-block;">${formatted}</kbd>`;
+            return `<kbd class="keymap-badge" style="background: rgba(255,255,255,0.08); border: 1px solid var(--t-line-strong, rgba(255,255,255,0.15)); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; color: #fff; display: inline-block;">${formatted}</kbd>`;
         }).join(" <span style='color:var(--text-muted); font-size:10px;'>/</span> ");
     }
 

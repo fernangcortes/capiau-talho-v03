@@ -100,7 +100,7 @@ function showSearchResultPreview(r, card) {
             popover.id = "search-result-context-popover";
             popover.style.position = "fixed";
             popover.style.zIndex = "10010";
-            popover.style.background = "rgba(10, 8, 14, 0.95)";
+            popover.style.background = "var(--t-surface-1, rgba(10, 8, 14, 0.95))";
             popover.style.border = "1px solid rgba(6, 182, 212, 0.5)";
             popover.style.borderRadius = "12px";
             popover.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
@@ -776,14 +776,14 @@ function applyFiltersAndRenderCards() {
                 const occWrapper = document.createElement("div");
                 occWrapper.className = "occurrences-toggle-wrapper";
                 occWrapper.style.marginTop = "8px";
-                occWrapper.style.borderTop = "1px dashed rgba(255,255,255,0.08)";
+                occWrapper.style.borderTop = "1px dashed var(--t-line-weak, rgba(255,255,255,0.08))";
                 occWrapper.style.paddingTop = "6px";
                 
                 occWrapper.innerHTML = `
                     <button class="btn-toggle-occurrences" style="background: none; border: none; color: var(--color-cyan); font-size: 10px; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 2px 0; outline: none; font-weight: 600;">
                         <i class="fa-solid fa-chevron-down"></i> Ver mais ocorrências (${r.other_occurrences.length})
                     </button>
-                    <div class="occurrences-list" style="display: none; flex-direction: column; gap: 6px; margin-top: 6px; padding-left: 8px; border-left: 2px solid rgba(6, 182, 212, 0.25);">
+                    <div class="occurrences-list" style="display: none; flex-direction: column; gap: 6px; margin-top: 6px; padding-left: 8px; border-left: 2px solid var(--t-line-strong, rgba(6, 182, 212, 0.25));">
                     </div>
                 `;
                 
@@ -806,7 +806,7 @@ function applyFiltersAndRenderCards() {
                     const subCard = document.createElement("div");
                     subCard.className = "occurrence-subcard";
                     subCard.style.background = "rgba(255,255,255,0.01)";
-                    subCard.style.border = "1px solid rgba(255,255,255,0.03)";
+                    subCard.style.border = "1px solid var(--t-line-weak, rgba(255,255,255,0.03))";
                     subCard.style.borderRadius = "4px";
                     subCard.style.padding = "4px 6px";
                     subCard.style.fontSize = "10px";

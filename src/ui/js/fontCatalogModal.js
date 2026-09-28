@@ -144,7 +144,7 @@ export class FontCatalogModal {
                                 <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border-glass); padding-top: 8px; margin-top: 4px;">
                                     <span style="font-size: 9px; color: var(--text-muted);">${font.weights ? font.weights.length + ' pesos' : 'Normal'}</span>
                                     <div style="display: flex; gap: 6px;">
-                                        <button class="btn-select-font-clip" data-font-id="${font.id}" title="Aplicar ao clipe selecionado" style="font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(6,182,212,0.4); background: rgba(6,182,212,0.1); color: var(--color-cyan); cursor: pointer;">
+                                        <button class="btn-select-font-clip" data-font-id="${font.id}" title="Aplicar ao clipe selecionado" style="font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--t-line-strong, rgba(6,182,212,0.4)); background: var(--t-tint-2, rgba(6,182,212,0.1)); color: var(--color-cyan); cursor: pointer;">
                                             Aplicar
                                         </button>
                                         <button class="btn-set-brandkit-font" data-font-id="${font.id}" title="Definir como fonte padrão no Brand Kit" style="font-size: 10px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border-glass); background: transparent; color: var(--text-secondary); cursor: pointer;">
@@ -159,7 +159,7 @@ export class FontCatalogModal {
 
                 <!-- Conteúdo da Aba: Brand Kit do Projeto -->
                 <div id="font-tab-content-brandkit" style="display: ${this.activeTab === 'brandkit' ? 'flex' : 'none'}; flex: 1; flex-direction: column; overflow-y: auto; padding: 20px 24px; gap: 20px;">
-                    <div style="background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.25); border-radius: 6px; padding: 12px 16px; font-size: 11.5px; color: #fde047; line-height: 1.5; display: flex; gap: 12px; align-items: center;">
+                    <div style="background: var(--t-tint-1, rgba(245,158,11,0.06)); border: 1px solid var(--t-line-strong, rgba(245,158,11,0.25)); border-radius: 6px; padding: 12px 16px; font-size: 11.5px; color: #fde047; line-height: 1.5; display: flex; gap: 12px; align-items: center;">
                         <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 18px; color: #f59e0b;"></i>
                         <div>
                             <strong>Guia Tipográfico & Visual do Projeto:</strong> As regras do Brand Kit guiam a Inteligência Artificial e a criação de novos títulos, mantendo a consistência visual em todo o corte. Você tem liberdade total para alterar qualquer elemento a qualquer momento.
@@ -228,7 +228,7 @@ export class FontCatalogModal {
 
                     <!-- Ações do Brand Kit -->
                     <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-glass); padding-top: 16px; margin-top: auto;">
-                        <button id="btn-apply-brandkit-all" class="btn-secondary" style="height: 32px; font-size: 11px; font-weight: 600; padding: 0 14px; border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.08); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+                        <button id="btn-apply-brandkit-all" class="btn-secondary" style="height: 32px; font-size: 11px; font-weight: 600; padding: 0 14px; border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); background: var(--t-tint-2, rgba(245,158,11,0.08)); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-wand-magic"></i> Padronizar Todos os Textos da Timeline
                         </button>
                         <button id="btn-save-brandkit" class="btn-primary" style="height: 32px; font-size: 11px; font-weight: 700; padding: 0 18px; border: none; background: var(--color-cyan); color: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
