@@ -1,12 +1,12 @@
-# Passagem: janelas drag & dock (F0–F5, P14, recolher, F2c partes 1, 2a e 2b) → próxima: F2c parte 2c (abas em faixas e detalhes)
+# Passagem: janelas drag & dock (F0–F5, P14, recolher, F2c partes 1, 2a, 2b e 2c) → próxima: F2c parte 2d (detalhes e pendências)
 
 > **Ideia futura do usuário (28/09):** timeline "prédio", que começa em cima e continua em faixas
 > abaixo (como linhas de texto), para monitores verticais e para vários editores. A timeline como
 > coluna (parte 2a) é o primeiro passo: ela já ocupa a altura inteira ao lado dos monitores.
 
-Branch: `talho-windows-drag-dock-6mtidh` (a partir de `main`). Até `48f0364` está no remoto; a F2c
-parte 2b (monitores em bloco ou sozinhos, 28/09 à noite) está na cópia de trabalho, **sem commit**
-(o usuário prefere commitar ele mesmo; perguntar).
+Branch: `talho-windows-drag-dock-6mtidh` (a partir de `main`). Até `02f2337` (fundo dos monitores
+`#101010`, commit do usuário) está no remoto ou em commits; a F2c parte 2c (abas no editor) está na
+cópia de trabalho, **sem commit** (perguntar).
 
 Commits no nome do autor (`fernangcortes <escrevaprofernando@gmail.com>`), **sem assinatura de IA**
 (sem `Co-Authored-By`/`Claude-Session`, sem branch `claude/...`). Atenção: o `git config --global
@@ -18,26 +18,53 @@ Plano completo, com decisões e animações: página "Talho Drag & Dock"
 (https://claude.ai/artifact/SF8tDpe1VVSy4brs938X3V). O `docs/PLANO_JANELAS_DRAG_DOCK.md` é ignorado
 pelo git e não existe em todas as máquinas: a página é a fonte do plano.
 
-## Próxima sessão: F2c parte 2c
+Servidor estático de teste: `.claude/launch.json` (fora do git) → `ui-static`, script em scratchpad de
+sessão. Se sumir, recriar: http que serve `src/ui`, `/api` responde `[]`, e **a raiz `/` e caminhos sem
+extensão viram `index.html` com `text/html`** (antes a raiz saía como octet-stream e o navegador baixava).
 
-1. **Abas destacáveis (F5) em faixas** (decisão 2). Hoje laterais, timeline e monitores entram em
-   faixas; aba destacada ainda nem vira coluna no editor (pendência antiga).
-2. Detalhes: o modal "Configurar workspace" (cards de colunas) ainda mostra laterais que estão em
-   faixa como colunas; teste com mouse real em Linux (`scripts/dock_bands_real_mouse_check.mjs`, no
-   molde de `dock_strips_real_mouse_check.mjs`, incluindo as alças dos monitores e do bloco); a setinha
-   do canto é recriada a cada `renderBands`; o seletor escondido `select-timeline-position` fica vazio
-   quando a timeline está numa faixa sem nome antigo.
-3. Pendências da parte 2b (abaixo): faixas que espremem o editor até 0; Numpad7/9 com monitor fora do
-   bloco; destacar/voltar monitor de faixa não verificado na tela.
+## Próxima sessão: F2c parte 2d
 
-Onde mexer: `dockModel.js` (`normalizeBands`, `BAND_PANEL_IDS`, `CENTER_PANEL_IDS`), `dockOps.js`,
-`dockDrag.js` (`resolveMonitorTarget`, `resolveBlockTarget`, `resolveBandEdgeTarget`),
-`workspaceManager.js` (`renderBands`, `renderMonitorPlacement`, `refreshCenterContent`,
-`reinitSplitters`/`growingColumn`, `restorePanel`), `tabPanels.js` (abas).
+As decisões da F2c estão todas implementadas. Falta acabamento:
+
+1. **Falta de espaço**: colunas demais saem da tela (laterais não encolhem; só timeline, monitores e
+   abas encolhem até 200 px) e duas faixas altas numa tela baixa espremem o editor até 0 px. Pensar
+   num mínimo para o editor/centro e em laterais que encolhem, ou faixas que encolhem.
+2. Numpad7/9 com monitor fora do bloco (`display: none` deixa divisor sobrando): tratar como recolher.
+3. Modal "Configurar workspace" (cards): mostra laterais que estão em faixa como colunas; abas em
+   coluna não têm card (`columnMetadata`).
+4. Teste com mouse real em Linux (`scripts/dock_bands_real_mouse_check.mjs`, no molde de
+   `dock_strips_real_mouse_check.mjs`): alças dos monitores, do bloco, das abas no editor e o arrasto
+   HTML5 do botão da aba. Nesta máquina o navegador do app às vezes para de desenhar (verificar pelo
+   motor, como nas partes 2b/2c).
+5. Destacar e voltar monitor ou aba que está numa faixa/coluna (janela real) não foi verificado.
+6. Menores: setinha do canto recriada a cada `renderBands`; seletor escondido
+   `select-timeline-position` vazio com a timeline numa faixa sem nome antigo.
 
 **Regra aprendida na parte 1:** nunca recolocar no DOM um painel que já está no lugar durante um
 arrasto (a alça perde a captura do ponteiro e o arrasto trava). Usar `placeInOrder` e deixar
 redesenhos para depois do soltar (`window.dockDrag.drag`).
+
+## F2c parte 2c (28/09, noite): abas destacáveis no editor — feito
+
+Decisões do usuário: aba vai para **faixa e coluna**; sai **arrastando o botão da aba** até o editor
+(e pelo botão direito); volta pelo **botão devolver e soltando a alça sobre um menu**.
+
+| Entrega | Onde |
+|---|---|
+| `TAB_NAMES`/`TAB_PANEL_IDS` no modelo (painéis opcionais: fora da árvore = no menu), `PLACED_ONLY_IDS` (centro + abas: só em `columnOrder` quando coluna). `BAND_PANEL_IDS` com as abas. `validateLayout` aceita abas sem exigi-las. Autoteste confere que a lista bate com o `tabPanels.js`. | `dockModel.js`, `tests/autoteste_dock_model.mjs` 1.9, `tests/autoteste_dock_tabs.mjs` 8 |
+| Operações: `panelHome` (= `panelToCenter`, aba de volta ao menu), `swapPanels`/`finalize` com as regras do centro para abas. 18 mil estados com ida e volta no modelo. | `dockOps.js`, `tests/autoteste_dock_ops.mjs` 13–14 |
+| `TabPanels.syncPlaced` (via `wm.onBeforeArrange`, no começo de cada arranjo): aba no editor sai do modo convidada, monta o invólucro (`.dock-tab-in-editor`) e o "devolver" leva ao menu (`sendHome`); aba que saiu do estado volta ao menu. Volta de janela: aba do editor volta para a vaga. Convidada (P14) no editor: botão some; menu dela continua guardado. | `tabPanels.js` (`placed`, `syncPlaced`, `sendHome`, `placeInEditor`, `mountSavedStrips`) |
+| Arrasto do botão da aba (HTML5): `dragover`/`drop` na janela, fora dos menus = alvo do editor com sombra (`dockDrag.showExternalTarget`); sobre um menu, reordenar/P14 como antes. **Borda do editor vence menu** (`dockDrag.isEditorEdge`, também no P14). Botão direito da faixa: "Colocar X numa faixa embaixo / como coluna". | `tabPanels.js` (`bindEditorDrop`), `tabsCustomization.js` |
+| Alça da aba no editor: bordas = faixa/coluna na ponta; sobre a Biblioteca/Painel Lateral = volta para aquele menu (alvo `tabHome`); sobre painéis e o centro = troca/ao lado (`resolveSlotTarget`, compartilhado com os monitores). Laterais e timeline aceitam abas como vizinhas. | `dockDrag.js` (`resolveTabTarget`, `resolveSlotTarget`, `applyTarget`) |
+| CSS da aba como coluna (altura inteira, encolhe até 200 px); largura salva em `layout-dim-splitter-tabpanel-<aba>`, também na célula da ponta. Regra na Seção IX da skill. | `styles.css`, `bindEdgeResizer`, `SKILL.md` |
+
+Verificado (28/09) no navegador do app (estático, 1440×900), pelo motor e por eventos de arrasto
+sintéticos: Chat pelo botão direito na faixa de baixo (modo largo do Chat com quadro de mídias) e Temas
+como coluna; botão da aba arrastado para a borda direita em cima do Painel Lateral (coluna na ponta, não
+muda de menu), para a borda de baixo (faixa nova) e sobre uma aba da faixa (ao lado); alça de Temas
+solta sobre o Painel Lateral (vai para lá como convidada); "devolver" do Chat; desfazer/refazer
+(botão volta ao menu e some de novo); recarregar com quatro abas no editor. Sem erro de console do
+layout. Janela destacada real não verificada.
 
 ## F2c parte 2b (28/09, noite): monitores em bloco ou sozinhos, centro que some — feito
 
