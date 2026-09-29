@@ -434,6 +434,35 @@ for (const mid of mainModals) {
 }
 console.log("✔ 2.5 passou: Todos os modais foram restaurados para o documento principal.");
 
+// Teste 2.5b: sequência real do restorePanel — a janela sai de popoutWindows (e fecha)
+// ANTES do gancho onPopoutRestored. Os modais não podem ficar presos na janela morta.
+console.log("2.5b Testando restoreModals depois que a janela destacada já saiu do registro...");
+FaceManager.adoptModals(popoutWindow.document);
+delete mainWindow.popoutWindows["CapIAu_Library_Window"];
+delete mainWindow.popoutWindows["library"];
+popoutWindow.closed = true;
+FaceManager.restoreModals(mainWindow.document);
+for (const mid of mainModals) {
+    const modalInMain = mainWindow.document.getElementById(mid);
+    assert(modalInMain, `Modal #${mid} deve voltar ao documento principal mesmo com a janela fora do registro`);
+    assert.equal(modalInMain.ownerDocument, mainWindow.document, `Modal #${mid} deve pertencer a mainWindow.document`);
+}
+popoutWindow.closed = false;
+mainWindow.popoutWindows["CapIAu_Library_Window"] = popoutWindow;
+mainWindow.popoutWindows["library"] = popoutWindow;
+console.log("✔ 2.5b passou: Modais recuperados pela referência guardada, sem depender do registro de janelas.");
+
+// Teste 2.5c: diálogos (prompt/alert/confirm) de faces.js abrem na janela que tem o foco
+console.log("2.5c Verificando diálogos de faces.js na janela com foco...");
+assert(
+    facesJs.includes("win.document.hasFocus()") &&
+    facesJs.includes("const prompt = (...args) => dialogWin().prompt(...args);") &&
+    facesJs.includes("const alert = (...args) => dialogWin().alert(...args);") &&
+    facesJs.includes("const confirm = (...args) => dialogWin().confirm(...args);"),
+    "faces.js deve abrir prompt/alert/confirm na janela destacada que tem o foco"
+);
+console.log("✔ 2.5c passou: prompt/alert/confirm roteados para a janela com foco.");
+
 // Teste 2.6: isAnyModalOpen com suporte a janelas popout e FaceManager.inspectorCard
 console.log("2.6 Testando isAnyModalOpen em janelas popout e com inspector ativo...");
 const { isAnyModalOpen } = await import("../src/ui/js/library.js");

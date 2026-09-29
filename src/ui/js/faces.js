@@ -3,6 +3,31 @@ import { CapIAuAPI } from "./api.js";
 import { parseQuery, evaluateAST } from "./searchParser.js";
 import { getActiveElement } from "./workspaceManager.js";
 
+// Este código roda na janela principal mesmo quando a aba de Rostos está destacada.
+// prompt/alert/confirm globais abririam no editor (atrás) — abre na janela que tem o foco.
+function dialogWin() {
+    for (const name in window.popoutWindows) {
+        const win = window.popoutWindows[name];
+        try {
+            if (win && !win.closed && win.document.hasFocus()) return win;
+        } catch (err) {}
+    }
+    return window;
+}
+const prompt = (...args) => dialogWin().prompt(...args);
+const alert = (...args) => dialogWin().alert(...args);
+const confirm = (...args) => dialogWin().confirm(...args);
+
+// Modais que acompanham a aba de Rostos quando ela é destacada.
+const FACE_MODAL_IDS = [
+    "face-group-manager-modal",
+    "fullscreen-faces-disambiguation",
+    "face-disambiguation-modal",
+    "names-manager-modal",
+    "entities-manager-modal",
+    "face-inspector-overlay"
+];
+
 export class FaceManager {
     static bindToolbarEvents(rootDoc = null) {
         const doc = rootDoc || (getActiveElement("sidebar-left")?.ownerDocument) || document;
@@ -76,18 +101,21 @@ export class FaceManager {
         return doc.defaultView || window;
     }
 
+    /**
+     * Acha o modal onde quer que ele esteja. Guarda a referência: quando a janela destacada
+     * fecha, ela já saiu de window.popoutWindows e só a referência alcança o modal.
+     */
+    static findModal(id, extraDoc = null) {
+        if (!this._modalEls) this._modalEls = {};
+        const el = getActiveElement(id) || extraDoc?.getElementById(id) || this._modalEls[id];
+        if (el) this._modalEls[id] = el;
+        return el;
+    }
+
     static adoptModals(targetDoc) {
         if (!targetDoc || targetDoc === document) return;
-        const modalIds = [
-            "face-group-manager-modal",
-            "fullscreen-faces-disambiguation",
-            "face-disambiguation-modal",
-            "names-manager-modal",
-            "entities-manager-modal",
-            "face-inspector-overlay"
-        ];
-        modalIds.forEach(id => {
-            const el = document.getElementById(id) || targetDoc.getElementById(id);
+        FACE_MODAL_IDS.forEach(id => {
+            const el = this.findModal(id, targetDoc);
             if (el && el.ownerDocument !== targetDoc) {
                 try {
                     targetDoc.adoptNode(el);
@@ -100,30 +128,21 @@ export class FaceManager {
     }
 
     static restoreModals(mainDoc = document) {
-        const modalIds = [
-            "face-group-manager-modal",
-            "fullscreen-faces-disambiguation",
-            "face-disambiguation-modal",
-            "names-manager-modal",
-            "entities-manager-modal",
-            "face-inspector-overlay"
-        ];
-        for (const name in window.popoutWindows) {
-            const win = window.popoutWindows[name];
-            if (win && win.document) {
-                modalIds.forEach(id => {
-                    const el = win.document.getElementById(id);
-                    if (el && el.ownerDocument !== mainDoc) {
-                        try {
-                            mainDoc.adoptNode(el);
-                            mainDoc.body.appendChild(el);
-                        } catch (err) {
-                            console.warn("[FaceManager] Erro ao restaurar modal para o doc principal:", id, err);
-                        }
-                    }
-                });
+        // Os modais vão para onde a aba de Rostos está agora. Se ela continua destacada em outra
+        // janela (ex.: devolveu só a Biblioteca), ficam lá; senão voltam ao editor principal.
+        const facesDoc = getActiveElement("tab-faces")?.ownerDocument;
+        const targetDoc = facesDoc && facesDoc.defaultView && !facesDoc.defaultView.closed ? facesDoc : mainDoc;
+        FACE_MODAL_IDS.forEach(id => {
+            const el = this.findModal(id);
+            if (el && el.ownerDocument !== targetDoc) {
+                try {
+                    targetDoc.adoptNode(el);
+                    targetDoc.body.appendChild(el);
+                } catch (err) {
+                    console.warn("[FaceManager] Erro ao restaurar modal para o doc principal:", id, err);
+                }
             }
-        }
+        });
     }
 
     static bindKeyboardEvents(win) {
