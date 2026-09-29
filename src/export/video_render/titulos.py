@@ -21,8 +21,25 @@ CACHE
 PNG nomeado pelo hash de (clipe, quadro, estado): render por segmentos e exports
 repetidos reaproveitam as fotos.
 
-LIMITES CONHECIDOS (avisados no preflight, ver fidelidade.py)
-- backdrop-filter (blur do video atras da caixa) nao existe na foto isolada.
+DESFOQUE ATRAS DA CAIXA
+-----------------------
+Na tela a caixa translucida usa backdrop-filter: blur() e desfoca o video que passa
+por baixo; a foto isolada nao tem esse video. Por isso a pagina fotografa tambem uma
+MASCARA da caixa em cada estado (mesma forma, transformacao, raio e opacidade, opaca,
+sem texto nem sombras). O comando desfoca o video ja composto, recorta pela mascara
+(alphamerge) e sobrepoe ANTES da foto do titulo.
+
+A mascara gravada NAO e a cobertura crua: na tela o resultado e
+o * (caixa sobre video desfocado) + (1 - o) * video, com o = opacidade do titulo.
+Sobrepor o desfoque com alfa o e depois a foto (alfa a_t) contaria a opacidade duas
+vezes (medido: erro 8-11/255 com opacidade 0,25-0,5). A alfa certa da camada
+desfocada e w = (o - a_t) / (1 - a_t), por pixel; e ela que vai para o PNG (cinza).
+
+Sigma do gblur: o blur(Npx) do Chromium, medido contra um xadrez (interior da caixa),
+equivale a gblur(steps=4) com sigma ~= 1.05 * N * escala do titulo (o raio acompanha
+o transform: scale; rotacao nao muda). Escala animada troca o sigma por sendcmd.
+
+LIMITES CONHECIDOS
 - Fonte enviada por upload vive so na sessao do editor; o navegador do render cai
   num substituto. `preparar` informa quando isso acontece.
 """
@@ -40,6 +57,10 @@ PAGINA = f"{HOST_INTERNO}/render_titulos.html"
 
 # Ordem de tentativa: navegadores ja instalados primeiro (nao exige download).
 CANAIS = ("msedge", "chrome", None)
+
+# blur(Npx) do Chromium ~= gblur(sigma = FATOR * N * escala, steps = PASSOS). Medido.
+FATOR_SIGMA_DESFOQUE = 1.05
+PASSOS_GBLUR = 4
 
 
 class TitulosIndisponiveis(RuntimeError):
@@ -163,6 +184,16 @@ class GeradorTitulos:
 
         Devolve [(png, n_quadros)] em ordem, com estados repetidos agrupados.
         """
+        return [(g["png"], g["n"]) for g in
+                self.grupos(clipe, largura, altura, fps, inicio, fim)]
+
+    def grupos(self, clipe: Dict[str, Any], largura: int, altura: int, fps: float,
+               inicio: int, fim: int) -> List[Dict[str, Any]]:
+        """Como `quadros`, com a mascara da caixa de cada estado.
+
+        Devolve [{"png", "n", "mascara": Path|None, "sigma": float|None}]: mascara e
+        sigma so existem quando o titulo tem caixa (desfoque do video atras).
+        """
         if fim <= inicio:
             return []
         pagina = self._abrir(int(largura), int(altura))
@@ -178,24 +209,53 @@ class GeradorTitulos:
         pasta = self.pasta_cache / base
         pasta.mkdir(parents=True, exist_ok=True)
 
-        saida: List[Tuple[Path, int]] = []
+        caixa = bool(prep.get("caixa"))
+        desfoque_px = float(prep.get("desfoquePx") or 0)
+        saida: List[Dict[str, Any]] = []
         for ini, n, chave in agrupar_estados(chaves):
+            rel = (inicio + ini) / float(fps)
             png = pasta / f"{_hash(chave)}.png"
             if not png.is_file():
-                rel = (inicio + ini) / float(fps)
                 pagina.evaluate("([c, t]) => window.RENDER_TITULOS.desenhar(c, t)", [clipe, rel])
                 pagina.screenshot(path=str(png), omit_background=True)
-            saida.append((png, n))
+            mascara = sigma = None
+            if caixa and desfoque_px > 0:
+                mascara = pasta / f"{_hash(chave)}_desfoque.png"
+                if not mascara.is_file():
+                    pagina.evaluate("([c, t]) => window.RENDER_TITULOS.mascara(c, t)", [clipe, rel])
+                    bruta = pagina.screenshot(omit_background=True)
+                    _gravar_mascara_desfoque(bruta, png, mascara)
+                escala = abs(float(json.loads(chave).get("scale", 1) or 0))
+                sigma = round(FATOR_SIGMA_DESFOQUE * desfoque_px * escala, 3)
+            saida.append({"png": png, "n": n, "mascara": mascara, "sigma": sigma})
         return saida
+
+
+def _gravar_mascara_desfoque(cobertura_png: bytes, titulo_png: Path, destino: Path) -> None:
+    """Alfa da camada desfocada: w = (o - a_t) / (1 - a_t) (ver docstring do modulo).
+
+    `o` = alfa da mascara crua (cobertura da caixa x opacidade); `a_t` = alfa da foto
+    do titulo. Grava em cinza (luma = alfa), como o alphamerge le.
+    """
+    import io
+    import numpy as np
+    from PIL import Image
+    o = np.asarray(Image.open(io.BytesIO(cobertura_png)).getchannel("A"), dtype=np.float32) / 255.0
+    a_t = np.asarray(Image.open(titulo_png).getchannel("A"), dtype=np.float32) / 255.0
+    w = np.clip((o - a_t) / np.maximum(1.0 - a_t, 1e-6), 0.0, 1.0)
+    w[a_t >= 1.0] = 0.0  # pixel totalmente coberto pelo titulo: o de baixo nao aparece
+    Image.fromarray((w * 255.0 + 0.5).astype(np.uint8), "L").save(destino)
 
 
 def preparar_titulos(seq, escopo, inicio_s: float, fim_s: float,
                      gerador: GeradorTitulos, pasta_listas: Path) -> Dict[str, Any]:
     """Titulos que aparecem na janela [inicio_s, fim_s) -> entradas e sobreposicoes.
 
-    Devolve {"entradas": [...], "camadas": [(indice_local, loc_s, dur_s)], "avisos": [...]}.
-    `indice_local` e a posicao da entrada nesta lista; quem monta o comando soma o
-    deslocamento das entradas anteriores.
+    Devolve {"entradas": [...], "camadas": [(indice_local, loc_s, dur_s, desfoque)],
+    "avisos": [...]}. `indice_local` e a posicao da entrada nesta lista; quem monta o
+    comando soma o deslocamento das entradas anteriores. `desfoque` e None (titulo sem
+    caixa) ou {"mascara": indice_local da lista de mascaras, "sigmas": [(t_rel_s, sigma)]}
+    com o sigma do gblur a partir de cada instante (relativo ao inicio da camada).
     """
     fps = float(seq.fps)
     entradas: List[Dict[str, Any]] = []
@@ -218,15 +278,34 @@ def preparar_titulos(seq, escopo, inicio_s: float, fim_s: float,
             # Quadros relativos ao inicio do clipe, como o player (round).
             q_ini = int(round((ini - c.inicio_s) * fps))
             q_fim = int(round((fim - c.inicio_s) * fps))
-            fotos = gerador.quadros(c.bruto, seq.largura, seq.altura, fps, q_ini, q_fim)
+            fotos = gerador.grupos(c.bruto, seq.largura, seq.altura, fps, q_ini, q_fim)
             if not fotos:
                 continue
+            chave_lista = _hash(c.id, q_ini, q_fim, c.bruto)
             lista = escrever_ffconcat(
-                pasta_listas / f"titulo_{_hash(c.id, q_ini, q_fim, c.bruto)}.ffconcat",
-                [(png, n / fps) for (png, n) in fotos])
-            camadas.append((len(entradas), ini - inicio_s, fim - ini))
+                pasta_listas / f"titulo_{chave_lista}.ffconcat",
+                [(g["png"], g["n"] / fps) for g in fotos])
+            k = len(entradas)
             entradas.append({
                 "tipo": "titulo", "caminho": str(lista), "ss": 0.0,
                 "t": round(fim - ini, 6), "clipe_id": c.id, "pista_id": pista.id,
             })
+            desfoque = None
+            if all(g["mascara"] is not None for g in fotos):
+                lista_m = escrever_ffconcat(
+                    pasta_listas / f"titulo_{chave_lista}_mascara.ffconcat",
+                    [(g["mascara"], g["n"] / fps) for g in fotos])
+                # Sigma a partir de cada instante da camada (so quando muda: escala animada)
+                sigmas: List[Tuple[float, float]] = []
+                t_rel = 0.0
+                for g in fotos:
+                    if not sigmas or abs(sigmas[-1][1] - g["sigma"]) > 1e-3:
+                        sigmas.append((round(t_rel, 6), g["sigma"]))
+                    t_rel += g["n"] / fps
+                desfoque = {"mascara": len(entradas), "sigmas": sigmas}
+                entradas.append({
+                    "tipo": "titulo", "caminho": str(lista_m), "ss": 0.0,
+                    "t": round(fim - ini, 6), "clipe_id": c.id, "pista_id": pista.id,
+                })
+            camadas.append((k, ini - inicio_s, fim - ini, desfoque))
     return {"entradas": entradas, "camadas": camadas, "avisos": list(gerador.avisos)}

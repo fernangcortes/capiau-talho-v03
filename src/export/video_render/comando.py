@@ -639,7 +639,12 @@ def montar_comando(seq, pedido, destino, *, rel_midia=None,
         avisos_titulos += list(res_t.get("avisos") or [])
         base_t = len(entradas_total)
         atual = rotulo_video
-        for (k, loc, dur) in res_t.get("camadas") or []:
+        for camada in res_t.get("camadas") or []:
+            k, loc, dur = camada[:3]
+            desfoque = camada[3] if len(camada) > 3 else None
+            if desfoque:
+                atual = _desfoque_caixa(filtros, atual, k, base_t + int(desfoque["mascara"]),
+                                        loc, dur, desfoque.get("sigmas") or [])
             rot_img, rot_sai = f"[tit{k}]", f"[vtit{k}]"
             filtros.append(
                 f"[{base_t + k}:v]format=rgba,setpts=PTS-STARTPTS+{_fmt(loc)}/TB{rot_img}")
@@ -752,6 +757,36 @@ def montar_comando(seq, pedido, destino, *, rel_midia=None,
         "rotulo_video": f"[{fim_v}_final]",
         "rotulo_audio": rotulo_audio if not param["mute_audio"] else None,
     }
+
+
+def _desfoque_caixa(filtros: List[str], atual: str, k: int, entrada_mascara: int,
+                    loc: float, dur: float, sigmas: List[Tuple[float, float]]) -> str:
+    """Desfoque do video atras da caixa do titulo (backdrop-filter do preview).
+
+    O video ja composto e desfocado so na janela do titulo (trim), recortado pela
+    mascara da caixa (PNG cinza = alfa da camada, ver titulos.py) e sobreposto antes
+    da foto do titulo. Desfoca em gbrp: em yuv420 o croma subamostrado sairia desfocado em
+    dobro (medido: cor lavada). Sigma variavel (escala animada) entra por sendcmd.
+    Devolve o novo rotulo do video.
+    """
+    from .titulos import PASSOS_GBLUR
+    sigma0 = float(sigmas[0][1]) if sigmas else 0.0
+    nome = f"gblur@tdf{k}"
+    trocas = ""
+    if len(sigmas) > 1:
+        cmds = ";".join(f"{_fmt(t)} {nome} sigma {_fmt(s)}" for t, s in sigmas[1:])
+        trocas = f"sendcmd=c='{cmds}',"
+    filtros.append(f"{atual}split=2[tdb{k}][tds{k}]")
+    filtros.append(
+        f"[tds{k}]trim=start={_fmt(loc)}:end={_fmt(loc + dur)},setpts=PTS-STARTPTS,"
+        f"format=gbrp,{trocas}{nome}=sigma={_fmt(sigma0)}:steps={PASSOS_GBLUR}[tdg{k}]")
+    filtros.append(f"[{entrada_mascara}:v]format=gray[tdm{k}]")
+    filtros.append(
+        f"[tdg{k}][tdm{k}]alphamerge,setpts=PTS-STARTPTS+{_fmt(loc)}/TB[tdgm{k}]")
+    filtros.append(
+        f"[tdb{k}][tdgm{k}]overlay=x=0:y=0:eof_action=pass:"
+        f"enable='between(t,{_fmt(loc)},{_fmt(loc + dur)})'[tdv{k}]")
+    return f"[tdv{k}]"
 
 
 def _renumerar(filtro: str, offset: int) -> str:

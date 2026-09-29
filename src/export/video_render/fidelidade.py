@@ -221,17 +221,8 @@ def relatorio(seq, pedido, relatorio_midia) -> Dict[str, Any]:
                 "'playwright' + Edge/Chrome), e o pacote nao esta instalado neste "
                 "ambiente. O resto do video sai normalmente.",
                 sorted({c.id for c in clipes_titulo})))
-        com_caixa = [c.id for c in clipes_titulo
-                     if (c.bruto or {}).get("backgroundColor") not in (None, "", "transparent", "#00000000")
-                     and (c.bruto or {}).get("bgMode") != "transparent"]
-        if com_caixa:
-            avisos.append(_aviso(
-                "warn", "TITULO_SEM_DESFOQUE_DE_FUNDO",
-                "Caixa do titulo sem desfoque do video atras",
-                "Na tela a caixa translucida desfoca o video que passa por baixo "
-                "(backdrop-filter). No arquivo a caixa sai com a mesma cor e "
-                "transparencia, mas sem esse desfoque.",
-                sorted(set(com_caixa))))
+        # Caixa translucida: o desfoque do video atras (backdrop-filter) e reproduzido
+        # no ffmpeg com a mascara da caixa (titulos.py), sem aviso.
 
     # Efeito de tipo desconhecido: seria descartado pelo grafo. disabled:true
     # NAO gera aviso (bypass deliberado, regra P5); categoria desmarcada tambem

@@ -29,18 +29,29 @@ def _titulo(cid, inicio, dur, pista="T1", **extra):
 
 
 class _Falso:
-    """Registra o que foi pedido e devolve um PNG por grupo de 10 quadros."""
+    """Registra o que foi pedido e devolve um PNG por grupo de 10 quadros.
 
-    def __init__(self, pasta: Path):
+    Titulo com backgroundColor ganha mascara; o sigma vem de `escalas` (um por grupo).
+    """
+
+    def __init__(self, pasta: Path, escalas=None):
         self.pasta, self.pedidos, self.avisos = pasta, [], []
+        self.escalas = escalas
 
-    def quadros(self, clipe, largura, altura, fps, inicio, fim):
+    def grupos(self, clipe, largura, altura, fps, inicio, fim):
         self.pedidos.append((clipe["id"], largura, altura, fps, inicio, fim))
+        caixa = clipe.get("backgroundColor") not in (None, "", "transparent")
         saida = []
-        for q in range(inicio, fim, 10):
+        for i, q in enumerate(range(inicio, fim, 10)):
             png = self.pasta / f"{clipe['id']}_{q}.png"
             png.write_bytes(b"")
-            saida.append((png, min(10, fim - q)))
+            m = None
+            if caixa:
+                m = self.pasta / f"{clipe['id']}_{q}_mascara.png"
+                m.write_bytes(b"")
+            escala = self.escalas[i] if self.escalas else 1.0
+            saida.append({"png": png, "n": min(10, fim - q), "mascara": m,
+                          "sigma": round(10.5 * escala, 3) if caixa else None})
         return saida
 
 
@@ -64,9 +75,23 @@ def test_janela_pede_so_os_quadros_visiveis(tmp_path):
     res = titulos.preparar_titulos(_seq(_titulo("gc", 2.0, 4.0)), modelo.Escopo(),
                                    3.0, 10.0, g, tmp_path)
     assert g.pedidos == [("gc", 1920, 1080, 30.0, 30, 120)]  # 1 s ja passou; ate o fim
-    (k, loc, dur), = res["camadas"]
-    assert (k, loc, dur) == (0, 0.0, 3.0)
+    (k, loc, dur, desfoque), = res["camadas"]
+    assert (k, loc, dur, desfoque) == (0, 0.0, 3.0, None)   # sem caixa: sem desfoque
     assert res["entradas"][0]["tipo"] == "titulo"
+
+
+def test_caixa_ganha_mascara_e_sigma_por_escala(tmp_path):
+    # 3 grupos de 10 quadros; a escala muda no segundo e volta no terceiro
+    g = _Falso(tmp_path, escalas=[1.0, 1.5, 1.5])
+    seq = _seq(_titulo("gc", 0.0, 1.0, backgroundColor="rgba(0,0,0,0.5)"))
+    res = titulos.preparar_titulos(seq, modelo.Escopo(), 0.0, 1.0, g, tmp_path)
+    (k, loc, dur, desfoque), = res["camadas"]
+    assert [e["clipe_id"] for e in res["entradas"]] == ["gc", "gc"]
+    assert desfoque["mascara"] == 1 and k == 0
+    lista_m = Path(res["entradas"][1]["caminho"]).read_text()
+    assert "_mascara.png" in lista_m
+    # sigma so e reenviado quando muda (em segundos relativos a camada)
+    assert desfoque["sigmas"] == [(0.0, 10.5), (pytest.approx(10 / 30), 15.75)]
 
 
 def test_ordem_das_pistas_de_texto_e_escopo(tmp_path):
@@ -126,3 +151,87 @@ def test_foto_real_do_titulo_com_fade(tmp_path):
     caixa = ultima.getbbox()
     assert caixa and caixa[1] > 540                                 # posY 30: metade de baixo
     assert ultima.getchannel("A").getextrema()[1] == 255
+
+
+@pytest.mark.skipif(not _navegador_ok(), reason="playwright/Edge/Chrome indisponivel")
+def test_desfoque_da_caixa_igual_ao_preview(tmp_path):
+    """Mede o desfoque do arquivo contra o backdrop-filter do Chromium sobre um xadrez.
+
+    "Preview" = a mesma pagina com o xadrez atras do titulo (o navegador desfoca).
+    Arquivo = xadrez + mascara + foto do titulo pelo grafo de comando.py no ffmpeg.
+    """
+    import base64
+    import subprocess
+    import numpy as np
+    from PIL import Image, ImageFilter
+    from src.export.video_render import comando
+
+    W, H = 640, 360
+    y, x = np.mgrid[0:H, 0:W]
+    chk = (((x // 12) + (y // 12)) % 2).astype(np.uint8) * 255
+    rgb = np.stack([chk, np.where((x // 80) % 2 == 0, chk, 255 - chk),
+                    (x * 255 // W).astype(np.uint8)], -1).astype(np.uint8)
+    xadrez = tmp_path / "xadrez.png"
+    Image.fromarray(rgb, "RGB").save(xadrez)
+
+    clip = _titulo("gc", 0, 1.0, text="Fulana", fontFamily="Inter", fontSize=40,
+                   backgroundColor="rgba(0,0,0,0.45)", boxPadding=14, boxBorderRadius=10,
+                   scale=1.2, rotation=5)
+    with titulos.GeradorTitulos(tmp_path / "cache") as g:
+        (grupo,) = g.grupos(clip, W, H, 30.0, 0, 1)
+        p = g._pagina
+        url = "data:image/png;base64," + base64.b64encode(xadrez.read_bytes()).decode()
+        p.evaluate("(u) => { document.getElementById('palco').style.background = `url(${u})`; }", url)
+        p.evaluate("([c, t]) => window.RENDER_TITULOS.desenhar(c, t)", [clip, 0])
+        preview = tmp_path / "preview.png"
+        p.screenshot(path=str(preview))
+    assert grupo["mascara"] is not None and grupo["sigma"] == pytest.approx(1.05 * 10 * 1.2)
+
+    filtros = []
+    atual = comando._desfoque_caixa(filtros, "[0:v]", 0, 2, 0.0, 1.0, [(0.0, grupo["sigma"])])
+    filtros.append(f"{atual}[1:v]overlay=0:0:format=rgb")
+    arquivo = tmp_path / "arquivo.png"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-loop", "1", "-t", "1", "-i", str(xadrez),
+                    "-i", str(grupo["png"]), "-i", str(grupo["mascara"]),
+                    "-filter_complex", ";".join(filtros), "-frames:v", "1", str(arquivo)],
+                   check=True)
+
+    alfa = Image.open(grupo["mascara"]).convert("L")
+    interior = np.array(alfa.filter(ImageFilter.MinFilter(21))) > 0   # longe da borda
+    assert interior.sum() > 2000
+    ref = np.array(Image.open(preview).convert("RGB")).astype(float)
+    sem = np.array(Image.open(xadrez).convert("RGB")).astype(float)
+    com = np.array(Image.open(arquivo).convert("RGB")).astype(float)
+    # sem desfoque o xadrez atravessa a caixa: longe do preview
+    foto = np.array(Image.open(grupo["png"]).convert("RGBA")).astype(float)
+    a = foto[..., 3:4] / 255.0
+    sem = sem * (1 - a) + foto[..., :3] * a
+    erro_sem = np.abs(sem - ref).mean(-1)[interior].mean()
+    erro_com = np.abs(com - ref).mean(-1)[interior].mean()
+    assert erro_sem > 15
+    assert erro_com < 3, (erro_sem, erro_com)
+
+
+def test_mascara_desfoque_nao_conta_a_opacidade_duas_vezes(tmp_path):
+    """Opacidade o, foto com alfa a_t: a camada desfocada entra com (o - a_t)/(1 - a_t)."""
+    import io
+    import numpy as np
+    from PIL import Image
+
+    def rgba(alfa):
+        im = Image.new("RGBA", (4, 1))
+        im.putdata([(255, 255, 255, a) for a in alfa])
+        return im
+
+    cobertura = io.BytesIO()
+    rgba([0, 128, 128, 255]).save(cobertura, format="PNG")    # fora | caixa o=.5 | caixa o=.5 | caixa o=1
+    foto = tmp_path / "t.png"
+    rgba([0, 29, 128, 115]).save(foto)                         # nada | fundo .45*.5 | texto | fundo .45
+    destino = tmp_path / "m.png"
+    titulos._gravar_mascara_desfoque(cobertura.getvalue(), foto, destino)
+    w = np.asarray(Image.open(destino), dtype=float) / 255
+    assert Image.open(destino).mode == "L"
+    assert w[0, 0] == 0                                        # fora da caixa
+    assert w[0, 1] == pytest.approx((0.502 - 0.114) / (1 - 0.114), abs=0.01)
+    assert w[0, 2] == 0                                        # texto tampa tudo o que esta atras
+    assert w[0, 3] == pytest.approx(1.0, abs=0.01)             # opacidade 1: desfoque inteiro

@@ -232,11 +232,11 @@ def test_titulo_aparece_no_video(tmp_path):
     class GeradorFalso:
         avisos = []
 
-        def quadros(self, clipe, largura, altura, fps, inicio, fim):
+        def grupos(self, clipe, largura, altura, fps, inicio, fim):
             vistos.append(clipe)
             png = tmp_path / "t.png"
             png.write_bytes(b"")
-            return [(png, fim - inicio)]
+            return [{"png": png, "n": fim - inicio, "mascara": None, "sigma": None}]
 
     fn = lambda s, e, a, b: titulos.preparar_titulos(s, e, a, b, GeradorFalso(), tmp_path)
     from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload

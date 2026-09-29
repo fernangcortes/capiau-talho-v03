@@ -3,7 +3,7 @@
 // O Python (src/export/video_render/titulos.py) abre esta página num navegador
 // headless e chama as funções em window.RENDER_TITULOS. Tudo o que decide a aparência
 // vem de tituloRender.js e keyframeEngine.js, os mesmos módulos do preview.
-import { montarElementoTitulo, estadoTitulo, pesoTitulo, estiloTitulo } from "./tituloRender.js";
+import { montarElementoTitulo, estadoTitulo, pesoTitulo, estiloTitulo, temCaixa, DESFOQUE_CAIXA_PX } from "./tituloRender.js";
 import { ensureFontLoaded } from "./fontManager.js";
 
 const palco = document.getElementById("palco");
@@ -55,7 +55,7 @@ window.RENDER_TITULOS = {
             await Promise.all(faces.map(f => document.fonts.load(`${f} 48px "${familia}"`, amostra)));
         } catch (_) { /* a medição abaixo diz se deu certo */ }
         await document.fonts.ready;
-        return { fonte: familia, face, fonteDisponivel: _fonteEmUso(familia, amostra, face) };
+        return { fonte: familia, face, fonteDisponivel: _fonteEmUso(familia, amostra, face), caixa: temCaixa(clip), desfoquePx: DESFOQUE_CAIXA_PX };
     },
 
     /** Chave do estado visual em cada quadro [inicio, fim) relativo ao início do clipe. */
@@ -71,6 +71,24 @@ window.RENDER_TITULOS = {
     desenhar(clip, relTimeS) {
         palco.innerHTML = "";
         palco.appendChild(montarElementoTitulo(document, clip, relTimeS, 1));
+        return true;
+    },
+
+    /**
+     * Máscara da área que o backdrop-filter desfoca na tela: a caixa do título (mesma
+     * posição, transformação, raio e opacidade), preenchida opaca, sem texto nem sombras.
+     * O ffmpeg desfoca o vídeo composto e o recorta por ela antes de pôr a foto do título.
+     */
+    mascara(clip, relTimeS) {
+        palco.innerHTML = "";
+        const el = montarElementoTitulo(document, clip, relTimeS, 1);
+        el.style.backgroundColor = "#ffffff";
+        el.style.color = "transparent";
+        el.style.textShadow = "none";
+        el.style.boxShadow = "none";
+        el.style.backdropFilter = "none";
+        el.style.webkitBackdropFilter = "none";
+        palco.appendChild(el);
         return true;
     }
 };

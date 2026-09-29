@@ -38,6 +38,16 @@ export function estiloTitulo(clip) {
     return String(clip.fontStyle || "").trim().toLowerCase() === "italic" ? "italic" : "normal";
 }
 
+/** Desfoque do vídeo atrás da caixa (backdrop-filter), em pixels do quadro. O render
+ *  do arquivo lê este valor para reproduzir o mesmo desfoque no ffmpeg. */
+export const DESFOQUE_CAIXA_PX = 10;
+
+/** O título tem caixa de fundo (com desfoque do vídeo atrás)? */
+export function temCaixa(clip) {
+    const bg = clip.backgroundColor;
+    return !(!bg || bg === "transparent" || bg === "#00000000" || clip.bgMode === "transparent");
+}
+
 function _sombraEscalada(sombra, e) {
     // "0 2px 10px rgba(...)" -> px multiplicados pela escala
     return sombra.replace(/(-?\d*\.?\d+)px/g, (_, n) => `${Number(n) * e}px`);
@@ -82,17 +92,16 @@ export function montarElementoTitulo(doc, clip, relTimeS, escala = 1) {
     el.style.lineHeight = String(clip.lineHeight || 1.2);
 
     const bgVal = clip.backgroundColor;
-    const isTransparent = !bgVal || bgVal === "transparent" || bgVal === "#00000000" || clip.bgMode === "transparent";
 
-    if (!isTransparent) {
+    if (temCaixa(clip)) {
         const pad = clip.boxPadding !== undefined ? clip.boxPadding : 8;
         const raio = clip.boxBorderRadius !== undefined ? clip.boxBorderRadius : 4;
         el.style.backgroundColor = bgVal;
         el.style.padding = `${pad * e}px ${14 * e}px`;
         el.style.borderRadius = `${raio * e}px`;
         el.style.boxShadow = _sombraEscalada("0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.08)", e);
-        el.style.backdropFilter = `blur(${10 * e}px)`;
-        el.style.webkitBackdropFilter = `blur(${10 * e}px)`;
+        el.style.backdropFilter = `blur(${DESFOQUE_CAIXA_PX * e}px)`;
+        el.style.webkitBackdropFilter = `blur(${DESFOQUE_CAIXA_PX * e}px)`;
         el.style.textShadow = _sombraEscalada("0 1px 4px rgba(0,0,0,0.6)", e);
     } else {
         el.style.backgroundColor = "transparent";
