@@ -3,6 +3,21 @@ import sqlite3
 import json
 from typing import List, Dict, Any, Optional
 
+# Nomes que NÃO identificam ninguém: rótulos de triagem e placeholders de cluster
+# ("Pessoa Desconhecida (Grupo 31)"). Nunca devem virar entidade nem entrar no prompt
+# de visão ou no enriquecimento — poluem a descrição e o embedding sem agregar informação.
+NON_IDENTIFYING_NAMES = ("Não Relevante", "Não é Rosto")
+PLACEHOLDER_NAME_PREFIX = "Pessoa Desconhecida"
+
+
+def is_identifying_name(name: Optional[str]) -> bool:
+    """True quando o nome identifica de fato uma pessoa/objeto (não é placeholder)."""
+    n = (name or "").strip()
+    if not n or n in NON_IDENTIFYING_NAMES:
+        return False
+    return not n.startswith(PLACEHOLDER_NAME_PREFIX)
+
+
 class EntityRepository:
     @staticmethod
     def upsert_entity(
@@ -20,6 +35,9 @@ class EntityRepository:
         name = (name or "").strip()
         if not name:
             raise ValueError("Nome de entidade vazio.")
+        if not is_identifying_name(name):
+            # Placeholders de cluster e rótulos de triagem não são entidades reais
+            raise ValueError(f"Nome não identifica uma entidade: '{name}'.")
 
         cursor = conn.cursor()
         cursor.execute("SELECT id, entity_type FROM entity WHERE project_id = ? AND name = ? COLLATE NOCASE", (project_id, name))
@@ -195,6 +213,9 @@ class EntityRepository:
         seen = set()
         results = []
         for r in cursor.fetchall():
+            # Placeholders de cluster não identificam ninguém: fora do prompt de visão
+            if not is_identifying_name(r["name"]):
+                continue
             key = r["name"].strip().lower()
             if key and key not in seen:
                 seen.add(key)

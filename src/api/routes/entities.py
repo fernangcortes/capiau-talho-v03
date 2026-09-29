@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 
 from src.db.connection import get_db
-from src.db.repositories.entities import EntityRepository
+from src.db.repositories.entities import EntityRepository, is_identifying_name
 from src.nlp.enrichment_engine import (
     enrich_project,
     enrich_photo,
@@ -48,9 +48,12 @@ def create_entity(payload: EntityCreate):
     if payload.entity_type not in ("person", "object", "location", "other"):
         raise HTTPException(status_code=400, detail="entity_type inválido.")
     with get_db() as conn:
-        entity_id = EntityRepository.upsert_entity(
-            conn, payload.project_id, payload.name, payload.entity_type, payload.description
-        )
+        try:
+            entity_id = EntityRepository.upsert_entity(
+                conn, payload.project_id, payload.name, payload.entity_type, payload.description
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         conn.commit()
     return {"status": "success", "entity_id": entity_id}
 
@@ -254,6 +257,9 @@ def backfill_legacy_labels(project_id: int):
 
         seen_entities = set()
         for r in rows:
+            # Placeholders de cluster e rótulos de triagem não viram entidade
+            if not is_identifying_name(r["name"]):
+                continue
             crop = r["crop_path"] or ""
             is_text_link = crop.startswith("text:")
             etype = "object" if is_text_link else "person"
