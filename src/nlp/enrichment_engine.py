@@ -304,21 +304,28 @@ def enrich_photo(project_id: int, photo_id: int, task_key: Optional[str] = None)
         data = EntityRepository.get_entities_for_media(conn, photo_id=photo_id)
         entities = data["entities"]
         replacements = data["replacements"]
-        if not entities and not replacements:
-            if task_key: TASK_MANAGER.add_log(task_key, f"[PHOTO #{photo_id}] Nenhuma entidade/rótulo vinculado a esta foto.", "INFO")
-            return False
-        
+        current = row["description"] or ""
         tags_raw = row["tags"]
 
-    names = [e["name"] for e in entities]
-    if task_key:
-        TASK_MANAGER.add_log(task_key, f"[PHOTO #{photo_id}] Solicitando reescrita LLM para entidades: {names}", "PHOTO")
+    if not entities and not replacements:
+        # Sem entidades: se a descrição atual ainda carrega nomes de uma rotulagem
+        # desfeita (entidade apagada/renomeada, placeholder removido), volta ao texto
+        # original. Caso contrário não há nada a fazer.
+        if current.strip() == raw.strip():
+            if task_key: TASK_MANAGER.add_log(task_key, f"[PHOTO #{photo_id}] Nenhuma entidade/rótulo vinculado a esta foto.", "INFO")
+            return False
+        if task_key: TASK_MANAGER.add_log(task_key, f"[PHOTO #{photo_id}] Sem entidades vinculadas: restaurando a descrição original.", "PHOTO")
+        enriched = raw
+    else:
+        names = [e["name"] for e in entities]
+        if task_key:
+            TASK_MANAGER.add_log(task_key, f"[PHOTO #{photo_id}] Solicitando reescrita LLM para entidades: {names}", "PHOTO")
 
-    # 2. Executar reescrita LLM (chamada HTTP) fora da transação do banco
-    enriched = _rewrite_with_fallback(raw, entities, replacements, project_id=project_id, task_key=task_key)
-    if not enriched:
-        if task_key: TASK_MANAGER.add_log(task_key, f"[PHOTO #{photo_id}] Reescrita LLM não retornou alterações.", "INFO")
-        return False
+        # 2. Executar reescrita LLM (chamada HTTP) fora da transação do banco
+        enriched = _rewrite_with_fallback(raw, entities, replacements, project_id=project_id, task_key=task_key)
+        if not enriched:
+            if task_key: TASK_MANAGER.add_log(task_key, f"[PHOTO #{photo_id}] Reescrita LLM não retornou alterações.", "INFO")
+            return False
 
     # 3. Persiste no SQLite em uma nova transação curta
     with get_db() as conn:
