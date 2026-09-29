@@ -166,5 +166,57 @@ ok("trim de cauda a 2x para no fim real da mídia");
 }
 ok("conformCuts respeita a velocidade ao aplicar o limite de mídia");
 
+// 8. Freeze frame congela o quadro que está NA TELA (relato: a 200% o freeze "pulava")
+for (const [nome, extra] of cenarios) {
+    for (const modo of ["ripple", "overwrite"]) {
+        STATE.activeTimelineCuts = [clipe("a", 0, 10, 120, extra)];
+        const antes = { ...STATE.activeTimelineCuts[0] };
+        const gelo = TIMELINE_STATE.createFreezeFrameCut("a", 40, 1.0, modo);
+        assert.ok(gelo, `freeze ${nome}/${modo} não foi criado`);
+        assert.ok(perto(gelo.freeze_time, fonteEm(antes, 40)),
+            `freeze ${nome}/${modo}: tela mostrava ${fonteEm(antes, 40)}, congelou ${gelo.freeze_time}`);
+        // no ripple o resto do clipe continua de onde parou (empurrado 30 frames)
+        if (modo === "ripple") {
+            const resto = STATE.activeTimelineCuts.find(c => c.id !== "a" && !c.is_freeze);
+            assert.ok(perto(fonteEm(resto, 40 + 30), fonteEm(antes, 40)), `freeze ${nome}: resto do clipe retomou errado`);
+        }
+    }
+}
+{
+    // cauda: congela o último quadro visível
+    STATE.activeTimelineCuts = [clipe("a", 0, 10, 120, { speed: 2 })];
+    const antes = { ...STATE.activeTimelineCuts[0] };
+    const gelo = TIMELINE_STATE.createFreezeFrameCut("a", 120, 1.0, "ripple");
+    assert.ok(perto(gelo.freeze_time, fonteEm(antes, 119)));
+}
+ok("freeze congela o quadro da tela em 100%, 2x, 50%, reverso e 2x reverso (meio e cauda)");
+
+// 9. Sobrescrita no meio de um clipe acelerado: as duas sobras seguem no lugar
+for (const [nome, extra] of cenarios) {
+    const base = clipe("a", 0, 10, 120, extra);
+    const antes = { ...base };
+    const res = TIMELINE_STATE.overwriteTimeRange("V1", 40, 20, [], [base], null);
+    const esq = res.find(c => c.timelineStartFrame === 0);
+    const dir = res.find(c => c.timelineStartFrame === 60);
+    for (const f of [0, 39]) assert.ok(perto(fonteEm(esq, f), fonteEm(antes, f)), `overwrite ${nome} esq ${f}`);
+    for (const f of [60, 119]) assert.ok(perto(fonteEm(dir, f), fonteEm(antes, f)), `overwrite ${nome} dir ${f}`);
+}
+ok("sobrescrita no meio preserva as sobras (fatiaDoClipe)");
+
+// 10. Lift e extract de um trecho do meio
+for (const [nome, extra] of cenarios) {
+    STATE.activeTimelineCuts = [clipe("a", 0, 10, 120, extra)];
+    const antes = { ...STATE.activeTimelineCuts[0] };
+    TIMELINE_STATE.liftRange(40, 60);
+    const dirLift = STATE.activeTimelineCuts.find(c => c.timelineStartFrame === 60);
+    assert.ok(perto(fonteEm(dirLift, 60), fonteEm(antes, 60)), `lift ${nome}`);
+
+    STATE.activeTimelineCuts = [clipe("a", 0, 10, 120, extra)];
+    TIMELINE_STATE.extractRange(40, 60);
+    const dirExt = STATE.activeTimelineCuts.find(c => c.timelineStartFrame === 40);
+    assert.ok(perto(fonteEm(dirExt, 40), fonteEm(antes, 60)), `extract ${nome}: o que vinha em 60 agora vem em 40`);
+}
+ok("lift e extract preservam o conteúdo das sobras");
+
 TIMELINE_HISTORY.clear();
 console.log(`\n=== ${n}/${n} TESTES APROVADOS ===`);

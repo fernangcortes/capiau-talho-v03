@@ -661,10 +661,7 @@ export class CapiauTimelineState {
                         id: `cut_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                         timelineStartFrame: cStart,
                         timeline_start: cStart / this.fps,
-                        inFrame: cIn,
-                        in: cIn / this.fps,
-                        outFrame: cIn + leftDur,
-                        out: (cIn + leftDur) / this.fps
+                        ...this.fatiaDoClipe(cut, 0, leftDur)
                     };
                     newCuts.push(leftCut);
 
@@ -675,10 +672,7 @@ export class CapiauTimelineState {
                         id: `cut_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                         timelineStartFrame: endF,
                         timeline_start: endF / this.fps,
-                        inFrame: cIn + rightOffset,
-                        in: (cIn + rightOffset) / this.fps,
-                        outFrame: cIn + rightOffset + rightDur,
-                        out: (cIn + rightOffset + rightDur) / this.fps
+                        ...this.fatiaDoClipe(cut, rightOffset, rightDur)
                     };
                     newCuts.push(rightCut);
                     continue;
@@ -689,8 +683,7 @@ export class CapiauTimelineState {
                     const newDur = startF - cStart;
                     const trimmedCut = {
                         ...cut,
-                        outFrame: cIn + newDur,
-                        out: (cIn + newDur) / this.fps
+                        ...this.fatiaDoClipe(cut, 0, newDur)
                     };
                     newCuts.push(trimmedCut);
                     continue;
@@ -704,8 +697,7 @@ export class CapiauTimelineState {
                         ...cut,
                         timelineStartFrame: endF,
                         timeline_start: endF / this.fps,
-                        inFrame: cIn + cutOffset,
-                        in: (cIn + cutOffset) / this.fps
+                        ...this.fatiaDoClipe(cut, cutOffset, newDur)
                     };
                     newCuts.push(trimmedCut);
                     continue;
@@ -780,10 +772,7 @@ export class CapiauTimelineState {
                         id: `cut_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                         timelineStartFrame: cStart,
                         timeline_start: cStart / this.fps,
-                        inFrame: cIn,
-                        in: cIn / this.fps,
-                        outFrame: cIn + leftDur,
-                        out: (cIn + leftDur) / this.fps
+                        ...this.fatiaDoClipe(cut, 0, leftDur)
                     };
                     intermediateCuts.push(leftCut);
 
@@ -794,10 +783,7 @@ export class CapiauTimelineState {
                         id: `cut_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                         timelineStartFrame: endF,
                         timeline_start: endF / this.fps,
-                        inFrame: cIn + rightOffset,
-                        in: (cIn + rightOffset) / this.fps,
-                        outFrame: cIn + rightOffset + rightDur,
-                        out: (cIn + rightOffset + rightDur) / this.fps
+                        ...this.fatiaDoClipe(cut, rightOffset, rightDur)
                     };
                     intermediateCuts.push(rightCut);
                     continue;
@@ -807,8 +793,7 @@ export class CapiauTimelineState {
                     const newDur = startF - cStart;
                     const trimmedCut = {
                         ...cut,
-                        outFrame: cIn + newDur,
-                        out: (cIn + newDur) / this.fps
+                        ...this.fatiaDoClipe(cut, 0, newDur)
                     };
                     intermediateCuts.push(trimmedCut);
                     continue;
@@ -821,8 +806,7 @@ export class CapiauTimelineState {
                         ...cut,
                         timelineStartFrame: endF,
                         timeline_start: endF / this.fps,
-                        inFrame: cIn + cutOffset,
-                        in: (cIn + cutOffset) / this.fps
+                        ...this.fatiaDoClipe(cut, cutOffset, newDur)
                     };
                     intermediateCuts.push(trimmedCut);
                     continue;
@@ -1628,8 +1612,7 @@ export class CapiauTimelineState {
                 // Parte esquerda
                 newCuts.push({
                     ...c,
-                    outFrame: c.inFrame + leftDur,
-                    out: (c.inFrame + leftDur) / fps
+                    ...this.fatiaDoClipe(c, 0, leftDur)
                 });
 
                 // Parte direita: reutiliza stamp compartilhado via splitLinkMap para par A/V
@@ -1650,8 +1633,7 @@ export class CapiauTimelineState {
                     id: `cut_${stamp}_${isAudio ? "a" : "v"}`,
                     timelineStartFrame: endFrame,
                     timeline_start: endFrame / fps,
-                    inFrame: c.inFrame + rightOffset,
-                    in: (c.inFrame + rightOffset) / fps,
+                    ...this.fatiaDoClipe(c, rightOffset, (c.outFrame - c.inFrame) - rightOffset),
                     link_id: c.link_id ? `link_${stamp}` : null
                 });
                 continue;
@@ -1662,8 +1644,7 @@ export class CapiauTimelineState {
                 const leftDur = startFrame - cStart;
                 newCuts.push({
                     ...c,
-                    outFrame: c.inFrame + leftDur,
-                    out: (c.inFrame + leftDur) / fps
+                    ...this.fatiaDoClipe(c, 0, leftDur)
                 });
                 continue;
             }
@@ -1675,8 +1656,7 @@ export class CapiauTimelineState {
                     ...c,
                     timelineStartFrame: endFrame,
                     timeline_start: endFrame / fps,
-                    inFrame: c.inFrame + offset,
-                    in: (c.inFrame + offset) / fps
+                    ...this.fatiaDoClipe(c, offset, (c.outFrame - c.inFrame) - offset)
                 });
                 continue;
             }
@@ -2091,13 +2071,11 @@ export class CapiauTimelineState {
                 });
             } else if (cStart < startFrame && cEnd > startFrame) {
                 const leftDur = startFrame - cStart;
+                const base = { ...c, inFrame: cIn, outFrame: cOut, in: c.in !== undefined ? c.in : cIn / fps };
                 // Parte esquerda permanece
                 newCuts.push({
                     ...c,
-                    inFrame: cIn,
-                    in: c.in !== undefined ? c.in : cIn / fps,
-                    outFrame: cIn + leftDur,
-                    out: (cIn + leftDur) / fps
+                    ...this.fatiaDoClipe(base, 0, leftDur)
                 });
 
                 // Parte direita empurrada: reutiliza stamp compartilhado via splitLinkMap
@@ -2118,10 +2096,7 @@ export class CapiauTimelineState {
                     id: `cut_${stamp}_${isAudio ? "a" : "v"}`,
                     timelineStartFrame: startFrame + durationFrames,
                     timeline_start: (startFrame + durationFrames) / fps,
-                    inFrame: cIn + leftDur,
-                    in: (cIn + leftDur) / fps,
-                    outFrame: cOut,
-                    out: c.out !== undefined ? c.out : cOut / fps,
+                    ...this.fatiaDoClipe(base, leftDur, cDur - leftDur),
                     link_id: c.link_id ? `link_${stamp}` : null
                 });
             } else {
@@ -3580,6 +3555,35 @@ export class CapiauTimelineState {
         this.sincronizarOutDoClipe(c);
     }
 
+    /**
+     * inFrame/outFrame/in/out da PEÇA de `c` que começa `offset` frames de timeline
+     * depois do início do clipe e dura `dur` frames de timeline. Ponto único para quem
+     * fatia clipes montando objetos (lift/extract, sobrescrita, ripple insert, freeze):
+     * com velocidade/reverso a fonte anda na escala certa; a 100% dá os valores de sempre.
+     */
+    fatiaDoClipe(c, offset, dur) {
+        const peca = { ...c };
+        const baseIn = c.inFrame || 0, baseOut = c.outFrame || 0;
+        this.aplicarCabeca(peca, baseIn, baseOut, offset);
+        this.aplicarCauda(peca, peca.inFrame, peca.outFrame, dur - ((peca.outFrame || 0) - (peca.inFrame || 0)));
+        return { inFrame: peca.inFrame, outFrame: peca.outFrame, in: peca.in, out: peca.out };
+    }
+
+    /** Instante da FONTE (s) tocado num frame da timeline — a conta de player._targetSecondsFor. */
+    fonteNoFrame(c, frame) {
+        const fps = this.fps || 24;
+        if (c.is_freeze) {
+            return (typeof c.freeze_time === "number" && !isNaN(c.freeze_time)) ? c.freeze_time : (c.in || 0);
+        }
+        const start = c.timelineStartFrame || 0;
+        const off = ((frame - start) / fps) * this.velocidadeDoClipe(c);
+        if (c.reverse) {
+            const out = (typeof c.out === "number" && !isNaN(c.out)) ? c.out : (c.in || 0);
+            return Math.max(c.in || 0, Math.min(out, out - off));
+        }
+        return (c.in || 0) + off;
+    }
+
     /** Frame da FONTE onde o trecho termina (outFrame em clipe comum). */
     fimFonteFrames(c, baseIn, baseOut) {
         if (!this.clipeTemRetime(c)) return baseOut;
@@ -3963,8 +3967,7 @@ export class CapiauTimelineState {
 
                         splitAndShift.push({
                             ...c,
-                            outFrame: c.inFrame + offsetFrames,
-                            out: (c.inFrame + offsetFrames) / fps
+                            ...this.fatiaDoClipe(c, 0, offsetFrames)
                         });
 
                         splitAndShift.push({
@@ -3972,8 +3975,7 @@ export class CapiauTimelineState {
                             id: `cut_${Date.now()}_${Math.floor(Math.random()*900+100)}_${c.id.endsWith("_a") ? "a" : "v"}`,
                             timelineStartFrame: startFrame + durFrames,
                             timeline_start: (startFrame + durFrames) / fps,
-                            inFrame: c.inFrame + offsetFrames,
-                            in: (c.inFrame + offsetFrames) / fps,
+                            ...this.fatiaDoClipe(c, offsetFrames, cDur - offsetFrames),
                             link_id: newLink
                         });
                     } else {
@@ -5602,25 +5604,19 @@ export class CapiauTimelineState {
             // e anexa o bloco estático exatamente ao final do clipe (cEnd),
             // preservando o clipe inteiro e evitando gerar um fragmento residual indesejado de 1 frame.
             actualInsertFrame = cEnd;
-            if (targetClip.is_freeze) {
-                freezeTimeSec = (targetClip.freeze_time !== undefined) ? targetClip.freeze_time : (targetClip.in || 0);
-                freezeFrameInSource = (targetClip.freeze_frame !== undefined) ? targetClip.freeze_frame : (targetClip.inFrame || 0);
-            } else {
-                freezeFrameInSource = Math.max(targetClip.inFrame || 0, (targetClip.outFrame || 1) - 1);
-                freezeTimeSec = (targetClip.out !== undefined && fps > 0)
-                    ? Math.max(targetClip.in || 0, freezeFrameInSource / fps)
-                    : (freezeFrameInSource / fps);
-            }
         } else {
             actualInsertFrame = targetFrame;
-            const offsetFrames = Math.max(0, targetFrame - cStart);
-            if (targetClip.is_freeze) {
-                freezeTimeSec = (targetClip.freeze_time !== undefined) ? targetClip.freeze_time : (targetClip.in || 0);
-                freezeFrameInSource = (targetClip.freeze_frame !== undefined) ? targetClip.freeze_frame : (targetClip.inFrame || 0);
-            } else {
-                freezeTimeSec = (targetClip.in || 0) + (offsetFrames / fps);
-                freezeFrameInSource = (targetClip.inFrame || 0) + offsetFrames;
-            }
+        }
+        // Congela o quadro que o player MOSTRA nesse ponto (na cauda, o último visível).
+        // Antes a conta era in + offset/fps: num clipe a 200% ou reverso o freeze pegava
+        // outro quadro da fonte, não o que estava na tela.
+        if (targetClip.is_freeze) {
+            freezeTimeSec = (targetClip.freeze_time !== undefined) ? targetClip.freeze_time : (targetClip.in || 0);
+            freezeFrameInSource = (targetClip.freeze_frame !== undefined) ? targetClip.freeze_frame : (targetClip.inFrame || 0);
+        } else {
+            const quadroTela = isTail ? Math.max(cStart, cEnd - 1) : targetFrame;
+            freezeTimeSec = this.fonteNoFrame({ ...targetClip, timelineStartFrame: cStart }, quadroTela);
+            freezeFrameInSource = Math.round(freezeTimeSec * fps);
         }
 
         let createdFreezeClip = null;
