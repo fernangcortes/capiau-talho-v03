@@ -668,9 +668,44 @@ async function _carregarTimelines() {
     await _aposTrocaDeTimeline();
 }
 
+/**
+ * Copia os pontos IN/OUT da tela para os campos da faixa, ANTES do preflight.
+ *
+ * Antes isso só acontecia em aplicarPreflight, ou seja, depois de um preflight
+ * bem-sucedido. Se os campos guardavam uma faixa velha (de uma timeline mais
+ * longa, aberta antes na mesma sessão), o preflight da timeline nova voltava
+ * 400 "Faixa IN-OUT vazia", aplicarPreflight nunca rodava e os campos nunca
+ * eram corrigidos: o painel ficava travado, mesmo salvando a timeline de novo.
+ *
+ * Sem IN/OUT na tela, volta para "timeline inteira": o fim depende da duração,
+ * que só o preflight conhece, e manter uma faixa velha é justamente o defeito.
+ */
+function _sincronizarFaixaComTimeline(fps) {
+    const temInOut = TIMELINE_STATE && typeof TIMELINE_STATE.hasInOut === "function" && TIMELINE_STATE.hasInOut();
+    if (!temInOut) {
+        const full = _q("ev-range-full");
+        if (full) full.checked = true;
+        return false;
+    }
+    const fpsVal = Number(fps) || Number(TIMELINE_STATE.fps) || 24;
+    const range = TIMELINE_STATE.getEffectiveInOutFrames();
+    const startSec = range.startFrame / fpsVal;
+    const endSec = range.endFrame / fpsVal;
+    if (_el.rangeIni && document.activeElement !== _el.rangeIni) {
+        _el.rangeIni.value = String(Math.round(startSec * 100) / 100);
+    }
+    if (_el.rangeFim && document.activeElement !== _el.rangeFim) {
+        _el.rangeFim.value = String(Math.round(endSec * 100) / 100);
+    }
+    if (_el.rangeInOutRadio) _el.rangeInOutRadio.checked = true;
+    return true;
+}
+
 async function _aposTrocaDeTimeline() {
     _carregarPostPersistido(_estado.timelineId);
     _restaurarUltimoRenderSeHouver(); // fire-and-forget: só enriquece o painel
+    _sincronizarFaixaComTimeline();
+    _atualizarVisibilidadeFaixa();
     await executarPreflight();
 
     // Reabertura com job vivo: se esta timeline já tem render em andamento (começou
@@ -772,20 +807,11 @@ function aplicarPreflight(pfBruto) {
     if (_el.infoClipes) _el.infoClipes.textContent = `${pf.clipes} clipes`;
 
     // 2. Faixa IN–OUT pré-preenchida com os pontos marcados na timeline (ou alcance completo).
-    const fpsVal = Number(pf.fps) || TIMELINE_STATE.fps || 24;
-    const hasTimelineInOut = TIMELINE_STATE && typeof TIMELINE_STATE.hasInOut === "function" && TIMELINE_STATE.hasInOut();
-
-    if (hasTimelineInOut) {
-        const range = TIMELINE_STATE.getEffectiveInOutFrames();
-        const startSec = range.startFrame / fpsVal;
-        const endSec = range.endFrame / fpsVal;
-        if (_el.rangeIni && document.activeElement !== _el.rangeIni) {
-            _el.rangeIni.value = String(Math.round(startSec * 100) / 100);
-        }
-        if (_el.rangeFim && document.activeElement !== _el.rangeFim) {
-            _el.rangeFim.value = String(Math.round(endSec * 100) / 100);
-        }
-        if (_el.rangeInOutRadio) _el.rangeInOutRadio.checked = true;
+    // Sem IN/OUT na tela: só preenche os campos (para quem trocar para IN-OUT à
+    // mão), sem mexer no rádio -- aqui o usuário pode ter escolhido a faixa.
+    const temInOut = TIMELINE_STATE && typeof TIMELINE_STATE.hasInOut === "function" && TIMELINE_STATE.hasInOut();
+    if (temInOut) {
+        _sincronizarFaixaComTimeline(pf.fps);
     } else {
         if (_el.rangeIni && document.activeElement !== _el.rangeIni) _el.rangeIni.value = "0";
         if (_el.rangeFim && document.activeElement !== _el.rangeFim) {

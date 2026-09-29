@@ -370,6 +370,10 @@ class Faixa:
             fim = float(self.fim_s) if self.fim_s is not None else duracao_total_s
             fim = min(fim, duracao_total_s)
             if fim <= ini:
+                if ini >= duracao_total_s:
+                    raise ValueError(
+                        f"Faixa IN-OUT fora da timeline: o IN ({ini:.2f}s) está depois "
+                        f"do fim da timeline ({duracao_total_s:.2f}s).")
                 raise ValueError("Faixa IN-OUT vazia: o OUT precisa vir depois do IN.")
             return ini, fim
         return 0.0, duracao_total_s
