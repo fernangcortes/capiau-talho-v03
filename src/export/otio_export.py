@@ -117,8 +117,8 @@ def generate_otio_timeline(timeline_id: int, as_uri: bool = True, use_proxies: b
         clips_by_track = {}
         for cut in clips:
             track_id = str(cut.get('track', 'V1'))
-            if track_id in ai_track_ids:
-                continue
+            if track_id in ai_track_ids or cut.get("disabled"):
+                continue  # IA nao aceita e clipe desligado (tecla F) ficam fora
             clips_by_track.setdefault(track_id, []).append(cut)
 
         # Ordena as trilhas conforme a ordem definida (de baixo para cima no OTIO)

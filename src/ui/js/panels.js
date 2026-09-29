@@ -6,6 +6,7 @@ import { parseQuery, evaluateAST } from "./searchParser.js";
 import { CapiauTimelineRenderer } from "./timelineRenderer.js";
 import { CapiauTimelineInteraction } from "./timelineInteraction.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY, secondsToFrames } from "./timelineState.js";
+import { cortesParaSalvar, cortesDoBanco } from "./timelinePersistencia.js";
 import { getActiveElement, getActiveQuerySelector } from "./workspaceManager.js";
 import { WaveformManager } from "./waveformManager.js";
 import { KEYMAP_SERVICE, COMMANDS_CATALOG, COMMAND_CATEGORIES, PRESET_NAMES } from "./keymapService.js";
@@ -2149,20 +2150,7 @@ export class PanelsManager {
 
         try {
             const fps = TIMELINE_STATE.fps || 24;
-            const cuts = STATE.activeTimelineCuts.map(c => ({
-                id: String(c.id),
-                type: c.type || "video",
-                video_id: c.video_id ?? null,
-                photo_id: c.photo_id ?? null,
-                in_time: c.in,
-                out_time: c.out,
-                track: c.track,
-                timeline_start: (c.timelineStartFrame || 0) / fps,
-                link_id: c.link_id || null,
-                effects: c.effects || [],
-                alternatives: c.alternatives || [],
-                origin: c.origin || "user"
-            }));
+            const cuts = cortesParaSalvar(STATE.activeTimelineCuts, fps);
             const tracks = TIMELINE_STATE.serializeTracks();
             const width = TIMELINE_STATE.width || 1920;
             const height = TIMELINE_STATE.height || 1080;
@@ -3500,22 +3488,7 @@ export class PanelsManager {
             TIMELINE_STATE.setTimelineProperties({ width: loadWidth, height: loadHeight, fps: loadFps });
 
             const fps = TIMELINE_STATE.fps || 24;
-            const cuts = (sequence.clips || []).map((c, idx) => ({
-                id: c.id || `cut_loaded_${idx}_${Date.now()}`,
-                type: c.type || "video",
-                video_id: c.video_id ?? null,
-                photo_id: c.photo_id ?? null,
-                in: c.in,
-                out: c.out,
-                track: c.track || "V1",
-                link_id: c.link_id || null,
-                effects: c.effects || [],
-                alternatives: c.alternatives || [],
-                origin: c.origin || "user",
-                timelineStartFrame: c.timeline_start !== undefined && c.timeline_start !== null
-                    ? secondsToFrames(c.timeline_start, fps)
-                    : undefined
-            }));
+            const cuts = cortesDoBanco(sequence.clips, fps);
 
             // Timelines antigas (sem pistas de áudio): cria pares A/V vinculados
             STATE.activeTimelineCuts = TIMELINE_STATE.migrateCutsToAV(cuts);

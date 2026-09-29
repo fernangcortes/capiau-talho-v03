@@ -414,12 +414,22 @@ def backfill_palette(project_id: int):
         "distribution": dict(sorted(distribution.items(), key=lambda kv: -kv[1])),
     }
 
+# Campos do clipe na tela que sao DERIVADOS dos segundos (conformCuts refaz na
+# carga). Gravar os dois cria duas verdades que divergem no primeiro trim.
+_CAMPOS_DERIVADOS_CLIPE = {"in", "out", "inFrame", "outFrame", "timelineStartFrame"}
+
+
 @router.post("/api/timeline")
 def save_timeline(timeline: TimelineCreate, conn: sqlite3.Connection = Depends(get_db_conn)):
     """Salva um novo rascunho de timeline (formato v2 multipista)."""
     try:
         cuts_dict = [
             {
+                # Campos extras do editor primeiro (disabled, speed, is_freeze,
+                # texto do titulo...); os fixos abaixo vencem em caso de nome
+                # repetido. Frames sao derivados de segundos na carga e ficam fora.
+                **{k: v for k, v in (c.model_extra or {}).items()
+                   if k not in _CAMPOS_DERIVADOS_CLIPE},
                 "id": c.id,
                 "type": c.type or "video",
                 "video_id": c.video_id,
@@ -435,7 +445,7 @@ def save_timeline(timeline: TimelineCreate, conn: sqlite3.Connection = Depends(g
             }
             for c in timeline.cuts
         ]
-        tracks_dict = [t.dict() for t in timeline.tracks] if timeline.tracks else None
+        tracks_dict = [t.model_dump() for t in timeline.tracks] if timeline.tracks else None
         timeline_id = ProjectRepository.save_timeline(
             conn, timeline.project_id, timeline.name, timeline.description,
             cuts_dict, tracks=tracks_dict, fps=timeline.fps,

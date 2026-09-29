@@ -254,7 +254,7 @@ def exportar_stems(sequencia, destino, *, sobrescrever: bool = False,
     exportados: dict = {}
     ignorados: list = []
 
-    clips = [c for c in seq["clips"] if isinstance(c, dict)]
+    clips = [c for c in seq["clips"] if isinstance(c, dict) and not c.get("disabled")]
     clips.sort(key=lambda c: (str(c.get("track", "")), float(c.get("timeline_start", 0.0) or 0.0)))
 
     for cut in clips:
@@ -399,7 +399,7 @@ def relatorio_efeitos(sequencia, destino, *, sobrescrever: bool = False,
 
     ia_ids = _trilhas_ignoradas(seq)
     secoes = 0
-    for idx, cut in enumerate([c for c in seq["clips"] if isinstance(c, dict)], start=1):
+    for idx, cut in enumerate([c for c in seq["clips"] if isinstance(c, dict) and not c.get("disabled")], start=1):
         if str(cut.get("track", "")) in ia_ids:
             continue
         efeitos = _efeitos_tipo_a(cut)

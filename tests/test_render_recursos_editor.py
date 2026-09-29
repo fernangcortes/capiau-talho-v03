@@ -5,10 +5,10 @@ O render le o BANCO, nunca a tela. Entao cada teste faz o caminho inteiro:
     clipe como a UI guarda -> TimelineCreate (schema) -> rota save_timeline
     -> banco -> leitura do render -> modelo.normalizar -> grafos de video/audio
 
-O payload enviado aqui e o IDEAL (o clipe inteiro, como esta em
-STATE.activeTimelineCuts). Hoje o mapeamento da UI (panels.js e
-exportVideo.js) ainda manda so in/out/track/timeline_start/link_id/effects,
-entao um recurso so funciona de verdade quando passa aqui E a UI envia o campo.
+O payload enviado aqui e o clipe inteiro, como esta em STATE.activeTimelineCuts
+-- o mesmo que src/ui/js/timelinePersistencia.js (corteParaSalvar) manda,
+menos os frames derivados. O lado JS dessa ponte tem autoteste proprio
+(tests/autoteste_timeline_persistencia.mjs).
 
 Recurso que hoje NAO renderiza fica em xfail(strict=True): a suite segue verde
 e o teste passa a falhar no dia em que o recurso for consertado, obrigando a
@@ -144,13 +144,43 @@ def test_pista_muda_fica_fora_da_mixagem():
 
 
 # ---------------------------------------------------------------------------
+# Persistencia: o que o editor guarda no clipe sobrevive ao banco
+# ---------------------------------------------------------------------------
+
+def test_campos_do_editor_sobrevivem_ao_salvamento():
+    """Antes o schema descartava tudo fora de in/out/track/link/effects."""
+    titulo = {"id": "gc", "type": "text", "text": "Fulana", "fontFamily": "Inter",
+              "posX": 0.1, "in": 0.0, "out": 3.0, "track": "T1",
+              "timeline_start": 0.0, "effects": []}
+    clipes = [_video("rapido", 0.0, 0.0, 10.0, speed=2.0, reverse=True,
+                     source_duration_frames=300, rotation=90, name="Fala 1"),
+              _video("gelo", 5.0, 2.0, 5.0, is_freeze=True, freeze_time=2.0),
+              _video("sub", 8.0, 40.0, 44.0, is_subclip=True, parent_video_id=1,
+                     hard_boundaries=True, disabled=True),
+              titulo]
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute("CREATE TABLE timeline (id INTEGER PRIMARY KEY, project_id INTEGER, "
+                 "name TEXT, description TEXT, sequence_json TEXT, created_at TEXT)")
+    corpo = TimelineCreate(name="t", cuts=[_payload_ui(c) for c in clipes],
+                           tracks=PISTAS, fps=FPS)
+    tid = narrative.save_timeline(corpo, conn)["timeline_id"]
+    salvos = {c["id"]: c for c in
+              narrative._carregar_timeline_render(tid, conn)["sequencia"]["clips"]}
+
+    assert salvos["rapido"]["speed"] == 2.0 and salvos["rapido"]["reverse"] is True
+    assert salvos["rapido"]["rotation"] == 90 and salvos["rapido"]["name"] == "Fala 1"
+    assert salvos["gelo"]["is_freeze"] is True and salvos["gelo"]["freeze_time"] == 2.0
+    assert salvos["sub"]["disabled"] is True and salvos["sub"]["hard_boundaries"] is True
+    assert salvos["gc"]["text"] == "Fulana" and salvos["gc"]["posX"] == 0.1
+    # in/out vem dos campos oficiais (in_time/out_time), nunca de um extra
+    assert salvos["rapido"]["in"] == 0.0 and salvos["rapido"]["out"] == 10.0
+
+
+# ---------------------------------------------------------------------------
 # O que NAO renderiza hoje (lacunas conhecidas)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Clipe desativado (tecla F, plano: 'bypass no pipeline de exportacao'): o "
-    "campo `disabled` e descartado por CutItem/save_timeline, e o Salvar do "
-    "painel (panels.js:2157) nem filtra. O clipe desligado sai no arquivo."))
 def test_clipe_desativado_nao_entra_no_render():
     clipes = _par_av("liga", 0.0, 0.0, 5.0) + _par_av("desliga", 5.0, 0.0, 5.0, disabled=True)
     r = _render(clipes)
@@ -159,9 +189,9 @@ def test_clipe_desativado_nao_entra_no_render():
 
 
 @pytest.mark.xfail(strict=True, reason=(
-    "Velocidade (Task 13/14): `speed` nao e salvo e o motor nao faz retime "
-    "(modelo.Clipe.duracao_s = out - in). Um clipe a 200% sai em 100% com o "
-    "DOBRO da duracao, empurrando tudo que vem depois."))
+    "Velocidade (Task 13/14): `speed` ja chega ao banco, mas o motor nao faz "
+    "retime (modelo.Clipe.duracao_s = out - in). Um clipe a 200% sai em 100% "
+    "com o DOBRO da duracao, empurrando tudo que vem depois."))
 def test_velocidade_2x_ocupa_metade_do_tempo():
     # Tela: 10 s de fonte a 200% ocupam 5 s na timeline (timelineState:5681-5688)
     c = _video("rapido", 0.0, 0.0, 10.0, speed=2.0, source_duration_frames=300,
@@ -172,7 +202,8 @@ def test_velocidade_2x_ocupa_metade_do_tempo():
 
 
 @pytest.mark.xfail(strict=True, reason=(
-    "Reverso (Task 13): `reverse` nao e salvo e o motor nao tem reverse/areverse."))
+    "Reverso (Task 13): `reverse` ja chega ao banco, mas o motor nao tem "
+    "reverse/areverse."))
 def test_reverso_inverte_video_e_audio():
     r = _render(_par_av("rev", 0.0, 0.0, 4.0, speed=1.0, reverse=True))
     assert "reverse" in r["video"]["filter_complex"]
@@ -180,9 +211,9 @@ def test_reverso_inverte_video_e_audio():
 
 
 @pytest.mark.xfail(strict=True, reason=(
-    "Freeze frame (Task 12): `is_freeze`/`freeze_time` nao sao salvos; o clipe "
-    "chega como trecho normal [freeze_time, freeze_time + dur] e o video ANDA "
-    "em vez de congelar."))
+    "Freeze frame (Task 12): `is_freeze`/`freeze_time` ja chegam ao banco, mas "
+    "o motor le o trecho normal [freeze_time, freeze_time + dur] e o video "
+    "ANDA em vez de congelar."))
 def test_freeze_frame_segura_um_quadro():
     c = _video("gelo", 0.0, 2.0, 5.0, is_freeze=True, freeze_time=2.0, freeze_frame=60)
     r = _render([c])
@@ -193,8 +224,8 @@ def test_freeze_frame_segura_um_quadro():
 
 
 @pytest.mark.xfail(strict=True, reason=(
-    "Titulos/GCs (pista T1): texto, fonte e posicao nao sao salvos (CutItem nao "
-    "tem os campos) e o motor nao desenha texto (sem drawtext/overlay)."))
+    "Titulos/GCs (pista T1): texto, fonte e posicao ja chegam ao banco, mas o "
+    "motor nao desenha texto (sem drawtext/overlay)."))
 def test_titulo_aparece_no_video():
     titulo = {"id": "gc", "type": "text", "textCategory": "lower_third",
               "text": "Fulana de Tal", "subtext": "Diretora", "fontFamily": "Inter",
@@ -204,18 +235,11 @@ def test_titulo_aparece_no_video():
     assert "drawtext" in r["video"]["filter_complex"] or "gc" in _ids_entradas(r["video"])
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Rotacao do clipe (tecla R na biblioteca / insertMedia): `rotation` e "
-    "descartado no salvamento; modelo.normalizar ja sabe converte-lo em "
-    "transform, mas o campo nunca chega."))
 def test_rotacao_do_clipe_chega_ao_render():
     r = _render([_video("giro", 0.0, 0.0, 4.0, rotation=90)])
     assert "rotate" in r["video"]["filter_complex"]
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Pista oculta: TrackItem nao tem `hidden`, entao o preflight nunca inicia o "
-    "escopo com a pista desligada (regra P7 de modelo.py)."))
 def test_pista_oculta_persiste():
     pistas = [dict(p, hidden=True) if p["id"] == "V2" else p for p in PISTAS]
     seq = _salvar_e_ler(_par_av("c1", 0.0, 0.0, 5.0), pistas)
