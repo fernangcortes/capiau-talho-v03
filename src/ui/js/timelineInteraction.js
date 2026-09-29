@@ -7361,8 +7361,13 @@ export class CapiauTimelineInteraction {
         };
 
         // O flyout fica no body do documento da timeline (destacada = janela destacada).
+        // adoptNode so quando o documento muda de fato (mesma guarda de library.js):
+        // no mesmo documento e desnecessario, e o DOM falso dos autotestes nao o tem.
         if (flyout && doc.body && flyout.parentNode !== doc.body) {
-            doc.body.appendChild(doc.adoptNode(flyout));
+            if (flyout.ownerDocument !== doc && typeof doc.adoptNode === "function") {
+                doc.adoptNode(flyout);
+            }
+            doc.body.appendChild(flyout);
         }
 
         const positionAndShowFlyout = () => {

@@ -9,7 +9,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (...p) => readFileSync(path.join(rootDir, ...p), "utf8");
+// CRLF -> LF: no Windows (core.autocrlf=true) a copia de trabalho vem em CRLF e as
+// buscas com "\n" abaixo falhavam mesmo com o conteudo identico.
+const read = (...p) => readFileSync(path.join(rootDir, ...p), "utf8").replace(/\r\n/g, "\n");
 const groupHtml = read("src", "ui", "panel-group.html");
 const panelHtml = read("src", "ui", "panel.html");
 const wm = read("src", "ui", "js", "workspaceManager.js");
