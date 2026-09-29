@@ -406,10 +406,13 @@ def casar_entradas(entradas: List[Dict[str, Any]], seq, rel_midia) -> Tuple[List
         item = {"rotulo": f"{clipe.id}@{clipe.in_s:.4f}",
                 "base_id": base_id,
                 "caminho": Path(fonte.caminho)}
-        por_clipe.setdefault(_chave(tipo_entrada, clipe.in_s, clipe.duracao_s), []).append(item)
+        # As entradas trazem o trecho da FONTE (ss, t): com velocidade != 1 ele
+        # difere da duracao na timeline, entao a chave usa out - in.
+        dur_fonte = clipe.out_s - clipe.in_s
+        por_clipe.setdefault(_chave(tipo_entrada, clipe.in_s, dur_fonte), []).append(item)
         # WAV tratado comeca em ZERO: o grafo de audio pode emitir ss=0/t=duracao.
         if fonte.wav_tratado is not None:
-            por_clipe.setdefault(_chave("audio", 0.0, clipe.duracao_s), []).append(item)
+            por_clipe.setdefault(_chave("audio", 0.0, dur_fonte), []).append(item)
 
     caminhos: List[str] = []
     avisos: List[str] = []

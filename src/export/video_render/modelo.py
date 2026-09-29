@@ -113,11 +113,37 @@ class Clipe:
     origem: str = "user"
     effects: List[Dict[str, Any]] = field(default_factory=list)
     indice: int = 0                  # posicao original na lista `clips` (regra P4)
+    # Velocidade/reverso (Task 13/14). `in_s`/`out_s` continuam sendo o trecho da
+    # FONTE; na timeline o clipe ocupa (out - in) / velocidade -- o mesmo mapa do
+    # player (_targetSecondsFor): fonte = in + (t - inicio) * velocidade, e no
+    # reverso fonte = out - (t - inicio) * velocidade.
+    velocidade: float = 1.0
+    reverso: bool = False
+    corrigir_tom: bool = True        # pitch_correction: atempo (True) x asetrate (False)
 
     @property
     def duracao_s(self) -> float:
-        """Duracao ocupada na timeline. Sempre out - in: o motor nao faz retime."""
-        return max(0.0, self.out_s - self.in_s)
+        """Duracao ocupada na TIMELINE (trecho da fonte dividido pela velocidade)."""
+        return max(0.0, self.out_s - self.in_s) / self.velocidade
+
+    @property
+    def retime(self) -> bool:
+        """True quando o clipe nao toca a fonte 1:1 (velocidade != 1 ou reverso)."""
+        return self.reverso or abs(self.velocidade - 1.0) > 1e-9
+
+    def trecho_fonte(self, delta_s: float, dur_s: float) -> Tuple[float, float]:
+        """Janela da TIMELINE -> (inicio, duracao) na FONTE.
+
+        `delta_s`: segundos desde o inicio do clipe na timeline; `dur_s`: duracao
+        da janela na timeline. Ponto unico dessa conta para os grafos e para o
+        recorte da regra P4 -- espalhar `in_s + delta` foi o que deixou a
+        velocidade de fora do motor inteiro.
+        """
+        a = max(0.0, float(delta_s)) * self.velocidade
+        b = a + max(0.0, float(dur_s)) * self.velocidade
+        if self.reverso:
+            return self.out_s - b, b - a
+        return self.in_s + a, b - a
 
     @property
     def fim_s(self) -> float:
@@ -282,7 +308,16 @@ def _clipe(c, indice: int) -> Optional[Clipe]:
         except (ValueError, TypeError):
             pass
 
+    tipo = str(c.get("type") or "video").lower()
+    # Mesma faixa do dialogo de velocidade (timelineState.changeClipSpeed).
+    velocidade = min(100.0, max(0.01, _float_positivo(c.get("speed"), 1.0)))
+    reverso = bool(c.get("reverse"))
+    if tipo == "photo":
+        velocidade, reverso = 1.0, False  # foto e imagem parada: nao ha o que acelerar
+
     return Clipe(
+        velocidade=velocidade, reverso=reverso,
+        corrigir_tom=c.get("pitch_correction") is not False,
         id=str(c.get("id") or f"cut_{indice}"),
         tipo=str(c.get("type") or "video").lower(),
         track=str(c.get("track") or "V1"),
@@ -337,16 +372,21 @@ def resolver_sobreposicoes(clipes: List[Clipe]) -> List[Clipe]:
         for (ini, fim) in pedacos:
             if fim - ini <= 1e-9:
                 continue
+            # trecho_fonte ja escala pela velocidade e inverte no reverso: aparar
+            # a CABECA de um clipe reverso tira o FIM da fonte.
+            ss, t = clipe.trecho_fonte(ini - clipe.inicio_s, fim - ini)
             recorte = Clipe(
                 id=clipe.id if (ini == clipe.inicio_s and fim == clipe.fim_s)
                    else f"{clipe.id}__{_ms(ini)}",
                 tipo=clipe.tipo, track=clipe.track,
                 inicio_s=ini,
-                in_s=clipe.in_s + (ini - clipe.inicio_s),
-                out_s=clipe.in_s + (fim - clipe.inicio_s),
+                in_s=ss,
+                out_s=ss + t,
                 video_id=clipe.video_id, photo_id=clipe.photo_id,
                 link_id=clipe.link_id, nome=clipe.nome, origem=clipe.origem,
                 effects=clipe.effects, indice=clipe.indice,
+                velocidade=clipe.velocidade, reverso=clipe.reverso,
+                corrigir_tom=clipe.corrigir_tom,
             )
             resultado.append(recorte)
             donos.append((ini, fim))

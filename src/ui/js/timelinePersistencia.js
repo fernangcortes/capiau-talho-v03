@@ -39,6 +39,18 @@ export function corteParaSalvar(c, fps) {
         const copia = _copiaSerializavel(v);
         if (copia !== undefined) extras[chave] = copia;
     });
+
+    // Velocidade: o player toca fonte = in + (tempo na timeline) * speed, com a
+    // duracao vinda dos FRAMES (outFrame - inFrame). O `out` em segundos nao e
+    // confiavel nesses clipes: trim/slip/rolling gravam out = outFrame / fps sem
+    // considerar a velocidade. Salva o out que o player de fato alcanca.
+    let outTime = c.out;
+    const speed = Number(c.speed);
+    if (Number.isFinite(speed) && speed > 0 && Math.abs(speed - 1) > 1e-9
+        && Number.isFinite(c.inFrame) && Number.isFinite(c.outFrame)) {
+        outTime = (Number(c.in) || 0) + ((c.outFrame - c.inFrame) / fpsVal) * speed;
+    }
+
     return {
         ...extras,
         id: String(c.id),
@@ -46,7 +58,7 @@ export function corteParaSalvar(c, fps) {
         video_id: c.video_id ?? null,
         photo_id: c.photo_id ?? null,
         in_time: c.in,
-        out_time: c.out,
+        out_time: outTime,
         track: c.track,
         timeline_start: (c.timelineStartFrame || 0) / fpsVal,
         link_id: c.link_id || null,

@@ -71,6 +71,13 @@ const normal = corteDoBanco({ id: "n", in: 1, out: 4, timeline_start: 0, track: 
 assert.ok(!("inFrame" in normal) && !("outFrame" in normal));
 ok("clipe a 100% deixa os frames para o conformCuts");
 
+// 6b. Trim num clipe acelerado deixa `out` errado (out = outFrame/fps, sem a
+//     velocidade). O salvo tem de ser o que o player toca: in + duração * speed.
+const trimado = { id: "t", in: 4, out: 3.5, inFrame: 60, outFrame: 105, timelineStartFrame: 0,
+                  track: "V1", speed: 2, effects: [] };
+assert.equal(corteParaSalvar(trimado, FPS).out_time, 4 + (45 / FPS) * 2);
+ok("clipe acelerado salva o out que o player alcança, mesmo com out desatualizado");
+
 // 7. Os três pontos do app usam a ponte (nenhum mapeamento à mão sobrou)
 const panels = readFileSync(path.join(raiz, "src/ui/js/panels.js"), "utf8");
 const exportVideo = readFileSync(path.join(raiz, "src/ui/js/exportVideo.js"), "utf8");

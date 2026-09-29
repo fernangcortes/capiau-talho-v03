@@ -284,6 +284,14 @@ def cadeia_clipe(clipe, seq, escopo, rotulo_entrada, rotulo_saida,
         # Video chega com -ss antes do -i: garantir base temporal em zero para
         # os st/expressoes de fade e KB.
         linear.append("setpts=PTS-STARTPTS")
+        # Retime ANTES de tudo: daqui em diante o stream esta no tempo da
+        # TIMELINE, e fades/KB/deslocamento medem como no player. A entrada ja
+        # traz o trecho da fonte certo (Clipe.trecho_fonte); `reverse` inverte
+        # esse trecho e o setpts o encaixa na duracao da timeline.
+        if clipe.reverso:
+            linear.append("reverse")
+        if abs(clipe.velocidade - 1.0) > 1e-9:
+            linear.append(f"setpts={_n(1.0 / clipe.velocidade)}*PTS")
     linear.append("format=rgba")
     linear.extend(geometria.filtro_fit(modo_fit, w, h))
     linear.extend(cor.cadeia_cor(bloco_cor))
@@ -402,11 +410,13 @@ def camada_pista(pista, clipes, seq, escopo, inicio_s: float, fim_s: float,
         )
         acumulado = depois
 
+        # Trecho da FONTE que cobre a janela (velocidade e reverso inclusos).
+        ss_fonte, t_fonte = c.trecho_fonte(delta, fim - ini)
         entradas.append({
             "tipo": "foto" if c.e_foto else "video",
             "caminho": None,             # midia.py resolve; ver docstring
-            "ss": round(c.in_s + delta, 6),
-            "t": round(fim - ini, 6),
+            "ss": round(ss_fonte, 6),
+            "t": round(t_fonte, 6),
             "loop": bool(c.e_foto),
             "clipe_id": c.id,
             "video_id": c.video_id,

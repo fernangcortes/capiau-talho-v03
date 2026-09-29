@@ -433,6 +433,53 @@ def _filtros_dinamica(params: Dict[str, Any]) -> List[str]:
 
 
 # ---------------------------------------------------------------------------
+# Velocidade e reverso (Task 13/14)
+# ---------------------------------------------------------------------------
+
+# atempo aceita 0.5..2.0 em qualquer versao do ffmpeg (as novas vao alem, mas
+# encadear mantem o grafo portavel e a qualidade melhor em fatores extremos).
+_ATEMPO_MIN, _ATEMPO_MAX = 0.5, 2.0
+
+
+def _fatores_atempo(velocidade: float) -> List[float]:
+    """Quebra a velocidade em fatores de atempo dentro de [0.5, 2.0]."""
+    fatores: List[float] = []
+    resto = float(velocidade)
+    while resto > _ATEMPO_MAX + 1e-9:
+        fatores.append(_ATEMPO_MAX)
+        resto /= _ATEMPO_MAX
+    while resto < _ATEMPO_MIN - 1e-9:
+        fatores.append(_ATEMPO_MIN)
+        resto /= _ATEMPO_MIN
+    fatores.append(resto)
+    return fatores
+
+
+def _filtros_retime(clipe: modelo.Clipe) -> List[str]:
+    """areverse + mudanca de velocidade, levando o ramo ao tempo da timeline.
+
+    O player CALA o audio de clipe reverso ou acima de 200% (isHighSpeedOrReverse
+    em player.js): limitacao do elemento <audio>, nao escolha do editor. O
+    arquivo faz o que o editor pediu. pitch_correction (padrao) = atempo, que
+    preserva o tom (el.preservesPitch); desligado = asetrate, que muda o tom
+    junto com a velocidade, como a fita.
+    """
+    filtros: List[str] = []
+    if clipe.reverso:
+        filtros.append("areverse")
+    v = clipe.velocidade
+    if abs(v - 1.0) <= 1e-9:
+        return filtros
+    if clipe.corrigir_tom:
+        filtros += [f"atempo={_num(f)}" for f in _fatores_atempo(v)]
+    else:
+        filtros += [f"aresample={SAMPLE_RATE_SAIDA}",
+                    f"asetrate={_num(SAMPLE_RATE_SAIDA * v)}",
+                    f"aresample={SAMPLE_RATE_SAIDA}"]
+    return filtros
+
+
+# ---------------------------------------------------------------------------
 # Cadeia por clipe
 # ---------------------------------------------------------------------------
 
@@ -478,10 +525,13 @@ def cadeia_clipe_audio(clipe: modelo.Clipe, pista: modelo.Pista, seq: modelo.Seq
             f"[{ini_render}, {fim_render}] (duracao efetiva {duracao}).")
 
     params = _parametros_fx(clipe, escopo)
+    _ss, dur_fonte = clipe.trecho_fonte(head, duracao)
     partes: List[str] = [
-        f"{rotulo_entrada}atrim=start=0:end={_num(duracao)}",
+        f"{rotulo_entrada}atrim=start=0:end={_num(dur_fonte)}",
         "asetpts=PTS-STARTPTS",
     ]
+    # Retime ANTES do volume: fades e transicoes medem no tempo da TIMELINE.
+    partes += _filtros_retime(clipe)
     # Depois do atrim+asetpts, t=0 e o instante da timeline em que ESTE ramo
     # comeca (o adelay vem depois do volume). Medir os fades a partir do inicio
     # da janela de render punha o fade-in de um clipe no meio da janela em t
@@ -589,16 +639,17 @@ def _entrada_do_recorte(recorte: modelo.Clipe, bruto: Optional[modelo.Clipe],
         if alvo:
             caminho, tratado = str(alvo), True
 
+    # Trecho da FONTE (velocidade e reverso inclusos); o WAV tratado comeca no
+    # IN autorado do corte original, entao desloca por bruto.in_s.
+    ss_fonte, t_fonte = recorte.trecho_fonte(head, duracao)
     if tratado:
-        base = recorte.in_s - (bruto.in_s if bruto is not None else recorte.in_s)
-    else:
-        base = recorte.in_s
+        ss_fonte -= (bruto.in_s if bruto is not None else recorte.in_s)
 
     return {
         "tipo": "audio",
         "caminho": caminho,
-        "ss": round(base + head, 9),
-        "t": round(duracao, 9),
+        "ss": round(max(0.0, ss_fonte), 9),
+        "t": round(t_fonte, 9),
         "tratado": tratado,
         "clipe_id": recorte.id,
         "video_id": recorte.video_id,
@@ -657,7 +708,13 @@ def _transicoes_da_pista(pares, escopo: modelo.Escopo,
         # B so pode comecar antes do IN se a fonte TEM esse trecho: midia
         # original a partir de 0; WAV tratado comeca no IN autorado (armadilha 3).
         tratado_b = bool(resolver_tratado and resolver_tratado(bruto_b if bruto_b is not None else b))
-        folga_b = (b.in_s - (bruto_b.in_s if bruto_b is not None else b.in_s)) if tratado_b else b.in_s
+        if b.reverso:
+            # Cabeca de um reverso le DEPOIS do OUT: a duracao da midia nao e
+            # conhecida aqui, e o WAV tratado acaba no OUT. Sem folga garantida.
+            folga_b = float("inf") if not tratado_b else 0.0
+        else:
+            folga_b = ((b.in_s - (bruto_b.in_s if bruto_b is not None else b.in_s))
+                       if tratado_b else b.in_s) / b.velocidade
         base = {"inicio_s": corte - half_a, "span_s": half_a + half_b,
                 "curve": str(ef_a.get("curve") or "equal_power"),
                 "tension": ef_a.get("tension")}
@@ -684,8 +741,12 @@ def _estender(clipe: modelo.Clipe, transicoes: List[Dict[str, Any]]) -> modelo.C
     if ini <= _EPS_TEMPO and fim <= _EPS_TEMPO:
         return clipe
     import dataclasses
+    # Segundos de TIMELINE viram segundos de FONTE pela velocidade; no reverso a
+    # cabeca da timeline e o FIM da fonte, entao os lados trocam.
+    v = clipe.velocidade
+    mais_cedo, mais_tarde = (fim * v, ini * v) if clipe.reverso else (ini * v, fim * v)
     return dataclasses.replace(clipe, inicio_s=clipe.inicio_s - ini,
-                               in_s=clipe.in_s - ini, out_s=clipe.out_s + fim)
+                               in_s=clipe.in_s - mais_cedo, out_s=clipe.out_s + mais_tarde)
 
 
 def camada_pista_audio(pista: modelo.Pista, seq: modelo.Sequencia,

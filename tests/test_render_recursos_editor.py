@@ -188,10 +188,6 @@ def test_clipe_desativado_nao_entra_no_render():
     assert "desliga_a" not in _ids_entradas(r["audio"])
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Velocidade (Task 13/14): `speed` ja chega ao banco, mas o motor nao faz "
-    "retime (modelo.Clipe.duracao_s = out - in). Um clipe a 200% sai em 100% "
-    "com o DOBRO da duracao, empurrando tudo que vem depois."))
 def test_velocidade_2x_ocupa_metade_do_tempo():
     # Tela: 10 s de fonte a 200% ocupam 5 s na timeline (timelineState:5681-5688)
     c = _video("rapido", 0.0, 0.0, 10.0, speed=2.0, source_duration_frames=300,
@@ -201,9 +197,6 @@ def test_velocidade_2x_ocupa_metade_do_tempo():
     assert "setpts=0.5*" in r["video"]["filter_complex"]
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Reverso (Task 13): `reverse` ja chega ao banco, mas o motor nao tem "
-    "reverse/areverse."))
 def test_reverso_inverte_video_e_audio():
     r = _render(_par_av("rev", 0.0, 0.0, 4.0, speed=1.0, reverse=True))
     assert "reverse" in r["video"]["filter_complex"]
