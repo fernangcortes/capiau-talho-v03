@@ -72,6 +72,11 @@ EFEITOS_POR_CATEGORIA = {
 # Estruturas
 # ---------------------------------------------------------------------------
 
+# Quanto da fonte ler para ter o quadro do freeze: 0,05 s cobre ao menos um quadro
+# em qualquer taxa >= 20 fps. O grafo usa so o primeiro (trim=end_frame=1).
+JANELA_QUADRO_CONGELADO_S = 0.05
+
+
 @dataclass
 class Pista:
     """Uma pista da timeline, com o que o render precisa saber dela."""
@@ -120,6 +125,11 @@ class Clipe:
     velocidade: float = 1.0
     reverso: bool = False
     corrigir_tom: bool = True        # pitch_correction: atempo (True) x asetrate (False)
+    # Freeze frame (Task 12): o player mostra SEMPRE o quadro `freeze_time`
+    # (_targetSecondsFor) e o clipe nasce sem parceiro de audio. in/out seguem
+    # medindo a duracao na timeline.
+    congelado: bool = False
+    congelar_em_s: float = 0.0
 
     @property
     def duracao_s(self) -> float:
@@ -138,7 +148,12 @@ class Clipe:
         da janela na timeline. Ponto unico dessa conta para os grafos e para o
         recorte da regra P4 -- espalhar `in_s + delta` foi o que deixou a
         velocidade de fora do motor inteiro.
+
+        Clipe congelado le so o quadro do congelamento, seja qual for a janela:
+        o grafo de video repete esse quadro pela duracao do clipe.
         """
+        if self.congelado:
+            return self.congelar_em_s, JANELA_QUADRO_CONGELADO_S
         a = max(0.0, float(delta_s)) * self.velocidade
         b = a + max(0.0, float(dur_s)) * self.velocidade
         if self.reverso:
@@ -315,7 +330,14 @@ def _clipe(c, indice: int) -> Optional[Clipe]:
     if tipo == "photo":
         velocidade, reverso = 1.0, False  # foto e imagem parada: nao ha o que acelerar
 
+    # Freeze de foto ja e imagem parada; so video precisa segurar o quadro.
+    congelado = bool(c.get("is_freeze")) and tipo != "photo"
+    congelar_em_s = _float_nao_negativo(c.get("freeze_time"), in_s) if congelado else 0.0
+    if congelado:
+        velocidade, reverso = 1.0, False  # quadro unico: velocidade nao se aplica
+
     return Clipe(
+        congelado=congelado, congelar_em_s=congelar_em_s,
         velocidade=velocidade, reverso=reverso,
         corrigir_tom=c.get("pitch_correction") is not False,
         id=str(c.get("id") or f"cut_{indice}"),
@@ -374,7 +396,10 @@ def resolver_sobreposicoes(clipes: List[Clipe]) -> List[Clipe]:
                 continue
             # trecho_fonte ja escala pela velocidade e inverte no reverso: aparar
             # a CABECA de um clipe reverso tira o FIM da fonte.
-            ss, t = clipe.trecho_fonte(ini - clipe.inicio_s, fim - ini)
+            if clipe.congelado:
+                ss, t = clipe.in_s, fim - ini   # congelado: in/out so medem a duracao
+            else:
+                ss, t = clipe.trecho_fonte(ini - clipe.inicio_s, fim - ini)
             recorte = Clipe(
                 id=clipe.id if (ini == clipe.inicio_s and fim == clipe.fim_s)
                    else f"{clipe.id}__{_ms(ini)}",
@@ -387,6 +412,7 @@ def resolver_sobreposicoes(clipes: List[Clipe]) -> List[Clipe]:
                 effects=clipe.effects, indice=clipe.indice,
                 velocidade=clipe.velocidade, reverso=clipe.reverso,
                 corrigir_tom=clipe.corrigir_tom,
+                congelado=clipe.congelado, congelar_em_s=clipe.congelar_em_s,
             )
             resultado.append(recorte)
             donos.append((ini, fim))

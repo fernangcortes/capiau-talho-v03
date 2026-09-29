@@ -771,7 +771,9 @@ def camada_pista_audio(pista: modelo.Pista, seq: modelo.Sequencia,
     ramos: List[str] = []
     marca = _rotulo_seguro(pista.id)
 
-    pares = _recortes_da_pista(seq, pista)
+    # Freeze frame e quadro parado: o player nao toca som nele (nasce sem
+    # parceiro de audio), e ler o trecho da fonte aqui daria som onde nao ha.
+    pares = [(r, b) for (r, b) in _recortes_da_pista(seq, pista) if not r.congelado]
     for (recorte, bruto, transicoes) in _transicoes_da_pista(pares, escopo, resolver_tratado):
         bordas = (recorte.inicio_s, recorte.fim_s)
         tocado = _estender(recorte, transicoes)

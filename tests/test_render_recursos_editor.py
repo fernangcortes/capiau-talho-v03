@@ -203,10 +203,6 @@ def test_reverso_inverte_video_e_audio():
     assert "areverse" in r["audio"]["filter_complex"]
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Freeze frame (Task 12): `is_freeze`/`freeze_time` ja chegam ao banco, mas "
-    "o motor le o trecho normal [freeze_time, freeze_time + dur] e o video "
-    "ANDA em vez de congelar."))
 def test_freeze_frame_segura_um_quadro():
     c = _video("gelo", 0.0, 2.0, 5.0, is_freeze=True, freeze_time=2.0, freeze_frame=60)
     r = _render([c])

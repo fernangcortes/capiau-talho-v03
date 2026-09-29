@@ -284,6 +284,11 @@ def cadeia_clipe(clipe, seq, escopo, rotulo_entrada, rotulo_saida,
         # Video chega com -ss antes do -i: garantir base temporal em zero para
         # os st/expressoes de fade e KB.
         linear.append("setpts=PTS-STARTPTS")
+        if clipe.congelado:
+            # Freeze frame: a entrada traz so o quadro do congelamento; ele se repete
+            # pela duracao do trecho (medido: 91 quadros identicos em 3 s a 30 fps).
+            linear.append("trim=end_frame=1")
+            linear.append(f"tpad=stop_mode=clone:stop_duration={_n(dur_stream)}")
         # Retime ANTES de tudo: daqui em diante o stream esta no tempo da
         # TIMELINE, e fades/KB/deslocamento medem como no player. A entrada ja
         # traz o trecho da fonte certo (Clipe.trecho_fonte); `reverse` inverte
