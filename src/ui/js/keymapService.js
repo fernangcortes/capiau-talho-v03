@@ -1588,12 +1588,12 @@ class KeymapService {
     getShortcutBadgesHTML(commandId) {
         const bindings = this.activeBindings[commandId] || [];
         if (bindings.length === 0) {
-            return `<span style="color: var(--text-muted); font-size: calc(11px * var(--font-scale, 1)); font-style: italic;">Nenhum</span>`;
+            return `<span style="color: var(--text-muted); font-size: var(--fs-11); font-style: italic;">Nenhum</span>`;
         }
         return bindings.map(b => {
             const formatted = this.formatCombo(b);
-            return `<kbd class="keymap-badge" style="background: rgba(255,255,255,0.08); border: 1px solid var(--t-line-strong, rgba(255,255,255,0.15)); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: calc(11px * var(--font-scale, 1)); color: #fff; display: inline-block;">${formatted}</kbd>`;
-        }).join(" <span style='color:var(--text-muted); font-size:calc(10px * var(--font-scale, 1));'>/</span> ");
+            return `<kbd class="keymap-badge" style="background: rgba(255,255,255,0.08); border: 1px solid var(--t-line-strong, rgba(255,255,255,0.15)); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: var(--fs-11); color: #fff; display: inline-block;">${formatted}</kbd>`;
+        }).join(" <span style='color:var(--text-muted); font-size:var(--fs-10);'>/</span> ");
     }
 
     // ── CONFLITOS ───────────────────────────────────────────────────────────

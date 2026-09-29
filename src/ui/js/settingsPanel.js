@@ -405,7 +405,7 @@ export class SettingsPanelManager {
         if (entry.help_tech) {
             const techIcon = document.createElement("i");
             techIcon.className = "fa-solid fa-circle-info";
-            techIcon.style.cssText = "color: var(--text-muted); font-size: calc(11px * var(--font-scale, 1)); cursor: help; margin-left: 6px;";
+            techIcon.style.cssText = "color: var(--text-muted); font-size: var(--fs-11); cursor: help; margin-left: 6px;";
             techIcon.setAttribute("data-tooltip", entry.help_tech);
             label.appendChild(techIcon);
         }
@@ -549,7 +549,7 @@ export class SettingsPanelManager {
             clearBtn.className = "btn-setting-revert";
             clearBtn.style.width = "auto";
             clearBtn.style.padding = "0 8px";
-            clearBtn.style.fontSize = "calc(10px * var(--font-scale, 1))";
+            clearBtn.style.fontSize = "var(--fs-10)";
             clearBtn.textContent = "Limpar";
             clearBtn.setAttribute("data-tooltip", "Apagar a chave salva no app e voltar a usar a do arquivo .env.");
             clearBtn.disabled = disabled;

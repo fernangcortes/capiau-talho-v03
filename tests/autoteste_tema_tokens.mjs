@@ -12,7 +12,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
     classify, scanCss, scanMarkup, applyTokens, unwrapTokens, isSemanticSelector,
-    scanFontSizes, applyFontScale, unwrapFontScale
+    scanFontSizes, applyFontScale, unwrapFontScale,
+    FS_STEPS, fsStep, scanFontCalcs, applyFontSteps, unwrapFontSteps, roundFontCalcs
 } from "./tema_cores.mjs";
 import { temaArquivos, temaAchados } from "../scripts/tema_tokenizar.mjs";
 
@@ -226,5 +227,43 @@ console.log("✔ 6.2 passou: todo font-size da UI segue --font-scale.");
     assert.doesNotMatch(overlay, /var\(--font-(heading|body)\)/, "título do vídeo não segue a fonte da UI");
 }
 console.log("✔ 6.3 passou: fontes locais, sem Google Fonts, e título do vídeo fora do tema.");
+
+// ----------------------------------------------------------------------
+// PARTE 7: Escala de texto em degraus (--fs-N)
+// ----------------------------------------------------------------------
+console.log("\n--- PARTE 7: Degraus de texto ---");
+{
+    assert.equal(fsStep(9.5), 10, "meio-pixel sobe");
+    assert.equal(fsStep(7), 8);
+    assert.equal(fsStep(15), 16);
+    assert.equal(fsStep(11), 11, "tamanho inteiro fica");
+    assert.equal(fsStep(17), null, "fora da tabela: decidir à mão");
+    const css = "a{font-size: calc(9.5px * var(--font-scale, 1))} b{font-size:calc(11px * var(--font-scale, 1))} c{width: calc(17px * var(--font-scale, 1))}";
+    const out = applyFontSteps(css, scanFontCalcs(css));
+    assert.ok(out.includes("font-size: var(--fs-10)") && out.includes("font-size:var(--fs-11)"));
+    assert.ok(out.includes("calc(17px * var(--font-scale, 1))"), "fora da tabela não muda");
+    assert.equal(unwrapFontSteps(out), roundFontCalcs(css), "desfazer devolve o original arredondado");
+    assert.equal(scanFontCalcs(out).filter(f => f.step != null).length, 0, "idempotente");
+}
+console.log("✔ 7.1 passou: calc(Npx) → var(--fs-N).");
+{
+    const theme = readFileSync(path.join(rootDir, "src", "ui", "theme.css"), "utf8");
+    const definidos = new Set();
+    for (const m of theme.matchAll(/--fs-(\d+):\s*calc\((\d+)px \* var\(--font-scale, 1\)\)/g)) {
+        assert.equal(m[1], m[2], `--fs-${m[1]} vale ${m[1]}px`);
+        definidos.add(Number(m[1]));
+    }
+    assert.deepEqual([...definidos].sort((a, b) => a - b), FS_STEPS, "theme.css define todos os degraus");
+    const soltos = [], indefinidos = [];
+    for (const { file } of temaArquivos()) {
+        const text = readFileSync(file, "utf8");
+        const rel = path.relative(rootDir, file);
+        for (const f of scanFontCalcs(text)) soltos.push(`${rel}:${text.slice(0, f.index).split("\n").length}  ${f.match}`);
+        for (const m of text.matchAll(/var\(--fs-(\d+)\)/g)) if (!definidos.has(Number(m[1]))) indefinidos.push(`${rel}: --fs-${m[1]}`);
+    }
+    assert.deepEqual(soltos.slice(0, 20), [], "calc de fonte fora dos degraus (rode: node scripts/tema_tokenizar.mjs --write)");
+    assert.deepEqual(indefinidos.slice(0, 20), [], "var(--fs-N) sem definição em theme.css");
+}
+console.log("✔ 7.2 passou: a UI só usa degraus definidos em theme.css.");
 
 console.log("\n=== AUTOTESTE TOKENS DE TEMA CONCLUÍDO COM SUCESSO ===");

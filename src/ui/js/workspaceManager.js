@@ -2564,14 +2564,14 @@ export class WorkspaceManager {
                 <div class="ws-badge ${badgeClass}">
                     <i class="fa-solid ${badgeIcon}"></i> <span>${badgeText}</span>
                 </div>
-                <div style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted); line-height: 1.3; min-height: 26px;">
+                <div style="font-size: var(--fs-10); color: var(--text-muted); line-height: 1.3; min-height: 26px;">
                     ${meta.desc}
                 </div>
                 <div class="ws-card-footer">
                     <button type="button" class="btn-card-nudge" data-dir="left" data-index="${idx}" ${idx === 0 ? "disabled" : ""} title="Mover para a esquerda">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
-                    <span style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted); font-weight: 500;">Posição ${idx + 1}</span>
+                    <span style="font-size: var(--fs-10); color: var(--text-muted); font-weight: 500;">Posição ${idx + 1}</span>
                     <button type="button" class="btn-card-nudge" data-dir="right" data-index="${idx}" ${idx === this.pendingColumnOrder.length - 1 ? "disabled" : ""} title="Mover para a direita">
                         <i class="fa-solid fa-chevron-right"></i>
                     </button>

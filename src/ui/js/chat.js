@@ -347,16 +347,16 @@ export class ChatManager {
         if (history.length === 0) {
             messages.innerHTML = `
                 <div class="empty-state" style="padding: 40px 20px;">
-                    <i class="fa-solid fa-brain" style="color: var(--color-violet); font-size: calc(28px * var(--font-scale, 1)); margin-bottom: 10px; text-shadow: 0 0 10px rgba(138, 92, 246, 0.4);"></i>
+                    <i class="fa-solid fa-brain" style="color: var(--color-violet); font-size: var(--fs-32); margin-bottom: 10px; text-shadow: 0 0 10px rgba(138, 92, 246, 0.4);"></i>
                     <p style="font-weight: 600;">Como posso ajudar no seu documentário?</p>
-                    <p style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-muted); margin-top: 4px; line-height: 1.5; padding: 0 10px; text-align: center;">
+                    <p style="font-size: var(--fs-11); color: var(--text-muted); margin-top: 4px; line-height: 1.5; padding: 0 10px; text-align: center;">
                         Pesquise por falantes, momentos de ação de B-rolls ou trechos de roteiro. <br>
                         Pergunte coisas como: <span style="font-style: italic; font-weight: 500; color: var(--color-cyan);">"O que o diretor fala sobre lentes?"</span> ou <span style="font-style: italic; font-weight: 500; color: var(--color-cyan);">"Sugira clipes sobre iluminação"</span>.
                     </p>
                 </div>
             `;
             if (grid) {
-                grid.innerHTML = `<div class="empty-state-text" style="font-style: italic; color: var(--text-muted); font-size: calc(11px * var(--font-scale, 1));">Nenhuma mídia citada no chat ainda.</div>`;
+                grid.innerHTML = `<div class="empty-state-text" style="font-style: italic; color: var(--text-muted); font-size: var(--fs-11);">Nenhuma mídia citada no chat ainda.</div>`;
             }
             return;
         }
@@ -380,11 +380,11 @@ export class ChatManager {
                 warnEl.style.borderRadius = "6px";
                 warnEl.style.padding = "8px 10px";
                 warnEl.style.marginBottom = "6px";
-                warnEl.style.fontSize = "calc(11px * var(--font-scale, 1))";
+                warnEl.style.fontSize = "var(--fs-11)";
                 warnEl.style.color = "#fca5a5";
                 warnEl.style.lineHeight = "1.4";
                 warnEl.innerHTML = `
-                    <div style="font-weight: 700; font-size: calc(11px * var(--font-scale, 1)); display: flex; align-items: center; gap: 6px; margin-bottom: 2px; color: var(--color-rose);">
+                    <div style="font-weight: 700; font-size: var(--fs-11); display: flex; align-items: center; gap: 6px; margin-bottom: 2px; color: var(--color-rose);">
                         <i class="fa-solid fa-triangle-exclamation"></i> Índice de Busca Indisponível
                     </div>
                     <div>${window.escapeHtml ? window.escapeHtml(m.indexWarning) : m.indexWarning}</div>
@@ -438,7 +438,7 @@ export class ChatManager {
                 grid.appendChild(card);
             });
         } else if (grid) {
-            grid.innerHTML = `<div class="empty-state-text" style="font-style: italic; color: var(--text-muted); font-size: calc(11px * var(--font-scale, 1));">Nenhuma mídia citada no chat ainda.</div>`;
+            grid.innerHTML = `<div class="empty-state-text" style="font-style: italic; color: var(--text-muted); font-size: var(--fs-11);">Nenhuma mídia citada no chat ainda.</div>`;
         }
 
         // Registra o click handler nas bolhas atuais
@@ -752,12 +752,12 @@ export class ChatManager {
         html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
         
         // Cabeçalhos: ### texto -> h4, ## texto -> h3, # texto -> h2
-        html = html.replace(/^###\s*(.*?)$/gm, '<h4 style="margin: 6px 0; color: var(--color-cyan); font-size:calc(12px * var(--font-scale, 1));">$1</h4>');
-        html = html.replace(/^##\s*(.*?)$/gm, '<h3 style="margin: 8px 0; color: var(--color-violet); font-size:calc(13px * var(--font-scale, 1));">$1</h3>');
-        html = html.replace(/^#\s*(.*?)$/gm, '<h2 style="margin: 10px 0; color: #fff; font-size:calc(14px * var(--font-scale, 1));">$1</h2>');
+        html = html.replace(/^###\s*(.*?)$/gm, '<h4 style="margin: 6px 0; color: var(--color-cyan); font-size:var(--fs-12);">$1</h4>');
+        html = html.replace(/^##\s*(.*?)$/gm, '<h3 style="margin: 8px 0; color: var(--color-violet); font-size:var(--fs-13);">$1</h3>');
+        html = html.replace(/^#\s*(.*?)$/gm, '<h2 style="margin: 10px 0; color: #fff; font-size:var(--fs-14);">$1</h2>');
 
         // Listas: - item ou * item
-        html = html.replace(/^\s*[-*]\s*(.*?)$/gm, '<div style="display:flex; align-items:flex-start; gap:6px; margin: 4px 0 4px 12px;"><i class="fa-solid fa-circle" style="font-size:calc(4px * var(--font-scale, 1)); color:var(--color-cyan); margin-top: 6px;"></i> <span>$1</span></div>');
+        html = html.replace(/^\s*[-*]\s*(.*?)$/gm, '<div style="display:flex; align-items:flex-start; gap:6px; margin: 4px 0 4px 12px;"><i class="fa-solid fa-circle" style="font-size:var(--fs-4); color:var(--color-cyan); margin-top: 6px;"></i> <span>$1</span></div>');
 
         // Linha Horizontal: ---
         html = html.replace(/^---$/gm, '<hr style="border:none; border-top: 1px solid var(--border-glass); margin: 10px 0;">');

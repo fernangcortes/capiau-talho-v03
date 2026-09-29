@@ -140,7 +140,7 @@ export class EntityManager {
             return `<img src="${url}" alt="" style="width:28px; height:28px; border-radius:50%; object-fit:cover; display:block;" onerror="this.style.visibility='hidden'">`;
         }
         const icon = TYPE_ICONS[entity.entity_type] || "fa-tag";
-        return `<div style="width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:calc(11px * var(--font-scale, 1));"><i class="fa-solid ${icon}"></i></div>`;
+        return `<div style="width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:var(--fs-11);"><i class="fa-solid ${icon}"></i></div>`;
     }
 
     /** Miniatura = crop do rosto agrupado com o mesmo nome (person.profile_image_path
@@ -174,7 +174,7 @@ export class EntityManager {
             tr.style.borderBottom = "1px solid var(--t-line-weak, rgba(255,255,255,0.04))";
 
             const aliasesHtml = (entity.aliases && entity.aliases.length)
-                ? `<div style="font-size:calc(9px * var(--font-scale, 1)); color:var(--text-muted);">${esc(entity.aliases.join(", "))}</div>` : "";
+                ? `<div style="font-size:var(--fs-9); color:var(--text-muted);">${esc(entity.aliases.join(", "))}</div>` : "";
             const statusColor = entity.status === "confirmed" ? "var(--color-emerald)" : entity.status === "rejected" ? "var(--color-rose)" : "var(--color-violet)";
             const linkText = entity.linked_entity_name ? `interpretado por ${esc(entity.linked_entity_name)}` : "—";
             const showLinkBtn = entity.entity_type === "person" && entity.realm === "story";
@@ -397,11 +397,11 @@ export class EntityManager {
                         </select>
                     </div>
                     <div style="display:flex; gap:6px;">
-                        <button class="btn-primary btn-save-entity-edit" style="height:30px; font-size:calc(11px * var(--font-scale, 1)); padding:0 12px;">Salvar</button>
-                        <button class="btn-secondary btn-cancel-entity-edit" style="height:30px; font-size:calc(11px * var(--font-scale, 1)); padding:0 12px;">Cancelar</button>
+                        <button class="btn-primary btn-save-entity-edit" style="height:30px; font-size:var(--fs-11); padding:0 12px;">Salvar</button>
+                        <button class="btn-secondary btn-cancel-entity-edit" style="height:30px; font-size:var(--fs-11); padding:0 12px;">Cancelar</button>
                     </div>
                 </div>
-                <div style="font-size:calc(10px * var(--font-scale, 1)); color:var(--text-muted); margin-top:6px;"><i class="fa-solid fa-circle-info"></i> Alterar o nome reprocessa (re-enriquece) as descrições da mídia já associada a esta entidade.</div>
+                <div style="font-size:var(--fs-10); color:var(--text-muted); margin-top:6px;"><i class="fa-solid fa-circle-info"></i> Alterar o nome reprocessa (re-enriquece) as descrições da mídia já associada a esta entidade.</div>
             </td>
         `;
         tr.insertAdjacentElement("afterend", editRow);

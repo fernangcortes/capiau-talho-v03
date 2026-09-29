@@ -983,7 +983,7 @@ export function getMediaRichContent(item, kind = "video", currentTitle = "") {
                     .map(t => {
                         const isPerson = t.startsWith("Speaker:") || t.startsWith("Person:");
                         const tagLabel = isPerson ? t.split(":")[1].trim() : t;
-                        const icon = isPerson ? '<i class="fa-solid fa-user" style="font-size:calc(7.5px * var(--font-scale, 1));"></i> ' : '';
+                        const icon = isPerson ? '<i class="fa-solid fa-user" style="font-size:var(--fs-8);"></i> ' : '';
                         return `<span class="media-tag-chip ${isPerson ? 'person' : ''}">${icon}${escapeHtml(tagLabel)}</span>`;
                     });
                 if (chips.length > 0) {
@@ -1599,7 +1599,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         const isCurrent = (item.category || "").toLowerCase() === catKey.toLowerCase();
         subItem.innerHTML = `
             <span class="menu-item-text">${catName}</span>
-            ${isCurrent ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:calc(10px * var(--font-scale, 1)); margin-left:auto; width:auto;"></i>' : ''}
+            ${isCurrent ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:var(--fs-10); margin-left:auto; width:auto;"></i>' : ''}
         `;
         subItem.addEventListener("click", async (ev) => {
             ev.stopPropagation();
@@ -1705,7 +1705,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     autoItem.innerHTML = `
         <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--color-cyan);"></i>
         <span class="menu-item-text">🤖 Automático (Classificação IA)</span>
-        ${!hasManualOverride ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:calc(10px * var(--font-scale, 1)); margin-left:auto; width:auto;"></i>' : ''}
+        ${!hasManualOverride ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:var(--fs-10); margin-left:auto; width:auto;"></i>' : ''}
     `;
     autoItem.addEventListener("click", (ev) => {
         ev.stopPropagation();
@@ -1731,7 +1731,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
         const isCurrent = currentSmartBin === bin.id;
         subItem.innerHTML = `
             <span class="menu-item-text">${bin.label}</span>
-            ${isCurrent ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:calc(10px * var(--font-scale, 1)); margin-left:auto; width:auto;"></i>' : ''}
+            ${isCurrent ? '<i class="fa-solid fa-check" style="color:var(--color-cyan); font-size:var(--fs-10); margin-left:auto; width:auto;"></i>' : ''}
         `;
         subItem.addEventListener("click", (ev) => {
             ev.stopPropagation();
@@ -1771,7 +1771,7 @@ export function showMediaContextMenu(e, item, kind, cardEl) {
     // Item: Girar Mídia (+90°)
     const rotateItem = document.createElement("div");
     rotateItem.className = "menu-item";
-    rotateItem.innerHTML = `<i class="fa-solid fa-rotate-right" style="color:var(--color-cyan);"></i><span class="menu-item-text">Girar Mídia (+90°)</span><span style="margin-left:auto; font-size:calc(10px * var(--font-scale, 1)); color:var(--text-muted); padding-left:12px;">R</span>`;
+    rotateItem.innerHTML = `<i class="fa-solid fa-rotate-right" style="color:var(--color-cyan);"></i><span class="menu-item-text">Girar Mídia (+90°)</span><span style="margin-left:auto; font-size:var(--fs-10); color:var(--text-muted); padding-left:12px;">R</span>`;
     rotateItem.addEventListener("click", async () => {
         menu.remove();
         try {
@@ -2019,23 +2019,23 @@ export function promptExternalPathIngest(targetFolderPath = "root") {
     modal.innerHTML = `
         <div class="modal-content glassmorphism" style="max-width: 460px; padding: 20px; border-radius: 8px;">
             <div class="modal-header" style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="font-size: calc(14px * var(--font-scale, 1)); color: var(--text-primary); display: flex; align-items: center; gap: 8px; margin: 0;">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px; margin: 0;">
                     <i class="fa-solid fa-link" style="color: var(--color-cyan);"></i> Vincular Pasta Local / HD Externo
                 </h2>
-                <button class="btn-close-modal" id="btn-close-external-ingest" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: calc(16px * var(--font-scale, 1));">&times;</button>
+                <button class="btn-close-modal" id="btn-close-external-ingest" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: var(--fs-16);">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+                <p style="font-size: var(--fs-11); color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
                     Informe o caminho absoluto da pasta no disco ou HD externo. Os arquivos serão catalogados <strong>in-place (sem cópia de arquivos)</strong>.
                 </p>
-                <label style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary); margin-bottom: 6px; display: block;">Caminho da Pasta:</label>
+                <label style="font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: 6px; display: block;">Caminho da Pasta:</label>
                 <div style="display: flex; gap: 6px;">
-                    <input type="text" id="external-path-input" placeholder="Ex: D:/Gravacoes/Documentario ou E:\\Acervo" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.35); border: 1px solid var(--border-glass); padding: 8px 10px; border-radius: 4px; color: #fff; font-size: calc(12px * var(--font-scale, 1)); font-family: monospace;">
-                    <button id="btn-browse-win" class="btn-outline" title="Procurar no Windows" style="padding: 0 10px; font-size: calc(11px * var(--font-scale, 1)); white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+                    <input type="text" id="external-path-input" placeholder="Ex: D:/Gravacoes/Documentario ou E:\\Acervo" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.35); border: 1px solid var(--border-glass); padding: 8px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-12); font-family: monospace;">
+                    <button id="btn-browse-win" class="btn-outline" title="Procurar no Windows" style="padding: 0 10px; font-size: var(--fs-11); white-space: nowrap; display: flex; align-items: center; gap: 4px;">
                         <i class="fa-solid fa-folder-open"></i> Procurar...
                     </button>
                 </div>
-                <div id="browse-hint" style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted, #888); margin-top: 6px;">
+                <div id="browse-hint" style="font-size: var(--fs-10); color: var(--text-muted, #888); margin-top: 6px;">
                     Dica: Você pode copiar e colar o caminho da barra de endereços do Explorer.
                 </div>
             </div>
@@ -2246,14 +2246,14 @@ export function promptCreateSubfolder(parentFolderPath) {
     modal.innerHTML = `
         <div class="modal-content glassmorphism" style="max-width: 380px; padding: 18px;">
             <div class="modal-header" style="margin-bottom: 12px;">
-                <h2 style="font-size: calc(14px * var(--font-scale, 1)); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-folder-plus" style="color: var(--color-violet);"></i> Nova Subpasta
                 </h2>
                 <button class="btn-close-modal" id="btn-close-subfolder">&times;</button>
             </div>
             <div class="modal-body">
-                <label style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary); margin-bottom: 6px; display: block;">Nome da Pasta:</label>
-                <input type="text" id="subfolder-name-input" placeholder="Ex: Entrevistas Principais" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 7px 10px; border-radius: 4px; color: #fff; font-size: calc(12px * var(--font-scale, 1));">
+                <label style="font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: 6px; display: block;">Nome da Pasta:</label>
+                <input type="text" id="subfolder-name-input" placeholder="Ex: Entrevistas Principais" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 7px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-12);">
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
                 <button id="btn-cancel-subfolder" class="btn-outline">Cancelar</button>
@@ -2307,14 +2307,14 @@ export function promptRenameFolder(folderPath, currentName) {
     modal.innerHTML = `
         <div class="modal-content glassmorphism" style="max-width: 380px; padding: 18px;">
             <div class="modal-header" style="margin-bottom: 12px;">
-                <h2 style="font-size: calc(14px * var(--font-scale, 1)); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-pen-to-square" style="color: var(--color-cyan);"></i> Renomear Pasta
                 </h2>
                 <button class="btn-close-modal" id="btn-close-rename-folder">&times;</button>
             </div>
             <div class="modal-body">
-                <label style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary); margin-bottom: 6px; display: block;">Novo Nome:</label>
-                <input type="text" id="rename-folder-input" value="${escapeHtml(currentName)}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 7px 10px; border-radius: 4px; color: #fff; font-size: calc(12px * var(--font-scale, 1));">
+                <label style="font-size: var(--fs-11); color: var(--text-secondary); margin-bottom: 6px; display: block;">Novo Nome:</label>
+                <input type="text" id="rename-folder-input" value="${escapeHtml(currentName)}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 7px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-12);">
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
                 <button id="btn-cancel-rename-folder" class="btn-outline">Cancelar</button>
@@ -2397,14 +2397,14 @@ export function confirmDeleteVirtualFolder(folderPath, folderName) {
     modal.innerHTML = `
         <div class="modal-content glassmorphism" style="max-width: 440px; padding: 20px;">
             <div class="modal-header" style="margin-bottom: 12px;">
-                <h2 style="font-size: calc(15px * var(--font-scale, 1)); color: var(--color-rose); display: flex; align-items: center; gap: 8px;">
+                <h2 style="font-size: var(--fs-16); color: var(--color-rose); display: flex; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-triangle-exclamation"></i> Excluir Pasta da Biblioteca
                 </h2>
                 <button class="btn-close-modal" id="btn-close-del-bin">&times;</button>
             </div>
-            <div class="modal-body" style="font-size: calc(12px * var(--font-scale, 1)); color: var(--text-secondary); line-height: 1.5;">
+            <div class="modal-body" style="font-size: var(--fs-12); color: var(--text-secondary); line-height: 1.5;">
                 <p>Tem certeza de que deseja remover a pasta <b>"${escapeHtml(folderName)}"</b> da sua biblioteca?</p>
-                <p style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 8px; border-radius: 4px; border-left: 2px solid var(--color-cyan); margin-top: 10px;">
+                <p style="font-size: var(--fs-11); color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 8px; border-radius: 4px; border-left: 2px solid var(--color-cyan); margin-top: 10px;">
                     <i class="fa-solid fa-circle-info" style="color: var(--color-cyan);"></i> Esta ação remove apenas a pasta virtual do projeto. <b>Nenhum arquivo físico original no seu disco rígido será apagado.</b> Você pode desfazer a qualquer momento com <b>Ctrl + Z</b>.
                 </p>
             </div>
@@ -2640,26 +2640,26 @@ export function promptFolderImportTarget(folderName, targetFolderPath, onChoice)
     modal.innerHTML = `
         <div class="modal-content glassmorphism" style="max-width: 440px; padding: 20px;">
             <div class="modal-header" style="margin-bottom: 14px;">
-                <h2 style="font-size: calc(14px * var(--font-scale, 1)); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-folder-tree" style="color: var(--color-cyan);"></i> Importação de Pasta
                 </h2>
                 <button class="btn-close-modal" id="btn-close-import-choice">&times;</button>
             </div>
-            <div class="modal-body" style="font-size: calc(12px * var(--font-scale, 1)); color: var(--text-secondary); line-height: 1.5;">
+            <div class="modal-body" style="font-size: var(--fs-12); color: var(--text-secondary); line-height: 1.5;">
                 <p>Como você deseja organizar os arquivos da pasta <b>"${escapeHtml(folderName)}"</b> na biblioteca?</p>
                 <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
                     <button id="btn-choice-create-bin" class="btn-primary" style="padding: 10px 14px; display: flex; align-items: center; gap: 10px; text-align: left; background: var(--t-tint-3, rgba(139, 92, 246, 0.2)); border: 1px solid var(--t-line-strong, rgba(139, 92, 246, 0.5)); color: #fff; cursor: pointer; border-radius: 6px;">
-                        <i class="fa-solid fa-folder-plus" style="font-size: calc(16px * var(--font-scale, 1)); color: var(--color-violet);"></i>
+                        <i class="fa-solid fa-folder-plus" style="font-size: var(--fs-16); color: var(--color-violet);"></i>
                         <div>
                             <div style="font-weight: 700;">Criar Bin "${escapeHtml(folderName)}"</div>
-                            <div style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted);">Cria uma pasta virtual dedicada na biblioteca</div>
+                            <div style="font-size: var(--fs-10); color: var(--text-muted);">Cria uma pasta virtual dedicada na biblioteca</div>
                         </div>
                     </button>
                     <button id="btn-choice-current-folder" class="btn-secondary" style="padding: 10px 14px; display: flex; align-items: center; gap: 10px; text-align: left; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass); color: #fff; cursor: pointer; border-radius: 6px;">
-                        <i class="fa-solid fa-folder-open" style="font-size: calc(16px * var(--font-scale, 1)); color: var(--color-cyan);"></i>
+                        <i class="fa-solid fa-folder-open" style="font-size: var(--fs-16); color: var(--color-cyan);"></i>
                         <div>
                             <div style="font-weight: 700;">Importar na Pasta Atual (${escapeHtml(currentDisplayName)})</div>
-                            <div style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted);">Coloca as mídias diretamente na pasta selecionada</div>
+                            <div style="font-size: var(--fs-10); color: var(--text-muted);">Coloca as mídias diretamente na pasta selecionada</div>
                         </div>
                     </button>
                 </div>
@@ -2715,25 +2715,25 @@ export function promptMoveMediaToBin(item, mediaType = "video") {
     modal.innerHTML = `
         <div class="modal-content glassmorphism" style="max-width: 400px; padding: 18px;">
             <div class="modal-header" style="margin-bottom: 12px;">
-                <h2 style="font-size: calc(14px * var(--font-scale, 1)); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-folder-tree" style="color: var(--color-violet);"></i> Mover Mídia para Bin
                 </h2>
                 <button class="btn-close-modal" id="btn-close-move-bin">&times;</button>
             </div>
-            <div class="modal-body" style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary);">
+            <div class="modal-body" style="font-size: var(--fs-11); color: var(--text-secondary);">
                 <div style="margin-bottom: 8px; font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                     Mídia: ${escapeHtml(item.filename || item.title || `Item #${item.id}`)}
                 </div>
                 <label style="display: block; margin-bottom: 6px;">Selecione o Bin de Destino:</label>
                 <div class="dropdown-wrapper" style="height: 32px; padding: 0 10px; margin-bottom: 10px; display: flex; align-items: center;">
-                    <select id="select-target-bin" style="background: transparent; border: none; outline: none; color: #fff; font-size: calc(11px * var(--font-scale, 1)); width: 100%; cursor: pointer;">
+                    <select id="select-target-bin" style="background: transparent; border: none; outline: none; color: #fff; font-size: var(--fs-11); width: 100%; cursor: pointer;">
                         ${binOptions}
                         <option value="__new__">+ Criar Novo Bin...</option>
                     </select>
                 </div>
                 <div id="new-bin-container" style="display: none; margin-top: 6px;">
                     <label style="display: block; margin-bottom: 4px;">Nome da Nova Pasta:</label>
-                    <input type="text" id="input-new-bin-name" placeholder="Ex: Cenas Externas" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: calc(11px * var(--font-scale, 1));">
+                    <input type="text" id="input-new-bin-name" placeholder="Ex: Cenas Externas" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                 </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
@@ -2814,25 +2814,25 @@ export function promptEditMediaMetadata(item, mediaType = "video") {
     modal.innerHTML = `
         <div class="modal-content glassmorphism" style="max-width: 480px; padding: 20px; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header" style="margin-bottom: 14px;">
-                <h2 style="font-size: calc(14px * var(--font-scale, 1)); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-pen-to-square" style="color: var(--color-gold);"></i> Editar Metadados da Mídia
                 </h2>
                 <button class="btn-close-modal" id="btn-close-edit-meta">&times;</button>
             </div>
-            <div class="modal-body" style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary); display: flex; flex-direction: column; gap: 10px;">
-                <div style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 6px 8px; border-radius: 4px; word-break: break-all;">
+            <div class="modal-body" style="font-size: var(--fs-11); color: var(--text-secondary); display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-size: var(--fs-10); color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 6px 8px; border-radius: 4px; word-break: break-all;">
                     <strong>Arquivo:</strong> ${escapeHtml(item.filename || "")}<br>
                     <strong>Caminho Real:</strong> ${escapeHtml(item.filepath || "")}
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Título Editorial:</label>
-                    <input type="text" id="meta-title" value="${escapeHtml(currentTitle)}" placeholder="Ex: Entrevista com Diretora" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: calc(11px * var(--font-scale, 1));">
+                    <input type="text" id="meta-title" value="${escapeHtml(currentTitle)}" placeholder="Ex: Entrevista com Diretora" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <div style="flex: 1;">
                         <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Categoria de Triagem:</label>
                         <div class="dropdown-wrapper" style="height: 30px; padding: 0 8px; display: flex; align-items: center;">
-                            <select id="meta-category" style="background: transparent; border: none; outline: none; color: #fff; font-size: calc(11px * var(--font-scale, 1)); width: 100%; cursor: pointer;">
+                            <select id="meta-category" style="background: transparent; border: none; outline: none; color: #fff; font-size: var(--fs-11); width: 100%; cursor: pointer;">
                                 <option value="">Sem Categoria</option>
                                 ${catOptions}
                             </select>
@@ -2840,24 +2840,24 @@ export function promptEditMediaMetadata(item, mediaType = "video") {
                     </div>
                     <div style="flex: 1;">
                         <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Data / Diária de Gravação:</label>
-                        <input type="datetime-local" id="meta-recorded-at" value="${escapeHtml(currentRecAt)}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 5px 8px; border-radius: 4px; color: #fff; font-size: calc(11px * var(--font-scale, 1));">
+                        <input type="datetime-local" id="meta-recorded-at" value="${escapeHtml(currentRecAt)}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 5px 8px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                     </div>
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Pasta Virtual (Bin):</label>
-                    <input type="text" id="meta-vfolder" value="${escapeHtml(currentVFolder)}" placeholder="root ou root/Subpasta" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: calc(11px * var(--font-scale, 1));">
+                    <input type="text" id="meta-vfolder" value="${escapeHtml(currentVFolder)}" placeholder="root ou root/Subpasta" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Resumo / Destaque:</label>
-                    <input type="text" id="meta-summary" value="${escapeHtml(currentSummary)}" placeholder="Síntese curta da ação ou depoimento" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: calc(11px * var(--font-scale, 1));">
+                    <input type="text" id="meta-summary" value="${escapeHtml(currentSummary)}" placeholder="Síntese curta da ação ou depoimento" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Descrição Detalhada:</label>
-                    <textarea id="meta-description" rows="3" placeholder="Descrição visual e contextual completa..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: calc(11px * var(--font-scale, 1)); resize: vertical;">${escapeHtml(currentDesc)}</textarea>
+                    <textarea id="meta-description" rows="3" placeholder="Descrição visual e contextual completa..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11); resize: vertical;">${escapeHtml(currentDesc)}</textarea>
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Tags (separadas por vírgula):</label>
-                    <input type="text" id="meta-tags" value="${escapeHtml(currentTags)}" placeholder="ex: externa, drone, luciana, por do sol" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: calc(11px * var(--font-scale, 1));">
+                    <input type="text" id="meta-tags" value="${escapeHtml(currentTags)}" placeholder="ex: externa, drone, luciana, por do sol" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
                 </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
@@ -2918,23 +2918,23 @@ export function promptRelinkMediaDialog(prefillFolder = "") {
     modal.innerHTML = `
         <div class="modal-content glassmorphism" style="max-width: 480px; padding: 20px;">
             <div class="modal-header" style="margin-bottom: 14px;">
-                <h2 style="font-size: calc(14px * var(--font-scale, 1)); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                <h2 style="font-size: var(--fs-14); color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-link" style="color: var(--color-cyan);"></i> Relincar Mídias / Buscar no Disco
                 </h2>
                 <button class="btn-close-modal" id="btn-close-relink">&times;</button>
             </div>
-            <div class="modal-body" style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-secondary); line-height: 1.5; display: flex; flex-direction: column; gap: 10px;">
+            <div class="modal-body" style="font-size: var(--fs-11); color: var(--text-secondary); line-height: 1.5; display: flex; flex-direction: column; gap: 10px;">
                 <p>Se você trocou de computador ou moveu a pasta de arquivos, aponte a pasta raiz onde as gravações estão agora. O Talho fará uma <b>busca inteligente recursiva em todas as subpastas</b>, reconciliando os arquivos pelo nome e hash sem perder suas decupagens.</p>
                 <div>
                     <label style="display: block; margin-bottom: 4px; font-weight: 600; color: #fff;">Pasta Raiz de Busca:</label>
                     <div style="display: flex; gap: 6px;">
-                        <input type="text" id="relink-folder-input" value="${escapeHtml(prefillFolder)}" placeholder="Ex: D:/MeusProjetos/Gravacoes" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: calc(11px * var(--font-scale, 1));">
-                        <button id="btn-browse-relink" class="btn-secondary" style="font-size: calc(11px * var(--font-scale, 1)); padding: 0 12px; cursor: pointer;">
+                        <input type="text" id="relink-folder-input" value="${escapeHtml(prefillFolder)}" placeholder="Ex: D:/MeusProjetos/Gravacoes" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 6px 10px; border-radius: 4px; color: #fff; font-size: var(--fs-11);">
+                        <button id="btn-browse-relink" class="btn-secondary" style="font-size: var(--fs-11); padding: 0 12px; cursor: pointer;">
                             <i class="fa-solid fa-folder-open"></i> Procurar...
                         </button>
                     </div>
                 </div>
-                <div id="relink-status-feedback" style="display: none; padding: 8px; border-radius: 4px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); font-size: calc(11px * var(--font-scale, 1));">
+                <div id="relink-status-feedback" style="display: none; padding: 8px; border-radius: 4px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); font-size: var(--fs-11);">
                 </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
@@ -3969,12 +3969,12 @@ function renderTreeNode(node, container, depth = 0) {
         
         folderHeader.innerHTML = `
             <div style="display: flex; align-items: center; flex: 1; min-width: 0;">
-                <i class="fa-solid ${chevron} chevron-icon" style="font-size:calc(9px * var(--font-scale, 1)); margin-right:6px; color:var(--text-muted);"></i>
+                <i class="fa-solid ${chevron} chevron-icon" style="font-size:var(--fs-9); margin-right:6px; color:var(--text-muted);"></i>
                 <i class="fa-solid ${icon} folder-icon" style="color:${folderColor}; margin-right:8px;"></i>
                 <span class="folder-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${node.name}</span>
             </div>
             <div class="folder-actions" style="display: flex; gap: 4px; margin-right: 6px;">
-                <button class="btn-folder-action" data-action="add-media" title="Importar mídias para esta pasta" style="background: none; border: none; padding: 2px 4px; color: var(--color-cyan); cursor: pointer; font-size: calc(10px * var(--font-scale, 1)); display: flex; align-items: center; justify-content: center;">
+                <button class="btn-folder-action" data-action="add-media" title="Importar mídias para esta pasta" style="background: none; border: none; padding: 2px 4px; color: var(--color-cyan); cursor: pointer; font-size: var(--fs-10); display: flex; align-items: center; justify-content: center;">
                     <i class="fa-solid fa-plus"></i>
                 </button>
                 <button class="btn-folder-action btn-folder-toggle ${toggleStateClass}" data-action="toggle-subfolders" title="${toggleTitle}" style="background: none; border: none; padding: 2px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
@@ -4152,28 +4152,28 @@ function renderTreeNode(node, container, depth = 0) {
         } else if (v.status === "transcribing" || v.status === "processing") {
             if (isConverting) {
                 statusGlow = `<i class="fa-solid fa-circle-notch fa-spin proxy-spin-icon" style="color: var(--color-cyan);" data-tooltip="Convertendo..."></i>`;
-                actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Conversão"><i class="fa-solid fa-circle-stop" style="font-size:calc(10px * var(--font-scale, 1));"></i></button>`;
+                actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Conversão"><i class="fa-solid fa-circle-stop" style="font-size:var(--fs-10);"></i></button>`;
             } else {
                 statusGlow = `<span class="waveform-anim-icon" data-tooltip="Processando áudio / ASR..."><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span><span class="waveform-anim-bar"></span></span>`;
             }
         } else if (v.status === "analyzing") {
             statusGlow = `<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--color-violet);" data-tooltip="Analisando visão com IA..."></i>`;
-            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Análise"><i class="fa-solid fa-circle-stop" style="font-size:calc(10px * var(--font-scale, 1));"></i></button>`;
+            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--color-rose); cursor:pointer; padding:2px;" onclick="event.stopPropagation(); window.cancelConversion(${v.id})" data-tooltip="Cancelar Análise"><i class="fa-solid fa-circle-stop" style="font-size:var(--fs-10);"></i></button>`;
         } else if (v.status === "transcribed") {
             statusBadge = `<span class="badge" style="color: var(--color-cyan); border-color: var(--t-line-strong, rgba(6, 182, 212, 0.3));">ASR</span>`;
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: calc(10px * var(--font-scale, 1));"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
         } else if (v.status === "analyzed") {
             if (hasVisionError) {
                 statusBadge = `<span class="badge" style="color: var(--color-rose); border-color: var(--t-line-strong, rgba(244, 63, 94, 0.4));">FALHA VISUAL</span>`;
             } else {
                 statusBadge = `<span class="badge" style="color: var(--color-violet); border-color: var(--t-line-strong, rgba(138, 92, 246, 0.3));">VISÃO</span>`;
             }
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: calc(10px * var(--font-scale, 1));"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
         } else if (v.status === "ingested") {
-            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: calc(10px * var(--font-scale, 1));"></i></button>`;
+            actionBtn = `<button class="btn-card-action btn-hover-only" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Deletar Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
         } else if (v.status === "error") {
             statusGlow = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--color-rose);" data-tooltip="Erro no processamento!"></i>`;
-            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Limpar Vídeo/Proxy"><i class="fa-solid fa-trash-can" style="font-size: calc(10px * var(--font-scale, 1));"></i></button>`;
+            actionBtn = `<button class="btn-card-action" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; padding: 2px;" onclick="event.stopPropagation(); window.deleteProxy(${v.id})" data-tooltip="Limpar Vídeo/Proxy"><i class="fa-solid fa-trash-can" style="font-size: var(--fs-10);"></i></button>`;
         }
         
         // Thumbnail (Real ou Ícone)
@@ -4204,18 +4204,18 @@ function renderTreeNode(node, container, depth = 0) {
         const visionBadgeHtml = hasVisionError ? `<div class="vision-error-badge" data-tooltip="Falha visual detectada. Clique em Reanalisar Falhas no topo"><i class="fa-solid fa-triangle-exclamation"></i> Falha Visual</div>` : '';
 
         const overrideBtnHtml = hasVisionError
-            ? `<button class="btn-card-action btn-hover-only btn-quick-override-ok" style="background:transparent; border:none; color:var(--color-emerald); cursor:pointer; padding: 2px;" data-tooltip="Marcar como Analisado (Ignorar Falha)"><i class="fa-solid fa-circle-check" style="font-size: calc(10px * var(--font-scale, 1));"></i></button>`
-            : `<button class="btn-card-action btn-hover-only btn-quick-override-fail" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" data-tooltip="Sinalizar Falha Visual (Mandar para Reanálise)"><i class="fa-solid fa-triangle-exclamation" style="font-size: calc(10px * var(--font-scale, 1));"></i></button>`;
+            ? `<button class="btn-card-action btn-hover-only btn-quick-override-ok" style="background:transparent; border:none; color:var(--color-emerald); cursor:pointer; padding: 2px;" data-tooltip="Marcar como Analisado (Ignorar Falha)"><i class="fa-solid fa-circle-check" style="font-size: var(--fs-10);"></i></button>`
+            : `<button class="btn-card-action btn-hover-only btn-quick-override-fail" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding: 2px;" data-tooltip="Sinalizar Falha Visual (Mandar para Reanálise)"><i class="fa-solid fa-triangle-exclamation" style="font-size: var(--fs-10);"></i></button>`;
 
         const subclipBadgeHtml = v.is_subclip
-            ? `<span class="badge badge-subclip" style="background: var(--t-tint-3, rgba(168, 85, 247, 0.2)); border: 1px solid var(--t-line-strong, rgba(168, 85, 247, 0.4)); color: #c084fc; font-size: calc(10px * var(--font-scale, 1)); padding: 1px 5px; border-radius: 3px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-scissors"></i> SUBCLIPE</span>`
+            ? `<span class="badge badge-subclip" style="background: var(--t-tint-3, rgba(168, 85, 247, 0.2)); border: 1px solid var(--t-line-strong, rgba(168, 85, 247, 0.4)); color: #c084fc; font-size: var(--fs-10); padding: 1px 5px; border-radius: 3px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-scissors"></i> SUBCLIPE</span>`
             : `<span class="badge-tag ${badgeClass}">${badgeLabel}</span>`;
 
         card.innerHTML = `
             <div class="media-thumbnail" style="position: relative;">
                 ${thumbContent}
                 ${visionBadgeHtml}
-                <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: calc(10px * var(--font-scale, 1)); cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
+                <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: var(--fs-10); cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
                     <i class="fa-regular fa-square"></i>
                 </button>
             </div>
@@ -4590,7 +4590,7 @@ function renderTreeNode(node, container, depth = 0) {
         card.innerHTML = `
             <div class="media-thumbnail photo-thumb-container" style="position: relative;">
                 ${imgHtml}
-                <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: calc(10px * var(--font-scale, 1)); cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
+                <button class="btn-select-similar-item" data-tooltip="Selecionar para busca por similaridade" style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border: none; background: rgba(0,0,0,0.6); color: var(--text-muted); font-size: var(--fs-10); cursor: pointer; display: none; align-items: center; justify-content: center; border-radius: 3px; z-index: 10;">
                     <i class="fa-regular fa-square"></i>
                 </button>
             </div>
@@ -5902,7 +5902,7 @@ export class GalleryInteractionController {
         if (showKeyword) {
             const kw = getMediaKeyword(item);
             if (kw) {
-                keywordHtml = `<div class="gallery-hud-keyword" style="font-size: calc(10px * var(--font-scale, 1)); color: var(--color-cyan); margin-bottom: 4px; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-tag" style="font-size: calc(8px * var(--font-scale, 1));"></i> <span>${escapeHtml(kw)}</span></div>`;
+                keywordHtml = `<div class="gallery-hud-keyword" style="font-size: var(--fs-10); color: var(--color-cyan); margin-bottom: 4px; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-tag" style="font-size: var(--fs-8);"></i> <span>${escapeHtml(kw)}</span></div>`;
             }
         }
         let filenameHtml = (showFilename && item.filename && item.filename !== item.title) ? `<div class="gallery-hud-filename">${escapeHtml(item.filename)}</div>` : "";
@@ -7884,7 +7884,7 @@ export class LibraryManager {
         
         const suggestions = getAvailableSuggestions(items, tabId);
         if (suggestions.length === 0) {
-            chipsContainer.innerHTML = `<span style="color:var(--text-muted); font-size:calc(9px * var(--font-scale, 1)); padding: 4px;">Nenhuma tag sugerida para este material.</span>`;
+            chipsContainer.innerHTML = `<span style="color:var(--text-muted); font-size:var(--fs-9); padding: 4px;">Nenhuma tag sugerida para este material.</span>`;
             return;
         }
         
@@ -8253,13 +8253,13 @@ export class LibraryManager {
 
     async loadDocuments() {
         if (!this.docsListEl) return;
-        this.docsListEl.innerHTML = "<div class='loading' style='font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);'>Carregando documentos...</div>";
+        this.docsListEl.innerHTML = "<div class='loading' style='font-size:var(--fs-11); color:var(--text-muted);'>Carregando documentos...</div>";
         try {
             const docs = await CapIAuAPI.fetchDocuments(STATE.currentProjectId);
             this.allDocuments = docs;
             this.renderDocuments(docs);
         } catch (e) {
-            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:calc(11px * var(--font-scale, 1)); padding:8px;'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
+            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:var(--fs-11); padding:8px;'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
         }
     }
 
@@ -8274,7 +8274,7 @@ export class LibraryManager {
         this.docsListEl.innerHTML = "";
         
         if (!docs || docs.length === 0) {
-            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:calc(11px * var(--font-scale, 1)); padding:8px;'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
+            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:var(--fs-11); padding:8px;'>Nenhum documento cadastrado. Importe um roteiro acima!</div>";
             return;
         }
 
@@ -8291,7 +8291,7 @@ export class LibraryManager {
         }
         
         if (filtered.length === 0) {
-            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:calc(11px * var(--font-scale, 1)); padding:8px;'>Nenhum documento encontrado.</div>";
+            this.docsListEl.innerHTML = "<div style='color:var(--text-muted); font-size:var(--fs-11); padding:8px;'>Nenhum documento encontrado.</div>";
             return;
         }
         
@@ -8316,15 +8316,15 @@ export class LibraryManager {
                 ? `<button class="btn-card-action doc-extract-btn" data-doc-id="${doc.id}" style="color:var(--color-violet); background:transparent; border:none; cursor:pointer;" onclick="window.startScriptExtraction(${doc.id}, '${doc.filename.replace(/'/g, "\\'")}')" title="Extrair estrutura (cenas e personagens)"><i class="fa-solid fa-diagram-project"></i></button>`
                 : "";
             const extractBadge = doc.doc_type === "script"
-                ? `<span class="doc-extract-badge" data-doc-id="${doc.id}" style="font-size:calc(9px * var(--font-scale, 1)); color:var(--color-violet);"></span>`
+                ? `<span class="doc-extract-badge" data-doc-id="${doc.id}" style="font-size:var(--fs-9); color:var(--color-violet);"></span>`
                 : "";
 
             card.innerHTML = `
                 <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
-                    <i class="fa-solid ${docIcon}" style="color: var(--color-cyan); font-size: calc(14px * var(--font-scale, 1));"></i>
+                    <i class="fa-solid ${docIcon}" style="color: var(--color-cyan); font-size: var(--fs-14);"></i>
                     <div style="display:flex; flex-direction:column; min-width:0; flex:1;">
-                        <span style="font-size:calc(12px * var(--font-scale, 1)); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-primary);" title="${doc.filename}">${doc.filename}</span>
-                        <span style="font-size:calc(9px * var(--font-scale, 1)); color:var(--text-muted); text-transform:capitalize;">${doc.doc_type === 'script' ? 'Roteiro' : doc.doc_type}</span>
+                        <span style="font-size:var(--fs-12); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-primary);" title="${doc.filename}">${doc.filename}</span>
+                        <span style="font-size:var(--fs-9); color:var(--text-muted); text-transform:capitalize;">${doc.doc_type === 'script' ? 'Roteiro' : doc.doc_type}</span>
                         ${extractBadge}
                     </div>
                 </div>
@@ -8416,13 +8416,13 @@ export class LibraryManager {
         if (!section) return;
 
         section.style.display = "flex";
-        section.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Carregando estrutura…</div>`;
+        section.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Carregando estrutura…</div>`;
 
         try {
             const scenesResp = await CapIAuAPI.fetchScenes(STATE.currentProjectId, docId, true);
             this.renderScriptStructureSection(docId, scenesResp.scenes || []);
         } catch (e) {
-            section.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--color-rose); padding:8px;">Erro ao carregar estrutura: ${e.message}</div>`;
+            section.innerHTML = `<div style="font-size:var(--fs-11); color:var(--color-rose); padding:8px;">Erro ao carregar estrutura: ${e.message}</div>`;
         }
     }
 
@@ -8435,33 +8435,33 @@ export class LibraryManager {
 
         const visibleScenes = scenes.filter(s => s.status !== "rejected");
         const sceneRows = visibleScenes.map(s => `
-            <label style="display:flex; align-items:flex-start; gap:6px; font-size:calc(11px * var(--font-scale, 1)); padding:4px 0; cursor:pointer;">
+            <label style="display:flex; align-items:flex-start; gap:6px; font-size:var(--fs-11); padding:4px 0; cursor:pointer;">
                 <input type="checkbox" class="curation-scene-check" data-scene-id="${s.id}" style="margin-top:2px;">
                 <span>
                     <strong>${s.number}. ${esc(s.heading || "(sem título)")}</strong>${s.status === "confirmed" ? ' <span style="color:var(--color-emerald);">✓ confirmada</span>' : ""}
                     <br><span style="color:var(--text-muted);">${esc(s.synopsis || "")}</span>
                 </span>
             </label>
-        `).join("") || `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted); padding:4px 0;">Nenhuma cena extraída.</div>`;
+        `).join("") || `<div style="font-size:var(--fs-11); color:var(--text-muted); padding:4px 0;">Nenhuma cena extraída.</div>`;
 
         section.innerHTML = `
             <div style="display:flex; align-items:center; justify-content:space-between;">
-                <span style="font-size:calc(11px * var(--font-scale, 1)); font-weight:700; color:var(--text-primary);"><i class="fa-solid fa-diagram-project"></i> Estrutura extraída</span>
-                <button onclick="window.closeScriptStructure()" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:calc(12px * var(--font-scale, 1));" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
+                <span style="font-size:var(--fs-11); font-weight:700; color:var(--text-primary);"><i class="fa-solid fa-diagram-project"></i> Estrutura extraída</span>
+                <button onclick="window.closeScriptStructure()" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:var(--fs-12);" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
             <div style="display:flex; flex-direction:column; gap:2px;">
-                <div style="font-size:calc(10px * var(--font-scale, 1)); font-weight:700; color:var(--color-violet); text-transform:uppercase;">Cenas (${visibleScenes.length})</div>
+                <div style="font-size:var(--fs-10); font-weight:700; color:var(--color-violet); text-transform:uppercase;">Cenas (${visibleScenes.length})</div>
                 <div style="max-height:220px; overflow-y:auto; border:1px solid var(--border-glass); border-radius:6px; padding:4px 8px;">${sceneRows}</div>
                 <div style="display:flex; gap:6px; margin-top:4px;">
-                    <button class="btn-secondary" style="font-size:calc(10px * var(--font-scale, 1)); padding:4px 8px;" onclick="window.applySceneCuration('confirmed')">Aceitar selecionadas</button>
-                    <button class="btn-secondary" style="font-size:calc(10px * var(--font-scale, 1)); padding:4px 8px;" onclick="window.applySceneCuration('rejected')">Rejeitar selecionadas</button>
-                    <button class="btn-secondary" style="font-size:calc(10px * var(--font-scale, 1)); padding:4px 8px;" onclick="window.applySceneCuration('confirmed', true)">Aceitar todas</button>
+                    <button class="btn-secondary" style="font-size:var(--fs-10); padding:4px 8px;" onclick="window.applySceneCuration('confirmed')">Aceitar selecionadas</button>
+                    <button class="btn-secondary" style="font-size:var(--fs-10); padding:4px 8px;" onclick="window.applySceneCuration('rejected')">Rejeitar selecionadas</button>
+                    <button class="btn-secondary" style="font-size:var(--fs-10); padding:4px 8px;" onclick="window.applySceneCuration('confirmed', true)">Aceitar todas</button>
                 </div>
             </div>
 
             <div style="margin-top:6px;">
-                <button class="btn-secondary" style="font-size:calc(10px * var(--font-scale, 1)); padding:4px 8px;" onclick="window.EntityManager.openEntitiesModal({status:'suggested'})"><i class="fa-solid fa-address-card"></i> Ver personagens / locações / objetos sugeridos</button>
+                <button class="btn-secondary" style="font-size:var(--fs-10); padding:4px 8px;" onclick="window.EntityManager.openEntitiesModal({status:'suggested'})"><i class="fa-solid fa-address-card"></i> Ver personagens / locações / objetos sugeridos</button>
             </div>
         `;
     }
@@ -8935,7 +8935,7 @@ export class LibraryManager {
 
                 let subclipBadgeHtml = "";
                 if (item.is_subclip) {
-                    subclipBadgeHtml = `<div class="gallery-subclip-badge badge-subclip" style="position: absolute; top: 4px; left: 4px; background: rgba(168, 85, 247, 0.85); color: #fff; font-size: calc(10px * var(--font-scale, 1)); font-weight: 700; padding: 2px 6px; border-radius: 4px; z-index: 4; display: flex; align-items: center; gap: 4px; backdrop-filter: blur(4px);"><i class="fa-solid fa-scissors"></i> SUB</div>`;
+                    subclipBadgeHtml = `<div class="gallery-subclip-badge badge-subclip" style="position: absolute; top: 4px; left: 4px; background: rgba(168, 85, 247, 0.85); color: #fff; font-size: var(--fs-10); font-weight: 700; padding: 2px 6px; border-radius: 4px; z-index: 4; display: flex; align-items: center; gap: 4px; backdrop-filter: blur(4px);"><i class="fa-solid fa-scissors"></i> SUB</div>`;
                 }
 
                 if (isVideo) {
@@ -10250,7 +10250,7 @@ export class LibraryManager {
                 input.type = "text";
                 input.className = "inline-inspector-title-input";
                 input.value = currentVal;
-                input.style.cssText = "width: 100%; max-width: 280px; background: rgba(0,0,0,0.85); color: #fff; border: 1px solid var(--color-cyan); border-radius: 4px; padding: 2px 6px; font-size: calc(11px * var(--font-scale, 1)); font-family: inherit; outline: none; box-shadow: 0 0 10px var(--t-glow, rgba(6,182,212,0.4));";
+                input.style.cssText = "width: 100%; max-width: 280px; background: rgba(0,0,0,0.85); color: #fff; border: 1px solid var(--color-cyan); border-radius: 4px; padding: 2px 6px; font-size: var(--fs-11); font-family: inherit; outline: none; box-shadow: 0 0 10px var(--t-glow, rgba(6,182,212,0.4));";
                 
                 titleTextEl.innerHTML = "";
                 titleTextEl.appendChild(input);
@@ -10425,7 +10425,7 @@ export class LibraryManager {
         header.style.cssText = "display: flex; align-items: center; gap: 8px; flex-wrap: wrap;";
 
         const selo = document.createElement("span");
-        selo.style.cssText = "font-size: calc(9px * var(--font-scale, 1)); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; " +
+        selo.style.cssText = "font-size: var(--fs-9); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; " +
             (atual ? "color: var(--color-cyan); background: rgba(6,182,212,0.12);"
                    : "color: var(--text-muted); background: rgba(255,255,255,0.05);");
         selo.textContent = atual ? "no ar agora" : this.formatarDataHistorico(dados.created_at);
@@ -10433,7 +10433,7 @@ export class LibraryManager {
 
         const origem = document.createElement("span");
         const humano = dados.origem === "humano";
-        origem.style.cssText = "font-size: calc(9px * var(--font-scale, 1)); font-weight: 600; padding: 2px 6px; border-radius: 4px; " +
+        origem.style.cssText = "font-size: var(--fs-9); font-weight: 600; padding: 2px 6px; border-radius: 4px; " +
             (humano ? "color: var(--color-emerald); background: rgba(16,185,129,0.12);"
                     : "color: var(--color-violet); background: rgba(138,92,246,0.12);");
         origem.textContent = humano ? "escrito à mão" : (dados.origem === "importado" ? "importado" : "gerado por IA");
@@ -10445,10 +10445,10 @@ export class LibraryManager {
             const wrap = document.createElement("div");
             wrap.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
             const lbl = document.createElement("div");
-            lbl.style.cssText = "font-size: calc(9px * var(--font-scale, 1)); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;";
+            lbl.style.cssText = "font-size: var(--fs-9); font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px;";
             lbl.textContent = rotulo;
             const txt = document.createElement("div");
-            txt.style.cssText = "font-size: calc(11px * var(--font-scale, 1)); line-height: 1.45; white-space: pre-line; color: " +
+            txt.style.cssText = "font-size: var(--fs-11); line-height: 1.45; white-space: pre-line; color: " +
                 (negrito ? "var(--text-primary); font-weight: 600;" : "var(--text-secondary);");
             txt.textContent = valor;
             wrap.appendChild(lbl);
@@ -10470,7 +10470,7 @@ export class LibraryManager {
         if (!atual && typeof onRestore === "function") {
             const btn = document.createElement("button");
             btn.className = "btn-secondary";
-            btn.style.cssText = "align-self: flex-start; margin-top: 4px; height: 26px; padding: 0 12px; font-size: calc(11px * var(--font-scale, 1)); font-weight: 600; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-primary); display: flex; align-items: center; gap: 6px;";
+            btn.style.cssText = "align-self: flex-start; margin-top: 4px; height: 26px; padding: 0 12px; font-size: var(--fs-11); font-weight: 600; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-primary); display: flex; align-items: center; gap: 6px;";
             btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Restaurar esta versão';
             btn.onclick = () => onRestore(dados, btn);
             card.appendChild(btn);
@@ -10495,7 +10495,7 @@ export class LibraryManager {
             modal.addEventListener("click", (ev) => { if (ev.target === modal) fechar(); });
         }
 
-        list.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Carregando versões...</div>`;
+        list.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Carregando versões...</div>`;
         modal.classList.add("active");
 
         let data;
@@ -10504,7 +10504,7 @@ export class LibraryManager {
         } catch (err) {
             list.innerHTML = "";
             const erro = document.createElement("div");
-            erro.style.cssText = "font-size:calc(11px * var(--font-scale, 1)); color:var(--color-rose);";
+            erro.style.cssText = "font-size:var(--fs-11); color:var(--color-rose);";
             erro.textContent = "Erro ao carregar o histórico: " + err.message;
             list.appendChild(erro);
             return;
@@ -10546,7 +10546,7 @@ export class LibraryManager {
         const versoes = data.versions || [];
         if (versoes.length === 0) {
             const vazio = document.createElement("div");
-            vazio.style.cssText = "font-size: calc(11px * var(--font-scale, 1)); color: var(--text-muted); font-style: italic;";
+            vazio.style.cssText = "font-size: var(--fs-11); color: var(--text-muted); font-style: italic;";
             vazio.textContent = "Nenhuma versão anterior guardada ainda. A partir de agora, todo reprocessamento arquiva a decupagem que for substituída.";
             list.appendChild(vazio);
             return;
@@ -10566,8 +10566,8 @@ export class LibraryManager {
         const chaptersList = document.getElementById("inspector-chapters-list");
         const editorContainer = document.getElementById("inspector-transcript-editor");
         
-        if (chaptersList) chaptersList.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Carregando índice...</div>`;
-        if (editorContainer) editorContainer.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Carregando diálogos...</div>`;
+        if (chaptersList) chaptersList.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Carregando índice...</div>`;
+        if (editorContainer) editorContainer.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Carregando diálogos...</div>`;
 
         try {
             const data = await CapIAuAPI.fetchTranscript(video.id);
@@ -10578,7 +10578,7 @@ export class LibraryManager {
             if (chaptersList) {
                 chaptersList.innerHTML = "";
                 if (dialogues.length === 0) {
-                    chaptersList.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Sem transcrição disponível para gerar índice.</div>`;
+                    chaptersList.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Sem transcrição disponível para gerar índice.</div>`;
                 } else {
                     let currentSpeaker = null;
                     let lastChapterTime = -100;
@@ -10594,7 +10594,7 @@ export class LibraryManager {
                             const timecode = formatTimecode(d.start_time).substring(3, 11);
                             item.innerHTML = `
                                 <span class="timeline-chapter-time" data-time="${d.start_time}">${timecode}</span>
-                                <div style="font-weight: 700; font-size: calc(11px * var(--font-scale, 1)); color: var(--color-cyan); margin-bottom: 2px;">${d.speaker_id}</div>
+                                <div style="font-weight: 700; font-size: var(--fs-11); color: var(--color-cyan); margin-bottom: 2px;">${d.speaker_id}</div>
                                 <div class="timeline-chapter-text">"${d.text.substring(0, 80)}${d.text.length > 80 ? '...' : ''}"</div>
                             `;
                             
@@ -10612,7 +10612,7 @@ export class LibraryManager {
             if (editorContainer) {
                 editorContainer.innerHTML = "";
                 if (dialogues.length === 0) {
-                    editorContainer.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Sem falas disponíveis para edição.</div>`;
+                    editorContainer.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Sem falas disponíveis para edição.</div>`;
                 } else {
                     // Carrega todos os falantes conhecidos do projeto para o dropdown
                     const speakersList = await CapIAuAPI.fetchProjectSpeakers(STATE.currentProjectId).catch(() => []);
@@ -10635,18 +10635,18 @@ export class LibraryManager {
                         block.innerHTML = `
                             <div class="inspector-dialogue-header">
                                 <div class="inspector-dialogue-speaker">
-                                    <i class="fa-solid fa-user" style="color:var(--color-cyan); font-size: calc(9px * var(--font-scale, 1));"></i>
-                                    <select class="nle-select sel-dialogue-speaker" style="padding: 2px 6px; font-size: calc(10px * var(--font-scale, 1)); width: 120px;">
+                                    <i class="fa-solid fa-user" style="color:var(--color-cyan); font-size: var(--fs-9);"></i>
+                                    <select class="nle-select sel-dialogue-speaker" style="padding: 2px 6px; font-size: var(--fs-10); width: 120px;">
                                         ${optionsHtml}
                                     </select>
-                                    <input type="text" class="input-new-speaker" placeholder="Nome do falante..." style="display:none; width:100px; padding: 2px 4px; font-size: calc(10px * var(--font-scale, 1));">
+                                    <input type="text" class="input-new-speaker" placeholder="Nome do falante..." style="display:none; width:100px; padding: 2px 4px; font-size: var(--fs-10);">
                                 </div>
                                 <span class="inspector-dialogue-time" data-time="${d.start_time}">${timecode}</span>
                             </div>
                             <textarea class="inspector-dialogue-text-area txt-dialogue-text">${d.text}</textarea>
                             <div class="inspector-dialogue-actions">
-                                <button class="btn-flat-action cyan btn-dialogue-split" style="font-size: calc(9px * var(--font-scale, 1));" title="Dividir fala neste ponto"><i class="fa-solid fa-scissors"></i> Dividir</button>
-                                <button class="btn-primary btn-dialogue-save" style="font-size: calc(9px * var(--font-scale, 1)); padding: 2px 8px; border-radius: 4px; border:none; background:var(--t-tint-3, rgba(6,182,212,0.15)); color:var(--color-cyan); font-weight:bold; cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                                <button class="btn-flat-action cyan btn-dialogue-split" style="font-size: var(--fs-9);" title="Dividir fala neste ponto"><i class="fa-solid fa-scissors"></i> Dividir</button>
+                                <button class="btn-primary btn-dialogue-save" style="font-size: var(--fs-9); padding: 2px 8px; border-radius: 4px; border:none; background:var(--t-tint-3, rgba(6,182,212,0.15)); color:var(--color-cyan); font-weight:bold; cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
                             </div>
                         `;
 
@@ -10754,8 +10754,8 @@ export class LibraryManager {
 
         } catch(e) {
             console.warn("Sem transcrição disponível:", e);
-            if (chaptersList) chaptersList.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Mídia de B-roll sem índice. Carregando frames de visão...</div>`;
-            if (editorContainer) editorContainer.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Falas não disponíveis.</div>`;
+            if (chaptersList) chaptersList.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Mídia de B-roll sem índice. Carregando frames de visão...</div>`;
+            if (editorContainer) editorContainer.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Falas não disponíveis.</div>`;
 
             // Se for broll, carrega descrições de visão
             if (video.video_type === "broll" || video.status === "analyzed") {
@@ -10765,7 +10765,7 @@ export class LibraryManager {
                     if (chaptersList) {
                         chaptersList.innerHTML = "";
                         if (frames.length === 0) {
-                            chaptersList.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Nenhuma descrição visual disponível.</div>`;
+                            chaptersList.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Nenhuma descrição visual disponível.</div>`;
                         } else {
                             frames.forEach(f => {
                                 const item = document.createElement("div");
@@ -10783,7 +10783,7 @@ export class LibraryManager {
                         }
                     }
                 } catch(err) {
-                    if (chaptersList) chaptersList.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Sem frames de visão processados.</div>`;
+                    if (chaptersList) chaptersList.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Sem frames de visão processados.</div>`;
                 }
             }
         }
@@ -10793,7 +10793,7 @@ export class LibraryManager {
         const themesList = document.getElementById("inspector-themes-list");
         const themeSelect = document.getElementById("sel-inspector-link-theme");
 
-        if (themesList) themesList.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Carregando temas...</div>`;
+        if (themesList) themesList.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Carregando temas...</div>`;
         if (themeSelect) themeSelect.innerHTML = `<option value="">Carregando...</option>`;
 
         try {
@@ -10832,7 +10832,7 @@ export class LibraryManager {
                             
                             card.innerHTML = `
                                 <div class="inspector-theme-title">${theme.title}</div>
-                                <div class="inspector-theme-desc" style="font-size: calc(9px * var(--font-scale, 1)); color: var(--text-muted);">Intervalo: ${timecodeStart} - ${timecodeEnd}</div>
+                                <div class="inspector-theme-desc" style="font-size: var(--fs-9); color: var(--text-muted);">Intervalo: ${timecodeStart} - ${timecodeEnd}</div>
                                 ${seg.text_excerpt ? `<div class="inspector-theme-excerpt">"${seg.text_excerpt}"</div>` : ''}
                                 <button class="inspector-theme-delete-btn" data-segment-id="${seg.id}" title="Desvincular tema"><i class="fa-solid fa-trash-can"></i></button>
                             `;
@@ -10857,26 +10857,26 @@ export class LibraryManager {
                 }
 
                 if (!hasThemes) {
-                    themesList.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Nenhum tema narrativo vinculado a este vídeo. Utilize o formulário acima para vincular.</div>`;
+                    themesList.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Nenhum tema narrativo vinculado a este vídeo. Utilize o formulário acima para vincular.</div>`;
                 }
             }
 
         } catch (e) {
             console.warn("Erro ao carregar temas:", e);
-            if (themesList) themesList.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted);">Falha ao carregar temas narrativos.</div>`;
+            if (themesList) themesList.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted);">Falha ao carregar temas narrativos.</div>`;
         }
     }
 
     async loadInspectorFaces(video) {
         const grid = document.getElementById("inspector-faces-grid");
-        if (grid) grid.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted); grid-column: 1/-1;">Carregando rostos...</div>`;
+        if (grid) grid.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted); grid-column: 1/-1;">Carregando rostos...</div>`;
 
         try {
             const faces = await CapIAuAPI.fetchVideoFaces(video.id).catch(() => []);
             if (grid) {
                 grid.innerHTML = "";
                 if (faces.length === 0) {
-                    grid.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted); grid-column: 1/-1;">Nenhum rosto detectado neste clipe de vídeo.</div>`;
+                    grid.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted); grid-column: 1/-1;">Nenhum rosto detectado neste clipe de vídeo.</div>`;
                 } else {
                     faces.forEach(face => {
                         const card = document.createElement("div");
@@ -10888,7 +10888,7 @@ export class LibraryManager {
                             <img src="/api/faces/face/${face.id}/thumbnail" class="inspector-face-thumb" onerror="this.src='https://placehold.co/60x60/11131a/cyan?text=Face'">
                             <span class="inspector-face-time" title="Buscar no Source Player">${timecode}</span>
                             <input type="text" class="inspector-face-input" value="${face.name || 'Pessoa Desconhecida'}" placeholder="Nome do rosto...">
-                            <button class="btn-primary btn-face-save" style="font-size: calc(8px * var(--font-scale, 1)); padding: 2px 6px; border-radius: 4px; border:none; background:var(--t-tint-2, rgba(6,182,212,0.1)); color:var(--color-cyan); font-weight:bold; cursor:pointer; width: 100%; margin-top:2px;">Salvar Rótulo</button>
+                            <button class="btn-primary btn-face-save" style="font-size: var(--fs-8); padding: 2px 6px; border-radius: 4px; border:none; background:var(--t-tint-2, rgba(6,182,212,0.1)); color:var(--color-cyan); font-weight:bold; cursor:pointer; width: 100%; margin-top:2px;">Salvar Rótulo</button>
                         `;
 
                         card.querySelector(".inspector-face-time").addEventListener("click", () => {
@@ -10918,7 +10918,7 @@ export class LibraryManager {
             }
         } catch(e) {
             console.warn("Erro ao carregar faces do inspetor:", e);
-            if (grid) grid.innerHTML = `<div style="font-size:calc(11px * var(--font-scale, 1)); color:var(--text-muted); grid-column: 1/-1;">Erro ao processar rostos detectados.</div>`;
+            if (grid) grid.innerHTML = `<div style="font-size:var(--fs-11); color:var(--text-muted); grid-column: 1/-1;">Erro ao processar rostos detectados.</div>`;
         }
     }
 }
@@ -12124,7 +12124,7 @@ export class LibraryScrollIndexTracker {
                         <div class="scroll-index-title">Título da Mídia</div>
                         <div class="scroll-index-sub">
                             <span class="scroll-index-badge tag-interview">Fala</span>
-                            <span class="scroll-index-duration" style="font-family: monospace; font-size: calc(8.5px * var(--font-scale, 1)); color: var(--text-muted);"></span>
+                            <span class="scroll-index-duration" style="font-family: monospace; font-size: var(--fs-9); color: var(--text-muted);"></span>
                             <span class="scroll-index-color-chip" style="display:none;"><span class="scroll-index-color-dot"></span><span class="scroll-index-color-text"></span></span>
                         </div>
                     </div>

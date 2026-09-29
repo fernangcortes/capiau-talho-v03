@@ -15,8 +15,8 @@
     <link rel="stylesheet" href="fonts/fonts.css?v=1">
     <!-- CSS e FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=79">
-    <link rel="stylesheet" href="theme.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=80">
+    <link rel="stylesheet" href="theme.css?v=4">
     <script src="js/themeBoot.js?v=2"></script>
     <style>
         body {
@@ -98,7 +98,7 @@
             width: 26px;
             height: 24px;
             padding: 0;
-            font-size: calc(11px * var(--font-scale, 1));
+            font-size: var(--fs-11);
             cursor: pointer;
             display: inline-flex;
             align-items: center;
@@ -300,7 +300,7 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            font-size: calc(12px * var(--font-scale, 1));
+            font-size: var(--fs-12);
             color: var(--text-secondary, #94a3b8);
         }
         .single-restore:hover .single-restore-line {
@@ -382,8 +382,8 @@
         <!-- Slot 1 -->
         <div id="dual-slot-1" class="dual-panel-slot">
             <div class="popout-loading-state" id="dual-loader-1">
-                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: calc(24px * var(--font-scale, 1)); color: var(--color-cyan);"></i>
-                <p style="margin-top: 10px; font-size: calc(12px * var(--font-scale, 1)); color: var(--text-secondary);">Sincronizando Menu 1...</p>
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: var(--fs-24); color: var(--color-cyan);"></i>
+                <p style="margin-top: 10px; font-size: var(--fs-12); color: var(--text-secondary);">Sincronizando Menu 1...</p>
             </div>
         </div>
 
@@ -393,8 +393,8 @@
         <!-- Slot 2 -->
         <div id="dual-slot-2" class="dual-panel-slot">
             <div class="popout-loading-state" id="dual-loader-2">
-                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: calc(24px * var(--font-scale, 1)); color: #c084fc;"></i>
-                <p style="margin-top: 10px; font-size: calc(12px * var(--font-scale, 1)); color: var(--text-secondary);">Sincronizando Menu 2...</p>
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: var(--fs-24); color: #c084fc;"></i>
+                <p style="margin-top: 10px; font-size: var(--fs-12); color: var(--text-secondary);">Sincronizando Menu 2...</p>
             </div>
         </div>
 
@@ -411,11 +411,11 @@
     <!-- ── CONTAINER TRADICIONAL (PAINEL ÚNICO) ── -->
     <div id="panel-container">
         <div class="popout-loading-state" id="popout-loader">
-            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: calc(28px * var(--font-scale, 1)); color: var(--color-cyan);"></i>
-            <p style="margin-top: 15px; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-secondary); font-weight: 500;">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: var(--fs-32); color: var(--color-cyan);"></i>
+            <p style="margin-top: 15px; font-size: var(--fs-13); color: var(--text-secondary); font-weight: 500;">
                 Sincronizando painel com o editor principal...
             </p>
-            <span style="font-size: calc(11px * var(--font-scale, 1)); color: var(--text-muted, #64748b); margin-top: 4px;">
+            <span style="font-size: var(--fs-11); color: var(--text-muted, #64748b); margin-top: 4px;">
                 Aguardando conexão via BroadcastChannel
             </span>
         </div>

@@ -65,3 +65,23 @@
 body {
     font-weight: var(--font-weight-ui, 400);
 }
+
+/* Escala de texto em degraus. A UI usa só var(--fs-N), nunca px solto nem calc() próprio:
+   mudar um degrau (ou dar escalas diferentes por faixa no futuro) é mexer aqui.
+   Migração e trava: scripts/tema_tokenizar.mjs e tests/autoteste_tema_tokens.mjs (parte 7).
+   --fs-4 é o marcador de lista do chat, não texto. */
+:root {
+    --fs-4: calc(4px * var(--font-scale, 1));
+    --fs-8: calc(8px * var(--font-scale, 1));
+    --fs-9: calc(9px * var(--font-scale, 1));
+    --fs-10: calc(10px * var(--font-scale, 1));
+    --fs-11: calc(11px * var(--font-scale, 1));
+    --fs-12: calc(12px * var(--font-scale, 1));
+    --fs-13: calc(13px * var(--font-scale, 1));
+    --fs-14: calc(14px * var(--font-scale, 1));
+    --fs-16: calc(16px * var(--font-scale, 1));
+    --fs-18: calc(18px * var(--font-scale, 1));
+    --fs-20: calc(20px * var(--font-scale, 1));
+    --fs-24: calc(24px * var(--font-scale, 1));
+    --fs-32: calc(32px * var(--font-scale, 1));
+}

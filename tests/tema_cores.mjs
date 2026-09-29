@@ -257,3 +257,46 @@ export function applyFontScale(text, found) {
 export function unwrapFontScale(text) {
     return text.replace(/calc\((\d+(?:\.\d+)?px) \* var\(--font-scale, 1\)\)/g, "$1");
 }
+
+// ── Escala de texto em degraus (--fs-N) ─────────────────────────────────────
+// Cada calc(Npx * var(--font-scale, 1)) vira var(--fs-M), definido uma vez em theme.css.
+// Meio-pixel arredonda para cima; 15, 22, 26 e 28 caem no degrau vizinho. 4px é o marcador de lista do chat.
+export const FS_STEPS = [4, 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 32];
+const FS_MAP = {
+    4: 4, 7: 8, 7.5: 8, 8: 8, 8.5: 9, 9: 9, 9.5: 10, 10: 10, 10.5: 11, 11: 11, 11.5: 12, 12: 12,
+    12.5: 13, 13: 13, 14: 14, 15: 16, 16: 16, 18: 18, 20: 20, 22: 24, 24: 24, 26: 32, 28: 32, 32: 32,
+};
+
+/** Degrau da escala para um tamanho em px (null = fora da tabela: decidir à mão). */
+export function fsStep(px) {
+    return FS_MAP[px] ?? null;
+}
+
+const FS_CALC = /calc\((\d+(?:\.\d+)?)px \* var\(--font-scale, 1\)\)/g;
+
+/** Acha calc(Npx * var(--font-scale, 1)) que ainda não viraram var(--fs-N). */
+export function scanFontCalcs(text) {
+    return [...text.matchAll(FS_CALC)].map(m => ({ index: m.index, match: m[0], px: Number(m[1]), step: fsStep(Number(m[1])) }));
+}
+
+export function applyFontSteps(text, found) {
+    let res = text;
+    for (const f of [...found].sort((a, b) => b.index - a.index)) {
+        if (f.step == null) continue;
+        res = res.slice(0, f.index) + `var(--fs-${f.step})` + res.slice(f.index + f.match.length);
+    }
+    return res;
+}
+
+/** Desfaz os degraus: devolve calc(Mpx * …) com o tamanho do degrau (prova de que só os tamanhos mudaram). */
+export function unwrapFontSteps(text) {
+    return text.replace(/var\(--fs-(\d+)\)/g, "calc($1px * var(--font-scale, 1))");
+}
+
+/** O texto original com cada tamanho já arredondado ao seu degrau (o que o unwrap deve devolver). */
+export function roundFontCalcs(text) {
+    return text.replace(FS_CALC, (all, px) => {
+        const step = fsStep(Number(px));
+        return step == null ? all : `calc(${step}px * var(--font-scale, 1))`;
+    });
+}
