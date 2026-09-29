@@ -215,14 +215,22 @@ export function evaluateClipProperty(clip, propertyName, relativeTimeS, fallback
 /**
  * Avalia o conjunto completo de transformação e estilo de um clipe para renderização no player.
  */
+// Número ou o padrão SÓ quando não é número. `Number(v) || padrão` trocava 0 legítimo
+// pelo padrão: o fade de entrada (opacidade 0 no primeiro keyframe) começava opaco e
+// piscava no primeiro quadro; escala 0, padding 0 e raio 0 também eram ignorados.
+function _numOu(v, padrao) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : padrao;
+}
+
 export function evaluateClipTransform(clip, relativeTimeS) {
     if (!clip) return {};
 
-    const xVal = Number(evaluateClipProperty(clip, "x", relativeTimeS, 0)) || 0;
-    const yVal = Number(evaluateClipProperty(clip, "y", relativeTimeS, 0)) || 0;
-    const scaleVal = Number(evaluateClipProperty(clip, "scale", relativeTimeS, 1.0)) || 1.0;
-    const rotVal = Number(evaluateClipProperty(clip, "rotation", relativeTimeS, 0)) || 0;
-    const opVal = Math.max(0, Math.min(1, Number(evaluateClipProperty(clip, "opacity", relativeTimeS, 1.0)) || 1.0));
+    const xVal = _numOu(evaluateClipProperty(clip, "x", relativeTimeS, 0), 0);
+    const yVal = _numOu(evaluateClipProperty(clip, "y", relativeTimeS, 0), 0);
+    const scaleVal = _numOu(evaluateClipProperty(clip, "scale", relativeTimeS, 1.0), 1.0);
+    const rotVal = _numOu(evaluateClipProperty(clip, "rotation", relativeTimeS, 0), 0);
+    const opVal = Math.max(0, Math.min(1, _numOu(evaluateClipProperty(clip, "opacity", relativeTimeS, 1.0), 1.0)));
 
     return {
         x: xVal,
@@ -237,8 +245,8 @@ export function evaluateClipTransform(clip, relativeTimeS) {
         lineHeight: Number(evaluateClipProperty(clip, "lineHeight", relativeTimeS, 1.2)) || 1.2,
         color: evaluateClipProperty(clip, "color", relativeTimeS, "#ffffff"),
         backgroundColor: evaluateClipProperty(clip, "backgroundColor", relativeTimeS, "transparent"),
-        boxPadding: Number(evaluateClipProperty(clip, "boxPadding", relativeTimeS, 8)) || 8,
-        boxBorderRadius: Number(evaluateClipProperty(clip, "boxBorderRadius", relativeTimeS, 4)) || 4,
+        boxPadding: _numOu(evaluateClipProperty(clip, "boxPadding", relativeTimeS, 8), 8),
+        boxBorderRadius: _numOu(evaluateClipProperty(clip, "boxBorderRadius", relativeTimeS, 4), 4),
         blur: Number(evaluateClipProperty(clip, "blur", relativeTimeS, 0)) || 0
     };
 }
