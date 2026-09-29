@@ -393,6 +393,22 @@ def _limpar(caminhos: List[Path], pastas: List[Path]) -> None:
             pass
 
 
+def _fontes_do_projeto(timeline_id: int) -> List[Dict[str, Any]]:
+    """Fontes enviadas ao projeto da timeline (para os titulos). Falha = lista vazia:
+    o titulo cai num substituto e o gerador avisa."""
+    try:
+        from src.db.connection import get_db
+        from src.services import fontes_projeto
+        with get_db() as conn:
+            row = conn.execute("SELECT project_id FROM timeline WHERE id = ?",
+                               (int(timeline_id),)).fetchone()
+        if not row or row[0] is None:
+            return []
+        return fontes_projeto.listar(int(row[0]))
+    except Exception:
+        return []
+
+
 def _render_job(sequencia, pedido) -> Dict[str, Any]:
     """O render completo de um pedido. Devolve dict-status; nunca levanta.
 
@@ -494,7 +510,8 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
         if any(c.tipo == "text" for c in sequencia.clipes):
             from src.config import CONFIG
             pasta_titulos = Path(CONFIG.CACHE_DIR) / "titulos"
-            gerador_titulos = _titulos.GeradorTitulos(pasta_titulos)
+            gerador_titulos = _titulos.GeradorTitulos(
+                pasta_titulos, fontes=_fontes_do_projeto(timeline_id))
 
             def fn_titulos(seq, escopo, s, f):
                 TASK_MANAGER.add_log(chave, f"[INFO] Desenhando titulos de {s:.1f}s a {f:.1f}s")

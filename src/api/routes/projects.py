@@ -278,6 +278,52 @@ def list_documents(project_id: int, conn: sqlite3.Connection = Depends(get_db_co
     """Retorna a lista de documentos de contexto cadastrados do projeto."""
     return ProjectRepository.list_documents(conn, project_id)
 
+# ── Fontes enviadas pelo usuário (títulos) ──────────────────────────────────
+# Guardadas em data/fontes/<projeto>/: o editor as registra ao abrir o projeto e o
+# render de títulos (outro navegador) as carrega do mesmo lugar.
+
+def _fonte_publica(project_id: int, f: dict) -> dict:
+    from urllib.parse import quote
+    return {"familia": f["familia"], "arquivo": f["arquivo"], "tamanho": f["tamanho"],
+            "url": f"/api/project/{project_id}/fonts/{quote(f['arquivo'])}?v={int(f['mtime'])}"}
+
+
+@router.get("/api/project/{project_id}/fonts")
+def list_project_fonts(project_id: int):
+    """Fontes enviadas para o projeto: [{familia, arquivo, tamanho, url}]."""
+    from src.services import fontes_projeto
+    return [_fonte_publica(project_id, f) for f in fontes_projeto.listar(project_id)]
+
+
+@router.post("/api/project/{project_id}/fonts")
+async def upload_project_font(project_id: int, file: UploadFile = File(...)):
+    """Guarda um arquivo de fonte (.ttf/.otf/.woff/.woff2) no projeto."""
+    from src.services import fontes_projeto
+    dados = await file.read(fontes_projeto.TAMANHO_MAXIMO + 1)
+    try:
+        f = fontes_projeto.salvar(project_id, file.filename or "", dados)
+    except fontes_projeto.FonteInvalida as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return _fonte_publica(project_id, f)
+
+
+@router.get("/api/project/{project_id}/fonts/{arquivo}")
+def get_project_font(project_id: int, arquivo: str):
+    from src.services import fontes_projeto
+    alvo = fontes_projeto.caminho(project_id, arquivo)
+    if alvo is None:
+        raise HTTPException(status_code=404, detail="Fonte não encontrada neste projeto.")
+    tipos = {".ttf": "font/ttf", ".otf": "font/otf", ".woff": "font/woff", ".woff2": "font/woff2"}
+    return FileResponse(str(alvo), media_type=tipos.get(alvo.suffix.lower(), "application/octet-stream"))
+
+
+@router.delete("/api/project/{project_id}/fonts/{arquivo}")
+def remove_project_font(project_id: int, arquivo: str):
+    from src.services import fontes_projeto
+    if not fontes_projeto.remover(project_id, arquivo):
+        raise HTTPException(status_code=404, detail="Fonte não encontrada neste projeto.")
+    return {"status": "success"}
+
 @router.delete("/api/docs/{doc_id}")
 def remove_document(doc_id: int, project_id: int = Query(1), conn: sqlite3.Connection = Depends(get_db_conn)):
     """Remove um documento de contexto e limpa seus vetores associados."""

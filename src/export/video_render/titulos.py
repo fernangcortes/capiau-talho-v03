@@ -39,9 +39,12 @@ Sigma do gblur: o blur(Npx) do Chromium, medido contra um xadrez (interior da ca
 equivale a gblur(steps=4) com sigma ~= 1.05 * N * escala do titulo (o raio acompanha
 o transform: scale; rotacao nao muda). Escala animada troca o sigma por sendcmd.
 
-LIMITES CONHECIDOS
-- Fonte enviada por upload vive so na sessao do editor; o navegador do render cai
-  num substituto. `preparar` informa quando isso acontece.
+FONTES ENVIADAS
+---------------
+Fontes que o usuario enviou ao projeto (src/services/fontes_projeto.py, arquivos em
+data/fontes/<projeto>/) sao servidas pela mesma rota interna em /__fontes/<arquivo> e
+registradas pela pagina no `preparar`. Fonte que nao esta no projeto nem no Google
+cai num substituto; `preparar` mede e o gerador avisa.
 """
 from __future__ import annotations
 
@@ -61,6 +64,9 @@ CANAIS = ("msedge", "chrome", None)
 # blur(Npx) do Chromium ~= gblur(sigma = FATOR * N * escala, steps = PASSOS). Medido.
 FATOR_SIGMA_DESFOQUE = 1.05
 PASSOS_GBLUR = 4
+
+# Fontes enviadas ao projeto, servidas pela rota interna
+PREFIXO_FONTES = "__fontes/"
 
 
 class TitulosIndisponiveis(RuntimeError):
@@ -112,9 +118,12 @@ class GeradorTitulos:
     a criou). Uso: `with GeradorTitulos(pasta) as g: g.quadros(...)`.
     """
 
-    def __init__(self, pasta_cache: Path, canais=CANAIS):
+    def __init__(self, pasta_cache: Path, canais=CANAIS, fontes=None):
+        """`fontes`: fontes enviadas ao projeto, como fontes_projeto.listar()
+        ([{"familia", "arquivo", "caminho", "tamanho", "mtime"}])."""
         self.pasta_cache = Path(pasta_cache)
         self.canais = canais
+        self.fontes = list(fontes or [])
         self._pw = None
         self._navegador = None
         self._pagina = None
@@ -140,6 +149,15 @@ class GeradorTitulos:
         """Serve src/ui por rota interna: o render nao depende do servidor estar no ar."""
         from urllib.parse import unquote, urlparse
         rel = unquote(urlparse(route.request.url).path).lstrip("/")
+        if rel.startswith(PREFIXO_FONTES):
+            nome = rel[len(PREFIXO_FONTES):]
+            f = next((f for f in self.fontes if f["arquivo"] == nome), None)
+            if f is None or not Path(f["caminho"]).is_file():
+                route.fulfill(status=404, body="")
+                return
+            route.fulfill(status=200, body=Path(f["caminho"]).read_bytes(),
+                          headers={"Content-Type": "application/octet-stream"})
+            return
         alvo = (RAIZ_UI / rel).resolve()
         if RAIZ_UI not in alvo.parents or not alvo.is_file():
             route.fulfill(status=404, body="")
@@ -197,15 +215,23 @@ class GeradorTitulos:
         if fim <= inicio:
             return []
         pagina = self._abrir(int(largura), int(altura))
-        prep = pagina.evaluate("([c, w, h]) => window.RENDER_TITULOS.preparar(c, w, h)",
-                               [clipe, int(largura), int(altura)])
+        from urllib.parse import quote
+        fontes = [{"familia": f["familia"],
+                   "url": f"{HOST_INTERNO}/{PREFIXO_FONTES}{quote(f['arquivo'])}"}
+                  for f in self.fontes]
+        prep = pagina.evaluate("([c, w, h, f]) => window.RENDER_TITULOS.preparar(c, w, h, f)",
+                               [clipe, int(largura), int(altura), fontes])
         if not prep.get("fonteDisponivel", True):
             self.avisos.append(
                 f"Titulo {clipe.get('id')}: fonte \"{prep.get('fonte')}\" indisponivel para o "
                 "render; usado um substituto.")
         chaves = pagina.evaluate("([c, f, a, b]) => window.RENDER_TITULOS.estados(c, f, a, b)",
                                  [clipe, float(fps), int(inicio), int(fim)])
-        base = _hash(clipe, largura, altura)
+        # Fonte enviada trocada (mesmo nome, outro arquivo) nao pode reaproveitar fotos
+        familia = str(clipe.get("fontFamily") or "").strip().lower()
+        assinatura = [(f["arquivo"], f["tamanho"], f["mtime"]) for f in self.fontes
+                      if f["familia"].lower() == familia]
+        base = _hash(clipe, largura, altura, assinatura) if assinatura else _hash(clipe, largura, altura)
         pasta = self.pasta_cache / base
         pasta.mkdir(parents=True, exist_ok=True)
 

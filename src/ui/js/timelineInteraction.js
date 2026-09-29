@@ -7951,7 +7951,9 @@ export class CapiauTimelineInteraction {
             const alignment = clip.alignment || "center";
             const category = clip.textCategory || "lower_third";
 
-            const fontOptions = CURATED_FONTS.map(f => `<option value="${f.id}" ${f.id === fontFamily ? 'selected' : ''}>${f.name} (${f.mood})</option>`).join("");
+            const fontesProjeto = (STATE.projectData && STATE.projectData.custom_fonts) || [];
+            const fontOptions = CURATED_FONTS.map(f => `<option value="${f.id}" ${f.id === fontFamily ? 'selected' : ''}>${f.name} (${f.mood})</option>`).join("")
+                + fontesProjeto.map(f => `<option value="${this._escapeHTML(f.id)}" ${f.id === fontFamily ? 'selected' : ''}>${this._escapeHTML(f.name)} (enviada)</option>`).join("");
             const pesoAtual = pesoTitulo(clip);
             const estiloAtual = estiloTitulo(clip);
             const nomesPeso = { "300": "Leve", "400": "Normal", "500": "Médio", "600": "Seminegrito", "700": "Negrito", "800": "Extranegrito", "900": "Black" };

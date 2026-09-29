@@ -119,40 +119,92 @@ export async function querySystemFonts() {
     return [];
 }
 
+// Fontes enviadas pelo usuário: o arquivo fica no servidor, por projeto
+// (data/fontes/<projeto>/, rotas /api/project/{id}/fonts). O editor registra as do
+// projeto aberto; o render de títulos carrega os mesmos arquivos.
+const facesDoProjeto = new Map(); // família -> FontFace registrada em document.fonts
+
+function _fonteCustom(f) {
+    return {
+        id: f.familia,
+        name: f.familia,
+        category: "custom",
+        mood: "all",
+        weights: [400],
+        isGoogle: false,
+        isCustom: true,
+        arquivo: f.arquivo,
+        url: f.url,
+        specimen: "Fonte personalizada importada"
+    };
+}
+
+async function _registrarFace(f) {
+    const face = new FontFace(f.familia, `url("${f.url}")`);
+    await face.load();
+    const antiga = facesDoProjeto.get(f.familia);
+    if (antiga) document.fonts.delete(antiga);
+    document.fonts.add(face);
+    facesDoProjeto.set(f.familia, face);
+}
+
+function _guardarNoEstado(f) {
+    STATE.projectData = STATE.projectData || {};
+    const lista = (STATE.projectData.custom_fonts || []).filter(c => c.id !== f.familia);
+    lista.push(_fonteCustom(f));
+    STATE.projectData.custom_fonts = lista;
+}
+
 /**
- * Carrega arquivo de fonte enviado pelo usuário (.ttf, .otf, .woff2) na sessão atual.
+ * Registra as fontes enviadas para o projeto (ao abrir o app e ao trocar de projeto).
+ * Fontes do projeto anterior saem de document.fonts.
+ */
+export async function carregarFontesDoProjeto(projectId = STATE.currentProjectId) {
+    if (projectId === null || projectId === undefined) return [];
+    let lista = [];
+    try {
+        const r = await fetch(`/api/project/${projectId}/fonts`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        lista = await r.json();
+    } catch (err) {
+        console.error("[fontManager] Não foi possível listar as fontes do projeto:", err);
+        return [];
+    }
+    if (projectId !== STATE.currentProjectId) return []; // trocou de projeto no meio
+    for (const face of facesDoProjeto.values()) document.fonts.delete(face);
+    facesDoProjeto.clear();
+    STATE.projectData = STATE.projectData || {};
+    STATE.projectData.custom_fonts = [];
+    for (const f of lista) {
+        try {
+            await _registrarFace(f);
+            _guardarNoEstado(f);
+        } catch (err) {
+            console.error(`[fontManager] Fonte "${f.familia}" não carregou:`, err);
+        }
+    }
+    STATE.emit("projectFontsLoaded", STATE.projectData.custom_fonts);
+    return STATE.projectData.custom_fonts;
+}
+
+/**
+ * Envia um arquivo de fonte (.ttf, .otf, .woff, .woff2) para o projeto aberto e o
+ * registra no editor. Sobrevive a recarregar a página e chega ao render.
  */
 export async function loadUserFontFile(file) {
     if (!file) return null;
-    const fontName = file.name.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_\s-]/g, "");
-    try {
-        const arrayBuffer = await file.arrayBuffer();
-        const fontFace = new FontFace(fontName, arrayBuffer);
-        await fontFace.load();
-        document.fonts.add(fontFace);
-
-        const customFont = {
-            id: fontName,
-            name: fontName,
-            category: "custom",
-            mood: "all",
-            weights: [400],
-            isGoogle: false,
-            isCustom: true,
-            specimen: "Fonte personalizada importada"
-        };
-
-        STATE.projectData = STATE.projectData || {};
-        STATE.projectData.custom_fonts = STATE.projectData.custom_fonts || [];
-        if (!STATE.projectData.custom_fonts.some(f => f.id === fontName)) {
-            STATE.projectData.custom_fonts.push(customFont);
-        }
-
-        return customFont;
-    } catch (err) {
-        console.error("[fontManager] Erro ao carregar arquivo de fonte:", err);
-        throw err;
+    const corpo = new FormData();
+    corpo.append("file", file);
+    const r = await fetch(`/api/project/${STATE.currentProjectId}/fonts`, { method: "POST", body: corpo });
+    if (!r.ok) {
+        let detalhe = `HTTP ${r.status}`;
+        try { detalhe = (await r.json()).detail || detalhe; } catch (_) { /* corpo não-JSON */ }
+        throw new Error(detalhe);
     }
+    const f = await r.json();
+    await _registrarFace(f);
+    _guardarNoEstado(f);
+    return _fonteCustom(f);
 }
 
 /**

@@ -34,13 +34,27 @@ function _fonteEmUso(familia, amostra, face = "400") {
     return ["monospace", "serif"].some(g => medir(`"${familia}", ${g}`) !== medir(g));
 }
 
+// Fontes enviadas para o projeto (servidas pelo Python na rota interna): url -> FontFace
+const fontesRegistradas = new Map();
+
+async function _registrarFonteDoProjeto(f) {
+    if (fontesRegistradas.has(f.url)) return;
+    const face = new FontFace(f.familia, `url("${f.url}")`);
+    try {
+        await face.load();
+        document.fonts.add(face);
+    } catch (_) { /* a medição em preparar() acusa o substituto */ }
+    fontesRegistradas.set(f.url, face);
+}
+
 window.RENDER_TITULOS = {
     /**
      * Ajusta o palco ao quadro e garante a fonte do título carregada.
+     * `fontes` = fontes enviadas para o projeto [{familia, url}]; a do título é registrada.
      * Devolve {fonte, fonteDisponivel}: false quando o navegador caiu num substituto
-     * (fonte do Google sem internet, fonte enviada só na sessão do editor...).
+     * (fonte do Google sem internet, fonte que não está no projeto...).
      */
-    async preparar(clip, largura, altura) {
+    async preparar(clip, largura, altura, fontes = []) {
         palco.style.width = `${largura}px`;
         palco.style.height = `${altura}px`;
         const familia = _familia(clip);
@@ -48,6 +62,8 @@ window.RENDER_TITULOS = {
         // Faces que o título usa: texto no peso/estilo do clipe, subtexto 400 (herda o estilo)
         const face = `${estilo} ${pesoTitulo(clip)}`;
         const faces = [face, `${estilo} 400`];
+        const propria = (fontes || []).find(f => f.familia.toLowerCase() === familia.toLowerCase());
+        if (propria) await _registrarFonteDoProjeto(propria);
         ensureFontLoaded(familia, estilo);
         const amostra = `${clip.text || ""}${clip.subtext || ""}`.trim() || "Aa";
         await _esperarFolhas();

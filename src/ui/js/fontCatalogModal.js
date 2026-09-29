@@ -309,7 +309,7 @@ export class FontCatalogModal {
                             window.showToast(`Fonte "${loaded.name}" instalada no projeto!`, "success");
                         }
                     } catch (err) {
-                        alert("Não foi possível carregar o arquivo de fonte. Use .ttf, .otf ou .woff2.");
+                        alert(`Não foi possível enviar a fonte: ${err.message || err}`);
                     }
                 }
             };

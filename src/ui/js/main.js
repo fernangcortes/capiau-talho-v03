@@ -19,6 +19,7 @@ import { LOG_MANAGER } from "./logManager.js";
 import { initTabsCustomization, setTabVisibility } from "./tabsCustomization.js";
 import { TEXT_AI_ENGINE } from "./textAIEngine.js";
 import { TITLES_TAB } from "./titlesTab.js";
+import { carregarFontesDoProjeto } from "./fontManager.js";
 
 // Função para destacar os termos da busca com <mark>
 function highlightTerms(text, query) {
@@ -1516,6 +1517,10 @@ window.searchSimilarMultiple = async function() {
 // Inicialização da Aplicação
 window.addEventListener("DOMContentLoaded", () => {
     console.log("CapIAu-Talho: Inicializando os módulos...");
+
+    // Fontes enviadas para o projeto (títulos): guardadas no servidor, registradas aqui
+    carregarFontesDoProjeto();
+    STATE.on("projectChanged", (projectId) => carregarFontesDoProjeto(projectId));
 
     // Checagem inicial de saúde do servidor (porta e Qdrant)
     checkSystemHealth();
