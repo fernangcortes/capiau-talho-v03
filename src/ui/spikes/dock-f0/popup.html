@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Spike F0 - Janela destacada</title>
+    <style>
+        :root { color-scheme: dark; }
+        body { margin: 0; padding: 10px; background: #0b0f19; color: #e6eaf5; font: 14px/1.5 "Segoe UI", system-ui, sans-serif; }
+        p { margin: 0 0 8px; color: #8e97b0; font-size: 12.5px; }
+        .panel { background: #182036; border: 1px solid rgba(226,232,255,.12); border-radius: 6px; overflow: hidden; }
+        .handle { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: rgba(139,92,246,.2); cursor: grab; user-select: none; touch-action: none; font-weight: 600; font-size: 13px; }
+        .body { padding: 8px; font-size: 13px; color: #8e97b0; }
+        video, canvas.tl { display: block; width: 100%; background: #000; border-radius: 4px; }
+        canvas.tl { height: 60px; margin-top: 6px; }
+    </style>
+</head>
+<body>
+    <p>Janela destacada. Arraste a alça de volta para a zona ciano da janela principal.</p>
+    <div id="slot"></div>
+</body>
+</html>

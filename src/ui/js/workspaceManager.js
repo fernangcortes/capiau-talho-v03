@@ -1,5 +1,8 @@
 import { STATE } from "./state.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
+import { layoutFromLegacy, legacyFromLayout, LayoutHistory, serializeLayout, normalizeBands, hasBands, convertTimelinePosition, BAND_EDGES, CENTER_STAGE, TIMELINE_ID, MONITOR_IDS, CENTER_PANEL_IDS, PLACED_ONLY_IDS } from "./dockModel.js";
+import { normalizeStacks, stackGuests, stackOf, removeFromStack, setCorner, bandOf, placeTimeline, toggleTimelineSide, timelineExpanded, timelineIsColumn, monitorsInBlock } from "./dockOps.js";
+import { COLLAPSIBLE_PANELS, REOPEN_LINE_IDS, edgeInLine, collapseButtonFor, visibleSplitters, loadCollapsed, saveCollapsed } from "./panelCollapse.js";
 
 window.popoutWindows = {};
 
@@ -71,6 +74,45 @@ export function getActiveQuerySelector(selector) {
     return document.querySelector(selector);
 }
 
+/**
+ * Mudar um <video>/<audio> de documento (adoptNode) faz o navegador reiniciar o elemento:
+ * volta a 0 s e pausa (medido no spike F0). Guarda tempo e reprodução antes e reaplica depois,
+ * já e de novo quando os metadados recarregam.
+ */
+export function preserveMediaAcrossDocuments(root) {
+    const states = Array.from(root.querySelectorAll("video, audio"))
+        .filter(m => m.currentSrc || m.srcObject)
+        .map(m => ({ m, time: m.currentTime, paused: m.paused }));
+    return () => {
+        states.forEach(({ m, time, paused }) => {
+            const apply = () => {
+                if (!m.srcObject && Number.isFinite(time) && time > 0) m.currentTime = time;
+                if (!paused) m.play().catch(() => {});
+            };
+            const onMeta = () => { m.removeEventListener("loadedmetadata", onMeta); apply(); };
+            m.addEventListener("loadedmetadata", onMeta);
+            setTimeout(() => m.removeEventListener("loadedmetadata", onMeta), 5000);
+            apply();
+        });
+    };
+}
+
+/**
+ * Põe os nós (ignorando null) no começo do contêiner, nessa ordem, movendo só o que está fora do
+ * lugar. Mover um painel no DOM faz a alça perder a captura do ponteiro no meio de um arrasto.
+ */
+/** Linha de expandir de cada painel que pode ir para uma faixa (laterais e timeline). */
+const BAND_LINE_IDS = { ...REOPEN_LINE_IDS, [TIMELINE_ID]: "reopen-timeline" };
+/** Altura do divisor da faixa (5px): a faixa com a timeline sozinha = altura dela + divisor. */
+const BAND_RESIZER_H = 5;
+
+function placeInOrder(container, nodes) {
+    nodes.filter(Boolean).forEach((node, i) => {
+        const current = container.children[i];
+        if (current !== node) container.insertBefore(node, current || null);
+    });
+}
+
 export class WorkspaceManager {
     constructor() {
         this.channel = new BroadcastChannel("capiau-workspace-sync");
@@ -81,12 +123,9 @@ export class WorkspaceManager {
         this.resolvedMonitorsLayout = "side-by-side";
         this.autoMonitorsObserver = null;
         this._autoMonitorsRaf = null;
-        const savedTimelinePos = localStorage.getItem("capiau_timeline_position");
-        this.timelinePosition = ["center", "bottom-left", "bottom-right", "bottom-full"].includes(savedTimelinePos)
-            ? savedTimelinePos
-            : (savedTimelinePos === "bottom" ? "bottom-full" : "center");
-        this.studioTop = null;
-        this.compoundStage = null;
+        // "center" (embaixo dos monitores), "band" (numa faixa) ou "column" (coluna do editor); sai das
+        // faixas e de columnOrder, ver loadTimelinePosition.
+        this.timelinePosition = "center";
         this.isZenMode = false;
         this.preZenState = null;
         this.defaultColumnOrder = ["sidebar-left", "inspector-panel", "center-stage", "sidebar-right"];
@@ -101,14 +140,37 @@ export class WorkspaceManager {
             } catch (e) {}
         }
 
+        // Laterais empilhadas numa mesma coluna (F2b drag & dock), de cima para baixo.
+        this.columnStacks = [];
+        try {
+            this.columnStacks = normalizeStacks(JSON.parse(localStorage.getItem("capiau_column_stacks") || "[]"));
+        } catch (e) {}
+
+        // Faixas inteiras em cima/embaixo do editor (F2c) e quem fica com cada canto.
+        this.bands = { top: [], bottom: [] };
+        this.bandCorners = {};
+        try {
+            const saved = JSON.parse(localStorage.getItem("capiau_dock_bands") || "null");
+            if (saved) ({ bands: this.bands, corners: this.bandCorners } = normalizeBands(saved.bands, saved.corners));
+        } catch (e) {}
+        this.loadTimelinePosition();
+
+        // Painéis recolhidos (Biblioteca, Ajustes, Painel Lateral), valem em qualquer lugar e ficam
+        // salvos ao reabrir. Os recolhidos sozinhos (Painel Lateral sem abas) não vão para o salvo.
+        this.collapsedPanels = loadCollapsed(localStorage);
+        this.autoCollapsedPanels = new Set();
+
         this.pendingColumnOrder = [...this.columnOrder];
-        this.pendingTimelinePosition = this.timelinePosition;
+        this.pendingTimelinePosition = this.timelineShape();
         this.pendingMonitorsLayout = this.monitorsLayout;
 
         this.columnMetadata = {
             "sidebar-left": { title: "Biblioteca / Mídia", icon: "fa-folder-open", desc: "Mídias, pastas e bins do projeto" },
             "inspector-panel": { title: "Inspetor / Efeitos", icon: "fa-sliders", desc: "Propriedades, transformações e ajustes" },
             "center-stage": { title: "Monitores & Preview", icon: "fa-desktop", desc: "Source Player, Program Player e Timeline Central" },
+            "timeline-panel": { title: "Timeline", icon: "fa-film", desc: "Linha do tempo como coluna do editor" },
+            "source-player-panel": { title: "Source", icon: "fa-tv", desc: "Monitor Source fora do bloco, como coluna" },
+            "program-player-panel": { title: "Program", icon: "fa-tv", desc: "Monitor Program fora do bloco, como coluna" },
             "sidebar-right": { title: "Ferramentas / Painel Direito", icon: "fa-toolbox", desc: "Ferramentas secundárias, exportação e IA" }
         };
 
@@ -142,7 +204,888 @@ export class WorkspaceManager {
         this._timelineResizeAnimRaf = null;
         this._lastTimelineCustomHeight = null;
 
+        // Histórico de layout (F1 do plano de janelas drag & dock): cada método que muda a
+        // disposição dos painéis registra o novo estado, uma entrada por ação do usuário.
+        this.layoutHistory = new LayoutHistory();
+        // F3: janelas abertas durante um arrasto; o painel só entra nelas quando o mouse é solto.
+        this._deferredPopouts = new Map();
+        this._layoutHistoryReady = false;
+        this._applyingLayout = false;
+        this._layoutCommitTimer = null;
+        [
+            "setTimelinePosition", "setMonitorsLayout", "applyColumnsOrder", "setColumnLayout", "applyWorkspace",
+            "attachPanelToPopout", "attachDualPanelsToPopout", "restorePanel", "restoreDualPopout"
+        ].forEach((name) => {
+            const original = this[name].bind(this);
+            this[name] = (...args) => {
+                const result = original(...args);
+                this.scheduleLayoutCommit();
+                return result;
+            };
+        });
+
         this.init();
+    }
+
+    /** Estado legado atual (colunas, timeline, monitores e janelas destacadas) para o DockModel. */
+    getLegacyLayoutState() {
+        const isOpen = (w) => !!(w && !w.closed);
+        const dualWin = window.popoutWindows?.["dual-sidebar"];
+        let dual = null;
+        if (isOpen(dualWin)) {
+            const panels = (localStorage.getItem("capiau_dual_popout_panels") || "").split(",").filter(Boolean);
+            if (panels.length === 2) {
+                dual = { panels, layout: localStorage.getItem("capiau_dual_popout_layout") || "side-by-side" };
+            }
+        }
+        const groupWin = window.popoutWindows?.["group"];
+        const groupPanels = this.getGroupPanels();
+        const group = groupPanels.length >= 2
+            ? { panels: groupPanels, arrangement: localStorage.getItem("capiau_group_popout_arrangement") || "row" }
+            : null;
+        const popped = Object.keys(window.popoutWindows || {}).filter(id =>
+            id !== "dual-sidebar" && id !== "group" && isOpen(window.popoutWindows[id])
+            && window.popoutWindows[id] !== dualWin && window.popoutWindows[id] !== groupWin
+        );
+        const legacy = {
+            columnOrder: [...this.columnOrder],
+            timelinePosition: this.timelinePosition,
+            monitorsLayout: this.monitorsLayout,
+            columnStacks: this.columnStacks.map(st => [...st]),
+            popped,
+            dual,
+            group,
+            tabStrips: window.tabPanels?.getStrips?.() || {}
+        };
+        if (hasBands(this.bands)) {
+            legacy.bands = { top: [...this.bands.top], bottom: [...this.bands.bottom] };
+            legacy.bandCorners = { ...this.bandCorners };
+        }
+        return legacy;
+    }
+
+    /** Colunas no formato do dockOps: ordem, pilhas e, se houver, faixas e cantos. */
+    getColumnState() {
+        const state = { order: [...this.columnOrder], stacks: this.columnStacks.map(st => [...st]) };
+        if (hasBands(this.bands)) {
+            state.bands = { top: [...this.bands.top], bottom: [...this.bands.bottom] };
+            state.corners = { ...this.bandCorners };
+        }
+        return state;
+    }
+
+    /**
+     * Aplica ordem das colunas + pilhas de laterais de uma vez (um passo no histórico).
+     * bands/corners (F2c): ausentes = faixas continuam como estão; { top: [], bottom: [] } = sem faixas.
+     */
+    setColumnLayout(order, stacks, bands, corners, skipSplitterReinit = false) {
+        this.columnStacks = normalizeStacks(stacks);
+        if (bands !== undefined) {
+            this.keepTimelineHeight(normalizeBands(bands, corners).bands);
+            this.storeBands(bands, corners);
+        }
+        try {
+            localStorage.setItem("capiau_column_stacks", JSON.stringify(this.columnStacks));
+        } catch (e) {}
+        this.applyColumnsOrder(order, true, skipSplitterReinit);
+    }
+
+    /**
+     * A timeline muda de lugar com a altura que tinha: faixa nova só com ela fica com essa altura;
+     * de volta para baixo dos monitores, volta com a altura salva de lá (ou a atual).
+     */
+    keepTimelineHeight(nextBands) {
+        const edge = bandOf(nextBands, TIMELINE_ID);
+        const was = bandOf(this.bands, TIMELINE_ID);
+        if (edge === was) return;
+        const h = this.currentTimelineHeight();
+        if (!h) return;
+        try {
+            if (edge && !this.bands[edge].length) localStorage.setItem(`capiau_band_h_${edge}`, String(h + BAND_RESIZER_H));
+            if (!edge && !(parseFloat(localStorage.getItem("layout-dim-splitter-timeline")) > 50)) {
+                localStorage.setItem("layout-dim-splitter-timeline", String(h));
+            }
+        } catch (e) {}
+    }
+
+    /** Guarda faixas e cantos. */
+    storeBands(bands, corners) {
+        ({ bands: this.bands, corners: this.bandCorners } = normalizeBands(bands, corners));
+        try {
+            localStorage.setItem("capiau_dock_bands", JSON.stringify({ bands: this.bands, corners: this.bandCorners }));
+        } catch (e) {}
+        this.deriveTimelinePosition();
+    }
+
+    /**
+     * Onde está a timeline (F2c parte 2): numa faixa ("band"), como coluna em columnOrder ("column")
+     * ou embaixo dos monitores ("center"). Faixas e colunas mandam; timelinePosition só resume.
+     */
+    deriveTimelinePosition() {
+        this.timelinePosition = bandOf(this.bands, TIMELINE_ID) ? "band"
+            : this.columnOrder.includes(TIMELINE_ID) ? "column" : "center";
+        try { localStorage.setItem("capiau_timeline_position", this.timelinePosition); } catch (e) {}
+    }
+
+    /** Lê a posição salva; as antigas (bottom-left/right/full) viram a faixa de baixo com os mesmos cantos. */
+    loadTimelinePosition() {
+        const saved = localStorage.getItem("capiau_timeline_position");
+        const conv = convertTimelinePosition(saved === "bottom" ? "bottom-full" : saved, this.bands, this.bandCorners, this.columnOrder);
+        // Faixa vence coluna: a timeline não fica nos dois lugares.
+        if (conv.timelinePosition === "band") this.columnOrder = this.columnOrder.filter(id => id !== TIMELINE_ID);
+        const edge = bandOf(conv.bands, TIMELINE_ID);
+        if (edge && !bandOf(this.bands, TIMELINE_ID) && !this.bands[edge].length && !localStorage.getItem(`capiau_band_h_${edge}`)) {
+            // Faixa nova só com a timeline: fica com a altura que a timeline tinha embaixo.
+            const h = parseFloat(localStorage.getItem("layout-dim-splitter-studio-timeline")) || parseFloat(localStorage.getItem("layout-dim-splitter-timeline"));
+            if (h > 50) { try { localStorage.setItem(`capiau_band_h_${edge}`, String(Math.round(h) + BAND_RESIZER_H)); } catch (e) {} }
+        }
+        this.storeBands(conv.bands, conv.bandCorners);
+    }
+
+    /**
+     * Posição da timeline com os nomes de antes, para menus, botões e workspaces: "center",
+     * "bottom-full" / "bottom-left" / "bottom-right" (faixa de baixo com esses cantos), "band"
+     * (outra combinação: faixa de cima, só sob o centro) ou "column".
+     */
+    timelineShape() {
+        const edge = bandOf(this.bands, TIMELINE_ID);
+        if (!edge) return this.timelinePosition === "column" ? "column" : "center";
+        if (edge !== "bottom") return "band";
+        const state = this.getColumnState();
+        const left = timelineExpanded(state, "left");
+        const right = timelineExpanded(state, "right");
+        return left && right ? "bottom-full" : left ? "bottom-left" : right ? "bottom-right" : "band";
+    }
+
+    /** Tira um painel da pilha antes de destacá-lo (ele sai sozinho para a janela nova). */
+    detachFromStack(panelId) {
+        if (!stackOf(this.columnStacks, panelId)) return;
+        const next = removeFromStack(this.getColumnState(), panelId);
+        this.setColumnLayout(next.order, next.stacks);
+    }
+
+    // ── Faixas inteiras em cima/embaixo do editor (F2c) ──────────────────────
+    //
+    // O .workspace fica dentro de uma moldura em grade (.dock-frame) de 3 × 3:
+    //   linha 1 = faixa de cima, linha 3 = faixa de baixo, coluna 1/3 = coluna da ponta que ficou
+    //   com um canto ("column"): ela sai do .workspace e vai até o fim, e a faixa encurta.
+    // O renderizador legado continua montando colunas e timeline dentro do .workspace; renderBands
+    // roda depois dele e leva os membros de faixa e as colunas da ponta para a moldura.
+
+    ensureDockFrame(workspace) {
+        if (workspace.parentElement?.classList.contains("dock-frame")) return workspace.parentElement;
+        const frame = document.createElement("div");
+        frame.className = "dock-frame";
+        workspace.before(frame);
+        frame.appendChild(workspace);
+        return frame;
+    }
+
+    /**
+     * Colunas de cada lado do centro na ordem de columnOrder, sem os membros de faixa e sem os
+     * convidados de pilha (que vão dentro do anfitrião).
+     */
+    sideColumns() {
+        const members = new Set([...this.bands.top, ...this.bands.bottom]);
+        const guests = stackGuests(this.columnStacks);
+        const cols = this.columnOrder.filter(id => !members.has(id) && !guests.has(id));
+        const ci = cols.indexOf(CENTER_STAGE);
+        if (ci === -1) return { left: cols, right: [] };
+        return { left: cols.slice(0, ci), right: cols.slice(ci + 1) };
+    }
+
+    cornerOwnedByColumn(side, edge) {
+        const key = (edge === "top" ? "t" : "b") + (side === "left" ? "l" : "r");
+        return this.bands[edge].length > 0 && this.bandCorners[key] === "column";
+    }
+
+    renderBands() {
+        const workspace = document.querySelector(".workspace");
+        if (!workspace) return;
+        const frame = this.ensureDockFrame(workspace);
+        const isPopped = (id) => !!(window.popoutWindows?.[id] && !window.popoutWindows[id].closed);
+        const members = new Set([...this.bands.top, ...this.bands.bottom]);
+        const local = (id) => {
+            if (!id || id === CENTER_STAGE || isPopped(id)) return null;
+            const el = this.findPanelElement(id);
+            return el && el.ownerDocument === document ? el : null;
+        };
+
+        document.querySelectorAll(".dock-band-member").forEach(el => {
+            if (!members.has(el.id)) el.classList.remove("dock-band-member", "dock-band-last");
+        });
+
+        // Lado que fica com um canto: todas as colunas daquele lado do centro vão até o fim, juntas.
+        const sides = this.sideColumns();
+        const pulled = {};
+        ["left", "right"].forEach(side => {
+            let cell = frame.querySelector(`:scope > .dock-edge[data-side="${side}"]`);
+            const els = sides[side].map(local).filter(Boolean);
+            const top = this.cornerOwnedByColumn(side, "top");
+            const bottom = this.cornerOwnedByColumn(side, "bottom");
+            if (!els.length || (!top && !bottom)) {
+                if (cell) {
+                    // Sobrou algo dentro (painel ou linha)? Volta para o editor; o arranjo seguinte acerta a ordem.
+                    const back = [...cell.children].filter(c => !c.classList.contains("dock-edge-resizer") && !c.classList.contains("dock-edge-splitter"));
+                    if (side === "left") workspace.prepend(...back); else workspace.append(...back);
+                    cell.remove();
+                }
+                return;
+            }
+            if (!cell) {
+                cell = document.createElement("div");
+                cell.className = "dock-edge";
+                cell.dataset.side = side;
+                const resizer = document.createElement("div");
+                resizer.className = "dock-edge-resizer";
+                resizer.setAttribute("data-tooltip", "Arraste para redimensionar");
+                cell.appendChild(resizer);
+                // O divisor que encosta no editor redimensiona a coluna de dentro (a vizinha do centro).
+                this.bindEdgeResizer(resizer, side, () => document.getElementById(cell.dataset.panel));
+                frame.appendChild(cell);
+            }
+            const resizer = cell.querySelector(":scope > .dock-edge-resizer");
+            const oldSplitters = [...cell.querySelectorAll(":scope > .dock-edge-splitter")];
+            const want = [];
+            els.forEach((el, i) => {
+                if (i > 0) {
+                    let splitter = oldSplitters.find(sp => sp.dataset.next === el.id);
+                    if (!splitter) {
+                        splitter = document.createElement("div");
+                        splitter.className = "dock-edge-splitter";
+                        splitter.dataset.next = el.id;
+                        splitter.setAttribute("data-tooltip", "Arraste para redimensionar");
+                        // Entre duas colunas da célula, redimensiona a de fora, como os divisores do editor.
+                        this.bindEdgeResizer(splitter, side, () => document.getElementById(side === "left" ? splitter.dataset.prev : splitter.dataset.next));
+                    }
+                    splitter.dataset.prev = els[i - 1].id;
+                    want.push(splitter);
+                }
+                const line = document.getElementById(BAND_LINE_IDS[el.id]);
+                want.push(...(side === "left" ? [line, el] : [el, line]));
+            });
+            if (side === "left") want.push(resizer); else want.unshift(resizer);
+            oldSplitters.forEach(sp => { if (!want.includes(sp)) sp.remove(); });
+            [...cell.children].forEach(c => { if (!want.includes(c)) workspace.appendChild(c); });
+            placeInOrder(cell, want);
+            cell.dataset.panel = (side === "left" ? els[els.length - 1] : els[0]).id;
+            cell.style.gridColumn = side === "left" ? "1" : "3";
+            cell.style.gridRow = `${top ? 1 : 2} / ${bottom ? 4 : 3}`;
+            pulled[side] = { top, bottom };
+        });
+
+        BAND_EDGES.forEach(edge => {
+            let band = frame.querySelector(`:scope > .dock-band[data-edge="${edge}"]`);
+            const ids = this.bands[edge];
+            if (!ids.length) {
+                if (band) {
+                    band.querySelectorAll(".dock-band-row > :not(.dock-band-splitter)").forEach(c => workspace.appendChild(c));
+                    band.remove();
+                }
+                return;
+            }
+            if (!band) {
+                band = document.createElement("div");
+                band.className = "dock-band";
+                band.dataset.edge = edge;
+                band.innerHTML = '<div class="dock-band-resizer" data-tooltip="Arraste para redimensionar"></div><div class="dock-band-row"></div>';
+                const resizer = band.firstElementChild;
+                if (edge === "top") band.appendChild(resizer);
+                this.bindBandResizer(resizer, band, edge);
+                frame.appendChild(band);
+            }
+            const row = band.querySelector(":scope > .dock-band-row");
+            const oldSplitters = [...row.querySelectorAll(":scope > .dock-band-splitter")];
+            const want = [];
+            let present = 0;
+            ids.forEach(id => {
+                const el = local(id);
+                if (!el) return;
+                if (present > 0) {
+                    let splitter = oldSplitters.find(sp => sp.dataset.next === id);
+                    if (!splitter) {
+                        splitter = document.createElement("div");
+                        splitter.className = "dock-band-splitter";
+                        splitter.dataset.next = id;
+                        splitter.setAttribute("data-tooltip", "Arraste para redimensionar");
+                        this.bindBandSplitter(splitter, row);
+                    }
+                    want.push(splitter);
+                }
+                want.push(document.getElementById(BAND_LINE_IDS[id]), el);
+                el.classList.remove("dock-stack-host", "dock-stack-guest", "dock-stack-self-collapsed");
+                el.style.removeProperty("--dock-guest-h");
+                el.classList.add("dock-band-member");
+                const w = parseFloat(localStorage.getItem(`capiau_band_w_${id}`));
+                el.classList.toggle("has-band-w", !isNaN(w) && w > 120);
+                if (!isNaN(w) && w > 120) el.style.setProperty("--dock-band-w", `${w}px`);
+                present++;
+            });
+            oldSplitters.forEach(sp => { if (!want.includes(sp)) sp.remove(); });
+            placeInOrder(row, want);
+            // Quem saiu desta faixa (ex.: a timeline voltando para o centro) volta para o editor.
+            [...row.children].forEach(c => { if (!want.includes(c)) workspace.appendChild(c); });
+            band.hidden = present === 0;
+            band.classList.toggle("has-timeline", ids.includes(TIMELINE_ID) && !!local(TIMELINE_ID));
+            const h = parseFloat(localStorage.getItem(`capiau_band_h_${edge}`));
+            band.style.setProperty("--dock-band-h", `${!isNaN(h) && h > 80 ? h : 260}px`);
+            band.style.gridRow = edge === "top" ? "1" : "3";
+            band.style.gridColumn = `${pulled.left?.[edge] ? 2 : 1} / ${pulled.right?.[edge] ? 3 : 4}`;
+        });
+
+        this.renderCornerToggles(sides, local);
+    }
+
+    /** Setinha no rodapé (e no topo) da coluna da ponta: alterna quem fica com o canto. */
+    renderCornerToggles(sides, local) {
+        document.querySelectorAll(".dock-corner-toggle").forEach(b => b.remove());
+        ["left", "right"].forEach(side => {
+            // Na coluna da ponta; recolhida, na próxima aberta daquele lado.
+            const fromEdge = (side === "left" ? sides[side] : [...sides[side]].reverse()).map(local).filter(Boolean);
+            const el = fromEdge.find(e => !this.isPanelCollapsed(e.id)) || fromEdge[0];
+            if (!el) return;
+            BAND_EDGES.forEach(edge => {
+                if (!this.bands[edge].length) return;
+                const corner = (edge === "top" ? "t" : "b") + (side === "left" ? "l" : "r");
+                const grow = !this.cornerOwnedByColumn(side, edge);
+                const up = edge === "top" ? grow : !grow;
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = `dock-corner-toggle dock-corner-${edge}`;
+                btn.innerHTML = `<i class="fa-solid fa-chevron-${up ? "up" : "down"}"></i>`;
+                btn.setAttribute("data-tooltip", grow ? `Estender até ${edge === "top" ? "em cima" : "embaixo"}` : "Deixar a faixa passar");
+                btn.addEventListener("pointerdown", (e) => e.stopPropagation());
+                btn.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.setBandCorner(corner, grow ? "column" : "band");
+                });
+                el.appendChild(btn);
+            });
+        });
+    }
+
+    setBandCorner(corner, mode) {
+        const next = setCorner(this.getColumnState(), corner, mode);
+        if (!next) return false;
+        this.setColumnLayout(next.order, next.stacks, next.bands || { top: [], bottom: [] }, next.corners || {});
+        window.dockDrag?.showToast?.("undo", mode === "column" ? "Layout alterado: coluna até o fim" : "Layout alterado: faixa passa inteira");
+        return true;
+    }
+
+    /** Arrasto de redimensionar (pointer capture): onMove(dx, dy), onEnd(). */
+    bindResizeDrag(handle, onStart, onMove, onEnd) {
+        handle.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            handle.setPointerCapture(e.pointerId);
+            const x0 = e.clientX, y0 = e.clientY;
+            if (onStart() === false) return;
+            handle.classList.add("active");
+            document.body.classList.add("layout-resizing");
+            const move = (ev) => onMove(ev.clientX - x0, ev.clientY - y0);
+            const up = () => {
+                handle.classList.remove("active");
+                document.body.classList.remove("layout-resizing");
+                handle.removeEventListener("pointermove", move);
+                handle.removeEventListener("pointerup", up);
+                handle.removeEventListener("pointercancel", up);
+                onEnd();
+                window.dispatchEvent(new Event("resize"));
+            };
+            handle.addEventListener("pointermove", move);
+            handle.addEventListener("pointerup", up);
+            handle.addEventListener("pointercancel", up);
+        });
+    }
+
+    bindBandResizer(resizer, band, edge) {
+        let h0 = 0;
+        let raf = null;
+        // Faixa com a timeline: o canvas acompanha a cada quadro, sem esticar nem piscar (Seção I.3 da skill).
+        const redraw = () => {
+            if (raf || !band.classList.contains("has-timeline")) return;
+            raf = requestAnimationFrame(() => {
+                raf = null;
+                window.timelineRenderer?.resize?.();
+                window.timelineRenderer?.draw?.();
+            });
+        };
+        this.bindResizeDrag(resizer, () => { h0 = band.getBoundingClientRect().height; }, (dx, dy) => {
+            const max = (band.parentElement?.getBoundingClientRect().height || 800) - 180;
+            const h = Math.max(120, Math.min(max, h0 + (edge === "top" ? dy : -dy)));
+            band.style.setProperty("--dock-band-h", `${Math.round(h)}px`);
+            redraw();
+        }, () => {
+            const h = parseFloat(band.style.getPropertyValue("--dock-band-h"));
+            if (!isNaN(h)) { try { localStorage.setItem(`capiau_band_h_${edge}`, String(h)); } catch (e) {} }
+        });
+        // Duplo clique, como no divisor de antes: ajusta a altura para caber todas as pistas.
+        resizer.addEventListener("dblclick", () => {
+            if (band.classList.contains("has-timeline")) this.fitTimelineHeightToTracks(true);
+        });
+    }
+
+    /** Divisor dentro da faixa: redimensiona o painel visível antes dele. */
+    bindBandSplitter(splitter, row) {
+        let prev = null, w0 = 0;
+        this.bindResizeDrag(splitter, () => {
+            prev = splitter.previousElementSibling;
+            while (prev && !(prev.classList.contains("dock-band-member") && !prev.classList.contains("collapsed"))) prev = prev.previousElementSibling;
+            if (!prev) return false;
+            w0 = prev.getBoundingClientRect().width;
+        }, (dx) => {
+            const w = Math.max(160, Math.min(row.getBoundingClientRect().width - 160, w0 + dx));
+            prev.style.setProperty("--dock-band-w", `${Math.round(w)}px`);
+            prev.classList.add("has-band-w");
+        }, () => {
+            const w = parseFloat(prev.style.getPropertyValue("--dock-band-w"));
+            if (!isNaN(w)) { try { localStorage.setItem(`capiau_band_w_${prev.id}`, String(w)); } catch (e) {} }
+        });
+    }
+
+    /**
+     * Divisor de coluna na célula da ponta que ficou com o canto (fora do .workspace, sem os
+     * divisores legados). getEl diz qual coluna ele redimensiona.
+     */
+    bindEdgeResizer(handle, side, getEl) {
+        const keys = { "sidebar-left": "layout-dim-splitter-sidebar-left", "inspector-panel": "layout-dim-splitter-inspector", "sidebar-right": "layout-dim-splitter-sidebar-right", "timeline-panel": "layout-dim-splitter-timeline-panel",
+            "source-player-panel": "layout-dim-splitter-source-player-panel", "program-player-panel": "layout-dim-splitter-program-player-panel" };
+        let el = null, w0 = 0;
+        this.bindResizeDrag(handle, () => {
+            el = getEl();
+            if (!el || el.classList.contains("collapsed")) return false;
+            w0 = el.getBoundingClientRect().width;
+        }, (dx) => {
+            const w = Math.round(Math.max(200, Math.min(PLACED_ONLY_IDS.includes(el.id) ? 1600 : 900, w0 + (side === "left" ? dx : -dx))));
+            el.style.width = `${w}px`;
+            el.style.flex = `0 0 ${w}px`;
+        }, () => {
+            const w = parseFloat(el.style.width);
+            // Abas (F2c parte 2c): a mesma chave do divisor do editor (splitter-<id>).
+            const key = keys[el.id] || (PLACED_ONLY_IDS.includes(el.id) ? `layout-dim-splitter-${el.id}` : null);
+            if (!isNaN(w) && key) { try { localStorage.setItem(key, String(w)); } catch (e) {} }
+        });
+    }
+
+    /**
+     * Faixa: o recolhido some e os outros ocupam o espaço; a linha de expandir fica em pé no lugar
+     * dele. Todos recolhidos: a faixa encolhe e as linhas deitam, uma embaixo da outra.
+     */
+    applyBandCollapse(row) {
+        const band = row.closest(".dock-band");
+        if (!band) return;
+        const members = this.bands[band.dataset.edge].map(id => row.querySelector(`:scope > #${id}`)).filter(Boolean);
+        const states = members.map(m => this.isPanelCollapsed(m.id));
+        const all = members.length > 0 && states.every(Boolean);
+        band.classList.toggle("dock-band-all-collapsed", all);
+        members.forEach((m, i) => {
+            m.classList.toggle("collapsed", states[i]);
+            m.classList.remove("dock-stack-self-collapsed", "dock-band-last");
+            const line = document.getElementById(BAND_LINE_IDS[m.id]);
+            if (!line) return;
+            if (line.nextElementSibling !== m) row.insertBefore(line, m);
+            line.classList.toggle("restore-line-h", all);
+            line.style.display = states[i] ? "block" : "none";
+        });
+        const visible = members.filter((m, i) => !states[i]);
+        if (visible.length) visible[visible.length - 1].classList.add("dock-band-last");
+
+        const seq = [!states[0]];
+        const splitters = [null];
+        members.slice(1).forEach((m, i) => {
+            seq.push("splitter", !states[i + 1]);
+            splitters.push(row.querySelector(`:scope > .dock-band-splitter[data-next="${m.id}"]`), null);
+        });
+        visibleSplitters(seq).forEach((show, i) => {
+            if (splitters[i]) splitters[i].style.display = show ? "" : "none";
+        });
+        members.forEach(m => this.refreshCollapseArrow(m.id));
+    }
+
+    /** Monta embaixo do anfitrião os painéis empilhados com ele, cada um com seu divisor de altura. */
+    mountStackGuests(hostId, hostEl) {
+        const stack = this.columnStacks.find(st => st[0] === hostId);
+        if (!stack || !hostEl) return;
+        hostEl.classList.add("dock-stack-host");
+        const side = hostEl.classList.contains("dock-right") ? "right" : "left";
+        stack.slice(1).forEach((guestId) => {
+            const isPopped = !!(window.popoutWindows?.[guestId] && !window.popoutWindows[guestId].closed);
+            const guestEl = hostEl.querySelector(`:scope > #${guestId}`)
+                || document.getElementById(guestId)
+                || this.poppedElements?.[guestId];
+            if (!guestEl || isPopped || guestEl.ownerDocument !== document) return;
+            const splitter = document.createElement("div");
+            splitter.className = "dock-stack-splitter";
+            splitter.dataset.guest = guestId;
+            splitter.setAttribute("data-tooltip", "Arraste para redimensionar");
+            hostEl.appendChild(splitter);
+            hostEl.appendChild(guestEl);
+            guestEl.classList.add("dock-stack-guest");
+            this.updatePanelDockDirection(guestId, side);
+            const saved = parseFloat(localStorage.getItem(`capiau_stack_h_${guestId}`));
+            if (!isNaN(saved) && saved > 80) guestEl.style.setProperty("--dock-guest-h", `${saved}px`);
+            else guestEl.style.removeProperty("--dock-guest-h");
+            this.bindStackSplitter(splitter, guestEl, hostEl);
+        });
+    }
+
+    bindStackSplitter(splitter, guestEl, hostEl) {
+        splitter.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            splitter.setPointerCapture(e.pointerId);
+            const startY = e.clientY;
+            const startH = guestEl.getBoundingClientRect().height;
+            const maxH = hostEl.getBoundingClientRect().height - 140;
+            splitter.classList.add("active");
+            const move = (ev) => {
+                const h = Math.max(120, Math.min(maxH, startH - (ev.clientY - startY)));
+                guestEl.style.setProperty("--dock-guest-h", `${Math.round(h)}px`);
+            };
+            const up = () => {
+                splitter.classList.remove("active");
+                splitter.removeEventListener("pointermove", move);
+                splitter.removeEventListener("pointerup", up);
+                splitter.removeEventListener("pointercancel", up);
+                const h = parseFloat(guestEl.style.getPropertyValue("--dock-guest-h"));
+                if (!isNaN(h)) {
+                    try { localStorage.setItem(`capiau_stack_h_${guestEl.id}`, String(h)); } catch (err) {}
+                }
+                window.dispatchEvent(new Event("resize"));
+            };
+            splitter.addEventListener("pointermove", move);
+            splitter.addEventListener("pointerup", up);
+            splitter.addEventListener("pointercancel", up);
+        });
+    }
+
+    // ── Recolher painéis: coluna, pilha e janelas destacadas ─────────────────
+
+    findPanelElement(panelId) {
+        return document.getElementById(panelId)
+            || this.poppedElements?.[panelId]
+            || null;
+    }
+
+    /** Onde o painel está: "column", "stack" (com host), ou numa janela: "single", "dual", "group" (com win). */
+    panelPlacement(panelId) {
+        const el = this.findPanelElement(panelId);
+        if (!el) return null;
+        if (el.ownerDocument !== document) {
+            const win = el.ownerDocument.defaultView;
+            if (!win || win.closed) return null;
+            const kind = win === window.popoutWindows?.["group"] ? "group"
+                : win === window.popoutWindows?.["dual-sidebar"] ? "dual"
+                : "single";
+            return { kind, el, win };
+        }
+        if (el.parentElement?.classList.contains("dock-band-row")) return { kind: "band", el, row: el.parentElement };
+        if (el.classList.contains("dock-stack-host")) return { kind: "stack", el, host: el };
+        if (el.classList.contains("dock-stack-guest") && el.parentElement?.classList.contains("dock-stack-host")) {
+            return { kind: "stack", el, host: el.parentElement };
+        }
+        return { kind: "column", el };
+    }
+
+    isPanelCollapsed(panelId) {
+        // A timeline recolhe pelo próprio botão (main.js), que só marca a classe no painel.
+        if (panelId === TIMELINE_ID) return !!document.getElementById(TIMELINE_ID)?.classList.contains("collapsed");
+        return this.collapsedPanels.has(panelId);
+    }
+
+    /**
+     * Recolhe ou expande um painel onde ele estiver. auto = recolhido pelo próprio editor
+     * (ex.: Painel Lateral sem abas): vale agora, mas não vai para o estado salvo.
+     */
+    setPanelCollapsed(panelId, collapsed, { auto = false } = {}) {
+        if (!COLLAPSIBLE_PANELS.includes(panelId)) return;
+        if (collapsed) this.collapsedPanels.add(panelId);
+        else this.collapsedPanels.delete(panelId);
+        if (collapsed && auto) this.autoCollapsedPanels.add(panelId);
+        else this.autoCollapsedPanels.delete(panelId);
+        saveCollapsed(localStorage, [...this.collapsedPanels].filter(id => !this.autoCollapsedPanels.has(id)));
+        if (!collapsed && panelId === "inspector-panel") {
+            document.getElementById("reopen-inspector")?.classList.remove("has-updates");
+        }
+        this.applyPanelCollapse(panelId);
+        window.dispatchEvent(new Event("resize"));
+    }
+
+    togglePanelCollapsed(panelId) {
+        this.setPanelCollapsed(panelId, !this.isPanelCollapsed(panelId));
+        return this.isPanelCollapsed(panelId);
+    }
+
+    /** Mostra o estado guardado de um painel no lugar onde ele está agora. */
+    applyPanelCollapse(panelId) {
+        const place = this.panelPlacement(panelId);
+        if (!place) return;
+        if (place.kind === "stack") {
+            this.applyStackCollapse(place.host);
+            return;
+        }
+        if (place.kind === "band") {
+            this.applyBandCollapse(place.row);
+            return;
+        }
+        const collapsed = this.isPanelCollapsed(panelId);
+        const line = document.getElementById(REOPEN_LINE_IDS[panelId]);
+        if (line) line.classList.remove("restore-line-h");
+        if (place.kind === "column") {
+            // A linha fica ao lado do painel (pode ter ficado dentro de uma pilha desfeita).
+            if (line && line.parentElement !== place.el.parentElement) {
+                if (place.el.classList.contains("dock-right")) place.el.after(line);
+                else place.el.before(line);
+            }
+            place.el.classList.remove("dock-stack-self-collapsed");
+            place.el.classList.toggle("collapsed", collapsed);
+            if (line) line.style.display = collapsed ? "block" : "none";
+            this.refreshEdgeSplitters();
+        } else {
+            // Na janela destacada quem desenha o recolher é a própria página (panel.html / panel-group.html).
+            place.el.classList.remove("collapsed", "dock-stack-self-collapsed");
+            if (line) line.style.display = "none";
+            try { place.win.capiauSetPanelCollapsed?.(panelId, collapsed); } catch (e) {}
+        }
+        this.refreshCollapseArrow(panelId);
+    }
+
+    /**
+     * Pilha de coluna: o recolhido some e os outros ocupam o espaço; a linha de expandir fica no
+     * lugar dele (em cima, se era o de cima). Todos recolhidos: a coluna some e as linhas ficam
+     * em pé onde ela estava, como uma coluna recolhida.
+     */
+    applyStackCollapse(host) {
+        if (!host) return;
+        const guests = [...host.querySelectorAll(":scope > .dock-stack-guest")];
+        const members = [host, ...guests];
+        const states = members.map(m => this.isPanelCollapsed(m.id));
+        const lines = members.map(m => document.getElementById(REOPEN_LINE_IDS[m.id]));
+        const all = states.every(Boolean);
+
+        host.classList.toggle("collapsed", all);
+        host.classList.toggle("dock-stack-self-collapsed", states[0] && !all);
+        guests.forEach((g, i) => g.classList.toggle("collapsed", states[i + 1]));
+
+        if (all) {
+            const isRight = host.classList.contains("dock-right");
+            let ref = host;
+            lines.forEach(line => {
+                if (!line) return;
+                line.classList.remove("restore-line-h");
+                line.style.display = "block";
+                if (isRight) { ref.after(line); ref = line; }
+                else host.before(line);
+            });
+        } else {
+            members.forEach((m, i) => {
+                const line = lines[i];
+                if (!line) return;
+                if (!states[i]) {
+                    // Escondida fora da coluna, para não sobrar dentro de um painel quando a pilha mudar.
+                    line.style.display = "none";
+                    line.classList.remove("restore-line-h");
+                    if (line.parentElement === host) host.before(line);
+                    return;
+                }
+                line.classList.add("restore-line-h");
+                line.style.display = "block";
+                if (i === 0) {
+                    host.insertBefore(line, host.firstChild);
+                } else {
+                    const splitter = host.querySelector(`:scope > .dock-stack-splitter[data-guest="${m.id}"]`);
+                    host.insertBefore(line, splitter || m);
+                }
+            });
+        }
+
+        // Divisores só entre dois painéis visíveis.
+        const seq = [!states[0]];
+        const splitters = [null];
+        guests.forEach((g, i) => {
+            seq.push("splitter", !states[i + 1]);
+            splitters.push(host.querySelector(`:scope > .dock-stack-splitter[data-guest="${g.id}"]`), null);
+        });
+        visibleSplitters(seq).forEach((show, i) => {
+            if (splitters[i]) splitters[i].style.display = show ? "" : "none";
+        });
+
+        members.forEach(m => this.refreshCollapseArrow(m.id));
+    }
+
+    applyAllCollapse() {
+        const hosts = new Set();
+        // Toda faixa, inclusive a que só tem a timeline.
+        const rows = new Set(document.querySelectorAll(".dock-frame > .dock-band > .dock-band-row"));
+        COLLAPSIBLE_PANELS.forEach(id => {
+            const place = this.panelPlacement(id);
+            if (!place) return;
+            if (place.kind === "stack") hosts.add(place.host);
+            else if (place.kind === "band") rows.add(place.row);
+            else this.applyPanelCollapse(id);
+        });
+        hosts.forEach(host => this.applyStackCollapse(host));
+        rows.forEach(row => this.applyBandCollapse(row));
+        this.refreshEdgeSplitters();
+    }
+
+    /** Divisor entre duas colunas da célula da ponta: só com as duas abertas. */
+    refreshEdgeSplitters() {
+        const open = (id) => { const el = document.getElementById(id); return !!el && !this.isPanelCollapsed(id); };
+        document.querySelectorAll(".dock-edge-splitter").forEach(sp => {
+            sp.style.display = open(sp.dataset.prev) && open(sp.dataset.next) ? "" : "none";
+        });
+    }
+
+    /** Para onde o painel recolhe: esquerda/direita lado a lado, cima/baixo empilhado. */
+    collapseEdge(panelId) {
+        const place = this.panelPlacement(panelId);
+        if (!place) return null;
+        if (place.kind === "stack") {
+            const members = [place.host, ...place.host.querySelectorAll(":scope > .dock-stack-guest")];
+            return edgeInLine("column", members.indexOf(place.el), members.length);
+        }
+        if (place.kind === "band") {
+            // Sozinho na faixa: recolhe para o lado da faixa no editor (cima/baixo).
+            const members = [...place.row.querySelectorAll(":scope > .dock-band-member")];
+            if (members.length === 1) return place.row.closest(".dock-band")?.dataset.edge === "top" ? "up" : "down";
+            return edgeInLine("row", members.indexOf(place.el), members.length);
+        }
+        if (place.kind === "column") return place.el.classList.contains("dock-right") ? "right" : "left";
+        try {
+            return place.win.capiauPanelEdge?.(panelId) || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    refreshCollapseArrow(panelId) {
+        const edge = this.collapseEdge(panelId);
+        const btn = edge && this.findPanelElement(panelId)?.querySelector(".btn-toggle-sidebar");
+        if (!btn) return;
+        const { html, tooltip } = collapseButtonFor(edge);
+        if (btn.innerHTML !== html) btn.innerHTML = html;
+        btn.removeAttribute("title");
+        btn.setAttribute("data-tooltip", tooltip);
+    }
+
+    refreshCollapseArrows() {
+        COLLAPSIBLE_PANELS.forEach(id => this.refreshCollapseArrow(id));
+    }
+
+    getDockLayout() {
+        return layoutFromLegacy(this.getLegacyLayoutState());
+    }
+
+    /** Agrupa as chamadas encadeadas de uma mesma ação num único passo do histórico. */
+    scheduleLayoutCommit() {
+        // Painel de faixa que foi para uma janela ou voltou dela: a faixa se redesenha (F2c).
+        clearTimeout(this._bandsRenderTimer);
+        const renderWhenIdle = () => {
+            // No meio de um arrasto espera o soltar: redesenhar agora poderia mover o painel da alça.
+            if (window.dockDrag?.drag) { this._bandsRenderTimer = setTimeout(renderWhenIdle, 200); return; }
+            this.renderBands();
+            this.applyAllCollapse();
+        };
+        this._bandsRenderTimer = setTimeout(renderWhenIdle, 60);
+        if (!this._layoutHistoryReady || this._applyingLayout) return;
+        clearTimeout(this._layoutCommitTimer);
+        this._layoutCommitTimer = setTimeout(() => {
+            const layout = this.getDockLayout();
+            this.layoutHistory.record(layout);
+            try {
+                localStorage.setItem("capiau_dock_layout", serializeLayout(layout));
+            } catch (e) {}
+        }, 80);
+    }
+
+    /** Aplica uma árvore de layout usando o renderizador atual. Retorna false se não for representável. */
+    applyDockLayout(layout) {
+        const legacy = legacyFromLayout(layout);
+        if (!legacy) return false;
+
+        this._applyingLayout = true;
+        clearTimeout(this._layoutCommitTimer);
+        try {
+            // As faixas levam a timeline junto (legacy.timelinePosition é "band" ou "center").
+            this.setMonitorsLayout(legacy.monitorsLayout, true);
+            this.setColumnLayout(legacy.columnOrder, legacy.columnStacks || [], legacy.bands || { top: [], bottom: [] }, legacy.bandCorners || {});
+            // P14: menu de cada aba (antes das janelas: ao voltar de uma janela, a aba vai para o menu certo).
+            window.tabPanels?.applyStrips?.(legacy.tabStrips || {});
+
+            // Janelas destacadas: primeiro fecha as que sobram, depois abre as que faltam.
+            // Abrir precisa do gesto do usuário (o atalho de teclado conta) e o navegador
+            // só permite uma janela por gesto.
+            const current = this.getLegacyLayoutState();
+            const sameDual = (a, b) => !!a && !!b && a.panels.join() === b.panels.join() && a.layout === b.layout;
+            if (current.dual && !sameDual(current.dual, legacy.dual)) {
+                try { window.popoutWindows["dual-sidebar"]?.close(); } catch (e) {}
+                this.restoreDualPopout(current.dual.panels[0], current.dual.panels[1]);
+            }
+            // Mesmos painéis em outra ordem não reabrem a janela: a troca de lugar é feita nela mesma.
+            const sameGroup = (a, b) => !!a && !!b && [...a.panels].sort().join() === [...b.panels].sort().join();
+            if (current.group && !sameGroup(current.group, legacy.group)) this.restoreGroupPopout();
+            current.popped.filter(id => !legacy.popped.includes(id)).forEach(id => this.togglePopout(id));
+            if (legacy.group && !sameGroup(current.group, legacy.group)) {
+                this.openGroupPopout(legacy.group.panels, legacy.group.arrangement);
+            } else if (legacy.group && current.group) {
+                if (legacy.group.panels.join() !== current.group.panels.join()) this.setGroupOrder(legacy.group.panels);
+                if (legacy.group.arrangement !== current.group.arrangement) this.setGroupArrangement(legacy.group.arrangement, true);
+            }
+            if (legacy.dual && !sameDual(current.dual, legacy.dual)) {
+                this.openDualPopout(legacy.dual.panels[0], legacy.dual.panels[1], legacy.dual.layout);
+            }
+            legacy.popped.filter(id => !current.popped.includes(id)).forEach(id => this.togglePopout(id));
+        } finally {
+            setTimeout(() => { this._applyingLayout = false; }, 150);
+        }
+        return true;
+    }
+
+    undoLayout() {
+        const target = this.layoutHistory.undo();
+        if (!target) {
+            showToast("Nada para desfazer no layout");
+            return false;
+        }
+        this.applyDockLayout(target);
+        showToast("Layout desfeito (Ctrl+Alt+Shift+Z refaz)", "success");
+        return true;
+    }
+
+    redoLayout() {
+        const target = this.layoutHistory.redo();
+        if (!target) {
+            showToast("Nada para refazer no layout");
+            return false;
+        }
+        this.applyDockLayout(target);
+        showToast("Layout refeito", "success");
+        return true;
+    }
+
+    /** "Restaurar padrão": reaplica a versão salva do workspace carregado (ou o Padrão). */
+    resetLayoutToWorkspace() {
+        const ws = localStorage.getItem("capiau_active_workspace") || "default";
+        const known = this.getCustomWorkspaces()[ws] || this.workspacePresets[ws] || ws === "multitela";
+        const target = known ? ws : "default";
+        this.applyWorkspace(target);
+        const name = this.getCustomWorkspaces()[target]?.name || this.workspacePresets[target]?.name || target;
+        showToast(`Layout restaurado: ${name} (Ctrl+Alt+Z desfaz)`, "success");
+    }
+
+    /** Atalhos do histórico de layout. Usado pela janela principal e pelas destacadas. */
+    handleLayoutShortcut(e) {
+        let action = null;
+        if (KEYMAP_SERVICE.matches(e, "layout.redo")) action = () => this.redoLayout();
+        else if (KEYMAP_SERVICE.matches(e, "layout.undo")) action = () => this.undoLayout();
+        else if (KEYMAP_SERVICE.matches(e, "layout.reset")) action = () => this.resetLayoutToWorkspace();
+        if (!action) return false;
+        e.preventDefault();
+        e.stopPropagation();
+        action();
+        return true;
     }
 
     sendHandshake() {
@@ -157,6 +1100,23 @@ export class WorkspaceManager {
     init() {
         // Escuta mensagens do BroadcastChannel para sincronia bidirecional
         this.channel.addEventListener("message", (e) => this.handleMessage(e));
+
+        // O layout inicial (restaurado do localStorage, janelas destacadas reabrindo) não entra
+        // no histórico: a linha de base é fixada depois que a página assenta.
+        const startLayoutHistory = () => setTimeout(() => {
+            this.layoutHistory.reset(this.getDockLayout());
+            this._layoutHistoryReady = true;
+        }, 1500);
+        if (document.readyState === "complete") startLayoutHistory();
+        else window.addEventListener("load", startLayoutHistory, { once: true });
+
+        const btnResetLayout = document.getElementById("btn-reset-workspace-layout");
+        if (btnResetLayout) {
+            btnResetLayout.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.resetLayoutToWorkspace();
+            });
+        }
 
         // Dispara handshake inicial e retries para reconectar janelas já abertas no segundo monitor
         this.sendHandshake();
@@ -274,8 +1234,11 @@ export class WorkspaceManager {
             
             // Ouvinte de clique geral no wrapper (e elementos internos que propagam)
             wrapper.addEventListener("click", (e) => {
-                // Ignora se clicou em algum botão ou controle, ou se clicou em face-box (desambiguação)
-                if (e.target.closest("button") || e.target.closest(".face-box") || e.target.closest(".player-controls")) return;
+                // Ignora se clicou em algum botão ou controle, ou se clicou em face-box (desambiguação).
+                // A camada de rostos do Source trata o próprio clique (play/pause ou desenhar caixa):
+                // tratar aqui também alternava duas vezes e o clique se anulava.
+                if (e.target.closest("button") || e.target.closest(".face-box") || e.target.closest(".player-controls")
+                    || e.target.closest("#source-video-face-overlay-container")) return;
                 
                 // Evita disparar se o usuário acabou de desenhar um retângulo de rosto no overlayContainer
                 if (window.player && window.player.isDrawing) return;
@@ -288,18 +1251,20 @@ export class WorkspaceManager {
                 
                 clickTimer = setTimeout(() => {
                     clickTimer = null;
+                    // No documento do player: destacado, ele está na outra janela (não aqui).
+                    const doc = wrapper.ownerDocument || document;
                     // Play/Pause. Sem videoId (Program) o clique vai para o botão do painel:
                     // o Program compõe a timeline num pool de buffers <video>, então não há
                     // um elemento fixo para dar play — quem manda é o ProgramPlayer.
                     if (!videoId) {
-                        const btnPlay = document.getElementById(btnPlayId);
+                        const btnPlay = doc.getElementById(btnPlayId);
                         if (btnPlay) btnPlay.click();
                         return;
                     }
-                    const vid = document.getElementById(videoId);
+                    const vid = doc.getElementById(videoId);
                     if (vid && vid.src) {
                         if (vid.paused) vid.play(); else vid.pause();
-                        const btnPlay = document.getElementById(btnPlayId);
+                        const btnPlay = doc.getElementById(btnPlayId);
                         if (btnPlay) {
                             btnPlay.innerHTML = vid.paused
                                 ? `<i class="fa-solid fa-play"></i>`
@@ -310,8 +1275,9 @@ export class WorkspaceManager {
             });
 
             wrapper.addEventListener("dblclick", (e) => {
-                if (e.target.closest("button") || e.target.closest(".face-box") || e.target.closest(".player-controls")) return;
-                const btnExpand = document.getElementById(btnExpandId);
+                if (e.target.closest("button") || e.target.closest(".face-box") || e.target.closest(".player-controls")
+                    || e.target.closest("#source-video-face-overlay-container")) return;
+                const btnExpand = (wrapper.ownerDocument || document).getElementById(btnExpandId);
                 if (btnExpand) btnExpand.click();
             });
         };
@@ -474,27 +1440,18 @@ export class WorkspaceManager {
             });
         }
 
+        // Expandir para um lado = o canto daquele lado da faixa da timeline (mesmo efeito do Numpad1/3).
         const chkTimelineExpandLeft = document.getElementById("chk-timeline-expand-left");
         if (chkTimelineExpandLeft) {
             chkTimelineExpandLeft.addEventListener("change", (e) => {
-                const isRight = (this.timelinePosition === "bottom-right" || this.timelinePosition === "bottom-full");
-                if (e.target.checked) {
-                    this.setTimelinePosition(isRight ? "bottom-full" : "bottom-left");
-                } else {
-                    this.setTimelinePosition(isRight ? "bottom-right" : "center");
-                }
+                if (e.target.checked !== this.isTimelineExpanded("left")) this.toggleTimelineExpandLeft();
             });
         }
 
         const chkTimelineExpandRight = document.getElementById("chk-timeline-expand-right");
         if (chkTimelineExpandRight) {
             chkTimelineExpandRight.addEventListener("change", (e) => {
-                const isLeft = (this.timelinePosition === "bottom-left" || this.timelinePosition === "bottom-full");
-                if (e.target.checked) {
-                    this.setTimelinePosition(isLeft ? "bottom-full" : "bottom-right");
-                } else {
-                    this.setTimelinePosition(isLeft ? "bottom-left" : "center");
-                }
+                if (e.target.checked !== this.isTimelineExpanded("right")) this.toggleTimelineExpandRight();
             });
         }
 
@@ -533,6 +1490,8 @@ export class WorkspaceManager {
 
         // Atualiza a direcionalidade inteligente dos botões das colunas
         this.updateAllPanelsDockDirection();
+        // Painéis recolhidos na sessão anterior.
+        this.applyAllCollapse();
 
         this.initMaximizeButtons();
         this.initSidebarObservers();
@@ -665,11 +1624,12 @@ export class WorkspaceManager {
         const isAuto = this.monitorsLayout === "auto";
         const effectiveLayout = isAuto ? (this.resolvedMonitorsLayout || "side-by-side") : this.monitorsLayout;
         const isStacked = effectiveLayout === "stacked";
-        const isBottomFull = this.timelinePosition === "bottom-full";
-        const isBottomLeft = this.timelinePosition === "bottom-left";
-        const isBottomRight = this.timelinePosition === "bottom-right";
-        const isLeftExpanded = isBottomLeft || isBottomFull;
-        const isRightExpanded = isBottomRight || isBottomFull;
+        const shape = this.timelineShape();
+        const isBottomFull = shape === "bottom-full";
+        const isBottomLeft = shape === "bottom-left";
+        const isBottomRight = shape === "bottom-right";
+        const isLeftExpanded = this.isTimelineExpanded("left");
+        const isRightExpanded = this.isTimelineExpanded("right");
 
         const selectMonitorsLayout = document.getElementById("select-monitors-layout");
         if (selectMonitorsLayout) {
@@ -690,7 +1650,7 @@ export class WorkspaceManager {
 
         const selectTimelinePosition = document.getElementById("select-timeline-position");
         if (selectTimelinePosition) {
-            selectTimelinePosition.value = this.timelinePosition;
+            selectTimelinePosition.value = shape === "band" || shape === "column" ? "" : shape;
         }
         let timelineLabel = "Entre menus";
         if (isBottomFull) {
@@ -699,6 +1659,10 @@ export class WorkspaceManager {
             timelineLabel = "Abaixo da esquerda";
         } else if (isBottomRight) {
             timelineLabel = "Abaixo da direita";
+        } else if (shape === "band") {
+            timelineLabel = bandOf(this.bands, TIMELINE_ID) === "top" ? "Faixa de cima" : "Faixa de baixo (sob o centro)";
+        } else if (shape === "column") {
+            timelineLabel = "Coluna";
         }
         const iconTimelinePosition = document.getElementById("icon-timeline-position");
         if (iconTimelinePosition) {
@@ -708,6 +1672,10 @@ export class WorkspaceManager {
                 iconTimelinePosition.className = "fa-solid fa-arrow-left";
             } else if (isBottomRight) {
                 iconTimelinePosition.className = "fa-solid fa-arrow-right";
+            } else if (shape === "band") {
+                iconTimelinePosition.className = "fa-solid fa-grip-lines";
+            } else if (shape === "column") {
+                iconTimelinePosition.className = "fa-solid fa-table-columns";
             } else {
                 iconTimelinePosition.className = "fa-solid fa-arrows-left-right-to-line";
             }
@@ -1036,9 +2004,6 @@ export class WorkspaceManager {
                 monitorsContainer.classList.add("stacked");
                 monitorsContainer.classList.remove("side-by-side");
             }
-            if (this.timelinePosition === "bottom-full") {
-                document.body.classList.add("studio");
-            }
             if (sourcePanel) {
                 sourcePanel.style.width = "100%";
                 sourcePanel.style.height = "";
@@ -1101,6 +2066,11 @@ export class WorkspaceManager {
         if (!panelId || panelId === "center-stage") return;
         const panel = document.getElementById(panelId) || this.poppedElements?.[panelId] || getActiveElement(panelId);
         if (!panel) return;
+        // Em janela destacada a página decide o lado (Janela Dupla empilhada = cima/baixo).
+        if (panel.ownerDocument !== document) {
+            this.refreshCollapseArrow(panelId);
+            return;
+        }
 
         const isLeft = side === "left";
         panel.classList.toggle("dock-left", isLeft);
@@ -1112,13 +2082,9 @@ export class WorkspaceManager {
             if (header && toggleBtn.parentElement !== header) {
                 header.insertBefore(toggleBtn, header.firstChild);
             }
-            toggleBtn.innerHTML = isLeft 
-                ? `<i class="fa-solid fa-chevron-left"></i>` 
-                : `<i class="fa-solid fa-chevron-right"></i>`;
-            const title = isLeft ? "Recolher Painel (Esquerda)" : "Recolher Painel (Direita)";
-            toggleBtn.removeAttribute("title");
-            toggleBtn.setAttribute("data-tooltip", title);
         }
+        // Seta: esquerda/direita na coluna, cima/baixo na pilha.
+        this.refreshCollapseArrow(panelId);
     }
 
     /**
@@ -1140,7 +2106,7 @@ export class WorkspaceManager {
      * @param {string[]} newOrder
      * @param {boolean} [persist=true]
      */
-    applyColumnsOrder(newOrder, persist = true) {
+    applyColumnsOrder(newOrder, persist = true, skipSplitterReinit = false) {
         if (!Array.isArray(newOrder) || newOrder.length === 0) return;
         this.columnOrder = [...newOrder];
         if (persist) {
@@ -1149,19 +2115,11 @@ export class WorkspaceManager {
             } catch (e) {}
         }
 
-        if (this.timelinePosition === "bottom-left" || this.timelinePosition === "bottom-right") {
-            this.setTimelinePosition(this.timelinePosition, true);
-        } else {
-            const isBottomFull = this.timelinePosition === "bottom-full";
-            const workspace = document.querySelector(".workspace");
-            const topContainer = (isBottomFull ? this.studioTop : workspace) || workspace;
-
-            if (topContainer) {
-                this.arrangeTopColumns(topContainer);
-            }
-        }
+        this.deriveTimelinePosition();
+        const moved = this.renderTimelinePlacement();
         this.updateAllPanelsDockDirection();
-        this.reinitSplitters();
+        if (!skipSplitterReinit) this.reinitSplitters();
+        if (moved) this.refreshTimelineCanvas();
         setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
     }
 
@@ -1174,7 +2132,7 @@ export class WorkspaceManager {
 
         // Clona o estado atual para modificações pendentes
         this.pendingColumnOrder = [...this.columnOrder];
-        this.pendingTimelinePosition = this.timelinePosition;
+        this.pendingTimelinePosition = this.timelineShape();
         this.pendingMonitorsLayout = this.monitorsLayout;
 
         this.renderConfigCardsTrack();
@@ -1383,6 +2341,12 @@ export class WorkspaceManager {
                 label: "Timeline: Faixa de baixo (Total)",
                 desc: "Largura total ocupando toda a base da tela",
                 icon: "fa-solid fa-window-maximize"
+            },
+            {
+                value: "column",
+                label: "Timeline: Coluna",
+                desc: "Coluna de altura inteira ao lado dos monitores (arraste a alça para mudar de lugar)",
+                icon: "fa-solid fa-table-columns"
             }
         ];
 
@@ -1440,8 +2404,9 @@ export class WorkspaceManager {
             menu.appendChild(header);
 
             // Itens
+            const shape = this.timelineShape();
             options.forEach(opt => {
-                const isActive = this.timelinePosition === opt.value;
+                const isActive = shape === opt.value;
                 const item = document.createElement("div");
                 item.className = `menu-item ${isActive ? "active" : ""}`;
                 item.setAttribute("data-value", opt.value);
@@ -1458,7 +2423,7 @@ export class WorkspaceManager {
                 item.addEventListener("click", (ev) => {
                     ev.stopPropagation();
                     closeMenu();
-                    if (this.timelinePosition !== opt.value) {
+                    if (shape !== opt.value) {
                         this.setTimelinePosition(opt.value);
                         if (window.showToast) {
                             window.showToast(`Posição da Timeline: ${opt.label.replace("Timeline: ", "")}`, "info");
@@ -1599,14 +2564,14 @@ export class WorkspaceManager {
                 <div class="ws-badge ${badgeClass}">
                     <i class="fa-solid ${badgeIcon}"></i> <span>${badgeText}</span>
                 </div>
-                <div style="font-size: 10px; color: var(--text-muted); line-height: 1.3; min-height: 26px;">
+                <div style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted); line-height: 1.3; min-height: 26px;">
                     ${meta.desc}
                 </div>
                 <div class="ws-card-footer">
                     <button type="button" class="btn-card-nudge" data-dir="left" data-index="${idx}" ${idx === 0 ? "disabled" : ""} title="Mover para a esquerda">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
-                    <span style="font-size: 10px; color: var(--text-muted); font-weight: 500;">Posição ${idx + 1}</span>
+                    <span style="font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted); font-weight: 500;">Posição ${idx + 1}</span>
                     <button type="button" class="btn-card-nudge" data-dir="right" data-index="${idx}" ${idx === this.pendingColumnOrder.length - 1 ? "disabled" : ""} title="Mover para a direita">
                         <i class="fa-solid fa-chevron-right"></i>
                     </button>
@@ -1729,11 +2694,14 @@ export class WorkspaceManager {
      */
     arrangeColumnsIntoContainer(targetContainer, colIds) {
         if (!targetContainer || !Array.isArray(colIds) || colIds.length === 0) return;
+        // Abas (F2c parte 2c): as que entram no editor montam o invólucro antes; as que saem voltam ao menu.
+        this.onBeforeArrange?.();
 
         const reopenMap = {
             "sidebar-left": "reopen-left",
             "inspector-panel": "reopen-inspector",
-            "sidebar-right": "reopen-right"
+            "sidebar-right": "reopen-right",
+            "timeline-panel": "reopen-timeline"
         };
 
         const workspace = document.querySelector(".workspace");
@@ -1746,19 +2714,37 @@ export class WorkspaceManager {
             if (id === "center-stage") {
                 return (targetContainer && targetContainer.querySelector(".center-stage"))
                     || (workspace && workspace.querySelector(".center-stage"))
-                    || (this.compoundStage && this.compoundStage.querySelector(".center-stage"))
-                    || (this.studioTop && this.studioTop.querySelector(".center-stage"))
                     || document.querySelector(".center-stage");
             }
             return (targetContainer && targetContainer.querySelector(`#${id}`))
                 || (workspace && workspace.querySelector(`#${id}`))
-                || (this.compoundStage && this.compoundStage.querySelector(`#${id}`))
-                || (this.studioTop && this.studioTop.querySelector(`#${id}`))
                 || document.getElementById(id)
                 || this.poppedElements?.[id];
         };
 
+        // Pilhas (F2b): convidados ficam dentro do anfitrião; limpa montagens antigas das colunas deste lote.
+        const guests = stackGuests(this.columnStacks);
+        // Membros de faixa (F2c) não ocupam coluna: renderBands os leva para a faixa.
+        const inBand = new Set([...this.bands.top, ...this.bands.bottom]);
         colIds.forEach((colId) => {
+            if (colId === "center-stage" || inBand.has(colId)) return;
+            const el = findColumnElement(colId);
+            if (!el) return;
+            el.querySelectorAll(":scope > .dock-stack-splitter").forEach(sp => sp.remove());
+            el.classList.remove("dock-stack-host", "dock-stack-self-collapsed");
+            if (!guests.has(colId)) {
+                el.classList.remove("dock-stack-guest");
+                el.style.removeProperty("--dock-guest-h");
+            }
+        });
+
+        colIds.forEach((colId) => {
+            if (inBand.has(colId)) return;
+            if (guests.has(colId)) {
+                const reopenGuest = reopenMap[colId] ? findColumnElement(reopenMap[colId]) : null;
+                if (reopenGuest) reopenGuest.style.display = "none";
+                return;
+            }
             if (colId === "center-stage") {
                 const centerEl = findColumnElement("center-stage");
                 if (centerEl) {
@@ -1793,11 +2779,18 @@ export class WorkspaceManager {
                     targetContainer.appendChild(reopenEl);
                 }
             }
+            if (colEl && !isPopped) this.mountStackGuests(colId, colEl);
         });
+
+        // Monitores no bloco ou fora dele (F2c parte 2b), faixas e colunas da ponta com canto (F2c),
+        // depois os recolhidos no lugar novo (linha e seta).
+        this.renderMonitorPlacement();
+        this.renderBands();
+        this.applyAllCollapse();
     }
 
     /**
-     * Organiza as colunas superiores dentro do contêiner especificado (studioTop ou workspace),
+     * Organiza as colunas superiores dentro do contêiner especificado (o workspace),
      * respeitando rigorosamente this.columnOrder e posicionando as linhas restauradoras
      * de acordo com a direcionalidade (à esquerda se dock-left, à direita se dock-right).
      * @param {HTMLElement} targetContainer
@@ -1814,233 +2807,141 @@ export class WorkspaceManager {
     }
 
     /**
-     * Altera a posição da Timeline (entre menus laterais no centro vs faixa inferior de largura total,
-     * ou expandida abaixo apenas do menu lateral esquerdo ou direito).
-     * @param {"center" | "bottom-left" | "bottom-right" | "bottom-full"} position 
+     * Posição da Timeline (F2c parte 2): embaixo dos monitores ("center") ou numa faixa. Aceita os
+     * nomes de antes, que viram a faixa de baixo com os cantos do mesmo desenho: "bottom-full"
+     * (largura total), "bottom-left" (sob a esquerda e o centro; o lado direito vai até o fim) e
+     * "bottom-right"; "band" = fica na faixa em que está (ou largura total, se não estiver).
+     * @param {"center" | "band" | "bottom-left" | "bottom-right" | "bottom-full"} position
      * @param {boolean} [skipSplitterReinit=false]
      */
     setTimelinePosition(position, skipSplitterReinit = false) {
-        if (!["center", "bottom-left", "bottom-right", "bottom-full"].includes(position)) return;
-        this.timelinePosition = position;
-        localStorage.setItem("capiau_timeline_position", position);
+        const next = placeTimeline(this.getColumnState(), position === "bottom" ? "bottom-full" : position);
+        if (!next) return;
+        this.applyTimelineState(next, skipSplitterReinit);
+    }
 
+    /** Aplica um estado de colunas/faixas que mexe na timeline. */
+    applyTimelineState(next, skipSplitterReinit = false) {
+        this.setColumnLayout(next.order, next.stacks, next.bands || { top: [], bottom: [] }, next.corners || {}, skipSplitterReinit);
+    }
+
+    /** Altura atual da timeline no editor (px), ou a salva; null se não houver. */
+    currentTimelineHeight() {
+        const panel = document.getElementById(TIMELINE_ID);
+        // No centro sem monitores ela ocupa a altura toda: aí vale a altura salva (F2c parte 2b).
+        const parent = panel?.parentElement;
+        const lying = (parent?.classList.contains("center-stage") && !parent.classList.contains("center-no-monitors"))
+            || parent?.classList.contains("dock-band-row");
+        if (panel && lying && panel.ownerDocument === document && !panel.classList.contains("collapsed")) {
+            const h = panel.getBoundingClientRect().height;
+            if (h > 50) return Math.round(h);
+        }
+        const saved = parseFloat(localStorage.getItem("layout-dim-splitter-timeline"))
+            || parseFloat(localStorage.getItem("layout-dim-splitter-studio-timeline"));
+        return saved > 50 ? Math.round(saved) : null;
+    }
+
+    /**
+     * Monitores (F2c parte 2b): os que estão no bloco ficam no .monitors-container (Source antes de
+     * Program); os de faixa ou coluna saem dele (quem os leva é o renderBands ou o arranjo das
+     * colunas). O centro mostra o que sobrou: monitores, só a timeline (ela ocupa a altura toda) ou
+     * nada (some, e o vizinho mais perto cresce no lugar: reinitSplitters).
+     */
+    renderMonitorPlacement() {
+        const container = document.querySelector(".monitors-container");
+        const centerStage = document.querySelector(".center-stage");
+        if (!container || !centerStage) return;
+        const inBlock = monitorsInBlock(this.getColumnState());
+        MONITOR_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el || el.ownerDocument !== document) return; // destacado: volta pelo restorePanel
+            const out = !inBlock.includes(id);
+            el.classList.toggle("dock-monitor-out", out);
+            if (out) {
+                // Maximizar é dentro do bloco; fora dele não há o que esconder.
+                if (el.classList.contains("maximized")) document.getElementById(id === MONITOR_IDS[0] ? "btn-expand-source" : "btn-expand-program")?.click();
+                return;
+            }
+            el.style.removeProperty("--dock-band-w");
+            el.classList.remove("dock-band-member", "dock-band-last", "has-band-w");
+            if (el.parentElement === container) return;
+            // Volta ao bloco: sem a largura de quando era coluna; a orientação do bloco reaplica o resto.
+            el.style.width = "";
+            el.style.flex = "1";
+            if (id === MONITOR_IDS[0]) container.prepend(el);
+            else container.appendChild(el);
+        });
+        const inside = MONITOR_IDS.filter(id => document.getElementById(id)?.parentElement === container);
+        // Sozinho no bloco: ocupa tudo (sem a porcentagem do divisor entre os dois).
+        if (inside.length === 1) {
+            const el = document.getElementById(inside[0]);
+            el.style.flex = "1 1 0%";
+            el.style.width = "";
+        }
+        document.body.classList.toggle("layout-monitors-split", inBlock.length < MONITOR_IDS.length);
+        this.refreshCenterContent();
+        window.dockDrag?.placeBlockHandle?.();
+    }
+
+    /** Classes do centro pelo que está nele: sem monitores (a timeline cresce) ou vazio (some). */
+    refreshCenterContent() {
+        const container = document.querySelector(".monitors-container");
+        const centerStage = document.querySelector(".center-stage");
+        if (!container || !centerStage) return;
+        const monitors = MONITOR_IDS.some(id => document.getElementById(id)?.parentElement === container);
+        const timeline = document.getElementById(TIMELINE_ID)?.parentElement === centerStage && this.timelinePosition === "center";
+        centerStage.classList.toggle("center-no-monitors", !monitors);
+        centerStage.classList.toggle("center-empty", !monitors && !timeline);
+    }
+
+    /**
+     * Põe a timeline onde o estado diz e acerta as classes do body. Como coluna, quem a leva é o
+     * arranjo das colunas; na faixa, o renderBands (chamado pelo arranjo); no centro, vai para baixo
+     * dos monitores.
+     * Devolve true se ela mudou de lugar.
+     */
+    renderTimelinePlacement() {
         const workspace = document.querySelector(".workspace");
-        if (!workspace) return;
+        if (!workspace) return false;
+        const timelinePanel = document.getElementById(TIMELINE_ID);
+        const before = timelinePanel?.parentElement || null;
+        this.arrangeTopColumns(workspace);
 
-        const isTimelinePopped = !!(window.popoutWindows?.["timeline-panel"] && !window.popoutWindows["timeline-panel"].closed);
-
-        // Helper para localizar elementos com segurança onde quer que estejam
-        const findElement = (id) => {
-            return (workspace && workspace.querySelector(`#${id}`))
-                || (this.compoundStage && this.compoundStage.querySelector(`#${id}`))
-                || (this.studioTop && this.studioTop.querySelector(`#${id}`))
-                || document.getElementById(id);
-        };
-
-        const timelinePanel = findElement("timeline-panel");
-        const reopenTimeline = findElement("reopen-timeline");
-
-        // Preserva rigorosamente a altura atual da timeline antes de reposicionar
-        let currentTimelineH = null;
-        if (timelinePanel && !timelinePanel.classList.contains("collapsed")) {
-            const inlineH = parseFloat(timelinePanel.style.height);
-            if (!isNaN(inlineH) && inlineH > 50) {
-                currentTimelineH = Math.round(inlineH);
-            } else {
-                const rectH = (typeof timelinePanel.getBoundingClientRect === "function" ? timelinePanel.getBoundingClientRect().height : 0) || timelinePanel.offsetHeight;
-                if (rectH && rectH > 50) {
-                    currentTimelineH = Math.round(rectH);
-                }
-            }
-        }
-        if (!currentTimelineH) {
-            const savedH = parseFloat(localStorage.getItem("layout-dim-splitter-timeline"))
-                        || parseFloat(localStorage.getItem("layout-dim-splitter-studio-timeline"));
-            if (!isNaN(savedH) && savedH > 50) {
-                currentTimelineH = Math.round(savedH);
-            }
-        }
-        if (currentTimelineH) {
-            try {
-                localStorage.setItem("layout-dim-splitter-timeline", currentTimelineH);
-                localStorage.setItem("layout-dim-splitter-studio-timeline", currentTimelineH);
-            } catch (e) {}
-        }
-
-        const centerIndex = this.columnOrder.indexOf("center-stage");
-
-        if (position === "bottom-full") {
-            if (!this.studioTop) {
-                this.studioTop = document.createElement("div");
-                this.studioTop.className = "studio-top";
-            }
-            // 1. Garante que studioTop está inserido no workspace
-            if (this.studioTop.parentNode !== workspace) {
-                workspace.appendChild(this.studioTop);
-            }
-
-            // 2. Agrupa as colunas superiores dentro de studioTop na ordem de columnOrder
-            this.arrangeTopColumns(this.studioTop);
-
-            // 3. Timeline no workspace abaixo de studioTop (full-width)
-            if (timelinePanel && !isTimelinePopped) {
-                workspace.appendChild(timelinePanel);
-            }
-            if (reopenTimeline) {
-                workspace.appendChild(reopenTimeline);
-            }
-
-            // 4. Limpeza de compoundStage somente após transferir os elementos com segurança
-            if (this.compoundStage && this.compoundStage.parentNode) {
-                this.compoundStage.remove();
-            }
-
-            // 5. Classes do body para layout-timeline-bottom (full-width)
-            document.body.classList.remove("layout-timeline-bottom-left", "layout-timeline-bottom-right", "layout-timeline-expanded");
-            document.body.classList.add("layout-timeline-bottom");
-            const effectiveMonitors = this.monitorsLayout === "auto"
-                ? (this.resolvedMonitorsLayout || "side-by-side")
-                : this.monitorsLayout;
-            if (effectiveMonitors === "stacked") {
-                document.body.classList.add("studio");
-            } else {
-                document.body.classList.remove("studio");
-            }
-        } else if (position === "bottom-left") {
-            // Timeline expande para a esquerda (abaixo de menus esquerdos + center-stage).
-            // Menu direito permanece full-height.
-            if (!this.compoundStage) {
-                this.compoundStage = document.createElement("div");
-                this.compoundStage.className = "compound-stage";
-            }
-            if (!this.studioTop) {
-                this.studioTop = document.createElement("div");
-                this.studioTop.className = "studio-top";
-            }
-            if (this.studioTop.parentNode !== this.compoundStage) {
-                this.compoundStage.appendChild(this.studioTop);
-            }
-
-            // Colunas à esquerda e centro vão para studioTop (dentro do compoundStage)
-            const leftCols = centerIndex !== -1
-                ? this.columnOrder.filter((col, idx) => idx <= centerIndex)
-                : ["sidebar-left", "inspector-panel", "center-stage"];
-            const rightCols = centerIndex !== -1
-                ? this.columnOrder.filter((col, idx) => idx > centerIndex)
-                : ["sidebar-right"];
-
-            this.arrangeColumnsIntoContainer(this.studioTop, leftCols);
-
-            // Timeline dentro do compoundStage abaixo do studioTop
-            if (timelinePanel && !isTimelinePopped) {
-                this.compoundStage.appendChild(timelinePanel);
-            }
-            if (reopenTimeline) {
-                this.compoundStage.appendChild(reopenTimeline);
-            }
-
-            // Inserção no workspace: compoundStage na esquerda, colunas direitas na direita
-            if (workspace.firstChild !== this.compoundStage) {
-                workspace.prepend(this.compoundStage);
-            }
-            this.arrangeColumnsIntoContainer(workspace, rightCols);
-
-            document.body.classList.remove("layout-timeline-bottom", "layout-timeline-bottom-right", "studio");
-            document.body.classList.add("layout-timeline-bottom-left", "layout-timeline-expanded");
-        } else if (position === "bottom-right") {
-            // Timeline expande para a direita (abaixo de center-stage + menu direito).
-            // Menus esquerdos permanecem full-height.
-            if (!this.compoundStage) {
-                this.compoundStage = document.createElement("div");
-                this.compoundStage.className = "compound-stage";
-            }
-            if (!this.studioTop) {
-                this.studioTop = document.createElement("div");
-                this.studioTop.className = "studio-top";
-            }
-            if (this.studioTop.parentNode !== this.compoundStage) {
-                this.compoundStage.appendChild(this.studioTop);
-            }
-
-            const leftCols = centerIndex !== -1
-                ? this.columnOrder.filter((col, idx) => idx < centerIndex)
-                : ["sidebar-left", "inspector-panel"];
-            const rightCols = centerIndex !== -1
-                ? this.columnOrder.filter((col, idx) => idx >= centerIndex)
-                : ["center-stage", "sidebar-right"];
-
-            // Colunas esquerdas diretamente no workspace à esquerda
-            this.arrangeColumnsIntoContainer(workspace, leftCols);
-
-            // Inserção no workspace: compoundStage garantidamente após as colunas esquerdas
-            workspace.appendChild(this.compoundStage);
-
-            // Colunas centro e direita dentro de studioTop (no compoundStage)
-            this.arrangeColumnsIntoContainer(this.studioTop, rightCols);
-
-            // Timeline dentro do compoundStage abaixo do studioTop
-            if (timelinePanel && !isTimelinePopped) {
-                this.compoundStage.appendChild(timelinePanel);
-            }
-            if (reopenTimeline) {
-                this.compoundStage.appendChild(reopenTimeline);
-            }
-
-            document.body.classList.remove("layout-timeline-bottom", "layout-timeline-bottom-left", "studio");
-            document.body.classList.add("layout-timeline-bottom-right", "layout-timeline-expanded");
-        } else {
-            // position === "center":
-            // 1. Move todas as colunas superiores de volta para o workspace
-            this.arrangeTopColumns(workspace);
-
-            // 2. Localiza o centerStage agora garantidamente dentro de workspace
-            const currentCenterStage = (workspace && workspace.querySelector(".center-stage"))
-                || (this.compoundStage && this.compoundStage.querySelector(".center-stage"))
-                || (this.studioTop && this.studioTop.querySelector(".center-stage"))
-                || document.querySelector(".center-stage");
-
-            // 3. Move timelinePanel e reopenTimeline para dentro do centerStage
-            if (currentCenterStage) {
-                if (timelinePanel && !isTimelinePopped) {
-                    currentCenterStage.appendChild(timelinePanel);
-                }
+        const inBand = this.timelinePosition === "band";
+        const isPopped = !!(window.popoutWindows?.[TIMELINE_ID] && !window.popoutWindows[TIMELINE_ID].closed);
+        const local = timelinePanel && !isPopped && timelinePanel.ownerDocument === document;
+        if (this.timelinePosition === "center") {
+            const centerStage = workspace.querySelector(".center-stage") || document.querySelector(".center-stage");
+            const reopenTimeline = document.getElementById("reopen-timeline");
+            if (centerStage) {
+                if (local && timelinePanel.parentElement !== centerStage) centerStage.appendChild(timelinePanel);
                 if (reopenTimeline) {
-                    currentCenterStage.appendChild(reopenTimeline);
+                    reopenTimeline.classList.remove("restore-line-h");
+                    if (reopenTimeline.parentElement !== centerStage || reopenTimeline.previousElementSibling !== timelinePanel) {
+                        centerStage.appendChild(reopenTimeline);
+                    }
                 }
             }
-
-            // 4. Somente após todos os filhos terem sido transferidos, remove studioTop e compoundStage
-            if (this.studioTop && this.studioTop.parentNode) {
-                this.studioTop.remove();
+            const h = parseFloat(localStorage.getItem("layout-dim-splitter-timeline"));
+            if (local) timelinePanel.style.removeProperty("width"); // largura de quando era coluna
+            if (local && h > 50 && !timelinePanel.classList.contains("collapsed")) {
+                timelinePanel.style.height = `${Math.round(h)}px`;
+                timelinePanel.style.flex = `0 0 ${Math.round(h)}px`;
             }
-            if (this.compoundStage && this.compoundStage.parentNode) {
-                this.compoundStage.remove();
-            }
-
-            document.body.classList.remove(
-                "layout-timeline-bottom",
-                "layout-timeline-bottom-left",
-                "layout-timeline-bottom-right",
-                "layout-timeline-expanded",
-                "studio"
-            );
         }
 
+        this.refreshCenterContent();
+        const inColumn = this.timelinePosition === "column";
+        document.body.classList.remove("layout-timeline-bottom", "layout-timeline-bottom-left", "layout-timeline-bottom-right", "studio");
+        document.body.classList.toggle("layout-timeline-expanded", inBand || inColumn);
+        document.body.classList.toggle("layout-timeline-band", inBand);
+        document.body.classList.toggle("layout-timeline-column", inColumn);
         this.updateLayoutUI();
+        return !!local && timelinePanel.parentElement !== before;
+    }
 
-        if (timelinePanel && currentTimelineH && !timelinePanel.classList.contains("collapsed")) {
-            timelinePanel.style.height = `${currentTimelineH}px`;
-            timelinePanel.style.flex = `0 0 ${currentTimelineH}px`;
-        }
-
-        if (!skipSplitterReinit) {
-            this.reinitSplitters();
-        }
-
-        if (timelinePanel && currentTimelineH && !timelinePanel.classList.contains("collapsed")) {
-            timelinePanel.style.height = `${currentTimelineH}px`;
-            timelinePanel.style.flex = `0 0 ${currentTimelineH}px`;
-        }
+    /** Canvas da timeline e cabeçalhos das pistas depois de ela mudar de lugar. */
+    refreshTimelineCanvas() {
         if (window.timelineRenderer) {
             window.timelineRenderer.resize();
             window.timelineRenderer.requestRedraw();
@@ -2052,6 +2953,11 @@ export class WorkspaceManager {
             this.evaluateAutoMonitorsLayout();
         }
         setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
+    }
+
+    /** A timeline passa inteira por baixo daquele lado ("left" | "right")? */
+    isTimelineExpanded(side) {
+        return timelineExpanded(this.getColumnState(), side);
     }
 
     /** Alterna ciclicamente a disposição dos monitores: Auto -> Lado a Lado -> Empilhados -> Auto */
@@ -2075,7 +2981,7 @@ export class WorkspaceManager {
         }
     }
 
-    /** Alterna rapidamente a posição da timeline (entre centro e largura total) */
+    /** Numpad2: centro ↔ faixa de baixo com largura total. */
     toggleTimelinePosition() {
         const next = this.timelinePosition === "center" ? "bottom-full" : "center";
         this.setTimelinePosition(next);
@@ -2084,42 +2990,37 @@ export class WorkspaceManager {
         }
     }
 
-    /** Alterna a expansão da timeline para a esquerda */
+    /** Numpad1: alterna o canto esquerdo da faixa da timeline (no centro, vai para a faixa expandida à esquerda). */
     toggleTimelineExpandLeft() {
-        let next;
-        if (this.timelinePosition === "bottom-left") {
-            next = "center";
-        } else if (this.timelinePosition === "bottom-full") {
-            next = "bottom-right";
-        } else if (this.timelinePosition === "bottom-right") {
-            next = "bottom-full";
-        } else {
-            next = "bottom-left";
-        }
-        this.setTimelinePosition(next);
+        this.toggleTimelineSide("left");
+    }
+
+    /** Numpad3: o espelho do Numpad1, para a direita. */
+    toggleTimelineExpandRight() {
+        this.toggleTimelineSide("right");
+    }
+
+    toggleTimelineSide(side) {
+        const next = toggleTimelineSide(this.getColumnState(), side);
+        if (!next) return;
+        this.applyTimelineState(next);
         if (window.showToast) {
-            const isExp = (next === "bottom-left" || next === "bottom-full");
-            window.showToast(isExp ? "Timeline: Expandida para a esquerda" : "Timeline: Recolhida da esquerda", "info");
+            const name = side === "left" ? "esquerda" : "direita";
+            window.showToast(this.isTimelineExpanded(side) ? `Timeline: Expandida para a ${name}` : `Timeline: Recolhida da ${name}`, "info");
         }
     }
 
-    /** Alterna a expansão da timeline para a direita */
-    toggleTimelineExpandRight() {
-        let next;
-        if (this.timelinePosition === "bottom-right") {
-            next = "center";
-        } else if (this.timelinePosition === "bottom-full") {
-            next = "bottom-left";
-        } else if (this.timelinePosition === "bottom-left") {
-            next = "bottom-full";
-        } else {
-            next = "bottom-right";
-        }
-        this.setTimelinePosition(next);
-        if (window.showToast) {
-            const isExp = (next === "bottom-right" || next === "bottom-full");
-            window.showToast(isExp ? "Timeline: Expandida para a direita" : "Timeline: Recolhida da direita", "info");
-        }
+    /**
+     * Centro vazio (F2c parte 2b): a coluna vizinha dele que cresce no lugar. Entre as duas vizinhas,
+     * a de conteúdo (monitor ou timeline); empate, a da esquerda. present = colunas no editor, com o centro.
+     */
+    growingColumn(present) {
+        const ci = present.indexOf(CENTER_STAGE);
+        if (ci === -1) return present[0] || CENTER_STAGE;
+        const left = present[ci - 1];
+        const right = present[ci + 1];
+        if (!left || !right) return left || right || CENTER_STAGE;
+        return !CENTER_PANEL_IDS.includes(left) && CENTER_PANEL_IDS.includes(right) ? right : left;
     }
 
     /** Remove todos os divisores da árvore do workspace. */
@@ -2130,37 +3031,25 @@ export class WorkspaceManager {
     }
 
     /**
-     * (Re)inicializa todos os divisores de tela de acordo com a combinação ativa
-     * de (timelinePosition, monitorsLayout).
+     * (Re)inicializa todos os divisores de tela: entre as colunas do editor e, com a timeline
+     * embaixo dos monitores, entre eles e ela. Faixas e colunas da ponta têm divisores próprios
+     * (renderBands); a timeline numa faixa usa o divisor de altura da faixa.
      */
     reinitSplitters() {
         this.removeAllSplitters();
 
-        const isBottomFull = this.timelinePosition === "bottom-full";
-        const isBottomLeft = this.timelinePosition === "bottom-left";
-        const isBottomRight = this.timelinePosition === "bottom-right";
-        const isStacked = (this.monitorsLayout === "auto" ? (this.resolvedMonitorsLayout || "side-by-side") : this.monitorsLayout) === "stacked";
         const workspace = document.querySelector(".workspace");
         const centerStage = document.querySelector(".center-stage");
         const monitorsContainer = document.querySelector(".monitors-container");
         const timelineWrapper = document.querySelector(".timeline-canvas-wrapper");
+        // Com a timeline passando sob um lado, as larguras daquele lado são as do modo "timeline embaixo"
+        // (chaves studio-*), como antes da F2c parte 2.
+        const expandedLeft = this.isTimelineExpanded("left");
+        const expandedRight = this.isTimelineExpanded("right");
 
         if (centerStage) {
             centerStage.style.removeProperty("width");
             centerStage.style.flex = "1 1 0%";
-        }
-        if (this.compoundStage) {
-            this.compoundStage.style.removeProperty("width");
-            this.compoundStage.style.flex = "1 1 0%";
-        }
-        if (this.studioTop) {
-            this.studioTop.style.removeProperty("width");
-            this.studioTop.style.removeProperty("height");
-            this.studioTop.style.flex = "1 1 0%";
-        }
-        const timelinePanelEl = document.getElementById("timeline-panel");
-        if (timelinePanelEl && isBottomFull) {
-            timelinePanelEl.style.removeProperty("width");
         }
         if (monitorsContainer) {
             monitorsContainer.style.removeProperty("width");
@@ -2177,7 +3066,7 @@ export class WorkspaceManager {
                 minVal = 200;
                 maxVal = 900;
                 defaultVal = 350;
-                className = (isBottomFull || isBottomLeft) ? "splitter-studio-lib splitter-sidebar-left" : "splitter-sidebar-left";
+                className = expandedLeft ? "splitter-studio-lib splitter-sidebar-left" : "splitter-sidebar-left";
             } else if (targetCol === "inspector-panel") {
                 minVal = 240;
                 maxVal = 800;
@@ -2187,287 +3076,108 @@ export class WorkspaceManager {
                 minVal = 220;
                 maxVal = 800;
                 defaultVal = 320;
-                className = (isBottomFull || isBottomRight) ? "splitter-studio-right splitter-sidebar-right" : "splitter-sidebar-right";
+                className = expandedRight ? "splitter-studio-right splitter-sidebar-right" : "splitter-sidebar-right";
+            } else if (targetCol === TIMELINE_ID) {
+                // Timeline como coluna (F2c parte 2): chave própria, larga por padrão.
+                minVal = 260;
+                maxVal = 1600;
+                defaultVal = 420;
+                className = "splitter-timeline-panel";
+            } else if (MONITOR_IDS.includes(targetCol)) {
+                // Monitor como coluna (F2c parte 2b): chave própria por monitor.
+                minVal = 240;
+                maxVal = 1600;
+                defaultVal = 480;
             }
             return { minVal, maxVal, defaultVal, className };
         };
 
-        if (isBottomLeft) {
-            // Modo bottom-left: timeline expandida para a esquerda (abaixo de menus esquerdos + monitors)
-            // 1. Divisor vertical dentro do compoundStage (entre studioTop e timelinePanel)
-            if (this.compoundStage) {
-                SplitterHelper.initSplitter(this.compoundStage, ".studio-top", "#timeline-panel", {
-                    direction: "vertical",
-                    resizeTarget: "right",
+        if (workspace) {
+            // Garante que a ordem visual e de DOM das colunas superiores esteja correta
+            this.arrangeTopColumns(workspace);
+
+            // Colunas presentes no editor (não destacadas nem levadas para a ponta ou para uma faixa;
+            // o centro vazio também não conta, F2c parte 2b)
+            const present = this.columnOrder.filter(colId => {
+                const el = colId === "center-stage"
+                    ? workspace.querySelector(".center-stage")
+                    : workspace.querySelector(`#${colId}`);
+                const isPopped = !!(window.popoutWindows?.[colId] && !window.popoutWindows[colId].closed);
+                return el && !isPopped && el.parentNode === workspace;
+            });
+            const centerEmpty = !!centerStage?.classList.contains("center-empty");
+            const activeCols = centerEmpty ? present.filter(id => id !== CENTER_STAGE) : present;
+            const pivot = centerEmpty ? this.growingColumn(present) : CENTER_STAGE;
+            this.growing = pivot === CENTER_STAGE ? null : pivot;
+            document.querySelectorAll(".dock-growing").forEach(el => {
+                if (el.id === pivot) return;
+                el.classList.remove("dock-growing");
+                el.style.flex = ""; // o divisor dele (se tiver) põe a largura de volta
+            });
+            if (this.growing) {
+                // Ocupa o lugar do centro: cresce com o editor, sem a largura de quando tinha divisor.
+                const el = document.getElementById(this.growing);
+                el.classList.add("dock-growing");
+                el.style.removeProperty("width");
+                el.style.flex = "1 1 0%";
+            }
+
+            // As colunas de cada lado redimensionam para fora de quem cresce (o centro ou quem ficou no lugar dele).
+            const centerIndex = activeCols.indexOf(pivot);
+
+            // Instancia os divisores dinamicamente entre cada par de colunas adjacentes ativas
+            for (let i = 0; i < activeCols.length - 1; i++) {
+                const colA = activeCols[i];
+                const colB = activeCols[i + 1];
+                const leftSelector = colA === "center-stage" ? ".center-stage" : `#${colA}`;
+                const rightSelector = colB === "center-stage" ? ".center-stage" : `#${colB}`;
+
+                let resizeTarget = "left";
+                let targetCol = colA;
+
+                if (centerIndex !== -1) {
+                    if (i + 1 <= centerIndex) {
+                        resizeTarget = "left";
+                        targetCol = colA;
+                    } else if (i >= centerIndex) {
+                        resizeTarget = "right";
+                        targetCol = colB;
+                    } else if (colB === pivot) {
+                        resizeTarget = "left";
+                        targetCol = colA;
+                    } else if (colA === pivot) {
+                        resizeTarget = "right";
+                        targetCol = colB;
+                    }
+                }
+
+                const cfg = getColSplitterConfig(targetCol);
+
+                SplitterHelper.initSplitter(workspace, leftSelector, rightSelector, {
+                    direction: "horizontal",
+                    resizeTarget: resizeTarget,
                     unit: "px",
-                    minVal: 150,
-                    maxVal: 700,
-                    defaultVal: 300,
-                    className: "splitter-studio-timeline splitter-compound-timeline",
-                    tooltip: "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)",
-                    onDoubleClick: () => this.fitTimelineHeightToTracks(true)
+                    minVal: cfg.minVal,
+                    maxVal: cfg.maxVal,
+                    defaultVal: cfg.defaultVal,
+                    className: cfg.className
                 });
             }
+        }
 
-            // 2. Divisores horizontais dentro de studioTop (entre colunas esquerdas e center-stage)
-            const centerIndex = this.columnOrder.indexOf("center-stage");
-            const leftCols = centerIndex !== -1
-                ? this.columnOrder.filter((col, idx) => idx <= centerIndex)
-                : ["sidebar-left", "inspector-panel", "center-stage"];
-            
-            if (this.studioTop) {
-                const activeLeft = leftCols.filter(colId => {
-                    const el = colId === "center-stage" 
-                        ? this.studioTop.querySelector(".center-stage")
-                        : this.studioTop.querySelector(`#${colId}`);
-                    const isPopped = !!(window.popoutWindows?.[colId] && !window.popoutWindows[colId].closed);
-                    return el && !isPopped && el.parentNode === this.studioTop;
-                });
-
-                for (let i = 0; i < activeLeft.length - 1; i++) {
-                    const colA = activeLeft[i];
-                    const colB = activeLeft[i + 1];
-                    const leftSelector = colA === "center-stage" ? ".center-stage" : `#${colA}`;
-                    const rightSelector = colB === "center-stage" ? ".center-stage" : `#${colB}`;
-                    const cfg = getColSplitterConfig(colA);
-
-                    SplitterHelper.initSplitter(this.studioTop, leftSelector, rightSelector, {
-                        direction: "horizontal",
-                        resizeTarget: "left",
-                        unit: "px",
-                        minVal: cfg.minVal,
-                        maxVal: cfg.maxVal,
-                        defaultVal: cfg.defaultVal,
-                        className: cfg.className
-                    });
-                }
-            }
-
-            // 3. Divisores horizontais no workspace (entre compoundStage e colunas direitas)
-            if (workspace && this.compoundStage) {
-                const rightCols = centerIndex !== -1
-                    ? this.columnOrder.filter((col, idx) => idx > centerIndex)
-                    : ["sidebar-right"];
-                const activeRight = rightCols.filter(colId => {
-                    const el = workspace.querySelector(`#${colId}`);
-                    const isPopped = !!(window.popoutWindows?.[colId] && !window.popoutWindows[colId].closed);
-                    return el && !isPopped && el.parentNode === workspace;
-                });
-
-                if (activeRight.length > 0) {
-                    // Splitter entre compoundStage e a primeira coluna direita ativa
-                    const firstRight = activeRight[0];
-                    const cfgFirst = getColSplitterConfig(firstRight);
-                    SplitterHelper.initSplitter(workspace, ".compound-stage", `#${firstRight}`, {
-                        direction: "horizontal",
-                        resizeTarget: "right",
-                        unit: "px",
-                        minVal: cfgFirst.minVal,
-                        maxVal: cfgFirst.maxVal,
-                        defaultVal: cfgFirst.defaultVal,
-                        className: cfgFirst.className
-                    });
-
-                    // Splitters subsequentes entre colunas direitas
-                    for (let j = 0; j < activeRight.length - 1; j++) {
-                        const colA = activeRight[j];
-                        const colB = activeRight[j + 1];
-                        const cfg = getColSplitterConfig(colB);
-                        SplitterHelper.initSplitter(workspace, `#${colA}`, `#${colB}`, {
-                            direction: "horizontal",
-                            resizeTarget: "right",
-                            unit: "px",
-                            minVal: cfg.minVal,
-                            maxVal: cfg.maxVal,
-                            defaultVal: cfg.defaultVal,
-                            className: cfg.className
-                        });
-                    }
-                }
-            }
-        } else if (isBottomRight) {
-            // Modo bottom-right: timeline expandida para a direita (abaixo de center-stage + menus direitos)
-            // 1. Divisor vertical dentro do compoundStage (entre studioTop e timelinePanel)
-            if (this.compoundStage) {
-                SplitterHelper.initSplitter(this.compoundStage, ".studio-top", "#timeline-panel", {
-                    direction: "vertical",
-                    resizeTarget: "right",
-                    unit: "px",
-                    minVal: 150,
-                    maxVal: 700,
-                    defaultVal: 300,
-                    className: "splitter-studio-timeline splitter-compound-timeline",
-                    tooltip: "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)",
-                    onDoubleClick: () => this.fitTimelineHeightToTracks(true)
-                });
-            }
-
-            // 2. Divisores horizontais dentro de studioTop (entre center-stage e colunas direitas)
-            const centerIndex = this.columnOrder.indexOf("center-stage");
-            const rightCols = centerIndex !== -1
-                ? this.columnOrder.filter((col, idx) => idx >= centerIndex)
-                : ["center-stage", "sidebar-right"];
-
-            if (this.studioTop) {
-                const activeRight = rightCols.filter(colId => {
-                    const el = colId === "center-stage"
-                        ? this.studioTop.querySelector(".center-stage")
-                        : this.studioTop.querySelector(`#${colId}`);
-                    const isPopped = !!(window.popoutWindows?.[colId] && !window.popoutWindows[colId].closed);
-                    return el && !isPopped && el.parentNode === this.studioTop;
-                });
-
-                for (let i = 0; i < activeRight.length - 1; i++) {
-                    const colA = activeRight[i];
-                    const colB = activeRight[i + 1];
-                    const leftSelector = colA === "center-stage" ? ".center-stage" : `#${colA}`;
-                    const rightSelector = colB === "center-stage" ? ".center-stage" : `#${colB}`;
-                    const cfg = getColSplitterConfig(colB);
-
-                    SplitterHelper.initSplitter(this.studioTop, leftSelector, rightSelector, {
-                        direction: "horizontal",
-                        resizeTarget: "right",
-                        unit: "px",
-                        minVal: cfg.minVal,
-                        maxVal: cfg.maxVal,
-                        defaultVal: cfg.defaultVal,
-                        className: cfg.className
-                    });
-                }
-            }
-
-            // 3. Divisores horizontais no workspace (entre colunas esquerdas e compoundStage)
-            if (workspace) {
-                const leftCols = centerIndex !== -1
-                    ? this.columnOrder.filter((col, idx) => idx < centerIndex)
-                    : ["sidebar-left", "inspector-panel"];
-                const activeLeft = leftCols.filter(colId => {
-                    const el = workspace.querySelector(`#${colId}`);
-                    const isPopped = !!(window.popoutWindows?.[colId] && !window.popoutWindows[colId].closed);
-                    return el && !isPopped && el.parentNode === workspace;
-                });
-
-                if (activeLeft.length > 0) {
-                    for (let j = 0; j < activeLeft.length - 1; j++) {
-                        const colA = activeLeft[j];
-                        const colB = activeLeft[j + 1];
-                        const cfg = getColSplitterConfig(colA);
-                        SplitterHelper.initSplitter(workspace, `#${colA}`, `#${colB}`, {
-                            direction: "horizontal",
-                            resizeTarget: "left",
-                            unit: "px",
-                            minVal: cfg.minVal,
-                            maxVal: cfg.maxVal,
-                            defaultVal: cfg.defaultVal,
-                            className: cfg.className
-                        });
-                    }
-
-                    if (this.compoundStage) {
-                        const lastLeft = activeLeft[activeLeft.length - 1];
-                        const cfgLast = getColSplitterConfig(lastLeft);
-                        SplitterHelper.initSplitter(workspace, `#${lastLeft}`, ".compound-stage", {
-                            direction: "horizontal",
-                            resizeTarget: "left",
-                            unit: "px",
-                            minVal: cfgLast.minVal,
-                            maxVal: cfgLast.maxVal,
-                            defaultVal: cfgLast.defaultVal,
-                            className: cfgLast.className
-                        });
-                    }
-                }
-            }
-        } else {
-            // Modos "bottom-full" e "center"
-            const topContainer = isBottomFull ? this.studioTop : workspace;
-
-            if (topContainer) {
-                // Garante que a ordem visual e de DOM das colunas superiores esteja correta
-                this.arrangeTopColumns(topContainer);
-
-                // Identifica as colunas ativas atualmente presentes em topContainer (não destacadas em popout)
-                const activeCols = this.columnOrder.filter(colId => {
-                    const el = colId === "center-stage" 
-                        ? topContainer.querySelector(".center-stage")
-                        : topContainer.querySelector(`#${colId}`);
-                    const isPopped = !!(window.popoutWindows?.[colId] && !window.popoutWindows[colId].closed);
-                    return el && !isPopped && el.parentNode === topContainer;
-                });
-
-                const centerIndex = activeCols.indexOf("center-stage");
-
-                // Instancia os divisores dinamicamente entre cada par de colunas adjacentes ativas
-                for (let i = 0; i < activeCols.length - 1; i++) {
-                    const colA = activeCols[i];
-                    const colB = activeCols[i + 1];
-                    const leftSelector = colA === "center-stage" ? ".center-stage" : `#${colA}`;
-                    const rightSelector = colB === "center-stage" ? ".center-stage" : `#${colB}`;
-
-                    let resizeTarget = "left";
-                    let targetCol = colA;
-
-                    if (centerIndex !== -1) {
-                        if (i + 1 <= centerIndex) {
-                            resizeTarget = "left";
-                            targetCol = colA;
-                        } else if (i >= centerIndex) {
-                            resizeTarget = "right";
-                            targetCol = colB;
-                        } else if (colB === "center-stage") {
-                            resizeTarget = "left";
-                            targetCol = colA;
-                        } else if (colA === "center-stage") {
-                            resizeTarget = "right";
-                            targetCol = colB;
-                        }
-                    }
-
-                    const cfg = getColSplitterConfig(targetCol);
-
-                    SplitterHelper.initSplitter(topContainer, leftSelector, rightSelector, {
-                        direction: "horizontal",
-                        resizeTarget: resizeTarget,
-                        unit: "px",
-                        minVal: cfg.minVal,
-                        maxVal: cfg.maxVal,
-                        defaultVal: cfg.defaultVal,
-                        className: cfg.className
-                    });
-                }
-            }
-
-            if (isBottomFull) {
-                if (workspace) {
-                    // Linha superior <-> Timeline full-width
-                    SplitterHelper.initSplitter(workspace, ".studio-top", "#timeline-panel", {
-                        direction: "vertical",
-                        resizeTarget: "right",
-                        unit: "px",
-                        minVal: 150,
-                        maxVal: 700,
-                        defaultVal: 300,
-                        className: "splitter-studio-timeline",
-                        tooltip: "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)",
-                        onDoubleClick: () => this.fitTimelineHeightToTracks(true)
-                    });
-                }
-            } else {
-                if (centerStage) {
-                    // Monitors Container <-> Timeline Panel no center-stage
-                    SplitterHelper.initSplitter(centerStage, ".monitors-container", "#timeline-panel", {
-                        direction: "vertical",
-                        resizeTarget: "right",
-                        unit: "px",
-                        minVal: 150,
-                        maxVal: 700,
-                        defaultVal: 300,
-                        className: "splitter-timeline",
-                        tooltip: "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)",
-                        onDoubleClick: () => this.fitTimelineHeightToTracks(true)
-                    });
-                }
-            }
+        if (this.timelinePosition === "center" && centerStage && !centerStage.classList.contains("center-no-monitors")) {
+            // Monitors Container <-> Timeline Panel no center-stage
+            SplitterHelper.initSplitter(centerStage, ".monitors-container", "#timeline-panel", {
+                direction: "vertical",
+                resizeTarget: "right",
+                unit: "px",
+                minVal: 150,
+                maxVal: 700,
+                defaultVal: 300,
+                className: "splitter-timeline",
+                tooltip: "Arraste para redimensionar (duplo clique para ajustar a todas as pistas)",
+                onDoubleClick: () => this.fitTimelineHeightToTracks(true)
+            });
         }
 
         this.reinitMonitorsSplitter();
@@ -2499,6 +3209,8 @@ export class WorkspaceManager {
     fitTimelineHeightToTracks(smooth = true) {
         const timelinePanel = document.getElementById("timeline-panel") || getActiveElement("timeline-panel");
         if (!timelinePanel) return;
+        // Como coluna a timeline ocupa a altura inteira: não há altura para ajustar.
+        if (timelinePanel.ownerDocument === document && this.timelinePosition === "column") return;
 
         const doc = timelinePanel.ownerDocument || document;
         const win = doc.defaultView || window;
@@ -2538,11 +3250,31 @@ export class WorkspaceManager {
         // 5. Total necessário (+ 2px de segurança contra subpixel rounding para a última pista)
         const neededH = Math.ceil(headerH + rulerH + tracksH + padBorderV + 2);
 
-        // 6. Limites do contêiner pai
-        const container = timelinePanel.parentElement;
+        // 6. Limites do contêiner pai. Na faixa (F2c), a altura é a da faixa inteira, dentro da moldura.
+        const band = timelinePanel.closest(".dock-band");
+        const container = band ? band.parentElement : timelinePanel.parentElement;
         const containerH = container ? (container.clientHeight || container.getBoundingClientRect().height) : (win.innerHeight - 60);
-        // Preserva pelo menos 180px para os monitores / studio-top + 4px de divisor
+        // Preserva pelo menos 180px para os monitores + 4px de divisor
         const maxAllowedH = Math.max(180, Math.floor(containerH - 184));
+        // Aplica a altura: no centro, no painel; na faixa, na faixa (+ o divisor dela).
+        const setH = (h) => {
+            if (band) {
+                band.style.setProperty("--dock-band-h", `${h + BAND_RESIZER_H}px`);
+            } else {
+                timelinePanel.style.height = `${h}px`;
+                timelinePanel.style.flex = `0 0 ${h}px`;
+            }
+        };
+        const saveH = (h) => {
+            try {
+                if (band) {
+                    localStorage.setItem(`capiau_band_h_${band.dataset.edge}`, String(h + BAND_RESIZER_H));
+                } else {
+                    localStorage.setItem("layout-dim-splitter-timeline", h);
+                    localStorage.setItem("layout-dim-splitter-studio-timeline", h);
+                }
+            } catch (e) {}
+        };
         const minAllowedH = 150;
 
         const fitTargetH = Math.max(minAllowedH, Math.min(maxAllowedH, neededH));
@@ -2567,10 +3299,6 @@ export class WorkspaceManager {
         const deltaH = targetH - currentH;
         if (Math.abs(deltaH) === 0) return;
 
-        // Chave de armazenamento no localStorage
-        const isBottomFull = this.timelinePosition === "bottom-full";
-        const storageKey = isBottomFull ? "layout-dim-splitter-studio-timeline" : "layout-dim-splitter-timeline";
-
         // Cancela qualquer animação de redimensionamento anterior
         if (this._timelineResizeAnimRaf) {
             cancelAnimationFrame(this._timelineResizeAnimRaf);
@@ -2578,12 +3306,8 @@ export class WorkspaceManager {
         }
 
         if (!smooth) {
-            timelinePanel.style.height = `${targetH}px`;
-            timelinePanel.style.flex = `0 0 ${targetH}px`;
-            try {
-                localStorage.setItem("layout-dim-splitter-timeline", targetH);
-                localStorage.setItem("layout-dim-splitter-studio-timeline", targetH);
-            } catch (e) {}
+            setH(targetH);
+            saveH(targetH);
             if (tlState) {
                 if (targetH === fitTargetH) tlState.scrollTop = 0;
                 tlState.clampScrollTop();
@@ -2617,8 +3341,7 @@ export class WorkspaceManager {
             const eased = easeOutCubic(progress);
 
             const newH = Math.round(startH + deltaH * eased);
-            timelinePanel.style.height = `${newH}px`;
-            timelinePanel.style.flex = `0 0 ${newH}px`;
+            setH(newH);
 
             if (tlState && shouldZeroScroll && startScroll > 0) {
                 tlState.scrollTop = Math.round(startScroll * (1 - eased));
@@ -2637,11 +3360,8 @@ export class WorkspaceManager {
             } else {
                 this._timelineResizeAnimRaf = null;
                 // Finalização com os valores exatos
-                timelinePanel.style.height = `${targetH}px`;
-                try {
-                    localStorage.setItem("layout-dim-splitter-timeline", targetH);
-                    localStorage.setItem("layout-dim-splitter-studio-timeline", targetH);
-                } catch (e) {}
+                setH(targetH);
+                saveH(targetH);
                 if (tlState) {
                     if (shouldZeroScroll) tlState.scrollTop = 0;
                     tlState.clampScrollTop();
@@ -2836,7 +3556,8 @@ export class WorkspaceManager {
     captureCurrentState() {
         const isStudio = document.body.classList.contains("studio");
         const monitorsLayout = this.monitorsLayout || (isStudio ? "stacked" : "side-by-side");
-        const timelinePosition = this.timelinePosition || (isStudio ? "bottom-full" : "center");
+        // "center" ou "band"; a faixa (com a timeline e os cantos) vai em bands/bandCorners.
+        const timelinePosition = this.timelinePosition || "center";
 
         const sidebarLeft = getActiveElement("sidebar-left") || this.poppedElements?.["sidebar-left"] || document.getElementById("sidebar-left");
         const inspectorPanel = getActiveElement("inspector-panel") || this.poppedElements?.["inspector-panel"] || document.getElementById("inspector-panel");
@@ -2883,7 +3604,8 @@ export class WorkspaceManager {
             leftOrder: localStorage.getItem("left-tabs-order"),
             leftVisibility: localStorage.getItem("left-tabs-visibility"),
             rightOrder: localStorage.getItem("right-tabs-order"),
-            rightVisibility: localStorage.getItem("right-tabs-visibility")
+            rightVisibility: localStorage.getItem("right-tabs-visibility"),
+            tabStrips: window.tabPanels?.getStrips?.() || {}
         };
 
         return {
@@ -2891,6 +3613,9 @@ export class WorkspaceManager {
             monitorsLayout: monitorsLayout,
             timelinePosition: timelinePosition,
             columnOrder: [...this.columnOrder],
+            columnStacks: this.columnStacks.map(st => [...st]),
+            bands: { top: [...this.bands.top], bottom: [...this.bands.bottom] },
+            bandCorners: { ...this.bandCorners },
             popouts: Object.keys(window.popoutWindows || {}).filter(k => window.popoutWindows[k] && !window.popoutWindows[k].closed),
             splitters: {
                 "layout-dim-splitter-sidebar-left": getDim("layout-dim-splitter-sidebar-left"),
@@ -2902,12 +3627,14 @@ export class WorkspaceManager {
                 "layout-dim-splitter-studio-right": getDim("layout-dim-splitter-studio-right"),
                 "layout-dim-splitter-studio-timeline": getDim("layout-dim-splitter-studio-timeline"),
                 "layout-dim-splitter-studio-players": getDim("layout-dim-splitter-studio-players"),
-                "layout-dim-splitter-timeline-headers": getDim("layout-dim-splitter-timeline-headers")
+                "layout-dim-splitter-timeline-headers": getDim("layout-dim-splitter-timeline-headers"),
+                "capiau_band_h_top": getDim("capiau_band_h_top"),
+                "capiau_band_h_bottom": getDim("capiau_band_h_bottom")
             },
             collapsed: {
-                sidebarLeft: sidebarLeft ? sidebarLeft.classList.contains("collapsed") : false,
-                inspectorPanel: inspectorPanel ? inspectorPanel.classList.contains("collapsed") : false,
-                sidebarRight: sidebarRight ? sidebarRight.classList.contains("collapsed") : false,
+                sidebarLeft: this.isPanelCollapsed("sidebar-left"),
+                inspectorPanel: this.isPanelCollapsed("inspector-panel"),
+                sidebarRight: this.isPanelCollapsed("sidebar-right"),
                 timelinePanel: timelinePanel ? timelinePanel.classList.contains("collapsed") : false,
                 header: appContainer ? appContainer.classList.contains("header-collapsed") : false,
                 timelineToolbar: timelineActions ? timelineActions.classList.contains("collapsed") : false,
@@ -3054,11 +3781,15 @@ export class WorkspaceManager {
             // Preset Customizado
             const wantMonitorsLayout = customConfig.monitorsLayout || (customConfig.isStudio ? "stacked" : "side-by-side");
             const wantTimelinePosition = customConfig.timelinePosition || (customConfig.isStudio ? "bottom-full" : "center");
-            this.setTimelinePosition(wantTimelinePosition, true);
             this.setMonitorsLayout(wantMonitorsLayout, true);
 
+            // Workspace salvo antes da F2c parte 2 (timeline "bottom-*" sem faixa) vira a faixa de baixo.
+            const saved = convertTimelinePosition(wantTimelinePosition, customConfig.bands, customConfig.bandCorners);
+            const stacks = Array.isArray(customConfig.columnStacks) ? customConfig.columnStacks : [];
             if (customConfig.columnOrder && Array.isArray(customConfig.columnOrder) && customConfig.columnOrder.length > 0) {
-                this.applyColumnsOrder(customConfig.columnOrder, true);
+                this.setColumnLayout(customConfig.columnOrder, stacks, saved.bands, saved.bandCorners);
+            } else {
+                this.setColumnLayout(this.columnOrder, stacks, saved.bands, saved.bandCorners);
             }
 
             // Restaura dimensões gravadas nos Splitters
@@ -3125,7 +3856,7 @@ export class WorkspaceManager {
                 const toggleLeft = document.getElementById("toggle-left");
                 const reopenLeft = document.getElementById("reopen-left");
                 if (sidebarLeft && reopenLeft) {
-                    const isCollapsed = sidebarLeft.classList.contains("collapsed");
+                    const isCollapsed = this.isPanelCollapsed("sidebar-left");
                     if (c.sidebarLeft && !isCollapsed) {
                         if (toggleLeft) toggleLeft.click(); else sidebarLeft.classList.add("collapsed");
                     } else if (!c.sidebarLeft && isCollapsed) {
@@ -3137,7 +3868,7 @@ export class WorkspaceManager {
                 const toggleInspector = document.getElementById("toggle-inspector");
                 const reopenInspector = document.getElementById("reopen-inspector");
                 if (inspectorPanel && reopenInspector) {
-                    const isCollapsed = inspectorPanel.classList.contains("collapsed");
+                    const isCollapsed = this.isPanelCollapsed("inspector-panel");
                     if (c.inspectorPanel && !isCollapsed) {
                         if (toggleInspector) toggleInspector.click(); else inspectorPanel.classList.add("collapsed");
                     } else if (!c.inspectorPanel && isCollapsed) {
@@ -3148,7 +3879,7 @@ export class WorkspaceManager {
                 const toggleRight = document.getElementById("toggle-right");
                 const reopenRight = document.getElementById("reopen-right");
                 if (sidebarRight && reopenRight) {
-                    const isCollapsed = sidebarRight.classList.contains("collapsed");
+                    const isCollapsed = this.isPanelCollapsed("sidebar-right");
                     if (c.sidebarRight && !isCollapsed) {
                         if (toggleRight) toggleRight.click(); else sidebarRight.classList.add("collapsed");
                     } else if (!c.sidebarRight && isCollapsed) {
@@ -3345,9 +4076,9 @@ export class WorkspaceManager {
             // Presets Nativos / Estáticos
             const preset = this.workspacePresets[ws];
             if (preset) {
-                this.setTimelinePosition(preset.timeline, true);
                 this.setMonitorsLayout(preset.monitors, true);
-                this.applyColumnsOrder(preset.columns, true);
+                this.setColumnLayout(preset.columns, [], { top: [], bottom: [] }, {});
+                this.setTimelinePosition(preset.timeline);
             }
 
             if (ws === "montagem") {
@@ -3403,6 +4134,12 @@ export class WorkspaceManager {
             }
         }
 
+        // P14: menu de cada aba vem do workspace (os prontos: todas no menu de origem). Na abertura
+        // da página (antes do histórico começar) fica o que o usuário deixou, não o do workspace.
+        if (this._layoutHistoryReady) {
+            window.tabPanels?.applyStrips?.(customConfig?.tabsCustomization?.tabStrips || {});
+        }
+
         // Armazena a workspace ativa e atualiza a UI
         localStorage.setItem("capiau_active_workspace", ws);
         this.updateWorkspaceSelectUI();
@@ -3423,7 +4160,12 @@ export class WorkspaceManager {
         setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
     }
 
-    togglePopout(panelId) {
+    togglePopout(panelId, options = {}) {
+        // Painel numa janela com vários painéis: sai só ele; a janela continua com os outros.
+        if (this.getGroupPanels().includes(panelId)) {
+            this.removeFromGroup(panelId);
+            return;
+        }
         const win = window.popoutWindows[panelId];
         const isPoppedWindowOpen = win && !win.closed;
         const localPanel = this.poppedElements[panelId] || document.getElementById(panelId);
@@ -3440,7 +4182,13 @@ export class WorkspaceManager {
             return;
         }
 
+        // Painel empilhado sai da pilha antes de ir para a janela nova.
+        this.detachFromStack(panelId);
+
         const winName = getPopoutWindowName(panelId);
+        // window.open pelo nome pode navegar uma janela ainda aberta (editor recarregado): o aviso
+        // de "fechei" da página antiga não pode desfazer esta abertura.
+        this.suppressCloseMessages([panelId]);
         
         // Lê dimensões e coordenadas salvas no localStorage
         let width = panelId.includes("player") ? 640 : 800;
@@ -3496,8 +4244,358 @@ export class WorkspaceManager {
                 }
             }, 500);
         } else {
-            alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
+            // quiet: a restauração ao iniciar (sem clique) trata o bloqueio com o aviso "Restaurar janelas".
+            if (!options.quiet) alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
         }
+    }
+
+    /** Tamanho salvo da janela destacada do painel (ou o padrão). */
+    readPopoutSize(panelId) {
+        let width = panelId.includes("player") ? 640 : 800;
+        let height = panelId.includes("player") ? 480 : 600;
+        try {
+            const b = JSON.parse(localStorage.getItem(`capiau_popout_bounds_${panelId}`) || "null");
+            const w = b && (b.outerWidth || b.width);
+            const h = b && (b.outerHeight || b.height);
+            if (w > 150 && h > 150) { width = w; height = h; }
+        } catch (e) {}
+        return { width, height };
+    }
+
+    /**
+     * F3: abre a janela destacada durante o arrasto, na posição do cursor e ainda sem o painel.
+     * Precisa ser chamada enquanto o gesto do usuário vale (~5 s após pressionar o mouse).
+     * Retorna a janela ou null se o navegador bloquear.
+     */
+    openLivePopout(panelId, left, top) {
+        const { width, height } = this.readPopoutSize(panelId);
+        const features = `popup=yes,width=${width},height=${height},left=${Math.round(left)},top=${Math.round(top)},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`;
+        this._deferredPopouts.set(panelId, true);
+        const popup = window.open(`panel.html?panel=${panelId}&dock=live`, getPopoutWindowName(panelId), features);
+        if (!popup) {
+            this._deferredPopouts.delete(panelId);
+            return null;
+        }
+        window.popoutWindows[panelId] = popup;
+        return popup;
+    }
+
+    /** F3: o mouse foi solto fora do editor — o painel entra na janela que acompanhou o cursor. */
+    commitLivePopout(panelId, popup) {
+        this.detachFromStack(panelId);
+        localStorage.setItem(`capiau_popout_active_${panelId}`, "true");
+        const pending = this._deferredPopouts.get(panelId);
+        this._deferredPopouts.delete(panelId);
+        // Se a janela já carregou, anexa agora; senão os retries do panel.html anexam ao carregar.
+        if (pending && pending !== true && !pending.closed) this.attachPanelToPopout(panelId, pending);
+        const timer = setInterval(() => {
+            if (!popup.closed) return;
+            clearInterval(timer);
+            if (window.popoutWindows[panelId] === popup) this.restorePanel(panelId);
+        }, 500);
+    }
+
+    /** F3: o cursor voltou para dentro do editor antes de soltar — fecha a janela prévia. */
+    cancelLivePopout(panelId, popup) {
+        this._deferredPopouts.delete(panelId);
+        if (window.popoutWindows[panelId] === popup) delete window.popoutWindows[panelId];
+        try { popup.close(); } catch (e) {}
+    }
+
+    /**
+     * F4: uma janela destacada troca de modo navegando para outro panel.html (simples ↔ dupla).
+     * O beforeunload dela avisa "fechou"; durante a troca esse aviso não pode restaurar nada.
+     */
+    suppressCloseMessages(panels) {
+        const prev = this._suppressedClose && Date.now() < this._suppressedClose.until ? this._suppressedClose.panels : [];
+        this._suppressedClose = { panels: new Set([...prev, ...panels]), until: Date.now() + 4000 };
+    }
+
+    isCloseMessageSuppressed(panels) {
+        const s = this._suppressedClose;
+        return !!s && Date.now() < s.until && panels.filter(Boolean).every(id => s.panels.has(id));
+    }
+
+    /**
+     * Aviso de "fechei" atrasado: os painéis já vivem numa janela aberta com outro nome
+     * (ex.: a janela simples fechou durante a troca para um grupo). Nada a restaurar.
+     */
+    isStaleCloseMessage(panels, windowName) {
+        if (!windowName) return false;
+        return panels.filter(Boolean).every(id => {
+            const w = window.popoutWindows[id];
+            try { return !!w && !w.closed && w.name !== windowName; } catch (e) { return false; }
+        });
+    }
+
+    watchWindowClosed(win, onClosed) {
+        const timer = setInterval(() => {
+            if (!win.closed) return;
+            clearInterval(timer);
+            onClosed();
+        }, 500);
+    }
+
+    /**
+     * F4: junta panelId à janela destacada de targetPanel, que vira a Janela Dupla sem abrir janela
+     * nova (sem depender do gesto do usuário). side: "left" | "right" | "top" | "bottom".
+     * Retorna false se não for possível (já existe Janela Dupla, janela fechada, painel inválido).
+     */
+    joinIntoPopout(targetPanel, panelId, side) {
+        const win = window.popoutWindows[targetPanel];
+        const dual = window.popoutWindows["dual-sidebar"];
+        if (!win || win.closed || (dual && !dual.closed) || targetPanel === panelId) return false;
+
+        // O painel arrastado sai de onde estiver (outra janela destacada ou pilha).
+        const own = window.popoutWindows[panelId];
+        if (own && !own.closed) this.togglePopout(panelId);
+        this.detachFromStack(panelId);
+
+        // Traz o painel da janela de volta antes de ela recarregar (o documento antigo será descartado).
+        this.suppressCloseMessages([targetPanel]);
+        delete window.popoutWindows[targetPanel];
+        this.restorePanel(targetPanel);
+
+        const order = side === "left" || side === "top" ? [panelId, targetPanel] : [targetPanel, panelId];
+        const layout = side === "top" || side === "bottom" ? "stacked" : "side-by-side";
+        order.forEach(id => {
+            window.popoutWindows[id] = win;
+            localStorage.setItem(`capiau_popout_active_${id}`, "true");
+        });
+        window.popoutWindows["dual-sidebar"] = win;
+        localStorage.setItem("capiau_dual_popout_active", "true");
+        localStorage.setItem("capiau_dual_popout_panels", order.join(","));
+        localStorage.setItem("capiau_dual_popout_layout", layout);
+        try {
+            if (layout === "side-by-side") win.resizeTo(Math.min(screen.availWidth, Math.max(win.outerWidth, 1000)), win.outerHeight);
+            else win.resizeTo(win.outerWidth, Math.min(screen.availHeight, Math.max(win.outerHeight, 880)));
+        } catch (e) {}
+        win.location.href = `panel.html?panels=${order.join(",")}&layout=${layout}&dock=keep`;
+        this.watchWindowClosed(win, () => {
+            if (window.popoutWindows["dual-sidebar"] === win) this.restoreDualPopout(order[0], order[1]);
+        });
+        return true;
+    }
+
+    /**
+     * F4: tira panelId da Janela Dupla. Ele volta ao editor; o outro painel continua sozinho
+     * na mesma janela (que recarrega no modo simples).
+     */
+    splitFromDual(panelId) {
+        const win = window.popoutWindows["dual-sidebar"];
+        const panels = (localStorage.getItem("capiau_dual_popout_panels") || "").split(",").filter(Boolean);
+        if (!win || win.closed || !panels.includes(panelId)) return false;
+        const other = panels.find(id => id !== panelId);
+
+        this.suppressCloseMessages(panels);
+        delete window.popoutWindows["dual-sidebar"];
+        localStorage.removeItem("capiau_dual_popout_active");
+        localStorage.removeItem("capiau_dual_popout_panels");
+        panels.forEach(id => {
+            delete window.popoutWindows[id];
+            this.restorePanel(id);
+        });
+        this.rebindMainSidebarToggles();
+        this.updateAllPanelsDockDirection();
+        this.reinitSplitters();
+
+        window.popoutWindows[other] = win;
+        localStorage.setItem(`capiau_popout_active_${other}`, "true");
+        win.location.href = `panel.html?panel=${other}&dock=keep`;
+        this.watchWindowClosed(win, () => {
+            if (window.popoutWindows[other] === win) this.restorePanel(other);
+        });
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 40);
+        return true;
+    }
+
+    // ── F4b: janela com 2 a 4 painéis (panel-group.html) ────────────────────
+
+    /** Painéis na janela de grupo aberta (vazio se não houver). */
+    getGroupPanels() {
+        const win = window.popoutWindows?.["group"];
+        if (!win || win.closed) return [];
+        return (localStorage.getItem("capiau_group_popout_panels") || "").split(",").filter(Boolean);
+    }
+
+    setGroupState(win, panels, arrangement) {
+        window.popoutWindows["group"] = win;
+        panels.forEach(id => {
+            window.popoutWindows[id] = win;
+            localStorage.setItem(`capiau_popout_active_${id}`, "true");
+        });
+        localStorage.setItem("capiau_group_popout_active", "true");
+        localStorage.setItem("capiau_group_popout_panels", panels.join(","));
+        localStorage.setItem("capiau_group_popout_arrangement", arrangement);
+        this.watchWindowClosed(win, () => {
+            if (window.popoutWindows["group"] === win) this.restoreGroupPopout();
+        });
+    }
+
+    clearGroupState(panels) {
+        delete window.popoutWindows["group"];
+        localStorage.removeItem("capiau_group_popout_active");
+        localStorage.removeItem("capiau_group_popout_panels");
+        panels.forEach(id => delete window.popoutWindows[id]);
+    }
+
+    /** Chamado pelo panel-group.html ao carregar: move cada painel para o seu espaço. */
+    registerGroupPopout(panels, win, arrangement) {
+        if (!win || win.closed || window.popoutWindows["group"] !== win) return;
+        panels.forEach(id => {
+            const slot = win.document.querySelector(`[data-group-slot="${id}"]`);
+            const el = this.poppedElements[id] || document.getElementById(id);
+            if (!slot || (el && el.parentNode === slot)) return;
+            this.attachPanelToPopout(id, win, slot);
+        });
+        if (arrangement) localStorage.setItem("capiau_group_popout_arrangement", arrangement);
+    }
+
+    /** Disposição escolhida na barra da janela de grupo (entra no histórico de layout). */
+    setGroupArrangement(arrangement, apply = false) {
+        localStorage.setItem("capiau_group_popout_arrangement", arrangement);
+        const win = window.popoutWindows["group"];
+        if (apply && win && !win.closed) {
+            try { win.document.querySelector(`.group-btn[data-arrangement="${arrangement}"]`)?.click(); } catch (e) {}
+        }
+        this.scheduleLayoutCommit();
+    }
+
+    /** Nova ordem dos painéis na janela de grupo (mesmos painéis), sem recarregar a janela. */
+    setGroupOrder(order) {
+        const win = window.popoutWindows["group"];
+        const panels = this.getGroupPanels();
+        if (!win || win.closed || [...order].sort().join() !== [...panels].sort().join()) return false;
+        localStorage.setItem("capiau_group_popout_panels", order.join(","));
+        try { win.capiauSetGroupOrder?.(order); } catch (e) {}
+        this.refreshCollapseArrows();
+        this.scheduleLayoutCommit();
+        return true;
+    }
+
+    /** Troca dois painéis de lugar dentro da janela de grupo (arrastar um sobre o outro). */
+    swapGroupPanels(a, b) {
+        const order = this.getGroupPanels();
+        const i = order.indexOf(a), j = order.indexOf(b);
+        if (i < 0 || j < 0 || i === j) return false;
+        [order[i], order[j]] = [order[j], order[i]];
+        return this.setGroupOrder(order);
+    }
+
+    /** Abre uma janela de grupo nova (desfazer, restaurar sessão). Precisa do gesto do usuário. */
+    openGroupPopout(panels, arrangement = "row", options = {}) {
+        panels.forEach(id => {
+            const own = window.popoutWindows[id];
+            if (own && !own.closed) this.togglePopout(id);
+            this.detachFromStack(id);
+        });
+        let width = 1200, height = 800, left = null, top = null;
+        try {
+            const b = JSON.parse(localStorage.getItem("capiau_popout_bounds_group") || "null");
+            if (b && b.outerWidth > 200) ({ outerWidth: width, outerHeight: height, screenX: left, screenY: top } = b);
+        } catch (e) {}
+        let features = `popup=yes,width=${width},height=${height},resizable=yes,scrollbars=yes`;
+        if (left !== null && top !== null) features += `,left=${left},top=${top}`;
+        // O nome pode achar uma janela de grupo ainda aberta (ex.: editor recarregado): ela é
+        // navegada, e o aviso de "fechei" da página antiga não pode desfazer a restauração.
+        this.suppressCloseMessages(panels);
+        const win = window.open(`panel-group.html?group=${panels.join(",")}&arrangement=${arrangement}`, "CapIAu_Group_Window", features);
+        if (!win) {
+            if (!options.quiet) alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
+            return null;
+        }
+        this.setGroupState(win, panels, arrangement);
+        return win;
+    }
+
+    /**
+     * Troca o conteúdo de uma janela destacada já aberta (simples, dupla ou grupo) para um grupo
+     * com panels, navegando a própria janela: não abre outra nem depende do gesto do usuário.
+     */
+    convertWindowToGroup(win, panels, arrangement) {
+        const inside = Object.keys(window.popoutWindows).filter(id => window.popoutWindows[id] === win && id !== "group" && id !== "dual-sidebar");
+        this.suppressCloseMessages([...new Set([...inside, ...panels])]);
+        if (window.popoutWindows["dual-sidebar"] === win) {
+            delete window.popoutWindows["dual-sidebar"];
+            localStorage.removeItem("capiau_dual_popout_active");
+            localStorage.removeItem("capiau_dual_popout_panels");
+        }
+        if (window.popoutWindows["group"] === win) this.clearGroupState(inside);
+        // Os painéis voltam ao editor antes de a janela recarregar (o documento antigo é descartado).
+        inside.forEach(id => {
+            delete window.popoutWindows[id];
+            this.restorePanel(id);
+        });
+        panels.forEach(id => this.detachFromStack(id));
+        this.setGroupState(win, panels, arrangement);
+        win.location.href = `panel-group.html?group=${panels.join(",")}&arrangement=${arrangement}&dock=keep`;
+    }
+
+    /** Tira um painel da janela de grupo; com 1 restante ela vira janela simples. */
+    removeFromGroup(panelId) {
+        const win = window.popoutWindows["group"];
+        const panels = this.getGroupPanels();
+        if (!win || !panels.includes(panelId)) return false;
+        const rest = panels.filter(id => id !== panelId);
+        const arrangement = localStorage.getItem("capiau_group_popout_arrangement") || "row";
+        if (rest.length >= 2) {
+            this.convertWindowToGroup(win, rest, arrangement);
+            return true;
+        }
+        this.suppressCloseMessages(panels);
+        this.clearGroupState(panels);
+        panels.forEach(id => this.restorePanel(id));
+        const other = rest[0];
+        window.popoutWindows[other] = win;
+        localStorage.setItem(`capiau_popout_active_${other}`, "true");
+        win.location.href = `panel.html?panel=${other}&dock=keep`;
+        this.watchWindowClosed(win, () => {
+            if (window.popoutWindows[other] === win) this.restorePanel(other);
+        });
+        return true;
+    }
+
+    /** Reacopla todos os painéis da janela de grupo e a fecha. */
+    restoreGroupPopout() {
+        const win = window.popoutWindows["group"];
+        const panels = (localStorage.getItem("capiau_group_popout_panels") || "").split(",").filter(Boolean);
+        this.suppressCloseMessages(panels);
+        this.clearGroupState(panels);
+        if (win && !win.closed) {
+            try { win.close(); } catch (e) {}
+        }
+        panels.forEach(id => this.restorePanel(id));
+        this.rebindMainSidebarToggles();
+        this.updateAllPanelsDockDirection();
+        this.reinitSplitters();
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 40);
+    }
+
+    /**
+     * F4b: junta panelId à janela destacada win (simples, dupla ou grupo), no começo ("start") ou
+     * no fim ("end"), com a disposição dada. Duas laterais sozinhas viram a Janela Dupla (F4a).
+     */
+    joinIntoWindow(win, panelId, position, arrangement) {
+        if (!win || win.closed) return false;
+        const inside = Object.keys(window.popoutWindows).filter(id => window.popoutWindows[id] === win && id !== "group" && id !== "dual-sidebar");
+        const ordered = window.popoutWindows["group"] === win ? this.getGroupPanels()
+            : window.popoutWindows["dual-sidebar"] === win ? (localStorage.getItem("capiau_dual_popout_panels") || "").split(",").filter(Boolean)
+            : inside;
+        if (ordered.includes(panelId) || ordered.length >= 4) return false;
+        const group = window.popoutWindows["group"];
+        if (group && !group.closed && group !== win) return false; // uma janela de grupo por vez
+
+        // O painel arrastado sai de onde estiver.
+        const own = window.popoutWindows[panelId];
+        if (own && !own.closed && own !== win) {
+            if (own === group) this.removeFromGroup(panelId);
+            else if (own === window.popoutWindows["dual-sidebar"]) this.splitFromDual(panelId);
+            else this.togglePopout(panelId);
+        }
+        this.detachFromStack(panelId);
+        const panels = position === "start" ? [panelId, ...ordered] : [...ordered, panelId];
+        this.convertWindowToGroup(win, panels, arrangement);
+        return true;
     }
 
     registerPopout(panelId, win) {
@@ -3506,7 +4604,7 @@ export class WorkspaceManager {
         this.attachPanelToPopout(panelId, win);
     }
 
-    openDualPopout(panelId1, panelId2, layout = "side-by-side") {
+    openDualPopout(panelId1, panelId2, layout = "side-by-side", options = {}) {
         if (!panelId1 || !panelId2 || panelId1 === panelId2) {
             alert("Selecione dois menus laterais diferentes para destacar juntos.");
             return;
@@ -3517,6 +4615,9 @@ export class WorkspaceManager {
             dualWin.focus();
             return;
         }
+
+        this.detachFromStack(panelId1);
+        this.detachFromStack(panelId2);
 
         // Se algum dos painéis já estiver destacado individualmente, fecha e restaura antes
         if (window.popoutWindows[panelId1] && !window.popoutWindows[panelId1].closed && window.popoutWindows[panelId1] !== dualWin) {
@@ -3562,6 +4663,7 @@ export class WorkspaceManager {
             features += `,left=${left},top=${top},screenX=${left},screenY=${top}`;
         }
 
+        this.suppressCloseMessages([panelId1, panelId2]);
         const popup = window.open(
             `panel.html?panels=${panelId1},${panelId2}&layout=${layout}`,
             "CapIAu_DualSidebar_Window",
@@ -3588,7 +4690,8 @@ export class WorkspaceManager {
                 }
             }, 500);
         } else {
-            alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
+            // quiet: a restauração ao iniciar (sem clique) trata o bloqueio com o aviso "Restaurar janelas".
+            if (!options.quiet) alert("Bloqueador de popups detectado! Por favor, autorize popups para este site para poder destacar painéis em outros monitores.");
         }
     }
 
@@ -3628,14 +4731,18 @@ export class WorkspaceManager {
             slot1.innerHTML = "";
             p1.classList.remove("collapsed");
             p1.classList.remove("popped-out-hidden");
+            const restoreMedia1 = preserveMediaAcrossDocuments(p1);
             win.document.adoptNode(p1);
             slot1.appendChild(p1);
+            restoreMedia1();
 
             slot2.innerHTML = "";
             p2.classList.remove("collapsed");
             p2.classList.remove("popped-out-hidden");
+            const restoreMedia2 = preserveMediaAcrossDocuments(p2);
             win.document.adoptNode(p2);
             slot2.appendChild(p2);
+            restoreMedia2();
 
             // Esconde linhas restauradoras do editor principal para evitar falso estado recolhido
             const r1 = document.getElementById("reopen-left");
@@ -3692,8 +4799,7 @@ export class WorkspaceManager {
                         e.preventDefault();
                         e.stopPropagation();
                         e.stopImmediatePropagation();
-                        const slotBtnId = idx === 0 ? "btn-toggle-slot-1" : "btn-toggle-slot-2";
-                        win.document.getElementById(slotBtnId)?.click();
+                        this.setPanelCollapsed(currentId, true);
                     });
 
                     // Duplo clique no espaço vazio do cabeçalho da sidebar na janela destacada recolhe o slot correspondente
@@ -3716,6 +4822,10 @@ export class WorkspaceManager {
         localStorage.setItem(`capiau_popout_active_${panelId1}`, "true");
         localStorage.setItem(`capiau_popout_active_${panelId2}`, "true");
         localStorage.setItem("capiau_dual_popout_active", "true");
+
+        // Recolhido continua recolhido na janela (e a seta aponta para cima/baixo se empilhados).
+        this.applyPanelCollapse(panelId1);
+        this.applyPanelCollapse(panelId2);
 
         // Reorganiza os divisores e atualiza o layout do editor principal imediatamente
         this.reinitSplitters();
@@ -3772,6 +4882,9 @@ export class WorkspaceManager {
                 if (activeTag === "input" || activeTag === "textarea") return;
                 
                 if (window.isAnyModalOpen && window.isAnyModalOpen(win.document)) return;
+                if (this.handleLayoutShortcut(e)) return;
+                // Numpad (recolher/destacar painéis) vale também com o foco na janela destacada.
+                if (this.handleWorkspaceShortcut(e)) return;
                 if (window.FaceManager && window.FaceManager.inspectorCard) return;
 
                 // Intercepta atalho de rotação de mídia sob o cursor (R / Shift+R) no popout
@@ -3880,16 +4993,40 @@ export class WorkspaceManager {
             }
         }
         else if (data.type === "POPOUT_CLOSED") {
+            if (this.isCloseMessageSuppressed([data.panel]) || this.isStaleCloseMessage([data.panel], data.windowName)) return;
             this.restorePanel(data.panel);
+        }
+        else if (data.type === "GROUP_POPOUT_READY") {
+            const win = window.popoutWindows["group"];
+            if (win && !win.closed) this.registerGroupPopout(data.panels || [], win, data.arrangement);
+        }
+        else if (data.type === "GROUP_POPOUT_CLOSED") {
+            const panels = data.panels || [];
+            const groupWin = window.popoutWindows["group"];
+            // Já reacoplado por nós (grupo não está mais aberto) ou painéis já em outra janela: nada a fazer.
+            if (!groupWin || this.isCloseMessageSuppressed(panels) || this.isStaleCloseMessage(panels, data.windowName)) return;
+            this.restoreGroupPopout();
         }
         else if (data.type === "DUAL_POPOUT_CLOSED") {
             const panels = data.panels || [];
+            if (this.isCloseMessageSuppressed(panels) || this.isStaleCloseMessage(panels, data.windowName)) return;
             this.restoreDualPopout(panels[0], panels[1]);
         }
     }
 
-    attachPanelToPopout(panelId, win) {
+    attachPanelToPopout(panelId, win, slot = null) {
         if (!win || win.closed || !win.document) return;
+        // Ordem de empilhamento aproximada (F5): a janela focada por último está por cima.
+        if (!win.__dockZBound) {
+            win.__dockZBound = true;
+            win.__dockZ = Date.now();
+            win.addEventListener("focus", () => { win.__dockZ = Date.now(); });
+        }
+        // Janela aberta no meio de um arrasto (F3): segura até soltar, senão a alça sai de baixo do cursor.
+        if (this._deferredPopouts.has(panelId)) {
+            this._deferredPopouts.set(panelId, win);
+            return;
+        }
         
         const localPanel = document.getElementById(panelId) || this.poppedElements[panelId];
         if (!localPanel) {
@@ -3904,12 +5041,15 @@ export class WorkspaceManager {
             this.originalNextSiblings[panelId] = localPanel.nextSibling;
         }
 
-        const container = win.document.getElementById("panel-container");
+        // F4b: numa janela com vários painéis, cada um vai para o seu espaço (slot).
+        const container = slot || win.document.getElementById("panel-container");
         if (container) {
             // Limpa loader da janela popout e injeta o elemento
             container.innerHTML = "";
+            const restoreMedia = preserveMediaAcrossDocuments(localPanel);
             win.document.adoptNode(localPanel);
             container.appendChild(localPanel);
+            restoreMedia();
             localPanel.classList.remove("popped-out-hidden");
             
             // Transforma o botão de pop-out em botão de reanexação na janela destacada
@@ -3927,12 +5067,17 @@ export class WorkspaceManager {
                 popBtn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    this.togglePopout(panelId);
+                    if (this.getGroupPanels().includes(panelId)) this.removeFromGroup(panelId);
+                    else this.togglePopout(panelId);
                 };
             }
         }
 
         localStorage.setItem(`capiau_popout_active_${panelId}`, "true");
+
+        // Recolhido continua recolhido na janela; a seta segue a posição dentro dela.
+        localPanel.classList.remove("collapsed");
+        if (COLLAPSIBLE_PANELS.includes(panelId)) this.applyPanelCollapse(panelId);
 
         // Reorganiza os divisores e atualiza o layout do editor principal imediatamente após a remoção do painel
         this.reinitSplitters();
@@ -4022,6 +5167,9 @@ export class WorkspaceManager {
                 if (activeTag === "input" || activeTag === "textarea") return;
                 
                 if (window.isAnyModalOpen && window.isAnyModalOpen(win.document)) return;
+                if (this.handleLayoutShortcut(e)) return;
+                // Numpad (recolher/destacar painéis) vale também com o foco na janela destacada.
+                if (this.handleWorkspaceShortcut(e)) return;
                 if (window.FaceManager && window.FaceManager.inspectorCard) return;
 
                 // Intercepta atalho de rotação de mídia sob o cursor (R / Shift+R) no popout
@@ -4092,26 +5240,29 @@ export class WorkspaceManager {
             document.adoptNode(localPanel);
 
             const workspace = document.querySelector(".workspace");
-            const topContainer = (this.timelinePosition === "bottom-full" ? this.studioTop : workspace) || workspace;
 
             if (this.columnOrder.includes(panelId)) {
-                if (this.timelinePosition === "bottom-left" || this.timelinePosition === "bottom-right") {
-                    this.setTimelinePosition(this.timelinePosition, true);
-                } else if (topContainer) {
-                    topContainer.appendChild(localPanel);
-                    this.arrangeTopColumns(topContainer);
+                if (workspace) {
+                    workspace.appendChild(localPanel);
+                    this.arrangeTopColumns(workspace);
                 }
                 if (panelId === "inspector-panel" && window.timelineInteraction && typeof window.timelineInteraction.onInspectorPopoutRestored === "function") {
                     window.timelineInteraction.onInspectorPopoutRestored();
                 }
+            } else if (bandOf(this.bands, panelId) && workspace) {
+                // Volta para a vaga dele na faixa (laterais, timeline e monitores).
+                workspace.appendChild(localPanel);
+                this.renderBands();
             } else if (panelId === "timeline-panel") {
-                if (this.timelinePosition === "bottom-full" && workspace) {
+                const centerStage = document.querySelector(".center-stage");
+                if (this.timelinePosition === "band" && workspace) {
+                    // Volta para a vaga dela na faixa.
                     workspace.appendChild(localPanel);
-                } else if ((this.timelinePosition === "bottom-left" || this.timelinePosition === "bottom-right") && this.compoundStage) {
-                    this.compoundStage.appendChild(localPanel);
-                } else {
-                    const centerStage = document.querySelector(".center-stage");
-                    if (centerStage) centerStage.appendChild(localPanel);
+                    this.renderBands();
+                } else if (centerStage) {
+                    const reopen = document.getElementById("reopen-timeline");
+                    if (reopen && reopen.parentElement === centerStage) centerStage.insertBefore(localPanel, reopen);
+                    else centerStage.appendChild(localPanel);
                 }
             } else if (panelId === "source-player-panel") {
                 const monitors = document.querySelector(".monitors-container");
@@ -4200,6 +5351,8 @@ export class WorkspaceManager {
             this.reinitSplitters();
             setTimeout(() => window.dispatchEvent(new Event("resize")), 30);
         }
+        // De volta ao editor: recolhido fica recolhido, com a linha e a seta do lugar novo.
+        if (COLLAPSIBLE_PANELS.includes(panelId) || panelId === TIMELINE_ID) this.applyAllCollapse();
     }
 
     syncTimelineCanvasToPopout(retries = 0) {
@@ -4238,7 +5391,7 @@ export class WorkspaceManager {
                 e.stopPropagation();
                 // Alterna o layout Estúdio (biblioteca + players empilhados + timeline full-width)
                 const effectiveMonitors = this.monitorsLayout === "auto" ? (this.resolvedMonitorsLayout || "side-by-side") : this.monitorsLayout;
-                const isStudio = this.timelinePosition === "bottom-full" && effectiveMonitors === "stacked";
+                const isStudio = this.timelineShape() === "bottom-full" && effectiveMonitors === "stacked";
                 this.applyStudio(!isStudio);
             });
         }
@@ -4335,14 +5488,12 @@ export class WorkspaceManager {
      * Alterna a Biblioteca (Sidebar Esquerda)
      */
     toggleLibrary() {
-        const lib = document.getElementById("sidebar-left");
-        const reopen = document.getElementById("reopen-left");
-        const toggleBtn = document.getElementById("toggle-left");
-        if (lib && lib.classList.contains("collapsed")) {
-            if (reopen) reopen.click(); else lib.classList.remove("collapsed");
+        if (!this.panelPlacement("sidebar-left")) return;
+        if (this.isPanelCollapsed("sidebar-left")) {
+            window.expandSidebar ? window.expandSidebar("left") : this.setPanelCollapsed("sidebar-left", false);
             if (window.showToast) window.showToast("Biblioteca: Visível", "info");
-        } else if (lib) {
-            if (toggleBtn) toggleBtn.click(); else lib.classList.add("collapsed");
+        } else {
+            window.collapseSidebar ? window.collapseSidebar("left") : this.setPanelCollapsed("sidebar-left", true);
             if (window.showToast) window.showToast("Biblioteca: Oculta", "info");
         }
     }
@@ -4356,7 +5507,7 @@ export class WorkspaceManager {
             btn.click();
         } else {
             const effectiveMonitors = this.monitorsLayout === "auto" ? (this.resolvedMonitorsLayout || "side-by-side") : this.monitorsLayout;
-            const isStudio = this.timelinePosition === "bottom-full" && effectiveMonitors === "stacked";
+            const isStudio = this.timelineShape() === "bottom-full" && effectiveMonitors === "stacked";
             this.applyStudio(!isStudio);
         }
     }
@@ -4365,16 +5516,9 @@ export class WorkspaceManager {
      * Alterna o Inspetor de Propriedades e Efeitos
      */
     toggleInspector() {
-        const insp = document.getElementById("inspector-panel");
-        const reopen = document.getElementById("reopen-inspector");
-        const toggleBtn = document.getElementById("toggle-inspector");
-        if (insp && insp.classList.contains("collapsed")) {
-            if (reopen) reopen.click(); else insp.classList.remove("collapsed");
-            if (window.showToast) window.showToast("Inspetor: Visível", "info");
-        } else if (insp) {
-            if (toggleBtn) toggleBtn.click(); else insp.classList.add("collapsed");
-            if (window.showToast) window.showToast("Inspetor: Oculto", "info");
-        }
+        if (!this.panelPlacement("inspector-panel")) return;
+        const collapsed = this.togglePanelCollapsed("inspector-panel");
+        if (window.showToast) window.showToast(collapsed ? "Inspetor: Oculto" : "Inspetor: Visível", "info");
     }
 
     /**
@@ -4398,16 +5542,9 @@ export class WorkspaceManager {
      * Alterna o Painel Lateral Direito (Ferramentas, IA, Exportação)
      */
     toggleRightSidebar() {
-        const r = document.getElementById("sidebar-right");
-        const reopen = document.getElementById("reopen-right");
-        const toggleBtn = document.getElementById("toggle-right");
-        if (r && r.classList.contains("collapsed")) {
-            if (reopen) reopen.click(); else r.classList.remove("collapsed");
-            if (window.showToast) window.showToast("Painel Direito: Visível", "info");
-        } else if (r) {
-            if (toggleBtn) toggleBtn.click(); else r.classList.add("collapsed");
-            if (window.showToast) window.showToast("Painel Direito: Oculto", "info");
-        }
+        if (!this.panelPlacement("sidebar-right")) return;
+        const collapsed = this.togglePanelCollapsed("sidebar-right");
+        if (window.showToast) window.showToast(collapsed ? "Painel Direito: Oculto" : "Painel Direito: Visível", "info");
     }
 
     /**
@@ -4713,222 +5850,234 @@ export class WorkspaceManager {
                 }
             }
 
-            // 1. Slots de Workspace: Salvar (Ctrl + Alt + Shift + [1-9])
-            if (e.ctrlKey && e.altKey && e.shiftKey) {
-                for (let i = 1; i <= 9; i++) {
-                    if (e.code === `Digit${i}` || e.code === `Numpad${i}` || KEYMAP_SERVICE.matches(e, `workspace.save_slot_${i}`)) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.saveWorkspaceSlot(i);
-                        return;
-                    }
-                }
-            }
+            // 0. Histórico de layout (Ctrl + Alt + Z / Ctrl + Alt + Shift + Z)
+            if (this.handleLayoutShortcut(e)) return;
 
-            // 2. Slots de Workspace: Carregar (Ctrl + Alt + [1-9])
-            if (e.ctrlKey && e.altKey && !e.shiftKey) {
-                for (let i = 1; i <= 9; i++) {
-                    if (e.code === `Digit${i}` || e.code === `Numpad${i}` || KEYMAP_SERVICE.matches(e, `workspace.load_slot_${i}`)) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.loadWorkspaceSlot(i);
-                        return;
-                    }
-                }
-            }
-
-            // 3. Alt + Numpad
-            if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
-                if (e.code === "Numpad1" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_1")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTrackHeaders();
-                    return;
-                }
-                if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_2")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelinePanelVertical();
-                    return;
-                }
-                if (e.code === "Numpad3" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_3")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelineToolbar();
-                    return;
-                }
-                if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_4")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeLibraryStudio();
-                    return;
-                }
-                if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_5")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeInspector();
-                    return;
-                }
-                if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_6")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeRightSidebar();
-                    return;
-                }
-                if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_7")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeSourcePlayer();
-                    return;
-                }
-                if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_9")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeProgramPlayer();
-                    return;
-                }
-            }
-
-            // 4. Ctrl + Numpad (Destacar / Popout)
-            if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
-                if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_2")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("timeline-panel");
-                    return;
-                }
-                if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_4")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("sidebar-left");
-                    return;
-                }
-                if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_5")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("inspector-panel");
-                    return;
-                }
-                if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_6")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("sidebar-right");
-                    return;
-                }
-                if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_7")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("source-player-panel");
-                    return;
-                }
-                if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_9")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.togglePopout("program-player-panel");
-                    return;
-                }
-            }
-
-            // 5. Teclas Simples do Numpad (sem modificadores)
-            if (!e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
-                if (e.code === "Numpad1" || KEYMAP_SERVICE.matches(e, "workspace.numpad_1")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelineExpandLeft();
-                    return;
-                }
-                if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.numpad_2")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelinePosition();
-                    return;
-                }
-                if (e.code === "Numpad3" || KEYMAP_SERVICE.matches(e, "workspace.numpad_3")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelineExpandRight();
-                    return;
-                }
-                if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.numpad_4")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleLibrary();
-                    return;
-                }
-                if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.numpad_5")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleInspector();
-                    return;
-                }
-                if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.numpad_6")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleRightSidebar();
-                    return;
-                }
-                if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.numpad_7")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleSourcePlayer();
-                    return;
-                }
-                if (e.code === "Numpad8" || KEYMAP_SERVICE.matches(e, "workspace.numpad_8")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleHeader();
-                    return;
-                }
-                if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.numpad_9")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleProgramPlayer();
-                    return;
-                }
-                if (e.code === "Numpad0" || KEYMAP_SERVICE.matches(e, "workspace.numpad_0")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleZenMode();
-                    return;
-                }
-                if (e.code === "NumpadDecimal" || KEYMAP_SERVICE.matches(e, "workspace.numpad_decimal")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleTimelineHeader();
-                    return;
-                }
-                if (e.code === "NumpadAdd" || KEYMAP_SERVICE.matches(e, "workspace.numpad_add")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.adjustTrackHeight(10);
-                    return;
-                }
-                if (e.code === "NumpadSubtract" || KEYMAP_SERVICE.matches(e, "workspace.numpad_subtract")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.adjustTrackHeight(-10);
-                    return;
-                }
-                if (e.code === "NumpadDivide" || KEYMAP_SERVICE.matches(e, "workspace.numpad_divide")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleMonitorsLayout();
-                    return;
-                }
-                if (e.code === "NumpadMultiply" || KEYMAP_SERVICE.matches(e, "workspace.numpad_multiply")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.swapMonitorsFocus();
-                    return;
-                }
-                if (e.code === "NumpadEnter" || KEYMAP_SERVICE.matches(e, "workspace.numpad_enter")) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.maximizeFocusedOrHovered();
-                    return;
-                }
-            }
+            this.handleWorkspaceShortcut(e);
         });
+    }
+
+    /**
+     * Atalhos do Numpad e slots de workspace. Também chamado pelas janelas destacadas, para o
+     * Numpad valer com o foco dentro delas. Devolve true se tratou a tecla.
+     */
+    handleWorkspaceShortcut(e) {
+        // 1. Slots de Workspace: Salvar (Ctrl + Alt + Shift + [1-9])
+        if (e.ctrlKey && e.altKey && e.shiftKey) {
+            for (let i = 1; i <= 9; i++) {
+                if (e.code === `Digit${i}` || e.code === `Numpad${i}` || KEYMAP_SERVICE.matches(e, `workspace.save_slot_${i}`)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.saveWorkspaceSlot(i);
+                    return true;
+                }
+            }
+        }
+
+        // 2. Slots de Workspace: Carregar (Ctrl + Alt + [1-9])
+        if (e.ctrlKey && e.altKey && !e.shiftKey) {
+            for (let i = 1; i <= 9; i++) {
+                if (e.code === `Digit${i}` || e.code === `Numpad${i}` || KEYMAP_SERVICE.matches(e, `workspace.load_slot_${i}`)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.loadWorkspaceSlot(i);
+                    return true;
+                }
+            }
+        }
+
+        // 3. Alt + Numpad
+        if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
+            if (e.code === "Numpad1" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_1")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTrackHeaders();
+                return true;
+            }
+            if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_2")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelinePanelVertical();
+                return true;
+            }
+            if (e.code === "Numpad3" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_3")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelineToolbar();
+                return true;
+            }
+            if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_4")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeLibraryStudio();
+                return true;
+            }
+            if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_5")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeInspector();
+                return true;
+            }
+            if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_6")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeRightSidebar();
+                return true;
+            }
+            if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_7")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeSourcePlayer();
+                return true;
+            }
+            if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.alt_numpad_9")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeProgramPlayer();
+                return true;
+            }
+        }
+
+        // 4. Ctrl + Numpad (Destacar / Popout)
+        if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+            if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_2")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("timeline-panel");
+                return true;
+            }
+            if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_4")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("sidebar-left");
+                return true;
+            }
+            if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_5")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("inspector-panel");
+                return true;
+            }
+            if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_6")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("sidebar-right");
+                return true;
+            }
+            if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_7")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("source-player-panel");
+                return true;
+            }
+            if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.ctrl_numpad_9")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePopout("program-player-panel");
+                return true;
+            }
+        }
+
+        // 5. Teclas Simples do Numpad (sem modificadores)
+        if (!e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+            if (e.code === "Numpad1" || KEYMAP_SERVICE.matches(e, "workspace.numpad_1")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelineExpandLeft();
+                return true;
+            }
+            if (e.code === "Numpad2" || KEYMAP_SERVICE.matches(e, "workspace.numpad_2")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelinePosition();
+                return true;
+            }
+            if (e.code === "Numpad3" || KEYMAP_SERVICE.matches(e, "workspace.numpad_3")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelineExpandRight();
+                return true;
+            }
+            if (e.code === "Numpad4" || KEYMAP_SERVICE.matches(e, "workspace.numpad_4")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleLibrary();
+                return true;
+            }
+            if (e.code === "Numpad5" || KEYMAP_SERVICE.matches(e, "workspace.numpad_5")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleInspector();
+                return true;
+            }
+            if (e.code === "Numpad6" || KEYMAP_SERVICE.matches(e, "workspace.numpad_6")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleRightSidebar();
+                return true;
+            }
+            if (e.code === "Numpad7" || KEYMAP_SERVICE.matches(e, "workspace.numpad_7")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleSourcePlayer();
+                return true;
+            }
+            if (e.code === "Numpad8" || KEYMAP_SERVICE.matches(e, "workspace.numpad_8")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleHeader();
+                return true;
+            }
+            if (e.code === "Numpad9" || KEYMAP_SERVICE.matches(e, "workspace.numpad_9")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleProgramPlayer();
+                return true;
+            }
+            if (e.code === "Numpad0" || KEYMAP_SERVICE.matches(e, "workspace.numpad_0")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleZenMode();
+                return true;
+            }
+            if (e.code === "NumpadDecimal" || KEYMAP_SERVICE.matches(e, "workspace.numpad_decimal")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTimelineHeader();
+                return true;
+            }
+            if (e.code === "NumpadAdd" || KEYMAP_SERVICE.matches(e, "workspace.numpad_add")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.adjustTrackHeight(10);
+                return true;
+            }
+            if (e.code === "NumpadSubtract" || KEYMAP_SERVICE.matches(e, "workspace.numpad_subtract")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.adjustTrackHeight(-10);
+                return true;
+            }
+            if (e.code === "NumpadDivide" || KEYMAP_SERVICE.matches(e, "workspace.numpad_divide")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleMonitorsLayout();
+                return true;
+            }
+            if (e.code === "NumpadMultiply" || KEYMAP_SERVICE.matches(e, "workspace.numpad_multiply")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.swapMonitorsFocus();
+                return true;
+            }
+            if (e.code === "NumpadEnter" || KEYMAP_SERVICE.matches(e, "workspace.numpad_enter")) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.maximizeFocusedOrHovered();
+                return true;
+            }
+        }
+        return false;
     }
 }
 

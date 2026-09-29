@@ -1,5 +1,5 @@
 """Modelos Pydantic unificados para validação de requisições e respostas da API."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Dict, Any, Optional
 
 class ProjectCreate(BaseModel):
@@ -83,7 +83,18 @@ class TitleUpdate(BaseModel):
     title: str
 
 class CutItem(BaseModel):
-    video_id: Optional[int] = None          # obrigatório para type='video'; None para fotos
+    """Um clipe da timeline como a UI salva.
+
+    `extra="allow"`: o editor guarda no clipe muito mais do que os campos
+    abaixo (disabled, rotation, speed/reverse, is_freeze/freeze_time, subclipe,
+    texto e estilo dos titulos...). Descartar o desconhecido fazia tudo isso
+    sumir no banco: o render (que so le o banco) exportava clipe desligado,
+    velocidade errada e titulo nenhum, e reabrir a timeline perdia o mesmo.
+    Quem decide O QUE vai e a UI (timelinePersistencia.js); a rota grava.
+    """
+    model_config = ConfigDict(extra="allow")
+
+    video_id: Optional[int] = None         # obrigatório para type='video'; None para fotos
     type: str = "video"                     # 'video' | 'photo' (discriminador de mídia)
     photo_id: Optional[int] = None          # preenchido quando type='photo' (still)
     in_time: float  # mapeado de 'in' por ser palavra reservada
@@ -97,6 +108,9 @@ class CutItem(BaseModel):
     origin: Optional[str] = None                          # "user" | "ai"
 
 class TrackItem(BaseModel):
+    # Mesmo motivo do CutItem: a UI manda hidden, thumbnailsEnabled etc.
+    model_config = ConfigDict(extra="allow")
+
     id: str
     name: str = ""
     kind: str = "video"  # 'video' | 'audio' | 'ai'
@@ -106,6 +120,7 @@ class TrackItem(BaseModel):
     locked: bool = False
     sync_locked: bool = True
     magnetic: Optional[bool] = False
+    hidden: bool = False   # P7 do render: pista oculta nasce desligada no escopo
 
 class TimelineCreate(BaseModel):
     name: str

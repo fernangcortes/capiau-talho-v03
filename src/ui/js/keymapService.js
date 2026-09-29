@@ -554,6 +554,24 @@ export const COMMANDS_CATALOG = [
 
     // ── LAYOUT & WORKSPACE (NUMPAD & SLOTS) ──────────────────────────────────
     {
+        id: "layout.undo",
+        category: "workspace_numpad",
+        label: "Desfazer Mudança de Layout",
+        description: "Desfaz a última mudança na disposição dos painéis (histórico separado do da timeline)"
+    },
+    {
+        id: "layout.redo",
+        category: "workspace_numpad",
+        label: "Refazer Mudança de Layout",
+        description: "Refaz a mudança de layout desfeita anteriormente"
+    },
+    {
+        id: "layout.reset",
+        category: "workspace_numpad",
+        label: "Restaurar Layout do Workspace",
+        description: "Volta à versão salva do workspace carregado (ou ao Padrão); pode ser desfeito"
+    },
+    {
         id: "workspace.numpad_1",
         category: "workspace_numpad",
         label: "Timeline: Expansão Direcional Esquerda",
@@ -846,6 +864,9 @@ export const KEYMAP_PRESETS = {
         "history.undo": ["Ctrl+KeyZ"],
         "history.redo": ["Ctrl+Shift+KeyZ", "Ctrl+KeyY"],
         "workspace.save": ["Ctrl+Shift+KeyS"],
+        "layout.undo": ["Ctrl+Alt+KeyZ"],
+        "layout.redo": ["Ctrl+Alt+Shift+KeyZ"],
+        "layout.reset": [],
 
         "timeline.zoom_fit": ["Backslash", "Shift+KeyZ"],
         "timeline.zoom_in": ["Equal", "NumpadAdd"],
@@ -1567,12 +1588,12 @@ class KeymapService {
     getShortcutBadgesHTML(commandId) {
         const bindings = this.activeBindings[commandId] || [];
         if (bindings.length === 0) {
-            return `<span style="color: var(--text-muted); font-size: 11px; font-style: italic;">Nenhum</span>`;
+            return `<span style="color: var(--text-muted); font-size: calc(11px * var(--font-scale, 1)); font-style: italic;">Nenhum</span>`;
         }
         return bindings.map(b => {
             const formatted = this.formatCombo(b);
-            return `<kbd class="keymap-badge" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; color: #fff; display: inline-block;">${formatted}</kbd>`;
-        }).join(" <span style='color:var(--text-muted); font-size:10px;'>/</span> ");
+            return `<kbd class="keymap-badge" style="background: rgba(255,255,255,0.08); border: 1px solid var(--t-line-strong, rgba(255,255,255,0.15)); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: calc(11px * var(--font-scale, 1)); color: #fff; display: inline-block;">${formatted}</kbd>`;
+        }).join(" <span style='color:var(--text-muted); font-size:calc(10px * var(--font-scale, 1));'>/</span> ");
     }
 
     // ── CONFLITOS ───────────────────────────────────────────────────────────

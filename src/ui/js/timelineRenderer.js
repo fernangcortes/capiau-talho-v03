@@ -4,6 +4,7 @@ import { STATE } from "./state.js";
 import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode, evaluateFadeCurve, getClipSyncStatus } from "./timelineState.js";
 import { WaveformManager } from "./waveformManager.js";
 import { getAllKeyframeTimelineFrames } from "./keyframeEngine.js";
+import { themeColor, THEME_CHANGED_EVENT } from "./themeTokens.js";
 
 // Paleta de cores para pistas de vídeo (V1 roxo/íris clássico NLE, V2 ciano B-roll, etc.)
 const TRACK_PALETTE = [
@@ -114,6 +115,7 @@ export class CapiauTimelineRenderer {
         this.highlightedMatchClipIds = new Set(); // IDs de clipes em destaque temporário de Match Frame
         this._matchFlashTimer = null;
         this.syncBadgeRects = new Map(); // Mapa de retângulos dos badges de sincronia A/V (clipId -> rect)
+        if (typeof window !== "undefined" && window.addEventListener) window.addEventListener(THEME_CHANGED_EVENT, () => { this.isDirty = true; });
         this.init();
     }
 
@@ -341,7 +343,7 @@ export class CapiauTimelineRenderer {
         if (!ctx) return;
 
         // Limpa o canvas
-        ctx.fillStyle = this.colors.bg;
+        ctx.fillStyle = themeColor("surface-3", this.colors.bg);
         ctx.fillRect(0, 0, this.width, this.height);
 
         // Desenha trilhas de fundo
@@ -728,7 +730,7 @@ export class CapiauTimelineRenderer {
             }
 
             const style = this.getTrackStyle(lane.track);
-            ctx.fillStyle = style.bg;
+            ctx.fillStyle = themeColor("tint-1", style.bg);
             ctx.fillRect(0, lane.top, this.width, lane.height);
 
             // Pista travada: leve escurecimento
@@ -738,7 +740,7 @@ export class CapiauTimelineRenderer {
             }
 
             // Divisória inferior
-            ctx.strokeStyle = this.colors.borderGlass;
+            ctx.strokeStyle = themeColor("line-weak", this.colors.borderGlass);
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, lane.top + lane.height);
@@ -774,11 +776,11 @@ export class CapiauTimelineRenderer {
         const fpsBase = Math.max(1, Math.round(fpsVal));
 
         // Fundo da régua
-        ctx.fillStyle = this.colors.rulerBg;
+        ctx.fillStyle = themeColor("surface-3", this.colors.rulerBg);
         ctx.fillRect(0, 0, this.width, this.rulerHeight);
 
         // Borda inferior da régua Y: 30
-        ctx.strokeStyle = this.colors.borderGlass;
+        ctx.strokeStyle = themeColor("line-weak", this.colors.borderGlass);
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(0, this.rulerHeight);

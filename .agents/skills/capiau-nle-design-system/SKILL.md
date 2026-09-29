@@ -1,6 +1,6 @@
 ---
 name: capiau-nle-design-system
-description: Diretrizes do design system flat, layout sem espaços (seamless), sidebars adaptativas, selects premium, controles numéricos, retração universal por duplo clique e motor global de tooltips para a interface clássica NLE do CapIAu.
+description: Diretrizes do design system flat, layout sem espaços (seamless), sidebars adaptativas, selects premium, controles numéricos, retração universal por duplo clique, contêineres de painéis (recolher, setas e troca de lugar em pilhas, faixas e janelas) e motor global de tooltips para a interface clássica NLE do CapIAu.
 ---
 
 # Design System Flat & Seamless NLE - CapIAu
@@ -69,7 +69,7 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
   });
   ```
 * **Posicionamento no DOM:**
-  * A linha restauradora deve ser um **irmão direto** no mesmo contêiner flex do painel colapsado, posicionada logo após o painel no fluxo do DOM.
+  * A linha restauradora deve ser um **irmão direto** no mesmo contêiner flex do painel colapsado, posicionada **do lado para onde o painel recolhe** (antes dele se recolhe para a esquerda/cima, depois se recolhe para a direita/baixo). Painéis dentro de pilhas, faixas e janelas com vários painéis seguem a Seção IX.
   * **Nunca usar `position: absolute`** — isso causa sobreposições, problemas de z-index e inacessibilidade quando múltiplos painéis estão colapsados simultaneamente.
   * O painel colapsado deve usar `width: 0px !important; opacity: 0; pointer-events: none;` com transição suave.
 
@@ -420,3 +420,63 @@ Este guia orienta futuros agentes de IA e desenvolvedores a manterem e expandire
   * Quando um painel é adotado em uma janela popout (`panel.html` ou popouts individuais), o evento de duplo clique no seu cabeçalho deve ser compatibilizado com o documento da janela hospedeira (`win.document`).
   * No contexto da nova janela, a limpeza de seleção deve referenciar o `getSelection` da janela correspondente (`(win.getSelection || window.getSelection)()?.removeAllRanges()`), garantindo isolamento de contexto e prevenindo erros entre janelas filhas.
 
+---
+
+## IX. Contêineres de Painéis: Recolher, Setas e Troca de Lugar (Multi-Panel Containers)
+
+### 16. Padrão para qualquer lugar que tenha mais de um painel
+Vale para colunas do editor, pilhas de coluna, faixas, janelas destacadas simples, Janela Dupla e janela de grupo, e para **qualquer contêiner novo** que junte painéis. Implementação de referência: `src/ui/js/panelCollapse.js` (funções puras), `WorkspaceManager` (`setPanelCollapsed`, `panelPlacement`, `applyPanelCollapse`, `applyStackCollapse`, `collapseEdge`, `swapGroupPanels`), `panel.html` e `panel-group.html`.
+
+* **Estado único, desenho local:**
+  * "Recolhido" é um estado do painel guardado num lugar só (um `Set` no `WorkspaceManager`, salvo no `localStorage`), não uma classe CSS solta. Cada contêiner apenas **desenha** esse estado do seu jeito.
+  * Para saber se um painel está recolhido, use `isPanelCollapsed(id)`. **Nunca** `classList.contains("collapsed")`: dentro de pilha ou janela a classe pode não existir. (Exceção interna: a timeline recolhe pelo próprio botão e guarda o estado na classe; `isPanelCollapsed("timeline-panel")` lê essa classe, então continue usando `isPanelCollapsed`.)
+  * Todo recolher/expandir passa por `setPanelCollapsed(id, bool)`, venha de botão, linha, duplo clique ou atalho.
+  * Recolher feito pelo próprio sistema (ex.: menu que ficou sem abas) usa `{ auto: true }` e não vai para o estado salvo.
+  * Recolher/expandir **não** entra no desfazer de layout (Ctrl+Alt+Z); fica salvo ao reabrir.
+* **Onde o painel está (`panelPlacement`):** `column`, `stack`, `band` (faixa inteira em cima/embaixo, `applyBandCollapse`), `single`, `dual`, `group`. Contêiner novo = novo tipo aqui + seu desenho de recolhido. Ao mudar o painel de lugar, chame o reaplicar (`applyAllCollapse`) para ele aparecer recolhido/expandido no lugar novo.
+* **Regra do espaço:**
+  * O painel recolhido some; os vizinhos **ocupam todo o espaço** (o último visível do contêiner recebe `flex: 1 1 0% !important`).
+  * Divisores só entre dois painéis visíveis. Havendo vários candidatos entre eles, fica o que encosta no visível seguinte (`visibleSplitters`). Arrastar um divisor redimensiona o **visível** anterior, pulando recolhidos.
+* **Linha de expandir no lugar do painel:**
+  * Fica exatamente na posição dele dentro do contêiner: acima se ele estava em cima, abaixo se estava embaixo, à esquerda/direita lado a lado.
+  * Orientação perpendicular ao eixo do contêiner: contêiner em linha → linha em pé (4px de largura); contêiner em coluna → linha deitada (4px de altura, classe `.restore-line-h`).
+  * Todos recolhidos: o contêiner encolhe e as linhas giram para a orientação do contêiner de fora (numa coluna do editor, a coluna some e as linhas ficam em pé onde ela estava).
+* **Seta de recolher calculada pela posição, nunca fixa no HTML:**
+  * `edgeInLine(eixo, índice, total)`: primeira metade recolhe para o começo (esquerda/cima), a outra para o fim (direita/baixo). Empilhado usa `fa-chevron-up`/`down`; lado a lado, `left`/`right`. Dica: "Recolher Painel (Cima/Baixo/Esquerda/Direita)".
+  * Painel sozinho no seu contêiner (ex.: único painel de uma linha da grade) usa a posição do contêiner dentro do de fora.
+  * Recalcular depois de **toda** reorganização: trocar, empilhar, destacar, juntar, mudar disposição, trocar de lugar.
+* **Janelas destacadas:**
+  * A página hospedeira expõe `window.capiauSetPanelCollapsed(id, bool)` (desenha) e `window.capiauPanelEdge(id)` (diz a direção).
+  * Controles da própria página (botões, linhas) chamam o editor (`opener.workspaceManager.setPanelCollapsed`) e só mudam localmente se o editor não estiver acessível.
+  * A janela repassa as teclas ao handler de atalhos do editor (`handleWorkspaceShortcut`), para os atalhos valerem com o foco nela.
+* **Trocar de lugar dentro do contêiner:**
+  * Todo contêiner com mais de um painel permite trocar dois painéis arrastando a **alça** de um sobre o outro. Prévia: moldura ciano sobre o painel alvo com "Trocar com X".
+  * A troca move os invólucros (slots) com o painel dentro: **não** recarrega a janela nem re-adota o DOM (vídeo e rolagem continuam).
+  * Entra no desfazer de layout. Soltar dentro do próprio contêiner, fora de outro painel, não faz nada.
+  * Disposições com posição especial (ex.: painel sozinho na grade de 3) oferecem também escolha explícita na barra (seletor + botão), além do arrasto.
+* **Cantos disputados entre coluna e faixa (F2c):**
+  * Onde as colunas de um lado encontram uma faixa inteira, o canto é de um dos dois: `"band"` (a faixa passa com a largura inteira e as colunas param antes dela) ou `"column"` (**todas as colunas daquele lado do centro** vão até o fim, juntas, e a faixa encurta até o centro). Estado em `bandCorners` (`tl`, `tr`, `bl`, `br`), só para faixas que existem; faixa nova começa com `"band"`.
+  * O usuário escolhe **no arrasto**: na borda esquerda/direita do editor, soltar na altura da faixa (o canto) = `"column"`; soltar ao lado do centro = `"band"`. A sombra de prévia mostra o retângulo exato.
+  * E **depois**: setinha no rodapé da coluna (no topo, se a faixa é em cima), `.dock-corner-toggle`. A seta aponta para onde a coluna vai crescer/encolher; dica "Estender até embaixo/em cima" ou "Deixar a faixa passar". Entra no desfazer de layout e no workspace salvo.
+  * Implementação: a moldura `.dock-frame` é uma grade 3 × 3 em volta do `.workspace`; as colunas do lado que fica com o canto saem para a célula `.dock-edge` daquele lado, na mesma ordem, com divisores entre elas (`.dock-edge-splitter`, redimensiona a de fora; só aparece entre duas abertas) e o divisor da célula (`.dock-edge-resizer`, redimensiona a vizinha do centro). A faixa ocupa só as colunas da grade que sobram. A setinha fica na coluna da ponta (recolhida, na próxima aberta). Vale para qualquer contêiner de borda novo.
+* **Timeline em faixa ou coluna (F2c parte 2):**
+  * A timeline fica em um lugar só: embaixo dos monitores, numa faixa ou como coluna do editor (em `columnOrder`, como as laterais, mas nunca em pilha). Faixas e colunas mandam: `timelinePosition` é `"band"`, `"column"` ou `"center"` conforme onde ela está (faixa vence coluna).
+  * Como coluna: altura inteira, largura pelo divisor (`layout-dim-splitter-timeline-panel`, padrão 420 px) e é a única coluna que encolhe quando falta espaço (mín. 200 px). Recolhida some e a linha `.timeline-restore-line` fica em pé no lugar. Entra na célula da ponta com as laterais do lado dela. É a base da futura timeline "prédio" (monitor vertical).
+  * As posições antigas são nomes de faixa de baixo + cantos: `bottom-full` = `bl`/`br` `"band"`; `bottom-left` = `bl` `"band"`, `br` `"column"`; `bottom-right` = o espelho. Numpad2 = centro ↔ largura total; Numpad1/Numpad3 alternam o canto esquerdo/direito da faixa dela (no centro, vão para a faixa já expandida para o lado; recolher o único lado expandido volta ao centro).
+  * Mudar de lugar leva a altura junto (faixa nova só com ela = altura dela + divisor; de volta ao centro, a altura salva de lá). O divisor de altura da faixa redesenha o canvas a cada quadro (Seção I.3) e o duplo clique nele ajusta às pistas.
+  * Recolhida numa faixa: linha de expandir (`.timeline-restore-line`) em pé no lugar dela; sozinha na faixa, a faixa encolhe e a linha deita.
+* **Monitores em bloco ou sozinhos, e o centro que some (F2c parte 2b):**
+  * Duas alças no cabeçalho do primeiro monitor do bloco: ⋮⋮ move só ele; a do bloco (`.dock-handle-block`, logo depois) move os monitores do bloco juntos. Sem monitor no bloco, a alça do bloco some.
+  * Monitor sozinho segue as regras da timeline: um lugar só (no bloco, numa faixa ou como coluna em `columnOrder`, nunca em pilha); faixa vence coluna. Fora do bloco, solto sobre o centro ou sobre o monitor que ficou, volta para o bloco (sobre o outro monitor, a borda escolhe lado a lado ou empilhados). Maximizar e trocar são do bloco: somem quando ele se divide (`body.layout-monitors-split`).
+  * O bloco: bordas de cima/embaixo = os monitores dele vão juntos para a faixa; bordas esquerda/direita e sobre uma coluna = o centro muda de vaga nas colunas.
+  * **Centro que esvazia:** sem monitores, a timeline que estiver nele ocupa a altura toda (`.center-no-monitors`); sem nada, o centro some (`.center-empty`) e a coluna vizinha mais perto cresce no lugar dele (`.dock-growing`; entre duas, a de conteúdo, monitor ou timeline; empate, a da esquerda). Os divisores passam a redimensionar para fora de quem cresce. Qualquer painel novo que possa esvaziar um contêiner deve seguir essa regra: nunca deixar buraco.
+* **Abas no editor (F2c parte 2c):**
+  * Uma aba destacável (`tabpanel-<aba>`) mora no menu dela; no editor, fica numa faixa ou como coluna, com as mesmas regras da timeline e dos monitores (um lugar só, nunca em pilha, faixa vence coluna). Enquanto está no editor, o botão dela some do menu (o Painel Lateral sem abas se recolhe sozinho).
+  * Sai arrastando o **botão da aba** até o editor (sombra de prévia; sobre um menu continua reordenando ou mudando de menu) ou pelo botão direito da faixa ("Colocar X numa faixa embaixo / como coluna"). Volta pelo botão "devolver" do cabeçalho ou soltando a alça sobre a Biblioteca ou o Painel Lateral (o menu onde soltar é onde ela entra).
+  * **Borda do editor vence menu:** a faixa fina das bordas (26 px) sempre cria faixa ou coluna na ponta, mesmo que a coluna da ponta seja um menu. Vale para qualquer arrasto novo que também tenha o menu como alvo.
+* **Checklist para um contêiner novo:**
+  1. Registrar o tipo em `panelPlacement` e desenhar o recolhido (espaço, divisores, linha no lugar).
+  2. Implementar a direção da seta (`edgeInLine`) e chamar o recálculo após reorganizar.
+  3. Permitir trocar de lugar por arrasto (e escolha explícita onde houver posição especial).
+  4. Se for outra janela: expor `capiauSetPanelCollapsed` / `capiauPanelEdge` e repassar teclas.
+  5. Autoteste das regras puras em `tests/` (ver `tests/autoteste_panel_collapse.mjs`).

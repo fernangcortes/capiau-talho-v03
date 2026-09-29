@@ -1,0 +1,18 @@
+/* Fontes da interface, empacotadas (sem Google Fonts, funciona offline).
+   Todas SIL Open Font License 1.1 — ver LEIA-ME.md nesta pasta. Subconjunto latino (cobre o português). */
+
+@font-face { font-family: "Inter"; src: url("inter-var.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Outfit"; src: url("outfit-var.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Roboto Flex"; src: url("roboto-flex-var.woff2") format("woff2"); font-weight: 100 1000; font-style: normal; font-display: swap; }
+
+@font-face { font-family: "IBM Plex Sans Condensed"; src: url("plex-sans-condensed-300.woff2") format("woff2"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans Condensed"; src: url("plex-sans-condensed-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans Condensed"; src: url("plex-sans-condensed-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans Condensed"; src: url("plex-sans-condensed-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans Condensed"; src: url("plex-sans-condensed-700.woff2") format("woff2"); font-weight: 700 900; font-display: swap; }
+
+@font-face { font-family: "Barlow Semi Condensed"; src: url("barlow-semi-condensed-300.woff2") format("woff2"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "Barlow Semi Condensed"; src: url("barlow-semi-condensed-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Barlow Semi Condensed"; src: url("barlow-semi-condensed-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Barlow Semi Condensed"; src: url("barlow-semi-condensed-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Barlow Semi Condensed"; src: url("barlow-semi-condensed-700.woff2") format("woff2"); font-weight: 700 900; font-display: swap; }

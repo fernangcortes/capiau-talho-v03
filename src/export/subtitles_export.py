@@ -47,7 +47,7 @@ def _format_ass_time(seconds: float) -> str:
 
 def generate_srt(timeline_cuts: list, fps: float = 24.0) -> str:
     """Gera conteúdo SRT a partir dos clipes de texto da timeline."""
-    text_clips = [c for c in timeline_cuts if c.get("type") == "text"]
+    text_clips = [c for c in timeline_cuts if c.get("type") == "text" and not c.get("disabled")]
     text_clips.sort(key=lambda c: float(c.get("timeline_start", 0.0) or 0.0))
 
     srt_entries = []
@@ -80,7 +80,7 @@ def generate_srt(timeline_cuts: list, fps: float = 24.0) -> str:
 
 def generate_vtt(timeline_cuts: list, fps: float = 24.0) -> str:
     """Gera conteúdo WebVTT a partir dos clipes de texto da timeline."""
-    text_clips = [c for c in timeline_cuts if c.get("type") == "text"]
+    text_clips = [c for c in timeline_cuts if c.get("type") == "text" and not c.get("disabled")]
     text_clips.sort(key=lambda c: float(c.get("timeline_start", 0.0) or 0.0))
 
     vtt_lines = ["WEBVTT\n"]
@@ -133,7 +133,7 @@ Style: Quote,Cormorant Garamond,46,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     events = []
-    text_clips = [c for c in timeline_cuts if c.get("type") == "text"]
+    text_clips = [c for c in timeline_cuts if c.get("type") == "text" and not c.get("disabled")]
     text_clips.sort(key=lambda c: float(c.get("timeline_start", 0.0) or 0.0))
 
     for clip in text_clips:

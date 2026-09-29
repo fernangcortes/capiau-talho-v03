@@ -146,7 +146,7 @@ export class PlayerTextOverlayManager {
             el.style.transform = `translate(-50%, -50%) scale(${tf.scale}) rotate(${tf.rotation}deg)`;
             el.style.opacity = tf.opacity;
             el.style.transformOrigin = "center center";
-            el.style.fontFamily = clip.fontFamily ? `"${clip.fontFamily}", sans-serif` : "var(--font-heading)";
+            el.style.fontFamily = clip.fontFamily ? `"${clip.fontFamily}", sans-serif` : "'Outfit', 'Inter', sans-serif";
             el.style.fontSize = `${fontSize}px`;
             el.style.letterSpacing = `${tracking}px`;
             el.style.color = clip.color || "#ffffff";

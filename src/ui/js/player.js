@@ -6,6 +6,7 @@ import { TIMELINE_STATE, TIMELINE_HISTORY, evaluateFadeCurve, formatRulerTimecod
 import { getActiveElement } from "./workspaceManager.js";
 import { PlayerTextOverlayManager } from "./playerTextOverlay.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
+import { themeColor } from "./themeTokens.js";
 
 // Foco global do teclado para players: "source" ou "program"
 window.activeFocusedPlayer = "source";
@@ -1047,13 +1048,15 @@ export class SourcePlayer {
     }
 
     startScrubberDrag(e) {
+        // No documento do clique: com o player numa janela destacada, o mouse anda lá, não aqui.
+        const doc = e?.target?.ownerDocument || document;
         const onMouseMove = (moveEvent) => this.seekScrubber(moveEvent);
         const onMouseUp = () => {
-            document.removeEventListener("mousemove", onMouseMove);
-            document.removeEventListener("mouseup", onMouseUp);
+            doc.removeEventListener("mousemove", onMouseMove);
+            doc.removeEventListener("mouseup", onMouseUp);
         };
-        document.addEventListener("mousemove", onMouseMove);
-        document.addEventListener("mouseup", onMouseUp);
+        doc.addEventListener("mousemove", onMouseMove);
+        doc.addEventListener("mouseup", onMouseUp);
     }
 
     setSpeed(speed) {
@@ -1238,7 +1241,7 @@ export class SourcePlayer {
         if (!osd) {
             osd = document.createElement("div");
             osd.className = "player-shuttle-osd";
-            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:rgba(18,18,24,0.85); color:var(--color-cyan); padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700; font-family:'Outfit',sans-serif; letter-spacing:0.5px; border:1px solid rgba(6,182,212,0.4); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
+            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:var(--t-surface-2, rgba(18,18,24,0.85)); color:var(--color-cyan); padding:4px 12px; border-radius:12px; font-size:calc(11px * var(--font-scale, 1)); font-weight:700; font-family:var(--font-heading); letter-spacing:0.5px; border:1px solid var(--t-line-strong, rgba(6,182,212,0.4)); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
             panel.appendChild(osd);
         }
         osd.textContent = text;
@@ -1896,8 +1899,11 @@ export class SourcePlayer {
         this.mouseMoveHandler = (ev) => this.onMouseMove(ev);
         this.mouseUpHandler = (ev) => this.onMouseUp(ev);
 
-        document.addEventListener("mousemove", this.mouseMoveHandler);
-        document.addEventListener("mouseup", this.mouseUpHandler);
+        // No documento do clique: com o Source numa janela destacada, o mouse anda lá. Ouvindo aqui,
+        // o soltar nunca chegava, a caixa ficava presa e esticava ao passar pela janela principal.
+        this.drawingDoc = this.overlayContainer.ownerDocument || document;
+        this.drawingDoc.addEventListener("mousemove", this.mouseMoveHandler);
+        this.drawingDoc.addEventListener("mouseup", this.mouseUpHandler);
     }
 
     onMouseMove(e) {
@@ -1922,8 +1928,9 @@ export class SourcePlayer {
         if (!this.isDrawing) return;
         this.isDrawing = false;
 
-        document.removeEventListener("mousemove", this.mouseMoveHandler);
-        document.removeEventListener("mouseup", this.mouseUpHandler);
+        const doc = this.drawingDoc || document;
+        doc.removeEventListener("mousemove", this.mouseMoveHandler);
+        doc.removeEventListener("mouseup", this.mouseUpHandler);
 
         if (!this.drawingBox) return;
 
@@ -1949,7 +1956,7 @@ export class SourcePlayer {
                     clearTimeout(this.clickTimeout);
                     this.clickTimeout = null;
                 }
-                const btnExpand = document.getElementById("btn-expand-source");
+                const btnExpand = this.el("btn-expand-source");
                 if (btnExpand) btnExpand.click();
             } else {
                 this.clickTimeout = setTimeout(() => {
@@ -2122,7 +2129,7 @@ export function updateProgramMinimap() {
     if (ctx) {
         const mw = canvas.width;
         const mh = canvas.height;
-        ctx.fillStyle = "#0a080e";
+        ctx.fillStyle = themeColor("surface-1", "#0a080e");
         ctx.fillRect(0, 0, mw, mh);
 
         const aspect = tw / th;
@@ -2168,7 +2175,7 @@ export function updateProgramMinimap() {
         }
 
         if (!frameDrawn) {
-            ctx.fillStyle = "#16121f";
+            ctx.fillStyle = themeColor("surface-3", "#16121f");
             ctx.fillRect(dx, dy, dw, dh);
             ctx.strokeStyle = "rgba(168, 85, 247, 0.4)";
             ctx.lineWidth = 1;
@@ -3182,7 +3189,7 @@ export class ProgramPlayer {
         if (!osd) {
             osd = document.createElement("div");
             osd.className = "player-shuttle-osd";
-            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:rgba(18,18,24,0.85); color:#a855f7; padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700; font-family:'Outfit',sans-serif; letter-spacing:0.5px; border:1px solid rgba(168,85,247,0.4); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
+            osd.style.cssText = "position:absolute; top:45px; left:50%; transform:translateX(-50%); background:var(--t-surface-2, rgba(18,18,24,0.85)); color:#a855f7; padding:4px 12px; border-radius:12px; font-size:calc(11px * var(--font-scale, 1)); font-weight:700; font-family:var(--font-heading); letter-spacing:0.5px; border:1px solid var(--t-line-strong, rgba(168,85,247,0.4)); backdrop-filter:blur(8px); box-shadow:0 4px 12px rgba(0,0,0,0.5); pointer-events:none; z-index:99; transition:opacity 0.2s ease; opacity:0;";
             panel.appendChild(osd);
         }
         osd.textContent = text;
@@ -5369,8 +5376,8 @@ export class ProgramPlayer {
             };
 
             const onMouseUp = (upEv) => {
-                document.removeEventListener("mousemove", onMouseMove);
-                document.removeEventListener("mouseup", onMouseUp);
+                doc.removeEventListener("mousemove", onMouseMove);
+                doc.removeEventListener("mouseup", onMouseUp);
                 this.hideSnapGuides();
                 TIMELINE_HISTORY.commit();
 
@@ -5381,8 +5388,10 @@ export class ProgramPlayer {
                 }
             };
 
-            document.addEventListener("mousemove", onMouseMove);
-            document.addEventListener("mouseup", onMouseUp);
+            // No documento do clique: com o Program numa janela destacada, o mouse anda lá.
+            const doc = overlay.ownerDocument || document;
+            doc.addEventListener("mousemove", onMouseMove);
+            doc.addEventListener("mouseup", onMouseUp);
         };
 
         overlay.addEventListener("mousedown", onMouseDown);
@@ -5399,13 +5408,15 @@ export class ProgramPlayer {
     }
 
     startScrubberDrag(e) {
+        // No documento do clique: com o player numa janela destacada, o mouse anda lá, não aqui.
+        const doc = e?.target?.ownerDocument || document;
         const onMouseMove = (moveEvent) => this.seekScrubber(moveEvent);
         const onMouseUp = () => {
-            document.removeEventListener("mousemove", onMouseMove);
-            document.removeEventListener("mouseup", onMouseUp);
+            doc.removeEventListener("mousemove", onMouseMove);
+            doc.removeEventListener("mouseup", onMouseUp);
         };
-        document.addEventListener("mousemove", onMouseMove);
-        document.addEventListener("mouseup", onMouseUp);
+        doc.addEventListener("mousemove", onMouseMove);
+        doc.addEventListener("mouseup", onMouseUp);
     }
 
     /**
@@ -5434,7 +5445,7 @@ export class ProgramPlayer {
                     </div>
                     <video id="nle-2up-outgoing-vid" preload="auto" playsinline muted style="max-width:100%; max-height:100%; object-fit:contain;"></video>
                     <img id="nle-2up-outgoing-img" style="display:none; max-width:100%; max-height:100%; object-fit:contain;" />
-                    <div id="nle-2up-outgoing-empty" style="display:none; color:var(--text-muted); font-size:12px; font-family:'Outfit',sans-serif;">Espaço Vazio</div>
+                    <div id="nle-2up-outgoing-empty" style="display:none; color:var(--text-muted); font-size:calc(12px * var(--font-scale, 1)); font-family:var(--font-heading);">Espaço Vazio</div>
                 </div>
                 <div class="nle-2up-col incoming">
                     <div class="nle-2up-badge incoming">
@@ -5443,7 +5454,7 @@ export class ProgramPlayer {
                     </div>
                     <video id="nle-2up-incoming-vid" preload="auto" playsinline muted style="max-width:100%; max-height:100%; object-fit:contain;"></video>
                     <img id="nle-2up-incoming-img" style="display:none; max-width:100%; max-height:100%; object-fit:contain;" />
-                    <div id="nle-2up-incoming-empty" style="display:none; color:var(--text-muted); font-size:12px; font-family:'Outfit',sans-serif;">Espaço Vazio</div>
+                    <div id="nle-2up-incoming-empty" style="display:none; color:var(--text-muted); font-size:calc(12px * var(--font-scale, 1)); font-family:var(--font-heading);">Espaço Vazio</div>
                 </div>
             `;
             targetContainer.appendChild(overlay);
@@ -6948,11 +6959,11 @@ export class VideoPlayer {
             item.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <span style="color: var(--color-cyan, #06b6d4); font-weight: bold; font-family: monospace;">${idx + 1}.</span>
-                    <span style="background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: 10px;">${track}</span>
-                    <span style="font-family: monospace; font-size: 11px;">${tc}</span>
+                    <span style="background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: calc(10px * var(--font-scale, 1));">${track}</span>
+                    <span style="font-family: monospace; font-size: calc(11px * var(--font-scale, 1));">${tc}</span>
                     <span style="color: var(--text-secondary, #94a3b8); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${clipName}</span>
                 </div>
-                <span class="rm-item-check-slot">${idx === currentIndex ? '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: 11px;"></i>' : ''}</span>
+                <span class="rm-item-check-slot">${idx === currentIndex ? '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: calc(11px * var(--font-scale, 1));"></i>' : ''}</span>
             `;
             item.addEventListener("click", (e) => {
                 e.stopPropagation();
@@ -6963,7 +6974,7 @@ export class VideoPlayer {
                     const checkSlot = el.querySelector(".rm-item-check-slot");
                     if (elIdx === idx) {
                         el.classList.add("is-active");
-                        if (checkSlot) checkSlot.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: 11px;"></i>';
+                        if (checkSlot) checkSlot.innerHTML = '<i class="fa-solid fa-check" style="color: var(--color-cyan, #06b6d4); font-size: calc(11px * var(--font-scale, 1));"></i>';
                     } else {
                         el.classList.remove("is-active");
                         if (checkSlot) checkSlot.innerHTML = '';
@@ -7045,10 +7056,10 @@ export function showAnnotationModal(speakers, initialValue = "") {
         header.style.borderBottom = "1px solid var(--border-glass)";
         header.style.paddingBottom = "10px";
         header.innerHTML = `
-            <h2 style="margin:0; font-size:16px; color:#fff; display:flex; align-items:center; gap:8px;">
+            <h2 style="margin:0; font-size:calc(16px * var(--font-scale, 1)); color:#fff; display:flex; align-items:center; gap:8px;">
                 <i class="fa-solid fa-tags" style="color:var(--color-cyan);"></i> Identificar Elemento
             </h2>
-            <button class="btn-close-modal" style="font-size:24px; color:var(--text-secondary); background:transparent; border:none; cursor:pointer;">&times;</button>
+            <button class="btn-close-modal" style="font-size:calc(24px * var(--font-scale, 1)); color:var(--text-secondary); background:transparent; border:none; cursor:pointer;">&times;</button>
         `;
 
         const body = document.createElement("div");
@@ -7059,7 +7070,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
 
         const inputLabel = document.createElement("label");
         inputLabel.textContent = "Nome da Pessoa ou Objeto:";
-        inputLabel.style.fontSize = "11px";
+        inputLabel.style.fontSize = "calc(11px * var(--font-scale, 1))";
         inputLabel.style.color = "var(--text-secondary)";
 
         const input = document.createElement("input");
@@ -7072,7 +7083,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         input.style.border = "1px solid var(--border-glass)";
         input.style.background = "rgba(255, 255, 255, 0.05)";
         input.style.color = "#fff";
-        input.style.fontSize = "13px";
+        input.style.fontSize = "calc(13px * var(--font-scale, 1))";
         input.style.outline = "none";
         input.style.boxSizing = "border-box";
 
@@ -7082,7 +7093,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         if (speakers && speakers.length > 0) {
             const suggestionsLabel = document.createElement("label");
             suggestionsLabel.textContent = "Selecionar existente:";
-            suggestionsLabel.style.fontSize = "11px";
+            suggestionsLabel.style.fontSize = "calc(11px * var(--font-scale, 1))";
             suggestionsLabel.style.color = "var(--text-secondary)";
             suggestionsLabel.style.marginTop = "5px";
             body.appendChild(suggestionsLabel);
@@ -7094,7 +7105,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
             suggestionsContainer.style.maxHeight = "120px";
             suggestionsContainer.style.overflowY = "auto";
             suggestionsContainer.style.padding = "6px";
-            suggestionsContainer.style.border = "1px solid rgba(255, 255, 255, 0.05)";
+            suggestionsContainer.style.border = "1px solid var(--t-line-weak, rgba(255, 255, 255, 0.05))";
             suggestionsContainer.style.borderRadius = "8px";
             suggestionsContainer.style.background = "rgba(0, 0, 0, 0.2)";
 
@@ -7106,7 +7117,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
                 btn.style.color = "var(--color-cyan)";
                 btn.style.padding = "3px 8px";
                 btn.style.borderRadius = "15px";
-                btn.style.fontSize = "10px";
+                btn.style.fontSize = "calc(10px * var(--font-scale, 1))";
                 btn.style.cursor = "pointer";
                 btn.style.transition = "all 0.15s";
 
@@ -7142,7 +7153,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         btnCancel.style.background = "transparent";
         btnCancel.style.color = "var(--text-secondary)";
         btnCancel.style.cursor = "pointer";
-        btnCancel.style.fontSize = "12px";
+        btnCancel.style.fontSize = "calc(12px * var(--font-scale, 1))";
 
         const btnConfirm = document.createElement("button");
         btnConfirm.textContent = "Confirmar";
@@ -7153,7 +7164,7 @@ export function showAnnotationModal(speakers, initialValue = "") {
         btnConfirm.style.color = "#000";
         btnConfirm.style.fontWeight = "600";
         btnConfirm.style.cursor = "pointer";
-        btnConfirm.style.fontSize = "12px";
+        btnConfirm.style.fontSize = "calc(12px * var(--font-scale, 1))";
 
         footer.appendChild(btnCancel);
         footer.appendChild(btnConfirm);

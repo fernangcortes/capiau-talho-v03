@@ -118,6 +118,7 @@ export class SettingsPanelManager {
         this.dirty.global.clear();
         this.dirty.project.clear();
         this.dirty.prompts.clear();
+        this.emitAppearanceDraft();
         this.isOpen = false;
         this.modal.classList.remove("active");
     }
@@ -148,6 +149,7 @@ export class SettingsPanelManager {
             b.classList.toggle("active", b.dataset.scope === scope));
         await this.refresh();
         this.renderAll();
+        this.emitAppearanceDraft();
     }
 
     setMode(mode) {
@@ -403,7 +405,7 @@ export class SettingsPanelManager {
         if (entry.help_tech) {
             const techIcon = document.createElement("i");
             techIcon.className = "fa-solid fa-circle-info";
-            techIcon.style.cssText = "color: var(--text-muted); font-size: 11px; cursor: help; margin-left: 6px;";
+            techIcon.style.cssText = "color: var(--text-muted); font-size: calc(11px * var(--font-scale, 1)); cursor: help; margin-left: 6px;";
             techIcon.setAttribute("data-tooltip", entry.help_tech);
             label.appendChild(techIcon);
         }
@@ -494,7 +496,10 @@ export class SettingsPanelManager {
                 if (entry.max !== undefined && entry.max !== null) v = Math.min(entry.max, v);
                 return v;
             };
-            range.addEventListener("input", () => { num.value = range.value; });
+            range.addEventListener("input", () => {
+                num.value = range.value;
+                if (entry.key.startsWith("ui.")) this.emitAppearanceDraft({ [entry.key]: parse(range.value) });
+            });
             range.addEventListener("change", () => onChange(parse(range.value)));
             range.addEventListener("dblclick", () => {
                 if (disabled) return;
@@ -544,7 +549,7 @@ export class SettingsPanelManager {
             clearBtn.className = "btn-setting-revert";
             clearBtn.style.width = "auto";
             clearBtn.style.padding = "0 8px";
-            clearBtn.style.fontSize = "10px";
+            clearBtn.style.fontSize = "calc(10px * var(--font-scale, 1))";
             clearBtn.textContent = "Limpar";
             clearBtn.setAttribute("data-tooltip", "Apagar a chave salva no app e voltar a usar a do arquivo .env.");
             clearBtn.disabled = disabled;
@@ -572,6 +577,15 @@ export class SettingsPanelManager {
     }
 
     enumLabel(key, opt) {
+        if (key === "ui.theme") {
+            return { neutro: "Neutro (quase preto)", classico: "Clássico (violeta)", custom: "Personalizado" }[opt] || opt;
+        }
+        if (key === "ui.font_family") {
+            return {
+                padrao: "Padrão (Inter + Outfit)", inter: "Inter", plex_condensed: "IBM Plex Sans Condensed",
+                roboto_flex: "Roboto Flex", barlow_semi_condensed: "Barlow Semi Condensed"
+            }[opt] || opt;
+        }
         if (key === "asr.language") {
             return { pt: "Português", en: "Inglês", es: "Espanhol" }[opt] || opt;
         }
@@ -628,6 +642,15 @@ export class SettingsPanelManager {
         this.renderNav(this.visibleCategories());
         this.renderCategory(this.activeCategory);
         this.updateFooter();
+        if (key.startsWith("ui.")) this.emitAppearanceDraft();
+    }
+
+    // Aparência (ui.*) tem prévia ao vivo: o js/themeManager.js aplica o rascunho por cima do salvo.
+    emitAppearanceDraft(live = null) {
+        const draft = {};
+        for (const [k, v] of this.dirty[this.scope]) if (k.startsWith("ui.")) draft[k] = v;
+        if (live) Object.assign(draft, live);
+        STATE.emit("appearanceDraft", draft);
     }
 
     async revertKey(key, isDirtyOnly) {
@@ -637,6 +660,7 @@ export class SettingsPanelManager {
             this.renderNav(this.visibleCategories());
             this.renderCategory(this.activeCategory);
             this.updateFooter();
+            if (key.startsWith("ui.")) this.emitAppearanceDraft();
             return;
         }
         try {
@@ -691,6 +715,7 @@ export class SettingsPanelManager {
         this.dirty[this.scope].clear();
         this.dirty.prompts.clear();
         this.renderAll();
+        this.emitAppearanceDraft();
     }
 
     updateFooter() {
@@ -698,7 +723,7 @@ export class SettingsPanelManager {
         const nPrompts = this.dirty.prompts.size;
         const n = nSettings + nPrompts;
         this.dirtyCountEl.textContent = n
-            ? `${n} alteração${n > 1 ? "ões" : ""} não salva${n > 1 ? "s" : ""} (${this.scope === "project" ? "projeto" : "global"})`
+            ? `${n} ${n > 1 ? "alterações" : "alteração"} não salva${n > 1 ? "s" : ""} (${this.scope === "project" ? "projeto" : "global"})`
             : "";
         this.btnSave.disabled = !n;
         this.btnDiscard.disabled = !n;

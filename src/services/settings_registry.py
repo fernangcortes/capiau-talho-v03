@@ -25,6 +25,7 @@ CATEGORIES = [
     {"id": "themes_search", "label": "Temas & Busca",        "icon": "fa-brain"},
     {"id": "faces",         "label": "Rostos",               "icon": "fa-user"},
     {"id": "hardware",      "label": "Hardware & GPU",       "icon": "fa-microchip"},
+    {"id": "appearance",    "label": "Aparência",            "icon": "fa-palette"},
     {"id": "prompts",       "label": "Prompts",              "icon": "fa-terminal", "pro_only": True},
 ]
 
@@ -828,6 +829,74 @@ SETTINGS_REGISTRY: List[Dict[str, Any]] = [
         "help": "Controla onde os modelos de busca semântica e visão local (CLIP para busca por texto de fotos e MiniLM para falas) serão carregados. No modo 'Automático', os modelos rodam na CPU para economizar os 2.0 GB de VRAM da GPU para a renderização de vídeo, garantindo estabilidade máxima sem riscos de estouro de memória.",
         "help_tech": "Define a string de dispositivo enviada ao PyTorch / SentenceTransformer ('cpu', 'directml', 'cuda'). Com 2.0 GB de VRAM, a CPU preserva memória dedicada livre para o decodificador/codificador de hardware do FFmpeg.",
         "category": "hardware", "level": "pro", "scope": "global", "requires_reprocess": False,
+    },
+
+    # -- Aparência da interface (docs/PLANO_TEMA_NEUTRO.md) ------------------------
+    # Só a UI: nada disso muda o vídeo exportado. Aplicado ao vivo por src/ui/js/themeManager.js.
+    {
+        "key": "ui.theme", "type": "enum", "default": "neutro",
+        "enum": ["neutro", "classico", "custom"],
+        "label": "Tema da interface",
+        "help": "Neutro: fundos quase pretos, sem cor, para não competir com a imagem. Clássico: o visual violeta original. Personalizado: você ajusta o brilho, o contraste entre áreas, as linhas e o tom logo abaixo.",
+        "help_tech": "data-theme no <html>; os presets definem os tokens --t-* de src/ui/theme.css. Cache em localStorage 'capiau.themeState' para aplicar antes do primeiro paint.",
+        "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "ui.custom_base", "type": "float", "default": 3.0, "min": 0.0, "max": 12.0, "step": 0.5,
+        "label": "Personalizado: brilho do fundo",
+        "help": "Quão escuro é o fundo mais profundo da interface. 0 é preto puro; valores maiores clareiam tudo por igual. Só vale no tema Personalizado.",
+        "help_tech": "Luminosidade HSL (%) de --t-surface-0; os demais níveis somam a distância entre níveis.",
+        "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "ui.custom_step", "type": "float", "default": 1.5, "min": 0.0, "max": 5.0, "step": 0.25,
+        "label": "Personalizado: diferença entre áreas",
+        "help": "Quanto um painel, um cabeçalho ou um botão se destacam do fundo. Pouco deixa tudo chapado; muito deixa as divisões bem marcadas.",
+        "help_tech": "Passo de luminosidade HSL (%) entre --t-surface-0..4; também escala os véus --t-tint-1..3.",
+        "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "ui.custom_lines", "type": "float", "default": 0.06, "min": 0.0, "max": 0.25, "step": 0.01,
+        "label": "Personalizado: intensidade das linhas",
+        "help": "Quão visíveis ficam as linhas que separam painéis e contornam campos. 0 some com elas.",
+        "help_tech": "Alfa branco de --t-line-weak; --t-line-strong usa o dobro.",
+        "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "ui.custom_hue", "type": "int", "default": 0, "min": 0, "max": 360, "step": 1,
+        "label": "Personalizado: tom",
+        "help": "A cor que tinge os fundos, em graus do círculo de cores (0 vermelho, 120 verde, 240 azul). Só aparece se a saturação for maior que zero.",
+        "help_tech": "Matiz HSL das superfícies --t-surface-*.",
+        "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "ui.custom_saturation", "type": "int", "default": 0, "min": 0, "max": 40, "step": 1,
+        "label": "Personalizado: saturação do tom",
+        "help": "Quanto de cor entra nos fundos. 0 é cinza puro, sem cor nenhuma.",
+        "help_tech": "Saturação HSL (%) das superfícies --t-surface-*.",
+        "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "ui.font_family", "type": "enum", "default": "padrao",
+        "enum": ["padrao", "inter", "plex_condensed", "roboto_flex", "barlow_semi_condensed"],
+        "label": "Fonte da interface",
+        "help": "Padrão: Inter no texto e Outfit nos títulos. As outras usam uma fonte só em tudo; as condensadas (IBM Plex Condensed, Barlow Semi Condensed) cabem mais em painéis estreitos. Não muda os títulos do vídeo.",
+        "help_tech": "Redefine --font-body e --font-heading. Fontes OFL empacotadas em src/ui/fonts (offline). Timecodes seguem em monospace.",
+        "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "ui.font_weight", "type": "int", "default": 400, "min": 300, "max": 500, "step": 10,
+        "label": "Peso do texto",
+        "help": "Espessura do texto comum. Menos que 400 deixa a letra mais fina e leve; negritos e títulos continuam destacados.",
+        "help_tech": "font-weight do <body> (--font-weight-ui). Inter e Roboto Flex são variáveis (qualquer valor); Plex e Barlow arredondam para 300/400/500.",
+        "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
+    },
+    {
+        "key": "ui.font_scale", "type": "float", "default": 1.0, "min": 0.9, "max": 1.2, "step": 0.05,
+        "label": "Tamanho do texto",
+        "help": "Aumenta ou diminui todo o texto da interface de uma vez. 1 é o tamanho original.",
+        "help_tech": "--font-scale; todo font-size em px da UI é calc(Npx * var(--font-scale, 1)).",
+        "category": "appearance", "level": "simple", "scope": "both", "requires_reprocess": False,
     },
 
     # -- Áudio: limiares da pré-análise (docs/PLANO_AJUSTES_DE_AUDIO.md, seção 7) --

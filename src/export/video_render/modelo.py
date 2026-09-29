@@ -241,6 +241,10 @@ def _clipe(c, indice: int) -> Optional[Clipe]:
     """Um item de `clips` -> Clipe. None quando o item nao da render nenhum."""
     if not isinstance(c, dict):
         return None
+    if c.get("disabled"):
+        # Clipe desligado na tela (tecla F): o player o esconde e cala; no
+        # arquivo ele simplesmente nao existe (vira o que estiver embaixo).
+        return None
 
     in_s = _float_nao_negativo(c.get("in"), 0.0)
     out_s = _float_nao_negativo(c.get("out"), 0.0)
@@ -370,6 +374,10 @@ class Faixa:
             fim = float(self.fim_s) if self.fim_s is not None else duracao_total_s
             fim = min(fim, duracao_total_s)
             if fim <= ini:
+                if ini >= duracao_total_s:
+                    raise ValueError(
+                        f"Faixa IN-OUT fora da timeline: o IN ({ini:.2f}s) está depois "
+                        f"do fim da timeline ({duracao_total_s:.2f}s).")
                 raise ValueError("Faixa IN-OUT vazia: o OUT precisa vir depois do IN.")
             return ini, fim
         return 0.0, duracao_total_s

@@ -201,12 +201,19 @@ def _parametros_fx(clipe: modelo.Clipe, escopo: modelo.Escopo) -> Dict[str, Any]
 # ---------------------------------------------------------------------------
 
 def _fades_ativos(clipe: modelo.Clipe) -> List[Dict[str, Any]]:
-    """Crossfades validos do clipe: sem disabled e com side conhecido."""
+    """Fades de BORDA validos do clipe: sem disabled, side conhecido, sem transitionId.
+
+    Crossfade com `transitionId` e metade de uma transicao entre dois clipes, e
+    o player NAO o toca como fade de borda (player.js, `_syncSingleAudioElement`:
+    filtra `!e.transitionId`): ele toca os DOIS clipes juntos na janela da
+    transicao. Isso mora em `_transicoes_da_pista`; tratar aqui tambem faria o
+    clipe A sumir antes do corte e o B nascer do silencio depois dele.
+    """
     resultado: List[Dict[str, Any]] = []
     for efeito in clipe.effects:
         if not isinstance(efeito, dict) or efeito.get("type") != "crossfade":
             continue
-        if efeito.get("disabled"):
+        if efeito.get("disabled") or efeito.get("transitionId"):
             continue
         lado = str(efeito.get("side") or "").lower()
         if lado not in ("in", "out"):
@@ -300,8 +307,27 @@ def _atalhos_afade(fades: List[Dict[str, Any]], produto: float,
     return filtros
 
 
+def _expressoes_transicao(transicoes: List[Dict[str, Any]], t0_s: float) -> List[str]:
+    """Ganho de cada transicao em que o clipe participa, em funcao do t LOCAL.
+
+    Espelho de syncAudioTracks (player.js): na janela [corte - halfA, corte +
+    halfB] o progresso e p = (agora - inicio_janela) / (halfA + halfB); o clipe
+    que sai toca com curva(1 - p) e o que entra com curva(p). Fora da janela o
+    clip() prende p em 0 ou 1 e o ganho vale 1 (ou 0 no lado ja encerrado, onde
+    o ramo nem tem amostras). `t0_s` e o instante da timeline em que t=0.
+    """
+    exprs: List[str] = []
+    for tr in transicoes:
+        p = (f"clip(((t-({_num(tr['inicio_s'] - t0_s)}))/{_num(tr['span_s'])}),0,1)")
+        if tr["papel"] == "sai":
+            p = f"(1-{p})"
+        exprs.append(fade.expressao(tr["curve"], tr["tension"], p))
+    return exprs
+
+
 def _estagio_volume(clipe: modelo.Clipe, pista: modelo.Pista, escopo: modelo.Escopo,
-                    offset_ini_s: float, offset_fim_s: float) -> List[str]:
+                    offset_ini_s: float, offset_fim_s: float,
+                    extras: Optional[List[str]] = None) -> List[str]:
     """O ganho de ENTRADA do grafo: pista x clipe x fade, com o clamp da tela.
 
     A tela calcula `el.volume = Math.max(0, Math.min(1.0, vol*clipVol*fadeVol))`
@@ -321,21 +347,27 @@ def _estagio_volume(clipe: modelo.Clipe, pista: modelo.Pista, escopo: modelo.Esc
     produto = vol_pista * vol_clipe
 
     fades = _fades_ativos(clipe)
-    if not fades:
+    extras = list(extras or [])
+    if not fades and not extras:
         if produto == 1.0:
             return []
         # O player clampa el.volume em [0,1]: pista 2.0 com clipe 1.0 toca a 1.0
         # NA TELA, e o arquivo tem de bater com a tela, nao com a intencao.
         return [f"volume={_num(_clamp(produto, 0.0, 1.0))}"]
 
-    atalho = _atalhos_afade(fades, produto, offset_ini_s, offset_fim_s)
-    if atalho is not None:
-        prefixo: List[str] = []
-        if produto != 1.0:
-            prefixo.append(f"volume={_num(_clamp(produto, 0.0, 1.0))}")
-        return prefixo + atalho
+    if not extras:
+        atalho = _atalhos_afade(fades, produto, offset_ini_s, offset_fim_s)
+        if atalho is not None:
+            prefixo: List[str] = []
+            if produto != 1.0:
+                prefixo.append(f"volume={_num(_clamp(produto, 0.0, 1.0))}")
+            return prefixo + atalho
 
-    expr = _expressao_fade_combinada(fades, offset_ini_s, offset_fim_s)
+    # O player MULTIPLICA o ganho da transicao (forcedGain) pelo fadeVol dos
+    # fades de borda: `vol * clipVol * fadeVol * forcedGain` (player.js).
+    exprs = ([_expressao_fade_combinada(fades, offset_ini_s, offset_fim_s)] if fades else [])
+    exprs += extras
+    expr = "*".join(f"({e})" for e in exprs)
     return [f"volume=volume='clip(({_num(produto)})*({expr}),0,1)':eval=frame"]
 
 
@@ -407,7 +439,9 @@ def _filtros_dinamica(params: Dict[str, Any]) -> List[str]:
 def cadeia_clipe_audio(clipe: modelo.Clipe, pista: modelo.Pista, seq: modelo.Sequencia,
                        escopo: modelo.Escopo, rotulo_entrada: str, rotulo_saida: str,
                        inicio_render_s: float = 0.0, *,
-                       fim_render_s: Optional[float] = None) -> str:
+                       fim_render_s: Optional[float] = None,
+                       transicoes: Optional[List[Dict[str, Any]]] = None,
+                       bordas_s: Optional[Tuple[float, float]] = None) -> str:
     """Ramo completo de UM clipe (ja resolvido pela regra P4) em uma string.
 
         [entrada]atrim -> asetpts -> volume/fade -> eq -> dinamica
@@ -429,6 +463,9 @@ def cadeia_clipe_audio(clipe: modelo.Clipe, pista: modelo.Pista, seq: modelo.Seq
       pula esses antes (render por segmentos faz isso o tempo inteiro).
     - A STRING e identica para fonte original e WAV tratado: a troca acontece
       nas ENTRADAS (ss/t), nunca aqui (armadilha 3).
+    - `transicoes`/`bordas_s` vem de `_transicoes_da_pista`: o clipe chega JA
+      estendido para dentro da janela da transicao, e `bordas_s` guarda o
+      inicio/fim AUTORADOS, que e onde os fades de borda continuam ancorados.
     """
     ini_render = float(inicio_render_s)
     fim_render = float(fim_render_s) if fim_render_s is not None else clipe.fim_s
@@ -445,9 +482,16 @@ def cadeia_clipe_audio(clipe: modelo.Clipe, pista: modelo.Pista, seq: modelo.Seq
         f"{rotulo_entrada}atrim=start=0:end={_num(duracao)}",
         "asetpts=PTS-STARTPTS",
     ]
+    # Depois do atrim+asetpts, t=0 e o instante da timeline em que ESTE ramo
+    # comeca (o adelay vem depois do volume). Medir os fades a partir do inicio
+    # da janela de render punha o fade-in de um clipe no meio da janela em t
+    # negativo: fator 0 no clipe inteiro, que saia mudo no arquivo.
+    t0 = clipe.inicio_s + head
+    borda_ini, borda_fim = bordas_s if bordas_s is not None else (clipe.inicio_s, clipe.fim_s)
     partes += _estagio_volume(clipe, pista, escopo,
-                              clipe.inicio_s - ini_render,
-                              clipe.fim_s - ini_render)
+                              borda_ini - t0,
+                              borda_fim - t0,
+                              _expressoes_transicao(transicoes or [], t0))
     partes += _filtros_eq(params)
     partes += _filtros_dinamica(params)
 
@@ -563,6 +607,87 @@ def _entrada_do_recorte(recorte: modelo.Clipe, bruto: Optional[modelo.Clipe],
     }
 
 
+# Folga para reconhecer que A termina onde B comeca (o player grava o corte em
+# frames; em segundos os dois lados podem divergir por arredondamento).
+_TOLERANCIA_CORTE_S = 0.1
+
+
+def _transicoes_da_pista(pares, escopo: modelo.Escopo,
+                         resolver_tratado: Optional[Callable] = None):
+    """Casa os dois lados de cada transicao de audio da pista.
+
+    O player cria a transicao gravando um crossfade `side: out` no clipe que
+    sai (duracao = halfA, a parte ANTES do corte) e um `side: in` no que entra
+    (duracao = halfB, a parte DEPOIS), com o mesmo `transitionId`. Na tela a
+    janela [corte - halfA, corte + halfB] toca os DOIS clipes juntos: o que
+    sai continua alem do seu OUT e o que entra comeca antes do seu IN, lendo
+    a sobra da midia (syncAudioTracks em player.js).
+
+    Devolve (recorte, bruto, transicoes) para cada par de entrada, onde cada
+    transicao e {papel, inicio_s, span_s, curve, tension, estende_ini_s,
+    estende_fim_s}. Lado sem parceiro nao vira nada: o player tambem nao toca
+    fade de borda para crossfade com transitionId.
+    """
+    lados: Dict[str, Dict[str, Tuple[int, Dict[str, Any]]]] = {}
+    if escopo.efeito_ligado("crossfade"):
+        for i, (recorte, _bruto) in enumerate(pares):
+            for ef in recorte.effects:
+                if (not isinstance(ef, dict) or ef.get("type") != "crossfade"
+                        or ef.get("disabled") or not ef.get("transitionId")):
+                    continue
+                lado = str(ef.get("side") or "").lower()
+                if lado in ("in", "out"):
+                    lados.setdefault(str(ef["transitionId"]), {})[lado] = (i, ef)
+
+    por_indice: Dict[int, List[Dict[str, Any]]] = {}
+    for tid, par in lados.items():
+        if "out" not in par or "in" not in par:
+            continue
+        ia, ef_a = par["out"]
+        ib, ef_b = par["in"]
+        a, bruto_a = pares[ia]
+        b, bruto_b = pares[ib]
+        if ia == ib or abs(a.fim_s - b.inicio_s) > _TOLERANCIA_CORTE_S:
+            continue
+        corte = b.inicio_s
+        half_a = min(max(0.0, _numero(ef_a.get("duration_s"), 0.0)), b.duracao_s)
+        half_b = min(max(0.0, _numero(ef_b.get("duration_s"), 0.0)), a.duracao_s)
+        if half_a + half_b <= _EPS_TEMPO:
+            continue
+        # B so pode comecar antes do IN se a fonte TEM esse trecho: midia
+        # original a partir de 0; WAV tratado comeca no IN autorado (armadilha 3).
+        tratado_b = bool(resolver_tratado and resolver_tratado(bruto_b if bruto_b is not None else b))
+        folga_b = (b.in_s - (bruto_b.in_s if bruto_b is not None else b.in_s)) if tratado_b else b.in_s
+        base = {"inicio_s": corte - half_a, "span_s": half_a + half_b,
+                "curve": str(ef_a.get("curve") or "equal_power"),
+                "tension": ef_a.get("tension")}
+        por_indice.setdefault(ia, []).append(
+            {**base, "papel": "sai", "estende_ini_s": 0.0, "estende_fim_s": half_b})
+        por_indice.setdefault(ib, []).append(
+            {**base, "papel": "entra", "estende_ini_s": min(half_a, max(0.0, folga_b)),
+             "estende_fim_s": 0.0})
+
+    return [(recorte, bruto, por_indice.get(i, []))
+            for i, (recorte, bruto) in enumerate(pares)]
+
+
+def _estender(clipe: modelo.Clipe, transicoes: List[Dict[str, Any]]) -> modelo.Clipe:
+    """Copia do clipe alongada para cobrir as janelas das suas transicoes.
+
+    Estender o comeco recua a posicao na timeline E o ponto de entrada na midia
+    juntos (o trecho continua alinhado); estender o fim so avanca o OUT. Fonte
+    que acaba antes do OUT estendido so entrega menos amostras - o apad do ramo
+    cobre, e na tela o player tambem cala nesse caso.
+    """
+    ini = max((t["estende_ini_s"] for t in transicoes), default=0.0)
+    fim = max((t["estende_fim_s"] for t in transicoes), default=0.0)
+    if ini <= _EPS_TEMPO and fim <= _EPS_TEMPO:
+        return clipe
+    import dataclasses
+    return dataclasses.replace(clipe, inicio_s=clipe.inicio_s - ini,
+                               in_s=clipe.in_s - ini, out_s=clipe.out_s + fim)
+
+
 def camada_pista_audio(pista: modelo.Pista, seq: modelo.Sequencia,
                        escopo: modelo.Escopo, inicio_s: float, fim_s: float,
                        indice_base: int,
@@ -585,17 +710,21 @@ def camada_pista_audio(pista: modelo.Pista, seq: modelo.Sequencia,
     ramos: List[str] = []
     marca = _rotulo_seguro(pista.id)
 
-    for (recorte, bruto) in _recortes_da_pista(seq, pista):
-        entrada = _entrada_do_recorte(recorte, bruto, pista,
+    pares = _recortes_da_pista(seq, pista)
+    for (recorte, bruto, transicoes) in _transicoes_da_pista(pares, escopo, resolver_tratado):
+        bordas = (recorte.inicio_s, recorte.fim_s)
+        tocado = _estender(recorte, transicoes)
+        entrada = _entrada_do_recorte(tocado, bruto, pista,
                                       inicio_s, fim_s, resolver_tratado)
         if entrada is None:
             continue
         indice = indice_base + len(entradas)
         rotulo_saida = f"[a{marca}_{len(ramos)}]"
         filtros.append(cadeia_clipe_audio(
-            recorte, pista, seq, escopo,
+            tocado, pista, seq, escopo,
             f"[{indice}:a]", rotulo_saida,
-            inicio_s, fim_render_s=fim_s))
+            inicio_s, fim_render_s=fim_s,
+            transicoes=transicoes, bordas_s=bordas))
         entradas.append(entrada)
         ramos.append(rotulo_saida)
 
