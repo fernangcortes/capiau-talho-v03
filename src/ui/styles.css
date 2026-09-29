@@ -670,6 +670,214 @@ textarea {
     cursor: pointer;
 }
 
+/* ── JANELA DE APARÊNCIA (js/appearanceWindow.js): flutua, arrasta, não escurece o editor ── */
+.apw {
+    position: fixed;
+    z-index: 99000;
+    width: 320px;
+    max-height: calc(100vh - 16px);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--t-line-strong, rgba(255, 255, 255, 0.14));
+    border-radius: 6px;
+    background: #121212;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+    color: var(--text-primary);
+    font-size: var(--fs-11);
+}
+.apw[hidden] {
+    display: none;
+}
+.apw-title {
+    height: 28px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px 0 10px;
+    border-bottom: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.08));
+    border-radius: 6px 6px 0 0;
+    background: #181818;
+    cursor: move;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.apw-dragging .apw-title {
+    cursor: grabbing;
+}
+.apw-grip,
+.apw-hint {
+    color: var(--text-muted);
+    font-size: var(--fs-9);
+}
+.apw-name {
+    flex: 1;
+    font-weight: 500;
+}
+.apw-close {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.apw-close:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+.apw-body {
+    overflow-y: auto;
+}
+.apw-sec {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    border-bottom: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.06));
+}
+.apw-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--fs-9);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+.apw-note {
+    font-size: var(--fs-9);
+    color: var(--text-muted);
+}
+.apw-swatches {
+    display: flex;
+    gap: 8px;
+}
+.apw-swatches button {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--sw);
+    cursor: pointer;
+}
+.apw-swatches button[data-default] {
+    background: linear-gradient(135deg, transparent 45%, var(--text-muted) 45%, var(--text-muted) 55%, transparent 55%);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.apw-swatches button.on {
+    box-shadow: 0 0 0 2px #121212, 0 0 0 4px var(--sw, var(--text-secondary));
+}
+.apw-swatches button[data-default].on {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25), 0 0 0 2px #121212, 0 0 0 4px var(--text-secondary);
+}
+.apw-seg {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 4px;
+    background: #0b0b0b;
+}
+.apw-seg button {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 22px;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: var(--fs-10);
+    white-space: nowrap;
+    cursor: pointer;
+}
+.apw-seg button.on {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+.apw-seg button:disabled {
+    cursor: default;
+}
+.apw-fonts {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.apw-fonts button {
+    height: 24px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    border: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.06));
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: var(--fs-12);
+    text-align: left;
+    cursor: pointer;
+}
+.apw-fonts button.on {
+    border-color: var(--accent);
+    background: rgba(255, 255, 255, 0.06);
+}
+.apw-scale {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.apw-scale input {
+    flex: 1;
+    accent-color: var(--accent);
+}
+.apw-mini {
+    width: 24px;
+    height: 20px;
+    border: 0;
+    border-radius: 3px;
+    background: #1e1e1e;
+    color: var(--text-primary);
+    font-size: var(--fs-10);
+    cursor: pointer;
+}
+.apw-foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+}
+.apw-status {
+    flex: 1;
+    font-size: var(--fs-9);
+    color: var(--color-rose);
+}
+.apw-link {
+    height: 20px;
+    padding: 0 8px;
+    border: 1px solid var(--t-line-strong, rgba(255, 255, 255, 0.14));
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: var(--fs-10);
+    cursor: pointer;
+}
+.apw-link:hover {
+    color: var(--text-primary);
+}
+.apw button:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: 1px;
+}
+#btn-open-appearance[aria-expanded="true"] i {
+    color: var(--accent);
+}
+
 /* ROSA - Ações Destrutivas / Erro */
 #btn-delete-project:hover,
 #btn-retry-failed:hover {
@@ -894,8 +1102,8 @@ button {
 
 .tab-btn.active {
     background: transparent;
-    color: var(--color-violet);
-    border-bottom: 2px solid var(--color-violet);
+    color: var(--t-accent, var(--color-violet));
+    border-bottom: 2px solid var(--t-accent, var(--color-violet));
     box-shadow: none;
 }
 

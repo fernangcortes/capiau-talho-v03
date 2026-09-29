@@ -19,6 +19,7 @@ import { LOG_MANAGER } from "./logManager.js";
 import { initTabsCustomization, setTabVisibility } from "./tabsCustomization.js";
 import { initHeaderMenus } from "./headerMenus.js";
 import { PanelRail } from "./panelRail.js";
+import { AppearanceWindow } from "./appearanceWindow.js";
 import { TEXT_AI_ENGINE } from "./textAIEngine.js";
 import { TITLES_TAB } from "./titlesTab.js";
 import { carregarFontesDoProjeto } from "./fontManager.js";
@@ -1897,6 +1898,11 @@ window.addEventListener("DOMContentLoaded", () => {
     const themeManager = new ThemeManager({ STATE, CapIAuAPI });
     window.themeManager = themeManager;
     themeManager.load();
+
+    // Aparência ao vivo: janela flutuante (cor de interação, fundo, trilhas, fonte, tamanho, peso).
+    const appearanceWindow = new AppearanceWindow({ themeManager, STATE });
+    window.appearanceWindow = appearanceWindow;
+    document.getElementById("btn-open-appearance")?.addEventListener("click", () => appearanceWindow.toggle());
     
     // Inicializa o sistema de auto-salvamento local
     initAutosave();

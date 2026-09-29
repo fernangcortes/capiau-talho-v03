@@ -5,6 +5,7 @@ import { TIMELINE_STATE, framesToTimecode, framesToSeconds, formatRulerTimecode,
 import { WaveformManager } from "./waveformManager.js";
 import { getAllKeyframeTimelineFrames } from "./keyframeEngine.js";
 import { themeColor, THEME_CHANGED_EVENT } from "./themeTokens.js";
+import { applyTrackMode } from "./trackColors.js";
 
 // Paleta de cores para pistas de vídeo (V1 roxo/íris clássico NLE, V2 ciano B-roll, etc.)
 const TRACK_PALETTE = [
@@ -170,8 +171,14 @@ export class CapiauTimelineRenderer {
         return null;
     }
 
-    /** Estilo visual de uma pista de vídeo pelo identificador ou índice entre as pistas de vídeo. */
+    /** Estilo da pista já no modo de cor escolhido na Aparência (coloridas / dessaturadas / mono). */
     getTrackStyle(track) {
+        const kind = ["ai", "text", "audio"].includes(track.kind) ? track.kind : "video";
+        return applyTrackMode(this.getBaseTrackStyle(track), themeColor("track-mode", "coloridas"), kind);
+    }
+
+    /** Estilo visual de uma pista de vídeo pelo identificador ou índice entre as pistas de vídeo. */
+    getBaseTrackStyle(track) {
         if (track.kind === "ai") return AI_TRACK_STYLE;
         if (track.kind === "text") return TEXT_TRACK_STYLE;
         if (track.kind === "audio") return AUDIO_TRACK_STYLE;
@@ -1463,7 +1470,7 @@ export class CapiauTimelineRenderer {
             const isPartner = !isSelected && selectedLink && cut.link_id === selectedLink;
             const isMatchHighlight = this.highlightedMatchClipIds && this.highlightedMatchClipIds.has(String(cut.id));
 
-            ctx.strokeStyle = isMatchHighlight ? "rgba(6, 182, 212, 0.95)" : ((isSelected || isPartner) ? this.colors.selection : style.border);
+            ctx.strokeStyle = isMatchHighlight ? "rgba(6, 182, 212, 0.95)" : ((isSelected || isPartner) ? themeColor("accent", this.colors.selection) : style.border);
             ctx.lineWidth = isMatchHighlight ? 2.5 : (isSelected ? 2 : 1.5);
             if (isPartner && !isMatchHighlight) ctx.setLineDash([4, 3]); // par A/V do selecionado: tracejado
             if (isMatchHighlight) {
@@ -2701,7 +2708,7 @@ export class CapiauTimelineRenderer {
         // Se estiver visível no canvas, desenha
         if (x >= -10 && x <= this.width + 10) {
             ctx.save();
-            ctx.strokeStyle = this.colors.playhead || "#ef4444";
+            ctx.strokeStyle = themeColor("accent", this.colors.playhead || "#ef4444");
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(x, 0);
@@ -2719,7 +2726,7 @@ export class CapiauTimelineRenderer {
             const isNearInOut = isNearIn || isNearOut;
 
             // Desenha a cabeça triangular/pentagonal no topo da régua
-            ctx.fillStyle = this.colors.playhead || "#ef4444";
+            ctx.fillStyle = themeColor("accent", this.colors.playhead || "#ef4444");
             ctx.beginPath();
             if (isNearInOut) {
                 // Cabeça pentagonal com topo reto para destacar da aba do colchete
