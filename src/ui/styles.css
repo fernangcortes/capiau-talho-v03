@@ -1040,21 +1040,15 @@ button {
     font-size: var(--fs-10);
 }
 
-/* Na barra o painel sai do fluxo; aberto, flutua ao lado dela, sem escurecer o editor. */
-.rail-mode:not(.rail-flyout) {
+/* Na barra o painel sai do fluxo; aberto pela barra, volta ao lugar dele na coluna
+   (empurra o editor e usa o divisor de sempre). Fechado, o divisor some como no recolhido. */
+.rail-mode:not(.rail-open) {
     display: none !important;
 }
-.rail-flyout {
-    position: fixed !important;
-    top: var(--rail-top) !important;
-    left: var(--rail-left) !important;
-    width: var(--rail-width) !important;
-    height: var(--rail-height) !important;
-    min-width: 0 !important;
-    max-width: none !important;
-    flex: none !important;
-    z-index: 9000;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+#sidebar-left.rail-mode:not(.rail-open) ~ .splitter-sidebar-left,
+#inspector-panel.rail-mode:not(.rail-open) ~ .splitter-inspector,
+.workspace:has(#sidebar-right.rail-mode:not(.rail-open)) .splitter-sidebar-right {
+    display: none !important;
 }
 
 /* Adjustments for borders to separate sidebars when docked in workspace or studio-top */

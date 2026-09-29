@@ -5,9 +5,10 @@
 //
 // "Linha" é o recolher de sempre (WorkspaceManager.setPanelCollapsed + linha de expandir).
 // "Barra" é novo: o painel sai do fluxo e fica uma coluna de 36 px com um botão por aba. Clicar
-// num botão ativa a aba de verdade (o mesmo botão da faixa) e abre o painel por cima do editor,
-// sem escurecer nada; Esc ou clique no editor fecha. As abas continuam as mesmas: destacar e
-// trocar de menu seguem pelos botões da faixa, que aparecem no painel aberto.
+// num botão ativa a aba de verdade (o mesmo botão da faixa) e abre o painel ao lado da barra, no
+// lugar dele na coluna: empurra monitores e timeline e se redimensiona pelo divisor de sempre.
+// Clicar de novo no botão da aba aberta fecha. As abas continuam as mesmas: destacar e trocar de
+// menu seguem pelos botões da faixa, que aparecem no painel aberto.
 //
 // Só vale para o painel numa coluna do editor. Numa pilha, faixa ou janela destacada a seta
 // continua recolhendo para a linha, como antes.
@@ -19,7 +20,7 @@ export const RAIL_PANELS = {
 };
 
 export const RAIL_STORAGE_KEY = "capiau_rail_panels";
-const DEFAULT_OPEN_WIDTH = 320;
+
 
 /** Próximo estado ao clicar na seta: aberta → barra → linha. Sem barra possível, aberta → linha. */
 export function nextOnArrow(state, railAllowed) {
@@ -68,7 +69,7 @@ export class PanelRail {
         this.storage = storage;
         this.rail = loadRail(storage);
         this.rails = {};      // panelId -> <nav>
-        this.openId = null;   // painel aberto por cima agora
+        this.openId = null;   // painel aberto ao lado da barra agora
         this._raf = 0;
     }
 
@@ -84,19 +85,6 @@ export class PanelRail {
             }
         }
 
-        // Clique no editor (fora do painel aberto e da barra) fecha; menus do <body> (context menus) não contam.
-        document.addEventListener("mousedown", (e) => {
-            if (!this.openId) return;
-            const panel = document.getElementById(this.openId);
-            if (panel?.contains(e.target) || this.rails[this.openId]?.contains(e.target)) return;
-            if (!e.target.closest?.(".workspace, .dock-frame, header.header")) return;
-            this.closeFlyout();
-        }, true);
-        window.addEventListener("keydown", (e) => {
-            if (e.key !== "Escape" || !this.openId) return;
-            if (document.querySelector(".hmenu-open, .custom-context-menu")) return; // o menu fecha primeiro
-            this.closeFlyout();
-        });
         window.addEventListener("resize", () => this.scheduleApply());
 
         // Linha de expandir: duplo clique leva direto para "aberta".
@@ -133,10 +121,6 @@ export class PanelRail {
     setState(id, state) {
         if (!(id in RAIL_PANELS)) return;
         const panel = document.getElementById(id);
-        if (state === "barra" && panel && !this.rail.has(id)) {
-            const w = panel.getBoundingClientRect().width;
-            if (w > 120) panel.dataset.railWidth = String(Math.round(w));
-        }
         if (state === "aberta") this.rail.delete(id);
         if (state === "barra") this.rail.add(id);
         // "linha" guarda a barra (se havia) para a linha devolver ao estado de antes.
@@ -149,7 +133,7 @@ export class PanelRail {
         window.dispatchEvent(new Event("resize"));
     }
 
-    /** Quem entrega resultado num painel (busca, IA) chama isto: na barra, abre por cima. */
+    /** Quem entrega resultado num painel (busca, IA) chama isto: na barra, abre o painel. */
     reveal(id) {
         if (this.stateOf(id) === "barra") this.openFlyout(id);
     }
@@ -183,7 +167,6 @@ export class PanelRail {
         panel.classList.toggle("rail-mode", railOn);
         if (!railOn && this.openId === id) this.closeFlyout();
         if (railOn) this.renderButtons(id);
-        if (this.openId === id) this.placeFlyout(id);
         this.wm?.refreshEdgeSplitters?.();
     }
 
@@ -235,7 +218,7 @@ export class PanelRail {
         down.className = `fa-solid ${nav.classList.contains("panel-rail-right") ? "fa-chevron-right" : "fa-chevron-left"}`;
     }
 
-    // ── Painel por cima ─────────────────────────────────────────────────────
+    // ── Painel aberto ao lado da barra ──────────────────────────────────────
 
     openFlyout(id) {
         if (this.stateOf(id) !== "barra") return;
@@ -243,36 +226,20 @@ export class PanelRail {
         const panel = document.getElementById(id);
         if (!panel) return;
         this.openId = id;
-        panel.classList.add("rail-flyout");
-        this.placeFlyout(id);
+        panel.classList.add("rail-open");
         this.renderButtons(id);
-        window.dispatchEvent(new Event("resize")); // listas virtuais e canvas do painel remedem
+        this.wm?.refreshEdgeSplitters?.();
+        window.dispatchEvent(new Event("resize")); // monitores, timeline e listas remedem
     }
 
     closeFlyout() {
         const id = this.openId;
         if (!id) return;
         this.openId = null;
-        const panel = document.getElementById(id);
-        if (panel) {
-            panel.classList.remove("rail-flyout");
-            ["--rail-top", "--rail-left", "--rail-height", "--rail-width"].forEach(p => panel.style.removeProperty(p));
-        }
+        document.getElementById(id)?.classList.remove("rail-open");
         this.renderButtons(id);
-    }
-
-    placeFlyout(id) {
-        const panel = document.getElementById(id);
-        const nav = this.rails[id];
-        if (!panel || !nav || nav.hidden) return;
-        const r = nav.getBoundingClientRect();
-        const width = Math.min(Number(panel.dataset.railWidth) || DEFAULT_OPEN_WIDTH, window.innerWidth - r.width - 40);
-        // Variáveis, não top/width direto: o painel guarda a própria largura (divisores) no style.
-        const left = nav.classList.contains("panel-rail-right") ? r.left - width : r.right;
-        panel.style.setProperty("--rail-top", `${Math.round(r.top)}px`);
-        panel.style.setProperty("--rail-height", `${Math.round(r.height)}px`);
-        panel.style.setProperty("--rail-width", `${Math.round(width)}px`);
-        panel.style.setProperty("--rail-left", `${Math.round(left)}px`);
+        this.wm?.refreshEdgeSplitters?.();
+        window.dispatchEvent(new Event("resize"));
     }
 }
 
