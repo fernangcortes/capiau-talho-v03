@@ -90,12 +90,16 @@ const SEARCH_STATE = {
 };
 
 let searchPreviewTimeout = null;
+// Guardado por referência: com a Busca destacada o popover vai para a janela dela.
+let searchPreviewPopover = null;
 
 function showSearchResultPreview(r, card) {
     if (searchPreviewTimeout) clearTimeout(searchPreviewTimeout);
     
     searchPreviewTimeout = setTimeout(() => {
-        let popover = document.getElementById("search-result-context-popover");
+        const doc = card.ownerDocument || document;
+        const win = doc.defaultView || window;
+        let popover = searchPreviewPopover;
         if (!popover) {
             popover = document.createElement("div");
             popover.id = "search-result-context-popover";
@@ -111,17 +115,20 @@ function showSearchResultPreview(r, card) {
             popover.style.flexDirection = "column";
             popover.style.gap = "8px";
             popover.style.pointerEvents = "none";
-            document.body.appendChild(popover);
+            searchPreviewPopover = popover;
+        }
+        if (popover.ownerDocument !== doc || !popover.isConnected) {
+            doc.body.appendChild(doc.adoptNode(popover));
         }
         
         const cardRect = card.getBoundingClientRect();
         let left = cardRect.right + 15;
-        if (left + 340 > window.innerWidth) {
+        if (left + 340 > win.innerWidth) {
             left = cardRect.left - 340; 
         }
         let top = cardRect.top + (cardRect.height - 240) / 2;
         if (top < 10) top = 10;
-        if (top + 240 > window.innerHeight) top = window.innerHeight - 250;
+        if (top + 240 > win.innerHeight) top = win.innerHeight - 250;
         
         popover.style.left = `${left}px`;
         popover.style.top = `${top}px`;
@@ -198,7 +205,7 @@ function showSearchResultPreview(r, card) {
 
 function hideSearchResultPreview() {
     if (searchPreviewTimeout) clearTimeout(searchPreviewTimeout);
-    const popover = document.getElementById("search-result-context-popover");
+    const popover = searchPreviewPopover;
     if (popover) {
         popover.style.display = "none";
         popover.innerHTML = "";

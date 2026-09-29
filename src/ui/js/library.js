@@ -1018,7 +1018,7 @@ export function startInlineTitleEditing(cardEl, item, kind = "video") {
     // Salva o tooltip original e remove temporariamente para não abrir tooltip flutuante ao digitar
     const savedTooltip = h4.getAttribute("data-tooltip") || "";
     h4.removeAttribute("data-tooltip");
-    const globalTooltip = document.getElementById("global-tooltip");
+    const globalTooltip = h4.ownerDocument.getElementById("global-tooltip");
     if (globalTooltip) {
         globalTooltip.style.display = "none";
     }
@@ -5849,16 +5849,24 @@ export class GalleryInteractionController {
             ${actionsHtml}
         `;
 
+        // O HUD vive na janela do item: com a Biblioteca destacada, o item está no documento da
+        // janela destacada e o HUD tem de ir para lá (senão aparece no editor principal).
+        const doc = itemEl.ownerDocument || document;
+        const win = doc.defaultView || window;
+        if (this.shiftHud.ownerDocument !== doc || !this.shiftHud.isConnected) {
+            doc.body.appendChild(doc.adoptNode(this.shiftHud));
+        }
+
         // Posiciona desacoplado próximo ao item sem sair da janela
         const rect = itemEl.getBoundingClientRect();
         let top = rect.bottom + 6;
         let left = rect.left;
 
-        if (top + 160 > window.innerHeight) {
+        if (top + 160 > win.innerHeight) {
             top = Math.max(10, rect.top - 170);
         }
-        if (left + 300 > window.innerWidth) {
-            left = Math.max(10, window.innerWidth - 310);
+        if (left + 300 > win.innerWidth) {
+            left = Math.max(10, win.innerWidth - 310);
         }
 
         this.shiftHud.style.top = `${top}px`;

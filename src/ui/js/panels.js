@@ -1734,10 +1734,12 @@ export class PanelsManager {
     }
 
     showCustomContextMenu(clientX, clientY, word, dialogue, bubble) {
-        const oldMenu = document.getElementById("custom-speech-context-menu");
+        // Menu na janela da fala (Falas destacada = janela destacada).
+        const doc = bubble?.ownerDocument || document;
+        const oldMenu = doc.getElementById("custom-speech-context-menu");
         if (oldMenu) oldMenu.remove();
         
-        const menu = document.createElement("div");
+        const menu = doc.createElement("div");
         menu.id = "custom-speech-context-menu";
         menu.className = "custom-context-menu";
         menu.style.left = `${clientX}px`;
@@ -1749,16 +1751,16 @@ export class PanelsManager {
             <div class="menu-item" id="ctx-inspect"><i class="fa-solid fa-magnifying-glass"></i> Inspecionar diálogo</div>
         `;
         
-        document.body.appendChild(menu);
+        doc.body.appendChild(menu);
         
         const closeMenu = () => {
             menu.remove();
-            document.removeEventListener("click", closeMenu);
+            doc.removeEventListener("click", closeMenu);
         };
-        setTimeout(() => document.addEventListener("click", closeMenu), 50);
+        setTimeout(() => doc.addEventListener("click", closeMenu), 50);
         
         menu.querySelector("#ctx-play").addEventListener("click", () => {
-            const player = document.getElementById("source-video");
+            const player = getActiveElement("source-video");
             if (player) {
                 player.currentTime = word.start_time;
                 player.play();
@@ -1848,11 +1850,13 @@ export class PanelsManager {
             
             const descDiv = row.querySelector(".vision-description");
             descDiv.addEventListener("mouseup", (e) => {
-                const selection = window.getSelection();
+                // Seleção e botão na janela do texto (Visão destacada = janela destacada).
+                const doc = descDiv.ownerDocument || document;
+                const selection = (doc.defaultView || window).getSelection();
                 const selectedText = selection.toString().trim();
                 if (selectedText.length > 1) {
                     e.stopPropagation();
-                    this.showFloatingLinkButton(e.clientX, e.clientY, selectedText, f.timestamp, STATE.activeVideo.id);
+                    this.showFloatingLinkButton(e.clientX, e.clientY, selectedText, f.timestamp, STATE.activeVideo.id, doc);
                 }
             });
 
@@ -2924,11 +2928,11 @@ export class PanelsManager {
         return { kind: "other", id: null, title, icon, thumbUrl: null };
     }
 
-    showFloatingLinkButton(x, y, selectedText, timestamp, videoId) {
-        const oldBtn = document.getElementById("floating-link-btn");
+    showFloatingLinkButton(x, y, selectedText, timestamp, videoId, doc = document) {
+        const oldBtn = doc.getElementById("floating-link-btn");
         if (oldBtn) oldBtn.remove();
 
-        const btn = document.createElement("button");
+        const btn = doc.createElement("button");
         btn.id = "floating-link-btn";
         btn.innerHTML = `<i class="fa-solid fa-link"></i> Vincular a Pessoa/Objeto`;
         btn.style.position = "fixed";
@@ -2952,14 +2956,14 @@ export class PanelsManager {
             this.promptLinkText(selectedText, timestamp, videoId);
         });
 
-        document.body.appendChild(btn);
+        doc.body.appendChild(btn);
 
         const removeBtn = () => {
             btn.remove();
-            document.removeEventListener("mousedown", removeBtn);
+            doc.removeEventListener("mousedown", removeBtn);
         };
         setTimeout(() => {
-            document.addEventListener("mousedown", removeBtn);
+            doc.addEventListener("mousedown", removeBtn);
         }, 100);
     }
 
@@ -3375,7 +3379,7 @@ export class PanelsManager {
                 if (valBadge) {
                     valBadge.textContent = `${pct}%`;
                 }
-                const globalTip = document.getElementById("global-tooltip");
+                const globalTip = row.ownerDocument.getElementById("global-tooltip");
                 if (globalTip && globalTip.classList.contains("visible")) {
                     globalTip.innerHTML = `<div style="font-weight: 400; opacity: 0.95; white-space: pre-line; word-break: break-word;">${label}</div>`;
                 }

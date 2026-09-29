@@ -3477,11 +3477,20 @@ export class CapiauTimelineInteraction {
         this.showRulerContextMenu(e.clientX, e.clientY, frame);
     }
 
+    /** Documento/janela onde a timeline está (destacada = janela destacada): menus e dicas vão para lá. */
+    _uiDoc() {
+        return this.canvas?.ownerDocument || document;
+    }
+
+    _uiWin() {
+        return this._uiDoc().defaultView || window;
+    }
+
     /**
      * Exibe menu de contexto da régua / timeline (marcação In/Out, Loop, Lift, Extract).
      */
     showRulerContextMenu(clientX, clientY, targetFrame) {
-        const oldMenu = document.getElementById("custom-timeline-context-menu");
+        const oldMenu = this._uiDoc().getElementById("custom-timeline-context-menu");
         if (oldMenu) oldMenu.remove();
 
         const menu = document.createElement("div");
@@ -3627,27 +3636,27 @@ export class CapiauTimelineInteraction {
             if (typeof window.showToast === "function") window.showToast("Extract (Ripple Delete) executado no intervalo IN-OUT", "info");
         }, hasAny);
 
-        document.body.appendChild(menu);
+        this._uiDoc().body.appendChild(menu);
 
         // Ajusta posição para não vazar da tela
         const rect = menu.getBoundingClientRect();
-        if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 10}px`;
-        if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+        if (rect.right > this._uiWin().innerWidth) menu.style.left = `${this._uiWin().innerWidth - rect.width - 10}px`;
+        if (rect.bottom > this._uiWin().innerHeight) menu.style.top = `${this._uiWin().innerHeight - rect.height - 10}px`;
 
         const closeHandler = (evt) => {
             if (!menu.contains(evt.target)) {
                 menu.remove();
-                document.removeEventListener("mousedown", closeHandler);
+                this._uiDoc().removeEventListener("mousedown", closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener("mousedown", closeHandler), 10);
+        setTimeout(() => this._uiDoc().addEventListener("mousedown", closeHandler), 10);
     }
 
     /**
      * Exibe o menu de contexto customizado do clipe (corte, ripple trim, divisão, etc.).
      */
     showClipContextMenu(clientX, clientY, clip, frame) {
-        const oldMenu = document.getElementById("custom-timeline-context-menu");
+        const oldMenu = this._uiDoc().getElementById("custom-timeline-context-menu");
         if (oldMenu) oldMenu.remove();
 
         const menu = document.createElement("div");
@@ -4268,7 +4277,7 @@ export class CapiauTimelineInteraction {
             menu.appendChild(itemPropagate);
         }
 
-        document.body.appendChild(menu);
+        this._uiDoc().body.appendChild(menu);
 
         // Limita posição na tela
         const win = this.canvas.ownerDocument.defaultView || window;
@@ -4284,17 +4293,17 @@ export class CapiauTimelineInteraction {
         const closeHandler = (ev) => {
             if (!menu.contains(ev.target)) {
                 menu.remove();
-                document.removeEventListener("mousedown", closeHandler);
+                this._uiDoc().removeEventListener("mousedown", closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener("mousedown", closeHandler), 10);
+        setTimeout(() => this._uiDoc().addEventListener("mousedown", closeHandler), 10);
     }
 
     /**
      * Exibe o menu de contexto do Gap (espaço vazio).
      */
     showGapContextMenu(clientX, clientY, gap, frame) {
-        const oldMenu = document.getElementById("custom-timeline-context-menu");
+        const oldMenu = this._uiDoc().getElementById("custom-timeline-context-menu");
         if (oldMenu) oldMenu.remove();
 
         const menu = document.createElement("div");
@@ -4327,8 +4336,8 @@ export class CapiauTimelineInteraction {
 
         const cleanup = () => {
             menu.remove();
-            document.removeEventListener("mousedown", closeHandler);
-            document.removeEventListener("keydown", keyHandler);
+            this._uiDoc().removeEventListener("mousedown", closeHandler);
+            this._uiDoc().removeEventListener("keydown", keyHandler);
         };
 
         const closeHandler = (ev) => {
@@ -4426,16 +4435,16 @@ export class CapiauTimelineInteraction {
             if (this.renderer) this.renderer.requestRedraw();
         }, true, "var(--text-muted)");
 
-        document.body.appendChild(menu);
+        this._uiDoc().body.appendChild(menu);
 
         // Previne transbordar das bordas da janela
         const rect = menu.getBoundingClientRect();
-        if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 10}px`;
-        if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+        if (rect.right > this._uiWin().innerWidth) menu.style.left = `${this._uiWin().innerWidth - rect.width - 10}px`;
+        if (rect.bottom > this._uiWin().innerHeight) menu.style.top = `${this._uiWin().innerHeight - rect.height - 10}px`;
 
         setTimeout(() => {
-            document.addEventListener("mousedown", closeHandler);
-            document.addEventListener("keydown", keyHandler);
+            this._uiDoc().addEventListener("mousedown", closeHandler);
+            this._uiDoc().addEventListener("keydown", keyHandler);
         }, 10);
     }
 
@@ -4443,7 +4452,7 @@ export class CapiauTimelineInteraction {
      * Exibe o menu de contexto customizado para ajuste rápido de curvas e remoção de Fade.
      */
     showFadeContextMenu(clientX, clientY, clip, side) {
-        const oldMenu = document.getElementById("custom-fade-context-menu");
+        const oldMenu = this._uiDoc().getElementById("custom-fade-context-menu");
         if (oldMenu) oldMenu.remove();
 
         const menu = document.createElement("div");
@@ -4548,16 +4557,16 @@ export class CapiauTimelineInteraction {
         };
         menu.appendChild(removeItem);
 
-        document.body.appendChild(menu);
+        this._uiDoc().body.appendChild(menu);
 
         // Fechar ao clicar fora
         const closeHandler = (e) => {
             if (!menu.contains(e.target)) {
                 menu.remove();
-                document.removeEventListener("mousedown", closeHandler);
+                this._uiDoc().removeEventListener("mousedown", closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener("mousedown", closeHandler), 10);
+        setTimeout(() => this._uiDoc().addEventListener("mousedown", closeHandler), 10);
     }
 
     /**
@@ -4565,7 +4574,7 @@ export class CapiauTimelineInteraction {
      */
     showTransitionContextMenu(clientX, clientY, transition) {
         if (!transition) return;
-        const oldMenu = document.getElementById("custom-transition-context-menu");
+        const oldMenu = this._uiDoc().getElementById("custom-transition-context-menu");
         if (oldMenu) oldMenu.remove();
 
         const menu = document.createElement("div");
@@ -4635,23 +4644,23 @@ export class CapiauTimelineInteraction {
         };
         menu.appendChild(removeItem);
 
-        document.body.appendChild(menu);
+        this._uiDoc().body.appendChild(menu);
 
         // Fechar ao clicar fora
         const closeHandler = (e) => {
             if (!menu.contains(e.target)) {
                 menu.remove();
-                document.removeEventListener("mousedown", closeHandler);
+                this._uiDoc().removeEventListener("mousedown", closeHandler);
             }
         };
-        setTimeout(() => document.addEventListener("mousedown", closeHandler), 10);
+        setTimeout(() => this._uiDoc().addEventListener("mousedown", closeHandler), 10);
     }
 
     /**
      * Tooltip visual durante o arrasto de duração ou curva de Fade.
      */
     showFadeTooltip(x, y, title, value) {
-        let tip = document.getElementById("timeline-fade-tooltip");
+        let tip = this._uiDoc().getElementById("timeline-fade-tooltip");
         if (!tip) {
             tip = document.createElement("div");
             tip.id = "timeline-fade-tooltip";
@@ -4667,7 +4676,7 @@ export class CapiauTimelineInteraction {
             tip.style.fontFamily = "var(--font-heading)";
             tip.style.backdropFilter = "blur(8px)";
             tip.style.boxShadow = "0 4px 12px rgba(0,0,0,0.5)";
-            document.body.appendChild(tip);
+            this._uiDoc().body.appendChild(tip);
         }
         tip.innerHTML = `<span style="color:var(--color-cyan); font-weight:600;">${title}:</span> <span style="font-family:monospace; font-weight:500;">${value}</span>`;
         tip.style.display = "block";
@@ -4676,7 +4685,7 @@ export class CapiauTimelineInteraction {
     }
 
     hideFadeTooltip() {
-        const tip = document.getElementById("timeline-fade-tooltip");
+        const tip = this._uiDoc().getElementById("timeline-fade-tooltip");
         if (tip) tip.style.display = "none";
     }
 
@@ -4739,7 +4748,7 @@ export class CapiauTimelineInteraction {
      * Tooltip visual durante o arraste da Ferramenta Slip (Deslizar Conteúdo Interno).
      */
     showSlipTooltip(x, y, deltaFrames, fps = 24, isIndependent = false) {
-        let tip = document.getElementById("timeline-slip-tooltip");
+        let tip = this._uiDoc().getElementById("timeline-slip-tooltip");
         if (!tip) {
             tip = document.createElement("div");
             tip.id = "timeline-slip-tooltip";
@@ -4755,7 +4764,7 @@ export class CapiauTimelineInteraction {
             tip.style.fontFamily = "var(--font-heading)";
             tip.style.backdropFilter = "blur(8px)";
             tip.style.boxShadow = "0 4px 12px rgba(0,0,0,0.5)";
-            document.body.appendChild(tip);
+            this._uiDoc().body.appendChild(tip);
         }
         const sign = deltaFrames > 0 ? "+" : (deltaFrames < 0 ? "" : "±");
         const deltaSec = (deltaFrames / fps).toFixed(2);
@@ -4768,7 +4777,7 @@ export class CapiauTimelineInteraction {
     }
 
     hideSlipTooltip() {
-        const tip = document.getElementById("timeline-slip-tooltip");
+        const tip = this._uiDoc().getElementById("timeline-slip-tooltip");
         if (tip) tip.style.display = "none";
     }
 
@@ -4776,7 +4785,7 @@ export class CapiauTimelineInteraction {
      * Tooltip visual durante o arraste da Ferramenta Slide (Deslizar Posição na Timeline).
      */
     showSlideTooltip(x, y, deltaFrames, fps = 24, isIndependent = false) {
-        let tip = document.getElementById("timeline-slide-tooltip");
+        let tip = this._uiDoc().getElementById("timeline-slide-tooltip");
         if (!tip) {
             tip = document.createElement("div");
             tip.id = "timeline-slide-tooltip";
@@ -4792,7 +4801,7 @@ export class CapiauTimelineInteraction {
             tip.style.fontFamily = "var(--font-heading)";
             tip.style.backdropFilter = "blur(8px)";
             tip.style.boxShadow = "0 4px 12px rgba(0,0,0,0.5)";
-            document.body.appendChild(tip);
+            this._uiDoc().body.appendChild(tip);
         }
         const sign = deltaFrames > 0 ? "+" : (deltaFrames < 0 ? "" : "±");
         const deltaSec = (deltaFrames / fps).toFixed(2);
@@ -4805,7 +4814,7 @@ export class CapiauTimelineInteraction {
     }
 
     hideSlideTooltip() {
-        const tip = document.getElementById("timeline-slide-tooltip");
+        const tip = this._uiDoc().getElementById("timeline-slide-tooltip");
         if (tip) tip.style.display = "none";
     }
 
@@ -4813,7 +4822,7 @@ export class CapiauTimelineInteraction {
      * Tooltip visual durante o arraste da Ferramenta Rolling Edit (Corte Contínuo Adjacente).
      */
     showRollingTooltip(x, y, deltaFrames, fps = 24, isIndependent = false) {
-        let tip = document.getElementById("timeline-rolling-tooltip");
+        let tip = this._uiDoc().getElementById("timeline-rolling-tooltip");
         if (!tip) {
             tip = document.createElement("div");
             tip.id = "timeline-rolling-tooltip";
@@ -4829,7 +4838,7 @@ export class CapiauTimelineInteraction {
             tip.style.fontFamily = "var(--font-heading)";
             tip.style.backdropFilter = "blur(8px)";
             tip.style.boxShadow = "0 4px 14px rgba(0,0,0,0.6), 0 0 10px rgba(6, 182, 212, 0.25)";
-            document.body.appendChild(tip);
+            this._uiDoc().body.appendChild(tip);
         }
         const sign = deltaFrames > 0 ? "+" : (deltaFrames < 0 ? "" : "±");
         const deltaSec = (deltaFrames / fps).toFixed(2);
@@ -4842,7 +4851,7 @@ export class CapiauTimelineInteraction {
     }
 
     hideRollingTooltip() {
-        const tip = document.getElementById("timeline-rolling-tooltip");
+        const tip = this._uiDoc().getElementById("timeline-rolling-tooltip");
         if (tip) tip.style.display = "none";
     }
 
@@ -4850,7 +4859,7 @@ export class CapiauTimelineInteraction {
      * Tooltip visual durante o arraste da Ferramenta Rate Stretch (Esticar / Comprimir Taxa de Velocidade).
      */
     showRateStretchTooltip(x, y, speed, durationFrames, deltaFrames, fps = 24) {
-        let tip = document.getElementById("timeline-rate-stretch-tooltip");
+        let tip = this._uiDoc().getElementById("timeline-rate-stretch-tooltip");
         if (!tip) {
             tip = document.createElement("div");
             tip.id = "timeline-rate-stretch-tooltip";
@@ -4866,7 +4875,7 @@ export class CapiauTimelineInteraction {
             tip.style.fontFamily = "var(--font-heading)";
             tip.style.backdropFilter = "blur(8px)";
             tip.style.boxShadow = "0 4px 14px rgba(0,0,0,0.6), 0 0 10px rgba(6, 182, 212, 0.3)";
-            document.body.appendChild(tip);
+            this._uiDoc().body.appendChild(tip);
         }
         const speedPercent = (speed * 100).toFixed(1);
         const speedMultiplier = speed.toFixed(2);
@@ -4879,7 +4888,7 @@ export class CapiauTimelineInteraction {
     }
 
     hideRateStretchTooltip() {
-        const tip = document.getElementById("timeline-rate-stretch-tooltip");
+        const tip = this._uiDoc().getElementById("timeline-rate-stretch-tooltip");
         if (tip) tip.style.display = "none";
     }
 
@@ -7329,7 +7338,10 @@ export class CapiauTimelineInteraction {
             "overwrite": doc.getElementById("btn-collision-overwrite"),
             "ripple": doc.getElementById("btn-collision-ripple")
         };
-        const flyout = doc.getElementById("flyout-collision-modes");
+        // Guardado na instância: o flyout sai do painel para o body (abaixo) e não vai junto quando a
+        // timeline é destacada ou volta; sem a referência ele ficaria preso na outra janela.
+        const flyout = doc.getElementById("flyout-collision-modes") || this._collisionFlyout || null;
+        if (flyout) this._collisionFlyout = flyout;
         const selectBtn = toolButtons["select"];
 
         const updateCollisionUI = (mode) => {
@@ -7347,8 +7359,9 @@ export class CapiauTimelineInteraction {
             }
         };
 
-        if (flyout && typeof document !== "undefined" && flyout.parentNode !== document.body) {
-            document.body.appendChild(flyout);
+        // O flyout fica no body do documento da timeline (destacada = janela destacada).
+        if (flyout && doc.body && flyout.parentNode !== doc.body) {
+            doc.body.appendChild(doc.adoptNode(flyout));
         }
 
         const positionAndShowFlyout = () => {
@@ -10862,7 +10875,7 @@ export class CapiauTimelineInteraction {
                 }
                 const tooltipText = `${propLabels[prop] || prop}: ${dispText}`;
                 slider.setAttribute("data-tooltip", tooltipText);
-                const globalTooltip = document.getElementById("global-tooltip");
+                const globalTooltip = slider.ownerDocument.getElementById("global-tooltip");
                 if (globalTooltip && globalTooltip.classList.contains("visible")) {
                     globalTooltip.textContent = tooltipText;
                 }
@@ -10952,7 +10965,7 @@ export class CapiauTimelineInteraction {
                 }
                 const tooltipText = `${cropLabels[prop] || prop}: ${dispText}`;
                 slider.setAttribute("data-tooltip", tooltipText);
-                const globalTooltip = document.getElementById("global-tooltip");
+                const globalTooltip = slider.ownerDocument.getElementById("global-tooltip");
                 if (globalTooltip && globalTooltip.classList.contains("visible")) {
                     globalTooltip.textContent = tooltipText;
                 }
@@ -11013,7 +11026,7 @@ export class CapiauTimelineInteraction {
                 }
                 const tooltipText = `${colorLabels[prop] || prop}: ${dispText}`;
                 slider.setAttribute("data-tooltip", tooltipText);
-                const globalTooltip = document.getElementById("global-tooltip");
+                const globalTooltip = slider.ownerDocument.getElementById("global-tooltip");
                 if (globalTooltip && globalTooltip.classList.contains("visible")) {
                     globalTooltip.textContent = tooltipText;
                 }
@@ -11073,7 +11086,7 @@ export class CapiauTimelineInteraction {
                     if (disp) disp.textContent = dispText;
                     const tooltipText = `${rotulos[prop] || prop}: ${dispText}`;
                     slider.setAttribute("data-tooltip", tooltipText);
-                    const globalTooltip = document.getElementById("global-tooltip");
+                    const globalTooltip = slider.ownerDocument.getElementById("global-tooltip");
                     if (globalTooltip && globalTooltip.classList.contains("visible")) {
                         globalTooltip.textContent = tooltipText;
                     }
@@ -11141,7 +11154,7 @@ export class CapiauTimelineInteraction {
                 }
                 const tooltipText = `Volume: ${dispText}`;
                 volSlider.setAttribute("data-tooltip", tooltipText);
-                const globalTooltip = document.getElementById("global-tooltip");
+                const globalTooltip = volSlider.ownerDocument.getElementById("global-tooltip");
                 if (globalTooltip && globalTooltip.classList.contains("visible")) {
                     globalTooltip.textContent = tooltipText;
                 }

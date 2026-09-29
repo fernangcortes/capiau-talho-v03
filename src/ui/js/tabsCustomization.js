@@ -232,7 +232,10 @@ function setupSidebarCustomization(containerId, orderKey, visibilityKey, activeK
 }
 
 function showTabsContextMenu(x, y, container, visibilityKey, activeKey, attrName, clickedBtn = null) {
-    const oldMenu = document.getElementById("custom-tabs-context-menu");
+    // Menu na janela da faixa de abas (Biblioteca/Painel Lateral destacados = janela destacada).
+    const doc = container.ownerDocument || document;
+    const win = doc.defaultView || window;
+    const oldMenu = doc.getElementById("custom-tabs-context-menu");
     if (oldMenu) oldMenu.remove();
 
     const menu = document.createElement("div");
@@ -341,22 +344,22 @@ function showTabsContextMenu(x, y, container, visibilityKey, activeKey, attrName
         });
     });
 
-    document.body.appendChild(menu);
+    doc.body.appendChild(menu);
 
     // Ajustar se passar da borda da tela
     const rect = menu.getBoundingClientRect();
-    if (x + rect.width > window.innerWidth) {
-        menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+    if (x + rect.width > win.innerWidth) {
+        menu.style.left = `${win.innerWidth - rect.width - 10}px`;
     }
-    if (y + rect.height > window.innerHeight) {
-        menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+    if (y + rect.height > win.innerHeight) {
+        menu.style.top = `${win.innerHeight - rect.height - 10}px`;
     }
 
     const closeMenu = () => {
         menu.remove();
-        document.removeEventListener("click", closeMenu);
+        doc.removeEventListener("click", closeMenu);
     };
-    setTimeout(() => document.addEventListener("click", closeMenu), 50);
+    setTimeout(() => doc.addEventListener("click", closeMenu), 50);
 }
 
 function applyTabVisibility(btn, isVisible, container, tabVal, visibilityKey, activeKey, attrName) {
