@@ -218,5 +218,48 @@ for (const [nome, extra] of cenarios) {
 }
 ok("lift e extract preservam o conteúdo das sobras");
 
+// 11. Monitor 2-Up mostra os quadros que a timeline mostra nas duas pontas da emenda
+for (const [nomeU, extraU] of cenarios) {
+    for (const [nomeD, extraD] of cenarios) {
+        const baixo = clipe("u", 0, 10, 120, extraU);
+        const arrastado = { ...clipe("d", 200, 50, 30, extraD), link_id: null };
+        const base = [baixo, arrastado];
+        const d0 = { ...arrastado };
+        for (const [simular, alvo] of [["simulateOverwrite", 40], ["simulateRipple", 40]]) {
+            for (const tras of [true, false]) {
+                const sim = TIMELINE_STATE[simular]("d", alvo, "V1", base.map(c => ({ ...c })), tras);
+                if (!sim || !sim.outgoingClip || !sim.incomingClip) continue;
+                const ctx = `${simular} ${tras ? "cabeça" : "cauda"} (baixo ${nomeU}, arrastado ${nomeD})`;
+                // o arrastado toca, na tela, seu primeiro e último quadro
+                const cabecaD = fonteEm(d0, d0.timelineStartFrame);
+                const caudaD = fonteEm(d0, d0.timelineStartFrame + 29);
+                if (sim.incomingClip.id === "d") assert.ok(perto(sim.incomingTime, cabecaD), `${ctx}: entrada ${sim.incomingTime} != ${cabecaD}`);
+                if (sim.outgoingClip.id === "d") assert.ok(perto(sim.outgoingTime, caudaD), `${ctx}: saída ${sim.outgoingTime} != ${caudaD}`);
+                // o clipe de baixo é cortado em 40: sai no 39, volta no quadro seguinte à emenda
+                if (sim.outgoingClip.id === "u") assert.ok(perto(sim.outgoingTime, fonteEm(baixo, 39)), `${ctx}: saída de baixo`);
+                if (sim.incomingClip.id === "u") {
+                    const emenda = simular === "simulateOverwrite" ? 70 : 40;
+                    assert.ok(perto(sim.incomingTime, fonteEm(baixo, emenda)), `${ctx}: entrada de baixo`);
+                }
+            }
+        }
+    }
+}
+ok("2-Up de sobrescrita e ripple mostra os quadros da tela em todas as combinações de velocidade");
+
+// 12. Slide e rolling montam o 2-Up com a mesma conta
+{
+    const { readFileSync } = await import("node:fs");
+    const fonte = readFileSync(new URL("../src/ui/js/timelineInteraction.js", import.meta.url), "utf8");
+    const chamadas = fonte.match(/const (outgoing|incoming)Time = [^\n]+/g) || [];
+    assert.ok(chamadas.length >= 8, "esperava as 8 chamadas de slide/rolling");
+    for (const linha of chamadas) {
+        assert.ok(linha.includes("TIMELINE_STATE.fonteNaPosicao("), `2-Up ainda calcula por frame cru: ${linha}`);
+    }
+    const u = clipe("l", 0, 10, 60, { speed: 2 });
+    assert.ok(perto(TIMELINE_STATE.fonteNaPosicao(u, 59), fonteEm(u, 59)));
+}
+ok("slide e rolling usam fonteNaPosicao no 2-Up");
+
 TIMELINE_HISTORY.clear();
 console.log(`\n=== ${n}/${n} TESTES APROVADOS ===`);

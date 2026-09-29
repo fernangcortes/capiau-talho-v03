@@ -1507,8 +1507,9 @@ export class CapiauTimelineInteraction {
                     this.showSlideTooltip(e.clientX, e.clientY, 0, fps);
 
                     if (window.player) {
-                        const outgoingTime = (leftClip.outFrame || 0) / fps;
-                        const incomingTime = (rightClip.inFrame || 0) / fps;
+                        // Instantes da FONTE (velocidade/reverso inclusos): o 2-Up busca direto neles.
+                        const outgoingTime = TIMELINE_STATE.fonteNaPosicao(leftClip, (leftClip.outFrame - leftClip.inFrame));
+                        const incomingTime = TIMELINE_STATE.fonteNaPosicao(rightClip, 0);
                         window.player.show2UpPreview(leftClip, outgoingTime, rightClip, incomingTime);
                     }
 
@@ -1686,8 +1687,8 @@ export class CapiauTimelineInteraction {
                     this.showRollingTooltip(e.clientX, e.clientY, 0, fps, !this.dragRollingLinked);
 
                     if (window.player) {
-                        const outgoingTime = Math.max(0, (leftClip.outFrame - 1)) / fps;
-                        const incomingTime = Math.max(0, (rightClip.inFrame)) / fps;
+                        const outgoingTime = TIMELINE_STATE.fonteNaPosicao(leftClip, Math.max(0, (leftClip.outFrame - leftClip.inFrame) - 1));
+                        const incomingTime = TIMELINE_STATE.fonteNaPosicao(rightClip, 0);
                         window.player.show2UpPreview(leftClip, outgoingTime, rightClip, incomingTime);
                     }
 
@@ -2650,8 +2651,9 @@ export class CapiauTimelineInteraction {
             }
 
             if (res && window.player && res.leftClip && res.rightClip) {
-                const outgoingTime = (res.leftClip.outFrame || 0) / fps;
-                const incomingTime = (res.rightClip.inFrame || 0) / fps;
+                // Instantes da FONTE (velocidade/reverso inclusos): o 2-Up busca direto neles.
+                const outgoingTime = TIMELINE_STATE.fonteNaPosicao(res.leftClip, (res.leftClip.outFrame - res.leftClip.inFrame));
+                const incomingTime = TIMELINE_STATE.fonteNaPosicao(res.rightClip, 0);
                 window.player.show2UpPreview(res.leftClip, outgoingTime, res.rightClip, incomingTime);
             }
 
@@ -2683,8 +2685,8 @@ export class CapiauTimelineInteraction {
             }
 
             if (res && window.player && res.leftClip && res.rightClip) {
-                const outgoingTime = Math.max(0, (res.leftClip.outFrame - 1)) / fps;
-                const incomingTime = Math.max(0, (res.rightClip.inFrame)) / fps;
+                const outgoingTime = TIMELINE_STATE.fonteNaPosicao(res.leftClip, Math.max(0, (res.leftClip.outFrame - res.leftClip.inFrame) - 1));
+                const incomingTime = TIMELINE_STATE.fonteNaPosicao(res.rightClip, 0);
                 window.player.show2UpPreview(res.leftClip, outgoingTime, res.rightClip, incomingTime);
             }
 

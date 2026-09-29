@@ -1728,8 +1728,12 @@ export class CapiauTimelineState {
             ? draggedVideoClip.outFrame
             : (draggedInFrame + duration);
 
-        const draggedHeadTime = draggedInFrame / fps;
-        const draggedTailTime = Math.max(draggedInFrame, draggedOutFrame - 1) / fps;
+        // Instantes da FONTE (velocidade/reverso inclusos): o 2-Up busca direto neles.
+        const draggedHeadTime = draggedVideoClip
+            ? this.fonteNaPosicao(draggedVideoClip, 0) : draggedInFrame / fps;
+        const draggedTailTime = draggedVideoClip
+            ? this.fonteNaPosicao(draggedVideoClip, Math.max(0, draggedOutFrame - draggedInFrame - 1))
+            : Math.max(draggedInFrame, draggedOutFrame - 1) / fps;
 
         // 1. Procura colisão na cabeça (finalStart): clipe anterior cuja cauda é cortada em finalStart
         const cutAtHead = underlyingVideoCuts.find(c => {
@@ -1765,8 +1769,7 @@ export class CapiauTimelineState {
             if (cutAtHead) {
                 outgoingClip = cutAtHead;
                 const offset = finalStart - (cutAtHead.timelineStartFrame || 0);
-                const cutFrame = cutAtHead.inFrame + Math.max(0, offset - 1);
-                outgoingTime = cutFrame / fps;
+                outgoingTime = this.fonteNaPosicao(cutAtHead, Math.max(0, offset - 1));
             } else {
                 const prevCut = underlyingVideoCuts.find(c => {
                     const cEnd = (c.timelineStartFrame || 0) + (c.outFrame - c.inFrame);
@@ -1774,7 +1777,7 @@ export class CapiauTimelineState {
                 });
                 if (prevCut) {
                     outgoingClip = prevCut;
-                    outgoingTime = Math.max(prevCut.inFrame, prevCut.outFrame - 1) / fps;
+                    outgoingTime = this.fonteNaPosicao(prevCut, Math.max(0, prevCut.outFrame - prevCut.inFrame - 1));
                 }
             }
 
@@ -1791,13 +1794,12 @@ export class CapiauTimelineState {
             if (cutAtTail) {
                 incomingClip = cutAtTail;
                 const offset = endFrame - (cutAtTail.timelineStartFrame || 0);
-                const cutFrame = cutAtTail.inFrame + offset;
-                incomingTime = cutFrame / fps;
+                incomingTime = this.fonteNaPosicao(cutAtTail, offset);
             } else {
                 const nextCut = underlyingVideoCuts.find(c => (c.timelineStartFrame || 0) === endFrame);
                 if (nextCut) {
                     incomingClip = nextCut;
-                    incomingTime = nextCut.inFrame / fps;
+                    incomingTime = this.fonteNaPosicao(nextCut, 0);
                 }
             }
         }
@@ -1934,8 +1936,12 @@ export class CapiauTimelineState {
             ? draggedVideoClip.outFrame
             : (draggedInFrame + duration);
 
-        const draggedHeadTime = draggedInFrame / fps;
-        const draggedTailTime = Math.max(draggedInFrame, draggedOutFrame - 1) / fps;
+        // Instantes da FONTE (velocidade/reverso inclusos): o 2-Up busca direto neles.
+        const draggedHeadTime = draggedVideoClip
+            ? this.fonteNaPosicao(draggedVideoClip, 0) : draggedInFrame / fps;
+        const draggedTailTime = draggedVideoClip
+            ? this.fonteNaPosicao(draggedVideoClip, Math.max(0, draggedOutFrame - draggedInFrame - 1))
+            : Math.max(draggedInFrame, draggedOutFrame - 1) / fps;
 
         const cutAtStart = underlyingVideoCuts.find(c => {
             const cStart = c.timelineStartFrame || 0;
@@ -1974,11 +1980,10 @@ export class CapiauTimelineState {
             if (cutAtStart) {
                 outgoingClip = cutAtStart;
                 const offset = insertFrame - (cutAtStart.timelineStartFrame || 0);
-                const cutFrame = cutAtStart.inFrame + Math.max(0, offset - 1);
-                outgoingTime = cutFrame / fps;
+                outgoingTime = this.fonteNaPosicao(cutAtStart, Math.max(0, offset - 1));
             } else if (cutTouchingBefore) {
                 outgoingClip = cutTouchingBefore;
-                outgoingTime = Math.max(cutTouchingBefore.inFrame, cutTouchingBefore.outFrame - 1) / fps;
+                outgoingTime = this.fonteNaPosicao(cutTouchingBefore, Math.max(0, cutTouchingBefore.outFrame - cutTouchingBefore.inFrame - 1));
             }
             incomingClip = draggedVideoClip;
             incomingTime = draggedHeadTime;
@@ -1990,11 +1995,10 @@ export class CapiauTimelineState {
             if (cutAtStart) {
                 incomingClip = cutAtStart;
                 const offset = insertFrame - (cutAtStart.timelineStartFrame || 0);
-                const cutFrame = cutAtStart.inFrame + offset;
-                incomingTime = cutFrame / fps;
+                incomingTime = this.fonteNaPosicao(cutAtStart, offset);
             } else if (cutStartingAtStart) {
                 incomingClip = cutStartingAtStart;
-                incomingTime = cutStartingAtStart.inFrame / fps;
+                incomingTime = this.fonteNaPosicao(cutStartingAtStart, 0);
             }
         }
 
@@ -3582,6 +3586,18 @@ export class CapiauTimelineState {
             return Math.max(c.in || 0, Math.min(out, out - off));
         }
         return (c.in || 0) + off;
+    }
+
+    /**
+     * Instante da FONTE (s) `offsetFrames` frames de timeline depois do início do clipe,
+     * independente de onde ele está na timeline. É o que os monitores 2-Up precisam
+     * (cauda de quem sai, cabeça de quem entra). A 100% vale (inFrame + offset) / fps.
+     */
+    fonteNaPosicao(c, offsetFrames) {
+        if (!c) return 0;
+        const fps = this.fps || 24;
+        const inSec = (typeof c.in === "number" && !isNaN(c.in)) ? c.in : (c.inFrame || 0) / fps;
+        return this.fonteNoFrame({ ...c, in: inSec, timelineStartFrame: 0 }, offsetFrames);
     }
 
     /** Frame da FONTE onde o trecho termina (outFrame em clipe comum). */
