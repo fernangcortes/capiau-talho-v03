@@ -130,6 +130,9 @@ class Clipe:
     # medindo a duracao na timeline.
     congelado: bool = False
     congelar_em_s: float = 0.0
+    # Titulo (type "text"): o clipe como veio do banco -- texto, estilo e keyframes.
+    # titulos.py o entrega intacto ao MESMO codigo que desenha o preview.
+    bruto: Optional[Dict[str, Any]] = None
 
     @property
     def duracao_s(self) -> float:
@@ -337,6 +340,7 @@ def _clipe(c, indice: int) -> Optional[Clipe]:
         velocidade, reverso = 1.0, False  # quadro unico: velocidade nao se aplica
 
     return Clipe(
+        bruto=dict(c) if tipo == "text" else None,
         congelado=congelado, congelar_em_s=congelar_em_s,
         velocidade=velocidade, reverso=reverso,
         corrigir_tom=c.get("pitch_correction") is not False,
@@ -413,6 +417,7 @@ def resolver_sobreposicoes(clipes: List[Clipe]) -> List[Clipe]:
                 velocidade=clipe.velocidade, reverso=clipe.reverso,
                 corrigir_tom=clipe.corrigir_tom,
                 congelado=clipe.congelado, congelar_em_s=clipe.congelar_em_s,
+                bruto=clipe.bruto,
             )
             resultado.append(recorte)
             donos.append((ini, fim))

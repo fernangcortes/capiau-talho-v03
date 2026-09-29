@@ -32,7 +32,7 @@ TIPOS_EFEITO_CONHECIDOS = frozenset(
 )
 
 # Kinds de pista que o motor conhece (P1/P2/P3 do modelo.py).
-KINDS_PISTA_CONHECIDOS = frozenset({"video", "audio", "ai"})
+KINDS_PISTA_CONHECIDOS = frozenset({"video", "audio", "ai", "text"})
 
 # ---------------------------------------------------------------------------
 # TEXTOS EM PONTO UNICO. O pacote B esta medindo as divergencias reais de
@@ -207,6 +207,31 @@ def relatorio(seq, pedido, relatorio_midia) -> Dict[str, Any]:
             "arquivo -- mesmo comportamento da regra das pistas de IA (P1), mas "
             "declarado aqui em vez de ignorado em silencio.",
             sorted(set(clipes_pista_desconhecida))))
+
+    # Titulos (pistas de texto): desenhados por navegador headless (titulos.py).
+    clipes_titulo = [c for c in em_cena if c.tipo == "text"
+                     and pedido.escopo.pista_ligada(c.track)]
+    if clipes_titulo:
+        from . import titulos as _titulos
+        if not _titulos.playwright_instalado():
+            avisos.append(_aviso(
+                "warn", "TITULOS_SEM_NAVEGADOR",
+                "Titulos nao vao aparecer no arquivo",
+                "O render desenha os titulos num navegador headless (pacote "
+                "'playwright' + Edge/Chrome), e o pacote nao esta instalado neste "
+                "ambiente. O resto do video sai normalmente.",
+                sorted({c.id for c in clipes_titulo})))
+        com_caixa = [c.id for c in clipes_titulo
+                     if (c.bruto or {}).get("backgroundColor") not in (None, "", "transparent", "#00000000")
+                     and (c.bruto or {}).get("bgMode") != "transparent"]
+        if com_caixa:
+            avisos.append(_aviso(
+                "warn", "TITULO_SEM_DESFOQUE_DE_FUNDO",
+                "Caixa do titulo sem desfoque do video atras",
+                "Na tela a caixa translucida desfoca o video que passa por baixo "
+                "(backdrop-filter). No arquivo a caixa sai com a mesma cor e "
+                "transparencia, mas sem esse desfoque.",
+                sorted(set(com_caixa))))
 
     # Efeito de tipo desconhecido: seria descartado pelo grafo. disabled:true
     # NAO gera aviso (bypass deliberado, regra P5); categoria desmarcada tambem

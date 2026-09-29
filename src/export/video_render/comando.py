@@ -420,6 +420,10 @@ def casar_entradas(entradas: List[Dict[str, Any]], seq, rel_midia) -> Tuple[List
 
     for i, ent in enumerate(entradas or []):
         tipo = str(ent.get("tipo") or "video").lower()
+        if tipo == "titulo":
+            # Imagens geradas pelo proprio render: nao ha midia do projeto a casar.
+            caminhos.append(str(ent.get("caminho") or ""))
+            continue
         ss = float(ent.get("ss") or 0.0)
         t = float(ent.get("t") or 0.0)
         sugestao = ent.get("caminho")
@@ -545,11 +549,18 @@ def montar_comando(seq, pedido, destino, *, rel_midia=None,
                    project_id: Optional[int] = None,
                    destino_validado: bool = False,
                    inicio_s: Optional[float] = None, fim_s: Optional[float] = None,
-                   agora: Optional[datetime.datetime] = None) -> Dict[str, Any]:
+                   agora: Optional[datetime.datetime] = None,
+                   titulos=None) -> Dict[str, Any]:
     """Monta a linha completa do ffmpeg para UMA janela da timeline.
 
     `inicio_s`/`fim_s` existem para a renderizacao em segmentos (execucao.py);
-    sem eles usa a faixa do proprio pedido. Devolve:
+    sem eles usa a faixa do proprio pedido.
+
+    `titulos(seq, escopo, inicio_s, fim_s) -> {"entradas", "camadas", "avisos"}`
+    fotografa os titulos da janela (titulos.preparar_titulos com um gerador
+    aberto por execucao.py). Injetado para este modulo continuar sem tocar disco
+    nem subir processo; ausente com titulo na janela = aviso, nunca silencio.
+    Devolve:
 
         {"cmd": [...], "duracao_s": float, "parametros": {...},
          "avisos": [...], "rotulo_video": "[vout]", "rotulo_audio": "[aout]|None"}
@@ -613,6 +624,32 @@ def montar_comando(seq, pedido, destino, *, rel_midia=None,
         if filtro_audio:
             filtros.append(filtro_audio)
 
+    # Titulos: imagens com alfa sobrepostas ao video ja composto, na ordem das
+    # pistas de texto. Entram por ultimo no vetor de entradas, entao seus indices
+    # sao os finais e nada antes precisa ser renumerado.
+    avisos_titulos: List[str] = []
+    tem_titulo = any(c.tipo == "text" and c.fim_s > inicio_s and c.inicio_s < fim_s
+                     for c in seq.clipes)
+    if tem_titulo and titulos is None:
+        avisos_titulos.append(
+            "Ha titulos nesta janela, mas o render foi montado sem o gerador de titulos: "
+            "eles NAO aparecem no arquivo.")
+    elif tem_titulo:
+        res_t = titulos(seq, pedido.escopo, inicio_s, fim_s) or {}
+        avisos_titulos += list(res_t.get("avisos") or [])
+        base_t = len(entradas_total)
+        atual = rotulo_video
+        for (k, loc, dur) in res_t.get("camadas") or []:
+            rot_img, rot_sai = f"[tit{k}]", f"[vtit{k}]"
+            filtros.append(
+                f"[{base_t + k}:v]format=rgba,setpts=PTS-STARTPTS+{_fmt(loc)}/TB{rot_img}")
+            filtros.append(
+                f"{atual}{rot_img}overlay=x=0:y=0:eof_action=pass:"
+                f"enable='between(t,{_fmt(loc)},{_fmt(loc + dur)})'{rot_sai}")
+            atual = rot_sai
+        entradas_total += list(res_t.get("entradas") or [])
+        rotulo_video = atual
+
     # Validacao no texto FINAL (ja com a renumeracao do audio aplicada): um
     # indice fora do vetor aqui renderizaria midia trocada em silencio.
     _validar_indices(";".join(f for f in filtros if f), len(entradas_total))
@@ -631,6 +668,10 @@ def montar_comando(seq, pedido, destino, *, rel_midia=None,
         if tipo == "cor":
             # Fonte lavfi (base preta etc.): o "caminho" e a propria expressao.
             cmd += ["-f", "lavfi", "-i", str(ent.get("caminho") or "color=c=black")]
+            continue
+        if tipo == "titulo":
+            # Sequencia de PNG com duracoes (lista ffconcat escrita por titulos.py).
+            cmd += ["-f", "concat", "-safe", "0", "-i", str(ent.get("caminho"))]
             continue
         if not caminho:
             raise ValueError(
@@ -697,7 +738,7 @@ def montar_comando(seq, pedido, destino, *, rel_midia=None,
         cmd += ["-y"]
     cmd += [str(destino_path)]
 
-    avisos = list(param["avisos"]) + list(avisos_casamento)
+    avisos = list(param["avisos"]) + list(avisos_casamento) + avisos_titulos
     if e_hw:
         avisos.append(
             f"Encoder por hardware ({nome_enc}): qualidade controlada pelos args do "

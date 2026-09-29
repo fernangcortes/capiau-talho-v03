@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<!--
+  Página fotografada pelo render do arquivo (src/export/video_render/titulos.py) num
+  navegador headless. Não é aberta pelo usuário. Monta cada título com o MESMO código do
+  preview (js/tituloRender.js) num palco do tamanho do quadro, com fundo transparente.
+-->
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Render de títulos</title>
+    <link rel="stylesheet" href="fonts/fonts.css?v=1">
+    <style>
+        /* O que o título herda do CSS do app (styles.css: * e body) */
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+        html, body { background: transparent !important; overflow: hidden; }
+        #palco { position: relative; overflow: hidden; }
+    </style>
+</head>
+<body>
+    <div id="palco"></div>
+    <script type="module" src="js/renderTitulos.js"></script>
+</body>
+</html>

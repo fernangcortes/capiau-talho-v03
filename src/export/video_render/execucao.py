@@ -45,6 +45,7 @@ from src.core.tasks import TASK_MANAGER
 
 from . import comando
 from . import midia
+from . import titulos as _titulos
 from .comando import _clipes_em_cena  # mesmo pacote: os recortes pos-regra-P4
 from .midia import assegurar_destino_seguro
 
@@ -404,6 +405,7 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
     destino_final: Optional[Path] = None
     parcial: Optional[Path] = None
     tmpdir: Optional[Path] = None
+    gerador_titulos = None  # navegador headless dos titulos: aberto so se houver titulo
 
     TASK_MANAGER.update_progress(chave, 0.0, "running", "render", label="Preparando...")
     try:
@@ -484,6 +486,24 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
             f"{duracao_total:.1f}s, {param['largura']}x{param['altura']}, "
             f"encoder={nome_encoder}, saida={destino_final}")
 
+        # ---- Titulos ---------------------------------------------------------
+        # Um navegador por job (a API sincrona do playwright pertence a esta
+        # thread); fotos em cache por conteudo, reaproveitadas entre segmentos e
+        # entre exports. Sem navegador o render segue SEM titulos, com aviso.
+        fn_titulos = None
+        if any(c.tipo == "text" for c in sequencia.clipes):
+            from src.config import CONFIG
+            pasta_titulos = Path(CONFIG.CACHE_DIR) / "titulos"
+            gerador_titulos = _titulos.GeradorTitulos(pasta_titulos)
+
+            def fn_titulos(seq, escopo, s, f):
+                TASK_MANAGER.add_log(chave, f"[INFO] Desenhando titulos de {s:.1f}s a {f:.1f}s")
+                try:
+                    return _titulos.preparar_titulos(seq, escopo, s, f, gerador_titulos,
+                                                     pasta_titulos / "listas")
+                except _titulos.TitulosIndisponiveis as e:
+                    return {"avisos": [f"Titulos NAO desenhados: {e}"]}
+
         resultado_cmd: Dict[str, Any] = {}
         fracao_feita = 0.0
         for indice, (alvo, s, f) in enumerate(comandos):
@@ -491,7 +511,7 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
                 raise RenderCancelado()
             resultado_cmd = comando.montar_comando(
                 sequencia, pedido, alvo, rel_midia=rel_midia, cfg=cfg,
-                destino_validado=True, inicio_s=s, fim_s=f)
+                destino_validado=True, inicio_s=s, fim_s=f, titulos=fn_titulos)
             for aviso in (resultado_cmd.get("avisos") or [])[:10]:
                 nivel = "WARN" if avisos_pendentes else "INFO"
                 TASK_MANAGER.add_log(chave, f"[{nivel}] {aviso}")
@@ -562,3 +582,5 @@ def _render_job(sequencia, pedido) -> Dict[str, Any]:
         # Redundancia deliberada com os excepts acima: o tmpdir NUNCA sobra,
         # nem num caminho de retorno esquecido.
         _limpar([], [tmpdir] if tmpdir else [])
+        if gerador_titulos is not None:
+            gerador_titulos.fechar()  # o navegador headless nao pode sobrar aberto

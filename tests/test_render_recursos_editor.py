@@ -212,16 +212,63 @@ def test_freeze_frame_segura_um_quadro():
     assert r["seq"].duracao_s() == pytest.approx(3.0)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Titulos/GCs (pista T1): texto, fonte e posicao ja chegam ao banco, mas o "
-    "motor nao desenha texto (sem drawtext/overlay)."))
-def test_titulo_aparece_no_video():
+def test_titulo_aparece_no_video(tmp_path):
+    """Titulo sai do banco com texto/estilo e vira camada sobreposta no comando.
+
+    O navegador e trocado por um gerador falso (a foto real e coberta em
+    test_render_titulos.py); aqui importa o caminho banco -> comando.
+    """
+    import types
+    from src.export.video_render import comando, titulos
+
     titulo = {"id": "gc", "type": "text", "textCategory": "lower_third",
               "text": "Fulana de Tal", "subtext": "Diretora", "fontFamily": "Inter",
               "fontSize": 48, "color": "#ffffff", "in": 0.0, "out": 3.0,
+              "track": "T1", "timeline_start": 1.0, "effects": []}
+    seq = _salvar_e_ler(_par_av("fala", 0.0, 0.0, 5.0) + [titulo])
+
+    vistos = []
+
+    class GeradorFalso:
+        avisos = []
+
+        def quadros(self, clipe, largura, altura, fps, inicio, fim):
+            vistos.append(clipe)
+            png = tmp_path / "t.png"
+            png.write_bytes(b"")
+            return [(png, fim - inicio)]
+
+    fn = lambda s, e, a, b: titulos.preparar_titulos(s, e, a, b, GeradorFalso(), tmp_path)
+    from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload
+    ped = pedido_render_do_payload(1, RenderPedidoPayload(kind="master"))
+    rel = types.SimpleNamespace(fontes={cid: types.SimpleNamespace(caminho=str(tmp_path / "m.mp4"),
+                                                                    wav_tratado=None)
+                                        for cid in ("fala", "fala_a")})
+    r = comando.montar_comando(seq, ped, str(tmp_path / "o.mp4"), rel_midia=rel,
+                               destino_validado=True, titulos=fn)
+
+    assert vistos and vistos[0]["text"] == "Fulana de Tal" and vistos[0]["subtext"] == "Diretora"
+    cmd = r["cmd"]
+    i = cmd.index("concat")
+    assert cmd[i - 1] == "-f" and cmd[i + 4].endswith(".ffconcat")
+    fc = cmd[cmd.index("-filter_complex") + 1]
+    assert "overlay=x=0:y=0:eof_action=pass:enable='between(t,1,4)'" in fc
+    assert not any("titulo" in a.lower() and "nao" in a.lower() for a in r["avisos"])
+
+
+def test_titulo_sem_gerador_avisa_em_vez_de_sumir(tmp_path):
+    import types
+    from src.export.video_render import comando
+    from src.api.schemas import RenderPedidoPayload, pedido_render_do_payload
+    titulo = {"id": "gc", "type": "text", "text": "Oi", "in": 0.0, "out": 2.0,
               "track": "T1", "timeline_start": 0.0, "effects": []}
-    r = _render(_par_av("fala", 0.0, 0.0, 5.0) + [titulo])
-    assert "drawtext" in r["video"]["filter_complex"] or "gc" in _ids_entradas(r["video"])
+    seq = _salvar_e_ler(_par_av("fala", 0.0, 0.0, 3.0) + [titulo])
+    rel = types.SimpleNamespace(fontes={cid: types.SimpleNamespace(caminho=str(tmp_path / "m.mp4"),
+                                                                    wav_tratado=None)
+                                        for cid in ("fala", "fala_a")})
+    r = comando.montar_comando(seq, pedido_render_do_payload(1, RenderPedidoPayload(kind="master")),
+                               str(tmp_path / "o.mp4"), rel_midia=rel, destino_validado=True)
+    assert any("NAO aparecem" in a for a in r["avisos"])
 
 
 def test_rotacao_do_clipe_chega_ao_render():

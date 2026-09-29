@@ -2,6 +2,7 @@
 import { STATE } from "./state.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY } from "./timelineState.js";
 import { evaluateClipTransform, evaluateClipProperty, hasKeyframes, addOrUpdateKeyframe } from "./keyframeEngine.js";
+import { montarElementoTitulo } from "./tituloRender.js";
 import { getActiveElement } from "./workspaceManager.js";
 
 export class PlayerTextOverlayManager {
@@ -36,6 +37,10 @@ export class PlayerTextOverlayManager {
             if (!this.isDragging) this.sync();
         });
         STATE.on("timelinePropertiesChanged", () => {
+            if (!this.isDragging) this.sync();
+        });
+        // O tamanho dos títulos acompanha o do monitor: redesenhar quando ele muda.
+        STATE.on("programViewportResized", () => {
             if (!this.isDragging) this.sync();
         });
     }
@@ -119,86 +124,21 @@ export class PlayerTextOverlayManager {
         if (!this.textLayer) return;
         this.textLayer.innerHTML = "";
 
+        // Tamanhos do título são pixels do QUADRO da sequência; o monitor mostra o quadro
+        // reduzido/ampliado, então o título escala junto (preview = arquivo exportado).
+        const viewport = this.el("program-player-viewport");
+        const larguraQuadro = TIMELINE_STATE.width || 1920;
+        const larguraMonitor = viewport ? (viewport.clientWidth || larguraQuadro) : larguraQuadro;
+        const escala = larguraMonitor / larguraQuadro;
+
         visibleClips.forEach(clip => {
             const clipStart = clip.timelineStartFrame !== undefined ? clip.timelineStartFrame : Math.round((clip.timeline_start || 0) * fps);
             const relTimeS = Math.max(0, (currentFrame - clipStart) / fps);
 
-            // Avalia transformações com interpolação de keyframes
-            const tf = evaluateClipTransform(clip, relTimeS);
-            const fontSize = evaluateClipProperty(clip, "fontSize", relTimeS, clip.fontSize || 36);
-            const tracking = evaluateClipProperty(clip, "tracking", relTimeS, clip.tracking || 0);
-
-            const el = document.createElement("div");
-            el.className = "player-text-rendered-item";
-            el.dataset.clipId = String(clip.id);
-
-            // Alinhamento horizontal
-            let textAlign = clip.alignment || "center";
-            let justifyVal = textAlign === "left" ? "flex-start" : (textAlign === "right" ? "flex-end" : "center");
-
-            const posX = tf.x;
-            const posY = tf.y;
-
-            // Estilos CSS do elemento de texto
-            el.style.position = "absolute";
-            el.style.left = `calc(50% + ${posX}%)`;
-            el.style.top = `calc(50% + ${posY}%)`;
-            el.style.transform = `translate(-50%, -50%) scale(${tf.scale}) rotate(${tf.rotation}deg)`;
-            el.style.opacity = tf.opacity;
-            el.style.transformOrigin = "center center";
-            el.style.fontFamily = clip.fontFamily ? `"${clip.fontFamily}", sans-serif` : "'Outfit', 'Inter', sans-serif";
-            el.style.fontSize = `${fontSize}px`;
-            el.style.letterSpacing = `${tracking}px`;
-            el.style.color = clip.color || "#ffffff";
-            el.style.textAlign = textAlign;
-            el.style.display = "flex";
-            el.style.flexDirection = "column";
-            el.style.alignItems = justifyVal;
+            // Mesma montagem do render do arquivo (tituloRender.js)
+            const el = montarElementoTitulo(this.textLayer.ownerDocument || document, clip, relTimeS, escala);
             el.style.pointerEvents = "auto";
             el.style.cursor = "move";
-            el.style.userSelect = "none";
-            el.style.whiteSpace = "pre-wrap";
-            el.style.wordBreak = "break-word";
-            el.style.maxWidth = "90%";
-            el.style.lineHeight = String(clip.lineHeight || 1.2);
-
-            const bgVal = clip.backgroundColor;
-            const isTransparent = !bgVal || bgVal === "transparent" || bgVal === "#00000000" || clip.bgMode === "transparent";
-
-            if (!isTransparent) {
-                el.style.backgroundColor = bgVal;
-                el.style.padding = `${clip.boxPadding !== undefined ? clip.boxPadding : 8}px 14px`;
-                el.style.borderRadius = `${clip.boxBorderRadius !== undefined ? clip.boxBorderRadius : 4}px`;
-                el.style.boxShadow = "0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.08)";
-                el.style.backdropFilter = "blur(10px)";
-                el.style.webkitBackdropFilter = "blur(10px)";
-                el.style.textShadow = "0 1px 4px rgba(0,0,0,0.6)";
-            } else {
-                el.style.backgroundColor = "transparent";
-                el.style.padding = "0";
-                el.style.borderRadius = "0";
-                el.style.boxShadow = "none";
-                el.style.backdropFilter = "none";
-                el.style.webkitBackdropFilter = "none";
-                el.style.textShadow = "0 2px 10px rgba(0,0,0,0.95), 0 0 4px rgba(0,0,0,0.9)";
-            }
-
-            // Conteúdo principal e subtexto (Lower Third)
-            const mainTextSpan = document.createElement("span");
-            mainTextSpan.className = "text-main-body";
-            mainTextSpan.textContent = clip.text || "";
-            el.appendChild(mainTextSpan);
-
-            if (clip.subtext && clip.subtext.trim()) {
-                const subSpan = document.createElement("span");
-                subSpan.className = "text-sub-body";
-                subSpan.style.fontSize = `${Math.max(12, Math.round(fontSize * 0.55))}px`;
-                subSpan.style.opacity = "0.88";
-                subSpan.style.marginTop = "4px";
-                subSpan.style.fontWeight = "400";
-                subSpan.textContent = clip.subtext;
-                el.appendChild(subSpan);
-            }
 
             // Mousedown seleciona o clipe e inicia o arraste imediatamente
             el.onmousedown = (e) => {

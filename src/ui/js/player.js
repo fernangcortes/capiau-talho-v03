@@ -2240,8 +2240,11 @@ export function syncProgramViewport() {
     const vW = Math.round(tw * scale);
     const vH = Math.round(th * scale);
 
+    const tamanhoMudou = viewport.style.width !== `${vW}px` || viewport.style.height !== `${vH}px`;
     viewport.style.width = `${vW}px`;
     viewport.style.height = `${vH}px`;
+    // Títulos escalam com o monitor (tituloRender.js): avisar para redesenhar na escala nova.
+    if (tamanhoMudou) STATE.emit("programViewportResized", { width: vW, height: vH });
 
     // Limites e translação de pan
     const wW = wrapper.clientWidth;
