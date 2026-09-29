@@ -11591,14 +11591,14 @@ export class CapiauTimelineInteraction {
                         clip.inFrame = this.dragStartInFrame;
                         clip.outFrame = this.dragStartOutFrame;
                         clip.in = clip.inFrame / fps;
-                        clip.out = clip.outFrame / fps;
+                        TIMELINE_STATE.sincronizarOutDoClipe(clip);
                         if (clip.link_id && this.dragPartnerStartInFrame !== null) {
                             const partner = cuts.find(c => c.id !== clip.id && c.link_id === clip.link_id);
                             if (partner) {
                                 partner.inFrame = this.dragPartnerStartInFrame;
                                 partner.outFrame = this.dragPartnerStartOutFrame;
                                 partner.in = partner.inFrame / fps;
-                                partner.out = partner.outFrame / fps;
+                                TIMELINE_STATE.sincronizarOutDoClipe(partner);
                                 const videoCut = (TIMELINE_STATE.trackKindOf(clip.track) === "video") ? clip : partner;
                                 const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : partner;
                                 if (videoCut && audioCut) {
@@ -11634,8 +11634,8 @@ export class CapiauTimelineInteraction {
                         left.outFrame = this.dragSlideBase.leftOut;
                         left.inFrame = this.dragSlideBase.leftIn;
                         left.timelineStartFrame = this.dragSlideBase.leftStart;
-                        left.out = left.outFrame / fps;
                         left.in = left.inFrame / fps;
+                        TIMELINE_STATE.sincronizarOutDoClipe(left);
                         left.timeline_start = left.timelineStartFrame / fps;
                     }
                     if (right) {
@@ -11643,7 +11643,7 @@ export class CapiauTimelineInteraction {
                         right.outFrame = this.dragSlideBase.rightOut;
                         right.timelineStartFrame = this.dragSlideBase.rightStart;
                         right.in = right.inFrame / fps;
-                        right.out = right.outFrame / fps;
+                        TIMELINE_STATE.sincronizarOutDoClipe(right);
                         right.timeline_start = right.timelineStartFrame / fps;
                     }
                     if (this.dragSlideBase.partnerClipId) {
@@ -11658,8 +11658,8 @@ export class CapiauTimelineInteraction {
                             pLeft.outFrame = this.dragSlideBase.partnerLeftOut;
                             pLeft.inFrame = this.dragSlideBase.partnerLeftIn;
                             pLeft.timelineStartFrame = this.dragSlideBase.partnerLeftStart;
-                            pLeft.out = pLeft.outFrame / fps;
                             pLeft.in = pLeft.inFrame / fps;
+                            TIMELINE_STATE.sincronizarOutDoClipe(pLeft);
                             pLeft.timeline_start = pLeft.timelineStartFrame / fps;
                         }
                         if (pRight) {
@@ -11667,7 +11667,7 @@ export class CapiauTimelineInteraction {
                             pRight.outFrame = this.dragSlideBase.partnerRightOut;
                             pRight.timelineStartFrame = this.dragSlideBase.partnerRightStart;
                             pRight.in = pRight.inFrame / fps;
-                            pRight.out = pRight.outFrame / fps;
+                            TIMELINE_STATE.sincronizarOutDoClipe(pRight);
                             pRight.timeline_start = pRight.timelineStartFrame / fps;
                         }
                     }
@@ -11694,7 +11694,7 @@ export class CapiauTimelineInteraction {
                         clip.timeline_start = this.dragStartClipFrame / fps;
                         clip.inFrame = this.dragStartInFrame;
                         clip.outFrame = this.dragStartOutFrame;
-                        clip.out = clip.outFrame / fps;
+                        TIMELINE_STATE.sincronizarOutDoClipe(clip);
                         if (clip.link_id && this.dragPartnerClipId) {
                             const partner = cuts.find(c => c.id === this.dragPartnerClipId);
                             if (partner) {
@@ -11703,7 +11703,7 @@ export class CapiauTimelineInteraction {
                                 partner.timeline_start = this.dragPartnerStartClipFrame / fps;
                                 partner.inFrame = this.dragPartnerStartInFrame;
                                 partner.outFrame = this.dragPartnerStartOutFrame;
-                                partner.out = partner.outFrame / fps;
+                                TIMELINE_STATE.sincronizarOutDoClipe(partner);
                             }
                         }
                         STATE.activeTimelineCuts = cuts;
@@ -11733,8 +11733,8 @@ export class CapiauTimelineInteraction {
                         left.outFrame = this.dragRollingBase.leftOut;
                         left.inFrame = this.dragRollingBase.leftIn;
                         left.timelineStartFrame = this.dragRollingBase.leftStart;
-                        left.out = left.outFrame / fps;
                         left.in = left.inFrame / fps;
+                        TIMELINE_STATE.sincronizarOutDoClipe(left);
                         left.timeline_start = left.timelineStartFrame / fps;
                     }
                     if (right) {
@@ -11742,7 +11742,7 @@ export class CapiauTimelineInteraction {
                         right.outFrame = this.dragRollingBase.rightOut;
                         right.timelineStartFrame = this.dragRollingBase.rightStart;
                         right.in = right.inFrame / fps;
-                        right.out = right.outFrame / fps;
+                        TIMELINE_STATE.sincronizarOutDoClipe(right);
                         right.timeline_start = right.timelineStartFrame / fps;
                     }
                     if (this.dragRollingBase.partnerLeftClipId && this.dragRollingBase.partnerRightClipId) {
@@ -11752,8 +11752,8 @@ export class CapiauTimelineInteraction {
                             pLeft.outFrame = this.dragRollingBase.partnerLeftOut;
                             pLeft.inFrame = this.dragRollingBase.partnerLeftIn;
                             pLeft.timelineStartFrame = this.dragRollingBase.partnerLeftStart;
-                            pLeft.out = pLeft.outFrame / fps;
                             pLeft.in = pLeft.inFrame / fps;
+                            TIMELINE_STATE.sincronizarOutDoClipe(pLeft);
                             pLeft.timeline_start = pLeft.timelineStartFrame / fps;
                         }
                         if (pRight) {
@@ -11761,7 +11761,7 @@ export class CapiauTimelineInteraction {
                             pRight.outFrame = this.dragRollingBase.partnerRightOut;
                             pRight.timelineStartFrame = this.dragRollingBase.partnerRightStart;
                             pRight.in = pRight.inFrame / fps;
-                            pRight.out = pRight.outFrame / fps;
+                            TIMELINE_STATE.sincronizarOutDoClipe(pRight);
                             pRight.timeline_start = pRight.timelineStartFrame / fps;
                         }
                     }
@@ -12849,9 +12849,16 @@ export class CapiauTimelineInteraction {
 
         const baseStart = (this.dragStartClipFrame !== null && this.dragStartClipFrame !== undefined) ? this.dragStartClipFrame : (clip.timelineStartFrame || 0);
         const baseIn = (this.dragStartInFrame !== null && this.dragStartInFrame !== undefined) ? this.dragStartInFrame : (clip.inFrame || 0);
+        // Com velocidade o outFrame anda junto com a cabeça (outFrame - inFrame = duração);
+        // a base do arraste é a referência fixa. Fora de arraste, o valor atual.
+        const emArraste = !!this.dragState;
+        const baseOut = (emArraste && this.dragStartOutFrame !== null && this.dragStartOutFrame !== undefined) ? this.dragStartOutFrame : (clip.outFrame || 0);
 
         const partnerBaseStart = (this.dragPartnerStartClipFrame !== null && this.dragPartnerStartClipFrame !== undefined) ? this.dragPartnerStartClipFrame : (partner ? partner.timelineStartFrame || 0 : null);
         const partnerBaseIn = (this.dragPartnerStartInFrame !== null && this.dragPartnerStartInFrame !== undefined) ? this.dragPartnerStartInFrame : (partner ? partner.inFrame || 0 : null);
+        const partnerBaseOut = partner
+            ? ((emArraste && this.dragPartnerStartOutFrame !== null && this.dragPartnerStartOutFrame !== undefined) ? this.dragPartnerStartOutFrame : (partner.outFrame || 0))
+            : null;
 
         // Barreira física sólida contra vizinho anterior na pista (Bloqueio Físico NLE)
         const neighbors = TIMELINE_STATE.getTrackClipNeighbors(clip.track, baseStart, ignored);
@@ -12866,38 +12873,36 @@ export class CapiauTimelineInteraction {
         // Clamping à mídia interna (inFrame não pode ser menor que 0, ou subclip_in_frame com hard boundaries)
         const clipMinIn = (clip.hard_boundaries && clip.is_subclip && clip.subclip_in_frame !== undefined)
             ? clip.subclip_in_frame : 0;
-        let minDeltaFromMedia = clipMinIn - baseIn;
+        // (folga em frames de TIMELINE: com velocidade a fonte anda delta * speed)
+        let minDeltaFromMedia = -TIMELINE_STATE.folgaCabecaFrames(clip, baseIn, baseOut, clipMinIn);
         if (partner && partnerBaseIn !== null) {
             const partnerMinIn = (partner.hard_boundaries && partner.is_subclip && partner.subclip_in_frame !== undefined)
                 ? partner.subclip_in_frame : 0;
-            minDeltaFromMedia = Math.max(minDeltaFromMedia, partnerMinIn - partnerBaseIn);
+            minDeltaFromMedia = Math.max(minDeltaFromMedia,
+                -TIMELINE_STATE.folgaCabecaFrames(partner, partnerBaseIn, partnerBaseOut, partnerMinIn));
         }
 
         const minDelta = Math.max(minDeltaFromMedia, minDeltaFromNeighbor);
 
         // Clamping ao encolher: clipe deve ter pelo menos 1 frame de duração
-        let maxDelta = (clip.outFrame - 1) - baseIn;
+        let maxDelta = (baseOut - 1) - baseIn;
         if (partner && partnerBaseIn !== null) {
-            const pMaxDelta = (partner.outFrame - 1) - partnerBaseIn;
+            const pMaxDelta = (partnerBaseOut - 1) - partnerBaseIn;
             maxDelta = Math.min(maxDelta, pMaxDelta);
         }
 
         const actualDelta = Math.min(maxDelta, Math.max(minDelta, deltaFrames));
 
-        const targetIn = baseIn + actualDelta;
         const targetStart = Math.max(neighbors.prevEnd, baseStart + actualDelta);
 
-        clip.inFrame = targetIn;
-        clip.in = targetIn / fps;
+        TIMELINE_STATE.aplicarCabeca(clip, baseIn, baseOut, actualDelta);
         clip.timelineStartFrame = targetStart;
         clip.timeline_start = targetStart / fps;
 
         if (partner && partnerBaseIn !== null && partnerBaseStart !== null) {
-            const partnerTargetIn = partnerBaseIn + actualDelta;
             const partnerMinStart = pNeighbors ? pNeighbors.prevEnd : 0;
             const partnerTargetStart = Math.max(partnerMinStart, partnerBaseStart + actualDelta);
-            partner.inFrame = partnerTargetIn;
-            partner.in = partnerTargetIn / fps;
+            TIMELINE_STATE.aplicarCabeca(partner, partnerBaseIn, partnerBaseOut, actualDelta);
             partner.timelineStartFrame = partnerTargetStart;
             partner.timeline_start = partnerTargetStart / fps;
 
@@ -12959,46 +12964,49 @@ export class CapiauTimelineInteraction {
         const partnerBaseStart = (this.dragPartnerStartClipFrame !== null && this.dragPartnerStartClipFrame !== undefined) ? this.dragPartnerStartClipFrame : (partner ? partner.timelineStartFrame || 0 : null);
         const partnerBaseOut = (this.dragPartnerStartOutFrame !== null && this.dragPartnerStartOutFrame !== undefined) ? this.dragPartnerStartOutFrame : (partner ? partner.outFrame || 0 : null);
 
-        const initialEnd = baseStart + (baseOut - clip.inFrame);
+        // Base do inFrame: no reverso a cauda da timeline é o INÍCIO da fonte, então o
+        // inFrame anda durante o arraste; as contas usam o do início do arraste.
+        const emArraste = !!this.dragState;
+        const baseInCauda = (emArraste && this.dragStartInFrame !== null && this.dragStartInFrame !== undefined) ? this.dragStartInFrame : (clip.inFrame || 0);
+        const partnerBaseInCauda = partner
+            ? ((emArraste && this.dragPartnerStartInFrame !== null && this.dragPartnerStartInFrame !== undefined) ? this.dragPartnerStartInFrame : (partner.inFrame || 0))
+            : null;
+
+        const initialEnd = baseStart + (baseOut - baseInCauda);
 
         // Barreira física sólida contra vizinho posterior na pista (Bloqueio Físico NLE)
         const neighbors = TIMELINE_STATE.getTrackClipNeighbors(clip.track, initialEnd, ignored);
         let maxDeltaFromNeighbor = neighbors.nextStart === Infinity ? Infinity : (neighbors.nextStart - initialEnd);
         if (partner && partnerBaseOut !== null && partnerBaseStart !== null) {
-            const partnerInitialEnd = partnerBaseStart + (partnerBaseOut - partner.inFrame);
+            const partnerInitialEnd = partnerBaseStart + (partnerBaseOut - partnerBaseInCauda);
             const pNeighbors = TIMELINE_STATE.getTrackClipNeighbors(partner.track, partnerInitialEnd, ignored);
             const pDeltaFromNeighbor = pNeighbors.nextStart === Infinity ? Infinity : (pNeighbors.nextStart - partnerInitialEnd);
             maxDeltaFromNeighbor = Math.min(maxDeltaFromNeighbor, pDeltaFromNeighbor);
         }
 
-        // Clamping à duração real da mídia física (impede estender além do arquivo repetindo frames ou áudio piscando)
-        const clipMax = TIMELINE_STATE.getMaxMediaFrames(clip);
-        let maxDeltaFromMedia = Number.isFinite(clipMax) ? (clipMax - baseOut) : Infinity;
+        // Clamping à duração real da mídia física (impede estender além do arquivo repetindo frames ou áudio piscando).
+        // Folga em frames de TIMELINE: a 2x cada frame de timeline consome 2 da fonte.
+        let maxDeltaFromMedia = TIMELINE_STATE.folgaCaudaFrames(clip, baseInCauda, baseOut);
         if (partner && partnerBaseOut !== null) {
-            const partnerMax = TIMELINE_STATE.getMaxMediaFrames(partner);
-            const partnerDeltaMedia = Number.isFinite(partnerMax) ? (partnerMax - partnerBaseOut) : Infinity;
-            maxDeltaFromMedia = Math.min(maxDeltaFromMedia, partnerDeltaMedia);
+            maxDeltaFromMedia = Math.min(maxDeltaFromMedia,
+                TIMELINE_STATE.folgaCaudaFrames(partner, partnerBaseInCauda, partnerBaseOut));
         }
 
         const maxDelta = Math.min(maxDeltaFromNeighbor, maxDeltaFromMedia);
 
         // Limite inferior ao encolher: clipe deve manter pelo menos 1 frame de duração
-        let minDelta = (clip.inFrame + 1) - baseOut;
+        let minDelta = (baseInCauda + 1) - baseOut;
         if (partner && partnerBaseOut !== null) {
-            const pMinDelta = (partner.inFrame + 1) - partnerBaseOut;
+            const pMinDelta = (partnerBaseInCauda + 1) - partnerBaseOut;
             minDelta = Math.max(minDelta, pMinDelta);
         }
 
         const actualDelta = Math.max(minDelta, Math.min(maxDelta, deltaFrames));
 
-        const targetOut = baseOut + actualDelta;
-        clip.outFrame = targetOut;
-        clip.out = targetOut / fps;
+        TIMELINE_STATE.aplicarCauda(clip, baseInCauda, baseOut, actualDelta);
 
         if (partner && partnerBaseOut !== null) {
-            const partnerTargetOut = partnerBaseOut + actualDelta;
-            partner.outFrame = partnerTargetOut;
-            partner.out = partnerTargetOut / fps;
+            TIMELINE_STATE.aplicarCauda(partner, partnerBaseInCauda, partnerBaseOut, actualDelta);
 
             const videoCut = (TIMELINE_STATE.trackKindOf(clip.track) === "video") ? clip : partner;
             const audioCut = (TIMELINE_STATE.trackKindOf(clip.track) === "audio") ? clip : partner;
@@ -13098,11 +13106,11 @@ export class CapiauTimelineInteraction {
                 const targetOut = targetIn + duration;
                 const maxFrames = TIMELINE_STATE.getMaxMediaFrames(clip);
 
-                if (targetIn >= 0 && (!Number.isFinite(maxFrames) || targetOut <= maxFrames)) {
+                if (targetIn >= 0 && (!Number.isFinite(maxFrames) || TIMELINE_STATE.fimFonteFrames(clip, targetIn, targetOut) <= maxFrames)) {
                     clip.inFrame = targetIn;
                     clip.outFrame = targetOut;
                     clip.in = targetIn / fps;
-                    clip.out = targetOut / fps;
+                    TIMELINE_STATE.sincronizarOutDoClipe(clip);
                     const audioCut = clipKind === "audio" ? clip : partner;
                     if (audioCut) audioCut.syncOffset = 0;
                 } else {

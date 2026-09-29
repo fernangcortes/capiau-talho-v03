@@ -2808,8 +2808,7 @@ export class CapiauTimelineState {
                         if (cStart < minStart) minStart = cStart;
                         if (cEnd > maxEnd) maxEnd = cEnd;
 
-                        c.inFrame += delta;
-                        c.in = c.inFrame / fps;
+                        this.aplicarCabeca(c, c.inFrame, c.outFrame, delta);
                         // O clipe resultante recua para cStart (fechando o início descartado)
                         c.timelineStartFrame = cStart;
                         c.timeline_start = cStart / fps;
@@ -2844,8 +2843,7 @@ export class CapiauTimelineState {
                         if (cStart < minStart) minStart = cStart;
                         if (cEnd > maxEnd) maxEnd = cEnd;
 
-                        c.outFrame = c.inFrame + (playhead - cStart);
-                        c.out = c.outFrame / fps;
+                        this.aplicarCauda(c, c.inFrame, c.outFrame, (playhead - cStart) - cDur);
                         c.timelineStartFrame = cStart;
                         c.timeline_start = cStart / fps;
                     }
@@ -3511,6 +3509,103 @@ export class CapiauTimelineState {
         return Infinity;
     }
 
+    // ── TEMPO DE FONTE EM CLIPES COM VELOCIDADE / REVERSO ─────────────────────
+    //
+    // Invariante (o mesmo que changeClipSpeed cria e que o player toca):
+    //   inFrame  = in * fps                      (frame da FONTE onde o trecho começa)
+    //   outFrame - inFrame                       = duração na TIMELINE
+    //   out      = in + (outFrame - inFrame)/fps * speed   (fim do trecho na fonte)
+    // Player: fonte = in + (t - início) * speed; no reverso, fonte = out - (t - início) * speed.
+    //
+    // Antes, trim/split/rolling/slide aplicavam o delta de TIMELINE direto no inFrame e
+    // gravavam in = inFrame/fps e out = outFrame/fps: num clipe a 2x, cortar 10 frames da
+    // cabeça andava só 10 frames na fonte (o conteúdo "escorregava") e o out ficava errado
+    // (o reverso tocava o trecho errado). Com speed 1 e sem reverso, as funções abaixo dão
+    // exatamente o mesmo resultado de antes.
+
+    velocidadeDoClipe(c) {
+        const s = Number(c && c.speed);
+        return (Number.isFinite(s) && s > 0) ? s : 1;
+    }
+
+    clipeTemRetime(c) {
+        return !!c && (!!c.reverse || Math.abs(this.velocidadeDoClipe(c) - 1) > 1e-9);
+    }
+
+    /** Recalcula `out` (segundos da fonte) a partir de in + duração * speed. */
+    sincronizarOutDoClipe(c) {
+        if (!c) return;
+        const fps = this.fps || 24;
+        if (!this.clipeTemRetime(c)) {
+            c.out = (c.outFrame || 0) / fps;
+            return;
+        }
+        c.out = (c.in || 0) + (((c.outFrame || 0) - (c.inFrame || 0)) / fps) * this.velocidadeDoClipe(c);
+    }
+
+    /**
+     * Corta (d > 0) ou estende (d < 0) a CABEÇA do clipe em `d` frames de timeline,
+     * a partir da base (inFrame/outFrame do início da operação). Não mexe na posição.
+     */
+    aplicarCabeca(c, baseIn, baseOut, d) {
+        const fps = this.fps || 24;
+        if (!this.clipeTemRetime(c)) {
+            c.inFrame = baseIn + d;
+            c.in = c.inFrame / fps;
+            return;
+        }
+        const dur = (baseOut - baseIn) - d;
+        // Reverso: a cabeça da timeline é o FIM da fonte; o início da fonte não muda.
+        const inFrame = c.reverse ? baseIn : baseIn + Math.round(d * this.velocidadeDoClipe(c));
+        c.inFrame = inFrame;
+        c.outFrame = inFrame + dur;
+        c.in = inFrame / fps;
+        this.sincronizarOutDoClipe(c);
+    }
+
+    /** Estende (d > 0) ou corta (d < 0) a CAUDA do clipe em `d` frames de timeline, a partir da base. */
+    aplicarCauda(c, baseIn, baseOut, d) {
+        const fps = this.fps || 24;
+        if (!this.clipeTemRetime(c)) {
+            c.outFrame = baseOut + d;
+            c.out = c.outFrame / fps;
+            return;
+        }
+        const dur = (baseOut - baseIn) + d;
+        // Reverso: a cauda da timeline é o INÍCIO da fonte.
+        const inFrame = c.reverse ? baseIn - Math.round(d * this.velocidadeDoClipe(c)) : baseIn;
+        c.inFrame = inFrame;
+        c.outFrame = inFrame + dur;
+        c.in = inFrame / fps;
+        this.sincronizarOutDoClipe(c);
+    }
+
+    /** Frame da FONTE onde o trecho termina (outFrame em clipe comum). */
+    fimFonteFrames(c, baseIn, baseOut) {
+        if (!this.clipeTemRetime(c)) return baseOut;
+        return baseIn + (baseOut - baseIn) * this.velocidadeDoClipe(c);
+    }
+
+    /** Quantos frames de TIMELINE a cauda ainda pode crescer sem passar da mídia. */
+    folgaCaudaFrames(c, baseIn, baseOut) {
+        const max = this.getMaxMediaFrames(c);
+        if (!this.clipeTemRetime(c)) return Number.isFinite(max) ? (max - baseOut) : Infinity;
+        const s = this.velocidadeDoClipe(c);
+        if (c.reverse) return Math.floor(baseIn / s);          // a fonte recua até o frame 0
+        if (!Number.isFinite(max)) return Infinity;
+        return Math.floor((max - baseIn) / s) - (baseOut - baseIn);
+    }
+
+    /** Quantos frames de TIMELINE a cabeça ainda pode crescer sem sair da mídia. */
+    folgaCabecaFrames(c, baseIn, baseOut, minIn = 0) {
+        if (!this.clipeTemRetime(c)) return baseIn - minIn;
+        const s = this.velocidadeDoClipe(c);
+        if (!c.reverse) return Math.floor((baseIn - minIn) / s);
+        const max = this.getMaxMediaFrames(c);                 // reverso: a fonte avança até o fim
+        if (!Number.isFinite(max)) return Infinity;
+        return Math.floor((max - baseIn) / s) - (baseOut - baseIn);
+    }
+
     /**
      * Garante que cortes vindos do JSON de salvamento ou de arrays dinâmicos
      * tenham sempre inFrame e outFrame inteiros válidos, in e out consistentes em segundos,
@@ -3527,9 +3622,16 @@ export class CapiauTimelineState {
             let outFrame = cut.outFrame !== undefined ? cut.outFrame : secondsToFrames(cut.out, fps);
 
             if (!cut.is_freeze) {
-                const maxMedia = this.getMaxMediaFrames(cut);
-                if (Number.isFinite(maxMedia) && maxMedia > 0) {
-                    if (outFrame > maxMedia) outFrame = maxMedia;
+                if (this.clipeTemRetime(cut)) {
+                    // Em clipe com velocidade outFrame é duração de TIMELINE, não frame da
+                    // fonte: comparar com a mídia cortava um clipe a 50% pela metade.
+                    const folga = this.folgaCaudaFrames(cut, inFrame, outFrame);
+                    if (folga < 0) outFrame += folga;
+                } else {
+                    const maxMedia = this.getMaxMediaFrames(cut);
+                    if (Number.isFinite(maxMedia) && maxMedia > 0) {
+                        if (outFrame > maxMedia) outFrame = maxMedia;
+                    }
                 }
                 if (inFrame < 0) inFrame = 0;
             }
@@ -5061,7 +5163,7 @@ export class CapiauTimelineState {
             working.inFrame = Math.round(newIn);
             working.outFrame = Math.round(newOut);
             working.in = Math.round(newIn) / fps;
-            working.out = Math.round(newOut) / fps;
+            this.sincronizarOutDoClipe(working); // velocidade é preservada: out = in + duração * speed
 
             // Par A/V vinculado
             if (working.link_id) {
@@ -5149,14 +5251,13 @@ export class CapiauTimelineState {
                     id: `cut_${Date.now()}_${Math.floor(Math.random() * 900 + 100)}_${c.id.endsWith("_a") ? "a" : "v"}`,
                     timelineStartFrame: splitFrame,
                     timeline_start: splitFrame / fps,
-                    inFrame: c.inFrame + offsetFrames,
-                    in: (c.inFrame + offsetFrames) / fps,
                     link_id: linkId
                 };
-
-                // Modificar o primeiro clipe (parte esquerda)
-                c.outFrame = c.inFrame + offsetFrames;
-                c.out = c.outFrame / fps;
+                // Direita: perde a cabeça até o corte; esquerda: perde a cauda depois dele
+                // (com velocidade/reverso a fonte anda na escala certa).
+                const baseIn = c.inFrame, baseOut = c.outFrame;
+                this.aplicarCabeca(secondClip, baseIn, baseOut, offsetFrames);
+                this.aplicarCauda(c, baseIn, baseOut, offsetFrames - (baseOut - baseIn));
 
                 currentCuts.push(secondClip);
                 return secondClip;
@@ -5229,13 +5330,11 @@ export class CapiauTimelineState {
                     id: `cut_${Date.now()}_${Math.floor(Math.random() * 900 + 100)}_${c.id.endsWith("_a") ? "a" : "v"}`,
                     timelineStartFrame: splitFrame,
                     timeline_start: splitFrame / fps,
-                    inFrame: c.inFrame + offsetFrames,
-                    in: (c.inFrame + offsetFrames) / fps,
                     link_id: newLinkId
                 };
-
-                c.outFrame = c.inFrame + offsetFrames;
-                c.out = c.outFrame / fps;
+                const baseIn = c.inFrame, baseOut = c.outFrame;
+                this.aplicarCabeca(secondClip, baseIn, baseOut, offsetFrames);
+                this.aplicarCauda(c, baseIn, baseOut, offsetFrames - (baseOut - baseIn));
 
                 currentCuts.push(secondClip);
                 createdClips.push(secondClip);
@@ -5742,8 +5841,7 @@ export class CapiauTimelineState {
                             } else {
                                 // O corte é cortado no início: move cStart para newTargetEnd e consome a mídia
                                 const overlap = newTargetEnd - cStart;
-                                c.inFrame = (c.inFrame || 0) + overlap;
-                                c.in = (c.in || 0) + (overlap / fps);
+                                this.aplicarCabeca(c, c.inFrame || 0, c.outFrame || 0, overlap);
                                 c.timelineStartFrame = newTargetEnd;
                                 c.timeline_start = newTargetEnd / fps;
                             }
@@ -6702,8 +6800,9 @@ export class CapiauTimelineState {
             // Limites do clipe principal:
             // newIn = refIn + delta >= 0 => delta >= -refIn
             let minDelta = -refIn;
-            // newOut = refOut + delta <= maxMediaFrames => delta <= maxMediaFrames - refOut
-            let maxDelta = Number.isFinite(maxMediaFrames) ? (maxMediaFrames - refOut) : Infinity;
+            // fim da fonte + delta <= maxMediaFrames (com velocidade o trecho da fonte é
+            // duração * speed, não outFrame)
+            let maxDelta = Number.isFinite(maxMediaFrames) ? (maxMediaFrames - this.fimFonteFrames(clip, refIn, refOut)) : Infinity;
 
             // Parceiro vinculado (áudio/vídeo)
             let partner = null;
@@ -6722,7 +6821,7 @@ export class CapiauTimelineState {
 
                         minDelta = Math.max(minDelta, -partnerRefIn);
                         if (Number.isFinite(partnerMaxFrames)) {
-                            maxDelta = Math.min(maxDelta, partnerMaxFrames - partnerRefOut);
+                            maxDelta = Math.min(maxDelta, partnerMaxFrames - this.fimFonteFrames(partner, partnerRefIn, partnerRefOut));
                         }
                     }
                 }
@@ -6738,13 +6837,13 @@ export class CapiauTimelineState {
             clip.inFrame = refIn + clampedDelta;
             clip.outFrame = refOut + clampedDelta;
             clip.in = clip.inFrame / fps;
-            clip.out = clip.outFrame / fps;
+            this.sincronizarOutDoClipe(clip);
 
             if (partner) {
                 partner.inFrame = partnerRefIn + clampedDelta;
                 partner.outFrame = partnerRefOut + clampedDelta;
                 partner.in = partner.inFrame / fps;
-                partner.out = partner.outFrame / fps;
+                this.sincronizarOutDoClipe(partner);
                 const videoCut = (this.trackKindOf(clip.track) === "video") ? clip : partner;
                 const audioCut = (this.trackKindOf(clip.track) === "audio") ? clip : partner;
                 if (videoCut && audioCut) {
@@ -6758,7 +6857,7 @@ export class CapiauTimelineState {
                         other.inFrame = partnerBaseIn;
                         other.outFrame = partnerBaseOut;
                         other.in = other.inFrame / fps;
-                        other.out = other.outFrame / fps;
+                        this.sincronizarOutDoClipe(other);
                     }
                     const videoCut = (this.trackKindOf(clip.track) === "video") ? clip : other;
                     const audioCut = (this.trackKindOf(clip.track) === "audio") ? clip : other;
@@ -6850,24 +6949,24 @@ export class CapiauTimelineState {
 
             if (clipDur <= 0 || leftDur <= 0 || rightDur <= 0) return;
 
-            const maxLeftMedia = this.getMaxMediaFrames(leftClip);
             const minDur = 1;
 
             // Limites do clipe principal:
             // delta > 0 (direita):
-            // - Left expande: refLeftOut + delta <= maxLeftMedia => delta <= maxLeftMedia - refLeftOut
+            // - Left expande até o fim da mídia (folga em frames de TIMELINE, com
+            //   velocidade/reverso considerados)
             // - Right encolhe: rightDur - delta >= minDur => delta <= rightDur - minDur
             let maxDelta = Math.min(
-                Number.isFinite(maxLeftMedia) ? (maxLeftMedia - refLeftOut) : Infinity,
+                this.folgaCaudaFrames(leftClip, refLeftIn, refLeftOut),
                 rightDur - minDur
             );
 
             // delta < 0 (esquerda):
             // - Left encolhe: leftDur + delta >= minDur => delta >= minDur - leftDur
-            // - Right expande: refRightIn + delta >= 0 => delta >= -refRightIn
+            // - Right expande até o início da mídia
             let minDelta = Math.max(
                 minDur - leftDur,
-                -refRightIn
+                -this.folgaCabecaFrames(rightClip, refRightIn, refRightOut)
             );
 
             // Parceiro vinculado (áudio/vídeo)
@@ -6914,18 +7013,16 @@ export class CapiauTimelineState {
 
                             const pLeftDur = refPartnerLeftOut - refPartnerLeftIn;
                             const pRightDur = refPartnerRightOut - refPartnerRightIn;
-                            const maxPartnerLeftMedia = this.getMaxMediaFrames(partnerLeft);
-
                             if (pLeftDur > 0 && pRightDur > 0) {
                                 maxDelta = Math.min(
                                     maxDelta,
-                                    Number.isFinite(maxPartnerLeftMedia) ? (maxPartnerLeftMedia - refPartnerLeftOut) : Infinity,
+                                    this.folgaCaudaFrames(partnerLeft, refPartnerLeftIn, refPartnerLeftOut),
                                     pRightDur - minDur
                                 );
                                 minDelta = Math.max(
                                     minDelta,
                                     minDur - pLeftDur,
-                                    -refPartnerRightIn
+                                    -this.folgaCabecaFrames(partnerRight, refPartnerRightIn, refPartnerRightOut)
                                 );
                             }
                         }
@@ -6943,11 +7040,9 @@ export class CapiauTimelineState {
             clip.timelineStartFrame = refClipStart + clampedDelta;
             clip.timeline_start = clip.timelineStartFrame / fps;
 
-            leftClip.outFrame = refLeftOut + clampedDelta;
-            leftClip.out = leftClip.outFrame / fps;
+            this.aplicarCauda(leftClip, refLeftIn, refLeftOut, clampedDelta);
 
-            rightClip.inFrame = refRightIn + clampedDelta;
-            rightClip.in = rightClip.inFrame / fps;
+            this.aplicarCabeca(rightClip, refRightIn, refRightOut, clampedDelta);
             rightClip.timelineStartFrame = refRightStart + clampedDelta;
             rightClip.timeline_start = rightClip.timelineStartFrame / fps;
 
@@ -6955,11 +7050,9 @@ export class CapiauTimelineState {
                 partner.timelineStartFrame = refPartnerClipStart + clampedDelta;
                 partner.timeline_start = partner.timelineStartFrame / fps;
 
-                partnerLeft.outFrame = refPartnerLeftOut + clampedDelta;
-                partnerLeft.out = partnerLeft.outFrame / fps;
+                this.aplicarCauda(partnerLeft, refPartnerLeftIn, refPartnerLeftOut, clampedDelta);
 
-                partnerRight.inFrame = refPartnerRightIn + clampedDelta;
-                partnerRight.in = partnerRight.inFrame / fps;
+                this.aplicarCabeca(partnerRight, refPartnerRightIn, refPartnerRightOut, clampedDelta);
                 partnerRight.timelineStartFrame = refPartnerRightStart + clampedDelta;
                 partnerRight.timeline_start = partnerRight.timelineStartFrame / fps;
 
@@ -7065,23 +7158,23 @@ export class CapiauTimelineState {
             if (refLeftDuration <= 0 || refRightDuration <= 0) return;
 
             const minDur = 1;
-            const maxMediaLeft = this.getMaxMediaFrames(leftClip);
 
-            // Invariantes Matemáticas & Clamping Bidirecional Rígido:
+            // Invariantes Matemáticas & Clamping Bidirecional Rígido (folgas de mídia em
+            // frames de TIMELINE, com velocidade/reverso considerados):
             // 1. Expansão para a direita (delta > 0):
-            // - Left expande: refLeftOut + delta <= maxMediaLeft => delta <= maxMediaLeft - refLeftOut
+            // - Left expande até o fim da mídia
             // - Right encolhe: refRightDuration - delta >= minDur => delta <= refRightDuration - minDur
             let maxDelta = Math.min(
-                Number.isFinite(maxMediaLeft) ? (maxMediaLeft - refLeftOut) : Infinity,
+                this.folgaCaudaFrames(leftClip, refLeftIn, refLeftOut),
                 refRightDuration - minDur
             );
 
             // 2. Expansão para a esquerda (delta < 0):
             // - Left encolhe: refLeftDuration + delta >= minDur => delta >= -(refLeftDuration - minDur)
-            // - Right expande: refRightIn + delta >= 0 => delta >= -refRightIn
+            // - Right expande até o início da mídia
             let minDelta = Math.max(
                 -(refLeftDuration - minDur),
-                -refRightIn
+                -this.folgaCabecaFrames(rightClip, refRightIn, refRightOut)
             );
 
             // Pares vinculados (A/V)
@@ -7121,16 +7214,15 @@ export class CapiauTimelineState {
                         const pRightDur = refPartnerRightOut - refPartnerRightIn;
 
                         if (pLeftDur > 0 && pRightDur > 0) {
-                            const maxPartnerLeftMedia = this.getMaxMediaFrames(partnerLeft);
                             maxDelta = Math.min(
                                 maxDelta,
-                                Number.isFinite(maxPartnerLeftMedia) ? (maxPartnerLeftMedia - refPartnerLeftOut) : Infinity,
+                                this.folgaCaudaFrames(partnerLeft, refPartnerLeftIn, refPartnerLeftOut),
                                 pRightDur - minDur
                             );
                             minDelta = Math.max(
                                 minDelta,
                                 -(pLeftDur - minDur),
-                                -refPartnerRightIn
+                                -this.folgaCabecaFrames(partnerRight, refPartnerRightIn, refPartnerRightOut)
                             );
                         }
                     }
@@ -7147,22 +7239,18 @@ export class CapiauTimelineState {
             const clampedDelta = Math.max(minDelta, Math.min(maxDelta, deltaFrames));
 
             // Aplica as alterações no Clip A (Left)
-            leftClip.outFrame = refLeftOut + clampedDelta;
-            leftClip.out = leftClip.outFrame / fps;
+            this.aplicarCauda(leftClip, refLeftIn, refLeftOut, clampedDelta);
 
             // Aplica as alterações no Clip B (Right)
-            rightClip.inFrame = refRightIn + clampedDelta;
-            rightClip.in = rightClip.inFrame / fps;
+            this.aplicarCabeca(rightClip, refRightIn, refRightOut, clampedDelta);
             rightClip.timelineStartFrame = refRightStart + clampedDelta;
             rightClip.timeline_start = rightClip.timelineStartFrame / fps;
 
             // Sincronia de parceiros A/V
             if (partnerLeft && partnerRight) {
-                partnerLeft.outFrame = refPartnerLeftOut + clampedDelta;
-                partnerLeft.out = partnerLeft.outFrame / fps;
+                this.aplicarCauda(partnerLeft, refPartnerLeftIn, refPartnerLeftOut, clampedDelta);
 
-                partnerRight.inFrame = refPartnerRightIn + clampedDelta;
-                partnerRight.in = partnerRight.inFrame / fps;
+                this.aplicarCabeca(partnerRight, refPartnerRightIn, refPartnerRightOut, clampedDelta);
                 partnerRight.timelineStartFrame = refPartnerRightStart + clampedDelta;
                 partnerRight.timeline_start = partnerRight.timelineStartFrame / fps;
 
