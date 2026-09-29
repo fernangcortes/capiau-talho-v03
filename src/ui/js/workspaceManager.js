@@ -932,7 +932,7 @@ export class WorkspaceManager {
 
     /** Divisor entre duas colunas da célula da ponta: só com as duas abertas. */
     refreshEdgeSplitters() {
-        const open = (id) => { const el = document.getElementById(id); return !!el && !this.isPanelCollapsed(id); };
+        const open = (id) => { const el = document.getElementById(id); return !!el && !this.isPanelCollapsed(id) && !el.classList.contains("rail-mode"); };
         document.querySelectorAll(".dock-edge-splitter").forEach(sp => {
             sp.style.display = open(sp.dataset.prev) && open(sp.dataset.next) ? "" : "none";
         });

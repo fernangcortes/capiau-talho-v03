@@ -977,6 +977,86 @@ button {
     box-shadow: 0 0 10px var(--t-glow, rgba(139, 92, 246, 0.6));
 }
 
+/* ── BARRA FINA DOS PAINÉIS (js/panelRail.js): aberta → barra → linha ────────── */
+.panel-rail {
+    width: 36px;
+    flex: 0 0 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 0;
+    box-sizing: border-box;
+    background: #0d0d0d;
+    border-right: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.06));
+    user-select: none;
+    -webkit-user-select: none;
+}
+.panel-rail[hidden] {
+    display: none;
+}
+.panel-rail.panel-rail-right {
+    border-right: 0;
+    border-left: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.06));
+}
+.panel-rail-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.panel-rail-spacer {
+    flex: 1;
+    width: 100%;
+}
+.panel-rail-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: var(--fs-12);
+    cursor: pointer;
+}
+.panel-rail-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+}
+.panel-rail-btn.active {
+    color: var(--text-primary);
+}
+.panel-rail-btn.open {
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 2px 0 0 var(--accent);
+}
+.panel-rail-right .panel-rail-btn.open {
+    box-shadow: inset -2px 0 0 var(--accent);
+}
+.panel-rail-down {
+    font-size: var(--fs-10);
+}
+
+/* Na barra o painel sai do fluxo; aberto, flutua ao lado dela, sem escurecer o editor. */
+.rail-mode:not(.rail-flyout) {
+    display: none !important;
+}
+.rail-flyout {
+    position: fixed !important;
+    top: var(--rail-top) !important;
+    left: var(--rail-left) !important;
+    width: var(--rail-width) !important;
+    height: var(--rail-height) !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: none !important;
+    z-index: 9000;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
 /* Adjustments for borders to separate sidebars when docked in workspace or studio-top */
 .workspace > .sidebar-left,
 .studio-top > .sidebar-left {

@@ -18,6 +18,7 @@ import { initExportVideoPanel } from "./exportVideo.js";
 import { LOG_MANAGER } from "./logManager.js";
 import { initTabsCustomization, setTabVisibility } from "./tabsCustomization.js";
 import { initHeaderMenus } from "./headerMenus.js";
+import { PanelRail } from "./panelRail.js";
 import { TEXT_AI_ENGINE } from "./textAIEngine.js";
 import { TITLES_TAB } from "./titlesTab.js";
 import { carregarFontesDoProjeto } from "./fontManager.js";
@@ -1983,13 +1984,26 @@ window.addEventListener("DOMContentLoaded", () => {
     // poder revelá-los: resultado renderizado em painel recolhido = "não aconteceu nada".
     window.collapseSidebar = collapseSidebar;
     window.expandSidebar = expandSidebar;
-    window.expandLeftPanel = () => expandSidebar("left");
-    window.expandInspectorPanel = () => expandSidebar("inspector");
-    window.expandRightPanel = () => expandSidebar("right");
+    // Barra fina (panelRail.js): aberta → barra → linha. Na barra, "mostrar o painel" abre por cima.
+    const panelRail = new PanelRail({
+        workspaceManager: window.workspaceManager,
+        collapse: (panelId) => collapseSidebar(Object.keys(SIDE_PANELS).find(k => SIDE_PANELS[k] === panelId)),
+        beforeHide: (panelId) => {
+            if (panelId === "sidebar-left" && window.libraryManager && window.libraryManager.mediaInspectorActive) {
+                window.libraryManager.closeMediaInspector();
+            }
+        }
+    });
+    window.panelRail = panelRail;
+    panelRail.init();
 
-    if (toggleLeft) toggleLeft.addEventListener("click", () => collapseSidebar("left"));
-    if (toggleInspector) toggleInspector.addEventListener("click", () => collapseSidebar("inspector"));
-    if (toggleRight) toggleRight.addEventListener("click", () => collapseSidebar("right"));
+    window.expandLeftPanel = () => { expandSidebar("left"); panelRail.reveal("sidebar-left"); };
+    window.expandInspectorPanel = () => { expandSidebar("inspector"); panelRail.reveal("inspector-panel"); };
+    window.expandRightPanel = () => { expandSidebar("right"); panelRail.reveal("sidebar-right"); };
+
+    if (toggleLeft) toggleLeft.addEventListener("click", () => panelRail.stepDown("sidebar-left"));
+    if (toggleInspector) toggleInspector.addEventListener("click", () => panelRail.stepDown("inspector-panel"));
+    if (toggleRight) toggleRight.addEventListener("click", () => panelRail.stepDown("sidebar-right"));
     if (toggleTimeline) toggleTimeline.addEventListener("click", () => collapseSidebar("timeline"));
     
     if (reopenLeft) reopenLeft.addEventListener("click", () => expandSidebar("left"));
