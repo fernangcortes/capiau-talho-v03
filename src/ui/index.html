@@ -17,7 +17,7 @@
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Customizados -->
-    <link rel="stylesheet" href="styles.css?v=80">
+    <link rel="stylesheet" href="styles.css?v=85">
     <link rel="stylesheet" href="theme.css?v=4">
     <script src="js/themeBoot.js?v=2"></script>
 </head>
@@ -32,127 +32,130 @@
                 </div>
             </div>
 
-            <div class="project-area glassmorphism">
+            <!-- Projeto: seletor à vista, ações no menu -->
+            <div class="project-area hgroup">
                 <i class="fa-solid fa-folder-tree project-icon"></i>
                 <select id="project-selector" data-tooltip="Projeto Ativo">
                     <!-- Projetos inseridos dinamicamente -->
                 </select>
-                <button id="btn-new-project" class="btn-icon" data-tooltip="Criar um novo projeto no banco de dados local.">
-                    <i class="fa-solid fa-folder-plus"></i>
-                </button>
-                <button id="btn-sync-project" class="btn-icon" data-tooltip="Sincronizar e exportar ou importar dados de backup do projeto." style="color: var(--color-cyan);">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                </button>
-                <button id="btn-delete-project" class="btn-icon btn-danger" data-tooltip="Remover permanentemente o projeto ativo e seus metadados.">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
-            </div>
-            
-            <!-- Seletor de Workspace -->
-            <div class="project-area glassmorphism" style="background: var(--t-tint-2, rgba(168, 85, 247, 0.1)); border-color: var(--t-line-strong, rgba(168, 85, 247, 0.3)); display: flex; align-items: center; gap: 4px;">
-                <i class="fa-solid fa-table-columns" style="color: #c084fc;"></i>
-                <select id="select-workspace" data-tooltip="Configuração de Workspace" style="color: #c084fc; max-width: 140px; background: transparent; border: none; outline: none; font-size: var(--fs-11); font-weight: 600; cursor: pointer;">
-                    <optgroup label="Presets Padrão">
-                        <option value="default">Workspace: Padrão</option>
-                        <option value="decupagem">Workspace: Decupagem</option>
-                        <option value="montagem">Workspace: Estúdio</option>
-                        <option value="multitela">Workspace: Multi-Tela</option>
-                    </optgroup>
-                    <optgroup id="optgroup-custom-workspaces" label="Meus Workspaces">
-                        <!-- Workspaces customizadas dinâmicas -->
-                    </optgroup>
-                </select>
-                <button id="btn-config-workspace" class="btn-icon" data-tooltip="Organizar Painéis & Configurar Workspace (Drag & Drop)" style="color: var(--color-cyan);">
-                    <i class="fa-solid fa-sliders"></i>
-                </button>
-                <button id="btn-save-workspace" class="btn-icon" data-tooltip="Salvar posição atual como Workspace Customizada" style="color: #c084fc;">
-                    <i class="fa-solid fa-floppy-disk"></i>
-                </button>
-                <button id="btn-reset-workspace-layout" class="btn-icon" data-tooltip="Restaurar layout do workspace carregado (Ctrl + Alt + Z desfaz)" style="color: #c084fc;">
-                    <i class="fa-solid fa-arrow-rotate-left"></i>
-                </button>
-                <button id="btn-rename-workspace" class="btn-icon" data-tooltip="Renomear Workspace Customizada Selecionada" style="color: #c084fc; display: none;">
-                    <i class="fa-solid fa-pen"></i>
-                </button>
-                <button id="btn-delete-workspace" class="btn-icon btn-danger" data-tooltip="Excluir Workspace Customizada Selecionada" style="display: none;">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
-            </div>
-            
-            <!-- Controles de Layout (Monitores & Timeline) -->
-            <div class="project-area glassmorphism layout-controls-group" style="background: var(--t-tint-2, rgba(6, 182, 212, 0.08)); border-color: var(--t-line-strong, rgba(6, 182, 212, 0.25)); display: flex; align-items: center; gap: 6px; padding: 2px 8px;">
-                <!-- Seletor de Disposição dos Monitores -->
-                <div style="display: flex; align-items: center; gap: 4px;" data-tooltip="Disposição dos Monitores (Preview & Program)">
-                    <i id="icon-monitors-layout" class="fa-solid fa-table-columns" style="color: var(--color-cyan); font-size: var(--fs-11);"></i>
-                    <select id="select-monitors-layout" style="color: var(--color-cyan); max-width: 160px; background: transparent; border: none; outline: none; font-size: var(--fs-11); font-weight: 600; cursor: pointer;">
-                        <option value="auto">Monitores: Automático</option>
-                        <option value="side-by-side">Monitores: Lado a Lado</option>
-                        <option value="stacked">Monitores: Empilhados</option>
-                    </select>
+                <div class="hmenu-wrap">
+                    <button type="button" class="hmenu-trigger hbtn-icon" data-hmenu="hmenu-project" aria-haspopup="menu" aria-expanded="false" aria-label="Ações do projeto" data-tooltip="Novo, sincronizar, remover">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                    <div class="hmenu" id="hmenu-project" role="menu" hidden>
+                        <div class="hmenu-head">Projeto</div>
+                        <button type="button" id="btn-new-project" class="hmenu-item" role="menuitem"><i class="fa-solid fa-folder-plus"></i><span>Novo projeto…</span></button>
+                        <button type="button" id="btn-sync-project" class="hmenu-item" role="menuitem"><i class="fa-solid fa-cloud-arrow-up"></i><span>Sincronizar, exportar, importar…</span></button>
+                        <div class="hmenu-sep"></div>
+                        <button type="button" id="btn-delete-project" class="hmenu-item hmenu-danger" role="menuitem"><i class="fa-solid fa-trash-can"></i><span>Remover projeto…</span></button>
+                    </div>
                 </div>
-
-                <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.15);"></div>
-
-                <!-- Seletor de Posição da Timeline (Line-Icon com Tooltip e Menu Design System) -->
-                <button id="btn-timeline-position" class="btn-icon" data-tooltip="Posição da Linha do Tempo: Entre menus" style="color: #c084fc; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; cursor: pointer; border-radius: 4px;">
-                    <i id="icon-timeline-position" class="fa-solid fa-arrows-left-right-to-line" style="font-size: var(--fs-11);"></i>
-                </button>
-                <select id="select-timeline-position" style="display: none;" aria-hidden="true">
-                    <option value="center">Timeline: Entre menus</option>
-                    <option value="bottom-left">Timeline: Abaixo da esquerda</option>
-                    <option value="bottom-right">Timeline: Abaixo da direita</option>
-                    <option value="bottom-full">Timeline: Faixa de baixo (Total)</option>
-                </select>
-
-                <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.15);"></div>
-
-                <!-- Botão de Destacar Menus Duplos (Multi-Monitor) -->
-                <button id="btn-dual-sidebar-popout" class="btn-icon" data-tooltip="Destacar Menus Laterais Juntos em Nova Janela (Multi-Monitor)" style="color: #c084fc;">
-                    <i class="fa-solid fa-table-columns"></i>
-                </button>
             </div>
-            
+
+            <!-- Workspaces: os slots [1]–[4] à vista (espelham #select-workspace), o resto no menu ⋯ -->
+            <div class="ws-group hgroup">
+                <div class="ws-segmented" id="ws-segmented" role="group" aria-label="Workspaces"></div>
+                <div class="hmenu-wrap">
+                    <button type="button" class="hmenu-trigger hbtn-icon" data-hmenu="hmenu-layout" aria-haspopup="menu" aria-expanded="false" aria-label="Layout e workspace" data-tooltip="Layout e workspace">
+                        <i class="fa-solid fa-ellipsis"></i>
+                    </button>
+                    <div class="hmenu" id="hmenu-layout" role="menu" hidden>
+                        <div class="hmenu-head">Workspace</div>
+                        <label class="hmenu-field">
+                            <i class="fa-solid fa-table-columns"></i>
+                            <select id="select-workspace" aria-label="Workspace">
+                                <optgroup label="Presets Padrão">
+                                    <option value="default">Workspace: Padrão</option>
+                                    <option value="decupagem">Workspace: Decupagem</option>
+                                    <option value="montagem">Workspace: Estúdio</option>
+                                    <option value="multitela">Workspace: Multi-Tela</option>
+                                </optgroup>
+                                <optgroup id="optgroup-custom-workspaces" label="Meus Workspaces">
+                                    <!-- Workspaces customizadas dinâmicas -->
+                                </optgroup>
+                            </select>
+                        </label>
+                        <button type="button" id="btn-config-workspace" class="hmenu-item" role="menuitem"><i class="fa-solid fa-sliders"></i><span>Organizar painéis…</span></button>
+                        <button type="button" id="btn-save-workspace" class="hmenu-item" role="menuitem"><i class="fa-solid fa-floppy-disk"></i><span>Salvar como workspace…</span><kbd>Ctrl Shift S</kbd></button>
+                        <button type="button" id="btn-reset-workspace-layout" class="hmenu-item" role="menuitem"><i class="fa-solid fa-arrow-rotate-left"></i><span>Restaurar layout</span><kbd>Ctrl Alt Z desfaz</kbd></button>
+                        <button type="button" id="btn-rename-workspace" class="hmenu-item" role="menuitem" style="display: none;"><i class="fa-solid fa-pen"></i><span>Renomear workspace…</span></button>
+                        <button type="button" id="btn-delete-workspace" class="hmenu-item hmenu-danger" role="menuitem" style="display: none;"><i class="fa-solid fa-trash-can"></i><span>Excluir workspace</span></button>
+                        <div class="hmenu-sep"></div>
+                        <div class="hmenu-head">Monitores</div>
+                        <label class="hmenu-field">
+                            <i id="icon-monitors-layout" class="fa-solid fa-table-columns"></i>
+                            <select id="select-monitors-layout" aria-label="Disposição dos monitores">
+                                <option value="auto">Monitores: Automático</option>
+                                <option value="side-by-side">Monitores: Lado a Lado</option>
+                                <option value="stacked">Monitores: Empilhados</option>
+                            </select>
+                        </label>
+                        <div class="hmenu-sep"></div>
+                        <div class="hmenu-head">Timeline e janelas</div>
+                        <button type="button" id="btn-timeline-position" class="hmenu-item" role="menuitem" data-hmenu-keep data-tooltip="Posição da Linha do Tempo: Entre menus"><i id="icon-timeline-position" class="fa-solid fa-arrows-left-right-to-line"></i><span>Posição da timeline…</span></button>
+                        <select id="select-timeline-position" style="display: none;" aria-hidden="true">
+                            <option value="center">Timeline: Entre menus</option>
+                            <option value="bottom-left">Timeline: Abaixo da esquerda</option>
+                            <option value="bottom-right">Timeline: Abaixo da direita</option>
+                            <option value="bottom-full">Timeline: Faixa de baixo (Total)</option>
+                        </select>
+                        <button type="button" id="btn-dual-sidebar-popout" class="hmenu-item" role="menuitem"><i class="fa-solid fa-window-restore"></i><span>Destacar laterais juntos</span></button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Espaço Vazio Clicável para Retração do Cabeçalho (Sem tooltip) -->
             <div class="header-empty-spacer"></div>
-            
+
             <div class="search-area glassmorphism">
                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                <input type="text" id="semantic-search-input" placeholder="Buscar falas ou B-rolls semanticamente (ex: escolha das lentes)...">
-                <select id="search-filter">
+                <input type="text" id="semantic-search-input" placeholder="Buscar falas ou B-roll…">
+                <select id="search-filter" aria-label="Tipo de mídia">
                     <option value="">Todas as Mídias</option>
                     <option value="interview">Entrevistas (ASR)</option>
                     <option value="broll">Bastidores (B-roll)</option>
                     <option value="photo">Fotos de Set</option>
                 </select>
-                <button id="btn-search" class="btn-primary" data-tooltip="Executar pesquisa semântica por inteligência artificial nos arquivos do projeto.">
+                <!-- A busca roda no Enter; o botão fica para quem chama .click() -->
+                <button id="btn-search" class="btn-primary" hidden aria-hidden="true" tabindex="-1">
                     <i class="fa-solid fa-magnifying-glass"></i>
                 </button>
             </div>
-            
+
+            <div class="header-empty-spacer"></div>
+
             <div class="actions-area">
-                <div id="health-status-badge" class="glassmorphism" data-tooltip="Status do Sistema: Verificando..." style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; font-size: var(--fs-10); font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); margin-right: 4px;">
-                    <span id="health-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 6px var(--t-glow, #22c55e);"></span>
-                    <span id="health-label" style="color: var(--text-secondary);">:8000</span>
+                <div id="health-status-badge" class="glassmorphism" data-tooltip="Status do Sistema: Verificando...">
+                    <span id="health-dot"></span>
+                    <span id="health-label">:8000</span>
                 </div>
-                <button id="btn-scan" class="btn-outline" data-tooltip="Escanear a pasta watch/ para identificar e importar novos arquivos de mídia locais.">
-                    <i class="fa-solid fa-arrows-rotate"></i>
-                </button>
-                <button id="btn-import-external" class="btn-outline" data-tooltip="Importar mídias de um HD externo ou pasta em modo Link (sem cópia física, gerando apenas proxies).">
-                    <i class="fa-solid fa-hard-drive"></i>
-                </button>
-                <button id="btn-open-proxies" class="btn-outline" data-tooltip="Abrir pasta física local onde são salvos os arquivos de proxy.">
-                    <i class="fa-solid fa-folder-open"></i>
-                </button>
-                <button id="btn-retry-failed" class="btn-outline" style="color: var(--color-rose); border-color: var(--t-line-strong, rgba(244, 63, 94, 0.3));" data-tooltip="Tentar gerar novamente todos os proxies ou transcrições que falharam ou estão ausentes.">
-                    <i class="fa-solid fa-arrows-rotate"></i>
-                </button>
-                <button id="btn-cluster" class="btn-secondary" data-tooltip="Executar inteligência artificial para agrupar e organizar trechos e transcrições em blocos temáticos.">
-                    <i class="fa-solid fa-brain"></i>
-                </button>
-                <button id="btn-open-settings" class="btn-outline" data-tooltip="Abrir Painel de Configurações da IA (Modelos, Chaves e Parâmetros)">
+
+                <div class="hmenu-wrap">
+                    <button type="button" class="hmenu-trigger hbtn" data-hmenu="hmenu-import" aria-haspopup="menu" aria-expanded="false">
+                        <i class="fa-solid fa-arrow-up-from-bracket"></i><span>Importar</span><i class="fa-solid fa-chevron-down hbtn-caret"></i>
+                    </button>
+                    <div class="hmenu" id="hmenu-import" role="menu" hidden>
+                        <button type="button" id="btn-scan" class="hmenu-item" role="menuitem"><i class="fa-solid fa-arrows-rotate"></i><span>Escanear a pasta watch/</span></button>
+                        <button type="button" id="btn-import-external" class="hmenu-item" role="menuitem"><i class="fa-solid fa-hard-drive"></i><span>HD externo em modo link…</span></button>
+                        <div class="hmenu-sep"></div>
+                        <button type="button" id="btn-open-proxies" class="hmenu-item" role="menuitem"><i class="fa-solid fa-folder-open"></i><span>Abrir pasta de proxies</span></button>
+                    </div>
+                </div>
+
+                <div class="hsplit">
+                    <button type="button" id="btn-cluster" class="hbtn" data-tooltip="Agrupar e organizar trechos e transcrições em blocos temáticos."><i class="fa-solid fa-brain"></i><span>Organizar com IA</span></button>
+                    <div class="hmenu-wrap">
+                        <button type="button" class="hmenu-trigger hbtn hbtn-caret-only" data-hmenu="hmenu-ia" aria-haspopup="menu" aria-expanded="false" aria-label="Mais ações de IA"><i class="fa-solid fa-chevron-down"></i></button>
+                        <div class="hmenu" id="hmenu-ia" role="menu" hidden>
+                            <button type="button" id="btn-retry-failed" class="hmenu-item hmenu-danger" role="menuitem"><i class="fa-solid fa-arrows-rotate"></i><span>Refazer proxies e transcrições com falha</span></button>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btn-open-settings" class="btn-outline" data-tooltip="Configurações (IA, aparência, atalhos)" aria-label="Configurações">
                     <i class="fa-solid fa-gear"></i>
                 </button>
-                <button id="btn-collapse-header" class="btn-outline" data-tooltip="Ocultar cabeçalho para expandir o espaço vertical de trabalho e edição.">
+                <button id="btn-collapse-header" class="btn-outline" data-tooltip="Ocultar cabeçalho para expandir o espaço vertical de trabalho e edição." aria-label="Ocultar cabeçalho">
                     <i class="fa-solid fa-chevron-up"></i>
                 </button>
             </div>
@@ -3636,7 +3639,7 @@
     </div>
 
     <!-- Lógica da Aplicação -->
-    <script type="module" src="js/main.js?v=72"></script>
+    <script type="module" src="js/main.js?v=74"></script>
 </body>
 </html>
 

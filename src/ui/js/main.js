@@ -17,6 +17,7 @@ import { initAutosave, triggerAutosave } from "./timelineAutosave.js";
 import { initExportVideoPanel } from "./exportVideo.js";
 import { LOG_MANAGER } from "./logManager.js";
 import { initTabsCustomization, setTabVisibility } from "./tabsCustomization.js";
+import { initHeaderMenus } from "./headerMenus.js";
 import { TEXT_AI_ENGINE } from "./textAIEngine.js";
 import { TITLES_TAB } from "./titlesTab.js";
 import { carregarFontesDoProjeto } from "./fontManager.js";
@@ -1576,6 +1577,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     // Inicializa a customização de abas (Drag & Drop e Visibilidade)
     initTabsCustomization();
+    initHeaderMenus();
     window.initTabsCustomization = initTabsCustomization;
 
     // Motor Global de Tooltips Premium NLE
