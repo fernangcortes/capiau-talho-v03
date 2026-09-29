@@ -25,6 +25,19 @@ export function estadoTitulo(clip, relTimeS) {
     };
 }
 
+/** Peso da fonte do título ("100".."900"); sem valor ou inválido = 400 (títulos antigos). */
+export function pesoTitulo(clip) {
+    const p = String(clip.fontWeight ?? "").trim().toLowerCase();
+    if (/^[1-9]00$/.test(p)) return p;
+    if (p === "bold") return "700";
+    return "400";
+}
+
+/** Estilo da fonte do título: "italic" ou "normal". */
+export function estiloTitulo(clip) {
+    return String(clip.fontStyle || "").trim().toLowerCase() === "italic" ? "italic" : "normal";
+}
+
 function _sombraEscalada(sombra, e) {
     // "0 2px 10px rgba(...)" -> px multiplicados pela escala
     return sombra.replace(/(-?\d*\.?\d+)px/g, (_, n) => `${Number(n) * e}px`);
@@ -54,6 +67,8 @@ export function montarElementoTitulo(doc, clip, relTimeS, escala = 1) {
     el.style.transformOrigin = "center center";
     el.style.fontFamily = clip.fontFamily ? `"${clip.fontFamily}", sans-serif` : "'Outfit', 'Inter', sans-serif";
     el.style.fontSize = `${st.fontSize * e}px`;
+    el.style.fontWeight = pesoTitulo(clip);
+    el.style.fontStyle = estiloTitulo(clip);
     el.style.letterSpacing = `${st.tracking * e}px`;
     el.style.color = clip.color || "#ffffff";
     el.style.textAlign = textAlign;

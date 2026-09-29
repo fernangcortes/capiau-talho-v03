@@ -2,7 +2,8 @@
 import { STATE } from "./state.js";
 import { TIMELINE_STATE, TIMELINE_HISTORY } from "./timelineState.js";
 import { evaluateClipTransform, evaluateClipProperty, hasKeyframes, addOrUpdateKeyframe } from "./keyframeEngine.js";
-import { montarElementoTitulo } from "./tituloRender.js";
+import { montarElementoTitulo, estiloTitulo } from "./tituloRender.js";
+import { ensureFontLoaded } from "./fontManager.js";
 import { getActiveElement } from "./workspaceManager.js";
 
 export class PlayerTextOverlayManager {
@@ -135,6 +136,8 @@ export class PlayerTextOverlayManager {
             const clipStart = clip.timelineStartFrame !== undefined ? clip.timelineStartFrame : Math.round((clip.timeline_start || 0) * fps);
             const relTimeS = Math.max(0, (currentFrame - clipStart) / fps);
 
+            // Projeto recém-aberto: a folha do Google da fonte do clipe ainda não foi pedida
+            ensureFontLoaded(clip.fontFamily, estiloTitulo(clip));
             // Mesma montagem do render do arquivo (tituloRender.js)
             const el = montarElementoTitulo(this.textLayer.ownerDocument || document, clip, relTimeS, escala);
             el.style.pointerEvents = "auto";

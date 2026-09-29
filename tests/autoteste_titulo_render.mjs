@@ -61,7 +61,7 @@ const gc = {
 {
     const overlay = readFileSync(new URL("../src/ui/js/playerTextOverlay.js", import.meta.url), "utf8");
     const render = readFileSync(new URL("../src/ui/js/renderTitulos.js", import.meta.url), "utf8");
-    assert.ok(overlay.includes('import { montarElementoTitulo } from "./tituloRender.js"'));
+    assert.ok(/import \{ montarElementoTitulo[^}]*\} from "\.\/tituloRender\.js"/.test(overlay));
     assert.ok(overlay.includes("montarElementoTitulo(this.textLayer.ownerDocument || document, clip, relTimeS, escala)"));
     assert.ok(!/el\.style\.fontSize\s*=/.test(overlay), "o preview voltou a montar o estilo por conta própria");
     assert.ok(overlay.includes('STATE.on("programViewportResized"'), "título precisa redesenhar quando o monitor muda de tamanho");
@@ -69,6 +69,23 @@ const gc = {
     const player = readFileSync(new URL("../src/ui/js/player.js", import.meta.url), "utf8");
     assert.ok(player.includes('STATE.emit("programViewportResized"'));
     ok("preview (escala do monitor) e render (escala 1) montam pelo mesmo tituloRender.js");
+}
+
+// 4. Peso e estilo do clipe chegam ao título (tela e arquivo); subtexto continua 400
+{
+    const { pesoTitulo, estiloTitulo } = await import("../src/ui/js/tituloRender.js");
+    const negrito = montarElementoTitulo(docFalso, { ...gc, fontWeight: "700", fontStyle: "italic" }, 1, 1);
+    assert.equal(negrito.style.fontWeight, "700");
+    assert.equal(negrito.style.fontStyle, "italic");
+    assert.equal(negrito.children[1].style.fontWeight, "400", "subtexto continua 400");
+    const antigo = montarElementoTitulo(docFalso, gc, 1, 1);
+    assert.equal(antigo.style.fontWeight, "400", "clipe sem fontWeight fica como antes");
+    assert.equal(antigo.style.fontStyle, "normal");
+    assert.equal(pesoTitulo({ fontWeight: 900 }), "900");
+    assert.equal(pesoTitulo({ fontWeight: "bold" }), "700");
+    assert.equal(pesoTitulo({ fontWeight: "950; color:red" }), "400", "valor estranho não vaza para o CSS");
+    assert.equal(estiloTitulo({ fontStyle: "oblique" }), "normal");
+    ok("fontWeight/fontStyle do clipe aplicados; subtexto 400; valores inválidos caem no padrão");
 }
 
 console.log(`\n=== ${n}/${n} TESTES APROVADOS ===`);

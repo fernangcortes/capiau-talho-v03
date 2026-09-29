@@ -59,25 +59,34 @@ const loadedGoogleFonts = new Set(["Outfit", "Inter"]);
 
 /**
  * Injeta a folha de estilos Google Fonts no documento caso ainda não tenha sido carregada.
+ * Pede todos os pesos do catálogo. `estilo` "italic" pede também as faces itálicas numa
+ * folha à parte: família sem itálico faz o Google recusar a folha inteira (400), e essa
+ * recusa não pode derrubar as faces normais — o navegador sintetiza o oblíquo.
  */
-export function ensureFontLoaded(fontFamily) {
+export function ensureFontLoaded(fontFamily, estilo = "normal") {
     if (!fontFamily) return;
     const cleanName = fontFamily.trim().replace(/['"]/g, '');
-
-    if (loadedGoogleFonts.has(cleanName)) return;
-
     const fontObj = CURATED_FONTS.find(f => f.id.toLowerCase() === cleanName.toLowerCase());
-    if (fontObj && fontObj.isGoogle) {
-        const familyParam = cleanName.replace(/\s+/g, '+');
-        const weightsParam = fontObj.weights.join(';');
-        const url = `https://fonts.googleapis.com/css2?family=${familyParam}:wght@${weightsParam}&display=swap`;
+    if (!fontObj || !fontObj.isGoogle) return;
+    const familyParam = cleanName.replace(/\s+/g, '+');
 
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = url;
-        document.head.appendChild(link);
+    if (!loadedGoogleFonts.has(cleanName)) {
+        _injetarFolha(`https://fonts.googleapis.com/css2?family=${familyParam}:wght@${fontObj.weights.join(';')}&display=swap`);
         loadedGoogleFonts.add(cleanName);
     }
+    const chaveItalico = `${cleanName}|italic`;
+    if (estilo === "italic" && !loadedGoogleFonts.has(chaveItalico)) {
+        const pesos = fontObj.weights.map(w => `1,${w}`).join(';');
+        _injetarFolha(`https://fonts.googleapis.com/css2?family=${familyParam}:ital,wght@${pesos}&display=swap`);
+        loadedGoogleFonts.add(chaveItalico);
+    }
+}
+
+function _injetarFolha(url) {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = url;
+    document.head.appendChild(link);
 }
 
 /**
@@ -183,6 +192,6 @@ export function applyBrandKitToClip(clip, category = "lower_third") {
     clip.boxPadding = bk.boxPadding;
     clip.boxBorderRadius = bk.boxBorderRadius;
     clip.alignment = bk.defaultAlignment;
-    ensureFontLoaded(clip.fontFamily);
+    ensureFontLoaded(clip.fontFamily, clip.fontStyle);
     return clip;
 }

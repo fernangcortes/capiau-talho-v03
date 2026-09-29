@@ -425,7 +425,7 @@ export function createTextClipFromPreset(presetId, textContent = "Novo Texto", s
     const fps = TIMELINE_STATE.fps || 24;
     const durationFrames = Math.round((preset.defaultDurationS || 4.0) * fps);
 
-    ensureFontLoaded(preset.fontFamily);
+    ensureFontLoaded(preset.fontFamily, preset.fontStyle);
 
     return {
         id: `txt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,

@@ -3,7 +3,7 @@
 // O Python (src/export/video_render/titulos.py) abre esta página num navegador
 // headless e chama as funções em window.RENDER_TITULOS. Tudo o que decide a aparência
 // vem de tituloRender.js e keyframeEngine.js, os mesmos módulos do preview.
-import { montarElementoTitulo, estadoTitulo } from "./tituloRender.js";
+import { montarElementoTitulo, estadoTitulo, pesoTitulo, estiloTitulo } from "./tituloRender.js";
 import { ensureFontLoaded } from "./fontManager.js";
 
 const palco = document.getElementById("palco");
@@ -28,9 +28,9 @@ async function _esperarFolhas(limiteMs = 8000) {
  * duas famílias genéricas: se a largura muda, a família pedida foi usada. Vale também
  * para fontes instaladas no sistema, que não aparecem em document.fonts.
  */
-function _fonteEmUso(familia, amostra) {
+function _fonteEmUso(familia, amostra, face = "400") {
     const ctx = document.createElement("canvas").getContext("2d");
-    const medir = (pilha) => { ctx.font = `400 48px ${pilha}`; return ctx.measureText(amostra).width; };
+    const medir = (pilha) => { ctx.font = `${face} 48px ${pilha}`; return ctx.measureText(amostra).width; };
     return ["monospace", "serif"].some(g => medir(`"${familia}", ${g}`) !== medir(g));
 }
 
@@ -44,15 +44,18 @@ window.RENDER_TITULOS = {
         palco.style.width = `${largura}px`;
         palco.style.height = `${altura}px`;
         const familia = _familia(clip);
-        ensureFontLoaded(familia);
+        const estilo = estiloTitulo(clip);
+        // Faces que o título usa: texto no peso/estilo do clipe, subtexto 400 (herda o estilo)
+        const face = `${estilo} ${pesoTitulo(clip)}`;
+        const faces = [face, `${estilo} 400`];
+        ensureFontLoaded(familia, estilo);
         const amostra = `${clip.text || ""}${clip.subtext || ""}`.trim() || "Aa";
         await _esperarFolhas();
         try {
-            // Carrega as faces que o título usa (texto e subtexto, pesos 400/700).
-            await Promise.all(["400", "700"].map(p => document.fonts.load(`${p} 48px "${familia}"`, amostra)));
+            await Promise.all(faces.map(f => document.fonts.load(`${f} 48px "${familia}"`, amostra)));
         } catch (_) { /* a medição abaixo diz se deu certo */ }
         await document.fonts.ready;
-        return { fonte: familia, fonteDisponivel: _fonteEmUso(familia, amostra) };
+        return { fonte: familia, face, fonteDisponivel: _fonteEmUso(familia, amostra, face) };
     },
 
     /** Chave do estado visual em cada quadro [inicio, fim) relativo ao início do clipe. */

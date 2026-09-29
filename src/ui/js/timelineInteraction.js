@@ -16,6 +16,7 @@ import {
 } from "./keyframeEngine.js";
 import { FONT_MODAL } from "./fontCatalogModal.js";
 import { CURATED_FONTS, ensureFontLoaded } from "./fontManager.js";
+import { pesoTitulo, estiloTitulo } from "./tituloRender.js";
 import { KEYMAP_SERVICE } from "./keymapService.js";
 
 // Velocidades de render MEDIDAS nesta máquina (NÃO estimadas):
@@ -7951,6 +7952,10 @@ export class CapiauTimelineInteraction {
             const category = clip.textCategory || "lower_third";
 
             const fontOptions = CURATED_FONTS.map(f => `<option value="${f.id}" ${f.id === fontFamily ? 'selected' : ''}>${f.name} (${f.mood})</option>`).join("");
+            const pesoAtual = pesoTitulo(clip);
+            const estiloAtual = estiloTitulo(clip);
+            const nomesPeso = { "300": "Leve", "400": "Normal", "500": "Médio", "600": "Seminegrito", "700": "Negrito", "800": "Extranegrito", "900": "Black" };
+            const weightOptions = Object.entries(nomesPeso).map(([p, n]) => `<option value="${p}" ${p === pesoAtual ? 'selected' : ''}>${n} (${p})</option>`).join("");
 
             let bgMode = clip.bgMode || "glass_dark";
             let bgColorHex = "#000000";
@@ -8022,6 +8027,18 @@ export class CapiauTimelineInteraction {
                             <div class="control-wrap" style="display:flex; gap:4px; align-items:center; flex:1;">
                                 <select data-text-prop="fontFamily" class="nle-select" style="flex: 1; padding: 2px 4px; font-size: calc(10px * var(--font-scale, 1)); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
                                     ${fontOptions}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="adjustments-row" data-control-id="font_weight">
+                            <label>Peso</label>
+                            <div class="control-wrap" style="display:flex; gap:4px; align-items:center; flex:1;">
+                                <select data-text-prop="fontWeight" class="nle-select" style="flex: 1; padding: 2px 4px; font-size: calc(10px * var(--font-scale, 1)); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
+                                    ${weightOptions}
+                                </select>
+                                <select data-text-prop="fontStyle" class="nle-select" style="padding: 2px 4px; font-size: calc(10px * var(--font-scale, 1)); background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: #fff;">
+                                    <option value="normal" ${estiloAtual === 'normal' ? 'selected' : ''}>Normal</option>
+                                    <option value="italic" ${estiloAtual === 'italic' ? 'selected' : ''}>Itálico</option>
                                 </select>
                             </div>
                         </div>
