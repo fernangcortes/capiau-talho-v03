@@ -818,6 +818,9 @@ export class WorkspaceManager {
             document.getElementById("reopen-inspector")?.classList.remove("has-updates");
         }
         this.applyPanelCollapse(panelId);
+        // Barra fina na hora: com o editor atrás de uma janela destacada o navegador pausa os
+        // quadros de animação, e o redesenho pelo "resize" não chegaria à janela.
+        try { window.panelRail?.apply?.(panelId); } catch (e) {}
         window.dispatchEvent(new Event("resize"));
     }
 
@@ -4197,6 +4200,8 @@ export class WorkspaceManager {
 
         // Painel empilhado sai da pilha antes de ir para a janela nova.
         this.detachFromStack(panelId);
+        // Destacar é gesto do usuário: a janela nova abre o painel (barra fina), mesmo que ele estivesse na barra ou na linha.
+        (this._openOnAttach ||= new Set()).add(panelId);
 
         const winName = getPopoutWindowName(panelId);
         // window.open pelo nome pode navegar uma janela ainda aberta (editor recarregado): o aviso
@@ -4296,6 +4301,7 @@ export class WorkspaceManager {
     /** F3: o mouse foi solto fora do editor — o painel entra na janela que acompanhou o cursor. */
     commitLivePopout(panelId, popup) {
         this.detachFromStack(panelId);
+        (this._openOnAttach ||= new Set()).add(panelId);
         localStorage.setItem(`capiau_popout_active_${panelId}`, "true");
         const pending = this._deferredPopouts.get(panelId);
         this._deferredPopouts.delete(panelId);
@@ -5207,6 +5213,14 @@ export class WorkspaceManager {
         if (panelId === "timeline-panel") {
             this.syncTimelineCanvasToPopout();
         }
+
+        // Barra fina: destacar abre o painel na janela nova. Reconectar uma janela que já existia
+        // (editor recarregado) mantém o estado dela; em qualquer caso a janela desenha o estado atual.
+        try {
+            const rail = window.panelRail;
+            if (this._openOnAttach?.delete(panelId) && rail && rail.stateOf(panelId) !== "aberta") rail.setState(panelId, "aberta");
+            else rail?.apply?.(panelId);
+        } catch (e) {}
 
         try {
             this.channel.postMessage({

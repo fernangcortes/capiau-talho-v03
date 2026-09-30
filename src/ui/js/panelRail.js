@@ -199,7 +199,8 @@ export class PanelRail {
     }
 
     apply(id) {
-        const panel = document.getElementById(id);
+        // Numa janela destacada o painel mora no documento dela: procura lá também.
+        const panel = document.getElementById(id) || this.wm?.findPanelElement?.(id);
         const nav = this.rails[id];
         if (!panel || !nav) return;
         const state = this.stateOf(id);

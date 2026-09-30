@@ -57,7 +57,7 @@ console.log("✔ 3 passou: colunas (ao lado, ponta, empilhar, trocar), timeline 
 // 3b. Pilhas no WorkspaceManager (F2b)
 const wm = read("src", "ui", "js", "workspaceManager.js");
 assert.ok(wm.includes("mountStackGuests(colId, colEl)"), "arranjo das colunas monta as pilhas");
-assert.ok(/this\.detachFromStack\(panelId\);\s*\n\s*const winName = getPopoutWindowName\(panelId\);/.test(wm), "destacar tira o painel da pilha antes");
+assert.ok(/this\.detachFromStack\(panelId\);[^]{0,400}?const winName = getPopoutWindowName\(panelId\);/.test(wm), "destacar tira o painel da pilha antes");
 assert.ok(wm.includes("this.detachFromStack(panelId1);") && wm.includes("this.detachFromStack(panelId2);"), "janela dupla tira os dois painéis das pilhas");
 assert.ok(/columnStacks: this\.columnStacks\.map\(st => \[\.\.\.st\]\),\s*\n\s*bands: \{ top: \[\.\.\.this\.bands\.top\], bottom: \[\.\.\.this\.bands\.bottom\] \},\s*\n\s*bandCorners: \{ \.\.\.this\.bandCorners \},\s*\n\s*popouts:/.test(wm), "workspace salvo guarda as pilhas e as faixas (F2c)");
 assert.ok(css.includes(".dock-stack-guest {") && css.includes(".dock-stack-splitter {"), "estilos das pilhas");
