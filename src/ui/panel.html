@@ -306,6 +306,15 @@
         @media (max-width: 90px) { .popout-rail-nav .rail-label { display: none; } body.popout-rail .popout-rail-nav .panel-rail-btn { justify-content: center; padding: 0; } }
         body.popout-rail-side #panel-container { margin-left: 36px; }
         body.popout-rail-side.popout-rail-right #panel-container { margin-left: 0; margin-right: 36px; }
+        /* Coluna de abas escondida (janela aberta): o conteúdo ocupa tudo; a linha na borda traz a coluna. */
+        body.popout-rail .panel-rail-hide { display: none; }
+        body.popout-rail-side.popout-rail-hidden .popout-rail-nav { display: none; }
+        body.popout-rail-side.popout-rail-hidden #panel-container { margin-left: 0; margin-right: 0; }
+        .popout-rail-reveal { display: none; position: fixed; top: 0; bottom: 0; left: 0; width: 4px; z-index: 6; cursor: pointer;
+            background: var(--t-line-strong, rgba(255, 255, 255, 0.12)); transition: background 0.15s; }
+        body.popout-rail-right .popout-rail-reveal { left: auto; right: 0; }
+        .popout-rail-reveal:hover { background: var(--accent); }
+        body.popout-rail-side.popout-rail-hidden .popout-rail-reveal { display: block; }
         .single-restore-line {
             flex: 0 0 4px;
             background: color-mix(in srgb, var(--t-accent, rgb(6, 182, 212)) 18%, transparent);
@@ -920,6 +929,13 @@
             const RAIL_W = 36;
             let railSaved = null;
             let railNav = null;
+            let railReveal = null;
+            const RAIL_HIDDEN_KEY = `capiau_popout_rail_hidden_${panel1Name}`;
+            const setRailHidden = (hidden) => {
+                document.body.classList.toggle("popout-rail-hidden", !!hidden);
+                try { localStorage.setItem(RAIL_HIDDEN_KEY, hidden ? "1" : "0"); } catch (e) {}
+                window.dispatchEvent(new Event("resize"));
+            };
             const editorRail = () => { try { return window.opener && !window.opener.closed ? window.opener.panelRail : null; } catch (e) { return null; } };
             const railEsc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
             // mode: "barra" (só a lista de abas; a janela encolhe), "aberta" (coluna ao lado do conteúdo,
@@ -939,22 +955,34 @@
                     if (!railNav) return false;
                     railNav.remove();
                     railNav = null;
-                    document.body.classList.remove("popout-rail", "popout-rail-side", "popout-rail-right");
+                    railReveal?.remove();
+                    railReveal = null;
+                    document.body.classList.remove("popout-rail", "popout-rail-side", "popout-rail-right", "popout-rail-hidden");
                 } else {
                     if (!railNav) {
                         railNav = document.createElement("nav");
                         railNav.className = "panel-rail popout-rail-nav";
                         railNav.setAttribute("aria-label", TITLE_MAP[panel1Name] || panel1Name);
                         railNav.innerHTML = `<div class="panel-rail-tabs"></div><div class="panel-rail-spacer"></div>
+                            <button type="button" class="panel-rail-btn panel-rail-hide" data-tooltip="Esconder a coluna de abas" aria-label="Esconder a coluna de abas"><i class="fa-solid fa-angles-left"></i></button>
                             <button type="button" class="panel-rail-btn panel-rail-down"><i class="fa-solid fa-chevron-left"></i></button>`;
                         railNav.addEventListener("click", (e) => {
                             const b = e.target.closest(".panel-rail-btn");
                             if (!b) return;
+                            if (b.classList.contains("panel-rail-hide")) return setRailHidden(true);
                             const rail = editorRail();
                             if (b.classList.contains("panel-rail-down")) rail?.stepDown(panel1Name);
                             else rail?.popoutPick(panel1Name, Number(b.dataset.index));
                         });
                         document.body.appendChild(railNav);
+                        railReveal = document.createElement("div");
+                        railReveal.className = "popout-rail-reveal";
+                        railReveal.setAttribute("data-tooltip", "Mostrar a coluna de abas");
+                        railReveal.addEventListener("click", () => setRailHidden(false));
+                        document.body.appendChild(railReveal);
+                        let hidden = false;
+                        try { hidden = localStorage.getItem(RAIL_HIDDEN_KEY) === "1"; } catch (e) {}
+                        document.body.classList.toggle("popout-rail-hidden", hidden);
                     }
                     document.body.classList.toggle("popout-rail", barra);
                     document.body.classList.toggle("popout-rail-side", !barra);
@@ -965,6 +993,7 @@
                     down.setAttribute("data-tooltip", tip);
                     down.setAttribute("aria-label", tip);
                     down.querySelector("i").className = `fa-solid ${right ? "fa-chevron-right" : "fa-chevron-left"}`;
+                    railNav.querySelector(".panel-rail-hide i").className = `fa-solid ${right ? "fa-angles-right" : "fa-angles-left"}`;
                     const html = tabs.map((t, i) =>
                         `<button type="button" class="panel-rail-btn${t.active ? " active" : ""}${t.active && !barra ? " open" : ""}" data-index="${i}" data-tooltip="${railEsc(t.label)}" aria-label="${railEsc(t.label)}"><i class="${railEsc(t.icon)}"></i><span class="rail-label">${railEsc(t.label)}</span></button>`).join("");
                     const box = railNav.querySelector(".panel-rail-tabs");
