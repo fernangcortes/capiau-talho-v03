@@ -2744,8 +2744,10 @@
     </div>
 
     <!-- Modal de Configurações da IA -->
-    <div id="settings-modal" class="modal-overlay">
-        <div class="modal-content settings-modal-content glassmorphism">
+    <!-- Configurações: gaveta lateral direita que empurra o editor e o Welcome Hub (nunca fica na frente) -->
+    <aside id="settings-modal" class="settings-drawer" aria-label="Configurações" aria-hidden="true">
+        <div id="settings-drawer-resize" class="settings-drawer-resize" data-tooltip="Arraste para mudar a largura (duplo clique volta ao padrão)"></div>
+        <div class="settings-modal-content">
             <div class="settings-modal-header">
                 <h2><i class="fa-solid fa-gears"></i> Configurações da IA</h2>
                 <div class="settings-header-controls">
@@ -2758,7 +2760,7 @@
                         <button class="mode-btn" data-mode="pro">Profissional</button>
                     </div>
                 </div>
-                <button class="btn-close-modal" id="btn-close-settings-modal">&times;</button>
+                <button class="btn-close-modal" id="btn-close-settings-modal" aria-label="Fechar configurações" data-tooltip="Fechar (Esc)">&times;</button>
             </div>
             <div class="settings-modal-body">
                 <nav id="settings-nav" class="settings-nav"></nav>
@@ -2768,12 +2770,12 @@
                 <div id="settings-presets" class="settings-presets"></div>
                 <div style="display: flex; align-items: center; gap: var(--sp-12);">
                     <span id="settings-dirty-count" class="settings-dirty-count" style="font-size: var(--fs-11); color: var(--color-rose);"></span>
-                    <button id="btn-settings-discard" class="btn-outline" style="height: 36px; padding: 0 var(--sp-14); font-size: var(--fs-12);" disabled>Descartar</button>
-                    <button id="btn-settings-save" class="btn-primary" style="height: 36px; padding: 0 var(--sp-14); font-size: var(--fs-12);" disabled>Salvar</button>
+                    <button id="btn-settings-discard" class="btn-outline" style="height: 26px; padding: 0 var(--sp-14); font-size: var(--fs-12);" disabled>Descartar</button>
+                    <button id="btn-settings-save" class="btn-primary" style="height: 26px; padding: 0 var(--sp-14); font-size: var(--fs-12);" disabled>Salvar</button>
                 </div>
             </div>
         </div>
-    </div>
+    </aside>
 
     <!-- Tooltip flutuante estilizada para Marcadores na Timeline (Ultra-compacta e sutil) -->
     <div id="timeline-marker-tooltip" class="glassmorphism" style="display: none; position: fixed; z-index: 3500; padding: var(--sp-4) var(--sp-8); border-radius: 5px; background: var(--t-surface-3, rgba(15, 23, 42, 0.9)); opacity: 0.9; border: 1px solid var(--accent); box-shadow: 0 4px 12px rgba(0,0,0,0.4); pointer-events: none; backdrop-filter: blur(8px); flex-direction: column; gap: var(--sp-2); max-width: 200px; box-sizing: border-box;">

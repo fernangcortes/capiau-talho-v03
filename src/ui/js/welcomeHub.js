@@ -354,7 +354,14 @@ export class WelcomeHub {
 
         // Sub-modal seguro de chaves de API
         if (this.btnWelcomeSettings) {
-            this.btnWelcomeSettings.addEventListener("click", () => this.openApiKeysModal());
+            this.btnWelcomeSettings.addEventListener("click", () => this.openSettingsDrawer());
+        }
+        // Botão fica marcado enquanto a gaveta de Configurações está aberta
+        if (typeof this.window?.addEventListener === "function") {
+            this.window.addEventListener("capiau:settings-drawer", (e) => {
+                this.btnWelcomeSettings?.setAttribute?.("aria-pressed", String(Boolean(e.detail?.open)));
+                if (!e.detail?.open) this.refreshKeyStatus();
+            });
         }
         if (this.btnCloseKeysModal) {
             this.btnCloseKeysModal.addEventListener("click", () => this.closeApiKeysModal());
@@ -1233,7 +1240,7 @@ export class WelcomeHub {
         }
 
         if (chip.action === "open_api_keys" || chip.action === "open_settings") {
-            await this.openApiKeysModal();
+            await this.openSettingsDrawer({ toggle: false });
             return;
         }
 
@@ -1660,6 +1667,20 @@ export class WelcomeHub {
                 this.keysFeedback.className = "welcome-keys-feedback error";
             }
         }
+    }
+
+    /**
+     * Chaves e modelos: abre as Configurações completas na gaveta direita, que empurra o Hub.
+     * Sem o painel (ambiente de teste), cai na janela simples de chaves.
+     */
+    async openSettingsDrawer({ toggle = true } = {}) {
+        const panel = this.window?.settingsPanel;
+        if (panel?.open) {
+            if (toggle && panel.toggle) panel.toggle("models_keys");
+            else await panel.open("models_keys");
+            return;
+        }
+        await this.openApiKeysModal();
     }
 
     /** Abre o painel completo de configurações da aplicação */

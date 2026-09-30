@@ -9214,6 +9214,144 @@ body:has(#btn-library-sort.active) #library-scroll-index-tooltip {
     overflow: hidden;
 }
 
+/* ── Configurações como gaveta lateral direita ───────────────────────────────
+   Nunca fica na frente de outro painel: com ela aberta, o editor (.app-container) e o
+   Welcome Hub encolhem pela largura da gaveta. Largura em --settings-drawer-w, definida
+   e limitada por settingsPanel.js (arrastar a borda esquerda muda; duplo clique volta). */
+:root {
+    --settings-drawer-w: 420px;
+}
+.settings-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--settings-drawer-w);
+    z-index: 9500;
+    display: none;
+    container-type: inline-size;
+}
+.settings-drawer.active {
+    display: flex;
+}
+body.settings-drawer-open .app-container {
+    width: calc(100vw - var(--settings-drawer-w));
+}
+body.settings-drawer-open .welcome-hub-overlay {
+    right: var(--settings-drawer-w);
+}
+body.settings-drawer-resizing,
+body.settings-drawer-resizing * {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+.settings-drawer-resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    width: 6px;
+    z-index: 2;
+    cursor: col-resize;
+}
+.settings-drawer-resize:hover,
+body.settings-drawer-resizing .settings-drawer-resize {
+    background: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.settings-drawer .settings-modal-content {
+    flex: 1;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border-radius: 0;
+    border: 0;
+    border-left: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.06));
+    background: var(--t-surface-1, #0d0d0d);
+    box-shadow: none;
+}
+.settings-drawer .settings-modal-header {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 8px 12px;
+}
+.settings-drawer .settings-modal-header h2 {
+    font-size: var(--fs-13);
+    font-weight: 500;
+}
+.settings-drawer .settings-header-controls {
+    order: 3;
+    width: 100%;
+    gap: 8px;
+}
+.settings-drawer .settings-scope-selector .scope-btn,
+.settings-drawer .settings-mode-switch .mode-btn {
+    padding: 3px 10px;
+    font-weight: 500;
+}
+.settings-drawer .settings-modal-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+}
+/* Cabeçalho do editor encolhe em degraus conforme a largura dele (a gaveta de
+   Configurações ou uma janela estreita tiram espaço): textos viram ícone antes de algo
+   sair da tela. Os nomes continuam nas dicas (data-tooltip). */
+.app-container > .header {
+    container-type: inline-size;
+    container-name: editor-header;
+}
+@container editor-header (max-width: 1260px) {
+    .header .actions-area .hbtn > span,
+    .header #health-label {
+        display: none;
+    }
+    .header .search-area {
+        min-width: 150px;
+    }
+}
+@container editor-header (max-width: 1060px) {
+    .header #ws-segmented .ws-btn {
+        font-size: 0;
+    }
+    .header #ws-segmented .ws-btn .ws-slot {
+        font-size: var(--fs-10);
+    }
+}
+@container editor-header (max-width: 900px) {
+    .header .search-area {
+        min-width: 110px;
+    }
+    .header #search-filter {
+        display: none;
+    }
+}
+/* Gaveta estreita: categorias viram uma faixa rolável em cima */
+@container (max-width: 620px) {
+    .settings-drawer .settings-modal-body {
+        flex-direction: column;
+    }
+    .settings-drawer .settings-nav {
+        width: auto;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 6px 8px;
+        border-right: 0;
+        border-bottom: 1px solid var(--border-glass);
+    }
+    .settings-drawer .settings-nav > * {
+        flex: none;
+        white-space: nowrap;
+    }
+    .settings-drawer .setting-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
 .settings-modal-header {
     padding: 16px 24px;
     border-bottom: 1px solid var(--border-glass);
@@ -14490,7 +14628,8 @@ body.layout-monitors-split .btn-swap-player {
     cursor: pointer;
 }
 .wh-hbtn:hover,
-.wh-hbtn[aria-expanded="true"] {
+.wh-hbtn[aria-expanded="true"],
+.wh-hbtn[aria-pressed="true"] {
     background: var(--t-tint-3, rgba(255, 255, 255, 0.07));
     color: var(--text-primary);
 }

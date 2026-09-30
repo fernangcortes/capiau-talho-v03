@@ -5,6 +5,8 @@ import { STATE } from "./state.js";
 import { CapIAuAPI } from "./api.js";
 
 const MODE_STORAGE_KEY = "capiau_ai_settings_mode";
+const DRAWER_WIDTH_KEY = "capiau_settings_drawer_w";
+const DRAWER_MIN_W = 340;
 
 export class SettingsPanelManager {
     constructor() {
@@ -35,7 +37,7 @@ export class SettingsPanelManager {
 
     init() {
         const btnOpen = document.getElementById("btn-open-settings");
-        if (btnOpen) btnOpen.addEventListener("click", () => this.open());
+        if (btnOpen) btnOpen.addEventListener("click", () => this.toggle());
 
         const linkFromChat = document.getElementById("link-open-settings-from-chat");
         if (linkFromChat) {
@@ -48,12 +50,21 @@ export class SettingsPanelManager {
         const btnClose = document.getElementById("btn-close-settings-modal");
         if (btnClose) btnClose.addEventListener("click", () => this.close());
 
-        // Fechar clicando fora do conteúdo (com confirmação se houver alterações)
+        // Gaveta lateral: não fecha ao clicar fora (o editor continua usável ao lado).
+        // Esc fecha só quando o foco está dentro dela, para não roubar atalhos do editor.
         if (this.modal) {
-            this.modal.addEventListener("mousedown", (e) => {
-                if (e.target === this.modal) this.close();
+            this.modal.addEventListener("keydown", (e) => {
+                if (e.key === "Escape" && this.isOpen) {
+                    e.stopPropagation();
+                    this.close();
+                }
             });
+            this.initDrawerResize();
         }
+        this.applyDrawerWidth(this.loadDrawerWidth());
+        window.addEventListener("resize", () => {
+            if (this.isOpen) this.applyDrawerWidth(this.drawerWidth);
+        });
 
         if (this.scopeSelector) {
             this.scopeSelector.querySelectorAll(".scope-btn").forEach(btn => {
@@ -108,7 +119,7 @@ export class SettingsPanelManager {
         this.updateScopeLabels();
         this.updateModeButtons();
         this.renderAll();
-        this.modal.classList.add("active");
+        this.setDrawerVisible(true);
     }
 
     close() {
@@ -120,7 +131,86 @@ export class SettingsPanelManager {
         this.dirty.prompts.clear();
         this.emitAppearanceDraft();
         this.isOpen = false;
-        this.modal.classList.remove("active");
+        this.setDrawerVisible(false);
+    }
+
+    /** Abre na categoria pedida; se já está aberta nela (ou sem categoria), fecha */
+    toggle(categoryId = null) {
+        if (this.isOpen && (!categoryId || categoryId === this.activeCategory)) {
+            this.close();
+        } else {
+            this.open(categoryId);
+        }
+    }
+
+    // ── Gaveta lateral direita ───────────────────────────────────────────────
+    // Não fica na frente de nada: o editor e o Welcome Hub encolhem pela largura dela
+    // (regra em styles.css, body.settings-drawer-open).
+
+    setDrawerVisible(visible) {
+        this.applyDrawerWidth(this.drawerWidth);
+        this.modal.classList.toggle("active", visible);
+        this.modal.setAttribute("aria-hidden", String(!visible));
+        document.body.classList.toggle("settings-drawer-open", visible);
+        window.dispatchEvent(new CustomEvent("capiau:settings-drawer", {
+            detail: { open: visible, category: this.activeCategory }
+        }));
+        // Timeline e monitores medem o próprio contêiner no resize
+        requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+    }
+
+    loadDrawerWidth() {
+        let saved = null;
+        try {
+            saved = parseInt(localStorage.getItem(DRAWER_WIDTH_KEY), 10);
+        } catch (e) { /* armazenamento indisponível */ }
+        return Number.isFinite(saved) ? saved : Math.round(window.innerWidth * 0.34);
+    }
+
+    /** Limita a largura para sobrar pelo menos 480 px para o editor */
+    applyDrawerWidth(width) {
+        const max = Math.max(DRAWER_MIN_W, Math.min(900, window.innerWidth - 480));
+        this.drawerWidth = Math.round(Math.min(max, Math.max(DRAWER_MIN_W, width || 0)));
+        document.documentElement.style.setProperty("--settings-drawer-w", `${this.drawerWidth}px`);
+    }
+
+    initDrawerResize() {
+        const handle = document.getElementById("settings-drawer-resize");
+        if (!handle) return;
+        handle.addEventListener("pointerdown", (e) => {
+            e.preventDefault();
+            handle.setPointerCapture(e.pointerId);
+            document.body.classList.add("settings-drawer-resizing");
+            let frame = 0;
+            const move = (ev) => {
+                this.applyDrawerWidth(window.innerWidth - ev.clientX);
+                if (!frame) {
+                    frame = requestAnimationFrame(() => {
+                        frame = 0;
+                        window.dispatchEvent(new Event("resize"));
+                    });
+                }
+            };
+            const up = () => {
+                handle.removeEventListener("pointermove", move);
+                handle.removeEventListener("pointerup", up);
+                handle.removeEventListener("pointercancel", up);
+                document.body.classList.remove("settings-drawer-resizing");
+                try {
+                    localStorage.setItem(DRAWER_WIDTH_KEY, String(this.drawerWidth));
+                } catch (err) { /* armazenamento indisponível */ }
+                window.dispatchEvent(new Event("resize"));
+            };
+            handle.addEventListener("pointermove", move);
+            handle.addEventListener("pointerup", up);
+            handle.addEventListener("pointercancel", up);
+        });
+        // Duplo clique volta à largura inicial
+        handle.addEventListener("dblclick", () => {
+            try { localStorage.removeItem(DRAWER_WIDTH_KEY); } catch (e) { /* ignora */ }
+            this.applyDrawerWidth(Math.round(window.innerWidth * 0.34));
+            window.dispatchEvent(new Event("resize"));
+        });
     }
 
     async refresh() {
