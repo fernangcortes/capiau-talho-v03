@@ -77,20 +77,152 @@ export const WELCOME_HUB_PROFILES = Object.freeze({
     }
 });
 
-/** Formata mensagem em Markdown simples com escape seguro de HTML */
-export function formatMessageContent(text) {
-    if (!text) return "";
-    const escaped = String(text)
+function escapeHtml(text) {
+    return String(text)
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
+}
 
-    return escaped
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.*?)\*/g, "<em>$1</em>")
-        .replace(/`(.*?)`/g, "<code>$1</code>")
-        .replace(/\n/g, "<br>");
+function formatInline(line) {
+    return escapeHtml(line)
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/__(.+?)__/g, "<strong>$1</strong>")
+        .replace(/(^|[^\w*])\*(?!\s)(.+?)\*(?!\w)/g, "$1<em>$2</em>")
+        .replace(/(^|[^\w])_(?!\s)(.+?)_(?!\w)/g, "$1<em>$2</em>")
+        .replace(/`(.+?)`/g, "<code>$1</code>")
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+        .replace(/\*\*|__/g, "");
+}
+
+/**
+ * Converte o markdown que o modelo devolve em texto limpo: nenhum símbolo (**, ###, -, ```)
+ * chega à tela. Títulos viram rótulo, listas viram listas, linhas seguidas viram <br>.
+ * Todo o texto é escapado antes de qualquer marcação.
+ */
+export function formatMessageContent(text) {
+    if (!text) return "";
+    const out = [];
+    let list = null;
+    let para = [];
+    const flushPara = () => {
+        if (para.length) out.push(`<p>${para.join("<br>")}</p>`);
+        para = [];
+    };
+    const closeList = () => {
+        if (list) out.push(`</${list}>`);
+        list = null;
+    };
+    const openList = (tag) => {
+        flushPara();
+        if (list !== tag) {
+            closeList();
+            out.push(`<${tag}>`);
+            list = tag;
+        }
+    };
+
+    for (const raw of String(text).replace(/\r\n?/g, "\n").split("\n")) {
+        const line = raw.trim();
+        let m;
+        if (!line || /^```/.test(line) || /^([-*_])\1{2,}$/.test(line)) {
+            flushPara();
+            closeList();
+            continue;
+        }
+        if ((m = line.match(/^#{1,6}\s+(.*)$/))) {
+            flushPara();
+            closeList();
+            out.push(`<span class="wh-lbl">${formatInline(m[1].replace(/[:：]\s*$/, ""))}</span>`);
+            continue;
+        }
+        if ((m = line.match(/^[-*+•]\s+(.*)$/))) {
+            openList("ul");
+            out.push(`<li>${formatInline(m[1])}</li>`);
+            continue;
+        }
+        if ((m = line.match(/^\d+[.)]\s+(.*)$/))) {
+            openList("ol");
+            out.push(`<li>${formatInline(m[1])}</li>`);
+            continue;
+        }
+        closeList();
+        para.push(formatInline(line.replace(/^>\s?/, "")));
+    }
+    flushPara();
+    closeList();
+    return out.join("");
+}
+
+/** Recursos da ferramenta explicados dentro da primeira mensagem */
+export const WELCOME_HUB_FEATURES = Object.freeze([
+    {
+        id: "decupar", icon: "fa-list-ul", title: "Decupar entrevistas",
+        what: "Separa cada fala em trechos com início e fim e marca os melhores momentos.",
+        needs: "Vídeo ou áudio com fala.", result: "Aba Índice do editor, uma linha por trecho.",
+        ask: "Como funciona a decupagem de entrevistas?"
+    },
+    {
+        id: "vozes", icon: "fa-wave-square", title: "Transcrever e separar vozes",
+        what: "Transcreve tudo e identifica quem fala, até 8 vozes, inclusive quando falam ao mesmo tempo.",
+        needs: "Áudio do gravador ou da câmera.", result: "Transcrição com o nome de cada pessoa.",
+        ask: "Como funciona a transcrição com separação de vozes?"
+    },
+    {
+        id: "rostos", icon: "fa-user", title: "Reconhecer rostos",
+        what: "Agrupa as aparições da mesma pessoa. Fotos de set ajudam a dar nome a cada rosto.",
+        needs: "Vídeo. Fotos são opcionais.", result: "Aba Rostos, com os planos de cada pessoa.",
+        ask: "Como funciona o reconhecimento de rostos?"
+    },
+    {
+        id: "texto", icon: "fa-i-cursor", title: "Cortar pelo texto",
+        what: "Apague ou reordene frases na transcrição e o corte acompanha. Dá para pedir um primeiro corte bruto.",
+        needs: "Transcrição pronta.", result: "Timeline do editor.",
+        ask: "Como funciona o corte pelo texto?"
+    },
+    {
+        id: "exportar", icon: "fa-file-export", title: "Levar para Premiere ou Resolve",
+        what: "Exporta o corte e os marcadores para abrir no seu editor de sempre.",
+        needs: "Um corte na timeline.", result: "Arquivo XML ou EDL na pasta do projeto.",
+        ask: "Como exporto para o Premiere ou o Resolve?"
+    }
+]);
+
+const MEDIA_KINDS = Object.freeze({
+    video: { label: "vídeo", icon: "fa-film", color: "var(--accent)", will: ["cenas", "rostos", "fala"] },
+    audio: { label: "áudio", icon: "fa-wave-square", color: "var(--color-emerald)", will: ["transcrição", "vozes"] },
+    foto: { label: "foto", icon: "fa-image", color: "var(--color-amber)", will: ["ref. de rosto"] },
+    pasta: { label: "pasta", icon: "fa-folder", color: "var(--accent)", will: ["tudo que houver dentro"] },
+    outro: { label: "outro", icon: "fa-file", color: "var(--text-muted)", will: ["ignorado"] }
+});
+
+/** Classifica um arquivo pelo tipo MIME ou pela extensão */
+export function mediaKindOf(nameOrType = "", type = "") {
+    const s = `${type} ${nameOrType}`.toLowerCase();
+    if (/video\/|\.(mov|mp4|mxf|mts|m2ts|avi|mkv|webm|r3d|braw)\b/.test(s)) return "video";
+    if (/audio\/|\.(wav|mp3|aac|m4a|flac|bwf|aiff?|ogg)\b/.test(s)) return "audio";
+    if (/image\/|\.(jpe?g|png|heic|tiff?|webp|dng|cr2|arw)\b/.test(s)) return "foto";
+    return "outro";
+}
+
+function formatBytes(bytes) {
+    if (!bytes) return "";
+    if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1).replace(".", ",")} GB`;
+    if (bytes >= 1e6) return `${Math.round(bytes / 1e6)} MB`;
+    return `${Math.max(1, Math.round(bytes / 1e3))} KB`;
+}
+
+function formatDuration(secs) {
+    if (!secs || !isFinite(secs)) return "";
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = Math.floor(secs % 60);
+    return (h ? `${h}:${String(m).padStart(2, "0")}` : `${m}`) + `:${String(s).padStart(2, "0")}`;
+}
+
+function baseName(path) {
+    return String(path || "").split(/[\\/]/).filter(Boolean).pop() || String(path || "");
 }
 
 export class WelcomeHub {
@@ -114,6 +246,10 @@ export class WelcomeHub {
         this.activeChips = [];
         this.isProcessing = false;
         this.isTransitioning = false;
+        this.pendingMedia = [];
+        this.openFeatures = new Set();
+        this.waitStartedAt = 0;
+        this.waitTimer = null;
 
         // Referências DOM
         this.overlay = null;
@@ -158,6 +294,10 @@ export class WelcomeHub {
         this.modalExistingProjects = this.document.getElementById("welcome-existing-projects-modal");
         this.btnCloseProjectsModal = this.document.getElementById("btn-close-welcome-projects-modal");
         this.projectsListContainer = this.document.getElementById("welcome-projects-list");
+        this.crumbName = this.document.getElementById("welcome-crumb-name");
+        this.planMeta = this.document.getElementById("welcome-plan-meta");
+        this.planSteps = this.document.getElementById("welcome-plan-steps");
+        this.keyDot = this.document.getElementById("welcome-key-dot");
 
         // Sub-Modal Seguro de Chaves de API
         this.btnWelcomeSettings = this.document.getElementById("btn-welcome-settings");
@@ -242,7 +382,55 @@ export class WelcomeHub {
 
         // Abrir sub-modal de projetos existentes
         if (this.btnExistingProjects) {
-            this.btnExistingProjects.addEventListener("click", () => this.openExistingProjectsModal());
+            this.btnExistingProjects.addEventListener("click", (e) => {
+                e?.stopPropagation?.();
+                const open = this.modalExistingProjects?.style?.display === "flex";
+                if (open) this.closeExistingProjectsModal();
+                else this.openExistingProjectsModal();
+            });
+        }
+        // Menu de projetos fecha ao clicar fora ou com Esc
+        if (typeof this.document.addEventListener === "function") {
+            this.document.addEventListener("click", (e) => {
+                if (this.modalExistingProjects?.style?.display !== "flex") return;
+                if (this.modalExistingProjects.contains?.(e.target)) return;
+                this.closeExistingProjectsModal();
+            });
+            this.document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape" && this.modalExistingProjects?.style?.display === "flex") {
+                    this.closeExistingProjectsModal();
+                }
+            });
+        }
+
+        // Itens de recurso dentro da conversa (abre/fecha e "Perguntar mais")
+        if (this.chatMessagesContainer) {
+            this.chatMessagesContainer.addEventListener("click", (e) => {
+                const head = e.target?.closest?.("[data-feat-toggle]");
+                if (head) {
+                    const id = head.dataset.featToggle;
+                    if (this.openFeatures.has(id)) this.openFeatures.delete(id);
+                    else this.openFeatures.add(id);
+                    const card = head.closest(".wh-feat");
+                    card?.classList.toggle("open", this.openFeatures.has(id));
+                    head.setAttribute("aria-expanded", String(this.openFeatures.has(id)));
+                    return;
+                }
+                const ask = e.target?.closest?.("[data-feat-ask]");
+                if (ask) {
+                    const feat = WELCOME_HUB_FEATURES.find(f => f.id === ask.dataset.featAsk);
+                    if (feat) this.handleUserInput(feat.ask);
+                }
+            });
+        }
+
+        // Adicionar mais mídias pelo cartão "+" da grade
+        if (this.dropzoneSummary) {
+            this.dropzoneSummary.addEventListener("click", (e) => {
+                if (e.target?.closest?.("[data-add-media]")) this.handleBrowseFiles();
+                const rm = e.target?.closest?.("[data-remove-media]");
+                if (rm) this.removeMedia(Number(rm.dataset.removeMedia));
+            });
         }
         if (this.btnCloseProjectsModal) {
             this.btnCloseProjectsModal.addEventListener("click", () => this.closeExistingProjectsModal());
@@ -296,6 +484,7 @@ export class WelcomeHub {
             this.renderMessages();
             this.renderChips();
         }
+        this.refreshKeyStatus();
         if (this.chatInput) {
             setTimeout(() => this.chatInput?.focus(), 150);
         }
@@ -335,12 +524,11 @@ export class WelcomeHub {
         this.isProcessing = false;
         this.isTransitioning = false;
 
-        if (this.dropzoneFeedback) {
-            this.dropzoneFeedback.style.display = "none";
-        }
-        if (this.dropzoneSummary) {
-            this.dropzoneSummary.innerHTML = "";
-        }
+        this.pendingMedia = [];
+        this.openFeatures = new Set();
+        this.stopWaiting();
+        this.updateDropzoneUI();
+        this.setCrumb("");
         if (this.chatInput) {
             this.chatInput.value = "";
             this.chatInput.disabled = false;
@@ -352,16 +540,69 @@ export class WelcomeHub {
         this.reset();
         this.state = WelcomeHub.STATES.AWAITING_NAME;
 
+        // A lista de recursos aparece embaixo desta mensagem (fora do histórico enviado ao modelo)
+        this.featuresAtIndex = this.conversationHistory.length;
         this.appendMessage({
             role: "assistant",
-            content: "👋 Olá! Sou o Copilot de Inteligência Cinematográfica do CapIAu-Talho.\n\nVamos configurar sua nova produção audiovisual passo a passo. **Qual o título ou tema do seu projeto?**"
+            content: "Oi! Eu organizo o material bruto e deixo tudo pronto para você editar no CapIAu-Talho.\n\nSolte as mídias à esquerda e me diga **o nome do projeto**. Se quiser entender o que a ferramenta faz, abra um dos itens abaixo."
         });
 
         this.setChips([
             { label: "Documentário Raízes", value: "Documentário Raízes" },
             { label: "Entrevista de Campo", value: "Entrevista de Campo" },
-            { label: "Making Of Oficial", value: "Making Of Oficial" }
+            { label: "Como funciona a análise?", value: "Como funciona a análise?" }
         ]);
+    }
+
+    /** Mostra o nome do projeto no cabeçalho */
+    setCrumb(name) {
+        if (this.crumbName) this.crumbName.textContent = name || "novo projeto";
+    }
+
+    /** Ponto de status das chaves no cabeçalho (verde: há chave; âmbar: nenhuma) */
+    async refreshKeyStatus() {
+        if (!this.keyDot || typeof this.api?.fetchSettings !== "function") return;
+        try {
+            const g = (await this.api.fetchSettings())?.global || {};
+            const hasOr = Boolean(g["api.openrouter_key"] && g["api.openrouter_key"] !== "your_openrouter_api_key_here");
+            const hasGem = Boolean(g["api.gemini_key"]);
+            this.keyDot.className = `wh-dot ${hasOr || hasGem ? "ok" : "missing"}`;
+            this.keyDot.title = hasOr || hasGem ? "Há chave de API configurada" : "Nenhuma chave de API: a conversa usa o assistente local";
+        } catch (err) {
+            console.warn("[WelcomeHub] Falha ao ler status das chaves:", err);
+        }
+    }
+
+    /** Indicador de espera enquanto a IA responde: tempo passando e aviso se demorar */
+    startWaiting() {
+        this.stopWaiting();
+        this.waitStartedAt = Date.now();
+        this.renderMessages();
+        if (typeof setInterval === "function" && this.document) {
+            this.waitTimer = setInterval(() => this.updateWaiting(), 200);
+        }
+    }
+
+    updateWaiting() {
+        if (!this.waitStartedAt || !this.document) return;
+        const secs = (Date.now() - this.waitStartedAt) / 1000;
+        const timer = this.document.getElementById("welcome-wait-timer");
+        if (timer) timer.textContent = `${secs.toFixed(1).replace(".", ",")} s`;
+        const label = this.document.getElementById("welcome-wait-label");
+        if (label) label.textContent = secs < 1 ? "Enviando sua mensagem" : "A IA está pensando";
+        const slow = this.document.getElementById("welcome-wait-slow");
+        if (slow && secs > 8 && slow.style.display === "none") {
+            slow.style.display = "block";
+            if (this.chatMessagesContainer) this.chatMessagesContainer.scrollTop = this.chatMessagesContainer.scrollHeight;
+        }
+    }
+
+    stopWaiting() {
+        if (this.waitTimer) clearInterval(this.waitTimer);
+        this.waitTimer = null;
+        const was = Boolean(this.waitStartedAt);
+        this.waitStartedAt = 0;
+        if (was) this.renderMessages();
     }
 
     /** Adiciona mensagem ao histórico e atualiza a visualização */
@@ -393,7 +634,7 @@ export class WelcomeHub {
         if (!text) {
             this.appendMessage({
                 role: "assistant",
-                content: "⚠️ Por favor, informe um título válido para o projeto."
+                content: "Escreva um nome para o projeto."
             });
             return false;
         }
@@ -403,7 +644,7 @@ export class WelcomeHub {
                          (text.startsWith("AIzaSy") && text.length >= 35);
         if (isApiKey) {
             // SEGURANÇA: Mascara a chave imediatamente e NUNCA salva o token bruto no histórico do chat
-            this.appendMessage({ role: "user", content: "🔒 [Chave de API informada e protegida contra exposição]" });
+            this.appendMessage({ role: "user", content: "[Chave de API informada e protegida contra exposição]" });
             const provider = text.startsWith("sk-") ? "openrouter" : "gemini";
             try {
                 if (this.api && typeof this.api.saveOnboardingApiKey === "function") {
@@ -411,10 +652,11 @@ export class WelcomeHub {
                 }
                 this.appendMessage({
                     role: "assistant",
-                    content: `🔒 **Chave de API (${provider === "openrouter" ? "OpenRouter" : "Gemini"}) configurada com segurança no banco local!**\n\nPor proteção de privacidade, a chave foi mascarada e não foi salva no histórico do chat nem enviada a outros modelos. Se desejar gerenciar suas credenciais a qualquer momento com campos protegidos, use o botão **Chaves de API** no topo do Welcome Hub.\n\nQual o título ou tema do seu projeto?`
+                    content: `**Chave de API (${provider === "openrouter" ? "OpenRouter" : "Gemini"}) configurada** e guardada no banco local.\n\nEla foi escondida aqui e não fica no histórico da conversa. Para ver ou trocar as chaves, use **Chaves e modelos** no topo.\n\nQual o nome do projeto?`
                 });
+                this.refreshKeyStatus();
                 this.setChips([
-                    { label: "🔑 Chaves de API & Modelos", action: "open_api_keys" },
+                    { label: "Chaves e modelos", action: "open_api_keys" },
                     { label: "Documentário Raízes", value: "Documentário Raízes" },
                     { label: "Entrevista de Campo", value: "Entrevista de Campo" }
                 ]);
@@ -422,7 +664,7 @@ export class WelcomeHub {
             } catch (keyErr) {
                 this.appendMessage({
                     role: "assistant",
-                    content: `⚠️ Não foi possível salvar a chave de API: ${keyErr.message || keyErr}. Você pode tentar novamente ou usar o botão **Chaves de API** no topo.`
+                    content: `Não consegui salvar a chave de API (${keyErr.message || keyErr}). Tente de novo ou use **Chaves e modelos** no topo.`
                 });
                 return false;
             }
@@ -431,7 +673,11 @@ export class WelcomeHub {
         // 2. Integração com a API OnboardingChat (Backend inteligente com conhecimento do Talho)
         if (this.api && typeof this.api.onboardingChat === "function") {
             this.isTransitioning = true;
-            this.appendMessage({ role: "user", content: text });
+            const userMsg = { role: "user", content: text };
+            this.appendMessage(userMsg);
+            this.setInputBusy(true);
+            this.startWaiting();
+            let answered = false;
             try {
                 const chatRes = await this.api.onboardingChat(
                     text,
@@ -439,12 +685,15 @@ export class WelcomeHub {
                     this.projectName || null,
                     this.selectedProfile?.id || null
                 );
+                this.stopWaiting();
 
                 if (chatRes && chatRes.reply) {
+                    answered = true;
                     this.appendMessage({ role: "assistant", content: chatRes.reply });
 
                     if (chatRes.suggested_project_name && !this.projectName) {
                         this.projectName = chatRes.suggested_project_name;
+                        this.setCrumb(this.projectName);
                     }
                     if (chatRes.detected_profile) {
                         const prof = this.resolveProfile(chatRes.detected_profile);
@@ -474,7 +723,13 @@ export class WelcomeHub {
             } catch (err) {
                 console.warn("[WelcomeHub] Falha na API OnboardingChat, recorrendo ao motor local:", err);
             } finally {
+                this.stopWaiting();
+                this.setInputBusy(false);
                 this.isTransitioning = false;
+                // Sem resposta do backend: o motor local abaixo mostra a mensagem do usuário de novo
+                if (!answered && this.conversationHistory[this.conversationHistory.length - 1] === userMsg) {
+                    this.conversationHistory.pop();
+                }
             }
         }
 
@@ -488,21 +743,26 @@ export class WelcomeHub {
 
         if (isExplanationRequest) {
             this.appendMessage({ role: "user", content: text });
+            const feat = WELCOME_HUB_FEATURES.find(f => f.ask === text);
+            const nextStep = this.projectName
+                ? "Quando quiser, solte as mídias à esquerda."
+                : "Para começar, qual o **nome do projeto**?";
             this.appendMessage({
                 role: "assistant",
-                content: "👋 **Com certeza! Vou te explicar exatamente como o CapIAu-Talho funciona:**\n\n" +
-                         "O **CapIAu-Talho** é uma ilha de edição de vídeo (NLE) profissional desenhada sob medida para documentários e cinema autoral.\n\n" +
-                         "• **⚡ Triagem Instantânea (Sistema 1):** Classifica suas gravações brutas em menos de 20ms com IA em CPU local.\n" +
-                         "• **🎙️ Transcrição com Fala Sobreposta:** Identifica quem está falando mesmo quando duas pessoas falam ao mesmo tempo (*Nemotron 3 Diarization*).\n" +
-                         "• **👁️ Busca Visual e Grounding:** Encontra personagens e adereços clicando no player do vídeo.\n" +
-                         "• **🎬 Copilot de Montagem:** Sugere cortes preliminares (*rough cut*) com prévia em trilha fantasma para aprovação.\n\n" +
-                         "Para começarmos, qual o **título ou tema do seu projeto**?"
+                content: feat
+                    ? `**${feat.title}**\n\n${feat.what}\n\n- Precisa de: ${feat.needs}\n- Resultado: ${feat.result}\n\n${nextStep}`
+                    : "O **CapIAu-Talho** é uma ilha de edição feita para documentário e cinema autoral. Ele trabalha em três etapas:\n\n" +
+                      "1. **Ingestão**: confere cada arquivo e gera versões leves para editar.\n" +
+                      "2. **Análise nesta máquina**: transcrição, quem fala, rostos e cenas.\n" +
+                      "3. **Editor**: você revisa o que a IA achou e corta pelo texto.\n\n" +
+                      nextStep
             });
-            this.setChips([
-                { label: "Documentário Raízes", value: "Documentário Raízes" },
-                { label: "Entrevista de Campo", value: "Entrevista de Campo" },
-                { label: "Making Of Oficial", value: "Making Of Oficial" }
-            ]);
+            if (!this.projectName) {
+                this.setChips([
+                    { label: "Documentário Raízes", value: "Documentário Raízes" },
+                    { label: "Entrevista de Campo", value: "Entrevista de Campo" }
+                ]);
+            }
             return this.state !== WelcomeHub.STATES.AWAITING_MEDIA;
         }
 
@@ -511,19 +771,20 @@ export class WelcomeHub {
                 this.isTransitioning = true;
                 try {
                     this.projectName = text;
+                    this.setCrumb(text);
                     this.appendMessage({ role: "user", content: text });
 
                     // Transição para AWAITING_PROFILE
                     this.state = WelcomeHub.STATES.AWAITING_PROFILE;
                     this.appendMessage({
                         role: "assistant",
-                        content: `Excelente título: **${this.projectName}**!\n\nPara calibrar o pipeline de IA e otimizar o uso de GPU e nuvem, **qual o perfil de intenção da produção?**`
+                        content: `O projeto vai se chamar **${this.projectName}**.\n\nComo a análise deve rodar? Isso define quanto fica nesta máquina e quanto vai para a nuvem.`
                     });
 
                     this.setChips([
-                        { label: "🍃 Documentário Offline Econômico", value: "doc_offline_eco" },
-                        { label: "⚡ Entrevista Ágil", value: "entrevista_agil" },
-                        { label: "🎬 Cinema Nuvem SOTA", value: "cinema_nuvem_sota" }
+                        { label: "Documentário Offline Econômico", value: "doc_offline_eco" },
+                        { label: "Entrevista Ágil", value: "entrevista_agil" },
+                        { label: "Cinema Nuvem SOTA", value: "cinema_nuvem_sota" }
                     ]);
                     return true;
                 } finally {
@@ -536,7 +797,7 @@ export class WelcomeHub {
                 if (!profile) {
                     this.appendMessage({
                         role: "assistant",
-                        content: "⚠️ Por favor, escolha um dos 3 perfis disponíveis clicando nos chips abaixo ou digitando seu nome."
+                        content: "Escolha um dos três perfis abaixo, ou escreva o nome de um deles."
                     });
                     return false;
                 }
@@ -548,16 +809,24 @@ export class WelcomeHub {
 
                     // Transição para AWAITING_MEDIA
                     this.state = WelcomeHub.STATES.AWAITING_MEDIA;
+                    const mediaCount = this.pendingFolder ? 1 : this.pendingFiles.length;
                     this.appendMessage({
                         role: "assistant",
-                        content: `Perfil **${profile.label}** ativado!\n\n_${profile.desc}_\n\nAgora, **arraste para a área ao lado sua pasta de mídia bruta ou cartões SD**. Se preferir, podemos pular e importar depois diretamente no editor.`
+                        content: mediaCount
+                            ? `Perfil **${profile.label}**.\n\n${profile.desc}\n\nJá tenho ${this.pendingFolder ? "a pasta" : `${mediaCount} ${mediaCount === 1 ? "arquivo" : "arquivos"}`} à esquerda. Posso criar o projeto e começar a análise, ou você solta mais material antes.`
+                            : `Perfil **${profile.label}**.\n\n${profile.desc}\n\nAgora solte o material à esquerda: a pasta do cartão inteira serve. Também dá para pular e importar depois, no editor.`
                     });
 
-                    this.setChips([
-                        { label: "📁 Selecionar Pasta...", action: "browse_folder" },
-                        { label: "🎬 Selecionar Arquivos...", action: "browse_files" },
-                        { label: "⏭️ Pular Ingestão por Enquanto", action: "skip_media" }
-                    ]);
+                    this.setChips(mediaCount
+                        ? [
+                            { label: "Criar projeto e analisar", action: "create_now" },
+                            { label: "Adicionar mais arquivos", action: "browse_files" }
+                        ]
+                        : [
+                            { label: "Selecionar pasta…", action: "browse_folder" },
+                            { label: "Selecionar arquivos…", action: "browse_files" },
+                            { label: "Pular por enquanto", action: "skip_media" }
+                        ]);
                     return true;
                 } finally {
                     this.isTransitioning = false;
@@ -583,7 +852,7 @@ export class WelcomeHub {
 
                 this.appendMessage({
                     role: "assistant",
-                    content: "Por favor, arraste suas pastas/arquivos de mídia ou clique em 'Pular Ingestão por Enquanto' para prosseguir."
+                    content: "Solte o material à esquerda, ou escolha **Pular por enquanto** para importar depois no editor."
                 });
                 return false;
             }
@@ -638,7 +907,7 @@ export class WelcomeHub {
 
         this.appendMessage({
             role: "assistant",
-            content: `⚙️ Criando o projeto **${this.projectName}** no banco de dados SQLite e calibrando os motores de IA...`
+            content: `Criando o projeto **${this.projectName}** e aplicando o perfil de análise…`
         });
 
         try {
@@ -656,20 +925,23 @@ export class WelcomeHub {
             }
 
             // 3. Disparo da Ingestão de Mídias via TASK_MANAGER
-            let mediaSummaryText = "Nenhuma mídia importada inicialmente.";
+            let mediaSummaryText = "nenhuma ainda. Dá para importar no editor.";
             if (this.pendingFolder) {
                 try {
                     await this.api.triggerExternalIngest(this.pendingFolder, this.createdProjectId);
-                    mediaSummaryText = `📁 Pasta \`${this.pendingFolder}\` enviada para a fila de tarefas do \`TASK_MANAGER\`.`;
+                    mediaSummaryText = `a pasta ${baseName(this.pendingFolder)} entrou na fila de análise.`;
                 } catch (ingestErr) {
                     console.warn("[WelcomeHub] Falha ao disparar ingestão de pasta:", ingestErr);
+                    mediaSummaryText = `não consegui mandar a pasta para a análise (${ingestErr.message || ingestErr}). Importe pelo editor.`;
                 }
             } else if (this.pendingFiles.length > 0) {
                 try {
                     await this.api.triggerExternalFilesIngest(this.pendingFiles, this.createdProjectId);
-                    mediaSummaryText = `🎬 **${this.pendingFiles.length} mídia(s)** enviada(s) para a fila de tarefas do \`TASK_MANAGER\`.`;
+                    const n = this.pendingFiles.length;
+                    mediaSummaryText = `${n} ${n === 1 ? "arquivo entrou" : "arquivos entraram"} na fila de análise.`;
                 } catch (ingestErr) {
                     console.warn("[WelcomeHub] Falha ao disparar ingestão de arquivos:", ingestErr);
+                    mediaSummaryText = `não consegui mandar os arquivos para a análise (${ingestErr.message || ingestErr}). Importe pelo editor.`;
                 }
             }
 
@@ -677,17 +949,17 @@ export class WelcomeHub {
             this.state = WelcomeHub.STATES.READY_TO_TRANSITION;
             this.appendMessage({
                 role: "assistant",
-                content: `✨ **Tudo pronto!** O projeto **${this.projectName}** foi configurado com sucesso.\n\n• **Perfil de IA:** ${this.selectedProfile?.label || "Padrão"}\n• **Status da Ingestão:** ${mediaSummaryText}\n\nClique abaixo para ingressar na ilha de edição clássica com o histórico preservado.`
+                content: `Projeto **${this.projectName}** criado.\n\n- Perfil: ${this.selectedProfile?.label || "Padrão"}\n- Mídias: ${mediaSummaryText}\n\nA análise continua enquanto você edita. A conversa vai junto para o editor.`
             });
 
             this.setChips([
-                { label: "🚀 Entrar na Ilha de Edição (NLE)", action: "transition_nle" }
+                { label: "Abrir no editor", action: "transition_nle" }
             ]);
         } catch (err) {
             console.error("[WelcomeHub] Erro na criação do projeto:", err);
             this.appendMessage({
                 role: "assistant",
-                content: `❌ Ocorreu um erro ao criar o projeto: ${err.message || err}. Deseja tentar novamente?`
+                content: `Não consegui criar o projeto (${err.message || err}). Quer tentar de novo?`
             });
             this.state = WelcomeHub.STATES.AWAITING_NAME;
             this.setChips([
@@ -818,6 +1090,13 @@ export class WelcomeHub {
             return;
         }
 
+        if (chip.action === "create_now") {
+            if (this.state !== WelcomeHub.STATES.AWAITING_MEDIA) return;
+            this.appendMessage({ role: "user", content: "Criar o projeto com estas mídias." });
+            await this.createProjectAndFinalize();
+            return;
+        }
+
         if (chip.action === "transition_nle") {
             if (this.state !== WelcomeHub.STATES.READY_TO_TRANSITION) return;
             await this.transitionToNLE();
@@ -840,10 +1119,12 @@ export class WelcomeHub {
             const folderPath = res?.folder || res?.path;
             if (folderPath) {
                 this.pendingFolder = folderPath;
+                this.pendingFiles = [];
+                this.pendingMedia = [{ name: baseName(folderPath), path: folderPath, kind: "pasta" }];
                 this.updateDropzoneUI();
                 this.appendMessage({
                     role: "user",
-                    content: `📁 Pasta selecionada: \`${folderPath}\``
+                    content: `Pasta selecionada: ${folderPath}`
                 });
 
                 if (this.state === WelcomeHub.STATES.AWAITING_MEDIA) {
@@ -862,11 +1143,10 @@ export class WelcomeHub {
             const res = await this.api.selectFiles();
             const files = res?.files || res?.paths || [];
             if (files && files.length > 0) {
-                this.pendingFiles = files;
-                this.updateDropzoneUI();
+                this.addMedia(files.map(p => ({ name: baseName(p), path: p, kind: mediaKindOf(p) })));
                 this.appendMessage({
                     role: "user",
-                    content: `🎬 **${files.length} arquivo(s) selecionado(s)**`
+                    content: `${files.length} ${files.length === 1 ? "arquivo selecionado" : "arquivos selecionados"}`
                 });
 
                 if (this.state === WelcomeHub.STATES.AWAITING_MEDIA) {
@@ -887,47 +1167,134 @@ export class WelcomeHub {
         const files = Array.from(dt.files || []);
         if (files.length === 0) return;
 
-        // Se houver caminhos físicos diretos (Electron ou Desktop)
-        const paths = files.map(f => f.path || f.name).filter(Boolean);
-        this.pendingFiles = paths;
-        this.updateDropzoneUI();
+        // Caminho físico quando existe (Electron/desktop); no navegador só há o nome
+        const canPreview = typeof File !== "undefined" && typeof URL !== "undefined" && typeof URL.createObjectURL === "function";
+        this.addMedia(files.map(f => {
+            const kind = mediaKindOf(f.name || f.path, f.type);
+            const isPreviewable = canPreview && f instanceof File && (kind === "video" || kind === "foto");
+            return {
+                name: f.name || baseName(f.path),
+                path: f.path || f.name,
+                size: f.size || 0,
+                kind,
+                url: isPreviewable ? URL.createObjectURL(f) : null
+            };
+        }));
 
         this.appendMessage({
             role: "user",
-            content: `📥 Mídias adicionadas via arrasto: **${paths.length} item(ns)**`
+            content: `Soltei ${files.length} ${files.length === 1 ? "arquivo" : "arquivos"}.`
         });
 
         if (this.state === WelcomeHub.STATES.AWAITING_MEDIA) {
             await this.createProjectAndFinalize();
+        } else if (this.state === WelcomeHub.STATES.AWAITING_NAME && !this.projectName) {
+            this.appendMessage({
+                role: "assistant",
+                content: "Recebi. Cada arquivo mostra à esquerda o que vai ser analisado nele.\n\nComo vai se chamar o projeto?"
+            });
         }
     }
 
-    /** Atualiza feedback visual da dropzone */
-    updateDropzoneUI() {
-        if (!this.dropzoneFeedback) return;
-
-        let total = 0;
-        let summaryHtml = "";
-
+    /** Junta novas mídias às que já estavam na área de soltar (sem repetir caminho) */
+    addMedia(items) {
         if (this.pendingFolder) {
-            total = 1;
-            summaryHtml = `<li><i class="fa-solid fa-folder"></i> ${this.pendingFolder}</li>`;
-            if (this.dropzoneCount) this.dropzoneCount.textContent = "1 pasta de mídias";
-        } else if (this.pendingFiles.length > 0) {
-            total = this.pendingFiles.length;
-            const previewFiles = this.pendingFiles.slice(0, 4);
-            summaryHtml = previewFiles.map(f => `<li><i class="fa-solid fa-file-video"></i> ${f}</li>`).join("");
-            if (this.pendingFiles.length > 4) {
-                summaryHtml += `<li>… e mais ${this.pendingFiles.length - 4} arquivo(s)</li>`;
-            }
-            if (this.dropzoneCount) this.dropzoneCount.textContent = `${total} arquivo(s)`;
+            this.pendingFolder = null;
+            this.pendingMedia = [];
         }
+        const known = new Set(this.pendingMedia.map(m => m.path));
+        for (const item of items) {
+            if (!item.path || known.has(item.path)) continue;
+            known.add(item.path);
+            this.pendingMedia.push(item);
+        }
+        this.pendingFiles = this.pendingMedia.map(m => m.path);
+        this.updateDropzoneUI();
+    }
 
-        if (total > 0) {
-            this.dropzoneFeedback.style.display = "block";
-            if (this.dropzoneSummary) this.dropzoneSummary.innerHTML = summaryHtml;
-        } else {
-            this.dropzoneFeedback.style.display = "none";
+    /** Tira uma mídia da área de soltar */
+    removeMedia(index) {
+        const item = this.pendingMedia[index];
+        if (!item) return;
+        if (item.url && typeof URL !== "undefined") URL.revokeObjectURL?.(item.url);
+        this.pendingMedia.splice(index, 1);
+        if (item.kind === "pasta") this.pendingFolder = null;
+        this.pendingFiles = this.pendingMedia.filter(m => m.kind !== "pasta").map(m => m.path);
+        this.updateDropzoneUI();
+    }
+
+    /** Desenha os cartões das mídias e o resumo do que vai ser analisado */
+    updateDropzoneUI() {
+        const media = this.pendingMedia;
+        const has = media.length > 0;
+        this.dropzone?.classList?.toggle?.("has-media", has);
+        if (this.dropzoneFeedback) this.dropzoneFeedback.style.display = has ? "flex" : "none";
+        if (!this.dropzoneSummary) return;
+
+        this.dropzoneSummary.innerHTML = has
+            ? media.map((m, i) => this.mediaTileHtml(m, i)).join("") +
+              '<button type="button" class="wh-add-tile" data-add-media="1">+ adicionar mais</button>'
+            : "";
+        if (!has) return;
+
+        // Duração dos vídeos que o navegador consegue ler
+        this.dropzoneSummary.querySelectorAll?.("video[data-media-index]").forEach(v => {
+            v.addEventListener("loadedmetadata", () => {
+                const m = media[Number(v.dataset.mediaIndex)];
+                if (m && !m.duration && isFinite(v.duration)) {
+                    m.duration = v.duration;
+                    this.updatePlanSummary();
+                    const meta = v.closest(".wh-tile")?.querySelector(".wh-fmeta");
+                    if (meta) meta.textContent = [formatBytes(m.size), formatDuration(m.duration)].filter(Boolean).join(" · ");
+                }
+            }, { once: true });
+        });
+        this.updatePlanSummary();
+    }
+
+    mediaTileHtml(m, index) {
+        const kind = MEDIA_KINDS[m.kind] || MEDIA_KINDS.outro;
+        let thumb = `<i class="fa-solid ${kind.icon}"></i>`;
+        if (m.url && m.kind === "foto") thumb = `<img src="${m.url}" alt="">`;
+        if (m.url && m.kind === "video") thumb = `<video src="${m.url}#t=1" muted preload="metadata" data-media-index="${index}"></video>`;
+        const meta = [formatBytes(m.size), formatDuration(m.duration)].filter(Boolean).join(" · ") || (m.kind === "pasta" ? escapeHtml(m.path) : "");
+        return `<div class="wh-tile" style="--wh-kind: ${kind.color}">
+            <div class="wh-thumb">${thumb}<span class="wh-kind">${kind.label}</span>${m.duration ? `<span class="wh-dur">${formatDuration(m.duration)}</span>` : ""}</div>
+            <div class="wh-tile-body">
+                <div class="wh-fname" title="${escapeHtml(m.path)}">${escapeHtml(m.name)}</div>
+                <div class="wh-fmeta">${meta}</div>
+                <div class="wh-will">${kind.will.map(w => `<span>${w}</span>`).join("")}</div>
+            </div>
+        </div>`.replace(/\n\s*/g, "");
+    }
+
+    updatePlanSummary() {
+        const media = this.pendingMedia;
+        if (this.dropzoneCount) {
+            this.dropzoneCount.textContent = this.pendingFolder
+                ? "1 pasta pronta para análise"
+                : `${media.length} ${media.length === 1 ? "mídia pronta" : "mídias prontas"} para análise`;
+        }
+        if (this.planMeta) {
+            const bytes = media.reduce((a, m) => a + (m.size || 0), 0);
+            const secs = media.reduce((a, m) => a + (m.duration || 0), 0);
+            const count = k => media.filter(m => m.kind === k).length;
+            const parts = [["video", "vídeo", "vídeos"], ["audio", "áudio", "áudios"], ["foto", "foto", "fotos"]]
+                .filter(([k]) => count(k))
+                .map(([k, one, many]) => `${count(k)} ${count(k) === 1 ? one : many}`);
+            const h = Math.floor(secs / 3600);
+            const min = Math.round((secs % 3600) / 60);
+            this.planMeta.textContent = [
+                parts.join(", "),
+                secs ? `${h ? `${h}h${String(min).padStart(2, "0")}` : `${min} min`} de material` : "",
+                formatBytes(bytes)
+            ].filter(Boolean).join(" · ");
+        }
+        if (this.planSteps) {
+            const steps = new Set();
+            media.forEach(m => (MEDIA_KINDS[m.kind]?.will || []).forEach(w => steps.add(w)));
+            steps.delete("ignorado");
+            this.planSteps.innerHTML = [...steps].map(s => `<span class="wh-step">${escapeHtml(s)}</span>`).join("");
         }
     }
 
@@ -936,20 +1303,44 @@ export class WelcomeHub {
         if (!this.chatMessagesContainer) return;
         this.chatMessagesContainer.innerHTML = "";
 
-        this.conversationHistory.forEach(msg => {
+        this.conversationHistory.forEach((msg, index) => {
+            const isUser = msg.role === "user";
             const row = this.document.createElement("div");
-            row.className = `welcome-bubble-row ${msg.role === "user" ? "user-row" : "assistant-row"}`;
-
-            const bubble = this.document.createElement("div");
-            bubble.className = `welcome-bubble ${msg.role === "user" ? "user" : "assistant"}`;
-            bubble.innerHTML = formatMessageContent(msg.content);
-
-            row.appendChild(bubble);
+            row.className = `welcome-bubble-row ${isUser ? "user-row" : "assistant-row"}`;
+            const features = !isUser && index === this.featuresAtIndex ? this.featuresHtml() : "";
+            row.innerHTML = (isUser ? "" : '<div class="wh-who">Assistente</div>') +
+                `<div class="welcome-bubble ${isUser ? "user" : "assistant"}">${formatMessageContent(msg.content)}${features}</div>`;
             this.chatMessagesContainer.appendChild(row);
         });
 
+        if (this.waitStartedAt) {
+            const wait = this.document.createElement("div");
+            wait.className = "wh-wait";
+            wait.innerHTML = '<div class="wh-who">Assistente</div>' +
+                '<div class="wh-wait-line"><span class="wh-pulse"></span><span id="welcome-wait-label">Enviando sua mensagem</span><span id="welcome-wait-timer" class="wh-timer">0,0 s</span></div>' +
+                '<div id="welcome-wait-slow" class="wh-wait-slow" style="display: none;">Está demorando mais que o normal. Espero até 12 s; depois respondo com o assistente local.</div>';
+            this.chatMessagesContainer.appendChild(wait);
+        }
+
         // Rola automaticamente para o fim
         this.chatMessagesContainer.scrollTop = this.chatMessagesContainer.scrollHeight;
+    }
+
+    featuresHtml() {
+        return '<div class="wh-features">' + WELCOME_HUB_FEATURES.map(f => {
+            const open = this.openFeatures.has(f.id);
+            return `<div class="wh-feat${open ? " open" : ""}">` +
+                `<button type="button" class="wh-feat-head" data-feat-toggle="${f.id}" aria-expanded="${open}"><i class="fa-solid ${f.icon}"></i>${f.title}<i class="fa-solid fa-chevron-right wh-chev"></i></button>` +
+                `<div class="wh-feat-body">${f.what}<dl><dt>Precisa de</dt><dd>${f.needs}</dd><dt>Resultado</dt><dd>${f.result}</dd></dl>` +
+                `<button type="button" class="wh-btn" data-feat-ask="${f.id}">Perguntar mais</button></div></div>`;
+        }).join("") + "</div>";
+    }
+
+    /** Trava o campo de texto enquanto a IA responde */
+    setInputBusy(busy) {
+        if (this.chatInput) this.chatInput.disabled = busy;
+        if (this.btnChatSend) this.btnChatSend.disabled = busy;
+        if (!busy) this.chatInput?.focus?.();
     }
 
     /** Renderiza chips de resposta rápida */
@@ -973,12 +1364,13 @@ export class WelcomeHub {
         });
     }
 
-    /** Abre sub-modal de projetos existentes */
+    /** Abre o menu de projetos do cabeçalho */
     async openExistingProjectsModal() {
         if (!this.modalExistingProjects) return;
         this.modalExistingProjects.style.display = "flex";
+        this.btnExistingProjects?.setAttribute?.("aria-expanded", "true");
         if (this.projectsListContainer) {
-            this.projectsListContainer.innerHTML = '<div class="loading-state"><i class="fa-solid fa-circle-notch fa-spin"></i> Carregando projetos...</div>';
+            this.projectsListContainer.innerHTML = '<div class="wh-menu-empty">Carregando projetos…</div>';
         }
 
         try {
@@ -987,66 +1379,37 @@ export class WelcomeHub {
         } catch (err) {
             console.error("[WelcomeHub] Erro ao carregar projetos:", err);
             if (this.projectsListContainer) {
-                this.projectsListContainer.innerHTML = `<div class="error-state"><i class="fa-solid fa-triangle-exclamation"></i> Falha ao listar projetos: ${err.message || err}</div>`;
+                this.projectsListContainer.innerHTML = `<div class="wh-menu-empty">Não consegui listar os projetos (${escapeHtml(err.message || err)}).</div>`;
             }
         }
     }
 
-    /** Fecha sub-modal de projetos existentes */
+    /** Fecha o menu de projetos */
     closeExistingProjectsModal() {
         if (this.modalExistingProjects) {
             this.modalExistingProjects.style.display = "none";
         }
+        this.btnExistingProjects?.setAttribute?.("aria-expanded", "false");
     }
 
-    /** Renderiza lista de projetos existentes no modal */
+    /** Lista os projetos no menu, do mais recente para o mais antigo */
     renderExistingProjectsList(projects) {
         if (!this.projectsListContainer) return;
         this.projectsListContainer.innerHTML = "";
 
         if (!projects || projects.length === 0) {
-            this.projectsListContainer.innerHTML = `
-                <div class="empty-projects-state">
-                    <i class="fa-solid fa-folder-open"></i>
-                    <p>Nenhum projeto encontrado no banco de dados.</p>
-                    <button type="button" class="btn-welcome-flat" id="btn-modal-create-first">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Criar Primeiro Projeto com Chat Guiador
-                    </button>
-                </div>
-            `;
-            const btnFirst = this.projectsListContainer.querySelector("#btn-modal-create-first");
-            if (btnFirst) {
-                btnFirst.addEventListener("click", () => {
-                    this.closeExistingProjectsModal();
-                    this.startOnboarding();
-                });
-            }
+            this.projectsListContainer.innerHTML = '<div class="wh-menu-empty">Nenhum projeto ainda. Crie o primeiro pela conversa.</div>';
             return;
         }
 
-        projects.forEach(p => {
-            const card = this.document.createElement("div");
-            card.className = "welcome-project-card";
-
-            const info = this.document.createElement("div");
-            info.className = "welcome-project-info";
-            info.innerHTML = `
-                <h4><i class="fa-solid fa-film"></i> ${p.name || `Projeto #${p.id}`}</h4>
-                <p>${p.description || "Sem descrição disponível."}</p>
-                <span class="project-date">ID: ${p.id}</span>
-            `;
-
-            const btnOpen = this.document.createElement("button");
-            btnOpen.type = "button";
-            btnOpen.className = "btn-open-project";
-            btnOpen.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Abrir Projeto';
-            btnOpen.addEventListener("click", () => {
-                this.selectExistingProject(p.id);
-            });
-
-            card.appendChild(info);
-            card.appendChild(btnOpen);
-            this.projectsListContainer.appendChild(card);
+        [...projects].sort((a, b) => (b.id || 0) - (a.id || 0)).forEach(p => {
+            const item = this.document.createElement("button");
+            item.type = "button";
+            item.className = "wh-menu-item";
+            item.setAttribute?.("role", "menuitem");
+            item.innerHTML = `<span>${escapeHtml(p.name || `Projeto #${p.id}`)}</span><small>#${escapeHtml(p.id)}</small>`;
+            item.addEventListener("click", () => this.selectExistingProject(p.id));
+            this.projectsListContainer.appendChild(item);
         });
     }
 

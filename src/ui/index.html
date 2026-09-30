@@ -17,7 +17,7 @@
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Customizados -->
-    <link rel="stylesheet" href="styles.css?v=90">
+    <link rel="stylesheet" href="styles.css?v=91">
     <link rel="stylesheet" href="theme.css?v=5">
     <script src="js/themeBoot.js?v=2"></script>
 </head>
@@ -3643,192 +3643,133 @@
         </div>
     </div>
 
-    <!-- ── WELCOME HUB INTERATIVO EM TELA CHEIA (REQUISITO R1) ──────────────── -->
+    <!-- ── WELCOME HUB: cabeçalho do editor + canvas único (mídias | conversa) ── -->
     <div id="welcome-hub-overlay" class="welcome-hub-overlay" style="display: none;">
-        <div class="welcome-hub-container">
-            <!-- Top Bar / Header do Hub -->
-            <header class="welcome-hub-header">
-                <div class="welcome-brand">
-                    <i class="fa-solid fa-clapperboard welcome-logo-icon"></i>
-                    <div class="welcome-brand-text">
-                        <span class="welcome-brand-title">CapIAu-Talho</span>
-                        <span class="welcome-brand-badge">2026 SOTA</span>
-                    </div>
-                </div>
-                <div class="welcome-hub-top-actions">
-                    <button type="button" id="btn-welcome-settings" class="btn-welcome-flat" data-tooltip="Configurar chaves de API com segurança e modelos de IA">
-                        <i class="fa-solid fa-key"></i><span>Chaves de API</span>
-                    </button>
-                    <button type="button" id="btn-welcome-existing-projects" class="btn-welcome-flat" data-tooltip="Abrir lista de projetos já existentes no banco">
-                        <i class="fa-solid fa-folder-open"></i><span>Projetos Existentes</span>
-                    </button>
-                    <button type="button" id="btn-welcome-skip-nle" class="btn-welcome-flat" data-tooltip="Pular onboarding conversacional e abrir o editor clássico imediatamente">
-                        <i class="fa-solid fa-arrow-right-to-bracket"></i><span>Ir para o Editor Clássico</span>
-                    </button>
-                </div>
-            </header>
+        <header class="wh-header">
+            <div class="wh-logo"><i class="fa-solid fa-clapperboard"></i>CapIAu-Talho</div>
+            <span class="wh-sep"></span>
+            <div class="wh-crumb">Início · <b id="welcome-crumb-name">novo projeto</b></div>
+            <span class="wh-spacer"></span>
 
-            <!-- Grade Principal em 2 Colunas (Hero/Ingestão à esquerda, Chat Guiador à direita) -->
-            <main class="welcome-hub-main">
-                <!-- Coluna Esquerda: Apresentação & Dropzone de Ingestão -->
-                <section class="welcome-hub-left">
-                    <div class="welcome-hero-card glassmorphism">
-                        <div class="welcome-hero-headline">
-                            <h1>Ilha de Inteligência Cinematográfica</h1>
-                            <p>Crie ou configure sua produção audiovisual com auxílio conversacional de IA multimodal.</p>
-                        </div>
-
-                        <!-- Dropzone Viva de Ingestão -->
-                        <div id="welcome-dropzone" class="welcome-dropzone" data-tooltip="Arraste pastas de mídia, cartões SD ou arquivos de vídeo/áudio">
-                            <div class="dropzone-icon-glow">
-                                <i class="fa-solid fa-cloud-arrow-up"></i>
-                            </div>
-                            <h3>Arraste Pastas de Mídia ou Cartões SD</h3>
-                            <p>Detecção automática de vídeos brutos, áudios multitrack e fotos de set.</p>
-                            <div class="welcome-dropzone-actions">
-                                <button type="button" id="btn-welcome-browse-folder" class="btn-welcome-browse">
-                                    <i class="fa-solid fa-folder-tree"></i><span>Selecionar Pasta…</span>
-                                </button>
-                                <button type="button" id="btn-welcome-browse-files" class="btn-welcome-browse secondary">
-                                    <i class="fa-solid fa-film"></i><span>Selecionar Arquivos…</span>
-                                </button>
-                            </div>
-                            <!-- Feedback visual de mídias detectadas -->
-                            <div id="welcome-dropzone-feedback" class="welcome-dropzone-feedback" style="display: none;">
-                                <div class="feedback-badge"><i class="fa-solid fa-circle-check"></i> <span id="welcome-files-count">0 mídias</span> detectadas</div>
-                                <ul id="welcome-files-summary-list" class="welcome-files-summary-list"></ul>
-                            </div>
-                        </div>
-
-                        <!-- Indicadores de Recursos 2026 SOTA -->
-                        <div class="welcome-features-grid">
-                            <div class="feature-item">
-                                <i class="fa-solid fa-bolt" style="color: var(--accent);"></i>
-                                <div>
-                                    <strong>Sistema 1 Dual</strong>
-                                    <span>Triagem em 22ms com Laya local & Jev RLCD</span>
-                                </div>
-                            </div>
-                            <div class="feature-item">
-                                <i class="fa-solid fa-vector-square" style="color: var(--color-violet);"></i>
-                                <div>
-                                    <strong>Grounding Canônico</strong>
-                                    <span>Bounding boxes inteiros [0–1000] no SQLite</span>
-                                </div>
-                            </div>
-                            <div class="feature-item">
-                                <i class="fa-solid fa-headphones" style="color: var(--color-emerald);"></i>
-                                <div>
-                                    <strong>Nemotron 3 Diarization</strong>
-                                    <span>Fala sobreposta em até 8 locutores locais</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Coluna Direita: O Chat Guiador Conversacional -->
-                <section class="welcome-hub-right">
-                    <div class="welcome-chat-card glassmorphism">
-                        <div class="welcome-chat-header">
-                            <div class="chat-agent-info">
-                                <div class="agent-avatar"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-                                <div>
-                                    <h4>Chat Guiador de Entrada</h4>
-                                    <span>Onboarding e calibração de modelos IA</span>
-                                </div>
-                            </div>
-                            <span class="chat-agent-status-badge"><span class="status-dot"></span> Ativo</span>
-                        </div>
-
-                        <!-- Feed rolável de mensagens do diálogo guiado -->
-                        <div id="welcome-chat-messages" class="welcome-chat-messages scrollable">
-                            <!-- Inserido dinamicamente via WelcomeHub -->
-                        </div>
-
-                        <!-- Área de Chips de Resposta Rápida (Perfis e Ações) -->
-                        <div id="welcome-chips-container" class="welcome-chips-container" style="display: none;">
-                            <!-- Inserido dinamicamente -->
-                        </div>
-
-                        <!-- Input interativo do chat do onboarding -->
-                        <div class="welcome-chat-input-area">
-                            <input type="text" id="welcome-chat-input" placeholder="Responda ao Chat Guiador ou dê Enter..." autocomplete="off">
-                            <button type="button" id="btn-welcome-chat-send" class="btn-welcome-send" data-tooltip="Enviar mensagem (Enter)">
-                                <i class="fa-solid fa-paper-plane"></i>
-                            </button>
-                        </div>
-                    </div>
-                </section>
-            </main>
-
-            <!-- Sub-Modal de Seleção de Projetos Existentes -->
-            <div id="welcome-existing-projects-modal" class="welcome-submodal" style="display: none;">
-                <div class="welcome-submodal-content glassmorphism">
-                    <div class="welcome-submodal-header">
-                        <h3><i class="fa-solid fa-folder-open"></i> Selecionar Projeto Existente</h3>
-                        <button type="button" id="btn-close-welcome-projects-modal" class="btn-close-modal">&times;</button>
-                    </div>
-                    <div id="welcome-projects-list" class="welcome-projects-list scrollable">
-                        <!-- Preenchido via CapIAuAPI.fetchProjects() -->
-                    </div>
+            <div class="wh-menu-wrap">
+                <button type="button" id="btn-welcome-existing-projects" class="wh-hbtn" aria-haspopup="menu" aria-expanded="false" data-tooltip="Abrir um projeto que já existe">
+                    <i class="fa-solid fa-folder-open"></i><span>Projetos</span><i class="fa-solid fa-chevron-down wh-chev"></i>
+                </button>
+                <div id="welcome-existing-projects-modal" class="wh-menu" role="menu" style="display: none;">
+                    <div class="wh-menu-head">Abrir projeto</div>
+                    <div id="welcome-projects-list" class="wh-menu-list"></div>
                 </div>
             </div>
+            <button type="button" id="btn-welcome-settings" class="wh-hbtn" data-tooltip="Chaves de API e modelos de IA">
+                <i class="fa-solid fa-key"></i><span>Chaves e modelos</span><span id="welcome-key-dot" class="wh-dot"></span>
+            </button>
+            <span class="wh-sep"></span>
+            <button type="button" id="btn-welcome-skip-nle" class="wh-hbtn wh-hbtn-primary" data-tooltip="Pular a conversa e abrir o editor">
+                <span>Abrir editor</span><i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </header>
 
-            <!-- Sub-Modal Seguro de Configuração de Chaves de API & Modelos -->
-            <div id="welcome-api-keys-modal" class="welcome-submodal" style="display: none;">
-                <div class="welcome-submodal-content glassmorphism" style="max-width: 540px;">
-                    <div class="welcome-submodal-header">
-                        <h3><i class="fa-solid fa-shield-halved" style="color: var(--accent);"></i> Chaves de API & Modelos de IA</h3>
-                        <button type="button" id="btn-close-welcome-keys-modal" class="btn-close-modal">&times;</button>
+        <main class="wh-canvas">
+            <!-- Mídias: área de soltar sempre aberta; cada arquivo vira um cartão -->
+            <section class="wh-media">
+                <div id="welcome-dropzone-feedback" class="wh-plan" style="display: none;">
+                    <div>
+                        <div class="wh-plan-title" id="welcome-files-count">0 mídias</div>
+                        <div class="wh-plan-meta" id="welcome-plan-meta"></div>
                     </div>
-                    <div class="welcome-keys-body">
-                        <div class="welcome-security-notice">
-                            <i class="fa-solid fa-lock" style="color: var(--accent); margin-right: var(--sp-6);"></i>
-                            <strong>Armazenamento Seguro:</strong> Suas chaves são gravadas diretamente no banco de dados local da aplicação (<code>app_setting</code>) e nunca são expostas no histórico do chat, logadas ou enviadas a outros modelos.
+                    <div class="wh-plan-steps" id="welcome-plan-steps"></div>
+                </div>
+                <div id="welcome-dropzone" class="wh-drop">
+                    <div class="wh-drop-empty">
+                        <div class="wh-drop-icon"><i class="fa-solid fa-arrow-up-from-bracket"></i></div>
+                        <h1>Solte aqui o material bruto</h1>
+                        <p>Pastas de cartão, vídeos, áudios do gravador e fotos de set. A análise roda nesta máquina.</p>
+                        <div class="wh-row">
+                            <button type="button" id="btn-welcome-browse-folder" class="wh-btn"><i class="fa-solid fa-folder-tree"></i>Selecionar pasta…</button>
+                            <button type="button" id="btn-welcome-browse-files" class="wh-btn"><i class="fa-solid fa-film"></i>Selecionar arquivos…</button>
                         </div>
-
-                        <!-- Campo OpenRouter -->
-                        <div class="welcome-key-field-group">
-                            <div class="welcome-key-label-row">
-                                <label for="welcome-key-openrouter"><i class="fa-solid fa-brain"></i> OpenRouter (DeepSeek / Claude / Llama)</label>
-                                <span id="badge-status-openrouter" class="key-status-badge">Verificando...</span>
-                            </div>
-                            <div class="welcome-key-input-row">
-                                <input type="password" id="welcome-key-openrouter" class="welcome-key-input" placeholder="sk-or-v1-..." autocomplete="off">
-                                <button type="button" class="btn-toggle-key-visibility btn-welcome-flat" data-target="welcome-key-openrouter" data-tooltip="Mostrar/Ocultar Chave">
-                                    <i class="fa-solid fa-eye"></i>
-                                </button>
-                            </div>
+                        <div class="wh-types">
+                            <span style="--wh-kind: var(--accent)">Vídeo: cenas, rostos, fala</span>
+                            <span style="--wh-kind: var(--color-emerald)">Áudio: transcrição, vozes</span>
+                            <span style="--wh-kind: var(--color-amber)">Foto: referência de rosto</span>
                         </div>
-
-                        <!-- Campo Google Gemini -->
-                        <div class="welcome-key-field-group">
-                            <div class="welcome-key-label-row">
-                                <label for="welcome-key-gemini"><i class="fa-solid fa-gem"></i> Google Gemini (Visão & Grounding)</label>
-                                <span id="badge-status-gemini" class="key-status-badge">Verificando...</span>
-                            </div>
-                            <div class="welcome-key-input-row">
-                                <input type="password" id="welcome-key-gemini" class="welcome-key-input" placeholder="AIzaSy..." autocomplete="off">
-                                <button type="button" class="btn-toggle-key-visibility btn-welcome-flat" data-target="welcome-key-gemini" data-tooltip="Mostrar/Ocultar Chave">
-                                    <i class="fa-solid fa-eye"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Feedback de salvamento -->
-                        <div id="welcome-keys-feedback" class="welcome-keys-feedback"></div>
                     </div>
-                    <div class="welcome-submodal-footer">
-                        <button type="button" id="btn-welcome-open-full-settings" class="btn-welcome-flat" style="font-size: var(--fs-11);">
-                            <i class="fa-solid fa-sliders"></i> Todas as Configurações
+                    <div id="welcome-files-summary-list" class="wh-grid"></div>
+                </div>
+            </section>
+
+            <!-- Conversa -->
+            <section class="wh-chat">
+                <div class="wh-chat-head">
+                    <div class="wh-chat-title">Assistente de entrada</div>
+                    <div class="wh-chat-sub">Cria o projeto com você e explica a ferramenta</div>
+                </div>
+                <div id="welcome-chat-messages" class="wh-msgs" aria-live="polite"></div>
+                <div class="wh-composer">
+                    <div id="welcome-chips-container" class="wh-chips" style="display: none;"></div>
+                    <div class="wh-inrow">
+                        <input type="text" id="welcome-chat-input" placeholder="Nome do projeto ou uma pergunta" autocomplete="off">
+                        <button type="button" id="btn-welcome-chat-send" class="wh-send" aria-label="Enviar" data-tooltip="Enviar (Enter)">
+                            <i class="fa-solid fa-paper-plane"></i>
                         </button>
-                        <div style="display: flex; gap: var(--sp-8);">
-                            <button type="button" id="btn-cancel-welcome-keys" class="btn-welcome-browse secondary" style="height: 34px; padding: 0 var(--sp-14); font-size: var(--fs-12);">Fechar</button>
-                            <button type="button" id="btn-save-welcome-keys" class="btn-welcome-browse" style="height: 34px; padding: 0 var(--sp-16); font-size: var(--fs-12);">
-                                <i class="fa-solid fa-floppy-disk"></i> Salvar Chaves
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Sub-Modal Seguro de Configuração de Chaves de API & Modelos -->
+        <div id="welcome-api-keys-modal" class="welcome-submodal" style="display: none;">
+            <div class="welcome-submodal-content glassmorphism" style="max-width: 540px;">
+                <div class="welcome-submodal-header">
+                    <h3><i class="fa-solid fa-shield-halved" style="color: var(--accent);"></i> Chaves de API & Modelos de IA</h3>
+                    <button type="button" id="btn-close-welcome-keys-modal" class="btn-close-modal">&times;</button>
+                </div>
+                <div class="welcome-keys-body">
+                    <div class="welcome-security-notice">
+                        <i class="fa-solid fa-lock" style="color: var(--accent); margin-right: var(--sp-6);"></i>
+                        <strong>Armazenamento Seguro:</strong> Suas chaves são gravadas diretamente no banco de dados local da aplicação (<code>app_setting</code>) e nunca são expostas no histórico do chat, logadas ou enviadas a outros modelos.
+                    </div>
+
+                    <!-- Campo OpenRouter -->
+                    <div class="welcome-key-field-group">
+                        <div class="welcome-key-label-row">
+                            <label for="welcome-key-openrouter"><i class="fa-solid fa-brain"></i> OpenRouter (DeepSeek / Claude / Llama)</label>
+                            <span id="badge-status-openrouter" class="key-status-badge">Verificando...</span>
+                        </div>
+                        <div class="welcome-key-input-row">
+                            <input type="password" id="welcome-key-openrouter" class="welcome-key-input" placeholder="sk-or-v1-..." autocomplete="off">
+                            <button type="button" class="btn-toggle-key-visibility btn-welcome-flat" data-target="welcome-key-openrouter" data-tooltip="Mostrar/Ocultar Chave">
+                                <i class="fa-solid fa-eye"></i>
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Campo Google Gemini -->
+                    <div class="welcome-key-field-group">
+                        <div class="welcome-key-label-row">
+                            <label for="welcome-key-gemini"><i class="fa-solid fa-gem"></i> Google Gemini (Visão & Grounding)</label>
+                            <span id="badge-status-gemini" class="key-status-badge">Verificando...</span>
+                        </div>
+                        <div class="welcome-key-input-row">
+                            <input type="password" id="welcome-key-gemini" class="welcome-key-input" placeholder="AIzaSy..." autocomplete="off">
+                            <button type="button" class="btn-toggle-key-visibility btn-welcome-flat" data-target="welcome-key-gemini" data-tooltip="Mostrar/Ocultar Chave">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Feedback de salvamento -->
+                    <div id="welcome-keys-feedback" class="welcome-keys-feedback"></div>
+                </div>
+                <div class="welcome-submodal-footer">
+                    <button type="button" id="btn-welcome-open-full-settings" class="btn-welcome-flat" style="font-size: var(--fs-11);">
+                        <i class="fa-solid fa-sliders"></i> Todas as Configurações
+                    </button>
+                    <div style="display: flex; gap: var(--sp-8);">
+                        <button type="button" id="btn-cancel-welcome-keys" class="btn-welcome-browse secondary" style="height: 34px; padding: 0 var(--sp-14); font-size: var(--fs-12);">Fechar</button>
+                        <button type="button" id="btn-save-welcome-keys" class="btn-welcome-browse" style="height: 34px; padding: 0 var(--sp-16); font-size: var(--fs-12);">
+                            <i class="fa-solid fa-floppy-disk"></i> Salvar Chaves
+                        </button>
                     </div>
                 </div>
             </div>

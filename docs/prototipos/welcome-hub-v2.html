@@ -1,0 +1,646 @@
+<title>Welcome Hub v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+/* Layout: cabeçalho 36px do editor · canvas único em 2 zonas (mídias | conversa) · gaveta direita que EMPURRA */
+:root {
+  color-scheme: dark;
+  --s0: #080808; --s1: #0d0d0d; --s2: #101010; --s3: #161616; --s4: #1e1e1e;
+  --tint: rgba(255,255,255,.035); --tint2: rgba(255,255,255,.07);
+  --line: rgba(255,255,255,.06); --line2: rgba(255,255,255,.12);
+  --fg: hsl(0,0%,94%); --fg2: hsl(250,6%,72%); --muted: #8C8A96;
+  --accent: hsl(190,90%,55%); --accent-soft: hsla(190,90%,55%,.12);
+  --ok: hsl(152,58%,50%); --warn: hsl(38,92%,58%); --err: hsl(340,80%,62%);
+  --note: hsl(48,100%,62%);
+  --f-head: 'Barlow Semi Condensed', 'Arial Narrow', sans-serif;
+  --f-body: 'Inter', system-ui, sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+html, body { height: 100%; }
+body { background: var(--s0); color: var(--fg); font: 400 12px/1.5 var(--f-body); margin: 0; overflow: hidden; }
+* { box-sizing: border-box; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+
+.app { height: 100%; display: grid; grid-template-rows: 36px 1fr; }
+
+/* ── cabeçalho ── */
+.hdr { display: flex; align-items: center; gap: 8px; padding-inline: 10px; background: var(--s1); border-bottom: 1px solid var(--line); min-width: 0; }
+.logo { display: flex; align-items: center; gap: 7px; font: 500 13px var(--f-head); letter-spacing: .02em; white-space: nowrap; }
+.logo svg { width: 16px; height: 16px; color: var(--accent); }
+.crumb { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumb b { color: var(--fg2); font-weight: 400; }
+.sp { flex: 1; }
+.hbtn { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 4px; border: 1px solid transparent; background: none; color: var(--fg2); font-size: 11px; white-space: nowrap; position: relative; }
+.hbtn:hover { background: var(--tint2); color: var(--fg); }
+.hbtn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.hbtn svg { width: 13px; height: 13px; flex: none; }
+.hbtn .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.hbtn .dot.warn { background: var(--warn); }
+.hbtn .count { font: 10px var(--f-mono); background: var(--accent-soft); color: var(--accent); border-radius: 3px; padding: 0 4px; }
+.hsep { width: 1px; height: 16px; background: var(--line2); }
+.hbtn.primary { border-color: var(--line2); color: var(--fg); }
+.hbtn.primary:hover { border-color: var(--accent); color: var(--accent); background: none; }
+.hmenu { position: absolute; top: 30px; right: 0; width: 260px; background: var(--s3); border: 1px solid var(--line2); border-radius: 6px; padding: 4px; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,.6); text-align: left; }
+.hmenu-head { font: 500 10px var(--f-head); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 6px 8px 4px; }
+.hmenu-item { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 4px; background: none; font-size: 11px; color: var(--fg2); text-align: left; }
+.hmenu-item:hover { background: var(--tint2); color: var(--fg); }
+.hmenu-item small { color: var(--muted); font-size: 10px; white-space: nowrap; }
+
+/* ── corpo: canvas + gaveta que empurra ── */
+.body { display: grid; grid-template-columns: minmax(0,1fr) 0px; transition: grid-template-columns .22s ease; min-height: 0; }
+.body.drawer-open { grid-template-columns: minmax(0,1fr) 300px; }
+.canvas { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(320px, .85fr); min-height: 0; min-width: 0; }
+
+/* zona de mídias */
+.media { position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--line); }
+.drop { position: relative; flex: 1; margin: 12px; border: 1px dashed var(--line2); border-radius: 8px; display: flex; flex-direction: column; min-height: 0; transition: border-color .15s, background .15s; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
+.drop-empty h1 { font: 500 20px/1.2 var(--f-head); margin: 0; letter-spacing: .01em; text-wrap: balance; }
+.drop-empty p { margin: 0; color: var(--muted); font-size: 11px; max-width: 42ch; }
+.drop-icon { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line2); display: grid; place-items: center; color: var(--accent); }
+.drop-icon svg { width: 20px; height: 20px; }
+.row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.btn { height: 26px; padding: 0 10px; border-radius: 4px; border: 1px solid var(--line2); background: var(--s2); font-size: 11px; color: var(--fg); display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--accent); }
+.btn.solid { background: var(--accent); color: #041318; border-color: var(--accent); font-weight: 500; }
+.btn.solid:hover { filter: brightness(1.1); }
+.btn.ghost { background: none; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--fg); }
+.btn svg { width: 12px; height: 12px; }
+.types { display: flex; gap: 16px; color: var(--muted); font-size: 10px; flex-wrap: wrap; justify-content: center; }
+.types span { display: inline-flex; gap: 5px; align-items: center; }
+.types i { width: 6px; height: 6px; border-radius: 2px; display: inline-block; }
+
+/* plano de análise + grade de arquivos */
+.plan { display: none; padding: 10px 12px; border-bottom: 1px solid var(--line); gap: 12px; align-items: center; flex-wrap: wrap; }
+.has-files .plan { display: flex; }
+.has-files .drop-empty { display: none; }
+.plan-title { font: 500 13px var(--f-head); }
+.plan-meta { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.plan-steps { display: flex; gap: 4px; flex-wrap: wrap; }
+.step-chip { font-size: 10px; padding: 2px 7px; border-radius: 10px; border: 1px solid var(--line2); color: var(--fg2); display: inline-flex; gap: 5px; align-items: center; }
+.step-chip i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); display: inline-block; }
+.grid { display: none; flex: 1; overflow: auto; padding: 12px 12px 48px; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); align-content: start; }
+.has-files .grid { display: grid; }
+.tile { background: var(--s2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; animation: pop .25s ease both; }
+@keyframes pop { from { transform: scale(.96); opacity: .3; } }
+.thumb { aspect-ratio: 16/9; background: var(--s3); position: relative; display: grid; place-items: center; overflow: hidden; max-width: 100%; }
+.thumb img, .thumb video { width: 100%; height: 100%; object-fit: cover; }
+.thumb .wave { position: absolute; inset: 22% 8%; display: flex; align-items: center; gap: 2px; }
+.thumb .wave b { flex: 1; background: var(--ok); opacity: .55; border-radius: 1px; }
+.thumb .frame { position: absolute; inset: 0; background: linear-gradient(135deg, hsl(200,20%,16%), hsl(30,18%,12%)); }
+.thumb .frame::after { content: ""; position: absolute; left: 38%; top: 22%; width: 24%; height: 58%; border-radius: 40% 40% 10% 10%; background: hsla(30,20%,40%,.35); }
+.dur { position: absolute; right: 5px; bottom: 5px; font: 10px var(--f-mono); background: rgba(0,0,0,.7); padding: 0 4px; border-radius: 2px; }
+.kind { position: absolute; left: 5px; top: 5px; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; padding: 1px 5px; border-radius: 2px; background: rgba(0,0,0,.7); }
+.tile-body { padding: 7px 8px 8px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.fname { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fmeta { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.will { display: flex; flex-wrap: wrap; gap: 3px; }
+.will span { font-size: 9px; padding: 1px 5px; border-radius: 2px; background: var(--tint2); color: var(--fg2); }
+.tile-x { position: absolute; right: 5px; top: 5px; width: 18px; height: 18px; border: 0; border-radius: 3px; background: rgba(0,0,0,.7); display: none; place-items: center; font-size: 11px; line-height: 1; }
+.tile:hover .tile-x { display: grid; }
+.add-tile { border: 1px dashed var(--line2); border-radius: 6px; display: grid; place-items: center; color: var(--muted); font-size: 11px; min-height: 150px; background: none; }
+.add-tile:hover { color: var(--accent); border-color: var(--accent); }
+
+/* zona da conversa */
+.chat { display: flex; flex-direction: column; min-height: 0; background: var(--s1); }
+.chat-head { padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+.chat-head .t { font: 500 13px var(--f-head); }
+.chat-head .m { color: var(--muted); font-size: 10px; }
+.msgs { flex: 1; overflow: auto; padding: 16px 16px 8px; display: flex; flex-direction: column; gap: 14px; }
+.msg { max-width: 62ch; font-size: 12px; line-height: 1.6; color: var(--fg2); }
+.msg p { margin: 0 0 6px; } .msg p:last-child { margin: 0; }
+.msg ul, .msg ol { margin: 4px 0 6px; padding-left: 16px; }
+.msg li { margin: 2px 0; }
+.msg strong { color: var(--fg); font-weight: 500; }
+.msg .lbl { display: block; font: 500 10px var(--f-head); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 8px 0 2px; }
+.msg code { font: 11px var(--f-mono); background: var(--tint2); padding: 0 4px; border-radius: 3px; }
+.msg.user { align-self: flex-end; background: var(--s3); color: var(--fg); padding: 7px 10px; border-radius: 8px 8px 2px 8px; }
+.msg.raw { white-space: pre-wrap; font-family: var(--f-body); }
+.who { font-size: 10px; color: var(--muted); margin-bottom: 3px; display: flex; gap: 6px; align-items: center; }
+.who i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; }
+
+/* explicações interativas */
+.features { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-width: 62ch; }
+.feat { border: 1px solid var(--line); border-radius: 6px; background: var(--s2); overflow: hidden; }
+.feat > button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 0; background: none; text-align: left; font-size: 11px; color: var(--fg); }
+.feat > button:hover { background: var(--tint); }
+.feat > button svg { width: 13px; height: 13px; color: var(--accent); flex: none; }
+.feat > button .chev { margin-left: auto; color: var(--muted); transition: transform .15s; }
+.feat.open > button .chev { transform: rotate(90deg); }
+.feat-body { display: none; padding: 0 9px 9px 30px; font-size: 11px; color: var(--fg2); }
+.feat.open .feat-body { display: block; }
+.feat-body dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 4px 0 8px; }
+.feat-body dt { color: var(--muted); font-size: 10px; }
+.feat-body dd { margin: 0; }
+
+/* indicador de espera */
+.wait { display: flex; flex-direction: column; gap: 6px; max-width: 62ch; }
+.wait-line { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--fg2); }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1s ease-in-out infinite; flex: none; }
+@keyframes pulse { 50% { opacity: .25; transform: scale(.7); } }
+.wait-steps { display: flex; gap: 4px; flex-wrap: wrap; }
+.ws { font-size: 10px; padding: 1px 6px; border-radius: 10px; color: var(--muted); border: 1px solid var(--line); }
+.ws.done { color: var(--ok); border-color: hsla(152,58%,50%,.3); }
+.ws.now { color: var(--accent); border-color: var(--accent); }
+.timer { font: 10px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { height: 2px; background: var(--line); border-radius: 1px; overflow: hidden; max-width: 260px; }
+.bar b { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s linear; }
+.wait-slow { font-size: 10px; color: var(--warn); display: none; }
+.cursor::after { content: "▍"; color: var(--accent); animation: pulse 1s infinite; margin-left: 1px; }
+
+.composer { padding: 10px 12px 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.chip { height: 22px; padding: 0 8px; border-radius: 11px; border: 1px solid var(--line2); background: none; font-size: 10px; color: var(--fg2); }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.inrow { display: flex; gap: 6px; }
+.inrow input { flex: 1; min-width: 0; height: 30px; background: var(--s2); border: 1px solid var(--line2); border-radius: 6px; color: var(--fg); padding: 0 10px; font: 12px var(--f-body); }
+.inrow input:disabled { opacity: .5; }
+.send { width: 30px; height: 30px; border-radius: 6px; border: 0; background: var(--accent); color: #041318; display: grid; place-items: center; }
+.send.stop { background: var(--s4); color: var(--fg); }
+.send svg { width: 13px; height: 13px; }
+
+/* gaveta direita */
+.drawer { background: var(--s1); border-left: 1px solid var(--line); overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.drawer-inner { width: 300px; display: flex; flex-direction: column; height: 100%; }
+.tabs { display: flex; border-bottom: 1px solid var(--line); height: 32px; }
+.tab { flex: 1; border: 0; background: none; font-size: 11px; color: var(--muted); border-bottom: 1px solid transparent; margin-bottom: -1px; }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tab-x { width: 32px; border: 0; background: none; color: var(--muted); font-size: 14px; }
+.panel { flex: 1; overflow: auto; padding: 12px; display: none; flex-direction: column; gap: 14px; }
+.panel.on { display: flex; }
+.sec-h { font: 500 10px var(--f-head); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.field label { font-size: 11px; color: var(--fg2); display: flex; justify-content: space-between; }
+.field input, .field select { height: 26px; background: var(--s2); border: 1px solid var(--line2); border-radius: 4px; color: var(--fg); padding: 0 8px; font: 11px var(--f-body); }
+.badge { font-size: 9px; padding: 0 5px; border-radius: 2px; }
+.badge.ok { color: var(--ok); background: hsla(152,58%,50%,.1); }
+.badge.no { color: var(--warn); background: hsla(38,92%,58%,.1); }
+.hint { font-size: 10px; color: var(--muted); }
+.proc { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.proc-top { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; }
+.proc-top span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.proc-top span:last-child { color: var(--muted); font: 10px var(--f-mono); white-space: nowrap; }
+.proc .bar { max-width: none; }
+.proc .st { font-size: 10px; color: var(--muted); }
+
+/* notas do protótipo */
+.notes-on .pin { display: flex; }
+.pin { display: none; position: absolute; z-index: 30; gap: 6px; align-items: flex-start; max-width: 250px; pointer-events: none; }
+.pin b { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--note); color: #1a1500; font: 600 10px/18px var(--f-body); text-align: center; }
+.pin span { background: hsla(48,100%,62%,.12); border: 1px solid hsla(48,100%,62%,.4); color: var(--fg); font-size: 10px; line-height: 1.4; padding: 5px 7px; border-radius: 4px; backdrop-filter: blur(4px); }
+.rel { position: relative; }
+
+.demo { position: fixed; left: 12px; bottom: 12px; z-index: 40; display: flex; gap: 4px; align-items: center; background: var(--s3); border: 1px solid var(--line2); border-radius: 6px; padding: 4px; flex-wrap: wrap; max-width: calc(100vw - 24px); }
+.demo span { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; padding: 0 4px; }
+.demo button { height: 22px; font-size: 10px; padding: 0 7px; border-radius: 3px; border: 0; background: none; color: var(--fg2); }
+.demo button:hover { background: var(--tint2); }
+.demo button[aria-pressed="true"] { background: var(--note); color: #1a1500; }
+
+@media (max-width: 820px) {
+  body { overflow: auto; }
+  .app { height: auto; min-height: 100%; }
+  .canvas { grid-template-columns: 1fr; }
+  .media { border-right: 0; border-bottom: 1px solid var(--line); min-height: 380px; }
+  .chat { min-height: 520px; }
+  .body.drawer-open { grid-template-columns: 1fr; }
+  .body.drawer-open .drawer { grid-row: 1; }
+  .drawer-inner { width: 100%; }
+  .hbtn .lbl-txt, .crumb { display: none; }
+  .pin { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="app" id="app">
+  <header class="hdr">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="9" width="18" height="12" rx="1.5"/><path d="M3 9l2.5-5 16 2.5L21 9M8 5l1.5 4M13 5.5l1.5 3.5"/></svg>
+      CapIAu-Talho
+    </div>
+    <div class="hsep"></div>
+    <div class="crumb">Início · <b id="crumb-name">novo projeto</b></div>
+    <div class="sp"></div>
+
+    <div class="rel">
+      <button class="hbtn" id="btn-projects" aria-haspopup="menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        <span class="lbl-txt">Projetos</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:10px"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hmenu" id="menu-projects" role="menu" hidden>
+        <div class="hmenu-head">Recentes</div>
+        <button class="hmenu-item" role="menuitem">Raízes do Cerrado <small>ontem · 12 mídias</small></button>
+        <button class="hmenu-item" role="menuitem">Feira de Anápolis <small>22/09 · 31 mídias</small></button>
+        <button class="hmenu-item" role="menuitem">Aula magna CriaLab <small>10/09 · 4 mídias</small></button>
+        <div class="hmenu-head">&nbsp;</div>
+        <button class="hmenu-item" role="menuitem">Ver todos os projetos… <small>18</small></button>
+      </div>
+    </div>
+    <button class="hbtn" id="btn-proc" aria-pressed="false" title="Processos em andamento">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12h3l2-6 4 12 2-6h5"/></svg>
+      <span class="lbl-txt">Processos</span><span class="count" id="proc-count">0</span>
+    </button>
+    <button class="hbtn" id="btn-settings" aria-pressed="false" title="Chaves de API e modelos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>
+      <span class="lbl-txt">Chaves e modelos</span><span class="dot warn" id="key-dot"></span>
+    </button>
+    <div class="hsep"></div>
+    <button class="hbtn primary" id="btn-editor" title="Pular a conversa e abrir o editor">
+      <span class="lbl-txt">Abrir editor</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+  </header>
+
+  <div class="body" id="body">
+    <div class="canvas">
+      <!-- MÍDIAS -->
+      <section class="media" id="media">
+        <div class="pin" style="left:24px; top:18px"><b>1</b><span>Canvas único. A área de soltar fica aberta o tempo todo; o que você solta aparece aqui, com o que vai ser analisado em cada arquivo.</span></div>
+        <div class="plan">
+          <div>
+            <div class="plan-title" id="plan-title">5 mídias prontas para análise</div>
+            <div class="plan-meta" id="plan-meta">2h14 de material · 7,9 GB · estimativa local ~22 min</div>
+          </div>
+          <div class="sp"></div>
+          <div class="plan-steps" id="plan-steps"></div>
+          <button class="btn solid" id="btn-analyze">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>Analisar
+          </button>
+        </div>
+        <div class="drop" id="drop">
+          <div class="drop-empty">
+            <div class="drop-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></div>
+            <h1>Solte aqui o material bruto</h1>
+            <p>Pastas de cartão, vídeos, áudios do gravador e fotos de set. Nada é enviado para a internet: a análise roda nesta máquina.</p>
+            <div class="row">
+              <button class="btn" id="pick-folder">Selecionar pasta…</button>
+              <button class="btn" id="pick-files">Selecionar arquivos…</button>
+              <input type="file" id="file-input" multiple hidden>
+            </div>
+            <div class="types">
+              <span><i style="background:var(--accent)"></i>Vídeo → cenas, rostos, fala</span>
+              <span><i style="background:var(--ok)"></i>Áudio → transcrição, vozes</span>
+              <span><i style="background:var(--warn)"></i>Foto → referência de rosto</span>
+            </div>
+          </div>
+          <div class="grid" id="grid"></div>
+        </div>
+      </section>
+
+      <!-- CONVERSA -->
+      <section class="chat rel" id="chat">
+        <div class="pin" style="left:16px; top:52px"><b>2</b><span>Texto limpo: listas viram listas, negrito vira peso. Nunca aparece ** ou ### na tela.</span></div>
+        <div class="chat-head">
+          <div>
+            <div class="t">Assistente de entrada</div>
+            <div class="m" id="model-line">deepseek-v4-flash via OpenRouter · responde em ~3 s</div>
+          </div>
+        </div>
+        <div class="msgs" id="msgs"></div>
+        <div class="composer rel">
+          <div class="pin" style="left:12px; bottom:84px"><b>3</b><span>Enquanto a IA pensa: etapas, tempo passando e o botão vira Parar. Passou de 8 s, avisa que vai cair no assistente local em 12 s.</span></div>
+          <div class="chips" id="chips"></div>
+          <div class="inrow">
+            <input id="in" placeholder="Escreva o nome do projeto ou pergunte algo" autocomplete="off">
+            <button class="send" id="send" aria-label="Enviar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 20l18-8L3 4v6l12 2-12 2z"/></svg></button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- GAVETA DIREITA -->
+    <aside class="drawer rel" id="drawer" aria-label="Configurações e processos">
+      <div class="pin" style="right:12px; top:44px; flex-direction: row-reverse"><b>4</b><span>Configurações abrem aqui, à direita, empurrando o canvas. Hoje o painel completo abre atrás do Hub (z-index 10000 contra 10005).</span></div>
+      <div class="drawer-inner">
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" id="tab-cfg" aria-selected="true">Chaves e modelos</button>
+          <button class="tab" role="tab" id="tab-proc" aria-selected="false">Processos</button>
+          <button class="tab-x" id="drawer-x" aria-label="Fechar">×</button>
+        </div>
+        <div class="panel on" id="panel-cfg">
+          <div>
+            <div class="sec-h">Chaves de API</div>
+            <div class="field"><label for="k-or">OpenRouter <span class="badge no" id="b-or">sem chave</span></label><input id="k-or" type="password" placeholder="sk-or-v1-…"></div>
+            <div class="field"><label for="k-gm">Google Gemini <span class="badge ok">salva</span></label><input id="k-gm" type="password" value="AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div>
+            <div class="hint">Ficam no banco local. Não entram no histórico da conversa.</div>
+            <div class="row" style="justify-content:flex-start; margin-top:8px"><button class="btn solid" id="save-keys">Salvar chaves</button></div>
+          </div>
+          <div>
+            <div class="sec-h">Modelos</div>
+            <div class="field"><label for="m-chat">Conversa</label><select id="m-chat"><option>deepseek-v4-flash</option><option>claude-sonnet-5-5</option><option>gemini-3-flash</option></select></div>
+            <div class="field"><label for="m-vis">Visão e rostos</label><select id="m-vis"><option>Gemini (nuvem)</option><option>Local (Laya)</option></select></div>
+          </div>
+          <div>
+            <div class="sec-h">Perfil de análise</div>
+            <div class="field"><label for="m-prof">Tipo de material</label><select id="m-prof"><option>Documentário / entrevista</option><option>Evento / cobertura</option><option>Aula / palestra</option></select></div>
+          </div>
+          <button class="btn ghost" style="align-self:flex-start">Todas as configurações →</button>
+        </div>
+        <div class="panel" id="panel-proc">
+          <div class="sec-h">Em andamento</div>
+          <div id="proc-list"><div class="hint">Nada rodando. Solte mídias e clique em Analisar.</div></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="demo" aria-label="Controles do protótipo">
+  <span>Protótipo</span>
+  <button id="d-notes" aria-pressed="true">Notas</button>
+  <button id="d-sample">Carregar exemplo</button>
+  <button id="d-clear">Limpar</button>
+  <button id="d-raw" aria-pressed="false">Ver texto como hoje</button>
+  <button id="d-slow" aria-pressed="false">IA lenta</button>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const app = $('#app'), body = $('#body'), media = $('#media'), grid = $('#grid'), msgs = $('#msgs');
+let files = [], busy = false, cancelBusy = null, rawMode = false, slow = false, procs = [];
+
+/* ── markdown → texto limpo (proposta para substituir formatMessageContent) ── */
+function inline(s) {
+  return esc(s)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.+?)__/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*(?!\s)(.+?)\*/g, '$1$2')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\[(.+?)\]\((.+?)\)/g, '$1');
+}
+function clean(md) {
+  const out = []; let list = null;
+  const close = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  for (const line of md.split('\n')) {
+    const t = line.trim();
+    let m;
+    if (!t) { close(); continue; }
+    if (/^(-{3,}|\*{3,})$/.test(t)) { close(); continue; }
+    if ((m = t.match(/^#{1,6}\s+(.*)/))) { close(); out.push(`<span class="lbl">${inline(m[1])}</span>`); continue; }
+    if ((m = t.match(/^[-*•]\s+(.*)/))) { if (list !== 'ul') { close(); out.push('<ul>'); list = 'ul'; } out.push(`<li>${inline(m[1])}</li>`); continue; }
+    if ((m = t.match(/^\d+[.)]\s+(.*)/))) { if (list !== 'ol') { close(); out.push('<ol>'); list = 'ol'; } out.push(`<li>${inline(m[1])}</li>`); continue; }
+    close(); out.push(`<p>${inline(t.replace(/^>\s?/, ''))}</p>`);
+  }
+  close();
+  return out.join('');
+}
+
+/* ── conversa ── */
+const history = [];
+function addMsg(role, md, extra) {
+  history.push({ role, md });
+  const wrap = document.createElement('div');
+  if (role === 'user') { wrap.className = 'msg user'; wrap.textContent = md; }
+  else {
+    wrap.innerHTML = `<div class="who"><i></i>Assistente</div><div class="msg ${rawMode ? 'raw' : ''}">${rawMode ? esc(md) : clean(md)}</div>`;
+    if (extra) wrap.appendChild(extra);
+  }
+  msgs.appendChild(wrap); msgs.scrollTop = msgs.scrollHeight;
+  return wrap;
+}
+function rerender() {
+  const h = history.splice(0); msgs.innerHTML = '';
+  h.forEach((m, i) => addMsg(m.role, m.md, i === 0 ? featuresEl() : null));
+}
+
+const FEATURES = [
+  { id: 'decupar', icon: 'M4 6h16M4 12h10M4 18h13', t: 'Decupar entrevistas',
+    what: 'Separa cada fala em trechos com início e fim, marca os melhores momentos e dá nota de uso.',
+    need: 'Vídeo ou áudio com fala.', where: 'Aba Índice do editor, uma linha por trecho.' },
+  { id: 'vozes', icon: 'M12 3v18M8 7v10M16 7v10M4 10v4M20 10v4', t: 'Transcrever e separar vozes',
+    what: 'Transcreve tudo e identifica quem fala, até 8 vozes, inclusive quando falam ao mesmo tempo.',
+    need: 'Áudio do gravador ou da câmera.', where: 'Transcrição com nome de cada pessoa.' },
+  { id: 'rostos', icon: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0', t: 'Reconhecer rostos',
+    what: 'Agrupa as aparições da mesma pessoa. Fotos de set ajudam a dar nome a cada rosto.',
+    need: 'Vídeo. Fotos são opcionais.', where: 'Aba Rostos, com os planos de cada pessoa.' },
+  { id: 'corte', icon: 'M6 6l12 12M6 18L18 6', t: 'Cortar pelo texto',
+    what: 'Apague ou reordene frases na transcrição e o corte acompanha. Monta um primeiro corte bruto.',
+    need: 'Transcrição pronta.', where: 'Timeline do editor.' },
+  { id: 'exportar', icon: 'M12 4v12M7 11l5 5 5-5M4 20h16', t: 'Levar para Premiere ou Resolve',
+    what: 'Exporta o corte e os marcadores para abrir no seu editor de sempre.',
+    need: 'Um corte na timeline.', where: 'Arquivo XML/EDL na pasta do projeto.' },
+];
+function featuresEl() {
+  const box = document.createElement('div'); box.className = 'features';
+  FEATURES.forEach(f => {
+    const d = document.createElement('div'); d.className = 'feat';
+    d.innerHTML = `<button aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="${f.icon}"/></svg>${f.t}<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+      <div class="feat-body">${f.what}<dl><dt>Precisa de</dt><dd>${f.need}</dd><dt>Resultado</dt><dd>${f.where}</dd></dl>
+      <button class="btn">Quero isso neste projeto</button></div>`;
+    const head = d.querySelector('button');
+    head.onclick = () => { const o = d.classList.toggle('open'); head.setAttribute('aria-expanded', o); };
+    d.querySelector('.feat-body .btn').onclick = () => send(`Quero ${f.t.toLowerCase()} neste projeto`);
+    box.appendChild(d);
+  });
+  return box;
+}
+
+function setChips(list) {
+  const c = $('#chips'); c.innerHTML = '';
+  list.forEach(l => { const b = document.createElement('button'); b.className = 'chip'; b.textContent = l; b.onclick = () => send(l); c.appendChild(b); });
+}
+
+/* respostas simuladas do modelo (em markdown, como o backend devolve hoje) */
+function reply(text) {
+  const t = text.toLowerCase();
+  if (t.includes('quero')) return `Anotado. Vou incluir **${text.replace(/^quero /i, '').replace(/ neste projeto$/i, '')}** na análise.\n\n### Próximo passo\n- Solte as mídias à esquerda, ou\n- me diga o nome do projeto para eu criar agora.`;
+  if (t.includes('como funciona') || t.includes('?')) return `O Talho roda em três etapas:\n\n1. **Ingestão**: copia e confere cada arquivo e gera versões leves para edição.\n2. **Análise local**: transcrição, vozes, rostos e cenas, sem mandar mídia para fora.\n3. **Editor**: você revisa o que a IA achou e corta pelo texto.\n\nA etapa 2 é a demorada. Você acompanha tudo em *Processos*, no topo.`;
+  if (files.length) return `Projeto **${text}** criado com as ${files.length} mídias.\n\n### O que vai rodar\n- Transcrição e separação de vozes nos áudios\n- Cenas e rostos nos vídeos\n- Fotos entram como referência de rosto\n\nClique em **Analisar** quando quiser começar. Enquanto isso, já dá para abrir o editor.`;
+  $('#crumb-name').textContent = text;
+  return `Ótimo, o projeto vai se chamar **${text}**.\n\nAgora solte o material à esquerda. Pode ser a pasta inteira do cartão: eu separo vídeo, áudio e foto sozinho.`;
+}
+
+function waitEl() {
+  const w = document.createElement('div'); w.className = 'wait';
+  w.innerHTML = `<div class="who"><i></i>Assistente</div>
+    <div class="wait-line"><span class="pulse"></span><span class="wl-txt">Enviando sua mensagem</span><span class="timer">0,0 s</span></div>
+    <div class="wait-steps"><span class="ws" data-s="0">mensagem</span><span class="ws" data-s="1">contexto do projeto</span><span class="ws" data-s="2">modelo pensando</span><span class="ws" data-s="3">escrevendo</span></div>
+    <div class="bar"><b></b></div>
+    <div class="wait-slow">Está demorando mais que o normal. Espero até 12 s; depois respondo com o assistente local.</div>`;
+  return w;
+}
+
+async function send(text) {
+  text = (text ?? $('#in').value).trim();
+  if (!text || busy) return;
+  $('#in').value = ''; setChips([]);
+  addMsg('user', text);
+  busy = true; const inp = $('#in'), sb = $('#send');
+  inp.disabled = true; sb.classList.add('stop'); sb.setAttribute('aria-label', 'Parar');
+  sb.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>';
+
+  const w = waitEl(); msgs.appendChild(w); msgs.scrollTop = msgs.scrollHeight;
+  const labels = ['Enviando sua mensagem', 'Juntando o que já sei do projeto', 'deepseek-v4-flash está pensando', 'Escrevendo a resposta'];
+  const total = slow ? 9500 : 2600, t0 = performance.now();
+  let cancelled = false; cancelBusy = () => { cancelled = true; };
+  await new Promise(res => {
+    const tick = () => {
+      const el = performance.now() - t0;
+      const stage = Math.min(2, Math.floor(el / (total / 3)));
+      w.querySelector('.timer').textContent = (el / 1000).toFixed(1).replace('.', ',') + ' s';
+      w.querySelector('.wl-txt').textContent = labels[stage];
+      w.querySelectorAll('.ws').forEach((s, i) => s.className = 'ws' + (i < stage ? ' done' : i === stage ? ' now' : ''));
+      w.querySelector('.bar b').style.width = Math.min(95, el / 120) + '%';
+      w.querySelector('.wait-slow').style.display = el > 8000 ? 'block' : 'none';
+      if (cancelled || el >= total) return res();
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+  w.remove();
+  if (cancelled) {
+    addMsg('assistant', 'Parei. Pode reformular ou seguir por outro caminho.');
+  } else {
+    // streaming: o texto chega aos poucos em vez de tudo de uma vez
+    const md = reply(text);
+    const node = addMsg('assistant', '');
+    const box = node.querySelector('.msg'); box.classList.add('cursor');
+    let i = 0;
+    await new Promise(res => {
+      const step = () => {
+        if (cancelled) return res();
+        i = Math.min(md.length, i + 3);
+        box.innerHTML = rawMode ? esc(md.slice(0, i)) : clean(md.slice(0, i));
+        msgs.scrollTop = msgs.scrollHeight;
+        if (i < md.length) setTimeout(step, 14); else res();
+      };
+      step();
+    });
+    box.classList.remove('cursor');
+    history[history.length - 1].md = md;
+    setChips(files.length ? ['Analisar agora', 'Abrir o editor', 'Como funciona a análise?'] : ['Documentário Raízes', 'Como funciona a análise?']);
+  }
+  busy = false; cancelBusy = null; inp.disabled = false; inp.focus();
+  sb.classList.remove('stop'); sb.setAttribute('aria-label', 'Enviar');
+  sb.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 20l18-8L3 4v6l12 2-12 2z"/></svg>';
+}
+$('#send').onclick = () => busy ? cancelBusy && cancelBusy() : send();
+$('#in').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+
+/* ── mídias ── */
+const fmtSize = b => b >= 1e9 ? (b / 1e9).toFixed(1).replace('.', ',') + ' GB' : b >= 1e6 ? Math.round(b / 1e6) + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' KB';
+const fmtDur = s => { if (!s || !isFinite(s)) return ''; const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = Math.floor(s % 60); return (h ? h + ':' : '') + String(m).padStart(h ? 2 : 1, '0') + ':' + String(ss).padStart(2, '0'); };
+const kindOf = f => /^video|\.(mov|mp4|mxf|mts|avi|mkv)$/i.test(f.type || f.name) ? 'video' : /^audio|\.(wav|mp3|aac|m4a|flac|bwf)$/i.test(f.type || f.name) ? 'audio' : /^image|\.(jpe?g|png|heic|tif)$/i.test(f.type || f.name) ? 'foto' : 'outro';
+const WILL = { video: ['cenas', 'rostos', 'fala'], audio: ['transcrição', 'vozes'], foto: ['ref. de rosto'], outro: ['ignorado'] };
+
+function tileEl(f, idx) {
+  const d = document.createElement('div'); d.className = 'tile';
+  const k = f.kind;
+  let thumb = '';
+  if (f.url && k === 'foto') thumb = `<img src="${f.url}" alt="">`;
+  else if (f.url && k === 'video') thumb = `<video src="${f.url}#t=1" muted preload="metadata"></video>`;
+  else if (k === 'audio') thumb = `<div class="wave">${Array.from({ length: 32 }, (_, i) => `<b style="height:${20 + Math.abs(Math.sin(i * 1.7 + idx)) * 80}%"></b>`).join('')}</div>`;
+  else thumb = `<div class="frame"></div>`;
+  d.innerHTML = `<div class="thumb">${thumb}<span class="kind" style="color:${k === 'video' ? 'var(--accent)' : k === 'audio' ? 'var(--ok)' : 'var(--warn)'}">${k}</span>${f.dur ? `<span class="dur">${fmtDur(f.dur)}</span>` : ''}<button class="tile-x" aria-label="Tirar ${esc(f.name)}">×</button></div>
+    <div class="tile-body"><div class="fname" title="${esc(f.name)}">${esc(f.name)}</div><div class="fmeta">${fmtSize(f.size)}${f.dur ? ' · ' + fmtDur(f.dur) : ''}</div>
+    <div class="will">${WILL[k].map(w => `<span>${w}</span>`).join('')}</div></div>`;
+  d.querySelector('.tile-x').onclick = () => { files.splice(files.indexOf(f), 1); renderFiles(); };
+  const v = d.querySelector('video');
+  if (v) v.onloadedmetadata = () => { if (!f.dur) { f.dur = v.duration; renderPlan(); d.querySelector('.fmeta').textContent = fmtSize(f.size) + ' · ' + fmtDur(f.dur); } };
+  return d;
+}
+function renderPlan() {
+  const secs = files.reduce((a, f) => a + (f.dur || 0), 0), bytes = files.reduce((a, f) => a + f.size, 0);
+  const h = Math.floor(secs / 3600), m = Math.round(secs % 3600 / 60);
+  $('#plan-title').textContent = `${files.length} ${files.length === 1 ? 'mídia pronta' : 'mídias prontas'} para análise`;
+  $('#plan-meta').textContent = `${secs ? (h ? h + 'h' + String(m).padStart(2, '0') : m + ' min') + ' de material · ' : ''}${fmtSize(bytes)} · estimativa local ~${Math.max(1, Math.round(secs / 360))} min`;
+  const kinds = new Set(files.map(f => f.kind)), steps = new Set();
+  kinds.forEach(k => WILL[k].forEach(w => steps.add(w)));
+  $('#plan-steps').innerHTML = [...steps].filter(s => s !== 'ignorado').map(s => `<span class="step-chip"><i></i>${s}</span>`).join('');
+}
+function renderFiles() {
+  media.classList.toggle('has-files', files.length > 0);
+  grid.innerHTML = '';
+  files.forEach((f, i) => grid.appendChild(tileEl(f, i)));
+  const add = document.createElement('button'); add.className = 'add-tile'; add.textContent = '+ adicionar mais'; add.onclick = () => $('#file-input').click();
+  grid.appendChild(add);
+  renderPlan();
+}
+function addFiles(list, announce = true) {
+  const before = files.length;
+  for (const f of list) files.push({ name: f.name, size: f.size, kind: kindOf(f), url: f instanceof File ? URL.createObjectURL(f) : null, dur: f.dur || 0 });
+  renderFiles();
+  if (announce && files.length > before && !busy) {
+    const n = files.length - before, c = k => files.slice(before).filter(f => f.kind === k).length;
+    const parts = [['video', 'vídeo', 'vídeos'], ['audio', 'áudio', 'áudios'], ['foto', 'foto', 'fotos']].filter(([k]) => c(k)).map(([k, s, p]) => `${c(k)} ${c(k) === 1 ? s : p}`);
+    addMsg('assistant', `Recebi **${n} ${n === 1 ? 'arquivo' : 'arquivos'}**: ${parts.join(', ')}.\n\nCada um mostra à esquerda o que vai ser analisado. Como vai se chamar o projeto?`);
+    setChips(['Documentário Raízes', 'Feira de Anápolis', 'Como funciona a análise?']);
+  }
+}
+const SAMPLE = [
+  { name: 'A001_entrevista_dona_ilda.mov', size: 4.2e9, dur: 2292, type: 'video/quicktime' },
+  { name: 'B001_entrevista_dona_ilda_contraplano.mov', size: 2.1e9, dur: 2280, type: 'video/quicktime' },
+  { name: 'ZOOM_F6_T1-T4_som_direto.wav', size: 1.1e9, dur: 2310, type: 'audio/wav' },
+  { name: 'C0042_cobertura_feira.mp4', size: 0.5e9, dur: 1164, type: 'video/mp4' },
+  { name: 'still_set_dona_ilda.jpg', size: 4.8e6, dur: 0, type: 'image/jpeg' },
+];
+
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => addFiles([...e.dataTransfer.files]));
+$('#pick-files').onclick = $('#pick-folder').onclick = () => $('#file-input').click();
+$('#file-input').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+
+/* ── gaveta direita (empurra, não sobrepõe) ── */
+function openDrawer(tab) {
+  const open = body.classList.contains('drawer-open'), same = $('#tab-' + tab).getAttribute('aria-selected') === 'true';
+  if (open && same) { closeDrawer(); return; }
+  body.classList.add('drawer-open');
+  ['cfg', 'proc'].forEach(t => { $('#tab-' + t).setAttribute('aria-selected', t === tab); $('#panel-' + t).classList.toggle('on', t === tab); });
+  $('#btn-settings').setAttribute('aria-pressed', tab === 'cfg'); $('#btn-proc').setAttribute('aria-pressed', tab === 'proc');
+}
+function closeDrawer() { body.classList.remove('drawer-open'); $('#btn-settings').setAttribute('aria-pressed', false); $('#btn-proc').setAttribute('aria-pressed', false); }
+$('#btn-settings').onclick = () => openDrawer('cfg');
+$('#btn-proc').onclick = () => openDrawer('proc');
+$('#tab-cfg').onclick = () => openDrawer('cfg');
+$('#tab-proc').onclick = () => openDrawer('proc');
+$('#drawer-x').onclick = closeDrawer;
+$('#save-keys').onclick = () => { if ($('#k-or').value.trim()) { $('#b-or').className = 'badge ok'; $('#b-or').textContent = 'salva'; $('#key-dot').className = 'dot'; $('#k-or').value = ''; } };
+
+/* processos */
+$('#btn-analyze').onclick = () => {
+  procs = files.filter(f => f.kind !== 'outro').map(f => ({ name: f.name, p: 0, st: 'na fila', speed: 0.6 + Math.random() }));
+  renderProcs(); openDrawer('proc');
+  addMsg('assistant', `Análise iniciada em **${procs.length} arquivos**. Acompanhe em *Processos*, à direita. Você já pode abrir o editor: o que for ficando pronto aparece lá.`);
+  setChips(['Abrir o editor']);
+};
+function renderProcs() {
+  const running = procs.filter(p => p.p < 100).length;
+  $('#proc-count').textContent = running;
+  $('#proc-list').innerHTML = procs.length ? procs.map(p => `<div class="proc"><div class="proc-top"><span>${esc(p.name)}</span><span>${Math.floor(p.p)}%</span></div><div class="bar"><b style="width:${p.p}%"></b></div><div class="st">${p.st}</div></div>`).join('') : '<div class="hint">Nada rodando. Solte mídias e clique em Analisar.</div>';
+}
+setInterval(() => {
+  if (!procs.length) return;
+  procs.forEach((p, i) => {
+    if (p.p >= 100) return;
+    if (i > 0 && procs[i - 1].p < 30) return;
+    p.p = Math.min(100, p.p + p.speed);
+    p.st = p.p < 15 ? 'conferindo e copiando' : p.p < 35 ? 'gerando proxy' : p.p < 75 ? 'transcrevendo e separando vozes' : p.p < 100 ? 'procurando rostos e cenas' : 'pronto';
+  });
+  renderProcs();
+}, 300);
+
+/* menu projetos */
+$('#btn-projects').onclick = e => { e.stopPropagation(); const m = $('#menu-projects'); m.hidden = !m.hidden; $('#btn-projects').setAttribute('aria-expanded', !m.hidden); };
+document.addEventListener('click', () => { $('#menu-projects').hidden = true; });
+$('#btn-editor').onclick = () => addMsg('assistant', 'No app, este botão fecha o Hub e abre o editor. Se houver mídias soltas aqui, elas vão junto para o projeto.');
+
+/* controles do protótipo */
+const notesBtn = $('#d-notes');
+notesBtn.onclick = () => { const on = app.classList.toggle('notes-on'); notesBtn.setAttribute('aria-pressed', on); };
+app.classList.add('notes-on');
+$('#d-sample').onclick = () => addFiles(SAMPLE);
+$('#d-clear').onclick = () => { files = []; procs = []; renderFiles(); renderProcs(); };
+$('#d-raw').onclick = e => { rawMode = !rawMode; e.target.setAttribute('aria-pressed', rawMode); rerender(); };
+$('#d-slow').onclick = e => { slow = !slow; e.target.setAttribute('aria-pressed', slow); };
+
+/* abertura */
+addMsg('assistant', `Oi! Eu organizo o material bruto e deixo tudo pronto para você editar.\n\nSolte as mídias à esquerda ou me diga o nome do projeto. Se quiser entender o que a ferramenta faz, abra um dos itens abaixo:`, featuresEl());
+setChips(['Documentário Raízes', 'Como funciona a análise?']);
+renderFiles();
+</script>
