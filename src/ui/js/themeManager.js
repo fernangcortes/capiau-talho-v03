@@ -122,6 +122,10 @@ export function computeThemeState(values = {}) {
         vars["--accent"] = accent;      // CSS da UI
         vars["--t-accent"] = accent;    // canvas (themeTokens) e quem precisa saber se foi escolhida
         vars["--t-accent-ink"] = ACCENT_INK;
+        // botão primário (styles.css .btn-primary): cor lisa, texto escuro, sem brilho
+        vars["--t-primary-bg"] = accent;
+        vars["--t-primary-ink"] = ACCENT_INK;
+        vars["--t-primary-shadow"] = "none";
     }
     const muted = TEXT_CONTRASTS[v["ui.text_contrast"]];
     if (muted) vars["--text-muted"] = muted;

@@ -2041,7 +2041,7 @@ export function promptExternalPathIngest(targetFolderPath = "root") {
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
                 <button id="btn-cancel-external-ingest" class="btn-outline">Cancelar</button>
-                <button id="btn-confirm-external-ingest" class="btn-primary" style="background: var(--color-cyan); border-color: var(--color-cyan); color: #000; font-weight: 600;">Vincular In-Place</button>
+                <button id="btn-confirm-external-ingest" class="btn-primary" style="--primary-bg: var(--color-cyan); --primary-ink: #000; font-weight: 600;">Vincular In-Place</button>
             </div>
         </div>
     `;

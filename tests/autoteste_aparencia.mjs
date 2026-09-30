@@ -4,7 +4,7 @@
 // ======================================================================
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { computeThemeState, ACCENTS, BACKGROUNDS, backgroundOf, TRACK_MODES, THEME_DEFAULTS, TEXT_CONTRASTS, ACCENT_INK, themeOriginsFromSettings, projectOverrides, ThemeManager } from "../src/ui/js/themeManager.js";
@@ -138,5 +138,33 @@ console.log("✔ 6 passou: contraste do texto secundário, tinta do primário e 
     assert.deepEqual(calls[4], ["reset", "project", 7, ["ui.accent"]], "voltar ao global apaga só as chaves do projeto");
 }
 console.log("✔ 7 passou: aparência grava no global ou só no projeto, e sabe de onde vem cada valor.");
+
+{
+    // Botão primário: com cor escolhida, todos lisos na cor, texto escuro e sem brilho.
+    const v = computeThemeState({ "ui.accent": "azul" }).vars;
+    assert.equal(v["--t-primary-bg"], ACCENTS.azul);
+    assert.equal(v["--t-primary-ink"], ACCENT_INK);
+    assert.equal(v["--t-primary-shadow"], "none");
+    assert.equal(computeThemeState({}).vars["--t-primary-bg"], undefined, "sem escolha, cada primário fica como é");
+
+    const css = readFileSync(path.join(rootDir, "src", "ui", "styles.css"), "utf8");
+    const rule = css.match(/\n\.btn-primary \{[^}]*\}/)[0];
+    assert.match(rule, /background: var\(--t-primary-bg, var\(--primary-bg,/);
+    assert.match(rule, /color: var\(--t-primary-ink, var\(--primary-ink,/);
+
+    // Primário sólido não escreve a própria cor em background/color: declara --primary-bg/--primary-ink,
+    // senão a cor de interação não chega nele. Rosa (parar/apagar), âmbar e tons claros têm significado e ficam.
+    const ui = path.join(rootDir, "src", "ui");
+    const files = ["index.html", ...readdirSync(path.join(ui, "js")).filter(f => f.endsWith(".js")).map(f => path.join("js", f))];
+    const bad = [];
+    for (const f of files) {
+        const text = readFileSync(path.join(ui, f), "utf8");
+        for (const m of text.matchAll(/<button[^>]*class="[^"]*\bbtn-primary\b[^"]*"[^>]*style="([^"]*)"/g)) {
+            if (/(^|[;\s])background:\s*(var\(--color-(cyan|violet)\)|linear-gradient\(135deg,\s*(#06b6d4|rgba\((139|6),))/.test(m[1])) bad.push(`${f}: ${m[1].slice(0, 80)}`);
+        }
+    }
+    assert.deepEqual(bad, [], "primário com cor de interação escrita no botão");
+}
+console.log("✔ 8 passou: botão primário segue a cor de interação, com texto escuro.");
 
 console.log("\n=== AUTOTESTE APARÊNCIA CONCLUÍDO COM SUCESSO ===");

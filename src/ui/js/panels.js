@@ -2672,12 +2672,14 @@ export class PanelsManager {
         if (btnSyncEnrich) {
             if (hasActiveEnrich) {
                 btnSyncEnrich.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando... (Clique p/ Parar)';
-                btnSyncEnrich.style.background = 'linear-gradient(135deg, #e11d48, #be123c)';
+                btnSyncEnrich.style.background = 'linear-gradient(135deg, #e11d48, #be123c)';   // parar: rosa, com qualquer cor de interação
+                btnSyncEnrich.style.color = '#fff';
                 btnSyncEnrich.title = 'Clique para cancelar a sincronização de descrições';
                 btnSyncEnrich.setAttribute('data-sync-active', 'true');
             } else {
                 btnSyncEnrich.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Sincronizar Nomes nas Descrições';
-                btnSyncEnrich.style.background = 'linear-gradient(135deg, #06b6d4, #0891b2)';
+                btnSyncEnrich.style.background = '';   // volta ao primário (--primary-bg no HTML)
+                btnSyncEnrich.style.color = '';
                 btnSyncEnrich.title = '';
                 btnSyncEnrich.removeAttribute('data-sync-active');
             }

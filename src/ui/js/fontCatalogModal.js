@@ -231,7 +231,7 @@ export class FontCatalogModal {
                         <button id="btn-apply-brandkit-all" class="btn-secondary" style="height: 32px; font-size: var(--fs-11); font-weight: 600; padding: 0 14px; border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); background: var(--t-tint-2, rgba(245,158,11,0.08)); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-wand-magic"></i> Padronizar Todos os Textos da Timeline
                         </button>
-                        <button id="btn-save-brandkit" class="btn-primary" style="height: 32px; font-size: var(--fs-11); font-weight: 700; padding: 0 18px; border: none; background: var(--color-cyan); color: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+                        <button id="btn-save-brandkit" class="btn-primary" style="height: 32px; font-size: var(--fs-11); font-weight: 700; padding: 0 18px; border: none; --primary-bg: var(--color-cyan); --primary-ink: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-check"></i> Salvar Brand Kit do Projeto
                         </button>
                     </div>

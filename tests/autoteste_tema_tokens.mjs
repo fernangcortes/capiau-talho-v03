@@ -119,7 +119,7 @@ console.log("\n--- PARTE 4: Presets ---");
         for (const m of readFileSync(path.join(rootDir, "src", "ui", "js", f), "utf8").matchAll(/themeColor\("([\w-]+)"/g)) usados.add("--t-" + m[1]);
     }
     // Escolhas da janela de Aparência: só existem quando o usuário escolhe; sem elas vale o padrão.
-    const opcionais = new Set(["--t-accent", "--t-track-mode"]);
+    const opcionais = new Set(["--t-accent", "--t-track-mode", "--t-primary-bg", "--t-primary-ink", "--t-primary-shadow"]);
     const faltando = [...usados].filter(t => !definidos.has(t) && !opcionais.has(t));
     assert.deepEqual(faltando, [], "todo token usado no código precisa de valor no Neutro");
     for (const antigo of ["--bg-base", "--bg-glass", "--bg-glass-active", "--border-glass", "--border-glass-glow"]) {

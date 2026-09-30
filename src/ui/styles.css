@@ -916,16 +916,19 @@ button {
     transition: var(--transition-smooth);
 }
 
+/* Primário: com cor de interação escolhida, --t-primary-* (themeManager) vale para todos, com texto
+   escuro e sem brilho. Sem escolha, cada botão fica como sempre: o roxo daqui ou a cor que ele mesmo
+   declara em --primary-bg / --primary-ink / --primary-shadow. */
 .btn-primary {
-    background: linear-gradient(135deg, var(--color-violet), hsl(262, 83%, 52%));
-    color: #fff;
+    background: var(--t-primary-bg, var(--primary-bg, linear-gradient(135deg, var(--color-violet), hsl(262, 83%, 52%))));
+    color: var(--t-primary-ink, var(--primary-ink, #fff));
     padding: 8px 16px;
     font-size: var(--fs-13);
-    box-shadow: 0 4px 15px var(--t-glow, rgba(138, 92, 246, 0.3));
+    box-shadow: var(--t-primary-shadow, var(--primary-shadow, 0 4px 15px var(--t-glow, rgba(138, 92, 246, 0.3))));
 }
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px var(--t-glow, rgba(138, 92, 246, 0.5));
+    box-shadow: var(--t-primary-shadow, 0 6px 20px var(--t-glow, rgba(138, 92, 246, 0.5)));
 }
 
 .btn-secondary {

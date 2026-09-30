@@ -584,7 +584,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                         <button id="btn-cancel-extraction" class="btn-secondary" style="font-size: var(--fs-11); height: 32px; padding: 0 14px; border: 1px solid var(--border-glass); color: #fff; cursor: pointer; border-radius: 4px;">
                             Cancelar
                         </button>
-                        <button id="btn-confirm-import-credits" class="btn-primary" ${count === 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''} style="font-size: var(--fs-11); font-weight: 700; height: 32px; padding: 0 18px; border: none; background: var(--color-cyan); color: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+                        <button id="btn-confirm-import-credits" class="btn-primary" ${count === 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''} style="font-size: var(--fs-11); font-weight: 700; height: 32px; padding: 0 18px; border: none; --primary-bg: var(--color-cyan); --primary-ink: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-file-import"></i> Importar para a Ficha Técnica
                         </button>
                     </div>
@@ -816,7 +816,7 @@ Direção de Arte — JÚLIA LIBÂNIO · Figurino — JÚLIA STAVROS
                         <button id="btn-normalize-all-gcs" class="btn-secondary" style="font-size: var(--fs-11); height: 32px; padding: 0 14px; border: 1px solid var(--t-line-strong, rgba(245,158,11,0.4)); background: var(--t-tint-2, rgba(245,158,11,0.08)); color: #f59e0b; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Validar e Corrigir Todos os GCs da Timeline
                         </button>
-                        <button id="btn-save-credits-done" class="btn-primary" style="font-size: var(--fs-11); font-weight: 700; height: 32px; padding: 0 18px; border: none; background: var(--color-cyan); color: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+                        <button id="btn-save-credits-done" class="btn-primary" style="font-size: var(--fs-11); font-weight: 700; height: 32px; padding: 0 18px; border: none; --primary-bg: var(--color-cyan); --primary-ink: #000; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-check"></i> Concluir
                         </button>
                     </div>
