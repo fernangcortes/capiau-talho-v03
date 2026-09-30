@@ -4960,26 +4960,22 @@ export class WorkspaceManager {
         if (window.showToast) window.showToast("Menus laterais reanexados ao editor principal", "info");
     }
 
+    /**
+     * Seta de recolher dos painéis laterais depois de uma janela destacada: um botão limpo com um
+     * comando só, a barra fina (aberta → barra → linha). Antes ficava o recolher antigo junto
+     * (ou no lugar) e a seta pulava a barra direto para a linha.
+     */
     rebindMainSidebarToggles() {
-        const toggleLeft = document.getElementById("toggle-left");
-        if (toggleLeft) {
-            toggleLeft.onclick = (e) => {
+        const toggles = { "toggle-left": ["sidebar-left", "left"], "toggle-inspector": ["inspector-panel", "inspector"], "toggle-right": ["sidebar-right", "right"] };
+        for (const [btnId, [panelId, side]] of Object.entries(toggles)) {
+            const old = document.getElementById(btnId);
+            if (!old) continue;
+            const btn = old.cloneNode(true);   // sem os listeners acumulados
+            old.replaceWith(btn);
+            btn.onclick = (e) => {
                 e.preventDefault();
-                if (window.collapseSidebar) window.collapseSidebar("left");
-            };
-        }
-        const toggleInspector = document.getElementById("toggle-inspector");
-        if (toggleInspector) {
-            toggleInspector.onclick = (e) => {
-                e.preventDefault();
-                if (window.collapseSidebar) window.collapseSidebar("inspector");
-            };
-        }
-        const toggleRight = document.getElementById("toggle-right");
-        if (toggleRight) {
-            toggleRight.onclick = (e) => {
-                e.preventDefault();
-                if (window.collapseSidebar) window.collapseSidebar("right");
+                if (window.panelRail) window.panelRail.stepDown(panelId);
+                else if (window.collapseSidebar) window.collapseSidebar(side);
             };
         }
     }

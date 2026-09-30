@@ -7,6 +7,7 @@
 // ======================================================================
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { nextOnArrow, loadRail, saveRail, stripTabs, RAIL_PANELS, RAIL_STORAGE_KEY, RAIL_PLACES, railLying, railArrowIcon, uprightTabs, PanelRail } from "../src/ui/js/panelRail.js";
 
 console.log("=== INICIANDO AUTOTESTE: BARRA FINA ===\n");
@@ -97,5 +98,15 @@ console.log("✔ 5 passou: barra em coluna, pilha e faixa; deitada na pilha e na
     assert.equal(uprightTabs("pe", "aberta", "column", false), false, "Ajustes não tem faixa de abas");
 }
 console.log("✔ 6 passou: abas em pé no painel aberto numa coluna.");
+
+{
+    // Depois de uma janela destacada, a seta religada passa pela barra (antes ia direto para a linha).
+    const src = readFileSync(new URL("../src/ui/js/workspaceManager.js", import.meta.url), "utf8");
+    const fn = src.match(/rebindMainSidebarToggles\(\) \{[\s\S]*?\n    \}/)[0];
+    assert.match(fn, /panelRail\.stepDown\(panelId\)/, "seta religada usa a barra fina");
+    assert.match(fn, /cloneNode\(true\)[\s\S]*replaceWith/, "botão limpo, sem o recolher antigo acumulado");
+    assert.doesNotMatch(fn, /onclick = \(e\) => \{\s*e\.preventDefault\(\);\s*if \(window\.collapseSidebar\) window\.collapseSidebar/, "sem o recolher direto");
+}
+console.log("✔ 7 passou: seta religada depois de janela destacada passa pela barra.");
 
 console.log("\n=== AUTOTESTE BARRA FINA CONCLUÍDO COM SUCESSO ===");
