@@ -1280,6 +1280,52 @@ button {
 .panel-rail-down {
     font-size: var(--fs-10);
 }
+/* Barra deitada: na pilha (no lugar do painel, entre os vizinhos) e na faixa com todos na barra. */
+.panel-rail.panel-rail-h {
+    width: auto;
+    height: 30px;
+    flex: 0 0 30px;
+    flex-direction: row;
+    padding: 0 4px;
+    border-right: 0;
+    border-left: 0;
+    border-top: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.06));
+    border-bottom: 1px solid var(--t-line-weak, rgba(255, 255, 255, 0.06));
+}
+.panel-rail-h .panel-rail-tabs {
+    flex-direction: row;
+}
+.panel-rail-h .panel-rail-btn {
+    height: 24px;
+}
+.panel-rail-h .panel-rail-btn.open,
+.panel-rail-right.panel-rail-h .panel-rail-btn.open {
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+/* Pilha: o anfitrião na barra esconde só o próprio conteúdo; os de baixo ocupam o espaço. */
+.dock-stack-host.dock-stack-self-rail > :not(.dock-stack-guest):not(.dock-stack-splitter):not(.restore-line-h):not(.panel-rail) {
+    display: none !important;
+}
+.dock-stack-host.dock-stack-self-rail:has(.dock-stack-guest) > .dock-stack-guest:not(.collapsed):not(.rail-mode) {
+    flex: 1 1 0% !important;
+}
+.dock-stack-host > .dock-stack-splitter:has(+ .panel-rail-h + .rail-mode:not(.rail-open)) {
+    display: none !important;
+}
+.dock-stack-host > .panel-rail,
+.dock-band-row > .panel-rail {
+    background: #0d0d0d;
+}
+/* Faixa com todos na barra: encolhe para a altura da barra deitada; as barras dividem a largura. */
+.dock-band.dock-band-all-rail {
+    height: auto;
+}
+.dock-band.dock-band-all-rail > .dock-band-resizer {
+    display: none;
+}
+.dock-band.dock-band-all-rail > .dock-band-row > .panel-rail-h {
+    flex: 1 1 0%;
+}
 
 /* Na barra o painel sai do fluxo; aberto pela barra, volta ao lugar dele na coluna
    (empurra o editor e usa o divisor de sempre). Fechado, o divisor some como no recolhido. */

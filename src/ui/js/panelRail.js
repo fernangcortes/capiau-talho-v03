@@ -11,8 +11,10 @@
 // não fecha o Painel Lateral. As abas continuam as mesmas: destacar e trocar de
 // menu seguem pelos botões da faixa, que aparecem no painel aberto.
 //
-// Só vale para o painel numa coluna do editor. Numa pilha, faixa ou janela destacada a seta
-// continua recolhendo para a linha, como antes.
+// Vale em qualquer lugar do editor: coluna (barra em pé ao lado), pilha (barra deitada no lugar
+// do painel, entre os vizinhos de cima e de baixo) e faixa (barra em pé entre os vizinhos; com
+// todos da faixa na barra, a faixa encolhe e as barras deitam). Na janela destacada a seta
+// continua recolhendo para a linha.
 
 export const RAIL_PANELS = {
     "sidebar-left": { strip: "left-tabs", toggle: "toggle-left", icon: "fa-solid fa-folder-open", label: "Biblioteca" },
@@ -22,6 +24,20 @@ export const RAIL_PANELS = {
 
 export const RAIL_STORAGE_KEY = "capiau_rail_panels";
 
+
+/** Lugares do editor onde o painel pode virar barra (WorkspaceManager.panelPlacement().kind). */
+export const RAIL_PLACES = ["column", "stack", "band"];
+
+/** A barra deita (horizontal) na pilha, ou na faixa quando todos dela estão na barra. Pura. */
+export function railLying(kind, bandAllRail = false) {
+    return kind === "stack" || (kind === "band" && bandAllRail);
+}
+
+/** Seta da barra: aponta para onde o painel recolhe (collapseEdge). Pura. */
+export function railArrowIcon(edge, right = false) {
+    const icons = { left: "fa-chevron-left", right: "fa-chevron-right", up: "fa-chevron-up", down: "fa-chevron-down" };
+    return icons[edge] || (right ? icons.right : icons.left);
+}
 
 /** Próximo estado ao clicar na seta: aberta → barra → linha. Sem barra possível, aberta → linha. */
 export function nextOnArrow(state, railAllowed) {
@@ -107,10 +123,10 @@ export class PanelRail {
         return this.rail.has(id);
     }
 
-    /** Pode virar barra agora: painel numa coluna do editor, nesta janela. */
+    /** Pode virar barra agora: painel no editor (coluna, pilha ou faixa), nesta janela. */
     canRail(id) {
         const place = this.wm?.panelPlacement?.(id);
-        return !!place && place.kind === "column" && place.el.ownerDocument === document;
+        return !!place && RAIL_PLACES.includes(place.kind) && place.el.ownerDocument === document;
     }
 
     stateOf(id) {
@@ -160,19 +176,62 @@ export class PanelRail {
         if (!panel || !nav) return;
         const state = this.stateOf(id);
         const railOn = state === "barra";
-
-        // A barra fica colada ao painel, do lado de fora do editor.
+        const place = railOn ? this.wm?.panelPlacement?.(id) : null;
+        const kind = place?.kind || "column";
+        // Anfitrião da pilha é também a caixa dos de baixo: não some, só esconde o próprio conteúdo.
+        const isHost = kind === "stack" && place.host === panel;
         const right = panel.classList.contains("dock-right");
+
         if (railOn) {
-            if (right) { if (panel.nextElementSibling !== nav) panel.after(nav); }
-            else if (panel.previousElementSibling !== nav) panel.before(nav);
+            if (kind === "column") {
+                // Coluna: colada ao painel, do lado de fora do editor.
+                if (right) { if (panel.nextElementSibling !== nav) panel.after(nav); }
+                else if (panel.previousElementSibling !== nav) panel.before(nav);
+            } else if (isHost) {
+                if (panel.firstElementChild !== nav) panel.prepend(nav);
+            } else if (panel.previousElementSibling !== nav) {
+                // Pilha (convidado) ou faixa: no lugar do painel, entre os vizinhos.
+                panel.before(nav);
+            }
         }
         nav.hidden = !railOn;
-        nav.classList.toggle("panel-rail-right", right);
-        panel.classList.toggle("rail-mode", railOn);
-        if (!railOn) this.closeFlyout(id);
+        nav.dataset.place = railOn ? kind : "";
+        nav.classList.toggle("panel-rail-right", railOn && kind === "column" && right);
+        nav.classList.toggle("panel-rail-h", railOn && railLying(kind));
+        panel.classList.toggle("rail-mode", railOn && !isHost);
+        panel.classList.toggle("rail-open", railOn && !isHost && this.openIds.has(id));
+        panel.classList.toggle("dock-stack-self-rail", railOn && isHost && !this.openIds.has(id));
+        if (!railOn) {
+            panel.classList.remove("dock-stack-self-rail");
+            this.closeFlyout(id);
+        }
         if (railOn) this.renderButtons(id);
+        this.applyBands();
         this.wm?.refreshEdgeSplitters?.();
+    }
+
+    /**
+     * Faixa com todos na barra (ou recolhidos): encolhe e as barras deitam. E o último painel
+     * visível da faixa estica, para não sobrar buraco onde estava um painel que virou barra.
+     */
+    applyBands() {
+        document.querySelectorAll(".dock-band > .dock-band-row").forEach(row => {
+            const band = row.parentElement;
+            const members = [...row.querySelectorAll(":scope > .dock-band-member")];
+            const railClosed = (m) => m.classList.contains("rail-mode") && !m.classList.contains("rail-open");
+            const hidden = (m) => railClosed(m) || m.classList.contains("collapsed");
+            const allRail = members.some(railClosed) && members.every(hidden);
+            band.classList.toggle("dock-band-all-rail", allRail);
+            members.forEach(m => {
+                const nav = this.rails[m.id];
+                if (nav && !nav.hidden) nav.classList.toggle("panel-rail-h", railLying("band", allRail));
+            });
+            if (members.some(railClosed)) {
+                const shown = members.filter(m => !hidden(m));
+                members.forEach(m => m.classList.remove("dock-band-last"));
+                if (shown.length) shown[shown.length - 1].classList.add("dock-band-last");
+            }
+        });
     }
 
     buildRail(id) {
@@ -220,7 +279,8 @@ export class PanelRail {
         const box = nav.querySelector(".panel-rail-tabs");
         if (box.innerHTML !== html) box.innerHTML = html;
         const down = nav.querySelector(".panel-rail-down i");
-        down.className = `fa-solid ${nav.classList.contains("panel-rail-right") ? "fa-chevron-right" : "fa-chevron-left"}`;
+        const edge = nav.dataset.place === "column" ? null : this.wm?.collapseEdge?.(id);
+        down.className = `fa-solid ${railArrowIcon(edge, nav.classList.contains("panel-rail-right"))}`;
     }
 
     // ── Painel aberto ao lado da barra ──────────────────────────────────────
@@ -230,8 +290,7 @@ export class PanelRail {
         const panel = document.getElementById(id);
         if (!panel || this.openIds.has(id)) return;
         this.openIds.add(id);
-        panel.classList.add("rail-open");
-        this.renderButtons(id);
+        this.apply(id);
         this.wm?.refreshEdgeSplitters?.();
         window.dispatchEvent(new Event("resize")); // monitores, timeline e listas remedem
     }
@@ -240,7 +299,8 @@ export class PanelRail {
         if (!this.openIds.has(id)) return;
         this.openIds.delete(id);
         document.getElementById(id)?.classList.remove("rail-open");
-        this.renderButtons(id);
+        if (this.stateOf(id) === "barra") this.apply(id);
+        else this.renderButtons(id);
         this.wm?.refreshEdgeSplitters?.();
         window.dispatchEvent(new Event("resize"));
     }

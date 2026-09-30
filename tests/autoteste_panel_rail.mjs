@@ -2,19 +2,19 @@
 // Autoteste: barra fina dos painéis (src/ui/js/panelRail.js)
 // Execução: node tests/autoteste_panel_rail.mjs
 //
-// Três estados por coluna: aberta → barra → linha. A linha volta ao estado de antes;
-// fora de uma coluna do editor não existe barra e a seta recolhe direto para a linha.
+// Três estados: aberta → barra → linha. A linha volta ao estado de antes. Vale em coluna,
+// pilha e faixa do editor; numa janela destacada a seta recolhe direto para a linha.
 // ======================================================================
 
 import assert from "node:assert/strict";
-import { nextOnArrow, loadRail, saveRail, stripTabs, RAIL_PANELS, RAIL_STORAGE_KEY } from "../src/ui/js/panelRail.js";
+import { nextOnArrow, loadRail, saveRail, stripTabs, RAIL_PANELS, RAIL_STORAGE_KEY, RAIL_PLACES, railLying, railArrowIcon, PanelRail } from "../src/ui/js/panelRail.js";
 
 console.log("=== INICIANDO AUTOTESTE: BARRA FINA ===\n");
 
 {
     assert.equal(nextOnArrow("aberta", true), "barra", "numa coluna, a seta vai para a barra");
     assert.equal(nextOnArrow("barra", true), "linha", "da barra, para a linha");
-    assert.equal(nextOnArrow("aberta", false), "linha", "pilha/faixa/janela: direto para a linha, como antes");
+    assert.equal(nextOnArrow("aberta", false), "linha", "janela destacada: direto para a linha, como antes");
     assert.equal(nextOnArrow("linha", true), "linha");
 }
 console.log("✔ 1 passou: aberta → barra → linha.");
@@ -60,5 +60,29 @@ console.log("✔ 3 passou: botões da barra = abas visíveis da faixa.");
     }
 }
 console.log("✔ 4 passou: painéis com barra configurados.");
+
+{
+    // Onde a barra existe e como ela fica.
+    assert.deepEqual(RAIL_PLACES, ["column", "stack", "band"]);
+    assert.equal(railLying("column"), false, "coluna: em pé");
+    assert.equal(railLying("stack"), true, "pilha: deitada, entre os vizinhos de cima e de baixo");
+    assert.equal(railLying("band"), false, "faixa: em pé entre os vizinhos");
+    assert.equal(railLying("band", true), true, "faixa com todos na barra: deitada, e a faixa encolhe");
+    assert.equal(railArrowIcon("up"), "fa-chevron-up");
+    assert.equal(railArrowIcon("down"), "fa-chevron-down");
+    assert.equal(railArrowIcon(null, true), "fa-chevron-right", "coluna da direita");
+    assert.equal(railArrowIcon(null), "fa-chevron-left");
+
+    // canRail: coluna, pilha e faixa desta janela; janela destacada não.
+    const doc = {};
+    globalThis.document = doc;
+    const mk = (kind, ownerDocument = doc) => ({ panelPlacement: () => ({ kind, el: { ownerDocument } }) });
+    const rail = (wm) => Object.assign(Object.create(PanelRail.prototype), { wm });
+    for (const kind of ["column", "stack", "band"]) assert.equal(rail(mk(kind)).canRail("sidebar-left"), true, kind);
+    assert.equal(rail(mk("single", {})).canRail("sidebar-left"), false, "janela destacada");
+    assert.equal(rail(mk("group", {})).canRail("sidebar-left"), false, "janela com vários painéis");
+    assert.equal(rail({ panelPlacement: () => null }).canRail("sidebar-left"), false, "sem lugar");
+}
+console.log("✔ 5 passou: barra em coluna, pilha e faixa; deitada na pilha e na faixa toda na barra.");
 
 console.log("\n=== AUTOTESTE BARRA FINA CONCLUÍDO COM SUCESSO ===");
